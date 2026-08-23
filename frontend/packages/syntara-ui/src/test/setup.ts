@@ -145,6 +145,16 @@ if (typeof globalThis !== 'undefined' && !globalThis.ResizeObserver) {
   } as typeof ResizeObserver
 }
 
+// Polyfill the `[hidden] { display: none }` UA-stylesheet rule (missing in happy-dom,
+// which only maps default display per tag name, not by attribute — this makes
+// getComputedStyle().display agree with the `hidden` attribute so axe-core's
+// visibility check doesn't flag legitimately hidden elements as unlabeled).
+if (typeof document !== 'undefined') {
+  const hiddenAttributeStyle = document.createElement('style')
+  hiddenAttributeStyle.textContent = '[hidden] { display: none !important; }'
+  document.head.appendChild(hiddenAttributeStyle)
+}
+
 beforeEach(() => {
   actWarnings = []
   routerTestState.pathname = '/'

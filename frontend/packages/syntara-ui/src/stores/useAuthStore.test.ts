@@ -445,6 +445,7 @@ describe('useAuthStore', () => {
       // Mock window.location.href assignment
       const locationHrefSpy = vi.spyOn(window, 'location', 'get').mockReturnValue({
         ...window.location,
+        origin: window.location.origin,
         href: window.location.href,
       })
       const hrefSetter = vi.fn()
