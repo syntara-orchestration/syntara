@@ -89,13 +89,13 @@ export default tseslint.config(
           selector:
             'ImportDeclaration[source.value="@patternfly/react-core"] > ImportSpecifier[imported.name="FormSelect"]',
           message:
-            'Use PatternFly Select, SelectList, SelectOption, and MenuToggle instead of FormSelect / FormSelectOption.',
+            'Use SynSelect with PatternFly SelectList, SelectOption, and MenuToggle instead of FormSelect / FormSelectOption.',
         },
         {
           selector:
             'ImportDeclaration[source.value="@patternfly/react-core"] > ImportSpecifier[imported.name="FormSelectOption"]',
           message:
-            'Use PatternFly Select, SelectList, SelectOption, and MenuToggle instead of FormSelect / FormSelectOption.',
+            'Use SynSelect with PatternFly SelectList, SelectOption, and MenuToggle instead of FormSelect / FormSelectOption.',
         },
       ],
       // axios restriction merged into the icon/wouter no-restricted-imports block below
@@ -293,6 +293,7 @@ export default tseslint.config(
       'syntara/prefer-pf-text-components': 'error',
       'syntara/use-design-tokens-not-hardcoded': 'error',
       'syntara/prefer-confirmation-dialog': 'error',
+      'syntara/prefer-syn-select': 'error',
       'syntara/no-locale-date-format': [
         'error',
         {

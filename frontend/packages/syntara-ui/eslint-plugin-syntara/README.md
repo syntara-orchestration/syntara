@@ -97,6 +97,10 @@ Disables without a `-- reason` suffix fail lint.
 
 Flags raw Modal compositions that appear to be destructive confirmation dialogs. Use `<NxConfirmationDialog>` for consistent UX.
 
+### `prefer-syn-select`
+
+Flags importing `Select` from `@patternfly/react-core`. Use `<SynSelect>` so scrollable-menu defaults (`isScrollable`, `maxMenuHeight`, popper `preventOverflow`, dismiss-on-outer-scroll) stay consistent. `SelectList`, `SelectOption`, `SelectGroup`, and `MenuToggle` still come from PatternFly. The wrapper file `src/components/SynSelect.tsx` is exempt.
+
 ### `prefer-pf-list-components`
 
 Enforces use of PatternFly list components (`<List>`, `<DataList>`) over plain HTML lists.

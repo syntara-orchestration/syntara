@@ -3,10 +3,21 @@ import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
+import { axe } from 'vitest-axe'
 
 import { SynSelect } from './SynSelect'
 
-function TestSynSelect({ onOpenChange }: Readonly<{ onOpenChange?: (open: boolean) => void }>) {
+function TestSynSelect({
+  onOpenChange,
+  isScrollable,
+  maxMenuHeight,
+  className,
+}: Readonly<{
+  onOpenChange?: (open: boolean) => void
+  isScrollable?: boolean
+  maxMenuHeight?: string
+  className?: string
+}>) {
   const [isOpen, setIsOpen] = useState(false)
 
   return (
@@ -17,6 +28,31 @@ function TestSynSelect({ onOpenChange }: Readonly<{ onOpenChange?: (open: boolea
           setIsOpen(open)
           onOpenChange?.(open)
         }}
+        isScrollable={isScrollable}
+        maxMenuHeight={maxMenuHeight}
+        className={className}
+        toggle={(toggleRef) => (
+          <MenuToggle ref={toggleRef} onClick={() => setIsOpen((open) => !open)} isExpanded={isOpen}>
+            Toggle
+          </MenuToggle>
+        )}
+      >
+        <SelectList>
+          <SelectOption value="one">One</SelectOption>
+          <SelectOption value="two">Two</SelectOption>
+        </SelectList>
+      </SynSelect>
+      <p>Outside</p>
+    </div>
+  )
+}
+
+function SelectWithoutHandler() {
+  const [isOpen, setIsOpen] = useState(false)
+  return (
+    <div>
+      <SynSelect
+        isOpen={isOpen}
         toggle={(toggleRef) => (
           <MenuToggle ref={toggleRef} onClick={() => setIsOpen((open) => !open)} isExpanded={isOpen}>
             Toggle
@@ -30,6 +66,12 @@ function TestSynSelect({ onOpenChange }: Readonly<{ onOpenChange?: (open: boolea
       <p>Outside</p>
     </div>
   )
+}
+
+async function openMenu() {
+  const user = userEvent.setup()
+  await user.click(screen.getByRole('button', { name: 'Toggle' }))
+  return screen.getByRole('listbox')
 }
 
 describe('SynSelect', () => {
@@ -69,28 +111,6 @@ describe('SynSelect', () => {
 
   it('does not throw when onOpenChange is omitted and the menu is dismissed', async () => {
     const user = userEvent.setup()
-
-    function SelectWithoutHandler() {
-      const [isOpen, setIsOpen] = useState(false)
-      return (
-        <div>
-          <SynSelect
-            isOpen={isOpen}
-            toggle={(toggleRef) => (
-              <MenuToggle ref={toggleRef} onClick={() => setIsOpen((open) => !open)} isExpanded={isOpen}>
-                Toggle
-              </MenuToggle>
-            )}
-          >
-            <SelectList>
-              <SelectOption value="one">One</SelectOption>
-            </SelectList>
-          </SynSelect>
-          <p>Outside</p>
-        </div>
-      )
-    }
-
     render(<SelectWithoutHandler />)
     await user.click(screen.getByRole('button', { name: 'Toggle' }))
 
@@ -99,5 +119,31 @@ describe('SynSelect', () => {
         screen.getByText('Outside').dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true }))
       })
     }).not.toThrow()
+  })
+
+  it('opens with an explicit maxMenuHeight override', async () => {
+    render(<TestSynSelect maxMenuHeight="10rem" />)
+    expect(await openMenu()).toBeInTheDocument()
+  })
+
+  it('opens with a caller className', async () => {
+    render(<TestSynSelect className="extra-select-class" />)
+    expect(await openMenu()).toBeInTheDocument()
+  })
+
+  it('accepts an isScrollable override', async () => {
+    render(<TestSynSelect isScrollable={false} />)
+    expect(await openMenu()).toBeInTheDocument()
+  })
+
+  it('has no accessibility violations when closed', async () => {
+    const { container } = render(<TestSynSelect />)
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
+  it('has no accessibility violations when open', async () => {
+    const { container } = render(<TestSynSelect />)
+    await openMenu()
+    expect(await axe(container)).toHaveNoViolations()
   })
 })
