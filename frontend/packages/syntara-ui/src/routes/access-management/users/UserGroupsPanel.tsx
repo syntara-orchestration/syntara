@@ -16,8 +16,7 @@ import {
   Truncate,
 } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiTrashIcon } from '@patternfly/react-icons'
-import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
-import type { IAction } from '@patternfly/react-table'
+import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { Group } from '@syntara/contracts'
 import { useMemo, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
@@ -30,6 +29,8 @@ import { IconLabel } from '../../../components/IconLabel'
 import { SynLabel } from '../../../components/labels/SynLabel'
 import { SynPageBody } from '../../../components/layout/SynPage'
 import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
+import { NxKebabMenu } from '../../../components/NxKebabMenu'
+import type { KebabAction } from '../../../components/NxKebabMenu'
 import { SynEmptyStateFilter } from '../../../components/states/SynEmptyStateFilter'
 import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import { useQueryState } from '../../../components/states/useQueryState'
@@ -214,11 +215,13 @@ function getGroupActions(
   group: Group,
   onRemove: (g: GroupInfo) => void,
   permissions: ReturnType<typeof useGroupPermissions>
-): IAction[] {
+): KebabAction[] {
   if (group.name === BUILTIN_AUTHENTICATED_GROUP_NAME) return []
   return [
     {
-      title: <IconLabel icon={<RhUiTrashIcon />}>Remove</IconLabel>,
+      key: 'remove',
+      title: <IconLabel icon={<RhUiTrashIcon />}>Remove from group</IconLabel>,
+      isDanger: true,
       isAriaDisabled: !permissions.canManageMembers,
       tooltipProps: permissions.canManageMembers ? undefined : { content: permissions.tooltips.manageMembers },
       onClick: permissions.canManageMembers ? () => onRemove({ id: group.id, name: group.name }) : undefined,
@@ -421,7 +424,10 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
                   </Td>
                   <Td isActionCell>
                     {group.name !== BUILTIN_AUTHENTICATED_GROUP_NAME && (
-                      <ActionsColumn items={getGroupActions(group as Group, setGroupToRemove, groupPermissions)} />
+                      <NxKebabMenu
+                        actions={getGroupActions(group as Group, setGroupToRemove, groupPermissions)}
+                        aria-label={`Actions for ${group.name}`}
+                      />
                     )}
                   </Td>
                 </Tr>

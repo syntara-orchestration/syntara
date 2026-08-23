@@ -1,7 +1,7 @@
 import { Button, LabelGroup, Truncate } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiTrashIcon } from '@patternfly/react-icons'
-import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
-import type { IAction, ThProps } from '@patternfly/react-table'
+import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
+import type { ThProps } from '@patternfly/react-table'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useMemo, useState } from 'react'
 
@@ -9,6 +9,8 @@ import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmati
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
 import { SynLabel } from '../../../components/labels/SynLabel'
+import type { KebabAction } from '../../../components/SynKebabMenu'
+import { SynKebabMenu } from '../../../components/SynKebabMenu'
 import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../../components/panels/list/SynListPanel'
 import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import { invalidateAuthzCaches } from '../../../hooks/invalidateAuthzCaches'
@@ -55,10 +57,12 @@ function getAssignmentActions(
   assignment: RoleAssignmentRead,
   onUnassign: (assignment: RoleAssignmentRead) => void,
   permissions: ReturnType<typeof useAssignmentPermissions>
-): IAction[] {
+): KebabAction[] {
   return [
     {
-      title: <IconLabel icon={<RhUiTrashIcon />}>Unassign</IconLabel>,
+      key: 'unassign',
+      title: <IconLabel icon={<RhUiTrashIcon />}>Unassign role</IconLabel>,
+      isDanger: true,
       isAriaDisabled: !permissions.canRevoke,
       tooltipProps: permissions.canRevoke ? undefined : { content: permissions.tooltips.revoke },
       onClick: permissions.canRevoke ? () => onUnassign(assignment) : undefined,
@@ -120,7 +124,10 @@ function RoleAssignmentsTable({
                 )}
               </Td>
               <Td isActionCell>
-                <ActionsColumn items={getAssignmentActions(assignment, onUnassign, permissions)} />
+                <SynKebabMenu
+                  actions={getAssignmentActions(assignment, onUnassign, permissions)}
+                  aria-label={`Actions for ${assignment.principal_name} ${assignment.role_name}`}
+                />
               </Td>
             </Tr>
           )

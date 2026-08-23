@@ -1,7 +1,7 @@
 import { Alert, Button, Flex, FlexItem, LabelGroup, StackItem, Truncate } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiTrashIcon } from '@patternfly/react-icons'
-import { ActionsColumn, ExpandableRowContent, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
-import type { IAction, ThProps } from '@patternfly/react-table'
+import { ExpandableRowContent, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
+import type { ThProps } from '@patternfly/react-table'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useMemo, useState } from 'react'
 
@@ -12,6 +12,8 @@ import { IconLabel } from '../../components/IconLabel'
 import { SynLabel } from '../../components/labels/SynLabel'
 import { SynPageBody } from '../../components/layout/SynPage'
 import { SynPanelContentStack } from '../../components/layout/SynPanelContentStack'
+import { NxKebabMenu } from '../../components/NxKebabMenu'
+import type { KebabAction } from '../../components/NxKebabMenu'
 import { SynEmptyStateFilter } from '../../components/states/SynEmptyStateFilter'
 import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 import { SynErrorState } from '../../components/states/SynErrorState'
@@ -57,10 +59,12 @@ function getAssignmentActions(
   row: RoleAssignmentRow,
   onUnassign: (row: RoleAssignmentRow) => void,
   permissions: ReturnType<typeof useAssignmentPermissions>
-): IAction[] {
+): KebabAction[] {
   return [
     {
-      title: <IconLabel icon={<RhUiTrashIcon />}>Unassign</IconLabel>,
+      key: 'unassign',
+      title: <IconLabel icon={<RhUiTrashIcon />}>Unassign role</IconLabel>,
+      isDanger: true,
       isAriaDisabled: !permissions.canRevoke,
       tooltipProps: permissions.canRevoke ? undefined : { content: permissions.tooltips.revoke },
       onClick: permissions.canRevoke ? () => onUnassign(row) : undefined,
@@ -181,7 +185,10 @@ function RoleAssignmentsTable({
                 </Td>
               )}
               <Td isActionCell>
-                <ActionsColumn items={getAssignmentActions(row, onUnassign, permissions)} />
+                <NxKebabMenu
+                  actions={getAssignmentActions(row, onUnassign, permissions)}
+                  aria-label={`Actions for ${row.roleName} (${row.scope})`}
+                />
               </Td>
             </Tr>
             {row.policies.length > 0 && (

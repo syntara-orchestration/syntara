@@ -10,8 +10,7 @@ import {
   Truncate,
 } from '@patternfly/react-core'
 import { RhUiBanIcon, RhUiEditIcon, RhUiSecurityIcon, RhUiTrashIcon } from '@patternfly/react-icons'
-import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
-import type { IAction } from '@patternfly/react-table'
+import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { IdentityProvidersAPI } from '@syntara/contracts'
 import { useNavigate } from '@tanstack/react-router'
 import { useCallback, useLayoutEffect, useMemo, useState } from 'react'
@@ -21,6 +20,8 @@ import { adminClient, identityProvidersClient } from '../../../client'
 import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
+import type { KebabAction } from '../../../components/SynKebabMenu'
+import { SynKebabMenu } from '../../../components/SynKebabMenu'
 import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../../components/panels/list/SynListPanel'
 import { ProviderIcon } from '../../../components/ProviderIcon'
 import { SynLink } from '../../../components/SynLink'
@@ -55,13 +56,14 @@ function getRowActions(
   onRevoke: (provider: IdentityProvider) => void,
   permissions: ReturnType<typeof useIdentityProviderPermissions>,
   onNavigate: (path: string) => void
-): IAction[] {
+): KebabAction[] {
   const { id } = provider
   const canEdit = permissions.canUpdate && !!id
   const canDel = permissions.canDelete && !!id
 
   return [
     {
+      key: 'edit',
       title: <IconLabel icon={<RhUiEditIcon />}>Edit provider</IconLabel>,
       isDisabled: !id,
       isAriaDisabled: !permissions.canUpdate,
@@ -71,6 +73,7 @@ function getRowActions(
         : undefined,
     },
     {
+      key: 'edit-mapping',
       title: <IconLabel icon={<RhUiEditIcon />}>Edit group mapping</IconLabel>,
       isDisabled: !id,
       isAriaDisabled: !permissions.canUpdate,
@@ -80,14 +83,17 @@ function getRowActions(
         : undefined,
     },
     {
+      key: 'revoke',
       title: <IconLabel icon={<RhUiBanIcon />}>Revoke tokens</IconLabel>,
       isAriaDisabled: !permissions.canRevoke,
       tooltipProps: tooltipWhenDenied(permissions.canRevoke, permissions.tooltips.revoke),
       onClick: permissions.canRevoke ? () => onRevoke(provider) : undefined,
     },
-    { isSeparator: true },
+    { key: 'sep-delete', isSeparator: true },
     {
-      title: <IconLabel icon={<RhUiTrashIcon />}>Delete</IconLabel>,
+      key: 'delete',
+      title: <IconLabel icon={<RhUiTrashIcon />}>Delete provider</IconLabel>,
+      isDanger: true,
       isDisabled: !id,
       isAriaDisabled: !permissions.canDelete,
       tooltipProps: tooltipWhenDenied(permissions.canDelete, permissions.tooltips.delete),
@@ -186,10 +192,11 @@ function ProviderRow({
         </DisabledWithTooltip>
       </Td>
       <Td isActionCell>
-        <ActionsColumn
-          items={getRowActions(provider, onDelete, onRevoke, permissions, (path) =>
+        <SynKebabMenu
+          actions={getRowActions(provider, onDelete, onRevoke, permissions, (path) =>
             detachPromise(navigate({ to: path }))
           )}
+          aria-label={`Actions for ${provider.name}`}
         />
       </Td>
     </Tr>
