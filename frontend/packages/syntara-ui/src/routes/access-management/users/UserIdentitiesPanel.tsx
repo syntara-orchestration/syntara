@@ -32,6 +32,7 @@ import { detachPromise } from '../../../utils/detachPromise'
 import { IdentityActionsKebab, IdentityDialogs, type ConvertProviderInfo } from './IdentityDialogs'
 import type { UserIdentity } from './identityUtils'
 import { applyLocalFilters, useLocalFilterState } from './identityUtils'
+import styles from './UserIdentitiesPanel.module.css'
 import { useUserIdentityPermissions } from './useUserIdentityPermissions'
 
 type IdentityProvider = IdentityProvidersAPI.components['schemas']['IdentityProviderRead']
@@ -416,7 +417,7 @@ export function UserIdentitiesPanel({
   }
 
   return (
-    <SynPanelContentStack>
+    <SynPanelContentStack className={styles.panel}>
       <StackItem>
         <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapMd' }}>
           <FlexItem grow={{ default: 'grow' }}>

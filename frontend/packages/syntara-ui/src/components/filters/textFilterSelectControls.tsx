@@ -18,6 +18,7 @@ import { LONG_SELECT_MAX_MENU_HEIGHT, longSelectMenuPopperProps } from '../longS
 import longSelectMenuStyles from '../longSelectMenu.module.css'
 import { SynSelect } from '../SynSelect'
 
+import toggleStyles from './filterToggle.module.css'
 import styles from './textFilterSelectControls.module.css'
 
 export const SEARCH_THRESHOLD = 10
@@ -43,7 +44,12 @@ type FieldSelectorMenuToggleProps = {
 
 function FieldSelectorMenuToggle({ toggleRef, isOpen, onOpenChange, label }: Readonly<FieldSelectorMenuToggleProps>) {
   return (
-    <MenuToggle ref={toggleRef} onClick={() => onOpenChange(!isOpen)} icon={<RhUiFilterIcon />}>
+    <MenuToggle
+      ref={toggleRef}
+      onClick={() => onOpenChange(!isOpen)}
+      icon={<RhUiFilterIcon />}
+      className={toggleStyles.toggle}
+    >
       {label}
     </MenuToggle>
   )
@@ -447,7 +453,7 @@ function MultiSelectFilterInputMenuToggle({
   displayText,
 }: Readonly<MultiSelectFilterInputMenuToggleProps>) {
   return (
-    <MenuToggle ref={toggleRef} onClick={() => onOpenChange(!isOpen)}>
+    <MenuToggle ref={toggleRef} onClick={() => onOpenChange(!isOpen)} className={toggleStyles.toggle}>
       {displayText}
     </MenuToggle>
   )
