@@ -34,7 +34,7 @@ from syntara.workflows.utils.namespace_resolver import NamespaceResolver
 from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
 
 _APPROVAL_COMMENTS_MAX_LENGTH = FieldLimits.DESCRIPTION_MAX_LENGTH
-_APPROVAL_PROMPT_PATCH = "aap-87735-approval-prompt"
+_APPROVAL_PROMPT_PATCH = "persist-approval-prompt"
 
 
 def _warn_approval_prompt(message: str) -> None:
@@ -106,6 +106,14 @@ class WorkflowApprovalMixin:
     skipped_nodes: set[str]
     _detached_nodes: set[str]
     _TEMPORAL_MARGIN: ClassVar[int]
+
+    def _scrub_data(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Redact secrets from activity payloads.
+
+        ``OrchestratorWorkflow`` overrides this with credential and secret-value
+        scrubbing. Identity fallback keeps the mixin testable in isolation.
+        """
+        return data
 
     async def _expire_approvals(self, node_id: str | None, activity_id: str) -> None:
         """Best-effort expire pending approval requests.
@@ -344,7 +352,11 @@ class WorkflowApprovalMixin:
             self._project_id,
         ]
         if workflow.patched(_APPROVAL_PROMPT_PATCH):
-            args.append(_resolved_approval_prompt(resolved_parameters))
+            prompt = _resolved_approval_prompt(resolved_parameters)
+            if prompt:
+                scrubbed = self._scrub_data({"prompt": prompt}).get("prompt")
+                prompt = scrubbed if isinstance(scrubbed, str) else None
+            args.append(prompt)
         return args
 
     async def _execute_approval_node(

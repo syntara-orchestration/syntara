@@ -59,6 +59,7 @@ def _make_workflow(
     wf._timed_out_converge_nodes = set()
     wf._detached_nodes = set()
     wf._converge_branch_nodes = {}
+    wf._secret_values: set[str] = set()
     init_workflow_runtime(wf)
     wf.pre_resolved_outputs = {}
     wf.stop_after_nodes = set()
@@ -611,6 +612,26 @@ class TestPrepareApprovalArgs:
             args = await wf._prepare_approval_args(node, graph, {"prompt": "Please review"})
 
         assert len(args) == 10
+
+    @pytest.mark.asyncio
+    async def test_prompt_is_scrubbed_of_secret_values(self) -> None:
+        """Persisted prompt must not contain decrypted secret values."""
+        wf = _make_workflow()
+        wf._secret_values.add("super-secret-token")
+        graph = _build_approval_graph()
+        node = ActivityNode("approval", "approval", {}, name="Review")
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+            args = await wf._prepare_approval_args(
+                node,
+                graph,
+                {"prompt": "Token super-secret-token must not be stored."},
+            )
+
+        assert args[10] is not None
+        assert "super-secret-token" not in args[10]
+        assert "[REDACTED]" in args[10]
 
 
 class TestDispatchApprovalNode:
