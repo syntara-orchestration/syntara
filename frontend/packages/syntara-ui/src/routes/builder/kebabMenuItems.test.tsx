@@ -276,13 +276,19 @@ describe('KebabMenuActionsGroup', () => {
     closeKebab: vi.fn(),
   }
 
-  it('renders all basic actions', () => {
+  it('renders all basic actions for new workflows', () => {
     render(<KebabMenuActionsGroup {...defaultProps} />)
 
     expect(screen.getByRole('menuitem', { name: /Verify workflow/i })).toBeInTheDocument()
-    expect(screen.getByRole('menuitem', { name: /Duplicate workflow/i })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /Duplicate workflow/i })).not.toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: /Export workflow/i })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: /Import workflow/i })).toBeInTheDocument()
+  })
+
+  it('renders duplicate for existing workflows', () => {
+    render(<KebabMenuActionsGroup {...defaultProps} showExistingWorkflowItems />)
+
+    expect(screen.getByRole('menuitem', { name: /Duplicate workflow/i })).toBeInTheDocument()
   })
 
   it('renders unpublish for published workflows', () => {

@@ -690,10 +690,16 @@ describe('BuilderEditorToolbar', () => {
   })
 
   describe('Duplicate workflow action', () => {
-    it('renders Duplicate workflow in kebab menu', () => {
+    it('renders Duplicate workflow in kebab menu for existing workflows', () => {
       render(<BuilderEditorToolbar {...defaultProps} isKebabOpen />)
 
       expect(screen.getByRole('menuitem', { name: /Duplicate workflow/i })).toBeInTheDocument()
+    })
+
+    it('does not render Duplicate for new workflows', () => {
+      render(<BuilderEditorToolbar {...defaultProps} isNew workflow={undefined} isKebabOpen />)
+
+      expect(screen.queryByRole('menuitem', { name: /Duplicate workflow/i })).not.toBeInTheDocument()
     })
 
     it('positions Duplicate between Verify and Export', () => {
