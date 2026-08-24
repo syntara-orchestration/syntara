@@ -81,6 +81,42 @@ vi.mock('@tanstack/react-router', async () => {
   }
 })
 
+// Stub the Monaco-backed CodeEditor: @monaco-editor/loader defaults to injecting a
+// <script src="https://cdn..."> tag to fetch Monaco from a CDN. jsdom silently drops external
+// script tags (no request, no event), so this quietly never resolved; happy-dom correctly throws
+// a DOMException for the blocked load, which surfaces as an unhandled rejection and fails the
+// vitest process (non-zero exit) even though every assertion still passes. Test files that need
+// finer control over the editor (drag/drop, expand button, etc.) already declare their own
+// vi.mock('@patternfly/react-code-editor', ...), which takes precedence over this one.
+vi.mock('@patternfly/react-code-editor', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@patternfly/react-code-editor')>()
+  return {
+    ...actual,
+    CodeEditor: ({
+      code,
+      onCodeChange,
+      customControls,
+      'aria-label': ariaLabel,
+    }: {
+      code?: string
+      onCodeChange?: (code: string) => void
+      customControls?: React.ReactNode
+      'aria-label'?: string
+    }) =>
+      React.createElement(
+        'div',
+        { 'data-testid': 'code-editor', 'aria-label': ariaLabel },
+        React.createElement('textarea', {
+          'data-testid': 'code-textarea',
+          value: code,
+          onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => onCodeChange?.(e.target.value),
+          'aria-label': ariaLabel,
+        }),
+        customControls
+      ),
+  }
+})
+
 import { resetPollingConnectionCounter } from '../routes/builder/utils/edgeConnectionHelpers'
 
 // Collect React act() warnings during each test, then fail in afterEach.
