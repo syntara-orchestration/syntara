@@ -7,6 +7,7 @@ import { axe } from 'vitest-axe'
 import { expectPageTitle } from '../../test/pageTitle'
 
 import { BuilderWorkflowPageHeader, type BuilderWorkflowPageHeaderProps } from './BuilderWorkflowPageHeader'
+import styles from './BuilderWorkflowPageHeader.module.css'
 
 const mockWorkflowStoreState = vi.hoisted(() => ({
   isDirty: false,
@@ -167,9 +168,19 @@ describe('BuilderWorkflowPageHeader', () => {
       />
     )
 
-    expect(screen.getByRole('textbox', { name: 'Workflow name' })).toBeVisible()
-    expect(screen.getByRole('textbox', { name: 'Workflow name' })).toHaveValue('Deploy app')
+    const nameInput = screen.getByRole('textbox', { name: 'Workflow name' })
+    expect(nameInput).toBeVisible()
+    expect(nameInput).toHaveValue('Deploy app')
     expect(screen.getByText('Draft')).toBeInTheDocument()
+
+    const nameSlot = nameInput.closest(`.${styles.workflowName}`)
+    expect(nameSlot).not.toBeNull()
+    expect(nameSlot?.closest(`.${styles.titleSlot}`)).toHaveClass('pf-m-wrap')
+
+    const computed = window.getComputedStyle(nameSlot as Element)
+    expect(computed.minWidth).toBe('16ch')
+    expect(computed.maxWidth).toBe('24ch')
+    expect(computed.flexShrink).toBe('1')
   })
 
   it('updates workflow name and marks dirty on change', async () => {
