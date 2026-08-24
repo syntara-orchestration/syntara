@@ -1,11 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { fn } from 'storybook/test'
 
-import { NxEmptyStateViewportTooSmall } from './NxEmptyStateViewportTooSmall'
+import { SynEmptyStateViewportTooSmall } from './SynEmptyStateViewportTooSmall'
 
 const meta = {
-  title: 'Components/States/NxEmptyStateViewportTooSmall',
-  component: NxEmptyStateViewportTooSmall,
+  title: 'Components/States/SynEmptyStateViewportTooSmall',
+  component: SynEmptyStateViewportTooSmall,
   parameters: {
     layout: 'fullscreen',
     docs: {
@@ -19,7 +19,7 @@ const meta = {
   args: {
     onReturn: fn(),
   },
-} satisfies Meta<typeof NxEmptyStateViewportTooSmall>
+} satisfies Meta<typeof SynEmptyStateViewportTooSmall>
 
 export default meta
 type Story = StoryObj<typeof meta>

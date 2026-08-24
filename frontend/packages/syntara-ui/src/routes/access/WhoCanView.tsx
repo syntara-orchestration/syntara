@@ -19,8 +19,8 @@ import { useCallback, useMemo, useState } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 
-import { NxEmptyStateNoData } from '../../components/states/NxEmptyStateNoData'
-import { NxErrorState } from '../../components/states/NxErrorState'
+import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
+import { SynErrorState } from '../../components/states/SynErrorState'
 import { LinkCell } from '../../components/table/LinkCell'
 import { NxScrollableTableContainer } from '../../components/table/NxScrollableTableContainer'
 import { getErrorMessage } from '../../utils/apiErrors'
@@ -303,7 +303,7 @@ export function WhoCanView({ resourceTypes, actionsByResource }: Readonly<Resour
         <Stack hasGutter>
           {whoCanMutation.isIdle && (
             <StackItem>
-              <NxEmptyStateNoData
+              <SynEmptyStateNoData
                 title="Find who has access"
                 description="Enter an action and resource type to see which users can perform it."
               />
@@ -323,7 +323,7 @@ export function WhoCanView({ resourceTypes, actionsByResource }: Readonly<Resour
 
           {whoCanMutation.isError && (
             <StackItem>
-              <NxErrorState title="Query failed" message={getErrorMessage(whoCanMutation.error)} onRetry={onSubmit} />
+              <SynErrorState title="Query failed" message={getErrorMessage(whoCanMutation.error)} onRetry={onSubmit} />
             </StackItem>
           )}
 

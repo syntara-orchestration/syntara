@@ -10,8 +10,8 @@ import { SynPage, SynPageBody } from '../../components/layout/SynPage'
 import { SynPageHeader } from '../../components/layout/SynPageHeader'
 import { SynPanel } from '../../components/layout/SynPanel'
 import { SynPanelContentStack } from '../../components/layout/SynPanelContentStack'
-import { NxEmptyStateFilter } from '../../components/states/NxEmptyStateFilter'
-import { NxEmptyStateNoData } from '../../components/states/NxEmptyStateNoData'
+import { SynEmptyStateFilter } from '../../components/states/SynEmptyStateFilter'
+import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 import { useQueryState } from '../../components/states/useQueryState'
 import { SynPageTitle } from '../../components/SynPageTitle'
 import { NxScrollableTableContainer } from '../../components/table/NxScrollableTableContainer'
@@ -159,7 +159,7 @@ export default function Executions() {
         <SynPanel isFullHeight>
           {visibleExecutions.length === 0 && !hasActiveFilters ? (
             <SynPageBody isCentered>
-              <NxEmptyStateNoData title="No executions found" description="No executions found." />
+              <SynEmptyStateNoData title="No executions found" description="No executions found." />
             </SynPageBody>
           ) : (
             <SynPanelContentStack variant="inset">
@@ -174,7 +174,7 @@ export default function Executions() {
 
               {visibleExecutions.length === 0 ? (
                 <SynPageBody isCentered>
-                  <NxEmptyStateFilter clearAllFilters={handleClearAllFilters} />
+                  <SynEmptyStateFilter clearAllFilters={handleClearAllFilters} />
                 </SynPageBody>
               ) : (
                 <NxScrollableTableContainer caption="Executions table" footer={getFooterProps(executionsQuery.data)}>

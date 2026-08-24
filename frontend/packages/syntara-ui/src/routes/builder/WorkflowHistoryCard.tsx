@@ -27,7 +27,7 @@ import { SynPanel } from '../../components/layout/SynPanel'
 import type { KebabAction } from '../../components/NxKebabMenu'
 import { NxKebabMenu } from '../../components/NxKebabMenu'
 import { NxLink } from '../../components/NxLink'
-import { NxEmptyStateFilter } from '../../components/states/NxEmptyStateFilter'
+import { SynEmptyStateFilter } from '../../components/states/SynEmptyStateFilter'
 import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 import type { PaginationFooterProps } from '../../components/table/PaginationFooter'
 import { PaginationFooter } from '../../components/table/PaginationFooter'
@@ -233,7 +233,7 @@ export function WorkflowHistoryCard(props: WorkflowHistoryCardProps) {
 
   let executionListBody: ReactNode
   if (executions.length === 0 && filters.length > 0) {
-    executionListBody = <NxEmptyStateFilter clearAllFilters={getClearFiltersHandler(onFilterChange)} />
+    executionListBody = <SynEmptyStateFilter clearAllFilters={getClearFiltersHandler(onFilterChange)} />
   } else if (executions.length === 0) {
     executionListBody = (
       <Content component={ContentVariants.p} className={styles.emptyStateText}>
