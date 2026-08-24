@@ -32,6 +32,7 @@ Read the component docs when working in that area — they contain detailed stan
 |---|---|
 | Backend Python code | [backend/AGENTS.md](backend/AGENTS.md) — SQLModel patterns, Alembic migrations, testing standards, 12+ domain-specific standards docs |
 | Frontend React/TypeScript | [frontend/AGENTS.md](frontend/AGENTS.md) — PatternFly patterns, 36-item PR checklist, architecture guides |
+| CI workflows / GitHub Actions | [docs/ci/workflows.md](docs/ci/workflows.md) — Workflow behavior, conditional execution, manual triggers, debugging |
 | Both (E2E, contracts, infra) | This file |
 
 ### Skills
