@@ -444,7 +444,7 @@ export async function deleteProject(page: Page, projectName: string) {
     const deleteDialog = page.getByRole('dialog', { name: /Delete project/i })
     await expect(deleteDialog).toBeVisible()
     await deleteDialog.getByRole('checkbox', { name: /I understand/i }).check()
-    await deleteDialog.getByRole('button', { name: 'Delete workflow' }).click()
+    await deleteDialog.getByRole('button', { name: 'Delete project' }).click()
 
     // Wait for dialog to close
     await expect(deleteDialog)

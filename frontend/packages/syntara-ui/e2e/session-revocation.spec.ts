@@ -34,7 +34,7 @@ async function openDeleteDialogFromList(app: Page, providerName: string) {
   await expect(providerRow).toBeVisible()
 
   await providerRow.getByRole('button', { name: /Actions|Kebab toggle/i }).click({ force: true })
-  await app.getByRole('menuitem', { name: 'Delete user' }).click()
+  await app.getByRole('menuitem', { name: 'Delete identity provider' }).click()
 }
 
 async function confirmIdpDeleteDialog(app: Page, providerName: string) {
@@ -44,7 +44,7 @@ async function confirmIdpDeleteDialog(app: Page, providerName: string) {
   await expect(dialog.getByText(/Revoke active sessions authenticated via this provider/i)).toBeVisible()
   await expect(dialog.getByText(/Remove all user identities linked to this provider/i)).toBeVisible()
 
-  const deleteButton = dialog.getByRole('button', { name: 'Delete user' })
+  const deleteButton = dialog.getByRole('button', { name: 'Delete identity provider' })
   await expect(deleteButton).toBeDisabled()
 
   const checkbox = dialog.getByRole('checkbox')

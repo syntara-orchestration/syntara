@@ -147,7 +147,7 @@ test.describe('Group Detail — Navigation & Tabs', () => {
         await app.getByRole('menuitem', { name: 'Remove member' }).click()
 
         await expect(app.getByRole('dialog')).toBeVisible()
-        await app.getByRole('button', { name: 'Remove', exact: true }).click()
+        await app.getByRole('button', { name: 'Remove member' }).click()
 
         await expect(app.getByText(/member removed/i)).toBeVisible()
       }
