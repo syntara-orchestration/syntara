@@ -20,6 +20,11 @@ BUILTIN_SCOPES: frozenset[str] = frozenset(
     }
 )
 
+# Retired V1 names. Same set as frontend RETIRED_V1_NAMESPACES. Checked
+# explicitly so leftover ${input.*} / ${inputs.*} / ${variables.*} get a
+# migration error instead of "unknown activity".
+RETIRED_V1_SCOPES: frozenset[str] = frozenset({"input", "inputs", "variables"})
+
 _SKIP_FIELDS_BY_NODE_TYPE: dict[str, frozenset[str]] = {
     "script": frozenset({"code"}),
 }
@@ -130,6 +135,22 @@ def check_template_expressions(
             scope = expr_body.split(".")[0]
 
             if scope in BUILTIN_SCOPES:
+                continue
+
+            if scope in RETIRED_V1_SCOPES:
+                hint = (
+                    "Workflow-level ${variables.*} is not supported"
+                    if scope == "variables"
+                    else "Use ${trigger.field} for trigger payload"
+                )
+                findings.append(
+                    ValidationFinding(
+                        severity=ValidationSeverity.error,
+                        category=ValidationCategory.invalid_reference,
+                        message=(f"Expression '${{{expr_body}}}' uses leftover V1 scope '{scope}'. {hint}"),
+                        node_id=element_id,
+                    )
+                )
                 continue
 
             if scope in node_ids:

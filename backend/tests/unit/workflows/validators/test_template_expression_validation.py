@@ -200,6 +200,11 @@ class TestInvalidNamespaceScope:
         assert len(errors) == 1
         assert errors[0].category == ValidationCategory.invalid_reference
         assert scope in errors[0].message
+        assert "leftover V1" in errors[0].message
+        if scope == "variables":
+            assert "variables.*" in errors[0].message
+        else:
+            assert "${trigger.field}" in errors[0].message
 
 
 # ---------------------------------------------------------------------------

@@ -5,7 +5,9 @@ import { getUpstreamNodeIds } from '../../edgeHelpers'
 import type { ValidationContext, ValidationError } from '../types'
 
 const KNOWN_NAMESPACES = new Set(['trigger', 'workflow', 'workflow_context'])
-const UNSUPPORTED_NAMESPACES = new Set(['input', 'inputs', 'variables'])
+// Retired V1 names. Same set as backend RETIRED_V1_SCOPES. Without this,
+// `input` would be treated as a missing node ID instead of a retired namespace.
+const RETIRED_V1_NAMESPACES = new Set(['input', 'inputs', 'variables'])
 const VARIABLE_REF_PATTERN = /\$\{([^}]+)\}/g
 
 type VariableReference = {
@@ -130,7 +132,7 @@ function checkUnsupportedNamespace(ref: VariableReference, activity: Activity): 
 }
 
 function validateRef(ref: VariableReference, activity: Activity, ctx: RefContext): ValidationError | null {
-  if (UNSUPPORTED_NAMESPACES.has(ref.namespace)) return checkUnsupportedNamespace(ref, activity)
+  if (RETIRED_V1_NAMESPACES.has(ref.namespace)) return checkUnsupportedNamespace(ref, activity)
   if (ref.namespace === 'trigger')
     return checkSchemaFieldReference(ref, activity, ctx.schemaFields, ref.namespace, ctx.schemaSuggestion)
   if (KNOWN_NAMESPACES.has(ref.namespace)) return null
@@ -155,7 +157,7 @@ export function validateVariableReferences(
     if (refs.length === 0) continue
 
     const needsUpstream = refs.some(
-      (r) => !KNOWN_NAMESPACES.has(r.namespace) && !UNSUPPORTED_NAMESPACES.has(r.namespace)
+      (r) => !KNOWN_NAMESPACES.has(r.namespace) && !RETIRED_V1_NAMESPACES.has(r.namespace)
     )
     const upstreamIds = needsUpstream ? getUpstreamNodeIds(activity.id, edges) : new Set<string>()
     const ctx: RefContext = { schemaFields, schemaSuggestion, activityIds, upstreamIds }
