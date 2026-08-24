@@ -144,7 +144,7 @@ test.describe('Integration Edit, Delete & Enable/Disable', () => {
       // Confirm disable in the dialog
       const dialog = app.getByRole('dialog')
       await expect(dialog).toBeVisible()
-      await expect(dialog.getByText(/Disable integration/i)).toBeVisible()
+      await expect(dialog.getByRole('heading', { name: /Disable integration/i })).toBeVisible()
       await dialog.getByRole('button', { name: 'Disable integration' }).click()
       await expect(dialog).not.toBeVisible()
 

@@ -36,7 +36,7 @@ test.describe('UI-9: Secret Rotation Grace Period Display', () => {
     await app.getByRole('button', { name: 'Create credential' }).click()
 
     const createModal = app.getByRole('dialog')
-    await expect(createModal.getByText('Create credential')).toBeVisible()
+    await expect(createModal.getByRole('heading', { name: 'Create credential' })).toBeVisible()
     await createModal.getByRole('button', { name: 'Create credential' }).click()
 
     // Handle the secret reveal modal for the new credential

@@ -150,7 +150,7 @@ test.describe('Concurrent Edit Conflict Detection @pr-check', () => {
 
       const publishDialog = app.getByRole('dialog')
       await expect(publishDialog).toBeVisible({ timeout: 15_000 })
-      await publishDialog.getByRole('button', { name: /^Publish$/i }).click()
+      await publishDialog.getByRole('button', { name: 'Publish workflow' }).click()
 
       await expect(app.getByText(/conflict: newer version available/i)).toBeVisible({ timeout: 15_000 })
 
