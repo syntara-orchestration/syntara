@@ -71,7 +71,7 @@ async def _fetch_credential(session: AsyncSession, credential_id: UUID) -> tuple
     """
     stmt = (
         select(Credential, Project.name)
-        .outerjoin(Project, Credential.project_id == Project.id)
+        .outerjoin(Project, Credential.project_id == Project.id)  # type: ignore[arg-type]
         .where(
             Credential.id == credential_id,
         )

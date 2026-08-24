@@ -521,7 +521,7 @@ class AAPProxyService:
                 session=self._session,
                 credential_id=credential_id,
                 user_id=user_id,
-                evaluator=self._evaluator,
+                evaluator=self._evaluator,  # type: ignore[arg-type]
                 user_labels=self._user.labels if self._user else None,
                 user_metadata=self._user.authz_metadata if self._user else None,
             )
