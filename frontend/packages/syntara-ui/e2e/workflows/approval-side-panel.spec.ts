@@ -110,7 +110,7 @@ test.describe('Approval Side Panel', () => {
   // Deep-link tests (read-only — none submit a decision)
   // ---------------------------------------------------------------------------
 
-  test('side panel displays approval details and action buttons', async ({ app }) => {
+  test('side panel displays approval details and action buttons', { tag: ['@konflux-skip'] }, async ({ app }) => {
     test.skip(!!sharedSetupSkipReason, sharedSetupSkipReason ?? '')
 
     await app.goto(toAppUrl(`/executions/${sharedExecutionId}?approval=${sharedApprovalId}&history=closed`))

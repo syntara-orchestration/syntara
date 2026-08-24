@@ -44,7 +44,7 @@ async function loginAs(page: Page, username: string, password?: string): Promise
     await page.getByLabel('Username').fill(username)
     await page.getByRole('textbox', { name: 'Password' }).fill(pw)
     await page.getByRole('button', { name: /^Log in( as administrator)?$/ }).click()
-    await expect(mainNav).toBeVisible()
+    await expect(mainNav).toBeVisible({ timeout: 30_000 })
   }
 }
 

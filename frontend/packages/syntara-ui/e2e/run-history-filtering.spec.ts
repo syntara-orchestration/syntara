@@ -157,7 +157,7 @@ async function openRunHistoryPanel(app: Page, workflowId: string, expectedRunIdP
   await waitForUIReady(app)
 
   const kebab = app.getByRole('button', { name: 'Workflow actions' })
-  await expect(kebab).toBeVisible({ timeout: 10_000 })
+  await expect(kebab).toBeVisible({ timeout: 30_000 })
   await kebab.click()
 
   const runHistoryItem = app.getByRole('menuitem', { name: 'Run history' })

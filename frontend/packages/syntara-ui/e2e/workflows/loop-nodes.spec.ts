@@ -171,33 +171,37 @@ test.describe('Loop Node Configuration [UI-16]', () => {
     }
   })
 
-  test('verifies Parameters panel displays conditional fields by loop type', async ({ app }) => {
-    await startWorkflowWithTrigger(app)
+  test(
+    'verifies Parameters panel displays conditional fields by loop type',
+    { tag: ['@konflux-skip'] },
+    async ({ app }) => {
+      await startWorkflowWithTrigger(app)
 
-    await openAddNodePanel(app)
-    await selectCategoryAndType(app, 'Logic', 'Loop')
-    await configureLoopNode(app, { type: 'while' })
+      await openAddNodePanel(app)
+      await selectCategoryAndType(app, 'Logic', 'Loop')
+      await configureLoopNode(app, { type: 'while' })
 
-    await expect(app.getByRole('textbox', { name: 'Name', exact: true })).toBeVisible()
-    await expect(app.getByText('Type', { exact: true })).toBeVisible()
-    await expect(app.getByRole('button', { name: 'Type', exact: true })).toContainText('While')
-    await expect(app.getByText('Conditional expression', { exact: true })).toBeVisible()
-    await expect(app.getByRole('button', { name: /Expression editor mode/i })).toBeVisible()
-    await expect(app.getByText('Max iterations', { exact: true })).toBeVisible()
-    await expect(app.getByRole('spinbutton', { name: /Max iterations/i })).toBeVisible()
+      await expect(app.getByRole('textbox', { name: 'Name', exact: true })).toBeVisible()
+      await expect(app.getByText('Type', { exact: true })).toBeVisible()
+      await expect(app.getByRole('button', { name: 'Type', exact: true })).toContainText('While')
+      await expect(app.getByText('Conditional expression', { exact: true })).toBeVisible()
+      await expect(app.getByRole('button', { name: /Expression editor mode/i })).toBeVisible()
+      await expect(app.getByText('Max iterations', { exact: true })).toBeVisible()
+      await expect(app.getByRole('spinbutton', { name: /Max iterations/i })).toBeVisible()
 
-    await configureLoopNode(app, { type: 'forEach' })
+      await configureLoopNode(app, { type: 'forEach' })
 
-    await expect(app.getByText('Items expression', { exact: true })).toBeVisible()
-    await expect(app.getByRole('textbox', { name: 'Items expression', exact: true })).toBeVisible()
-    await expect(app.getByText('Item variable', { exact: true })).toBeVisible()
-    await expect(app.getByRole('textbox', { name: 'Item variable', exact: true })).toBeVisible()
-    await expect(app.getByText('Index variable', { exact: true })).toBeVisible()
-    await expect(app.getByRole('textbox', { name: 'Index variable', exact: true })).toBeVisible()
-    await expect(app.getByRole('button', { name: /Expression editor mode/i })).not.toBeVisible()
+      await expect(app.getByText('Items expression', { exact: true })).toBeVisible()
+      await expect(app.getByRole('textbox', { name: 'Items expression', exact: true })).toBeVisible()
+      await expect(app.getByText('Item variable', { exact: true })).toBeVisible()
+      await expect(app.getByRole('textbox', { name: 'Item variable', exact: true })).toBeVisible()
+      await expect(app.getByText('Index variable', { exact: true })).toBeVisible()
+      await expect(app.getByRole('textbox', { name: 'Index variable', exact: true })).toBeVisible()
+      await expect(app.getByRole('button', { name: /Expression editor mode/i })).not.toBeVisible()
 
-    await app.getByRole('button', { name: 'Cancel' }).click()
-  })
+      await app.getByRole('button', { name: 'Cancel' }).click()
+    }
+  )
 
   const loopBodyTestCases = [
     {

@@ -61,7 +61,11 @@ export async function openAddNodePanel(page: Page) {
   }
 
   const addBtn = page.getByRole('button', { name: 'Add connected step' })
-  await expect(addBtn.first()).toBeVisible({ timeout: 20_000 })
+  // Re-click layout on each retry — Konflux is slow to fully render React Flow edge buttons.
+  await expect(async () => {
+    if (!(await addBtn.first().isVisible()) && (await layoutButton.count()) > 0) await layoutButton.click()
+    await expect(addBtn.first()).toBeVisible()
+  }).toPass({ timeout: 35_000, intervals: [1_500] })
 
   // Retry clicking — React Flow edge buttons can be briefly detached during layout animations
   for (let attempt = 0; attempt < 3; attempt++) {
