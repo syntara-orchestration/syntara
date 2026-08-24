@@ -283,6 +283,11 @@ async def _lifespan_startup(app: FastAPI) -> dict[str, Any]:  # noqa: PLR0915
 
     rate_limit_redis = _init_rate_limiting(app)
 
+    from syntara.core.memory_profiler import memory_profiler_loop  # noqa: PLC0415
+
+    mem_profiler_task = asyncio.create_task(memory_profiler_loop())
+    logger.info("Memory profiler enabled")
+
     return {
         "authz_evaluator": authz_evaluator,
         "lifecycle_manager": lifecycle_manager,
@@ -295,11 +300,17 @@ async def _lifespan_startup(app: FastAPI) -> dict[str, Any]:  # noqa: PLR0915
         "schedule_reconciliation_worker": schedule_reconciliation_worker,
         "runtime_settings": runtime_settings,
         "rate_limit_redis": rate_limit_redis,
+        "mem_profiler_task": mem_profiler_task,
     }
 
 
 async def _lifespan_shutdown(resources: dict[str, Any]) -> None:
     """Clean up application resources during shutdown."""
+    mem_task = resources.get("mem_profiler_task")
+    if mem_task is not None:
+        mem_task.cancel()
+        logger.info("Memory profiler stopped")
+
     await resources["schedule_reconciliation_worker"].stop()
     await resources["multipart_cleanup_worker"].stop()
     await resources["queue_depth_poller"].stop()
