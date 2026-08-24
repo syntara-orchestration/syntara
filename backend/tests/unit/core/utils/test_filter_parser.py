@@ -726,6 +726,66 @@ class TestFilterValueConversion:
         result = _convert_filter_value("any_value", field_attr)
         assert result == "any_value"
 
+    def test_convert_filter_value_uuid_valid(self) -> None:
+        """Test converting valid UUID values."""
+        from uuid import UUID
+
+        # Mock field attribute for UUID field
+        field_attr = MagicMock()
+        field_attr.type.python_type = UUID
+        field_attr.key = "id"
+
+        # Test valid UUID string (should return the string, not UUID object)
+        valid_uuid = "550e8400-e29b-41d4-a716-446655440000"
+        result = _convert_filter_value(valid_uuid, field_attr)
+        assert result == valid_uuid
+        assert isinstance(result, str)
+
+        # Test another valid UUID format
+        valid_uuid2 = "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+        result = _convert_filter_value(valid_uuid2, field_attr)
+        assert result == valid_uuid2
+
+    def test_convert_filter_value_uuid_invalid(self) -> None:
+        """Test converting invalid UUID values raises SafeValueError."""
+        from uuid import UUID
+
+        # Mock field attribute for UUID field
+        field_attr = MagicMock()
+        field_attr.type.python_type = UUID
+        field_attr.key = "resource_id"
+
+        # Test invalid UUID format - too short
+        with pytest.raises(SafeValueError, match="Invalid UUID value") as exc_info:
+            _convert_filter_value("not-a-uuid", field_attr)
+
+        error_message = str(exc_info.value)
+        assert "not-a-uuid" in error_message
+        assert "resource_id" in error_message
+        assert "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" in error_message
+
+        # Test invalid UUID format - wrong structure
+        with pytest.raises(SafeValueError, match="Invalid UUID value"):
+            _convert_filter_value("12345678-1234-1234-1234", field_attr)
+
+        # Test completely malformed UUID
+        with pytest.raises(SafeValueError, match="Invalid UUID value"):
+            _convert_filter_value("garbage", field_attr)
+
+    def test_convert_filter_value_uuid_non_string_passthrough(self) -> None:
+        """Test that non-string UUID input passes through unchanged."""
+        from uuid import UUID
+
+        # Mock field attribute for UUID field
+        field_attr = MagicMock()
+        field_attr.type.python_type = UUID
+        field_attr.key = "id"
+
+        # UUID object should pass through
+        uuid_obj = UUID("550e8400-e29b-41d4-a716-446655440000")
+        result = _convert_filter_value(uuid_obj, field_attr)
+        assert result == uuid_obj
+
 
 class TestSQLInjectionProtection:
     """Test SQL injection protection in filter values."""
