@@ -1,4 +1,6 @@
 ---
+# Frontend CI workflow with conditional E2E execution and cost-saving gates.
+# See docs/ci/workflows.md for detailed behavior and manual trigger documentation.
 name: CI Frontend
 
 on:
@@ -432,6 +434,12 @@ jobs:
     steps:
       - run: echo "Frontend checks passed"
 
+  # E2E UI tests run conditionally to reduce CI costs:
+  # - Auto-run on PRs when frontend/ or ci-frontend.yml changes
+  # - Skip on backend-only PRs (save ~15-20 min on 8-core runner)
+  # - Always run in merge queue (final safety check)
+  # - Manual trigger via /run-podman-e2e-ui comment (OWNER/MEMBER only)
+  # See docs/ci/workflows.md for complete behavior table and debugging guide.
   test-compose-e2e:
     name: (Frontend) Test Podman Compose E2E
     needs: [changes, frontend-checks-gate]
