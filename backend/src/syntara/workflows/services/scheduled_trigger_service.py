@@ -54,6 +54,24 @@ _cached_client: Client | None = None
 _connect_task: asyncio.Task[Client | None] | None = None
 _connect_started_at: float | None = None
 
+# Strong refs so the event loop does not GC an in-flight connect task.
+# ``asyncio.create_task`` keeps only a weak reference, and ``_connect_task``
+# holds a strong one only while the task is current. When a stale connect is
+# replaced (older than the waiter budget) the previous task would otherwise be
+# referenced solely by waiters still in ``asyncio.shield``; once they time out
+# nothing holds it and CPython GC-cancels ``Client.connect`` ("Task was
+# destroyed but it is pending"), dropping a late success. This set keeps every
+# connect alive until it finishes so a replaced connect can still cache its
+# client. Same pattern as ``_pending_schedule_delete_tasks`` in
+# ``workflow_service``.
+_pending_connect_tasks: set[asyncio.Task[Client | None]] = set()
+
+
+def _on_connect_task_done(task: asyncio.Task[Client | None]) -> None:
+    """Drop the strong ref once a shared connect finishes."""
+    _pending_connect_tasks.discard(task)
+
+
 # Waiters bound how long they join an in-flight connect. A timeout returns
 # None to that waiter only; the connect keeps running so overlapping waiters
 # can still receive it. A new wait replaces ``_connect_task`` when the
@@ -154,11 +172,19 @@ def _should_start_shared_connect(now: float) -> bool:
 
 
 def _start_shared_connect_locked(now: float) -> asyncio.Task[Client | None]:
-    """Start a new shared connect. Caller must hold ``_client_lock``."""
+    """Start a new shared connect. Caller must hold ``_client_lock``.
+
+    The new task is tracked in ``_pending_connect_tasks`` so replacing a stale
+    ``_connect_task`` does not leave the previous connect without a strong
+    reference (which would let CPython GC-cancel it once its waiters time out).
+    """
     global _connect_task, _connect_started_at  # noqa: PLW0603
-    _connect_task = asyncio.create_task(_connect_shared_client())
+    task = asyncio.create_task(_connect_shared_client())
+    _pending_connect_tasks.add(task)
+    task.add_done_callback(_on_connect_task_done)
+    _connect_task = task
     _connect_started_at = now
-    return _connect_task
+    return task
 
 
 async def _ensure_search_attribute(client: Client) -> bool:

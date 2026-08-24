@@ -10,6 +10,8 @@ Covers:
 """
 
 import asyncio
+import gc
+import weakref
 from collections.abc import AsyncIterator, Generator
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -32,9 +34,10 @@ def _reset_module_caches() -> Generator[None]:
     """Reset module-level caches between tests."""
 
     def _clear() -> None:
-        task = _mod._connect_task
-        if task is not None and not task.done():
-            task.cancel()
+        for task in {_mod._connect_task, *_mod._pending_connect_tasks}:
+            if task is not None and not task.done():
+                task.cancel()
+        _mod._pending_connect_tasks.clear()
         _mod._search_attr_available = None
         _mod._cached_client = None
         _mod._connect_task = None
@@ -1354,6 +1357,68 @@ class TestGetSharedClient:
                 assert not old_task.cancelled()
                 allow_first.set()
                 await asyncio.wait_for(old_task, timeout=1.0)
+                assert _mod._cached_client is second_client
+            finally:
+                allow_first.set()
+
+    async def test_replaced_connect_kept_alive_against_gc(self) -> None:
+        """A replaced connect must survive GC when only the module set holds it.
+
+        Reproduces the drop-on-the-floor bug: after the first waiter times out,
+        the replaced connect is referenced only by ``_pending_connect_tasks``.
+        Unlike the sibling replacement tests, this one keeps no local strong
+        ref to the old task, so ``gc.collect()`` would cancel it ("Task was
+        destroyed but it is pending") without the strong-ref set.
+        """
+        connect_calls = 0
+        allow_first = asyncio.Event()
+        first_client = MagicMock(name="stale")
+        second_client = MagicMock(name="fresh")
+
+        async def _connect(*_args: object, **_kwargs: object) -> MagicMock:
+            nonlocal connect_calls
+            connect_calls += 1
+            if connect_calls == 1:
+                await allow_first.wait()
+                return first_client
+            return second_client
+
+        with (
+            patch(
+                "syntara.workflows.services.scheduled_trigger_service.Client.connect",
+                new=_connect,
+            ),
+            patch("syntara.workflows.services.scheduled_trigger_service._CONNECT_TIMEOUT_SECONDS", 0.05),
+        ):
+            try:
+                # First waiter times out; the connect keeps running in the set.
+                assert await asyncio.wait_for(_mod._get_shared_client(), timeout=1.0) is None
+                stale_ref = weakref.ref(_mod._connect_task)
+                stale_task = stale_ref()
+                assert stale_task is not None
+                assert stale_task in _mod._pending_connect_tasks
+
+                # Replace the stale connect, then drop every local strong ref
+                # to it. Only ``_pending_connect_tasks`` should hold it now.
+                await asyncio.sleep(0.02)
+                assert await _mod._get_shared_client() is second_client
+                assert connect_calls == 2
+                assert _mod._connect_task is not stale_task
+                del stale_task
+                gc.collect()
+
+                # Without the strong-ref set the task would be gone/cancelled.
+                survivor = stale_ref()
+                assert survivor is not None
+                assert survivor in _mod._pending_connect_tasks
+                assert not survivor.cancelled()
+
+                # A late success from the survivor still completes and, once
+                # done, drops itself from the set via the done-callback.
+                allow_first.set()
+                assert await asyncio.wait_for(survivor, timeout=1.0) is not None
+                await asyncio.sleep(0)
+                assert survivor not in _mod._pending_connect_tasks
                 assert _mod._cached_client is second_client
             finally:
                 allow_first.set()
