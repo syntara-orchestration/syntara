@@ -8,6 +8,19 @@ type ActivityData = ExecutionsAPI.components['schemas']['ActivityData']
 type ActivityExecution = ExecutionsAPI.components['schemas']['ActivityExecution']
 type Execution = ExecutionsAPI.components['schemas']['Execution']
 
+/**
+ * Mirrors the real API's `execution_error_summary()` (backend
+ * `syntara.workflows.models.execution`): `error` is the same value as
+ * `error_details` on failure statuses, null otherwise — even if
+ * `error_details` is stale.
+ */
+export function executionErrorSummary(
+  status: string | undefined,
+  errorDetails: string | null | undefined
+): string | null {
+  return status === 'failed' || status === 'completed_with_errors' ? (errorDetails ?? null) : null
+}
+
 function toActivityData(activity: ActivityExecution): ActivityData {
   return {
     activity_id: activity.activity_name ?? activity.id,
@@ -27,6 +40,7 @@ export function getExecutionDetail(executionId: string): Execution | undefined {
   const workflow = workflows.find((item) => item.id === execution.workflow_id)
   return {
     ...execution,
+    error: executionErrorSummary(execution.status, execution.error_details),
     activities: (activityExecutions[execution.id] ?? []).map(toActivityData),
     workflow_definition: workflow?.version?.workflow_definition,
   }
