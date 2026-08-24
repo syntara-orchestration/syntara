@@ -9,7 +9,7 @@ type UseAllCredentialsOptions = {
   projectId?: string
 }
 
-export async function fetchAllCredentials({ projectId }: UseAllCredentialsOptions = {}): Promise<Credential[]> {
+async function fetchAllCredentials({ projectId }: UseAllCredentialsOptions = {}): Promise<Credential[]> {
   return fetchAllPages<Credential>((cursor) =>
     credentialsFetchClient.GET('/credentials', {
       params: {
