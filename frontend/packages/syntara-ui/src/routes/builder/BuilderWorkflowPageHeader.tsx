@@ -231,11 +231,12 @@ function BuilderEditorTitleSlot({
   return (
     <Flex
       className={styles.titleSlot}
+      data-testid="builder-title-slot"
       gap={{ default: 'gapMd' }}
       alignItems={{ default: 'alignItemsCenter' }}
       flexWrap={{ default: 'wrap' }}
     >
-      <FlexItem className={styles.workflowName}>
+      <FlexItem className={styles.workflowName} data-testid="builder-workflow-name">
         <Tooltip
           content={builderPermissions.tooltips.edit}
           trigger={builderPermissions.canEdit ? 'manual' : 'mouseenter focus'}

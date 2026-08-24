@@ -173,11 +173,11 @@ describe('BuilderWorkflowPageHeader', () => {
     expect(nameInput).toHaveValue('Deploy app')
     expect(screen.getByText('Draft')).toBeInTheDocument()
 
-    const nameSlot = nameInput.closest(`.${styles.workflowName}`)
-    expect(nameSlot).not.toBeNull()
-    expect(nameSlot?.closest(`.${styles.titleSlot}`)).toHaveClass('pf-m-wrap')
+    const nameSlot = screen.getByTestId('builder-workflow-name')
+    expect(nameSlot).toHaveClass(styles.workflowName)
+    expect(screen.getByTestId('builder-title-slot')).toHaveClass('pf-m-wrap')
 
-    const computed = window.getComputedStyle(nameSlot as Element)
+    const computed = window.getComputedStyle(nameSlot)
     expect(computed.minWidth).toBe('16ch')
     expect(computed.maxWidth).toBe('24ch')
     expect(computed.flexShrink).toBe('1')
