@@ -80,7 +80,7 @@ jobs:
           else
             echo "scripts=false" >> "$GITHUB_OUTPUT"
           fi
-          if grep -qE '^(frontend/|\.github/workflows/)' <<< "$FILES"; then
+          if grep -qE '^(frontend/|\.github/workflows/ci-frontend\.yml)' <<< "$FILES"; then
             echo "frontend=true" >> "$GITHUB_OUTPUT"
           else
             echo "frontend=false" >> "$GITHUB_OUTPUT"
