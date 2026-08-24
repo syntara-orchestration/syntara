@@ -10,11 +10,12 @@ Tests cover:
 from collections.abc import Generator
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from temporalio.exceptions import ApplicationError
 
+from syntara.approvals.models import ActivitySummary, ApprovalCreateRequest, WorkflowContext
 from syntara.core.constants import FieldLimits
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
 from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
@@ -22,6 +23,12 @@ from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
 from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
 from tests.unit.workflows.workflow_engine.conftest import init_workflow_runtime
+
+# Value registered in ``_secret_values`` by the prompt-scrubbing tests, used to probe
+# for leaks. Its alphabet is deliberately disjoint from the padding characters those
+# tests use ("p", "q", "x", "y") and from "[REDACTED]", which is uppercase — so any of
+# these characters appearing in a stored prompt is unambiguously a leaked fragment.
+_LEAK_PROBE = "abcd"
 
 
 @pytest.fixture(autouse=True)
@@ -632,6 +639,128 @@ class TestPrepareApprovalArgs:
         assert args[10] is not None
         assert "super-secret-token" not in args[10]
         assert "[REDACTED]" in args[10]
+
+    @pytest.mark.asyncio
+    async def test_oversized_prompt_with_short_secret_stays_within_limit(self) -> None:
+        """Scrubbing must not push a truncated prompt back over the column limit.
+
+        ``[REDACTED]`` is 10 characters and a tracked secret may be as short as 4
+        (``MIN_LEAK_PROBE_LENGTH``), so redaction *lengthens* the text. Truncating before
+        scrubbing produced a value longer than ``ApprovalCreateRequest.prompt`` allows,
+        which fails validation on POST /approvals and kills the approval node
+        (approval nodes resolve to ``RetryPolicy(maximum_attempts=1)``).
+        """
+        wf = _make_workflow()
+        wf._secret_values.add(_LEAK_PROBE)
+        graph = _build_approval_graph()
+        node = ActivityNode("approval", "approval", {}, name="Review")
+        # A secret every 100 characters, total well over the limit.
+        oversized = (_LEAK_PROBE + "x" * 96) * 40 + "y" * 500
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+            args = await wf._prepare_approval_args(node, graph, {"prompt": oversized})
+
+        assert args[10] is not None
+        assert len(args[10]) <= FieldLimits.DESCRIPTION_MAX_LENGTH
+        # The padding alphabet is disjoint from the secret's, and "[REDACTED]" is
+        # uppercase, so no character of the secret may survive anywhere — this
+        # catches a fragment left by a cut at any offset, not just the whole value.
+        assert not set(_LEAK_PROBE) & set(args[10])
+
+    @pytest.mark.asyncio
+    async def test_scrubbed_prompt_is_accepted_by_the_create_request_model(self) -> None:
+        """The stored prompt must satisfy the model the activity actually POSTs.
+
+        Guards the workflow-side truncation against the API-side ``max_length``;
+        they are coupled and nothing else checks that they agree.
+        """
+        wf = _make_workflow()
+        wf._secret_values.add(_LEAK_PROBE)
+        graph = _build_approval_graph()
+        node = ActivityNode("approval", "approval", {}, name="Review")
+        oversized = (_LEAK_PROBE + "x" * 96) * 40 + "y" * 500
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+            args = await wf._prepare_approval_args(node, graph, {"prompt": oversized})
+
+        ApprovalCreateRequest(
+            execution_id=uuid4(),
+            project_id=uuid4(),
+            approval_node_id="approval",
+            name="Review",
+            prompt=args[10],
+            next_step_approved=ActivitySummary(id="step", name="Step", type="task"),
+            workflow_context=WorkflowContext(workflow_name="Test Workflow", inputs={}),
+        )
+
+    @pytest.mark.asyncio
+    async def test_secret_straddling_the_truncation_point_is_not_left_partial(self) -> None:
+        """Truncating first bisects a secret so the scrubber can no longer match it."""
+        wf = _make_workflow()
+        wf._secret_values.add(_LEAK_PROBE)
+        graph = _build_approval_graph()
+        node = ActivityNode("approval", "approval", {}, name="Review")
+        # Position the secret so a cut near the limit lands inside it.
+        straddling = "p" * (FieldLimits.DESCRIPTION_MAX_LENGTH - 3) + _LEAK_PROBE + "q" * 500
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+            args = await wf._prepare_approval_args(node, graph, {"prompt": straddling})
+
+        assert args[10] is not None
+        # Assert on the secret's alphabet rather than the whole value or a
+        # specific tail: any surviving character is a leak regardless of where
+        # truncation cut or what marker it appended.
+        assert not set(_LEAK_PROBE) & set(args[10])
+
+    @pytest.mark.asyncio
+    async def test_object_prompt_is_scrubbed_by_credential_key_name(self) -> None:
+        """Key-name redaction only works while the value is still a dict.
+
+        ``json.dumps`` before scrubbing turns ``{"bearer_token": ...}`` into a plain
+        string, and ``scrub_credentials`` is a no-op on strings — the token would be
+        persisted verbatim even though its key is in ``CREDENTIAL_KEYS``.
+        """
+        wf = _make_workflow()
+        graph = _build_approval_graph()
+        node = ActivityNode("approval", "approval", {}, name="Review")
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+            args = await wf._prepare_approval_args(
+                node,
+                graph,
+                {"prompt": {"bearer_token": "eyJhbGciOiJIUzI1NiJ9.leaked", "note": "deploy"}},
+            )
+
+        assert args[10] is not None
+        assert "leaked" not in args[10]
+        assert "[REDACTED]" in args[10]
+        assert "deploy" in args[10]
+
+    @pytest.mark.asyncio
+    async def test_cyclic_prompt_is_dropped_before_reaching_the_scrubber(self) -> None:
+        """The scrubbers recurse without cycle detection, so the guard must run first.
+
+        ``scrub_credentials`` and ``scrub_credential_values`` raise ``RecursionError``
+        on a self-referencing structure, and ``RecursionError`` is not caught by the
+        ``(TypeError, ValueError)`` guard — it would escape ``_prepare_approval_args``
+        and fail the node. Keep the serializability check ahead of the scrub.
+        """
+        wf = _make_workflow()
+        wf._secret_values.add(_LEAK_PROBE)
+        graph = _build_approval_graph()
+        node = ActivityNode("approval", "approval", {}, name="Review")
+        cyclic: list[object] = []
+        cyclic.append(cyclic)
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+            args = await wf._prepare_approval_args(node, graph, {"prompt": cyclic})
+
+        assert args[10] is None
 
 
 class TestDispatchApprovalNode:

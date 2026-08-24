@@ -6,6 +6,7 @@ timeout expiration, cancellation cleanup, and previous-step context building.
 
 import asyncio
 import json
+from collections.abc import Callable
 from datetime import timedelta
 from typing import Any, ClassVar, cast
 
@@ -36,6 +37,13 @@ from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
 _APPROVAL_COMMENTS_MAX_LENGTH = FieldLimits.DESCRIPTION_MAX_LENGTH
 _APPROVAL_PROMPT_PATCH = "persist-approval-prompt"
 
+# Truncation must respect the narrower of the DB column width and the
+# ApprovalCreateRequest.prompt max_length — they are the same today, and this
+# constant is the place to change if either moves. Widening the column without
+# widening the request model would make an over-length prompt a 422 from
+# POST /approvals rather than a clipped message.
+_APPROVAL_PROMPT_MAX_LENGTH = FieldLimits.DESCRIPTION_MAX_LENGTH
+
 
 def _warn_approval_prompt(message: str) -> None:
     """Log prompt-coercion issues without crashing outside a workflow."""
@@ -43,50 +51,71 @@ def _warn_approval_prompt(message: str) -> None:
         workflow.logger.warning(message)
 
 
-def _resolved_approval_prompt(resolved_parameters: dict[str, Any]) -> str | None:
-    """Return the resolved approval-node prompt, or None if absent/blank.
+def _approval_prompt_value(resolved_parameters: dict[str, Any]) -> Any | None:  # noqa: ANN401
+    """Select the approval-node prompt, or None if it is not storable guidance.
 
     ``NamespaceResolver.resolve_value`` keeps the original type when the whole
-    field is a single ``${...}``. Store numbers as decimal text so a Message of
-    ``${trigger.amount}`` is kept. Skip booleans and empty containers — those
-    are not human-readable guidance. Serialize objects with ``json.dumps``;
-    if that fails or the JSON exceeds the column limit, store None rather than
-    a broken fragment. Oversized plain text is truncated to the column limit
-    with a trailing ellipsis so approvers can see it was clipped.
+    field is a single ``${...}``, so the prompt can arrive as any JSON value.
+    Booleans, empty containers and blank strings are not human-readable guidance
+    and are dropped here.
+
+    The ``json.dumps`` probe doubles as a **cycle guard**: ``scrub_credentials``
+    and ``scrub_credential_values`` recurse through dicts and lists with no cycle
+    detection, so a self-referencing template must be rejected *before* it reaches
+    the scrubber. Returning a value from this function is the promise that it is
+    safe to scrub.
     """
     prompt = resolved_parameters.get("prompt")
     if prompt is None or isinstance(prompt, bool):
         return None
-
-    text: str | None = None
-    from_json = False
     if isinstance(prompt, str):
-        text = prompt.strip() or None
-    elif isinstance(prompt, (dict, list)):
-        if prompt:
-            try:
-                text = json.dumps(prompt, default=str)
-                from_json = True
-            except (TypeError, ValueError):
-                _warn_approval_prompt("Could not serialize approval prompt; storing no prompt")
-    else:
-        text = str(prompt).strip() or None
+        return prompt.strip() or None
+    if isinstance(prompt, (dict, list)):
+        if not prompt:
+            return None
+        try:
+            json.dumps(prompt, default=str)
+        except (TypeError, ValueError):
+            _warn_approval_prompt("Could not serialize approval prompt; storing no prompt")
+            return None
+    return prompt
 
-    if not text:
+
+def _approval_prompt_text(value: Any) -> str | None:  # noqa: ANN401
+    """Render an already-scrubbed prompt value to the text that gets stored.
+
+    Runs last so the length cap is applied to the final string. Scrubbing can
+    *lengthen* a value — ``[REDACTED]`` is 10 characters and a secret may be as
+    short as 4 — so truncating before scrubbing can push the result back over the
+    limit and turn ``POST /approvals`` into a validation failure.
+
+    Objects that do not fit are dropped rather than stored as a broken JSON
+    fragment. Oversized plain text is truncated with a trailing ellipsis so
+    approvers can see it was clipped.
+    """
+    if value is None:
         return None
 
-    max_len = FieldLimits.DESCRIPTION_MAX_LENGTH
-    if len(text) <= max_len:
+    if isinstance(value, (dict, list)):
+        text = json.dumps(value, default=str)
+        if len(text) > _APPROVAL_PROMPT_MAX_LENGTH:
+            _warn_approval_prompt(
+                f"Approval prompt JSON length {len(text)} exceeds "
+                f"{_APPROVAL_PROMPT_MAX_LENGTH} characters; storing no prompt"
+            )
+            return None
         return text
 
-    if from_json:
-        _warn_approval_prompt(
-            f"Approval prompt JSON length {len(text)} exceeds {max_len} characters; storing no prompt"
-        )
+    text = (value if isinstance(value, str) else str(value)).strip()
+    if not text:
         return None
+    if len(text) <= _APPROVAL_PROMPT_MAX_LENGTH:
+        return text
 
-    _warn_approval_prompt(f"Approval prompt length {len(text)} exceeds {max_len} characters; truncating")
-    return text[: max_len - 1] + "…"
+    _warn_approval_prompt(
+        f"Approval prompt length {len(text)} exceeds {_APPROVAL_PROMPT_MAX_LENGTH} characters; truncating"
+    )
+    return text[: _APPROVAL_PROMPT_MAX_LENGTH - 1] + "…"
 
 
 class WorkflowApprovalMixin:
@@ -107,13 +136,10 @@ class WorkflowApprovalMixin:
     _detached_nodes: set[str]
     _TEMPORAL_MARGIN: ClassVar[int]
 
-    def _scrub_data(self, data: dict[str, Any]) -> dict[str, Any]:
-        """Redact secrets from activity payloads.
-
-        ``OrchestratorWorkflow`` overrides this with credential and secret-value
-        scrubbing. Identity fallback keeps the mixin testable in isolation.
-        """
-        return data
+    # Provided by OrchestratorWorkflow; declared here for mypy only. Deliberately
+    # not given an identity-function body — a redaction step that silently becomes
+    # a no-op if the MRO changes fails open, and this one guards secrets.
+    _scrub_data: Callable[[dict[str, Any]], dict[str, Any]]
 
     async def _expire_approvals(self, node_id: str | None, activity_id: str) -> None:
         """Best-effort expire pending approval requests.
@@ -352,11 +378,13 @@ class WorkflowApprovalMixin:
             self._project_id,
         ]
         if workflow.patched(_APPROVAL_PROMPT_PATCH):
-            prompt = _resolved_approval_prompt(resolved_parameters)
-            if prompt:
-                scrubbed = self._scrub_data({"prompt": prompt}).get("prompt")
-                prompt = scrubbed if isinstance(scrubbed, str) else None
-            args.append(prompt)
+            # select+guard -> scrub -> coerce+truncate. Order is load-bearing:
+            # the guard proves the value is safe to recurse into, and scrubbing
+            # before truncation keeps the final string inside the column limit.
+            value = _approval_prompt_value(resolved_parameters)
+            if value is not None:
+                value = self._scrub_data({"prompt": value})["prompt"]
+            args.append(_approval_prompt_text(value))
         return args
 
     async def _execute_approval_node(
