@@ -450,6 +450,41 @@ jobs:
           sudo apt-get clean
           df -h /
 
+      - name: Validate workflow inputs
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553 # v9
+        env:
+          PR_NUMBER: ${{ inputs.pr_number }}
+          PR_REF: ${{ inputs.pr_ref }}
+        with:
+          script: |
+            const prNumber = process.env.PR_NUMBER;
+            const prRef = process.env.PR_REF;
+
+            if (!prNumber || !prRef) {
+              core.setFailed('workflow_dispatch requires pr_number and pr_ref inputs');
+              return;
+            }
+
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: parseInt(prNumber, 10),
+            });
+
+            const baseRepo = `${context.repo.owner}/${context.repo.repo}`;
+            if (pr.data.head.repo.full_name !== baseRepo) {
+              core.setFailed('Refusing to run on fork PRs');
+              return;
+            }
+
+            if (pr.data.head.ref !== prRef) {
+              core.setFailed(`Input pr_ref='${prRef}' does not match PR #${prNumber} head ref='${pr.data.head.ref}'`);
+              return;
+            }
+
+            core.info(`Validated: PR #${prNumber} ref=${prRef}`);
+
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
