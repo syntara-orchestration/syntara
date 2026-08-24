@@ -98,6 +98,10 @@ class FilterableModel:
     Introspects ``__filterable_fields__`` and model field types to generate
     OpenAPI filter parameter schemas that match the hand-authored sub-specs.
 
+    For virtual fields (fields not in ``model_fields``), specify types via
+    dict format: ``__filterable_fields__ = {"field": str, "other": datetime}``.
+    Regular fields can still use list format for backward compatibility.
+
     Usage::
 
         @router.get("/items")
@@ -105,29 +109,59 @@ class FilterableModel:
             _filterable: Annotated[None, Depends(FilterableModel(Item))],
         ) -> ItemListResponse:
             ...
+
+    Virtual field example::
+
+        class MyModel(SQLModel, table=True):
+            __filterable_fields__ = {
+                "real_field": str,         # inferred from model, type ignored
+                "virtual_field": str,      # virtual field, type used
+            }
+            real_field: str
+            # virtual_field is computed or stored in JSONB
     """
 
     def __init__(self, model: type) -> None:
         """Validate model metadata and classify field types."""
-        filterable_fields: list[str] | None = getattr(model, "__filterable_fields__", None)
-        if filterable_fields is None:
+        filterable_fields_raw = getattr(model, "__filterable_fields__", None)
+        if filterable_fields_raw is None:
             msg = f"{model.__name__} has no __filterable_fields__"
             raise ValueError(msg)
+
+        # Support both list[str] and dict[str, type] formats
+        if isinstance(filterable_fields_raw, dict):
+            filterable_fields: dict[str, type | None] = filterable_fields_raw
+        else:
+            # Convert list to dict with None as type (will be inferred)
+            filterable_fields = {name: None for name in filterable_fields_raw}
 
         model_fields_map = getattr(model, "model_fields", {})
 
         self.model = model
         self._fields: dict[str, tuple[set[FilterOperator], type]] = {}
 
-        for field_name in filterable_fields:
-            if field_name not in model_fields_map:
-                continue
-            annotation = model_fields_map[field_name].annotation
-            python_type = _unwrap_optional(annotation)
-            ops = _classify_python_type(python_type)
-            if python_type is not annotation:
-                ops = ops | {FilterOperator.ISNULL}
-            self._fields[field_name] = (ops, python_type)
+        for field_name, declared_type in filterable_fields.items():
+            # Try to get type from model_fields first
+            if field_name in model_fields_map:
+                annotation = model_fields_map[field_name].annotation
+                python_type = _unwrap_optional(annotation)
+                ops = _classify_python_type(python_type)
+                if python_type is not annotation:
+                    ops = ops | {FilterOperator.ISNULL}
+                self._fields[field_name] = (ops, python_type)
+            # Fall back to declared type for virtual fields
+            elif declared_type is not None:
+                python_type = declared_type
+                ops = _classify_python_type(python_type)
+                self._fields[field_name] = (ops, python_type)
+            # Error if field is not found and has no declared type
+            else:
+                msg = (
+                    f"Field '{field_name}' in {model.__name__}.__filterable_fields__ "
+                    f"not found in model_fields. For virtual fields, use dict format: "
+                    f"__filterable_fields__ = {{'{field_name}': <type>}}"
+                )
+                raise ValueError(msg)
 
     def get_field_operators(self, field_name: str) -> set[FilterOperator]:
         """Return the operator set for a given filterable field."""

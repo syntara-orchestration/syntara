@@ -150,6 +150,34 @@ class MyModel(BaseResource, table=True):
 
 Requests filtering on undeclared fields return a `422` error (`SafeValueError`).
 
+**Virtual Fields:** For fields not in `model_fields` (e.g., JSONB-derived, computed), use dict format to declare types:
+
+```python
+class IdentityProvider(BaseResource, table=True):
+    __filterable_fields__: ClassVar[dict[str, type | None]] = {
+        **{name: None for name in BaseResource.__filterable_fields__},
+        "enabled": None,  # Regular field, type inferred
+        "provider_type": str,  # Virtual field with explicit type
+    }
+```
+
+Virtual fields require custom query logic via `special_field_handlers` in the service.
+
+**Python Client Limitation:** The generated Python client's filter parameter types (e.g., `ListIdentityProvidersId`) do not serialize correctly for deepObject parameters. Use `additional_params` instead:
+
+```python
+# Don't use the typed filter params - they serialize incorrectly
+# id_filter = ListIdentityProvidersId(eq=some_uuid)
+# response = client.list_identity_providers(id=id_filter)  # Produces ?eq=value ❌
+
+# Instead, use additional_params with bracket notation
+response = client.list_identity_providers(
+    additional_params={"id[eq]": str(some_uuid)}  # Produces ?id[eq]=value ✓
+)
+```
+
+This limitation only affects the Python client. The TypeScript client generates correct deepObject serialization.
+
 ### Filter Combination Logic
 
 Filters are combined using AND/OR semantics based on how they are specified:
@@ -492,6 +520,19 @@ class MyModel(BaseResource, table=True):
 ```
 
 Requests filtering on undeclared fields return a `422` error (`SafeValueError`).
+
+**Virtual Fields:** For fields not in `model_fields` (e.g., JSONB-derived, computed), use dict format to declare types:
+
+```python
+class IdentityProvider(BaseResource, table=True):
+    __filterable_fields__: ClassVar[dict[str, type | None]] = {
+        **{name: None for name in BaseResource.__filterable_fields__},
+        "enabled": None,  # Regular field, type inferred
+        "provider_type": str,  # Virtual field with explicit type
+    }
+```
+
+Virtual fields require custom query logic via `special_field_handlers` in the service.
 
 #### Filter Combination Logic
 
@@ -1220,7 +1261,6 @@ Both list and CRUD compliance tests run as part of `make test-api-compliance` an
 | `tests/unit/api/compliance/test_crud_endpoint_compliance.py` | CRUD endpoint compliance validation tests |
 | `tests/unit/api/compliance/test_crud_endpoint_discovery.py` | CRUD endpoint discovery mechanism tests |
 | `tests/unit/api/compliance/endpoint_discovery.py` | Discovery logic and helpers |
-| `tests/unit/api/compliance/test_filterable_model_compliance.py` | FilterableModel compliance validation tests |
 | `tests/unit/core/openapi/test_filterable.py` | FilterableModel unit tests |
 | `tests/unit/api/compliance/list_compliance_exclusions.yaml` | List exclusion registry with justifications |
 | `tests/unit/api/compliance/crud_compliance_exclusions.yaml` | CRUD exclusion registry with justifications |

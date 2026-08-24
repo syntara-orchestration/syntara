@@ -142,16 +142,32 @@ class TestFilterableModel:
         with pytest.raises(ValueError, match="__filterable_fields__"):
             FilterableModel(NoFilterModel)
 
-    def test_skips_filterable_field_not_on_model(self):
+    def test_raises_error_for_undeclared_virtual_field(self):
+        """Field in __filterable_fields__ but not in model_fields or __virtual_filterable_field_types__ should error."""
         from syntara.core.openapi.filterable import FilterableModel
 
         class VirtualFieldModel(SQLModel, table=False):
             name: str = ""
             __filterable_fields__: ClassVar[list[str]] = ["name", "nonexistent"]
 
+        with pytest.raises(ValueError, match="nonexistent.*not found"):
+            FilterableModel(VirtualFieldModel)
+
+    def test_virtual_field_with_type_declaration(self):
+        """Virtual fields with types in dict-format __filterable_fields__ should be included."""
+        from syntara.core.openapi.filterable import FilterableModel
+
+        class VirtualFieldModel(SQLModel, table=False):
+            name: str = ""
+            __filterable_fields__: ClassVar[dict[str, type | None]] = {
+                "name": None,  # Will be inferred from model_fields
+                "virtual_field": str,  # Virtual field with explicit type
+            }
+
         dep = FilterableModel(VirtualFieldModel)
         assert "name" in dep._fields
-        assert "nonexistent" not in dep._fields
+        assert "virtual_field" in dep._fields
+        assert dep.get_field_operators("virtual_field") == _STRING_OPS
 
     def test_operators_for_string_field(self):
         from syntara.core.openapi.filterable import FilterableModel
