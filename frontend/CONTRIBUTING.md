@@ -139,7 +139,7 @@ The Podman Compose E2E UI tests automatically run when frontend-relevant changes
 - Debugging test failures
 - Re-running tests after transient failures
 
-The test run will appear in the PR checks automatically. Results are visible in the same place as automatic E2E runs.
+The run is dispatched against `devel` and appears under the Actions tab for the `CI Frontend` workflow (filter by `workflow_dispatch`). It is not attached as a check on the PR the way automatic `pull_request` E2E runs are — use the Actions run link to view results.
 
 ## Code Readability Rules
 

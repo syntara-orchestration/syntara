@@ -30,8 +30,10 @@ permissions:
   pull-requests: read
   statuses: read
 
+# workflow_dispatch runs against devel ref — scope by PR number so manual
+# triggers don't cancel each other or fight push-to-devel runs.
 concurrency:
-  group: ci-frontend-${{ github.ref }}
+  group: ci-frontend-${{ github.event_name == 'workflow_dispatch' && format('dispatch-{0}', inputs.pr_number) || github.ref }}
   cancel-in-progress: true
 
 # Scoped to this file only — other workflows pin their own.
@@ -52,15 +54,18 @@ jobs:
       - id: check
         env:
           GH_TOKEN: ${{ github.token }}
+          # Prefer the PR event number; fall back to workflow_dispatch input so
+          # manual `/run-podman-e2e-ui` runs path-filter against the real PR
+          # instead of treating the run as "no PR → enable everything".
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
         run: |
           set -euo pipefail
-          PR_NUMBER="${{ github.event.pull_request.number }}"
-          if [ -z "$PR_NUMBER" ]; then
+          if [ -z "${PR_NUMBER}" ]; then
             echo "::warning::No PR number (merge_group context), running all CI as fallback"
             { echo "code=true"; echo "backend=true"; echo "contracts=true"; echo "scripts=true"; echo "frontend=true"; } >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          FILES=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/files --paginate --jq '.[].filename')
+          FILES=$(gh api "repos/${{ github.repository }}/pulls/${PR_NUMBER}/files" --paginate --jq '.[].filename')
           if [ -z "$FILES" ]; then
             echo "::warning::No files from API, running all CI as fallback"
             { echo "code=true"; echo "backend=true"; echo "contracts=true"; echo "scripts=true"; echo "frontend=true"; } >> "$GITHUB_OUTPUT"
@@ -463,16 +468,26 @@ jobs:
     needs: [changes, frontend-checks-gate]
     # Only auto-trigger on same-repo PRs with frontend changes, or manual dispatch, or merge queue.
     # Fork PRs are explicitly excluded from auto-triggering to prevent security risks.
+    # always() + gate != failure|cancelled lets workflow_dispatch still run when the
+    # checks gate is skipped (e.g. docs-only PR), while preserving fast-fail when
+    # lint/unit actually failed.
     if: |
-      (needs.changes.outputs.frontend == 'true' && github.event_name != 'push' && github.event.pull_request.head.repo.full_name == github.repository) ||
-      github.event_name == 'merge_group' ||
-      github.event_name == 'workflow_dispatch'
+      always() &&
+      needs.changes.result == 'success' &&
+      needs.frontend-checks-gate.result != 'failure' &&
+      needs.frontend-checks-gate.result != 'cancelled' &&
+      (
+        (needs.changes.outputs.frontend == 'true' && github.event_name != 'push' && github.event.pull_request.head.repo.full_name == github.repository) ||
+        github.event_name == 'merge_group' ||
+        github.event_name == 'workflow_dispatch'
+      )
     runs-on: ubuntu-latest-8-cores
     timeout-minutes: 120
     # Job-level concurrency ensures only the latest commit runs this expensive test.
     # When a new commit is pushed, any in-progress E2E run from the prior commit is cancelled.
+    # workflow_dispatch is keyed by PR number (same reason as workflow-level concurrency).
     concurrency:
-      group: e2e-frontend-${{ github.head_ref || github.ref }}
+      group: e2e-frontend-${{ github.event_name == 'workflow_dispatch' && format('dispatch-{0}', inputs.pr_number) || github.head_ref || github.ref }}
       cancel-in-progress: true
     steps:
       - name: Free disk space
