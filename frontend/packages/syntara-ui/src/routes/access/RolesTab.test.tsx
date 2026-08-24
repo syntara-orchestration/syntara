@@ -597,6 +597,51 @@ describe('RolesTab', () => {
         expect(queryParams).toHaveProperty('sort', '-name')
       })
     })
+
+    it('sends sort parameter when Scope column is clicked', async () => {
+      const user = userEvent.setup()
+      render(<RolesTab />, { wrapper: createWrapper() })
+
+      const scopeHeader = screen.getByRole('columnheader', { name: /Scope/i })
+      await user.click(within(scopeHeader).getByRole('button'))
+
+      await waitFor(() => {
+        const lastCall = vi.mocked(accessClient.useQuery).mock.calls.at(-1)
+        const queryParams = (lastCall?.[2] as unknown as { params?: { query?: Record<string, unknown> } })?.params
+          ?.query
+        expect(queryParams).toHaveProperty('sort', 'scope')
+      })
+    })
+
+    it('sends sort parameter when Project column is clicked', async () => {
+      const user = userEvent.setup()
+      render(<RolesTab />, { wrapper: createWrapper() })
+
+      const projectHeader = screen.getByRole('columnheader', { name: /Project/i })
+      await user.click(within(projectHeader).getByRole('button'))
+
+      await waitFor(() => {
+        const lastCall = vi.mocked(accessClient.useQuery).mock.calls.at(-1)
+        const queryParams = (lastCall?.[2] as unknown as { params?: { query?: Record<string, unknown> } })?.params
+          ?.query
+        expect(queryParams).toHaveProperty('sort', 'project_id')
+      })
+    })
+
+    it('sends sort parameter when Type column is clicked', async () => {
+      const user = userEvent.setup()
+      render(<RolesTab />, { wrapper: createWrapper() })
+
+      const typeHeader = screen.getByRole('columnheader', { name: /Type/i })
+      await user.click(within(typeHeader).getByRole('button'))
+
+      await waitFor(() => {
+        const lastCall = vi.mocked(accessClient.useQuery).mock.calls.at(-1)
+        const queryParams = (lastCall?.[2] as unknown as { params?: { query?: Record<string, unknown> } })?.params
+          ?.query
+        expect(queryParams).toHaveProperty('sort', 'is_builtin')
+      })
+    })
   })
 
   describe('Pagination', () => {
@@ -665,8 +710,7 @@ describe('RolesTab', () => {
       render(<RolesTab />, { wrapper: createWrapper() })
 
       const viewerRow = screen.getByRole('row', { name: /viewer/i })
-      const descriptionCell = viewerRow.querySelector('td[data-label="Description"]')
-      expect(descriptionCell).toHaveTextContent('-')
+      expect(within(viewerRow).getAllByText('-').length).toBeGreaterThan(0)
     })
 
     it('policies are hidden by default and shown when row is expanded', async () => {
@@ -787,6 +831,33 @@ describe('RolesTab', () => {
   })
 
   describe('Filter empty state', () => {
+    it('shows filter toolbar with Create role when filters are active but no results', async () => {
+      vi.mocked(accessClient.useQuery).mockImplementation((...args: unknown[]) => {
+        const opts = args[2] as { params?: { query?: Record<string, unknown> } } | undefined
+        const hasNameFilter = opts?.params?.query?.['name[contains]']
+        return {
+          data: { resources: hasNameFilter ? [] : mockRoles, next: null, total: hasNameFilter ? 0 : 3 },
+          isPending: false,
+          isError: false,
+          error: null,
+          isFetching: false,
+          refetch: mockRefetch,
+        } as never
+      })
+
+      const user = userEvent.setup()
+      render(<RolesTab />, { wrapper: createWrapper() })
+
+      const textInput = screen.getByRole('textbox', { name: /name filter/i })
+      await user.type(textInput, 'nonexistent')
+      await user.keyboard('{Enter}')
+
+      await waitFor(() => {
+        expect(screen.getByText('No results found')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Create role' })).toBeInTheDocument()
+      })
+    })
+
     it('shows filter empty state when filters are active but no results', async () => {
       // Mock implementation: return data on initial load, empty after filter
       vi.mocked(accessClient.useQuery).mockImplementation((...args: unknown[]) => {

@@ -60,6 +60,21 @@ const mockUseProjectSelector = vi.fn(() => ({
   projects: [] as { id: string; name: string }[],
   ProjectSelector: null,
 }))
+
+function mockAllProjectsSelector(
+  projects: { id: string; name: string }[] = [],
+  overrides: Partial<ReturnType<typeof mockUseProjectSelector>> = {}
+) {
+  mockUseProjectSelector.mockReturnValue({
+    selectedProject: null,
+    selectedProjectId: null,
+    stableProjectId: null,
+    isAllProjects: true,
+    projects,
+    ProjectSelector: null,
+    ...overrides,
+  })
+}
 vi.mock('../../hooks/useProjectSelector', () => ({
   useProjectSelector: () => mockUseProjectSelector(),
 }))
@@ -1028,15 +1043,10 @@ describe('Approvals Component', () => {
 
   describe('Grouped view (All Projects)', () => {
     it('renders grouped approvals when all projects are selected', () => {
-      mockUseProjectSelector.mockReturnValue({
-        selectedProject: null,
-        isAllProjects: true,
-        projects: [
-          { id: 'proj-1', name: 'Project Alpha' },
-          { id: 'proj-2', name: 'Project Beta' },
-        ],
-        ProjectSelector: null,
-      })
+      mockAllProjectsSelector([
+        { id: 'proj-1', name: 'Project Alpha' },
+        { id: 'proj-2', name: 'Project Beta' },
+      ])
 
       const approvalsWithProjects = mockApprovals.map((a, i) => ({
         ...a,
@@ -1061,12 +1071,7 @@ describe('Approvals Component', () => {
     it('toggles project group collapsed/expanded', async () => {
       const user = userEvent.setup()
 
-      mockUseProjectSelector.mockReturnValue({
-        selectedProject: null,
-        isAllProjects: true,
-        projects: [{ id: 'proj-1', name: 'Project Alpha' }],
-        ProjectSelector: null,
-      })
+      mockAllProjectsSelector([{ id: 'proj-1', name: 'Project Alpha' }])
 
       const approvalsWithProject = [{ ...mockApprovals[0], project_id: 'proj-1' }]
       mockApprovalsQuery(approvalsWithProject as Approval[])
@@ -1090,12 +1095,7 @@ describe('Approvals Component', () => {
     })
 
     it('shows "No project" for approvals without project_id', () => {
-      mockUseProjectSelector.mockReturnValue({
-        selectedProject: null,
-        isAllProjects: true,
-        projects: [{ id: 'proj-1', name: 'Project Alpha' }],
-        ProjectSelector: null,
-      })
+      mockAllProjectsSelector([{ id: 'proj-1', name: 'Project Alpha' }])
 
       const approvalsWithoutProject = [{ ...mockApprovals[0], project_id: undefined }]
       mockApprovalsQuery(approvalsWithoutProject as unknown as Approval[])
@@ -1314,12 +1314,7 @@ describe('Approvals Component', () => {
         isLoading: false,
         error: null,
       })
-      mockUseProjectSelector.mockReturnValue({
-        selectedProject: null,
-        isAllProjects: true,
-        projects: [],
-        ProjectSelector: null,
-      })
+      mockAllProjectsSelector()
       // Reset permission mock to default
       vi.mocked(useApprovalPermissions).mockReturnValue({
         canRead: true,

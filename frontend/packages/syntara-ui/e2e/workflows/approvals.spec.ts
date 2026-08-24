@@ -9,9 +9,9 @@
 import type { Page } from '@playwright/test'
 
 import { test, expect, toAppUrl } from '../fixtures'
+import { applyApprovalNameFilter } from '../helpers/approvals'
 import { APP_TITLE } from '../helpers/appTitle'
 import { addApprovalNodeWithBranch } from '../helpers/v2-nodes'
-import { applyApprovalNameFilter } from '../helpers/approvals'
 import { buildUniqueName, createBasicWorkflowViaApi, openWorkflowInBuilder } from '../helpers/workflows'
 import { apiRequest, pollApprovalVisible, pollExecutionStatus } from '../utils/api'
 

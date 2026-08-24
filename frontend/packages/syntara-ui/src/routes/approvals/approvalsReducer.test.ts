@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { approvalsReducer, type ApprovalsAction } from './Approvals'
+import { approvalsReducer, type ApprovalsAction } from './approvalsReducer'
 
 describe('approvalsReducer', () => {
   it('returns the same state for unknown actions', () => {
