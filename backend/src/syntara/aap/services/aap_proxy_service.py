@@ -53,7 +53,9 @@ if TYPE_CHECKING:
 
     from syntara.aap.models.queries import AAPBaseQuery, AAPResourceQuery
     from syntara.authz.engine import AllowedProjectsResult
+    from syntara.authz.evaluator import AuthzEvaluator
     from syntara.core.config.base import Settings
+    from syntara.core.models import User
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -108,11 +110,15 @@ class AAPProxyService:
         settings: Settings,
         session: AsyncSession,
         allowed_projects: AllowedProjectsResult | None = None,
+        evaluator: AuthzEvaluator | None = None,
+        user: User | None = None,
     ) -> None:
         """Initialize with injected dependencies."""
         self._settings = settings
         self._session = session
         self._allowed_projects = allowed_projects
+        self._evaluator = evaluator
+        self._user = user
         # Lazily created per-connection client to avoid repeated TCP/TLS setup
         # within the same request (e.g., org resolution + resource list).
         self._client: httpx.AsyncClient | None = None
@@ -515,6 +521,9 @@ class AAPProxyService:
                 session=self._session,
                 credential_id=credential_id,
                 user_id=user_id,
+                evaluator=self._evaluator,
+                user_labels=self._user.labels if self._user else None,
+                user_metadata=self._user.authz_metadata if self._user else None,
             )
         else:
             logger.info(

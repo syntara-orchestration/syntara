@@ -938,10 +938,11 @@ class TestCredentialAuthorization:
 
         mock_session = AsyncMock()
         user_id = uuid4()
+        mock_evaluator = MagicMock()
 
         with pytest.raises(AAPAuthenticationError, match="Invalid credential_id format"):
             await resolve_aap_connection_from_credential(
-                session=mock_session, credential_id="not-a-uuid", user_id=user_id
+                session=mock_session, credential_id="not-a-uuid", user_id=user_id, evaluator=mock_evaluator
             )
 
 
@@ -1056,6 +1057,9 @@ class TestResolveConnectionFromIntegration:
             session=mock_session,
             credential_id=credential_id,
             user_id=user_id,
+            evaluator=service._evaluator,
+            user_labels=None,
+            user_metadata=None,
         )
 
     @pytest.mark.asyncio
@@ -1410,6 +1414,9 @@ class TestDefaultAAPIntegrationResolution:
             session=mock_session,
             credential_id=credential_id,
             user_id=user_id,
+            evaluator=service._evaluator,
+            user_labels=None,
+            user_metadata=None,
         )
 
     @pytest.mark.asyncio

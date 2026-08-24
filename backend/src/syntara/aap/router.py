@@ -13,9 +13,9 @@ used). When ``credential_id`` is provided, the specified Syntara credential
 may only use credentials they own.
 
 Authorization: The ``current_user`` dependency ensures only authenticated
-Syntara users can call these endpoints. When using credential_id, users can
-only use credentials they own (authorization check enforced). When using
-integration_id, project-scoped integration visibility is enforced via
+Syntara users can call these endpoints. When using credential_id, project-scoped
+``credential:use`` RBAC permission is enforced. When using integration_id,
+project-scoped integration visibility is enforced via
 ``ProjectScopeFilter("integration", "read")``.
 """
 
@@ -48,8 +48,9 @@ from syntara.aap.models.responses import (
 from syntara.aap.services.aap_proxy_service import AAPProxyService
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.auth import get_current_user
-from syntara.authz.dependencies import ProjectScopeFilter
+from syntara.authz.dependencies import ProjectScopeFilter, get_authz_evaluator
 from syntara.authz.engine import AllowedProjectsResult
+from syntara.authz.evaluator import AuthzEvaluator
 from syntara.core.config.base import Settings, get_settings
 from syntara.core.database.session import get_db
 from syntara.core.models import User
@@ -80,9 +81,11 @@ async def _get_aap_proxy_service(
     settings: Annotated[Settings, Depends(get_settings)],
     db: Annotated[AsyncSession, Depends(get_db)],
     allowed_projects: Annotated[AllowedProjectsResult, Depends(_integration_scope)],
+    evaluator: Annotated[AuthzEvaluator, Depends(get_authz_evaluator)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> AsyncGenerator[AAPProxyService]:
     """Provide AAPProxyService with settings and db session wired; close client after request."""
-    service = AAPProxyService(settings, db, allowed_projects=allowed_projects)
+    service = AAPProxyService(settings, db, allowed_projects=allowed_projects, evaluator=evaluator, user=current_user)
     try:
         yield service
     finally:
