@@ -59,7 +59,7 @@ def _make_workflow(
     wf._timed_out_converge_nodes = set()
     wf._detached_nodes = set()
     wf._converge_branch_nodes = {}
-    wf._secret_values: set[str] = set()
+    wf._secret_values = set()
     init_workflow_runtime(wf)
     wf.pre_resolved_outputs = {}
     wf.stop_after_nodes = set()
