@@ -124,20 +124,13 @@ The application will be available at:
 
 Some CI jobs can be manually triggered via slash commands in PR comments. Only repository owners and members can use these commands.
 
-#### `/run-podman-e2e-ui` - Manual E2E UI Test Runs
+#### Manual E2E UI Test Runs
 
-The Podman Compose E2E UI tests automatically run when frontend-relevant changes are detected (changes in `frontend/` or `.github/workflows/ci-frontend.yml`). For backend-only PRs or other workflow changes, you can manually trigger these tests by commenting:
+The Podman Compose E2E UI tests automatically run when frontend-relevant changes are detected. For backend-only PRs or other workflow changes, you can manually trigger these tests by commenting:
 
 ```
 /run-podman-e2e-ui
 ```
-
-**When to use it:**
-
-- Backend-only PRs where you want to verify the UI still works
-- Workflow or CI configuration changes
-- Debugging test failures
-- Re-running tests after transient failures
 
 ## Code Readability Rules
 
