@@ -7,7 +7,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { NxLabel } from '../../components/labels/NxLabel'
 import { SynPanelContentStack } from '../../components/layout/SynPanelContentStack'
 import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../components/panels/list/NxListPanel'
-import { NxEmptyStateNoData } from '../../components/states/NxEmptyStateNoData'
+import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 import type { FilterConfig, FilterFieldDefinition } from '../../types/filters'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../types/filters'
 import { detachPromise } from '../../utils/detachPromise'
@@ -218,7 +218,7 @@ export function MyPermissionsView() {
         hasActiveFilters={hasActiveFilters}
         onClearAllFilters={clearAllFilters}
         noDataState={
-          <NxEmptyStateNoData title="No permissions" description="The current user has no permissions assigned." />
+          <SynEmptyStateNoData title="No permissions" description="The current user has no permissions assigned." />
         }
         toolbar={
           <NxListPanelToolbar

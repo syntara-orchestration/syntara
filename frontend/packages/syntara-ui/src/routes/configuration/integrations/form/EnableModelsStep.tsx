@@ -17,8 +17,8 @@ import { useCallback, useMemo, useState } from 'react'
 
 import { FilterBar } from '../../../../components/filters/FilterBar'
 import { SynPanelContentStack } from '../../../../components/layout/SynPanelContentStack'
-import { NxEmptyStateFilter } from '../../../../components/states/NxEmptyStateFilter'
-import { NxEmptyStateNoData } from '../../../../components/states/NxEmptyStateNoData'
+import { SynEmptyStateFilter } from '../../../../components/states/SynEmptyStateFilter'
+import { SynEmptyStateNoData } from '../../../../components/states/SynEmptyStateNoData'
 import { NxScrollableTableContainer } from '../../../../components/table/NxScrollableTableContainer'
 import type { FilterConfig, FilterFieldDefinition } from '../../../../types/filters'
 import { getIntegrationNameFilterDefinition } from '../integrationFilters'
@@ -176,7 +176,7 @@ function EnableModelsStep({
 
   if (models.length === 0) {
     return (
-      <NxEmptyStateNoData
+      <SynEmptyStateNoData
         title="No models found"
         description="The connection was successful, but no models were found on this provider."
       />
@@ -195,7 +195,7 @@ function EnableModelsStep({
       </StackItem>
 
       {hasActiveFilters && filteredModels.length === 0 ? (
-        <NxEmptyStateFilter clearAllFilters={handleClearAllFilters} />
+        <SynEmptyStateFilter clearAllFilters={handleClearAllFilters} />
       ) : (
         <NxScrollableTableContainer caption="Enable models">
           <colgroup>

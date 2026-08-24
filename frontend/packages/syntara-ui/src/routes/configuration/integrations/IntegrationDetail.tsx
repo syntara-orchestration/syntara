@@ -35,7 +35,7 @@ import { SynPanel } from '../../../components/layout/SynPanel'
 import type { KebabAction } from '../../../components/NxKebabMenu'
 import { NxKebabMenu } from '../../../components/NxKebabMenu'
 import { NxLink } from '../../../components/NxLink'
-import { NxErrorState } from '../../../components/states/NxErrorState'
+import { SynErrorState } from '../../../components/states/SynErrorState'
 import { useQueryState } from '../../../components/states/useQueryState'
 import { SynPageTitle } from '../../../components/SynPageTitle'
 import { NxUrlTabs } from '../../../components/tabs/NxUrlTabs'
@@ -354,7 +354,7 @@ export function IntegrationDetail() {
         <SynPageHeader title="Error" breadcrumbs={breadcrumbsIntegrationDetailEarlyShell()} />
         <SynPageBody>
           <SynPanel isFullHeight>
-            <NxErrorState title="Invalid integration" message="No integration ID provided" />
+            <SynErrorState title="Invalid integration" message="No integration ID provided" />
           </SynPanel>
         </SynPageBody>
       </SynPage>

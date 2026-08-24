@@ -12,7 +12,7 @@ import {
   NxListPanelToolbar,
   NxListPanelView,
 } from '../../../components/panels/list/NxListPanel'
-import { NxEmptyStateNoData } from '../../../components/states/NxEmptyStateNoData'
+import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import { useDialogState } from '../../../hooks/useDialogState'
 import { useAlerts } from '../../../providers/alerts'
 import { getErrorMessage } from '../../../utils/apiErrors'
@@ -166,7 +166,7 @@ export function ProjectRolesTab({ projectId }: Readonly<{ projectId: string }>) 
           hasActiveFilters={hasActiveFilters}
           onClearAllFilters={clearAllFilters}
           noDataState={
-            <NxEmptyStateNoData
+            <SynEmptyStateNoData
               title="No roles found"
               description="No roles are available for this project."
               buttonText="Add role"

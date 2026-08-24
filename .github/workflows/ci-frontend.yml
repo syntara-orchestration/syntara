@@ -406,9 +406,19 @@ jobs:
             }
             core.setFailed(`Timed out waiting for shared checks: ${required.join(', ')}`);
 
+  # Gate for E2E tests to reduce costs. Expensive E2E jobs only start after
+  # fast checks pass, avoiding wasted resources when basic validation fails.
+  frontend-checks-gate:
+    name: (Frontend) Checks Gate
+    runs-on: ubuntu-latest
+    needs: [changes, checks, unit-tests]
+    if: needs.changes.outputs.code == 'true' || needs.changes.outputs.contracts == 'true'
+    steps:
+      - run: echo "Frontend checks passed"
+
   test-compose-e2e:
     name: (Frontend) Test Podman Compose E2E
-    needs: changes
+    needs: [changes, frontend-checks-gate]
     if: needs.changes.outputs.code == 'true' && github.event_name != 'push'
     runs-on: ubuntu-latest-8-cores
     timeout-minutes: 120
@@ -604,6 +614,7 @@ jobs:
 
   konflux-frontend-gate:
     name: (Frontend) Konflux Gate
+    needs: [changes, frontend-checks-gate]
     # Tekton PAC only fires on pull_request events (not merge_group or push).
     if: github.event_name == 'pull_request'
     permissions:
@@ -620,6 +631,7 @@ jobs:
 
   konflux-ui-tests-gate:
     name: (Frontend) Konflux UI Tests Gate
+    needs: [changes, frontend-checks-gate]
     # Tekton PAC only fires on pull_request events (not merge_group or push).
     if: github.event_name == 'pull_request'
     permissions:
@@ -651,6 +663,7 @@ jobs:
       - coverage-report
       - storybook-build
       - test-build
+      - frontend-checks-gate
       - konflux-frontend-gate
       - konflux-ui-tests-gate
       - shared-checks-gate
@@ -664,7 +677,7 @@ jobs:
           fi
 
           ok="success|skipped"
-          for job in gen-contracts checks unit-tests coverage-report storybook-build test-build test-compose-e2e konflux-frontend-gate konflux-ui-tests-gate shared-checks-gate; do
+          for job in gen-contracts checks unit-tests coverage-report storybook-build test-build frontend-checks-gate test-compose-e2e konflux-frontend-gate konflux-ui-tests-gate shared-checks-gate; do
             case "$job" in
               gen-contracts)           result="${{ needs.gen-contracts.result }}" ;;
               checks)                  result="${{ needs.checks.result }}" ;;
@@ -672,6 +685,7 @@ jobs:
               coverage-report)         result="${{ needs.coverage-report.result }}" ;;
               storybook-build)         result="${{ needs.storybook-build.result }}" ;;
               test-build)              result="${{ needs.test-build.result }}" ;;
+              frontend-checks-gate)    result="${{ needs.frontend-checks-gate.result }}" ;;
               test-compose-e2e)        result="${{ needs.test-compose-e2e.result }}" ;;
               konflux-frontend-gate)   result="${{ needs.konflux-frontend-gate.result }}" ;;
               konflux-ui-tests-gate)   result="${{ needs.konflux-ui-tests-gate.result }}" ;;

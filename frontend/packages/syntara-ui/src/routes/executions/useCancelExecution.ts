@@ -27,11 +27,11 @@ export function useCancelExecution(executionId: string) {
       { params: { path: { execution_id: executionId } } },
       {
         onSuccess() {
-          showSuccess({ title: 'Execution cancellation requested' })
+          showSuccess({ title: 'Run cancellation requested' })
           invalidateExecutionQueries(queryClient)
         },
         onError(error: unknown) {
-          showError({ title: 'Failed to cancel execution', description: getErrorMessage(error) })
+          showError({ title: 'Failure to cancel run', description: getErrorMessage(error) })
         },
       }
     )

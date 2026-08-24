@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { executionsClient } from '../../client'
 import { FilterBar } from '../../components/filters/FilterBar'
 import { SynPanel } from '../../components/layout/SynPanel'
-import { NxEmptyStateFilter } from '../../components/states/NxEmptyStateFilter'
+import { SynEmptyStateFilter } from '../../components/states/SynEmptyStateFilter'
 import { useQueryState } from '../../components/states/useQueryState'
 import { useElapsedTime } from '../../hooks/useElapsedTime'
 import type { FilterConfig } from '../../types/filters'
@@ -139,7 +139,7 @@ function ThreePanelLayout({
           <Stack className={styles.activityListScrollWrapper}>
             {activityOrder.length === 0 && hasFilteredOutActivities ? (
               <StackItem isFilled>
-                <NxEmptyStateFilter clearAllFilters={() => onFilterChange([])} />
+                <SynEmptyStateFilter clearAllFilters={() => onFilterChange([])} />
               </StackItem>
             ) : (
               <CompactActivityList
@@ -277,7 +277,7 @@ function SinglePanelLayout({
 
         {activityOrder.length === 0 && hasFilteredOutActivities ? (
           <StackItem isFilled style={{ minHeight: 0 }}>
-            <NxEmptyStateFilter clearAllFilters={() => onFilterChange([])} />
+            <SynEmptyStateFilter clearAllFilters={() => onFilterChange([])} />
           </StackItem>
         ) : (
           <ExecutionActivityTable

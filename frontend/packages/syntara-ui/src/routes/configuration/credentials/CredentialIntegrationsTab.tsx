@@ -7,7 +7,7 @@ import { AppRoute } from '../../../app/AppRoute'
 import { integrationsClient } from '../../../client'
 import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
 import { NxListPanelTable, NxListPanelView } from '../../../components/panels/list/NxListPanel'
-import { NxEmptyStateNoData } from '../../../components/states/NxEmptyStateNoData'
+import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import { LinkCell } from '../../../components/table/LinkCell'
 import { UserTimestamp } from '../../../components/table/UserTimestamp'
 import { useExpandableRowIds } from '../../../hooks/useExpandableRowIds'
@@ -146,7 +146,7 @@ export function CredentialIntegrationsTab({ credentialId }: Readonly<CredentialI
         hasActiveFilters={false}
         onClearAllFilters={noop}
         noDataState={
-          <NxEmptyStateNoData
+          <SynEmptyStateNoData
             title="No integrations using this credential"
             description="This credential is not currently referenced by any integrations. Integrations will appear here once they are configured to use this credential."
           />

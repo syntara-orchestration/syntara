@@ -3,10 +3,10 @@ import { RhUiErrorFillIcon } from '@patternfly/react-icons'
 
 import { getErrorMessage, getErrorTitle, isRetryableError, isServiceUnavailableError } from '../../utils/apiErrors'
 
-import { NxEmptyStateServiceUnavailable } from './NxEmptyStateServiceUnavailable'
+import { SynEmptyStateServiceUnavailable } from './SynEmptyStateServiceUnavailable'
 
-/** Props for {@link NxErrorState}. */
-export type NxErrorStateProps = {
+/** Props for {@link SynErrorState}. */
+export type SynErrorStateProps = {
   title?: string
   message: unknown
   onRetry?: () => void
@@ -17,13 +17,13 @@ export type NxErrorStateProps = {
  *
  * Derives the title and message from the error automatically; pass `title` to override.
  * Shows a Retry button only when the error is retryable and `onRetry` is provided.
- * 503 Service Unavailable errors render {@link NxEmptyStateServiceUnavailable} instead.
+ * 503 Service Unavailable errors render {@link SynEmptyStateServiceUnavailable} instead.
  */
-export function NxErrorState(props: NxErrorStateProps) {
+export function SynErrorState(props: SynErrorStateProps) {
   const { title, message, onRetry } = props
 
   if (isServiceUnavailableError(message)) {
-    return <NxEmptyStateServiceUnavailable description={getErrorMessage(message)} />
+    return <SynEmptyStateServiceUnavailable description={getErrorMessage(message)} />
   }
 
   const errorTitle = title ?? getErrorTitle(message)

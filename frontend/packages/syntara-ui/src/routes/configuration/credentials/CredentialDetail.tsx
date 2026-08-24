@@ -21,7 +21,7 @@ import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../components/layout/SynPanel'
 import type { KebabAction } from '../../../components/NxKebabMenu'
 import { NxKebabMenu } from '../../../components/NxKebabMenu'
-import { NxErrorState } from '../../../components/states/NxErrorState'
+import { SynErrorState } from '../../../components/states/SynErrorState'
 import { useQueryState } from '../../../components/states/useQueryState'
 import { SynPageTitle } from '../../../components/SynPageTitle'
 import { UserTimestamp } from '../../../components/table/UserTimestamp'
@@ -258,7 +258,7 @@ export default function CredentialDetail() {
         <SynPageHeader title="Error" breadcrumbs={breadcrumbsCredentialEarlyShell('Error')} />
         <SynPageBody>
           <SynPanel isFullHeight>
-            <NxErrorState title="Invalid credential" message="No credential ID provided" />
+            <SynErrorState title="Invalid credential" message="No credential ID provided" />
           </SynPanel>
         </SynPageBody>
       </SynPage>
