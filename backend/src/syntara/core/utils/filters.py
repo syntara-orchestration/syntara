@@ -380,8 +380,9 @@ def _convert_filter_value(value: FilterValue, field_attr: Any) -> FilterValue:  
         # Get the Python type from the SQLAlchemy column
         python_type = field_attr.type.python_type
     except (AttributeError, NotImplementedError):
-        # Some SQLAlchemy types don't implement python_type (like UUID, custom types)
-        # This is expected, just use string comparison for these fields
+        # Some custom SQLAlchemy types don't implement python_type (e.g., DiscriminatedJSONB, custom TypeDecorators)
+        # Standard types (str, int, UUID, datetime, etc.) do provide python_type and are handled below
+        # This fallback uses string comparison for fields where type cannot be determined
         logger.debug(
             "Field does not provide python_type, using string comparison",
             field=getattr(field_attr, "key", "unknown"),
