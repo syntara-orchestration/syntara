@@ -150,7 +150,7 @@ class TestFilterableModel:
             name: str = ""
             __filterable_fields__: ClassVar[list[str]] = ["name", "nonexistent"]
 
-        with pytest.raises(ValueError, match="nonexistent.*not found"):
+        with pytest.raises(ValueError, match=r"nonexistent.*not found"):
             FilterableModel(VirtualFieldModel)
 
     def test_virtual_field_with_type_declaration(self):
