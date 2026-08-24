@@ -980,6 +980,27 @@ class TestControlNodeSyncTrigger:
             mock_skipped.assert_called_once_with(metadata, self.mock_handle)
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "node_type",
+        [NodeType.CONDITION, NodeType.APPROVAL, NodeType.CONVERGE],
+    )
+    async def test_sync_detached_after_control_node_completes(self, node_type: str) -> None:
+        """Completing a control node also syncs detached nodes (marks them CANCELLED)."""
+        metadata = create_test_metadata(
+            activity_definitions_map={"ctrl_node": {"type": node_type}},
+            pending_activity_updates={1: {"activity_id": "ctrl_node", "status": ActivityStatus.RUNNING}},
+        )
+        event = self._create_completed_event()
+
+        with (
+            patch.object(self.service, "_sync_skipped_nodes", new_callable=AsyncMock),
+            patch.object(self.service, "_sync_detached_nodes", new_callable=AsyncMock) as mock_detached,
+            patch.object(self.service, "_sync_activities_to_db", new_callable=AsyncMock),
+        ):
+            await self.service._handle_event_post_processing(event, metadata, self.mock_handle)
+            mock_detached.assert_called_once_with(metadata, self.mock_handle)
+
+    @pytest.mark.asyncio
     async def test_no_sync_skipped_for_script_node(self) -> None:
         """Completing a non-control node (script) does NOT sync skipped nodes."""
         metadata = create_test_metadata(
@@ -990,10 +1011,12 @@ class TestControlNodeSyncTrigger:
 
         with (
             patch.object(self.service, "_sync_skipped_nodes", new_callable=AsyncMock) as mock_skipped,
+            patch.object(self.service, "_sync_detached_nodes", new_callable=AsyncMock) as mock_detached,
             patch.object(self.service, "_sync_activities_to_db", new_callable=AsyncMock),
         ):
             await self.service._handle_event_post_processing(event, metadata, self.mock_handle)
             mock_skipped.assert_not_called()
+            mock_detached.assert_not_called()
 
 
 class TestWorkflowEventExtraction:
@@ -2629,6 +2652,43 @@ class TestSyncNodesToTerminalStatus:
         handle.query = AsyncMock(side_effect=RuntimeError("workflow not reachable"))
 
         await self.service._sync_skipped_nodes(metadata, handle)
+
+    # -- _sync_detached_nodes tests --
+
+    @pytest.mark.asyncio
+    async def test_detached_node_marked_as_cancelled_not_skipped(self) -> None:
+        """Node detached by converge ANY strategy should be marked CANCELLED, not SKIPPED."""
+        activity = self._create_mock_activity_execution("node-slow")
+        self._mock_session([activity])
+        metadata = self._create_metadata(activity_index_map={"node-slow": 2})
+
+        handle = AsyncMock()
+        handle.query = AsyncMock(return_value=["node-slow"])
+
+        await self.service._sync_detached_nodes(metadata, handle)
+
+        handle.query.assert_awaited_once_with("get_detached_nodes")
+        assert activity.status == ActivityStatus.CANCELLED
+
+    @pytest.mark.asyncio
+    async def test_detached_sync_noop_when_no_detached_nodes(self) -> None:
+        """_sync_detached_nodes is a no-op when the workflow has no detached nodes."""
+        metadata = self._create_metadata()
+        handle = AsyncMock()
+        handle.query = AsyncMock(return_value=[])
+
+        await self.service._sync_detached_nodes(metadata, handle)
+
+        self.mock_session_factory.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_detached_sync_query_error_does_not_propagate(self) -> None:
+        """Errors during detached node sync should be logged, not raised."""
+        metadata = self._create_metadata()
+        handle = AsyncMock()
+        handle.query = AsyncMock(side_effect=RuntimeError("workflow not reachable"))
+
+        await self.service._sync_detached_nodes(metadata, handle)
 
     # -- _ensure_activity_records_exist tests --
 

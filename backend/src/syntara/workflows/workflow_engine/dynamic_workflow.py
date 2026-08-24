@@ -1555,6 +1555,19 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         return list(self.skipped_nodes)
 
     @workflow.query
+    def get_detached_nodes(self) -> list[str]:
+        """Query to get list of detached node IDs.
+
+        Detached nodes were in-flight when a converge ANY strategy fired.
+        ActivitySyncService marks these CANCELLED rather than SKIPPED.
+
+        Returns:
+            List of node IDs that were detached due to converge ANY completion
+
+        """
+        return list(self._detached_nodes)
+
+    @workflow.query
     def get_pre_resolved_nodes(self) -> list[str]:
         """Query to get list of pre-resolved node IDs.
 
