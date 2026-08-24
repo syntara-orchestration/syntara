@@ -1,7 +1,7 @@
 import { EmptyState, EmptyStateBody } from '@patternfly/react-core'
 import { RhUiErrorFillIcon } from '@patternfly/react-icons'
 
-export type NxEmptyStateServiceUnavailableProps = {
+export type SynEmptyStateServiceUnavailableProps = {
   title?: string
   description?: string
   showAdminHint?: boolean
@@ -12,10 +12,10 @@ export type NxEmptyStateServiceUnavailableProps = {
  *
  * @example
  * if (error.error === 'service_unavailable') {
- *   return <NxEmptyStateServiceUnavailable description={error.message} />
+ *   return <SynEmptyStateServiceUnavailable description={error.message} />
  * }
  */
-export function NxEmptyStateServiceUnavailable(props: Readonly<NxEmptyStateServiceUnavailableProps>) {
+export function SynEmptyStateServiceUnavailable(props: Readonly<SynEmptyStateServiceUnavailableProps>) {
   const { title, description, showAdminHint = true } = props
 
   const defaultTitle = 'Service Unavailable'

@@ -20,7 +20,7 @@ import { useMemo, useState } from 'react'
 import { integrationsClient } from '../../../client'
 import { NxLabel } from '../../../components/labels/NxLabel'
 import { SynPageBody } from '../../../components/layout/SynPage'
-import { NxEmptyStateNoData } from '../../../components/states/NxEmptyStateNoData'
+import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import { NxScrollableTableContainer } from '../../../components/table/NxScrollableTableContainer'
 import { useAlerts } from '../../../providers/alerts'
 import { getErrorMessage } from '../../../utils/apiErrors'
@@ -112,7 +112,7 @@ export function IntegrationResourcesTab({
   if (tools.length === 0) {
     return (
       <SynPageBody isCentered>
-        <NxEmptyStateNoData
+        <SynEmptyStateNoData
           title="No resources discovered yet"
           description="Click Refresh tools to discover available tools from this integration."
           buttonText="Refresh tools"

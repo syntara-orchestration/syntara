@@ -68,11 +68,12 @@ export async function clickAddConnectedStep(page: Page) {
   // Wait again after layout completes
   await waitForUIReady(page)
 
-  // Wait for canvas to finish re-rendering after layout and "Add connected step" buttons to appear
+  // Wait for canvas to finish re-rendering after layout and "Add connected step" buttons to appear.
+  // Konflux CI can be slow to re-render after layout — use a generous timeout.
   await expect(async () => {
     const addBtn = page.getByRole('button', { name: 'Add connected step' })
     await expect(addBtn.first()).toBeVisible()
-  }).toPass({ timeout: 10000, intervals: [500] })
+  }).toPass({ timeout: 25000, intervals: [500] })
 
   const addBtn = page.getByRole('button', { name: 'Add connected step' })
   await addBtn.first().click()

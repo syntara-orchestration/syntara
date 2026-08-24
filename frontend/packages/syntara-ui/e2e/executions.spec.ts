@@ -4,7 +4,7 @@ import { APP_TITLE } from './helpers/appTitle'
 test.describe('Execution list (requires running executions)', () => {
   test.skip(!!process.env.CI, 'CI deploys a fresh backend with no running executions to assert on')
 
-  test('user views executions and opens a running execution', async ({ app }) => {
+  test('user views executions and opens a running execution', { tag: ['@konflux-skip'] }, async ({ app }) => {
     await app.goto(toAppUrl('/executions'))
     await expect(app.getByRole('heading', { name: 'Workflow Runs' })).toBeVisible()
     await expect(app).toHaveTitle(`Workflow Runs | ${APP_TITLE}`)

@@ -345,22 +345,18 @@ if _parsed.scheme not in ("http", "https") or not any(h in (_parsed.hostname or 
     HTTPBIN_URL = "https://httpbin.org"
 
 
-_httpbin_cached: bool | None = None
-
-
 def httpbin_available() -> bool:
-    """Check if httpbin is reachable. Cache the result for the session."""
-    global _httpbin_cached  # noqa: PLW0603
-    if _httpbin_cached is None:
-        try:
-            urllib.request.urlopen(f"{HTTPBIN_URL}/status/200", timeout=5)  # noqa: S310
-            _httpbin_cached = True
-        except Exception:
-            _httpbin_cached = False
-    return _httpbin_cached
+    """Check if httpbin is reachable (uncached — always makes a fresh network request)."""
+    try:
+        urllib.request.urlopen(f"{HTTPBIN_URL}/status/200", timeout=5)  # noqa: S310
+    except Exception:
+        return False
+    else:
+        return True
 
 
-requires_httpbin = pytest.mark.skipif(
-    not httpbin_available(),
-    reason=f"httpbin not reachable at {HTTPBIN_URL}. Set HTTPBIN_URL to override.",
-)
+# Plain mark — runtime skip is handled by the pytest_runtest_setup hook in
+# tests/e2e/conftest.py, which calls httpbin_available() just before the test
+# body runs.  Using a collection-time skipif caused tests to be collected (not
+# skipped) when httpbin was up at import time but went down before execution.
+requires_httpbin = pytest.mark.requires_httpbin

@@ -1,8 +1,8 @@
 import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../components/layout/SynPanel'
-import { NxErrorState } from '../../../components/states/NxErrorState'
-import { NxLoadingState } from '../../../components/states/NxLoadingState'
+import { SynErrorState } from '../../../components/states/SynErrorState'
+import { SynLoadingState } from '../../../components/states/SynLoadingState'
 import { SynPageTitle } from '../../../components/SynPageTitle'
 import { detachPromise } from '../../../utils/detachPromise'
 
@@ -30,7 +30,7 @@ export function ExecutionDetailErrorStates({
         <SynPageHeader title="Error" />
         <SynPageBody>
           <SynPanel isFullHeight>
-            <NxErrorState title="Invalid execution" message="No execution ID provided" />
+            <SynErrorState title="Invalid execution" message="No execution ID provided" />
           </SynPanel>
         </SynPageBody>
       </SynPage>
@@ -44,7 +44,7 @@ export function ExecutionDetailErrorStates({
         <SynPageHeader title="Error loading execution" />
         <SynPageBody>
           <SynPanel isFullHeight>
-            <NxErrorState title="Error loading execution" message={error} onRetry={() => detachPromise(onRetry())} />
+            <SynErrorState title="Error loading execution" message={error} onRetry={() => detachPromise(onRetry())} />
           </SynPanel>
         </SynPageBody>
       </SynPage>
@@ -58,7 +58,7 @@ export function ExecutionDetailErrorStates({
         <SynPageHeader title="Loading execution" />
         <SynPageBody>
           <SynPanel isFullHeight>
-            <NxLoadingState />
+            <SynLoadingState />
           </SynPanel>
         </SynPageBody>
       </SynPage>

@@ -23,7 +23,7 @@ import type { IntegrationsAPI } from '@syntara/contracts'
 import { useMemo, useState } from 'react'
 
 import { SynPanelContentStack } from '../../../../components/layout/SynPanelContentStack'
-import { NxEmptyStateNoData } from '../../../../components/states/NxEmptyStateNoData'
+import { SynEmptyStateNoData } from '../../../../components/states/SynEmptyStateNoData'
 import { NxScrollableTableContainer } from '../../../../components/table/NxScrollableTableContainer'
 
 import styles from './WizardSteps.module.css'
@@ -122,7 +122,7 @@ function EnableToolsStep({
 
   if (tools.length === 0) {
     return (
-      <NxEmptyStateNoData
+      <SynEmptyStateNoData
         title="No tools found"
         description="The connection was successful, but no tools were found on this server."
       />

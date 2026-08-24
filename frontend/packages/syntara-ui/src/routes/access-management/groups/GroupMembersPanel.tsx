@@ -10,8 +10,8 @@ import { FilterBar } from '../../../components/filters'
 import { IconLabel } from '../../../components/IconLabel'
 import { SynPageBody } from '../../../components/layout/SynPage'
 import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
-import { NxEmptyStateFilter } from '../../../components/states/NxEmptyStateFilter'
-import { NxEmptyStateNoData } from '../../../components/states/NxEmptyStateNoData'
+import { SynEmptyStateFilter } from '../../../components/states/SynEmptyStateFilter'
+import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import { useQueryState } from '../../../components/states/useQueryState'
 import { LinkCell } from '../../../components/table/LinkCell'
 import { NxScrollableTableContainer } from '../../../components/table/NxScrollableTableContainer'
@@ -145,7 +145,7 @@ export function GroupMembersPanel({ groupId, onMembershipChange }: Readonly<Grou
   if (members.length === 0) {
     return (
       <>
-        <NxEmptyStateNoData
+        <SynEmptyStateNoData
           title="No members"
           description="Add users to this group to manage their access."
           buttonText="Add member"
@@ -202,7 +202,7 @@ export function GroupMembersPanel({ groupId, onMembershipChange }: Readonly<Grou
 
         {filteredMembers.length === 0 ? (
           <SynPageBody isCentered>
-            <NxEmptyStateFilter
+            <SynEmptyStateFilter
               clearAllFilters={() => {
                 clearAllFilters()
                 setPage(1)

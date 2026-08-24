@@ -22,6 +22,7 @@ from uuid import UUID
 
 import pytest
 from orchestrator_test_sdk.e2e import unique_name
+from orchestrator_test_sdk.e2e.helpers import _retry_api_call
 from syntara_api_client.api import SyntaraApiRegistry
 from syntara_api_client.models import WorkflowCreate, WorkflowDefinition, WorkflowRead
 from syntara_api_client.models.publish_version_request import PublishVersionRequest
@@ -84,10 +85,13 @@ class TestScheduledTrigger:
 
         # Publish — this creates the Temporal Schedule.  If the trigger config
         # is invalid, publish will fail with a validation error.
-        pub_resp = syntara_api.workflows.publish_version(
-            workflow_id=workflow.id,
-            version=1,
-            body=PublishVersionRequest(),
+        pub_resp = _retry_api_call(
+            lambda: syntara_api.workflows.publish_version(
+                workflow_id=workflow.id,
+                version=1,
+                body=PublishVersionRequest(),
+            ),
+            delay=5.0,
         )
         assert pub_resp.status_code == HTTPStatus.OK, (
             f"Failed to publish cron-scheduled workflow: {pub_resp.status_code} {pub_resp.content!r}"
@@ -142,10 +146,13 @@ class TestScheduledTrigger:
         workflow = workflow_factory(workflow_data)
         assert workflow.id is not None
 
-        pub_resp = syntara_api.workflows.publish_version(
-            workflow_id=workflow.id,
-            version=1,
-            body=PublishVersionRequest(),
+        pub_resp = _retry_api_call(
+            lambda: syntara_api.workflows.publish_version(
+                workflow_id=workflow.id,
+                version=1,
+                body=PublishVersionRequest(),
+            ),
+            delay=5.0,
         )
         assert pub_resp.status_code == HTTPStatus.OK, (
             f"Failed to publish interval-scheduled workflow: {pub_resp.status_code} {pub_resp.content!r}"
