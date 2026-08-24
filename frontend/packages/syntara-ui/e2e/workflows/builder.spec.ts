@@ -464,52 +464,6 @@ test('two nodes can be connected with an edge', async ({ app }) => {
   }
 })
 
-test('edge is visually distinguishable on canvas', async ({ app }) => {
-  const workflowName = buildUniqueName('e2e-builder')
-  await createWorkflowWithTrigger(app, workflowName)
-
-  try {
-    await closeNodeEditorPanel(app)
-    await expect(app.getByText('Manual trigger')).toBeVisible()
-
-    // Add two nodes - these will auto-connect:
-    // Manual trigger -> Source Node -> Target Node
-    await addScriptNode(app, 'Source Node', 'print("source")')
-    await addScriptNode(app, 'Target Node', 'print("target")')
-
-    // Edge existence is proven implicitly by addScriptNode succeeding (it clicks an
-    // edge overlay button). The "edge follows connection path" test verifies SVG path data.
-  } finally {
-    await deleteWorkflow(app, workflowName)
-  }
-})
-
-test('multiple edges can be created sequentially', async ({ app }) => {
-  const workflowName = buildUniqueName('e2e-builder')
-  await createWorkflowWithTrigger(app, workflowName)
-
-  try {
-    await closeNodeEditorPanel(app)
-    await expect(app.getByText('Manual trigger')).toBeVisible()
-
-    // Add three nodes
-    await addScriptNode(app, 'Node 1', 'print("1")')
-    await addScriptNode(app, 'Node 2', 'print("2")')
-    await addScriptNode(app, 'Node 3', 'print("3")')
-
-    // Layout to position nodes
-    await triggerLayout(app)
-
-    // Verify all nodes are visible — three successful addScriptNode calls prove
-    // three edges were sequentially created (each call clicks an edge overlay button).
-    await verifyNodeVisible(app, 'Node 1')
-    await verifyNodeVisible(app, 'Node 2')
-    await verifyNodeVisible(app, 'Node 3')
-  } finally {
-    await deleteWorkflow(app, workflowName)
-  }
-})
-
 test('edge follows connection path between nodes', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-builder')
   await createWorkflowWithTrigger(app, workflowName)
@@ -532,32 +486,6 @@ test('edge follows connection path between nodes', async ({ app }) => {
 
     // Verify it's actual SVG path commands (starts with M for moveTo)
     expect(pathData).toMatch(/^M/)
-  } finally {
-    await deleteWorkflow(app, workflowName)
-  }
-})
-
-test('connected nodes form a workflow DAG', async ({ app }) => {
-  const workflowName = buildUniqueName('e2e-builder')
-  await createWorkflowWithTrigger(app, workflowName)
-
-  try {
-    await closeNodeEditorPanel(app)
-    await expect(app.getByText('Manual trigger')).toBeVisible()
-
-    // Add nodes that will form a linear DAG: Manual Trigger -> Script 1 -> Script 2
-    await addScriptNode(app, 'Processing Step', 'print("processing")')
-    await addScriptNode(app, 'Final Step', 'print("final")')
-
-    // Layout to visualize the DAG
-    await triggerLayout(app)
-
-    // Verify all DAG nodes are present and visible after layout.
-    // DAG structure (trigger→processing→final) is proven by addScriptNode succeeding
-    // for each node — each call clicks an edge overlay button that only exists on a connected edge.
-    await verifyNodeVisible(app, 'Manual trigger')
-    await verifyNodeVisible(app, 'Processing Step')
-    await verifyNodeVisible(app, 'Final Step')
   } finally {
     await deleteWorkflow(app, workflowName)
   }

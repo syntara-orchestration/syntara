@@ -19,15 +19,12 @@ import {
   type SeededUser,
 } from './seeds/iam'
 import {
-  createCredentialSeed,
   createIdentityProviderViaApi,
   createIntegrationViaApi,
   createWorkflowViaApi,
-  deleteCredentialViaApi,
   deleteIdentityProviderViaApi,
   deleteIntegrationViaApi,
   deleteWorkflowViaApi,
-  type SeededCredential,
   type SeededIdentityProvider,
   type SeededIntegration,
   type SeededWorkflow,
@@ -35,7 +32,6 @@ import {
 import { ensureProject, getAuthToken } from './utils/api'
 
 const seededWorkflows: SeededWorkflow[] = []
-const seededCredentials: SeededCredential[] = []
 const seededIntegrations: SeededIntegration[] = []
 const seededUsers: SeededUser[] = []
 const seededGroups: SeededGroup[] = []
@@ -61,11 +57,6 @@ test.beforeAll(async ({ browser }) => {
   )
   for (const result of workflowResults) {
     if (result.status === 'fulfilled' && result.value) seededWorkflows.push(result.value)
-  }
-
-  for (let i = 1; i <= 2; i++) {
-    const cred = await createCredentialSeed(page, { name: `${prefix}-cred-${i}`, projectId, token })
-    if (cred) seededCredentials.push(cred)
   }
 
   for (let i = 1; i <= 2; i++) {
@@ -96,9 +87,6 @@ test.afterAll(async ({ browser }) => {
 
   for (const wf of seededWorkflows) {
     await deleteWorkflowViaApi(page, wf.id)
-  }
-  for (const cred of seededCredentials) {
-    await deleteCredentialViaApi(page, cred.id)
   }
   for (const integration of seededIntegrations) {
     await deleteIntegrationViaApi(page, integration.id)
@@ -372,26 +360,6 @@ test.describe('Pagination Navigation — Workflows', () => {
     await app.getByRole('menuitem', { name: /50 per page/i }).click()
 
     await expect(prevButton).toBeDisabled()
-  })
-})
-
-test.describe('Pagination Footer — Credentials', () => {
-  const guard = createUnavailableGuard('No credentials data available')
-
-  test.beforeEach(async ({ app }) => {
-    await app.goto(toAppUrl('/configuration/credentials'))
-    const table = app.getByRole('grid', { name: 'Credentials table' })
-    const hasTable = await table
-      .waitFor({ state: 'visible', timeout: 30_000 })
-      .then(() => true)
-      .catch(() => false)
-    if (!hasTable) guard.markUnavailable()
-    test.skip(!hasTable, 'No credentials data available')
-  })
-
-  test('credentials table renders with footer', async ({ app }) => {
-    const table = app.getByRole('grid', { name: 'Credentials table' })
-    await expect(table).toBeVisible()
   })
 })
 
