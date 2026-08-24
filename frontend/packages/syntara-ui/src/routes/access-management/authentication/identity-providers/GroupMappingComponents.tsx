@@ -19,14 +19,14 @@ import {
   TextInput,
 } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiEditIcon, RhUiSyncIcon } from '@patternfly/react-icons'
-import { Tbody, Table } from '@patternfly/react-table'
+import { Tbody } from '@patternfly/react-table'
 import { useCallback, useMemo, useState } from 'react'
 import { Controller, type Control } from 'react-hook-form'
 
 import { FilterBar } from '../../../../components/filters/FilterBar'
-import { NxPanelContentStack } from '../../../../components/layout/NxPanelContentStack'
-import { NxEmptyStateFilter } from '../../../../components/states/NxEmptyStateFilter'
-import { NxEmptyStateNoData } from '../../../../components/states/NxEmptyStateNoData'
+import { SynPanelContentStack } from '../../../../components/layout/SynPanelContentStack'
+import { SynEmptyStateFilter } from '../../../../components/states/SynEmptyStateFilter'
+import { SynEmptyStateNoData } from '../../../../components/states/SynEmptyStateNoData'
 import { NxScrollableTableContainer } from '../../../../components/table/NxScrollableTableContainer'
 import type { FilterConfig, FilterFieldDefinition } from '../../../../types/filters'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../../../types/filters'
@@ -218,7 +218,7 @@ export function MappingTable({
   const showAddButton = !isReadOnly && showAddMappingAction
 
   const table = (
-    <Table aria-label="Group mappings" variant="compact">
+    <NxScrollableTableContainer caption="Group mappings" variant="compact">
       <GroupMappingTableHead showActionsColumn={showActionsColumn} showWildcardHelp={showWildcardHelp} />
       <Tbody>
         {rows.map((row) => {
@@ -260,7 +260,7 @@ export function MappingTable({
           )
         })}
       </Tbody>
-    </Table>
+    </NxScrollableTableContainer>
   )
 
   if (!showAddButton) {
@@ -269,7 +269,7 @@ export function MappingTable({
 
   return (
     <Stack hasGutter>
-      <StackItem>{table}</StackItem>
+      {table}
       <StackItem>
         <Button variant="link" icon={<RhUiAddIcon />} onClick={onAdd}>
           Add mapping
@@ -408,7 +408,7 @@ export function ReadOnlyView({ entries, mappedGroups, onEditMapping }: Readonly<
   /** Defensive: parent normally switches to empty state before rendering read-only with zero rows */
   if (entries.length === 0) {
     return (
-      <NxEmptyStateNoData
+      <SynEmptyStateNoData
         title="No group mappings"
         description="There are no group mappings to display for this identity provider."
       />
@@ -416,7 +416,7 @@ export function ReadOnlyView({ entries, mappedGroups, onEditMapping }: Readonly<
   }
 
   return (
-    <NxPanelContentStack hasGutter>
+    <SynPanelContentStack hasGutter>
       <GroupMappingReadOnlyToolbar
         filters={filters}
         onFilterChange={handleFilterChange}
@@ -425,11 +425,12 @@ export function ReadOnlyView({ entries, mappedGroups, onEditMapping }: Readonly<
       />
       {filteredEntries.length === 0 ? (
         <StackItem isFilled style={READ_ONLY_EMPTY_FILTER_STATE_STYLE}>
-          <NxEmptyStateFilter clearAllFilters={clearFiltersAndPage} />
+          <SynEmptyStateFilter clearAllFilters={clearFiltersAndPage} />
         </StackItem>
       ) : (
         <NxScrollableTableContainer
           caption="Group mappings"
+          variant="compact"
           footer={{
             page,
             perPage,
@@ -460,6 +461,6 @@ export function ReadOnlyView({ entries, mappedGroups, onEditMapping }: Readonly<
           </Tbody>
         </NxScrollableTableContainer>
       )}
-    </NxPanelContentStack>
+    </SynPanelContentStack>
   )
 }

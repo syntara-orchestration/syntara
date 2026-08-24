@@ -146,6 +146,9 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             self._cleanup_timeout_tasks()
             self._mark_remaining_unreachable_nodes(graph)
 
+            if self._detached_nodes:
+                await self._expire_remaining_approvals(graph)
+
             return self._build_result(execution_id, include_node_results)
 
         except asyncio.CancelledError:

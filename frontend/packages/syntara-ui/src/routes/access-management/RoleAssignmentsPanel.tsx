@@ -10,12 +10,12 @@ import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { FilterBar } from '../../components/filters'
 import { IconLabel } from '../../components/IconLabel'
 import { NxLabel } from '../../components/labels/NxLabel'
-import { NxPageBody } from '../../components/layout/NxPage'
-import { NxPanelContentStack } from '../../components/layout/NxPanelContentStack'
-import { NxEmptyStateFilter } from '../../components/states/NxEmptyStateFilter'
-import { NxEmptyStateNoData } from '../../components/states/NxEmptyStateNoData'
-import { NxErrorState } from '../../components/states/NxErrorState'
-import { NxLoadingState } from '../../components/states/NxLoadingState'
+import { SynPageBody } from '../../components/layout/SynPage'
+import { SynPanelContentStack } from '../../components/layout/SynPanelContentStack'
+import { SynEmptyStateFilter } from '../../components/states/SynEmptyStateFilter'
+import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
+import { SynErrorState } from '../../components/states/SynErrorState'
+import { SynLoadingState } from '../../components/states/SynLoadingState'
 import { LinkCell } from '../../components/table/LinkCell'
 import { NxScrollableTableContainer } from '../../components/table/NxScrollableTableContainer'
 import { invalidateAuthzCaches } from '../../hooks/invalidateAuthzCaches'
@@ -254,25 +254,25 @@ function TableContent({
   if (filteredRows.length === 0) {
     if (rows.length === 0) {
       return (
-        <NxPageBody isCentered>
-          <NxEmptyStateNoData
+        <SynPageBody isCentered>
+          <SynEmptyStateNoData
             title="No role assignments"
             description={`No project-scoped roles have been assigned to this ${principalTypeLabel[principalType]}.`}
             buttonText="Assign role"
             addData={openAssignIfAllowed}
           />
-        </NxPageBody>
+        </SynPageBody>
       )
     }
     return (
-      <NxPageBody isCentered>
-        <NxEmptyStateFilter
+      <SynPageBody isCentered>
+        <SynEmptyStateFilter
           clearAllFilters={() => {
             clearAllFilters()
             resetPage()
           }}
         />
-      </NxPageBody>
+      </SynPageBody>
     )
   }
 
@@ -395,7 +395,7 @@ export function RoleAssignmentsPanel({
   // ── Loading / error states ──────────────────────────────────────────────
   if (activeQuery.isError && !queryForbidden) {
     return (
-      <NxErrorState
+      <SynErrorState
         title="Error loading role assignments"
         message={activeQuery.error}
         onRetry={() => detachPromise(activeQuery.refetch())}
@@ -403,12 +403,12 @@ export function RoleAssignmentsPanel({
     )
   }
 
-  if (isLoading) return <NxLoadingState />
+  if (isLoading) return <SynLoadingState />
 
   if (rows.length === 0 && !queryForbidden) {
     return (
       <>
-        <NxEmptyStateNoData
+        <SynEmptyStateNoData
           title="No role assignments"
           description={`No roles have been assigned to this ${principalTypeLabel[principalType]}.`}
           buttonText="Assign role"
@@ -427,7 +427,7 @@ export function RoleAssignmentsPanel({
 
   return (
     <>
-      <NxPanelContentStack>
+      <SynPanelContentStack>
         <ForbiddenAlert visible={queryForbidden} />
 
         <StackItem>
@@ -485,7 +485,7 @@ export function RoleAssignmentsPanel({
           onToggleRow={handleToggleRow}
           onCollapseAll={handleCollapseAll}
         />
-      </NxPanelContentStack>
+      </SynPanelContentStack>
 
       <AssignRoleModal
         principalType={principalType}

@@ -24,77 +24,83 @@ import { buildUniqueName, deleteWorkflow, selectProjectIfRequired } from '../hel
 import { ensureProject } from '../utils/api'
 
 test.describe('Manual Trigger', () => {
-  test('creates workflow with manual trigger and verifies canvas display', async ({ app }) => {
-    const workflowName = buildUniqueName('e2e-manual')
+  test(
+    'creates workflow with manual trigger and verifies canvas display',
+    { tag: ['@konflux-skip'] },
+    async ({ app }) => {
+      const workflowName = buildUniqueName('e2e-manual')
 
-    await ensureProject(app)
-    await app.goto(toAppUrl('/workflow-builder/new'))
+      await ensureProject(app)
+      await app.goto(toAppUrl('/workflow-builder/new'))
 
-    try {
-      await addManualTrigger(app, 'Start workflow')
-      await addScriptNode(app, 'Process data', 'print("processing")')
+      try {
+        await addManualTrigger(app, 'Start workflow')
+        await addScriptNode(app, 'Process data', 'print("processing")')
 
-      await selectProjectIfRequired(app)
-      await app.getByPlaceholder('Workflow name').fill(workflowName)
-      await app.getByRole('button', { name: 'Save', exact: true }).click()
-      await expect(app).toHaveURL(/workflow-builder\/.+/)
+        await selectProjectIfRequired(app)
+        await app.getByPlaceholder('Workflow name').fill(workflowName)
+        await app.getByRole('button', { name: 'Save', exact: true }).click()
+        await expect(app).toHaveURL(/workflow-builder\/.+/)
 
-      await app.goto(toAppUrl('/workflows'))
-      await app.getByPlaceholder('Filter by name').fill(workflowName)
-      await app.getByRole('button', { name: 'Apply filter' }).click()
-      await expect(app.getByRole('link', { name: workflowName, exact: true })).toBeVisible()
+        await app.goto(toAppUrl('/workflows'))
+        await app.getByPlaceholder('Filter by name').fill(workflowName)
+        await app.getByRole('button', { name: 'Apply filter' }).click()
+        await expect(app.getByRole('link', { name: workflowName, exact: true })).toBeVisible()
 
-      await app.getByRole('link', { name: workflowName, exact: true }).click()
+        await app.getByRole('link', { name: workflowName, exact: true }).click()
 
-      // Wait for builder to load
-      await expect(app).toHaveURL(/workflow-builder\/.+/, { timeout: 15_000 })
+        // Wait for builder to load
+        await expect(app).toHaveURL(/workflow-builder\/.+/, { timeout: 15_000 })
 
-      // Click Layout to position nodes within the viewport so both are visible
-      const layoutButton = app.getByRole('button', { name: 'Reset layout', exact: true })
-      await expect(layoutButton).toBeVisible({ timeout: 10_000 })
-      await layoutButton.click()
-      await app
-        .locator('[role="group"][aria-roledescription="node"]')
-        .filter({ hasText: 'Start workflow' })
-        .waitFor({ state: 'visible', timeout: 5_000 })
+        // Click Layout to position nodes within the viewport so both are visible
+        const layoutButton = app.getByRole('button', { name: 'Reset layout', exact: true })
+        await expect(layoutButton).toBeVisible({ timeout: 10_000 })
+        await layoutButton.click()
+        await app
+          .locator('[role="group"][aria-roledescription="node"]')
+          .filter({ hasText: 'Start workflow' })
+          .waitFor({ state: 'visible', timeout: 5_000 })
 
-      // Verify both nodes are visible on the canvas after reopening
-      const triggerNode = app
-        .locator('[role="group"][aria-roledescription="node"]')
-        .filter({ hasText: 'Start workflow' })
-      const scriptNode = app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: 'Process data' })
+        // Verify both nodes are visible on the canvas after reopening
+        const triggerNode = app
+          .locator('[role="group"][aria-roledescription="node"]')
+          .filter({ hasText: 'Start workflow' })
+        const scriptNode = app
+          .locator('[role="group"][aria-roledescription="node"]')
+          .filter({ hasText: 'Process data' })
 
-      await expect(triggerNode).toBeVisible({ timeout: 15_000 })
-      await expect(scriptNode).toBeVisible({ timeout: 15_000 })
+        await expect(triggerNode).toBeVisible({ timeout: 15_000 })
+        await expect(scriptNode).toBeVisible({ timeout: 15_000 })
 
-      // Verify the edge connection exists between the nodes
-      const edges = app.locator('[role="group"][aria-roledescription="edge"]')
-      const edgeCount = await edges.count()
-      expect(edgeCount).toBeGreaterThanOrEqual(1) // At least one edge: trigger -> script
+        // Verify the edge connection exists between the nodes
+        const edges = app.locator('[role="group"][aria-roledescription="edge"]')
+        const edgeCount = await edges.count()
+        expect(edgeCount).toBeGreaterThanOrEqual(1) // At least one edge: trigger -> script
 
-      // Test the full end-to-end journey: now run the workflow from the canvas
-      const runButton = app.getByRole('button', { name: 'Run' })
-      await expect(runButton).toBeVisible()
-      await expect(runButton).toBeEnabled()
+        // Test the full end-to-end journey: now run the workflow from the canvas
+        const runButton = app.getByRole('button', { name: 'Run' })
+        await expect(runButton).toBeVisible()
+        await expect(runButton).toBeEnabled()
 
-      await runButton.click()
-      const dialog = app.getByRole('dialog')
-      await expect(dialog).toBeVisible()
+        await runButton.click()
+        const dialog = app.getByRole('dialog')
+        await expect(dialog).toBeVisible()
 
-      // After reopening a saved workflow, the UI may detect state differences as unsaved changes
-      await dialog.getByRole('button', { name: /Run now|Save and run/ }).click()
-      await expect(dialog).not.toBeVisible()
+        // After reopening a saved workflow, the UI may detect state differences as unsaved changes
+        await dialog.getByRole('button', { name: /Run now|Save and run/ }).click()
+        await expect(dialog).not.toBeVisible()
 
-      // Verify the run details panel appears after execution starts
-      await expect(app.getByRole('heading', { name: 'Run details' })).toBeVisible({ timeout: 30_000 })
+        // Verify the run details panel appears after execution starts
+        await expect(app.getByRole('heading', { name: 'Run details' })).toBeVisible({ timeout: 30_000 })
 
-      // Trigger completed successfully. do not require the script node's badge;
-      // see file header note.
-      await expect(triggerNode.getByRole('img', { name: 'Success' })).toBeVisible({ timeout: 60_000 })
-    } finally {
-      await deleteWorkflow(app, workflowName)
+        // Trigger completed successfully. do not require the script node's badge;
+        // see file header note.
+        await expect(triggerNode.getByRole('img', { name: 'Success' })).toBeVisible({ timeout: 60_000 })
+      } finally {
+        await deleteWorkflow(app, workflowName)
+      }
     }
-  })
+  )
 
   test('trigger form shows name field with default value', async ({ app }) => {
     await ensureProject(app)

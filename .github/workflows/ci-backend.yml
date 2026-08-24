@@ -755,9 +755,9 @@ jobs:
 
           echo "Combined report written to pytest-results.xml"
 
-      # Pass the PR number as an artifact so the workflow_run-based SonarCloud
-      # fallback (for fork PRs) can identify and tag the analysis correctly.
       - name: Save PR number
+        # Pass the PR number as an artifact so the workflow_run-based SonarCloud
+        # fallback (for fork PRs) can identify and tag the analysis correctly.
         if: github.event_name == 'pull_request'
         run: echo "PR ${{ github.event.number }}" > pr_number.txt
 
@@ -909,88 +909,27 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - name: Wait for Konflux conforma check
-        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553 # v9
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: ./.github/actions/konflux-gate
         with:
-          script: |
-            const sha = context.payload.pull_request.head.sha;
-            const timeout = 85 * 60 * 1000;
-            const startupWindow = 15 * 60 * 1000;
-            const interval = 30 * 1000;
-            const start = Date.now();
-            const pipelineCheckName = 'Konflux kflux-prd-rh03 / ansible-automation-orchestrator-backend-devel-on-pull-request';
-            const conformaCheckName = 'Red Hat Konflux / conforma-on-pull-request-devel / ansible-automation-orchestrator-backend-devel';
+          check-name: 'Red Hat Konflux / conforma-on-pull-request-{branch} / ansible-automation-orchestrator-backend-{branch}'
+          pipeline-check-name: 'Konflux kflux-prd-rh03 / ansible-automation-orchestrator-backend-{branch}-on-pull-request'
+          timeout-minutes: '85'
 
-            // Phase 1: wait up to 15 minutes for the parent pipeline check to appear.
-            // If it never appears the Tekton CEL did not match (no backend/ changes) — skip.
-            console.log('Waiting for Konflux pipeline to start...');
-            while (true) {
-              const { data } = await github.rest.checks.listForRef({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                ref: sha,
-                check_name: pipelineCheckName,
-                per_page: 1,
-              });
-              if (data.check_runs.length > 0) {
-                console.log('Konflux pipeline started — waiting for conforma check...');
-                break;
-              }
-              const elapsed = Math.round((Date.now() - start) / 1000);
-              if (Date.now() - start > startupWindow) {
-                console.log(`Konflux pipeline never appeared after 15 minutes — Tekton CEL did not match, skipping`);
-                return;
-              }
-              console.log(`Waiting for pipeline to start... (${elapsed}s elapsed)`);
-              await new Promise(r => setTimeout(r, interval));
-            }
-
-            // Phase 2: pipeline fired — wait for conforma to pass, bailing early if
-            // the parent pipeline itself fails before conforma runs (e.g. build error).
-            while (Date.now() - start < timeout) {
-              const { data: parentData } = await github.rest.checks.listForRef({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                ref: sha,
-                check_name: pipelineCheckName,
-                per_page: 1,
-              });
-              const parentRun = parentData.check_runs[0];
-              if (parentRun?.status === 'completed' && !['success', 'neutral'].includes(parentRun.conclusion)) {
-                core.setFailed(`Konflux pipeline failed (${parentRun.conclusion}) before conforma ran: ${parentRun.html_url}`);
-                return;
-              }
-
-              const { data } = await github.rest.checks.listForRef({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                ref: sha,
-                check_name: conformaCheckName,
-                per_page: 100,
-              });
-
-              const runs = data.check_runs;
-              const completed = runs.filter(r => r.status === 'completed');
-              const succeeded = completed.filter(r => ['success', 'neutral'].includes(r.conclusion));
-              const failed = completed.filter(r => !['success', 'neutral', 'cancelled', 'skipped'].includes(r.conclusion));
-
-              if (failed.length > 0) {
-                core.setFailed(`${conformaCheckName} failed (${failed[0].conclusion}): ${failed[0].html_url}`);
-                return;
-              }
-              if (succeeded.length > 0) {
-                const r = succeeded[0];
-                const suffix = r.conclusion === 'neutral' ? ' (with warnings)' : '';
-                console.log(`${conformaCheckName} passed${suffix}: ${r.html_url}`);
-                return;
-              }
-
-              const elapsed = Math.round((Date.now() - start) / 1000);
-              const state = runs.length === 0 ? 'not started yet' : runs[runs.length - 1].status;
-              console.log(`${conformaCheckName}: ${state} (${elapsed}s elapsed)`);
-              await new Promise(r => setTimeout(r, interval));
-            }
-            core.setFailed(`Timed out after 85 minutes waiting for: ${conformaCheckName}`);
+  konflux-api-tests-gate:
+    name: (Backend) Konflux API Tests Gate
+    # Tekton PAC only fires on pull_request events (not merge_group or push).
+    if: github.event_name == 'pull_request'
+    permissions:
+      checks: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: ./.github/actions/konflux-gate
+        with:
+          check-name: 'Konflux kflux-prd-rh03 / automation-orchestrator-api-tests-{branch}-pull-request'
+          timeout-minutes: '115'
 
   snyk-sast:
     uses: ./.github/workflows/sast-snyk.yml
@@ -1023,6 +962,7 @@ jobs:
       - test-integration
       - test-compose-e2e
       - konflux-backend-gate
+      - konflux-api-tests-gate
       - shared-checks-gate
       - snyk-sast
       - snyk-sca
@@ -1044,7 +984,7 @@ jobs:
 
           # Check all other required jobs
           ok="success|skipped"
-          for job in api-spec-validation api-spec-bundle api-spec-drift generate-api-client check-api-paths check-dead-code check-cycles check-orphans check-openapi-breaking verify-test-structure mypy test-unit test-cli test-integration test-compose-e2e konflux-backend-gate shared-checks-gate snyk-sast snyk-sca; do
+          for job in api-spec-validation api-spec-bundle api-spec-drift generate-api-client check-api-paths check-dead-code check-cycles check-orphans check-openapi-breaking verify-test-structure mypy test-unit test-cli test-integration test-compose-e2e konflux-backend-gate konflux-api-tests-gate shared-checks-gate snyk-sast snyk-sca; do
             case "$job" in
               api-spec-validation)   result="${{ needs.api-spec-validation.result }}" ;;
               api-spec-bundle)       result="${{ needs.api-spec-bundle.result }}" ;;
@@ -1062,6 +1002,7 @@ jobs:
               test-integration)      result="${{ needs.test-integration.result }}" ;;
               test-compose-e2e)      result="${{ needs.test-compose-e2e.result }}" ;;
               konflux-backend-gate)  result="${{ needs.konflux-backend-gate.result }}" ;;
+              konflux-api-tests-gate) result="${{ needs.konflux-api-tests-gate.result }}" ;;
               shared-checks-gate)    result="${{ needs.shared-checks-gate.result }}" ;;
               snyk-sast)             result="${{ needs.snyk-sast.result }}" ;;
               snyk-sca)              result="${{ needs.snyk-sca.result }}" ;;

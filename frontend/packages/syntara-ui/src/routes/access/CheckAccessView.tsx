@@ -18,8 +18,8 @@ import { Controller, useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 
 import { NxLabel } from '../../components/labels/NxLabel'
-import { NxEmptyStateNoData } from '../../components/states/NxEmptyStateNoData'
-import { NxErrorState } from '../../components/states/NxErrorState'
+import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
+import { SynErrorState } from '../../components/states/SynErrorState'
 import { getErrorMessage } from '../../utils/apiErrors'
 
 import { accessClient } from './accessClient'
@@ -244,7 +244,7 @@ export function CheckAccessView({ resourceTypes, actionsByResource }: Readonly<R
         <Stack hasGutter>
           {canIMutation.isIdle && (
             <StackItem>
-              <NxEmptyStateNoData
+              <SynEmptyStateNoData
                 title="Check access permissions"
                 description="Select a resource type and action, then click Check Access to verify your permissions."
               />
@@ -264,7 +264,7 @@ export function CheckAccessView({ resourceTypes, actionsByResource }: Readonly<R
 
           {canIMutation.isError && (
             <StackItem>
-              <NxErrorState
+              <SynErrorState
                 title="Access check failed"
                 message={getErrorMessage(canIMutation.error)}
                 onRetry={onSubmit}

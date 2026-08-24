@@ -2,11 +2,11 @@ import { useCallback, useState } from 'react'
 
 import { breadcrumbsIdentityProvidersPage } from '../../../app/breadcrumbBuilders'
 import { EmptyStateAccessDenied } from '../../../components/EmptyStateAccessDenied'
-import { NxPage, NxPageBody } from '../../../components/layout/NxPage'
-import { NxPageHeader } from '../../../components/layout/NxPageHeader'
-import { NxPanel } from '../../../components/layout/NxPanel'
-import { NxPageTitle } from '../../../components/NxPageTitle'
+import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
+import { SynPageHeader } from '../../../components/layout/SynPageHeader'
+import { SynPanel } from '../../../components/layout/SynPanel'
 import { NxListPanel } from '../../../components/panels/list/NxListPanel'
+import { SynPageTitle } from '../../../components/SynPageTitle'
 import { useCanI } from '../../../hooks/useCanI'
 import { useDocLink } from '../../../utils/docs/useDocLink'
 
@@ -37,34 +37,34 @@ export default function Authentication() {
 
   if (isChecking) {
     return (
-      <NxPage>
-        <NxPageTitle segments={['Identity Providers']} />
-        <NxPageHeader title="Identity Providers" breadcrumbs={breadcrumbsIdentityProvidersPage()} />
-        <NxPageBody>
-          <NxPanel isFullHeight />
-        </NxPageBody>
-      </NxPage>
+      <SynPage>
+        <SynPageTitle segments={['Identity Providers']} />
+        <SynPageHeader title="Identity Providers" breadcrumbs={breadcrumbsIdentityProvidersPage()} />
+        <SynPageBody>
+          <SynPanel isFullHeight />
+        </SynPageBody>
+      </SynPage>
     )
   }
 
   if (!canRead) {
     return (
-      <NxPage>
-        <NxPageTitle segments={['Identity Providers']} />
-        <NxPageHeader title="Identity Providers" breadcrumbs={breadcrumbsIdentityProvidersPage()} />
-        <NxPageBody>
-          <NxPanel isFullHeight>
+      <SynPage>
+        <SynPageTitle segments={['Identity Providers']} />
+        <SynPageHeader title="Identity Providers" breadcrumbs={breadcrumbsIdentityProvidersPage()} />
+        <SynPageBody>
+          <SynPanel isFullHeight>
             <EmptyStateAccessDenied description="You don't have permission to view identity providers. Contact your administrator to request access." />
-          </NxPanel>
-        </NxPageBody>
-      </NxPage>
+          </SynPanel>
+        </SynPageBody>
+      </SynPage>
     )
   }
 
   return (
-    <NxPage>
-      <NxPageTitle segments={['Identity Providers']} />
-      <NxPageHeader
+    <SynPage>
+      <SynPageTitle segments={['Identity Providers']} />
+      <SynPageHeader
         title="Identity Providers"
         docLink={identityProvidersDocLink}
         breadcrumbs={breadcrumbsIdentityProvidersPage()}
@@ -78,11 +78,11 @@ export default function Authentication() {
           ) : undefined
         }
       />
-      <NxPageBody>
+      <SynPageBody>
         <NxListPanel>
           <IdentityProvidersTab onHeaderToolbarStateChange={handleHeaderToolbarStateChange} />
         </NxListPanel>
-      </NxPageBody>
-    </NxPage>
+      </SynPageBody>
+    </SynPage>
   )
 }

@@ -299,7 +299,7 @@ describe('Integrations Component', () => {
       render(<Integrations />, { wrapper })
 
       // Check for empty state message (no filters active, so shows empty state not filter empty)
-      expect(screen.getByText('No integrations have been configured yet.')).toBeInTheDocument()
+      expect(screen.getByText('No integrations yet')).toBeInTheDocument()
       // Multiple "Configure integration" buttons exist (header + empty state), so use getAllByText
       expect(screen.getAllByText('Configure integration').length).toBeGreaterThan(0)
     })
@@ -318,7 +318,7 @@ describe('Integrations Component', () => {
       render(<Integrations />, { wrapper })
 
       expect(screen.getByText('No results found')).toBeInTheDocument()
-      expect(screen.queryByText('No integrations have been configured yet.')).not.toBeInTheDocument()
+      expect(screen.queryByText('No integrations yet')).not.toBeInTheDocument()
     })
   })
 
@@ -1596,7 +1596,7 @@ describe('Integrations Component', () => {
 
       render(<Integrations />, { wrapper })
 
-      expect(screen.getByText('No integrations have been configured yet.')).toBeInTheDocument()
+      expect(screen.getByText('No integrations yet')).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Configure integration' })).not.toBeInTheDocument()
     })
   })

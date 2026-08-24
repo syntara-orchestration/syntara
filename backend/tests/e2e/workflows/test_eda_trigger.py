@@ -16,7 +16,7 @@ from uuid import UUID
 import httpx
 import pytest
 from orchestrator_test_sdk.e2e import unique_name
-from orchestrator_test_sdk.e2e.helpers import poll_execution_until_complete
+from orchestrator_test_sdk.e2e.helpers import _retry_api_call, poll_execution_until_complete
 from orchestrator_test_sdk.e2e.tls import e2e_ssl_context
 from syntara_api_client.api import SyntaraApiRegistry
 from syntara_api_client.models import WorkflowCreate, WorkflowDefinition, WorkflowRead
@@ -126,11 +126,13 @@ class TestEdaTrigger:
     ):
         """POST without Bearer token returns 401."""
         eda_url = f"{syntara_base_url}/api/v1/webhooks/eda/{unique_name('no-auth')}"
-        response = httpx.post(
-            eda_url,
-            json={"event_type": "test"},
-            verify=e2e_ssl_context(),
-            timeout=30,
+        response = _retry_api_call(
+            lambda: httpx.post(
+                eda_url,
+                json={"event_type": "test"},
+                verify=e2e_ssl_context(),
+                timeout=30,
+            )
         )
         assert response.status_code == HTTPStatus.UNAUTHORIZED
 

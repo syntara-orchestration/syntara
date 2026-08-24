@@ -5,21 +5,17 @@ import { useCallback, useMemo, useState } from 'react'
 
 import { AppRoute } from '../../../app/AppRoute'
 import { integrationsClient } from '../../../client'
-import { NxPanelContentStack } from '../../../components/layout/NxPanelContentStack'
+import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
 import { NxListPanelTable, NxListPanelView } from '../../../components/panels/list/NxListPanel'
-import { NxEmptyStateNoData } from '../../../components/states/NxEmptyStateNoData'
+import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import { LinkCell } from '../../../components/table/LinkCell'
+import { UserTimestamp } from '../../../components/table/UserTimestamp'
 import { useExpandableRowIds } from '../../../hooks/useExpandableRowIds'
 import { detachPromise } from '../../../utils/detachPromise'
 import { INTEGRATION_TYPE_LABELS } from '../integrations/integrationFilters'
 import { StatusLabel } from '../integrations/StatusLabel'
 
-import {
-  expandableRowIds,
-  hasTrimmedDescription,
-  RELATED_RESOURCE_DASH,
-  relatedResourceRowId,
-} from './credentialRelatedTableUtils'
+import { expandableRowIds, hasTrimmedDescription, relatedResourceRowId } from './credentialRelatedTableUtils'
 import { DescriptionExpandableContent } from './DescriptionExpandableContent'
 
 type Integration = IntegrationsAPI.components['schemas']['IntegrationRead']
@@ -98,7 +94,7 @@ function IntegrationsTable({
                 {INTEGRATION_TYPE_LABELS[integration.integration_type ?? ''] ?? integration.integration_type ?? ''}
               </Td>
               <Td dataLabel="Created by">
-                <Truncate content={integration.created_by ?? RELATED_RESOURCE_DASH} />
+                <UserTimestamp user={integration.created_by} timestamp={integration.created_at} inline />
               </Td>
               <Td dataLabel="Status">
                 <StatusLabel
@@ -140,7 +136,7 @@ export function CredentialIntegrationsTab({ credentialId }: Readonly<CredentialI
   const { expandedRows, allRowsExpanded, handleToggleRow, handleCollapseAll } = useExpandableRowIds(expandableIds)
 
   return (
-    <NxPanelContentStack>
+    <SynPanelContentStack>
       <NxListPanelView
         isPending={query.isPending}
         error={query.error}
@@ -150,7 +146,7 @@ export function CredentialIntegrationsTab({ credentialId }: Readonly<CredentialI
         hasActiveFilters={false}
         onClearAllFilters={noop}
         noDataState={
-          <NxEmptyStateNoData
+          <SynEmptyStateNoData
             title="No integrations using this credential"
             description="This credential is not currently referenced by any integrations. Integrations will appear here once they are configured to use this credential."
           />
@@ -179,6 +175,6 @@ export function CredentialIntegrationsTab({ credentialId }: Readonly<CredentialI
           </NxListPanelTable>
         }
       />
-    </NxPanelContentStack>
+    </SynPanelContentStack>
   )
 }

@@ -14,14 +14,15 @@ import {
   Truncate,
 } from '@patternfly/react-core'
 import { RhUiCaretLeftIcon, RhUiCaretRightIcon } from '@patternfly/react-icons'
-import { Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
+import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import { useCallback, useMemo, useState } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 
-import { NxEmptyStateNoData } from '../../components/states/NxEmptyStateNoData'
-import { NxErrorState } from '../../components/states/NxErrorState'
+import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
+import { SynErrorState } from '../../components/states/SynErrorState'
 import { LinkCell } from '../../components/table/LinkCell'
+import { NxScrollableTableContainer } from '../../components/table/NxScrollableTableContainer'
 import { getErrorMessage } from '../../utils/apiErrors'
 import { getUserDetailPath } from '../access-management/accessManagementPaths'
 
@@ -81,32 +82,13 @@ function WhoCanResults({
         />
       </StackItem>
       {users.length > 0 && (
-        <>
-          <StackItem>
-            <Table aria-label="Users with access" isStriped style={{ width: '100%' }}>
-              <Thead>
-                <Tr>
-                  <Th>Username</Th>
-                </Tr>
-              </Thead>
-              <Tbody>
-                {users.map((u) => (
-                  <Tr key={u.id}>
-                    <Td dataLabel="Username">
-                      <LinkCell href={getUserDetailPath(u.id)}>
-                        <Truncate content={u.username} />
-                      </LinkCell>
-                    </Td>
-                  </Tr>
-                ))}
-              </Tbody>
-            </Table>
-          </StackItem>
-          <StackItem>
+        <NxScrollableTableContainer
+          caption="Users with access"
+          isStriped
+          footerContent={
             <Flex
               justifyContent={{ default: 'justifyContentSpaceBetween' }}
               alignItems={{ default: 'alignItemsCenter' }}
-              style={{ padding: 'var(--pf-t--global--spacer--md) 0' }}
             >
               <FlexItem>
                 <Content component={ContentVariants.p}>
@@ -134,8 +116,25 @@ function WhoCanResults({
                 </Flex>
               )}
             </Flex>
-          </StackItem>
-        </>
+          }
+        >
+          <Thead>
+            <Tr>
+              <Th>Username</Th>
+            </Tr>
+          </Thead>
+          <Tbody>
+            {users.map((u) => (
+              <Tr key={u.id}>
+                <Td dataLabel="Username">
+                  <LinkCell href={getUserDetailPath(u.id)}>
+                    <Truncate content={u.username} />
+                  </LinkCell>
+                </Td>
+              </Tr>
+            ))}
+          </Tbody>
+        </NxScrollableTableContainer>
       )}
     </>
   )
@@ -304,7 +303,7 @@ export function WhoCanView({ resourceTypes, actionsByResource }: Readonly<Resour
         <Stack hasGutter>
           {whoCanMutation.isIdle && (
             <StackItem>
-              <NxEmptyStateNoData
+              <SynEmptyStateNoData
                 title="Find who has access"
                 description="Enter an action and resource type to see which users can perform it."
               />
@@ -324,7 +323,7 @@ export function WhoCanView({ resourceTypes, actionsByResource }: Readonly<Resour
 
           {whoCanMutation.isError && (
             <StackItem>
-              <NxErrorState title="Query failed" message={getErrorMessage(whoCanMutation.error)} onRetry={onSubmit} />
+              <SynErrorState title="Query failed" message={getErrorMessage(whoCanMutation.error)} onRetry={onSubmit} />
             </StackItem>
           )}
 

@@ -62,7 +62,11 @@ from syntara.workflows.models.workflow_publish_event import PublishAction, Workf
 from syntara.workflows.services.scheduled_trigger_service import ScheduledTriggerService
 from syntara.workflows.services.webhook_trigger_service import WEBHOOK_TRIGGER_TYPES, WebhookTriggerService
 from syntara.workflows.services.workflow_diff import generate_change_summary
-from syntara.workflows.validators import validate_workflow_references, workflow_validator
+from syntara.workflows.validators import (
+    get_system_continue_on_failure,
+    validate_workflow_references,
+    workflow_validator,
+)
 
 if TYPE_CHECKING:
     from syntara.workflows.models import WorkflowVersionListResponse
@@ -560,6 +564,8 @@ class WorkflowService(BaseService):
         labels: dict[str, Any],
         workflow_definition: dict[str, Any],
         project_id: UUID,
+        *,
+        is_import: bool = False,
     ) -> tuple[Workflow, WorkflowVersion, ValidationResult]:
         """Create a new V2 workflow with initial version.
 
@@ -569,6 +575,8 @@ class WorkflowService(BaseService):
             labels: Optional key-value labels
             workflow_definition: V2 workflow definition as dict (triggers + nodes + edges)
             project_id: Project to assign workflow to
+            is_import: When True, missing LLM models are cleared with warnings
+                instead of raising errors (allows import of workflows from other instances)
 
         Returns:
             Tuple of (created workflow, initial version, validation result)
@@ -579,12 +587,16 @@ class WorkflowService(BaseService):
         """
         recorder = get_metrics_recorder()
         component = ComponentLabel.WORKFLOW_ENGINE
+        system_cof = await get_system_continue_on_failure()
 
         with recorder.time(
             MetricType.WORKFLOW_VALIDATION_DURATION,
             labels={"component": component.value, "operation": "create"},
         ):
-            result = workflow_validator.collect_findings(workflow_definition)
+            result = workflow_validator.collect_findings(
+                workflow_definition,
+                system_continue_on_failure=system_cof,
+            )
 
         has_validation_issues = _has_validation_issues(result)
         if has_validation_issues:
@@ -609,7 +621,9 @@ class WorkflowService(BaseService):
 
         await self._validate_credential_project_scope(workflow_definition, project_id)
         await self._validate_no_secret_url_conflicts(workflow_definition)
-        ref_findings = await validate_workflow_references(self.session, workflow_definition, project_id)
+        ref_findings = await validate_workflow_references(
+            self.session, workflow_definition, project_id, is_import=is_import
+        )
         if ref_findings:
             result = ValidationResult.from_findings([*result.findings, *ref_findings])
             has_validation_issues = True
@@ -1128,12 +1142,16 @@ class WorkflowService(BaseService):
 
         """
         recorder = get_metrics_recorder()
+        system_cof = await get_system_continue_on_failure()
 
         with recorder.time(
             MetricType.WORKFLOW_VALIDATION_DURATION,
             labels={"component": ComponentLabel.WORKFLOW_ENGINE.value, "operation": "version_update"},
         ):
-            result = workflow_validator.collect_findings(workflow_definition)
+            result = workflow_validator.collect_findings(
+                workflow_definition,
+                system_continue_on_failure=system_cof,
+            )
 
         workflow.has_validation_issues = _has_validation_issues(result)
         if workflow.has_validation_issues:
@@ -1319,7 +1337,11 @@ class WorkflowService(BaseService):
             )
 
         definition = target_version.workflow_definition
-        result = workflow_validator.collect_findings(definition)
+        system_cof = await get_system_continue_on_failure()
+        result = workflow_validator.collect_findings(
+            definition,
+            system_continue_on_failure=system_cof,
+        )
         if len(definition.get("nodes", [])) == 0:
             result = ValidationResult.from_findings(
                 [

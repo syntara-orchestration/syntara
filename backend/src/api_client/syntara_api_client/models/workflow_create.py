@@ -32,6 +32,8 @@ class WorkflowCreate:
             project_id (UUID): Project to assign workflow to
             description (None | str | Unset): Workflow description
             labels (WorkflowCreateLabels | Unset): Workflow labels
+            is_import (bool | Unset): When true, unavailable LLM models are cleared with warnings instead of rejecting the
+                request. Use when importing workflows from other instances. Default: False.
     """
 
     name: str
@@ -39,6 +41,7 @@ class WorkflowCreate:
     project_id: UUID
     description: None | str | Unset = UNSET
     labels: WorkflowCreateLabels | Unset = UNSET
+    is_import: bool | Unset = False
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -64,6 +67,8 @@ class WorkflowCreate:
         if not isinstance(self.labels, Unset):
             labels = self.labels.to_dict()
 
+        is_import = self.is_import
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -77,6 +82,8 @@ class WorkflowCreate:
             field_dict["description"] = description
         if labels is not UNSET:
             field_dict["labels"] = labels
+        if is_import is not UNSET:
+            field_dict["is_import"] = is_import
 
         return field_dict
 
@@ -124,12 +131,15 @@ class WorkflowCreate:
         else:
             labels = WorkflowCreateLabels.from_dict(_labels)
 
+        is_import = d.pop("is_import", UNSET)
+
         workflow_create = cls(
             name=name,
             workflow_definition=workflow_definition,
             project_id=project_id,
             description=description,
             labels=labels,
+            is_import=is_import,
         )
 
         workflow_create.additional_properties = d

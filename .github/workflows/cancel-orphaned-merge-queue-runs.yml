@@ -1,0 +1,43 @@
+---
+name: Cancel orphaned merge-queue runs
+
+# GitHub's merge queue creates temporary `gh-readonly-queue/<base>/pr-<n>-<sha>`
+# branches and deletes them when an entry leaves the queue (kick, reshuffle, or
+# successful merge). merge_group CI runs against those branches do not auto-cancel
+# on deletion, so orphaned runs keep consuming runner minutes. This workflow
+# cancels them as soon as the queue branch is deleted.
+#
+# Uses the `delete` event (fully supported by actionlint) rather than the
+# undocumented-in-Actions-schema `merge_group` `destroyed` type.
+
+on:
+  delete:
+
+permissions:
+  actions: write
+
+jobs:
+  cancel-orphans:
+    name: Cancel orphaned runs
+    if: github.event.ref_type == 'branch' && startsWith(github.event.ref, 'gh-readonly-queue/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Cancel active runs against deleted queue branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DELETED_REF: ${{ github.event.ref }}
+          CURRENT_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          echo "Deleted merge-queue branch: ${DELETED_REF}"
+          encoded_ref=$(jq -rn --arg b "${DELETED_REF}" '$b|@uri')
+          gh api --paginate \
+            "repos/${GITHUB_REPOSITORY}/actions/runs?branch=${encoded_ref}&per_page=100" \
+            --jq '.workflow_runs[] | select(.status != "completed") | .id' \
+          | while IFS= read -r id; do
+              [ -z "${id}" ] && continue
+              [ "${id}" = "${CURRENT_RUN_ID}" ] && continue
+              echo "Cancelling orphaned run ${id}"
+              gh run cancel "${id}" -R "${GITHUB_REPOSITORY}" || true
+            done

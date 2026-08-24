@@ -95,6 +95,10 @@ async function configureApprovalNode(
   }
 
   if (config.fallbackDecision) {
+    const enableLink = page.getByRole('button', { name: 'Enable continue on failure' })
+    if ((await enableLink.count()) > 0) {
+      await enableLink.click()
+    }
     const fallbackToggle = page.getByRole('button', { name: 'Fallback decision', exact: true })
     await expect(fallbackToggle).toBeVisible()
     await fallbackToggle.click()
@@ -122,6 +126,7 @@ async function addApprovalNodeWithConfig(
 
 test.describe('Approval Node Configuration', () => {
   test('user configures Approval node with message, decision window, and fallback decision', async ({ app }) => {
+    test.slow()
     const workflowName = buildUniqueName('e2e-approval')
 
     try {
@@ -155,6 +160,7 @@ test.describe('Approval Node Configuration', () => {
   })
 
   test('user edits Approval node to verify configuration persistence', async ({ app }) => {
+    test.slow()
     const workflowName = buildUniqueName('e2e-approval-edit')
 
     try {
@@ -200,14 +206,14 @@ test.describe('Approval Node Configuration', () => {
     }
   })
 
-  test.skip('user configures Approval node with both fallback decision options', async ({ app }) => {
+  test('user configures Approval node with both fallback decision options', async ({ app }) => {
+    test.slow()
     const fallbackDecisions: Array<'approve' | 'reject'> = ['approve', 'reject']
     const workflowNames: string[] = []
 
     try {
-      // Test each fallback decision option in a separate workflow
-      // This avoids the non-deterministic behavior of openAddNodePanel().first()
-      // when multiple Approval nodes (each with two "Add connected step" buttons) exist
+      // Test each fallback decision option in a separate workflow to avoid
+      // non-deterministic openAddNodePanel().first() with multiple Approval nodes
       for (const decision of fallbackDecisions) {
         const workflowName = buildUniqueName(`e2e-approval-fallback-${decision}`)
         workflowNames.push(workflowName)
@@ -242,6 +248,7 @@ test.describe('Approval Node Configuration', () => {
   })
 
   test('user adds Approval node, clicks to open details panel, configures, and saves', async ({ app }) => {
+    test.slow()
     const workflowName = buildUniqueName('e2e-approval-click-edit')
 
     try {
@@ -287,6 +294,7 @@ test.describe('Approval Node Configuration', () => {
   })
 
   test('user verifies Parameters panel displays all Approval node fields', async ({ app }) => {
+    test.slow()
     // Arrange - Create a workflow with manual trigger
     await startWorkflowWithTrigger(app)
 
@@ -301,6 +309,13 @@ test.describe('Approval Node Configuration', () => {
 
     const fallbackToggle = app.getByRole('button', { name: 'Fallback decision', exact: true })
     await expect(fallbackToggle).toBeVisible()
+    await expect(fallbackToggle).toBeDisabled()
+    await expect(
+      app.getByText('On failure behavior is System default (stop on failure), so this fallback will not be used.')
+    ).toBeVisible()
+
+    await app.getByRole('button', { name: 'Enable continue on failure' }).click()
+    await expect(fallbackToggle).toBeEnabled()
 
     // Verify the fallback decision dropdown has both options
     await fallbackToggle.click()

@@ -17,11 +17,11 @@ import { useMemo } from 'react'
 import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsUserDetail } from '../../../app/breadcrumbBuilders'
 import { authClient } from '../../../client'
-import { NxPage, NxPageBody } from '../../../components/layout/NxPage'
-import { NxPageHeader } from '../../../components/layout/NxPageHeader'
-import { NxPageTitle } from '../../../components/NxPageTitle'
+import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
+import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { NxListPanel, NxListPanelTabs } from '../../../components/panels/list/NxListPanel'
 import { useQueryState } from '../../../components/states/useQueryState'
+import { SynPageTitle } from '../../../components/SynPageTitle'
 import { DateCell } from '../../../components/table/DateCell'
 import { useDeleteAction } from '../../../hooks/useDeleteAction'
 import { useDialogState } from '../../../hooks/useDialogState'
@@ -403,9 +403,9 @@ export function UserDetail({ isMyProfile }: Readonly<UserDetailProps> = {}) {
   const userBreadcrumbs = isMyProfile ? [] : breadcrumbsUserDetail(displayName, basePath, activeTab)
 
   return (
-    <NxPage>
-      <NxPageTitle segments={[pageTitle, isMyProfile ? undefined : 'Users']} />
-      <NxPageHeader
+    <SynPage>
+      <SynPageTitle segments={[pageTitle, isMyProfile ? undefined : 'Users']} />
+      <SynPageHeader
         title={pageTitle}
         docLink={docLink}
         breadcrumbs={userBreadcrumbs}
@@ -426,7 +426,7 @@ export function UserDetail({ isMyProfile }: Readonly<UserDetailProps> = {}) {
           />
         }
       />
-      <NxPageBody>
+      <SynPageBody>
         <NxListPanel>
           <UserDetailTabBar
             basePath={basePath}
@@ -445,7 +445,7 @@ export function UserDetail({ isMyProfile }: Readonly<UserDetailProps> = {}) {
             isOwnProfile={isOwnProfile}
           />
         </NxListPanel>
-      </NxPageBody>
+      </SynPageBody>
 
       <UserDetailConfirmationDialogs
         user={userData}
@@ -454,6 +454,6 @@ export function UserDetail({ isMyProfile }: Readonly<UserDetailProps> = {}) {
         onRevoke={handleRevoke}
         onDelete={() => handleDelete(deleteDialog.item)}
       />
-    </NxPage>
+    </SynPage>
   )
 }

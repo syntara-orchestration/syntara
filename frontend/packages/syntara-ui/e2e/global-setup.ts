@@ -14,6 +14,8 @@
  * On the mock backend the flags are set to '1' unconditionally — all services
  * are synthetic and always available.
  */
+import { request as playwrightRequest, type APIRequestContext } from '@playwright/test'
+
 import { isSkipWebServerForPlaywrightTests } from './playwrightWebServerEnv'
 
 const appBaseUrl: string = process.env['SYNTARA_E2E_BASE_URL'] ?? 'http://localhost:4173'
@@ -22,17 +24,25 @@ function apiUrl(path: string): string {
   return new URL(`/api/v1${path}`, appBaseUrl).toString()
 }
 
-async function authenticate(): Promise<string | null> {
+// Playwright's request context is used instead of bare Node.js fetch() so that
+// ignoreHTTPSErrors applies — plain fetch() rejects self-signed / cluster-issued
+// certs that Playwright browser contexts skip via the ignoreHTTPSErrors config.
+async function createContext(): Promise<APIRequestContext> {
+  return playwrightRequest.newContext({
+    baseURL: appBaseUrl,
+    ignoreHTTPSErrors: true,
+  })
+}
+
+async function authenticate(ctx: APIRequestContext): Promise<string | null> {
   const password = process.env['SYNTARA_E2E_PASSWORD']
   if (!password) return null
 
   try {
-    const resp = await fetch(apiUrl('/auth/login'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: 'admin', password }),
+    const resp = await ctx.post(apiUrl('/auth/login'), {
+      data: { username: 'admin', password },
     })
-    if (!resp.ok) return null
+    if (!resp.ok()) return null
     const body = (await resp.json()) as { access_token?: string }
     return body.access_token ?? null
   } catch {
@@ -41,20 +51,19 @@ async function authenticate(): Promise<string | null> {
 }
 
 async function api(
+  ctx: APIRequestContext,
   token: string,
   method: string,
   path: string,
   data?: unknown
 ): Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }> {
-  const resp = await fetch(apiUrl(path), {
+  const resp = await ctx.fetch(apiUrl(path), {
     method,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: data ? JSON.stringify(data) : undefined,
+    headers: { Authorization: `Bearer ${token}` },
+    ...(data !== undefined && { data }),
   })
-  return { ok: resp.ok, status: resp.status, json: () => resp.json() }
+  const body: unknown = await resp.json()
+  return { ok: resp.ok(), status: resp.status(), json: () => Promise.resolve(body) }
 }
 
 async function sleep(ms: number): Promise<void> {
@@ -68,7 +77,10 @@ async function sleep(ms: number): Promise<void> {
  * Returns which services are **positively confirmed as down**. A timeout or
  * error is treated as inconclusive (fail-open).
  */
-async function probeExecutionEngine(token: string): Promise<{
+async function probeExecutionEngine(
+  ctx: APIRequestContext,
+  token: string
+): Promise<{
   executionEngineDown: boolean
   temporalWorkerDown: boolean
 }> {
@@ -76,13 +88,13 @@ async function probeExecutionEngine(token: string): Promise<{
   let createdProjectId: string | null = null
 
   try {
-    const projectsResp = await api(token, 'GET', '/projects')
+    const projectsResp = await api(ctx, token, 'GET', '/projects')
     if (!projectsResp.ok) return result
     const projects = (await projectsResp.json()) as { resources: Array<{ id: string }> }
     let projectId = projects.resources?.[0]?.id
 
     if (!projectId) {
-      const createProject = await api(token, 'POST', '/projects', {
+      const createProject = await api(ctx, token, 'POST', '/projects', {
         name: 'e2e-probe',
         description: 'Health probe project',
       })
@@ -91,7 +103,7 @@ async function probeExecutionEngine(token: string): Promise<{
       createdProjectId = projectId
     }
 
-    const createResp = await api(token, 'POST', '/workflows', {
+    const createResp = await api(ctx, token, 'POST', '/workflows', {
       name: `__e2e_probe_${Date.now()}`,
       project_id: projectId,
       workflow_definition: {
@@ -114,9 +126,9 @@ async function probeExecutionEngine(token: string): Promise<{
     const workflowId = workflow.id
 
     try {
-      await api(token, 'POST', `/workflows/${workflowId}/versions/${workflow.current_version}/publish`, {})
+      await api(ctx, token, 'POST', `/workflows/${workflowId}/versions/${workflow.current_version}/publish`, {})
 
-      const runResp = await api(token, 'POST', `/workflows/${workflowId}/run`, {})
+      const runResp = await api(ctx, token, 'POST', `/workflows/${workflowId}/run`, {})
       if (!runResp.ok) {
         // API explicitly rejected the run request — engine is positively down
         result.executionEngineDown = true
@@ -132,7 +144,7 @@ async function probeExecutionEngine(token: string): Promise<{
       let finalStatus = 'pending'
       for (let i = 0; i < 30; i++) {
         await sleep(2000)
-        const statusResp = await api(token, 'GET', `/executions/${executionId}`)
+        const statusResp = await api(ctx, token, 'GET', `/executions/${executionId}`)
         if (!statusResp.ok) return result
         const exec = (await statusResp.json()) as { status: string }
         finalStatus = exec.status
@@ -144,13 +156,13 @@ async function probeExecutionEngine(token: string): Promise<{
         result.temporalWorkerDown = true
       }
     } finally {
-      await api(token, 'DELETE', `/workflows/${workflowId}`).catch(() => {})
+      await api(ctx, token, 'DELETE', `/workflows/${workflowId}`).catch(() => {})
     }
   } catch {
     // Network/unexpected error — inconclusive, leave fail-open defaults
   } finally {
     if (createdProjectId) {
-      await api(token, 'DELETE', `/projects/${createdProjectId}`).catch(() => {})
+      await api(ctx, token, 'DELETE', `/projects/${createdProjectId}`).catch(() => {})
     }
   }
 
@@ -166,22 +178,27 @@ export default async function globalSetup(): Promise<void> {
 
   console.log('[global-setup] Probing backend service health...')
 
-  const token = await authenticate()
-  if (!token) {
-    console.log('[global-setup] Could not authenticate — assuming services are healthy (fail-open)')
-    return
+  const ctx = await createContext()
+  try {
+    const token = await authenticate(ctx)
+    if (!token) {
+      console.log('[global-setup] Could not authenticate — assuming services are healthy (fail-open)')
+      return
+    }
+
+    const { executionEngineDown, temporalWorkerDown } = await probeExecutionEngine(ctx, token)
+
+    if (executionEngineDown) {
+      delete process.env['SYNTARA_E2E_HAS_EXECUTION_ENGINE']
+      delete process.env['SYNTARA_E2E_HAS_TEMPORAL_WORKER']
+    } else if (temporalWorkerDown) {
+      delete process.env['SYNTARA_E2E_HAS_TEMPORAL_WORKER']
+    }
+
+    console.log(
+      `[global-setup] Probe results: execution_engine=${!executionEngineDown}, temporal_worker=${!temporalWorkerDown}`
+    )
+  } finally {
+    await ctx.dispose()
   }
-
-  const { executionEngineDown, temporalWorkerDown } = await probeExecutionEngine(token)
-
-  if (executionEngineDown) {
-    delete process.env['SYNTARA_E2E_HAS_EXECUTION_ENGINE']
-    delete process.env['SYNTARA_E2E_HAS_TEMPORAL_WORKER']
-  } else if (temporalWorkerDown) {
-    delete process.env['SYNTARA_E2E_HAS_TEMPORAL_WORKER']
-  }
-
-  console.log(
-    `[global-setup] Probe results: execution_engine=${!executionEngineDown}, temporal_worker=${!temporalWorkerDown}`
-  )
 }

@@ -5,11 +5,11 @@ import { useNavigate } from '@tanstack/react-router'
 import { useCallback, useMemo, useState } from 'react'
 
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
-import { NxPage, NxPageBody } from '../../components/layout/NxPage'
-import { NxPageHeader } from '../../components/layout/NxPageHeader'
+import { SynPage, SynPageBody } from '../../components/layout/SynPage'
+import { SynPageHeader } from '../../components/layout/SynPageHeader'
 import { NxKebabMenu } from '../../components/NxKebabMenu'
-import { NxPageTitle } from '../../components/NxPageTitle'
 import { NxListPanel } from '../../components/panels/list/NxListPanel'
+import { SynPageTitle } from '../../components/SynPageTitle'
 import { builtinProjectTooltip } from '../../hooks/permissionUtils'
 import { useCursorPagination, useCursorReset } from '../../hooks/useCursorPagination'
 import { useDialogState } from '../../hooks/useDialogState'
@@ -217,9 +217,9 @@ export default function Workflows() {
   const hasQueryState = workflowsQuery.isPending || !!workflowsQuery.error
   return (
     <>
-      <NxPage>
-        <NxPageTitle segments={['Workflows']} />
-        <NxPageHeader
+      <SynPage>
+        <SynPageTitle segments={['Workflows']} />
+        <SynPageHeader
           title="Workflows"
           docLink={workflowsDocLink}
           projectSelector={hasQueryState ? undefined : ProjectSelector}
@@ -240,7 +240,7 @@ export default function Workflows() {
           }
         />
 
-        <NxPageBody>
+        <SynPageBody>
           <NxListPanel>
             <WorkflowsListView
               isPending={workflowsQuery.isPending}
@@ -268,8 +268,8 @@ export default function Workflows() {
               projectActionCallbacks={projectActionCallbacks}
             />
           </NxListPanel>
-        </NxPageBody>
-      </NxPage>
+        </SynPageBody>
+      </SynPage>
 
       <WorkflowDialogs
         runDialog={runDialog}

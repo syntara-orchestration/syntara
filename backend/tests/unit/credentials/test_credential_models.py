@@ -152,3 +152,4 @@ class TestCredentialWorkflowRef:
         ref = CredentialWorkflowRef(id=uuid4(), name="my-workflow")
         assert ref.name == "my-workflow"
         assert ref.node_names == []
+        assert ref.created_at is None

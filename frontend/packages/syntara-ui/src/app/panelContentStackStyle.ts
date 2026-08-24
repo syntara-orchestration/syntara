@@ -3,11 +3,11 @@ import type { CSSProperties } from 'react'
 /**
  * Layout style objects for full-height panel content.
  *
- * - **NxPanelContentStack** composes `panelContentStackStyle` (see `NxPanelContentStack.tsx`) — prefer
+ * - **SynPanelContentStack** composes `panelContentStackStyle` (see `SynPanelContentStack.tsx`) — prefer
  *   that component over spreading the style object directly.
  * - **Standalone exports** are for call sites that need a raw `style` object without the wrapper.
  *
- * PatternFly `Stack` props for the main content column inside `NxPanel` with `isFullHeight`.
+ * PatternFly `Stack` props for the main content column inside `SynPanel` with `isFullHeight`.
  * `height: '100%'` alone often fails to fill a flex parent; `flex: 1` + `minHeight: 0` opts into
  * correct flex shrink/growth so nested `NxScrollableTableContainer` / scroll regions get a real height.
  */

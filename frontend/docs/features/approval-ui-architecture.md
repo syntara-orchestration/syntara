@@ -279,7 +279,7 @@ The `what_can_i` authorization endpoint returns project **names**, not IDs. The 
 │                                                                           │
 │ ┌─────────────────────────────────────────────────────────────────────┐ │
 │ │ Render                                                               │ │
-│ │ ├─ NxPageHeader (title, ProjectSelector, ApprovalsBulkActions)     │ │
+│ │ ├─ SynPageHeader (title, ProjectSelector, ApprovalsBulkActions)     │ │
 │ │ ├─ FilterBar (name, status filters)                                │ │
 │ │ ├─ ApprovalsTableHead (sort, select-all checkbox)                  │ │
 │ │ ├─ GroupedApprovalsTableBody (if isAllProjects)                    │ │

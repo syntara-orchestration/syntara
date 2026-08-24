@@ -6,10 +6,10 @@ import { useEffect, useRef } from 'react'
 
 import { AppRoute } from '../../../../app/AppRoute'
 import { EmptyStateAccessDenied } from '../../../../components/EmptyStateAccessDenied'
-import { NxPage, NxPageBody } from '../../../../components/layout/NxPage'
-import { NxPageHeader } from '../../../../components/layout/NxPageHeader'
-import { NxPanel } from '../../../../components/layout/NxPanel'
-import { NxPageTitle } from '../../../../components/NxPageTitle'
+import { SynPage, SynPageBody } from '../../../../components/layout/SynPage'
+import { SynPageHeader } from '../../../../components/layout/SynPageHeader'
+import { SynPanel } from '../../../../components/layout/SynPanel'
+import { SynPageTitle } from '../../../../components/SynPageTitle'
 import { useCanI } from '../../../../hooks/useCanI'
 import { detachPromise } from '../../../../utils/detachPromise'
 
@@ -26,13 +26,13 @@ function GroupMappingPageShell({
   children: ReactNode
 }>) {
   return (
-    <NxPage>
-      <NxPageTitle segments={[title, 'Identity Providers']} />
-      <NxPageHeader title={title} breadcrumbs={breadcrumbs} />
-      <NxPageBody>
-        <NxPanel isFullHeight>{children}</NxPanel>
-      </NxPageBody>
-    </NxPage>
+    <SynPage>
+      <SynPageTitle segments={[title, 'Identity Providers']} />
+      <SynPageHeader title={title} breadcrumbs={breadcrumbs} />
+      <SynPageBody>
+        <SynPanel isFullHeight>{children}</SynPanel>
+      </SynPageBody>
+    </SynPage>
   )
 }
 
