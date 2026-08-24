@@ -139,8 +139,6 @@ The Podman Compose E2E UI tests automatically run when frontend-relevant changes
 - Debugging test failures
 - Re-running tests after transient failures
 
-**Authorization:** Repository owners and members only
-
 The test run will appear in the PR checks automatically. Results are visible in the same place as automatic E2E runs.
 
 ## Code Readability Rules

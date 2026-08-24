@@ -21,10 +21,14 @@ on:
         required: true
         type: string
 
+# Required permissions for this workflow:
+# - contents:read - checkout code in all jobs
+# - pull-requests:read - fetch PR file list via gh api for change detection
+# - statuses:read - read E2E commit status in the Konflux gate jobs
 permissions:
-  contents: read # checkout code
-  pull-requests: read # gh api needs PR file list
-  statuses: read # read E2E commit status
+  contents: read
+  pull-requests: read
+  statuses: read
 
 concurrency:
   group: ci-frontend-${{ github.ref }}
@@ -443,7 +447,12 @@ jobs:
   test-compose-e2e:
     name: (Frontend) Test Podman Compose E2E
     needs: [changes, frontend-checks-gate]
-    if: (needs.changes.outputs.frontend == 'true' && github.event_name != 'push') || github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch'
+    # Only auto-trigger on same-repo PRs with frontend changes, or manual dispatch, or merge queue.
+    # Fork PRs are explicitly excluded from auto-triggering to prevent security risks.
+    if: |
+      (needs.changes.outputs.frontend == 'true' && github.event_name != 'push' && github.event.pull_request.head.repo.full_name == github.repository) ||
+      github.event_name == 'merge_group' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest-8-cores
     timeout-minutes: 120
     # Job-level concurrency ensures only the latest commit runs this expensive test.
@@ -496,7 +505,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
-          ref: ${{ inputs.pr_ref || github.sha }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.pr_ref || github.sha }}
 
       - name: Set up Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
