@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { SynSelect } from './SynSelect'
 
-function TestNxSelect({ onOpenChange }: Readonly<{ onOpenChange?: (open: boolean) => void }>) {
+function TestSynSelect({ onOpenChange }: Readonly<{ onOpenChange?: (open: boolean) => void }>) {
   const [isOpen, setIsOpen] = useState(false)
 
   return (
@@ -36,7 +36,7 @@ describe('SynSelect', () => {
   it('closes when wheel happens outside the menu', async () => {
     const user = userEvent.setup()
     const onOpenChange = vi.fn()
-    render(<TestNxSelect onOpenChange={onOpenChange} />)
+    render(<TestSynSelect onOpenChange={onOpenChange} />)
 
     await user.click(screen.getByRole('button', { name: 'Toggle' }))
     expect(screen.getByRole('listbox')).toBeInTheDocument()
@@ -54,7 +54,7 @@ describe('SynSelect', () => {
   it('keeps the menu open when wheel happens on an option', async () => {
     const user = userEvent.setup()
     const onOpenChange = vi.fn()
-    render(<TestNxSelect onOpenChange={onOpenChange} />)
+    render(<TestSynSelect onOpenChange={onOpenChange} />)
 
     await user.click(screen.getByRole('button', { name: 'Toggle' }))
     const option = screen.getByRole('option', { name: 'One' })
