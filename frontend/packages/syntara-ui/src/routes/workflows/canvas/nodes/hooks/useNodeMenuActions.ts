@@ -148,11 +148,7 @@ export function useNodeMenuActions(options: UseNodeMenuActionsOptions): NodeMenu
   const allAdditionalActions = [...builderActions, ...additionalActions]
 
   if (allAdditionalActions.length > 0) {
-    return [
-      ...allAdditionalActions,
-      { id: 'sep-delete', label: '', onClick: noop, separator: true },
-      deleteAction,
-    ]
+    return [...allAdditionalActions, { id: 'sep-delete', label: '', onClick: noop, separator: true }, deleteAction]
   }
 
   return [deleteAction]

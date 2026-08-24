@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
@@ -101,6 +101,6 @@ describe('SynEmptyStateNoData', () => {
 
     const button = screen.getByRole('button', { name: 'Add data' })
     expect(button).toHaveClass('pf-m-primary')
-    expect(button.querySelector('svg')).toBeInTheDocument()
+    expect(within(button).getByRole('img', { hidden: true })).toBeInTheDocument()
   })
 })
