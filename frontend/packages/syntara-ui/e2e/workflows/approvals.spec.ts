@@ -279,14 +279,20 @@ test.describe('Approval Workflow Operations', () => {
       await app.getByPlaceholder('Filter by name').fill(approval.approvalName)
       await app.getByRole('button', { name: 'Apply filter' }).click()
 
+      await expect(app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Name' })).toBeVisible({
+        timeout: 15_000,
+      })
+
       // Step 1: Select the approval using row-scoped checkbox
       const row = table.getByRole('row').filter({ hasText: approval.approvalName })
+      await expect(row).toBeVisible({ timeout: 15_000 })
       await row.getByRole('checkbox').check()
+      const batchToolbar = app.getByRole('toolbar', { name: /selected/i })
+      await expect(batchToolbar).toBeVisible()
       await expect(app.getByText('1 selected')).toBeVisible()
 
-      // Step 2: Click "Approve Selected"
-      const approveButton = app.getByRole('button', { name: 'Approve' })
-      await approveButton.click()
+      // Step 2: Click "Approve Selected" from the batch toolbar (not a row action)
+      await batchToolbar.getByRole('button', { name: 'Approve' }).click()
 
       // Step 3: Verify dialog appears
       const dialog = app.getByRole('dialog')
@@ -301,6 +307,7 @@ test.describe('Approval Workflow Operations', () => {
       await expect(dialog).not.toBeVisible()
 
       // Step 6: Verify selection is still active (no API call was made)
+      await expect(batchToolbar).toBeVisible()
       await expect(app.getByText('1 selected')).toBeVisible()
 
       // Step 7: Deselect to clean up
