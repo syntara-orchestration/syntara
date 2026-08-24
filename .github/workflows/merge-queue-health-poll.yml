@@ -9,7 +9,7 @@ on:
 jobs:
   queue-health-check:
     runs-on: ubuntu-latest
-    if: vars.SLACK_CI_MONITORING_WEBHOOK_URL != '' || secrets.SLACK_CI_MONITORING_WEBHOOK_URL != ''
+    if: vars.SLACK_CI_MONITORING_WEBHOOK_URL != ''
     permissions:
       contents: read
       actions: read
@@ -34,6 +34,6 @@ jobs:
         working-directory: .github/scripts
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          SLACK_CI_MONITORING_WEBHOOK_URL: ${{ secrets.SLACK_CI_MONITORING_WEBHOOK_URL }}
+          SLACK_CI_MONITORING_WEBHOOK_URL: ${{ vars.SLACK_CI_MONITORING_WEBHOOK_URL || secrets.SLACK_CI_MONITORING_WEBHOOK_URL }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_RUN_ID: ${{ github.run_id }}
