@@ -231,12 +231,14 @@ export function KebabMenuActionsGroup({
           </Icon>
           Verify workflow
         </DropdownItem>
-        <DuplicateMenuItem
-          canEdit={canEdit}
-          editTooltip={tooltips.edit}
-          handleDuplicate={handleDuplicate}
-          closeKebab={closeKebab}
-        />
+        {showExistingWorkflowItems && (
+          <DuplicateMenuItem
+            canEdit={canEdit}
+            editTooltip={tooltips.edit}
+            handleDuplicate={handleDuplicate}
+            closeKebab={closeKebab}
+          />
+        )}
         <DropdownItem onClick={handleExport}>
           <Icon isInline className={toolbarStyles.menuIcon}>
             <RhUiExportIcon />

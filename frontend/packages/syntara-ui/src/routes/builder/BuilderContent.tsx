@@ -421,7 +421,10 @@ export function BuilderContent(props: BuilderContentProps) {
   )
 
   const handleDuplicateWorkflow = useCallback(() => {
-    if (!currentWorkflow) return
+    if (!currentWorkflow) {
+      showError({ title: 'Cannot duplicate workflow', description: 'Save the workflow before duplicating.' })
+      return
+    }
     const { edges, nodePositions } = useWorkflowStore.getState()
     const activities = currentWorkflow.workflow.activities ?? []
     const triggers = currentWorkflow.triggers ?? []
@@ -430,7 +433,7 @@ export function BuilderContent(props: BuilderContentProps) {
       nodePositions,
     })
     executeDuplicateWorkflow(definition)
-  }, [currentWorkflow, workflowName, workflowDescription, executeDuplicateWorkflow])
+  }, [currentWorkflow, workflowName, workflowDescription, executeDuplicateWorkflow, showError])
 
   const versionPanel = useBuilderVersionPanel({
     workflowId,
