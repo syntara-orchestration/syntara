@@ -139,8 +139,6 @@ The Podman Compose E2E UI tests automatically run when frontend-relevant changes
 - Debugging test failures
 - Re-running tests after transient failures
 
-The run is dispatched against `devel` and appears under the Actions tab for the `CI Frontend` workflow (filter by `workflow_dispatch`). It is not attached as a check on the PR the way automatic `pull_request` E2E runs are — use the Actions run link to view results.
-
 ## Code Readability Rules
 
 We enforce code readability through ESLint rules that keep functions small, files focused, and logic simple. The size/readability thresholds below are generally configured as `warn` so they guide refactoring without blocking every PR, but new code should still respect them.

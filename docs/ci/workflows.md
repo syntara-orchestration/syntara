@@ -24,13 +24,6 @@ The `test-compose-e2e` job runs Playwright E2E tests against the full stack (Pod
 | Any changes               | -                 | Manual `/run-podman-e2e-ui` | ✅ **ALWAYS RUNS** (on demand)        |
 | Frontend changes          | `true`            | Push to `devel`             | ⏭️ **SKIPS** (merge queue handles it) |
 
-**Pattern detection:**
-
-```bash
-# Frontend changes detected when files match:
-^(frontend/|\.github/workflows/ci-frontend\.yml)
-```
-
 **Key behaviors:**
 
 - **Conditional execution:** PRs with backend-only changes skip E2E UI tests during development
@@ -59,8 +52,6 @@ frontend-checks-gate:
 **Impact:**
 
 - E2E starts ~2-3 min later (waits for checks to pass)
-- Saves ~2 hours of 8-core runner time per failed lint/unit test
-- Fails fast in ~2-3 min instead of waiting for full E2E suite
 
 ### Manual Triggers
 
@@ -71,8 +62,6 @@ Manually trigger E2E UI tests on any PR by commenting:
 ```
 /run-podman-e2e-ui
 ```
-
-**Authorization:** Repository OWNER or MEMBER only (stricter than COLLABORATOR)
 
 **When to use:**
 
@@ -124,8 +113,6 @@ When PRs enter the merge queue (`merge_group` event):
 - Gates are bypassed for comprehensive validation
 - This is the final safety check before code lands
 
-**Rationale:** Merge queue runs represent the last chance to catch issues before code reaches `devel`. Skipping tests here would compromise safety.
-
 ## Debugging CI Issues
 
 ### Check workflow runs
@@ -156,10 +143,3 @@ Konflux (Red Hat CI) runs in a restricted environment. See [`CLAUDE.md`](../../C
 - `@konflux-skip` tag for Playwright E2E tests
 - `@requires_httpbin` marker for backend tests
 - Graceful skips for network connectivity issues
-
-## Future Improvements
-
-- Apply conditional execution to other expensive jobs after validating the pattern
-- Add more manual trigger commands for other test suites
-- Document backend CI workflows
-- Add workflow execution time metrics
