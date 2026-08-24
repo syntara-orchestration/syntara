@@ -40,6 +40,36 @@ npm run e2e:ui     # Run with Playwright UI for debugging
 
 ---
 
+## Test Suite Tags
+
+The E2E suite uses Playwright tags to control which tests run in different environments. Tags appear in two forms:
+
+```typescript
+// Describe-level tag — applies to all tests in the block
+test.describe('Integration filtering', { tag: '@pr-check' }, () => { ... })
+
+// Individual test tag — applies to one test
+test('my test', { tag: ['@konflux-skip'] }, async ({ app }) => { ... })
+```
+
+| Tag | What it marks | Runs in | Excluded from | Mechanism |
+|---|---|---|---|---|
+| `@pr-check` | Fast, reliable describe blocks covering the most critical user paths — intended as a quick PR gate subset | All CI environments (full suite always runs; `--grep @pr-check` selects this subset locally) | _(no current CI filter — tag exists for manual use and future CI optimization)_ | `--grep @pr-check` |
+| `@konflux-skip` | Tests confirmed flaky in Konflux's specific execution environment (not flaky in GitHub Actions) | GitHub Actions `test-compose-e2e` job (runs normally) | Konflux `ao-ui-tests` Tekton pipelines | `.tekton/automation-orchestrator-ui-tests-*.yaml` passes `playwright-grep-invert: '@konflux-skip'` → `--grep-invert` |
+| `@local-only` | Visual regression screenshot tests (`e2e/visual-regression/`) | Local development via `npm run e2e:visual-regression` | All CI | `playwright.config.ts` `testIgnore: **/visual-regression/**` + in-test `test.skip(!!process.env.CI)` |
+
+### Tag rules
+
+- **`@pr-check`** — Tag a `test.describe` when the tests inside are fast (under ~30 s total), reliable (no flaky backend dependencies), and cover the most critical user paths. Do NOT tag slow, data-dependent, or flaky describe blocks.
+- **`@konflux-skip`** — Use only for a test confirmed flaky in Konflux's environment specifically. This is a last resort — fix the root cause first. Each tagged test must have a comment explaining the environment-specific cause. Discuss with the team before tagging additional tests.
+- **`@local-only`** — Reserved for visual regression tests. Do not apply to functional tests.
+
+### Never commit `test.fixme` as a long-term state
+
+`test.fixme` marks a test as expected-to-fail, which shows up in CI reports as a "known failure" rather than a clean skip. It is appropriate only as a same-PR placeholder (a test whose fix is in the next commit). For environment-specific skipping use `@konflux-skip`; for data-dependent conditional skipping use `test.skip(!condition, 'reason')`.
+
+---
+
 ## Prerequisites
 
 ### Default Mode (Mock API)

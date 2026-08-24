@@ -66,6 +66,7 @@ class TestMetricType:
             "WORKFLOW_VALIDATION_DURATION",
             # Temporal Worker
             "TEMPORAL_QUEUE_DEPTH",
+            "ACTIVE_WORKFLOWS",
             "ACTIVITY_EXECUTION_SUCCESS_RATE",
             # Execution Service
             "WORKFLOW_START_LATENCY",

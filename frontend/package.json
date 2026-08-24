@@ -65,6 +65,8 @@
     "nanoid": "^3.3.17"
   },
   "devDependencies": {
+    "@emnapi/core": "2.0.0-alpha.3",
+    "@emnapi/runtime": "2.0.0-alpha.3",
     "@testing-library/dom": "^10.4.1",
     "@vitest/coverage-v8": "^4.1.10",
     "concurrently": "^10.0.4",

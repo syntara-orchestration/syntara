@@ -14,11 +14,11 @@ import { OIDC_AUTHORIZE_PATH, identityProvidersClient, usersClient } from '../..
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { FilterBar } from '../../../components/filters/FilterBar'
 import { NxLabel } from '../../../components/labels/NxLabel'
-import { NxPanelContentStack } from '../../../components/layout/NxPanelContentStack'
+import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
 import { NxLink } from '../../../components/NxLink'
 import { ProviderIcon } from '../../../components/ProviderIcon'
-import { NxEmptyStateFilter } from '../../../components/states/NxEmptyStateFilter'
-import { NxLoadingState } from '../../../components/states/NxLoadingState'
+import { SynEmptyStateFilter } from '../../../components/states/SynEmptyStateFilter'
+import { SynLoadingState } from '../../../components/states/SynLoadingState'
 import { useQueryState } from '../../../components/states/useQueryState'
 import { DateCell } from '../../../components/table/DateCell'
 import { NxScrollableTableContainer } from '../../../components/table/NxScrollableTableContainer'
@@ -399,7 +399,7 @@ export function UserIdentitiesPanel({
   }
 
   // Prevent "No identity providers configured" from flashing before useAuthProviders settles.
-  if (isProvidersLoading && identities.length === 0) return <NxLoadingState />
+  if (isProvidersLoading && identities.length === 0) return <SynLoadingState />
 
   if (!showTable) {
     return (
@@ -416,7 +416,7 @@ export function UserIdentitiesPanel({
   }
 
   return (
-    <NxPanelContentStack>
+    <SynPanelContentStack>
       <StackItem>
         <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapMd' }}>
           <FlexItem grow={{ default: 'grow' }}>
@@ -448,7 +448,7 @@ export function UserIdentitiesPanel({
       </StackItem>
       {sortedRows.length === 0 ? (
         <StackItem isFilled style={flexCenteredBothAxes}>
-          <NxEmptyStateFilter clearAllFilters={identitiesFilter.clearAllFilters} />
+          <SynEmptyStateFilter clearAllFilters={identitiesFilter.clearAllFilters} />
         </StackItem>
       ) : (
         <NxScrollableTableContainer
@@ -503,6 +503,6 @@ export function UserIdentitiesPanel({
         </NxScrollableTableContainer>
       )}
       {dialogs}
-    </NxPanelContentStack>
+    </SynPanelContentStack>
   )
 }

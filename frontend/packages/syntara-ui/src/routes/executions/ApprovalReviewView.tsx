@@ -26,7 +26,7 @@ import { Controller, useForm, useWatch } from 'react-hook-form'
 
 import { approvalsClient } from '../../client'
 import { NxCodeBlock } from '../../components/details/NxCodeBlock'
-import { NxPanel } from '../../components/layout/NxPanel'
+import { SynPanel } from '../../components/layout/SynPanel'
 import { useFormMutationErrorHandler } from '../../hooks/useFormMutationErrorHandler'
 import { useAlerts } from '../../providers/alerts'
 import { detachPromise } from '../../utils/detachPromise'
@@ -172,7 +172,7 @@ export function ApprovalReviewView({ approval, activityNameMap, onClose }: Appro
   }
 
   return (
-    <NxPanel isFullHeight style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+    <SynPanel isFullHeight style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <Stack hasGutter style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         <StackItem>
           <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
@@ -275,6 +275,6 @@ export function ApprovalReviewView({ approval, activityNameMap, onClose }: Appro
           </Form>
         </StackItem>
       </Stack>
-    </NxPanel>
+    </SynPanel>
   )
 }

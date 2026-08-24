@@ -68,11 +68,12 @@ export async function clickAddConnectedStep(page: Page) {
   // Wait again after layout completes
   await waitForUIReady(page)
 
-  // Wait for canvas to finish re-rendering after layout and "Add connected step" buttons to appear
+  // Wait for canvas to finish re-rendering after layout and "Add connected step" buttons to appear.
+  // Konflux CI can be slow to re-render after layout — use a generous timeout.
   await expect(async () => {
     const addBtn = page.getByRole('button', { name: 'Add connected step' })
     await expect(addBtn.first()).toBeVisible()
-  }).toPass({ timeout: 10000, intervals: [500] })
+  }).toPass({ timeout: 25000, intervals: [500] })
 
   const addBtn = page.getByRole('button', { name: 'Add connected step' })
   await addBtn.first().click()
@@ -528,6 +529,10 @@ export async function startWorkflowWithTrigger(page: Page) {
   await page.getByRole('button', { name: 'Manual trigger' }).click()
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Manual trigger')
   await page.getByRole('button', { name: 'Create', exact: true }).click()
+  // Wait for the editor panel to finish closing before returning — the panel auto-closes
+  // after trigger creation, but callers that immediately call openAddNodePanel would race
+  // against the closing animation and not find the edge "Add connected step" buttons.
+  await expect(page.getByRole('button', { name: 'Create', exact: true })).not.toBeAttached({ timeout: 10_000 })
 }
 
 /** Save the workflow with the given name. Waits for URL to confirm persistence. */

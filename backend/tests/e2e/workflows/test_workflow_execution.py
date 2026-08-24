@@ -20,7 +20,7 @@ from uuid import UUID
 
 import pytest
 from orchestrator_test_sdk.e2e import unique_name
-from orchestrator_test_sdk.e2e.helpers import create_and_run_workflow, poll_for_pending_approval
+from orchestrator_test_sdk.e2e.helpers import _retry_api_call, create_and_run_workflow, poll_for_pending_approval
 from syntara_api_client.api import SyntaraApiRegistry
 from syntara_api_client.models import (
     ExecutionCreate,
@@ -124,8 +124,8 @@ class TestWorkflowExecution:
 
         for _ in range(max_polls):
             # Query execution status
-            current_execution = syntara_api.executions.get(
-                execution_id=UUID(str(execution_id)), include="activities"
+            current_execution = _retry_api_call(
+                lambda: syntara_api.executions.get(execution_id=UUID(str(execution_id)), include="activities")
             ).assert_and_get()
 
             # Track observed states
@@ -230,8 +230,8 @@ class TestWorkflowExecution:
 
         for _ in range(max_polls):
             # Step 3: GET execution status with activities included
-            current_execution = syntara_api.executions.get(
-                execution_id=UUID(str(execution_id)), include="activities"
+            current_execution = _retry_api_call(
+                lambda: syntara_api.executions.get(execution_id=UUID(str(execution_id)), include="activities")
             ).assert_and_get()
 
             # Check if completed
@@ -381,7 +381,9 @@ class TestWorkflowExecution:
 
         for exec_id in execution_ids:
             for _poll in range(max_polls):
-                execution = syntara_api.executions.get(execution_id=UUID(str(exec_id))).assert_and_get()
+                execution = _retry_api_call(
+                    lambda eid=exec_id: syntara_api.executions.get(execution_id=UUID(str(eid)))
+                ).assert_and_get()
                 if str(execution.status) in terminal_states:
                     break
                 time.sleep(poll_interval)

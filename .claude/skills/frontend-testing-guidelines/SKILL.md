@@ -5,7 +5,7 @@ user-invocable: false
 
 # Testing Guidelines
 
-Comprehensive testing standards for this project. Referenced from CLAUDE.md.
+Comprehensive testing standards for this project. Referenced from frontend/AGENTS.md.
 
 ---
 

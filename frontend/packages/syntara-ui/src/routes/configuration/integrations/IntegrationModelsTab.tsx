@@ -7,11 +7,11 @@ import { useCallback, useMemo, useState } from 'react'
 import { integrationsClient } from '../../../client'
 import { FilterBar } from '../../../components/filters/FilterBar'
 import { NxLabel } from '../../../components/labels/NxLabel'
-import { NxPageBody } from '../../../components/layout/NxPage'
-import { NxEmptyStateFilter } from '../../../components/states/NxEmptyStateFilter'
-import { NxEmptyStateNoData } from '../../../components/states/NxEmptyStateNoData'
-import { NxErrorState } from '../../../components/states/NxErrorState'
-import { NxLoadingState } from '../../../components/states/NxLoadingState'
+import { SynPageBody } from '../../../components/layout/SynPage'
+import { SynEmptyStateFilter } from '../../../components/states/SynEmptyStateFilter'
+import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
+import { SynErrorState } from '../../../components/states/SynErrorState'
+import { SynLoadingState } from '../../../components/states/SynLoadingState'
 import { NxScrollableTableContainer } from '../../../components/table/NxScrollableTableContainer'
 import { useAlerts } from '../../../providers/alerts'
 import type { FilterConfig, FilterFieldDefinition } from '../../../types/filters'
@@ -251,28 +251,28 @@ export function IntegrationModelsTab({
 
   if (isLoading)
     return (
-      <NxPageBody isCentered>
-        <NxLoadingState />
-      </NxPageBody>
+      <SynPageBody isCentered>
+        <SynLoadingState />
+      </SynPageBody>
     )
 
   if (error)
     return (
-      <NxPageBody isCentered>
-        <NxErrorState title="Unable to load models" message={error} onRetry={() => detachPromise(refetchModels())} />
-      </NxPageBody>
+      <SynPageBody isCentered>
+        <SynErrorState title="Unable to load models" message={error} onRetry={() => detachPromise(refetchModels())} />
+      </SynPageBody>
     )
 
   if (models.length === 0)
     return (
-      <NxPageBody isCentered>
-        <NxEmptyStateNoData
+      <SynPageBody isCentered>
+        <SynEmptyStateNoData
           title="No models discovered yet"
           description="Click Refresh models to discover available models from this provider."
           buttonText="Refresh models"
           addData={canUpdate ? handleRefresh : undefined}
         />
-      </NxPageBody>
+      </SynPageBody>
     )
 
   return (
@@ -293,7 +293,7 @@ export function IntegrationModelsTab({
         />
       </StackItem>
       {hasActiveFilters && filteredModels.length === 0 ? (
-        <NxEmptyStateFilter clearAllFilters={handleClearAllFilters} />
+        <SynEmptyStateFilter clearAllFilters={handleClearAllFilters} />
       ) : (
         <NxScrollableTableContainer caption="Integration models">
           <colgroup>

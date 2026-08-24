@@ -1,4 +1,4 @@
-import { Button, Label, LabelGroup, Truncate } from '@patternfly/react-core'
+import { Button, LabelGroup, Truncate } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { IAction, ThProps } from '@patternfly/react-table'
@@ -10,7 +10,7 @@ import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
 import { NxLabel } from '../../../components/labels/NxLabel'
 import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../../components/panels/list/NxListPanel'
-import { NxEmptyStateNoData } from '../../../components/states/NxEmptyStateNoData'
+import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import { invalidateAuthzCaches } from '../../../hooks/invalidateAuthzCaches'
 import { useCursorPagination, useCursorReset } from '../../../hooks/useCursorPagination'
 import { useTableSort } from '../../../hooks/useTableSort'
@@ -112,9 +112,7 @@ function RoleAssignmentsTable({
                 {(assignment.role_policies ?? []).length > 0 ? (
                   <LabelGroup numLabels={3}>
                     {(assignment.role_policies ?? []).map((name) => (
-                      <Label key={name} isCompact>
-                        {name}
-                      </Label>
+                      <NxLabel key={name}>{name}</NxLabel>
                     ))}
                   </LabelGroup>
                 ) : (
@@ -247,7 +245,7 @@ export function ProjectRoleAssignmentsTab({ projectId }: Readonly<{ projectId: s
         hasActiveFilters={hasActiveFilters}
         onClearAllFilters={handleClearAllFilters}
         noDataState={
-          <NxEmptyStateNoData
+          <SynEmptyStateNoData
             title="No role assignments"
             description="No roles have been assigned in this project."
             buttonText="Assign role"

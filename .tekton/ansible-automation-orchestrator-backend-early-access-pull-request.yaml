@@ -37,7 +37,7 @@ spec:
     - name: build-args
       value:
         - CONTAINER_IMAGE_VERSION={{revision}}
-        - DOWNSTREAM_OVERRIDE=quay.io/redhat-user-workloads/nexus-tenant/ansible-automation-platform/automation-orchestrator-downstream-override@sha256:2c388549b6eb79f56a83468f60f821319ed48602fbd5b609f3af1508cb7e918c
+        - DOWNSTREAM_OVERRIDE=quay.io/redhat-user-workloads/nexus-tenant/ansible-automation-platform/automation-orchestrator-downstream-override:latest@sha256:65b73e30b53acecd365311202765d8b61d2dfbb6db1862839785c0a44353abd1
         - BRANDING=true
         - BUILDER_IMAGE=registry.redhat.io/ansible-automation-platform/uv-builder-rhel9:latest@sha256:bdd64fcb4597cfb665c15c4b4841ded098baa26dce1f544b4dbd17a575b8984a
     - name: build-platforms
@@ -57,7 +57,7 @@ spec:
       - name: name
         value: container
       - name: bundle
-        value: quay.io/aap-ci/tekton-catalog/pipeline/build/container:0.2@sha256:4b3a85960859057464f43090f7387dfb3d7fa10a84581f0d6ab1c289ef279b82
+        value: quay.io/aap-ci/tekton-catalog/pipeline/build/container:0.2@sha256:85e23e713364af6bed2c0e1c69cb2a49845e64d30cd7dd7ca32341d992cc1449
       - name: kind
         value: pipeline
       - name: secret

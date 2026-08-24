@@ -82,11 +82,19 @@ jobs:
           retention-days: 30
 
       # With --update-snapshots=all, Playwright rewrites every PNG it captures.
-      # Diffing against the checked-in files (rather than trusting Playwright's
-      # pass/fail) is what keeps this PR limited to
-      # only the images that are genuinely different — see
-      # update-visual-baselines.yml, which uses the same approach for the
-      # on-demand /update-screenshots flow.
+      # Filter drops AA/byte-noise under the hybrid keep rule so git only sees
+      # meaningful diffs (validated on PR #213). Same filter is used by
+      # update-visual-baselines.yml for /update-screenshots.
+      # Run on success OR failure: screenshots uses continue-on-error, so a
+      # mid-suite failure can still leave rewritten PNGs that Detect would
+      # otherwise stage unfiltered. No continue-on-error: a filter crash must
+      # fail the job rather than Detect staging unfiltered noise.
+      - name: Filter noisy baseline diffs
+        id: filter-noise
+        if: always() && steps.screenshots.outcome != 'skipped'
+        working-directory: frontend/packages/syntara-ui
+        run: npm exec tsx -- scripts/filter-noisy-baseline-diffs.ts
+
       - name: Detect changed baselines
         id: detect
         working-directory: frontend/packages/syntara-ui
@@ -134,7 +142,11 @@ jobs:
       - name: Write summary
         if: always()
         run: |
-          if [[ "${{ steps.screenshots.outcome }}" == "failure" ]]; then
+          if [[ "${{ steps.filter-noise.outcome }}" == "failure" ]]; then
+            echo "### :x: Visual Regression — baseline noise filter failed" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Screenshot PNGs were rewritten but the keep/restore filter crashed. No weekly PR was opened. See the Filter noisy baseline diffs step log." >> "$GITHUB_STEP_SUMMARY"
+          elif [[ "${{ steps.screenshots.outcome }}" == "failure" ]]; then
             echo "### :x: Visual Regression — screenshot generation had errors" >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
             echo "Check the \`visual-regression-weekly-results\` artifact — this means a real test error (timeout, crash), not a pixel diff." >> "$GITHUB_STEP_SUMMARY"
@@ -157,8 +169,8 @@ jobs:
       # a broken weekly run would otherwise show green indefinitely, quietly
       # breaking the "worst case is one week of staleness" guarantee this
       # cron exists to provide. Fail explicitly here instead.
-      - name: Fail job if screenshot generation had errors
-        if: steps.screenshots.outcome == 'failure'
+      - name: Fail job if screenshot generation or noise filter had errors
+        if: steps.screenshots.outcome == 'failure' || steps.filter-noise.outcome == 'failure'
         run: |
-          echo "::error::Screenshot generation failed — see the visual-regression-weekly-results artifact and job summary above"
+          echo "::error::Screenshot generation or baseline noise filter failed — see the job summary above"
           exit 1

@@ -1,4 +1,4 @@
-import { Content, ContentVariants, EmptyState, EmptyStateBody, Label, StackItem, Title } from '@patternfly/react-core'
+import { Content, ContentVariants, EmptyState, EmptyStateBody, StackItem, Title } from '@patternfly/react-core'
 import { RhUiCubesFillIcon, RhUiKeyIcon } from '@patternfly/react-icons'
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import { useCallback, useState } from 'react'
@@ -6,9 +6,10 @@ import { useCallback, useState } from 'react'
 import { AppRoute } from '../../../app/AppRoute'
 import { flexCenteredBothAxes } from '../../../app/flexCenteredBothAxes'
 import { FilterBar } from '../../../components/filters/FilterBar'
-import { NxPanelContentStack } from '../../../components/layout/NxPanelContentStack'
+import { NxLabel } from '../../../components/labels/NxLabel'
+import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
 import { NxLink } from '../../../components/NxLink'
-import { NxEmptyStateFilter } from '../../../components/states/NxEmptyStateFilter'
+import { SynEmptyStateFilter } from '../../../components/states/SynEmptyStateFilter'
 import { DateCell } from '../../../components/table/DateCell'
 import { NxScrollableTableContainer } from '../../../components/table/NxScrollableTableContainer'
 import type { PaginationFooterProps } from '../../../components/table/PaginationFooter'
@@ -76,7 +77,7 @@ export function SelectUserStep({
   const showSelectionUi = users.length > 0 || hasActiveFilters
 
   return (
-    <NxPanelContentStack>
+    <SynPanelContentStack>
       {showSelectionUi && (
         <>
           <StackItem>
@@ -113,7 +114,7 @@ export function SelectUserStep({
       )}
       {users.length === 0 && hasActiveFilters && (
         <StackItem isFilled style={flexCenteredBothAxes}>
-          <NxEmptyStateFilter clearAllFilters={usersFilter.clearAllFilters} />
+          <SynEmptyStateFilter clearAllFilters={usersFilter.clearAllFilters} />
         </StackItem>
       )}
       {users.length > 0 && (
@@ -147,9 +148,9 @@ export function SelectUserStep({
                   <Td dataLabel="Email">{user.email}</Td>
                   <Td dataLabel="Authentication">
                     {(user.auth_sources ?? [AUTH_SOURCE_LOCAL]).map((source) => (
-                      <Label key={source} isCompact color={source === AUTH_SOURCE_LOCAL ? 'grey' : 'blue'}>
+                      <NxLabel key={source} color={source === AUTH_SOURCE_LOCAL ? 'grey' : 'blue'}>
                         {source}
-                      </Label>
+                      </NxLabel>
                     ))}
                   </Td>
                 </Tr>
@@ -158,7 +159,7 @@ export function SelectUserStep({
           </Tbody>
         </NxScrollableTableContainer>
       )}
-    </NxPanelContentStack>
+    </SynPanelContentStack>
   )
 }
 
@@ -190,7 +191,7 @@ export function SelectIdentityStep({
   const showSelectionUi = identities.length > 0 || hasActiveFilters
 
   return (
-    <NxPanelContentStack>
+    <SynPanelContentStack>
       {showSelectionUi && (
         <>
           <StackItem>
@@ -222,7 +223,7 @@ export function SelectIdentityStep({
       )}
       {identities.length === 0 && hasActiveFilters && (
         <StackItem isFilled style={flexCenteredBothAxes}>
-          <NxEmptyStateFilter clearAllFilters={identitiesFilter.clearAllFilters} />
+          <SynEmptyStateFilter clearAllFilters={identitiesFilter.clearAllFilters} />
         </StackItem>
       )}
       {!showSelectionUi && (
@@ -293,6 +294,6 @@ export function SelectIdentityStep({
           </Tbody>
         </NxScrollableTableContainer>
       )}
-    </NxPanelContentStack>
+    </SynPanelContentStack>
   )
 }

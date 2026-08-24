@@ -73,6 +73,7 @@ class MetricType(StrEnum):
 
     # Temporal Worker Metrics
     TEMPORAL_QUEUE_DEPTH = "temporal_queue_depth"
+    ACTIVE_WORKFLOWS = "active_workflows"
     ACTIVITY_EXECUTION_SUCCESS_RATE = "activity_execution_success_rate"
 
     # Execution Service Metrics
@@ -174,6 +175,7 @@ METRIC_CATEGORIES: dict[MetricsCategoryType, list[MetricType]] = {
     ],
     MetricsCategoryType.TEMPORAL_WORKER: [
         MetricType.TEMPORAL_QUEUE_DEPTH,
+        MetricType.ACTIVE_WORKFLOWS,
         MetricType.ACTIVITY_EXECUTION_SUCCESS_RATE,
         MetricType.ACTIVITY_DURATION,
     ],

@@ -14,7 +14,7 @@ from typing import Annotated, Any
 
 import structlog
 import uvicorn
-from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
@@ -67,7 +67,7 @@ from syntara.core.models.user import User
 from syntara.core.router_discovery import _get_lock_file_path, discover_and_register_routers, iter_api_routes
 from syntara.core.websocket.manager import get_connection_lifecycle_manager
 from syntara.core.websocket.router import build_websocket_router
-from syntara.files.health import check_file_storage_health, validate_file_storage_at_startup
+from syntara.files.health import validate_file_storage_at_startup
 from syntara.files.workers.file_cleanup import get_multipart_cleanup_worker
 from syntara.metrics.cleanup import get_metrics_cleanup_worker
 from syntara.metrics.completion_poller import get_completion_poller
@@ -479,9 +479,9 @@ async def _check_database() -> str:
     limit how long the probe *holds* a slot rather than only how long it
     waits for one.
 
-    The outcome is cached for ``DB_PROBE_CACHE_TTL_SECONDS``.  Three probes
-    (startup, readiness, and the deprecated ``/health``) can fire within the
-    same second, and without a cache each one opens its own connection —
+    The outcome is cached for ``DB_PROBE_CACHE_TTL_SECONDS``.  Startup and
+    readiness probes can fire within the same second, and without a cache
+    each one opens its own connection —
     precisely when the pool is most contended.  Failures are cached too, so
     an outage does not turn every probe into another query against a
     database that is already struggling.  The TTL is short enough that
@@ -524,55 +524,6 @@ async def _check_database() -> str:
         error_detail=error_detail,
     )
     return _db_probe_cache.resolve()
-
-
-@app.get("/health", tags=["Health"], include_in_schema=False, deprecated=True)
-async def health_check(request: Request) -> dict[str, Any]:  # noqa: ARG001
-    """Health check endpoint with database connectivity test.
-
-    Deprecated: use ``/healthz/live`` for liveness and ``/healthz/ready``
-    for readiness.  This endpoint is retained until every consumer (the
-    operator's probes in particular) has migrated, and is removed in a
-    follow-up change.
-
-    Returns:
-        dict: Health status with database status
-
-    Responses:
-        200: Service is healthy and database is connected
-        503: Database unreachable or too slow. The body is an RFC 9457
-            problem document, not the 200 payload shape.
-
-    Example:
-        ```bash
-        curl http://localhost:8000/health
-        ```
-
-        Response:
-        ```json
-        {
-            "status": "healthy",
-            "timestamp": "2025-10-09T12:00:00Z",
-            "checks": {
-                "database": "ok",
-                "file_storage": "ok"
-            }
-        }
-        ```
-
-    """
-    timestamp = datetime.now(UTC).isoformat()
-    db_status = await _check_database()
-    file_storage_status = await check_file_storage_health()
-
-    return {
-        "status": "healthy",
-        "timestamp": timestamp,
-        "checks": {
-            "database": db_status,
-            "file_storage": file_storage_status,
-        },
-    }
 
 
 @app.get("/healthz/live", tags=["Health"], include_in_schema=False)

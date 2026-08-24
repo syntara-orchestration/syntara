@@ -12,7 +12,7 @@ import {
   NxListPanelToolbar,
   NxListPanelView,
 } from '../../../components/panels/list/NxListPanel'
-import { NxEmptyStateNoData } from '../../../components/states/NxEmptyStateNoData'
+import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import { useDialogState } from '../../../hooks/useDialogState'
 import { useAlerts } from '../../../providers/alerts'
 import { getErrorMessage } from '../../../utils/apiErrors'
@@ -160,7 +160,7 @@ export function ProjectPoliciesTab({ projectId }: Readonly<{ projectId: string }
           hasActiveFilters={hasActiveFilters}
           onClearAllFilters={clearAllFilters}
           noDataState={
-            <NxEmptyStateNoData title="No policies found" description="No policies are available for this project." />
+            <SynEmptyStateNoData title="No policies found" description="No policies are available for this project." />
           }
           toolbar={
             <NxListPanelToolbar

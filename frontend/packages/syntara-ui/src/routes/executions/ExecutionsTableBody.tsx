@@ -46,6 +46,7 @@ type Execution = {
   completed_at?: string | null
   created_at?: string
   updated_at?: string
+  project_id: string
 }
 
 type ExecutionRowProps = {
@@ -66,7 +67,9 @@ function ExecutionRowActions({
   const queryClient = useQueryClient()
 
   /* v8 ignore start -- v8 emits phantom branches from compiled hook destructuring */
-  const { allowed: canRun, isChecking } = useCanI('run', 'execution')
+  const { allowed: canRun, isChecking } = useCanI('run', 'execution', {
+    resourceProject: execution.project_id,
+  })
   const {
     isCurrentVersion,
     versionLabel: dialogVersionLabel,

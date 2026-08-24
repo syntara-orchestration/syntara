@@ -22,7 +22,7 @@ import { useEffect } from 'react'
 
 import { AppRoute } from '../../app/AppRoute'
 import { NxCodeBlock } from '../../components/details/NxCodeBlock'
-import { NxPanel } from '../../components/layout/NxPanel'
+import { SynPanel } from '../../components/layout/SynPanel'
 import { DateCell } from '../../components/table/DateCell'
 import { detachPromise } from '../../utils/detachPromise'
 
@@ -69,7 +69,7 @@ export function PolicyDetailSidebar({ policy, onClose, projectName }: Readonly<P
   const hasLabels = Object.keys(policy.labels ?? {}).length > 0
 
   return (
-    <NxPanel
+    <SynPanel
       style={{ width: '32rem', borderLeft: '1px solid var(--pf-t--global--border--color--default)' }}
       isFullHeight
       isScrollable
@@ -243,6 +243,6 @@ export function PolicyDetailSidebar({ policy, onClose, projectName }: Readonly<P
           <NxCodeBlock jsonObject={policyJson} noMaxHeight enableCopy />
         </StackItem>
       </Stack>
-    </NxPanel>
+    </SynPanel>
   )
 }

@@ -828,7 +828,7 @@ components:
           type: integer
           title: Max Lifetime Days
           default: 180
-          description: Maximum credential lifetime in days (-1 for unlimited)
+          description: Maximum credential lifetime in days (0 for unlimited)
       type: object
       required:
         - resources
@@ -1253,7 +1253,7 @@ components:
           type: integer
           title: Max Lifetime Days
           default: 180
-          description: Maximum credential lifetime in days (-1 for unlimited)
+          description: Maximum credential lifetime in days (0 for unlimited)
       type: object
       required:
         - resources

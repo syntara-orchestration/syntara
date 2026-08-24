@@ -1,11 +1,11 @@
-"""Integration tests for the /health and /healthz/{live,ready} endpoints."""
+"""Integration tests for the /healthz/{live,ready} endpoints."""
 
 from __future__ import annotations
 
 import asyncio
 import time
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
+from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
 
@@ -26,49 +26,6 @@ def _clear_db_probe_cache() -> Iterator[None]:
     """
     with patch("syntara.api.main._db_probe_cache", None):
         yield
-
-
-class TestHealthEndpointFileStorage:
-    """Verify that /health includes file_storage in its response."""
-
-    @pytest.mark.asyncio
-    async def test_includes_file_storage_field_when_unconfigured(
-        self,
-        base_client: AsyncClient,
-    ) -> None:
-        """Regression guard: /health must return checks.file_storage.
-
-        The frontend's useFileStorageStatus hook gates the upload UI on this
-        field — if absent it fails open and shows upload as available even
-        when S3 is not configured.
-        """
-        mock_fm = MagicMock()
-        type(mock_fm).s3_configured = PropertyMock(return_value=False)
-
-        with patch("syntara.files.health.get_file_manager", return_value=mock_fm):
-            resp = await base_client.get("/health")
-
-        assert resp.status_code == 200
-        body = resp.json()
-        assert "file_storage" in body["checks"], "/health response is missing 'file_storage' in checks"
-        assert body["checks"]["file_storage"] == "unconfigured"
-
-    @pytest.mark.asyncio
-    async def test_includes_file_storage_field_when_configured(
-        self,
-        base_client: AsyncClient,
-    ) -> None:
-        mock_fm = MagicMock()
-        type(mock_fm).s3_configured = PropertyMock(return_value=True)
-        mock_retriever = MagicMock()
-        mock_retriever.health_check = AsyncMock(return_value=True)
-        mock_fm.get_retriever.return_value = mock_retriever
-
-        with patch("syntara.files.health.get_file_manager", return_value=mock_fm):
-            resp = await base_client.get("/health")
-
-        assert resp.status_code == 200
-        assert resp.json()["checks"]["file_storage"] == "ok"
 
 
 class TestLivenessEndpoint:
@@ -258,7 +215,7 @@ class TestReadinessProbeCache:
 
     @pytest.mark.asyncio
     async def test_repeat_probes_within_ttl_query_the_database_once(self, base_client: AsyncClient) -> None:
-        """Startup, readiness and /health can fire in the same second.
+        """Startup and readiness probes can fire in the same second.
 
         Without the memo each opens its own connection, exactly when the
         pool is most contended.
@@ -268,10 +225,9 @@ class TestReadinessProbeCache:
         with patch("syntara.api.main.AsyncSessionLocal", self._counting_session_factory(opened)):
             first = await base_client.get("/healthz/ready")
             second = await base_client.get("/healthz/ready")
-            third = await base_client.get("/health")
 
-        assert first.status_code == second.status_code == third.status_code == 200
-        assert len(opened) == 1, f"expected one database query across three probes, got {len(opened)}"
+        assert first.status_code == second.status_code == 200
+        assert len(opened) == 1, f"expected one database query across two probes, got {len(opened)}"
 
     @pytest.mark.asyncio
     async def test_probes_query_again_once_the_ttl_expires(self, base_client: AsyncClient) -> None:

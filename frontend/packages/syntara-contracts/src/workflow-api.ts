@@ -729,6 +729,12 @@ export interface components {
        * @description Project to assign workflow to
        */
       project_id: string
+      /**
+       * Is Import
+       * @description When true, unavailable LLM models are cleared with warnings instead of rejecting the request. Use when importing workflows from other instances.
+       * @default false
+       */
+      is_import?: boolean
     }
     /**
      * WorkflowUpdate

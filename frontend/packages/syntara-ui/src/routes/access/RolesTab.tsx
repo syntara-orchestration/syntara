@@ -1,4 +1,4 @@
-import { Button, Content, Label, LabelGroup } from '@patternfly/react-core'
+import { Button, Content, LabelGroup } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiEditFillIcon, RhUiLockIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import { ActionsColumn, ExpandableRowContent, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { IAction, ThProps } from '@patternfly/react-table'
@@ -8,8 +8,9 @@ import { useCallback, useMemo, useState } from 'react'
 import { NxConfirmationDialog } from '../../components/dialogs/NxConfirmationDialog'
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { IconLabel } from '../../components/IconLabel'
+import { NxLabel } from '../../components/labels/NxLabel'
 import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../components/panels/list/NxListPanel'
-import { NxEmptyStateNoData } from '../../components/states/NxEmptyStateNoData'
+import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 import { invalidateAuthzCaches } from '../../hooks/invalidateAuthzCaches'
 import { useColumnSortState } from '../../hooks/useColumnSortState'
 import { useCursorPagination, useCursorReset } from '../../hooks/useCursorPagination'
@@ -168,13 +169,11 @@ function RolesTable({
               </Td>
               <Td dataLabel="Type">
                 {role.is_builtin ? (
-                  <Label color="grey" icon={<RhUiLockIcon />} isCompact>
+                  <NxLabel color="grey" icon={<RhUiLockIcon />}>
                     Built-in
-                  </Label>
+                  </NxLabel>
                 ) : (
-                  <Label color="blue" isCompact>
-                    Custom
-                  </Label>
+                  <NxLabel color="blue">Custom</NxLabel>
                 )}
               </Td>
               <Td isActionCell>
@@ -186,9 +185,9 @@ function RolesTable({
                 <ExpandableRowContent>
                   <LabelGroup isCompact numLabels={Infinity}>
                     {(role.policies ?? []).map((policy) => (
-                      <Label key={policy} color="grey" isCompact>
+                      <NxLabel key={policy} color="grey">
                         {policy}
-                      </Label>
+                      </NxLabel>
                     ))}
                   </LabelGroup>
                 </ExpandableRowContent>
@@ -298,7 +297,7 @@ export function RolesTab() {
         isEmpty={roles.length === 0}
         hasActiveFilters={hasActiveFilters}
         onClearAllFilters={handleClearAllFilters}
-        noDataState={<NxEmptyStateNoData title="No roles found" description="No roles are available." />}
+        noDataState={<SynEmptyStateNoData title="No roles found" description="No roles are available." />}
         toolbar={
           roles.length > 0 || hasActiveFilters ? (
             <NxListPanelToolbar
