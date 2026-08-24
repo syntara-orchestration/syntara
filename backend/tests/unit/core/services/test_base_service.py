@@ -310,13 +310,13 @@ class TestValidateQueryParams:
         assert "foo" in msg
         assert "order" in msg
 
-    def test_error_lists_valid_fields(self) -> None:
+    def test_error_does_not_leak_valid_fields(self) -> None:
         service = self._make_service()
-        with pytest.raises(SafeValueError, match="Valid filter fields") as exc_info:
+        with pytest.raises(SafeValueError, match="Unknown query parameter") as exc_info:
             service._validate_query_params({"bogus": "1"}, Workflow)
         msg = str(exc_info.value)
-        assert "name" in msg
-        assert "created_at" in msg
+        assert "Valid filter fields" not in msg
+        assert "bogus" in msg
 
     def test_label_bracket_params_accepted(self) -> None:
         service = self._make_service()
@@ -339,3 +339,12 @@ class TestValidateQueryParams:
         service = self._make_service()
         with pytest.raises(SafeValueError, match=r"Unknown query parameter.*foo"):
             service._validate_query_params({"name": "alice", "foo": "bar"}, Workflow)
+
+    def test_invalid_value_raised_before_unknown_param(self) -> None:
+        """When a known field has an invalid value AND unknown params exist.
+
+        The invalid-value error is raised first (loop order).
+        """
+        service = self._make_service()
+        with pytest.raises(SafeValueError, match=r"Invalid value for field 'is_enabled'"):
+            service._validate_query_params({"is_enabled": "not-a-bool", "bogus": "1"}, Workflow)

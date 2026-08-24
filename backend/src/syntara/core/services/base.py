@@ -658,8 +658,7 @@ class BaseService:
 
         if unknown_params:
             params_str = ", ".join(sorted(unknown_params))
-            valid_str = ", ".join(sorted(filterable))
-            msg = f"Unknown query parameter(s): {params_str}. Valid filter fields are: {valid_str}"
+            msg = f"Unknown query parameter(s): {params_str}"
             raise SafeValueError(msg)
 
     async def list_resources(
