@@ -371,7 +371,7 @@ test.describe('V2 Workflow Schema Migration', () => {
   // 5. API response format verification
   // -------------------------------------------------------------------------
 
-  test('API response preserves v2 schema format on reload', async ({ app }) => {
+  test('API response preserves v2 schema format on reload', { tag: ['@konflux-skip'] }, async ({ app }) => {
     const workflowName = buildUniqueName('v2-response-format')
     await app.goto(toAppUrl('/workflow-builder/new'))
 

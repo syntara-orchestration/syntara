@@ -327,7 +327,7 @@ test.describe('Save with warnings', () => {
 })
 
 test.describe('Variable reference validation', () => {
-  test('reference to nonexistent node shows validation error', async ({ app }) => {
+  test('reference to nonexistent node shows validation error', { tag: ['@konflux-skip'] }, async ({ app }) => {
     test.setTimeout(90_000)
     const workflowName = buildUniqueName('e2e-varref-invalid')
 

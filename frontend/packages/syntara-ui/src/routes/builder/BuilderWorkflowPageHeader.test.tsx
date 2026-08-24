@@ -221,6 +221,7 @@ describe('BuilderWorkflowPageHeader', () => {
           onBackToEditor={vi.fn()}
           executionId="exec-123"
           executionStatus="running"
+          projectId="proj-1"
         />
       </QueryClientProvider>
     )
@@ -241,6 +242,7 @@ describe('BuilderWorkflowPageHeader', () => {
           onBackToEditor={vi.fn()}
           executionId="exec-123"
           executionStatus="running"
+          projectId="proj-1"
           hasApprovalPending
           onReviewApproval={vi.fn()}
         />
@@ -264,6 +266,7 @@ describe('BuilderWorkflowPageHeader', () => {
           onBackToEditor={vi.fn()}
           executionId="exec-456"
           executionStatus="pending"
+          projectId="proj-1"
         />
       </QueryClientProvider>
     )

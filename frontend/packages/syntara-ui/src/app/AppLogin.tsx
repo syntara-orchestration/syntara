@@ -23,7 +23,7 @@ import { RhUiErrorIcon } from '@patternfly/react-icons'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { RETURN_TO_KEY, SESSION_EXPIRED_KEY } from '../components/session/sessionTimeoutConstants'
-import { NxLoadingState } from '../components/states/NxLoadingState'
+import { SynLoadingState } from '../components/states/SynLoadingState'
 import { useBrand } from '../providers/brand'
 import { useColorScheme } from '../providers/theme/useColorScheme'
 import { AuthError, useAuthStore, selectIsAuthenticated, selectIsRefreshing } from '../stores/useAuthStore'
@@ -297,7 +297,7 @@ function AppLoginForm() {
   if (!bootstrapDone || isRefreshing || providersLoading) {
     return (
       <Bullseye style={{ height: '100vh' }}>
-        <NxLoadingState />
+        <SynLoadingState />
       </Bullseye>
     )
   }

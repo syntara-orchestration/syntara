@@ -14,11 +14,11 @@ import {
 } from '../../../../app/breadcrumbBuilders'
 import type { AppBreadcrumbItem } from '../../../../app/breadcrumbs/appBreadcrumbItem'
 import { identityProvidersClient, OIDC_REDIRECT_URI } from '../../../../client'
-import { NxPage, NxPageBody } from '../../../../components/layout/NxPage'
-import { NxPageHeader } from '../../../../components/layout/NxPageHeader'
-import { NxPanel } from '../../../../components/layout/NxPanel'
-import { NxPageTitle } from '../../../../components/NxPageTitle'
+import { SynPage, SynPageBody } from '../../../../components/layout/SynPage'
+import { SynPageHeader } from '../../../../components/layout/SynPageHeader'
+import { SynPanel } from '../../../../components/layout/SynPanel'
 import { useQueryState } from '../../../../components/states/useQueryState'
+import { SynPageTitle } from '../../../../components/SynPageTitle'
 import { useDirtyFormGuard } from '../../../../hooks/useDirtyFormGuard'
 import { useFormMutationErrorHandler } from '../../../../hooks/useFormMutationErrorHandler'
 import { useAlerts } from '../../../../providers/alerts'
@@ -225,14 +225,14 @@ function identityProviderFormBreadcrumbTrail(
 
 function ProviderNotFound({ onBack, onRetry }: Readonly<{ onBack: () => void; onRetry: () => void }>) {
   return (
-    <NxPage>
-      <NxPageTitle segments={['Edit OIDC provider', 'Identity Providers']} />
-      <NxPageHeader
+    <SynPage>
+      <SynPageTitle segments={['Edit OIDC provider', 'Identity Providers']} />
+      <SynPageHeader
         title="Edit OIDC provider"
         breadcrumbs={breadcrumbsIdentityProviderFormLoading('Edit OIDC provider')}
       />
-      <NxPageBody>
-        <NxPanel isFullHeight>
+      <SynPageBody>
+        <SynPanel isFullHeight>
           <EmptyState headingLevel="h2" titleText="Identity provider not found" icon={RhUiSearchIcon} isFullHeight>
             <EmptyStateBody>
               The identity provider you are looking for does not exist or may have been deleted.
@@ -248,9 +248,9 @@ function ProviderNotFound({ onBack, onRetry }: Readonly<{ onBack: () => void; on
               </EmptyStateActions>
             </EmptyStateFooter>
           </EmptyState>
-        </NxPanel>
-      </NxPageBody>
-    </NxPage>
+        </SynPanel>
+      </SynPageBody>
+    </SynPage>
   )
 }
 
@@ -443,25 +443,25 @@ export function IdentityProviderForm({ mode }: Readonly<IdentityProviderFormProp
   }
   if (isEdit && queryState) {
     return (
-      <NxPage>
-        <NxPageTitle segments={[pageTitle, 'Identity Providers']} />
-        <NxPageHeader title={pageTitle} breadcrumbs={breadcrumbsIdentityProviderFormLoading(pageTitle)} />
-        <NxPageBody>
-          <NxPanel isFullHeight>{queryState}</NxPanel>
-        </NxPageBody>
-      </NxPage>
+      <SynPage>
+        <SynPageTitle segments={[pageTitle, 'Identity Providers']} />
+        <SynPageHeader title={pageTitle} breadcrumbs={breadcrumbsIdentityProviderFormLoading(pageTitle)} />
+        <SynPageBody>
+          <SynPanel isFullHeight>{queryState}</SynPanel>
+        </SynPageBody>
+      </SynPage>
     )
   }
 
   const idpFormCrumbs = identityProviderFormBreadcrumbTrail(isEdit, pageTitle, providerId, providerData?.name)
 
   return (
-    <NxPage>
-      <NxPageTitle segments={[pageTitle, 'Identity Providers']} />
-      <NxPageHeader title={pageTitle} docLink={identityProvidersDocLink} breadcrumbs={idpFormCrumbs} />
-      <NxPageBody>
+    <SynPage>
+      <SynPageTitle segments={[pageTitle, 'Identity Providers']} />
+      <SynPageHeader title={pageTitle} docLink={identityProvidersDocLink} breadcrumbs={idpFormCrumbs} />
+      <SynPageBody>
         {/* hasNoPadding: PF Wizard applies its own lg padding on __main-body; Panel padding would double it. */}
-        <NxPanel isFullHeight isScrollable hasNoPadding>
+        <SynPanel isFullHeight isScrollable hasNoPadding>
           <IdentityProviderFormFields
             control={control}
             setValue={setValue}
@@ -475,8 +475,8 @@ export function IdentityProviderForm({ mode }: Readonly<IdentityProviderFormProp
             onSubmit={normalizeAndSubmit}
             onCancel={navigateBack}
           />
-        </NxPanel>
-      </NxPageBody>
-    </NxPage>
+        </SynPanel>
+      </SynPageBody>
+    </SynPage>
   )
 }

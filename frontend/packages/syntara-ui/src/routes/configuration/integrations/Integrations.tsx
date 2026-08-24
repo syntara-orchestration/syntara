@@ -10,17 +10,17 @@ import { AppRoute } from '../../../app/AppRoute'
 import { integrationsClient } from '../../../client'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
-import { NxPage, NxPageBody } from '../../../components/layout/NxPage'
-import { NxPageHeader } from '../../../components/layout/NxPageHeader'
+import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
+import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import type { KebabAction } from '../../../components/NxKebabMenu'
 import { NxKebabMenu } from '../../../components/NxKebabMenu'
-import { NxPageTitle } from '../../../components/NxPageTitle'
 import {
   NxListPanel,
   NxListPanelTable,
   NxListPanelToolbar,
   NxListPanelView,
 } from '../../../components/panels/list/NxListPanel'
+import { SynPageTitle } from '../../../components/SynPageTitle'
 import { LinkCell } from '../../../components/table/LinkCell'
 import { useCursorPagination, useCursorReset } from '../../../hooks/useCursorPagination'
 import type { FilterFieldDefinition } from '../../../types/filters'
@@ -214,9 +214,9 @@ export default function Integrations() {
   const isEmpty = results.length === 0
 
   return (
-    <NxPage>
-      <NxPageTitle segments={['Integrations']} />
-      <NxPageHeader
+    <SynPage>
+      <SynPageTitle segments={['Integrations']} />
+      <SynPageHeader
         title="Integrations"
         docLink={docLink}
         toolbar={
@@ -241,7 +241,7 @@ export default function Integrations() {
         }
       />
 
-      <NxPageBody>
+      <SynPageBody>
         <NxListPanel>
           <NxListPanelView
             isPending={query.isPending}
@@ -275,7 +275,7 @@ export default function Integrations() {
             }
           />
         </NxListPanel>
-      </NxPageBody>
+      </SynPageBody>
 
       <IntegrationDialogs
         validateDialog={validateDialog}
@@ -285,6 +285,6 @@ export default function Integrations() {
         onDelete={handleDelete}
         onDisable={handleDisable}
       />
-    </NxPage>
+    </SynPage>
   )
 }

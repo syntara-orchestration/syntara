@@ -4,8 +4,8 @@ import type { PermissionRequirement } from '../hooks/permissionUtils'
 import { useCanI } from '../hooks/useCanI'
 
 import { EmptyStateAccessDenied } from './EmptyStateAccessDenied'
-import { NxErrorState } from './states/NxErrorState'
-import { NxLoadingState } from './states/NxLoadingState'
+import { SynErrorState } from './states/SynErrorState'
+import { SynLoadingState } from './states/SynLoadingState'
 
 type ProtectedRouteProps = PermissionRequirement & {
   children: ReactNode
@@ -22,10 +22,10 @@ type ProtectedRouteProps = PermissionRequirement & {
 export function ProtectedRoute({ action, resourceType, children }: Readonly<ProtectedRouteProps>) {
   const { allowed, isChecking, isError } = useCanI(action, resourceType)
 
-  if (isChecking) return <NxLoadingState />
+  if (isChecking) return <SynLoadingState />
   if (isError) {
     return (
-      <NxErrorState title="Unable to verify permissions" message="The permission check failed. Please try again." />
+      <SynErrorState title="Unable to verify permissions" message="The permission check failed. Please try again." />
     )
   }
   if (!allowed) {

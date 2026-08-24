@@ -3,8 +3,14 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
+import { useCanI } from '../../hooks/useCanI'
+
 import { ExecutionDetailHeaderToolbar, ExecutionDetailTitleRowAddons } from './ExecutionDetailPageHeaderParts'
 import { executionDetailHasTitleRowExtras, executionDetailPageHeading } from './executionDetailPageHeaderTitle'
+
+vi.mock('../../hooks/useCanI', () => ({
+  useCanI: vi.fn(() => ({ allowed: true, isChecking: false, isError: false })),
+}))
 
 vi.mock('../../client', () => ({
   authMiddleware: { onRequest: vi.fn() },
@@ -110,6 +116,34 @@ describe('ExecutionDetailPageHeaderParts', () => {
 
   it('renders cancel button when execution is cancellable', () => {
     const queryClient = new QueryClient()
+    const execution = {
+      id: 'exec-123',
+      workflow_id: 'wf-1',
+      workflow_version_id: 'wfv-1',
+      project_id: 'proj-1',
+      status: 'running' as const,
+    } as never
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ExecutionDetailHeaderToolbar
+          showApprovalActionStrip={false}
+          isApprovalLoading={false}
+          onReviewClick={() => {}}
+          historyCardOpen={false}
+          onToggleHistory={() => {}}
+          onBackToEditor={() => {}}
+          onCopyToEditor={() => {}}
+          isCancellable={true}
+          executionId="exec-123"
+          execution={execution}
+        />
+      </QueryClientProvider>
+    )
+    expect(screen.getByRole('button', { name: 'Cancel run' })).toBeInTheDocument()
+  })
+
+  it('does not render cancel button when execution is undefined even if isCancellable', () => {
+    const queryClient = new QueryClient()
     render(
       <QueryClientProvider client={queryClient}>
         <ExecutionDetailHeaderToolbar
@@ -126,7 +160,7 @@ describe('ExecutionDetailPageHeaderParts', () => {
         />
       </QueryClientProvider>
     )
-    expect(screen.getByRole('button', { name: 'Cancel run' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cancel run' })).not.toBeInTheDocument()
   })
 
   it('does not render cancel button when execution is not cancellable', () => {
@@ -189,6 +223,13 @@ describe('ExecutionDetailPageHeaderParts', () => {
 
   it('renders cancel and approval buttons together when both applicable', () => {
     const queryClient = new QueryClient()
+    const execution = {
+      id: 'exec-123',
+      workflow_id: 'wf-1',
+      workflow_version_id: 'wfv-1',
+      project_id: 'proj-1',
+      status: 'running' as const,
+    } as never
     render(
       <QueryClientProvider client={queryClient}>
         <ExecutionDetailHeaderToolbar
@@ -201,7 +242,7 @@ describe('ExecutionDetailPageHeaderParts', () => {
           onCopyToEditor={() => {}}
           isCancellable={true}
           executionId="exec-123"
-          execution={undefined}
+          execution={execution}
         />
       </QueryClientProvider>
     )
@@ -255,12 +296,43 @@ describe('ExecutionDetailPageHeaderParts', () => {
     expect(onCopyToEditor).toHaveBeenCalledOnce()
   })
 
+  it('passes resourceProject to useCanI for cancel and retry buttons', () => {
+    const queryClient = new QueryClient()
+    const execution = {
+      id: 'exec-scoped',
+      workflow_id: 'wf-1',
+      workflow_version_id: 'wfv-1',
+      project_id: 'proj-42',
+      status: 'failed' as const,
+      mode: 'standard',
+    } as never
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ExecutionDetailHeaderToolbar
+          showApprovalActionStrip={false}
+          isApprovalLoading={false}
+          onReviewClick={() => {}}
+          historyCardOpen={false}
+          onToggleHistory={() => {}}
+          onBackToEditor={() => {}}
+          onCopyToEditor={() => {}}
+          isCancellable={false}
+          executionId="exec-scoped"
+          execution={execution}
+        />
+      </QueryClientProvider>
+    )
+
+    expect(useCanI).toHaveBeenCalledWith('run', 'execution', { resourceProject: 'proj-42' })
+  })
+
   it('renders retry button when execution is in terminal state', () => {
     const queryClient = new QueryClient()
     const execution = {
       id: 'exec-terminal',
       workflow_id: 'wf-1',
       workflow_version_id: 'wfv-1',
+      project_id: 'proj-1',
       status: 'failed' as const,
       mode: 'standard',
     } as never
@@ -289,6 +361,7 @@ describe('ExecutionDetailPageHeaderParts', () => {
       id: 'exec-running',
       workflow_id: 'wf-1',
       workflow_version_id: 'wfv-1',
+      project_id: 'proj-1',
       status: 'running' as const,
       mode: 'standard',
     } as never

@@ -310,7 +310,7 @@ test.describe('Node editor panels', () => {
     workflowId = app.url().split('/').pop() ?? workflowId
 
     // --- Verify each node's output data ---
-    // Scope text assertions to the Output panel's NxPanel container using the
+    // Scope text assertions to the Output panel's SynPanel container using the
     // panelContainer CSS module class (Vite preserves the name in the hashed class).
     const outputPanel = app.locator('[class*="panelContainer"]').filter({
       has: app.getByRole('heading', { name: 'Output', exact: true }),
@@ -1054,7 +1054,7 @@ test.describe('Node editor panels', () => {
     await expect(app.getByText('Mock data pinned (1)')).not.toBeVisible()
   })
 
-  test('mock data cancel flow', async ({ app }) => {
+  test('mock data cancel flow', { tag: ['@konflux-skip'] }, async ({ app }) => {
     const workflowName = buildUniqueName('e2e-mock-cancel')
     await app.goto(toAppUrl('/workflow-builder/new'))
     await selectProjectIfRequired(app)

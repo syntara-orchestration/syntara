@@ -1,7 +1,7 @@
 import { Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table'
 import { type ReactNode, useCallback, useMemo } from 'react'
 
-import { NxPanelContentStack } from '../../../../components/layout/NxPanelContentStack'
+import { SynPanelContentStack } from '../../../../components/layout/SynPanelContentStack'
 import { NxScrollableTableContainer } from '../../../../components/table/NxScrollableTableContainer'
 import { buildRowKey, toSafeString } from '../utils/tableHelpers'
 
@@ -36,7 +36,7 @@ export function DataTableView({ data, ariaLabel, renderCell, renderHeader }: Rea
   )
 
   return (
-    <NxPanelContentStack>
+    <SynPanelContentStack>
       <NxScrollableTableContainer caption={ariaLabel} useFixedLayout={false} variant="compact">
         <Thead>
           <Tr>
@@ -60,6 +60,6 @@ export function DataTableView({ data, ariaLabel, renderCell, renderHeader }: Rea
           ))}
         </Tbody>
       </NxScrollableTableContainer>
-    </NxPanelContentStack>
+    </SynPanelContentStack>
   )
 }

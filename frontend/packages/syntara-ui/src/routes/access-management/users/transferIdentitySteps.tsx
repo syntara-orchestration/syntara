@@ -7,9 +7,9 @@ import { AppRoute } from '../../../app/AppRoute'
 import { flexCenteredBothAxes } from '../../../app/flexCenteredBothAxes'
 import { FilterBar } from '../../../components/filters/FilterBar'
 import { NxLabel } from '../../../components/labels/NxLabel'
-import { NxPanelContentStack } from '../../../components/layout/NxPanelContentStack'
+import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
 import { NxLink } from '../../../components/NxLink'
-import { NxEmptyStateFilter } from '../../../components/states/NxEmptyStateFilter'
+import { SynEmptyStateFilter } from '../../../components/states/SynEmptyStateFilter'
 import { DateCell } from '../../../components/table/DateCell'
 import { NxScrollableTableContainer } from '../../../components/table/NxScrollableTableContainer'
 import type { PaginationFooterProps } from '../../../components/table/PaginationFooter'
@@ -77,7 +77,7 @@ export function SelectUserStep({
   const showSelectionUi = users.length > 0 || hasActiveFilters
 
   return (
-    <NxPanelContentStack>
+    <SynPanelContentStack>
       {showSelectionUi && (
         <>
           <StackItem>
@@ -114,7 +114,7 @@ export function SelectUserStep({
       )}
       {users.length === 0 && hasActiveFilters && (
         <StackItem isFilled style={flexCenteredBothAxes}>
-          <NxEmptyStateFilter clearAllFilters={usersFilter.clearAllFilters} />
+          <SynEmptyStateFilter clearAllFilters={usersFilter.clearAllFilters} />
         </StackItem>
       )}
       {users.length > 0 && (
@@ -159,7 +159,7 @@ export function SelectUserStep({
           </Tbody>
         </NxScrollableTableContainer>
       )}
-    </NxPanelContentStack>
+    </SynPanelContentStack>
   )
 }
 
@@ -191,7 +191,7 @@ export function SelectIdentityStep({
   const showSelectionUi = identities.length > 0 || hasActiveFilters
 
   return (
-    <NxPanelContentStack>
+    <SynPanelContentStack>
       {showSelectionUi && (
         <>
           <StackItem>
@@ -223,7 +223,7 @@ export function SelectIdentityStep({
       )}
       {identities.length === 0 && hasActiveFilters && (
         <StackItem isFilled style={flexCenteredBothAxes}>
-          <NxEmptyStateFilter clearAllFilters={identitiesFilter.clearAllFilters} />
+          <SynEmptyStateFilter clearAllFilters={identitiesFilter.clearAllFilters} />
         </StackItem>
       )}
       {!showSelectionUi && (
@@ -294,6 +294,6 @@ export function SelectIdentityStep({
           </Tbody>
         </NxScrollableTableContainer>
       )}
-    </NxPanelContentStack>
+    </SynPanelContentStack>
   )
 }
