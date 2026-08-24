@@ -12,8 +12,8 @@ import { test, expect, toAppUrl } from '../fixtures'
 import { APP_TITLE } from '../helpers/appTitle'
 import { addApprovalNodeWithBranch } from '../helpers/v2-nodes'
 import { runWorkflowFromBuilder, waitForExecutionPaused } from '../helpers/workflow-run'
-import { buildUniqueName, createBasicWorkflowViaApi, openWorkflowInBuilder } from '../helpers/workflows'
-import { apiRequest, pollApprovalVisible } from '../utils/api'
+import { buildUniqueName, openWorkflowInBuilder } from '../helpers/workflows'
+import { apiRequest, createWorkflowViaApi, pollApprovalVisible } from '../utils/api'
 
 /**
  * Helper: Create a workflow with an approval node and run it to create a pending approval.
@@ -30,7 +30,9 @@ async function createPendingApproval(
   const workflowName = buildUniqueName('e2e-batch-test')
   const approvalName = buildUniqueName(namePrefix)
 
-  const { id: workflowId } = await createBasicWorkflowViaApi(app, workflowName, 'Pre-approval step')
+  const { id: workflowId } = await createWorkflowViaApi(app, workflowName, [
+    { id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} },
+  ])
   await openWorkflowInBuilder(app, workflowName, workflowId)
 
   // Add approval node and save
@@ -38,12 +40,9 @@ async function createPendingApproval(
   await app.getByRole('button', { name: 'Save', exact: true }).click()
   await runWorkflowFromBuilder(app)
 
-  // Wait for execution to pause at the approval node (requires Temporal).
-  // Use test.skip rather than a hard assertion: the globalSetup probe confirmed
-  // Temporal was reachable, but under CI load the worker can be transiently too
-  // slow to pick up the execution within the timeout budget.
+  // Wait for execution to pause at the approval node (requires Temporal)
   const reachedApproval = await waitForExecutionPaused(app)
-  test.skip(!reachedApproval, 'Execution stayed Pending — Temporal worker may be overloaded')
+  expect(reachedApproval, 'Execution stayed Pending — Temporal worker may not be running').toBeTruthy()
 
   // Wait for the approval record to be queryable in the listing API before returning.
   // There is a brief async gap between the execution reaching "paused" and the approval
@@ -495,7 +494,9 @@ test.describe('Approval Workflow Operations', () => {
     // Create a workflow with an approval node so we control the approval name
     const workflowName = buildUniqueName('e2e-approve')
     const approvalNodeName = buildUniqueName('gate')
-    const { id: workflowId } = await createBasicWorkflowViaApi(app, workflowName, 'Pre-approval step')
+    const { id: workflowId } = await createWorkflowViaApi(app, workflowName, [
+      { id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} },
+    ])
     await openWorkflowInBuilder(app, workflowName, workflowId)
 
     try {
@@ -506,7 +507,7 @@ test.describe('Approval Workflow Operations', () => {
 
       // Wait for execution to pause at the approval node (requires Temporal)
       const reachedApproval = await waitForExecutionPaused(app)
-      test.skip(!reachedApproval, 'Execution stayed Pending — Temporal worker may be overloaded')
+      expect(reachedApproval, 'Execution stayed Pending — Temporal worker may not be running').toBeTruthy()
 
       // Navigate to the approvals queue and find our approval
       await app.goto(toAppUrl('/approvals'))
