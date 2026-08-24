@@ -184,6 +184,7 @@ __all__ = (
     "ListIdentityProvidersEnabled",
     "ListIdentityProvidersId",
     "ListIdentityProvidersName",
+    "ListIdentityProvidersProviderType",
     "ListIdentityProvidersUpdatedAt",
     "ListRoleAssignmentsPrincipalTypeType0",
     "ListRoleAssignmentsScopeType0",

@@ -737,7 +737,7 @@ class TestFilterValueConversion:
             __tablename__ = "uuid_test_model"
             id: UUID = SMField(default_factory=uuid4, primary_key=True)
 
-        field_attr = getattr(UUIDModel, "id")
+        field_attr = UUIDModel.id
 
         # Confirm real column exposes python_type as UUID
         assert field_attr.type.python_type is UUID
@@ -758,7 +758,7 @@ class TestFilterValueConversion:
             __tablename__ = "uuid_test_model_2"
             id: UUID = SMField(default_factory=uuid4, primary_key=True)
 
-        field_attr = getattr(UUIDModel2, "id")
+        field_attr = UUIDModel2.id
 
         with pytest.raises(SafeValueError, match="Invalid UUID value") as exc_info:
             _convert_filter_value("not-a-uuid", field_attr)

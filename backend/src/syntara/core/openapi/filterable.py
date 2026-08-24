@@ -133,7 +133,7 @@ class FilterableModel:
             filterable_fields: dict[str, type | None] = filterable_fields_raw
         else:
             # Convert list to dict with None as type (will be inferred)
-            filterable_fields = {name: None for name in filterable_fields_raw}
+            filterable_fields = dict.fromkeys(filterable_fields_raw)
 
         model_fields_map = getattr(model, "model_fields", {})
 

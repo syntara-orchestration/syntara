@@ -12,6 +12,7 @@ from ...models.list_identity_providers_description import ListIdentityProvidersD
 from ...models.list_identity_providers_enabled import ListIdentityProvidersEnabled
 from ...models.list_identity_providers_id import ListIdentityProvidersId
 from ...models.list_identity_providers_name import ListIdentityProvidersName
+from ...models.list_identity_providers_provider_type import ListIdentityProvidersProviderType
 from ...models.list_identity_providers_updated_at import ListIdentityProvidersUpdatedAt
 from ...types import UNSET, Response, Unset
 
@@ -28,6 +29,7 @@ def _get_kwargs(
     name: ListIdentityProvidersName | Unset = UNSET,
     description: ListIdentityProvidersDescription | Unset = UNSET,
     enabled: ListIdentityProvidersEnabled | Unset = UNSET,
+    provider_type: ListIdentityProvidersProviderType | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
@@ -87,6 +89,12 @@ def _get_kwargs(
         json_enabled = enabled.to_dict()
     if not isinstance(json_enabled, Unset):
         params.update(json_enabled)
+
+    json_provider_type: dict[str, Any] | Unset = UNSET
+    if not isinstance(provider_type, Unset):
+        json_provider_type = provider_type.to_dict()
+    if not isinstance(json_provider_type, Unset):
+        params.update(json_provider_type)
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -179,6 +187,7 @@ def sync_detailed(
     name: ListIdentityProvidersName | Unset = UNSET,
     description: ListIdentityProvidersDescription | Unset = UNSET,
     enabled: ListIdentityProvidersEnabled | Unset = UNSET,
+    provider_type: ListIdentityProvidersProviderType | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> Response[ErrorData | IdentityProviderListResponse]:
     """List identity providers
@@ -196,6 +205,7 @@ def sync_detailed(
         name (ListIdentityProvidersName | Unset):
         description (ListIdentityProvidersDescription | Unset):
         enabled (ListIdentityProvidersEnabled | Unset):
+        provider_type (ListIdentityProvidersProviderType | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -216,6 +226,7 @@ def sync_detailed(
         name=name,
         description=description,
         enabled=enabled,
+        provider_type=provider_type,
         additional_params=additional_params,
     )
 
@@ -239,6 +250,7 @@ def sync(
     name: ListIdentityProvidersName | Unset = UNSET,
     description: ListIdentityProvidersDescription | Unset = UNSET,
     enabled: ListIdentityProvidersEnabled | Unset = UNSET,
+    provider_type: ListIdentityProvidersProviderType | Unset = UNSET,
 ) -> ErrorData | IdentityProviderListResponse | None:
     """List identity providers
 
@@ -255,6 +267,7 @@ def sync(
         name (ListIdentityProvidersName | Unset):
         description (ListIdentityProvidersDescription | Unset):
         enabled (ListIdentityProvidersEnabled | Unset):
+        provider_type (ListIdentityProvidersProviderType | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -276,6 +289,7 @@ def sync(
         name=name,
         description=description,
         enabled=enabled,
+        provider_type=provider_type,
     ).parsed
 
 
@@ -292,6 +306,7 @@ async def asyncio_detailed(
     name: ListIdentityProvidersName | Unset = UNSET,
     description: ListIdentityProvidersDescription | Unset = UNSET,
     enabled: ListIdentityProvidersEnabled | Unset = UNSET,
+    provider_type: ListIdentityProvidersProviderType | Unset = UNSET,
 ) -> Response[ErrorData | IdentityProviderListResponse]:
     """List identity providers
 
@@ -308,6 +323,7 @@ async def asyncio_detailed(
         name (ListIdentityProvidersName | Unset):
         description (ListIdentityProvidersDescription | Unset):
         enabled (ListIdentityProvidersEnabled | Unset):
+        provider_type (ListIdentityProvidersProviderType | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -328,6 +344,7 @@ async def asyncio_detailed(
         name=name,
         description=description,
         enabled=enabled,
+        provider_type=provider_type,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -348,6 +365,7 @@ async def asyncio(
     name: ListIdentityProvidersName | Unset = UNSET,
     description: ListIdentityProvidersDescription | Unset = UNSET,
     enabled: ListIdentityProvidersEnabled | Unset = UNSET,
+    provider_type: ListIdentityProvidersProviderType | Unset = UNSET,
 ) -> ErrorData | IdentityProviderListResponse | None:
     """List identity providers
 
@@ -364,6 +382,7 @@ async def asyncio(
         name (ListIdentityProvidersName | Unset):
         description (ListIdentityProvidersDescription | Unset):
         enabled (ListIdentityProvidersEnabled | Unset):
+        provider_type (ListIdentityProvidersProviderType | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -386,5 +405,6 @@ async def asyncio(
             name=name,
             description=description,
             enabled=enabled,
+            provider_type=provider_type,
         )
     ).parsed

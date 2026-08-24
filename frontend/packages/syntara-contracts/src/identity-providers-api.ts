@@ -1105,24 +1105,6 @@ export interface operations {
           /** Starts With */
           starts_with?: string
         }
-        'configuration.provider_type'?: string & {
-          /** Contains */
-          contains?: string
-          /** Equals */
-          eq?: string
-          /** Greater Than */
-          gt?: string
-          /** Greater Than or Equal */
-          gte?: string
-          /** In */
-          in?: string
-          /** Less Than */
-          lt?: string
-          /** Less Than or Equal */
-          lte?: string
-          /** Starts With */
-          starts_with?: string
-        }
       }
       header?: never
       path?: never
