@@ -289,26 +289,26 @@ test.describe('Approval Workflow Operations', () => {
       const row = table.getByRole('row').filter({ hasText: approval.approvalName })
       await expect(row).toBeVisible({ timeout: 15_000 })
       await row.getByRole('checkbox').check()
+      const batchToolbar = app.getByRole('toolbar', { name: /selected/i })
+      await expect(batchToolbar).toBeVisible()
       await expect(app.getByText('1 selected')).toBeVisible()
 
-      // Step 2: Click "Approve Selected"
+      // Step 2: Click Approve and verify confirmation dialog
       const approveButton = app.getByRole('button', { name: 'Approve' })
+      await expect(approveButton).toBeVisible()
       await approveButton.click()
 
       // Step 3: Verify dialog appears
       const dialog = app.getByRole('dialog')
       await expect(dialog).toBeVisible()
 
-      // Step 4: Click "Cancel" button
-      const cancelButton = dialog.getByRole('button', { name: 'Cancel' })
-      await expect(cancelButton).toBeVisible()
-      await cancelButton.click()
+      // Step 4: Click Cancel
+      await dialog.getByRole('button', { name: 'Cancel' }).click()
 
-      // Step 5: Verify dialog closed
-      await expect(dialog).not.toBeVisible()
-
-      // Step 6: Verify selection is still active (no API call was made)
-      await expect(app.getByText('1 selected')).toBeVisible()
+      // Step 5: Verify dialog closed and selection preserved (no API call)
+      await expect(dialog).not.toBeVisible({ timeout: 10_000 })
+      await expect(batchToolbar).toBeVisible()
+      await expect(app.getByText('1 selected')).toBeVisible({ timeout: 10_000 })
 
       // Step 7: Deselect to clean up
       await row.getByRole('checkbox').uncheck()

@@ -6,11 +6,11 @@ import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData
 import { NxScrollableTableContainer } from '../../components/table/NxScrollableTableContainer'
 import type { PaginationFooterProps } from '../../components/table/PaginationFooter'
 
+import type { ApprovalWithDetails } from './Approvals'
 import { FlatApprovalsTableBody, GroupedApprovalsTableBody } from './ApprovalsTableBody'
 import { ApprovalsTableHead } from './ApprovalsTableHead'
 import { BulkApproveDialog } from './BulkApproveDialog'
 import { BulkRejectDialog } from './BulkRejectDialog'
-import type { ApprovalWithDetails } from './Approvals'
 import type { useApprovalsData } from './useApprovalsData'
 
 type BulkActionDialogsProps = {

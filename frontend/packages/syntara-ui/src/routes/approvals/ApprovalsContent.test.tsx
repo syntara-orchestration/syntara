@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import type { ReactElement } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
+import type { PaginationFooterProps } from '../../components/table/PaginationFooter'
 import type { ProjectRead } from '../access/types'
 
 import type { ApprovalWithDetails } from './Approvals'
@@ -51,6 +52,16 @@ const mockProject: ProjectRead = {
   updated_at: '2024-01-01T00:00:00Z',
 }
 
+const mockFooterProps: PaginationFooterProps = {
+  page: 1,
+  perPage: 20,
+  total: 1,
+  hasNext: false,
+  onPrev: vi.fn(),
+  onNext: vi.fn(),
+  onPerPageChange: vi.fn(),
+}
+
 const defaultTableProps = {
   sortedApprovals: [mockApproval],
   hasActiveFilters: false,
@@ -72,7 +83,7 @@ const defaultTableProps = {
   onToggleProject: vi.fn(),
   selectedApprovalIds: new Set<string>(),
   onSelectRow: vi.fn(),
-  footerProps: { itemCount: 1, perPage: 20, page: 1, onSetPage: vi.fn(), onPerPageSelect: vi.fn() },
+  footerProps: mockFooterProps,
   approvalPermissions: new Map([['a1', true]]),
   isLoadingPermissions: false,
 }
