@@ -9,7 +9,7 @@ import { IconLabel } from '../../../components/IconLabel'
 import type { KebabAction } from '../../../components/NxKebabMenu'
 import { NxKebabMenu } from '../../../components/NxKebabMenu'
 import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../../components/panels/list/NxListPanel'
-import { NxEmptyStateNoData } from '../../../components/states/NxEmptyStateNoData'
+import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import { DateCell } from '../../../components/table/DateCell'
 import { useCursorPagination, useCursorReset } from '../../../hooks/useCursorPagination'
 import { useDialogState } from '../../../hooks/useDialogState'
@@ -376,7 +376,7 @@ export function CredentialsTab({
         hasActiveFilters={hasActiveFilters}
         onClearAllFilters={handleClearAllFilters}
         noDataState={
-          <NxEmptyStateNoData
+          <SynEmptyStateNoData
             title="No credentials yet"
             description="Create a credential to enable API access for this service account."
             buttonText={permissions.canUpdate ? 'Create credential' : undefined}

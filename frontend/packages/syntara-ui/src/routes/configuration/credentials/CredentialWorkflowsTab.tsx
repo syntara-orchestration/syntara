@@ -8,7 +8,7 @@ import { credentialsClient } from '../../../client'
 import { NxLabel } from '../../../components/labels/NxLabel'
 import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
 import { NxListPanelTable, NxListPanelView } from '../../../components/panels/list/NxListPanel'
-import { NxEmptyStateNoData } from '../../../components/states/NxEmptyStateNoData'
+import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import { DateCell } from '../../../components/table/DateCell'
 import { LinkCell } from '../../../components/table/LinkCell'
 import { UserTimestamp } from '../../../components/table/UserTimestamp'
@@ -161,7 +161,7 @@ export function CredentialWorkflowsTab({ credentialId }: Readonly<CredentialWork
         hasActiveFilters={false}
         onClearAllFilters={noop}
         noDataState={
-          <NxEmptyStateNoData
+          <SynEmptyStateNoData
             title="No workflows using this credential"
             description="This credential is not currently referenced by any workflows. Workflows will appear here once they are configured to use this credential."
           />

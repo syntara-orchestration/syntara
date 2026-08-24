@@ -2,20 +2,20 @@ import { Button, EmptyState, EmptyStateBody, EmptyStateActions, EmptyStateFooter
 import { RhUiCubesFillIcon } from '@patternfly/react-icons'
 import type { ReactNode } from 'react'
 
-import { NxEmptyStateImageIcon } from './NxEmptyStateImageIcon'
+import { SynEmptyStateImageIcon } from './SynEmptyStateImageIcon'
 
 /**
  * Full-height empty state for when there is no data available yet.
  *
  * @example
- * <NxEmptyStateNoData
+ * <SynEmptyStateNoData
  *   title="No workflows found"
  *   description="Create your first workflow to get started."
  *   buttonText="Create Workflow"
  *   addData={() => navigate('/create')}
  * />
  */
-export type NxEmptyStateNoDataProps = {
+export type SynEmptyStateNoDataProps = {
   title?: string
   description?: string
   buttonText?: string
@@ -25,7 +25,7 @@ export type NxEmptyStateNoDataProps = {
   secondaryActions?: ReactNode
 }
 
-export function NxEmptyStateNoData(props: NxEmptyStateNoDataProps) {
+export function SynEmptyStateNoData(props: SynEmptyStateNoDataProps) {
   const { title, description, buttonText, imageSrc, imageAlt, addData, secondaryActions } = props
 
   const defaultTitle = 'No data available'
@@ -33,7 +33,9 @@ export function NxEmptyStateNoData(props: NxEmptyStateNoDataProps) {
   const defaultButtonText = 'Add data'
 
   // Use custom image component if provided, otherwise use default icon
-  const icon = imageSrc ? () => <NxEmptyStateImageIcon src={imageSrc} alt={imageAlt ?? 'No data'} /> : RhUiCubesFillIcon
+  const icon = imageSrc
+    ? () => <SynEmptyStateImageIcon src={imageSrc} alt={imageAlt ?? 'No data'} />
+    : RhUiCubesFillIcon
 
   return (
     <EmptyState headingLevel="h2" titleText={title ?? defaultTitle} icon={icon} isFullHeight>

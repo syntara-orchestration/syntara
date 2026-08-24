@@ -1,19 +1,19 @@
 import { Button, EmptyState, EmptyStateBody, EmptyStateActions, EmptyStateFooter } from '@patternfly/react-core'
 import { RhUiSearchIcon } from '@patternfly/react-icons'
 
-import { NxEmptyStateImageIcon } from './NxEmptyStateImageIcon'
+import { SynEmptyStateImageIcon } from './SynEmptyStateImageIcon'
 
 /**
  * Full-height empty state for when filters return no results.
  *
  * @example
- * <NxEmptyStateFilter
+ * <SynEmptyStateFilter
  *   clearAllFilters={() => setSearch('')}
  *   imageSrc="/no-results.png"
  *   imageAlt="No results"
  * />
  */
-export type NxEmptyStateFilterProps = {
+export type SynEmptyStateFilterProps = {
   title?: string
   description?: string
   buttonText?: string
@@ -22,7 +22,7 @@ export type NxEmptyStateFilterProps = {
   clearAllFilters?: () => void
 }
 
-export function NxEmptyStateFilter(props: NxEmptyStateFilterProps) {
+export function SynEmptyStateFilter(props: SynEmptyStateFilterProps) {
   const { title, description, buttonText, imageSrc, imageAlt, clearAllFilters } = props
 
   const defaultTitle = 'No results found'
@@ -30,7 +30,9 @@ export function NxEmptyStateFilter(props: NxEmptyStateFilterProps) {
   const defaultButtonText = 'Clear all filters'
 
   // Use custom image component if provided, otherwise use default icon
-  const icon = imageSrc ? () => <NxEmptyStateImageIcon src={imageSrc} alt={imageAlt ?? 'No results'} /> : RhUiSearchIcon
+  const icon = imageSrc
+    ? () => <SynEmptyStateImageIcon src={imageSrc} alt={imageAlt ?? 'No results'} />
+    : RhUiSearchIcon
 
   return (
     <EmptyState headingLevel="h2" titleText={title ?? defaultTitle} icon={icon} isFullHeight>

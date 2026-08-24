@@ -11,7 +11,7 @@ import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../components/layout/SynPanel'
 import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
-import { NxEmptyStateFilter } from '../../../components/states/NxEmptyStateFilter'
+import { SynEmptyStateFilter } from '../../../components/states/SynEmptyStateFilter'
 import { useQueryState } from '../../../components/states/useQueryState'
 import { SynPageTitle } from '../../../components/SynPageTitle'
 import { NxScrollableTableContainer } from '../../../components/table/NxScrollableTableContainer'
@@ -377,7 +377,7 @@ export default function Credentials() {
 
               {credentials.length === 0 ? (
                 <SynPageBody isCentered>
-                  <NxEmptyStateFilter clearAllFilters={handleClearAllFilters} />
+                  <SynEmptyStateFilter clearAllFilters={handleClearAllFilters} />
                 </SynPageBody>
               ) : (
                 <NxScrollableTableContainer

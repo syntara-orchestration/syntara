@@ -21,7 +21,7 @@ import { NxCodeBlock } from '../../components/details/NxCodeBlock'
 import { NxDetail } from '../../components/details/NxDetail'
 import { NxDetailList } from '../../components/details/NxDetailList'
 import { NxLabel } from '../../components/labels/NxLabel'
-import { NxEmptyStateNoData } from '../../components/states/NxEmptyStateNoData'
+import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 
 import {
   formatTraceFieldLabel,
@@ -244,7 +244,7 @@ export function AgentTraceView({ agentTrace, isLoading }: AgentTraceViewProps) {
 
   if (!agentTrace || agentTrace.steps.length === 0) {
     return (
-      <NxEmptyStateNoData
+      <SynEmptyStateNoData
         title="No agent steps yet"
         description="No agent reasoning steps are available for this activity."
       />

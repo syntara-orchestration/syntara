@@ -11,7 +11,7 @@ import { useMemo } from 'react'
 import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../components/layout/SynPanel'
-import { NxEmptyStateFilter } from '../../../components/states/NxEmptyStateFilter'
+import { SynEmptyStateFilter } from '../../../components/states/SynEmptyStateFilter'
 import { SynPageTitle } from '../../../components/SynPageTitle'
 import { useFuse } from '../../../hooks/useFuse'
 
@@ -45,7 +45,7 @@ export default function Glossary() {
       {results.length === 0 ? (
         <SynPageBody>
           <SynPanel isFullHeight>
-            <NxEmptyStateFilter clearAllFilters={() => setSearch('')} />
+            <SynEmptyStateFilter clearAllFilters={() => setSearch('')} />
           </SynPanel>
         </SynPageBody>
       ) : (

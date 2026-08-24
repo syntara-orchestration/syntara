@@ -2,7 +2,7 @@ import { Button, Content, StackItem } from '@patternfly/react-core'
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { fn } from 'storybook/test'
 
-import { NxErrorState } from '../states/NxErrorState'
+import { SynErrorState } from '../states/SynErrorState'
 
 import { SynPage, SynPageBody } from './SynPage'
 import { SynPageHeader } from './SynPageHeader'
@@ -150,7 +150,7 @@ export const ErrorPageLayout: Story = {
       <SynPageHeader title="Workflows" toolbar={<Button variant="primary">Create workflow</Button>} />
       <SynPageBody isCentered>
         <SynPanel isFullHeight>
-          <NxErrorState message={{ detail: 'Connection timed out.', retryable: true }} onRetry={fn()} />
+          <SynErrorState message={{ detail: 'Connection timed out.', retryable: true }} onRetry={fn()} />
         </SynPanel>
       </SynPageBody>
     </SynPage>

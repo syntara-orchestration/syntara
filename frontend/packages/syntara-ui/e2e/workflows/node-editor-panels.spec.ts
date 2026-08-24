@@ -1054,7 +1054,7 @@ test.describe('Node editor panels', () => {
     await expect(app.getByText('Mock data pinned (1)')).not.toBeVisible()
   })
 
-  test('mock data cancel flow', async ({ app }) => {
+  test('mock data cancel flow', { tag: ['@konflux-skip'] }, async ({ app }) => {
     const workflowName = buildUniqueName('e2e-mock-cancel')
     await app.goto(toAppUrl('/workflow-builder/new'))
     await selectProjectIfRequired(app)

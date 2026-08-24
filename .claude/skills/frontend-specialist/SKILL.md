@@ -70,7 +70,7 @@ Standards for implementing, reviewing, and refactoring frontend code using React
 - [ ] No raw `fetch()` — all API calls use typed clients from `client.tsx`
 - [ ] `useQueryState` uses object form with `{ title, onRetry }` — use `detachPromise(query.refetch())`, not `void`
 - [ ] No unsafe `as` casts on API responses — use typed responses or type guards
-- [ ] Errors displayed via `NxErrorState` component -- no raw error markup
+- [ ] Errors displayed via `SynErrorState` component -- no raw error markup
 - [ ] Mutations use `useMutationErrorHandler` or `useFormMutationErrorHandler`
 
 ### Forms

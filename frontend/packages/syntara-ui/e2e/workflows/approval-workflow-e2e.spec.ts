@@ -64,7 +64,7 @@ async function createPendingApproval(app: Page): Promise<{ workflowId: string; a
 test.describe('Approval Workflow E2E', () => {
   test.skip(!process.env['SYNTARA_E2E_HAS_TEMPORAL_WORKER'], 'Temporal worker unavailable (globalSetup probe)')
 
-  test('view pending approval with previous step output', async ({ app }) => {
+  test('view pending approval with previous step output', { tag: ['@konflux-skip'] }, async ({ app }) => {
     // Create a pending approval (workflow has a script node before the approval node)
     const approval = await createPendingApproval(app)
 

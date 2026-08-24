@@ -3,7 +3,7 @@ import { Component, type ReactNode } from 'react'
 import { SynPage, SynPageBody } from './layout/SynPage'
 import { SynPageHeader } from './layout/SynPageHeader'
 import { SynPanel } from './layout/SynPanel'
-import { NxErrorState } from './states/NxErrorState'
+import { SynErrorState } from './states/SynErrorState'
 
 type ErrorBoundaryProps = {
   children: ReactNode
@@ -40,7 +40,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
           <SynPageHeader title="Something went wrong" />
           <SynPageBody>
             <SynPanel isFullHeight>
-              <NxErrorState
+              <SynErrorState
                 title="Something went wrong"
                 message={this.state.error?.message ?? 'An unexpected error occurred'}
               />
