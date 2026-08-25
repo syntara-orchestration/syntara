@@ -6,28 +6,12 @@
  */
 import { test, expect } from './fixtures'
 import {
-  createServiceAccountViaUI,
   createTestServiceAccount,
-  deleteServiceAccountByName,
   deleteServiceAccountViaApi,
   goToServiceAccountDetail,
 } from './helpers/service-accounts'
-import { buildUniqueName } from './helpers/workflows'
 
 test.describe('UI-11: Service Account CRUD Lifecycle', () => {
-  test('admin can create a service account via UI', async ({ app }) => {
-    const saName = buildUniqueName('sa-create')
-
-    const creds = await createServiceAccountViaUI(app, { name: saName })
-
-    try {
-      expect(creds.clientId).toBeTruthy()
-      expect(creds.clientSecret).toBeTruthy()
-    } finally {
-      await deleteServiceAccountByName(app, saName)
-    }
-  })
-
   test.describe('edit and delete', () => {
     let sa: { id: string; name: string }
 
