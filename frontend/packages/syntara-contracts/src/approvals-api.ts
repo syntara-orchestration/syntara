@@ -180,6 +180,11 @@ export interface components {
        */
       decision_notes?: string | null
       /**
+       * Prompt
+       * @description Message to display to approvers when requesting approval
+       */
+      prompt?: string | null
+      /**
        * Signal Delivery Error
        * @description Error if the workflow signal failed after a decision. Only present in the decide response; null on subsequent reads.
        */
@@ -268,6 +273,11 @@ export interface components {
        * @description Group IDs whose members can approve
        */
       approver_group_ids?: string[] | null
+      /**
+       * Prompt
+       * @description Message to display to approvers when requesting approval
+       */
+      prompt?: string | null
     }
     /**
      * WorkflowContext

@@ -439,6 +439,13 @@ components:
                 - type: "null"
               description: Notes provided with decision
               title: Decision Notes
+            prompt:
+              anyOf:
+                - maxLength: 2000
+                  type: string
+                - type: "null"
+              description: Message to display to approvers when requesting approval
+              title: Prompt
             signal_delivery_error:
               anyOf:
                 - type: string
@@ -558,6 +565,13 @@ components:
             - type: "null"
           title: Approver Group Ids
           description: Group IDs whose members can approve
+        prompt:
+          anyOf:
+            - maxLength: 2000
+              type: string
+            - type: "null"
+          title: Prompt
+          description: Message to display to approvers when requesting approval
 
     WorkflowContext:
       type: object
