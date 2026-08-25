@@ -229,7 +229,6 @@ test.describe('Name Keyword Filtering', () => {
       await deleteCredentialByName(app, credName)
     }
   })
-
 })
 
 // ---------------------------------------------------------------------------
