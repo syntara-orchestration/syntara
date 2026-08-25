@@ -276,30 +276,26 @@ test.describe('Approval Workflow Operations', () => {
       const row = table.getByRole('row').filter({ hasText: approval.approvalName })
       await expect(row).toBeVisible({ timeout: 15_000 })
       await row.getByRole('checkbox').check()
-      const batchToolbar = app.getByRole('toolbar', { name: /selected/i })
-      await expect(batchToolbar).toBeVisible()
-      await expect(app.getByText('1 selected')).toBeVisible()
 
-      // Step 2: Click Approve and verify confirmation dialog
-      const approveButton = app.getByRole('button', { name: 'Approve' })
+      const pageHeader = app.getByTestId('page-header')
+      await expect(pageHeader.getByText('1 selected')).toBeVisible({ timeout: 15_000 })
+
+      // Step 2: Open bulk approve dialog from the page header actions
+      const approveButton = pageHeader.getByRole('button', { name: 'Approve' })
       await expect(approveButton).toBeVisible()
       await approveButton.click()
 
-      // Step 3: Verify dialog appears
+      // Step 3: Cancel without submitting — dialog should close and selection should remain
       const dialog = app.getByRole('dialog')
-      await expect(dialog).toBeVisible()
-
-      // Step 4: Click Cancel
+      await expect(dialog.getByRole('heading', { name: /approve.*approval/i })).toBeVisible()
       await dialog.getByRole('button', { name: 'Cancel' }).click()
 
-      // Step 5: Verify dialog closed and selection preserved (no API call)
-      await expect(dialog).not.toBeVisible({ timeout: 10_000 })
-      await expect(batchToolbar).toBeVisible()
-      await expect(app.getByText('1 selected')).toBeVisible({ timeout: 10_000 })
+      await expect(app.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 })
+      await expect(pageHeader.getByText('1 selected')).toBeVisible({ timeout: 10_000 })
 
-      // Step 7: Deselect to clean up
+      // Step 4: Deselect to clean up
       await row.getByRole('checkbox').uncheck()
-      await expect(app.getByText('1 selected')).not.toBeVisible()
+      await expect(pageHeader.getByText('1 selected')).not.toBeVisible()
     } finally {
       // Cleanup: delete created workflow
       await apiRequest(app, 'delete', `/workflows/${approval.workflowId}`).catch(() => {})
