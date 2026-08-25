@@ -129,6 +129,7 @@ export function SynPageHeader(props: SynPageHeaderProps) {
 
   return (
     <CompassMainHeader
+      data-testid="page-header"
       panelProps={{ isGlass: true }}
       title={titleForCompass}
       toolbar={
