@@ -2,6 +2,7 @@
 import { GitHubClient } from './lib/github.js'
 import { SlackNotifier } from './lib/slack.js'
 import { getEnvironment } from './lib/env.js'
+import { inferPreviousHealthFromJobs } from './lib/health-state.js'
 import type { HealthState } from './lib/types.js'
 
 const MERGE_TIMEOUT_MINUTES = 120
@@ -84,29 +85,7 @@ async function getPreviousHealthState(
     console.log(`Previous run ID: ${previousRun.id}`)
 
     const jobs = await github.getWorkflowRunJobs(previousRun.id)
-
-    // Check which alert step ran in the previous workflow
-    const sentUnhealthyAlert = jobs[0]?.steps?.some(
-      (step) => step.name === 'Send unhealthy alert' && step.conclusion === 'success'
-    )
-
-    const sentRecoveryAlert = jobs[0]?.steps?.some(
-      (step) => step.name === 'Send recovery alert' && step.conclusion === 'success'
-    )
-
-    if (sentRecoveryAlert) {
-      // Recovery means the previous run ended in a healthy state.
-      return 'healthy'
-    }
-
-    if (sentUnhealthyAlert) {
-      // An unhealthy alert means the previous run ended in an unhealthy state.
-      return 'unhealthy'
-    }
-
-    // If neither alert was sent, state didn't change - infer from conclusion
-    // This is imperfect but works for the steady state
-    return 'unknown'
+    return inferPreviousHealthFromJobs(jobs);
   } catch (error) {
     console.warn('Could not determine previous state:', error)
     return 'unknown'
