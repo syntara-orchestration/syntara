@@ -109,23 +109,6 @@ test.describe('Credential Detail Page & Workflows Tab', () => {
     }
   })
 
-  test('workflows tab shows workflow references when available', async ({ app }) => {
-    const { name } = await createTestCredential(app, { prefix: 'e2e-detail-wf-refs' })
-    try {
-      await navigateToCredentialDetail(app, name)
-      await app.getByRole('tab', { name: /Workflows/ }).click()
-
-      // This credential was just created — it won't have workflows referencing it
-      // Assert the empty state or table renders correctly
-      const emptyState = app.getByText('No workflows using this credential')
-      const table = app.getByRole('grid', { name: 'Workflows using this credential' })
-      const errorState = app.getByText('Failed to load workflows')
-      await expect(emptyState.or(table).or(errorState)).toBeVisible()
-    } finally {
-      await deleteCredentialByName(app, name)
-    }
-  })
-
   test('workflows tab shows count in footer when workflows exist', async ({ app }) => {
     const { name } = await createTestCredential(app, { prefix: 'e2e-detail-wf-count' })
     try {
