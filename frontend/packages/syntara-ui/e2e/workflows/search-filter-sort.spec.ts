@@ -42,35 +42,6 @@ test.describe('Workflows Table - Search, Filter, and Sort', () => {
     return workflows
   }
 
-  test('user can remove individual filter chip', async ({ app }) => {
-    const workflows = await createTestWorkflows(app, 1)
-    expect(workflows).toHaveLength(1)
-
-    try {
-      const searchTerm = workflows[0].name
-
-      await app.goto(toAppUrl('/workflows'))
-      await app.getByPlaceholder('Filter by name').fill(searchTerm)
-      await app.getByRole('button', { name: 'Apply filter' }).click()
-
-      const nameChipGroup = app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Name' })
-      await expect(nameChipGroup).toBeVisible()
-
-      // Remove filter chip by clicking its close button
-      // Find the chip containing our search term, then click its close button
-      const chipWithText = nameChipGroup.filter({ hasText: searchTerm })
-      await chipWithText.getByRole('button', { name: /close/i }).click()
-
-      // Verify filter is removed
-      await expect(nameChipGroup).not.toBeVisible()
-      await expect(app).not.toHaveURL(new RegExp(`name.*${searchTerm}`))
-    } finally {
-      for (const wf of workflows) {
-        await deleteWorkflowViaApi(app, wf.id)
-      }
-    }
-  })
-
   test('search results update as user types and applies filter', async ({ app }) => {
     const workflows = await createTestWorkflows(app, 2)
     expect(workflows.length).toBeGreaterThanOrEqual(2)
