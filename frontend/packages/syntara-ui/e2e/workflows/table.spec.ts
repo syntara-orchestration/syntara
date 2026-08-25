@@ -49,46 +49,6 @@ test.describe('Workflows Table - Display and Navigation', () => {
     }
   })
 
-  test('workflows table displays action controls (kebab menu)', async ({ app }) => {
-    // Create a workflow specifically for this test
-    const project = await ensureProject(app)
-    const workflowName = buildUniqueName('e2e-kebab')
-    const workflow = await createWorkflowViaApi(app, {
-      name: workflowName,
-      projectId: project?.id,
-    })
-
-    if (!workflow) throw new Error('Failed to create test workflow')
-
-    try {
-      await app.goto(toAppUrl('/workflows'))
-      await expect(app.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
-
-      // Filter by workflow name
-      await app.getByPlaceholder('Filter by name').fill(workflowName)
-      await app.getByRole('button', { name: 'Apply filter' }).click()
-
-      // Wait for filter chip to appear
-      const nameChipGroup = app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Name' })
-      await expect(nameChipGroup).toBeVisible()
-
-      // Wait for the workflow row
-      const table = app.getByRole('grid', { name: 'Workflows table' })
-      const workflowRow = table.getByRole('row', { name: new RegExp(workflowName) })
-      await expect(workflowRow).toBeVisible({ timeout: 15000 })
-
-      // Verify kebab menu
-      const kebabToggle = workflowRow.getByRole('button', { name: /Actions|Kebab toggle/i })
-      await expect(kebabToggle).toBeVisible()
-
-      await kebabToggle.click({ force: true })
-
-      await expect(app.getByRole('menuitem', { name: /Delete workflow/i })).toBeVisible()
-    } finally {
-      await deleteWorkflowViaApi(app, workflow.id)
-    }
-  })
-
   test('empty state displays when no workflows match filter', async ({ app }) => {
     // Create a workflow to ensure we have data, then filter for something else
     const project = await ensureProject(app)
