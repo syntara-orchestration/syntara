@@ -120,5 +120,4 @@ test.describe('Workflows Table - Search, Filter, and Sort', () => {
       }
     }
   })
-
 })
