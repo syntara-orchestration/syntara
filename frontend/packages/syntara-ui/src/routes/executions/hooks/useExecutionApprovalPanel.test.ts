@@ -222,6 +222,18 @@ describe('useExecutionApprovalPanel', () => {
     expect(result.current.approvalMessage).toBe('Deploy to production?')
   })
 
+  it('returns approvalMessage when approval_node_id has a loop-iteration suffix', () => {
+    const loopApproval = { ...mockApproval, approval_node_id: 'node-1_iter_0' }
+    const nodeClick = makeNodeClick(loopApproval, [loopApproval])
+    const wfDef = {
+      nodes: [{ id: 'node-1', config: { prompt: 'Approve this server?' } }],
+    }
+
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', nodeClick, wfDef))
+
+    expect(result.current.approvalMessage).toBe('Approve this server?')
+  })
+
   it('returns approvalMessage from v2 parameters.prompt', () => {
     const nodeClick = makeNodeClick(mockApproval, [mockApproval])
     const wfDef = {
@@ -572,5 +584,57 @@ describe('useExecutionApprovalPanel', () => {
     })
 
     expect(result.current.panelOpen).toBe(true)
+  })
+
+  it('auto-dismisses using this approval iteration activity key', async () => {
+    mockFetchApprovals.mockResolvedValue([])
+    const loopApproval = { ...mockApproval, loop_iteration_path: [2] }
+    const nodeClick = makeNodeClick(loopApproval, [loopApproval])
+
+    storeHelpers.setStatus('node-1#iter-2', 'waiting')
+
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', nodeClick, undefined))
+
+    act(() => result.current.open())
+    expect(result.current.panelOpen).toBe(true)
+
+    await act(async () => {
+      storeHelpers.setStatus('node-1#iter-2', 'failed')
+      await vi.runAllTimersAsync()
+    })
+
+    expect(result.current.panelOpen).toBe(false)
+    expect(mockClearApprovals).toHaveBeenCalled()
+  })
+
+  it('does not dismiss a nested pass when an earlier canvas record is already completed', async () => {
+    mockFetchApprovals.mockResolvedValue([])
+    const nestedApproval = { ...mockApproval, loop_iteration_path: [1, 0] }
+    const nodeClick = makeNodeClick(nestedApproval, [nestedApproval])
+
+    storeHelpers.setStatus('node-1', 'completed')
+    storeHelpers.setStatus('node-1#iter-0', 'completed')
+    storeHelpers.setStatus('node-1#iter-3', 'waiting')
+
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', nodeClick, undefined))
+
+    act(() => result.current.open())
+    expect(result.current.panelOpen).toBe(true)
+
+    await act(async () => {
+      storeHelpers.setStatus('node-1', 'completed')
+      await vi.runAllTimersAsync()
+    })
+
+    expect(result.current.panelOpen).toBe(true)
+    expect(mockClearApprovals).not.toHaveBeenCalled()
+
+    await act(async () => {
+      storeHelpers.setStatus('node-1#iter-3', 'failed')
+      await vi.runAllTimersAsync()
+    })
+
+    expect(result.current.panelOpen).toBe(false)
+    expect(mockClearApprovals).toHaveBeenCalled()
   })
 })

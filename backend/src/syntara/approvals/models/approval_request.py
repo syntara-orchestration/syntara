@@ -60,12 +60,18 @@ class BaseApprovalRequest(BaseResource, table=False):
         index=True,
     )
 
-    # Approval identity
+    # Approval identity — canvas node ID, not a Temporal or loop-iteration ID
     approval_node_id: str = Field(
         min_length=1,
         max_length=FieldLimits.NAME_MAX_LENGTH,
         sa_type=String(FieldLimits.NAME_MAX_LENGTH),  # type: ignore[call-overload]
-        description="Activity ID from workflow definition",
+        description="Canvas node ID from the workflow definition",
+    )
+
+    loop_iteration_path: list[int] = Field(
+        default_factory=list,
+        sa_column=Column(JSONB, nullable=False, server_default=text("'[]'::jsonb")),
+        description="Enclosing-loop indices, outermost first (empty when not inside a loop)",
     )
 
     # Status
@@ -133,7 +139,14 @@ class ApprovalRequest(BaseApprovalRequest, table=True):
     """
 
     __tablename__ = "approval_requests"
-    __table_args__ = (UniqueConstraint("execution_id", "approval_node_id", name="uix_execution_approval_node"),)
+    __table_args__ = (
+        UniqueConstraint(
+            "execution_id",
+            "approval_node_id",
+            "loop_iteration_path",
+            name="uix_execution_approval_node_path",
+        ),
+    )
 
     # Filterable and sortable fields for API endpoints
     __filterable_fields__: ClassVar[list[str]] = [
@@ -161,6 +174,13 @@ class ApprovalRequest(BaseApprovalRequest, table=True):
         nullable=True,
         ondelete="SET NULL",
         description="Principal who made the decision",
+    )
+
+    temporal_activity_id: str | None = Field(
+        default=None,
+        max_length=FieldLimits.NAME_MAX_LENGTH,
+        sa_type=String(FieldLimits.NAME_MAX_LENGTH),  # type: ignore[call-overload]
+        description="Temporal activity ID to signal when this request is decided",
     )
 
     # Relationships
@@ -200,6 +220,10 @@ class ApprovalRequestRead(BaseApprovalRequest, table=False):
     )
     workflow_context: WorkflowContext = Field(  # type: ignore[assignment]
         ..., description="Workflow inputs and previous step output"
+    )
+    loop_iteration_path: list[int] = Field(
+        default_factory=list,
+        description="Enclosing-loop indices, outermost first (empty when not inside a loop)",
     )
 
     # Approver configuration - API returns summary objects

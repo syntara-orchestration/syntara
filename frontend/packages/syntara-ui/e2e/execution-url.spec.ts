@@ -19,7 +19,7 @@ test.describe('Execution URL unification', () => {
         .toHaveURL(/\/executions\//)
         .then(() => true)
         .catch(() => false)
-      test.skip(!didNavigate, 'Workflow execution failed — execution engine may not be running')
+      expect(didNavigate, 'Workflow execution failed — execution engine may not be running').toBeTruthy()
 
       await expect(app.getByRole('button', { name: 'Back to editor' })).toBeVisible()
     } finally {
@@ -41,7 +41,7 @@ test.describe('Execution URL unification', () => {
         .toHaveURL(/\/executions\//)
         .then(() => true)
         .catch(() => false)
-      test.skip(!didNavigate, 'Workflow execution failed — execution engine may not be running')
+      expect(didNavigate, 'Workflow execution failed — execution engine may not be running').toBeTruthy()
 
       await openWorkflowInBuilder(app, workflowName, id)
 
@@ -79,7 +79,7 @@ test.describe('Execution URL unification', () => {
         .toHaveURL(/\/executions\//)
         .then(() => true)
         .catch(() => false)
-      test.skip(!didNavigate, 'Workflow execution failed — execution engine may not be running')
+      expect(didNavigate, 'Workflow execution failed — execution engine may not be running').toBeTruthy()
 
       const heading = app.getByRole('heading', { level: 1 })
       await expect(heading).toContainText(workflowName)
@@ -103,7 +103,7 @@ test.describe('Execution URL unification', () => {
         .toHaveURL(/\/executions\//)
         .then(() => true)
         .catch(() => false)
-      test.skip(!didNavigate, 'Workflow execution failed — execution engine may not be running')
+      expect(didNavigate, 'Workflow execution failed — execution engine may not be running').toBeTruthy()
 
       // Run workflow second time to have multiple executions
       await openWorkflowInBuilder(app, workflowName, id)
@@ -114,7 +114,7 @@ test.describe('Execution URL unification', () => {
         .toHaveURL(/\/executions\//)
         .then(() => true)
         .catch(() => false)
-      test.skip(!didNavigateSecond, 'Second workflow execution failed')
+      expect(didNavigateSecond, 'Second workflow execution failed').toBeTruthy()
 
       // History card is closed by default when navigating from builder; open it
       await app.getByRole('button', { name: 'Run history' }).click()
@@ -149,7 +149,7 @@ test.describe('Execution URL unification', () => {
         .toHaveURL(/\/executions\//)
         .then(() => true)
         .catch(() => false)
-      test.skip(!didNavigate, 'Workflow execution failed — execution engine may not be running')
+      expect(didNavigate, 'Workflow execution failed — execution engine may not be running').toBeTruthy()
 
       // Go back to builder
       await openWorkflowInBuilder(app, workflowName, id)

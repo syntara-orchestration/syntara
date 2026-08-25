@@ -67,7 +67,7 @@ export function useUserFormSubmit({
               ? {}
               : {
                   username: formData.username,
-                  first_name: formData.first_name ?? '',
+                  first_name: formData.first_name || undefined,
                   last_name: formData.last_name || undefined,
                   email,
                 }),
@@ -95,7 +95,7 @@ export function useUserFormSubmit({
           body: {
             username: formData.username,
             email,
-            first_name: formData.first_name ?? '',
+            first_name: formData.first_name || null,
             last_name: formData.last_name || null,
             password: formData.password ?? '',
             is_enabled: formData.is_enabled,

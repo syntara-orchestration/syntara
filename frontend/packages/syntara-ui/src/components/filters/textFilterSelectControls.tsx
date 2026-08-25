@@ -16,7 +16,7 @@ import type { FilterConfig, FilterFieldDefinition } from '../../types/filters'
 import { detachPromise } from '../../utils/detachPromise'
 import { LONG_SELECT_MAX_MENU_HEIGHT, longSelectMenuPopperProps } from '../longSelectMenu'
 import longSelectMenuStyles from '../longSelectMenu.module.css'
-import { NxSelect } from '../NxSelect'
+import { SynSelect } from '../SynSelect'
 
 import styles from './textFilterSelectControls.module.css'
 
@@ -86,7 +86,7 @@ export function FieldSelector({
   )
 
   return (
-    <NxSelect
+    <SynSelect
       id="attribute-search-field-select"
       isOpen={isOpen}
       selected={selectedField.key}
@@ -102,7 +102,7 @@ export function FieldSelector({
           </SelectOption>
         ))}
       </SelectList>
-    </NxSelect>
+    </SynSelect>
   )
 }
 
@@ -391,7 +391,7 @@ export function SelectFilterInput({
 
   return (
     <ToolbarItem>
-      <NxSelect
+      <SynSelect
         id="attribute-search-value-select"
         isOpen={isOpen}
         selected={activeOption?.value}
@@ -417,7 +417,7 @@ export function SelectFilterInput({
           />
         )}
         <SelectList>{selectListBody}</SelectList>
-      </NxSelect>
+      </SynSelect>
     </ToolbarItem>
   )
 }
@@ -494,7 +494,7 @@ export function MultiSelectFilterInput({
 
   return (
     <ToolbarItem>
-      <NxSelect
+      <SynSelect
         id="attribute-search-multiselect"
         isOpen={isOpen}
         onOpenChange={onOpenChange}
@@ -513,7 +513,7 @@ export function MultiSelectFilterInput({
             </SelectOption>
           ))}
         </SelectList>
-      </NxSelect>
+      </SynSelect>
     </ToolbarItem>
   )
 }

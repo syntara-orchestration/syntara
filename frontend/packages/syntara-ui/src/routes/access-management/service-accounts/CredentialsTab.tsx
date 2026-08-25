@@ -6,10 +6,10 @@ import { useCallback, useMemo, useState } from 'react'
 import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
-import type { KebabAction } from '../../../components/NxKebabMenu'
-import { NxKebabMenu } from '../../../components/NxKebabMenu'
 import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../../components/panels/list/NxListPanel'
 import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
+import type { KebabAction } from '../../../components/SynKebabMenu'
+import { SynKebabMenu } from '../../../components/SynKebabMenu'
 import { DateCell } from '../../../components/table/DateCell'
 import { useCursorPagination, useCursorReset } from '../../../hooks/useCursorPagination'
 import { useDialogState } from '../../../hooks/useDialogState'
@@ -296,7 +296,7 @@ function CredentialsTable({
               <RotationGraceIndicator oldSecretValidUntil={cred.old_secret_valid_until} />
             </Td>
             <Td isActionCell>
-              <NxKebabMenu
+              <SynKebabMenu
                 actions={getCredentialActions(cred, permissions, onRotate, onDelete)}
                 aria-label={`Actions for ${cred.identifier}`}
               />

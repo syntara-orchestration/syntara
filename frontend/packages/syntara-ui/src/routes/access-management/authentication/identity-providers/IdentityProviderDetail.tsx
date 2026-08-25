@@ -40,11 +40,11 @@ import { IconLabel } from '../../../../components/IconLabel'
 import { SynPage, SynPageBody } from '../../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../../components/layout/SynPanel'
-import { NxKebabMenu } from '../../../../components/NxKebabMenu'
-import type { KebabAction } from '../../../../components/NxKebabMenu'
 import { NxListPanel, NxListPanelTabs } from '../../../../components/panels/list/NxListPanel'
 import { ProviderIcon } from '../../../../components/ProviderIcon'
 import { useQueryState } from '../../../../components/states/useQueryState'
+import type { KebabAction } from '../../../../components/SynKebabMenu'
+import { SynKebabMenu } from '../../../../components/SynKebabMenu'
 import { SynPageTitle } from '../../../../components/SynPageTitle'
 import { DateCell } from '../../../../components/table/DateCell'
 import { useDeleteAction } from '../../../../hooks/useDeleteAction'
@@ -255,7 +255,7 @@ function IdentityProviderDetailToolbar({
           Edit provider
         </Button>
       </DisabledWithTooltip>
-      <NxKebabMenu actions={kebabActions} aria-label="Identity provider actions" />
+      <SynKebabMenu actions={kebabActions} aria-label="Identity provider actions" />
     </>
   )
 }
