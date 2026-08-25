@@ -12,7 +12,7 @@ import { SynEmptyStateFilter } from '../../states/SynEmptyStateFilter'
 import { SynEmptyStateNoData } from '../../states/SynEmptyStateNoData'
 import { SynErrorState } from '../../states/SynErrorState'
 import { SynLoadingState } from '../../states/SynLoadingState'
-import { type TableFooterProps, NxScrollableTableContainer } from '../../table/NxScrollableTableContainer'
+import { type TableFooterProps, SynScrollableTableContainer } from '../../table/SynScrollableTableContainer'
 import { NxUrlTabs } from '../../tabs/NxUrlTabs'
 
 import styles from './NxListPanel.module.css'
@@ -255,14 +255,14 @@ export type NxListPanelTableProps = {
 /** Paginated scrollable table for use inside `NxListPanel`. */
 export function NxListPanelTable({ children, caption, footer, isExpandable, useFixedLayout }: NxListPanelTableProps) {
   return (
-    <NxScrollableTableContainer
+    <SynScrollableTableContainer
       caption={caption}
       footer={footer}
       isExpandable={isExpandable}
       useFixedLayout={useFixedLayout}
     >
       {children}
-    </NxScrollableTableContainer>
+    </SynScrollableTableContainer>
   )
 }
 

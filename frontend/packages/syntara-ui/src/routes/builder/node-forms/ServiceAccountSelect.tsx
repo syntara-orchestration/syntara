@@ -3,8 +3,8 @@ import { RhUiAddIcon } from '@patternfly/react-icons'
 import type React from 'react'
 import { useCallback, useMemo, useState } from 'react'
 
-import { NxLabel } from '../../../components/labels/NxLabel'
-import { NxSelect } from '../../../components/NxSelect'
+import { SynLabel } from '../../../components/labels/SynLabel'
+import { SynSelect } from '../../../components/SynSelect'
 import { useCanI } from '../../../hooks/useCanI'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import { detachPromise } from '../../../utils/detachPromise'
@@ -108,7 +108,7 @@ export function ServiceAccountSelect({ id, selectedIds, onChange, isDisabled }: 
 
   return (
     <>
-      <NxSelect isOpen={isOpen} onOpenChange={setIsOpen} onSelect={handleSelect} toggle={renderToggle}>
+      <SynSelect isOpen={isOpen} onOpenChange={setIsOpen} onSelect={handleSelect} toggle={renderToggle}>
         <SelectList>
           {canCreate && (
             <>
@@ -135,14 +135,14 @@ export function ServiceAccountSelect({ id, selectedIds, onChange, isDisabled }: 
             </SelectOption>
           )}
         </SelectList>
-      </NxSelect>
+      </SynSelect>
 
       {selectedSAs.length > 0 && (
         <LabelGroup aria-label="Selected service accounts" style={{ marginTop: 'var(--pf-t--global--spacer--sm)' }}>
           {selectedSAs.map((sa) => (
-            <NxLabel key={sa.id} onClose={isDisabled ? undefined : () => handleRemove(sa.id)}>
+            <SynLabel key={sa.id} onClose={isDisabled ? undefined : () => handleRemove(sa.id)}>
               {sa.name}
-            </NxLabel>
+            </SynLabel>
           ))}
         </LabelGroup>
       )}

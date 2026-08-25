@@ -165,7 +165,7 @@ Both dialogs accept `isOpen`, `onClose`, `onConfirm(note)`, `approvalCount`, and
 
 **File:** `packages/syntara-ui/src/routes/approvals/approvalUtils.tsx`
 
-Renders a status badge using `NxLabel` with `variant="outline"` and status-specific icons.
+Renders a status badge using `SynLabel` with `variant="outline"` and status-specific icons.
 
 | Status      | Color   | Icon                  | Label     |
 | ----------- | ------- | --------------------- | --------- |
