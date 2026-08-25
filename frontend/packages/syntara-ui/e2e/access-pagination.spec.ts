@@ -96,8 +96,9 @@ test.describe('Access Management — Dropdown Pagination', () => {
     await expect(roleSearchInput).toBeVisible()
     await roleSearchInput.click()
 
-    const noResults = dialog.getByText(/No results match/i)
-    const roleOptions = dialog.getByRole('option').filter({ hasNotText: /No results match/i })
+    // PatternFly Select renders options in a portal outside the dialog
+    const noResults = app.getByText(/No results match/i)
+    const roleOptions = app.getByRole('option').filter({ hasNotText: /No results match/i })
     await expect(roleOptions.or(noResults)).toBeVisible({ timeout: 15_000 })
     expect(await roleOptions.count()).toBeGreaterThan(0)
 
