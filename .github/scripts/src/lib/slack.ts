@@ -88,13 +88,15 @@ export class SlackNotifier {
 
   /**
    * Sends a red alert when the merge queue has stalled.
-   * Fires when PRs are waiting but nothing has merged in 60+ minutes.
+   * Fires when PRs are waiting but nothing has merged beyond the timeout threshold.
    */
-  async sendQueueBackupAlert(
-    queueDepth: number,
-    minutesSinceMerge: number,
-    queueUrl: string
-  ): Promise<void> {
+  async sendQueueBackupAlert(params: {
+    queueDepth: number;
+    minutesSinceMerge: number;
+    timeoutMinutes: number;
+    queueUrl: string;
+  }): Promise<void> {
+    const { queueDepth, minutesSinceMerge, timeoutMinutes, queueUrl } = params;
     const message: SlackMessage = {
       attachments: [
         {
@@ -124,7 +126,7 @@ export class SlackNotifier {
               type: 'section',
               text: {
                 type: 'mrkdwn',
-                text: 'The merge queue has entries but nothing has merged in over 60 minutes. The queue may be stalled.',
+                text: `The merge queue has entries but nothing has merged in over ${timeoutMinutes} minutes. The queue may be stalled.`,
               },
             },
             {

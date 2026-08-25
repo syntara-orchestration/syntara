@@ -4,7 +4,7 @@ import { SlackNotifier } from './lib/slack.js';
 import { getEnvironment } from './lib/env.js';
 import type { HealthState } from './lib/types.js';
 
-const MERGE_TIMEOUT_MINUTES = 90;
+const MERGE_TIMEOUT_MINUTES = 120;
 
 /**
  * Checks if the merge queue is healthy by verifying recent merge activity.
@@ -105,13 +105,13 @@ async function getPreviousHealthState(
     );
 
     if (sentRecoveryAlert) {
-      // If recovery was sent, previous state was unhealthy
-      return 'unhealthy';
+      // If recovery was sent, previous run ended in healthy state
+      return 'healthy';
     }
 
     if (sentUnhealthyAlert) {
-      // If unhealthy alert was sent, previous state was healthy (transition to unhealthy)
-      return 'healthy';
+      // If unhealthy alert was sent, previous run ended in unhealthy state
+      return 'unhealthy';
     }
 
     // If neither alert was sent, state didn't change - infer from conclusion
@@ -154,11 +154,12 @@ async function main() {
     (previousHealth === 'healthy' || previousHealth === 'unknown')
   ) {
     console.log('⚠️  Transition to unhealthy detected - sending alert');
-    await slack.sendQueueBackupAlert(
-      currentState.queueDepth!,
-      currentState.minutesSinceMerge!,
-      queueUrl
-    );
+    await slack.sendQueueBackupAlert({
+      queueDepth: currentState.queueDepth!,
+      minutesSinceMerge: currentState.minutesSinceMerge!,
+      timeoutMinutes: MERGE_TIMEOUT_MINUTES,
+      queueUrl,
+    });
     console.log('✅ Unhealthy alert sent to Slack');
     console.log('::set-output name=health::unhealthy');
     return;
