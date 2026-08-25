@@ -4,11 +4,11 @@ import { SlackNotifier } from './lib/slack.js'
 import { getEnvironment } from './lib/env.js'
 import type { HealthState } from './lib/types.js'
 
-const MERGE_TIMEOUT_MINUTES = 90
+const MERGE_TIMEOUT_MINUTES = 120
 
 /**
  * Checks if the merge queue is healthy by verifying recent merge activity.
- * Returns unhealthy if the queue has entries but no merges in 90+ minutes.
+ * Returns unhealthy if the queue has entries but no merges in 120+ minutes.
  */
 async function assessHealth(github: GitHubClient, branch: string): Promise<HealthState> {
   console.log('Querying merge queue status...')
@@ -29,12 +29,12 @@ async function assessHealth(github: GitHubClient, branch: string): Promise<Healt
 
   // Check for recent merges
   const now = Date.now()
-  const ninetyMinsAgo = new Date(now - MERGE_TIMEOUT_MINUTES * 60 * 1000)
-  const recentMerges = await github.getRecentMerges(branch, ninetyMinsAgo)
+  const timeoutMinutesAgo = new Date(now - MERGE_TIMEOUT_MINUTES * 60 * 1000)
+  const recentMerges = await github.getRecentMerges(branch, timeoutMinutesAgo)
 
   console.log(`Recent merges to ${branch}: ${recentMerges.length}`)
 
-  // If queue has entries but no merges in 90 min, unhealthy
+  // If the queue has entries but no merges in 120 minutes, it is unhealthy.
   if (recentMerges.length === 0) {
     // Calculate time since last merge
     const allMerges = await github.getRecentMerges(
@@ -95,13 +95,13 @@ async function getPreviousHealthState(
     )
 
     if (sentRecoveryAlert) {
-      // If recovery was sent, previous state was unhealthy
-      return 'unhealthy'
+      // Recovery means the previous run ended in a healthy state.
+      return 'healthy'
     }
 
     if (sentUnhealthyAlert) {
-      // If unhealthy alert was sent, previous state was healthy (transition to unhealthy)
-      return 'healthy'
+      // An unhealthy alert means the previous run ended in an unhealthy state.
+      return 'unhealthy'
     }
 
     // If neither alert was sent, state didn't change - infer from conclusion
@@ -141,7 +141,12 @@ async function main() {
   // Transition to unhealthy
   if (currentState.health === 'unhealthy' && (previousHealth === 'healthy' || previousHealth === 'unknown')) {
     console.log('⚠️  Transition to unhealthy detected - sending alert')
-    await slack.sendQueueBackupAlert(currentState.queueDepth!, currentState.minutesSinceMerge!, queueUrl)
+    await slack.sendQueueBackupAlert({
+      queueDepth: currentState.queueDepth!,
+      minutesSinceMerge: currentState.minutesSinceMerge!,
+      timeoutMinutes: MERGE_TIMEOUT_MINUTES,
+      queueUrl,
+    })
     console.log('✅ Unhealthy alert sent to Slack')
     console.log('::set-output name=health::unhealthy')
     return
