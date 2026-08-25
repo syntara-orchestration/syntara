@@ -340,11 +340,11 @@ export function MyListPage() {
   return (
     <SynPage>
       <FilterBar ... />
-      <NxScrollableTableContainer
+      <SynScrollableTableContainer
         footer={getFooterProps(query.data)}
       >
         {/* <Th sort={getSortParams('name')}>Name</Th> */}
-      </NxScrollableTableContainer>
+      </SynScrollableTableContainer>
       <NxConfirmationDialog
         isOpen={deleteDialog.isOpen}
         onClose={deleteDialog.close}

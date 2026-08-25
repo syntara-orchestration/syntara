@@ -285,6 +285,45 @@ describe('UsersTab Component', () => {
       expect(screen.getByText('admin@example.com')).toBeInTheDocument()
     })
 
+    it('falls back to username in the name column when first_name is empty', () => {
+      vi.mocked(accessClient.useQuery).mockImplementation((...args: unknown[]) => {
+        const endpoint = args[1] as string
+        if (endpoint === '/groups' || endpoint === '/groups/{group_id}/members') {
+          return {
+            data: { resources: [] },
+            isPending: false,
+            isError: false,
+            error: null,
+            isFetching: false,
+            refetch: vi.fn(),
+          } as never
+        }
+        return {
+          data: {
+            resources: [
+              {
+                ...mockUsers[2],
+                username: 'noname',
+                first_name: '',
+                last_name: null,
+                email: 'noname@example.com',
+              },
+            ],
+          },
+          isPending: false,
+          isError: false,
+          error: null,
+          isFetching: false,
+          refetch: vi.fn(),
+        } as never
+      })
+
+      render(<UsersTab />, { wrapper })
+
+      const table = screen.getByRole('grid', { name: 'Users' })
+      expect(within(table).getAllByText('noname')).toHaveLength(2)
+    })
+
     it('renders last login as dash for null', () => {
       render(<UsersTab />, { wrapper })
 

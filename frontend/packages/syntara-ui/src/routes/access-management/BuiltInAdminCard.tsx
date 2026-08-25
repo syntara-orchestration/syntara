@@ -1,8 +1,8 @@
 import { Card, CardBody, Flex, FlexItem, Switch, Tooltip } from '@patternfly/react-core'
 import { RhUiCheckCircleIcon, RhUiLockIcon, RhUiUnlockIcon } from '@patternfly/react-icons'
 
-import { NxLabel } from '../../components/labels/NxLabel'
-import { NxLink } from '../../components/NxLink'
+import { SynLabel } from '../../components/labels/SynLabel'
+import { SynLink } from '../../components/SynLink'
 
 import { getUserDetailPath } from './accessManagementPaths'
 import { BUILTIN_ADMIN_TOGGLE_DISABLED_REASON } from './adminConstants'
@@ -32,15 +32,15 @@ export function BuiltInAdminCard({ userId, isEnabled, canToggle, onToggle }: Rea
         <Flex alignItems={{ default: 'alignItemsCenter' }}>
           <FlexItem>{isEnabled ? <RhUiUnlockIcon aria-hidden="true" /> : <RhUiLockIcon aria-hidden="true" />}</FlexItem>
           <FlexItem>
-            <NxLink to={getUserDetailPath(userId)}>
+            <SynLink to={getUserDetailPath(userId)}>
               <strong>Built-in Administrator Account</strong>
-            </NxLink>
+            </SynLink>
           </FlexItem>
           <FlexItem>
             {/* Intentionally inverted: "Disabled" is the desired/green state for the built-in admin account */}
-            <NxLabel variant="outline" status={isEnabled ? 'danger' : 'success'} icon={<RhUiCheckCircleIcon />}>
+            <SynLabel variant="outline" status={isEnabled ? 'danger' : 'success'} icon={<RhUiCheckCircleIcon />}>
               {isEnabled ? 'Enabled' : 'Disabled'}
-            </NxLabel>
+            </SynLabel>
           </FlexItem>
           <FlexItem>
             Username: <strong>admin</strong>

@@ -19,9 +19,9 @@ class UserCreate:
 
         Attributes:
             username (str): Unique username
-            first_name (str): User's first name
             password (str): Plaintext password (will be hashed)
             email (None | str | Unset): Email address
+            first_name (None | str | Unset): User's first name
             last_name (None | str | Unset): User's last name
             is_enabled (bool | Unset): Whether the user account is enabled Default: True.
             group_names (list[str] | None | Unset): Groups to assign the user to. Omit to use the default (users group).
@@ -29,9 +29,9 @@ class UserCreate:
     """
 
     username: str
-    first_name: str
     password: str
     email: None | str | Unset = UNSET
+    first_name: None | str | Unset = UNSET
     last_name: None | str | Unset = UNSET
     is_enabled: bool | Unset = True
     group_names: list[str] | None | Unset = UNSET
@@ -40,8 +40,6 @@ class UserCreate:
     def to_dict(self) -> dict[str, Any]:
         username = self.username
 
-        first_name = self.first_name
-
         password = self.password
 
         email: None | str | Unset
@@ -49,6 +47,12 @@ class UserCreate:
             email = UNSET
         else:
             email = self.email
+
+        first_name: None | str | Unset
+        if isinstance(self.first_name, Unset):
+            first_name = UNSET
+        else:
+            first_name = self.first_name
 
         last_name: None | str | Unset
         if isinstance(self.last_name, Unset):
@@ -72,12 +76,13 @@ class UserCreate:
         field_dict.update(
             {
                 "username": username,
-                "first_name": first_name,
                 "password": password,
             }
         )
         if email is not UNSET:
             field_dict["email"] = email
+        if first_name is not UNSET:
+            field_dict["first_name"] = first_name
         if last_name is not UNSET:
             field_dict["last_name"] = last_name
         if is_enabled is not UNSET:
@@ -92,8 +97,6 @@ class UserCreate:
         d = dict(src_dict)
         username = d.pop("username")
 
-        first_name = d.pop("first_name")
-
         password = d.pop("password")
 
         def _parse_email(data: object) -> None | str | Unset:
@@ -104,6 +107,15 @@ class UserCreate:
             return cast(None | str | Unset, data)
 
         email = _parse_email(d.pop("email", UNSET))
+
+        def _parse_first_name(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        first_name = _parse_first_name(d.pop("first_name", UNSET))
 
         def _parse_last_name(data: object) -> None | str | Unset:
             if data is None:
@@ -135,9 +147,9 @@ class UserCreate:
 
         user_create = cls(
             username=username,
-            first_name=first_name,
             password=password,
             email=email,
+            first_name=first_name,
             last_name=last_name,
             is_enabled=is_enabled,
             group_names=group_names,

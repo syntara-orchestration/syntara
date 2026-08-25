@@ -27,7 +27,7 @@ import { FilterBar } from '../../../../components/filters/FilterBar'
 import { SynPanelContentStack } from '../../../../components/layout/SynPanelContentStack'
 import { SynEmptyStateFilter } from '../../../../components/states/SynEmptyStateFilter'
 import { SynEmptyStateNoData } from '../../../../components/states/SynEmptyStateNoData'
-import { NxScrollableTableContainer } from '../../../../components/table/NxScrollableTableContainer'
+import { SynScrollableTableContainer } from '../../../../components/table/SynScrollableTableContainer'
 import type { FilterConfig, FilterFieldDefinition } from '../../../../types/filters'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../../../types/filters'
 import { APP_TITLE } from '../../../../utils/appTitle'
@@ -218,7 +218,7 @@ export function MappingTable({
   const showAddButton = !isReadOnly && showAddMappingAction
 
   const table = (
-    <NxScrollableTableContainer caption="Group mappings" variant="compact">
+    <SynScrollableTableContainer caption="Group mappings" variant="compact">
       <GroupMappingTableHead showActionsColumn={showActionsColumn} showWildcardHelp={showWildcardHelp} />
       <Tbody>
         {rows.map((row) => {
@@ -260,7 +260,7 @@ export function MappingTable({
           )
         })}
       </Tbody>
-    </NxScrollableTableContainer>
+    </SynScrollableTableContainer>
   )
 
   if (!showAddButton) {
@@ -428,7 +428,7 @@ export function ReadOnlyView({ entries, mappedGroups, onEditMapping }: Readonly<
           <SynEmptyStateFilter clearAllFilters={clearFiltersAndPage} />
         </StackItem>
       ) : (
-        <NxScrollableTableContainer
+        <SynScrollableTableContainer
           caption="Group mappings"
           variant="compact"
           footer={{
@@ -459,7 +459,7 @@ export function ReadOnlyView({ entries, mappedGroups, onEditMapping }: Readonly<
               />
             ))}
           </Tbody>
-        </NxScrollableTableContainer>
+        </SynScrollableTableContainer>
       )}
     </SynPanelContentStack>
   )

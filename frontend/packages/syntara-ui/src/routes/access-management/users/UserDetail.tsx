@@ -398,7 +398,7 @@ export function UserDetail({ isMyProfile }: Readonly<UserDetailProps> = {}) {
   const userData = userQuery.data
   if (!userData) return null
 
-  const displayName = userDisplayName(userData) || userData.username
+  const displayName = userDisplayName(userData)
   const pageTitle = isMyProfile ? 'My Profile' : displayName
   const userBreadcrumbs = isMyProfile ? [] : breadcrumbsUserDetail(displayName, basePath, activeTab)
 

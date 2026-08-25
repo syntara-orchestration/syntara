@@ -6,12 +6,12 @@ import { useCallback, useMemo } from 'react'
 import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
-import { NxLabel } from '../../../components/labels/NxLabel'
-import type { KebabAction } from '../../../components/NxKebabMenu'
-import { NxKebabMenu } from '../../../components/NxKebabMenu'
-import { NxLink } from '../../../components/NxLink'
+import { SynLabel } from '../../../components/labels/SynLabel'
 import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../../components/panels/list/NxListPanel'
 import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
+import type { KebabAction } from '../../../components/SynKebabMenu'
+import { SynKebabMenu } from '../../../components/SynKebabMenu'
+import { SynLink } from '../../../components/SynLink'
 import { DateCell } from '../../../components/table/DateCell'
 import { useCursorPagination, useCursorReset } from '../../../hooks/useCursorPagination'
 import { useDeleteAction } from '../../../hooks/useDeleteAction'
@@ -97,13 +97,13 @@ function ServiceAccountRow({
   return (
     <Tr>
       <Td dataLabel="Name">
-        <NxLink to={getServiceAccountDetailPath(sa.id)}>
+        <SynLink to={getServiceAccountDetailPath(sa.id)}>
           <Truncate content={sa.name} />
-        </NxLink>
+        </SynLink>
       </Td>
       <Td dataLabel="Owning project">
         {sa.project_name && !sa.is_project_deleted ? (
-          <NxLink to={getProjectDetailPath(sa.project_id)}>{sa.project_name}</NxLink>
+          <SynLink to={getProjectDetailPath(sa.project_id)}>{sa.project_name}</SynLink>
         ) : (
           <>
             {sa.project_name ?? sa.project_id}
@@ -113,7 +113,7 @@ function ServiceAccountRow({
                 <Tooltip content="The owning project for this service account has been deleted">
                   {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
                   <span tabIndex={0}>
-                    <NxLabel color="grey">Deleted</NxLabel>
+                    <SynLabel color="grey">Deleted</SynLabel>
                   </span>
                 </Tooltip>
               </>
@@ -140,7 +140,10 @@ function ServiceAccountRow({
         />
       </Td>
       <Td isActionCell>
-        <NxKebabMenu actions={getRowActions(sa, onEdit, onDelete, permissions)} aria-label={`Actions for ${sa.name}`} />
+        <SynKebabMenu
+          actions={getRowActions(sa, onEdit, onDelete, permissions)}
+          aria-label={`Actions for ${sa.name}`}
+        />
       </Td>
     </Tr>
   )

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
@@ -356,6 +356,23 @@ describe('UserForm', () => {
       render(<UserForm mode="edit" />, { wrapper })
 
       expect(screen.queryByText('Groups')).not.toBeInTheDocument()
+    })
+
+    it('uses username in breadcrumbs when first name is blank', () => {
+      setupEditMocks()
+      vi.mocked(accessClient.useQuery).mockReturnValue({
+        data: { ...mockUserData, first_name: '', last_name: null },
+        isPending: false,
+        isError: false,
+        error: null,
+        isFetching: false,
+        refetch: vi.fn(),
+      } as never)
+
+      render(<UserForm mode="edit" />, { wrapper })
+
+      const nav = screen.getByRole('navigation', { name: 'Breadcrumb' })
+      expect(within(nav).getByText('jdoe')).toBeInTheDocument()
     })
 
     it('calls updateUser mutation with form data on submit', async () => {

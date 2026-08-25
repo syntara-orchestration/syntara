@@ -4,14 +4,14 @@ import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
-import { NxSelect } from './NxSelect'
+import { SynSelect } from './SynSelect'
 
-function TestNxSelect({ onOpenChange }: Readonly<{ onOpenChange?: (open: boolean) => void }>) {
+function TestSynSelect({ onOpenChange }: Readonly<{ onOpenChange?: (open: boolean) => void }>) {
   const [isOpen, setIsOpen] = useState(false)
 
   return (
     <div>
-      <NxSelect
+      <SynSelect
         isOpen={isOpen}
         onOpenChange={(open) => {
           setIsOpen(open)
@@ -26,17 +26,17 @@ function TestNxSelect({ onOpenChange }: Readonly<{ onOpenChange?: (open: boolean
         <SelectList>
           <SelectOption value="one">One</SelectOption>
         </SelectList>
-      </NxSelect>
+      </SynSelect>
       <p>Outside</p>
     </div>
   )
 }
 
-describe('NxSelect', () => {
+describe('SynSelect', () => {
   it('closes when wheel happens outside the menu', async () => {
     const user = userEvent.setup()
     const onOpenChange = vi.fn()
-    render(<TestNxSelect onOpenChange={onOpenChange} />)
+    render(<TestSynSelect onOpenChange={onOpenChange} />)
 
     await user.click(screen.getByRole('button', { name: 'Toggle' }))
     expect(screen.getByRole('listbox')).toBeInTheDocument()
@@ -54,7 +54,7 @@ describe('NxSelect', () => {
   it('keeps the menu open when wheel happens on an option', async () => {
     const user = userEvent.setup()
     const onOpenChange = vi.fn()
-    render(<TestNxSelect onOpenChange={onOpenChange} />)
+    render(<TestSynSelect onOpenChange={onOpenChange} />)
 
     await user.click(screen.getByRole('button', { name: 'Toggle' }))
     const option = screen.getByRole('option', { name: 'One' })
@@ -74,7 +74,7 @@ describe('NxSelect', () => {
       const [isOpen, setIsOpen] = useState(false)
       return (
         <div>
-          <NxSelect
+          <SynSelect
             isOpen={isOpen}
             toggle={(toggleRef) => (
               <MenuToggle ref={toggleRef} onClick={() => setIsOpen((open) => !open)} isExpanded={isOpen}>
@@ -85,7 +85,7 @@ describe('NxSelect', () => {
             <SelectList>
               <SelectOption value="one">One</SelectOption>
             </SelectList>
-          </NxSelect>
+          </SynSelect>
           <p>Outside</p>
         </div>
       )

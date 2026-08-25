@@ -4,7 +4,7 @@ import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { ThProps } from '@patternfly/react-table'
 import { useCallback, useMemo, useState } from 'react'
 
-import { NxLabel } from '../../components/labels/NxLabel'
+import { SynLabel } from '../../components/labels/SynLabel'
 import { SynPanelContentStack } from '../../components/layout/SynPanelContentStack'
 import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../components/panels/list/NxListPanel'
 import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
@@ -104,19 +104,19 @@ function PermissionsTableContent({
               <code>{perm.policy_name}</code>
             </Td>
             <Td dataLabel="Effect">
-              <NxLabel
+              <SynLabel
                 color={perm.effect === 'allow' ? 'green' : 'red'}
                 icon={perm.effect === 'allow' ? <RhUiCheckCircleIcon /> : <RhUiCloseCircleIcon />}
               >
                 {perm.effect}
-              </NxLabel>
+              </SynLabel>
             </Td>
             <Td dataLabel="Actions">
               <Flex gap={{ default: 'gapXs' }} flexWrap={{ default: 'wrap' }}>
                 {perm.actions.map((a) => (
-                  <NxLabel key={a} color="blue">
+                  <SynLabel key={a} color="blue">
                     {a}
-                  </NxLabel>
+                  </SynLabel>
                 ))}
               </Flex>
             </Td>

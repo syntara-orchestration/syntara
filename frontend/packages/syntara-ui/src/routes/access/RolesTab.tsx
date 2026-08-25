@@ -8,7 +8,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { NxConfirmationDialog } from '../../components/dialogs/NxConfirmationDialog'
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { IconLabel } from '../../components/IconLabel'
-import { NxLabel } from '../../components/labels/NxLabel'
+import { SynLabel } from '../../components/labels/SynLabel'
 import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../components/panels/list/NxListPanel'
 import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 import { invalidateAuthzCaches } from '../../hooks/invalidateAuthzCaches'
@@ -170,11 +170,11 @@ function RolesTable({
               </Td>
               <Td dataLabel="Type">
                 {role.is_builtin ? (
-                  <NxLabel color="grey" icon={<RhUiLockIcon />}>
+                  <SynLabel color="grey" icon={<RhUiLockIcon />}>
                     Built-in
-                  </NxLabel>
+                  </SynLabel>
                 ) : (
-                  <NxLabel color="blue">Custom</NxLabel>
+                  <SynLabel color="blue">Custom</SynLabel>
                 )}
               </Td>
               <Td isActionCell>
@@ -186,9 +186,9 @@ function RolesTable({
                 <ExpandableRowContent>
                   <LabelGroup isCompact numLabels={Infinity}>
                     {(role.policies ?? []).map((policy) => (
-                      <NxLabel key={policy} color="grey">
+                      <SynLabel key={policy} color="grey">
                         {policy}
-                      </NxLabel>
+                      </SynLabel>
                     ))}
                   </LabelGroup>
                 </ExpandableRowContent>

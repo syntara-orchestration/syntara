@@ -2,12 +2,12 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 
 import { createTestRouter } from '../test/createTestRouter'
 
-import { NxLink } from './NxLink'
+import { SynLink } from './SynLink'
 
 const Router = createTestRouter('/')
 
-const meta: Meta<typeof NxLink> = {
-  component: NxLink,
+const meta: Meta<typeof SynLink> = {
+  component: SynLink,
   tags: ['autodocs'],
   decorators: [
     (Story) => (

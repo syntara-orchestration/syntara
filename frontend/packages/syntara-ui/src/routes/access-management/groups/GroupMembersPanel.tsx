@@ -14,7 +14,7 @@ import { SynEmptyStateFilter } from '../../../components/states/SynEmptyStateFil
 import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import { useQueryState } from '../../../components/states/useQueryState'
 import { LinkCell } from '../../../components/table/LinkCell'
-import { NxScrollableTableContainer } from '../../../components/table/NxScrollableTableContainer'
+import { SynScrollableTableContainer } from '../../../components/table/SynScrollableTableContainer'
 import { useFilterState } from '../../../hooks/useFilterState'
 import { useAlerts } from '../../../providers/alerts'
 import type { FilterFieldDefinition } from '../../../types/filters'
@@ -211,7 +211,7 @@ export function GroupMembersPanel({ groupId, onMembershipChange }: Readonly<Grou
             />
           </SynPageBody>
         ) : (
-          <NxScrollableTableContainer
+          <SynScrollableTableContainer
             caption="Group members table"
             footer={{
               page,
@@ -267,7 +267,7 @@ export function GroupMembersPanel({ groupId, onMembershipChange }: Readonly<Grou
                 </Tr>
               ))}
             </Tbody>
-          </NxScrollableTableContainer>
+          </SynScrollableTableContainer>
         )}
       </SynPanelContentStack>
 

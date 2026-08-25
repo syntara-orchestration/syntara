@@ -5,7 +5,7 @@ import type { User } from '@syntara/contracts'
 import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
-import { NxKebabMenu } from '../../../components/NxKebabMenu'
+import { SynKebabMenu } from '../../../components/SynKebabMenu'
 import { useDialogState } from '../../../hooks/useDialogState'
 import { useUserPermissions } from '../useUserPermissions'
 
@@ -85,7 +85,7 @@ export function UserDetailToolbar({
         </Button>
       </DisabledWithTooltip>
       {showKebabMenu && (
-        <NxKebabMenu
+        <SynKebabMenu
           actions={[
             {
               key: 'revoke',

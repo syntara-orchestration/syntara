@@ -63,7 +63,7 @@ function userFormBreadcrumbTrail(
     return breadcrumbsCreateUser()
   }
   const userBasePath = userId ? AppRoute.AccessManagement.UserDetail.replace(':userId', userId) : undefined
-  const displayName = user ? userDisplayName(user) || user.username : undefined
+  const displayName = user ? userDisplayName(user) : undefined
   if (displayName && userBasePath) {
     return breadcrumbsEditUser(displayName, userBasePath)
   }
