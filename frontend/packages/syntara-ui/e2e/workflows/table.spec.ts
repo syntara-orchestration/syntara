@@ -82,5 +82,4 @@ test.describe('Workflows Table - Display and Navigation', () => {
       await deleteWorkflowViaApi(app, workflow.id)
     }
   })
-
 })
