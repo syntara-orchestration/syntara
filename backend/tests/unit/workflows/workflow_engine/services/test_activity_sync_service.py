@@ -5110,3 +5110,100 @@ class TestReconcileStaleExecutions:
             mock_snapshot.assert_not_awaited()
 
         mock_session.commit.assert_not_awaited()
+
+
+class TestQueryActivityIoOutputMerge:
+    """Test _query_activity_io merges partial output with final output."""
+
+    def setup_method(self) -> None:
+        self.service = ActivitySyncService(Mock(), Mock())
+
+    @pytest.mark.asyncio
+    async def test_merges_partial_output_with_queried_output(self) -> None:
+        mock_handle = AsyncMock()
+        mock_handle.query.side_effect = [
+            {"param": "value"},
+            {"status": "completed", "result": "done"},
+        ]
+        initial_partial = {"invocation_id": "abc-123"}
+        activity_data: dict[str, Any] = {"status": ActivityStatus.FAILED}
+
+        _, output_data = await self.service._query_activity_io(
+            mock_handle, "my-activity", activity_data, initial_partial
+        )
+
+        assert output_data is not None
+        assert output_data["invocation_id"] == "abc-123"
+        assert output_data["status"] == "completed"
+        assert output_data["result"] == "done"
+
+    @pytest.mark.asyncio
+    async def test_queried_output_takes_precedence_on_conflict(self) -> None:
+        mock_handle = AsyncMock()
+        mock_handle.query.side_effect = [
+            {},
+            {"status": "completed", "invocation_id": "updated-id"},
+        ]
+        initial_partial = {"invocation_id": "original-id", "status": "running"}
+        activity_data: dict[str, Any] = {"status": ActivityStatus.FAILED}
+
+        _, output_data = await self.service._query_activity_io(
+            mock_handle, "my-activity", activity_data, initial_partial
+        )
+
+        assert output_data is not None
+        assert output_data["invocation_id"] == "updated-id"
+        assert output_data["status"] == "completed"
+
+    @pytest.mark.asyncio
+    async def test_no_partial_output_returns_queried_output_only(self) -> None:
+        mock_handle = AsyncMock()
+        mock_handle.query.side_effect = [
+            {},
+            {"status": "completed"},
+        ]
+        activity_data: dict[str, Any] = {"status": ActivityStatus.FAILED}
+
+        _, output_data = await self.service._query_activity_io(mock_handle, "my-activity", activity_data, None)
+
+        assert output_data == {"status": "completed"}
+
+    @pytest.mark.asyncio
+    async def test_no_queried_output_returns_partial_output(self) -> None:
+        mock_handle = AsyncMock()
+        mock_handle.query.side_effect = [
+            {},
+            None,
+        ]
+        initial_partial = {"invocation_id": "abc-123"}
+        activity_data: dict[str, Any] = {"status": ActivityStatus.FAILED}
+
+        _, output_data = await self.service._query_activity_io(
+            mock_handle, "my-activity", activity_data, initial_partial
+        )
+
+        assert output_data == {"invocation_id": "abc-123"}
+
+    @pytest.mark.asyncio
+    async def test_merge_on_retry_path(self) -> None:
+        mock_handle = AsyncMock()
+        mock_handle.query.side_effect = [
+            {},
+            None,
+            {"status": "completed", "output": "result"},
+        ]
+        initial_partial = {"job_id": 42}
+        activity_data: dict[str, Any] = {"status": ActivityStatus.COMPLETED}
+
+        with patch(
+            "syntara.workflows.workflow_engine.services.activity_sync_service.asyncio.sleep",
+            new_callable=AsyncMock,
+        ):
+            _, output_data = await self.service._query_activity_io(
+                mock_handle, "my-activity", activity_data, initial_partial
+            )
+
+        assert output_data is not None
+        assert output_data["job_id"] == 42
+        assert output_data["status"] == "completed"
+        assert output_data["output"] == "result"
