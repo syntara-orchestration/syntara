@@ -259,6 +259,21 @@ class TestForEachLoop:
         assert wf.loop_iteration_results["loop_1"]["body_node.status"] == ["ok"]
         assert wf.loop_iteration_results["loop_1"]["body_node.value"] == [42]
 
+    def test_clear_loop_body_resets_nested_loop_state(self) -> None:
+        """Nested loop state is reset so inner loops re-initialize on the next outer iteration."""
+        wf = _make_workflow()
+        wf.loop_body_map["inner_loop"] = "outer_loop"
+        wf.loop_body_map["body_node"] = "inner_loop"
+        wf.loop_state["inner_loop"] = ForEachLoopState(items=["x"], current_index=0)
+        wf.loop_iteration_results["inner_loop"] = {"body_node.output": ["v1"]}
+        wf.resolver.set_namespace("inner_loop", {"status": "completed"})
+
+        wf._clear_loop_body("outer_loop")
+
+        assert "inner_loop" not in wf.loop_body_map
+        assert "inner_loop" not in wf.loop_state
+        assert "inner_loop" not in wf.loop_iteration_results
+
     def test_loop_body_complete_returns_false_when_incomplete(self) -> None:
         wf = _make_workflow()
         wf.loop_body_map["body_a"] = "loop_1"

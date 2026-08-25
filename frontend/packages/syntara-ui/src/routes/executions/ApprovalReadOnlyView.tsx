@@ -26,6 +26,7 @@ import type { Approval } from '@syntara/contracts'
 
 import { NxCodeBlock } from '../../components/details/NxCodeBlock'
 import { SynPanel } from '../../components/layout/SynPanel'
+import { lookupMapByApprovalNodeId } from '../approvals/approvalNodeId'
 import { ApprovalSummaryList } from '../approvals/ApprovalSummaryList'
 
 import styles from './ApprovalReadOnlyView.module.css'
@@ -68,9 +69,9 @@ export function ApprovalReadOnlyView({
     next_step_rejected: nextStepRejected,
   } = approval
 
-  const resolveName = (id: string, fallback: string) => activityNameMap?.get(id) ?? fallback
+  const resolveName = (id: string, fallback: string) => lookupMapByApprovalNodeId(activityNameMap, id) ?? fallback
   const approvalNodeId = approval.approval_node_id
-  const resolvedNodeName = approvalNodeId ? activityNameMap?.get(approvalNodeId) : undefined
+  const resolvedNodeName = lookupMapByApprovalNodeId(activityNameMap, approvalNodeId)
   const approvalDisplayName = resolvedNodeName ? `Approval for ${resolvedNodeName}` : approval.name
 
   const approverSummaryParts: string[] = []

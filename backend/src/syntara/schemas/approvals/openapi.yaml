@@ -378,8 +378,14 @@ components:
               type: string
               maxLength: 255
               minLength: 1
-              description: Activity ID from workflow definition
+              description: Canvas node ID from the workflow definition
               title: Approval Node Id
+            loop_iteration_path:
+              type: array
+              items:
+                type: integer
+              description: Enclosing-loop indices, outermost first (empty when not inside a loop)
+              title: Loop Iteration Path
             name:
               type: string
               maxLength: 255
@@ -513,13 +519,26 @@ components:
         approval_node_id:
           type: string
           title: Approval Node Id
-          description: Activity ID from workflow definition
+          description: Canvas node ID from the workflow definition
         name:
           type: string
           maxLength: 255
           minLength: 1
           title: Name
           description: Display name for the approval request
+        loop_iteration_path:
+          type: array
+          items:
+            type: integer
+          title: Loop Iteration Path
+          description: Enclosing-loop indices, outermost first (empty when not inside a loop)
+        temporal_activity_id:
+          anyOf:
+            - type: string
+              maxLength: 255
+            - type: "null"
+          title: Temporal Activity Id
+          description: Temporal activity ID to signal on decide (defaults to approval_node_id)
         timeout_at:
           anyOf:
             - type: string

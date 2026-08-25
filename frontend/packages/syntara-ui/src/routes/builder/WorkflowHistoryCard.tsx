@@ -22,12 +22,12 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { FilterBar } from '../../components/filters/FilterBar'
 import { IconLabel } from '../../components/IconLabel'
 import { ApprovalPendingBadge } from '../../components/labels/ApprovalPendingBadge'
-import { NxLabel } from '../../components/labels/NxLabel'
+import { SynLabel } from '../../components/labels/SynLabel'
 import { SynPanel } from '../../components/layout/SynPanel'
-import type { KebabAction } from '../../components/NxKebabMenu'
-import { NxKebabMenu } from '../../components/NxKebabMenu'
-import { NxLink } from '../../components/NxLink'
 import { SynEmptyStateFilter } from '../../components/states/SynEmptyStateFilter'
+import type { KebabAction } from '../../components/SynKebabMenu'
+import { SynKebabMenu } from '../../components/SynKebabMenu'
+import { SynLink } from '../../components/SynLink'
 import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 import type { PaginationFooterProps } from '../../components/table/PaginationFooter'
 import { PaginationFooter } from '../../components/table/PaginationFooter'
@@ -112,7 +112,7 @@ function HistoryRowRetryAction({ execution }: Readonly<{ execution: Execution }>
   return (
     <>
       <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} role="presentation">
-        <NxKebabMenu aria-label={`Actions for execution ${truncatedId ?? execution.id}`} actions={kebabActions} />
+        <SynKebabMenu aria-label={`Actions for execution ${truncatedId ?? execution.id}`} actions={kebabActions} />
       </div>
       <RetryExecutionDialog
         isOpen={retryDialogOpen}
@@ -179,13 +179,13 @@ export function ExecutionHistoryRow({ execution, onSelect, isSelected }: Executi
           {versionHref && (
             <Content component={ContentVariants.small} className={styles.historyRowMeta}>
               {'Version: '}
-              <NxLink to={versionHref} className={styles.historyRowRaised}>
+              <SynLink to={versionHref} className={styles.historyRowRaised}>
                 {execution.workflow_version_name ? (
                   <Truncate content={execution.workflow_version_name} />
                 ) : (
                   <ExecutionTimestamp dateString={execution.workflow_version_created_at} />
                 )}
-              </NxLink>
+              </SynLink>
             </Content>
           )}
           {execution.retried_from_execution_id && (
@@ -197,7 +197,7 @@ export function ExecutionHistoryRow({ execution, onSelect, isSelected }: Executi
         <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapSm' }} flexWrap={{ default: 'wrap' }}>
           {execution.status && <StatusLabel status={execution.status} />}
           <ApprovalPendingBadge approvalPending={execution.approval_pending} />
-          {isTestRun && <NxLabel color="purple">Test run</NxLabel>}
+          {isTestRun && <SynLabel color="purple">Test run</SynLabel>}
         </Flex>
       </Stack>
       {retryable && (

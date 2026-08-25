@@ -3,11 +3,11 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 import { fn } from 'storybook/test'
 
 import { IconLabel } from './IconLabel'
-import type { KebabAction } from './NxKebabMenu'
-import { NxKebabMenu } from './NxKebabMenu'
+import type { KebabAction } from './SynKebabMenu'
+import { SynKebabMenu } from './SynKebabMenu'
 
-const meta: Meta<typeof NxKebabMenu> = {
-  component: NxKebabMenu,
+const meta: Meta<typeof SynKebabMenu> = {
+  component: SynKebabMenu,
   tags: ['autodocs'],
   decorators: [
     (Story) => (
@@ -40,7 +40,7 @@ const meta: Meta<typeof NxKebabMenu> = {
 }
 
 export default meta
-type Story = StoryObj<typeof NxKebabMenu>
+type Story = StoryObj<typeof SynKebabMenu>
 
 const defaultActions: KebabAction[] = [
   { key: 'edit', title: <IconLabel icon={<RhUiEditIcon />}>Edit</IconLabel>, onClick: fn() },
