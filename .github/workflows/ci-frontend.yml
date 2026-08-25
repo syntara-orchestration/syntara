@@ -55,7 +55,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           # Prefer the PR event number; fall back to workflow_dispatch input so
-          # manual `/run-podman-e2e-ui` runs path-filter against the real PR
+          # manual `/run-e2e-ui-tests` runs path-filter against the real PR
           # instead of treating the run as "no PR → enable everything".
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
         run: |
@@ -461,7 +461,7 @@ jobs:
   # - Auto-run on PRs when frontend/ or ci-frontend.yml changes
   # - Skip on backend-only PRs (save ~15-20 min on 8-core runner)
   # - Always run in merge queue (final safety check)
-  # - Manual trigger via /run-podman-e2e-ui comment (OWNER/MEMBER only)
+  # - Manual trigger via /run-e2e-ui-tests comment (OWNER/MEMBER only)
   # See docs/ci/workflows.md for complete behavior table and debugging guide.
   test-compose-e2e:
     name: (Frontend) Test Podman Compose E2E

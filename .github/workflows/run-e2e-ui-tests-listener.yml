@@ -1,5 +1,5 @@
 ---
-name: '/run-podman-e2e-ui'
+name: '/run-e2e-ui-tests'
 
 # Lightweight listener: validates the PR comment and dispatches the real
 # E2E UI test workflow. Keeps ghost "skipped" runs out of the heavy
@@ -18,7 +18,7 @@ jobs:
     if: >-
       github.event.issue.pull_request
       && github.event.comment.user.type != 'Bot'
-      && contains(github.event.comment.body, '/run-podman-e2e-ui')
+      && contains(github.event.comment.body, '/run-e2e-ui-tests')
       && contains(fromJson('["OWNER","MEMBER"]'), github.event.comment.author_association)
     runs-on: ubuntu-24.04
     steps:
@@ -34,7 +34,7 @@ jobs:
             });
             const baseRepo = `${context.repo.owner}/${context.repo.repo}`;
             if (pr.data.head.repo.full_name !== baseRepo) {
-              core.setFailed('Refusing to run /run-podman-e2e-ui on fork PRs.');
+              core.setFailed('Refusing to run /run-e2e-ui-tests on fork PRs.');
               return;
             }
             core.setOutput('ref', pr.data.head.ref);
