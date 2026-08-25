@@ -419,7 +419,7 @@ and read the top candidates before writing new tests.
 
 ### Removable patterns
 
-1. **Assertion-free test bodies** — if a test adds nodes or performs actions but has no `expect()` call, it proves nothing. Remove it; the covered path is implicit in tests that share the same setup.
+1. **Assertion-free test bodies** — if a test performs actions but has no `expect()` call, check whether implicit throw-on-action error detection is genuinely sufficient for the scenario. If another test already covers the same path with explicit assertions, remove the assertion-free copy. If no other test covers the path, add assertions rather than removing the test.
 
 ### Duplicate-coverage patterns (remove the weaker test)
 
@@ -428,7 +428,7 @@ and read the top candidates before writing new tests.
 4. **Unit-level coverage duplicated at E2E level** — if a component unit test already covers a behavior exhaustively (e.g., date-format consistency, form validation), the E2E test adds no unique confidence. Remove the E2E copy.
 5. **Journey test whose sub-steps each have their own spec** — a 90-second "search, view, and delete" journey is redundant when filtering, table, and destructive-modal specs each cover one step individually. Remove the composite journey.
 6. **Navigation sub-step already covered by a superset test** — if test A navigates to page X and asserts heading + URL, and test B does the same navigation PLUS additional assertions, remove A. The superset's execution already validates the sub-step.
-7. **Parallel "same pattern, different resource" over-testing** — shared infrastructure behaviors (URL-based filter persistence, shareable URL round-trips, cursor-based pagination) are implemented once by a shared hook (`useCursorPagination`). Do not duplicate these cross-cutting tests for every resource type. One representative spec per behavior pattern is enough; additional resource-type copies only add CI time with no additional confidence.
+7. **Parallel "same pattern, different resource" over-testing** — shared infrastructure behaviors (URL-based filter persistence, shareable URL round-trips, cursor-based pagination) are implemented once by a shared hook (`useCursorPagination`). Do not duplicate these cross-cutting tests for every resource type. One representative spec per behavior pattern is enough; additional resource-type copies only add CI time with no additional confidence. Before removing, confirm both tests exercise the same hook, component, or code path — surface-level similarity in actions does not guarantee identical coverage.
 
 ### Ineffective CI guards (fix, don't remove)
 
