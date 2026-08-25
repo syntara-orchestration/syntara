@@ -1,12 +1,17 @@
 .root {
   max-width: 100%;
   overflow: hidden;
-  --pf-v6-c-timestamp--Color: inherit;
-  --pf-v6-c-timestamp--Display: inline;
 }
 
-/* Truncate uses overflow:hidden which clips the link underline below the baseline.
-   Spacer on descendant spans gives the underline room without targeting PF class names. */
-.root span {
+/* The Truncate component's outer span uses overflow:hidden which clips the text-decoration
+   underline drawn below the baseline. A small bottom padding gives the underline room to render. */
+.root :global(.pf-v6-c-truncate) {
   padding-bottom: var(--pf-t--global--spacer--xs);
+}
+
+/* PF Timestamp uses inline-block (which blocks text-decoration propagation) and its own
+   color token. Override both so it inherits the link's blue color and dotted underline. */
+.root :global(.pf-v6-c-timestamp) {
+  --pf-v6-c-timestamp--Color: inherit;
+  display: inline;
 }

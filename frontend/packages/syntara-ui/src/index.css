@@ -8,11 +8,10 @@
   --syntara-nav-flyout-min-width: 12.5rem;
   --syntara-builder-side-panel-width: 25rem;
   --syntara-table-cell-max-width: 25rem;
-  overflow-x: hidden;
+}
 
-  /* Portaled menus/poppers render on document.body, so stacking and arrow
-     visibility are overridden via PF component tokens rather than unscoped class selectors. */
-  --pf-v6-c-popper--ZIndex: var(--pf-t--global--z-index--2xl);
-  --pf-v6-c-menu__container--ZIndex: var(--pf-t--global--z-index--2xl);
-  --pf-v6-c-popper__arrow--Display: none;
+/* Prevent horizontal scrollbar from PF portaled menus (Select/Dropdown) that
+   extend past the viewport edge. */
+html {
+  overflow-x: hidden;
 }

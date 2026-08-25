@@ -35,8 +35,10 @@
   justify-content: flex-start;
 }
 
-.iconDockNav {
-  --pf-v6-c-nav__toggle--Display: none;
+/* PF has no --pf-v6-c-nav__toggle--Display token. Hide flyout carets only on the
+   collapsed icon dock so expanded NavExpandable toggles stay visible. */
+.iconDockNav :global(.pf-v6-c-nav__toggle) {
+  display: none;
 }
 
 .flyoutMenu {
