@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { FormProvider, useForm } from 'react-hook-form'
+import { FormProvider, useForm, type FieldErrors } from 'react-hook-form'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
@@ -379,18 +379,21 @@ describe('MappingTable', () => {
   })
 
   it('evaluates entryErrors on read-only rows without crashing', () => {
+    const entryErrors: FieldErrors<GroupMappingEditFormValues>['entries'] = [
+      {
+        idpGroupValue: { type: 'required', message: 'IdP group value is required' },
+        mappedGroupId: { type: 'required', message: 'Select a group' },
+      },
+      undefined,
+    ]
+
     render(
       <MappingTable
         {...defaultProps}
         rows={mockRows}
         isReadOnly
         showValidation
-        entryErrors={
-          [
-            { idpGroupValue: { message: 'IdP group value is required' }, mappedGroupId: { message: 'Select a group' } },
-            null,
-          ] as unknown as GroupMappingEditFormValues['entries']
-        }
+        entryErrors={entryErrors}
       />
     )
 
@@ -404,7 +407,10 @@ describe('MappingTable', () => {
         rows={[{ rowId: 'k1', index: 0, idpGroupValue: 'idp-admin', mappedGroupId: 'g1' }]}
         isReadOnly
         showValidation
-        entryErrors={'not-an-array' as unknown as GroupMappingEditFormValues['entries']}
+        entryErrors={
+          // @ts-expect-error -- defensive runtime guard when form state is malformed
+          'not-an-array'
+        }
       />
     )
 
@@ -412,17 +418,20 @@ describe('MappingTable', () => {
   })
 
   it('ignores entry field errors with non-string messages', () => {
+    const entryErrors: FieldErrors<GroupMappingEditFormValues>['entries'] = [
+      {
+        idpGroupValue: { type: 'custom', message: 'IdP group value is required' },
+        mappedGroupId: { type: 'required' },
+      },
+    ]
+
     render(
       <MappingTable
         {...defaultProps}
         rows={[{ rowId: 'k1', index: 0, idpGroupValue: 'idp-admin', mappedGroupId: 'g1' }]}
         isReadOnly
         showValidation
-        entryErrors={
-          [
-            { idpGroupValue: { message: 123 }, mappedGroupId: { notMessage: true } },
-          ] as unknown as GroupMappingEditFormValues['entries']
-        }
+        entryErrors={entryErrors}
       />
     )
 

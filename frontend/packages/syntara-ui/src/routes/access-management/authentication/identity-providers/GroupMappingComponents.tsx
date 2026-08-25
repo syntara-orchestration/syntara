@@ -21,7 +21,7 @@ import {
 import { RhUiAddIcon, RhUiEditIcon, RhUiSyncIcon } from '@patternfly/react-icons'
 import { Tbody } from '@patternfly/react-table'
 import { useCallback, useMemo, useState } from 'react'
-import { Controller, type Control } from 'react-hook-form'
+import { Controller, type Control, type FieldErrors } from 'react-hook-form'
 
 import { FilterBar } from '../../../../components/filters/FilterBar'
 import { SynPanelContentStack } from '../../../../components/layout/SynPanelContentStack'
@@ -40,8 +40,10 @@ import type { GroupMappingEntry, MappedGroup } from './groupMappingUtils'
 import { idpHelp } from './idpFieldHelp'
 import { IDP_TYPE_PRESETS } from './idpTypePresets'
 
+type GroupMappingEntryErrors = FieldErrors<GroupMappingEditFormValues>['entries']
+
 function entryFieldErrorMessage(
-  entryErrors: GroupMappingEditFormValues['entries'] | undefined,
+  entryErrors: GroupMappingEntryErrors | undefined,
   index: number,
   field: 'idpGroupValue' | 'mappedGroupId'
 ): string | undefined {
@@ -189,7 +191,7 @@ export type MappingTableProps = {
   mappedGroups: MappedGroup[]
   isReadOnly?: boolean
   showValidation?: boolean
-  entryErrors?: GroupMappingEditFormValues['entries']
+  entryErrors?: GroupMappingEntryErrors
   onRemove: (index: number) => void
   onAdd: () => void
   onCreateGroup: (index: number) => void
