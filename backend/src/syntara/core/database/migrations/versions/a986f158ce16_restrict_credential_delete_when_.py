@@ -1,7 +1,7 @@
 """restrict credential delete when integration references it
 
 Revision ID: a986f158ce16
-Revises: 4ca3cbf8652a
+Revises: c7e4a91b2d03
 Create Date: 2026-08-21 12:26:10.309857
 
 """
@@ -12,7 +12,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "a986f158ce16"
-down_revision: str | Sequence[str] | None = "4ca3cbf8652a"
+down_revision: str | Sequence[str] | None = "c7e4a91b2d03"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
