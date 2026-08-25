@@ -464,26 +464,6 @@ test('two nodes can be connected with an edge', async ({ app }) => {
   }
 })
 
-test('edge is visually distinguishable on canvas', async ({ app }) => {
-  const workflowName = buildUniqueName('e2e-builder')
-  await createWorkflowWithTrigger(app, workflowName)
-
-  try {
-    await closeNodeEditorPanel(app)
-    await expect(app.getByText('Manual trigger')).toBeVisible()
-
-    // Add two nodes - these will auto-connect:
-    // Manual trigger -> Source Node -> Target Node
-    await addScriptNode(app, 'Source Node', 'print("source")')
-    await addScriptNode(app, 'Target Node', 'print("target")')
-
-    // Edge existence is proven implicitly by addScriptNode succeeding (it clicks an
-    // edge overlay button). The "edge follows connection path" test verifies SVG path data.
-  } finally {
-    await deleteWorkflow(app, workflowName)
-  }
-})
-
 test('multiple edges can be created sequentially', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-builder')
   await createWorkflowWithTrigger(app, workflowName)
