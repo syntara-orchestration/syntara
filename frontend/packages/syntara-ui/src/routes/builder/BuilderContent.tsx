@@ -370,7 +370,7 @@ export function BuilderContent(props: BuilderContentProps) {
       const baseName = workflow.name.length > maxBaseLength ? workflow.name.slice(0, maxBaseLength) : workflow.name
       const duplicateName = `${baseName}${suffix}`
 
-      const nodes = definition.nodes as Array<Record<string, unknown>> | undefined
+      const nodes = Array.isArray(definition.nodes) ? (definition.nodes as Array<Record<string, unknown>>) : undefined
       const transformedDefinition = {
         ...definition,
         nodes: nodes?.map((node) => {
@@ -401,6 +401,10 @@ export function BuilderContent(props: BuilderContentProps) {
               actionLinks: created?.id ? (
                 <AlertActionLink
                   onClick={() => {
+                    // Check isDirty at click time to detect unsaved changes.
+                    // Note: If user makes edits between click and dialog render (~100ms),
+                    // those edits won't trigger the dialog. This is acceptable - the timing
+                    // window is too small to be a practical concern.
                     if (useWorkflowStore.getState().isDirty) {
                       setPendingDuplicateNavigation(`/workflow-builder/${created.id}`)
                     } else {
