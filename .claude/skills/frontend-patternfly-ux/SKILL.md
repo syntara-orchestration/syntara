@@ -32,15 +32,6 @@ This document serves as the definitive technical and design North Star for **thi
 
 **In short:** We use this framework to build faster, stay aligned with the broader PatternFly ecosystem, and ensure that this product remains premium and stable.
 
-### Publication and Branding Constraints
-
-This skill is published upstream and must **not** contain product branding, marketing names, or internal tooling references in prose. When writing or updating this document:
-
-- **Do not reference** in prose: Automation Orchestrator, AO, Nexus, Jira, Syntara (as a product name), Ansible, or Red Hat (as employer branding).
-- **Use generic terms** instead: "this product", "the platform", "the UI repository", "contributor channels", "the issue tracker".
-- **Do not cite ticket IDs** (e.g., `AAP-12345`) — describe the behavioral reason directly.
-- **Code identifiers are fine** — file paths, package names, component names, CSS custom properties, and API field names are technical references, not branding.
-
 ### UI/UX Team
 
 For engagement questions, reach out to the UX team in the project's contributor channels.

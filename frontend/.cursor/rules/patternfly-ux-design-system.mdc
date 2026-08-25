@@ -15,8 +15,6 @@ alwaysApply: false
 
 When building frontend UI in this project, follow these opinionated PatternFly patterns. This ensures consistency across feature teams and reduces cognitive load for users.
 
-**Publication constraint:** This rule must not contain product branding or internal tooling references in prose (no Automation Orchestrator, AO, Nexus, Jira, etc.). Use generic terms like "this product" or "the platform". See the full skill for details.
-
 ## Philosophy
 
 Our UX is designed around the **supervisor** mental model — an operator who must understand, trust, and intervene in complex automation across scale.
