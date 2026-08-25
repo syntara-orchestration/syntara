@@ -4,16 +4,12 @@ App-level fixtures are loaded here (not via the pytest11 entry point) so that
 syntara.* imports happen AFTER pytest-cov starts its coverage tracer.
 """
 
-# The syntara package preloads regopy, whose native library must load before
-# anything imports greenlet or temporalio's bridge — otherwise every in-process
-# rego evaluation in this pytest run leaks ~69 KB natively. This import must
-# stay first, ahead of any plugin/fixture module that pulls in SQLAlchemy.
-# Guarded by tests/fixtures/regopy_preload.py; see
-# docs/standards/imports-and-modules.md ("Native import order").
-import syntara  # noqa: F401
-
 pytest_plugins = [
-    # Session guard for the regopy-first import order of this very process
+    # MUST stay first: preloads regopy's native library before the fixture
+    # plugins below pull in SQLAlchemy/greenlet — otherwise every in-process
+    # rego evaluation in this pytest run leaks ~69 KB natively — and guards
+    # the resulting import order for the whole session.
+    # See docs/standards/imports-and-modules.md ("Native import order").
     "tests.fixtures.regopy_preload",
     # Logging setup, performance marker, worker_id fixture, and cleanup hooks
     "tests.fixtures.hooks",
