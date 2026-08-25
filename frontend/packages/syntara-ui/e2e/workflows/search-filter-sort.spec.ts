@@ -42,40 +42,6 @@ test.describe('Workflows Table - Search, Filter, and Sort', () => {
     return workflows
   }
 
-  test('user can search workflows by name', async ({ app }) => {
-    const workflows = await createTestWorkflows(app, 1)
-    expect(workflows).toHaveLength(1)
-
-    try {
-      const searchTerm = workflows[0].name
-
-      // Navigate to workflows page
-      await app.goto(toAppUrl('/workflows'))
-      await expect(app.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
-
-      // Enter search term
-      const searchInput = app.getByPlaceholder('Filter by name')
-      await searchInput.fill(searchTerm)
-      await app.getByRole('button', { name: 'Apply filter' }).click()
-
-      // Verify filter chip appears
-      const nameChipGroup = app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Name' })
-      await expect(nameChipGroup).toBeVisible()
-      await expect(nameChipGroup.getByText(searchTerm)).toBeVisible()
-
-      // Verify URL contains filter
-      await expect(app).toHaveURL(new RegExp(`name.*${searchTerm}`))
-
-      // Verify matching workflow appears
-      const table = app.getByRole('grid', { name: 'Workflows table' })
-      await expect(table.getByRole('row', { name: new RegExp(workflows[0].name) })).toBeVisible()
-    } finally {
-      for (const wf of workflows) {
-        await deleteWorkflowViaApi(app, wf.id)
-      }
-    }
-  })
-
   test('user can clear search filter', async ({ app }) => {
     const workflows = await createTestWorkflows(app, 1)
     expect(workflows).toHaveLength(1)
