@@ -29,6 +29,9 @@ class FileDetailResponse:
                 CONVERTING: Conversion in progress
                 CONVERTED: Successfully converted to text/markdown
                 CONVERSION_FAILED: Conversion failed with error
+        is_project_deleted (bool): True when the owning project has been soft-deleted; the file is retained as an
+            orphan. Project-scoped files:delete cannot remove orphans after soft-delete; only system-scope files:delete with
+            a known file UUID can.
         conversion_error (None | str | Unset): Error message if conversion failed
     """
 
@@ -37,6 +40,7 @@ class FileDetailResponse:
     size_bytes: int
     mime_type: str
     status: FileStatus
+    is_project_deleted: bool
     conversion_error: None | str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
@@ -50,6 +54,8 @@ class FileDetailResponse:
         mime_type = self.mime_type
 
         status = self.status.value
+
+        is_project_deleted = self.is_project_deleted
 
         conversion_error: None | str | Unset
         if isinstance(self.conversion_error, Unset):
@@ -66,6 +72,7 @@ class FileDetailResponse:
                 "size_bytes": size_bytes,
                 "mime_type": mime_type,
                 "status": status,
+                "is_project_deleted": is_project_deleted,
             }
         )
         if conversion_error is not UNSET:
@@ -86,6 +93,8 @@ class FileDetailResponse:
 
         status = FileStatus(d.pop("status"))
 
+        is_project_deleted = d.pop("is_project_deleted")
+
         def _parse_conversion_error(data: object) -> None | str | Unset:
             if data is None:
                 return data
@@ -101,6 +110,7 @@ class FileDetailResponse:
             size_bytes=size_bytes,
             mime_type=mime_type,
             status=status,
+            is_project_deleted=is_project_deleted,
             conversion_error=conversion_error,
         )
 

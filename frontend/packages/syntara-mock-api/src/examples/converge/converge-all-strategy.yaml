@@ -1,5 +1,5 @@
 ---
-schema_version: "2.0.0"
+schema_version: '2.0.0'
 name: converge-all-test
 description: Test converge with all strategy - waits for all branches to complete
 triggers:

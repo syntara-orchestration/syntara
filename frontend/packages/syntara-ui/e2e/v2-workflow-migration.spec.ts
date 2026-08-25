@@ -35,7 +35,7 @@ import {
   deleteLlmIntegration,
 } from './helpers/v2-nodes'
 import { addConvergeNode } from './helpers/v2-nodes-converge'
-import { buildUniqueName, selectProjectIfRequired, deleteWorkflow } from './helpers/workflows'
+import { buildUniqueName, selectProjectIfRequired, deleteWorkflow, triggerLayout } from './helpers/workflows'
 
 /** Inline v2 schema type (formerly in toV2Definition.ts stub, now replaced by generated contracts). */
 type V2WorkflowDefinition = {
@@ -141,7 +141,8 @@ test.describe('V2 Workflow Schema Migration', () => {
   // 2. All executor node types
   // -------------------------------------------------------------------------
 
-  test.skip('creates and saves all v2 executor node types', async ({ app }) => {
+  test('creates and saves all v2 executor node types', async ({ app }) => {
+    test.setTimeout(120_000)
     const workflowName = buildUniqueName('v2-all-executors')
     await app.goto(toAppUrl('/workflow-builder/new'))
 
@@ -156,17 +157,16 @@ test.describe('V2 Workflow Schema Migration', () => {
       await addScriptNode(app, 'Run script', 'echo "hello"')
       await addHttpRequestNode(app, 'Fetch data', 'https://api.example.com/data')
       await addAgenticNode(app, 'AI analysis', 'Analyze the fetched data')
-      await addAapNode(app, 'Deploy with Ansible', '456')
+      await addAapNode(app, 'Deploy with Ansible')
       await addApprovalNodeWithBranch(app, 'Approve deployment')
       // After approval, the workflow ends (the WithBranch helper adds a script on approved branch)
-
-      // Wait for the approval node to be fully rendered before saving
-      await expect(app.getByText('Approve deployment')).toBeVisible({ timeout: 10_000 })
+      await triggerLayout(app)
 
       // Intercept save
       const saveRequestPromise = app.waitForRequest(
         (req) => req.url().includes('/workflows') && req.method() === 'POST'
       )
+      await selectProjectIfRequired(app)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
       await app.getByRole('button', { name: 'Save' }).click()
       const saveRequest = await saveRequestPromise
@@ -212,7 +212,7 @@ test.describe('V2 Workflow Schema Migration', () => {
   // 3. All control flow node types
   // -------------------------------------------------------------------------
 
-  test.skip('creates and saves all v2 control flow node types', async ({ app }) => {
+  test('creates and saves all v2 control flow node types', async ({ app }) => {
     const workflowName = buildUniqueName('v2-control-flow')
     await app.goto(toAppUrl('/workflow-builder/new'))
 
@@ -227,6 +227,7 @@ test.describe('V2 Workflow Schema Migration', () => {
       const saveRequestPromise = app.waitForRequest(
         (req) => req.url().includes('/workflows') && req.method() === 'POST'
       )
+      await selectProjectIfRequired(app)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
       await app.getByRole('button', { name: 'Save' }).click()
       const saveRequest = await saveRequestPromise
@@ -278,7 +279,8 @@ test.describe('V2 Workflow Schema Migration', () => {
   // 4. Comprehensive round-trip (all 9 node types)
   // -------------------------------------------------------------------------
 
-  test.skip('comprehensive v2 workflow: all node types persist and reload', async ({ app }) => {
+  test('comprehensive v2 workflow: all node types persist and reload', async ({ app }) => {
+    test.setTimeout(120_000)
     const workflowName = buildUniqueName('v2-comprehensive')
     await app.goto(toAppUrl('/workflow-builder/new'))
 
@@ -296,7 +298,7 @@ test.describe('V2 Workflow Schema Migration', () => {
       await addScriptNode(app, 'Validate input', 'print("validating")')
       await addHttpRequestNode(app, 'Fetch API data', 'https://api.example.com')
       await addAgenticNode(app, 'AI processing', 'Process the data')
-      await addAapNode(app, 'Ansible deployment', '789')
+      await addAapNode(app, 'Ansible deployment')
       await addApprovalNodeWithBranch(app, 'Manual approval')
 
       // Control flow
@@ -308,6 +310,7 @@ test.describe('V2 Workflow Schema Migration', () => {
       const saveRequestPromise = app.waitForRequest(
         (req) => req.url().includes('/workflows') && req.method() === 'POST'
       )
+      await selectProjectIfRequired(app)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
       await app.getByRole('button', { name: 'Save' }).click()
       const saveRequest = await saveRequestPromise
@@ -343,7 +346,9 @@ test.describe('V2 Workflow Schema Migration', () => {
       // Reopen the saved workflow
       await targetRow.getByRole('link', { name: workflowName, exact: true }).click()
 
-      // Every node name should be visible on the canvas
+      // Every node should be present on the canvas after reload.
+      // Use accessible group names (not getByText) since React Flow may
+      // not render text labels at small zoom levels with many nodes.
       const nodeNames = [
         'Start workflow',
         'Validate input',
@@ -357,9 +362,9 @@ test.describe('V2 Workflow Schema Migration', () => {
       ]
       for (const nodeName of nodeNames) {
         await expect(
-          app.locator('.react-flow').getByText(nodeName, { exact: true }),
-          `node "${nodeName}" should be visible after reload`
-        ).toBeVisible()
+          app.locator('.react-flow').getByRole('group', { name: new RegExp(`^${nodeName}(,|$)`) }),
+          `node "${nodeName}" should be present after reload`
+        ).toBeAttached({ timeout: 15_000 })
       }
     } finally {
       await deleteWorkflow(app, workflowName)

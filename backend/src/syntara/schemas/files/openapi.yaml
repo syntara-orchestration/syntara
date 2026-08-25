@@ -226,6 +226,46 @@ paths:
           $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
       security:
         - bearerAuth: []
+    delete:
+      summary: Delete file
+      description: |-
+        Permanently delete a file and its stored content. After a project is soft-deleted, project-scoped files:delete cannot authorize orphan cleanup (the project no longer resolves). Only system-scope files:delete can remove an orphan, and only when the caller already knows the file UUID.
+      operationId: delete_file
+      tags:
+        - Files
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: File Id
+          description: UUID of the file to delete
+      x-app-permission:
+        resource: files
+        action: delete
+      responses:
+        '204':
+          description: File deleted successfully
+        '400':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+        '401':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+        '403':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+        '404':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+        '409':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+        '422':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
+        '429':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        '500':
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+      security:
+        - bearerAuth: []
 
   /files/{file_id}/download:
     get:
@@ -391,6 +431,14 @@ components:
         status:
           $ref: '#/components/schemas/FileStatus'
           description: Processing status (pending_conversion)
+        is_project_deleted:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+          description: >-
+            True when the owning project has been soft-deleted; the file is
+            retained as an orphan. Null when not computed (e.g. upload response).
+          title: Is Project Deleted
 
     FileDetailResponse:
       type: object
@@ -402,6 +450,7 @@ components:
         - size_bytes
         - mime_type
         - status
+        - is_project_deleted
       properties:
         file_id:
           type: string
@@ -439,6 +488,14 @@ components:
           description: Error message if conversion failed
           examples:
             - null
+        is_project_deleted:
+          type: boolean
+          title: Is Project Deleted
+          description: >-
+            True when the owning project has been soft-deleted; the file is
+            retained as an orphan. Project-scoped files:delete cannot remove
+            orphans after soft-delete; only system-scope files:delete with a
+            known file UUID can.
 
     FilesMetadataResponse:
       type: object

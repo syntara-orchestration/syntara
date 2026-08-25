@@ -145,6 +145,7 @@ class ActivityName(StrEnum):
     EXPIRE_APPROVAL = "expire_approval_requests"
     CANCEL_APPROVAL = "cancel_approval_requests"
     FAIL_DETACHED_APPROVAL = "fail_detached_approval"
+    CANCEL_AGENTIC = "cancel_agentic_invocation"
     ACTIVITY_MONITORING = "register_activity_monitoring"
     COMPLETE_WAIT = "complete_wait"
     FETCH_RUNTIME_SETTINGS = "fetch_workflow_runtime_settings"
