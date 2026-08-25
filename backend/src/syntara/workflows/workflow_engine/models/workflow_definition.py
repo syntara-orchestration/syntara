@@ -89,7 +89,7 @@ def validate_uuid_or_template(value: str, field_label: str) -> str:
 class TemplateAwareBaseModel(BaseModel):
     """Base model that allows template expressions in any field.
 
-    Template expressions like ${input.field} or ${workflow.vars.count} bypass
+    Template expressions like ${trigger.field} or ${step_1.count} bypass
     type validation and constraints, allowing them to be stored as strings and
     evaluated at runtime during workflow execution.
 

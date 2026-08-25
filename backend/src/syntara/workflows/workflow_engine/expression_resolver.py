@@ -159,8 +159,7 @@ class ExpressionResolver:
     """Resolves ${...} expressions in workflow definitions.
 
     Supports:
-    - ${input.field_name} - workflow inputs
-    - ${variables.var_name} - workflow variables
+    - ${trigger.field_name} - trigger payload
     - ${activity_id.field} - activity outputs (direct field access)
     - ${activity_id.output.field} - activity outputs (via output key)
     - ${iteration_index} - loop iteration index
