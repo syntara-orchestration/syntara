@@ -11,6 +11,7 @@ export async function dismissConnectionBanner(app: Page): Promise<void> {
   const banner = app.getByRole('alert').filter({ hasText: 'Live updates paused' })
   if (await banner.isVisible({ timeout: 3_000 }).catch(() => false)) {
     await banner.getByRole('button', { name: /close/i }).click()
+    await banner.waitFor({ state: 'hidden', timeout: 5_000 })
   }
 }
 
@@ -76,8 +77,9 @@ export async function navigateToApprovalAndOpen(app: Page, approvalName: string)
 
   await applyApprovalNameFilter(app, approvalsTable, approvalName, { waitForRowText: approvalName })
 
-  const approvalBtn = approvalsTable.getByRole('button', { name: approvalName })
-  await approvalBtn.click()
+  const approvalLink = approvalsTable.getByRole('link', { name: approvalName })
+  await expect(approvalLink).toBeVisible({ timeout: 15_000 })
+  await approvalLink.click()
 
   await waitForApprovalPanel(app)
 }

@@ -1362,9 +1362,14 @@ export interface components {
       execution_id: string
       /**
        * Approval Node Id
-       * @description Activity ID from workflow definition
+       * @description Canvas node ID from the workflow definition
        */
       approval_node_id: string
+      /**
+       * Loop Iteration Path
+       * @description Enclosing-loop indices, outermost first (empty when not inside a loop)
+       */
+      loop_iteration_path?: number[]
       /**
        * Name
        * @description Human-readable name for the approval request

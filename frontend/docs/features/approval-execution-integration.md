@@ -41,7 +41,7 @@ function useFetchApprovalForNode(executionId: string): {
 
 - Uses `approvalsClient.useQuery('get', '/approvals', ...)` with `enabled: false` to disable automatic fetching
 - Query params: `execution_id` and `status: 'pending'`
-- `fetchForNode(approvalNodeId)` calls `refetch()`, then filters the returned list by `approval_node_id`
+- `fetchForNode(approvalNodeId)` calls `refetch()`, then filters the returned list by canvas `approval_node_id` (pending first, else latest `loop_iteration_path`). Legacy `{nodeId}_iter_{n}` suffixes are a fallback only.
 - Returns `null` if no matching approval is found
 - `clear()` resets the loading state (e.g., when closing the review view)
 
@@ -293,10 +293,10 @@ TypeScript types from `@syntara/contracts` enforce this casing at compile time.
 Both `ApprovalReviewView` and `ApprovalDetailContent` resolve human-readable names from the workflow definition:
 
 ```typescript
-const resolveName = (id: string, fallback: string) => activityNameMap?.get(id) ?? fallback
+const resolveName = (id: string, fallback: string) => lookupMapByApprovalNodeId(activityNameMap, id) ?? fallback
 
 const approvalNodeId = approval.approval_node_id
-const resolvedNodeName = approvalNodeId ? activityNameMap?.get(approvalNodeId) : undefined
+const resolvedNodeName = lookupMapByApprovalNodeId(activityNameMap, approvalNodeId)
 const approvalDisplayName = resolvedNodeName ? `Approval for ${resolvedNodeName}` : approval.name
 ```
 

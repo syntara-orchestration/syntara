@@ -133,9 +133,14 @@ export interface components {
       execution_id: string
       /**
        * Approval Node Id
-       * @description Activity ID from workflow definition
+       * @description Canvas node ID from the workflow definition
        */
       approval_node_id: string
+      /**
+       * Loop Iteration Path
+       * @description Enclosing-loop indices, outermost first (empty when not inside a loop)
+       */
+      loop_iteration_path?: number[]
       /**
        * Name
        * @description Human-readable name for the approval request
@@ -239,7 +244,7 @@ export interface components {
       project_id: string
       /**
        * Approval Node Id
-       * @description Activity ID from workflow definition
+       * @description Canvas node ID from the workflow definition
        */
       approval_node_id: string
       /**
@@ -247,6 +252,16 @@ export interface components {
        * @description Display name for the approval request
        */
       name: string
+      /**
+       * Loop Iteration Path
+       * @description Enclosing-loop indices, outermost first (empty when not inside a loop)
+       */
+      loop_iteration_path?: number[]
+      /**
+       * Temporal Activity Id
+       * @description Temporal activity ID to signal on decide (defaults to approval_node_id)
+       */
+      temporal_activity_id?: string | null
       /**
        * Timeout At
        * @description When this request expires (null = no timeout)
