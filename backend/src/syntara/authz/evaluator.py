@@ -102,25 +102,36 @@ def evaluate_policy_input(authz_input: dict[str, Any], *, policy_path: Path | No
     return _normalize_raw(raw)
 
 
+# Native modules that claim the libstdc++ allocator bindings when loaded
+# before librego_shared.so; both measured at ~69 KB leaked per evaluation.
+_NATIVE_ALLOCATOR_CLAIMANTS = ("greenlet", "temporalio.bridge.temporal_sdk_bridge")
+
+
 def _warn_if_import_order_regressed() -> None:
     """Log a tripwire warning when the regopy-first import guarantee is lost.
 
     ``syntara/__init__.py`` preloads regopy so its native allocator symbols
-    bind before greenlet / temporalio load.  If greenlet still ended up first
-    (preload removed, or an entrypoint that bypasses the ``syntara`` package),
-    every rego evaluation leaks ~69 KB of native memory and the process will
-    OOM under authz load.  See ``docs/standards/imports-and-modules.md``
-    ("Native import order: regopy loads first").
+    bind before greenlet or temporalio's Rust bridge load.  If either still
+    ended up first (preload removed, or an entrypoint that bypasses the
+    ``syntara`` package), every rego evaluation leaks ~69 KB of native memory
+    and the process will OOM under authz load.  See
+    ``docs/standards/imports-and-modules.md`` ("Native import order: regopy
+    loads first").
     """
-    if "greenlet" not in sys.modules or "regopy" not in sys.modules:
+    if "regopy" not in sys.modules:
         return
     modules = list(sys.modules)
-    if modules.index("greenlet") < modules.index("regopy"):
+    regopy_index = modules.index("regopy")
+    offenders = [
+        name for name in _NATIVE_ALLOCATOR_CLAIMANTS if name in sys.modules and modules.index(name) < regopy_index
+    ]
+    if offenders:
         logger.warning(
-            "greenlet was imported before regopy — every rego evaluation will leak "
-            "~69 KB of native memory and the backend will OOM under authz load. "
-            "The preload in syntara/__init__.py should prevent this; see "
-            "docs/standards/imports-and-modules.md ('Native import order').",
+            "A native library was imported before regopy — every rego evaluation "
+            "will leak ~69 KB of native memory and the backend will OOM under "
+            "authz load. The preload in syntara/__init__.py should prevent this; "
+            "see docs/standards/imports-and-modules.md ('Native import order').",
+            imported_before_regopy=offenders,
             regopy_preload_error=getattr(syntara, "_REGOPY_PRELOAD_ERROR", None),
         )
 

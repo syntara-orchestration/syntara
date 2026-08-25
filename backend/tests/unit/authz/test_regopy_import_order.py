@@ -150,3 +150,56 @@ def test_unexpected_regopy_import_error_is_raised(tmp_path):
     assert result.returncode != 0
     assert "SHOULD-NOT-REACH" not in result.stdout
     assert "unexpected loader explosion" in result.stderr
+
+
+def test_tripwire_warns_when_greenlet_precedes_regopy():
+    """The startup tripwire must fire when greenlet claimed the allocator first."""
+    pytest.importorskip("regopy")
+    result = _run_python(
+        """
+        import greenlet  # noqa: F401  # simulates an entrypoint bypassing the preload
+
+        from syntara.authz import evaluator
+
+        evaluator._warn_if_import_order_regressed()
+        """
+    )
+    assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+    assert "imported before regopy" in result.stdout + result.stderr
+    assert "greenlet" in result.stdout + result.stderr
+
+
+def test_tripwire_warns_when_temporalio_bridge_precedes_regopy():
+    """The tripwire must also fire for temporalio's Rust bridge (same leak)."""
+    pytest.importorskip("regopy")
+    pytest.importorskip("temporalio")
+    result = _run_python(
+        """
+        import temporalio.bridge.temporal_sdk_bridge  # noqa: F401
+
+        from syntara.authz import evaluator
+
+        evaluator._warn_if_import_order_regressed()
+        """
+    )
+    assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+    assert "imported before regopy" in result.stdout + result.stderr
+    assert "temporal_sdk_bridge" in result.stdout + result.stderr
+
+
+def test_tripwire_silent_when_preload_order_is_correct():
+    """With the package preload intact, the tripwire must stay silent."""
+    pytest.importorskip("regopy")
+    pytest.importorskip("temporalio")
+    result = _run_python(
+        """
+        from syntara.authz import evaluator  # syntara preloads regopy first
+
+        import greenlet  # noqa: F401
+        import temporalio.bridge.temporal_sdk_bridge  # noqa: F401
+
+        evaluator._warn_if_import_order_regressed()
+        """
+    )
+    assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+    assert "imported before regopy" not in result.stdout + result.stderr

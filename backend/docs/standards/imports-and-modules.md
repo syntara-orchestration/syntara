@@ -59,7 +59,7 @@ Violations of import order will be caught by `make lint` and auto-fixed by `make
 **Guards, in order of firing:**
 
 1. **The preload itself** (`src/syntara/__init__.py`) — guarded `import regopy`. Only two failures are tolerated and recorded in `syntara._REGOPY_PRELOAD_ERROR`: regopy not installed, and the known UBI E2E-image gap where `libatomic.so.1` is missing (PR #560). Any other loader failure raises immediately.
-2. **Startup tripwire** (`syntara/authz/evaluator.py`) — `RegoEvaluator.start()` logs a WARNING if greenlet somehow ended up before regopy in `sys.modules` insertion order, including the recorded preload error.
+2. **Startup tripwire** (`syntara/authz/evaluator.py`) — `RegoEvaluator.start()` logs a WARNING if greenlet or temporalio's Rust bridge (`temporalio.bridge.temporal_sdk_bridge`) ended up before regopy in `sys.modules` insertion order, including the recorded preload error.
 3. **Unit tests** (`tests/unit/authz/test_regopy_import_order.py`) — subprocess tests assert the preload order and both guard branches.
 4. **Leak canary** (`tests/integration/authz/test_regopy_leak_canary.py`) — measures RSS growth over 800 in-app evaluations; a regression fails at ~55 MB against a 25 MB threshold.
 
