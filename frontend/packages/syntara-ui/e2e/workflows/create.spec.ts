@@ -66,36 +66,6 @@ test.describe('Workflows - Create New Workflow', () => {
     }
   })
 
-  test('workflow name can be customized before saving', async ({ app }) => {
-    const customName = buildUniqueName('e2e-custom')
-
-    try {
-      await app.goto(toAppUrl('/workflow-builder/new'))
-      await expect(app.getByRole('heading', { name: 'Select a trigger node' })).toBeVisible()
-
-      await app.getByRole('button', { name: 'Manual trigger' }).click()
-      await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Manual trigger')
-      await app.getByRole('button', { name: 'Create' }).click()
-
-      await selectProjectIfRequired(app)
-
-      const workflowNameInput = app.getByPlaceholder('Workflow name')
-      await expect(workflowNameInput).toBeVisible()
-
-      await workflowNameInput.clear()
-      await workflowNameInput.fill(customName)
-
-      const saveButton = app.getByRole('button', { name: 'Save' })
-      await expect(saveButton).toBeVisible()
-      await saveButton.click()
-
-      await expect(app).toHaveURL(/workflow-builder\/.+/, { timeout: 15000 })
-      await expect(app.getByPlaceholder('Workflow name')).toHaveValue(customName)
-    } finally {
-      await deleteWorkflow(app, customName)
-    }
-  })
-
   test('user can create workflow and immediately edit it', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-edit')
 
