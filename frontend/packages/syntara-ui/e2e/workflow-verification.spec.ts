@@ -382,7 +382,7 @@ test.describe('Variable reference validation', () => {
     }
   })
 
-  test('reference to undefined input field shows validation error', async ({ app }) => {
+  test('reference to undefined trigger field shows validation error', async ({ app }) => {
     test.setTimeout(90_000)
     const workflowName = buildUniqueName('e2e-varref-field')
 
@@ -395,13 +395,21 @@ test.describe('Variable reference validation', () => {
       await app.getByRole('button', { name: 'Save' }).click()
       await expect(app).toHaveURL(/workflow-builder\/.+/, { timeout: SAVE_URL_TIMEOUT })
 
+      await mockValidateEndpoint(app, {
+        valid: false,
+        errors: [{ message: '"missing_field" is not a defined trigger field on this trigger', node_id: null }],
+      })
+
       await triggerVerifyWorkflow(app)
 
       await expect(app.getByText(/Verification failed/)).toBeVisible({ timeout: VERIFY_BANNER_TIMEOUT })
 
       await app.getByRole('button', { name: /alert details/i }).click()
-      await expect(app.getByText(/is not a defined trigger field/i)).toBeVisible({ timeout: VERIFY_BANNER_TIMEOUT })
+      await expect(app.getByText(/^".*" is not a defined trigger field/i)).toBeVisible({
+        timeout: VERIFY_BANNER_TIMEOUT,
+      })
     } finally {
+      await app.unroute(VALIDATE_ROUTE)
       await deleteWorkflowViaApi(app, workflowId)
     }
   })

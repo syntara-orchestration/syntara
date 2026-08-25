@@ -157,17 +157,22 @@ export default tseslint.config(
               group: ['@tanstack/react-router'],
               importNames: ['Link'],
               message:
-                'Use NxLink from components/NxLink instead of TanStack Link directly. NxLink provides consistent PatternFly styling.',
+                'Use SynLink from components/SynLink instead of TanStack Link directly. SynLink provides consistent PatternFly styling.',
             },
           ],
         },
       ],
     },
   },
-  // NxLink.tsx wraps TanStack Link for general use. SynPageBreadcrumbs also
-  // imports Link directly because NxLink renders a PF6 Button (wrong for breadcrumb styling).
+  // SynLink.tsx wraps TanStack Link for general use. SynPageBreadcrumbs and
+  // HistoryListItemLink import Link directly because SynLink renders a PF6 Button
+  // (wrong for breadcrumb items and stretched list-row overlays).
   {
-    files: ['**/components/NxLink.tsx', '**/components/layout/SynPageBreadcrumbs.tsx'],
+    files: [
+      '**/components/SynLink.tsx',
+      '**/components/layout/SynPageBreadcrumbs.tsx',
+      '**/routes/builder/HistoryListItemLink.tsx',
+    ],
     rules: {
       '@typescript-eslint/no-restricted-imports': 'off',
     },
@@ -202,7 +207,7 @@ export default tseslint.config(
       'react-hooks/exhaustive-deps': 'error',
       // Strict accessibility linting for JSX (labels, roles, alt text, etc.)
       ...jsxA11y.configs.strict.rules,
-      // Allow tabIndex={0} on role="region" elements (e.g. NxScrollableTableContainer scroll region).
+      // Allow tabIndex={0} on role="region" elements (e.g. SynScrollableTableContainer scroll region).
       // A named region landmark is the correct semantic wrapper when a non-interactive container needs
       // keyboard focus for scrolling (WCAG 2.1.1 / jsx-a11y/no-noninteractive-tabindex rule docs).
       'jsx-a11y/no-noninteractive-tabindex': ['error', { roles: ['region'] }],

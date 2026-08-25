@@ -2,9 +2,11 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
   buildExecutionHistoryRowModel,
+  executionDetailHref,
   getClearFiltersHandler,
   resolveVersionStatusForBadge,
   shouldShowSecondaryVersionDatetime,
+  workflowVersionHref,
 } from './historyRowModel'
 
 describe('buildExecutionHistoryRowModel', () => {
@@ -122,6 +124,16 @@ describe('resolveVersionStatusForBadge', () => {
     expect(resolveVersionStatusForBadge('nope')).toBeNull()
     expect(resolveVersionStatusForBadge(null)).toBeNull()
     expect(resolveVersionStatusForBadge(undefined)).toBeNull()
+  })
+})
+
+describe('history row URL helpers', () => {
+  it('builds a workflow-builder URL for a given workflow version', () => {
+    expect(workflowVersionHref('wf-42', 7)).toBe('/workflow-builder/wf-42?version=7')
+  })
+
+  it('builds an executions URL for a given execution id', () => {
+    expect(executionDetailHref('exec-abc')).toBe('/executions/exec-abc')
   })
 })
 

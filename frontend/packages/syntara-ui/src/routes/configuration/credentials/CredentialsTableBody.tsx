@@ -15,8 +15,8 @@ import { Fragment } from 'react'
 
 import { AppRoute } from '../../../app/AppRoute'
 import groupedTableStyles from '../../../components/groupedTable.module.css'
-import type { KebabAction } from '../../../components/NxKebabMenu'
-import { NxKebabMenu } from '../../../components/NxKebabMenu'
+import type { KebabAction } from '../../../components/SynKebabMenu'
+import { SynKebabMenu } from '../../../components/SynKebabMenu'
 import { LinkCell } from '../../../components/table/LinkCell'
 import { UserTimestamp } from '../../../components/table/UserTimestamp'
 import type { ProjectRead } from '../../access/types'
@@ -107,7 +107,7 @@ function CredentialRow({
           )}
         </Td>
         <Td isActionCell onClick={(e) => e.stopPropagation()}>
-          <NxKebabMenu actions={actions} aria-label={`Actions for ${credential.name}`} />
+          <SynKebabMenu actions={actions} aria-label={`Actions for ${credential.name}`} />
         </Td>
       </Tr>
       {hasDescription && (

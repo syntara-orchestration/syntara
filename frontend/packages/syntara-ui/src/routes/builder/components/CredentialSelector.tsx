@@ -19,7 +19,7 @@ import React, { type ReactElement, useCallback, useMemo, useState } from 'react'
 import { credentialsClient } from '../../../client'
 import { LONG_SELECT_MAX_MENU_HEIGHT, longSelectMenuPopperProps } from '../../../components/longSelectMenu'
 import longSelectMenuStyles from '../../../components/longSelectMenu.module.css'
-import { NxSelect } from '../../../components/NxSelect'
+import { SynSelect } from '../../../components/SynSelect'
 import { detachPromise } from '../../../utils/detachPromise'
 import type { Credential, CredentialType } from '../../configuration/credentials/credentialConstants'
 import { CredentialFormModal } from '../../configuration/credentials/form/CredentialFormModal'
@@ -327,7 +327,7 @@ export function CredentialSelector({
 
   return (
     <FormGroup label={label} labelHelp={resolvedLabelHelp} fieldId={fieldId} isRequired={isRequired}>
-      <NxSelect
+      <SynSelect
         id={fieldId}
         isOpen={isOpen}
         selected={value ?? NO_CREDENTIAL_VALUE}
@@ -362,7 +362,7 @@ export function CredentialSelector({
             </SelectOption>
           )}
         </SelectList>
-      </NxSelect>
+      </SynSelect>
 
       <FieldError message={errorMessage} />
       <ReadOnlyCredentialWarning show={isReadOnlyCredential} />

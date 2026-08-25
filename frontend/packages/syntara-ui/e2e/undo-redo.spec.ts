@@ -126,7 +126,7 @@ test.describe('Execution History Navigation', () => {
         .toHaveURL(/\/executions\//)
         .then(() => true)
         .catch(() => false)
-      test.skip(!didNavigate, 'Workflow execution failed — execution engine may not be running')
+      expect(didNavigate, 'Workflow execution failed — execution engine may not be running').toBeTruthy()
 
       // Navigate back to the builder
       await openWorkflowInBuilder(app, workflowName, id)
