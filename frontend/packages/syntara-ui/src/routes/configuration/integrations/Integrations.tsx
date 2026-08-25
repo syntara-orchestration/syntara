@@ -12,14 +12,14 @@ import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
 import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
-import type { KebabAction } from '../../../components/NxKebabMenu'
-import { NxKebabMenu } from '../../../components/NxKebabMenu'
 import {
   NxListPanel,
   NxListPanelTable,
   NxListPanelToolbar,
   NxListPanelView,
 } from '../../../components/panels/list/NxListPanel'
+import type { KebabAction } from '../../../components/SynKebabMenu'
+import { SynKebabMenu } from '../../../components/SynKebabMenu'
 import { SynPageTitle } from '../../../components/SynPageTitle'
 import { DateCell } from '../../../components/table/DateCell'
 import { LinkCell } from '../../../components/table/LinkCell'
@@ -149,7 +149,7 @@ function IntegrationsTableContent({
               )}
             </Td>
             <Td isActionCell>
-              <NxKebabMenu
+              <SynKebabMenu
                 actions={buildRowActions(integration, validateDialog, deleteDialog, permissions)}
                 aria-label={`Actions for ${integration.name}`}
               />

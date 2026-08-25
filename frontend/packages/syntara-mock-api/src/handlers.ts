@@ -2609,7 +2609,7 @@ export const handlers = [
     const body = (await request.json()) as {
       username?: string
       email?: string
-      first_name?: string
+      first_name?: string | null
       last_name?: string | null
       password?: string
       is_enabled?: boolean

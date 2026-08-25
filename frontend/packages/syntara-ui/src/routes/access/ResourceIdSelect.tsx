@@ -8,7 +8,7 @@ import {
 } from '@patternfly/react-core'
 import { type Ref, useEffect, useMemo, useState } from 'react'
 
-import { NxSelect } from '../../components/NxSelect'
+import { SynSelect } from '../../components/SynSelect'
 
 import { dynamicFetchClient } from './accessClient'
 import { RESOURCE_ENDPOINTS, type ResourceOption } from './canIUtils'
@@ -127,7 +127,7 @@ export function ResourceIdSelect({ resourceType, value, onChange }: Readonly<Res
   )
 
   return (
-    <NxSelect
+    <SynSelect
       id="can-i-resource-id"
       isOpen={isOpen}
       onOpenChange={handleOpenChange}
@@ -157,6 +157,6 @@ export function ResourceIdSelect({ resourceType, value, onChange }: Readonly<Res
           ))
         )}
       </SelectList>
-    </NxSelect>
+    </SynSelect>
   )
 }

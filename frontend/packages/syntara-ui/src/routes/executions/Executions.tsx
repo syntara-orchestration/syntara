@@ -14,7 +14,7 @@ import { SynEmptyStateFilter } from '../../components/states/SynEmptyStateFilter
 import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 import { useQueryState } from '../../components/states/useQueryState'
 import { SynPageTitle } from '../../components/SynPageTitle'
-import { NxScrollableTableContainer } from '../../components/table/NxScrollableTableContainer'
+import { SynScrollableTableContainer } from '../../components/table/SynScrollableTableContainer'
 import { useCursorPagination, useCursorReset } from '../../hooks/useCursorPagination'
 import { useProjectSelector } from '../../hooks/useProjectSelector'
 import { useProjectsForGrouping } from '../../hooks/useProjectsForGrouping'
@@ -177,7 +177,7 @@ export default function Executions() {
                   <SynEmptyStateFilter clearAllFilters={handleClearAllFilters} />
                 </SynPageBody>
               ) : (
-                <NxScrollableTableContainer caption="Executions table" footer={getFooterProps(executionsQuery.data)}>
+                <SynScrollableTableContainer caption="Executions table" footer={getFooterProps(executionsQuery.data)}>
                   <Thead>
                     <Tr>
                       <Th modifier="nowrap">Run ID</Th>
@@ -200,7 +200,7 @@ export default function Executions() {
                   ) : (
                     <FlatExecutionsTableBody executions={visibleExecutions} />
                   )}
-                </NxScrollableTableContainer>
+                </SynScrollableTableContainer>
               )}
             </SynPanelContentStack>
           )}

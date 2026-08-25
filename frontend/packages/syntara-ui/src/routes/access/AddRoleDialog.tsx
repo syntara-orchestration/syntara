@@ -21,7 +21,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { Controller, useForm, useWatch, type Control, type FieldErrors, type UseFormRegister } from 'react-hook-form'
 
-import { NxSelect } from '../../components/NxSelect'
+import { SynSelect } from '../../components/SynSelect'
 import { invalidateAuthzCaches } from '../../hooks/invalidateAuthzCaches'
 import { useFormMutationErrorHandler } from '../../hooks/useFormMutationErrorHandler'
 import { useAlerts } from '../../providers/alerts'
@@ -45,7 +45,7 @@ function RoleScopeSelect({
 }) {
   const [isOpen, setIsOpen] = useState(false)
   return (
-    <NxSelect
+    <SynSelect
       id="role-scope"
       isOpen={isOpen}
       selected={value}
@@ -71,7 +71,7 @@ function RoleScopeSelect({
         <SelectOption value="system">System</SelectOption>
         <SelectOption value="project">Project</SelectOption>
       </SelectList>
-    </NxSelect>
+    </SynSelect>
   )
 }
 
