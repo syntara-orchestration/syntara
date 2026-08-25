@@ -113,7 +113,7 @@ async def test_webhook_path_template_expression_bypass() -> None:
 async def test_authorized_service_account_ids_required() -> None:
     """Creating a webhook without authorized_service_account_ids should fail."""
     with pytest.raises(ValidationError, match="authorized_service_account_ids"):
-        WebhookTriggerParameters(webhook_path="test-hook")
+        WebhookTriggerParameters.model_validate({"webhook_path": "test-hook"})
 
 
 async def test_authorized_service_account_ids_rejects_empty_list() -> None:

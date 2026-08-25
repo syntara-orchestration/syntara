@@ -93,6 +93,7 @@ async def eda_workflow(
                 "type": "eda_trigger",
                 "parameters": {
                     "webhook_path": "github-deployments",
+                    "authorized_service_account_ids": [str(uuid4())],
                 },
             }
         ],
@@ -141,6 +142,7 @@ async def eda_workflow_with_schema(
                 "parameters": {
                     "webhook_path": "validated-events",
                     "input_schema": input_schema,
+                    "authorized_service_account_ids": [str(uuid4())],
                 },
             }
         ],
@@ -431,7 +433,11 @@ class TestCrossTypePathIsolation:
                 "schema_version": "2.0.0",
                 "name": "Generic Webhook Workflow",
                 "triggers": [
-                    {"id": "wh_1", "type": "webhook_trigger", "parameters": {"webhook_path": shared_path}},
+                    {
+                        "id": "wh_1",
+                        "type": "webhook_trigger",
+                        "parameters": {"webhook_path": shared_path, "authorized_service_account_ids": [str(uuid4())]},
+                    },
                 ],
                 "nodes": [
                     {"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}},
@@ -450,7 +456,11 @@ class TestCrossTypePathIsolation:
                 "schema_version": "2.0.0",
                 "name": "EDA Webhook Workflow",
                 "triggers": [
-                    {"id": "eda_1", "type": "eda_trigger", "parameters": {"webhook_path": shared_path}},
+                    {
+                        "id": "eda_1",
+                        "type": "eda_trigger",
+                        "parameters": {"webhook_path": shared_path, "authorized_service_account_ids": [str(uuid4())]},
+                    },
                 ],
                 "nodes": [
                     {"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}},
