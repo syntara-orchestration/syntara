@@ -490,4 +490,3 @@ test('edge follows connection path between nodes', async ({ app }) => {
     await deleteWorkflow(app, workflowName)
   }
 })
-
