@@ -5,10 +5,10 @@ import type { ReactNode } from 'react'
 import { useEffect, useRef } from 'react'
 
 import { AppRoute } from '../../../../app/AppRoute'
-import { EmptyStateAccessDenied } from '../../../../components/EmptyStateAccessDenied'
 import { SynPage, SynPageBody } from '../../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../../components/layout/SynPanel'
+import { SynEmptyStateAccessDenied } from '../../../../components/states/SynEmptyStateAccessDenied'
 import { SynPageTitle } from '../../../../components/SynPageTitle'
 import { useCanI } from '../../../../hooks/useCanI'
 import { detachPromise } from '../../../../utils/detachPromise'
@@ -116,7 +116,7 @@ export function EditGroupMapping() {
   if (!canUpdate) {
     return (
       <GroupMappingPageShell title={metadata.pageTitle} breadcrumbs={metadata.breadcrumbs}>
-        <EmptyStateAccessDenied description="You don't have permission to edit group mapping. Contact your administrator to request access." />
+        <SynEmptyStateAccessDenied description="You don't have permission to edit group mapping. Contact your administrator to request access." />
       </GroupMappingPageShell>
     )
   }
