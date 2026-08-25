@@ -844,7 +844,7 @@ class ApprovalNodeParameters(BaseModel):
     approver_groups: list[str] | None = Field(
         default=None, max_length=50, description="Group names whose members can approve"
     )
-    prompt: str | None = Field(default=None, description="Message to display to approvers")
+    prompt: str | None = Field(default=None, max_length=2000, description="Message to display to approvers")
     fallback_decision: Literal["approve", "reject"] | None = Field(
         default=None, description="Decision when approval times out with continue_on_failure"
     )

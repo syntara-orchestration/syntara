@@ -189,7 +189,7 @@ class WorkflowApprovalMixin:
     ) -> list[Any]:
         """Build the positional argument list for create_approval_request_activity.
 
-        Returns a 9-element list matching the activity signature in
+        Returns a 11-element list matching the activity signature in
         ``approval_activity.create_approval_request_activity``::
 
             [0] execution_id:       str            — parent workflow execution ID
@@ -202,6 +202,7 @@ class WorkflowApprovalMixin:
             [7] approver_user_ids:  list[str] | None — user UUIDs who can approve
             [8] approver_group_ids: list[str] | None — group UUIDs whose members can approve
             [9] project_id:         str | None      — project ID for the approval request
+            [10] prompt:            str | None      — message to display to approvers
 
         """
         name = node.name or f"Approval for {node.id}"
@@ -256,6 +257,7 @@ class WorkflowApprovalMixin:
         # Extract approver configuration (string arrays)
         approver_users = resolved_parameters.get("approver_users")
         approver_groups = resolved_parameters.get("approver_groups")
+        prompt = resolved_parameters.get("prompt") or None
 
         # Resolve approver usernames/groups to UUIDs (skip if none configured)
         if approver_users or approver_groups:
@@ -281,6 +283,7 @@ class WorkflowApprovalMixin:
             approver_user_ids,
             approver_group_ids,
             self._project_id,
+            prompt,
         ]
 
     async def _execute_approval_node(

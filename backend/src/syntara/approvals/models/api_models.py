@@ -177,6 +177,17 @@ class ApprovalCreateRequest(SQLModel):
         max_length=FieldLimits.APPROVER_LIST_MAX_LENGTH,
         description="Group IDs whose members can approve",
     )
+    prompt: str | None = Field(
+        None,
+        max_length=FieldLimits.DESCRIPTION_MAX_LENGTH,
+        description="Message to display to approvers when requesting approval",
+    )
+
+    @field_validator("prompt", mode="before")
+    @classmethod
+    def strip_html_tags_from_prompt(cls, v: str | None) -> str | None:
+        """Strip HTML tags to prevent stored XSS."""
+        return _sanitize_notes(v)
 
 
 class ApprovalDecisionRequest(SQLModel):

@@ -124,6 +124,14 @@ class BaseApprovalRequest(BaseResource, table=False):
         description="Notes provided with decision",
     )
 
+    prompt: str | None = Field(
+        default=None,
+        nullable=True,
+        max_length=FieldLimits.DESCRIPTION_MAX_LENGTH,
+        sa_type=String(FieldLimits.DESCRIPTION_MAX_LENGTH),  # type: ignore[call-overload]
+        description="Message to display to approvers when requesting approval",
+    )
+
 
 class ApprovalRequest(BaseApprovalRequest, table=True):
     """ApprovalRequest database model with UUID foreign key for decided_by.

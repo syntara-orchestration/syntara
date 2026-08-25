@@ -199,12 +199,13 @@ class TestPrepareApprovalArgs:
         with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
             args = await wf._prepare_approval_args(node, graph, node.parameters)
 
-        assert len(args) == 10
+        assert len(args) == 11
         assert args[0] == "exec-456"  # execution_id
         assert args[1] == "approval"  # approval_node_id
         assert args[2] == "Review Deployment"  # name
         assert args[7] is None  # approver_user_ids (None when no approvers configured)
         assert args[8] is None  # approver_group_ids (None when no approvers configured)
+        assert args[10] is None  # prompt (not configured)
 
     @pytest.mark.asyncio
     async def test_approval_args_with_approver_config(self) -> None:
@@ -230,9 +231,10 @@ class TestPrepareApprovalArgs:
         with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
             args = await wf._prepare_approval_args(node, graph, config)
 
-        assert len(args) == 10
+        assert len(args) == 11
         assert args[7] == [alice_id, bob_id]  # approver_user_ids
         assert args[8] == [security_team_id, admins_id]  # approver_group_ids
+        assert args[10] is None  # prompt (not configured)
 
         # Verify the resolution activity was called with the correct arguments
         mock_execute.assert_called_once()
@@ -477,12 +479,13 @@ class TestDispatchApprovalNode:
         approval_call = mock_activity.call_args_list[0]
         assert approval_call.args[0] == ActivityName.APPROVAL
         activity_args = approval_call.kwargs["args"]
-        assert len(activity_args) == 10
+        assert len(activity_args) == 11
         assert activity_args[0] == "exec-789"  # execution_id
         assert activity_args[1] == "approval"  # approval_node_id
         assert activity_args[2] == "Review Deployment"  # name (from node.name)
         assert activity_args[3]["id"] == "deploy"  # next_step_approved
         assert activity_args[4]["workflow_name"] == "Production Pipeline"  # workflow_context
+        assert activity_args[10] is None  # prompt (not configured)
 
     @pytest.mark.asyncio
     async def test_dispatch_sets_approved_port(self) -> None:

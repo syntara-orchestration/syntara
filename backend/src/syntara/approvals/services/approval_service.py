@@ -443,6 +443,7 @@ class ApprovalService(BaseService):
             next_step_approved=next_step_approved_dict,
             next_step_rejected=next_step_rejected_dict,
             workflow_context=workflow_context_dict,
+            prompt=request.prompt,
         )
 
         self.session.add(approval)
