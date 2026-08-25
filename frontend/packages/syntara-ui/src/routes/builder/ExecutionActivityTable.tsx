@@ -5,7 +5,7 @@ import type React from 'react'
 import { Fragment, useMemo } from 'react'
 
 import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
-import { NxScrollableTableContainer } from '../../components/table/NxScrollableTableContainer'
+import { SynScrollableTableContainer } from '../../components/table/SynScrollableTableContainer'
 import { extractAAPJobUrl, isAAPNodeType } from '../../utils/aapJobUrl'
 import { formatElapsedTime } from '../../utils/dateUtils'
 import type { ActivityState } from '../workflows/execution/types'
@@ -145,7 +145,7 @@ export function ExecutionActivityTable({
   const hasAAPColumn = useMemo(() => activityOrder.some((a) => isAAPNodeType(a.type)), [activityOrder])
 
   return (
-    <NxScrollableTableContainer caption="Activity states" useFixedLayout={false} variant="compact">
+    <SynScrollableTableContainer caption="Activity states" useFixedLayout={false} variant="compact">
       <Thead>
         <Tr>
           <Th modifier="nowrap">Name</Th>
@@ -172,6 +172,6 @@ export function ExecutionActivityTable({
           />
         ))}
       </Tbody>
-    </NxScrollableTableContainer>
+    </SynScrollableTableContainer>
   )
 }

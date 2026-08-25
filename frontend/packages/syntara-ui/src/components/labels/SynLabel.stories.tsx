@@ -9,10 +9,10 @@ import {
 } from '@patternfly/react-icons'
 import type { Meta, StoryObj } from '@storybook/react-vite'
 
-import { NxLabel } from './NxLabel'
+import { SynLabel } from './SynLabel'
 
-const meta: Meta<typeof NxLabel> = {
-  component: NxLabel,
+const meta: Meta<typeof SynLabel> = {
+  component: SynLabel,
   tags: ['autodocs'],
   parameters: {
     docs: {
@@ -21,7 +21,7 @@ const meta: Meta<typeof NxLabel> = {
           'Standard application label. Defaults to `variant="filled"` and `isCompact={true}`.\n\n' +
           'Use for all system-generated labels: statuses, categories, metadata badges, and counts. ' +
           'Pass `status` and `icon` for status indicators; pass `color` for categorical labels.\n\n' +
-          'For user-authored tags (workflow tags, user-entered values), use `NxUserTag` instead.',
+          'For user-authored tags (workflow tags, user-entered values), use `SynUserTag` instead.',
       },
     },
   },
@@ -44,29 +44,29 @@ export const AllStatuses: Story = {
   render: () => (
     <Flex gap={{ default: 'gapSm' }}>
       <FlexItem>
-        <NxLabel status="success" icon={<RhUiCheckCircleIcon />}>
+        <SynLabel status="success" icon={<RhUiCheckCircleIcon />}>
           Success
-        </NxLabel>
+        </SynLabel>
       </FlexItem>
       <FlexItem>
-        <NxLabel status="danger" icon={<RhUiCloseCircleIcon />}>
+        <SynLabel status="danger" icon={<RhUiCloseCircleIcon />}>
           Danger
-        </NxLabel>
+        </SynLabel>
       </FlexItem>
       <FlexItem>
-        <NxLabel status="warning" icon={<RhUiWarningIcon />}>
+        <SynLabel status="warning" icon={<RhUiWarningIcon />}>
           Warning
-        </NxLabel>
+        </SynLabel>
       </FlexItem>
       <FlexItem>
-        <NxLabel status="info" icon={<RhUiInformationIcon />}>
+        <SynLabel status="info" icon={<RhUiInformationIcon />}>
           Info
-        </NxLabel>
+        </SynLabel>
       </FlexItem>
       <FlexItem>
-        <NxLabel status="custom" icon={<RhUiSyncIcon />}>
+        <SynLabel status="custom" icon={<RhUiSyncIcon />}>
           Custom
-        </NxLabel>
+        </SynLabel>
       </FlexItem>
     </Flex>
   ),
@@ -77,22 +77,22 @@ export const ColorVariants: Story = {
   render: () => (
     <Flex gap={{ default: 'gapSm' }}>
       <FlexItem>
-        <NxLabel color="blue">System</NxLabel>
+        <SynLabel color="blue">System</SynLabel>
       </FlexItem>
       <FlexItem>
-        <NxLabel color="green">Project</NxLabel>
+        <SynLabel color="green">Project</SynLabel>
       </FlexItem>
       <FlexItem>
-        <NxLabel color="purple">Custom</NxLabel>
+        <SynLabel color="purple">Custom</SynLabel>
       </FlexItem>
       <FlexItem>
-        <NxLabel color="grey">Built-in</NxLabel>
+        <SynLabel color="grey">Built-in</SynLabel>
       </FlexItem>
       <FlexItem>
-        <NxLabel color="teal">User</NxLabel>
+        <SynLabel color="teal">User</SynLabel>
       </FlexItem>
       <FlexItem>
-        <NxLabel color="orange">Group</NxLabel>
+        <SynLabel color="orange">Group</SynLabel>
       </FlexItem>
     </Flex>
   ),
@@ -103,13 +103,13 @@ export const WithoutIcon: Story = {
   render: () => (
     <Flex gap={{ default: 'gapSm' }}>
       <FlexItem>
-        <NxLabel status="success">Completed</NxLabel>
+        <SynLabel status="success">Completed</SynLabel>
       </FlexItem>
       <FlexItem>
-        <NxLabel status="danger">Failed</NxLabel>
+        <SynLabel status="danger">Failed</SynLabel>
       </FlexItem>
       <FlexItem>
-        <NxLabel status="custom">Pending</NxLabel>
+        <SynLabel status="custom">Pending</SynLabel>
       </FlexItem>
     </Flex>
   ),
@@ -120,14 +120,14 @@ export const FullSize: Story = {
   render: () => (
     <Flex gap={{ default: 'gapSm' }}>
       <FlexItem>
-        <NxLabel status="success" icon={<RhUiCheckCircleIcon />} isCompact={false}>
+        <SynLabel status="success" icon={<RhUiCheckCircleIcon />} isCompact={false}>
           Completed
-        </NxLabel>
+        </SynLabel>
       </FlexItem>
       <FlexItem>
-        <NxLabel status="custom" icon={<RhUiHourglassIcon />} isCompact={false}>
+        <SynLabel status="custom" icon={<RhUiHourglassIcon />} isCompact={false}>
           Pending
-        </NxLabel>
+        </SynLabel>
       </FlexItem>
     </Flex>
   ),

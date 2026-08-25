@@ -3,7 +3,7 @@ import { RhUiWarningIcon } from '@patternfly/react-icons'
 import type { IntegrationsAPI } from '@syntara/contracts'
 
 import { NxDetail } from '../../../components/details/NxDetail'
-import { NxLabel } from '../../../components/labels/NxLabel'
+import { SynLabel } from '../../../components/labels/SynLabel'
 
 import styles from './IntegrationDetail.module.css'
 
@@ -22,18 +22,18 @@ export function SecuritySection({ configuration }: Readonly<{ configuration: Int
       <DescriptionList isHorizontal className={styles.securityDetails}>
         <NxDetail label="HTTP connections">
           {configuration.allow_http ? (
-            <NxLabel variant="outline" status="warning" icon={<RhUiWarningIcon />}>
+            <SynLabel variant="outline" status="warning" icon={<RhUiWarningIcon />}>
               HTTP allowed
-            </NxLabel>
+            </SynLabel>
           ) : (
             'HTTPS only'
           )}
         </NxDetail>
         <NxDetail label="TLS certificate verification">
           {configuration.insecure_skip_tls_verify ? (
-            <NxLabel variant="outline" status="warning" icon={<RhUiWarningIcon />}>
+            <SynLabel variant="outline" status="warning" icon={<RhUiWarningIcon />}>
               TLS verification disabled
-            </NxLabel>
+            </SynLabel>
           ) : (
             'Enabled'
           )}

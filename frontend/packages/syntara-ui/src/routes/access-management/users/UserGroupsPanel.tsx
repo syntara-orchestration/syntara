@@ -27,14 +27,14 @@ import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmation
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { FilterBar } from '../../../components/filters'
 import { IconLabel } from '../../../components/IconLabel'
-import { NxLabel } from '../../../components/labels/NxLabel'
+import { SynLabel } from '../../../components/labels/SynLabel'
 import { SynPageBody } from '../../../components/layout/SynPage'
 import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
 import { SynEmptyStateFilter } from '../../../components/states/SynEmptyStateFilter'
 import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import { useQueryState } from '../../../components/states/useQueryState'
 import { LinkCell } from '../../../components/table/LinkCell'
-import { NxScrollableTableContainer } from '../../../components/table/NxScrollableTableContainer'
+import { SynScrollableTableContainer } from '../../../components/table/SynScrollableTableContainer'
 import { useFilterState } from '../../../hooks/useFilterState'
 import { useFormMutationErrorHandler } from '../../../hooks/useFormMutationErrorHandler'
 import { useAlerts } from '../../../providers/alerts'
@@ -375,7 +375,7 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
             />
           </SynPageBody>
         ) : (
-          <NxScrollableTableContainer
+          <SynScrollableTableContainer
             caption="User groups table"
             footer={{
               page,
@@ -409,7 +409,7 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
                     {group.name === BUILTIN_AUTHENTICATED_GROUP_NAME && (
                       <>
                         {' '}
-                        <NxLabel color="grey">All users</NxLabel>
+                        <SynLabel color="grey">All users</SynLabel>
                       </>
                     )}
                   </Td>
@@ -427,7 +427,7 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
                 </Tr>
               ))}
             </Tbody>
-          </NxScrollableTableContainer>
+          </SynScrollableTableContainer>
         )}
       </SynPanelContentStack>
 

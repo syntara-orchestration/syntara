@@ -5,7 +5,7 @@ import { useCallback, useMemo, useState } from 'react'
 
 import { AppRoute } from '../../../app/AppRoute'
 import { credentialsClient } from '../../../client'
-import { NxLabel } from '../../../components/labels/NxLabel'
+import { SynLabel } from '../../../components/labels/SynLabel'
 import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
 import { NxListPanelTable, NxListPanelView } from '../../../components/panels/list/NxListPanel'
 import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
@@ -99,9 +99,9 @@ function WorkflowsTable({
                 {workflow.node_names && workflow.node_names.length > 0 ? (
                   <LabelGroup numLabels={5}>
                     {workflow.node_names.map((nodeName) => (
-                      <NxLabel key={nodeName} variant="outline">
+                      <SynLabel key={nodeName} variant="outline">
                         {nodeName}
-                      </NxLabel>
+                      </SynLabel>
                     ))}
                   </LabelGroup>
                 ) : (

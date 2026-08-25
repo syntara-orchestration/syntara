@@ -2,10 +2,10 @@ import { Flex, FlexItem, LabelGroup } from '@patternfly/react-core'
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { fn } from 'storybook/test'
 
-import { NxUserTag } from './NxUserTag'
+import { SynUserTag } from './SynUserTag'
 
-const meta: Meta<typeof NxUserTag> = {
-  component: NxUserTag,
+const meta: Meta<typeof SynUserTag> = {
+  component: SynUserTag,
   tags: ['autodocs'],
   parameters: {
     docs: {
@@ -13,7 +13,7 @@ const meta: Meta<typeof NxUserTag> = {
         component:
           'Outline label for user-authored content — workflow tags, user-entered values.\n\n' +
           'Renders with `variant="outline"` hardcoded. For system-generated labels ' +
-          '(statuses, categories, metadata), use `NxLabel` instead.',
+          '(statuses, categories, metadata), use `SynLabel` instead.',
       },
     },
   },
@@ -33,9 +33,9 @@ export const Default: Story = {
 export const TagGroup: Story = {
   render: () => (
     <LabelGroup>
-      <NxUserTag>production</NxUserTag>
-      <NxUserTag>critical</NxUserTag>
-      <NxUserTag>team-platform</NxUserTag>
+      <SynUserTag>production</SynUserTag>
+      <SynUserTag>critical</SynUserTag>
+      <SynUserTag>team-platform</SynUserTag>
     </LabelGroup>
   ),
 }
@@ -45,10 +45,10 @@ export const Removable: Story = {
   render: () => (
     <Flex gap={{ default: 'gapSm' }}>
       <FlexItem>
-        <NxUserTag onClose={fn()}>production</NxUserTag>
+        <SynUserTag onClose={fn()}>production</SynUserTag>
       </FlexItem>
       <FlexItem>
-        <NxUserTag onClose={fn()}>critical</NxUserTag>
+        <SynUserTag onClose={fn()}>critical</SynUserTag>
       </FlexItem>
     </Flex>
   ),
