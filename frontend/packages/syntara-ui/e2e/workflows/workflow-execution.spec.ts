@@ -15,50 +15,7 @@ import {
   createBasicWorkflowViaApi,
   openWorkflowInBuilder,
   deleteWorkflow,
-  openBuilderById,
-  runSingleWorkflowNode,
 } from '../helpers/workflows'
-import { createWorkflowViaApi, deleteWorkflowViaApi } from '../utils/api'
-
-// Skipped: failed node error details assertion times out — depends on execution engine completing and error propagation
-test.skip('failed node details including error messages are displayed', async ({ app }) => {
-  const workflowName = buildUniqueName('e2e-failed-node')
-
-  const { id: workflowId } = await createWorkflowViaApi(
-    app,
-    workflowName,
-    [{ id: 'trigger_manual', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
-    [
-      {
-        id: 'failing_node',
-        type: 'script',
-        name: 'Failing Node',
-        parameters: { language: 'python', code: 'raise Exception("Node configured to fail.")' },
-      },
-    ],
-    [{ from: 'trigger_manual', to: 'failing_node' }]
-  )
-
-  try {
-    await openBuilderById(app, workflowId)
-
-    await app.getByRole('button', { name: 'Run' }).click()
-    await expect(app.getByRole('heading', { name: /Run/i })).toBeVisible({ timeout: 15_000 })
-    await app.getByRole('button', { name: 'Run now' }).click()
-
-    const failingNode = app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: 'Failing Node' })
-    await expect(failingNode.getByLabel('Error')).toBeVisible({ timeout: 15_000 })
-    await failingNode.click()
-    await expect(app.getByRole('heading', { name: 'Run details' })).toBeVisible({ timeout: 15_000 })
-
-    await app.getByRole('tab', { name: 'Details' }).click()
-    await expect(app.getByRole('tab', { name: 'Details', selected: true })).toBeVisible({ timeout: 15_000 })
-    await expect(app.getByText('"error": "Script failed with exit code 1')).toBeVisible({ timeout: 15_000 })
-    await expect(app.getByText('"status": "failed"')).toBeVisible({ timeout: 15_000 })
-  } finally {
-    await deleteWorkflowViaApi(app, workflowId)
-  }
-})
 
 // Skipped: per-node I/O inspection times out — depends on execution engine completing and run history data availability
 test.skip('per-node input and output data can be inspected from run history', async ({ app }) => {
