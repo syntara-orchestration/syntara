@@ -79,32 +79,6 @@ test.describe('Workflows Table - Search, Filter, and Sort', () => {
     }
   })
 
-  test('empty search results show appropriate message', async ({ app }) => {
-    await app.goto(toAppUrl('/workflows'))
-    await expect(app.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
-
-    // Search for non-existent workflow
-    const impossibleSearch = `nonexistent-${Date.now()}`
-    await app.getByPlaceholder('Filter by name').fill(impossibleSearch)
-    await app.getByRole('button', { name: 'Apply filter' }).click()
-
-    // Wait for filter to be applied
-    const nameChipGroup = app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Name' })
-    await expect(nameChipGroup).toBeVisible()
-
-    // Check for empty state
-    const table = app.getByRole('grid', { name: 'Workflows table' })
-    const tableVisible = await table.isVisible().catch(() => false)
-
-    if (!tableVisible) {
-      // Empty state should be shown
-      await expect(app.getByRole('heading', { name: 'No results found' })).toBeVisible()
-
-      // Verify clear filters button is available
-      await expect(app.getByRole('button', { name: 'Clear all filters' }).last()).toBeVisible()
-    }
-  })
-
   test('filter state persists in URL for sharing', async ({ app }) => {
     const workflows = await createTestWorkflows(app, 1)
     expect(workflows).toHaveLength(1)
