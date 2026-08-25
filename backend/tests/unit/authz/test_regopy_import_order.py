@@ -1,0 +1,112 @@
+"""Regression tests for the regopy preload in ``syntara/__init__.py``.
+
+``librego_shared.so`` (rego-cpp) statically links snmalloc and exports
+``operator new``/``operator delete``.  When another native library (greenlet,
+temporalio's Rust bridge) loads first, libstdc++ allocation symbols bind
+across two allocators and every rego query permanently leaks ~69 KB of native
+memory — enough to OOM the backend under E2E load.  ``syntara/__init__.py``
+therefore imports regopy before anything else, guarded so environments that
+cannot load it (no regopy installed, or UBI images without libatomic.so.1)
+still import cleanly.
+
+Each scenario runs in a subprocess so it observes a pristine interpreter.
+"""
+
+import os
+import subprocess
+import sys
+import textwrap
+from pathlib import Path
+
+import pytest
+
+_UBI_LOADER_ERROR = "libatomic.so.1: cannot open shared object file: No such file or directory"
+
+
+def _run_python(code: str, *, extra_pythonpath: Path | None = None) -> subprocess.CompletedProcess[str]:
+    """Run *code* in a fresh interpreter, optionally shadowing modules via PYTHONPATH."""
+    env = os.environ.copy()
+    if extra_pythonpath is not None:
+        existing = env.get("PYTHONPATH", "")
+        env["PYTHONPATH"] = str(extra_pythonpath) + (os.pathsep + existing if existing else "")
+    return subprocess.run(  # noqa: S603
+        [sys.executable, "-c", textwrap.dedent(code)],
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+        env=env,
+    )
+
+
+def test_import_syntara_preloads_regopy_before_greenlet():
+    """``import syntara`` must load regopy before greenlet can claim the allocator."""
+    pytest.importorskip("regopy")
+    result = _run_python(
+        """
+        import sys
+
+        import syntara
+
+        assert "regopy" in sys.modules, "import syntara did not preload regopy"
+        assert syntara._REGOPY_PRELOAD_ERROR is None
+
+        import greenlet  # noqa: F401
+
+        modules = list(sys.modules)
+        assert modules.index("regopy") < modules.index("greenlet"), (
+            "regopy must be inserted into sys.modules before greenlet"
+        )
+        print("ORDER-OK")
+        """
+    )
+    assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+    assert "ORDER-OK" in result.stdout
+
+
+def test_missing_libatomic_is_tolerated_and_recorded(tmp_path):
+    """The known UBI loader gap (PR #560) must not break ``import syntara``."""
+    (tmp_path / "regopy.py").write_text(f'raise OSError("{_UBI_LOADER_ERROR}")\n')
+    result = _run_python(
+        """
+        import syntara
+
+        assert syntara._REGOPY_PRELOAD_ERROR is not None
+        assert "cannot open shared object file" in syntara._REGOPY_PRELOAD_ERROR
+        print("SENTINEL-OK")
+        """,
+        extra_pythonpath=tmp_path,
+    )
+    assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+    assert "SENTINEL-OK" in result.stdout
+
+
+def test_regopy_not_installed_is_tolerated_and_recorded(tmp_path):
+    """A missing regopy distribution (collection-only envs) must be tolerated."""
+    (tmp_path / "regopy.py").write_text("raise ModuleNotFoundError(\"No module named 'regopy'\")\n")
+    result = _run_python(
+        """
+        import syntara
+
+        assert syntara._REGOPY_PRELOAD_ERROR is not None
+        print("SENTINEL-OK")
+        """,
+        extra_pythonpath=tmp_path,
+    )
+    assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+    assert "SENTINEL-OK" in result.stdout
+
+
+def test_unexpected_regopy_import_error_is_raised(tmp_path):
+    """Anything other than the known loader gaps must surface immediately."""
+    (tmp_path / "regopy.py").write_text('raise ImportError("unexpected loader explosion")\n')
+    result = _run_python(
+        """
+        import syntara  # noqa: F401
+        print("SHOULD-NOT-REACH")
+        """,
+        extra_pythonpath=tmp_path,
+    )
+    assert result.returncode != 0
+    assert "SHOULD-NOT-REACH" not in result.stdout
+    assert "unexpected loader explosion" in result.stderr
