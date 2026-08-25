@@ -97,10 +97,10 @@ test.describe('Access Management — Dropdown Pagination', () => {
     await roleSearchInput.click()
 
     // PatternFly Select renders options in a portal outside the dialog
-    const noResults = app.getByText(/No results match/i)
     const roleOptions = app.getByRole('option').filter({ hasNotText: /No results match/i })
-    await expect(roleOptions.or(noResults)).toBeVisible({ timeout: 15_000 })
-    expect(await roleOptions.count()).toBeGreaterThan(0)
+    await expect(async () => {
+      expect(await roleOptions.count()).toBeGreaterThan(0)
+    }).toPass({ timeout: 15_000 })
 
     // Close the dialog via its X button — the PF6 Select dropdown is
     // a portal overlay that blocks the Cancel button, but the close
