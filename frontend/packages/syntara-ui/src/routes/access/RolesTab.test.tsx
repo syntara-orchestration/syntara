@@ -533,6 +533,21 @@ describe('RolesTab', () => {
   })
 
   describe('Sorting', () => {
+    async function expectSortAfterColumnClick(columnPattern: RegExp, expectedSort: string) {
+      const user = userEvent.setup()
+      render(<RolesTab />, { wrapper: createWrapper() })
+
+      const header = screen.getByRole('columnheader', { name: columnPattern })
+      await user.click(within(header).getByRole('button'))
+
+      await waitFor(() => {
+        const lastCall = vi.mocked(accessClient.useQuery).mock.calls.at(-1)
+        const queryParams = (lastCall?.[2] as unknown as { params?: { query?: Record<string, unknown> } })?.params
+          ?.query
+        expect(queryParams).toHaveProperty('sort', expectedSort)
+      })
+    }
+
     it('renders sortable Name column', () => {
       render(<RolesTab />, { wrapper: createWrapper() })
 
@@ -598,49 +613,12 @@ describe('RolesTab', () => {
       })
     })
 
-    it('sends sort parameter when Scope column is clicked', async () => {
-      const user = userEvent.setup()
-      render(<RolesTab />, { wrapper: createWrapper() })
-
-      const scopeHeader = screen.getByRole('columnheader', { name: /Scope/i })
-      await user.click(within(scopeHeader).getByRole('button'))
-
-      await waitFor(() => {
-        const lastCall = vi.mocked(accessClient.useQuery).mock.calls.at(-1)
-        const queryParams = (lastCall?.[2] as unknown as { params?: { query?: Record<string, unknown> } })?.params
-          ?.query
-        expect(queryParams).toHaveProperty('sort', 'scope')
-      })
-    })
-
-    it('sends sort parameter when Project column is clicked', async () => {
-      const user = userEvent.setup()
-      render(<RolesTab />, { wrapper: createWrapper() })
-
-      const projectHeader = screen.getByRole('columnheader', { name: /Project/i })
-      await user.click(within(projectHeader).getByRole('button'))
-
-      await waitFor(() => {
-        const lastCall = vi.mocked(accessClient.useQuery).mock.calls.at(-1)
-        const queryParams = (lastCall?.[2] as unknown as { params?: { query?: Record<string, unknown> } })?.params
-          ?.query
-        expect(queryParams).toHaveProperty('sort', 'project_id')
-      })
-    })
-
-    it('sends sort parameter when Type column is clicked', async () => {
-      const user = userEvent.setup()
-      render(<RolesTab />, { wrapper: createWrapper() })
-
-      const typeHeader = screen.getByRole('columnheader', { name: /Type/i })
-      await user.click(within(typeHeader).getByRole('button'))
-
-      await waitFor(() => {
-        const lastCall = vi.mocked(accessClient.useQuery).mock.calls.at(-1)
-        const queryParams = (lastCall?.[2] as unknown as { params?: { query?: Record<string, unknown> } })?.params
-          ?.query
-        expect(queryParams).toHaveProperty('sort', 'is_builtin')
-      })
+    it.each([
+      { column: /Scope/i, sort: 'scope' },
+      { column: /Project/i, sort: 'project_id' },
+      { column: /Type/i, sort: 'is_builtin' },
+    ])('sends $sort sort when column header is clicked', async ({ column, sort }) => {
+      await expectSortAfterColumnClick(column, sort)
     })
   })
 
