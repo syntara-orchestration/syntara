@@ -12,6 +12,8 @@ sandbox warnings that can interfere with other activities.
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 from dataclasses import asdict
 from typing import TYPE_CHECKING, Any, TypedDict
 from uuid import UUID
@@ -24,6 +26,11 @@ from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
+
+# Temporal only delivers cancellation to activities that heartbeat. The agent
+# execution runs for minutes inside a single activity, so it must heartbeat or a
+# cancelled workflow cannot interrupt it. Ref: AAP-88614.
+_HEARTBEAT_INTERVAL_SECONDS = 10.0
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -70,8 +77,30 @@ async def _run_invocation_execution(operation_input: InvocationExecutionInput) -
         )
 
     executor = InvocationExecutor()
-    await executor.execute_invocation(UUID(invocation_id), actor_context=actor_context)
+    heartbeat_task = asyncio.create_task(_heartbeat_until_cancelled())
+    try:
+        await executor.execute_invocation(UUID(invocation_id), actor_context=actor_context)
+    finally:
+        heartbeat_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await heartbeat_task
     return {"output": {"status": "completed"}}
+
+
+async def _heartbeat_until_cancelled() -> None:
+    """Heartbeat on a fixed interval until the surrounding task is cancelled.
+
+    Temporal delivers a cancellation request to an activity through its
+    heartbeats; an activity that never heartbeats cannot be interrupted. Outside
+    an activity context (unit tests, direct calls) ``activity.heartbeat`` raises,
+    so the loop exits quietly rather than failing the operation.
+    """
+    while True:
+        await asyncio.sleep(_HEARTBEAT_INTERVAL_SECONDS)
+        try:
+            activity.heartbeat()
+        except RuntimeError:  # not inside an activity context
+            return
 
 
 async def _run_integration_health_check(operation_input: dict[str, Any]) -> dict[str, Any]:  # noqa: ARG001

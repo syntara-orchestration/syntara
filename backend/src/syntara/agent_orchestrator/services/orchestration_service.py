@@ -24,12 +24,13 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import ToolNode
+from sqlalchemy.exc import SQLAlchemyError
 
 from syntara.agent_orchestrator.agents.generic_agent import GenericAgent
 from syntara.agent_orchestrator.agents.orchestrator_agent import OrchestratorAgent
 from syntara.agent_orchestrator.constants import AgentRoutes
 from syntara.agent_orchestrator.context_manager.planner import ContextManagerPlanner
-from syntara.agent_orchestrator.exceptions import ToolSelectionUnavailableError
+from syntara.agent_orchestrator.exceptions import InvocationCancelledError, ToolSelectionUnavailableError
 from syntara.agent_orchestrator.models.agent_response import GenericAgentResponse
 from syntara.agent_orchestrator.models.agent_state import AgentState, AgentStateFactory
 from syntara.agent_orchestrator.models.context_data import InvocationContextData
@@ -59,6 +60,11 @@ from syntara.metrics.instrumentation import LLMStreamTracker
 
 logger = structlog.stdlib.get_logger(__name__)
 
+
+# How often the streaming loop re-reads Invocation.status to notice a cancellation.
+# The planner only checks during context planning; without this the agent runs to
+# completion after a cancel. Ref: AAP-88614.
+_CANCELLATION_POLL_INTERVAL_SECONDS = 3.0
 
 _MAX_TOOL_OUTPUT_LENGTH = 10_000
 _MAX_TOOL_CONTENT_LENGTH = 200
@@ -547,6 +553,10 @@ class OrchestrationService:
                 # over stream-derived reasoning-step estimates for Agent Steps header.
                 self._apply_provider_token_totals(result)
 
+                # A cancel can land between the last poll and here; signalling a
+                # cancelled workflow would target an execution that no longer exists.
+                await self._raise_if_invocation_cancelled(invocation_id, phase="completion")
+
                 # Publish completion event
                 await self._publish_completion_event(invocation_id, stream_id, client)
 
@@ -556,6 +566,12 @@ class OrchestrationService:
                 logger.info("Streaming orchestration completed", invocation_id=invocation_id)
 
                 return result
+
+            except InvocationCancelledError:
+                # Expected control flow, not a failure: no error event, no failure
+                # signal. InvocationExecutor records the cancelled outcome.
+                logger.info("Orchestration abandoned — invocation cancelled", invocation_id=invocation_id)
+                raise
 
             except Exception as e:
                 # Handle streaming errors
@@ -603,8 +619,18 @@ class OrchestrationService:
             model=self._get_model_name(),
         )
 
+        last_cancellation_check = time.monotonic()
+
         # Stream events from LangGraph
         async for event in graph.astream_events(initial_state, config, version="v2"):
+            # Abandon the run promptly once the invocation is cancelled — otherwise
+            # the loop keeps calling the LLM after the user cancelled. Throttled so a
+            # token-by-token stream does not hammer the database.
+            now = time.monotonic()
+            if now - last_cancellation_check >= _CANCELLATION_POLL_INTERVAL_SECONDS:
+                last_cancellation_check = now
+                await self._raise_if_invocation_cancelled(invocation_id, phase="orchestration")
+
             # Process streaming events (event is StandardStreamEvent | CustomStreamEvent)
             event_dict = cast("dict[str, Any]", event)
             ttft_tracker.process_event(event_dict)
@@ -617,6 +643,32 @@ class OrchestrationService:
             final_state = self._extract_final_state(event_dict, final_state)
 
         return final_state
+
+    async def _raise_if_invocation_cancelled(self, invocation_id: UUID, *, phase: str) -> None:
+        """Raise ``InvocationCancelledError`` if the invocation has been cancelled.
+
+        Reads through the context manager's session factory rather than holding a
+        session open for the life of the run. Database errors degrade gracefully —
+        the same choice ``ContextManagerPlanner._check_cancellation`` makes — since
+        failing to reach the database is not evidence of a cancellation.
+        """
+        from syntara.agent_orchestrator.models import Invocation, InvocationStatus  # noqa: PLC0415
+
+        try:
+            async with self.context_manager.get_async_session_context() as session:
+                invocation = await session.get(Invocation, invocation_id)
+                cancelled = bool(invocation and invocation.status == InvocationStatus.CANCELLED)
+        except (SQLAlchemyError, OSError) as exc:
+            logger.warning(
+                "Failed to check cancellation status, continuing execution",
+                invocation_id=invocation_id,
+                phase=phase,
+                error=str(exc),
+            )
+            return
+
+        if cancelled:
+            raise InvocationCancelledError(str(invocation_id), phase)
 
     def _extract_final_state(
         self, event_dict: dict[str, Any], current_final_state: AgentState | None

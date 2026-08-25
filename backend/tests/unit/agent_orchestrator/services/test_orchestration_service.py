@@ -11,7 +11,7 @@ import pytest
 from langchain_core.tools import BaseTool
 
 from syntara.agent_orchestrator.context_manager.models import ContextPackage
-from syntara.agent_orchestrator.models import InvocationContextData
+from syntara.agent_orchestrator.models import InvocationContextData, InvocationStatus
 from syntara.agent_orchestrator.services.orchestration_service import OrchestrationService
 from syntara.audit.emitter import AuditActorContext
 
@@ -916,3 +916,141 @@ class TestGetToolsStrategy:
             tool_selection_strategy="SELECTED",
             tool_selections={"uuid-a", "uuid-b"},
         )
+
+
+def _session_cm_returning(status: "InvocationStatus") -> MagicMock:
+    """Build a get_async_session_context stand-in whose invocation has `status`."""
+    invocation = MagicMock()
+    invocation.status = status
+    session = AsyncMock()
+    session.get = AsyncMock(return_value=invocation)
+    cm = MagicMock()
+    cm.__aenter__ = AsyncMock(return_value=session)
+    cm.__aexit__ = AsyncMock(return_value=False)
+    return MagicMock(return_value=cm)
+
+
+class TestOrchestrationServiceHonoursCancellation:
+    """A cancelled invocation must stop the agent loop, not just the DB record.
+
+    The planner only polls Invocation.status during context planning (retrieval
+    and assembly). Once the LangGraph loop is running nothing observed the
+    status, so a UI cancel kept burning LLM tokens to completion and still
+    signalled a workflow that no longer existed. Ref: AAP-88614.
+    """
+
+    @pytest.mark.asyncio
+    async def test_agent_loop_aborts_when_invocation_cancelled(self) -> None:
+        """The streaming loop stops early once the invocation is CANCELLED."""
+        from syntara.agent_orchestrator.exceptions import InvocationCancelledError
+
+        mock_llm = AsyncMock()
+        mock_llm.model_name = "test-model"
+        mock_context_manager = MagicMock()
+        mock_context_manager.get_async_session_context = _session_cm_returning(InvocationStatus.CANCELLED)
+
+        service = OrchestrationService(mock_llm, mock_context_manager)
+        invocation_id = uuid4()
+
+        consumed = 0
+
+        async def counting_stream(*_args: object, **_kwargs: object) -> AsyncGenerator[dict[str, Any], None]:
+            nonlocal consumed
+            for i in range(50):
+                consumed += 1
+                yield create_mock_streaming_event("on_chat_model_stream", f"tok{i}")
+            yield {"event": "on_chain_end", "data": {}}
+
+        mock_graph = AsyncMock()
+        mock_graph.astream_events = counting_stream
+
+        with (
+            patch.object(service, "_setup_graph", return_value=mock_graph),
+            patch("syntara.agent_orchestrator.services.orchestration_service.StreamClient") as mock_stream_client,
+            patch(
+                "syntara.agent_orchestrator.services.orchestration_service._CANCELLATION_POLL_INTERVAL_SECONDS",
+                0.0,
+            ),
+        ):
+            mock_stream_client.return_value.__aenter__.return_value = AsyncMock()
+
+            with pytest.raises(InvocationCancelledError):
+                await service.execute(
+                    prompt="Test prompt",
+                    session_id="test-session",
+                    invocation_id=invocation_id,
+                    actor_context=AuditActorContext(),
+                    ctx=InvocationContextData(),
+                )
+
+        assert consumed < 50, f"stream should have been abandoned early, consumed {consumed}/50 events"
+
+    @pytest.mark.asyncio
+    async def test_completion_callback_not_sent_when_invocation_cancelled(self) -> None:
+        """No completion signal is sent to a workflow that was cancelled."""
+        from syntara.agent_orchestrator.exceptions import InvocationCancelledError
+
+        mock_llm = AsyncMock()
+        mock_llm.model_name = "test-model"
+        mock_context_manager = MagicMock()
+        mock_context_manager.get_async_session_context = _session_cm_returning(InvocationStatus.CANCELLED)
+
+        service = OrchestrationService(mock_llm, mock_context_manager)
+
+        mock_graph = AsyncMock()
+        mock_graph.astream_events = lambda *_a, **_k: mock_astream_events_generator("a", "b")
+
+        with (
+            patch.object(service, "_setup_graph", return_value=mock_graph),
+            patch("syntara.agent_orchestrator.services.orchestration_service.StreamClient") as mock_stream_client,
+            patch(
+                "syntara.agent_orchestrator.services.orchestration_service._CANCELLATION_POLL_INTERVAL_SECONDS",
+                0.0,
+            ),
+            patch.object(service, "_handle_completion_callback", new=AsyncMock()) as mock_callback,
+        ):
+            mock_stream_client.return_value.__aenter__.return_value = AsyncMock()
+
+            with pytest.raises(InvocationCancelledError):
+                await service.execute(
+                    prompt="Test prompt",
+                    session_id="test-session",
+                    invocation_id=uuid4(),
+                    actor_context=AuditActorContext(),
+                    ctx=InvocationContextData(),
+                )
+
+            mock_callback.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_running_invocation_completes_normally(self) -> None:
+        """A RUNNING invocation is unaffected by the cancellation poll."""
+        mock_llm = AsyncMock()
+        mock_llm.model_name = "test-model"
+        mock_context_manager = MagicMock()
+        mock_context_manager.get_async_session_context = _session_cm_returning(InvocationStatus.RUNNING)
+
+        service = OrchestrationService(mock_llm, mock_context_manager)
+
+        mock_graph = AsyncMock()
+        mock_graph.astream_events = lambda *_a, **_k: mock_astream_events_generator("Hello", "World")
+
+        with (
+            patch.object(service, "_setup_graph", return_value=mock_graph),
+            patch("syntara.agent_orchestrator.services.orchestration_service.StreamClient") as mock_stream_client,
+            patch(
+                "syntara.agent_orchestrator.services.orchestration_service._CANCELLATION_POLL_INTERVAL_SECONDS",
+                0.0,
+            ),
+        ):
+            mock_stream_client.return_value.__aenter__.return_value = AsyncMock()
+
+            result = await service.execute(
+                prompt="Test prompt",
+                session_id="test-session",
+                invocation_id=uuid4(),
+                actor_context=AuditActorContext(),
+                ctx=InvocationContextData(),
+            )
+
+        assert result is not None
