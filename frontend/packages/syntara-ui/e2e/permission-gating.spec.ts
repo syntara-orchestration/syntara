@@ -781,7 +781,8 @@ test.describe('Permission gating — Access Management actions', () => {
 
     const createButton = auditorApp.getByRole('button', { name: /Create group/i })
     await expect(createButton).toBeVisible()
-    await expect(createButton).toHaveAttribute('aria-disabled', 'true')
+    // aria-disabled is set after the permissions API resolves — give it extra time
+    await expect(createButton).toHaveAttribute('aria-disabled', 'true', { timeout: 20_000 })
   })
 
   test('auditor: Create user button is disabled', async ({ auditorApp }) => {
