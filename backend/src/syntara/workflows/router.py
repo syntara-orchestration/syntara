@@ -171,6 +171,7 @@ async def _build_workflow_with_version_response(
     validation_result: "ValidationResult | None" = None,
 ) -> WorkflowReadWithVersion | PublishWorkflowVersionResponse:
     workflow_read = WorkflowRead.model_validate(workflow, from_attributes=True)
+    await service.resolve_user_references([workflow_read])
     await _populate_published_version_number(workflow_read, workflow, version, service.session)
     ever_published, pub_ts = await service.get_publish_context([version.id])
     base = workflow_read.model_dump()
@@ -291,6 +292,7 @@ async def create_workflow(
         is_import=request.is_import,
     )
     read = WorkflowRead.model_validate(workflow, from_attributes=True)
+    await service.resolve_user_references([read])
     if _has_validation_issues(result):
         read.validation_result = result
     return read
@@ -326,6 +328,7 @@ async def list_workflows(
         allowed_projects=visibility.to_allowed_projects(),
     )
     await service.populate_published_version_numbers(result.resources)
+    await service.resolve_user_references(result.resources)
     return result
 
 
@@ -542,7 +545,9 @@ async def unpublish_workflow(
 ) -> WorkflowRead:
     """Unpublish the currently published workflow version."""
     workflow = await service.unpublish_workflow(workflow_id=workflow_id)
-    return WorkflowRead.model_validate(workflow)
+    read = WorkflowRead.model_validate(workflow)
+    await service.resolve_user_references([read])
+    return read
 
 
 @router.post(

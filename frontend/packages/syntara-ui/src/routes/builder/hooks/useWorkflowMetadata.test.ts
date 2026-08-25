@@ -23,7 +23,7 @@ describe('useWorkflowMetadata', () => {
         id: 'wf-123',
         current_version: 5,
         published_version_id: 'ver-2',
-        created_by: 'admin',
+        created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'test-user' },
       })
     )
 
@@ -32,7 +32,7 @@ describe('useWorkflowMetadata', () => {
       id: 'wf-123',
       version: 5,
       published: true,
-      author: 'admin',
+      author: 'test-user',
     })
   })
 
@@ -84,12 +84,25 @@ describe('useWorkflowMetadata', () => {
   })
 
   it('uses created_by as author when it is a string', () => {
-    const { result } = renderHook(() => useWorkflowMetadata({ name: 'test', created_by: 'jane' }))
+    const { result } = renderHook(() =>
+      useWorkflowMetadata({ name: 'test', created_by: { id: 'jane-id', name: 'jane' } })
+    )
 
     expect(result.current?.author).toBe('jane')
   })
 
-  it('defaults author to Unknown when created_by is not a string', () => {
+  it('uses UserReference name as author when created_by is a UserReference', () => {
+    const { result } = renderHook(() =>
+      useWorkflowMetadata({
+        name: 'test',
+        created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'demo' },
+      })
+    )
+
+    expect(result.current?.author).toBe('demo')
+  })
+
+  it('defaults author to Unknown when created_by is not a string or UserReference', () => {
     const { result } = renderHook(() => useWorkflowMetadata({ name: 'test', created_by: 42 }))
 
     expect(result.current?.author).toBe('Unknown')

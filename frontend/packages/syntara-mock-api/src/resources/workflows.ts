@@ -98,7 +98,7 @@ export const workflows: (WorkflowWithVersion & { project_id: string })[] = yamlF
   .map((file) => {
     const filePath = join(examplesDir, file)
     const id = file.replace(/\.yaml$/, '').replace(/\//g, '-')
-    const workflow = convertYamlToWorkflow(filePath, id, 'system', examplesDir)
+    const workflow = convertYamlToWorkflow(filePath, id, undefined, examplesDir)
     const projectId = projectIds[stableHash(id) % projectIds.length]
     return { ...workflow, project_id: projectId }
   })

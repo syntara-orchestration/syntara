@@ -130,9 +130,11 @@ class TestWorkflowListing:
             )
         )
 
-        creator_id = workflow1.created_by
+        # created_by is a UserReference {id, name} on API responses
+        assert workflow1.created_by is not None
+        creator_id = workflow1.created_by.id
 
-        # Filter by creator using additional_params
+        # Filter by creator using additional_params (filter still accepts UUID)
         result = syntara_api.workflows.list(
             include_total=True, additional_params={"created_by": str(creator_id)}
         ).assert_and_get()
