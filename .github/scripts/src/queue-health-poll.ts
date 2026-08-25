@@ -2,13 +2,14 @@
 import { GitHubClient } from './lib/github.js';
 import { SlackNotifier } from './lib/slack.js';
 import { getEnvironment } from './lib/env.js';
+import { inferPreviousHealthFromJobs } from './lib/health-state.js';
 import type { HealthState } from './lib/types.js';
 
 const MERGE_TIMEOUT_MINUTES = 120;
 
 /**
  * Checks if the merge queue is healthy by verifying recent merge activity.
- * Returns unhealthy if the queue has entries but no merges in 90+ minutes.
+ * Returns unhealthy if the queue has entries but no merges beyond the timeout.
  */
 async function assessHealth(github: GitHubClient, branch: string): Promise<HealthState> {
   console.log('Querying merge queue status...');
@@ -29,12 +30,12 @@ async function assessHealth(github: GitHubClient, branch: string): Promise<Healt
 
   // Check for recent merges
   const now = Date.now();
-  const ninetyMinsAgo = new Date(now - MERGE_TIMEOUT_MINUTES * 60 * 1000);
-  const recentMerges = await github.getRecentMerges(branch, ninetyMinsAgo);
+  const timeoutAgo = new Date(now - MERGE_TIMEOUT_MINUTES * 60 * 1000);
+  const recentMerges = await github.getRecentMerges(branch, timeoutAgo);
 
   console.log(`Recent merges to ${branch}: ${recentMerges.length}`);
 
-  // If queue has entries but no merges in 90 min, unhealthy
+  // If queue has entries but no merges within the timeout, unhealthy
   if (recentMerges.length === 0) {
     // Calculate time since last merge
     const allMerges = await github.getRecentMerges(
@@ -92,31 +93,7 @@ async function getPreviousHealthState(
     console.log(`Previous run ID: ${previousRun.id}`);
 
     const jobs = await github.getWorkflowRunJobs(previousRun.id);
-
-    // Check which alert step ran in the previous workflow
-    const sentUnhealthyAlert = jobs[0]?.steps?.some(
-      (step) =>
-        step.name === 'Send unhealthy alert' && step.conclusion === 'success'
-    );
-
-    const sentRecoveryAlert = jobs[0]?.steps?.some(
-      (step) =>
-        step.name === 'Send recovery alert' && step.conclusion === 'success'
-    );
-
-    if (sentRecoveryAlert) {
-      // If recovery was sent, previous run ended in healthy state
-      return 'healthy';
-    }
-
-    if (sentUnhealthyAlert) {
-      // If unhealthy alert was sent, previous run ended in unhealthy state
-      return 'unhealthy';
-    }
-
-    // If neither alert was sent, state didn't change - infer from conclusion
-    // This is imperfect but works for the steady state
-    return 'unknown';
+    return inferPreviousHealthFromJobs(jobs);
   } catch (error) {
     console.warn('Could not determine previous state:', error);
     return 'unknown';
