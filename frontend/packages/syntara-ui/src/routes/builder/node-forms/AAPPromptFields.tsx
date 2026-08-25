@@ -20,7 +20,7 @@ import React, { type ReactElement, useState } from 'react'
 import { Controller, useFormContext } from 'react-hook-form'
 
 import { TagInput } from '../../../components/forms/TagInput'
-import { NxSelect } from '../../../components/NxSelect'
+import { SynSelect } from '../../../components/SynSelect'
 import { ExpandableCodeEditor, type ExpandableCodeEditorHandle } from '../components/ExpandableCodeEditor'
 
 import type { AAPJobTemplateFormData } from './aapJobTemplateSchema'
@@ -37,7 +37,7 @@ function RunTypeSelect({ value, onChange }: { value: string; onChange: (value: s
   const [isOpen, setIsOpen] = useState(false)
   const selectedLabel = RUN_TYPE_OPTIONS.find((o) => o.value === value)?.label
   return (
-    <NxSelect
+    <SynSelect
       id="aap-jobType"
       isOpen={isOpen}
       selected={value || undefined}
@@ -66,7 +66,7 @@ function RunTypeSelect({ value, onChange }: { value: string; onChange: (value: s
           </SelectOption>
         ))}
       </SelectList>
-    </NxSelect>
+    </SynSelect>
   )
 }
 
@@ -83,7 +83,7 @@ function VerbositySelect({ value, onChange }: { value: string; onChange: (value:
   const [isOpen, setIsOpen] = useState(false)
   const selectedLabel = VERBOSITY_OPTIONS.find((o) => o.value === value)?.label
   return (
-    <NxSelect
+    <SynSelect
       id="aap-verbosity"
       isOpen={isOpen}
       selected={value || undefined}
@@ -112,7 +112,7 @@ function VerbositySelect({ value, onChange }: { value: string; onChange: (value:
           </SelectOption>
         ))}
       </SelectList>
-    </NxSelect>
+    </SynSelect>
   )
 }
 

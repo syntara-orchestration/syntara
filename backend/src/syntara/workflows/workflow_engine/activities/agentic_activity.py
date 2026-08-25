@@ -140,7 +140,6 @@ async def execute_agentic_activity(
 
     """
     logger.info("Starting agentic activity (v2)")
-    activity.heartbeat({HEARTBEAT_STOP_MONITOR: True})
 
     try:
         try:

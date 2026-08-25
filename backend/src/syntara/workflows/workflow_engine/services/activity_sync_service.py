@@ -1794,6 +1794,11 @@ class ActivitySyncService:
         elif event_type == EventType.EVENT_TYPE_ACTIVITY_TASK_CANCELED:
             self._process_activity_canceled(event, metadata)
 
+    @staticmethod
+    def _merge_output(initial: dict[str, Any] | None, queried: dict[str, Any]) -> dict[str, Any]:
+        """Merge heartbeat partial output with workflow-queried output."""
+        return {**initial, **queried} if initial else queried
+
     async def _query_activity_io(
         self,
         handle: WorkflowHandle[Any, Any],
@@ -1824,7 +1829,7 @@ class ActivitySyncService:
             input_data = await handle.query("get_activity_input", activity_id) or {}
             queried_output = await handle.query("get_activity_output", activity_id)
             if queried_output is not None:
-                output_data = queried_output
+                output_data = self._merge_output(initial_output_data, queried_output)
 
             # Race condition mitigation: If activity is completed but output is None,
             # retry the query. This handles the case where Temporal emits the
@@ -1846,7 +1851,7 @@ class ActivitySyncService:
                     await asyncio.sleep(delay_ms / 1000.0)
                     queried_output = await handle.query("get_activity_output", activity_id)
                     if queried_output is not None:
-                        output_data = queried_output
+                        output_data = self._merge_output(initial_output_data, queried_output)
                         logger.debug(
                             "Successfully retrieved output on retry",
                             activity_id=activity_id,
