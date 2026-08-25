@@ -175,4 +175,80 @@ export class GitHubClient {
   getPrUrl(prNumber: number): string {
     return `https://github.com/${this.owner}/${this.repo}/pull/${prNumber}`;
   }
+
+  /**
+   * Fetches PRs that were removed from the merge queue (dequeued).
+   * Uses the Timeline API to detect removed_from_merge_queue events.
+   * Does not include successfully merged PRs.
+   */
+  async getRecentDequeues(
+    since: Date
+  ): Promise<Array<{ number: number; title: string; dequeuedAt: string }>> {
+    // Get recently updated PRs (both open and closed)
+    const [openPrs, closedPrs] = await Promise.all([
+      this.octokit.pulls.list({
+        owner: this.owner,
+        repo: this.repo,
+        state: 'open',
+        sort: 'updated',
+        direction: 'desc',
+        per_page: 50,
+      }),
+      this.octokit.pulls.list({
+        owner: this.owner,
+        repo: this.repo,
+        state: 'closed',
+        sort: 'updated',
+        direction: 'desc',
+        per_page: 30,
+      }),
+    ]);
+
+    const allPrs = [...openPrs.data, ...closedPrs.data];
+    const dequeues: Array<{ number: number; title: string; dequeuedAt: string }> = [];
+
+    // Check timeline events for each recently updated PR
+    for (const pr of allPrs) {
+      // Skip PRs that were successfully merged - those aren't dequeues
+      if (pr.merged_at) {
+        continue;
+      }
+
+      try {
+        const timeline = await this.octokit.issues.listEventsForTimeline({
+          owner: this.owner,
+          repo: this.repo,
+          issue_number: pr.number,
+          per_page: 100,
+        });
+
+        // Find removed_from_merge_queue events within our time window
+        // Timeline API returns various event types; we only care about ones with created_at
+        const dequeueEvents = timeline.data.filter((event: any) => {
+          const hasCreatedAt = 'created_at' in event && typeof event.created_at === 'string';
+          return (
+            hasCreatedAt &&
+            event.event === 'removed_from_merge_queue' &&
+            new Date(event.created_at) >= since
+          );
+        });
+
+        if (dequeueEvents.length > 0) {
+          const latestEvent = dequeueEvents[0] as any;
+          dequeues.push({
+            number: pr.number,
+            title: pr.title,
+            dequeuedAt: latestEvent.created_at,
+          });
+        }
+      } catch (error) {
+        // Timeline API may fail for some PRs - continue checking others
+        console.warn(`Could not fetch timeline for PR #${pr.number}:`, error);
+      }
+    }
+
+    return dequeues.sort(
+      (a, b) => new Date(b.dequeuedAt).getTime() - new Date(a.dequeuedAt).getTime()
+    );
+  }
 }
