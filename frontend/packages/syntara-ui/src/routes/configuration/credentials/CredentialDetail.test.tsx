@@ -55,11 +55,13 @@ type MockCredentialRecord = Omit<typeof mockCredential, 'description'> & { descr
 vi.mock('./useCredentialPermissions', () => ({
   useCredentialPermissions: vi.fn(() => ({
     canCreate: true,
+    canRead: true,
     canUpdate: true,
     canDelete: true,
     isLoading: false,
     tooltips: {
       create: 'You need credential:create permission to create a credential.',
+      read: 'You need credential:read permission to view this credential.',
       update: 'You need credential:update permission to edit this credential.',
       enable: 'You need credential:update permission to enable or disable this credential.',
       delete: 'You need credential:delete permission to delete this credential.',
