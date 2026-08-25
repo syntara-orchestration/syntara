@@ -4,9 +4,9 @@ import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { NxScrollableTableContainer } from './NxScrollableTableContainer'
+import { SynScrollableTableContainer } from './SynScrollableTableContainer'
 
-describe('NxScrollableTableContainer', () => {
+describe('SynScrollableTableContainer', () => {
   const minimalTable = (
     <>
       <Thead>
@@ -25,7 +25,7 @@ describe('NxScrollableTableContainer', () => {
   it('renders table content when used as a direct child of Stack', () => {
     render(
       <Stack style={{ height: '240px' }}>
-        <NxScrollableTableContainer caption="Demo table">{minimalTable}</NxScrollableTableContainer>
+        <SynScrollableTableContainer caption="Demo table">{minimalTable}</SynScrollableTableContainer>
       </Stack>
     )
 
@@ -35,7 +35,7 @@ describe('NxScrollableTableContainer', () => {
   it('scroll container is a named region landmark with tabIndex 0 for keyboard scrolling', () => {
     render(
       <Stack style={{ height: '240px' }}>
-        <NxScrollableTableContainer caption="Demo table">{minimalTable}</NxScrollableTableContainer>
+        <SynScrollableTableContainer caption="Demo table">{minimalTable}</SynScrollableTableContainer>
       </Stack>
     )
 
@@ -46,7 +46,7 @@ describe('NxScrollableTableContainer', () => {
   it('uses default density when variant is omitted', () => {
     render(
       <Stack style={{ height: '240px' }}>
-        <NxScrollableTableContainer caption="Demo table">{minimalTable}</NxScrollableTableContainer>
+        <SynScrollableTableContainer caption="Demo table">{minimalTable}</SynScrollableTableContainer>
       </Stack>
     )
 
@@ -56,9 +56,9 @@ describe('NxScrollableTableContainer', () => {
   it('applies compact density when variant is compact', () => {
     render(
       <Stack style={{ height: '240px' }}>
-        <NxScrollableTableContainer caption="Demo table" variant="compact">
+        <SynScrollableTableContainer caption="Demo table" variant="compact">
           {minimalTable}
-        </NxScrollableTableContainer>
+        </SynScrollableTableContainer>
       </Stack>
     )
 
@@ -68,7 +68,7 @@ describe('NxScrollableTableContainer', () => {
   it('does not stripe rows when isStriped is omitted', () => {
     render(
       <Stack style={{ height: '240px' }}>
-        <NxScrollableTableContainer caption="Demo table">{minimalTable}</NxScrollableTableContainer>
+        <SynScrollableTableContainer caption="Demo table">{minimalTable}</SynScrollableTableContainer>
       </Stack>
     )
 
@@ -78,9 +78,9 @@ describe('NxScrollableTableContainer', () => {
   it('applies striped rows when isStriped is set', () => {
     render(
       <Stack style={{ height: '240px' }}>
-        <NxScrollableTableContainer caption="Demo table" isStriped>
+        <SynScrollableTableContainer caption="Demo table" isStriped>
           {minimalTable}
-        </NxScrollableTableContainer>
+        </SynScrollableTableContainer>
       </Stack>
     )
 
@@ -90,9 +90,9 @@ describe('NxScrollableTableContainer', () => {
   it('pins custom footerContent inside the container root', () => {
     render(
       <Stack style={{ height: '240px' }}>
-        <NxScrollableTableContainer caption="Demo table" footerContent={<p>Custom footer</p>}>
+        <SynScrollableTableContainer caption="Demo table" footerContent={<p>Custom footer</p>}>
           {minimalTable}
-        </NxScrollableTableContainer>
+        </SynScrollableTableContainer>
       </Stack>
     )
 
@@ -103,7 +103,7 @@ describe('NxScrollableTableContainer', () => {
   it('has no accessibility violations in the supported Stack layout', async () => {
     const { container } = render(
       <Stack style={{ height: '240px' }}>
-        <NxScrollableTableContainer caption="Accessible table">{minimalTable}</NxScrollableTableContainer>
+        <SynScrollableTableContainer caption="Accessible table">{minimalTable}</SynScrollableTableContainer>
       </Stack>
     )
 
@@ -112,13 +112,13 @@ describe('NxScrollableTableContainer', () => {
 
   /**
    * The component's root is a `StackItem` with `data-testid="scrollable-table-container-root"`. It must
-   * be a direct child of the page `Stack` (see `NxScrollableTableContainer` JSDoc). Nesting it inside
+   * be a direct child of the page `Stack` (see `SynScrollableTableContainer` JSDoc). Nesting it inside
    * another `StackItem` breaks flex height.
    */
   it('root is a direct child of the page Stack in the supported layout', () => {
     render(
       <Stack aria-label="Fixture page stack" role="region" style={{ height: '240px' }}>
-        <NxScrollableTableContainer caption="Layout table">{minimalTable}</NxScrollableTableContainer>
+        <SynScrollableTableContainer caption="Layout table">{minimalTable}</SynScrollableTableContainer>
       </Stack>
     )
 
@@ -134,7 +134,7 @@ describe('NxScrollableTableContainer', () => {
     render(
       <Stack aria-label="Fixture page stack" role="region" style={{ height: '240px' }}>
         <StackItem isFilled>
-          <NxScrollableTableContainer caption="Nested layout table">{minimalTable}</NxScrollableTableContainer>
+          <SynScrollableTableContainer caption="Nested layout table">{minimalTable}</SynScrollableTableContainer>
         </StackItem>
       </Stack>
     )

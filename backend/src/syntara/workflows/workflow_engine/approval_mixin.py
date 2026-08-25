@@ -31,6 +31,11 @@ with workflow.unsafe.imports_passed_through():
 
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
 from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
+from syntara.workflows.workflow_engine.utils.loop_iteration_ids import (
+    approval_temporal_activity_id,
+    loop_index_chain,
+    use_unique_loop_iteration_ids,
+)
 
 _APPROVAL_COMMENTS_MAX_LENGTH = FieldLimits.DESCRIPTION_MAX_LENGTH
 
@@ -50,8 +55,23 @@ class WorkflowApprovalMixin:
     resolver: NamespaceResolver
     _runtime_settings: dict[str, Any]
     skipped_nodes: set[str]
+    loop_body_map: dict[str, str]
+    node_control_data: dict[str, dict[str, Any]]
     _detached_nodes: set[str]
     _TEMPORAL_MARGIN: ClassVar[int]
+
+    def _loop_iteration_path(self, node_id: str) -> list[int]:
+        """Return enclosing-loop indices for this node, outermost first (empty if none)."""
+        return loop_index_chain(node_id, self.loop_body_map, self.node_control_data)
+
+    def _approval_activity_id(self, node_id: str) -> str:
+        """Return the Temporal activity ID for this approval node.
+
+        New executions suffix the canvas ID with the loop-index chain. In-flight
+        pre-patch executions keep the canvas ID so replay matches history.
+        The Approvals API ``approval_node_id`` is always the canvas ID.
+        """
+        return approval_temporal_activity_id(node_id, self.loop_body_map, self.node_control_data)
 
     async def _expire_approvals(self, node_id: str | None, activity_id: str) -> None:
         """Best-effort expire pending approval requests.
@@ -75,7 +95,8 @@ class WorkflowApprovalMixin:
 
     async def _expire_approval_requests(self, node_id: str) -> None:
         """Expire pending approval requests for a timed-out approval node."""
-        await self._expire_approvals(node_id, activity_id=f"__internal__expire_approval_{node_id}")
+        activity_id = self._approval_activity_id(node_id)
+        await self._expire_approvals(node_id, activity_id=f"__internal__expire_approval_{activity_id}")
 
     async def _maybe_expire_approval(
         self,
@@ -117,11 +138,12 @@ class WorkflowApprovalMixin:
 
     async def _fail_detached_approval_activity(self, node_id: str) -> None:
         """Best-effort fail the async APPROVAL activity for a single detached node."""
+        activity_id = self._approval_activity_id(node_id)
         try:
             await workflow.execute_local_activity(
                 fail_detached_approval_activity,
-                args=[workflow.info().workflow_id, workflow.info().run_id, node_id],
-                activity_id=f"__internal__fail_detached_approval_{node_id}",
+                args=[workflow.info().workflow_id, workflow.info().run_id, activity_id],
+                activity_id=f"__internal__fail_detached_approval_{activity_id}",
                 start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
                 retry_policy=RetryPolicy(maximum_attempts=1),
             )
@@ -189,19 +211,21 @@ class WorkflowApprovalMixin:
     ) -> list[Any]:
         """Build the positional argument list for create_approval_request_activity.
 
-        Returns a 9-element list matching the activity signature in
-        ``approval_activity.create_approval_request_activity``::
+        New executions return a 12-element list. Pre-patch replay returns the
+        original 10-element list so Temporal history matches::
 
-            [0] execution_id:       str            — parent workflow execution ID
-            [1] approval_node_id:   str            — activity ID from workflow definition
-            [2] name:               str            — display name for the approval request
-            [3] next_step_approved: dict[str, Any] | None — first activity if approved
-            [4] workflow_context:   dict[str, Any]  — workflow name, inputs, previous step
-            [5] timeout_at:         str | None      — ISO datetime when the request expires
-            [6] next_step_rejected: dict[str, Any] | None — first activity if rejected
-            [7] approver_user_ids:  list[str] | None — user UUIDs who can approve
-            [8] approver_group_ids: list[str] | None — group UUIDs whose members can approve
-            [9] project_id:         str | None      — project ID for the approval request
+            [0] execution_id:          str            — parent workflow execution ID
+            [1] approval_node_id:      str            — canvas node ID
+            [2] name:                  str            — display name for the approval request
+            [3] next_step_approved:    dict[str, Any] | None — first activity if approved
+            [4] workflow_context:      dict[str, Any]  — workflow name, inputs, previous step
+            [5] timeout_at:            str | None      — ISO datetime when the request expires
+            [6] next_step_rejected:    dict[str, Any] | None — first activity if rejected
+            [7] approver_user_ids:     list[str] | None — user UUIDs who can approve
+            [8] approver_group_ids:    list[str] | None — group UUIDs whose members can approve
+            [9] project_id:            str | None      — project ID for the approval request
+            [10] loop_iteration_path:  list[int]       — enclosing-loop indices (empty if none)
+            [11] temporal_activity_id: str             — Temporal activity ID actually scheduled
 
         """
         name = node.name or f"Approval for {node.id}"
@@ -270,7 +294,7 @@ class WorkflowApprovalMixin:
             approver_user_ids = None
             approver_group_ids = None
 
-        return [
+        args = [
             self.execution_id,
             node.id,
             name,
@@ -282,6 +306,16 @@ class WorkflowApprovalMixin:
             approver_group_ids,
             self._project_id,
         ]
+        # Always call patched() here. Extra args must not appear on replay of
+        # histories that scheduled this activity with 10 positional arguments.
+        if use_unique_loop_iteration_ids():
+            args.extend(
+                [
+                    self._loop_iteration_path(node.id),
+                    self._approval_activity_id(node.id),
+                ]
+            )
+        return args
 
     async def _execute_approval_node(
         self,
@@ -295,6 +329,7 @@ class WorkflowApprovalMixin:
         received.
         """
         node_id = node.id
+        request_id = self._approval_activity_id(node_id)
         approval_args = await self._prepare_approval_args(node, graph, resolved_parameters)
         # Approval uses async completion: start_to_close_timeout must cover the full
         # human decision window, not just the API call to create the request.
@@ -308,7 +343,7 @@ class WorkflowApprovalMixin:
             await workflow.execute_activity(
                 ActivityName.APPROVAL,
                 args=approval_args,
-                activity_id=node_id,
+                activity_id=request_id,
                 start_to_close_timeout=timedelta(seconds=approval_start_to_close),
                 retry_policy=retry_policy,
             ),

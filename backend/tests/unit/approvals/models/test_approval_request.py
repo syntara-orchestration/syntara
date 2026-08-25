@@ -10,8 +10,11 @@ import pytest
 from pydantic import ValidationError
 
 from syntara.approvals.models import (
+    ActivitySummary,
+    ApprovalCreateRequest,
     ApprovalRequest,
     ApprovalRequestStatus,
+    WorkflowContext,
 )
 from syntara.core.constants import FieldLimits
 from tests.unit.fixtures.approval import (
@@ -107,6 +110,20 @@ class TestApprovalRequestValidation:
         )
 
         assert approval.status == ApprovalRequestStatus.PENDING
+        assert approval.loop_iteration_path == []
+
+    def test_create_request_rejects_negative_loop_iteration_path(self) -> None:
+        """API create payload must not store a negative loop index."""
+        with pytest.raises(ValidationError):
+            ApprovalCreateRequest(
+                execution_id=uuid4(),
+                project_id=uuid4(),
+                approval_node_id="gate",
+                name="Test",
+                loop_iteration_path=[-1],
+                next_step_approved=ActivitySummary(id="next", name="Next", type="task"),
+                workflow_context=WorkflowContext(workflow_name="wf", inputs={}),
+            )
 
     def test_sortable_fields_contains_correct_fields(self) -> None:
         assert ApprovalRequest.__sortable_fields__ == [
