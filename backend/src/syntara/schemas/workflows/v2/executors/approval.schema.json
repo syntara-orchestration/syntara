@@ -27,6 +27,7 @@
       },
       "prompt": {
         "type": "string",
+        "maxLength": 2000,
         "description": "Message to display to approvers when requesting approval."
       },
       "fallback_decision": {
