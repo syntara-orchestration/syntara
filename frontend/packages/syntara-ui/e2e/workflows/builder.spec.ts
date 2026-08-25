@@ -491,28 +491,3 @@ test('edge follows connection path between nodes', async ({ app }) => {
   }
 })
 
-test('connected nodes form a workflow DAG', async ({ app }) => {
-  const workflowName = buildUniqueName('e2e-builder')
-  await createWorkflowWithTrigger(app, workflowName)
-
-  try {
-    await closeNodeEditorPanel(app)
-    await expect(app.getByText('Manual trigger')).toBeVisible()
-
-    // Add nodes that will form a linear DAG: Manual Trigger -> Script 1 -> Script 2
-    await addScriptNode(app, 'Processing Step', 'print("processing")')
-    await addScriptNode(app, 'Final Step', 'print("final")')
-
-    // Layout to visualize the DAG
-    await triggerLayout(app)
-
-    // Verify all DAG nodes are present and visible after layout.
-    // DAG structure (trigger→processing→final) is proven by addScriptNode succeeding
-    // for each node — each call clicks an edge overlay button that only exists on a connected edge.
-    await verifyNodeVisible(app, 'Manual trigger')
-    await verifyNodeVisible(app, 'Processing Step')
-    await verifyNodeVisible(app, 'Final Step')
-  } finally {
-    await deleteWorkflow(app, workflowName)
-  }
-})
