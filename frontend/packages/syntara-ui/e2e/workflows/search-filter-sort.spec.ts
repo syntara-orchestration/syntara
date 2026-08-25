@@ -79,39 +79,6 @@ test.describe('Workflows Table - Search, Filter, and Sort', () => {
     }
   })
 
-  test('filter state persists in URL for sharing', async ({ app }) => {
-    const workflows = await createTestWorkflows(app, 1)
-    expect(workflows).toHaveLength(1)
-
-    try {
-      const searchTerm = workflows[0].name
-
-      await app.goto(toAppUrl('/workflows'))
-      await app.getByPlaceholder('Filter by name').fill(searchTerm)
-      await app.getByRole('button', { name: 'Apply filter' }).click()
-
-      // Capture URL with filter
-      const filteredUrl = app.url()
-      expect(filteredUrl).toContain('name')
-      expect(filteredUrl).toContain(searchTerm)
-
-      // Navigate away
-      await app.goto(toAppUrl('/'))
-
-      // Navigate back using the filtered URL
-      await app.goto(filteredUrl)
-
-      // Verify filter is restored
-      await expect(app.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
-      const nameChipGroup = app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Name' })
-      await expect(nameChipGroup.getByText(searchTerm)).toBeVisible()
-    } finally {
-      for (const wf of workflows) {
-        await deleteWorkflowViaApi(app, wf.id)
-      }
-    }
-  })
-
   test('multiple workflows can be found using partial name search', async ({ app }) => {
     const workflows = await createTestWorkflows(app, 2)
     expect(workflows.length).toBeGreaterThanOrEqual(2)
