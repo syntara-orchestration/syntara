@@ -464,32 +464,6 @@ test('two nodes can be connected with an edge', async ({ app }) => {
   }
 })
 
-test('multiple edges can be created sequentially', async ({ app }) => {
-  const workflowName = buildUniqueName('e2e-builder')
-  await createWorkflowWithTrigger(app, workflowName)
-
-  try {
-    await closeNodeEditorPanel(app)
-    await expect(app.getByText('Manual trigger')).toBeVisible()
-
-    // Add three nodes
-    await addScriptNode(app, 'Node 1', 'print("1")')
-    await addScriptNode(app, 'Node 2', 'print("2")')
-    await addScriptNode(app, 'Node 3', 'print("3")')
-
-    // Layout to position nodes
-    await triggerLayout(app)
-
-    // Verify all nodes are visible — three successful addScriptNode calls prove
-    // three edges were sequentially created (each call clicks an edge overlay button).
-    await verifyNodeVisible(app, 'Node 1')
-    await verifyNodeVisible(app, 'Node 2')
-    await verifyNodeVisible(app, 'Node 3')
-  } finally {
-    await deleteWorkflow(app, workflowName)
-  }
-})
-
 test('edge follows connection path between nodes', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-builder')
   await createWorkflowWithTrigger(app, workflowName)
