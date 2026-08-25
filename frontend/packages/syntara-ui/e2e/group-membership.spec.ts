@@ -104,9 +104,7 @@ test.describe('Group Detail — Navigation & Tabs', () => {
   })
 
   test.describe('Member add/remove (typeahead)', () => {
-    test.skip(!!process.env.CI, "Typeahead dropdown timing is unreliable in CI — options don't render within timeout")
-
-    test('add and remove a member from the group detail', async ({ app }) => {
+    test('add and remove a member from the group detail', { tag: ['@konflux-skip'] }, async ({ app }) => {
       const table = app.getByRole('grid', { name: 'Groups table' })
       await table.getByRole('button', { name: 'admins', exact: true }).click()
       await expect(app.getByRole('heading', { level: 1, name: 'admins', exact: true })).toBeVisible()
