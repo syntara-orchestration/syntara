@@ -30,36 +30,6 @@ async function waitForBadge(app: Page, name: string, count?: number) {
   }
 }
 
-test.skip('node status badges show success after execution completes', async ({ app }) => {
-  test.setTimeout(120_000)
-  const workflowName = buildUniqueName('e2e-manual-run-badge')
-  const { id: workflowId } = await createWorkflowViaApi(
-    app,
-    workflowName,
-    [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
-    [
-      {
-        id: 'action_1',
-        type: 'script',
-        name: 'Test action',
-        parameters: { language: 'python', code: "print('hi')" },
-      },
-    ],
-    [{ from: 'trigger_1', to: 'action_1' }]
-  )
-  try {
-    await openBuilderById(app, workflowId)
-    await expect(app.getByText('Manual trigger')).toBeVisible({ timeout: 30_000 })
-
-    await app.getByRole('button', { name: 'Run' }).click()
-    await app.getByRole('dialog').getByRole('button', { name: 'Run now' }).click()
-
-    await waitForBadge(app, 'Success', 2)
-  } finally {
-    await deleteWorkflowViaApi(app, workflowId)
-  }
-})
-
 test.skip('failed nodes show an error status badge', async ({ app }) => {
   test.setTimeout(120_000)
   const workflowName = buildUniqueName('e2e-manual-run-fail')
