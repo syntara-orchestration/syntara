@@ -143,7 +143,7 @@ class TestFilterableModel:
             FilterableModel(NoFilterModel)
 
     def test_raises_error_for_undeclared_virtual_field(self):
-        """Field in __filterable_fields__ but not in model_fields or __virtual_filterable_field_types__ should error."""
+        """Field in list-format __filterable_fields__ but not in model_fields should error (use dict format for virtual fields)."""
         from syntara.core.openapi.filterable import FilterableModel
 
         class VirtualFieldModel(SQLModel, table=False):
