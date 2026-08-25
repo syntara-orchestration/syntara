@@ -154,18 +154,15 @@ test.describe('Approval Workflow Operations', () => {
       await expect(rows.filter({ hasText: approval2.approvalName })).toBeVisible({ timeout: 15_000 })
       await rows.filter({ hasText: approval2.approvalName }).getByRole('checkbox').check()
 
-      // Step 2: Verify batch toolbar appears with count
-      const batchToolbar = app.getByRole('toolbar', { name: /selected/i })
-      await expect(batchToolbar).toBeVisible()
-      await expect(app.getByText('2 selected')).toBeVisible()
+      // Bulk actions live in the page header (Compass toolbar has no accessible name).
+      const pageHeader = app.getByTestId('page-header')
+      await expect(pageHeader.getByText('2 selected')).toBeVisible()
 
-      // Step 3: Verify batch action buttons are visible
-      const approveButton = app.getByRole('button', { name: 'Approve' })
-      const rejectButton = app.getByRole('button', { name: 'Reject' })
+      const approveButton = pageHeader.getByRole('button', { name: 'Approve' })
+      const rejectButton = pageHeader.getByRole('button', { name: 'Reject' })
       await expect(approveButton).toBeVisible()
       await expect(rejectButton).toBeVisible()
 
-      // Step 4: Click "Approve Selected" and verify confirmation dialog
       await approveButton.click()
 
       const dialog = app.getByRole('dialog')
@@ -185,9 +182,7 @@ test.describe('Approval Workflow Operations', () => {
       // Step 7: Verify success notification
       await expect(app.getByText('Approvals submitted')).toBeVisible({ timeout: 10_000 })
 
-      // Step 8: Verify selection cleared (batch toolbar should disappear)
-      await expect(batchToolbar).not.toBeVisible()
-      await expect(app.getByText('2 selected')).not.toBeVisible()
+      await expect(pageHeader.getByText('2 selected')).not.toBeVisible()
 
       // Step 9: Verify checkboxes are unchecked
       await expect(rows.filter({ hasText: approval1.approvalName }).getByRole('checkbox')).not.toBeChecked()
@@ -287,12 +282,10 @@ test.describe('Approval Workflow Operations', () => {
       const row = table.getByRole('row').filter({ hasText: approval.approvalName })
       await expect(row).toBeVisible({ timeout: 15_000 })
       await row.getByRole('checkbox').check()
-      const batchToolbar = app.getByRole('toolbar', { name: /selected/i })
-      await expect(batchToolbar).toBeVisible()
-      await expect(app.getByText('1 selected')).toBeVisible()
+      const pageHeader = app.getByTestId('page-header')
+      await expect(pageHeader.getByText('1 selected')).toBeVisible()
 
-      // Step 2: Click "Approve Selected" from the batch toolbar (not a row action)
-      await batchToolbar.getByRole('button', { name: 'Approve' }).click()
+      await pageHeader.getByRole('button', { name: 'Approve' }).click()
 
       // Step 3: Verify dialog appears
       const dialog = app.getByRole('dialog')
@@ -306,9 +299,7 @@ test.describe('Approval Workflow Operations', () => {
       // Step 5: Verify dialog closed
       await expect(dialog).not.toBeVisible()
 
-      // Step 6: Verify selection is still active (no API call was made)
-      await expect(batchToolbar).toBeVisible()
-      await expect(app.getByText('1 selected')).toBeVisible()
+      await expect(pageHeader.getByText('1 selected')).toBeVisible()
 
       // Step 7: Deselect to clean up
       await row.getByRole('checkbox').uncheck()
@@ -473,20 +464,13 @@ test.describe('Approval Workflow Operations', () => {
       await expect(selectAllCheckbox).toBeEnabled()
       await selectAllCheckbox.check()
 
-      // Step 2: Verify all approvals are selected (2 in this case)
-      const selectedText = app.getByText('2 selected')
+      const pageHeader = app.getByTestId('page-header')
+      const selectedText = pageHeader.getByText('2 selected')
       await expect(selectedText).toBeVisible({ timeout: 10_000 })
 
-      // Step 3: Verify batch toolbar is visible
-      const batchToolbar = app.getByRole('toolbar', { name: /selected/i })
-      await expect(batchToolbar).toBeVisible()
-
-      // Step 4: Uncheck header checkbox to deselect all
       await selectAllCheckbox.uncheck()
 
-      // Step 5: Verify selection cleared
       await expect(selectedText).not.toBeVisible()
-      await expect(batchToolbar).not.toBeVisible()
 
       // Step 6: Verify all checkboxes are unchecked
       await expect(rows.filter({ hasText: approval1.approvalName }).getByRole('checkbox')).not.toBeChecked()
