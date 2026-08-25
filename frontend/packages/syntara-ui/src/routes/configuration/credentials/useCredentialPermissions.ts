@@ -5,11 +5,13 @@ import { useCanI } from '../../../hooks/useCanI'
 
 type CredentialPermissions = {
   canCreate: boolean
+  canRead: boolean
   canUpdate: boolean
   canDelete: boolean
   isLoading: boolean
   tooltips: {
     create: string
+    read: string
     update: string
     enable: string
     delete: string
@@ -37,8 +39,12 @@ type UseCredentialPermissionsOptions = {
 /**
  * Permission checks for credential actions.
  *
- * Checks: credential:create, credential:update, credential:delete.
+ * Checks: credential:read, credential:create, credential:update, credential:delete.
  * All values default to `false` (safe-false) until the checks resolve.
+ *
+ * @note All authorization checks require backend enforcement on credential endpoints.
+ * Client-side permission gates are for UX only; backend MUST verify READ, CREATE, UPDATE,
+ * DELETE permissions on GET, POST, PATCH, DELETE endpoints respectively.
  */
 export function useCredentialPermissions(options?: UseCredentialPermissionsOptions): CredentialPermissions {
   const resourceType = 'credential' as const
@@ -49,23 +55,36 @@ export function useCredentialPermissions(options?: UseCredentialPermissionsOptio
   const createOptions = hasProject ? { resourceProject, enabled } : { checkAnyProject: true as const, enabled }
   const scopedOptions = hasProject ? { resourceProject, enabled } : { enabled }
 
+  const { allowed: canRead, isChecking: isCheckingRead } = useCanI('read', resourceType, scopedOptions)
   const { allowed: canCreate, isChecking: isCheckingCreate } = useCanI('create', resourceType, createOptions)
   const { allowed: canUpdate, isChecking: isCheckingUpdate } = useCanI('update', resourceType, scopedOptions)
   const { allowed: canDelete, isChecking: isCheckingDelete } = useCanI('delete', resourceType, scopedOptions)
 
   return useMemo(
     () => ({
+      canRead,
       canCreate,
       canUpdate,
       canDelete,
-      isLoading: !enabled || isCheckingCreate || isCheckingUpdate || isCheckingDelete,
+      isLoading: !enabled || isCheckingRead || isCheckingCreate || isCheckingUpdate || isCheckingDelete,
       tooltips: {
         create: permissionTooltip('create a credential', 'credential:create'),
+        read: permissionTooltip('view this credential', 'credential:read'),
         update: permissionTooltip('edit this credential', 'credential:update'),
         enable: permissionTooltip('enable or disable this credential', 'credential:update'),
         delete: permissionTooltip('delete this credential', 'credential:delete'),
       },
     }),
-    [canCreate, canUpdate, canDelete, enabled, isCheckingCreate, isCheckingUpdate, isCheckingDelete]
+    [
+      canRead,
+      canCreate,
+      canUpdate,
+      canDelete,
+      enabled,
+      isCheckingRead,
+      isCheckingCreate,
+      isCheckingUpdate,
+      isCheckingDelete,
+    ]
   )
 }

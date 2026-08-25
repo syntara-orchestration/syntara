@@ -877,11 +877,13 @@ describe('CredentialDetail', () => {
   it('disables Edit button when user lacks credential:update permission', () => {
     vi.mocked(useCredentialPermissions).mockReturnValue({
       canCreate: true,
+      canRead: true,
       canUpdate: false,
       canDelete: true,
       isLoading: false,
       tooltips: {
         create: 'create tooltip',
+        read: 'read tooltip',
         update: 'You need credential:update permission to edit this credential.',
         enable: 'enable tooltip',
         delete: 'delete tooltip',
@@ -897,11 +899,13 @@ describe('CredentialDetail', () => {
   it('disables Enable/Disable toggle when user lacks credential:update permission', () => {
     vi.mocked(useCredentialPermissions).mockReturnValue({
       canCreate: true,
+      canRead: true,
       canUpdate: false,
       canDelete: true,
       isLoading: false,
       tooltips: {
         create: 'create tooltip',
+        read: 'read tooltip',
         update: 'You need credential:update permission to edit this credential.',
         enable: 'enable tooltip',
         delete: 'delete tooltip',
@@ -917,11 +921,13 @@ describe('CredentialDetail', () => {
   it('disables Delete kebab action when user lacks credential:delete permission', async () => {
     vi.mocked(useCredentialPermissions).mockReturnValue({
       canCreate: true,
+      canRead: true,
       canUpdate: true,
       canDelete: false,
       isLoading: false,
       tooltips: {
         create: 'create tooltip',
+        read: 'read tooltip',
         update: 'update tooltip',
         enable: 'enable tooltip',
         delete: 'You need credential:delete permission to delete this credential.',

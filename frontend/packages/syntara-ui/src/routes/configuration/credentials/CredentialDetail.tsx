@@ -91,6 +91,43 @@ function DynamicCredentialFields({ typeFields, credInputs }: Readonly<DynamicFie
   })
 }
 
+type AccessCheckProps = {
+  isPermissionsLoading: boolean
+  canRead: boolean
+  readTooltip: string
+}
+
+function AccessCheck({ isPermissionsLoading, canRead, readTooltip }: Readonly<AccessCheckProps>) {
+  // Gate credential data display on both load completion AND read authorization
+  if (isPermissionsLoading) {
+    return (
+      <SynPage>
+        <SynPageTitle segments={['Credential', 'Credentials']} />
+        <SynPageHeader title="Credential" breadcrumbs={breadcrumbsCredentialEarlyShell('Credential')} />
+        <SynPageBody>
+          <SynPanel isFullHeight />
+        </SynPageBody>
+      </SynPage>
+    )
+  }
+
+  if (!canRead) {
+    return (
+      <SynPage>
+        <SynPageTitle segments={['Credential', 'Credentials']} />
+        <SynPageHeader title="Credential" breadcrumbs={breadcrumbsCredentialEarlyShell('Credential')} />
+        <SynPageBody>
+          <SynPanel isFullHeight>
+            <SynErrorState title="Access Denied" message={readTooltip} />
+          </SynPanel>
+        </SynPageBody>
+      </SynPage>
+    )
+  }
+
+  return null
+}
+
 type CredentialDetailToolbarProps = {
   credential: Credential
   canUpdate: boolean
@@ -158,7 +195,7 @@ function filterTabsByPermission(
   return ALL_CREDENTIAL_TABS.filter((tab) => tabPermissions[tab] ?? true)
 }
 
-// eslint-disable-next-line max-lines-per-function -- detail page with multiple tabs, dialogs, and toolbar actions
+// eslint-disable-next-line max-lines-per-function, complexity -- detail page with multiple tabs, dialogs, toolbar actions, and permission checks
 export default function CredentialDetail() {
   const credentialsDocLink = useDocLink('credentials')
   const { credentialId }: { credentialId: string } = useParams({ strict: false })
@@ -183,6 +220,7 @@ export default function CredentialDetail() {
   const credential = credQuery.data
 
   const {
+    canRead,
     canUpdate,
     canDelete,
     isLoading: isPermissionsLoading,
@@ -333,6 +371,11 @@ export default function CredentialDetail() {
   }
 
   if (!credential?.id) return null
+
+  const accessCheckResult = (
+    <AccessCheck isPermissionsLoading={isPermissionsLoading} canRead={canRead} readTooltip={tooltips.read} />
+  )
+  if (accessCheckResult) return accessCheckResult
 
   const credInputs = credential.inputs ?? {}
   const credentialTypeDisplayText = getTypeDisplayText(credType?.name, typeLoadError)
