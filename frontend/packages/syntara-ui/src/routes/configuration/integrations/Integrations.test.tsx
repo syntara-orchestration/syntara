@@ -11,6 +11,7 @@ import { useFilterState } from '../../../hooks/useFilterState'
 import { AlertProvider } from '../../../providers/alerts'
 import { assertUrlParam } from '../../../test/filter-test-helpers'
 import { routerTestState } from '../../../test/setup'
+import { formatDateTime } from '../../../utils/dateUtils.ts'
 
 import Integrations from './Integrations'
 
@@ -109,6 +110,7 @@ describe('Integrations Component', () => {
         ],
       },
       enabled_tool_count: 5,
+      last_validated_at: '2024-01-15T10:00:00Z',
       created_at: '2023-01-01T00:00:00Z',
       updated_at: '2023-01-02T00:00:00Z',
     },
@@ -127,6 +129,7 @@ describe('Integrations Component', () => {
         discovered_tools: [{ name: 'tool1' }, { name: 'tool2' }, { name: 'tool3' }],
       },
       enabled_tool_count: 3,
+      last_validated_at: '2024-01-16T11:00:00Z',
       created_at: '2023-02-01T00:00:00Z',
       updated_at: '2023-02-02T00:00:00Z',
     },
@@ -144,6 +147,7 @@ describe('Integrations Component', () => {
         discovered_tools: Array.from({ length: 8 }, (_, i) => ({ name: `tool${String(i + 1)}` })),
       },
       enabled_tool_count: 8,
+      last_validated_at: null,
       created_at: '2023-03-01T00:00:00Z',
       updated_at: '2023-03-02T00:00:00Z',
     },
@@ -359,6 +363,28 @@ describe('Integrations Component', () => {
       expect(screen.getByText('https://primary.example.com')).toBeInTheDocument()
       expect(screen.getByText('https://secondary.example.com')).toBeInTheDocument()
       expect(screen.getByText('https://dev.example.com')).toBeInTheDocument()
+    })
+
+    it('renders Last checked column header', () => {
+      render(<Integrations />, { wrapper })
+
+      expect(screen.getByRole('columnheader', { name: /Last checked/i })).toBeInTheDocument()
+    })
+
+    it('renders formatted last_validated_at timestamp in Last checked column', () => {
+      render(<Integrations />, { wrapper })
+
+      const rows = screen.getAllByRole('row')
+      const firstDataRow = rows[1]
+      expect(within(firstDataRow).getByText(formatDateTime('2024-01-15T10:00:00Z'))).toBeInTheDocument()
+    })
+
+    it('renders dash for null last_validated_at', () => {
+      render(<Integrations />, { wrapper })
+
+      const rows = screen.getAllByRole('row')
+      const thirdDataRow = rows[3]
+      expect(within(thirdDataRow).getByText('-')).toBeInTheDocument()
     })
   })
 
@@ -858,10 +884,10 @@ describe('Integrations Component', () => {
       )
     })
 
-    it('renders sortable headers for name, status, type, and state', () => {
+    it('renders sortable headers for name, status, type, last checked, and state', () => {
       render(<Integrations />, { wrapper })
 
-      for (const name of [/server name/i, /^Status$/i, /Integration type/i, /^State$/i]) {
+      for (const name of [/server name/i, /^Status$/i, /Integration type/i, /Last checked/i, /^State$/i]) {
         const header = screen.getByRole('columnheader', { name })
         expect(within(header).getByRole('button')).toBeInTheDocument()
       }
@@ -909,6 +935,18 @@ describe('Integrations Component', () => {
 
       await waitFor(() => {
         assertUrlParam(mockSetSearchParams, 'sort', 'enabled')
+      })
+    })
+
+    it('can sort by last_validated_at via the Last checked column', async () => {
+      const user = userEvent.setup()
+      render(<Integrations />, { wrapper })
+
+      const lastCheckedHeader = screen.getByRole('columnheader', { name: /Last checked/i })
+      await user.click(within(lastCheckedHeader).getByRole('button'))
+
+      await waitFor(() => {
+        assertUrlParam(mockSetSearchParams, 'sort', 'last_validated_at')
       })
     })
 

@@ -18,6 +18,7 @@ import { useAlerts } from '../../providers/alerts'
 import type { FilterConfig } from '../../types/filters'
 import { detachPromise } from '../../utils/detachPromise'
 import { useDocLink } from '../../utils/docs/useDocLink'
+import { canvasNodeIdFromApprovalNodeId } from '../approvals/approvalNodeId'
 import { ExecutionDetailsPanel, type WorkflowDefShape } from '../builder/ExecutionDetailsPanel'
 import { ExecutionViewContent } from '../builder/ExecutionViewContent'
 import { useActivityNameMap } from '../builder/useActivityNameMap'
@@ -428,7 +429,9 @@ export default function ExecutionDetail() {
             selectedNodeId={selectedNodeId}
             selectedNodeName={selectedNodeName}
             onNodeSelect={selectNode}
-            currentApprovalNodeId={currentApproval?.approval_node_id}
+            currentApprovalNodeId={
+              currentApproval ? canvasNodeIdFromApprovalNodeId(currentApproval.approval_node_id) : undefined
+            }
           />
         </SynPageBody>
       </SynReactFlowViewportGuard>

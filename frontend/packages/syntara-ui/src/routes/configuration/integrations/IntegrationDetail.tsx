@@ -38,6 +38,7 @@ import { NxLink } from '../../../components/NxLink'
 import { SynErrorState } from '../../../components/states/SynErrorState'
 import { useQueryState } from '../../../components/states/useQueryState'
 import { SynPageTitle } from '../../../components/SynPageTitle'
+import { DateCell } from '../../../components/table/DateCell.tsx'
 import { NxUrlTabs } from '../../../components/tabs/NxUrlTabs'
 import { useUrlTab } from '../../../hooks/useUrlTab'
 import { detachPromise } from '../../../utils/detachPromise'
@@ -113,6 +114,9 @@ function IntegrationDetailsTab({
               status={integration.validation_status ?? 'unknown'}
               errorMessage={integration.validation_error}
             />
+          </NxDetail>
+          <NxDetail label="Last checked">
+            <DateCell dateString={integration.last_validated_at} />
           </NxDetail>
           <NxDetail label="Scope">{integration.scope === 'project' ? 'Project' : 'Global'}</NxDetail>
           {integration.scope === 'project' && integration.id && (

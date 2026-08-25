@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildExpression } from './templateBuilder'
+import { buildExpression, canvasNodeIdForExpression } from './templateBuilder'
 
 describe('buildExpression', () => {
   it('builds simple field reference', () => {
@@ -43,6 +43,14 @@ describe('buildExpression', () => {
     expect(result).toBe('${step_5_data.items[0].name}')
   })
 
+  it('strips execution composite iteration keys to the canvas node ID', () => {
+    const result = buildExpression({
+      nodeId: 'approval2#iter-5',
+      fieldPath: ['status'],
+    })
+    expect(result).toBe('${approval2.status}')
+  })
+
   it('throws error for invalid node ID with special characters', () => {
     expect(() =>
       buildExpression({
@@ -83,5 +91,15 @@ describe('buildExpression', () => {
       fieldPath: ['field_name'],
     })
     expect(result).toBe('${step_1.field_name}')
+  })
+})
+
+describe('canvasNodeIdForExpression', () => {
+  it('returns canvas IDs unchanged', () => {
+    expect(canvasNodeIdForExpression('approval2')).toBe('approval2')
+  })
+
+  it('strips a composite iteration suffix', () => {
+    expect(canvasNodeIdForExpression('approval2#iter-5')).toBe('approval2')
   })
 })

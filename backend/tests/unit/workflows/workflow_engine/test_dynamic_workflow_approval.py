@@ -186,7 +186,7 @@ class TestPrepareApprovalArgs:
 
     @pytest.mark.asyncio
     async def test_basic_approval_args(self) -> None:
-        """Returns 9-element arg list with correct structure (added approver_user_ids and approver_group_ids)."""
+        """Returns a 12-element arg list with canvas node id and Temporal activity id."""
         resolver = NamespaceResolver()
         resolver.set_namespace("trigger", {"env": "production"})
         wf = _make_workflow(execution_id="exec-456", resolver=resolver)
@@ -199,12 +199,70 @@ class TestPrepareApprovalArgs:
         with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
             args = await wf._prepare_approval_args(node, graph, node.parameters)
 
-        assert len(args) == 10
+        assert len(args) == 12
         assert args[0] == "exec-456"  # execution_id
-        assert args[1] == "approval"  # approval_node_id
+        assert args[1] == "approval"  # canvas approval_node_id
         assert args[2] == "Review Deployment"  # name
         assert args[7] is None  # approver_user_ids (None when no approvers configured)
         assert args[8] is None  # approver_group_ids (None when no approvers configured)
+        assert args[10] == []  # loop_iteration_path
+        assert args[11] == "approval"  # temporal_activity_id
+
+    @pytest.mark.asyncio
+    async def test_approval_args_inside_loop_keeps_canvas_id(self) -> None:
+        """Loop-body approvals keep the canvas node id; path and Temporal id carry the index."""
+        wf = _make_workflow()
+        wf.loop_body_map["approval"] = "loop"
+        wf.node_control_data["loop"] = {"current_index": 1, "next_port": "iterate"}
+        graph = _build_approval_graph()
+        node = ActivityNode("approval", "approval", {}, name="Review Deployment")
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+            args = await wf._prepare_approval_args(node, graph, node.parameters)
+
+        assert args[1] == "approval"
+        assert args[10] == [1]
+        assert args[11] == "approval_iter_1"
+
+    @pytest.mark.asyncio
+    async def test_approval_args_inside_loop_first_iteration_uses_index_zero(self) -> None:
+        """First loop iteration still records path [0] and a unique Temporal id."""
+        wf = _make_workflow()
+        wf.loop_body_map["approval"] = "loop"
+        wf.node_control_data["loop"] = {"current_index": 0, "next_port": "iterate"}
+        graph = _build_approval_graph()
+        node = ActivityNode("approval", "approval", {}, name="Review Deployment")
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+            args = await wf._prepare_approval_args(node, graph, node.parameters)
+
+        assert args[1] == "approval"
+        assert args[10] == [0]
+        assert args[11] == "approval_iter_0"
+
+    @pytest.mark.asyncio
+    async def test_unpatched_replay_keeps_ten_approval_args(self) -> None:
+        """Pre-patch history scheduled 10 args; replay must not emit the two new ones."""
+        wf = _make_workflow()
+        wf.loop_body_map["approval"] = "loop"
+        wf.node_control_data["loop"] = {"current_index": 1, "next_port": "iterate"}
+        graph = _build_approval_graph()
+        node = ActivityNode("approval", "approval", {}, name="Review Deployment")
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with (
+            patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute),
+            patch(
+                "syntara.workflows.workflow_engine.approval_mixin.use_unique_loop_iteration_ids",
+                return_value=False,
+            ),
+        ):
+            args = await wf._prepare_approval_args(node, graph, node.parameters)
+
+        assert len(args) == 10
+        assert args[1] == "approval"
 
     @pytest.mark.asyncio
     async def test_approval_args_with_approver_config(self) -> None:
@@ -230,7 +288,7 @@ class TestPrepareApprovalArgs:
         with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
             args = await wf._prepare_approval_args(node, graph, config)
 
-        assert len(args) == 10
+        assert len(args) == 12
         assert args[7] == [alice_id, bob_id]  # approver_user_ids
         assert args[8] == [security_team_id, admins_id]  # approver_group_ids
 
@@ -477,12 +535,62 @@ class TestDispatchApprovalNode:
         approval_call = mock_activity.call_args_list[0]
         assert approval_call.args[0] == ActivityName.APPROVAL
         activity_args = approval_call.kwargs["args"]
-        assert len(activity_args) == 10
+        assert len(activity_args) == 12
         assert activity_args[0] == "exec-789"  # execution_id
-        assert activity_args[1] == "approval"  # approval_node_id
+        assert activity_args[1] == "approval"  # canvas approval_node_id
         assert activity_args[2] == "Review Deployment"  # name (from node.name)
         assert activity_args[3]["id"] == "deploy"  # next_step_approved
         assert activity_args[4]["workflow_name"] == "Production Pipeline"  # workflow_context
+        assert activity_args[10] == []
+        assert activity_args[11] == "approval"
+        assert approval_call.kwargs["activity_id"] == "approval"
+
+    @pytest.mark.asyncio
+    async def test_dispatch_inside_loop_uses_iteration_activity_id(self) -> None:
+        """Temporal activity_id is unique per iteration; approval_node_id stays the canvas id."""
+        wf = _make_workflow()
+        wf.loop_body_map["approval"] = "loop"
+        wf.node_control_data["loop"] = {"current_index": 2}
+        graph = _build_approval_graph()
+        node = graph.get_node("approval")
+
+        mock_activity = AsyncMock(return_value={"output": {"id": "apr-1", "decision": "approved"}})
+        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_activity):
+            await wf._dispatch_node_to_executor(node, {}, graph, timeout_seconds=300)
+
+        approval_call = mock_activity.call_args_list[0]
+        assert approval_call.kwargs["activity_id"] == "approval_iter_2"
+        assert approval_call.kwargs["args"][1] == "approval"
+        assert approval_call.kwargs["args"][10] == [2]
+        assert approval_call.kwargs["args"][11] == "approval_iter_2"
+
+    @pytest.mark.asyncio
+    async def test_unpatched_dispatch_keeps_canvas_activity_id_and_ten_args(self) -> None:
+        """Pre-patch replay schedules the canvas Temporal id with the original 10 args."""
+        wf = _make_workflow()
+        wf.loop_body_map["approval"] = "loop"
+        wf.node_control_data["loop"] = {"current_index": 2}
+        graph = _build_approval_graph()
+        node = graph.get_node("approval")
+
+        mock_activity = AsyncMock(return_value={"output": {"id": "apr-1", "decision": "approved"}})
+        with (
+            patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_activity),
+            patch(
+                "syntara.workflows.workflow_engine.approval_mixin.use_unique_loop_iteration_ids",
+                return_value=False,
+            ),
+            patch(
+                "syntara.workflows.workflow_engine.utils.loop_iteration_ids.use_unique_loop_iteration_ids",
+                return_value=False,
+            ),
+        ):
+            await wf._dispatch_node_to_executor(node, {}, graph, timeout_seconds=300)
+
+        approval_call = mock_activity.call_args_list[0]
+        assert approval_call.kwargs["activity_id"] == "approval"
+        assert len(approval_call.kwargs["args"]) == 10
+        assert approval_call.kwargs["args"][1] == "approval"
 
     @pytest.mark.asyncio
     async def test_dispatch_sets_approved_port(self) -> None:
@@ -841,3 +949,80 @@ class TestHandleNodeFailureBareApplicationError:
         ns = wf.resolver.get_namespace("approval")
         assert ns["status"] == "failed"
         assert ns["error"] == "something went wrong"
+
+
+class TestApprovalActivityId:
+    """Tests for canvas approval_node_id vs Temporal activity IDs."""
+
+    def test_outside_loop_returns_canvas_node_id(self) -> None:
+        """Approvals not in a loop body keep the canvas node ID as the Temporal id."""
+        wf = _make_workflow()
+        assert wf._approval_activity_id("approval") == "approval"
+        assert wf._loop_iteration_path("approval") == []
+
+    def test_inside_loop_appends_iteration_index(self) -> None:
+        """Loop-body Temporal IDs incorporate the current iteration index."""
+        wf = _make_workflow()
+        wf.loop_body_map["approval"] = "loop"
+        wf.node_control_data["loop"] = {"current_index": 3}
+        assert wf._approval_activity_id("approval") == "approval_iter_3"
+        assert wf._loop_iteration_path("approval") == [3]
+
+    def test_inside_loop_defaults_to_index_zero(self) -> None:
+        """Missing control data still produces a suffixed Temporal ID for uniqueness."""
+        wf = _make_workflow()
+        wf.loop_body_map["approval"] = "loop"
+        assert wf._approval_activity_id("approval") == "approval_iter_0"
+        assert wf._loop_iteration_path("approval") == [0]
+
+    def test_nested_loop_encodes_outer_then_inner_index(self) -> None:
+        """Nested loops include every enclosing index so inner resets stay unique."""
+        wf = _make_workflow()
+        wf.loop_body_map["approval"] = "inner_loop"
+        wf.loop_body_map["inner_loop"] = "outer_loop"
+        wf.node_control_data["inner_loop"] = {"current_index": 0}
+        wf.node_control_data["outer_loop"] = {"current_index": 2}
+        assert wf._approval_activity_id("approval") == "approval_iter_2_iter_0"
+        assert wf._loop_iteration_path("approval") == [2, 0]
+
+    def test_nested_loop_second_outer_iteration_is_distinct(self) -> None:
+        """The same inner index under a new outer index does not reuse the Temporal ID."""
+        wf = _make_workflow()
+        wf.loop_body_map["approval"] = "inner_loop"
+        wf.loop_body_map["inner_loop"] = "outer_loop"
+        wf.node_control_data["inner_loop"] = {"current_index": 0}
+        wf.node_control_data["outer_loop"] = {"current_index": 0}
+        first = wf._approval_activity_id("approval")
+        wf.node_control_data["outer_loop"] = {"current_index": 1}
+        second = wf._approval_activity_id("approval")
+        assert first == "approval_iter_0_iter_0"
+        assert second == "approval_iter_1_iter_0"
+        assert first != second
+
+    def test_unpatched_replay_keeps_canvas_temporal_id(self) -> None:
+        """Pre-patch in-flight executions keep Temporal activity_id equal to the canvas id."""
+        wf = _make_workflow()
+        wf.loop_body_map["approval"] = "loop"
+        wf.node_control_data["loop"] = {"current_index": 3}
+        with patch(
+            "syntara.workflows.workflow_engine.utils.loop_iteration_ids.use_unique_loop_iteration_ids",
+            return_value=False,
+        ):
+            assert wf._approval_activity_id("approval") == "approval"
+            assert wf._loop_iteration_path("approval") == [3]
+
+    @pytest.mark.asyncio
+    async def test_expire_uses_canvas_node_id(self) -> None:
+        """Timeout expire filters by canvas node id; the expire activity id stays unique."""
+        wf = _make_workflow()
+        wf.loop_body_map["approval"] = "loop"
+        wf.node_control_data["loop"] = {"current_index": 1}
+
+        mock_execute = AsyncMock()
+        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+            await wf._expire_approval_requests("approval")
+
+        mock_execute.assert_called_once()
+        call = mock_execute.call_args
+        assert call.kwargs["args"] == ["exec-123", "approval"]
+        assert call.kwargs["activity_id"] == "__internal__expire_approval_approval_iter_1"
