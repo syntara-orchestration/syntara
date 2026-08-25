@@ -297,6 +297,9 @@ export async function selectProjectIfRequired(page: Page, projectName?: string) 
   // already selected and no action is needed.
   if ((await projectInput.count()) === 0) return
 
+  // On saved workflows the project selector is disabled (project already assigned).
+  if (!(await projectInput.isEnabled())) return
+
   await projectInput.click()
   await page.getByRole('option').first().waitFor({ state: 'visible', timeout: 10_000 })
 

@@ -66,7 +66,7 @@ export function AIAgentNodeDetails({
 
   const existingFileIds = agentConfig.file_ids ?? agentConfig.fileIds ?? []
 
-  const handleSubmit = (data: AIAgentFormSubmitData) => {
+  const handleSubmit = (data: AIAgentFormSubmitData): boolean => {
     try {
       const updatedActivity = createAgenticActivity({
         id: nodeId,
@@ -87,11 +87,13 @@ export function AIAgentNodeDetails({
 
       updateActivity(nodeId, updatedActivity)
       onClose()
+      return true
     } catch (error) {
       showError({
         title: 'Update failed',
         description: error instanceof Error ? error.message : 'Failed to update task agent step',
       })
+      return false
     }
   }
 

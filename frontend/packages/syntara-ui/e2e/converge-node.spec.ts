@@ -264,11 +264,12 @@ test.describe('Converge Node - E2E Tests', () => {
       }
     })
 
-    test.skip('Round-trip persistence of "any" strategy configuration', async ({ app }) => {
+    test('Round-trip persistence of "any" strategy configuration', async ({ app }) => {
       const wfName = await createWorkflowWithBranchesForConverge(app)
 
       try {
         await addConvergeNodeWithAnyStrategy(app, 'Converge Any Persist', 5)
+        await triggerLayout(app)
 
         const saveRequestPromise = app.waitForRequest(
           (req) => req.url().includes('/workflows') && req.method() === 'POST'

@@ -262,7 +262,9 @@ test.describe('Approval Workflow Operations', () => {
     }
   })
 
-  test('user cancels batch approval without API call', async ({ app }) => {
+  // Temporal-backed pending approval + table filter/selection flakes under Konflux load.
+  // Sibling batch-approve tests already use @konflux-skip. Still runs in GitHub compose E2E.
+  test('user cancels batch approval without API call', { tag: ['@konflux-skip'] }, async ({ app }) => {
     // Create a pending approval to test cancel behavior
     const approval = await createPendingApproval(app)
 

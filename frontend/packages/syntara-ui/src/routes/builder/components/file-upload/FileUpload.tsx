@@ -33,6 +33,8 @@ export type FileUploadProps = {
   onFileDownloadCancel?: (fileId: string) => void
   /** File ids currently being downloaded (shows spinner on each card's download action). */
   downloadingFileIds?: ReadonlySet<string>
+  /** File ids currently being deleted from the server (shows spinner on each card's remove action). */
+  deletingFileIds?: ReadonlySet<string>
   /** When false, hides the remove action on file cards. Default: true. */
   canRemove?: boolean
   maxFiles?: number
@@ -103,6 +105,7 @@ function UploadStatusToggle({ variant, text }: { variant: 'danger' | 'success' |
 }
 
 const EMPTY_DOWNLOADING_FILE_IDS: ReadonlySet<string> = new Set()
+const EMPTY_DELETING_FILE_IDS: ReadonlySet<string> = new Set()
 
 export function FileUpload({
   onFilesSelected,
@@ -110,6 +113,7 @@ export function FileUpload({
   onFileDownload,
   onFileDownloadCancel,
   downloadingFileIds = EMPTY_DOWNLOADING_FILE_IDS,
+  deletingFileIds = EMPTY_DELETING_FILE_IDS,
   canRemove = true,
   maxFiles,
   maxSizeBytes,
@@ -222,6 +226,7 @@ export function FileUpload({
               onDownload={onFileDownload ? () => onFileDownload(uploadedFile.id, uploadedFile.file.name) : undefined}
               onCancelDownload={onFileDownloadCancel ? () => onFileDownloadCancel(uploadedFile.id) : undefined}
               isDownloading={downloadingFileIds.has(uploadedFile.id)}
+              isDeleting={deletingFileIds.has(uploadedFile.id)}
               downloadButtonAriaLabel={`Download ${uploadedFile.file.name}`}
               cancelDownloadAriaLabel={`Cancel download of ${uploadedFile.file.name}`}
               removeButtonAriaLabel={`Remove ${uploadedFile.file.name}`}
