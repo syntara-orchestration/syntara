@@ -3,7 +3,6 @@ import {
   findApprovalForCanvasNode,
   findApprovalIndexForCanvasNode,
   findNodeByApprovalNodeId,
-  innermostLoopIterationIndex,
   lookupMapByApprovalNodeId,
   matchesApprovalNodeId,
 } from './approvalNodeId'
@@ -161,19 +160,5 @@ describe('lookupMapByApprovalNodeId', () => {
   it('returns undefined for a missing map or id', () => {
     expect(lookupMapByApprovalNodeId(undefined, 'a1')).toBeUndefined()
     expect(lookupMapByApprovalNodeId(map, null)).toBeUndefined()
-  })
-})
-
-describe('innermostLoopIterationIndex', () => {
-  it('uses loop_iteration_path when present', () => {
-    expect(innermostLoopIterationIndex({ approval_node_id: 'a1', loop_iteration_path: [1, 0] })).toBe(0)
-  })
-
-  it('falls back to a legacy suffix', () => {
-    expect(innermostLoopIterationIndex({ approval_node_id: 'a1_iter_3' })).toBe(3)
-  })
-
-  it('returns undefined when the node is not in a loop', () => {
-    expect(innermostLoopIterationIndex({ approval_node_id: 'a1' })).toBeUndefined()
   })
 })

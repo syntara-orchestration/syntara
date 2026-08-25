@@ -68,11 +68,6 @@ function pickLatestLoopApproval<T extends ApprovalNodeRef>(matches: T[]): T | un
   )
 }
 
-export function innermostLoopIterationIndex(approval: ApprovalNodeRef): number | undefined {
-  const key = iterationSortKey(approval)
-  return key.length > 0 ? key[key.length - 1] : undefined
-}
-
 export function findApprovalForCanvasNode<T extends ApprovalNodeRef>(
   approvals: T[],
   canvasOrActivityId: string

@@ -606,4 +606,35 @@ describe('useExecutionApprovalPanel', () => {
     expect(result.current.panelOpen).toBe(false)
     expect(mockClearApprovals).toHaveBeenCalled()
   })
+
+  it('does not dismiss a nested pass when an earlier canvas record is already completed', async () => {
+    mockFetchApprovals.mockResolvedValue([])
+    const nestedApproval = { ...mockApproval, loop_iteration_path: [1, 0] }
+    const nodeClick = makeNodeClick(nestedApproval, [nestedApproval])
+
+    storeHelpers.setStatus('node-1', 'completed')
+    storeHelpers.setStatus('node-1#iter-0', 'completed')
+    storeHelpers.setStatus('node-1#iter-3', 'waiting')
+
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', nodeClick, undefined))
+
+    act(() => result.current.open())
+    expect(result.current.panelOpen).toBe(true)
+
+    await act(async () => {
+      storeHelpers.setStatus('node-1', 'completed')
+      await vi.runAllTimersAsync()
+    })
+
+    expect(result.current.panelOpen).toBe(true)
+    expect(mockClearApprovals).not.toHaveBeenCalled()
+
+    await act(async () => {
+      storeHelpers.setStatus('node-1#iter-3', 'failed')
+      await vi.runAllTimersAsync()
+    })
+
+    expect(result.current.panelOpen).toBe(false)
+    expect(mockClearApprovals).toHaveBeenCalled()
+  })
 })
