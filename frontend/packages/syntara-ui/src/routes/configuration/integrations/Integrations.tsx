@@ -21,6 +21,7 @@ import {
   NxListPanelView,
 } from '../../../components/panels/list/NxListPanel'
 import { SynPageTitle } from '../../../components/SynPageTitle'
+import { DateCell } from '../../../components/table/DateCell'
 import { LinkCell } from '../../../components/table/LinkCell'
 import { useCursorPagination, useCursorReset } from '../../../hooks/useCursorPagination'
 import type { FilterFieldDefinition } from '../../../types/filters'
@@ -93,6 +94,7 @@ function IntegrationsTableContent({
           <Th sort={getSortParams('integration_type')}>Integration type</Th>
           <Th>API URL</Th>
           <Th>Enabled resources</Th>
+          <Th sort={getSortParams('last_validated_at')}>Last checked</Th>
           <Th sort={getSortParams('enabled')}>State</Th>
           <Th screenReaderText="Actions" />
         </Tr>
@@ -121,6 +123,9 @@ function IntegrationsTableContent({
             </Td>
             <Td dataLabel="Enabled resources">
               <Badge isRead>{getEnabledResourceCount(integration)}</Badge>
+            </Td>
+            <Td dataLabel="Last checked">
+              <DateCell dateString={integration.last_validated_at} />
             </Td>
             <Td dataLabel="State">
               {permissions.isLoading || !permissions.canUpdate ? (
