@@ -184,6 +184,15 @@ describe('FileUploadItem', () => {
       expect(screen.queryByLabelText('Remove file')).not.toBeInTheDocument()
     })
 
+    it('shows loading state on remove while deleting and hides download', () => {
+      const file = createFile('Report_Q2.pdf')
+      render(
+        <FileUploadItem file={file} fileId="1" status="success" onDownload={() => {}} onRemove={() => {}} isDeleting />
+      )
+      expect(screen.getByLabelText('Remove file')).toHaveAttribute('disabled')
+      expect(screen.queryByLabelText('Download file')).not.toBeInTheDocument()
+    })
+
     it('shows Cancel link while downloading and calls onCancelDownload', async () => {
       const user = userEvent.setup()
       const onCancelDownload = vi.fn()
