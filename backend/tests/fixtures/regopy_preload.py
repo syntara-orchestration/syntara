@@ -23,7 +23,7 @@ subprocess) still gates the production import order.
 """
 
 try:
-    import regopy  # noqa: F401  # librego_shared.so must map before greenlet
+    import regopy  # type: ignore[import-untyped]  # noqa: F401  # librego_shared.so must map before greenlet
 except (ImportError, OSError):
     # regopy unavailable (collection-only environments, or UBI images without
     # libatomic.so.1) — the session guard below sees no regopy and stands down.
