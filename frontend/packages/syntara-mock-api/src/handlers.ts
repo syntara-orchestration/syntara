@@ -464,6 +464,10 @@ export const handlers = [
             aVal = a.enabled ? '1' : '0'
             bVal = b.enabled ? '1' : '0'
             break
+          case 'last_validated_at':
+            aVal = a.last_validated_at ?? ''
+            bVal = b.last_validated_at ?? ''
+            break
           case 'created_at':
             aVal = a.created_at ?? ''
             bVal = b.created_at ?? ''

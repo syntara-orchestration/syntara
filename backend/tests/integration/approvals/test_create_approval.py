@@ -90,6 +90,7 @@ class TestCreateApprovalContract:
             "id",
             "execution_id",
             "approval_node_id",
+            "loop_iteration_path",
             "name",
             "status",
             "next_step_approved",
@@ -103,6 +104,7 @@ class TestCreateApprovalContract:
         # Validate specific field values
         assert data["execution_id"] == execution_id
         assert data["approval_node_id"] == "test_approval_node"
+        assert data["loop_iteration_path"] == []
         assert data["name"] == "Test Approval Request"
         assert data["status"] == ApprovalRequestStatus.PENDING.value
         assert data["timeout_at"] == "2024-12-31T23:59:59Z"  # Should be normalized
@@ -602,7 +604,10 @@ class TestCreateApprovalContract:
             response,
             error_type="https://api.example.com/errors/resource-conflict",
             title="Approval Already Requested",
-            detail="An approval request already exists for this execution and approval node",
+            detail=(
+                "An approval request already exists for this execution and approval node "
+                "'duplicate_test_node' with loop_iteration_path []"
+            ),
             code="APPROVAL_ALREADY_REQUESTED",
             retryable=False,
         )

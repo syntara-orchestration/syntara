@@ -2,7 +2,7 @@ import { Button, Label, TreeView, type TreeViewDataItem } from '@patternfly/reac
 import { RhUiExternalLinkIcon } from '@patternfly/react-icons'
 import { useCallback, useMemo } from 'react'
 
-import { buildExpression } from '../../../../utils/expressions/templateBuilder'
+import { buildExpression, canvasNodeIdForExpression } from '../../../../utils/expressions/templateBuilder'
 import { highlightText } from '../../../../utils/highlightText'
 import { CopyExpressionAction, DraggableTreeLeaf } from '../components/DraggableTreeLeaf'
 import { DRAG_TYPE_FIELD, type FieldDragData } from '../utils/dragTypes'
@@ -121,10 +121,11 @@ function LeafNode({ fieldKey, value, typeLabel, nodeId, pathKey, searchTerm }: R
 }
 
 export function InputSchemaView({ data, nodeId, searchTerm }: Readonly<InputSchemaViewProps>) {
+  const expressionNodeId = canvasNodeIdForExpression(nodeId)
   const treeData = useMemo(() => {
     if (!data) return []
-    return buildTreeData(data, nodeId, [], searchTerm)
-  }, [data, nodeId, searchTerm])
+    return buildTreeData(data, expressionNodeId, [], searchTerm)
+  }, [data, expressionNodeId, searchTerm])
 
   if (!data || treeData.length === 0) {
     return null
