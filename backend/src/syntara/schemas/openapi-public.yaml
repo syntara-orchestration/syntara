@@ -35806,7 +35806,8 @@ components:
           description: Group names whose members can approve
         prompt:
           anyOf:
-            - type: string
+            - maxLength: 2000
+              type: string
             - type: 'null'
           title: Prompt
           description: Message to display to approvers
