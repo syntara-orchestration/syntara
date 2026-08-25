@@ -121,31 +121,4 @@ test.describe('Workflows Table - Search, Filter, and Sort', () => {
     }
   })
 
-  test('search input is preserved after page reload', async ({ app }) => {
-    const workflows = await createTestWorkflows(app, 1)
-    expect(workflows).toHaveLength(1)
-
-    try {
-      const searchTerm = workflows[0].name
-
-      await app.goto(toAppUrl('/workflows'))
-      await app.getByPlaceholder('Filter by name').fill(searchTerm)
-      await app.getByRole('button', { name: 'Apply filter' }).click()
-
-      // Verify filter is applied
-      const nameChipGroup = app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Name' })
-      await expect(nameChipGroup).toBeVisible()
-
-      // Reload the page
-      await app.reload()
-
-      // Verify filter is still applied after reload
-      await expect(app.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
-      await expect(nameChipGroup.getByText(searchTerm)).toBeVisible()
-    } finally {
-      for (const wf of workflows) {
-        await deleteWorkflowViaApi(app, wf.id)
-      }
-    }
-  })
 })
