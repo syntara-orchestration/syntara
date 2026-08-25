@@ -180,7 +180,7 @@ function CredentialDetailToolbar({
           Edit credential
         </Button>
       </DisabledWithTooltip>
-      <NxKebabMenu actions={kebabActions} aria-label="Credential actions" />
+      <SynKebabMenu actions={kebabActions} aria-label="Credential actions" />
     </>
   )
 }
@@ -372,9 +372,7 @@ export default function CredentialDetail() {
 
   if (!credential?.id) return null
 
-  const accessCheckResult = (
-    <AccessCheck isPermissionsLoading={isPermissionsLoading} canRead={canRead} readTooltip={tooltips.read} />
-  )
+  const accessCheckResult = AccessCheck({ isPermissionsLoading, canRead, readTooltip: tooltips.read })
   if (accessCheckResult) return accessCheckResult
 
   const credInputs = credential.inputs ?? {}

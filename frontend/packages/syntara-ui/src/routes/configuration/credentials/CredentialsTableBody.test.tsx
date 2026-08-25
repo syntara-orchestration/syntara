@@ -15,10 +15,11 @@ vi.mock('../../../components/table/LinkCell', () => ({
 vi.mock('./useCredentialPermissions', () => ({
   useCredentialPermissions: () => ({
     canCreate: true,
+    canRead: true,
     canUpdate: true,
     canDelete: true,
     isLoading: false,
-    tooltips: { create: '', update: '', enable: '', delete: '' },
+    tooltips: { create: '', read: '', update: '', enable: '', delete: '' },
   }),
 }))
 
