@@ -23,10 +23,9 @@ export const addNodePanel = (page: Page) =>
  */
 export async function waitForUIReady(page: Page) {
   // Wait for ALL PF6 toast alerts to disappear, not just the first.
-  // PF6 Alert renders aria-live="polite" only, no role="alert" — getByRole('alert')
-  // returns zero elements immediately and is therefore a no-op wait. OUIA is the
-  // stable selector for PF6 toast alerts.
-  await expect(page.locator('[data-ouia-component-type="PF6/Alert"]'))
+  // Scoped to the toast AlertGroup container (AlertGroup has no OUIA attribute);
+  // inline page alerts (ValidationBanner, BuilderReadOnlyBanner, etc.) are excluded.
+  await expect(page.locator('.pf-v6-c-alert-group [data-ouia-component-type="PF6/Alert"]'))
     .toHaveCount(0, { timeout: 5000 })
     .catch(() => {})
 

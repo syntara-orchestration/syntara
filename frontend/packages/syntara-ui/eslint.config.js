@@ -572,6 +572,17 @@ export default tseslint.config(
               message:
                 "Import `test` from the local fixtures file (e2e/fixtures.ts) instead of @playwright/test directly. The local fixtures extend Playwright's test with Currents action fixtures for automatic flaky test quarantine.",
             },
+            {
+              group: ['@playwright/test'],
+              importNamePattern: '^Page$',
+              message:
+                "Import 'type Page' from '../fixtures' (or './fixtures'), which re-exports it. All Playwright primitives must flow through the project fixtures module.",
+            },
+            {
+              group: ['@syntara/contracts/src', '@syntara/contracts/src/**'],
+              message:
+                "Import from '@syntara/contracts' (the public entry point), not from internal source paths. Internal paths are not part of the published API and can break silently when the package restructures.",
+            },
           ],
         },
       ],
