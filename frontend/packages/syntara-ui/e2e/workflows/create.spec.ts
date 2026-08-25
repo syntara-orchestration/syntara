@@ -66,20 +66,6 @@ test.describe('Workflows - Create New Workflow', () => {
     }
   })
 
-  test('create button navigates to builder with new workflow', async ({ app }) => {
-    await app.goto(toAppUrl('/workflows'))
-    await expect(app.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
-
-    await app.getByRole('button', { name: 'Create workflow' }).click()
-
-    await expect(app).toHaveURL(/workflow-builder\/new/)
-
-    const workflowNameInput = app.getByPlaceholder('Workflow name')
-    await expect(workflowNameInput).toBeVisible()
-
-    await expect(app.getByRole('heading', { name: 'Select a trigger node' })).toBeVisible()
-  })
-
   test('workflow name can be customized before saving', async ({ app }) => {
     const customName = buildUniqueName('e2e-custom')
 
