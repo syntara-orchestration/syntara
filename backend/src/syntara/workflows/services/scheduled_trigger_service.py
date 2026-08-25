@@ -31,7 +31,7 @@ from temporalio.common import SearchAttributeKey, SearchAttributePair, TypedSear
 from temporalio.service import RPCError, RPCStatusCode
 
 from syntara.core.config.base import get_settings
-from syntara.core.tls.temporal import build_temporal_tls_config
+from syntara.core.temporal.client import CONNECTION_ERRORS, get_shared_client, invalidate_on_connection_error
 from syntara.workflows.exceptions import ScheduledTriggerSyncError, TriggerValidationError
 from syntara.workflows.utils.schedule_parser import (
     SCHEDULE_ID_PREFIX,
@@ -47,12 +47,21 @@ logger = structlog.stdlib.get_logger(__name__)
 
 SA_ORCHESTRATOR_WORKFLOW_ID = SearchAttributeKey.for_keyword("OrchestratorWorkflowId")
 
-_client_lock = asyncio.Lock()
-_cached_client: Client | None = None
-
+# Trinary cache for search-attribute availability.
+#
+# ``True``  — server confirmed the OrchestratorWorkflowId attribute is registered.
+#             Cached indefinitely (stable server-side fact).
+# ``False`` — any RPC error (UNAVAILABLE, UNIMPLEMENTED, PERMISSION_DENIED …)
+#             or wrong attribute type.  Cached for the process lifetime —
+#             operator service availability is a cluster-level property.
+# ``None``  — never probed.  The first caller to reach
+#             ``_ensure_search_attribute`` will probe and transition to
+#             ``True`` or ``False``.
+#
+# This cache is intentionally *decoupled* from the connection cache in
+# ``syntara.core.temporal.client``.  Connection liveness is orthogonal to
+# whether the search attribute is registered on the cluster.
 _search_attr_available: bool | None = None
-
-_CONNECTION_ERRORS = frozenset({RPCStatusCode.UNAVAILABLE, RPCStatusCode.DEADLINE_EXCEEDED})
 
 
 async def _update_schedule_with_retry(
@@ -78,19 +87,11 @@ async def _update_schedule_with_retry(
             await asyncio.sleep(2)
 
 
-def _invalidate_client_cache() -> None:
-    """Clear the cached Temporal client so the next call reconnects."""
-    global _cached_client, _search_attr_available  # noqa: PLW0603
-    _cached_client = None
-    _search_attr_available = None
-
-
 async def _ensure_search_attribute(client: Client) -> bool:
     """Ensure the OrchestratorWorkflowId search attribute is registered in Temporal.
 
     Returns True if the attribute is available for server-side filtering,
-    False if the Temporal server does not support it.  The result is cached
-    for the lifetime of the client connection.
+    False otherwise.  See ``_search_attr_available`` for the caching rules.
     """
     global _search_attr_available  # noqa: PLW0603
 
@@ -108,6 +109,7 @@ async def _ensure_search_attribute(client: Client) -> bool:
             logger.info("OrchestratorWorkflowId search attribute already registered")
             return True
         if attr_type is not None:
+            # Wrong type is a stable misconfiguration — cache permanently.
             logger.warning(
                 "OrchestratorWorkflowId has unexpected type, using prefix scan fallback",
                 type=attr_type,
@@ -134,6 +136,12 @@ async def _ensure_search_attribute(client: Client) -> bool:
         return True
 
     except RPCError as e:
+        # The early-return guard above guarantees _search_attr_available is
+        # None here — we only enter the try block on an uncached probe.
+        # Cache False for all RPC errors (connection or otherwise) — the
+        # operator service availability is a cluster-level property that
+        # won't change within a process lifetime.  Process restarts (e.g.
+        # pod reschedules) will re-probe on a fresh None state.
         _search_attr_available = False
         logger.info(
             "Custom search attributes not available, using prefix scan fallback",
@@ -141,31 +149,6 @@ async def _ensure_search_attribute(client: Client) -> bool:
             status=e.status.name,
         )
         return False
-
-
-async def _get_shared_client() -> Client | None:
-    """Return a module-level cached Temporal client.
-
-    Connects once and reuses across all ``ScheduledTriggerService`` instances
-    so that lifecycle hooks share a single gRPC connection.  The cache is
-    invalidated on connection-level errors so the next call reconnects.
-    """
-    global _cached_client  # noqa: PLW0603
-    async with _client_lock:
-        if _cached_client is not None:
-            return _cached_client
-
-        try:
-            settings = get_settings()
-            _cached_client = await Client.connect(
-                settings.temporal_address,
-                namespace=settings.temporal_namespace,
-                tls=build_temporal_tls_config(),
-            )
-            return _cached_client
-        except (OSError, RuntimeError, RPCError) as e:
-            logger.warning("Temporal unavailable for schedule management", error=str(e))
-            return None
 
 
 class ScheduledTriggerService:
@@ -197,7 +180,7 @@ class ScheduledTriggerService:
         """
         if self._temporal_client is not None:
             return self._temporal_client
-        return await _get_shared_client()
+        return await get_shared_client()
 
     @staticmethod
     def validate_trigger_configs(workflow_definition: dict[str, Any]) -> None:
@@ -452,8 +435,8 @@ class ScheduledTriggerService:
                     workflow_id=workflow_id,
                     trigger_node_id=trigger_node_id,
                 )
-            elif isinstance(e, RPCError) and e.status in _CONNECTION_ERRORS:
-                _invalidate_client_cache()
+            elif isinstance(e, RPCError) and e.status in CONNECTION_ERRORS:
+                invalidate_on_connection_error(e)
                 raise
             else:
                 raise
@@ -495,8 +478,8 @@ class ScheduledTriggerService:
                 schedule_ids.add(entry.id)
             return schedule_ids
         except RPCError as e:
-            if e.status in _CONNECTION_ERRORS:
-                _invalidate_client_cache()
+            if e.status in CONNECTION_ERRORS:
+                invalidate_on_connection_error(e)
                 raise
             logger.warning(
                 "Search attribute query failed, falling back to prefix scan",
@@ -528,8 +511,8 @@ class ScheduledTriggerService:
             return True
         except RPCError as e:
             if e.status != RPCStatusCode.NOT_FOUND:
-                if e.status in _CONNECTION_ERRORS:
-                    _invalidate_client_cache()
+                if e.status in CONNECTION_ERRORS:
+                    invalidate_on_connection_error(e)
                 raise
             logger.debug("No schedule to delete", schedule_id=schedule_id)
             return False
