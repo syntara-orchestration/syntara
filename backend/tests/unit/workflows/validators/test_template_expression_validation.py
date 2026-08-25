@@ -190,7 +190,7 @@ class TestInvalidNamespaceScope:
             ("${inputs.env}", "inputs"),
         ],
     )
-    def test_unsupported_scopes_are_rejected(self, expression: str, scope: str) -> None:
+    def test_unknown_names_are_rejected_like_missing_nodes(self, expression: str, scope: str) -> None:
         defn = _base_definition(
             nodes=[_script_node("n1", environment={"X": expression})],
             edges=[{"from": "t1", "to": "n1"}],
@@ -200,11 +200,19 @@ class TestInvalidNamespaceScope:
         assert len(errors) == 1
         assert errors[0].category == ValidationCategory.invalid_reference
         assert scope in errors[0].message
-        assert "leftover V1" in errors[0].message
-        if scope == "variables":
-            assert "variables.*" in errors[0].message
-        else:
-            assert "${trigger.field}" in errors[0].message
+        assert "unknown activity or scope" in errors[0].message
+        assert "leftover V1" not in errors[0].message
+
+    def test_node_named_input_is_a_valid_reference(self) -> None:
+        defn = _base_definition(
+            nodes=[
+                _script_node("input"),
+                _script_node("n1", environment={"X": "${input.stdout}"}),
+            ],
+            edges=[{"from": "t1", "to": "input"}, {"from": "input", "to": "n1"}],
+        )
+        errors = check_template_expressions(defn, {"t1", "input", "n1"})
+        assert errors == []
 
 
 # ---------------------------------------------------------------------------

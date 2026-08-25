@@ -23,9 +23,9 @@ function makeTriggerWithInputs(fields: string[]): Activity {
 }
 
 describe('validateVariableReferences', () => {
-  describe('unsupported leftover namespaces', () => {
+  describe('unknown names (same rule as missing nodes)', () => {
     it.each(['input', 'inputs', 'variables'])(
-      'errors on ${%s.*} even when the field exists on the trigger schema',
+      'errors on ${%s.*} when no node has that id, even if the field exists on the trigger schema',
       (namespace) => {
         const activities: Activity[] = [
           makeActivity({
@@ -40,22 +40,28 @@ describe('validateVariableReferences', () => {
         expect(errors).toHaveLength(1)
         expect(errors[0].severity).toBe('error')
         expect(errors[0].nodeId).toBe('task-1')
-        expect(errors[0].message).toContain(`"${namespace}" is not a supported namespace`)
-        if (namespace === 'variables') {
-          expect(errors[0].suggestion).toContain('variables')
-        } else {
-          expect(errors[0].suggestion).toContain('${trigger.field}')
-        }
+        expect(errors[0].message).toContain(`node "${namespace}" does not exist`)
+        expect(errors[0].message).not.toContain('supported namespace')
       }
     )
 
-    it('errors on a bare ${input} reference', () => {
+    it('errors on a bare ${input} reference when no node is named input', () => {
       const activities: Activity[] = [makeActivity({ id: 'task-1', type: 'script', parameters: { code: '${input}' } })]
       const context: ValidationContext = { triggers: [makeTriggerWithInputs(['foo'])] }
 
       const errors = validateVariableReferences(activities, [], context)
       expect(errors).toHaveLength(1)
-      expect(errors[0].message).toContain('"input" is not a supported namespace')
+      expect(errors[0].message).toContain('node "input" does not exist')
+    })
+
+    it('accepts ${input.stdout} when a node is actually named input', () => {
+      const activities: Activity[] = [
+        makeActivity({ id: 'input', type: 'script', parameters: { code: 'echo hello' } }),
+        makeActivity({ id: 'task-1', type: 'script', parameters: { code: '${input.stdout}' } }),
+      ]
+      const edges: EdgeConnection[] = [{ id: 'e1', source: 'input', target: 'task-1' }]
+
+      expect(validateVariableReferences(activities, edges)).toEqual([])
     })
   })
 

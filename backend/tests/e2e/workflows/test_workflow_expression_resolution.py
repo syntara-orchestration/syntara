@@ -12,8 +12,9 @@ Test Plan Coverage:
   - Tests ${node_id.stdout_json.field} expressions in config.environment
   - Tests ${trigger_id.field} expressions referencing trigger node outputs
 - API-19 (Expression Resolution - System Variables): PARTIALLY COVERED
-  - ${inputs.*} / ${input.*}: leftover V1 names, not registered. Rejected at
-    save-time validation. Use ${trigger.*} / ${trigger_id.field}.
+  - ${inputs.*} / ${input.*}: not a reserved namespace. Use ${trigger.*} /
+    ${trigger_id.field} for trigger payload. A node whose id is ``input`` can
+    still be referenced as ${input.*}.
   - ${execution.id}: Implemented but at a different path. The correct expression is
     ${workflow_context.execution.id}. Covered by test_workflow_context_execution_id_resolves.
   - ${workflow.vars.x}: NOT implemented — no namespace creation in the engine.
@@ -325,9 +326,9 @@ class TestExpressionResolution:
 
         Test Plan: API-19 (PARTIALLY COVERED — trigger input path)
 
-        NOTE: API-19 specifies ${inputs.*}. That leftover V1 namespace is not
-        registered. Use ${trigger.*} or ${trigger_id.field}. This test covers
-        the ${trigger_manual.*} path.
+        NOTE: API-19 specifies ${inputs.*}. There is no inputs namespace; use
+        ${trigger.*} or ${trigger_id.field}. This test covers the
+        ${trigger_manual.*} path.
 
         This test uses ${trigger_manual.*}, which references the trigger node's output.
         Trigger nodes receive input_data from ExecutionCreate and output it, making their outputs

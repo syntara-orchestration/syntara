@@ -28,15 +28,13 @@ ${namespace.field.nested_field}
 | `{node_id}` | Any upstream node's output | Nodes downstream of that node |
 | `workflow_context` | Workflow metadata (`now`, `today`, execution info) | All nodes |
 | `loop` | Loop iteration data (`item`, `index`), scoped to the enclosing loop | Inside a loop body only |
-| `input` / `inputs` | Leftover V1 names for trigger payload | **Not supported** — rejected at validate and publish. Use `${trigger.*}` |
-| `variables` | Workflow-level variables | **Not implemented** — rejected at validate and publish |
 | `secrets` | Resolved credential values | **Not available as a namespace** — credentials are injected per-node via `credential_id` and never placed in the resolver |
 
-There is no `input`/`inputs` namespace — workflow input data flows through `trigger` (see [Trigger System Overview](triggers/overview.md#how-trigger-output-flows-to-downstream-nodes)).
+There is no `input`/`inputs`/`variables` namespace. Trigger payload is `${trigger.*}` (see [Trigger System Overview](triggers/overview.md#how-trigger-output-flows-to-downstream-nodes)). Those strings are ordinary node ids: `${input.foo}` is valid only if a node is actually named `input`.
 
 ### Breaking change
 
-Removing `input`, `inputs`, and `variables` from the allowed template scopes is a breaking change. `publish_workflow_version` re-validates on every publish, including re-publish of an existing unedited version, and returns HTTP 409 when any error or warning finding exists. Workflows that previously published with `${input.*}`, `${inputs.*}`, or `${variables.*}` will 409 on the next publish until those expressions are rewritten to `${trigger.*}` (trigger payload) or a node id. Already-published versions keep running; those leftover names already failed at execution. There is no grandfathering by creation date or schema version.
+`input`, `inputs`, and `variables` were previously allowlisted as template scopes even though they never resolved at runtime. They are no longer reserved names. `publish_workflow_version` re-validates on every publish, including re-publish of an existing unedited version, and returns HTTP 409 when any error or warning finding exists. Workflows that used `${input.*}`, `${inputs.*}`, or `${variables.*}` as fake scopes (with no node of that id) will 409 on the next publish until rewritten to `${trigger.*}` or a real node id. Already-published versions keep running; those expressions already failed at execution. There is no grandfathering by creation date or schema version.
 
 ## Type Preservation
 

@@ -401,7 +401,7 @@ class TestUnselectedTriggerSkipping:
 
     @pytest.mark.asyncio
     async def test_trigger_payload_not_registered_as_input_aliases(self) -> None:
-        """${input.*} and ${inputs.*} are leftover V1 names and are not registered."""
+        """${input.*} and ${inputs.*} are not registered unless a node uses that id."""
         backend = InMemoryGraphBackend()
         backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
         backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})

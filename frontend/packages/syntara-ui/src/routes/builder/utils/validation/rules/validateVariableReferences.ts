@@ -5,9 +5,6 @@ import { getUpstreamNodeIds } from '../../edgeHelpers'
 import type { ValidationContext, ValidationError } from '../types'
 
 const KNOWN_NAMESPACES = new Set(['trigger', 'workflow', 'workflow_context'])
-// Retired V1 names. Same set as backend RETIRED_V1_SCOPES. Without this,
-// `input` would be treated as a missing node ID instead of a retired namespace.
-const RETIRED_V1_NAMESPACES = new Set(['input', 'inputs', 'variables'])
 const VARIABLE_REF_PATTERN = /\$\{([^}]+)\}/g
 
 type VariableReference = {
@@ -115,24 +112,7 @@ type RefContext = {
   upstreamIds: Set<string>
 }
 
-function checkUnsupportedNamespace(ref: VariableReference, activity: Activity): ValidationError {
-  const stepName = activity.name ?? activity.id
-  const suggestion =
-    ref.namespace === 'variables'
-      ? 'Workflow-level ${variables.*} is not supported'
-      : 'Use ${trigger.field} for trigger payload'
-  return {
-    id: `var-ref-unsupported-${activity.id}-${ref.namespace}`,
-    severity: 'error',
-    rule: 'variable-references',
-    message: `Step "${stepName}" references \${${ref.fullRef}} but "${ref.namespace}" is not a supported namespace`,
-    nodeId: activity.id,
-    suggestion,
-  }
-}
-
 function validateRef(ref: VariableReference, activity: Activity, ctx: RefContext): ValidationError | null {
-  if (RETIRED_V1_NAMESPACES.has(ref.namespace)) return checkUnsupportedNamespace(ref, activity)
   if (ref.namespace === 'trigger')
     return checkSchemaFieldReference(ref, activity, ctx.schemaFields, ref.namespace, ctx.schemaSuggestion)
   if (KNOWN_NAMESPACES.has(ref.namespace)) return null
@@ -156,9 +136,7 @@ export function validateVariableReferences(
     const refs = paramStrings.flatMap(extractVariableReferences)
     if (refs.length === 0) continue
 
-    const needsUpstream = refs.some(
-      (r) => !KNOWN_NAMESPACES.has(r.namespace) && !RETIRED_V1_NAMESPACES.has(r.namespace)
-    )
+    const needsUpstream = refs.some((r) => !KNOWN_NAMESPACES.has(r.namespace))
     const upstreamIds = needsUpstream ? getUpstreamNodeIds(activity.id, edges) : new Set<string>()
     const ctx: RefContext = { schemaFields, schemaSuggestion, activityIds, upstreamIds }
 
