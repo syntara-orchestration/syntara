@@ -56,9 +56,16 @@ async def resolve_user_references(
 
     Unresolvable UUIDs (e.g. deleted users) produce None rather than
     an empty object, matching credential API behavior.
+
+    Lookup failures (SQLAlchemyError/OSError) also set fields to None
+    instead of raising. Username enrichment must not fail the parent
+    list/detail request; this matches CredentialService. The OpenAPI
+    contract is UserReference | null, so unresolved values cannot be
+    left as raw UUIDs.
     """
     user_map = await lookup_users(session, objects, field_names)
     if user_map is None:
+        # Intentional: degrade to null rather than fail the request.
         for obj in objects:
             for field in field_names:
                 setattr(obj, field, None)
@@ -93,11 +100,3 @@ class UserReferenceMixin:
     ) -> None:
         """Resolve user UUID fields to UserReference objects in-place."""
         await resolve_user_references(self.session, objects, field_names)
-
-    async def _resolve_user_references(
-        self,
-        objects: Sequence[Any],
-        field_names: Sequence[str] = ("created_by", "updated_by"),
-    ) -> None:
-        """Private alias used by credential endpoints."""
-        await self.resolve_user_references(objects, field_names)

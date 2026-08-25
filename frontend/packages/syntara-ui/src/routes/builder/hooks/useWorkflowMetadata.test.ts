@@ -84,9 +84,7 @@ describe('useWorkflowMetadata', () => {
   })
 
   it('uses created_by as author when it is a string', () => {
-    const { result } = renderHook(() =>
-      useWorkflowMetadata({ name: 'test', created_by: { id: 'jane-id', name: 'jane' } })
-    )
+    const { result } = renderHook(() => useWorkflowMetadata({ name: 'test', created_by: 'jane' }))
 
     expect(result.current?.author).toBe('jane')
   })

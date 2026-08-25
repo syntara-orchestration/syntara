@@ -78,15 +78,11 @@ class TestUserReferenceMixin:
     """Tests for the service mixin aliases."""
 
     @pytest.mark.asyncio
-    async def test_public_and_private_aliases_match(self, mock_session: MagicMock) -> None:
+    async def test_mixin_delegates_to_helper(self, mock_session: MagicMock) -> None:
         uid = uuid4()
         mock_session.exec = AsyncMock(return_value=[(uid, "dana")])
         host = _MixinHost(mock_session)
-        public_obj = SimpleNamespace(created_by=uid, updated_by=None)
-        private_obj = SimpleNamespace(created_by=uid, updated_by=None)
-        await host.resolve_user_references([public_obj])
-        await host._resolve_user_references([private_obj])
-        assert isinstance(public_obj.created_by, UserReference)
-        assert public_obj.created_by.name == "dana"
-        assert isinstance(private_obj.created_by, UserReference)
-        assert private_obj.created_by.name == "dana"
+        obj = SimpleNamespace(created_by=uid, updated_by=None)
+        await host.resolve_user_references([obj])
+        assert isinstance(obj.created_by, UserReference)
+        assert obj.created_by.name == "dana"

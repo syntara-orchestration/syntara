@@ -397,7 +397,7 @@ class CredentialService(UserReferenceMixin, BaseService):
 
         decrypted_inputs = data.inputs or {}
         read = self._build_masked_response(credential, credential_type, decrypted_inputs)
-        await self._resolve_user_references([read])
+        await self.resolve_user_references([read])
         return read
 
     @staticmethod
@@ -431,7 +431,7 @@ class CredentialService(UserReferenceMixin, BaseService):
         read.workflow_count = wf_counts.get(credential_id, 0)
         int_counts = await self.get_integration_counts([credential_id])
         read.integration_count = int_counts.get(credential_id, 0)
-        await self._resolve_user_references([read])
+        await self.resolve_user_references([read])
 
         return read
 
@@ -465,7 +465,7 @@ class CredentialService(UserReferenceMixin, BaseService):
                 resource.workflow_count = workflow_counts.get(resource.id, 0)
                 resource.integration_count = integration_counts.get(resource.id, 0)
 
-        await self._resolve_user_references(response.resources)
+        await self.resolve_user_references(response.resources)
 
         return response
 
@@ -541,7 +541,7 @@ class CredentialService(UserReferenceMixin, BaseService):
         integration_counts = await self.get_integration_counts([credential_id])
         read.integration_count = integration_counts.get(credential_id, 0)
 
-        await self._resolve_user_references([read])
+        await self.resolve_user_references([read])
 
         return read
 
