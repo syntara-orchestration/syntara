@@ -69,20 +69,20 @@ test.describe('Access Management — Dropdown Pagination', () => {
 
     const usersTable = app.getByRole('grid', { name: 'Users table' })
     const firstUserRow = usersTable.locator('tbody tr:first-child')
-    const firstUserButton = firstUserRow.getByRole('button')
-    const hasUser = await firstUserButton
+    const firstUserLink = firstUserRow.getByRole('link')
+    const hasUser = await firstUserLink
       .waitFor({ state: 'visible', timeout: 5000 })
       .then(() => true)
       .catch(() => false)
     test.skip(!hasUser, 'No users available; seed data required')
 
-    await firstUserButton.click()
+    await firstUserLink.click()
 
     await expect(app).toHaveURL(/system-administration\/access-management\/users\//)
 
-    const rolesTab = app.getByRole('tab', { name: /roles/i })
-    await expect(rolesTab).toBeVisible()
-    await rolesTab.click()
+    const assignmentsTab = app.getByRole('tab', { name: /assignments/i })
+    await expect(assignmentsTab).toBeVisible({ timeout: 10_000 })
+    await assignmentsTab.click()
 
     const assignButton = app.getByRole('button', { name: /assign role/i })
     await expect(assignButton).toBeVisible({ timeout: 10_000 })
@@ -101,7 +101,10 @@ test.describe('Access Management — Dropdown Pagination', () => {
     await expect(roleOptions.or(noResults)).toBeVisible({ timeout: 15_000 })
     expect(await roleOptions.count()).toBeGreaterThan(0)
 
-    await dialog.getByRole('button', { name: 'Cancel' }).click()
+    // Close the dialog via its X button — the PF6 Select dropdown is
+    // a portal overlay that blocks the Cancel button, but the close
+    // button in the dialog header is above the dropdown.
+    await dialog.getByRole('button', { name: 'Close', exact: true }).click()
     await expect(dialog).not.toBeVisible()
   })
 

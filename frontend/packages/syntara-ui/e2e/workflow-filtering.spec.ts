@@ -230,8 +230,7 @@ test.describe('Workflow Filtering', () => {
     await expect(nameChipGroup.getByText('test')).toBeVisible()
 
     // Act - Remove name filter chip
-    const nameLabel = nameChipGroup.getByRole('listitem').filter({ hasText: 'test' })
-    await nameLabel.getByRole('button', { name: /close/i }).click()
+    await nameChipGroup.getByRole('button', { name: 'Close test' }).click()
 
     // Assert - Filter removed
     await expect(nameChipGroup).not.toBeVisible()

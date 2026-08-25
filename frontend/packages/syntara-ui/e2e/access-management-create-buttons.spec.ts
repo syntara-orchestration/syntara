@@ -116,7 +116,7 @@ test.describe('Access Management — Create button labels', () => {
           .waitFor({ state: 'visible', timeout: 5000 })
           .then(() => true)
           .catch(() => false)
-        test.skip(!hasButton, `No seed data available; "${label}" button not visible in empty state`)
+        expect(hasButton, `No seed data available; "${label}" button not visible in empty state`).toBeTruthy()
       }
 
       await expect(actionButton).toBeVisible()

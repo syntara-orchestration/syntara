@@ -27,7 +27,7 @@ test('workflows table renders data rows', async ({ app }) => {
   const pagination = app.getByText(/\d+\s*-\s*\d+\s+of\s+(\d+)/)
   await expect(pagination).toBeVisible()
   const total = Number((await pagination.textContent())?.match(/of\s+(\d+)/)?.[1] ?? '0')
-  test.skip(total === 0, 'No workflows in table to assert row visibility')
+  expect(total, 'No workflows in table to assert row visibility').toBeGreaterThan(0)
   // Kebab aria-label is stable when row accessible names are not (grouped table + Truncate).
   // PatternFly expandable tables wrap each row in its own tbody, so positional
   // selectors like "tbody tr:first-child" match multiple elements. Filter to

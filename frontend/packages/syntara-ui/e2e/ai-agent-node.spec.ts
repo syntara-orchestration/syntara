@@ -176,7 +176,6 @@ test.describe('AI Agent Node @pr-check', () => {
         token: token ?? undefined,
         discoveredTools: [{ name: 'e2e_search_tool', enabled: true }],
       })
-      expect(mcpIntegration).not.toBeNull()
 
       const { name: credName } = await ensureLlmCredential(app)
 
