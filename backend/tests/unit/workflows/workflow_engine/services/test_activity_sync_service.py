@@ -984,8 +984,13 @@ class TestControlNodeSyncTrigger:
         "node_type",
         [NodeType.CONDITION, NodeType.APPROVAL, NodeType.CONVERGE],
     )
-    async def test_sync_detached_after_control_node_completes(self, node_type: str) -> None:
-        """Completing a control node also syncs detached nodes (marks them CANCELLED)."""
+    async def test_sync_detached_not_called_on_control_node_completion(self, node_type: str) -> None:
+        """Completing a control node does NOT sync detached nodes mid-workflow.
+
+        _sync_detached_nodes only runs at workflow terminal events so that the
+        detached activity's real COMPLETED/FAILED result can still land before
+        CANCELLED is written by the workflow-end safety-net call.
+        """
         metadata = create_test_metadata(
             activity_definitions_map={"ctrl_node": {"type": node_type}},
             pending_activity_updates={1: {"activity_id": "ctrl_node", "status": ActivityStatus.RUNNING}},
@@ -998,7 +1003,7 @@ class TestControlNodeSyncTrigger:
             patch.object(self.service, "_sync_activities_to_db", new_callable=AsyncMock),
         ):
             await self.service._handle_event_post_processing(event, metadata, self.mock_handle)
-            mock_detached.assert_called_once_with(metadata, self.mock_handle)
+            mock_detached.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_no_sync_skipped_for_script_node(self) -> None:
@@ -2657,8 +2662,8 @@ class TestSyncNodesToTerminalStatus:
 
     @pytest.mark.asyncio
     async def test_detached_node_marked_as_cancelled_not_skipped(self) -> None:
-        """Node detached by converge ANY strategy should be marked CANCELLED, not SKIPPED."""
-        activity = self._create_mock_activity_execution("node-slow")
+        """In-flight node detached by converge ANY strategy should be marked CANCELLED, not SKIPPED."""
+        activity = self._create_mock_activity_execution("node-slow", status=ActivityStatus.RUNNING)
         self._mock_session([activity])
         metadata = self._create_metadata(activity_index_map={"node-slow": 2})
 
@@ -3415,11 +3420,11 @@ class TestProcessHistoryEvent:
     async def test_handles_workflow_completion_event(self) -> None:
         """Test that workflow completion events trigger final sync.
 
-        Order matters: _sync_failed_nodes and _sync_skipped_nodes must run
-        BEFORE _update_execution_status_from_event so that
-        _finalize_non_terminal_activities (called inside the latter) does not
-        overwrite already-synced terminal statuses (e.g. a converge node that
-        is FAILED in the workflow but still PENDING in the DB).
+        Order matters: _sync_failed_nodes, _sync_skipped_nodes, and
+        _sync_detached_nodes must run BEFORE _update_execution_status_from_event
+        so that _finalize_non_terminal_activities (called inside the latter)
+        does not overwrite already-synced terminal statuses (e.g. a converge
+        node that is FAILED or a branch that is CANCELLED).
         """
         event = self._create_event(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED, event_id=20)
 
@@ -3432,6 +3437,9 @@ class TestProcessHistoryEvent:
         async def track_skipped(*_args: object, **_kwargs: object) -> None:
             call_order.append("skipped")
 
+        async def track_detached(*_args: object, **_kwargs: object) -> None:
+            call_order.append("detached")
+
         async def track_status(*_args: object, **_kwargs: object) -> None:
             call_order.append("status")
 
@@ -3439,6 +3447,7 @@ class TestProcessHistoryEvent:
             patch.object(self.service, "_update_execution_status_from_event", side_effect=track_status) as mock_status,
             patch.object(self.service, "_sync_skipped_nodes", side_effect=track_skipped) as mock_skipped,
             patch.object(self.service, "_sync_failed_nodes", side_effect=track_failed) as mock_failed,
+            patch.object(self.service, "_sync_detached_nodes", side_effect=track_detached) as mock_detached,
         ):
             result = await self.service._process_history_event(
                 event,
@@ -3452,7 +3461,8 @@ class TestProcessHistoryEvent:
         mock_status.assert_called_once()
         mock_skipped.assert_called_once()
         mock_failed.assert_called_once()
-        assert call_order == ["failed", "skipped", "status"]
+        mock_detached.assert_called_once()
+        assert call_order == ["failed", "skipped", "detached", "status"]
         assert self.metadata.last_processed_event_id == 20
 
     @pytest.mark.asyncio
@@ -3467,6 +3477,7 @@ class TestProcessHistoryEvent:
                 self.service, "_extract_failed_activities_from_event", return_value=fallback_map
             ) as mock_extract,
             patch.object(self.service, "_sync_skipped_nodes", new_callable=AsyncMock),
+            patch.object(self.service, "_sync_detached_nodes", new_callable=AsyncMock),
             patch.object(self.service, "_update_execution_status_from_event", new_callable=AsyncMock) as mock_update,
         ):
             result = await self.service._process_history_event(

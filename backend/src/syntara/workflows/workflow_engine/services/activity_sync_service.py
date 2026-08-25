@@ -648,7 +648,6 @@ class ActivitySyncService:
                     or activity_type in self._TRIGGER_ACTIVITY_TYPES
                 ):
                     await self._sync_skipped_nodes(metadata, handle)
-                    await self._sync_detached_nodes(metadata, handle)
 
         if event.event_type in {
             EventType.EVENT_TYPE_ACTIVITY_TASK_STARTED,
