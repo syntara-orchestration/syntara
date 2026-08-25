@@ -83,7 +83,17 @@ vi.mock('../../../utils/generateUUID', () => ({
 
 vi.mock('./TransferIdentityWizard.module.css', () => ({ default: {} }))
 
-const mockUsers = {
+const mockUsers: {
+  resources: Array<{
+    id: string
+    username: string
+    email: string
+    first_name: string
+    last_name: string | null
+  }>
+  next: null
+  total: number
+} = {
   resources: [
     { id: 'user-1', username: 'alice', email: 'alice@example.com', first_name: 'Alice', last_name: 'Smith' },
     { id: 'user-2', username: 'bob', email: 'bob@example.com', first_name: 'Bob', last_name: 'Jones' },
@@ -335,6 +345,26 @@ describe('TransferIdentityWizard', () => {
 
       expect(screen.getByText(/Choose one of/i)).toBeInTheDocument()
       expect(screen.getAllByText(/Bob Jones/i).length).toBeGreaterThan(0)
+    })
+
+    it('shows username in step 2 description when selected user has no name', async () => {
+      setupMocks({
+        users: {
+          resources: [
+            ...mockUsers.resources,
+            { id: 'user-3', username: 'noname', email: 'noname@example.com', first_name: '', last_name: null },
+          ],
+          next: null,
+          total: 4,
+        },
+      })
+      const user = userEvent.setup()
+      render(<TransferIdentityWizard />, { wrapper })
+      await user.click(screen.getByText('noname@example.com'))
+      await user.click(screen.getByRole('button', { name: 'Next' }))
+
+      expect(screen.getByText(/Choose one of/i)).toBeInTheDocument()
+      expect(screen.getAllByText(/noname/i).length).toBeGreaterThan(0)
     })
 
     it('shows empty state when selected user has no identities', async () => {

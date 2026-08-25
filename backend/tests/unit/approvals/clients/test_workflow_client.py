@@ -68,6 +68,32 @@ class TestWorkflowApiClient:
                 assert request_json == expected_payload
 
     @pytest.mark.usefixtures("fast_workflow_client_settings")
+    async def test_send_approval_signal_uses_stored_temporal_activity_id(self) -> None:
+        """Loop-body approvals signal the stored Temporal activity ID, not the canvas node ID."""
+        execution_id = uuid4()
+        approval_node_id = "approval"
+        temporal_activity_id = "approval_iter_1"
+
+        with patch("syntara.approvals.clients.workflow_client.generate_activity_signal_url") as mock_generate_url:
+            mock_generate_url.return_value = "http://localhost:8000/api/v1/signal"
+
+            with respx.mock:
+                respx.post("http://localhost:8000/api/v1/signal").mock(return_value=httpx.Response(200))
+
+                async with WorkflowApiClient() as client:
+                    await client.send_approval_signal(
+                        execution_id=execution_id,
+                        approval_node_id=approval_node_id,
+                        decision="approved",
+                        approval_id=uuid4(),
+                        decided_by="jsmith",
+                        decided_at="2026-05-20T10:00:00+00:00",
+                        temporal_activity_id=temporal_activity_id,
+                    )
+
+                mock_generate_url.assert_called_once_with(execution_id, temporal_activity_id)
+
+    @pytest.mark.usefixtures("fast_workflow_client_settings")
     async def test_send_approval_signal_success_after_retries(self) -> None:
         """Test successful approval signal sending after retries."""
         execution_id = uuid4()

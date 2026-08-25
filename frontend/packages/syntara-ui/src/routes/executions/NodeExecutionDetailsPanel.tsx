@@ -25,7 +25,7 @@ import { ActivityTypeEnum } from '@syntara/contracts'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { NxCodeBlock } from '../../components/details/NxCodeBlock'
-import { NxLabel } from '../../components/labels/NxLabel'
+import { SynLabel } from '../../components/labels/SynLabel'
 import { SynErrorState } from '../../components/states/SynErrorState'
 import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 import { useElapsedTime } from '../../hooks/useElapsedTime'
@@ -173,9 +173,9 @@ function ApprovalAuditSection({ audit }: Readonly<{ audit: ApprovalAudit }>) {
         <Stack>
           <StackItem className={styles.auditLabel}>Decision</StackItem>
           <StackItem>
-            <NxLabel variant="outline" status={status} icon={IconComponent ? <IconComponent /> : undefined}>
+            <SynLabel variant="outline" status={status} icon={IconComponent ? <IconComponent /> : undefined}>
               {audit.decision.charAt(0).toUpperCase() + audit.decision.slice(1)}
-            </NxLabel>
+            </SynLabel>
           </StackItem>
         </Stack>
       </FlexItem>

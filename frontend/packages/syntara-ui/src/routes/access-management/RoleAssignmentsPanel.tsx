@@ -9,7 +9,7 @@ import { NxConfirmationDialog } from '../../components/dialogs/NxConfirmationDia
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { FilterBar } from '../../components/filters'
 import { IconLabel } from '../../components/IconLabel'
-import { NxLabel } from '../../components/labels/NxLabel'
+import { SynLabel } from '../../components/labels/SynLabel'
 import { SynPageBody } from '../../components/layout/SynPage'
 import { SynPanelContentStack } from '../../components/layout/SynPanelContentStack'
 import { SynEmptyStateFilter } from '../../components/states/SynEmptyStateFilter'
@@ -17,7 +17,7 @@ import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData
 import { SynErrorState } from '../../components/states/SynErrorState'
 import { SynLoadingState } from '../../components/states/SynLoadingState'
 import { LinkCell } from '../../components/table/LinkCell'
-import { NxScrollableTableContainer } from '../../components/table/NxScrollableTableContainer'
+import { SynScrollableTableContainer } from '../../components/table/SynScrollableTableContainer'
 import { invalidateAuthzCaches } from '../../hooks/invalidateAuthzCaches'
 import { useColumnSortState } from '../../hooks/useColumnSortState'
 import { useExpandableRowIds } from '../../hooks/useExpandableRowIds'
@@ -106,7 +106,7 @@ function RoleAssignmentsTable({
   const expandableColumnCount = visibleColumns.length + 2
 
   return (
-    <NxScrollableTableContainer
+    <SynScrollableTableContainer
       caption="Role assignments table"
       isExpandable
       footer={{
@@ -164,9 +164,9 @@ function RoleAssignmentsTable({
               )}
               {isVisible('scope') && (
                 <Td dataLabel="Scope">
-                  <NxLabel color={row.scopeType === 'system' ? 'blue' : 'green'}>
+                  <SynLabel color={row.scopeType === 'system' ? 'blue' : 'green'}>
                     {row.scopeType === 'system' ? 'System' : 'Project'}
-                  </NxLabel>
+                  </SynLabel>
                 </Td>
               )}
               {isVisible('project') && (
@@ -190,9 +190,9 @@ function RoleAssignmentsTable({
                   <ExpandableRowContent>
                     <LabelGroup isCompact numLabels={Infinity}>
                       {row.policies.map((policy) => (
-                        <NxLabel key={policy.name} color="grey">
+                        <SynLabel key={policy.name} color="grey">
                           {policy.name}
-                        </NxLabel>
+                        </SynLabel>
                       ))}
                     </LabelGroup>
                   </ExpandableRowContent>
@@ -202,7 +202,7 @@ function RoleAssignmentsTable({
           </Tbody>
         )
       })}
-    </NxScrollableTableContainer>
+    </SynScrollableTableContainer>
   )
 }
 

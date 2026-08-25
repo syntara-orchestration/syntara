@@ -28,7 +28,9 @@ class UserCreate(SQLModel):
 
     username: str = Field(..., min_length=1, max_length=FieldLimits.NAME_MAX_LENGTH, description="Unique username")
     email: EmailStr | None = Field(default=None, max_length=FieldLimits.NAME_MAX_LENGTH, description="Email address")
-    first_name: str = Field(..., min_length=1, max_length=FieldLimits.NAME_MAX_LENGTH, description="User's first name")
+    first_name: str | None = Field(
+        default=None, max_length=FieldLimits.NAME_MAX_LENGTH, description="User's first name"
+    )
     last_name: str | None = Field(default=None, max_length=FieldLimits.NAME_MAX_LENGTH, description="User's last name")
     password: SecretStr = Field(..., min_length=14, description="Plaintext password (will be hashed)")
     is_enabled: bool = Field(default=True, description="Whether the user account is enabled")

@@ -160,8 +160,17 @@ class ApprovalCreateRequest(SQLModel):
 
     execution_id: UUID = Field(..., description="Parent workflow execution ID")
     project_id: UUID = Field(..., description="Project ID (denormalized from execution)")
-    approval_node_id: str = Field(..., description="Activity ID from workflow definition")
+    approval_node_id: str = Field(..., description="Canvas node ID from the workflow definition")
     name: str = Field(..., min_length=1, max_length=255, description="Display name for the approval request")
+    loop_iteration_path: list[int] = Field(
+        default_factory=list,
+        description="Enclosing-loop indices, outermost first (empty when not inside a loop)",
+    )
+    temporal_activity_id: str | None = Field(
+        default=None,
+        max_length=FieldLimits.NAME_MAX_LENGTH,
+        description="Temporal activity ID to signal on decide (defaults to approval_node_id)",
+    )
     timeout_at: datetime | None = Field(None, description="When this request expires (null = no timeout)")
     next_step_approved: ActivitySummary = Field(..., description="First activity that executes if approved")
     next_step_rejected: ActivitySummary | None = Field(None, description="First activity that executes if rejected")
@@ -177,6 +186,14 @@ class ApprovalCreateRequest(SQLModel):
         max_length=FieldLimits.APPROVER_LIST_MAX_LENGTH,
         description="Group IDs whose members can approve",
     )
+
+    @field_validator("loop_iteration_path")
+    @classmethod
+    def _non_negative_loop_iteration_path(cls, value: list[int]) -> list[int]:
+        if any(index < 0 for index in value):
+            msg = "loop_iteration_path entries must be non-negative integers"
+            raise ValueError(msg)
+        return value
 
 
 class ApprovalDecisionRequest(SQLModel):

@@ -30,6 +30,7 @@ import { SynPanel } from '../../components/layout/SynPanel'
 import { useFormMutationErrorHandler } from '../../hooks/useFormMutationErrorHandler'
 import { useAlerts } from '../../providers/alerts'
 import { detachPromise } from '../../utils/detachPromise'
+import { lookupMapByApprovalNodeId } from '../approvals/approvalNodeId'
 import { ApprovalSummaryList } from '../approvals/ApprovalSummaryList'
 import { useApprovalPermissions } from '../approvals/useApprovalPermissions'
 import { useCanDecideApproval } from '../approvals/useCanDecideApproval'
@@ -151,9 +152,9 @@ export function ApprovalReviewView({ approval, activityNameMap, onClose }: Appro
     next_step_rejected: nextStepRejected,
   } = approval
 
-  const resolveName = (id: string, fallback: string) => activityNameMap?.get(id) ?? fallback
+  const resolveName = (id: string, fallback: string) => lookupMapByApprovalNodeId(activityNameMap, id) ?? fallback
   const approvalNodeId = approval.approval_node_id
-  const resolvedNodeName = approvalNodeId ? activityNameMap?.get(approvalNodeId) : undefined
+  const resolvedNodeName = lookupMapByApprovalNodeId(activityNameMap, approvalNodeId)
   const approvalDisplayName = resolvedNodeName ? `Approval for ${resolvedNodeName}` : approval.name
 
   // If user is not authorized, show read-only view with approver information

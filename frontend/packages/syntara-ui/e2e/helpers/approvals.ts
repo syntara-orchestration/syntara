@@ -4,17 +4,6 @@ import { expect, toAppUrl } from '../fixtures'
 import { pollApprovalVisible } from '../utils/api'
 
 /**
- * Dismisses the "Live updates paused" connection banner if visible.
- * Uses role-based locator to stay off PatternFly class names.
- */
-export async function dismissConnectionBanner(app: Page): Promise<void> {
-  const banner = app.getByRole('alert').filter({ hasText: 'Live updates paused' })
-  if (await banner.isVisible({ timeout: 3_000 }).catch(() => false)) {
-    await banner.getByRole('button', { name: /close/i }).click()
-  }
-}
-
-/**
  * Waits for the approval review panel to be visible.
  * Verifies both URL navigation to execution detail with approval query param
  * and the "Review Approval" heading visibility.
@@ -39,6 +28,14 @@ export async function waitForApprovalPanel(app: Page, timeout = 15_000): Promise
  * await navigateToApprovalAndOpen(app, approval.approvalName)
  * // Now in execution detail with approval panel open
  */
+export async function dismissConnectionBanner(app: Page): Promise<void> {
+  const banner = app.getByRole('alert').filter({ hasText: 'Live updates paused' })
+  if (await banner.isVisible().catch(() => false)) {
+    await banner.getByRole('button', { name: /close/i }).click()
+    await banner.waitFor({ state: 'hidden', timeout: 5_000 })
+  }
+}
+
 export async function navigateToApprovalAndOpen(app: Page, approvalName: string): Promise<void> {
   // Guard against the race between execution reaching "paused" and the approval record
   // becoming queryable in the listing API (the two are slightly asynchronous on the backend).
@@ -53,9 +50,9 @@ export async function navigateToApprovalAndOpen(app: Page, approvalName: string)
   await app.getByPlaceholder('Filter by name').fill(approvalName)
   await app.getByRole('button', { name: 'Apply filter' }).click()
 
-  const approvalBtn = approvalsTable.getByRole('button', { name: approvalName })
-  await expect(approvalBtn).toBeVisible({ timeout: 15_000 })
-  await approvalBtn.click()
+  const approvalLink = approvalsTable.getByRole('link', { name: approvalName })
+  await expect(approvalLink).toBeVisible({ timeout: 15_000 })
+  await approvalLink.click()
 
   await waitForApprovalPanel(app)
 }
