@@ -17,40 +17,6 @@ import { createWorkflowViaApi, deleteWorkflowViaApi } from '../seeds/resources'
 import { ensureProject } from '../utils/api'
 
 test.describe('Workflows Table - Display and Navigation', () => {
-  test.skip('workflows table displays with name and state columns', async ({ app }) => {
-    // Create a workflow specifically for this test
-    const project = await ensureProject(app)
-    const workflowName = buildUniqueName('e2e-table-display')
-    const workflow = await createWorkflowViaApi(app, {
-      name: workflowName,
-      projectId: project?.id,
-    })
-
-    if (!workflow) throw new Error('Failed to create test workflow')
-
-    try {
-      // Navigate to workflows page
-      await app.goto(toAppUrl('/workflows'))
-      await expect(app.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
-
-      // Verify table exists
-      const table = app.getByRole('grid', { name: 'Workflows table' })
-      await expect(table).toBeVisible()
-
-      // Verify column headers exist
-      await expect(table.getByRole('columnheader', { name: 'Name' })).toBeVisible()
-      await expect(table.getByRole('columnheader', { name: 'Created at' })).toBeVisible()
-      await expect(table.getByRole('columnheader', { name: 'Updated at' })).toBeVisible()
-      await expect(table.getByRole('columnheader', { name: 'Tags' })).toBeVisible()
-      await expect(table.getByRole('columnheader', { name: 'State' })).toBeVisible()
-
-      // Verify our workflow row exists
-      await expect(table.getByRole('row', { name: new RegExp(workflowName) })).toBeVisible()
-    } finally {
-      await deleteWorkflowViaApi(app, workflow.id)
-    }
-  })
-
   test('clicking a workflow name navigates to the workflow builder', async ({ app }) => {
     // Create a workflow for this test
     const project = await ensureProject(app)
