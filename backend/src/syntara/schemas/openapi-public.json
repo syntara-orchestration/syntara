@@ -39678,8 +39678,16 @@
             "type": "string",
             "maxLength": 255,
             "minLength": 1,
-            "description": "Activity ID from workflow definition",
+            "description": "Canvas node ID from the workflow definition",
             "title": "Approval Node Id"
+          },
+          "loop_iteration_path": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "Enclosing-loop indices, outermost first (empty when not inside a loop)",
+            "title": "Loop Iteration Path"
           },
           "name": {
             "type": "string",
@@ -39871,7 +39879,7 @@
           "approval_node_id": {
             "type": "string",
             "title": "Approval Node Id",
-            "description": "Activity ID from workflow definition"
+            "description": "Canvas node ID from the workflow definition"
           },
           "name": {
             "type": "string",
@@ -39879,6 +39887,27 @@
             "minLength": 1,
             "title": "Name",
             "description": "Display name for the approval request"
+          },
+          "loop_iteration_path": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "title": "Loop Iteration Path",
+            "description": "Enclosing-loop indices, outermost first (empty when not inside a loop)"
+          },
+          "temporal_activity_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temporal Activity Id",
+            "description": "Temporal activity ID to signal on decide (defaults to approval_node_id)"
           },
           "timeout_at": {
             "anyOf": [
@@ -47800,7 +47829,6 @@
         "description": "Schema for creating a new local user (POST /users).\n\nExcludes auto-generated fields: id, created_at, updated_at, last_login, preferences.",
         "required": [
           "username",
-          "first_name",
           "password"
         ],
         "properties": {
@@ -47826,9 +47854,15 @@
             "title": "Email"
           },
           "first_name": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 255,
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "User's first name",
             "title": "First Name"
           },
