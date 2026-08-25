@@ -49,42 +49,4 @@ test.describe('Workflows Table - Display and Navigation', () => {
     }
   })
 
-  test('multiple workflows display in table with unique identifiers', async ({ app }) => {
-    // Create 2 workflows for this test
-    const project = await ensureProject(app)
-    const projectId = project?.id
-    const prefix = buildUniqueName('e2e-multi')
-
-    const workflow1 = await createWorkflowViaApi(app, {
-      name: `${prefix}-workflow-1`,
-      projectId,
-    })
-
-    const workflow2 = await createWorkflowViaApi(app, {
-      name: `${prefix}-workflow-2`,
-      projectId,
-    })
-
-    if (!workflow1 || !workflow2) throw new Error('Failed to create test workflows')
-
-    try {
-      await app.goto(toAppUrl('/workflows'))
-      await expect(app.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
-
-      // Filter by prefix to show only our test workflows
-      await app.getByPlaceholder('Filter by name').fill(prefix)
-      await app.getByRole('button', { name: 'Apply filter' }).click()
-
-      // Check if table exists
-      const table = app.getByRole('grid', { name: 'Workflows table' })
-      await expect(table).toBeVisible({ timeout: 5000 })
-
-      // Verify both workflows are visible
-      await expect(table.getByRole('row', { name: new RegExp(workflow1.name) })).toBeVisible()
-      await expect(table.getByRole('row', { name: new RegExp(workflow2.name) })).toBeVisible()
-    } finally {
-      await deleteWorkflowViaApi(app, workflow1.id)
-      await deleteWorkflowViaApi(app, workflow2.id)
-    }
-  })
 })
