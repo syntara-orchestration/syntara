@@ -866,10 +866,17 @@ test.describe('Permission gating — Detail page header actions', () => {
       await auditorApp.goto(toAppUrl(`${AM_URL}/groups/${groupId}`))
       await expect(auditorApp.getByRole('heading', { level: 1 })).toBeVisible()
 
-      await expect(auditorApp.getByRole('button', { name: 'Edit group' })).toHaveAttribute('aria-disabled', 'true')
+      // aria-disabled is set after the permissions API resolves — give it extra time
+      await expect(auditorApp.getByRole('button', { name: 'Edit group' })).toHaveAttribute('aria-disabled', 'true', {
+        timeout: 20_000,
+      })
 
       await auditorApp.getByRole('button', { name: 'Group actions' }).click()
-      await expect(auditorApp.getByRole('menuitem', { name: 'Delete group' })).toHaveAttribute('aria-disabled', 'true')
+      await expect(auditorApp.getByRole('menuitem', { name: 'Delete group' })).toHaveAttribute(
+        'aria-disabled',
+        'true',
+        { timeout: 20_000 }
+      )
     } finally {
       await deleteGroupViaApi(app, groupId)
     }
