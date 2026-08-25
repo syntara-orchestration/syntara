@@ -69,6 +69,16 @@ def _skip_sa_authorization() -> Generator[None]:
         yield
 
 
+@pytest.fixture(autouse=True)
+def _skip_sa_binding_sync() -> Generator[None]:
+    """Skip SA binding sync during publish — test SA IDs don't exist in the DB."""
+    with patch(
+        "syntara.workflows.services.webhook_trigger_service.WebhookTriggerService._sync_trigger_sa_bindings",
+        new_callable=AsyncMock,
+    ):
+        yield
+
+
 @pytest.fixture
 def _no_temporal(session_app: FastAPI) -> Generator[None]:
     """Override Temporal dependency to return None (simulate unavailability)."""
