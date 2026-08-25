@@ -28,6 +28,7 @@ import { useProjectSelector } from '../../hooks/useProjectSelector'
 import { useAlerts } from '../../providers/alerts'
 
 import styles from './ApprovalDetailContent.module.css'
+import { lookupMapByApprovalNodeId } from './approvalNodeId'
 import { getNotesLabel } from './approvalNotes'
 import { ApprovalStatusBadges } from './approvalUtils'
 import { buildWorkflowBuilderLink } from './buildWorkflowBuilderLink'
@@ -61,7 +62,7 @@ const getDecisionCopy = (decision: 'approved' | 'rejected') => ({
 function resolveApprovalName(approval: Approval, activityNameMap?: Map<string, string>): string {
   const approvalNodeId = approval.approval_node_id
   if (approvalNodeId && activityNameMap) {
-    const resolvedNodeName = activityNameMap.get(approvalNodeId)
+    const resolvedNodeName = lookupMapByApprovalNodeId(activityNameMap, approvalNodeId)
     if (resolvedNodeName) return resolvedNodeName
   }
   return approval.name

@@ -120,6 +120,14 @@ describe('InputSchemaPreview', () => {
     expect(setDataCalls[1][1]).toBe('${step-1.hostname}')
   })
 
+  it('renders schema preview for a loop-iteration composite activity id', () => {
+    const fields: OutputFieldDef[] = [{ name: 'hostname', type: 'string', description: 'The hostname' }]
+    render(<InputSchemaPreview fields={fields} nodeId="step-1#iter-2" />)
+
+    expect(screen.getByText('T hostname')).toBeInTheDocument()
+    expect(screen.getByRole('tree', { name: 'Schema preview' })).toBeInTheDocument()
+  })
+
   it('has no accessibility violations', async () => {
     const { container } = render(<InputSchemaPreview fields={sampleFields} nodeId="step-1" />)
 

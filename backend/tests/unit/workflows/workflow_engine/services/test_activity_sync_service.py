@@ -525,6 +525,72 @@ class TestActivityEventProcessing:
         assert update["_is_loop_iteration"] is True
         assert update["_is_loop_control"] is False
 
+    def test_process_activity_scheduled_approval_iter_suffix_is_not_loop_control(self) -> None:
+        """Approval body nodes with _iter_N suffix are iterations, not loop control."""
+        self.metadata.activity_definitions_map["approval-node"] = {"id": "approval-node", "type": NodeType.APPROVAL}
+        event = self._create_mock_event(
+            EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED,
+            event_id=6,
+            activity_id="approval-node_iter_1",
+        )
+
+        self.service._process_activity_scheduled(event, self.metadata)
+
+        update = self.metadata.pending_activity_updates[6]
+        assert update["activity_id"] == "approval-node"
+        assert update["_is_loop_iteration"] is True
+        assert update["_is_loop_control"] is False
+        assert update["iteration"] == 1
+
+    def test_process_activity_scheduled_nested_approval_iter_suffix_is_not_loop_control(self) -> None:
+        """Nested-loop approval IDs strip to the canvas node and are not loop control."""
+        self.metadata.activity_definitions_map["approval-node"] = {"id": "approval-node", "type": NodeType.APPROVAL}
+        event = self._create_mock_event(
+            EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED,
+            event_id=8,
+            activity_id="approval-node_iter_1_iter_0",
+        )
+
+        self.service._process_activity_scheduled(event, self.metadata)
+
+        update = self.metadata.pending_activity_updates[8]
+        assert update["activity_id"] == "approval-node"
+        assert update["_is_loop_iteration"] is True
+        assert update["_is_loop_control"] is False
+        assert update["iteration"] == 0
+
+    def test_process_activity_scheduled_loop_type_iter_suffix_is_loop_control(self) -> None:
+        """A LOOP-typed node with _iter_N suffix is still classified as loop control."""
+        self.metadata.activity_definitions_map["loop-node"] = {"id": "loop-node", "type": NodeType.LOOP}
+        event = self._create_mock_event(
+            EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED,
+            event_id=7,
+            activity_id="loop-node_iter_2",
+        )
+
+        self.service._process_activity_scheduled(event, self.metadata)
+
+        update = self.metadata.pending_activity_updates[7]
+        assert update["activity_id"] == "loop-node"
+        assert update["_is_loop_control"] is True
+        assert update["iteration"] == 2
+
+    def test_process_activity_scheduled_nested_loop_type_iter_suffix_is_loop_control(self) -> None:
+        """A nested LOOP control ID (outer then inner index) is still loop control."""
+        self.metadata.activity_definitions_map["inner"] = {"id": "inner", "type": NodeType.LOOP}
+        event = self._create_mock_event(
+            EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED,
+            event_id=9,
+            activity_id="inner_iter_2_iter_0",
+        )
+
+        self.service._process_activity_scheduled(event, self.metadata)
+
+        update = self.metadata.pending_activity_updates[9]
+        assert update["activity_id"] == "inner"
+        assert update["_is_loop_control"] is True
+        assert update["iteration"] == 0
+
     @pytest.mark.parametrize(
         ("attempt", "expected_retry_count", "expected_status"),
         [
@@ -2870,6 +2936,32 @@ class TestSyntheticActivityStarted:
         assert metadata.pending_activity_updates[5]["started_at"] is not None
 
     @pytest.mark.asyncio
+    async def test_loop_iteration_approval_id_maps_to_waiting(self) -> None:
+        """Suffixed Temporal ids still resolve to WAITING via the canvas node type."""
+        metadata = create_test_metadata(
+            execution_id=self.execution_id,
+            activity_definitions_map={"approval-node": {"type": "approval"}},
+            pending_activity_updates={
+                5: {
+                    "activity_id": "approval-node",
+                    "activity_name": "approval-node",
+                    "status": ActivityStatus.PENDING,
+                    "started_at": None,
+                    "completed_at": None,
+                    "error_details": None,
+                    "retry_count": 0,
+                },
+            },
+        )
+
+        event = SyntheticActivityStarted(activity_id="approval-node_iter_1_iter_0", scheduled_event_id=5)
+
+        with patch.object(self.service, "_sync_activities_to_db", new_callable=AsyncMock):
+            await self.service._process_synthetic_activity_started(event, metadata, Mock())
+
+        assert metadata.pending_activity_updates[5]["status"] == ActivityStatus.WAITING
+
+    @pytest.mark.asyncio
     async def test_skips_if_already_running(self) -> None:
         """Test that synthetic STARTED is a no-op if activity is already RUNNING."""
         metadata = create_test_metadata(
@@ -2971,6 +3063,37 @@ class TestScheduleDescribeProbe:
         item2 = await queue.get()
         assert isinstance(item2, SyntheticPartialOutput)
         assert item2.partial_output == {"job_id": 42}
+
+    @pytest.mark.asyncio
+    async def test_matches_pending_activity_by_raw_loop_iteration_id(self) -> None:
+        """Probe looks up Temporal's real activity_id, including _iter_N suffixes."""
+        pa = self._make_started_pa_with_heartbeat(
+            activity_id="approval-node_iter_1",
+            partial_output={"approval_id": "apr-1"},
+        )
+        mock_desc = Mock()
+        mock_desc.raw_description.pending_activities = [pa]
+        mock_handle = AsyncMock()
+        mock_handle.describe.return_value = mock_desc
+
+        queue: asyncio.Queue[Any] = asyncio.Queue()
+
+        with patch(
+            "syntara.workflows.workflow_engine.services.activity_sync_service.asyncio.sleep", new_callable=AsyncMock
+        ):
+            await self.service._schedule_describe_probe(
+                handle=mock_handle,
+                queue=queue,
+                activity_id="approval-node_iter_1",
+                scheduled_event_id=5,
+            )
+
+        item1 = await queue.get()
+        assert isinstance(item1, SyntheticActivityStarted)
+        assert item1.activity_id == "approval-node_iter_1"
+        item2 = await queue.get()
+        assert isinstance(item2, SyntheticPartialOutput)
+        assert item2.partial_output == {"approval_id": "apr-1"}
 
     @pytest.mark.asyncio
     async def test_stops_when_activity_no_longer_pending(self) -> None:
@@ -3473,6 +3596,32 @@ class TestProcessHistoryEvent:
         # Wait for the task and verify it called the probe
         await self.probe_tasks[0]
         mock_probe.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_launches_probe_with_raw_loop_iteration_activity_id(self) -> None:
+        """Describe probe uses Temporal's activity_id, not the stripped canvas id."""
+        event = self._create_event(
+            EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED,
+            event_id=10,
+            activity_id="approval-node_iter_1",
+        )
+
+        with (
+            patch.object(self.service, "_process_activity_event"),
+            patch.object(self.service, "_handle_event_post_processing", new_callable=AsyncMock, return_value=10),
+            patch.object(self.service, "_schedule_describe_probe", new_callable=AsyncMock) as mock_probe,
+        ):
+            await self.service._process_history_event(
+                event,
+                self.metadata,
+                self.mock_handle,
+                self.queue,
+                self.probe_tasks,
+            )
+
+        await self.probe_tasks[0]
+        mock_probe.assert_called_once()
+        assert mock_probe.call_args.args[2] == "approval-node_iter_1"
 
     @pytest.mark.asyncio
     async def test_skips_probe_for_internal_activities(self) -> None:
