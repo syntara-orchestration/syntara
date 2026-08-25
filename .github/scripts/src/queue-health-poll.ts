@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import { GitHubClient } from './lib/github.js';
-import { SlackNotifier } from './lib/slack.js';
 import { getEnvironment } from './lib/env.js';
-import { inferPreviousHealthFromJobs } from './lib/health-state.js';
+import { setOutput } from './lib/actions-output.js';
+import { decideAlert, inferPreviousHealthFromJobs } from './lib/health-state.js';
 import type { HealthState } from './lib/types.js';
 
 const MERGE_TIMEOUT_MINUTES = 120;
@@ -101,62 +101,40 @@ async function getPreviousHealthState(
 }
 
 /**
- * Monitors merge queue health and sends alerts on state transitions.
- * Runs every 5 minutes to detect queue backups and recoveries.
+ * Assesses merge queue health and writes workflow outputs for alert steps.
+ * Does not send Slack messages — named workflow steps handle notifications.
  */
 async function main() {
   const env = getEnvironment();
 
   const github = new GitHubClient(env.githubToken, env.repository);
-  const slack = new SlackNotifier(env.slackWebhookUrl);
 
-  // Fetch default branch dynamically
   const defaultBranch = await github.getDefaultBranch();
   console.log(`Monitoring merge queue for branch: ${defaultBranch}`);
 
-  // Assess current health
   const currentState = await assessHealth(github, defaultBranch);
   console.log(`Current health: ${currentState.health} (${currentState.reason})`);
 
-  // Get previous health state
   const previousHealth = await getPreviousHealthState(github, env.runId);
   console.log(`Previous health: ${previousHealth}`);
 
-  // Detect transitions and alert
   const queueUrl = github.getQueueUrl(defaultBranch);
+  const alert = decideAlert(currentState.health, previousHealth);
 
-  // Transition to unhealthy
-  if (
-    currentState.health === 'unhealthy' &&
-    (previousHealth === 'healthy' || previousHealth === 'unknown')
-  ) {
-    console.log('⚠️  Transition to unhealthy detected - sending alert');
-    await slack.sendQueueBackupAlert({
-      queueDepth: currentState.queueDepth!,
-      minutesSinceMerge: currentState.minutesSinceMerge!,
-      timeoutMinutes: MERGE_TIMEOUT_MINUTES,
-      queueUrl,
-    });
-    console.log('✅ Unhealthy alert sent to Slack');
-    console.log('::set-output name=health::unhealthy');
-    return;
+  setOutput('health', currentState.health);
+  setOutput('alert', alert);
+  setOutput('queue_url', queueUrl);
+  setOutput('timeout_minutes', String(MERGE_TIMEOUT_MINUTES));
+  setOutput('queue_depth', String(currentState.queueDepth ?? 0));
+  setOutput('minutes_since_merge', String(currentState.minutesSinceMerge ?? 0));
+
+  if (alert === 'unhealthy') {
+    console.log('⚠️  Transition to unhealthy detected — workflow will send alert');
+  } else if (alert === 'recovery') {
+    console.log('✅ Transition to healthy detected — workflow will send recovery');
+  } else {
+    console.log('No state transition — no alert needed');
   }
-
-  // Transition to healthy
-  if (
-    currentState.health === 'healthy' &&
-    previousHealth === 'unhealthy'
-  ) {
-    console.log('✅ Transition to healthy detected - sending recovery notification');
-    await slack.sendQueueRecoveryAlert(queueUrl);
-    console.log('✅ Recovery alert sent to Slack');
-    console.log('::set-output name=health::healthy');
-    return;
-  }
-
-  // No transition
-  console.log('No state transition - no alert needed');
-  console.log(`::set-output name=health::${currentState.health}`);
 }
 
 main().catch((error) => {

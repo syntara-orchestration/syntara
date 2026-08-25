@@ -25,7 +25,7 @@ export class SlackNotifier {
 
   /**
    * Sends a red alert when multiple PRs are dequeued in rapid succession.
-   * Indicates a systemic issue causing repeated check failures.
+   * Indicates a possible systemic issue with the merge queue.
    */
   async sendDequeueBurstAlert(params: {
     dequeues: Array<{ number: number; url: string; title: string }>;
@@ -67,7 +67,7 @@ export class SlackNotifier {
               type: 'section',
               text: {
                 type: 'mrkdwn',
-                text: 'Multiple PRs were removed from the merge queue due to failed checks. This may indicate a systemic issue.',
+                text: 'Multiple PRs were removed from the merge queue. This may indicate a systemic issue.',
               },
             },
             {

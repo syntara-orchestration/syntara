@@ -53,5 +53,5 @@ npm run check-queue-health
 2. Checks the merge queue for waiting PRs
 3. If empty, the queue is healthy
 4. If PRs are waiting, checks for recent merge activity to the default branch
-5. Sends alert when the queue becomes unhealthy (PRs waiting + no recent merges)
-6. Sends recovery notification when the queue becomes healthy again
+5. Writes health/alert outputs for downstream workflow steps
+6. Named workflow steps send Slack alerts only on transitions (and record marker steps for steady-state dedup)

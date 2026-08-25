@@ -224,17 +224,27 @@ export class GitHubClient {
 
         // Find removed_from_merge_queue events within our time window
         // Timeline API returns various event types; we only care about ones with created_at
-        const dequeueEvents = timeline.data.filter((event: any) => {
-          const hasCreatedAt = 'created_at' in event && typeof event.created_at === 'string';
-          return (
-            hasCreatedAt &&
-            event.event === 'removed_from_merge_queue' &&
-            new Date(event.created_at) >= since
-          );
+        const dequeueEvents = timeline.data.flatMap((event) => {
+          if (
+            !('event' in event) ||
+            event.event !== 'removed_from_merge_queue' ||
+            !('created_at' in event) ||
+            typeof event.created_at !== 'string'
+          ) {
+            return [];
+          }
+
+          if (new Date(event.created_at) < since) {
+            return [];
+          }
+
+          return [{ created_at: event.created_at }];
         });
 
         if (dequeueEvents.length > 0) {
-          const latestEvent = dequeueEvents[0] as any;
+          const latestEvent = dequeueEvents.reduce((latest, event) =>
+            new Date(event.created_at) > new Date(latest.created_at) ? event : latest
+          );
           dequeues.push({
             number: pr.number,
             title: pr.title,

@@ -12,7 +12,7 @@ const TIME_WINDOW_MINUTES = 45;
 /**
  * Detects dequeue bursts in the merge queue and sends Slack alerts.
  * Uses GitHub Timeline API to find actual removed_from_merge_queue events.
- * Alerts when multiple PRs are ejected due to failed checks within the time window.
+ * Alerts when multiple PRs are removed from the queue within the time window.
  */
 async function main() {
   const env = getEnvironment();

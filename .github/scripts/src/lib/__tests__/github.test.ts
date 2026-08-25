@@ -312,7 +312,7 @@ describe('GitHubClient', () => {
         {
           number: 10,
           title: 'Open dequeued PR',
-          dequeuedAt: '2026-08-25T12:10:00Z',
+          dequeuedAt: '2026-08-25T12:40:00Z',
         },
         {
           number: 11,
