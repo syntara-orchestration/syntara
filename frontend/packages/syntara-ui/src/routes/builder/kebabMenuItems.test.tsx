@@ -385,4 +385,135 @@ describe('KebabMenuActionsGroup', () => {
 
     expect(await axe(container)).toHaveNoViolations()
   })
+
+  it('does not call handlers when canEdit is false for duplicate', async () => {
+    const user = userEvent.setup()
+    const handleDuplicate = vi.fn()
+
+    render(
+      <KebabMenuActionsGroup
+        {...defaultProps}
+        showExistingWorkflowItems
+        canEdit={false}
+        handleDuplicate={handleDuplicate}
+      />
+    )
+
+    const duplicateItem = screen.getByRole('menuitem', { name: /Duplicate workflow/i })
+    await user.click(duplicateItem)
+
+    expect(handleDuplicate).not.toHaveBeenCalled()
+  })
+
+  it('does not call handlers when canEdit is false for import', async () => {
+    const user = userEvent.setup()
+    const mockClick = vi.fn()
+    const importFileRef = { current: { click: mockClick } as unknown as HTMLInputElement }
+
+    render(<KebabMenuActionsGroup {...defaultProps} canEdit={false} importFileRef={importFileRef} />)
+
+    const importItem = screen.getByRole('menuitem', { name: /Import workflow/i })
+    await user.click(importItem)
+
+    expect(mockClick).not.toHaveBeenCalled()
+  })
+
+  it('does not call handlers when canEdit is false for unpublish', async () => {
+    const user = userEvent.setup()
+    const onUnpublish = vi.fn()
+
+    render(
+      <KebabMenuActionsGroup
+        {...defaultProps}
+        showExistingWorkflowItems
+        publishedVersionId="ver-1"
+        canEdit={false}
+        onUnpublish={onUnpublish}
+      />
+    )
+
+    const unpublishItem = screen.getByRole('menuitem', { name: /Unpublish workflow/i })
+    await user.click(unpublishItem)
+
+    expect(onUnpublish).not.toHaveBeenCalled()
+  })
+
+  it('does not call handlers when canDelete is false for delete', async () => {
+    const user = userEvent.setup()
+    const dispatch = vi.fn()
+
+    render(<KebabMenuActionsGroup {...defaultProps} showExistingWorkflowItems canDelete={false} dispatch={dispatch} />)
+
+    const deleteItem = screen.getByRole('menuitem', { name: /Delete workflow/i })
+    await user.click(deleteItem)
+
+    expect(dispatch).not.toHaveBeenCalled()
+  })
+
+  it('renders all items when showExistingWorkflowItems and publishedVersionId are set', () => {
+    render(
+      <KebabMenuActionsGroup {...defaultProps} showExistingWorkflowItems publishedVersionId="ver-1" canEdit canDelete />
+    )
+
+    expect(screen.getByRole('menuitem', { name: /Verify workflow/i })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /Duplicate workflow/i })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /Export workflow/i })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /Import workflow/i })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /Unpublish workflow/i })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /Delete workflow/i })).toBeInTheDocument()
+  })
+
+  it('renders correct subset when showExistingWorkflowItems is false and not published', () => {
+    render(<KebabMenuActionsGroup {...defaultProps} showExistingWorkflowItems={false} publishedVersionId={null} />)
+
+    expect(screen.getByRole('menuitem', { name: /Verify workflow/i })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /Duplicate workflow/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /Export workflow/i })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /Import workflow/i })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /Unpublish workflow/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /Delete workflow/i })).not.toBeInTheDocument()
+  })
+
+  it('shows tooltips for all disabled actions', async () => {
+    const user = userEvent.setup()
+    const tooltips = {
+      edit: 'Cannot edit',
+      save: 'Cannot save',
+      publish: 'Cannot publish',
+      unpublish: 'Cannot unpublish',
+      run: 'Cannot run',
+      delete: 'Cannot delete',
+    }
+
+    render(
+      <KebabMenuActionsGroup
+        {...defaultProps}
+        showExistingWorkflowItems
+        publishedVersionId="ver-1"
+        canEdit={false}
+        canDelete={false}
+        tooltips={tooltips}
+      />
+    )
+
+    // Hover over duplicate to show tooltip
+    const duplicateItem = screen.getByRole('menuitem', { name: /Duplicate workflow/i })
+    await user.hover(duplicateItem)
+    expect(await screen.findByText('Cannot edit')).toBeInTheDocument()
+
+    // Hover over import to show tooltip
+    const importItem = screen.getByRole('menuitem', { name: /Import workflow/i })
+    await user.hover(importItem)
+    expect(await screen.findByText('Cannot edit')).toBeInTheDocument()
+
+    // Hover over unpublish to show tooltip
+    const unpublishItem = screen.getByRole('menuitem', { name: /Unpublish workflow/i })
+    await user.hover(unpublishItem)
+    expect(await screen.findByText('Cannot unpublish')).toBeInTheDocument()
+
+    // Hover over delete to show tooltip
+    const deleteItem = screen.getByRole('menuitem', { name: /Delete workflow/i })
+    await user.hover(deleteItem)
+    expect(await screen.findByText('Cannot delete')).toBeInTheDocument()
+  })
 })
