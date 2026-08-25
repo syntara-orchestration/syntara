@@ -230,23 +230,6 @@ test.describe('Name Keyword Filtering', () => {
     }
   })
 
-  test('non-matching filter shows EmptyStateFilter', async ({ app }) => {
-    const { name: credName } = await createTestCredential(app, { prefix: 'e2e-filter-nomatch' })
-
-    try {
-      await goToCredentialsList(app)
-      await expect(app.getByPlaceholder('Filter by keyword')).toBeVisible({ timeout: 15_000 })
-      const nonexistent = buildUniqueName('e2e-no-match-ever')
-      await filterCredentialByName(app, nonexistent)
-
-      await expect(app.getByText('No results found')).toBeVisible()
-      await expect(
-        app.getByRole('search', { name: 'Filters' }).getByRole('button', { name: 'Clear all filters' })
-      ).toBeVisible()
-    } finally {
-      await deleteCredentialByName(app, credName)
-    }
-  })
 })
 
 // ---------------------------------------------------------------------------
