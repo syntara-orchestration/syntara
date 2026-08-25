@@ -12,7 +12,7 @@ import { SynPanelContentStack } from '../../../components/layout/SynPanelContent
 import { SynEmptyStateFilter } from '../../../components/states/SynEmptyStateFilter'
 import { useQueryState } from '../../../components/states/useQueryState'
 import { SynPageTitle } from '../../../components/SynPageTitle'
-import { NxScrollableTableContainer } from '../../../components/table/NxScrollableTableContainer'
+import { SynScrollableTableContainer } from '../../../components/table/SynScrollableTableContainer'
 import { builtinProjectTooltip } from '../../../hooks/permissionUtils'
 import { useCursorPagination, useCursorReset } from '../../../hooks/useCursorPagination'
 import { useDeleteAction } from '../../../hooks/useDeleteAction'
@@ -331,7 +331,7 @@ export default function Credentials() {
                   <SynEmptyStateFilter clearAllFilters={handleClearAllFilters} />
                 </SynPageBody>
               ) : (
-                <NxScrollableTableContainer
+                <SynScrollableTableContainer
                   isExpandable
                   caption="Credentials table"
                   footer={getFooterProps(query.data)}
@@ -381,7 +381,7 @@ export default function Credentials() {
                       getIsBuiltinProject={getIsBuiltinProject}
                     />
                   )}
-                </NxScrollableTableContainer>
+                </SynScrollableTableContainer>
               )}
             </SynPanelContentStack>
           </SynPanel>

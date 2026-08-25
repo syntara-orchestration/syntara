@@ -28,15 +28,15 @@ import { credentialsClient, integrationsClient } from '../../../client'
 import { NxDetail } from '../../../components/details/NxDetail'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
-import { NxLabel } from '../../../components/labels/NxLabel'
+import { SynLabel } from '../../../components/labels/SynLabel'
 import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../components/layout/SynPanel'
-import type { KebabAction } from '../../../components/NxKebabMenu'
-import { NxKebabMenu } from '../../../components/NxKebabMenu'
-import { NxLink } from '../../../components/NxLink'
 import { SynErrorState } from '../../../components/states/SynErrorState'
 import { useQueryState } from '../../../components/states/useQueryState'
+import type { KebabAction } from '../../../components/SynKebabMenu'
+import { SynKebabMenu } from '../../../components/SynKebabMenu'
+import { SynLink } from '../../../components/SynLink'
 import { SynPageTitle } from '../../../components/SynPageTitle'
 import { DateCell } from '../../../components/table/DateCell.tsx'
 import { NxUrlTabs } from '../../../components/tabs/NxUrlTabs'
@@ -80,7 +80,7 @@ function IntegrationProjectsList({ integrationId }: Readonly<{ integrationId: st
   return (
     <LabelGroup numLabels={5}>
       {assignments.map((a) => (
-        <NxLabel key={a.project_id}>{a.project_name}</NxLabel>
+        <SynLabel key={a.project_id}>{a.project_name}</SynLabel>
       ))}
     </LabelGroup>
   )
@@ -136,15 +136,15 @@ function IntegrationDetailsTab({
             ) : (
               <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapSm' }}>
                 <FlexItem>
-                  <NxLink to={AppRoute.Configuration.Credentials.Detail.replace(':credentialId', credentialId)}>
+                  <SynLink to={AppRoute.Configuration.Credentials.Detail.replace(':credentialId', credentialId)}>
                     {credentialName}
-                  </NxLink>
+                  </SynLink>
                 </FlexItem>
                 {!credentialEnabled && (
                   <FlexItem>
-                    <NxLabel variant="outline" status="warning" icon={<RhUiWarningIcon />}>
+                    <SynLabel variant="outline" status="warning" icon={<RhUiWarningIcon />}>
                       Credential disabled
-                    </NxLabel>
+                    </SynLabel>
                   </FlexItem>
                 )}
               </Flex>
@@ -204,7 +204,7 @@ function IntegrationToolbar({
           Edit integration
         </Button>
       </DisabledWithTooltip>
-      <NxKebabMenu actions={kebabActions} aria-label="Integration actions" />
+      <SynKebabMenu actions={kebabActions} aria-label="Integration actions" />
     </>
   )
 }

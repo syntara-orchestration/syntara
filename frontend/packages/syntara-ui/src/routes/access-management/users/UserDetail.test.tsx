@@ -319,6 +319,32 @@ describe('UserDetail', () => {
       expect(screen.getByText('Created')).toBeInTheDocument()
     })
 
+    it('falls back to username in heading when first_name is empty', () => {
+      vi.mocked(accessClient.useQuery).mockImplementation((_method, path) => {
+        if (path === '/users/{user_id}') {
+          return {
+            data: { ...mockUser, first_name: '', last_name: null },
+            isPending: false,
+            isError: false,
+            error: null,
+            refetch: vi.fn(),
+          } as never
+        }
+        if (path === '/users/{user_id}/identities') return emptyIdentitiesResult
+        return {
+          data: mockGroupsData,
+          isPending: false,
+          isError: false,
+          error: null,
+          refetch: vi.fn(),
+        } as never
+      })
+
+      render(<UserDetail />, { wrapper })
+
+      expect(screen.getByRole('heading', { name: 'jdoe' })).toBeInTheDocument()
+    })
+
     it('falls back to username in heading when first_name is null', () => {
       vi.mocked(accessClient.useQuery).mockImplementation((_method, path) => {
         if (path === '/users/{user_id}') {

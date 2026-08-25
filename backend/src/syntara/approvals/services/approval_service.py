@@ -63,6 +63,8 @@ from syntara.core.services.extensions import ConvertResourceMixin, EnrichQueryMi
 
 logger = structlog.stdlib.get_logger(__name__)
 
+_EMPTY_LOOP_PATH: tuple[int, ...] = ()
+
 
 class ApprovalEnrichQuery(EnrichQueryMixin):
     """Eagerly load the decider and approver relationships to avoid lazy-load in async context."""
@@ -91,7 +93,14 @@ class ApprovalServiceConvertResourceMixin(ConvertResourceMixin):
     def convert_resource(self, resource: ApprovalRequest) -> ApprovalRequestRead:  # type: ignore[override]
         """Convert ApprovalRequest to ApprovalRequestRead format."""
         # Extract data from the resource, excluding FK relationship fields and decided_by
-        resource_data = resource.model_dump(exclude={"decided_by", "approver_user_records", "approver_group_records"})
+        resource_data = resource.model_dump(
+            exclude={
+                "decided_by",
+                "approver_user_records",
+                "approver_group_records",
+                "temporal_activity_id",
+            }
+        )
 
         # Create the ApprovalRequestRead instance with the base data
         result = ApprovalRequestRead(**resource_data)
@@ -233,12 +242,19 @@ class ApprovalService(BaseService):
         result = await self.session.exec(query)
         return result.one_or_none()
 
-    async def _get_approval_request(self, execution_id: UUID, approval_node_id: str) -> ApprovalRequest | None:
+    async def _get_approval_request(
+        self,
+        execution_id: UUID,
+        approval_node_id: str,
+        loop_iteration_path: Sequence[int] | None = None,
+    ) -> ApprovalRequest | None:
+        iteration_path: Sequence[int] = loop_iteration_path if loop_iteration_path is not None else _EMPTY_LOOP_PATH
         query = (
             select(ApprovalRequest)
             .where(
                 ApprovalRequest.execution_id == execution_id,
                 ApprovalRequest.approval_node_id == approval_node_id,
+                ApprovalRequest.loop_iteration_path == iteration_path,
             )
             .options(*ApprovalService._approval_eager_loads(include_decider=False))
         )
@@ -407,7 +423,8 @@ class ApprovalService(BaseService):
 
         Raises:
             ExecutionNotFoundError: If the referenced execution does not exist
-            ApprovalAlreadyRequestedError: If approval already exists for this execution and approval node
+            ApprovalAlreadyRequestedError: If approval already exists for this
+                execution, canvas node, and loop_iteration_path
 
         Transaction Boundaries:
             This operation is fully atomic - approval creation and all junction table inserts
@@ -416,10 +433,18 @@ class ApprovalService(BaseService):
             approval records. The transaction commits only when all operations succeed.
 
         """
-        # Check if an approval already exists for this execution and approval node
-        existing_approval = await self._get_approval_request(request.execution_id, request.approval_node_id)
+        # Check if an approval already exists for this execution, canvas node, and path
+        existing_approval = await self._get_approval_request(
+            request.execution_id,
+            request.approval_node_id,
+            request.loop_iteration_path,
+        )
         if existing_approval is not None:
-            raise ApprovalAlreadyRequestedError(request.execution_id, request.approval_node_id)
+            raise ApprovalAlreadyRequestedError(
+                request.execution_id,
+                request.approval_node_id,
+                request.loop_iteration_path,
+            )
 
         project_id = request.project_id
         await self._validate_execution_reference(request.execution_id, project_id)
@@ -443,6 +468,8 @@ class ApprovalService(BaseService):
             next_step_approved=next_step_approved_dict,
             next_step_rejected=next_step_rejected_dict,
             workflow_context=workflow_context_dict,
+            loop_iteration_path=request.loop_iteration_path or _EMPTY_LOOP_PATH,
+            temporal_activity_id=request.temporal_activity_id or request.approval_node_id,
         )
 
         self.session.add(approval)
@@ -474,10 +501,14 @@ class ApprovalService(BaseService):
             # PostgreSQL error codes: 23505 = unique violation, 23503 = FK violation
             pgcode = getattr(e.orig, "pgcode", "")
 
-            # Handle concurrent creation race condition (TOCTOU)
-            # Check if it's a unique constraint violation on (execution_id, approval_node_id)
+            # Handle concurrent creation race condition (TOCTOU).
+            # Unique violations on the execution/node/path constraint map to 409.
             if pgcode == "23505" and ("execution_id" in error_msg or "approval_node_id" in error_msg):
-                raise ApprovalAlreadyRequestedError(request.execution_id, request.approval_node_id) from e
+                raise ApprovalAlreadyRequestedError(
+                    request.execution_id,
+                    request.approval_node_id,
+                    request.loop_iteration_path,
+                ) from e
 
             # Handle FK constraint violations for approver UUIDs
             # These indicate invalid UUIDs were passed (should not happen in normal operation)
@@ -679,6 +710,7 @@ class ApprovalService(BaseService):
                     decided_by=self.user.username,
                     decided_at=(approval.decided_at or datetime.now(UTC)).isoformat(),
                     decision_notes=request.notes,
+                    temporal_activity_id=approval.temporal_activity_id,
                 )
         except Exception as e:  # noqa: BLE001
             signal_error = "Workflow signal delivery failed"
@@ -824,6 +856,7 @@ class ApprovalService(BaseService):
                     decided_by=self.user.username,
                     decided_at=(approval.decided_at or datetime.now(UTC)).isoformat(),
                     decision_notes=decision.notes,
+                    temporal_activity_id=approval.temporal_activity_id,
                 )
             except Exception as e:
                 logger.exception(

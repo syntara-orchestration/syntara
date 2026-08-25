@@ -53,6 +53,7 @@ from syntara.workflows.workflow_engine.models.workflow_definition import (
     NodeType,
 )
 from syntara.workflows.workflow_engine.unified_eval import safe_eval_with_namespace
+from syntara.workflows.workflow_engine.utils.loop_iteration_ids import loop_control_activity_id
 
 # Trigger types allowed for dynamic dispatch via Temporal activities.
 # Each entry must have a corresponding @activity.defn with a matching name.
@@ -950,10 +951,14 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                         loop_results[namespaced_key] = []
                     loop_results[namespaced_key].append(field_value)
 
-        # Clear from loop_body_map to allow fresh tracking on next iteration
-        # Results stay in resolver for query access
+        # Clear from loop_body_map to allow fresh tracking on next iteration.
+        # Also reset loop_state / iteration_results for body nodes that are
+        # themselves loops so nested loops re-initialize when the outer loop
+        # advances to the next iteration.
         for node_id in loop_body_nodes:
             del self.loop_body_map[node_id]
+            self.loop_state.pop(node_id, None)
+            self.loop_iteration_results.pop(node_id, None)
 
         workflow.logger.info(f"Cleared {len(loop_body_nodes)} loop body nodes from tracking for loop {loop_id}")
 
@@ -1175,7 +1180,9 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             await workflow.execute_activity(
                 ActivityName.LOOP,
                 args=[loop_parameters, node.outputs, self.loop_iteration_results[node_id]],
-                activity_id=f"{node_id}_iter_{state.current_index}",
+                activity_id=loop_control_activity_id(
+                    node_id, state.current_index, self.loop_body_map, self.node_control_data
+                ),
                 start_to_close_timeout=timedelta(seconds=timeout_seconds),
             ),
         )

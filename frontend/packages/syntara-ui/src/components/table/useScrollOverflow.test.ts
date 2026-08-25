@@ -57,27 +57,27 @@ describe('useScrollOverflow', () => {
     vi.restoreAllMocks()
   })
 
-  it('sets --nx-scroll-fade-opacity to 1 when content overflows and is not near the bottom', () => {
+  it('sets --syn-scroll-fade-opacity to 1 when content overflows and is not near the bottom', () => {
     const scrollEl = createMockScrollElement({ scrollHeight: 500, clientHeight: 300, scrollTop: 0 })
     const wrapperEl = document.createElement('div')
     const { result } = renderHook(() => useScrollOverflow())
 
     attachScrollOverflow(result.current.scrollRef, result.current.wrapperRef, scrollEl, wrapperEl)
 
-    expect(wrapperEl.style.getPropertyValue('--nx-scroll-fade-opacity')).toBe('1')
+    expect(wrapperEl.style.getPropertyValue('--syn-scroll-fade-opacity')).toBe('1')
   })
 
-  it('sets --nx-scroll-fade-opacity to 0 when content does not overflow', () => {
+  it('sets --syn-scroll-fade-opacity to 0 when content does not overflow', () => {
     const scrollEl = createMockScrollElement({ scrollHeight: 300, clientHeight: 300, scrollTop: 0 })
     const wrapperEl = document.createElement('div')
     const { result } = renderHook(() => useScrollOverflow())
 
     attachScrollOverflow(result.current.scrollRef, result.current.wrapperRef, scrollEl, wrapperEl)
 
-    expect(wrapperEl.style.getPropertyValue('--nx-scroll-fade-opacity')).toBe('0')
+    expect(wrapperEl.style.getPropertyValue('--syn-scroll-fade-opacity')).toBe('0')
   })
 
-  it('sets --nx-scroll-fade-opacity to 0 when scrolled to the bottom', () => {
+  it('sets --syn-scroll-fade-opacity to 0 when scrolled to the bottom', () => {
     // scrollableRemaining = 500 - 200 - 300 = 0
     const scrollEl = createMockScrollElement({ scrollHeight: 500, clientHeight: 300, scrollTop: 200 })
     const wrapperEl = document.createElement('div')
@@ -85,7 +85,7 @@ describe('useScrollOverflow', () => {
 
     attachScrollOverflow(result.current.scrollRef, result.current.wrapperRef, scrollEl, wrapperEl)
 
-    expect(wrapperEl.style.getPropertyValue('--nx-scroll-fade-opacity')).toBe('0')
+    expect(wrapperEl.style.getPropertyValue('--syn-scroll-fade-opacity')).toBe('0')
   })
 
   it('sets a proportional opacity when partially scrolled within the fade distance', () => {
@@ -96,19 +96,19 @@ describe('useScrollOverflow', () => {
 
     attachScrollOverflow(result.current.scrollRef, result.current.wrapperRef, scrollEl, wrapperEl)
 
-    expect(Number.parseFloat(wrapperEl.style.getPropertyValue('--nx-scroll-fade-opacity'))).toBeCloseTo(0.5)
+    expect(Number.parseFloat(wrapperEl.style.getPropertyValue('--syn-scroll-fade-opacity'))).toBeCloseTo(0.5)
   })
 
-  it('reads --nx-scroll-fade-distance from the scroll element computed style', () => {
+  it('reads --syn-scroll-fade-distance from the scroll element computed style', () => {
     // scrollableRemaining = 500 - 140 - 300 = 60; fadeDistance = 80; t = 0.75; smoothstep(0.75) = 0.84375
     const scrollEl = createMockScrollElement({ scrollHeight: 500, clientHeight: 300, scrollTop: 140 })
-    scrollEl.style.setProperty('--nx-scroll-fade-distance', '80')
+    scrollEl.style.setProperty('--syn-scroll-fade-distance', '80')
     const wrapperEl = document.createElement('div')
     const { result } = renderHook(() => useScrollOverflow())
 
     attachScrollOverflow(result.current.scrollRef, result.current.wrapperRef, scrollEl, wrapperEl)
 
-    expect(Number.parseFloat(wrapperEl.style.getPropertyValue('--nx-scroll-fade-opacity'))).toBeCloseTo(0.84375)
+    expect(Number.parseFloat(wrapperEl.style.getPropertyValue('--syn-scroll-fade-opacity'))).toBeCloseTo(0.84375)
   })
 
   it('clamps opacity to 1 when scrollable remaining exceeds the fade distance', () => {
@@ -119,10 +119,10 @@ describe('useScrollOverflow', () => {
 
     attachScrollOverflow(result.current.scrollRef, result.current.wrapperRef, scrollEl, wrapperEl)
 
-    expect(wrapperEl.style.getPropertyValue('--nx-scroll-fade-opacity')).toBe('1')
+    expect(wrapperEl.style.getPropertyValue('--syn-scroll-fade-opacity')).toBe('1')
   })
 
-  it('updates --nx-scroll-fade-opacity when a scroll event fires', () => {
+  it('updates --syn-scroll-fade-opacity when a scroll event fires', () => {
     const scrollTop = { value: 0 }
     const scrollEl = createMockScrollElement({ scrollHeight: 500, clientHeight: 300, scrollTop: 0 })
     Object.defineProperty(scrollEl, 'scrollTop', { get: () => scrollTop.value, configurable: true })
@@ -130,17 +130,17 @@ describe('useScrollOverflow', () => {
     const { result } = renderHook(() => useScrollOverflow())
 
     attachScrollOverflow(result.current.scrollRef, result.current.wrapperRef, scrollEl, wrapperEl)
-    expect(wrapperEl.style.getPropertyValue('--nx-scroll-fade-opacity')).toBe('1')
+    expect(wrapperEl.style.getPropertyValue('--syn-scroll-fade-opacity')).toBe('1')
 
     scrollTop.value = 200
     act(() => {
       scrollEl.dispatchEvent(new Event('scroll'))
     })
 
-    expect(wrapperEl.style.getPropertyValue('--nx-scroll-fade-opacity')).toBe('0')
+    expect(wrapperEl.style.getPropertyValue('--syn-scroll-fade-opacity')).toBe('0')
   })
 
-  it('updates --nx-scroll-fade-opacity when the ResizeObserver fires', () => {
+  it('updates --syn-scroll-fade-opacity when the ResizeObserver fires', () => {
     const scrollHeight = { value: 300 }
     const scrollEl = createMockScrollElement({ scrollHeight: 300, clientHeight: 300, scrollTop: 0 })
     Object.defineProperty(scrollEl, 'scrollHeight', { get: () => scrollHeight.value, configurable: true })
@@ -148,14 +148,14 @@ describe('useScrollOverflow', () => {
     const { result } = renderHook(() => useScrollOverflow())
 
     attachScrollOverflow(result.current.scrollRef, result.current.wrapperRef, scrollEl, wrapperEl)
-    expect(wrapperEl.style.getPropertyValue('--nx-scroll-fade-opacity')).toBe('0')
+    expect(wrapperEl.style.getPropertyValue('--syn-scroll-fade-opacity')).toBe('0')
 
     scrollHeight.value = 500
     act(() => {
       resizeCallback?.([] as ResizeObserverEntry[])
     })
 
-    expect(wrapperEl.style.getPropertyValue('--nx-scroll-fade-opacity')).toBe('1')
+    expect(wrapperEl.style.getPropertyValue('--syn-scroll-fade-opacity')).toBe('1')
   })
 
   it('attaches the scroll listener with the passive option', () => {
@@ -190,12 +190,12 @@ describe('useScrollOverflow', () => {
     act(() => {
       result.current.scrollRef(scrollEl)
     })
-    expect(wrapperEl.style.getPropertyValue('--nx-scroll-fade-opacity')).toBe('')
+    expect(wrapperEl.style.getPropertyValue('--syn-scroll-fade-opacity')).toBe('')
 
     act(() => {
       result.current.wrapperRef(wrapperEl)
     })
-    expect(wrapperEl.style.getPropertyValue('--nx-scroll-fade-opacity')).toBe('1')
+    expect(wrapperEl.style.getPropertyValue('--syn-scroll-fade-opacity')).toBe('1')
   })
 
   it('keeps stable callback ref identities across re-renders', () => {

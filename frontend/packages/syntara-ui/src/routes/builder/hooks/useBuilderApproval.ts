@@ -3,6 +3,7 @@ import type { Node } from '@xyflow/react'
 import { useCallback, useMemo, useState } from 'react'
 
 import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
+import { findNodeByApprovalNodeId } from '../../approvals/approvalNodeId'
 import { getApprovalPromptFromNode } from '../../approvals/approvalPrompt'
 import { useAutoApprovalDetection } from '../../executions/hooks/useAutoApprovalDetection'
 import {
@@ -91,7 +92,8 @@ export function useBuilderApproval({
 
   const approvalMessage = useMemo(() => {
     if (!pendingApproval || !currentWorkflow) return undefined
-    const activity = currentWorkflow.workflow?.activities?.find((a) => a.id === pendingApproval.approval_node_id)
+    const activities = currentWorkflow.workflow?.activities ?? []
+    const activity = findNodeByApprovalNodeId(activities, pendingApproval.approval_node_id)
     if (activity?.type !== ActivityTypeEnum.APPROVAL) return undefined
     return getApprovalPromptFromNode(activity)
   }, [pendingApproval, currentWorkflow])
