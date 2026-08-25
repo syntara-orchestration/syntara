@@ -477,6 +477,16 @@ jobs:
           RH_REGISTRY_USER: ${{ secrets.RH_REGISTRY_USER }}
         run: echo "$RH_REGISTRY_TOKEN" | podman login registry.redhat.io -u "$RH_REGISTRY_USER" --password-stdin
 
+      - name: Diagnose podman environment
+        run: |
+          podman --version
+          podman info --format json | python3 -c '
+          import sys, json
+          h = json.load(sys.stdin)["host"]
+          print("EventLogger=" + str(h.get("eventLogger", "?")))
+          print("CgroupVersion=" + str(h.get("cgroupVersion", h.get("cgroupsVersion", "?"))))
+          '
+
       - name: Start services with podman-compose
         timeout-minutes: 20
         env:
