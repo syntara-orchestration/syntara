@@ -1,4 +1,4 @@
-import { NxLabel } from './labels/NxLabel'
+import { SynLabel } from './labels/SynLabel'
 import { derivePublishStatus, type PublishDisplayStatus } from './publishStatusUtils'
 
 type BadgeConfig = {
@@ -29,5 +29,5 @@ export function WorkflowPublishStatusBadge({
       : derivePublishStatus(publishedVersionId, currentVersionId)
   const { color, label } = publishBadgeConfig[displayStatus]
 
-  return <NxLabel color={color}>{label}</NxLabel>
+  return <SynLabel color={color}>{label}</SynLabel>
 }

@@ -298,16 +298,16 @@ Filter bar is visible when data exists or when filters are active; hidden only w
 
 ### Table Component
 
-- Always use `NxScrollableTableContainer` wrapper — this applies the standard table variant by default
-- `NxScrollableTableContainer` does not set `variant="compact"` — the default (standard) variant is used for main data tables
+- Always use `SynScrollableTableContainer` wrapper — this applies the standard table variant by default
+- `SynScrollableTableContainer` does not set `variant="compact"` — the default (standard) variant is used for main data tables
 - Use `variant="compact"` only for dense, supplementary tables (e.g., activity state tables inside panels) where space is constrained
 - Always include `<Thead>` with column headers
 - Actions column is rightmost
 - Header includes title and primary actions for the whole page
 - Columns should be sortable if applicable
   - **Sort state lives in the URL**, not local component state. `useSortState` (`hooks/useSortState.ts`) reads/writes a `sort` query param in `field` / `-field` form (leading `-` = descending). `useCursorPagination` (`hooks/useCursorPagination.tsx`) composes `useSortState` together with filter state and cursor paging into a single hook, and resets to page 1 whenever the sort changes. Standalone panels that don't need filters/pagination can use `useSortableTable` directly to wire `<Th sort>` to the same URL-backed state. This is the standard across all server-sorted list pages (Workflows, Executions, Run History, Approvals, Integrations, Assignments) — do not reintroduce index-based, client-only sort state for new tables.
-- Clicking the name of a resource should navigate to the details view — use `LinkCell` (built on `NxLink`) for the name column
-- **Navigational text uses `NxLink`, not `Button` + `navigate`** — Any text that acts purely as a link to another route (resource names, cross-entity references in a detail view or table) should render `NxLink` (`components/NxLink.tsx`), a real anchor styled as a PatternFly inline link. Don't reach for `Button variant="link"` with an `onClick` that calls `navigate()` — that renders `role="button"` on something that is semantically navigation, breaking "open in new tab," "copy link address," and link-role accessibility/test queries.
+- Clicking the name of a resource should navigate to the details view — use `LinkCell` (built on `SynLink`) for the name column
+- **Navigational text uses `SynLink`, not `Button` + `navigate`** — Any text that acts purely as a link to another route (resource names, cross-entity references in a detail view or table) should render `SynLink` (`components/SynLink.tsx`), a real anchor styled as a PatternFly inline link. Don't reach for `Button variant="link"` with an `onClick` that calls `navigate()` — that renders `role="button"` on something that is semantically navigation, breaking "open in new tab," "copy link address," and link-role accessibility/test queries.
 - **Table columns:**
   - Columns for "created" or "modified" should have username (linked) + date together
   - This pattern should be used for any column that includes a date/time and a who
@@ -322,23 +322,23 @@ Filter bar is visible when data exists or when filters are active; hidden only w
   - Action order: non-destructive actions first (e.g., "Edit credential", "Duplicate workflow", "Disable credential"), then a divider, then destructive actions last (e.g., "Delete credential", "Remove integration")
   - On the **details page header**, the same actions appear in a kebab menu. Frequently used actions (e.g., Edit) are promoted to direct buttons in the header — primary button with icon for the most common action (e.g., `RhUiEditIcon` + "Edit credential"), remaining actions stay in the kebab.
 - **Text truncation** — All text-heavy columns (names, descriptions, emails, URLs) must use PatternFly's `<Truncate>` component. Long values show ellipsis with the full text in a tooltip on hover.
-  - `NxScrollableTableContainer` uses `table-layout: fixed` for equal column distribution — do not opt out with `useFixedLayout={false}`
+  - `SynScrollableTableContainer` uses `table-layout: fixed` for equal column distribution — do not opt out with `useFixedLayout={false}`
   - Wrap cell text in `<Truncate content={value} />` for any column that may contain user-generated or variable-length content
   - `LinkCell` children support `<Truncate>` — the link button constrains overflow automatically
-- **`NxKebabMenu` component** — Use `NxKebabMenu` (from `frontend/packages/syntara-ui/src/components/NxKebabMenu.tsx`) for table row actions and contextual overflow menus. API:
+- **`SynKebabMenu` component** — Use `SynKebabMenu` (from `frontend/packages/syntara-ui/src/components/SynKebabMenu.tsx`) for table row actions and contextual overflow menus. API:
   - `actions`: array of `{ key, title, onClick, isSeparator?, isDanger?, isAriaDisabled?, tooltipProps? }`
   - `aria-label`: must be unique per row (e.g., `` `Actions for ${resource.name}` ``)
   - Action ordering: non-destructive first → `isSeparator: true` → destructive last (`isDanger: true`)
   - Use `IconLabel` for action titles: `<IconLabel icon={<RhUiEditIcon />}>Edit workflow</IconLabel>`
   - Permission-gated items: `isAriaDisabled: true` + `tooltipProps: { content: tooltip }` (visible but non-actionable, stays focusable)
-  - **Only one kebab open at a time** — this is built into `NxKebabMenu` itself via a module-level registry of open-menu close callbacks; opening any `NxKebabMenu` automatically closes every other one on the page. Callers don't opt in or manage this — it's automatic across separate table rows and between a table row and an adjacent panel (e.g., a history panel row).
+  - **Only one kebab open at a time** — this is built into `SynKebabMenu` itself via a module-level registry of open-menu close callbacks; opening any `SynKebabMenu` automatically closes every other one on the page. Callers don't opt in or manage this — it's automatic across separate table rows and between a table row and an adjacent panel (e.g., a history panel row).
 - **Expandable rows** — When a table uses expandable rows to show nested detail (e.g., policies under a role, execution steps in a workflow run):
-  - Pass `isExpandable` to `NxScrollableTableContainer` for proper PF6 table styling
+  - Pass `isExpandable` to `SynScrollableTableContainer` for proper PF6 table styling
   - Include an expand-all / collapse-all toggle in the `<Thead>` using the `expand` prop on the first `<Th>`
   - Use `ExpandableRowContent` for the expanded row body
   - Expanded content should use compact gray `Label` components for list-style data (e.g., attached policies)
   - Column order left to right: expand/collapse chevron → [checkbox if selectable] → data columns → actions
-- **Footer/pagination** — use `PaginationFooter` via the `NxScrollableTableContainer` `footer` prop. `PaginationFooter` wraps PatternFly's [Pagination](https://www.patternfly.org/components/pagination) component; supports `page`, `perPage`, `total` (optional), `hasNext`, `onPrev`, `onNext`, and `onPerPageChange`. When `total` is unknown (cursor-based APIs), item count is estimated from `page`, `perPage`, and `hasNext`. Pair with `useCursorPagination` from `src/hooks/useCursorPagination.tsx` for cursor state management
+- **Footer/pagination** — use `PaginationFooter` via the `SynScrollableTableContainer` `footer` prop. `PaginationFooter` wraps PatternFly's [Pagination](https://www.patternfly.org/components/pagination) component; supports `page`, `perPage`, `total` (optional), `hasNext`, `onPrev`, `onNext`, and `onPerPageChange`. When `total` is unknown (cursor-based APIs), item count is estimated from `page`, `perPage`, and `hasNext`. Pair with `useCursorPagination` from `src/hooks/useCursorPagination.tsx` for cursor state management
 
 ### Form Component
 
@@ -399,10 +399,10 @@ Resource pickers (credential selectors, integration pickers, etc.) use a standar
 
 #### Multi-Select Typeahead with Label Chips
 
-For fields where users can select multiple items (e.g., group assignment on user creation), use `MenuToggle variant="typeahead"` + `TextInputGroup` + `LabelGroup` + **`NxLabel color="blue"`** (filled, default variant) for selected items:
+For fields where users can select multiple items (e.g., group assignment on user creation), use `MenuToggle variant="typeahead"` + `TextInputGroup` + `LabelGroup` + **`SynLabel color="blue"`** (filled, default variant) for selected items:
 
 - **Filter-as-you-type** with checkbox options
-- **Selected items as chips** — `NxLabel color="blue"` with close (×) button for individual removal; clear-all button with `aria-label` for removing all selections. Do **not** use `variant="outline"` for picker chips — outline is for filter chips and user tags, not multi-select selections.
+- **Selected items as chips** — `SynLabel color="blue"` with close (×) button for individual removal; clear-all button with `aria-label` for removing all selections. Do **not** use `variant="outline"` for picker chips — outline is for filter chips and user tags, not multi-select selections.
 - **Empty filter message** — `"No results match \"{filter}\""` when typeahead filter matches nothing
 - **Options with descriptions** — show supplementary text below option labels when available
 - **Create-only fields:** Some multi-select fields (e.g., group assignment) appear on the Create form only; editing is done through a dedicated panel on the detail page (e.g., `UserGroupsPanel`). This avoids overloading the edit form with group management.
@@ -507,8 +507,8 @@ When building or reviewing any page, verify every item:
 
 ### Main Content
 
-- [ ] Tables use `NxScrollableTableContainer`
-- [ ] Main data tables use `NxScrollableTableContainer` (standard variant by default)
+- [ ] Tables use `SynScrollableTableContainer`
+- [ ] Main data tables use `SynScrollableTableContainer` (standard variant by default)
 - [ ] `variant="compact"` only used for dense, supplementary tables where space is constrained
 - [ ] Tables have proper column headers
 - [ ] Forms have max-width of 600px
@@ -993,16 +993,16 @@ Use `Label` only when visual distinction is needed — for statuses, categorical
 
 | Content type                                                                          | Component                                           | Visual treatment            |
 | -------------------------------------------------------------------------------------- | ---------------------------------------------------- | ---------------------------- |
-| Live status of a monitored entity (execution, activity, approval, integration health) | `NxLabel variant="outline"` with `status` + icon     | Outlined with status color   |
-| Categorical metadata (System, Project, Built-in)                                      | `NxLabel` with `color`                              | Filled                        |
-| Counts, callouts (single-value, no type distinction)                                  | `NxLabel color="grey"`                              | Filled grey                   |
-| Informational context (e.g., "Test run", "Default")                                  | `NxLabel color="purple"` or `color="blue"`          | Filled colored                 |
-| User-authored tags, workflow tags                                                     | `NxUserTag`                                         | Outlined compact                |
+| Live status of a monitored entity (execution, activity, approval, integration health) | `SynLabel variant="outline"` with `status` + icon     | Outlined with status color   |
+| Categorical metadata (System, Project, Built-in)                                      | `SynLabel` with `color`                              | Filled                        |
+| Counts, callouts (single-value, no type distinction)                                  | `SynLabel color="grey"`                              | Filled grey                   |
+| Informational context (e.g., "Test run", "Default")                                  | `SynLabel color="purple"` or `color="blue"`          | Filled colored                 |
+| User-authored tags, workflow tags                                                     | `SynUserTag`                                         | Outlined compact                |
 | Filter chips (active filters)                                                        | `Label variant="outline" isCompact` in `LabelGroup` | Outlined compact, removable      |
 
-**`NxLabel`** (from `frontend/packages/syntara-ui/src/components/labels/NxLabel.tsx`) — thin wrapper over PF `Label` with UX defaults: `isCompact={true}`, `variant="filled"`. Never use PF `Label` directly.
+**`SynLabel`** (from `frontend/packages/syntara-ui/src/components/labels/SynLabel.tsx`) — thin wrapper over PF `Label` with UX defaults: `isCompact={true}`, `variant="filled"`. Never use PF `Label` directly.
 
-**`NxUserTag`** (from `frontend/packages/syntara-ui/src/components/labels/NxUserTag.tsx`) — outline-only wrapper for user-authored content. Always use for content typed by users (workflow tags, custom labels).
+**`SynUserTag`** (from `frontend/packages/syntara-ui/src/components/labels/SynUserTag.tsx`) — outline-only wrapper for user-authored content. Always use for content typed by users (workflow tags, custom labels).
 
 ### Filled vs. Outline — When to Use Each Variant
 
@@ -1037,9 +1037,9 @@ const statusIcons: Record<MyStatus, React.ComponentType> = {
 export function MyStatusLabel({ status }: Readonly<{ status: MyStatus }>) {
   const Icon = statusIcons[status]
   return (
-    <NxLabel variant="outline" status={statusMap[status]} icon={<Icon />}>
+    <SynLabel variant="outline" status={statusMap[status]} icon={<Icon />}>
       {displayLabels[status]}
-    </NxLabel>
+    </SynLabel>
   )
 }
 ```
@@ -1049,12 +1049,12 @@ Keep display labels in a separate constants file (e.g., `executionStatusConstant
 ### General Label Rules
 
 - If labels on a table reference a resource, make them clickable labels, navigating to the details page of the resource if one exists
-- Use outline (unfilled) `RhUi*Icon` variants when passing icons to `NxLabel`
+- Use outline (unfilled) `RhUi*Icon` variants when passing icons to `SynLabel`
 - If a label is used for a single thing (a count, a callout) and not to distinguish between 2+ types, use a filled gray label (`color="grey"`)
 
 #### System-generated labels
 
-- Use `NxLabel` (defaults to filled, compact) and default to gray
+- Use `SynLabel` (defaults to filled, compact) and default to gray
 - If used to categorize types (e.g., User vs. Group), use a colored variant
 - Color variants should have enough contrast to distinguish between them
 
@@ -1064,7 +1064,7 @@ Keep display labels in a separate constants file (e.g., `executionStatusConstant
 
 #### User-generated labels
 
-- Use `NxUserTag` (outlined, compact) for any user-entered values (tags, custom names in filter chips)
+- Use `SynUserTag` (outlined, compact) for any user-entered values (tags, custom names in filter chips)
 
 #### Label colors
 
@@ -1107,10 +1107,10 @@ Keep display labels in a separate constants file (e.g., `executionStatusConstant
 
 **Assignment table columns**
 
-- **Principal Type** — `NxLabel` with color from `principalTypeDisplay` in `routes/access-management/RoleAssignmentTypes.ts` (single source of truth for Assignments and Project Role Assignments tabs).
+- **Principal Type** — `SynLabel` with color from `principalTypeDisplay` in `routes/access-management/RoleAssignmentTypes.ts` (single source of truth for Assignments and Project Role Assignments tabs).
 - **Role Name** — `<Truncate content={roleName} />`. Role names are identifiers, not categorical metadata; do not use colored labels (e.g., purple) for this column.
 - **Scope** — filled label per the Scope row above (`ScopeLabel` / `SCOPE_DISPLAY` in `routes/access/ScopeLabel.tsx`: System=blue, Project=green).
-- **Policies** — default grey filled `NxLabel` when shown as a chip group.
+- **Policies** — default grey filled `SynLabel` when shown as a chip group.
 
 Principal type and scope are **different dimensions** — use colors from their respective rows in this table.
 
@@ -1945,7 +1945,7 @@ The project ships with Storybook for documenting and reviewing `Nx*` components.
 - **Light and dark mode:** Preview components in both themes via the Storybook toolbar (System / Light / Dark) before sign-off
 - **Composed stories over isolated demos:** Stories should reflect real app compositions (e.g., a full list page layout), not isolated prop playgrounds
 - **Autodocs:** Foundational `Nx*` components have `autodocs` enabled — browse auto-generated API docs alongside live examples
-- **Available stories:** `SynPage`, `SynPageHeader`, `SynPageBreadcrumbs`, `SynPanel`, `SynPanelContentStack`, `NxUrlTabs`, `NxConfirmationDialog`, `NxCodeBlock`, `NxDetail`, `NxDetailList`, `SynErrorState`, `SynLoadingState`, `SynEmptyStateNoData`, `SynEmptyStateFilter`, `SynEmptyStateServiceUnavailable`, `NxListPanel`, `NxKebabMenu`, `NxLabel`, `NxUserTag`, `NxScrollableTableContainer`
+- **Available stories:** `SynPage`, `SynPageHeader`, `SynPageBreadcrumbs`, `SynPanel`, `SynPanelContentStack`, `NxUrlTabs`, `NxConfirmationDialog`, `NxCodeBlock`, `NxDetail`, `NxDetailList`, `SynErrorState`, `SynLoadingState`, `SynEmptyStateNoData`, `SynEmptyStateFilter`, `SynEmptyStateServiceUnavailable`, `NxListPanel`, `SynKebabMenu`, `SynLabel`, `SynUserTag`, `SynScrollableTableContainer`
 
 ---
 
@@ -1967,10 +1967,10 @@ When implementing a new page or feature, use this decision tree:
 ```text
 What are you building?
 ├── List/table view
-│   ├── Use NxScrollableTableContainer (standard variant by default, "compact" only for dense supplementary tables)
+│   ├── Use SynScrollableTableContainer (standard variant by default, "compact" only for dense supplementary tables)
 │   ├── Add SynPageHeader with title + primary action
 │   ├── Add FilterBar (Attribute Search)
-│   ├── Add cursor-based pagination footer via NxScrollableTableContainer's footer prop
+│   ├── Add cursor-based pagination footer via SynScrollableTableContainer's footer prop
 │   ├── "Created"/"Modified" columns: username (linked) + date together
 │   └── Handle 3 empty states (no data / no results / error)
 │
@@ -2004,7 +2004,7 @@ What are you building?
 │   └── Single "Close" button (variant="primary")
 │
 ├── Log / event viewer (read-only)
-│   ├── Use NxScrollableTableContainer with expandable rows (isExpandable)
+│   ├── Use SynScrollableTableContainer with expandable rows (isExpandable)
 │   ├── Add expand-all/collapse-all toggle in header
 │   ├── Add FilterBar with multiple attribute filters (category, date range, status, severity, etc.)
 │   ├── All columns sortable

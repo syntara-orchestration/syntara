@@ -34,7 +34,7 @@ class ApprovalRequestRead:
         Attributes:
             project_id (UUID): Project this approval belongs to (denormalized from execution)
             execution_id (UUID): Parent execution ID
-            approval_node_id (str): Activity ID from workflow definition
+            approval_node_id (str): Canvas node ID from the workflow definition
             name (str): Human-readable name for the approval request
             next_step_approved (ActivitySummary): Activity summary for workflow context.
 
@@ -51,6 +51,7 @@ class ApprovalRequestRead:
             updated_at (datetime.datetime | Unset): Timestamp when resource was last updated Example: 2025-10-09T12:30:00Z.
             labels (ApprovalRequestReadLabels | Unset): Key-value pairs for resource labeling and filtering Example:
                 {'environment': 'production', 'region': 'us-east-1', 'team': 'platform'}.
+            loop_iteration_path (list[int] | Unset): Enclosing-loop indices, outermost first (empty when not inside a loop)
             prompt (None | str | Unset): Resolved guidance message from the approval node, shown to approvers
             status (ApprovalRequestStatus | Unset): Approval request status enumeration.
             timeout_at (datetime.datetime | None | Unset): When this request expires
@@ -75,6 +76,7 @@ class ApprovalRequestRead:
     created_at: datetime.datetime | Unset = UNSET
     updated_at: datetime.datetime | Unset = UNSET
     labels: ApprovalRequestReadLabels | Unset = UNSET
+    loop_iteration_path: list[int] | Unset = UNSET
     prompt: None | str | Unset = UNSET
     status: ApprovalRequestStatus | Unset = UNSET
     timeout_at: datetime.datetime | None | Unset = UNSET
@@ -117,6 +119,10 @@ class ApprovalRequestRead:
         labels: dict[str, Any] | Unset = UNSET
         if not isinstance(self.labels, Unset):
             labels = self.labels.to_dict()
+
+        loop_iteration_path: list[int] | Unset = UNSET
+        if not isinstance(self.loop_iteration_path, Unset):
+            loop_iteration_path = self.loop_iteration_path
 
         prompt: None | str | Unset
         if isinstance(self.prompt, Unset):
@@ -206,6 +212,8 @@ class ApprovalRequestRead:
             field_dict["updated_at"] = updated_at
         if labels is not UNSET:
             field_dict["labels"] = labels
+        if loop_iteration_path is not UNSET:
+            field_dict["loop_iteration_path"] = loop_iteration_path
         if prompt is not UNSET:
             field_dict["prompt"] = prompt
         if status is not UNSET:
@@ -278,6 +286,8 @@ class ApprovalRequestRead:
             labels = UNSET
         else:
             labels = ApprovalRequestReadLabels.from_dict(_labels)
+
+        loop_iteration_path = cast(list[int], d.pop("loop_iteration_path", UNSET))
 
         def _parse_prompt(data: object) -> None | str | Unset:
             if data is None:
@@ -410,6 +420,7 @@ class ApprovalRequestRead:
             created_at=created_at,
             updated_at=updated_at,
             labels=labels,
+            loop_iteration_path=loop_iteration_path,
             prompt=prompt,
             status=status,
             timeout_at=timeout_at,

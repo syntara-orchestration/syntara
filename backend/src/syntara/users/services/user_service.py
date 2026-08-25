@@ -189,7 +189,7 @@ class UsersService(BaseService):
     async def create_user(
         self,
         username: str,
-        first_name: str,
+        first_name: str | None,
         password: str,
         *,
         last_name: str | None = None,
@@ -201,7 +201,7 @@ class UsersService(BaseService):
 
         Args:
             username: Unique username
-            first_name: User's first name
+            first_name: User's first name (optional; stored as empty string when omitted)
             password: Plaintext password (will be hashed)
             last_name: User's last name (optional)
             email: Email address (optional)
@@ -221,7 +221,7 @@ class UsersService(BaseService):
             id=uuid4(),
             username=username,
             email=email.lower() if email else None,
-            first_name=first_name,
+            first_name=first_name or "",
             last_name=last_name,
             password_hash=hash_password(password),
             is_enabled=is_enabled,

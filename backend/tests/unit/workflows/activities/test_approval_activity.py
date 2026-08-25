@@ -134,6 +134,8 @@ async def test_create_approval_request_success(
     assert request_data["next_step_approved"]["id"] == "deploy"
     assert request_data["workflow_context"]["workflow_name"] == "Production Deployment"
     assert request_data["prompt"] is None
+    assert request_data["loop_iteration_path"] == []
+    assert request_data["temporal_activity_id"] == approval_node_id
 
 
 @pytest.mark.asyncio

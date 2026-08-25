@@ -18,7 +18,7 @@ import { FilterBar } from '../filters/FilterBar'
 import { SynPanel } from '../layout/SynPanel'
 import { SynPanelContentStack } from '../layout/SynPanelContentStack'
 
-import { NxScrollableTableContainer } from './NxScrollableTableContainer'
+import { SynScrollableTableContainer } from './SynScrollableTableContainer'
 
 type StatusValue = 'completed' | 'failed' | 'running' | 'pending'
 
@@ -84,7 +84,7 @@ const STORY_FILTER_FIELDS = [
  *   SynPanel isFullHeight
  *     SynPanelContentStack variant="inset"
  *       StackItem → FilterBar  (static, non-functional)
- *       NxScrollableTableContainer   ← Story renders here
+ *       SynScrollableTableContainer   ← Story renders here
  *
  * The height-constrained outer div simulates SynPageBody giving the panel a
  * bounded height so the table can scroll internally.
@@ -102,8 +102,8 @@ const panelDecorator: Decorator = (Story) => (
   </div>
 )
 
-const meta: Meta<typeof NxScrollableTableContainer> = {
-  component: NxScrollableTableContainer,
+const meta: Meta<typeof SynScrollableTableContainer> = {
+  component: SynScrollableTableContainer,
   tags: ['autodocs'],
   decorators: [panelDecorator],
   parameters: {
@@ -211,7 +211,7 @@ export const WithPagination: Story = {
     const hasNext = start + perPage < SAMPLE_ROWS.length
 
     return (
-      <NxScrollableTableContainer
+      <SynScrollableTableContainer
         caption="Paginated resources table"
         footer={{
           page,
@@ -250,7 +250,7 @@ export const WithPagination: Story = {
             </Tr>
           ))}
         </Tbody>
-      </NxScrollableTableContainer>
+      </SynScrollableTableContainer>
     )
   },
 }
@@ -291,7 +291,7 @@ export const Expandable: Story = {
     const columnCount = 6
 
     return (
-      <NxScrollableTableContainer
+      <SynScrollableTableContainer
         caption="Expandable resources table"
         isExpandable
         footer={{
@@ -372,7 +372,7 @@ export const Expandable: Story = {
             )
           })}
         </Tbody>
-      </NxScrollableTableContainer>
+      </SynScrollableTableContainer>
     )
   },
 }
