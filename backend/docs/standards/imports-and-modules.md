@@ -63,9 +63,6 @@ Violations of import order will be caught by `make lint` and auto-fixed by `make
 3. **Unit tests** (`tests/unit/authz/test_regopy_import_order.py`) — subprocess tests assert the preload order and both guard branches.
 4. **Leak canary** (`tests/integration/authz/test_regopy_leak_canary.py`) — measures RSS growth over 800 in-app evaluations; a regression fails at ~55 MB against a 25 MB threshold.
 
-**History:** the interpreter used to be recycled every N evaluations to "bound" this leak (AAP-86133). Measurements showed the leak rate is identical at every recycle interval (recycling never touched it), so the recycling machinery was removed when the import-order fix landed.
-
-Upstream issue: to be filed against [microsoft/rego-cpp](https://github.com/microsoft/rego-cpp) (exported allocator symbols should be hidden via `-fvisibility=hidden` / `--exclude-libs`).
 
 ## `__init__.py` Conventions
 

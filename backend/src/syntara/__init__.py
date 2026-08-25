@@ -4,7 +4,7 @@
 # temporalio's native bridge: librego_shared.so statically links snmalloc and
 # exports operator new/delete; if another native library loads first, libstdc++
 # allocation symbols bind across two allocators and every rego query leaks
-# ~69 KB natively (backend OOM, AAP-XXXXX). Loading regopy first makes the
+# ~69 KB natively. Loading regopy first makes the
 # bindings consistent. Guarded because E2E CI images without libatomic.so.1
 # cannot import regopy at all (PR #560); those processes never evaluate rego.
 # See docs/standards/imports-and-modules.md ("Native import order").
