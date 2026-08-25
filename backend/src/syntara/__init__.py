@@ -12,10 +12,14 @@ _REGOPY_PRELOAD_ERROR: str | None = None
 try:
     import regopy  # type: ignore[import-untyped]
 except (ImportError, OSError) as _exc:
-    # Only the known environment gaps are tolerated (PR #560: UBI9 E2E images
-    # without libatomic.so.1, or regopy not installed at all). Anything else
-    # is an unexpected loader failure and must surface immediately.
-    if isinstance(_exc, ModuleNotFoundError) or "cannot open shared object file" in str(_exc):
+    # Only the two known environment gaps are tolerated: regopy itself not
+    # installed (collection-only envs), and the UBI9 E2E images that lack
+    # libatomic.so.1 (PR #560). A missing transitive dependency or any other
+    # unloadable shared object is a packaging fault and must surface
+    # immediately, not run without the preload.
+    _regopy_not_installed = isinstance(_exc, ModuleNotFoundError) and _exc.name == "regopy"
+    _libatomic_gap = "libatomic.so.1: cannot open shared object file" in str(_exc)
+    if _regopy_not_installed or _libatomic_gap:
         _REGOPY_PRELOAD_ERROR = str(_exc)
     else:
         raise

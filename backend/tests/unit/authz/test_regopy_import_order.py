@@ -82,8 +82,12 @@ def test_missing_libatomic_is_tolerated_and_recorded(tmp_path):
 
 
 def test_regopy_not_installed_is_tolerated_and_recorded(tmp_path):
-    """A missing regopy distribution (collection-only envs) must be tolerated."""
-    (tmp_path / "regopy.py").write_text("raise ModuleNotFoundError(\"No module named 'regopy'\")\n")
+    """A missing regopy distribution (collection-only envs) must be tolerated.
+
+    The import machinery raises ``ModuleNotFoundError`` with ``name="regopy"``
+    when the distribution is absent; the stub replicates that exactly.
+    """
+    (tmp_path / "regopy.py").write_text('raise ModuleNotFoundError("No module named \'regopy\'", name="regopy")\n')
     result = _run_python(
         """
         import syntara
@@ -95,6 +99,42 @@ def test_regopy_not_installed_is_tolerated_and_recorded(tmp_path):
     )
     assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
     assert "SENTINEL-OK" in result.stdout
+
+
+def test_missing_transitive_dependency_is_raised(tmp_path):
+    """A ModuleNotFoundError for anything other than regopy itself must surface.
+
+    A missing transitive dependency of regopy is a packaging fault, not the
+    documented collection-only gap — the preload must not swallow it.
+    """
+    (tmp_path / "regopy.py").write_text('raise ModuleNotFoundError("No module named \'cffi\'", name="cffi")\n')
+    result = _run_python(
+        """
+        import syntara  # noqa: F401
+        print("SHOULD-NOT-REACH")
+        """,
+        extra_pythonpath=tmp_path,
+    )
+    assert result.returncode != 0
+    assert "SHOULD-NOT-REACH" not in result.stdout
+    assert "No module named 'cffi'" in result.stderr
+
+
+def test_other_missing_shared_object_is_raised(tmp_path):
+    """An unloadable shared object other than libatomic.so.1 must surface."""
+    (tmp_path / "regopy.py").write_text(
+        'raise OSError("libfoo.so.3: cannot open shared object file: No such file or directory")\n'
+    )
+    result = _run_python(
+        """
+        import syntara  # noqa: F401
+        print("SHOULD-NOT-REACH")
+        """,
+        extra_pythonpath=tmp_path,
+    )
+    assert result.returncode != 0
+    assert "SHOULD-NOT-REACH" not in result.stdout
+    assert "libfoo.so.3" in result.stderr
 
 
 def test_unexpected_regopy_import_error_is_raised(tmp_path):
