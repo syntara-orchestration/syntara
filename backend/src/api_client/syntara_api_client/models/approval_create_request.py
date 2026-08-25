@@ -45,6 +45,7 @@ class ApprovalCreateRequest:
             approver_user_ids (list[UUID] | None | Unset): User IDs who can approve (null = any user with approval:decide
                 permission)
             approver_group_ids (list[UUID] | None | Unset): Group IDs whose members can approve
+            prompt (None | str | Unset): Message to display to approvers when requesting approval
     """
 
     execution_id: UUID
@@ -57,6 +58,7 @@ class ApprovalCreateRequest:
     next_step_rejected: ActivitySummary | None | Unset = UNSET
     approver_user_ids: list[UUID] | None | Unset = UNSET
     approver_group_ids: list[UUID] | None | Unset = UNSET
+    prompt: None | str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -114,6 +116,12 @@ class ApprovalCreateRequest:
         else:
             approver_group_ids = self.approver_group_ids
 
+        prompt: None | str | Unset
+        if isinstance(self.prompt, Unset):
+            prompt = UNSET
+        else:
+            prompt = self.prompt
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -134,6 +142,8 @@ class ApprovalCreateRequest:
             field_dict["approver_user_ids"] = approver_user_ids
         if approver_group_ids is not UNSET:
             field_dict["approver_group_ids"] = approver_group_ids
+        if prompt is not UNSET:
+            field_dict["prompt"] = prompt
 
         return field_dict
 
@@ -233,6 +243,15 @@ class ApprovalCreateRequest:
 
         approver_group_ids = _parse_approver_group_ids(d.pop("approver_group_ids", UNSET))
 
+        def _parse_prompt(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        prompt = _parse_prompt(d.pop("prompt", UNSET))
+
         approval_create_request = cls(
             execution_id=execution_id,
             project_id=project_id,
@@ -244,6 +263,7 @@ class ApprovalCreateRequest:
             next_step_rejected=next_step_rejected,
             approver_user_ids=approver_user_ids,
             approver_group_ids=approver_group_ids,
+            prompt=prompt,
         )
 
         approval_create_request.additional_properties = d

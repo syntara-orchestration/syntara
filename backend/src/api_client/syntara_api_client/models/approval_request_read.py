@@ -60,6 +60,7 @@ class ApprovalRequestRead:
             decided_by (None | Unset | UserReference): User who made the decision
             decided_at (datetime.datetime | None | Unset): When decision was made
             decision_notes (None | str | Unset): Notes provided with decision
+            prompt (None | str | Unset): Message to display to approvers when requesting approval
             signal_delivery_error (None | str | Unset): Error if the workflow signal failed after a decision. Only present
                 in the decide response; null on subsequent reads.
     """
@@ -82,6 +83,7 @@ class ApprovalRequestRead:
     decided_by: None | Unset | UserReference = UNSET
     decided_at: datetime.datetime | None | Unset = UNSET
     decision_notes: None | str | Unset = UNSET
+    prompt: None | str | Unset = UNSET
     signal_delivery_error: None | str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
@@ -172,6 +174,12 @@ class ApprovalRequestRead:
         else:
             decision_notes = self.decision_notes
 
+        prompt: None | str | Unset
+        if isinstance(self.prompt, Unset):
+            prompt = UNSET
+        else:
+            prompt = self.prompt
+
         signal_delivery_error: None | str | Unset
         if isinstance(self.signal_delivery_error, Unset):
             signal_delivery_error = UNSET
@@ -214,6 +222,8 @@ class ApprovalRequestRead:
             field_dict["decided_at"] = decided_at
         if decision_notes is not UNSET:
             field_dict["decision_notes"] = decision_notes
+        if prompt is not UNSET:
+            field_dict["prompt"] = prompt
         if signal_delivery_error is not UNSET:
             field_dict["signal_delivery_error"] = signal_delivery_error
 
@@ -371,6 +381,15 @@ class ApprovalRequestRead:
 
         decision_notes = _parse_decision_notes(d.pop("decision_notes", UNSET))
 
+        def _parse_prompt(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        prompt = _parse_prompt(d.pop("prompt", UNSET))
+
         def _parse_signal_delivery_error(data: object) -> None | str | Unset:
             if data is None:
                 return data
@@ -399,6 +418,7 @@ class ApprovalRequestRead:
             decided_by=decided_by,
             decided_at=decided_at,
             decision_notes=decision_notes,
+            prompt=prompt,
             signal_delivery_error=signal_delivery_error,
         )
 
