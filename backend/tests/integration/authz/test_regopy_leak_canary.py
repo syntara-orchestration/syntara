@@ -30,7 +30,11 @@ def _skip_if_no_opa() -> None:
 
 _WARMUP_EVALS = 100
 _MEASURED_EVALS = 800
-_MAX_GROWTH_KB = 25 * 1024  # regression shows ~55 MB; healthy runs stay < 1 MB
+# Healthy runs measure 0.06-0.2 KB per evaluation; the allocator-mismatch
+# regression is ~69 KB. A per-eval bound of 5 KB keeps ~25x headroom over
+# measured noise while failing on anything above ~7% of the original leak
+# (the previous 25 MB total bound would have passed a 32 KB/eval regression).
+_MAX_GROWTH_KB_PER_EVAL = 5.0
 
 _CANARY_CODE = f"""
 import gc
@@ -89,10 +93,12 @@ def test_rego_eval_rss_growth_stays_bounded():
     match = re.search(r"GROWTH_KB=(-?\d+)", result.stdout)
     assert match, f"canary did not report growth: stdout={result.stdout}"
     growth_kb = int(match.group(1))
+    growth_kb_per_eval = growth_kb / _MEASURED_EVALS
 
-    assert growth_kb < _MAX_GROWTH_KB, (
+    assert growth_kb_per_eval < _MAX_GROWTH_KB_PER_EVAL, (
         f"RSS grew {growth_kb / 1024:.1f} MB over {_MEASURED_EVALS} evaluations "
-        f"({growth_kb / _MEASURED_EVALS:.1f} KB/eval) — the regopy native leak is back. "
-        "Check that regopy is imported before greenlet/temporalio "
-        "(syntara/__init__.py preload; docs/standards/imports-and-modules.md)."
+        f"({growth_kb_per_eval:.1f} KB/eval, limit {_MAX_GROWTH_KB_PER_EVAL}) — a native "
+        "leak per rego evaluation is back. Check that regopy is imported before "
+        "greenlet/temporalio (syntara/__init__.py preload; "
+        "docs/standards/imports-and-modules.md)."
     )
