@@ -2,8 +2,8 @@ import type { Page } from '@playwright/test'
 
 import { test, expect } from '../fixtures'
 import { addApprovalNodeWithBranch } from '../helpers/v2-nodes'
+import { runWorkflowFromBuilder, waitForExecutionPaused } from '../helpers/workflow-run'
 import { buildUniqueName, createBasicWorkflowViaApi, openWorkflowInBuilder, deleteWorkflow } from '../helpers/workflows'
-import { pollExecutionStatus } from '../utils/api'
 
 /**
  * E2E Tests: Approval Pending Badge Display
@@ -35,48 +35,28 @@ async function createPendingApproval(
   // Add approval node and save
   await addApprovalNodeWithBranch(app, approvalName)
   await app.getByRole('button', { name: 'Save', exact: true }).click()
-  await expect(app.getByRole('button', { name: 'Run', exact: true })).toBeEnabled({ timeout: 15_000 })
-
-  // Run the workflow
-  await app.getByRole('button', { name: 'Run', exact: true }).click()
-  await app.getByRole('button', { name: /Run now|Save and run/ }).click()
-
-  // Wait for navigation to execution detail page
-  const didNavigate = await app
-    .waitForURL(/\/executions\//, { timeout: 10_000 })
-    .then(() => true)
-    .catch(() => false)
-  test.skip(!didNavigate, 'Workflow execution failed — execution engine may not be running')
+  await runWorkflowFromBuilder(app)
 
   // Extract execution ID from URL
   const executionId = app.url().match(/executions\/([^/?]+)/)?.[1]
   if (!executionId) throw new Error('Failed to extract execution ID')
 
-  // Poll API for "paused" status instead of relying on UI updates
-  const reachedApproval = await pollExecutionStatus(app, executionId, ['paused'])
-    .then(() => true)
-    .catch(() => false)
-  test.skip(!reachedApproval, 'Execution did not reach paused state — Temporal worker may not be running')
+  // Wait for execution to reach approval and pause
+  const reachedApproval = await waitForExecutionPaused(app)
+  expect(reachedApproval, 'Execution stayed Pending — Temporal worker may not be running').toBeTruthy()
 
   return { workflowId, executionId, workflowName }
 }
 
 async function applyPendingApprovalStatusFilter(app: Page): Promise<void> {
-  const filterButton = app.getByRole('button', { name: /Filter|Add filter/i })
-  await expect(filterButton).toBeVisible()
-  await filterButton.click()
+  const filterToolbar = app.getByRole('search', { name: 'Filters' })
+  await expect(filterToolbar).toBeVisible()
 
-  const statusFieldOption = app.getByRole('option', { name: /^Status$/i })
-  await expect(statusFieldOption).toBeVisible()
-  await statusFieldOption.click()
+  await filterToolbar.getByRole('button', { name: 'Workflow name', exact: true }).click()
+  await app.getByRole('option', { name: 'Status' }).click()
 
-  const statusValueSelector = app.getByRole('button', { name: /Filter by status/i })
-  await expect(statusValueSelector).toBeVisible()
-  await statusValueSelector.click()
-
-  const pendingApprovalOption = app.getByRole('option', { name: /^Pending approval$/i })
-  await expect(pendingApprovalOption).toBeVisible()
-  await pendingApprovalOption.click()
+  await filterToolbar.getByRole('button', { name: 'Filter by status' }).click()
+  await app.getByRole('option', { name: 'Pending approval' }).click()
 }
 
 test.describe('Approval Pending Badge', () => {
@@ -96,32 +76,30 @@ test.describe('Approval Pending Badge', () => {
         // ===================================================================
         // LOCATION 1: Execution Detail Page Header
         // ===================================================================
-        // We're already on the execution detail page from createPendingApproval.
-        // Use a generous timeout — the badge depends on a WebSocket push and Konflux
-        // network latency can delay the update by several seconds.
-        await expect(app.getByText('Pending approval')).toBeVisible({ timeout: 15_000 })
-
-        // Verify the badge has warning styling (outline variant) in the execution detail page header
-        const badgeInDetail = app.locator('header').getByText('Pending approval')
-        await expect(badgeInDetail).toBeVisible()
+        // We're already on the execution detail page from createPendingApproval
+        const pageHeader = app.getByTestId('page-header')
+        const badgeInDetail = pageHeader.getByText('Pending approval')
+        await expect(badgeInDetail).toBeVisible({ timeout: 5_000 })
 
         // ===================================================================
         // LOCATION 2: Workflow Run History Panel
         // ===================================================================
         // Navigate back to the workflow builder
         await app.goto(`/workflow-builder/${workflowId}`)
+        await expect(app.getByPlaceholder('Workflow name')).toBeVisible({ timeout: 10_000 })
 
-        // Open the run history panel (if not already open)
-        const historyButton = app.getByRole('button', { name: /Run history|History/ })
-        if (await historyButton.isVisible()) {
-          await historyButton.click()
-        }
+        // Open the run history panel via the kebab menu
+        const kebab = app.getByRole('button', { name: 'Workflow actions' })
+        await expect(kebab).toBeVisible({ timeout: 5_000 })
+        await kebab.click()
+        await app.getByRole('menuitem', { name: /Run history/i }).click()
 
-        // Verify badge appears in the history panel
-        const historyPanel = app.getByRole('list', { name: 'Run history list' })
-        const badgeInHistory = historyPanel.getByText('Pending approval')
-
-        await expect(badgeInHistory).toBeVisible({ timeout: 5_000 })
+        // Verify badge appears in the history panel.
+        // PF6 SimpleList in grouped mode does not apply aria-label to any
+        // role="list" element, so confirm the panel via its heading instead.
+        await expect(app.getByRole('heading', { name: 'Run History' })).toBeVisible({ timeout: 5_000 })
+        const badgeInHistory = app.getByText('Pending approval')
+        await expect(badgeInHistory).toBeVisible({ timeout: 15_000 })
 
         // ===================================================================
         // LOCATION 3: Executions List Table
@@ -130,7 +108,7 @@ test.describe('Approval Pending Badge', () => {
         await app.goto('/executions')
 
         // Wait for the table to load
-        await expect(app.getByRole('table')).toBeVisible({ timeout: 10_000 })
+        await expect(app.getByRole('grid')).toBeVisible({ timeout: 10_000 })
 
         // Find the row with our execution ID and verify badge is visible
         const executionRow = app.locator('tr', { has: app.getByText(executionId.slice(0, 8)) })
@@ -169,14 +147,7 @@ test.describe('Approval Pending Badge', () => {
       if (!workflowId) throw new Error('Failed to extract workflow ID')
 
       // createBasicWorkflowViaApi already saves the workflow, so Run button should be enabled
-      await expect(app.getByRole('button', { name: 'Run', exact: true })).toBeEnabled({ timeout: 15_000 })
-
-      // Run the workflow
-      await app.getByRole('button', { name: 'Run', exact: true }).click()
-      await app.getByRole('button', { name: /Run now|Save and run/ }).click()
-      await app.waitForTimeout(2000)
-      // Wait for navigation to execution detail page
-      await app.waitForURL(/\/executions\//, { timeout: 5_000 })
+      await runWorkflowFromBuilder(app)
 
       // Extract execution ID from URL for later verification
       const executionId = app.url().match(/executions\/([^/?]+)/)?.[1]
@@ -194,10 +165,10 @@ test.describe('Approval Pending Badge', () => {
         .waitFor({ state: 'visible', timeout: 30_000 })
         .then(() => true)
         .catch(() => false)
-      test.skip(
-        !reachedTerminal,
+      expect(
+        reachedTerminal,
         'Workflow execution did not complete in time — may indicate worker/runtime issues in CI'
-      )
+      ).toBeTruthy()
 
       // Give WebSocket updates a moment to settle after terminal state is reached
       await app.waitForTimeout(2000)
@@ -205,8 +176,8 @@ test.describe('Approval Pending Badge', () => {
       // Verify "Pending approval" badge does NOT appear in the execution detail header
       // This must be true regardless of whether the execution succeeded or failed,
       // because this workflow has NO approval node
-      const pendingBadgeInHeader = app.locator('header').getByText('Pending approval', { exact: true })
-      await expect(pendingBadgeInHeader).toHaveCount(0)
+      const pendingBadgeOnPage = app.getByText('Pending approval', { exact: true })
+      await expect(pendingBadgeOnPage).toHaveCount(0)
 
       // Navigate to executions list
       await app.goto('/executions')

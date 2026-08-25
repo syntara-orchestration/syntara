@@ -22,7 +22,7 @@
  * Safari has a known rendering bug where border-radius + overflow:auto on the same element
  * prevents the content from painting at all, especially with position:sticky inside.
  *
- * --nx-scroll-fade-distance is a unitless px value read by useScrollOverflow to compute the
+ * --syn-scroll-fade-distance is a unitless px value read by useScrollOverflow to compute the
  * proportional fade ratio. Defined here so it co-locates with the gradient styles it governs.
  */
 .scrollWrapper {
@@ -31,11 +31,11 @@
   min-height: 0;
   overflow: hidden;
   border-radius: var(--pf-t--global--border--radius--medium);
-  --nx-scroll-fade-distance: 120;
+  --syn-scroll-fade-distance: 120;
 }
 
 /* Gradient overlay hinting at scrollable content below. Opacity is set proportionally by
-   useScrollOverflow via --nx-scroll-fade-opacity (0 = at bottom, 1 = far from bottom).
+   useScrollOverflow via --syn-scroll-fade-opacity (0 = at bottom, 1 = far from bottom).
    Two background layers: the bottom one masks content by fading to the panel background;
    the top one darkens using the PF directional shadow token so the hint is visible against
    the background rather than blending into it. */
@@ -50,7 +50,7 @@
   pointer-events: none;
   z-index: 1;
   border-radius: 0 0 var(--pf-t--global--border--radius--medium) var(--pf-t--global--border--radius--medium);
-  opacity: var(--nx-scroll-fade-opacity, 0);
+  opacity: var(--syn-scroll-fade-opacity, 0);
 }
 
 /* Footer present: scroll area doesn't reach the panel bottom, so no bottom rounding at the seam. */
@@ -95,7 +95,7 @@
  * PatternFly's expandable row layout relies on the browser's automatic table layout
  * to correctly size columns and expansion control cells.
  *
- * Applied conditionally in NxScrollableTableContainer.tsx via the useFixedLayout prop.
+ * Applied conditionally in SynScrollableTableContainer.tsx via the useFixedLayout prop.
  */
 .tableFixedLayout {
   table-layout: fixed;
