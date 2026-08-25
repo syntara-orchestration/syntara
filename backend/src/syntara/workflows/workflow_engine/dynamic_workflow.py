@@ -189,6 +189,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         self._timeout_tasks: dict[str, asyncio.Task[Any]] = {}
         self._timed_out_converge_nodes: set[str] = set()
         self._detached_nodes: set[str] = set()
+        self._detached_pending_tasks: dict[str, asyncio.Task[Any]] = {}
         self._converge_branch_nodes: dict[str, set[str]] = {}
         self._cof_failed_nodes: set[str] = set()
         self._secret_values: set[str] = set()
@@ -270,7 +271,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         graph: WorkflowGraph,
     ) -> None:
         """Wait for all pending tasks to complete, scheduling successors as they finish."""
-        while pending_tasks or self._timed_out_converge_nodes:
+        while pending_tasks or self._timed_out_converge_nodes or self._detached_pending_tasks:
             # Cancel pending tasks for nodes that were skipped (by timeout or "any" converge)
             self._cancel_skipped_pending_tasks(pending_tasks)
             self._remove_detached_tasks(pending_tasks)
@@ -281,48 +282,85 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 workflow.logger.info(f"Scheduling successors of CoF-failed converge node {node_id}")
                 await self._schedule_successors(node_id, graph, pending_tasks)
 
-            if not pending_tasks:
+            if not pending_tasks and not self._detached_pending_tasks:
                 break
 
-            # Include timeout tasks so asyncio.wait wakes up when a timeout fires,
-            # rather than blocking until a pending node completes.
-            wait_tasks = set(pending_tasks.values())
+            # Include timeout tasks and detached tasks in the wait set.
+            wait_tasks: set[asyncio.Task[Any]] = set(pending_tasks.values())
             for timeout_task in self._timeout_tasks.values():
                 if not timeout_task.done():
                     wait_tasks.add(timeout_task)
+            wait_tasks.update(self._detached_pending_tasks.values())
+
+            if not wait_tasks:
+                break
 
             done, _ = await asyncio.wait(wait_tasks, return_when=asyncio.FIRST_COMPLETED)
 
             for task in done:
-                completed_node_id = self._find_node_for_task(task, pending_tasks)
-                if not completed_node_id:
-                    continue
+                await self._process_completed_task(task, pending_tasks, graph)
 
-                del pending_tasks[completed_node_id]
+    async def _process_completed_task(
+        self,
+        task: asyncio.Task[Any],
+        pending_tasks: dict[str, asyncio.Task[Any]],
+        graph: WorkflowGraph,
+    ) -> None:
+        """Handle a single completed task from the asyncio.wait done set."""
+        detached_node_id = self._find_node_for_task(task, self._detached_pending_tasks)
+        if detached_node_id:
+            del self._detached_pending_tasks[detached_node_id]
+            await self._handle_detached_completion(detached_node_id, task, graph, pending_tasks)
+            return
 
-                try:
-                    output = await task
-                except Exception as node_error:  # noqa: BLE001
-                    node = graph.get_node(completed_node_id)
-                    cof = resolve_continue_on_failure(node, self._runtime_settings)
-                    self._handle_node_failure(
-                        completed_node_id, node_error, graph, pending_tasks, continue_on_failure=cof
-                    )
-                    await self._maybe_expire_approval(completed_node_id, node, node_error)
-                    if cof:
-                        self._route_failed_node(completed_node_id, node)
-                        await self._handle_continued_failure(completed_node_id, node, graph, pending_tasks)
-                    continue
+        completed_node_id = self._find_node_for_task(task, pending_tasks)
+        if not completed_node_id:
+            return
 
-                self.resolver.set_namespace(completed_node_id, {**output, "status": "completed"})
-                workflow.logger.info(f"Node {completed_node_id} completed, pending: {list(pending_tasks.keys())}")
+        del pending_tasks[completed_node_id]
 
-                await self._schedule_successors(
-                    completed_node_id=completed_node_id,
-                    graph=graph,
-                    pending_tasks=pending_tasks,
-                )
-                self._cancel_skipped_pending_tasks(pending_tasks)
+        try:
+            output = await task
+        except Exception as node_error:  # noqa: BLE001
+            node = graph.get_node(completed_node_id)
+            cof = resolve_continue_on_failure(node, self._runtime_settings)
+            self._handle_node_failure(completed_node_id, node_error, graph, pending_tasks, continue_on_failure=cof)
+            await self._maybe_expire_approval(completed_node_id, node, node_error)
+            if cof:
+                self._route_failed_node(completed_node_id, node)
+                await self._handle_continued_failure(completed_node_id, node, graph, pending_tasks)
+            return
+
+        self.resolver.set_namespace(completed_node_id, {**output, "status": "completed"})
+        workflow.logger.info(f"Node {completed_node_id} completed, pending: {list(pending_tasks.keys())}")
+        await self._schedule_successors(completed_node_id=completed_node_id, graph=graph, pending_tasks=pending_tasks)
+        self._cancel_skipped_pending_tasks(pending_tasks)
+
+    async def _handle_detached_completion(
+        self,
+        node_id: str,
+        task: asyncio.Task[Any],
+        graph: WorkflowGraph,
+        pending_tasks: dict[str, asyncio.Task[Any]],
+    ) -> None:
+        """Process a completed detached branch node and schedule its off-section successors.
+
+        Detached branches keep running in Temporal after a converge fires.  Their
+        off-section successors (nodes outside the parallel section) should still
+        execute once the detached node finishes.  Failures are recorded but do not
+        propagate to the main workflow status.
+        """
+        try:
+            output = await task
+        except Exception as exc:  # noqa: BLE001
+            error_msg = str(exc)
+            self.failed_nodes[node_id] = error_msg
+            self.resolver.set_namespace(node_id, {"status": "failed", "error": error_msg})
+            workflow.logger.warning(f"Detached node {node_id} failed: {exc} — off-section successors will not run")
+            return
+        self.resolver.set_namespace(node_id, {**output, "status": "completed"})
+        workflow.logger.info(f"Detached node {node_id} completed — scheduling off-section successors")
+        await self._schedule_successors(node_id, graph, pending_tasks)
 
     @staticmethod
     def _find_node_for_task(
@@ -462,15 +500,16 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 self._detached_nodes.add(pred_id)
 
     def _remove_detached_tasks(self, pending_tasks: dict[str, asyncio.Task[Any]]) -> None:
-        """Remove detached in-flight tasks from the main loop without cancelling them.
+        """Move detached in-flight tasks to _detached_pending_tasks.
 
-        When a converge node fails, in-flight predecessors keep running in
-        Temporal but no longer block the workflow from completing.
+        When a converge node fires (ANY) or fails, in-flight predecessors are
+        detached from the main scheduling loop.  They keep running in Temporal
+        and are awaited separately so their off-section successors can still run.
         """
         detached = [nid for nid in pending_tasks if nid in self._detached_nodes]
         for nid in detached:
-            del pending_tasks[nid]
-            workflow.logger.info(f"Detached in-flight node {nid} from main loop (converge failed)")
+            self._detached_pending_tasks[nid] = pending_tasks.pop(nid)
+            workflow.logger.info(f"Detached in-flight node {nid} (awaiting off-section successors)")
 
     def _cleanup_timeout_tasks(self) -> None:
         """Cancel any remaining converge timeout background tasks."""

@@ -46,6 +46,7 @@ class WorkflowConvergeMixin:
     _converge_branch_nodes: dict[str, set[str]]
     _timed_out_converge_nodes: set[str]
     _detached_nodes: set[str]
+    _detached_pending_tasks: dict[str, asyncio.Task[Any]]
 
     # Methods provided by OrchestratorWorkflow (resolved via MRO)
     def _are_predecessors_complete(self, node_id: str, graph: WorkflowGraph) -> bool: ...  # type: ignore[empty-body]
@@ -380,7 +381,7 @@ class WorkflowConvergeMixin:
         newly_skipped = []
         for pred_id in graph.get_predecessors(node_id):
             if pred_id not in self.skipped_nodes and not self.resolver.has_namespace(pred_id):
-                if pred_id in pending_tasks:
+                if pred_id in pending_tasks or pred_id in self._detached_pending_tasks:
                     workflow.logger.info(f"Converge: predecessor {pred_id} is still in flight, not skipping")
                     continue
                 self.skipped_nodes.add(pred_id)

@@ -835,3 +835,81 @@ def test_converge_all_branches_fail(syntara_api: SyntaraApiRegistry):
 
     assert activities["converge_node"].status in ("failed", "skipped")
     assert activities["final_action"].status == "skipped"
+
+
+@pytest.mark.e2e
+def test_converge_any_off_section_successor_runs_after_detached_branch(
+    syntara_api: SyntaraApiRegistry,
+) -> None:
+    """Converge ANY must not prevent side_action from running after slow_branch completes.
+
+    Graph:
+        trigger -> fast_branch --------> converge (ANY n=1) -> final_action
+               -> slow_branch (sleep 2) -> converge
+                  slow_branch           -> side_action   (outside parallel section)
+
+    fast_branch completes first; converge fires (n_required=1 met).
+    slow_branch is in-flight — it is detached from the main loop but kept tracked.
+    When slow_branch eventually finishes, side_action is scheduled from it and runs.
+    """
+    result = create_and_run_workflow(
+        syntara_api,
+        "e2e-converge-any-off-section-runs",
+        {
+            "name": "converge-any-off-section-runs",
+            "schema_version": "2.0.0",
+            "triggers": [{"id": "trigger", "type": "manual_trigger", "parameters": {}}],
+            "nodes": [
+                {
+                    "id": "fast_branch",
+                    "name": "Fast Branch",
+                    "type": "script",
+                    "parameters": {"language": "bash", "code": 'echo "fast done"'},
+                },
+                {
+                    "id": "slow_branch",
+                    "name": "Slow Branch (detached after converge fires)",
+                    "type": "script",
+                    "parameters": {"language": "bash", "code": 'sleep 2 && echo "slow done"'},
+                },
+                {
+                    "id": "converge_node",
+                    "name": "Converge ANY n=1",
+                    "type": "converge",
+                    "parameters": {"strategy": "any", "n_required": 1},
+                },
+                {
+                    "id": "side_action",
+                    "name": "Side Action (outside parallel section)",
+                    "type": "script",
+                    "parameters": {"language": "bash", "code": 'echo "side action ran"'},
+                },
+                {
+                    "id": "final_action",
+                    "name": "Final Action (after converge)",
+                    "type": "script",
+                    "parameters": {"language": "bash", "code": 'echo "final done"'},
+                },
+            ],
+            "edges": [
+                {"from": "trigger", "to": "fast_branch"},
+                {"from": "trigger", "to": "slow_branch"},
+                {"from": "fast_branch", "to": "converge_node"},
+                {"from": "slow_branch", "to": "converge_node"},
+                {"from": "slow_branch", "to": "side_action"},
+                {"from": "converge_node", "to": "final_action"},
+            ],
+        },
+        timeout=20,
+    )
+
+    activities = {a.activity_id: a for a in (result.activities or [])}
+
+    assert result.status == ExecutionStatus.COMPLETED, f"Workflow failed: {result.status}"
+    assert activities["fast_branch"].status == "completed"
+    assert activities["converge_node"].status == "completed"
+    assert activities["final_action"].status == "completed"
+    assert activities["slow_branch"].status == "completed", "slow_branch should complete (detached but awaited)"
+    assert activities["side_action"].status == "completed", (
+        "side_action must run after slow_branch — it is outside the parallel section"
+    )
