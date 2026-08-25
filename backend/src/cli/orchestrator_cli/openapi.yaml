@@ -8683,6 +8683,127 @@ paths:
                 retryable: true
       security:
         - bearerAuth: []
+    delete:
+      summary: Delete file
+      description: Permanently delete a file and its stored content. After a project is soft-deleted, project-scoped files:delete cannot authorize orphan cleanup (the project no longer resolves). Only system-scope files:delete can remove an orphan, and only when the caller already knows the file UUID.
+      operationId: delete_file
+      tags:
+        - Files
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: File Id
+          description: UUID of the file to delete
+      x-app-permission:
+        resource: files
+        action: delete
+      responses:
+        '204':
+          description: File deleted successfully
+        '400':
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/bad-request
+                title: Bad Request
+                detail: The request was malformed or contained invalid parameters
+                code: BAD_REQUEST
+                retryable: false
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/unauthorized
+                title: Unauthorized
+                detail: Authentication is required to access this resource
+                code: UNAUTHORIZED
+                retryable: false
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/forbidden
+                title: Forbidden
+                detail: You do not have permission to access this resource
+                code: FORBIDDEN
+                retryable: false
+        '404':
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/not-found
+                title: Resource Not Found
+                detail: No resource exists with the provided identifier
+                code: NOT_FOUND
+                retryable: false
+                instance: /api/v1/workflows
+        '409':
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/conflict
+                title: Conflict
+                detail: The request conflicts with the current state of the resource
+                code: CONFLICT
+                retryable: false
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/validation-error
+                title: Validation Error
+                detail: Field 'name' must be between 1 and 255 characters
+                code: VALIDATION_ERROR
+                retryable: false
+                instance: /api/v1/workflows
+        '429':
+          description: Too Many Requests
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/rate-limited
+                title: Too Many Requests
+                detail: Rate limit exceeded. Try again in 60 seconds.
+                code: RATE_LIMITED
+                retryable: true
+        '500':
+          description: Internal Server Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/internal-error
+                title: Internal Server Error
+                detail: An unexpected error occurred
+                code: INTERNAL_ERROR
+                retryable: true
+      security:
+        - bearerAuth: []
   /files/{file_id}/download:
     get:
       summary: Download file
@@ -29986,6 +30107,12 @@ components:
         status:
           $ref: '#/components/schemas/FileStatus'
           description: Processing status (pending_conversion)
+        is_project_deleted:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+          description: True when the owning project has been soft-deleted; the file is retained as an orphan. Null when not computed (e.g. upload response).
+          title: Is Project Deleted
     FileDetailResponse:
       type: object
       title: FileDetailResponse
@@ -29996,6 +30123,7 @@ components:
         - size_bytes
         - mime_type
         - status
+        - is_project_deleted
       properties:
         file_id:
           type: string
@@ -30033,6 +30161,10 @@ components:
           description: Error message if conversion failed
           examples:
             - null
+        is_project_deleted:
+          type: boolean
+          title: Is Project Deleted
+          description: True when the owning project has been soft-deleted; the file is retained as an orphan. Project-scoped files:delete cannot remove orphans after soft-delete; only system-scope files:delete with a known file UUID can.
     FilesMetadataResponse:
       type: object
       title: FilesMetadataResponse
