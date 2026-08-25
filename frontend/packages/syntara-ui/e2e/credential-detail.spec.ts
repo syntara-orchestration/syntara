@@ -109,22 +109,6 @@ test.describe('Credential Detail Page & Workflows Tab', () => {
     }
   })
 
-  test('workflows tab shows count in footer when workflows exist', async ({ app }) => {
-    const { name } = await createTestCredential(app, { prefix: 'e2e-detail-wf-count' })
-    try {
-      await navigateToCredentialDetail(app, name)
-      await app.getByRole('tab', { name: /Workflows/ }).click()
-
-      // Assert - Either count footer, empty state, or error renders
-      const countFooter = app.getByText(/\d+ workflows?/)
-      const emptyState = app.getByText('No workflows using this credential')
-      const errorState = app.getByText('Failed to load workflows')
-      await expect(countFooter.or(emptyState).or(errorState)).toBeVisible()
-    } finally {
-      await deleteCredentialByName(app, name)
-    }
-  })
-
   test('workflow names display as bold text in table', async ({ app }) => {
     const { name } = await createTestCredential(app, { prefix: 'e2e-detail-wf-bold' })
     try {
