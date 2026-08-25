@@ -1126,7 +1126,7 @@ class ExecutionService(BaseService):
             )
             raise
 
-        await self._cancel_linked_invocations(execution.id)
+        await self._cancel_linked_invocations(execution)
 
         self._emit_lifecycle_event(
             execution_id=execution.id,
@@ -1136,7 +1136,7 @@ class ExecutionService(BaseService):
             mode=execution.mode.value,
         )
 
-    async def _cancel_linked_invocations(self, execution_id: UUID) -> None:
+    async def _cancel_linked_invocations(self, execution: Execution) -> None:
         """Cancel agent invocations spawned by this execution.
 
         The agentic node completes asynchronously (``raise_complete_async``), so
@@ -1154,31 +1154,63 @@ class ExecutionService(BaseService):
         from syntara.agent_orchestrator.models import Invocation, InvocationStatus  # noqa: PLC0415
         from syntara.agent_orchestrator.services import InvocationService  # noqa: PLC0415
 
-        result = await self.session.exec(
-            select(Invocation)
-            .where(col(Invocation.context_data)["execution_id"].astext == str(execution_id))
-            .where(col(Invocation.status).in_([InvocationStatus.CREATED, InvocationStatus.RUNNING]))
-        )
-        invocations = result.all()
-        if not invocations:
+        invocation_ids = await self._linked_invocation_ids(execution.id)
+        if not invocation_ids:
             return
 
+        result = await self.session.exec(
+            select(Invocation)
+            .where(col(Invocation.id).in_(invocation_ids))
+            .where(Invocation.project_id == execution.project_id)
+            .where(col(Invocation.status).in_([InvocationStatus.CREATED, InvocationStatus.RUNNING]))
+        )
+
         invocation_service = InvocationService(self.session, self.user)
-        for invocation in invocations:
+        for invocation in result.all():
             try:
                 await invocation_service.cancel_invocation(
                     invocation.id,
-                    reason=f"Workflow execution {execution_id} cancelled",
+                    reason=f"Workflow execution {execution.id} cancelled",
                 )
             except Exception:
                 logger.exception(
                     "Failed to cancel invocation for cancelled execution",
-                    execution_id=execution_id,
+                    execution_id=execution.id,
                     invocation_id=invocation.id,
                 )
                 continue
 
             await self._cancel_agent_execution_for_invocation(invocation.id)
+
+    async def _linked_invocation_ids(self, execution_id: UUID) -> list[UUID]:
+        """Invocation ids this execution's agentic activities reported.
+
+        Read from ``ActivityExecution.output_data``, which the activity-sync
+        service writes from the worker's Temporal heartbeat. Unlike
+        ``Invocation.context_data`` — accepted verbatim from the invocation-create
+        request, so any caller can put an arbitrary ``execution_id`` in it — this
+        is not caller-writable, and it is already scoped to this execution by FK.
+        Using it keeps one tenant's cancellation from reaching another tenant's
+        invocation.
+        """
+        result = await self.session.exec(
+            select(col(ActivityExecution.output_data)["invocation_id"].astext).where(
+                ActivityExecution.execution_id == execution_id,
+                col(ActivityExecution.output_data)["invocation_id"].isnot(None),
+            )
+        )
+
+        invocation_ids: list[UUID] = []
+        for raw_id in result.all():
+            try:
+                invocation_ids.append(UUID(raw_id))
+            except (AttributeError, TypeError, ValueError):
+                logger.warning(
+                    "Ignoring malformed invocation_id in activity output",
+                    execution_id=execution_id,
+                    value=raw_id,
+                )
+        return invocation_ids
 
     async def _cancel_agent_execution_for_invocation(self, invocation_id: UUID) -> None:
         """Cancel the builtin AGENT_EXECUTION workflow running this invocation.
@@ -1186,13 +1218,36 @@ class ExecutionService(BaseService):
         Marking the invocation CANCELLED stops the agent at its next phase
         boundary; cancelling the Temporal workflow stops it from lingering as a
         running execution. Best-effort — the DB status is the effective stop.
+
+        ``input_data`` is caller-supplied, so the lookup is restricted to the
+        builtin "Agent Execution" workflow in the builtin project. Without that
+        restriction any execution could claim an ``invocation_id`` and be
+        cancelled alongside it.
         """
         if self.temporal_service is None:
             return
 
+        from syntara.authz.models.project import Project  # noqa: PLC0415
+        from syntara.workflows.constants import (  # noqa: PLC0415
+            BUILTIN_PROJECT_NAME,
+            BUILTIN_WORKFLOW_AGENT_EXECUTION,
+        )
+
+        builtin_project_id = (
+            select(Project.id)
+            .where(
+                Project.name == BUILTIN_PROJECT_NAME,
+                Project.deleted_at.is_(None),  # type: ignore[union-attr]
+            )
+            .scalar_subquery()
+        )
+
         result = await self.session.exec(
             select(Execution)
+            .join(Workflow, Workflow.id == Execution.workflow_id)  # type: ignore[arg-type]
             .where(col(Execution.input_data)["invocation_id"].astext == str(invocation_id))
+            .where(col(Workflow.name) == BUILTIN_WORKFLOW_AGENT_EXECUTION)
+            .where(Workflow.project_id == builtin_project_id)
             .where(col(Execution.status).not_in(TERMINAL_EXECUTION_STATUSES))
             .where(col(Execution.deleted_at).is_(None))
         )
