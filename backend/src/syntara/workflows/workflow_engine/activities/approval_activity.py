@@ -22,10 +22,21 @@ with workflow.unsafe.imports_passed_through():
     from syntara.workflows.workflow_engine import constants
     from syntara.workflows.workflow_engine.services.activity_sync_registry import get_activity_sync_service
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
+from syntara.workflows.workflow_engine.utils.loop_iteration_ids import matches_loop_iteration_id
 
 from .common import HEARTBEAT_STOP_MONITOR, ActivityExecutionError
 
 logger = structlog.stdlib.get_logger(__name__)
+
+
+def _is_approval_for_node(stored_node_id: str, node_id: str) -> bool:
+    """Return True if ``stored_node_id`` is this canvas node, including loop iterations.
+
+    New rows store the canvas ID. Legacy rows may still have
+    ``{node_id}_iter_{outer}_iter_{inner}...``. Exact match covers a specific
+    iteration; suffix matching covers expire-by-canvas-id and leftover suffixes.
+    """
+    return matches_loop_iteration_id(stored_node_id, node_id)
 
 
 class ApprovalActivityError(ActivityExecutionError):
@@ -44,6 +55,8 @@ async def create_approval_request_activity(
     approver_user_ids: list[str] | None = None,
     approver_group_ids: list[str] | None = None,
     project_id: str = "",
+    loop_iteration_path: list[int] | None = None,
+    temporal_activity_id: str | None = None,
 ) -> NoReturn:
     """Create an approval request via the Approvals API.
 
@@ -53,7 +66,7 @@ async def create_approval_request_activity(
 
     Args:
         execution_id: Parent workflow execution ID (UUID string).
-        approval_node_id: Activity ID from workflow definition.
+        approval_node_id: Canvas node ID from the workflow definition.
         name: Display name for the approval request.
         next_step_approved: First activity if approved (id, name, type), or None.
         workflow_context: Context dict (workflow_version_id, workflow_name, inputs, previous_step).
@@ -62,6 +75,9 @@ async def create_approval_request_activity(
         approver_user_ids: List of user UUIDs who can approve (None = any user with permission).
         approver_group_ids: List of group UUIDs whose members can approve.
         project_id: Project ID for the approval request (from parent execution).
+        loop_iteration_path: Enclosing-loop indices, outermost first (empty if none).
+        temporal_activity_id: Temporal activity ID to signal on decide. Defaults to
+            ``approval_node_id`` for callers that predate this field.
 
     Raises:
         ApprovalActivityError: If approval request creation fails.
@@ -92,6 +108,8 @@ async def create_approval_request_activity(
         "next_step_rejected": next_step_rejected,
         "approver_user_ids": approver_user_ids,
         "approver_group_ids": approver_group_ids,
+        "loop_iteration_path": loop_iteration_path or [],
+        "temporal_activity_id": temporal_activity_id or approval_node_id,
     }
 
     try:
@@ -148,7 +166,7 @@ async def _batch_update_approvals(
         ) as client:
             pending = await client.list_approvals_by_execution(UUID(execution_id), status="pending")
             if node_id:
-                pending = [a for a in pending if a.get("approval_node_id") == node_id]
+                pending = [a for a in pending if _is_approval_for_node(str(a.get("approval_node_id", "")), node_id)]
 
             if not pending:
                 logger.info("No pending approvals to %s", operation, execution_id=execution_id, node_id=node_id)
