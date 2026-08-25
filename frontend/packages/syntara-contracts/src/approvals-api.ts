@@ -147,6 +147,11 @@ export interface components {
        */
       name: string
       /**
+       * Prompt
+       * @description Resolved guidance message from the approval node, shown to approvers
+       */
+      prompt?: string | null
+      /**
        * @description Current approval status
        * @default pending
        */
@@ -252,6 +257,11 @@ export interface components {
        * @description Display name for the approval request
        */
       name: string
+      /**
+       * Prompt
+       * @description Resolved guidance message from the approval node, shown to approvers
+       */
+      prompt?: string | null
       /**
        * Loop Iteration Path
        * @description Enclosing-loop indices, outermost first (empty when not inside a loop)

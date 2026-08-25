@@ -42,6 +42,7 @@ async def _test_approval_activity(
     project_id: str | None = None,
     loop_iteration_path: list[int] | None = None,
     temporal_activity_id: str | None = None,
+    prompt: str | None = None,
 ) -> dict[str, Any]:
     """Test approval activity that blocks until Temporal times it out.
 
@@ -76,6 +77,7 @@ async def _test_multi_approval_activity(
     project_id: str | None = None,
     loop_iteration_path: list[int] | None = None,
     temporal_activity_id: str | None = None,
+    prompt: str | None = None,
 ) -> dict[str, Any]:
     """Approval activity where only one of two approval nodes ever gets a decision.
 

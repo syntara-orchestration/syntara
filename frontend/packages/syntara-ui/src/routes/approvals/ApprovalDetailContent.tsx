@@ -30,28 +30,12 @@ import { useAlerts } from '../../providers/alerts'
 import styles from './ApprovalDetailContent.module.css'
 import { lookupMapByApprovalNodeId } from './approvalNodeId'
 import { getNotesLabel } from './approvalNotes'
+import { getApprovalPromptFromRecord } from './approvalPrompt'
 import { ApprovalStatusBadges } from './approvalUtils'
 import { buildWorkflowBuilderLink } from './buildWorkflowBuilderLink'
 import { canDecideOnApproval } from './canDecideOnApproval'
 import { useApprovalDecideProjects } from './useApprovalDecideProjects'
 import { useCanDecideApproval } from './useCanDecideApproval'
-
-/**
- * Fallback extraction for description/prompt text from the approval object.
- * Neither field is in the ApprovalRequestRead contract yet; the mock API includes
- * `description` as an extra field. The primary source is the `message` prop
- * (populated from the workflow activity parameters). This function is the secondary
- * source for approvals fetched via deep-link where the workflow definition isn't available.
- */
-function getApprovalMessage(approval: Approval): string | undefined {
-  if ('description' in approval && typeof approval.description === 'string' && approval.description.trim()) {
-    return approval.description.trim()
-  }
-  if ('prompt' in approval && typeof approval.prompt === 'string' && approval.prompt.trim()) {
-    return approval.prompt.trim()
-  }
-  return undefined
-}
 
 const getDecisionCopy = (decision: 'approved' | 'rejected') => ({
   label: decision === 'approved' ? 'Approval notes' : 'Rejection notes',
@@ -70,7 +54,7 @@ function resolveApprovalName(approval: Approval, activityNameMap?: Map<string, s
 
 type ApprovalDetailContentProps = Readonly<{
   approval: Approval
-  /** Optional message to display (e.g. the prompt from the approval node config). Overrides auto-detection from the approval object. */
+  /** Optional message to display when the approval record has no persisted prompt (e.g. node definition fallback). */
   message?: string
   /** Optional map of activity ID to human-readable name for resolving approval node names. */
   activityNameMap?: Map<string, string>
@@ -287,7 +271,7 @@ export function ApprovalDetailContent({
   const workflowId = approval.workflow_context?.workflow_id
   const workflowVersion = approval.workflow_context?.workflow_version
   const workflowLink = workflowId ? buildWorkflowBuilderLink(workflowId, workflowVersion) : undefined
-  const approvalMessage = message || getApprovalMessage(approval)
+  const approvalMessage = getApprovalPromptFromRecord(approval) || message
   const approvalDisplayName = resolveApprovalName(approval, activityNameMap)
   const decisionNotes = approval.decision_notes ?? undefined
   const notesLabel = getNotesLabel(approvalStatus)

@@ -5,6 +5,8 @@ timeout expiration, cancellation cleanup, and previous-step context building.
 """
 
 import asyncio
+import json
+from collections.abc import Callable
 from datetime import timedelta
 from typing import Any, ClassVar, cast
 
@@ -38,6 +40,87 @@ from syntara.workflows.workflow_engine.utils.loop_iteration_ids import (
 )
 
 _APPROVAL_COMMENTS_MAX_LENGTH = FieldLimits.DESCRIPTION_MAX_LENGTH
+_APPROVAL_PROMPT_PATCH = "persist-approval-prompt"
+
+# Truncation must respect the narrower of the DB column width and the
+# ApprovalCreateRequest.prompt max_length — they are the same today, and this
+# constant is the place to change if either moves. Widening the column without
+# widening the request model would make an over-length prompt a 422 from
+# POST /approvals rather than a clipped message.
+_APPROVAL_PROMPT_MAX_LENGTH = FieldLimits.DESCRIPTION_MAX_LENGTH
+
+
+def _warn_approval_prompt(message: str) -> None:
+    """Log prompt-coercion issues without crashing outside a workflow."""
+    if workflow.in_workflow():
+        workflow.logger.warning(message)
+
+
+def _approval_prompt_value(resolved_parameters: dict[str, Any]) -> Any | None:  # noqa: ANN401
+    """Select the approval-node prompt, or None if it is not storable guidance.
+
+    ``NamespaceResolver.resolve_value`` keeps the original type when the whole
+    field is a single ``${...}``, so the prompt can arrive as any JSON value.
+    Booleans, empty containers and blank strings are not human-readable guidance
+    and are dropped here.
+
+    The ``json.dumps`` probe doubles as a **cycle guard**: ``scrub_credentials``
+    and ``scrub_credential_values`` recurse through dicts and lists with no cycle
+    detection, so a self-referencing template must be rejected *before* it reaches
+    the scrubber. Returning a value from this function is the promise that it is
+    safe to scrub.
+    """
+    prompt = resolved_parameters.get("prompt")
+    if prompt is None or isinstance(prompt, bool):
+        return None
+    if isinstance(prompt, str):
+        return prompt.strip() or None
+    if isinstance(prompt, (dict, list)):
+        if not prompt:
+            return None
+        try:
+            json.dumps(prompt, default=str)
+        except (TypeError, ValueError):
+            _warn_approval_prompt("Could not serialize approval prompt; storing no prompt")
+            return None
+    return prompt
+
+
+def _approval_prompt_text(value: Any) -> str | None:  # noqa: ANN401
+    """Render an already-scrubbed prompt value to the text that gets stored.
+
+    Runs last so the length cap is applied to the final string. Scrubbing can
+    *lengthen* a value — ``[REDACTED]`` is 10 characters and a secret may be as
+    short as 4 — so truncating before scrubbing can push the result back over the
+    limit and turn ``POST /approvals`` into a validation failure.
+
+    Objects that do not fit are dropped rather than stored as a broken JSON
+    fragment. Oversized plain text is truncated with a trailing ellipsis so
+    approvers can see it was clipped.
+    """
+    if value is None:
+        return None
+
+    if isinstance(value, (dict, list)):
+        text = json.dumps(value, default=str)
+        if len(text) > _APPROVAL_PROMPT_MAX_LENGTH:
+            _warn_approval_prompt(
+                f"Approval prompt JSON length {len(text)} exceeds "
+                f"{_APPROVAL_PROMPT_MAX_LENGTH} characters; storing no prompt"
+            )
+            return None
+        return text
+
+    text = (value if isinstance(value, str) else str(value)).strip()
+    if not text:
+        return None
+    if len(text) <= _APPROVAL_PROMPT_MAX_LENGTH:
+        return text
+
+    _warn_approval_prompt(
+        f"Approval prompt length {len(text)} exceeds {_APPROVAL_PROMPT_MAX_LENGTH} characters; truncating"
+    )
+    return text[: _APPROVAL_PROMPT_MAX_LENGTH - 1] + "…"
 
 
 class WorkflowApprovalMixin:
@@ -59,6 +142,11 @@ class WorkflowApprovalMixin:
     node_control_data: dict[str, dict[str, Any]]
     _detached_nodes: set[str]
     _TEMPORAL_MARGIN: ClassVar[int]
+
+    # Provided by OrchestratorWorkflow; declared here for mypy only. Deliberately
+    # not given an identity-function body — a redaction step that silently becomes
+    # a no-op if the MRO changes fails open, and this one guards secrets.
+    _scrub_data: Callable[[dict[str, Any]], dict[str, Any]]
 
     def _loop_iteration_path(self, node_id: str) -> list[int]:
         """Return enclosing-loop indices for this node, outermost first (empty if none)."""
@@ -211,8 +299,9 @@ class WorkflowApprovalMixin:
     ) -> list[Any]:
         """Build the positional argument list for create_approval_request_activity.
 
-        New executions return a 12-element list. Pre-patch replay returns the
-        original 10-element list so Temporal history matches::
+        Extra args are always appended, never inserted, so Temporal replay of
+        older histories still matches. #279 occupies [10] and [11]; prompt is
+        last::
 
             [0] execution_id:          str            — parent workflow execution ID
             [1] approval_node_id:      str            — canvas node ID
@@ -226,6 +315,10 @@ class WorkflowApprovalMixin:
             [9] project_id:            str | None      — project ID for the approval request
             [10] loop_iteration_path:  list[int]       — enclosing-loop indices (empty if none)
             [11] temporal_activity_id: str             — Temporal activity ID actually scheduled
+            [12] prompt:               str | None      — resolved guidance message
+
+        Pre-#279 replay returns 10 args. Post-#279 without this prompt patch
+        returns 12. New executions return 13.
 
         """
         name = node.name or f"Approval for {node.id}"
@@ -294,7 +387,8 @@ class WorkflowApprovalMixin:
             approver_user_ids = None
             approver_group_ids = None
 
-        args = [
+        # Temporal replay: extra args are always appended, never inserted.
+        args: list[Any] = [
             self.execution_id,
             node.id,
             name,
@@ -315,6 +409,14 @@ class WorkflowApprovalMixin:
                     self._approval_activity_id(node.id),
                 ]
             )
+        if workflow.patched(_APPROVAL_PROMPT_PATCH):
+            # select+guard -> scrub -> coerce+truncate. Order is load-bearing:
+            # the guard proves the value is safe to recurse into, and scrubbing
+            # before truncation keeps the final string inside the column limit.
+            value = _approval_prompt_value(resolved_parameters)
+            if value is not None:
+                value = self._scrub_data({"prompt": value})["prompt"]
+            args.append(_approval_prompt_text(value))
         return args
 
     async def _execute_approval_node(
