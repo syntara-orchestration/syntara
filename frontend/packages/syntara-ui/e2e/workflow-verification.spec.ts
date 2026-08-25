@@ -405,7 +405,8 @@ test.describe('Variable reference validation', () => {
       await expect(app.getByText(/Verification failed/)).toBeVisible({ timeout: VERIFY_BANNER_TIMEOUT })
 
       await app.getByRole('button', { name: /alert details/i }).click()
-      await expect(app.getByText(/^".*" is not a defined trigger field/i)).toBeVisible({
+      // Frontend finding starts with `Step "..."`, not a leading quote.
+      await expect(app.getByText(/is not a defined trigger field/i)).toBeVisible({
         timeout: VERIFY_BANNER_TIMEOUT,
       })
     } finally {
