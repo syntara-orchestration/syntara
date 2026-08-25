@@ -26,7 +26,7 @@ function isModifiedClick(event: MouseEvent<HTMLAnchorElement>): boolean {
 /**
  * PatternFly Simple List item rendered as a TanStack Router `<Link>` so rows get
  * link semantics (open in new tab, SR role, client-side routing) while unmodified
- * left-click still runs `onSelect`. NxLink is a PF Button, so it cannot be used here.
+ * left-click still runs `onSelect`. SynLink is a PF Button, so it cannot be used here.
  */
 export function HistoryListItemLink({
   to,
