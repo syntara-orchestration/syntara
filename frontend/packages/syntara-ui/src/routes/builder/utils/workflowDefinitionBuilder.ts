@@ -28,7 +28,7 @@ function isSwitchCaseArray(val: unknown): val is Array<{ port: string; label: st
  * Transform approval node approver lists from objects to string arrays.
  * The API returns {id, username}/{id, name} objects but the workflow schema expects string arrays.
  */
-function transformApprovalApprovers(parameters: Record<string, unknown>): Record<string, unknown> {
+export function transformApprovalApprovers(parameters: Record<string, unknown>): Record<string, unknown> {
   const transformed = { ...parameters }
 
   // Extract usernames from ApproverUserSummary[] -> string[]

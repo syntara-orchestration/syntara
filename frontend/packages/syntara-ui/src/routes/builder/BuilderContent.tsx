@@ -54,10 +54,11 @@ import { useRunStepDialog } from './hooks/useRunStepDialog'
 import { useUndoRedoKeyboard } from './hooks/useUndoRedoKeyboard'
 import { useWorkflowMetadata } from './hooks/useWorkflowMetadata'
 import { NodeActionsContext } from './NodeActionsContext'
+import { SaveBeforeViewDialog } from './SaveBeforeViewDialog'
 import type { BuilderContentProps } from './types/builderContent'
 import { useBuilderPermissions } from './useBuilderPermissions'
 import { createAddStepHandler } from './utils/panelActions'
-import { buildWorkflowDefinition } from './utils/workflowDefinitionBuilder'
+import { buildWorkflowDefinition, transformApprovalApprovers } from './utils/workflowDefinitionBuilder'
 import { ValidationBanner } from './ValidationBanner'
 import { VersionInfoCard } from './VersionInfoCard'
 import { VersionViewProvider } from './VersionViewContext'
@@ -77,6 +78,7 @@ export function BuilderContent(props: BuilderContentProps) {
   const [searchParams, setSearchParams] = useSearchParams()
   const { showAlert, showSuccess, showWarning, showError } = useAlerts()
   const [saveAttemptedWithoutProject, setSaveAttemptedWithoutProject] = useState(false)
+  const [pendingDuplicateNavigation, setPendingDuplicateNavigation] = useState<string | null>(null)
   const { selectedProject, stableProjectId, ProjectSelector } = useProjectSelector({
     requireProject: isNew,
     initialProjectId: isNew ? undefined : (workflow?.project_id ?? undefined),
@@ -367,12 +369,24 @@ export function BuilderContent(props: BuilderContentProps) {
       const maxBaseLength = 255 - suffix.length
       const baseName = workflow.name.length > maxBaseLength ? workflow.name.slice(0, maxBaseLength) : workflow.name
       const duplicateName = `${baseName}${suffix}`
+
+      const nodes = definition.nodes as Array<Record<string, unknown>> | undefined
+      const transformedDefinition = {
+        ...definition,
+        nodes: nodes?.map((node) => {
+          if (node.type === 'approval' && node.config) {
+            return { ...node, config: transformApprovalApprovers(node.config as Record<string, unknown>) }
+          }
+          return node
+        }),
+      }
+
       duplicateWorkflow(
         {
           body: {
             name: duplicateName,
-            description: workflow.description ?? '',
-            workflow_definition: definition,
+            description: workflowDescription,
+            workflow_definition: transformedDefinition,
             labels: workflow.labels ?? {},
             project_id: workflow.project_id,
           },
@@ -385,7 +399,15 @@ export function BuilderContent(props: BuilderContentProps) {
               title: 'Workflow duplicated',
               description: `Created "${duplicateName}"`,
               actionLinks: created?.id ? (
-                <AlertActionLink onClick={() => setLocation(`/workflow-builder/${created.id}`)}>
+                <AlertActionLink
+                  onClick={() => {
+                    if (useWorkflowStore.getState().isDirty) {
+                      setPendingDuplicateNavigation(`/workflow-builder/${created.id}`)
+                    } else {
+                      setLocation(`/workflow-builder/${created.id}`)
+                    }
+                  }}
+                >
                   Open workflow
                 </AlertActionLink>
               ) : undefined,
@@ -405,7 +427,7 @@ export function BuilderContent(props: BuilderContentProps) {
         }
       )
     },
-    [isDuplicating, workflow, duplicateWorkflow, queryClient, showAlert, showError, setLocation]
+    [isDuplicating, workflow, duplicateWorkflow, queryClient, showAlert, showError, setLocation, workflowDescription]
   )
 
   const handleDuplicateVersion = useCallback(
@@ -434,6 +456,27 @@ export function BuilderContent(props: BuilderContentProps) {
     })
     executeDuplicateWorkflow(definition)
   }, [currentWorkflow, workflowName, workflowDescription, executeDuplicateWorkflow, showError])
+
+  const handleSaveBeforeDuplicateNavigation = useCallback(async (): Promise<boolean> => {
+    const destinationPath = pendingDuplicateNavigation
+    const saved = await guardedSaveWorkflow()
+    setPendingDuplicateNavigation(null)
+    if (saved && destinationPath) {
+      setLocation(destinationPath)
+    }
+    return saved
+  }, [pendingDuplicateNavigation, guardedSaveWorkflow, setLocation])
+
+  const handleNavigateWithoutSaving = useCallback(() => {
+    if (pendingDuplicateNavigation) {
+      setLocation(pendingDuplicateNavigation)
+    }
+    setPendingDuplicateNavigation(null)
+  }, [pendingDuplicateNavigation, setLocation])
+
+  const handleCancelDuplicateNavigation = useCallback(() => {
+    setPendingDuplicateNavigation(null)
+  }, [])
 
   const versionPanel = useBuilderVersionPanel({
     workflowId,
@@ -716,6 +759,15 @@ export function BuilderContent(props: BuilderContentProps) {
             <UnsavedStepEditorDialog
               isOpen={unsavedStepEditorDialogOpen}
               onClose={() => dispatch({ type: 'SET_UNSAVED_STEP_EDITOR_DIALOG', payload: false })}
+            />
+            <SaveBeforeViewDialog
+              isOpen={pendingDuplicateNavigation !== null}
+              onSave={handleSaveBeforeDuplicateNavigation}
+              onViewWithoutSaving={handleNavigateWithoutSaving}
+              onCancel={handleCancelDuplicateNavigation}
+              title="Save changes before opening the duplicated workflow?"
+              bodyText="Opening the duplicated workflow will exit the editor view and will permanently delete all recent unsaved progress on your current workflow. Please save your work before leaving."
+              buttonLabel="Open without saving"
             />
           </SynPage>
         </VersionViewProvider>

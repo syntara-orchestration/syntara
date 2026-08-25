@@ -163,6 +163,16 @@ describe('DuplicateMenuItem', () => {
 
     expect(await screen.findByText('No edit permission')).toBeInTheDocument()
   })
+
+  it('has no accessibility violations', async () => {
+    const { container } = render(
+      <div role="menu">
+        <DuplicateMenuItem canEdit editTooltip="No permission" handleDuplicate={vi.fn()} closeKebab={vi.fn()} />
+      </div>
+    )
+
+    expect(await axe(container)).toHaveNoViolations()
+  })
 })
 
 describe('ImportMenuItem', () => {
@@ -192,6 +202,17 @@ describe('ImportMenuItem', () => {
 
     expect(mockClick).toHaveBeenCalledTimes(1)
     expect(closeKebab).toHaveBeenCalledTimes(1)
+  })
+
+  it('has no accessibility violations', async () => {
+    const ref = { current: null }
+    const { container } = render(
+      <div role="menu">
+        <ImportMenuItem canEdit editTooltip="No permission" importFileRef={ref} closeKebab={vi.fn()} />
+      </div>
+    )
+
+    expect(await axe(container)).toHaveNoViolations()
   })
 })
 
@@ -224,6 +245,16 @@ describe('UnpublishMenuItem', () => {
     expect(onUnpublish).toHaveBeenCalledTimes(1)
     expect(closeKebab).toHaveBeenCalledTimes(1)
   })
+
+  it('has no accessibility violations', async () => {
+    const { container } = render(
+      <div role="menu">
+        <UnpublishMenuItem canEdit unpublishTooltip="No permission" onUnpublish={vi.fn()} closeKebab={vi.fn()} />
+      </div>
+    )
+
+    expect(await axe(container)).toHaveNoViolations()
+  })
 })
 
 describe('DeleteMenuItem', () => {
@@ -250,6 +281,16 @@ describe('DeleteMenuItem', () => {
 
     expect(dispatch).toHaveBeenCalledWith({ type: 'SET_DELETE_DIALOG', payload: true })
     expect(closeKebab).toHaveBeenCalledTimes(1)
+  })
+
+  it('has no accessibility violations', async () => {
+    const { container } = render(
+      <div role="menu">
+        <DeleteMenuItem canDelete deleteTooltip="No permission" dispatch={vi.fn()} closeKebab={vi.fn()} />
+      </div>
+    )
+
+    expect(await axe(container)).toHaveNoViolations()
   })
 })
 
