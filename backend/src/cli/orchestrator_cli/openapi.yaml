@@ -33588,7 +33588,6 @@ components:
         Excludes auto-generated fields: id, created_at, updated_at, last_login, preferences.
       required:
         - username
-        - first_name
         - password
       properties:
         username:
@@ -33606,9 +33605,10 @@ components:
           description: Email address
           title: Email
         first_name:
-          type: string
-          minLength: 1
-          maxLength: 255
+          anyOf:
+            - type: string
+              maxLength: 255
+            - type: 'null'
           description: User's first name
           title: First Name
         last_name:

@@ -8,7 +8,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { NxConfirmationDialog } from '../../components/dialogs/NxConfirmationDialog'
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { IconLabel } from '../../components/IconLabel'
-import { NxLabel } from '../../components/labels/NxLabel'
+import { SynLabel } from '../../components/labels/SynLabel'
 import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../components/panels/list/NxListPanel'
 import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 import { useCursorReset } from '../../hooks/useCursorPagination'
@@ -184,9 +184,9 @@ function AssignmentsTableBody({
                 />
               </Td>
               <Td dataLabel="Principal type">
-                <NxLabel color={principalTypeDisplay[row.principalType].color}>
+                <SynLabel color={principalTypeDisplay[row.principalType].color}>
                   {principalTypeDisplay[row.principalType].text}
-                </NxLabel>
+                </SynLabel>
               </Td>
               <Td dataLabel="Role name">
                 <Truncate content={row.assignmentName} />
@@ -207,9 +207,9 @@ function AssignmentsTableBody({
                   <ExpandableRowContent>
                     <LabelGroup isCompact numLabels={Infinity}>
                       {row.rolePolicies.map((name) => (
-                        <NxLabel key={name} color="grey">
+                        <SynLabel key={name} color="grey">
                           {name}
-                        </NxLabel>
+                        </SynLabel>
                       ))}
                     </LabelGroup>
                   </ExpandableRowContent>

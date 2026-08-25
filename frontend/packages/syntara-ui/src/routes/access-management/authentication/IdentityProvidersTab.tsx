@@ -21,9 +21,9 @@ import { adminClient, identityProvidersClient } from '../../../client'
 import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
-import { NxLink } from '../../../components/NxLink'
 import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../../components/panels/list/NxListPanel'
 import { ProviderIcon } from '../../../components/ProviderIcon'
+import { SynLink } from '../../../components/SynLink'
 import { useCursorPagination } from '../../../hooks/useCursorPagination'
 import { useDeleteAction } from '../../../hooks/useDeleteAction'
 import { useDialogState } from '../../../hooks/useDialogState'
@@ -158,9 +158,9 @@ function ProviderRow({
           </FlexItem>
           <FlexItem style={{ minWidth: 0 }}>
             {provider.id ? (
-              <NxLink to={providerDetailPath(provider.id)}>
+              <SynLink to={providerDetailPath(provider.id)}>
                 <Truncate content={provider.name ?? ''} />
-              </NxLink>
+              </SynLink>
             ) : (
               <Truncate content={provider.name ?? ''} />
             )}
