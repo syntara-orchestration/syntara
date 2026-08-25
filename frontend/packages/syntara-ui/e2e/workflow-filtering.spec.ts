@@ -42,13 +42,9 @@ test.describe('Workflow Filtering', () => {
     await app.goto(toAppUrl('/workflows'))
     await expect(app.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
 
-    // Wait for table or empty state to load
+    // Table must be visible — beforeAll created workflows via API
     const table = app.getByRole('grid', { name: 'Workflows table' })
-    const hasTable = await table
-      .waitFor({ state: 'visible', timeout: 5000 })
-      .then(() => true)
-      .catch(() => false)
-    test.skip(!hasTable, 'No workflows available for filtering tests')
+    await expect(table).toBeVisible({ timeout: 10_000 })
 
     // Act - Apply name filter
     const nameFilterInput = app.getByPlaceholder('Filter by name')

@@ -176,6 +176,7 @@ class Integration(NamedResource, UserOwnedResource, table=True):
         "integration_type",
         "validation_status",
         "enabled",
+        "last_validated_at",
     ]
 
     __table_args__ = (
