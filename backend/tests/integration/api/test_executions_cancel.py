@@ -10,6 +10,7 @@ from httpx import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from syntara.agent_orchestrator.models import Invocation, InvocationStatus
 from syntara.core.models import User
 from syntara.workflows.models.execution import Execution, ExecutionStatus
 from syntara.workflows.models.workflow import Workflow
@@ -204,3 +205,169 @@ class TestCancelExecution:
         assert data["type"] == "https://api.example.com/errors/validation-error"
         assert data["code"] == "REQUEST_VALIDATION_ERROR"
         assert data["retryable"] is False
+
+
+@pytest.mark.asyncio
+class TestCancelExecutionPropagatesToInvocation:
+    """Cancelling an execution must stop the agent work it spawned.
+
+    The agentic node completes asynchronously (``raise_complete_async``) and the
+    agent loop runs in a separate builtin AGENT_EXECUTION workflow. The only
+    mechanism that stops an in-flight invocation is the planner's DB poll on
+    ``Invocation.status == CANCELLED``, so cancelling the user's execution must
+    write that status. Ref: AAP-88614.
+    """
+
+    async def _make_running_execution(
+        self,
+        test_db_session: AsyncSession,
+        test_user: User,
+        test_workflow: Workflow,
+    ) -> Execution:
+        result = await test_db_session.exec(
+            select(WorkflowVersion.id).where(
+                WorkflowVersion.workflow_id == test_workflow.id,
+                WorkflowVersion.version == test_workflow.current_version,
+            )
+        )
+        version_id = result.one()
+
+        execution = Execution(
+            workflow_id=test_workflow.id,
+            workflow_version_id=version_id,
+            temporal_workflow_id=f"temporal-{uuid.uuid4()}",
+            status=ExecutionStatus.RUNNING,
+            created_by=test_user.id,
+            input_data={},
+            labels={},
+            project_id=test_workflow.project_id,
+        )
+        test_db_session.add(execution)
+        await test_db_session.commit()
+        await test_db_session.refresh(execution)
+        return execution
+
+    @pytest.mark.parametrize(
+        "invocation_status",
+        [InvocationStatus.RUNNING, InvocationStatus.CREATED],
+    )
+    async def test_cancel_execution_cancels_linked_invocation(
+        self,
+        auth_client: AsyncClient,
+        test_db_session: AsyncSession,
+        test_user: User,
+        test_workflow: Workflow,
+        mock_temporal_service: Mock,
+        invocation_status: InvocationStatus,
+    ) -> None:
+        """Cancelling an execution marks its in-flight invocation CANCELLED."""
+        execution = await self._make_running_execution(test_db_session, test_user, test_workflow)
+
+        invocation = Invocation(
+            created_by=test_user.id,
+            prompt="summarise the incident report",
+            session_id=f"session-{uuid.uuid4()}",
+            project_id=test_workflow.project_id,
+            status=invocation_status,
+            context_data={
+                "execution_id": str(execution.id),
+                "activity_id": "1",
+                "activity_name": "agentic_v2",
+            },
+        )
+        test_db_session.add(invocation)
+        await test_db_session.commit()
+        await test_db_session.refresh(invocation)
+
+        response = await auth_client.post(f"/api/v1/executions/{execution.id}/cancel")
+        assert response.status_code == status.HTTP_202_ACCEPTED
+
+        await test_db_session.refresh(invocation)
+        assert invocation.status == InvocationStatus.CANCELLED
+        assert invocation.completed_at is not None
+
+    async def test_cancel_execution_cancels_builtin_agent_execution(
+        self,
+        auth_client: AsyncClient,
+        test_db_session: AsyncSession,
+        test_user: User,
+        test_workflow: Workflow,
+        mock_temporal_service: Mock,
+    ) -> None:
+        """Cancelling an execution also cancels the builtin agent execution.
+
+        The builtin AGENT_EXECUTION workflow is what actually runs the agent
+        loop; leaving it running orphans the Temporal workflow.
+        """
+        execution = await self._make_running_execution(test_db_session, test_user, test_workflow)
+
+        invocation = Invocation(
+            created_by=test_user.id,
+            prompt="summarise the incident report",
+            session_id=f"session-{uuid.uuid4()}",
+            project_id=test_workflow.project_id,
+            status=InvocationStatus.RUNNING,
+            context_data={"execution_id": str(execution.id)},
+        )
+        test_db_session.add(invocation)
+        await test_db_session.commit()
+        await test_db_session.refresh(invocation)
+
+        result = await test_db_session.exec(
+            select(WorkflowVersion.id).where(
+                WorkflowVersion.workflow_id == test_workflow.id,
+                WorkflowVersion.version == test_workflow.current_version,
+            )
+        )
+        version_id = result.one()
+
+        agent_execution = Execution(
+            workflow_id=test_workflow.id,
+            workflow_version_id=version_id,
+            temporal_workflow_id=f"temporal-agent-{uuid.uuid4()}",
+            status=ExecutionStatus.RUNNING,
+            created_by=test_user.id,
+            input_data={"invocation_id": str(invocation.id)},
+            labels={},
+            project_id=test_workflow.project_id,
+        )
+        test_db_session.add(agent_execution)
+        await test_db_session.commit()
+        await test_db_session.refresh(agent_execution)
+
+        response = await auth_client.post(f"/api/v1/executions/{execution.id}/cancel")
+        assert response.status_code == status.HTTP_202_ACCEPTED
+
+        cancelled_workflow_ids = {
+            call.kwargs["temporal_workflow_id"] for call in mock_temporal_service.cancel_workflow.call_args_list
+        }
+        assert agent_execution.temporal_workflow_id in cancelled_workflow_ids
+
+    async def test_cancel_execution_leaves_unrelated_invocation_untouched(
+        self,
+        auth_client: AsyncClient,
+        test_db_session: AsyncSession,
+        test_user: User,
+        test_workflow: Workflow,
+        mock_temporal_service: Mock,
+    ) -> None:
+        """Only invocations linked to the cancelled execution are affected."""
+        execution = await self._make_running_execution(test_db_session, test_user, test_workflow)
+
+        unrelated = Invocation(
+            created_by=test_user.id,
+            prompt="unrelated work",
+            session_id=f"session-{uuid.uuid4()}",
+            project_id=test_workflow.project_id,
+            status=InvocationStatus.RUNNING,
+            context_data={"execution_id": str(uuid.uuid4())},
+        )
+        test_db_session.add(unrelated)
+        await test_db_session.commit()
+        await test_db_session.refresh(unrelated)
+
+        response = await auth_client.post(f"/api/v1/executions/{execution.id}/cancel")
+        assert response.status_code == status.HTTP_202_ACCEPTED
+
+        await test_db_session.refresh(unrelated)
+        assert unrelated.status == InvocationStatus.RUNNING

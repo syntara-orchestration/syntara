@@ -27,10 +27,22 @@ def _make_execution(status: ExecutionStatus) -> Execution:
 
 
 def _mock_session_returning(execution: Execution | None) -> AsyncSession:
-    mock_result = Mock()
-    mock_result.one_or_none.return_value = execution
+    """Session whose first exec() yields the execution, and later ones nothing.
+
+    cancel_execution runs follow-up queries for linked invocations and their
+    builtin agent executions; those return empty here so these tests stay
+    focused on the Temporal cancellation request itself.
+    """
+    execution_result = Mock()
+    execution_result.one_or_none.return_value = execution
+    execution_result.all.return_value = []
+
+    empty_result = Mock()
+    empty_result.one_or_none.return_value = None
+    empty_result.all.return_value = []
+
     mock_session = Mock(spec=AsyncSession)
-    mock_session.exec = AsyncMock(return_value=mock_result)
+    mock_session.exec = AsyncMock(side_effect=[execution_result, empty_result, empty_result])
     return mock_session
 
 

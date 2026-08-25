@@ -1126,6 +1126,8 @@ class ExecutionService(BaseService):
             )
             raise
 
+        await self._cancel_linked_invocations(execution.id)
+
         self._emit_lifecycle_event(
             execution_id=execution.id,
             workflow_id=execution.workflow_id,
@@ -1133,6 +1135,76 @@ class ExecutionService(BaseService):
             action=ExecutionAction.CANCELLED,
             mode=execution.mode.value,
         )
+
+    async def _cancel_linked_invocations(self, execution_id: UUID) -> None:
+        """Cancel agent invocations spawned by this execution.
+
+        The agentic node completes asynchronously (``raise_complete_async``), so
+        the agent loop does not run inside the cancelled workflow — it runs in a
+        separate builtin AGENT_EXECUTION workflow driven by ``InvocationExecutor``.
+        The only thing that stops that loop is the planner's poll on
+        ``Invocation.status == CANCELLED``, so cancelling the execution has to
+        write that status or the agent runs to completion. Ref: AAP-88614.
+
+        Best-effort: a failure here must not turn a successful workflow
+        cancellation into an error for the caller.
+        """
+        # Imported lazily: agent_orchestrator imports this module for execution
+        # creation, so a module-level import would be circular.
+        from syntara.agent_orchestrator.models import Invocation, InvocationStatus  # noqa: PLC0415
+        from syntara.agent_orchestrator.services import InvocationService  # noqa: PLC0415
+
+        result = await self.session.exec(
+            select(Invocation)
+            .where(col(Invocation.context_data)["execution_id"].astext == str(execution_id))
+            .where(col(Invocation.status).in_([InvocationStatus.CREATED, InvocationStatus.RUNNING]))
+        )
+        invocations = result.all()
+        if not invocations:
+            return
+
+        invocation_service = InvocationService(self.session, self.user)
+        for invocation in invocations:
+            try:
+                await invocation_service.cancel_invocation(
+                    invocation.id,
+                    reason=f"Workflow execution {execution_id} cancelled",
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to cancel invocation for cancelled execution",
+                    execution_id=execution_id,
+                    invocation_id=invocation.id,
+                )
+                continue
+
+            await self._cancel_agent_execution_for_invocation(invocation.id)
+
+    async def _cancel_agent_execution_for_invocation(self, invocation_id: UUID) -> None:
+        """Cancel the builtin AGENT_EXECUTION workflow running this invocation.
+
+        Marking the invocation CANCELLED stops the agent at its next phase
+        boundary; cancelling the Temporal workflow stops it from lingering as a
+        running execution. Best-effort — the DB status is the effective stop.
+        """
+        if self.temporal_service is None:
+            return
+
+        result = await self.session.exec(
+            select(Execution)
+            .where(col(Execution.input_data)["invocation_id"].astext == str(invocation_id))
+            .where(col(Execution.status).not_in(TERMINAL_EXECUTION_STATUSES))
+            .where(col(Execution.deleted_at).is_(None))
+        )
+        for agent_execution in result.all():
+            try:
+                await self.temporal_service.cancel_workflow(temporal_workflow_id=agent_execution.temporal_workflow_id)
+            except Exception:
+                logger.exception(
+                    "Failed to cancel builtin agent execution",
+                    invocation_id=invocation_id,
+                    execution_id=agent_execution.id,
+                )
 
     async def retry_execution(self, execution_id: UUID) -> ExecutionRead:
         """Retry a completed execution, re-running with the same version and inputs.
