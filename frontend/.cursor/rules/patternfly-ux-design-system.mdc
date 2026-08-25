@@ -108,12 +108,12 @@ Use a docked icon navigation (left sidebar) with PatternFly's flyout panels comp
 
 ## Table Component
 
-- ALWAYS use `NxScrollableTableContainer` wrapper — this applies the standard table variant by default
-- `NxScrollableTableContainer` does not set `variant="compact"` — the default (standard) variant is used for main data tables
+- ALWAYS use `SynScrollableTableContainer` wrapper — this applies the standard table variant by default
+- `SynScrollableTableContainer` does not set `variant="compact"` — the default (standard) variant is used for main data tables
 - Use `variant="compact"` only for dense, supplementary tables (e.g., activity state tables inside panels) where space is constrained
 - ALWAYS include `<Thead>` with column headers
 - Actions column is rightmost (no column header label)
-- All row actions live inside a kebab menu (⋮) — no direct buttons in the actions column. Use `NxKebabMenu` component with `actions` array: `{ key, title, onClick, isSeparator?, isDanger?, isAriaDisabled?, tooltipProps? }`. Per-row `aria-label` must be unique (e.g., `` `Actions for ${name}` ``).
+- All row actions live inside a kebab menu (⋮) — no direct buttons in the actions column. Use `SynKebabMenu` component with `actions` array: `{ key, title, onClick, isSeparator?, isDanger?, isAriaDisabled?, tooltipProps? }`. Per-row `aria-label` must be unique (e.g., `` `Actions for ${name}` ``).
 - **Kebab labels:** Always `"Action + resource"` format (e.g., "Edit credential", "Delete credential") with icons via `IconLabel`; destructive items use `isDanger: true`
 - Action order in kebab: non-destructive first, divider, destructive last
 - On the details page header, same actions appear in a kebab; frequently used actions promoted to primary button with icon (e.g., `RhUiEditIcon` + "Edit credential")
@@ -121,8 +121,8 @@ Use a docked icon navigation (left sidebar) with PatternFly's flyout panels comp
 - Clicking resource name navigates to details view
 - "Created"/"Modified" columns: username (linked) + date together. Date format: `MMM DD, YYYY, H:MM:SS AM/PM` — always use `DateCell` / `formatDateTime()` from `dateUtils.ts` (never `toLocaleString` or PF `Timestamp`)
 - Text-heavy columns (names, descriptions, emails, URLs) MUST use `<Truncate>` — ellipsis with tooltip on hover; `table-layout: fixed` for equal column distribution (do not opt out with `useFixedLayout={false}`)
-- Expandable rows: pass `isExpandable` to `NxScrollableTableContainer`, add expand-all/collapse-all toggle in `<Thead>` via `expand` prop, use `ExpandableRowContent` for nested detail, compact gray `Label` for list data
-- Footer/pagination: cursor-based via `NxScrollableTableContainer`'s `footer` prop (`TableFooterProps`)
+- Expandable rows: pass `isExpandable` to `SynScrollableTableContainer`, add expand-all/collapse-all toggle in `<Thead>` via `expand` prop, use `ExpandableRowContent` for nested detail, compact gray `Label` for list data
+- Footer/pagination: cursor-based via `SynScrollableTableContainer`'s `footer` prop (`TableFooterProps`)
   - Left: item count — `"5 workflows (of 100 total)"`
   - Right: Previous / Next buttons using API cursor tokens (`prev`, `next`) — no page numbers or per-page selector
   - Pass `{ content, prev, next, onPrev, onNext }` to the `footer` prop
@@ -304,8 +304,8 @@ Button alignment differs by context (follows PatternFly convention):
 ## Statuses and Labels
 
 - **Statuses:** PatternFly Outline Status Label component
-- **System labels:** Use `NxLabel` (filled, compact by default) — defaults to gray; use `color` for categories, `status` for statuses
-- **User-generated labels:** Use `NxUserTag` (outlined, compact) for any user-entered values (tags, filter chips)
+- **System labels:** Use `SynLabel` (filled, compact by default) — defaults to gray; use `color` for categories, `status` for statuses
+- **User-generated labels:** Use `SynUserTag` (outlined, compact) for any user-entered values (tags, filter chips)
 - If labels on a table reference a resource, make them clickable, navigating to the details page
 
 ## Icons
@@ -479,4 +479,4 @@ If a global style seems necessary, follow the PatternFly gaps process: check PF 
 
 - `npm run storybook` (port 5174). Preview in light + dark mode via toolbar before sign-off.
 - Stories reflect real app compositions, not isolated prop demos.
-- `Nx*` components with `autodocs`: `SynPage`, `SynPageHeader`, `SynPageBreadcrumbs`, `SynPanel`, `SynPanelContentStack`, `NxUrlTabs`, `NxConfirmationDialog`, `NxCodeBlock`, `NxDetail`, `NxDetailList`, `SynErrorState`, `SynLoadingState`, `SynEmptyStateNoData`, `SynEmptyStateFilter`, `SynEmptyStateServiceUnavailable`, `NxListPanel`, `NxKebabMenu`, `NxLabel`, `NxUserTag`, `NxScrollableTableContainer`.
+- `Nx*` components with `autodocs`: `SynPage`, `SynPageHeader`, `SynPageBreadcrumbs`, `SynPanel`, `SynPanelContentStack`, `NxUrlTabs`, `NxConfirmationDialog`, `NxCodeBlock`, `NxDetail`, `NxDetailList`, `SynErrorState`, `SynLoadingState`, `SynEmptyStateNoData`, `SynEmptyStateFilter`, `SynEmptyStateServiceUnavailable`, `NxListPanel`, `SynKebabMenu`, `SynLabel`, `SynUserTag`, `SynScrollableTableContainer`.

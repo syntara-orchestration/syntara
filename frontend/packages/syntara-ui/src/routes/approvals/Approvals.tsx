@@ -13,8 +13,8 @@ import { SynEmptyStateFilter } from '../../components/states/SynEmptyStateFilter
 import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 import { useQueryState } from '../../components/states/useQueryState'
 import { SynPageTitle } from '../../components/SynPageTitle'
-import { NxScrollableTableContainer } from '../../components/table/NxScrollableTableContainer'
 import type { PaginationFooterProps } from '../../components/table/PaginationFooter'
+import { SynScrollableTableContainer } from '../../components/table/SynScrollableTableContainer'
 import { permissionTooltip } from '../../hooks/permissionUtils'
 import { useCursorPagination, useCursorReset } from '../../hooks/useCursorPagination'
 import { useProjectSelector } from '../../hooks/useProjectSelector'
@@ -248,7 +248,7 @@ function ApprovalsTableContent({
   isLoadingPermissions,
 }: Readonly<ApprovalsTableContentProps>) {
   return (
-    <NxScrollableTableContainer caption="Approvals table" isExpandable footer={footerProps}>
+    <SynScrollableTableContainer caption="Approvals table" isExpandable footer={footerProps}>
       <ApprovalsTableHead
         getSortParams={getSortParams}
         allRowsExpanded={allRowsExpanded}
@@ -287,7 +287,7 @@ function ApprovalsTableContent({
           isLoadingPermissions={isLoadingPermissions}
         />
       )}
-    </NxScrollableTableContainer>
+    </SynScrollableTableContainer>
   )
 }
 

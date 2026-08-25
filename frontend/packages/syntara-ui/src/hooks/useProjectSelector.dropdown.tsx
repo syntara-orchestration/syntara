@@ -19,7 +19,7 @@ import { RhUiAddIcon, RhUiCloseIcon } from '@patternfly/react-icons'
 import { useRef } from 'react'
 import type { CSSProperties, Dispatch, MouseEvent, ReactNode, SetStateAction } from 'react'
 
-import { NxSelect } from '../components/NxSelect'
+import { SynSelect } from '../components/SynSelect'
 import type { ProjectRead } from '../routes/access/types'
 import { ProjectFormModal } from '../routes/access-management/ProjectFormModal'
 import { detachPromise } from '../utils/detachPromise'
@@ -223,7 +223,7 @@ export function ProjectSelectorDropdown(props: Readonly<ProjectSelectorDropdownP
 
   return (
     <>
-      <NxSelect
+      <SynSelect
         isOpen={isOpen}
         variant="typeahead"
         shouldFocusFirstItemOnOpen={false}
@@ -320,7 +320,7 @@ export function ProjectSelectorDropdown(props: Readonly<ProjectSelectorDropdownP
             <Content component={ContentVariants.small}>Type to refine results</Content>
           </MenuFooter>
         )}
-      </NxSelect>
+      </SynSelect>
 
       <ProjectFormModal
         isOpen={createDialogOpen}

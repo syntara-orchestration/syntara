@@ -21,7 +21,7 @@ import { useMemo, useState } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 
 import { FormFieldWarning } from '../../components/FormFieldError'
-import { NxSelect } from '../../components/NxSelect'
+import { SynSelect } from '../../components/SynSelect'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { useFormMutationErrorHandler } from '../../hooks/useFormMutationErrorHandler'
 import { useAlerts } from '../../providers/alerts'
@@ -72,7 +72,7 @@ type AssignRoleFormBodyProps = {
 function ScopeSelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const [isOpen, setIsOpen] = useState(false)
   return (
-    <NxSelect
+    <SynSelect
       id="scope"
       isOpen={isOpen}
       selected={value}
@@ -97,7 +97,7 @@ function ScopeSelect({ value, onChange }: { value: string; onChange: (value: str
         <SelectOption value="system">System</SelectOption>
         <SelectOption value="project">Project</SelectOption>
       </SelectList>
-    </NxSelect>
+    </SynSelect>
   )
 }
 
