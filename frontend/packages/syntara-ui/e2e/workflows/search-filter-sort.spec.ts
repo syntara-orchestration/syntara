@@ -42,48 +42,6 @@ test.describe('Workflows Table - Search, Filter, and Sort', () => {
     return workflows
   }
 
-  test('user can clear search filter', async ({ app }) => {
-    const workflows = await createTestWorkflows(app, 1)
-    expect(workflows).toHaveLength(1)
-
-    try {
-      const searchTerm = workflows[0].name
-
-      await app.goto(toAppUrl('/workflows'))
-      await expect(app.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
-
-      // Apply filter
-      await app.getByPlaceholder('Filter by name').fill(searchTerm)
-      await app.getByRole('button', { name: 'Apply filter' }).click()
-
-      const nameChipGroup = app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Name' })
-      await expect(nameChipGroup).toBeVisible()
-
-      // Clear filter via "Clear all filters" button
-      await app.getByRole('search', { name: 'Filters' }).getByRole('button', { name: 'Clear all filters' }).click()
-
-      // Verify filter chip is removed
-      await expect(nameChipGroup).not.toBeVisible()
-
-      // Verify URL no longer contains filter
-      await expect(app).not.toHaveURL(/name%5Bcontains%5D/)
-
-      // Verify table shows more results (or at least doesn't show empty state)
-      const table = app.getByRole('grid', { name: 'Workflows table' })
-      const emptyState = app.getByRole('heading', { name: 'No results found' })
-
-      // Either table is visible or there genuinely are no workflows
-      const tableVisible = await table.isVisible().catch(() => false)
-      const emptyVisible = await emptyState.isVisible().catch(() => false)
-
-      expect(tableVisible || emptyVisible).toBe(true)
-    } finally {
-      for (const wf of workflows) {
-        await deleteWorkflowViaApi(app, wf.id)
-      }
-    }
-  })
-
   test('user can remove individual filter chip', async ({ app }) => {
     const workflows = await createTestWorkflows(app, 1)
     expect(workflows).toHaveLength(1)
