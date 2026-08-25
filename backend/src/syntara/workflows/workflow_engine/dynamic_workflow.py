@@ -790,7 +790,9 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         # All explored paths lead to skipped/failed nodes → unreachable
         return True
 
-    def _mark_downstream_as_skipped(self, start_node_id: str, graph: WorkflowGraph) -> None:
+    def _mark_downstream_as_skipped(
+        self, start_node_id: str, graph: WorkflowGraph, boundary: set[str] | None = None
+    ) -> None:
         """Eagerly mark downstream nodes as skipped via BFS propagation.
 
         Starting from a skipped node, propagate the skipped status to all
@@ -800,9 +802,15 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         ``_check_converge_successors`` / ``_evaluate_converge_failure``
         based on the node's strategy (ALL/ANY).
 
+        When ``boundary`` is provided, only nodes within that set are eligible
+        for skipping.  This prevents converge cancellation from propagating to
+        nodes that branch off a cancelled predecessor but are not part of the
+        converge's parallel section.
+
         Args:
             start_node_id: Node that was just marked as skipped
             graph: Workflow graph
+            boundary: Optional set of node IDs to restrict propagation to
 
         """
         queue = collections.deque([start_node_id])
@@ -825,6 +833,9 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 # let _check_converge_successors handle them.
                 succ_node = graph.get_node(succ_id)
                 if succ_node.type == NodeType.CONVERGE:
+                    continue
+
+                if boundary is not None and succ_id not in boundary:
                     continue
 
                 # Check if ALL predecessors of this successor are skipped or failed
