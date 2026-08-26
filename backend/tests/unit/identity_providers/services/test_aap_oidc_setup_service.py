@@ -146,6 +146,28 @@ class TestSetupHappyPath:
 
     @pytest.mark.asyncio
     @respx.mock
+    async def test_rp_initiated_logout_disabled_to_prevent_token_wipe(self) -> None:
+        """Regression: AAP push-button setup must NOT enable RP-initiated logout.
+
+        The setup registers a single shared OAuth2 application on AAP that every
+        user logs in through. When RP-initiated logout is enabled, logging out of
+        AO redirects to AAP's OIDC end-session endpoint and AAP deletes every API
+        token tied to that shared application -- across all users, not just the
+        one logging out. The setup must leave RP-initiated logout disabled so a
+        logout can never wipe other users' AAP API tokens.
+        """
+        respx.get(f"{_AAP_API}/organizations/").mock(return_value=httpx.Response(200, json=_org_response()))
+        respx.post(f"{_AAP_API}/applications/").mock(return_value=httpx.Response(201, json=_app_response()))
+
+        idp_service = _mock_idp_service()
+        service = _make_service(idp_service=idp_service)
+        await service.setup(_make_request())
+
+        config = idp_service.create_provider.call_args[0][0].configuration
+        assert config.enable_rp_initiated_logout is False
+
+    @pytest.mark.asyncio
+    @respx.mock
     async def test_constructs_redirect_uri_from_settings(self) -> None:
         respx.get(f"{_AAP_API}/organizations/").mock(return_value=httpx.Response(200, json=_org_response()))
         respx.post(f"{_AAP_API}/applications/").mock(return_value=httpx.Response(201, json=_app_response()))
