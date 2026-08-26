@@ -93,7 +93,7 @@ const mockWorkflow: WorkflowWithVersion = {
   is_enabled: true,
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',
-  created_by: 'user-1',
+  created_by: { id: 'user-1', name: 'user-1' },
   is_builtin: false,
   current_version: 1,
   version: {
