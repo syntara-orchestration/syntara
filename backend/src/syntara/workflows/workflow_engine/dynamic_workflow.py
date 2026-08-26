@@ -276,7 +276,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         while pending_tasks or self._timed_out_converge_nodes or self._detached_pending_tasks:
             # Cancel pending tasks for nodes that were skipped (by timeout or "any" converge)
             self._cancel_skipped_pending_tasks(pending_tasks)
-            self._remove_detached_tasks(pending_tasks)
+            self._remove_detached_tasks(pending_tasks, graph)
 
             # Schedule successors of converge nodes that failed with continue_on_failure
             for node_id in list(self._timed_out_converge_nodes):
@@ -540,17 +540,24 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             if pred_id in pending_tasks and not self.resolver.has_namespace(pred_id):
                 self._detached_nodes.add(pred_id)
 
-    def _remove_detached_tasks(self, pending_tasks: dict[str, asyncio.Task[Any]]) -> None:
+    def _remove_detached_tasks(self, pending_tasks: dict[str, asyncio.Task[Any]], graph: WorkflowGraph) -> None:
         """Move detached in-flight tasks to _detached_pending_tasks.
 
         When a converge node fires (ANY) or fails, in-flight predecessors are
-        detached from the main scheduling loop.  They keep running in Temporal
-        and are awaited separately so their off-section successors can still run.
+        detached from the main scheduling loop.  Non-blocking nodes are tracked
+        in _detached_pending_tasks so their off-section successors can still run.
+        Approval nodes are cancelled immediately — they require human input and
+        are cleaned up by _expire_remaining_approvals after the loop.
         """
         detached = [nid for nid in pending_tasks if nid in self._detached_nodes]
         for nid in detached:
-            self._detached_pending_tasks[nid] = pending_tasks.pop(nid)
-            workflow.logger.info(f"Detached in-flight node {nid} (awaiting off-section successors)")
+            task = pending_tasks.pop(nid)
+            if graph.get_node(nid).type == NodeType.APPROVAL:
+                task.cancel()
+                workflow.logger.info(f"Cancelled detached approval node {nid} (converge fired)")
+            else:
+                self._detached_pending_tasks[nid] = task
+                workflow.logger.info(f"Detached in-flight node {nid} (awaiting off-section successors)")
 
     def _cleanup_timeout_tasks(self) -> None:
         """Cancel any remaining converge timeout background tasks."""
