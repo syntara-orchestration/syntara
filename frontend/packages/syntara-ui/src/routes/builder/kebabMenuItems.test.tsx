@@ -92,16 +92,23 @@ describe('KebabMenuViewsGroup', () => {
 
 describe('DuplicateMenuItem', () => {
   it('renders duplicate menu item when enabled', () => {
-    render(<DuplicateMenuItem canEdit editTooltip="No permission" handleDuplicate={vi.fn()} closeKebab={vi.fn()} />)
+    render(
+      <DuplicateMenuItem canDuplicate duplicateTooltip="No permission" handleDuplicate={vi.fn()} closeKebab={vi.fn()} />
+    )
 
     const item = screen.getByRole('menuitem', { name: /Duplicate workflow/i })
     expect(item).toBeInTheDocument()
     expect(item).not.toHaveAttribute('aria-disabled', 'true')
   })
 
-  it('disables duplicate when canEdit is false', () => {
+  it('disables duplicate when canDuplicate is false', () => {
     render(
-      <DuplicateMenuItem canEdit={false} editTooltip="No permission" handleDuplicate={vi.fn()} closeKebab={vi.fn()} />
+      <DuplicateMenuItem
+        canDuplicate={false}
+        duplicateTooltip="No permission"
+        handleDuplicate={vi.fn()}
+        closeKebab={vi.fn()}
+      />
     )
 
     expect(screen.getByRole('menuitem', { name: /Duplicate workflow/i })).toHaveAttribute('aria-disabled', 'true')
@@ -114,8 +121,8 @@ describe('DuplicateMenuItem', () => {
 
     render(
       <DuplicateMenuItem
-        canEdit
-        editTooltip="No permission"
+        canDuplicate
+        duplicateTooltip="No permission"
         handleDuplicate={handleDuplicate}
         closeKebab={closeKebab}
       />
@@ -134,8 +141,8 @@ describe('DuplicateMenuItem', () => {
 
     render(
       <DuplicateMenuItem
-        canEdit={false}
-        editTooltip="No permission"
+        canDuplicate={false}
+        duplicateTooltip="No permission"
         handleDuplicate={handleDuplicate}
         closeKebab={closeKebab}
       />
@@ -152,8 +159,8 @@ describe('DuplicateMenuItem', () => {
 
     render(
       <DuplicateMenuItem
-        canEdit={false}
-        editTooltip="No edit permission"
+        canDuplicate={false}
+        duplicateTooltip="No create permission"
         handleDuplicate={vi.fn()}
         closeKebab={vi.fn()}
       />
@@ -161,13 +168,18 @@ describe('DuplicateMenuItem', () => {
 
     await user.hover(screen.getByRole('menuitem', { name: /Duplicate workflow/i }))
 
-    expect(await screen.findByText('No edit permission')).toBeInTheDocument()
+    expect(await screen.findByText('No create permission')).toBeInTheDocument()
   })
 
   it('has no accessibility violations', async () => {
     const { container } = render(
       <div role="menu">
-        <DuplicateMenuItem canEdit editTooltip="No permission" handleDuplicate={vi.fn()} closeKebab={vi.fn()} />
+        <DuplicateMenuItem
+          canDuplicate
+          duplicateTooltip="No permission"
+          handleDuplicate={vi.fn()}
+          closeKebab={vi.fn()}
+        />
       </div>
     )
 
@@ -299,6 +311,7 @@ describe('KebabMenuActionsGroup', () => {
     showExistingWorkflowItems: false,
     publishedVersionId: null as string | null,
     canEdit: true,
+    canCreate: true,
     canDelete: true,
     tooltips: {
       edit: 'No edit',
@@ -307,6 +320,7 @@ describe('KebabMenuActionsGroup', () => {
       unpublish: 'No unpublish',
       run: 'No run',
       delete: 'No delete',
+      create: 'No create',
     },
     handleVerify: vi.fn(),
     handleDuplicate: vi.fn(),
@@ -386,7 +400,7 @@ describe('KebabMenuActionsGroup', () => {
     expect(await axe(container)).toHaveNoViolations()
   })
 
-  it('does not call handlers when canEdit is false for duplicate', async () => {
+  it('does not call handlers when canCreate is false for duplicate', async () => {
     const user = userEvent.setup()
     const handleDuplicate = vi.fn()
 
@@ -394,7 +408,7 @@ describe('KebabMenuActionsGroup', () => {
       <KebabMenuActionsGroup
         {...defaultProps}
         showExistingWorkflowItems
-        canEdit={false}
+        canCreate={false}
         handleDuplicate={handleDuplicate}
       />
     )
@@ -452,7 +466,14 @@ describe('KebabMenuActionsGroup', () => {
 
   it('renders all items when showExistingWorkflowItems and publishedVersionId are set', () => {
     render(
-      <KebabMenuActionsGroup {...defaultProps} showExistingWorkflowItems publishedVersionId="ver-1" canEdit canDelete />
+      <KebabMenuActionsGroup
+        {...defaultProps}
+        showExistingWorkflowItems
+        publishedVersionId="ver-1"
+        canEdit
+        canCreate
+        canDelete
+      />
     )
 
     expect(screen.getByRole('menuitem', { name: /Verify workflow/i })).toBeInTheDocument()
@@ -483,6 +504,7 @@ describe('KebabMenuActionsGroup', () => {
       unpublish: 'Cannot unpublish',
       run: 'Cannot run',
       delete: 'Cannot delete',
+      create: 'Cannot create',
     }
 
     render(
@@ -491,6 +513,7 @@ describe('KebabMenuActionsGroup', () => {
         showExistingWorkflowItems
         publishedVersionId="ver-1"
         canEdit={false}
+        canCreate={false}
         canDelete={false}
         tooltips={tooltips}
       />
@@ -499,7 +522,7 @@ describe('KebabMenuActionsGroup', () => {
     // Hover over duplicate to show tooltip
     const duplicateItem = screen.getByRole('menuitem', { name: /Duplicate workflow/i })
     await user.hover(duplicateItem)
-    expect(await screen.findByText('Cannot edit')).toBeInTheDocument()
+    expect(await screen.findByText('Cannot create')).toBeInTheDocument()
 
     // Hover over import to show tooltip
     const importItem = screen.getByRole('menuitem', { name: /Import workflow/i })

@@ -60,10 +60,11 @@ describe('BuilderEditorToolbar', () => {
     onPendingImport: vi.fn(),
     builderPermissions: {
       canEdit: true,
+      canCreate: true,
       canRun: true,
       canDelete: true,
       isLoading: false,
-      tooltips: { edit: '', save: '', publish: '', unpublish: '', run: '', delete: '' },
+      tooltips: { edit: '', save: '', publish: '', unpublish: '', run: '', delete: '', create: '' },
     },
   }
 
@@ -727,19 +728,19 @@ describe('BuilderEditorToolbar', () => {
       expect(dispatch).toHaveBeenCalledWith({ type: 'SET_KEBAB_OPEN', payload: false })
     })
 
-    it('disables Duplicate when canEdit is false', () => {
+    it('disables Duplicate when canCreate is false', () => {
       render(
         <BuilderEditorToolbar
           {...defaultProps}
           isKebabOpen
-          builderPermissions={{ ...defaultProps.builderPermissions, canEdit: false }}
+          builderPermissions={{ ...defaultProps.builderPermissions, canCreate: false }}
         />
       )
 
       expect(screen.getByRole('menuitem', { name: /Duplicate workflow/i })).toHaveAttribute('aria-disabled', 'true')
     })
 
-    it('does not fire onDuplicate when canEdit is false', async () => {
+    it('does not fire onDuplicate when canCreate is false', async () => {
       const user = userEvent.setup()
       const onDuplicate = vi.fn()
 
@@ -748,7 +749,7 @@ describe('BuilderEditorToolbar', () => {
           {...defaultProps}
           isKebabOpen
           onDuplicate={onDuplicate}
-          builderPermissions={{ ...defaultProps.builderPermissions, canEdit: false }}
+          builderPermissions={{ ...defaultProps.builderPermissions, canCreate: false }}
         />
       )
 
@@ -757,7 +758,7 @@ describe('BuilderEditorToolbar', () => {
       expect(onDuplicate).not.toHaveBeenCalled()
     })
 
-    it('shows permission tooltip when canEdit is false', async () => {
+    it('shows permission tooltip when canCreate is false', async () => {
       const user = userEvent.setup()
 
       render(
@@ -766,15 +767,15 @@ describe('BuilderEditorToolbar', () => {
           isKebabOpen
           builderPermissions={{
             ...defaultProps.builderPermissions,
-            canEdit: false,
-            tooltips: { ...defaultProps.builderPermissions.tooltips, edit: 'No edit permission' },
+            canCreate: false,
+            tooltips: { ...defaultProps.builderPermissions.tooltips, create: 'No create permission' },
           }}
         />
       )
 
       await user.hover(screen.getByRole('menuitem', { name: /Duplicate workflow/i }))
 
-      expect(await screen.findByText('No edit permission')).toBeInTheDocument()
+      expect(await screen.findByText('No create permission')).toBeInTheDocument()
     })
   })
 

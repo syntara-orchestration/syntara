@@ -100,6 +100,7 @@ function WorkflowKebabMenu({
             showExistingWorkflowItems={showExistingWorkflowItems}
             publishedVersionId={publishedVersionId}
             canEdit={builderPermissions.canEdit}
+            canCreate={builderPermissions.canCreate}
             canDelete={builderPermissions.canDelete}
             tooltips={builderPermissions.tooltips}
             handleVerify={handleVerify}

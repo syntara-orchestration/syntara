@@ -54,10 +54,11 @@ vi.mock('../../app/useUnsavedChanges', () => ({
 
 const mockBuilderPermissions = vi.hoisted(() => ({
   canEdit: true,
+  canCreate: true,
   canRun: true,
   canDelete: true,
   isLoading: false,
-  tooltips: { edit: '', save: '', publish: '', unpublish: '', run: '', delete: '' },
+  tooltips: { edit: '', save: '', publish: '', unpublish: '', run: '', delete: '', create: '' },
 }))
 
 vi.mock('./useBuilderPermissions', () => ({
@@ -109,7 +110,7 @@ const mockWorkflow: WorkflowWithVersion = {
           id: 'activity-1',
           type: 'http_request',
           position: { x: 0, y: 0 },
-          config: { url: 'https://example.com' },
+          parameters: { url: 'https://example.com' },
         },
       ],
       edges: [],

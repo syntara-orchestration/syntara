@@ -77,19 +77,24 @@ export function KebabMenuViewsGroup({
 }
 
 export type DuplicateMenuItemProps = Readonly<{
-  canEdit: boolean
-  editTooltip: string
+  canDuplicate: boolean
+  duplicateTooltip: string
   handleDuplicate: () => void
   closeKebab: () => void
 }>
 
-export function DuplicateMenuItem({ canEdit, editTooltip, handleDuplicate, closeKebab }: DuplicateMenuItemProps) {
+export function DuplicateMenuItem({
+  canDuplicate,
+  duplicateTooltip,
+  handleDuplicate,
+  closeKebab,
+}: DuplicateMenuItemProps) {
   return (
     <DropdownItem
-      isAriaDisabled={!canEdit}
-      tooltipProps={canEdit ? undefined : { content: editTooltip }}
+      isAriaDisabled={!canDuplicate}
+      tooltipProps={canDuplicate ? undefined : { content: duplicateTooltip }}
       onClick={
-        canEdit
+        canDuplicate
           ? () => {
               handleDuplicate()
               closeKebab()
@@ -197,6 +202,7 @@ export type KebabMenuActionsGroupProps = Readonly<{
   showExistingWorkflowItems: boolean
   publishedVersionId: string | null
   canEdit: boolean
+  canCreate: boolean
   canDelete: boolean
   tooltips: BuilderPermissions['tooltips']
   handleVerify: (onValid?: () => void) => void
@@ -212,6 +218,7 @@ export function KebabMenuActionsGroup({
   showExistingWorkflowItems,
   publishedVersionId,
   canEdit,
+  canCreate,
   canDelete,
   tooltips,
   handleVerify,
@@ -233,8 +240,8 @@ export function KebabMenuActionsGroup({
         </DropdownItem>
         {showExistingWorkflowItems && (
           <DuplicateMenuItem
-            canEdit={canEdit}
-            editTooltip={tooltips.edit}
+            canDuplicate={canCreate}
+            duplicateTooltip={tooltips.create}
             handleDuplicate={handleDuplicate}
             closeKebab={closeKebab}
           />

@@ -58,7 +58,7 @@ import { SaveBeforeViewDialog } from './SaveBeforeViewDialog'
 import type { BuilderContentProps } from './types/builderContent'
 import { useBuilderPermissions } from './useBuilderPermissions'
 import { createAddStepHandler } from './utils/panelActions'
-import { buildWorkflowDefinition, transformApprovalApprovers } from './utils/workflowDefinitionBuilder'
+import { buildWorkflowDefinition, transformNodeParameters } from './utils/workflowDefinitionBuilder'
 import { ValidationBanner } from './ValidationBanner'
 import { VersionInfoCard } from './VersionInfoCard'
 import { VersionViewProvider } from './VersionViewContext'
@@ -374,8 +374,9 @@ export function BuilderContent(props: BuilderContentProps) {
       const transformedDefinition = {
         ...definition,
         nodes: nodes?.map((node) => {
-          if (node.type === 'approval' && node.config) {
-            return { ...node, config: transformApprovalApprovers(node.config as Record<string, unknown>) }
+          const parameters = node.parameters as Record<string, unknown> | undefined
+          if (parameters && typeof node.type === 'string') {
+            return { ...node, parameters: transformNodeParameters(node.type, parameters) }
           }
           return node
         }),
