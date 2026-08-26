@@ -46,8 +46,8 @@ async function goToSystem(app: Page) {
   await app.goto(toAppUrl('/system-administration/settings'))
   const sysTab = app.getByRole('tab', { name: 'System', exact: true })
   await sysTab.click()
-  // Wait for any form section to load (the specific fields depend on backend config)
-  await expect(app.locator('.pf-v6-c-form__group').nth(0)).toBeVisible({ timeout: 10_000 })
+  // Wait for the System tab panel to load
+  await expect(app.getByRole('tabpanel', { name: 'System' })).toBeVisible({ timeout: 10_000 })
 }
 
 /** Reset a single setting via its kebab menu then save. No-op if already at default. */
@@ -602,7 +602,8 @@ test.describe('Settings', () => {
       await expect(saveButton).toBeEnabled()
       await saveButton.click()
       await expect(saveButton).toBeDisabled({ timeout: 5000 })
-      await app.waitForLoadState('networkidle')
+      // Wait for save to complete (button re-enables)
+      await expect(saveButton).toBeEnabled({ timeout: 10_000 })
 
       // Reload and verify value persisted
       await app.goto(toAppUrl('/system-administration/settings'))
