@@ -743,7 +743,7 @@ test.describe('Permission gating — Credential actions', () => {
   })
 
   // Dual-browser auditor session + kebab aria-disabled is flaky under Konflux load.
-  // Still runs in GitHub compose E2E. Currents quarantines are not applied in Konflux.
+  // Still runs in GitHub compose E2E.
   test('auditor: credential row actions are aria-disabled', { tag: ['@konflux-skip'] }, async ({ app, auditorApp }) => {
     const credential = await createTestCredential(app)
 
