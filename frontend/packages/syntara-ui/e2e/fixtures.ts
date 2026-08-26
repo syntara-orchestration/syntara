@@ -1,4 +1,3 @@
-import { type CurrentsFixtures, type CurrentsWorkerFixtures, fixtures } from '@currents/playwright'
 import { expect, test as base, type Page, type Request } from '@playwright/test'
 
 import { APP_TITLE } from './helpers/appTitle'
@@ -60,16 +59,7 @@ async function loginAsRole(page: Page, username: string): Promise<void> {
   await page.getByRole('navigation', { name: 'Main navigation' }).waitFor({ timeout: 15_000 })
 }
 
-// Currents action fixtures (flaky test quarantine) must be applied to the base
-// before our project fixtures extend it. Tests run inside a Podman container in CI,
-// so there is no host-side pre-step that can inject a quarantine list — the fixture
-// mechanism is the only approach that works within the container's Playwright process.
-const currentsBase = base.extend<CurrentsFixtures, CurrentsWorkerFixtures>({
-  ...fixtures.baseFixtures,
-  ...fixtures.actionFixtures,
-})
-
-const xfailBase = currentsBase.extend<{ _xfailCheck: void }, { _xfailEntries: XfailEntry[] }>({
+const xfailBase = base.extend<{ _xfailCheck: void }, { _xfailEntries: XfailEntry[] }>({
   _xfailEntries: [
     async ({}, use) => {
       const base = processEnv['SYNTARA_XFAIL_SOURCE']
