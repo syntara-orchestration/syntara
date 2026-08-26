@@ -790,6 +790,12 @@ class IntegrationService(BaseService):
             integration_id=str(integration_id),
             error_type=type(exc).__name__,
         )
+        # The triggering exception may have left the session in a failed
+        # transaction (e.g. an IntegrityError raised by flush). Roll back before
+        # issuing new statements, otherwise the SELECT in _get_or_raise raises
+        # PendingRollbackError and the ERROR state is never persisted, leaving
+        # the integration wedged in refresh_status=REFRESHING with a null error.
+        await self.session.rollback()
         integration = await self._get_or_raise(integration_id, for_update=True)
         integration.refresh_status = IntegrationRefreshStatus.ERROR
         integration.refresh_error = f"Unexpected error during refresh: {type(exc).__name__}"
@@ -866,6 +872,7 @@ class IntegrationService(BaseService):
                 integration_id=str(integration_id),
                 error_type=type(exc).__name__,
             )
+            await self.session.rollback()
             integration = await self._get_or_raise(integration_id, for_update=True)
             integration.validation_status = IntegrationStatus.ERROR
             integration.validation_error = f"Unexpected error during validation: {type(exc).__name__}"
@@ -1112,6 +1119,17 @@ class IntegrationService(BaseService):
         pending_params: list[tuple[Tool, list[ToolParameter]]] = []
 
         for tool_meta in discovered_tools:
+            if tool_meta.name in found_names:
+                # A malformed server can advertise the same tool name twice.
+                # Deduping (first occurrence wins) keeps the refresh working;
+                # without this, two rows share a namespaced_name and the flush
+                # below raises a UniqueViolationError on uq_tools_namespaced_name.
+                logger.warning(
+                    "Skipping duplicate tool name in discovery result",
+                    integration_id=str(integration.id),
+                    tool_name=tool_meta.name,
+                )
+                continue
             found_names.add(tool_meta.name)
             namespaced = f"{integration.name}::{tool_meta.name}"
             logger.debug(

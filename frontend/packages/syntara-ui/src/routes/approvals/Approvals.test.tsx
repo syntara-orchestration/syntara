@@ -115,7 +115,7 @@ vi.mock('../../hooks/routing/useSearchParams', () => ({
   useSearchParams: () => [mockSearchParams, mockSetSearchParams],
 }))
 
-// NxLink (used by LinkCell in ApprovalsTableBody) renders @tanstack/react-router's Link,
+// SynLink (used by LinkCell in ApprovalsTableBody) renders @tanstack/react-router's Link,
 // which requires a router context. Stub it to a plain <a> so tests don't need a provider.
 vi.mock('@tanstack/react-router', async () => {
   const actual = await vi.importActual('@tanstack/react-router')

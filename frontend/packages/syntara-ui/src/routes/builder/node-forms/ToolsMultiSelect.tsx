@@ -12,7 +12,7 @@ import {
 import { RhUiCloseIcon } from '@patternfly/react-icons'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { NxSelect } from '../../../components/NxSelect'
+import { SynSelect } from '../../../components/SynSelect'
 
 import styles from './ToolsMultiSelect.module.css'
 
@@ -268,7 +268,7 @@ export function ToolsMultiSelect({
   const isFiltering = filterText.trim().length > 0
 
   return (
-    <NxSelect
+    <SynSelect
       id="agent-tools"
       isOpen={isOpen}
       onSelect={handleSelect}
@@ -323,6 +323,6 @@ export function ToolsMultiSelect({
           )
         })}
       </SelectList>
-    </NxSelect>
+    </SynSelect>
   )
 }

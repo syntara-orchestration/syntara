@@ -29,7 +29,7 @@ function isInsideSelectUi(target: EventTarget | null, anchor: HTMLElement | null
  *
  * Attach the returned ref to a wrapper around the Select (the menu is portaled
  * to `document.body`, so ancestors of this wrapper are the scroll parents that
- * matter for dismiss-on-outer-scroll). Prefer `NxSelect`, which wires this for you.
+ * matter for dismiss-on-outer-scroll). Prefer `SynSelect`, which wires this for you.
  */
 export function useCloseSelectOnOuterScroll(isOpen: boolean, onClose: () => void): RefObject<HTMLDivElement | null> {
   const anchorRef = useRef<HTMLDivElement | null>(null)

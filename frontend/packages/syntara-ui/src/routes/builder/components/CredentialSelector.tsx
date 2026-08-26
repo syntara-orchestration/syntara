@@ -19,7 +19,7 @@ import React, { type ReactElement, useCallback, useMemo, useState } from 'react'
 import { credentialsClient } from '../../../client'
 import { LONG_SELECT_MAX_MENU_HEIGHT, longSelectMenuPopperProps } from '../../../components/longSelectMenu'
 import longSelectMenuStyles from '../../../components/longSelectMenu.module.css'
-import { NxSelect } from '../../../components/NxSelect'
+import { SynSelect } from '../../../components/SynSelect'
 import { detachPromise } from '../../../utils/detachPromise'
 import type { Credential, CredentialType } from '../../configuration/credentials/credentialConstants'
 import { CredentialFormModal } from '../../configuration/credentials/form/CredentialFormModal'
@@ -84,7 +84,7 @@ function buildTypeGroups(credentials: Credential[], credentialTypes: CredentialT
   }
   const typeMap = new Map<string, CredentialType>()
   for (const ct of credentialTypes) {
-    typeMap.set(ct.id!, ct)
+    if (ct.id) typeMap.set(ct.id, ct)
   }
   const groupMap = new Map<string, TypeGroup>()
   for (const cred of credentials) {
@@ -93,6 +93,7 @@ function buildTypeGroups(credentials: Credential[], credentialTypes: CredentialT
       const ct = typeMap.get(typeId)
       groupMap.set(typeId, { typeId, typeName: ct?.name ?? 'Unknown', credentials: [] })
     }
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- safe: key was just set via groupMap.set(typeId, ...) above
     groupMap.get(typeId)!.credentials.push(cred)
   }
   return Array.from(groupMap.values())
@@ -327,7 +328,7 @@ export function CredentialSelector({
 
   return (
     <FormGroup label={label} labelHelp={resolvedLabelHelp} fieldId={fieldId} isRequired={isRequired}>
-      <NxSelect
+      <SynSelect
         id={fieldId}
         isOpen={isOpen}
         selected={value ?? NO_CREDENTIAL_VALUE}
@@ -362,7 +363,7 @@ export function CredentialSelector({
             </SelectOption>
           )}
         </SelectList>
-      </NxSelect>
+      </SynSelect>
 
       <FieldError message={errorMessage} />
       <ReadOnlyCredentialWarning show={isReadOnlyCredential} />

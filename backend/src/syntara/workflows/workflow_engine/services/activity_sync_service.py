@@ -934,6 +934,7 @@ class ActivitySyncService:
             if failed_node_map is None:
                 failed_node_map = self._extract_failed_activities_from_event(event)
             await self._sync_skipped_nodes(metadata, handle)
+            await self._sync_detached_nodes(metadata, handle)
             await self._update_execution_status_from_event(metadata, event, failed_node_map)
             metadata.last_processed_event_id = event.event_id
             return True
@@ -1794,6 +1795,11 @@ class ActivitySyncService:
         elif event_type == EventType.EVENT_TYPE_ACTIVITY_TASK_CANCELED:
             self._process_activity_canceled(event, metadata)
 
+    @staticmethod
+    def _merge_output(initial: dict[str, Any] | None, queried: dict[str, Any]) -> dict[str, Any]:
+        """Merge heartbeat partial output with workflow-queried output."""
+        return {**initial, **queried} if initial else queried
+
     async def _query_activity_io(
         self,
         handle: WorkflowHandle[Any, Any],
@@ -1824,7 +1830,7 @@ class ActivitySyncService:
             input_data = await handle.query("get_activity_input", activity_id) or {}
             queried_output = await handle.query("get_activity_output", activity_id)
             if queried_output is not None:
-                output_data = queried_output
+                output_data = self._merge_output(initial_output_data, queried_output)
 
             # Race condition mitigation: If activity is completed but output is None,
             # retry the query. This handles the case where Temporal emits the
@@ -1846,7 +1852,7 @@ class ActivitySyncService:
                     await asyncio.sleep(delay_ms / 1000.0)
                     queried_output = await handle.query("get_activity_output", activity_id)
                     if queried_output is not None:
-                        output_data = queried_output
+                        output_data = self._merge_output(initial_output_data, queried_output)
                         logger.debug(
                             "Successfully retrieved output on retry",
                             activity_id=activity_id,
@@ -2472,6 +2478,45 @@ class ActivitySyncService:
         except Exception:
             logger.exception(
                 "Error syncing skipped nodes to database",
+                execution_id=metadata.execution_id,
+            )
+
+    async def _sync_detached_nodes(
+        self,
+        metadata: ExecutionMonitorMetadata,
+        handle: WorkflowHandle[Any, Any],
+    ) -> None:
+        """Query workflow for detached nodes and mark them as CANCELLED in the database.
+
+        Detached nodes were in-flight when a converge ANY strategy fired.  They are
+        not in skipped_nodes (the workflow deliberately excludes them so their actual
+        Temporal result is preserved when possible), but if the workflow finishes
+        before the detached activity completes, the safety net would otherwise label
+        them SKIPPED.  Querying here and writing CANCELLED first wins the race against
+        _finalize_non_terminal_activities, whose terminal-status guard then leaves the
+        record untouched.
+        """
+        detached_node_ids: list[str] = []
+        try:
+            detached_node_ids = await handle.query("get_detached_nodes")
+        except Exception:
+            logger.exception(
+                "Error querying detached nodes",
+                execution_id=metadata.execution_id,
+            )
+
+        if not detached_node_ids:
+            return
+
+        try:
+            await self._sync_nodes_to_terminal_status(
+                metadata,
+                node_ids=detached_node_ids,
+                target_status=ActivityStatus.CANCELLED,
+            )
+        except Exception:
+            logger.exception(
+                "Error syncing detached nodes to cancelled status",
                 execution_id=metadata.execution_id,
             )
 

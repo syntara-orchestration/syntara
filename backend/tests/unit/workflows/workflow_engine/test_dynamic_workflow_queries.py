@@ -102,6 +102,35 @@ class TestGetSkippedNodesQuery:
         assert isinstance(wf.get_skipped_nodes(), list)
 
 
+class TestGetDetachedNodesQuery:
+    """Test the get_detached_nodes query method.
+
+    Detached nodes are branch nodes that were in-flight when a converge ANY
+    strategy fired.  They should be reported as CANCELLED, not SKIPPED.
+    """
+
+    def test_returns_empty_list_when_no_detached(self) -> None:
+        wf = _make_workflow()
+        assert wf.get_detached_nodes() == []
+
+    def test_returns_all_detached_node_ids(self) -> None:
+        wf = _make_workflow()
+        wf._detached_nodes = {"node_b", "node_c"}
+        assert sorted(wf.get_detached_nodes()) == ["node_b", "node_c"]
+
+    def test_returns_list_not_set(self) -> None:
+        wf = _make_workflow()
+        wf._detached_nodes = {"node_b"}
+        assert isinstance(wf.get_detached_nodes(), list)
+
+    def test_does_not_include_skipped_nodes(self) -> None:
+        """Detached and skipped nodes are disjoint — different mechanisms."""
+        wf = _make_workflow(skipped_nodes={"node_a"})
+        wf._detached_nodes = {"node_b"}
+        assert wf.get_detached_nodes() == ["node_b"]
+        assert wf.get_skipped_nodes() == ["node_a"]
+
+
 # ---------------------------------------------------------------------------
 # Tests: get_activity_input query
 # ---------------------------------------------------------------------------

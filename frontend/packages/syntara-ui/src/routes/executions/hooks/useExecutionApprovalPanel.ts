@@ -7,7 +7,7 @@ import {
   findApprovalForCanvasNode,
   findNodeByApprovalNodeId,
 } from '../../approvals/approvalNodeId'
-import { getApprovalPromptFromNode } from '../../approvals/approvalPrompt'
+import { getApprovalPromptFromNode, getApprovalPromptFromRecord } from '../../approvals/approvalPrompt'
 import { ACTIVITY_STATUS, isTerminalState } from '../../builder/utils/executionState/executionHelpers'
 import { latestActivityStateForCanvasNode } from '../../workflows/execution/utils/activityState'
 import { useExecutionStore } from '../../workflows/stores/useExecutionStore'
@@ -30,7 +30,8 @@ export type WorkflowDefinitionLike = {
  * - Panel open/close state
  * - URL-based deep linking (`?approval=abc-123`)
  * - WebSocket-based auto-detection of new approvals
- * - Extracting approval message/prompt from workflow definition
+ * - Extracting approval message/prompt from the approval record, with a
+ *   workflow-definition fallback for older rows that have no persisted prompt
  *
  * Part of the approval hooks architecture. See `useExecutionNodeClick.ts` for the full layering explanation.
  */
@@ -178,7 +179,10 @@ export function useExecutionApprovalPanel(
   }, [panelOpen, currentApproval, dismiss])
 
   const approvalMessage = useMemo(() => {
-    if (!currentApproval || !workflowDefinition) return undefined
+    if (!currentApproval) return undefined
+    const fromRecord = getApprovalPromptFromRecord(currentApproval)
+    if (fromRecord) return fromRecord
+    if (!workflowDefinition) return undefined
     const nodes = workflowDefinition.nodes ?? workflowDefinition.workflow?.activities ?? []
     const node = findNodeByApprovalNodeId(nodes, currentApproval.approval_node_id)
     return getApprovalPromptFromNode(node)

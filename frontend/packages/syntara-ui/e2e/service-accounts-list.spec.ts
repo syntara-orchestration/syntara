@@ -8,7 +8,7 @@
  * - UI-4: Create form validation errors
  * - UI-13: Zero-role creation allowed
  */
-import { test, expect, toAppUrl } from './fixtures'
+import { type Page, test, expect, toAppUrl } from './fixtures'
 import {
   createTestServiceAccount,
   deleteServiceAccountViaApi,
@@ -37,7 +37,7 @@ const MOCK_PROJECTS_RESPONSE = {
   next_cursor: null,
 }
 
-async function interceptCreateServiceAccountFlow(app: import('@playwright/test').Page, saName: string) {
+async function interceptCreateServiceAccountFlow(app: Page, saName: string) {
   await app.route(
     (url) => url.pathname === '/api/v1/projects',
     async (route) => {
@@ -255,8 +255,9 @@ test.describe('UI-3: Create Service Account — Form and One-Time Secret Modal',
     // Verify credential fields are present and contain non-empty values
     const credentialInputs = modal.getByRole('textbox')
     await expect(credentialInputs).toHaveCount(2)
-    expect((await credentialInputs.nth(0).inputValue()).length).toBeGreaterThan(0)
-    expect((await credentialInputs.nth(1).inputValue()).length).toBeGreaterThan(0)
+    const [firstCredential, secondCredential] = await credentialInputs.all()
+    expect((await firstCredential.inputValue()).length).toBeGreaterThan(0)
+    expect((await secondCredential.inputValue()).length).toBeGreaterThan(0)
 
     // Verify buttons are disabled until acknowledgement — scope to <footer> to avoid matching modal X button
     const footer = modal.locator('footer')

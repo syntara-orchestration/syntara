@@ -5,7 +5,7 @@
  * viewports so it does not clip the screen edge. Pair with `longSelectMenuPopperProps`
  * and `longSelectMenu.module.css` so overflow stays on the menu (no page scroll chaining).
  *
- * Prefer `NxSelect` for app selects; it closes on outer scroll automatically.
+ * Prefer `SynSelect` for app selects; it closes on outer scroll automatically.
  */
 export const LONG_SELECT_MAX_MENU_HEIGHT = 'min(40vh, 25rem)'
 

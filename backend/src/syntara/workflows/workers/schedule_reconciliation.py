@@ -2,14 +2,15 @@
 
 Runs a diff-based reconciliation cycle that:
 
-1. Queries the database for all published workflow versions with scheduled
-   triggers to build the *expected* set of Temporal Schedule IDs.
-2. Lists all ``orchestrator-sched-*`` Temporal Schedules to build the *actual*
-   set.
+1. Lists all ``orchestrator-sched-*`` Temporal Schedules to build the
+   *actual* set.
+2. Queries the database for published workflow versions with scheduled
+   triggers to build the *expected* set (after the list, so a republish
+   that landed during connect/list is not treated as an orphan).
 3. Creates missing schedules (from failed publishes) and deletes orphans
    (from unpublish/delete that couldn't reach Temporal).
 
-Steady-state cost: two reads (one DB, one Temporal), zero writes.
+Steady-state cost: two reads (one Temporal, one DB), zero writes.
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ from sqlmodel import select
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import async_sessionmaker
     from sqlmodel.ext.asyncio.session import AsyncSession
+    from temporalio.client import Client
 
 from syntara.core.config.base import get_settings
 from syntara.core.database.session import AsyncSessionLocal
@@ -38,6 +40,11 @@ from syntara.workflows.utils.schedule_parser import build_schedule_id
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 
 logger = structlog.stdlib.get_logger(__name__)
+
+# Skip this cycle if Temporal connect, list, or mutate hangs. Waiters shield
+# the shared connect; a timed-out get_client returns None to this cycle only
+# and leaves the connect running for overlapping publish/delete waiters.
+_RECONCILE_TEMPORAL_TIMEOUT_SECONDS = 10.0
 
 
 def _extract_expected_schedules(
@@ -67,20 +74,10 @@ def _extract_expected_schedules(
     return lookup
 
 
-async def reconcile_scheduled_triggers(
-    session_factory: async_sessionmaker[AsyncSession] | None,
-) -> None:
-    """Diff-based reconciliation of Temporal Schedules against published workflows.
-
-    Called by the PeriodicWorker each cycle.  Resilient to individual
-    schedule failures — one broken schedule does not block the rest.
-    """
-    if session_factory is None:
-        return
-
-    # -- Step 1: Build expected state (1 DB query) --
-    # Extract only the triggers array, filtered to workflows that contain
-    # at least one scheduled trigger (avoids fetching full definitions).
+async def _load_expected_schedules(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> dict[str, tuple[str, str, dict[str, Any]]]:
+    """Load expected Temporal schedule IDs from currently published workflows."""
     triggers_col = WorkflowVersion.workflow_definition["triggers"]
     async with session_factory() as session:
         result = await session.exec(
@@ -96,23 +93,74 @@ async def reconcile_scheduled_triggers(
             )
         )
         rows = [(str(wf_id), triggers) for wf_id, triggers in result.all()]
+    return _extract_expected_schedules(rows)
 
-    lookup = _extract_expected_schedules(rows)
-    expected_ids = set(lookup)
 
-    # -- Step 2: Build actual state (1 Temporal list_schedules call) --
-    # Use OrchestratorWorkflowId search attribute for server-side filtering when
-    # available, falling back to client-side prefix scan otherwise.
+async def _fetch_actual_schedules() -> tuple[ScheduledTriggerService, Client, set[str]] | None:
+    """Connect and list Temporal schedules, or skip this cycle on timeout."""
     service = ScheduledTriggerService()
-    client = await service.get_client()
+    try:
+        async with asyncio.timeout(_RECONCILE_TEMPORAL_TIMEOUT_SECONDS):
+            client = await service.get_client()
+    except TimeoutError:
+        logger.warning("schedule_reconciliation_skipped", reason="Temporal client timed out")
+        return None
 
     if client is None:
         logger.warning("schedule_reconciliation_skipped", reason="Temporal unavailable")
+        return None
+
+    try:
+        async with asyncio.timeout(_RECONCILE_TEMPORAL_TIMEOUT_SECONDS):
+            actual_ids = await service.list_all_schedules(client)
+    except TimeoutError:
+        logger.warning("schedule_reconciliation_skipped", reason="Temporal list timed out")
+        return None
+    return service, client, actual_ids
+
+
+async def _apply_schedule_delta(
+    service: ScheduledTriggerService,
+    client: Client,
+    lookup: dict[str, tuple[str, str, dict[str, Any]]],
+    missing_list: list[str],
+    orphan_list: list[str],
+) -> list[object] | None:
+    """Create missing schedules and delete orphans, or skip on timeout."""
+    try:
+        async with asyncio.timeout(_RECONCILE_TEMPORAL_TIMEOUT_SECONDS):
+            return list(
+                await asyncio.gather(
+                    *(service.create_schedule(*lookup[sid]) for sid in missing_list),
+                    *(ScheduledTriggerService.delete_schedule(client, sid) for sid in orphan_list),
+                    return_exceptions=True,
+                )
+            )
+    except TimeoutError:
+        logger.warning("schedule_reconciliation_skipped", reason="Temporal mutate timed out")
+        return None
+
+
+async def reconcile_scheduled_triggers(
+    session_factory: async_sessionmaker[AsyncSession] | None,
+) -> None:
+    """Diff-based reconciliation of Temporal Schedules against published workflows.
+
+    Called by the PeriodicWorker each cycle.  Resilient to individual
+    schedule failures — one broken schedule does not block the rest.
+    """
+    if session_factory is None:
         return
 
-    actual_ids = await service.list_all_schedules(client)
+    fetched = await _fetch_actual_schedules()
+    if fetched is None:
+        return
+    service, client, actual_ids = fetched
 
-    # -- Step 3: Compute delta --
+    # Load expected *after* list so a republish that landed during
+    # connect/list is not deleted as an orphan.
+    lookup = await _load_expected_schedules(session_factory)
+    expected_ids = set(lookup)
     missing = expected_ids - actual_ids
     orphans = actual_ids - expected_ids
 
@@ -124,14 +172,11 @@ async def reconcile_scheduled_triggers(
         )
         return
 
-    # -- Step 4: Apply delta (concurrent) --
     missing_list = sorted(missing)
     orphan_list = sorted(orphans)
-    all_results = await asyncio.gather(
-        *(service.create_schedule(*lookup[sid]) for sid in missing_list),
-        *(ScheduledTriggerService.delete_schedule(client, sid) for sid in orphan_list),
-        return_exceptions=True,
-    )
+    all_results = await _apply_schedule_delta(service, client, lookup, missing_list, orphan_list)
+    if all_results is None:
+        return
     create_results = all_results[: len(missing_list)]
     delete_results = all_results[len(missing_list) :]
 

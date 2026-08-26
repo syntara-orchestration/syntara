@@ -1,47 +1,47 @@
 import { render, screen } from '@testing-library/react'
 import { axe } from 'vitest-axe'
 
-import { NxUserTag } from './NxUserTag'
+import { SynUserTag } from './SynUserTag'
 
-describe('NxUserTag', () => {
+describe('SynUserTag', () => {
   it('renders children text', () => {
-    render(<NxUserTag>my-workflow-tag</NxUserTag>)
+    render(<SynUserTag>my-workflow-tag</SynUserTag>)
 
     expect(screen.getByText('my-workflow-tag')).toBeInTheDocument()
   })
 
   it('always renders as outline variant', () => {
-    render(<NxUserTag data-testid="tag">my-workflow-tag</NxUserTag>)
+    render(<SynUserTag data-testid="tag">my-workflow-tag</SynUserTag>)
 
     expect(screen.getByTestId('tag')).toHaveClass('pf-m-outline')
   })
 
   it('defaults to compact size', () => {
-    render(<NxUserTag data-testid="tag">my-workflow-tag</NxUserTag>)
+    render(<SynUserTag data-testid="tag">my-workflow-tag</SynUserTag>)
 
     expect(screen.getByTestId('tag')).toHaveClass('pf-m-compact')
   })
 
-  it('forwards isCompact={false} to NxLabel', () => {
+  it('forwards isCompact={false} to SynLabel', () => {
     render(
-      <NxUserTag data-testid="tag" isCompact={false}>
+      <SynUserTag data-testid="tag" isCompact={false}>
         my-workflow-tag
-      </NxUserTag>
+      </SynUserTag>
     )
 
     expect(screen.getByTestId('tag')).not.toHaveClass('pf-m-compact')
   })
 
   it('re-renders correctly when props change', () => {
-    const { rerender } = render(<NxUserTag data-testid="tag">first-tag</NxUserTag>)
+    const { rerender } = render(<SynUserTag data-testid="tag">first-tag</SynUserTag>)
 
     expect(screen.getByText('first-tag')).toBeInTheDocument()
     expect(screen.getByTestId('tag')).toHaveClass('pf-m-compact')
 
     rerender(
-      <NxUserTag data-testid="tag" isCompact={false}>
+      <SynUserTag data-testid="tag" isCompact={false}>
         second-tag
-      </NxUserTag>
+      </SynUserTag>
     )
 
     expect(screen.getByText('second-tag')).toBeInTheDocument()
@@ -50,7 +50,7 @@ describe('NxUserTag', () => {
 
   it('uses cached output when re-rendered with no prop changes', () => {
     function StableParent() {
-      return <NxUserTag data-testid="tag">stable-tag</NxUserTag>
+      return <SynUserTag data-testid="tag">stable-tag</SynUserTag>
     }
 
     const { rerender } = render(<StableParent />)
@@ -61,7 +61,7 @@ describe('NxUserTag', () => {
   })
 
   it('has no accessibility violations', async () => {
-    const { container } = render(<NxUserTag>my-workflow-tag</NxUserTag>)
+    const { container } = render(<SynUserTag>my-workflow-tag</SynUserTag>)
 
     expect(await axe(container)).toHaveNoViolations()
   })

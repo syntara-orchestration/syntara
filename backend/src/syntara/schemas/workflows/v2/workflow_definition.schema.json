@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://automation.example.com/schemas/workflows/v2/workflow_definition",
   "title": "Workflow Definition Schema v2",
-  "description": "JSON Schema for graph-based workflow definitions in the Syntara Workflow Engine v2",
+  "description": "JSON Schema for graph-based workflow definitions in the Orchestrator Workflow Engine v2",
   "type": "object",
   "required": [
     "schema_version",

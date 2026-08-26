@@ -53,6 +53,13 @@ class BaseApprovalRequest(BaseResource, table=False):
         index=True,
     )
 
+    prompt: str | None = Field(
+        default=None,
+        max_length=FieldLimits.DESCRIPTION_MAX_LENGTH,
+        sa_type=String(FieldLimits.DESCRIPTION_MAX_LENGTH),  # type: ignore[call-overload]
+        description="Resolved guidance message from the approval node, shown to approvers",
+    )
+
     # Soft reference to parent execution (no foreign key constraint)
     execution_id: UUID = Field(
         nullable=False,

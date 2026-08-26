@@ -61,7 +61,12 @@ export function useDirtyFormGuard({
   useEffect(() => {
     const unregister = registerDirtyCheck({
       check: () => isActive && isDirtyRef.current,
-      saveAndExit: onSaveRef.current ? () => onSaveRef.current!() : undefined,
+      saveAndExit: onSaveRef.current
+        ? () => {
+            const save = onSaveRef.current
+            return save ? save() : Promise.resolve(false)
+          }
+        : undefined,
       exitWithoutSaving: () => {
         isDirtyRef.current = false
         unregisterRef.current?.()

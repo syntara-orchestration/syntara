@@ -25,9 +25,9 @@ import { usersClient } from '../../../client'
 import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { DocLinkButton, SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../components/layout/SynPanel'
-import { NxLink } from '../../../components/NxLink'
 import { SynLoadingState } from '../../../components/states/SynLoadingState'
 import { useQueryState } from '../../../components/states/useQueryState'
+import { SynLink } from '../../../components/SynLink'
 import { SynPageTitle } from '../../../components/SynPageTitle'
 import { useMutationErrorHandler } from '../../../hooks/useMutationErrorHandler'
 import { useAlerts } from '../../../providers/alerts'
@@ -65,7 +65,7 @@ function WizardFooterStep1({ isNextDisabled, cancelHref }: Readonly<{ isNextDisa
             </Button>
           </ActionListItem>
           <ActionListItem>
-            <NxLink to={cancelHref}>Cancel</NxLink>
+            <SynLink to={cancelHref}>Cancel</SynLink>
           </ActionListItem>
         </ActionListGroup>
       </ActionList>
@@ -101,7 +101,7 @@ function WizardFooterStep2({
             </Button>
           </ActionListItem>
           <ActionListItem>
-            <NxLink to={cancelHref}>Cancel</NxLink>
+            <SynLink to={cancelHref}>Cancel</SynLink>
           </ActionListItem>
         </ActionListGroup>
       </ActionList>

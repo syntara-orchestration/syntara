@@ -15,14 +15,14 @@ import { credentialsClient } from '../../../client'
 import { NxDetail } from '../../../components/details/NxDetail'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
-import { NxLabel } from '../../../components/labels/NxLabel'
+import { SynLabel } from '../../../components/labels/SynLabel'
 import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../components/layout/SynPanel'
-import type { KebabAction } from '../../../components/NxKebabMenu'
-import { NxKebabMenu } from '../../../components/NxKebabMenu'
 import { SynErrorState } from '../../../components/states/SynErrorState'
 import { useQueryState } from '../../../components/states/useQueryState'
+import type { KebabAction } from '../../../components/SynKebabMenu'
+import { SynKebabMenu } from '../../../components/SynKebabMenu'
 import { SynPageTitle } from '../../../components/SynPageTitle'
 import { UserTimestamp } from '../../../components/table/UserTimestamp'
 import { NxUrlTabs } from '../../../components/tabs/NxUrlTabs'
@@ -61,13 +61,13 @@ function formatCount(count: number | null | undefined): string | number {
 
 function EnabledStateLabel({ enabled }: Readonly<{ enabled: boolean }>) {
   return enabled ? (
-    <NxLabel variant="outline" status="success" icon={<RhUiCheckCircleIcon />}>
+    <SynLabel variant="outline" status="success" icon={<RhUiCheckCircleIcon />}>
       Enabled
-    </NxLabel>
+    </SynLabel>
   ) : (
-    <NxLabel variant="outline" icon={<RhUiMinusCircleIcon />}>
+    <SynLabel variant="outline" icon={<RhUiMinusCircleIcon />}>
       Disabled
-    </NxLabel>
+    </SynLabel>
   )
 }
 
@@ -80,9 +80,9 @@ function DynamicCredentialFields({ typeFields, credInputs }: Readonly<DynamicFie
     return (
       <NxDetail key={field.id} label={field.label}>
         {isEncrypted ? (
-          <NxLabel variant="outline" icon={<RhUiLockIcon />}>
+          <SynLabel variant="outline" icon={<RhUiLockIcon />}>
             Encrypted
-          </NxLabel>
+          </SynLabel>
         ) : (
           String((value as string | number | boolean) ?? '—')
         )}
@@ -204,9 +204,9 @@ export default function CredentialDetail() {
   }
 
   function handleConfirmDisable() {
-    if (!credentialToDisable) return
+    if (!credentialToDisable?.id) return
     patchCredential(
-      { params: { path: { credential_id: credentialToDisable.id! } }, body: { enabled: false } },
+      { params: { path: { credential_id: credentialToDisable.id } }, body: { enabled: false } },
       {
         onSuccess: () => {
           detachPromise(credQuery.refetch())
@@ -226,6 +226,7 @@ export default function CredentialDetail() {
 
   const handleConfirmDelete = useDeleteAction<Credential, { params: { path: { credential_id: string } } }>({
     deleteFn: (params, callbacks) => deleteCredentialMut(params, callbacks),
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- safe: credentials opened for deletion always have an id (server-assigned); ?? '' would produce an invalid path param
     buildParams: (cred) => ({ params: { path: { credential_id: cred.id! } } }),
     entityLabel: 'credential',
     getItemName: (cred) => cred.name,
@@ -242,7 +243,9 @@ export default function CredentialDetail() {
       isDanger: true,
       isAriaDisabled: !canDelete,
       tooltipProps: canDelete ? undefined : { content: tooltips.delete },
-      onClick: () => openDeleteDialog(credential!),
+      onClick: () => {
+        if (credential) openDeleteDialog(credential)
+      },
     },
   ]
 
@@ -313,7 +316,7 @@ export default function CredentialDetail() {
                 Edit credential
               </Button>
             </DisabledWithTooltip>
-            <NxKebabMenu actions={kebabActions} aria-label="Credential actions" />
+            <SynKebabMenu actions={kebabActions} aria-label="Credential actions" />
           </>
         }
       />
