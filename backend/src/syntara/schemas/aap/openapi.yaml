@@ -12,7 +12,7 @@ info:
     without direct Ansible Automation Platform Controller access.
 
     Authentication to the Ansible Automation Platform Controller is resolved
-    server-side from the AAP Gateway integration (URL and TLS) and a Syntara
+    server-side from the AAP Gateway integration (URL and TLS) and an Orchestrator
     credential (token or username/password). When integration_id and
     credential_id are omitted, the unique visible enabled AAP integration
     and its management credential are used. When more than one AAP integration

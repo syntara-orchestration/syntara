@@ -60,7 +60,7 @@ router = APIRouter(prefix="/proxies/aap", tags=["Ansible Automation Platform Pro
 
 _integration_scope = ProjectScopeFilter("integration", "read")
 
-# The proxy always authenticates with a Syntara credential: query.credential_id
+# The proxy always authenticates with an Orchestrator credential: query.credential_id
 # or the integration's management credential. Env-var auth is not used here.
 _PROXY_USES_SYNTARA_CREDENTIAL = True
 

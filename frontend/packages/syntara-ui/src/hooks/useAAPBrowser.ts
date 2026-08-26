@@ -324,7 +324,7 @@ function useAAPBrowserResults(
  * Hook to browse AAP resources (organizations, job/workflow templates, inventories,
  * execution environments, credentials, instance groups) via the Syntara backend proxy.
  *
- * @param credentialId - Optional Syntara AAP credential ID for authentication.
+ * @param credentialId - Optional Orchestrator AAP credential ID for authentication.
  *   If omitted, the backend uses the selected integration's management credential.
  * @param initialState - Initial organization and template selection
  * @param templateType - 'job' for job templates (default) or 'workflow' for workflow templates

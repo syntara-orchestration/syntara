@@ -67,7 +67,7 @@ def _get_basic_auth_from_settings(settings: Settings) -> httpx.BasicAuth | None:
 def resolve_aap_connection(settings: Settings) -> AAPConnection:
     """Resolve AAP connection from environment settings.
 
-    Used by workflow execution when no Syntara credential is injected.
+    Used by workflow execution when no Orchestrator credential is injected.
     The BFF proxy (``/proxies/aap/*``) does not call this — it resolves
     from the AAP integration and credential instead.
 

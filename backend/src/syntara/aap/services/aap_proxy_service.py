@@ -7,7 +7,7 @@ Connection resolution:
 - ``integration_id`` selects the AAP Gateway (URL/TLS). If omitted, the unique
   visible enabled AAP integration is used. If more than one is visible, the
   caller must pass ``integration_id``.
-- ``credential_id`` selects a Syntara AAP credential (owner check). If omitted,
+- ``credential_id`` selects an Orchestrator AAP credential (owner check). If omitted,
   the selected integration's management credential is used.
 """
 

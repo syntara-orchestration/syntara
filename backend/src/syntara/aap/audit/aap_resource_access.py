@@ -56,7 +56,7 @@ class AAPResourceAccessEvent:
     """Domain event emitted when a user accesses AAP resources via the proxy.
 
     Captures the resource type, action (list/get), result metadata, and
-    whether a Syntara credential authenticated the request (explicit
+    whether an Orchestrator credential authenticated the request (explicit
     ``credential_id`` or the integration's management credential). Env-var
     auth is not used by the AAP proxy.
     """
