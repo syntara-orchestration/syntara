@@ -95,8 +95,15 @@ export async function addManualTrigger(page: Page, name = 'Manual trigger') {
   // Panel auto-closes after adding trigger - no manual close needed
 }
 
+/** Select a service account in the trigger form's "Authorized service accounts" dropdown. */
+async function selectServiceAccount(page: Page, serviceAccountName: string) {
+  await page.getByRole('button', { name: 'Select service accounts' }).click()
+  await page.getByRole('option', { name: serviceAccountName }).click()
+  await page.keyboard.press('Escape')
+}
+
 /** Add a webhook (API) trigger. Must be called on a fresh /workflow-builder/new page. */
-export async function addWebhookTrigger(page: Page, name: string, webhookPath: string) {
+export async function addWebhookTrigger(page: Page, name: string, webhookPath: string, serviceAccountName: string) {
   // Wait for page to finish loading
   await expect(page.getByRole('progressbar', { name: 'Loading' })).not.toBeVisible({ timeout: 15000 })
 
@@ -105,13 +112,14 @@ export async function addWebhookTrigger(page: Page, name: string, webhookPath: s
   await page.getByRole('button', { name: 'Webhook trigger', exact: true }).click()
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
   await page.getByRole('textbox', { name: 'Webhook path' }).fill(webhookPath)
+  await selectServiceAccount(page, serviceAccountName)
   await page.getByRole('button', { name: 'Create', exact: true }).click()
 
   // Panel auto-closes after adding trigger - no manual close needed
 }
 
 /** Add an EDA (Event-Driven Ansible) trigger. Must be called on a fresh /workflow-builder/new page. */
-export async function addEdaTrigger(page: Page, name: string, webhookPath: string) {
+export async function addEdaTrigger(page: Page, name: string, webhookPath: string, serviceAccountName: string) {
   // Wait for page to finish loading
   await expect(page.getByRole('progressbar', { name: 'Loading' })).not.toBeVisible({ timeout: 15000 })
 
@@ -120,6 +128,7 @@ export async function addEdaTrigger(page: Page, name: string, webhookPath: strin
   await page.getByRole('button', { name: 'Event-Driven Ansible trigger', exact: true }).click()
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
   await page.getByRole('textbox', { name: 'Webhook path' }).fill(webhookPath)
+  await selectServiceAccount(page, serviceAccountName)
   await page.getByRole('button', { name: 'Create', exact: true }).click()
 
   // Panel auto-closes after adding trigger - no manual close needed
