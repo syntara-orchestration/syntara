@@ -320,7 +320,10 @@ function createExecutionNotFoundResponse(executionId: string, subPath?: string) 
 
 /** In-memory file store for mock upload → download round-trips (retains original filenames). */
 const mockUploadedFiles = new Map<string, { filename: string; content: ArrayBuffer; mime_type: string }>()
-const knownFileMetadata: Record<string, { filename: string; size_bytes: number; mime_type: string }> = {
+const knownFileMetadata: Record<
+  string,
+  { filename: string; size_bytes: number; mime_type: string; is_project_deleted?: boolean }
+> = {
   'a1b2c3d4-0001-0001-0001-000000000001': {
     filename: 'server-config.txt',
     size_bytes: 2048,
@@ -3574,6 +3577,7 @@ export const handlers = [
           size_bytes: uploaded.content.byteLength,
           mime_type: uploaded.mime_type,
           status: 'ready',
+          is_project_deleted: false,
         }
       }
       const known = knownFileMetadata[id]
@@ -3583,6 +3587,7 @@ export const handlers = [
         size_bytes: known?.size_bytes ?? 1024,
         mime_type: known?.mime_type ?? 'text/plain',
         status: 'ready',
+        is_project_deleted: known?.is_project_deleted ?? false,
       }
     })
     return HttpResponse.json({ files })
@@ -3599,6 +3604,7 @@ export const handlers = [
         mime_type: uploaded.mime_type,
         status: 'converted',
         conversion_error: null,
+        is_project_deleted: false,
       })
     }
     const known = knownFileMetadata[fileId]
@@ -3610,9 +3616,23 @@ export const handlers = [
         mime_type: known.mime_type ?? 'text/plain',
         status: 'converted',
         conversion_error: null,
+        is_project_deleted: known.is_project_deleted ?? false,
       })
     }
     return new HttpResponse(null, { status: 404 })
+  }),
+
+  http.delete('/api/v1/files/:file_id', ({ params }) => {
+    const fileId = String(params.file_id)
+    if (mockUploadedFiles.has(fileId)) {
+      mockUploadedFiles.delete(fileId)
+      return new HttpResponse(null, { status: 204 })
+    }
+    if (knownFileMetadata[fileId]) {
+      delete knownFileMetadata[fileId]
+      return new HttpResponse(null, { status: 204 })
+    }
+    return HttpResponse.json({ detail: 'File not found' }, { status: 404 })
   }),
 
   http.get('/api/v1/files/:file_id/download', ({ params }) => {

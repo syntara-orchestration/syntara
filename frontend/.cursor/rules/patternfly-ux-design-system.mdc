@@ -34,7 +34,7 @@ How the UI is anchored:
 - **Automation builder** — Based on [React Flow](https://reactflow.dev/) with PatternFly as visual wrapper
 - **Accessibility** — Must achieve [WCAG 2.1 AA](https://www.w3.org/WAI/WCAG2AA-Conformance) and [Section 508](https://www.section508.gov/) compliance
 - **PatternFly gaps** — Check PF docs first → Raise with UX team → Engage PatternFly → Document with `patternfly-override` label → Resolve upstream
-- **`Nx` prefix convention** — opinionated global components use the `Nx` prefix (e.g., `SynPage`, `SynPanel`, `NxConfirmationDialog`, `NxDetailList`) in `src/components/` organized by: `layout/`, `dialogs/`, `details/`, `tabs/`, `states/`. Use the `Nx*` wrapper, not the raw PF component.
+- **Opinionated component prefixes** — `Syn*` for layout, state, tables, labels, links, and kebab menus (`SynPage`, `SynPanel`, `SynScrollableTableContainer`, `SynLabel`, `SynKebabMenu`); `Nx*` for dialogs, details, tabs, and list panels (`NxConfirmationDialog`, `NxUrlTabs`, `NxListPanel`). Use the wrapper, not raw PF components.
 
 ## Page Layout (MANDATORY)
 
@@ -68,6 +68,7 @@ Every page must follow this structural hierarchy:
 - **Main page header** — Left-aligned title, right-aligned actions
 - **Details page header** — Left-aligned breadcrumbs (`SynPageBreadcrumbs`) + title; toolbar left→right: Switch → Edit (primary) → kebab
 - **Form page header** — Left-aligned breadcrumbs + title; no action buttons in the header — Save and Cancel live in the `SynPanel` sticky footer
+- **Documentation link** — pass `docLink={useDocLink('key')}` to `SynPageHeader`; never hardcode doc URLs. Add keys to `docsUrls.json`.
 
 ### Breadcrumbs
 
@@ -121,7 +122,7 @@ Use a docked icon navigation (left sidebar) with PatternFly's flyout panels comp
 - Clicking resource name navigates to details view
 - "Created"/"Modified" columns: username (linked) + date together. Date format: `MMM DD, YYYY, H:MM:SS AM/PM` — always use `DateCell` / `formatDateTime()` from `dateUtils.ts` (never `toLocaleString` or PF `Timestamp`)
 - Text-heavy columns (names, descriptions, emails, URLs) MUST use `<Truncate>` — ellipsis with tooltip on hover; `table-layout: fixed` for equal column distribution (do not opt out with `useFixedLayout={false}`)
-- Expandable rows: pass `isExpandable` to `SynScrollableTableContainer`, add expand-all/collapse-all toggle in `<Thead>` via `expand` prop, use `ExpandableRowContent` for nested detail, compact gray `Label` for list data
+- Expandable rows: pass `isExpandable` to `SynScrollableTableContainer`, add expand-all/collapse-all toggle in `<Thead>` via `expand` prop, use `ExpandableRowContent` for nested detail, compact gray `Label` for list data. Hide expand toggle when row has no nested content. Use `useExpandableRowIds` for expand state. Assignment policies belong in expanded rows, not a crowded column.
 - Footer/pagination: cursor-based via `SynScrollableTableContainer`'s `footer` prop (`TableFooterProps`)
   - Left: item count — `"5 workflows (of 100 total)"`
   - Right: Previous / Next buttons using API cursor tokens (`prev`, `next`) — no page numbers or per-page selector
@@ -191,7 +192,7 @@ Action verb pairings: "Create" ↔ "Delete", "Add" ↔ "Remove" (internal resour
 ### Update/Edit
 
 - **Full page:** 5+ fields, multi-step, or if create is full page
-  - Pre-populate fields, track dirty state, warn on unsaved navigation, show loading while saving
+  - Pre-populate fields, track dirty state, warn on unsaved navigation via `useDirtyFormGuard`, show loading while saving
 - **Modal:** 2–4 fields, or if create is a modal
 - **Inline:** Single-field edits, toggles (use PatternFly Switch Checked with Label), renames
 
@@ -355,6 +356,8 @@ All icons MUST use the **`RhUi` prefix** (e.g., `RhUiAddIcon`, `RhUiEditIcon`, `
 - **Approval side panel:** Right-side panel on execution viewer for inline approval review. Mutually exclusive with history panel; auto-opens on pending approval via `useAutoApprovalDetection`. **Multi-approval navigation:** `ApprovalNavigationHeader` with prev/next arrows, "2 of 5" counter, keyboard nav support.
 - **Wait node countdown:** Live `HH:MM:SS` countdown on canvas during execution via `useWaitCountdown` (1s interval). Clears on terminal status.
 - **Import confirmation:** Modal with radio choices ("Import as new" vs "Import into current") for existing saved workflows. Direct import for new/empty. Warns about unsaved changes when `isDirty`.
+- **Run history rows:** Use `HistoryListItemLink` (real `<a>` via TanStack Router), not `Button` + `navigate`. Overlay pattern when row has nested controls (version link, kebab). `SynLink` cannot be used — it renders a Button.
+- **Browser tab dirty indicator:** Prepend `●` to `<title>` when builder has unsaved changes (via `toPageTitle`).
 
 ## Permission Gating
 
@@ -381,6 +384,7 @@ Non-dismissible alert dialog for security-critical time warnings: `Modal variant
 - 3-step PatternFly Wizard for initial setup: Select type → Configure connection → Review & confirm with "Test connection"
 - Detail page header: integration name + enabled/disabled `Switch` toggle (immediate, no confirmation for enable)
 - "Test connection" secondary button — must pass before enabling tools
+- **Last checked:** show `last_validated_at` as "Last checked" on list (sortable column) and detail (via `DateCell` / `UserTimestamp`)
 - Tools tab: table of available tools with per-row `Switch` to enable/disable individual tools
 
 ## Access Management & My Profile
@@ -388,6 +392,9 @@ Non-dismissible alert dialog for security-critical time warnings: `Modal variant
 - Access Management tab label: **"Check access"** (not "Can I")
 - Self-service flows (Check access, My tokens) live on the **My Profile** page, not Access Management
 - Access Management contains only admin tabs: Users, Groups, Projects, Roles, Policies, Assignments
+- **Role assignment pickers:** filter out already-assigned roles for the selected principal at the relevant scope
+- **Policy multi-select:** include "Select All" that fetches all pages and merges with existing selection
+- **User enabled toggle:** lives on the users list table State column (Switch), not on the edit user form
 - **My Profile** (`/my-profile`): reuses `UserDetail` with `isMyProfile` flag; no breadcrumbs; extra tabs (My tokens, Check access); accessible from user avatar menu in masthead
 
 ## Full-Page Wizard
