@@ -446,20 +446,28 @@ test.describe('Approval Workflow Operations', () => {
         timeout: 15_000,
       })
 
-      // PatternFly `Th select` sets aria-label="Select all rows" on the header checkbox.
+      // Click header row checkbox to select all and verify batch toolbar appears.
+      // Under Konflux cluster load the checkbox click can fail to register; retry the whole sequence.
       const selectAllCheckbox = table.getByRole('checkbox', { name: /select all/i })
       await expect(selectAllCheckbox).toBeEnabled()
-      await selectAllCheckbox.check()
-
       const pageHeader = app.getByTestId('page-header')
       const selectedText = pageHeader.getByText('2 selected')
-      await expect(selectedText).toBeVisible({ timeout: 10_000 })
+      const batchToolbar = app.getByRole('toolbar', { name: /selected/i })
 
+      await expect(async () => {
+        await selectAllCheckbox.check()
+        await expect(selectedText).toBeVisible()
+        await expect(batchToolbar).toBeVisible()
+      }).toPass({ timeout: 15_000, intervals: [500] })
+
+      // Uncheck header checkbox to deselect all
       await selectAllCheckbox.uncheck()
 
+      // Verify selection cleared
       await expect(selectedText).not.toBeVisible()
+      await expect(batchToolbar).not.toBeVisible()
 
-      // Step 6: Verify all checkboxes are unchecked
+      // Verify all checkboxes are unchecked
       await expect(rows.filter({ hasText: approval1.approvalName }).getByRole('checkbox')).not.toBeChecked()
       await expect(rows.filter({ hasText: approval2.approvalName }).getByRole('checkbox')).not.toBeChecked()
     } finally {
