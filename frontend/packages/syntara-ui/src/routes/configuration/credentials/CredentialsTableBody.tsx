@@ -97,6 +97,7 @@ function CredentialRow({
               ? {
                   rowIndex,
                   isExpanded,
+                  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- safe: credentials from the API always have an id; rows without id are excluded by the expandableCredentialIds filter upstream
                   onToggle: () => onToggleRow(credential.id!),
                 }
               : undefined

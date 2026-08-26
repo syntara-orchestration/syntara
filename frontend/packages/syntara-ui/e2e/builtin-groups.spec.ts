@@ -3,8 +3,7 @@
  *
  * Reference: UI-31, AAP-73926 (AAP-73926)
  */
-import { type Page } from '@playwright/test'
-
+import { type Page } from './fixtures'
 import { test, expect, toAppUrl } from './fixtures'
 import { buildUniqueName } from './helpers/workflows'
 import { apiRequest, createGroupViaApi, deleteGroupViaApi, findBuiltinGroupByName, getAuthToken } from './utils/api'

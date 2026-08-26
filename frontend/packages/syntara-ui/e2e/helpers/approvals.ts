@@ -1,6 +1,4 @@
-import type { Page } from '@playwright/test'
-
-import { expect, toAppUrl } from '../fixtures'
+import { expect, type Page, toAppUrl } from '../fixtures'
 import { pollApprovalVisible } from '../utils/api'
 
 /**

@@ -308,9 +308,9 @@ export default function CredentialDetail() {
   }
 
   function handleConfirmDisable() {
-    if (!credentialToDisable) return
+    if (!credentialToDisable?.id) return
     patchCredential(
-      { params: { path: { credential_id: credentialToDisable.id! } }, body: { enabled: false } },
+      { params: { path: { credential_id: credentialToDisable.id } }, body: { enabled: false } },
       {
         onSuccess: () => {
           detachPromise(credQuery.refetch())
@@ -330,6 +330,7 @@ export default function CredentialDetail() {
 
   const handleConfirmDelete = useDeleteAction<Credential, { params: { path: { credential_id: string } } }>({
     deleteFn: (params, callbacks) => deleteCredentialMut(params, callbacks),
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- safe: credentials opened for deletion always have an id (server-assigned); ?? '' would produce an invalid path param
     buildParams: (cred) => ({ params: { path: { credential_id: cred.id! } } }),
     entityLabel: 'credential',
     getItemName: (cred) => cred.name,

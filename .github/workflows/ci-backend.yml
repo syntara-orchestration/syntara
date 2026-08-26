@@ -555,12 +555,6 @@ jobs:
         run: make certs-generate
         working-directory: backend
 
-      - name: (Backend) Log in to registry.redhat.io
-        env:
-          RH_REGISTRY_TOKEN: ${{ secrets.RH_REGISTRY_TOKEN }}
-          RH_REGISTRY_USER: ${{ secrets.RH_REGISTRY_USER }}
-        run: echo "$RH_REGISTRY_TOKEN" | podman login registry.redhat.io -u "$RH_REGISTRY_USER" --password-stdin
-
       - name: Diagnose podman environment
         run: |
           podman --version

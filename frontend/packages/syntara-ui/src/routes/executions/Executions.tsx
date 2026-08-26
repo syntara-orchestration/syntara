@@ -118,7 +118,8 @@ export default function Executions() {
           executions: [],
         })
       }
-      groups.get(projectId)!.executions.push(execution)
+      const group = groups.get(projectId)
+      if (group) group.executions.push(execution)
     }
     return groups
   }, [visibleExecutions, projectsForGrouping, isAllProjects, builtinProjectIds])
