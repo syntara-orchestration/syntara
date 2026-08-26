@@ -684,7 +684,12 @@ jobs:
 
       - name: Run E2E tests
         working-directory: frontend/packages/syntara-ui
-        run: npm run e2e -- --timeout 120000
+        run: |
+          set +e
+          npm run e2e -- --timeout 120000
+          EXIT_CODE=$?
+          set -e
+          npx tsx e2e/check-quarantine-failures.ts $EXIT_CODE
         env:
           SYNTARA_E2E_SKIP_WEB_SERVER: '1'
           SYNTARA_E2E_BASE_URL: http://localhost:8080

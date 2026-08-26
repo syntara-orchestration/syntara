@@ -41,6 +41,7 @@ export default defineConfig({
     [process.env.CI ? 'line' : 'list'],
     ['json', { outputFile: 'test-results/results.json' }],
     ['html', { outputFolder: 'playwright-report', open: 'never' }],
+    ['./e2e/quarantine-reporter.ts'],
     ...(process.env.CURRENTS_PROJECT_ID && process.env.CURRENTS_RECORD_KEY ? [currentsReporter()] : []),
   ],
   use: {

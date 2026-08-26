@@ -90,7 +90,9 @@ const xfailBase = currentsBase.extend<{ _xfailCheck: void }, { _xfailEntries: Xf
     async ({ _xfailEntries }, use, testInfo) => {
       const match = matchesXfail(testInfo, _xfailEntries)
       if (match) {
-        testInfo.fail(true, `xfail: ${match.reason}`)
+        // Annotate as quarantined instead of marking as xfail
+        // The custom reporter will handle soft-failing quarantined tests
+        testInfo.annotations.push({ type: 'quarantined', description: match.reason })
       }
       await use()
     },
