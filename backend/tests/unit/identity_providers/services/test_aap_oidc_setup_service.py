@@ -140,7 +140,7 @@ class TestSetupHappyPath:
         assert str(config.issuer_url) == f"{_AAP_URL}/o/"
         assert config.scopes == "read write openid roles"
         assert config.aap_role_mapping_enabled is True
-        assert config.enable_rp_initiated_logout is True
+        assert config.enable_rp_initiated_logout is False
         assert config.auto_discovery is True
         assert config.allow_all_authenticated is False
 
