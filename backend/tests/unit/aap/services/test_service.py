@@ -995,10 +995,10 @@ def _mock_session_with_integration(integration: MagicMock | None) -> AsyncMock:
 
 def _bound_uuids_from_statement(stmt: object) -> set[UUID]:
     """Collect UUID bind params from a SQLAlchemy select (e.g. ``id IN (...)``)."""
-    compiled = stmt.compile()  # type: ignore[union-attr]
+    compiled = stmt.compile()  # type: ignore[attr-defined]
     bound: set[UUID] = set()
     for value in compiled.params.values():
-        items: tuple[object, ...] = value if isinstance(value, (list, tuple)) else (value,)
+        items = value if isinstance(value, (list, tuple)) else (value,)
         for item in items:
             if isinstance(item, UUID):
                 bound.add(item)
