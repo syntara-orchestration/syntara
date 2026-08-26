@@ -274,6 +274,20 @@ class TestRecordLLMCall:
         assert durations[0].labels["provider"] == "anthropic"
 
     @pytest.mark.asyncio
+    async def test_collapses_doubled_model_name_from_chunk_merge(self, recorder: MetricsRecorder) -> None:
+        """Chunk-merged model_name must not pollute metric labels (AAP-86784)."""
+        doubled = "anthropic/claude-3.5-sonnetanthropic/claude-3.5-sonnet"
+        result = await record_llm_call(
+            recorder,
+            lambda: _async_response(model_name=doubled),
+        )
+
+        durations = list(recorder.query(metric_types={MetricType.LLM_DURATION}))
+        assert durations[0].labels["model"] == "anthropic/claude-3.5-sonnet"
+        assert durations[0].labels["provider"] == "anthropic"
+        assert result.response_metadata["model_name"] == doubled
+
+    @pytest.mark.asyncio
     async def test_active_llm_requests_gauge_lifecycle(self, recorder: MetricsRecorder) -> None:
         """Gauge is 0 before, incremented during, and 0 again after a successful call."""
         assert recorder.prometheus.active_llm_requests._value.get() == pytest.approx(0.0)
