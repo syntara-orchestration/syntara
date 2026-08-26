@@ -1,8 +1,11 @@
-"""Safe AST evaluation for workflow condition expressions.
+"""Shared comparison helpers for workflow condition evaluation.
 
-Live ``${...}`` template resolution uses ``NamespaceResolver``. This module only
-provides ``safe_eval_condition`` and the comparison helpers imported by
-``unified_eval.py``.
+Live ``${...}`` template resolution uses ``NamespaceResolver``. Live boolean
+conditions use ``safe_eval_with_namespace`` in ``unified_eval.py``, which imports
+``_compare`` and ``_SAFE_COMPARISON_OPS`` from this module.
+
+``safe_eval_condition`` evaluates already-resolved literal expressions (no
+namespace lookup). Production condition, switch, and loop nodes do not call it.
 """
 
 import ast

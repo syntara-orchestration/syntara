@@ -5,6 +5,8 @@ string/numeric comparisons, and rejects malicious or unsupported expressions.
 """
 
 import importlib
+import json
+from pathlib import Path
 
 import pytest
 
@@ -231,3 +233,8 @@ class TestOrphanedExpressionResolverRemoved:
     def test_template_resolution_module_removed(self) -> None:
         with pytest.raises(ModuleNotFoundError):
             importlib.import_module("syntara.workflows.utils.template_resolution")
+
+    def test_orphan_allowlist_does_not_list_deleted_module(self) -> None:
+        allowlist = Path(__file__).resolve().parents[4] / "tools" / "ci" / "known_orphan_modules.json"
+        patterns = json.loads(allowlist.read_text())["patterns"]
+        assert "syntara/workflows/utils/template_resolution.py" not in patterns
