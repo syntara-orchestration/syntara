@@ -93,6 +93,7 @@ class TestApprovalRequestValidation:
         assert approval.decided_by is None
         assert approval.decided_at is None
         assert approval.decision_notes is None
+        assert approval.prompt is None
 
     def test_default_values(self) -> None:
         """Test model default values."""

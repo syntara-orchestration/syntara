@@ -27,6 +27,7 @@ from syntara.agent_orchestrator.audit.invocation_lifecycle import InvocationLife
 from syntara.agent_orchestrator.clients.openrouter_config import get_openrouter_llm
 from syntara.agent_orchestrator.context_manager import ContextManagerPlanner
 from syntara.agent_orchestrator.exceptions import (
+    AgentTimeoutError,
     CredentialResolutionError,
     InvocationCancelledError,
     LLMConfigurationError,
@@ -418,7 +419,8 @@ class InvocationExecutor:
             opaque = ctx.metadata.response_schema if ctx.metadata else None
             response_schema = opaque.get_data() if opaque else None
 
-            result_dict = await orchestration_service.execute(
+            timeout = ctx.timeout_seconds
+            execute_coro = orchestration_service.execute(
                 prompt=invocation.prompt,
                 session_id=invocation.session_id,
                 invocation_id=invocation.id,
@@ -427,6 +429,10 @@ class InvocationExecutor:
                 execution_id=execution_id,
                 response_schema=response_schema,
             )
+            if timeout is not None:
+                result_dict = await asyncio.wait_for(execute_coro, timeout=timeout)
+            else:
+                result_dict = await execute_coro
 
             # Extract model name from result metadata
             model_name = _extract_model_name(result_dict)
@@ -489,45 +495,65 @@ class InvocationExecutor:
             self._record_invocation_metrics(recorder, invocation_start, invocation.id, status="success")
 
         except InvocationCancelledError:
-            # Invocation was cancelled during execution - this is expected behavior
-            # Don't mark as failed since cancellation is already handled
             logger.info("Invocation cancelled during execution", invocation_id=invocation.id)
             self._record_invocation_metrics(recorder, invocation_start, invocation.id, status="cancelled")
-        except Exception as e:
-            self._record_invocation_metrics(recorder, invocation_start, invocation.id, status="error", error=e)
-
-            logger.exception(
-                "Exception during invocation execution",
-                invocation_id=invocation.id,
-                error_type=type(e).__name__,
+        except Exception as e:  # noqa: BLE001
+            e = self._wrap_timeout_error(e, invocation.id)
+            await self._handle_execution_failure(
+                e, invocation, ctx, recorder, invocation_start, execution_id, request_id
             )
 
-            if await self._fail_invocation_if_not_cancelled(
-                invocation.id,
-                completed_at=datetime.now(UTC),
-                error_message=(
-                    f"{type(e).__name__}: {classify_streaming_error(e).detail}"
-                    if isinstance(e, (ToolDiscoveryError, ToolSelectionUnavailableError))
-                    else f"{type(e).__name__}: {e}"
-                ),
-            ):
-                # Dispatch FAILED event
-                AuditEventDispatcher.dispatch(
-                    InvocationLifecycleEvent(
-                        session_id=invocation.session_id,
-                        invocation_id=invocation.id,
-                        execution_id=execution_id,
-                        request_id=request_id,
-                        status=InvocationStatus.FAILED,
-                        error_type=type(e).__name__,
-                        activity_id=ctx.activity_id,
-                        activity_name=ctx.activity_name,
-                    )
-                )
+    @staticmethod
+    def _wrap_timeout_error(e: Exception, invocation_id: UUID) -> Exception:
+        if isinstance(e, TimeoutError):
+            return AgentTimeoutError(
+                "The AI Agent did not respond in time. Try again, increase the node timeout, or simplify the prompt.",
+                str(invocation_id),
+            )
+        return e
 
-            # Send failure signal to workflow
-            cb_url = ctx.callback_url.get_secret_value() if ctx.callback_url else None
-            await WorkflowSignalClient.send_failure_signal(cb_url, invocation.id, e)
+    async def _handle_execution_failure(
+        self,
+        e: Exception,
+        invocation: Invocation,
+        ctx: InvocationContextData,
+        recorder: MetricsRecorder,
+        invocation_start: float,
+        execution_id: UUID | None,
+        request_id: UUID | None,
+    ) -> None:
+        self._record_invocation_metrics(recorder, invocation_start, invocation.id, status="error", error=e)
+
+        logger.exception(
+            "Exception during invocation execution",
+            invocation_id=invocation.id,
+            error_type=type(e).__name__,
+        )
+
+        if await self._fail_invocation_if_not_cancelled(
+            invocation.id,
+            completed_at=datetime.now(UTC),
+            error_message=(
+                f"{type(e).__name__}: {classify_streaming_error(e).detail}"
+                if isinstance(e, (ToolDiscoveryError, ToolSelectionUnavailableError))
+                else f"{type(e).__name__}: {e}"
+            ),
+        ):
+            AuditEventDispatcher.dispatch(
+                InvocationLifecycleEvent(
+                    session_id=invocation.session_id,
+                    invocation_id=invocation.id,
+                    execution_id=execution_id,
+                    request_id=request_id,
+                    status=InvocationStatus.FAILED,
+                    error_type=type(e).__name__,
+                    activity_id=ctx.activity_id,
+                    activity_name=ctx.activity_name,
+                )
+            )
+
+        cb_url = ctx.callback_url.get_secret_value() if ctx.callback_url else None
+        await WorkflowSignalClient.send_failure_signal(cb_url, invocation.id, e)
 
     async def _update_token_usage(
         self,

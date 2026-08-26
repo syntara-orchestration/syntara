@@ -1,4 +1,4 @@
-import { test, expect, toAppUrl } from './fixtures'
+import { type Page, test, expect, toAppUrl } from './fixtures'
 import {
   createTestCredential,
   deleteCredentialByName,
@@ -6,7 +6,7 @@ import {
   navigateToCredentialDetail,
 } from './helpers/credentials'
 
-async function filterCredentialByName(app: import('@playwright/test').Page, name: string) {
+async function filterCredentialByName(app: Page, name: string) {
   await app.getByPlaceholder('Filter by keyword').fill(name)
   await app.getByRole('button', { name: 'Apply filter' }).click()
 }
@@ -15,7 +15,7 @@ function listRowToggle(row: import('@playwright/test').Locator) {
   return row.getByRole('switch')
 }
 
-function detailPageToggle(app: import('@playwright/test').Page) {
+function detailPageToggle(app: Page) {
   return app.getByRole('switch', { name: /enabled/i })
 }
 

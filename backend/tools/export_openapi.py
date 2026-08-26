@@ -148,7 +148,7 @@ def build_spec_app(*, include_internal: bool = True) -> FastAPI:
     configure_app_logging()
 
     app = FastAPI(
-        title="Syntara API",
+        title="Orchestrator API",
         description="A distributed multi-agent workflow orchestration system",
         version=API_V1_VERSION,
         servers=[{"url": API_V1_PATH_PREFIX, "description": "API v1"}],
