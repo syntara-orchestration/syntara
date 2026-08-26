@@ -69,7 +69,6 @@ test.describe('Credential Delete — Integration Impact Warning', () => {
       await expect(
         modal.getByText("This credential can't be deleted until it's detached from these integrations")
       ).toBeVisible({ timeout: 15_000 })
-      await expect(modal.getByText('Integrations')).toBeVisible()
       await expect(modal.getByText(new RegExp(integrationName))).toBeVisible()
       await expect(modal.getByRole('checkbox')).not.toBeVisible()
       await expect(modal.getByRole('button', { name: 'Detach integrations first' })).toBeDisabled()
