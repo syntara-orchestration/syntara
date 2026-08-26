@@ -22,7 +22,10 @@ from pydantic import BaseModel
 from sqlmodel import col, select
 
 from syntara.aap.auth import AAPConnection
-from syntara.aap.credential_resolver import resolve_aap_connection_from_credential
+from syntara.aap.credential_resolver import (
+    resolve_aap_connection_from_credential,
+    resolve_aap_connection_from_management_credential,
+)
 from syntara.aap.exceptions import AAPAuthenticationError, AAPConnectionError, AAPNotConfiguredError, AAPUpstreamError
 from syntara.aap.models.responses import (
     AAPCredential,
@@ -39,14 +42,9 @@ from syntara.aap.models.responses import (
 )
 from syntara.core.lib.tls_utils import build_integration_httpx_verify
 from syntara.integrations.lib.url_validation import validate_integration_configuration_no_ssrf
-from syntara.integrations.models.integration import (
-    Integration,
-    IntegrationProjectAssignment,
-    IntegrationScope,
-    IntegrationStatus,
-    IntegrationType,
-)
+from syntara.integrations.models.integration import Integration, IntegrationType
 from syntara.integrations.models.integration_configuration import AAPConfiguration
+from syntara.integrations.services.integration_service import IntegrationService
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -362,8 +360,8 @@ class AAPProxyService:
         ``POST /integrations/{id}/validate`` already proved works.
 
         When the caller supplies ``credential_id``, that credential's owner
-        must match ``user_id``. Management-credential fallback is authorized
-        by integration visibility instead of personal ownership.
+        must match ``user_id``. Omitted ``credential_id`` uses the integration's
+        management credential after visibility has been enforced.
 
         Args:
             credential_id: Syntara credential ID for AAP authentication.
@@ -383,34 +381,26 @@ class AAPProxyService:
             msg = "user_id is required when credential_id is provided (authorization check cannot be bypassed)"
             raise ValueError(msg)
         integration = await self._resolve_aap_integration(integration_id)
-        resolved_credential_id, skip_ownership = self._resolve_aap_credential_id(credential_id, integration)
         if user_id is None:
             msg = "user_id is required for AAP proxy connection resolution"
             raise ValueError(msg)
         return await self._resolve_connection_from_integration(
             integration=integration,
-            credential_id=resolved_credential_id,
+            credential_id=credential_id,
             user_id=user_id,
-            skip_ownership_check=skip_ownership,
         )
 
     async def _enforce_integration_visibility(self, integration: Integration) -> None:
         """Raise AAPNotConfiguredError if the caller cannot see the integration.
 
-        GLOBAL integrations are visible to everyone. PROJECT-scoped integrations
-        require the caller to have access to at least one assigned project.
+        Delegates to ``IntegrationService.resolve_visible_integration_ids`` so
+        proxy defaulting and ``GET /integrations`` share the same GLOBAL /
+        project-assignment rules.
         """
-        if self._allowed_projects is None or self._allowed_projects.all_projects:
+        if self._allowed_projects is None:
             return
-        if integration.scope == IntegrationScope.GLOBAL:
-            return
-        stmt = select(IntegrationProjectAssignment.project_id).where(
-            IntegrationProjectAssignment.integration_id == integration.id,
-        )
-        result = await self._session.exec(stmt)
-        assigned_project_ids = set(result.all())
-        user_project_ids = set(self._allowed_projects.project_ids)
-        if not assigned_project_ids & user_project_ids:
+        visible_ids = await IntegrationService.resolve_visible_integration_ids(self._session, self._allowed_projects)
+        if visible_ids is not None and integration.id not in set(visible_ids):
             msg = f"Integration {integration.id} not found"
             raise AAPNotConfiguredError(msg)
 
@@ -420,51 +410,31 @@ class AAPProxyService:
             Integration.integration_type == IntegrationType.ANSIBLE_AUTOMATION_PLATFORM,
             col(Integration.enabled).is_(True),
         )
+        if self._allowed_projects is not None:
+            visible_ids = await IntegrationService.resolve_visible_integration_ids(
+                self._session, self._allowed_projects
+            )
+            if visible_ids is not None:
+                if not visible_ids:
+                    return []
+                stmt = stmt.where(col(Integration.id).in_(visible_ids))
         result = await self._session.exec(stmt)
-        integrations = list(result.all())
-        if self._allowed_projects is None or self._allowed_projects.all_projects:
-            return integrations
-
-        user_project_ids = set(self._allowed_projects.project_ids)
-        visible: list[Integration] = []
-        project_scoped: list[Integration] = []
-        for integration in integrations:
-            if integration.scope == IntegrationScope.GLOBAL:
-                visible.append(integration)
-            else:
-                project_scoped.append(integration)
-
-        if not project_scoped:
-            return visible
-
-        scoped_ids = [integration.id for integration in project_scoped]
-        assign_stmt = select(IntegrationProjectAssignment).where(
-            col(IntegrationProjectAssignment.integration_id).in_(scoped_ids),
-        )
-        assign_result = await self._session.exec(assign_stmt)
-        allowed_ids = {
-            assignment.integration_id for assignment in assign_result.all() if assignment.project_id in user_project_ids
-        }
-        visible.extend(integration for integration in project_scoped if integration.id in allowed_ids)
-        return visible
+        return list(result.all())
 
     @staticmethod
     def _select_default_aap_integration(integrations: list[Integration]) -> Integration:
-        """Pick the unique AAP integration to use when integration_id is omitted.
+        """Pick the unique visible enabled AAP integration when integration_id is omitted.
 
-        Prefers ``validation_status=available``. Raises if none exist or more
-        than one equally eligible integration is visible.
+        Uniqueness is exactly one visible enabled integration, matching the
+        public API contract. ``validation_status`` is not a tie-break.
         """
         if not integrations:
             msg = "No enabled AAP Controller integration is configured"
             raise AAPNotConfiguredError(msg)
-
-        available = [item for item in integrations if item.validation_status == IntegrationStatus.AVAILABLE]
-        candidates = available or integrations
-        if len(candidates) > 1:
+        if len(integrations) > 1:
             msg = "Multiple AAP Controller integrations are configured; pass integration_id to select one"
             raise AAPNotConfiguredError(msg)
-        return candidates[0]
+        return integrations[0]
 
     async def _resolve_aap_integration(self, integration_id: UUID | str | None) -> Integration:
         """Load the requested AAP integration, or the unique visible default."""
@@ -478,28 +448,6 @@ class AAPProxyService:
             integration_name=integration.name,
         )
         return integration
-
-    @staticmethod
-    def _resolve_aap_credential_id(
-        credential_id: UUID | str | None,
-        integration: Integration,
-    ) -> tuple[UUID | str, bool]:
-        """Return (credential_id, skip_ownership) for the proxy request.
-
-        An explicit credential_id keeps the owner check. Omitting it uses the
-        integration's management credential, authorized via integration visibility.
-        """
-        if credential_id:
-            return credential_id, False
-        if integration.management_credential_id:
-            logger.info(
-                "AAP proxy using integration management credential",
-                integration_id=str(integration.id),
-                credential_id=str(integration.management_credential_id),
-            )
-            return integration.management_credential_id, True
-        msg = "credential_id is required for AAP connection resolution"
-        raise AAPNotConfiguredError(msg)
 
     async def _load_aap_integration(self, integration_id: UUID | str) -> Integration:
         """Fetch an AAP integration by ID and enforce type, enabled, and visibility."""
@@ -538,10 +486,8 @@ class AAPProxyService:
     async def _resolve_connection_from_integration(
         self,
         integration: Integration,
-        credential_id: UUID | str,
+        credential_id: UUID | str | None,
         user_id: UUID,
-        *,
-        skip_ownership_check: bool = False,
     ) -> AAPConnection:
         """Resolve AAP connection URL from an integration, with auth from a credential."""
         config = integration.configuration
@@ -560,18 +506,29 @@ class AAPProxyService:
         base_url = config.base_url.rstrip("/")
         verify_ssl = not config.insecure_skip_tls_verify
 
-        logger.debug(
-            "Resolving AAP auth from credential with integration URL",
-            integration_id=str(integration.id),
-            credential_id=str(credential_id),
-            skip_ownership_check=skip_ownership_check,
-        )
-        cred_connection = await resolve_aap_connection_from_credential(
-            session=self._session,
-            credential_id=credential_id,
-            user_id=user_id,
-            skip_ownership_check=skip_ownership_check,
-        )
+        if credential_id:
+            logger.debug(
+                "Resolving AAP auth from credential with integration URL",
+                integration_id=str(integration.id),
+                credential_id=str(credential_id),
+            )
+            cred_connection = await resolve_aap_connection_from_credential(
+                session=self._session,
+                credential_id=credential_id,
+                user_id=user_id,
+            )
+        else:
+            logger.info(
+                "AAP proxy using integration management credential",
+                integration_id=str(integration.id),
+                credential_id=str(integration.management_credential_id)
+                if integration.management_credential_id
+                else None,
+            )
+            cred_connection = await resolve_aap_connection_from_management_credential(
+                session=self._session,
+                integration=integration,
+            )
         return AAPConnection(
             base_url=base_url,
             headers=cred_connection.headers,

@@ -901,7 +901,7 @@ class TestCredentialAuthorization:
         service = AAPProxyService(settings=get_settings(), session=mock_session)
         user_id = uuid4()
 
-        with pytest.raises(AAPNotConfiguredError, match="credential_id is required"):
+        with pytest.raises(AAPNotConfiguredError, match="no management credential"):
             await service._resolve_connection(integration_id=integration.id, user_id=user_id)
 
     @pytest.mark.asyncio
@@ -1039,7 +1039,6 @@ class TestResolveConnectionFromIntegration:
             session=mock_session,
             credential_id=credential_id,
             user_id=user_id,
-            skip_ownership_check=False,
         )
 
     @pytest.mark.asyncio
@@ -1240,10 +1239,17 @@ class TestEnforceIntegrationVisibility:
             timeout=30.0,
         )
 
-        with patch(
-            "syntara.aap.services.aap_proxy_service.resolve_aap_connection_from_credential",
-            new_callable=AsyncMock,
-            return_value=cred_connection,
+        with (
+            patch(
+                "syntara.aap.services.aap_proxy_service.IntegrationService.resolve_visible_integration_ids",
+                new_callable=AsyncMock,
+                return_value=[integration.id],
+            ),
+            patch(
+                "syntara.aap.services.aap_proxy_service.resolve_aap_connection_from_credential",
+                new_callable=AsyncMock,
+                return_value=cred_connection,
+            ),
         ):
             result = await service._resolve_connection(
                 integration_id=integration.id,
@@ -1262,12 +1268,7 @@ class TestEnforceIntegrationVisibility:
         integration = _mock_integration(base_url="https://aap-project.example.com")
         integration.scope = IntegrationScope.PROJECT
 
-        mock_session = AsyncMock()
-        mock_result_integration = MagicMock()
-        mock_result_integration.one_or_none.return_value = integration
-        mock_result_projects = MagicMock()
-        mock_result_projects.all.return_value = [uuid4()]
-        mock_session.exec = AsyncMock(side_effect=[mock_result_integration, mock_result_projects])
+        mock_session = _mock_session_with_integration(integration)
 
         unrelated_project = uuid4()
         restricted_projects = AllowedProjectsResult(all_projects=False, project_ids=[unrelated_project])
@@ -1276,7 +1277,14 @@ class TestEnforceIntegrationVisibility:
         credential_id = uuid4()
         user_id = uuid4()
 
-        with pytest.raises(AAPNotConfiguredError, match="not found"):
+        with (
+            patch(
+                "syntara.aap.services.aap_proxy_service.IntegrationService.resolve_visible_integration_ids",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            pytest.raises(AAPNotConfiguredError, match="not found"),
+        ):
             await service._resolve_connection(
                 integration_id=integration.id,
                 credential_id=credential_id,
@@ -1307,20 +1315,18 @@ class TestDefaultAAPIntegrationResolution:
         with (
             patch.object(service, "_list_visible_aap_integrations", new_callable=AsyncMock, return_value=[integration]),
             patch(
-                "syntara.aap.services.aap_proxy_service.resolve_aap_connection_from_credential",
+                "syntara.aap.services.aap_proxy_service.resolve_aap_connection_from_management_credential",
                 new_callable=AsyncMock,
                 return_value=cred_connection,
-            ) as mock_cred_resolver,
+            ) as mock_mgmt_resolver,
         ):
             result = await service._resolve_connection(user_id=user_id)
 
         assert result.base_url == "https://aap-gw.example.com"
         assert result.headers == {"Authorization": "Bearer mgmt-token"}
-        mock_cred_resolver.assert_called_once_with(
+        mock_mgmt_resolver.assert_called_once_with(
             session=service._session,
-            credential_id=management_credential_id,
-            user_id=user_id,
-            skip_ownership_check=True,
+            integration=integration,
         )
 
     @pytest.mark.asyncio
@@ -1342,18 +1348,16 @@ class TestDefaultAAPIntegrationResolution:
         )
 
         with patch(
-            "syntara.aap.services.aap_proxy_service.resolve_aap_connection_from_credential",
+            "syntara.aap.services.aap_proxy_service.resolve_aap_connection_from_management_credential",
             new_callable=AsyncMock,
             return_value=cred_connection,
-        ) as mock_cred_resolver:
+        ) as mock_mgmt_resolver:
             result = await service._resolve_connection(integration_id=integration.id, user_id=user_id)
 
         assert result.base_url == "https://aap-gw.example.com"
-        mock_cred_resolver.assert_called_once_with(
+        mock_mgmt_resolver.assert_called_once_with(
             session=mock_session,
-            credential_id=management_credential_id,
-            user_id=user_id,
-            skip_ownership_check=True,
+            integration=integration,
         )
 
     @pytest.mark.asyncio
@@ -1389,7 +1393,6 @@ class TestDefaultAAPIntegrationResolution:
             session=mock_session,
             credential_id=credential_id,
             user_id=user_id,
-            skip_ownership_check=False,
         )
 
     @pytest.mark.asyncio
@@ -1408,8 +1411,8 @@ class TestDefaultAAPIntegrationResolution:
             await service._resolve_connection(user_id=uuid4())
 
     @pytest.mark.asyncio
-    async def test_prefers_available_integration_when_others_are_unvalidated(self) -> None:
-        """A single validated integration wins over unvalidated siblings."""
+    async def test_multiple_enabled_integrations_require_explicit_id_even_if_one_is_available(self) -> None:
+        """Uniqueness is visible-enabled, not validation_status=available."""
         available = _mock_integration(
             name="Healthy AAP",
             base_url="https://healthy.example.com",
@@ -1418,12 +1421,6 @@ class TestDefaultAAPIntegrationResolution:
         )
         unknown = _mock_integration(name="Unvalidated AAP", validation_status="unknown")
         service = _service()
-        cred_connection = AAPConnection(
-            base_url="",
-            headers={"Authorization": "Bearer tok"},
-            verify_ssl=True,
-            timeout=30.0,
-        )
 
         with (
             patch.object(
@@ -1432,15 +1429,9 @@ class TestDefaultAAPIntegrationResolution:
                 new_callable=AsyncMock,
                 return_value=[unknown, available],
             ),
-            patch(
-                "syntara.aap.services.aap_proxy_service.resolve_aap_connection_from_credential",
-                new_callable=AsyncMock,
-                return_value=cred_connection,
-            ),
+            pytest.raises(AAPNotConfiguredError, match="pass integration_id"),
         ):
-            result = await service._resolve_connection(user_id=uuid4())
-
-        assert result.base_url == "https://healthy.example.com"
+            await service._resolve_connection(user_id=uuid4())
 
 
 class TestSelectDefaultAAPIntegration:
@@ -1453,6 +1444,12 @@ class TestSelectDefaultAAPIntegration:
     def test_single_integration_returned(self) -> None:
         integration = _mock_integration()
         assert AAPProxyService._select_default_aap_integration([integration]) is integration
+
+    def test_two_enabled_integrations_raise(self) -> None:
+        with pytest.raises(AAPNotConfiguredError, match="pass integration_id"):
+            AAPProxyService._select_default_aap_integration(
+                [_mock_integration(name="one"), _mock_integration(name="two")]
+            )
 
 
 class TestListVisibleAAPIntegrations:
@@ -1472,36 +1469,31 @@ class TestListVisibleAAPIntegrations:
         assert result == [integration]
 
     @pytest.mark.asyncio
-    async def test_project_scoped_integration_hidden_without_assignment(self) -> None:
+    async def test_empty_visible_ids_returns_empty(self) -> None:
         from syntara.authz.engine import AllowedProjectsResult
-        from syntara.integrations.models.integration import IntegrationScope
 
-        integration = _mock_integration()
-        integration.scope = IntegrationScope.PROJECT
         mock_session = AsyncMock()
-        mock_integrations = MagicMock()
-        mock_integrations.all.return_value = [integration]
-        mock_assignments = MagicMock()
-        mock_assignments.all.return_value = []
-        mock_session.exec = AsyncMock(side_effect=[mock_integrations, mock_assignments])
-
         service = AAPProxyService(
             settings=get_settings(),
             session=mock_session,
             allowed_projects=AllowedProjectsResult(all_projects=False, project_ids=[uuid4()]),
         )
 
-        result = await service._list_visible_aap_integrations()
+        with patch(
+            "syntara.aap.services.aap_proxy_service.IntegrationService.resolve_visible_integration_ids",
+            new_callable=AsyncMock,
+            return_value=[],
+        ):
+            result = await service._list_visible_aap_integrations()
 
         assert result == []
+        mock_session.exec.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_global_integration_visible_to_project_restricted_caller(self) -> None:
+    async def test_restricts_query_to_visible_ids(self) -> None:
         from syntara.authz.engine import AllowedProjectsResult
-        from syntara.integrations.models.integration import IntegrationScope
 
         integration = _mock_integration()
-        integration.scope = IntegrationScope.GLOBAL
         mock_session = AsyncMock()
         mock_result = MagicMock()
         mock_result.all.return_value = [integration]
@@ -1513,35 +1505,36 @@ class TestListVisibleAAPIntegrations:
             allowed_projects=AllowedProjectsResult(all_projects=False, project_ids=[uuid4()]),
         )
 
-        result = await service._list_visible_aap_integrations()
+        with patch(
+            "syntara.aap.services.aap_proxy_service.IntegrationService.resolve_visible_integration_ids",
+            new_callable=AsyncMock,
+            return_value=[integration.id],
+        ):
+            result = await service._list_visible_aap_integrations()
 
         assert result == [integration]
 
     @pytest.mark.asyncio
-    async def test_project_scoped_integration_visible_with_matching_assignment(self) -> None:
+    async def test_unrestricted_all_projects_does_not_filter_ids(self) -> None:
         from syntara.authz.engine import AllowedProjectsResult
-        from syntara.integrations.models.integration import IntegrationScope
 
-        project_id = uuid4()
         integration = _mock_integration()
-        integration.scope = IntegrationScope.PROJECT
-        assignment = MagicMock()
-        assignment.integration_id = integration.id
-        assignment.project_id = project_id
-
         mock_session = AsyncMock()
-        mock_integrations = MagicMock()
-        mock_integrations.all.return_value = [integration]
-        mock_assignments = MagicMock()
-        mock_assignments.all.return_value = [assignment]
-        mock_session.exec = AsyncMock(side_effect=[mock_integrations, mock_assignments])
-
+        mock_result = MagicMock()
+        mock_result.all.return_value = [integration]
+        mock_session.exec.return_value = mock_result
         service = AAPProxyService(
             settings=get_settings(),
             session=mock_session,
-            allowed_projects=AllowedProjectsResult(all_projects=False, project_ids=[project_id]),
+            allowed_projects=AllowedProjectsResult(all_projects=True, project_ids=[]),
         )
 
-        result = await service._list_visible_aap_integrations()
+        with patch(
+            "syntara.aap.services.aap_proxy_service.IntegrationService.resolve_visible_integration_ids",
+            new_callable=AsyncMock,
+            return_value=None,
+        ) as mock_resolve:
+            result = await service._list_visible_aap_integrations()
 
         assert result == [integration]
+        mock_resolve.assert_called_once()

@@ -61,6 +61,10 @@ router = APIRouter(prefix="/proxies/aap", tags=["Ansible Automation Platform Pro
 
 _integration_scope = ProjectScopeFilter("integration", "read")
 
+# The proxy always authenticates with a Syntara credential: query.credential_id
+# or the integration's management credential. Env-var auth is not used here.
+_PROXY_USES_SYNTARA_CREDENTIAL = True
+
 
 # ============================================================================
 # Dependency Injection
@@ -108,7 +112,7 @@ async def list_organizations(
                 user_id=current_user.id,
                 username=current_user.username,
                 result_count=result_count,
-                credential_used=query.credential_id is not None,
+                credential_used=_PROXY_USES_SYNTARA_CREDENTIAL,
                 search_filter=query.search,
                 error_type=error_type,
                 principal_type=current_user.__dict__.get("__principal_type__"),
@@ -140,7 +144,7 @@ async def list_job_templates(
                 user_id=current_user.id,
                 username=current_user.username,
                 result_count=result_count,
-                credential_used=query.credential_id is not None,
+                credential_used=_PROXY_USES_SYNTARA_CREDENTIAL,
                 search_filter=query.search,
                 organization_filter=query.organization,
                 error_type=error_type,
@@ -182,7 +186,7 @@ async def get_job_template(
                 username=current_user.username,
                 resource_id=job_template_id,
                 resource_name=resource_name,
-                credential_used=query.credential_id is not None,
+                credential_used=_PROXY_USES_SYNTARA_CREDENTIAL,
                 error_type=error_type,
                 principal_type=current_user.__dict__.get("__principal_type__"),
             )
@@ -215,7 +219,7 @@ async def list_workflow_job_templates(
                 user_id=current_user.id,
                 username=current_user.username,
                 result_count=result_count,
-                credential_used=query.credential_id is not None,
+                credential_used=_PROXY_USES_SYNTARA_CREDENTIAL,
                 search_filter=query.search,
                 organization_filter=query.organization,
                 error_type=error_type,
@@ -261,7 +265,7 @@ async def get_workflow_job_template(
                 username=current_user.username,
                 resource_id=workflow_job_template_id,
                 resource_name=resource_name,
-                credential_used=query.credential_id is not None,
+                credential_used=_PROXY_USES_SYNTARA_CREDENTIAL,
                 error_type=error_type,
                 principal_type=current_user.__dict__.get("__principal_type__"),
             )
@@ -292,7 +296,7 @@ async def list_inventories(
                 user_id=current_user.id,
                 username=current_user.username,
                 result_count=result_count,
-                credential_used=query.credential_id is not None,
+                credential_used=_PROXY_USES_SYNTARA_CREDENTIAL,
                 search_filter=query.search,
                 organization_filter=query.organization,
                 error_type=error_type,
@@ -327,7 +331,7 @@ async def list_execution_environments(
                 user_id=current_user.id,
                 username=current_user.username,
                 result_count=result_count,
-                credential_used=query.credential_id is not None,
+                credential_used=_PROXY_USES_SYNTARA_CREDENTIAL,
                 search_filter=query.search,
                 organization_filter=query.organization,
                 error_type=error_type,
@@ -360,7 +364,7 @@ async def list_credentials(
                 user_id=current_user.id,
                 username=current_user.username,
                 result_count=result_count,
-                credential_used=query.credential_id is not None,
+                credential_used=_PROXY_USES_SYNTARA_CREDENTIAL,
                 search_filter=query.search,
                 error_type=error_type,
                 principal_type=current_user.__dict__.get("__principal_type__"),
@@ -392,7 +396,7 @@ async def list_instance_groups(
                 user_id=current_user.id,
                 username=current_user.username,
                 result_count=result_count,
-                credential_used=query.credential_id is not None,
+                credential_used=_PROXY_USES_SYNTARA_CREDENTIAL,
                 search_filter=query.search,
                 error_type=error_type,
                 principal_type=current_user.__dict__.get("__principal_type__"),
@@ -424,7 +428,7 @@ async def list_labels(
                 user_id=current_user.id,
                 username=current_user.username,
                 result_count=result_count,
-                credential_used=query.credential_id is not None,
+                credential_used=_PROXY_USES_SYNTARA_CREDENTIAL,
                 search_filter=query.search,
                 error_type=error_type,
                 principal_type=current_user.__dict__.get("__principal_type__"),
