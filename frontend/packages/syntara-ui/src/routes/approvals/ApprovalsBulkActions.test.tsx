@@ -12,9 +12,10 @@ describe('ApprovalsBulkActions', () => {
     onReject: vi.fn(),
   }
 
-  it('renders approve and reject buttons', () => {
+  it('renders approve and reject buttons inside a toolbar', () => {
     render(<ApprovalsBulkActions {...defaultProps} />)
 
+    expect(screen.getByRole('toolbar', { name: 'Approval actions' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /approve/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /reject/i })).toBeInTheDocument()
   })
@@ -37,6 +38,7 @@ describe('ApprovalsBulkActions', () => {
     render(<ApprovalsBulkActions {...defaultProps} selectedCount={5} />)
 
     expect(screen.getByText('5 selected')).toBeInTheDocument()
+    expect(screen.getByRole('toolbar', { name: '5 selected' })).toBeInTheDocument()
   })
 
   it('does not show selection count when no items selected', () => {
