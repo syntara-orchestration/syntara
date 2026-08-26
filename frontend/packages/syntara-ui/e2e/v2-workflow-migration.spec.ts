@@ -362,7 +362,7 @@ test.describe('V2 Workflow Schema Migration', () => {
       ]
       for (const nodeName of nodeNames) {
         await expect(
-          app.locator('.react-flow').getByRole('group', { name: new RegExp(`^${nodeName}(,|$)`) }),
+          app.locator('.react-flow').getByRole('button', { name: new RegExp(`^${nodeName}(,|$)`) }),
           `node "${nodeName}" should be present after reload`
         ).toBeAttached({ timeout: 15_000 })
       }
