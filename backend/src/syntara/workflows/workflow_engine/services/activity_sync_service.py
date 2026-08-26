@@ -934,6 +934,7 @@ class ActivitySyncService:
             if failed_node_map is None:
                 failed_node_map = self._extract_failed_activities_from_event(event)
             await self._sync_skipped_nodes(metadata, handle)
+            await self._sync_detached_nodes(metadata, handle)
             await self._update_execution_status_from_event(metadata, event, failed_node_map)
             metadata.last_processed_event_id = event.event_id
             return True
@@ -2477,6 +2478,45 @@ class ActivitySyncService:
         except Exception:
             logger.exception(
                 "Error syncing skipped nodes to database",
+                execution_id=metadata.execution_id,
+            )
+
+    async def _sync_detached_nodes(
+        self,
+        metadata: ExecutionMonitorMetadata,
+        handle: WorkflowHandle[Any, Any],
+    ) -> None:
+        """Query workflow for detached nodes and mark them as CANCELLED in the database.
+
+        Detached nodes were in-flight when a converge ANY strategy fired.  They are
+        not in skipped_nodes (the workflow deliberately excludes them so their actual
+        Temporal result is preserved when possible), but if the workflow finishes
+        before the detached activity completes, the safety net would otherwise label
+        them SKIPPED.  Querying here and writing CANCELLED first wins the race against
+        _finalize_non_terminal_activities, whose terminal-status guard then leaves the
+        record untouched.
+        """
+        detached_node_ids: list[str] = []
+        try:
+            detached_node_ids = await handle.query("get_detached_nodes")
+        except Exception:
+            logger.exception(
+                "Error querying detached nodes",
+                execution_id=metadata.execution_id,
+            )
+
+        if not detached_node_ids:
+            return
+
+        try:
+            await self._sync_nodes_to_terminal_status(
+                metadata,
+                node_ids=detached_node_ids,
+                target_status=ActivityStatus.CANCELLED,
+            )
+        except Exception:
+            logger.exception(
+                "Error syncing detached nodes to cancelled status",
                 execution_id=metadata.execution_id,
             )
 

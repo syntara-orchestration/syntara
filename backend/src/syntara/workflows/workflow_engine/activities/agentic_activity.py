@@ -11,13 +11,14 @@ from uuid import UUID
 
 import structlog
 from pydantic import ValidationError
+from sqlmodel import select
 from temporalio import activity, workflow
 from temporalio.exceptions import ApplicationError, CancelledError
 
 from syntara.settings.cache.settings_cache import get_runtime_settings
 from syntara.workflows.workflow_engine import constants
 from syntara.workflows.workflow_engine.models import AgenticExecutorParameters
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
+from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, NodeType
 from syntara.workflows.workflow_engine.utils.credential_scrubber import ensure_resolved_credentials_dict
 
 from .common import HEARTBEAT_PARTIAL_OUTPUT_KEY, HEARTBEAT_STOP_MONITOR, ActivityExecutionError
@@ -53,11 +54,14 @@ class AgenticActivityError(ActivityExecutionError):
 async def _inject_runtime_settings(input_config: dict[str, Any]) -> None:
     """Inject live runtime settings into agentic activity config.
 
+    Pops the engine-injected timeout key and normalises it into
+    ``input_config["timeout"]`` so downstream code can read it before
+    ``model_validate`` discards unknown keys.
+
     Raises:
         ValueError: If the prompt exceeds the configured max length.
 
     """
-    # Pop the engine-injected timeout so it isn't forwarded to the orchestrator.
     engine_timeout = int(input_config.pop(constants.ENGINE_TIMEOUT_SECONDS_KEY, 300))
     if "timeout" not in input_config:
         input_config["timeout"] = engine_timeout
@@ -205,6 +209,7 @@ async def execute_agentic_activity(
                 file_ids=file_ids,
                 metadata=agent_metadata,
                 project_id=project_id,
+                timeout_seconds=input_config.get("timeout"),
             )
 
             logger.info(
@@ -264,3 +269,61 @@ def _inject_llm_credential_metadata(metadata: dict[str, Any], input_data: dict[s
     cred_id = resolved_creds.get("credential_id")
     if cred_id:
         metadata["credential_id"] = cred_id
+
+
+@activity.defn(name=ActivityName.CANCEL_AGENTIC)
+async def cancel_agentic_invocation_activity(
+    execution_id: str,
+    node_id: str | None = None,
+    reason: str = "Workflow cancelled",
+) -> dict[str, Any]:
+    """Best-effort cancel running agentic invocations for an execution.
+
+    Queries the activity_execution table for running agentic activities,
+    extracts invocation_ids from output_data, and cancels each.
+
+    Args:
+        execution_id: Parent workflow execution ID.
+        node_id: Optional node filter. When set, only the invocation for
+            this node is cancelled (timeout case). When None, all running
+            agentic invocations for the execution are cancelled (workflow
+            cancellation case).
+        reason: Cancellation reason forwarded to the orchestrator.
+
+    """
+    from syntara.core.database.session import get_db  # noqa: PLC0415
+    from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus  # noqa: PLC0415
+
+    invocation_ids: list[str] = []
+    async for session in get_db():
+        stmt = select(ActivityExecution).where(
+            ActivityExecution.execution_id == UUID(execution_id),
+            ActivityExecution.node_type == NodeType.AGENTIC,
+            ActivityExecution.status.in_([ActivityStatus.RUNNING, ActivityStatus.PENDING]),  # type: ignore[attr-defined]
+        )
+        if node_id:
+            stmt = stmt.where(ActivityExecution.activity_name == node_id)
+        result = await session.exec(stmt)
+        for act in result.all():
+            if isinstance(act.output_data, dict):
+                inv_id = act.output_data.get("invocation_id")
+                if inv_id:
+                    invocation_ids.append(str(inv_id))
+
+    if not invocation_ids:
+        logger.info("No running agentic invocations to cancel", execution_id=execution_id, node_id=node_id)
+        return {"attempted_count": 0}
+
+    async with AgentOrchestratorClient(
+        base_url=constants.AGENT_ORCHESTRATOR_BASE_URL,
+    ) as client:
+        for inv_id in invocation_ids:
+            await client.cancel_invocation(inv_id, reason=reason)
+
+    logger.info(
+        "Cancel requested for agentic invocations",
+        execution_id=execution_id,
+        node_id=node_id,
+        attempted_count=len(invocation_ids),
+    )
+    return {"attempted_count": len(invocation_ids)}
