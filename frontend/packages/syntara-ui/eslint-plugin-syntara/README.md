@@ -132,6 +132,18 @@ Use `DateCell` (table cells / detail fields), `UserTimestamp` (username + date),
 ],
 ```
 
+### `no-nested-component-definitions`
+
+Disallows React component definitions inside other functions or components (Sonar S6478). Nested components are re-created on every render, causing React to unmount and remount the entire subtree. Move the component to module scope and pass data as props.
+
+Test files and test utility directories are exempt — wrapper components defined in tests are idiomatic.
+
+### `no-hardcoded-doc-urls`
+
+Disallows hardcoded documentation URLs in project code. Use `useDocLink('key')` from `src/utils/docs/useDocLink.ts` and add new keys to `docsUrls.json` when needed.
+
+Exempt: `docsUrls.json`, `useDocLink.ts`, and `*.test.*` / `*.spec.*` files.
+
 ## Testing
 
 Run the test suite:

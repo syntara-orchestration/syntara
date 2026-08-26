@@ -97,6 +97,20 @@ export default tseslint.config(
           message:
             'Use PatternFly Select, SelectList, SelectOption, and MenuToggle instead of FormSelect / FormSelectOption.',
         },
+        {
+          selector: 'JSXOpeningElement[name.name="select"]',
+          message:
+            'Do not use native <select>. Use the PF6 Select + MenuToggle + SelectList + SelectOption pattern for accessible, styled dropdowns.',
+        },
+      ],
+      // Surface TODO/FIXME/HACK comments as warnings (does not fail lint / CI).
+      'no-warning-comments': [
+        'warn',
+        {
+          terms: ['TODO', 'FIXME', 'HACK', 'XXX'],
+          location: 'start',
+          decoration: ['/', '*'],
+        },
       ],
       // axios restriction merged into the icon/wouter no-restricted-imports block below
       // to avoid flat-config rule shadowing (the last matching block wins for a given rule).
@@ -158,6 +172,11 @@ export default tseslint.config(
               importNames: ['Link'],
               message:
                 'Use SynLink from components/SynLink instead of TanStack Link directly. SynLink provides consistent PatternFly styling.',
+            },
+            {
+              group: ['@syntara/contracts/src', '@syntara/contracts/src/**'],
+              message:
+                "Import from '@syntara/contracts' (the public entry point), not from internal source paths. Internal paths are not part of the published API and can break silently when the package restructures.",
             },
           ],
         },
@@ -309,6 +328,10 @@ export default tseslint.config(
           ],
         },
       ],
+      'syntara/no-nested-component-definitions': 'error',
+      'syntara/no-hardcoded-doc-urls': 'error',
+      // Ban non-null assertions in project source; tests/e2e turn this off below.
+      '@typescript-eslint/no-non-null-assertion': 'error',
       // Catch unnecessary useEffect patterns. Aligns with https://react.dev/learn/you-might-not-need-an-effect
       'reactYouMightNotNeedAnEffect/no-derived-state': 'warn',
       'reactYouMightNotNeedAnEffect/no-chain-state-updates': 'warn',
@@ -372,6 +395,10 @@ export default tseslint.config(
       'syntara/use-design-tokens-not-hardcoded': 'off',
       'syntara/prefer-confirmation-dialog': 'off',
       'syntara/no-locale-date-format': 'off',
+      'syntara/no-nested-component-definitions': 'off',
+      'syntara/no-hardcoded-doc-urls': 'off',
+      'no-warning-comments': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'off',
       'reactYouMightNotNeedAnEffect/no-derived-state': 'off',
       'reactYouMightNotNeedAnEffect/no-chain-state-updates': 'off',
       'reactYouMightNotNeedAnEffect/no-event-handler': 'off',
@@ -443,6 +470,40 @@ export default tseslint.config(
     },
   },
   {
+    // Cover helpers + specs: Page must come from fixtures; ban networkidle waits.
+    // Fixtures re-export Page; visual-regression keeps direct playwright imports.
+    files: ['e2e/**/*.{ts,tsx}'],
+    ignores: ['e2e/fixtures.ts', 'e2e/authorization/fixtures.ts', 'e2e/visual-regression/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@playwright/test'],
+              importNamePattern: '^Page$',
+              message:
+                "Import 'type Page' from '../fixtures' (or './fixtures'), which re-exports it. All Playwright primitives must flow through the project fixtures module.",
+            },
+            {
+              group: ['@syntara/contracts/src', '@syntara/contracts/src/**'],
+              message:
+                "Import from '@syntara/contracts' (the public entry point), not from internal source paths. Internal paths are not part of the published API and can break silently when the package restructures.",
+            },
+          ],
+        },
+      ],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "CallExpression[callee.property.name='waitForLoadState'][arguments.0.value='networkidle']",
+          message:
+            "Do not use waitForLoadState('networkidle') in SPAs — long-lived WebSocket connections prevent the network from ever reaching idle, making this assertion unreliable and a source of flakiness. Use explicit locator assertions (e.g. expect(locator).toBeVisible()) to confirm UI readiness instead.",
+        },
+      ],
+    },
+  },
+  {
     files: ['e2e/**/*.spec.ts'],
     rules: {
       // In flat config, array-valued rules replace (not merge with) earlier blocks.
@@ -455,15 +516,40 @@ export default tseslint.config(
           message:
             'Do not use dispatchEvent() in E2E tests. Use Playwright .click() which simulates real user interaction (scroll, hover, click center). dispatchEvent fires a synthetic event that can mask interaction bugs.',
         },
+        {
+          selector: "CallExpression[callee.property.name='waitForLoadState'][arguments.0.value='networkidle']",
+          message:
+            "Do not use waitForLoadState('networkidle') in SPAs — long-lived WebSocket connections prevent the network from ever reaching idle, making this assertion unreliable and a source of flakiness. Use explicit locator assertions (e.g. expect(locator).toBeVisible()) to confirm UI readiness instead.",
+        },
+        // Block fragile CSS class selectors inside locator(). Targets:
+        //   .pf-v6-*           — PatternFly CSS classes (implementation details, break on PF upgrades)
+        //   #id                — raw ID shorthand (use getByRole/getByLabel instead)
+        //   [class*="pf-..."]  — PF CSS class attribute selectors
+        // Allowed (stable identifiers):
+        //   [id="..."]              — settings/form field IDs tied to API keys
+        //   [data-*]               — explicit test/data attributes
+        //   .react-flow__*         — React Flow library API (stable)
+        //   [class*="moduleName"]  — CSS module class names (stable, Vite-preserved)
+        {
+          selector:
+            'CallExpression[callee.property.name="locator"] > .arguments:first-child[type="Literal"][value=/^\\.pf-|^#|^\\[class[^\\]]*=[\'"]pf-/]',
+          message:
+            'Do not use PatternFly CSS class selectors in locator(). Use semantic Playwright locators instead: getByRole, getByLabel, getByPlaceholder, getByText, or getByTestId.',
+        },
       ],
-      // Targets Playwright locator.first() -- .first() is not a standard JS/Array
-      // method, so false positives on non-Playwright code are rare in E2E specs.
+      // Targets Playwright locator.first() / .nth() -- not standard JS/Array methods,
+      // so false positives on non-Playwright code are rare in E2E specs.
       'no-restricted-properties': [
         'error',
         {
           property: 'first',
           message:
             'Avoid .first() — the locator should be specific enough to match exactly one element. If there are duplicates, scope with a parent locator.',
+        },
+        {
+          property: 'nth',
+          message:
+            'Avoid .nth() — use a specific locator that matches exactly one element instead. Exception: when asserting on an ordered list where position is semantically meaningful (e.g. table rows). Never use .nth(0).waitFor({ state: "hidden" }) to wait for all elements to disappear — use expect(locator).toHaveCount(0) instead.',
         },
       ],
     },
@@ -485,6 +571,17 @@ export default tseslint.config(
               importNamePattern: '^test$',
               message:
                 "Import `test` from the local fixtures file (e2e/fixtures.ts) instead of @playwright/test directly. The local fixtures extend Playwright's test with Currents action fixtures for automatic flaky test quarantine.",
+            },
+            {
+              group: ['@playwright/test'],
+              importNamePattern: '^Page$',
+              message:
+                "Import 'type Page' from '../fixtures' (or './fixtures'), which re-exports it. All Playwright primitives must flow through the project fixtures module.",
+            },
+            {
+              group: ['@syntara/contracts/src', '@syntara/contracts/src/**'],
+              message:
+                "Import from '@syntara/contracts' (the public entry point), not from internal source paths. Internal paths are not part of the published API and can break silently when the package restructures.",
             },
           ],
         },
@@ -535,6 +632,7 @@ export default tseslint.config(
       'testing-library/prefer-screen-queries': 'off',
       // Playwright worker-scoped fixtures require destructured first arg even when no deps are needed
       'no-empty-pattern': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'off',
     },
   },
   {

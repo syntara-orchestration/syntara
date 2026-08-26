@@ -1,4 +1,6 @@
-import { type Page, type Request } from '@playwright/test'
+import { type Request } from '@playwright/test'
+
+import { type Page } from '../fixtures'
 
 import { closeNodeEditorPanel } from './workflows'
 

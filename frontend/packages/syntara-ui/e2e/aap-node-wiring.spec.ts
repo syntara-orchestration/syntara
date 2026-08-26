@@ -5,7 +5,7 @@
  * to a configured AAP Gateway integration and that job/workflow templates
  * are browsable via the resource pickers.
  */
-import { test, expect } from './fixtures'
+import { type Page, test, expect } from './fixtures'
 import { buildUniqueName, clickAddConnectedStep, startWorkflowWithTrigger } from './helpers/workflows'
 import { isSkipWebServerForPlaywrightTests } from './playwrightWebServerEnv'
 import { deleteIntegrationViaApi } from './seeds/resources'
@@ -13,10 +13,7 @@ import { apiRequest, deleteCredentialViaApi, ensureProject } from './utils/api'
 
 const isRealBackend = isSkipWebServerForPlaywrightTests()
 
-async function createAAPIntegration(
-  app: import('@playwright/test').Page,
-  name: string
-): Promise<{ integrationId: string; credentialId: string }> {
+async function createAAPIntegration(app: Page, name: string): Promise<{ integrationId: string; credentialId: string }> {
   const project = await ensureProject(app)
   if (!project) throw new Error('Could not ensure project')
 
