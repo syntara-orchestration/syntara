@@ -275,7 +275,10 @@ class TestRotateCredential:
 
     @pytest.mark.asyncio
     async def test_rotate_acquires_row_lock(
-        self, service: ServiceAccountCredentialService, mock_session: AsyncMock
+        self,
+        service: ServiceAccountCredentialService,
+        mock_session: AsyncMock,
+        override_runtime_settings: Callable[..., AbstractContextManager[object]],
     ) -> None:
         mock_cred = MagicMock(spec=ServiceAccountCredential)
         mock_cred.credential_type = ServiceAccountCredentialType.CLIENT_CREDENTIALS
@@ -294,11 +297,12 @@ class TestRotateCredential:
 
         mock_session.exec.side_effect = exec_side_effect
 
-        with patch.object(type(service), "get_credential", wraps=service.get_credential) as wrapped:
-            await service.rotate_credential(uuid4(), service_account_id=uuid4())
-            wrapped.assert_called_once()
-            _, kwargs = wrapped.call_args
-            assert kwargs["for_update"] is True
+        with override_runtime_settings({"service_accounts.credential_max_lifetime_days": 0}):
+            with patch.object(type(service), "get_credential", wraps=service.get_credential) as wrapped:
+                await service.rotate_credential(uuid4(), service_account_id=uuid4())
+                wrapped.assert_called_once()
+                _, kwargs = wrapped.call_args
+                assert kwargs["for_update"] is True
 
 
 class TestConversionMethods:
