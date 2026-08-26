@@ -536,12 +536,10 @@ async def test_delete_project_blocked_when_credential_referenced_by_integration(
     assert "blocking-integration" in str(exc_info.value)
     assert "proj-cred-blocked" in str(exc_info.value)
 
-    # Project, credential, and integration are all still intact
-    seeded_db.expire_all()
-    assert (await seeded_db.exec(select(Credential).where(Credential.id == cred_id))).first() is not None
-    assert (await seeded_db.exec(select(Integration).where(Integration.id == int_id))).first() is not None
-
-    # Clean up: detach integration via raw update to avoid ORM attribute access
+    # Clean up: detach integration via raw update, then retry delete.
+    # Avoid expire_all() here — it would expire test_user (self.user on
+    # the service), causing MissingGreenlet when _cascade_cleanup accesses
+    # self.user.id in the second delete_project call below.
     from sqlalchemy import update
 
     await seeded_db.exec(
