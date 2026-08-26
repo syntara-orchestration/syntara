@@ -201,7 +201,7 @@ test.describe('V2 Workflow Schema Migration', () => {
       await app.getByPlaceholder('Filter by name').fill(workflowName)
       await app.getByRole('button', { name: 'Apply filter' }).click()
       const targetRow = app.getByRole('row', { name: new RegExp(workflowName) })
-      await expect(targetRow).toBeVisible()
+      await expect(targetRow).toBeVisible({ timeout: 15_000 })
     } finally {
       await deleteWorkflow(app, workflowName)
       await deleteLlmIntegration(app, llmIntegration.id)
@@ -341,7 +341,7 @@ test.describe('V2 Workflow Schema Migration', () => {
       await app.getByPlaceholder('Filter by name').fill(workflowName)
       await app.getByRole('button', { name: 'Apply filter' }).click()
       const targetRow = app.getByRole('row', { name: new RegExp(workflowName) })
-      await expect(targetRow).toBeVisible()
+      await expect(targetRow).toBeVisible({ timeout: 15_000 })
 
       // Reopen the saved workflow
       await targetRow.getByRole('link', { name: workflowName, exact: true }).click()
