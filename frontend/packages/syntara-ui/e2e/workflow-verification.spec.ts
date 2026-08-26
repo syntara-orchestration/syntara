@@ -409,8 +409,9 @@ test.describe('Variable reference validation', () => {
       await expect(app.getByText(/Verification failed/)).toBeVisible({ timeout: VERIFY_BANNER_TIMEOUT })
 
       await app.getByRole('button', { name: /alert details/i }).click()
-      // Frontend finding starts with `Step "..."`, not a leading quote.
-      await expect(app.getByText(/is not a defined trigger field/i)).toBeVisible({
+      // Anchor at a leading quote so this matches only the mocked API finding, not the
+      // client-side "Step \"...\"" row (Playwright strict mode fails if both match).
+      await expect(app.getByText(/^".*" is not a defined trigger field/i)).toBeVisible({
         timeout: VERIFY_BANNER_TIMEOUT,
       })
     } finally {
