@@ -1,5 +1,4 @@
 import { defineConfig } from '@playwright/test'
-import { currentsReporter } from '@currents/playwright'
 import { config } from 'dotenv'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -41,7 +40,6 @@ export default defineConfig({
     [process.env.CI ? 'line' : 'list'],
     ['json', { outputFile: 'test-results/results.json' }],
     ['html', { outputFolder: 'playwright-report', open: 'never' }],
-    ...(process.env.CURRENTS_PROJECT_ID && process.env.CURRENTS_RECORD_KEY ? [currentsReporter()] : []),
   ],
   use: {
     baseURL,

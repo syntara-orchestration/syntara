@@ -39,9 +39,6 @@ are stored at **repo level**.
 |--------|-----------|
 | `SONAR_TOKEN` | Per-repo SonarCloud project token |
 | `OPENROUTER_API_KEY` | Only this repo has LLM integration tests |
-| `CURRENTS_PROJECT_ID` | Per-repo Currents.dev project |
-| `CURRENTS_RECORD_KEY` | Per-repo Currents.dev recording |
-| `CURRENTS_API_KEY` | Per-repo Currents.dev API access |
 | `RAPIDAST_GCP_KEY` | Only this repo runs DAST scans |
 | `SLACK_CI_MONITORING_WEBHOOK_URL` | Slack webhook for merge queue monitoring alerts |
 

@@ -336,13 +336,6 @@ export default tseslint.config(
     },
   },
   {
-    // Currents requires a default export for its config file — exempt from the default-export ban
-    files: ['currents.config.ts'],
-    rules: {
-      'no-restricted-exports': 'off',
-    },
-  },
-  {
     // Playwright globalSetup runs in Node before tests — requires default export and uses console for logging
     files: ['e2e/global-setup.ts'],
     rules: {
@@ -484,7 +477,7 @@ export default tseslint.config(
               group: ['@playwright/test'],
               importNamePattern: '^test$',
               message:
-                "Import `test` from the local fixtures file (e2e/fixtures.ts) instead of @playwright/test directly. The local fixtures extend Playwright's test with Currents action fixtures for automatic flaky test quarantine.",
+                "Import `test` from the local fixtures file (e2e/fixtures.ts) instead of @playwright/test directly. The local fixtures extend Playwright's test with custom app fixtures.",
             },
           ],
         },

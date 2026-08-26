@@ -143,7 +143,7 @@ on fork PRs. Known examples (see
 | Area | Secrets involved | What to expect on forks |
 | --- | --- | --- |
 | Snyk SAST / SCA | `SNYK_TOKEN` (org) | May skip, fail, or lack token access vs in-org PRs |
-| Podman Compose E2E | `RH_REGISTRY_USER` / `RH_REGISTRY_TOKEN` (and related repo secrets such as Currents / OpenRouter where used) | Not fully verified from forks yet — registry login and compose steps are the main suspects if these jobs fail only on fork PRs |
+| Podman Compose E2E | `RH_REGISTRY_USER` / `RH_REGISTRY_TOKEN` (and related repo secrets such as OpenRouter where used) | Not fully verified from forks yet — registry login and compose steps are the main suspects if these jobs fail only on fork PRs |
 | Maintainer comment commands | N/A | `/build-pr-image` (and similar) only run for org owners/members — see [backend/CONTRIBUTING.md](backend/CONTRIBUTING.md#ci-commands-for-maintainers) |
 
 If you see **other** unexpected failures on a fork PR that look like missing

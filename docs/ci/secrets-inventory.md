@@ -15,9 +15,6 @@ workflows.
 | `QUAY_TOKEN` | Shared | Org | `build-frontend-image-devel`, `upload-backend-image` | Push built images to quay.io/ansible/* | Annual (robot account) |
 | `SNYK_TOKEN` | Downstream-only | Org | `sast-snyk`, `sca-snyk` | SAST and SCA vulnerability scanning | Annual (Snyk org token) |
 | `OPENROUTER_API_KEY` | Shared | Repo | `ci-backend` | E2E tests for LLM integration features | Per vendor policy |
-| `CURRENTS_PROJECT_ID` | Shared | Repo | `ci-frontend` | Currents.dev E2E test reporting project identifier | N/A (identifier, not credential) |
-| `CURRENTS_RECORD_KEY` | Shared | Repo | `ci-frontend` | Currents.dev E2E test result recording | Annual |
-| `CURRENTS_API_KEY` | Shared | Repo | `ci-frontend` | Currents.dev API access for test orchestration | Annual |
 | `RAPIDAST_GCP_KEY` | Downstream-only | Repo | `dast` | GCP service account for uploading DAST results | Annual (GCP SA key) |
 | `SONAR_TOKEN` | Shared | Repo | `ci-backend`, `ci-frontend`, `sonarcloud-backend`, `sonarcloud-frontend` | SonarCloud code quality and security analysis | Annual |
 | `SLACK_CI_MONITORING_WEBHOOK_URL` | Shared | Repo or Org | `merge-queue-health-poll`, `merge-queue-dequeue-alert` | Slack webhook for merge queue health alerts | N/A (webhook URL, not rotatable credential) |
