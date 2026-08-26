@@ -152,7 +152,8 @@ export function reorderActivities(activities: Activity[], edges: EdgeConnection[
   while (queue.length > 0) {
     // Sort queue to ensure deterministic ordering when there are multiple valid orders
     queue.sort((a, b) => a.localeCompare(b, 'en'))
-    const current = queue.shift()!
+    const current = queue[0]
+    queue.shift()
     sortedIds.push(current)
 
     const neighbors = adjacencyList.get(current) ?? []

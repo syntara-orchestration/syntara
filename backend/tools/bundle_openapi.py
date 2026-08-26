@@ -329,7 +329,7 @@ def _collect_tags(
 def _load_aggregator_metadata() -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """Return the fixed root info and servers for the merged spec."""
     root_info: dict[str, Any] = {
-        "title": "Syntara API",
+        "title": "Orchestrator API",
         "version": API_V1_VERSION,
         "description": "A distributed multi-agent workflow orchestration system",
     }

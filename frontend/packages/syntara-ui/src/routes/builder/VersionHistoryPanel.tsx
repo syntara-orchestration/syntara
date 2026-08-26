@@ -64,6 +64,7 @@ function groupVersionsByDate(versions: WorkflowVersion[]): VersionGroup[] {
   for (const version of versions) {
     const label = version.created_at ? getDateGroupLabel(version.created_at) : 'Unknown'
     if (!map.has(label)) map.set(label, [])
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- safe: key was just set via map.set(label, []) above
     map.get(label)!.push(version)
   }
   return Array.from(map.entries()).map(([label, items]) => ({ label, items }))

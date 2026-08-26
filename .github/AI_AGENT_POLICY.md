@@ -67,6 +67,61 @@ Pull requests that change shared agent skills or instruction files should:
 3. Stay advisory — do not add executable hook wiring.
 4. Get review from the CODEOWNERS team for the touched paths.
 
+## Decision: which skills stay in this repository
+
+**This repository is the source of truth for the shared skills under
+`.claude/skills/`.** They stay here so any contributor's agent can load them.
+Do not remove them from this tree in favor of a private copy.
+
+### The test (apply before adding or expanding a skill)
+
+A skill belongs **in this public tree** if a contributor with only this
+repository needs it to implement, test, or review correctly — and the text is
+safe to publish.
+
+A skill (or a section of a skill) must **stay out of this tree** if it contains
+any of:
+
+| Must not appear in `.claude/skills/` | Examples |
+| --- | --- |
+| Secret **values** | Passwords, tokens, API keys, cookie dumps |
+| Org-only infrastructure | Internal hostnames, VPN-only URLs, private CI dashboards |
+| Org-only process | Private chat channels, internal runbooks, org-only tracker IDs |
+| Contributor machine paths | Home directories, local clone paths |
+| Product overlay config | Private doc bases, branded URLs injected only on private builds |
+
+### CRITICAL: secrets handling vs secret values
+
+**Secret values must never appear in a skill.** How to *avoid leaking* a secret
+**must** stay public, so agents working from this repo do not print
+`SYNTARA_E2E_PASSWORD` or `cat` `backend/.secrets/admin-password`. See
+[`.claude/skills/frontend-run-e2e/SKILL.md`](../.claude/skills/frontend-run-e2e/SKILL.md)
+— that CRITICAL block is public on purpose.
+
+Org-specific overlays (issue trackers, private MCP wiring, product doc URLs)
+belong in **local** files this policy already ignores (`CLAUDE.local.md`,
+`.claude/settings.local.json`) or in a private add-on that **adds** overlay
+skills. That add-on must not become a second, independently edited copy of the
+files below.
+
+### Skills that stay in this repository
+
+| Skill | Why public |
+| --- | --- |
+| `frontend-specialist` | Stack and workflow for this codebase |
+| `frontend-coding-standards` | Patterns the code must follow |
+| `frontend-patternfly-ux` | UX conventions for this UI |
+| `frontend-testing-guidelines` | Vitest / accessibility |
+| `frontend-playwright-e2e` | How to **write** E2E tests |
+| `frontend-run-e2e` | How to **run** E2E tests, including never printing secrets |
+| `frontend-pr-review` / `frontend-review-pr` | Review checklist |
+| `frontend-build-ui-feature` | Feature wizard (tracker-neutral) |
+| `frontend-library-references` | Public `llms.txt` URLs |
+| `backend-fix-api-spec-drift` | Public OpenAPI workflow |
+
+If a consumer vendors these files, re-copy from this repository after merge.
+Do not edit the vendored copy as the source of truth.
+
 ## Related contributor docs
 
 - Frontend AI workflow guide: [`frontend/docs/ai-assisted-development.md`](../frontend/docs/ai-assisted-development.md)
