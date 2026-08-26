@@ -79,6 +79,19 @@ class WebhookLimits:
     PAYLOAD_MAX_BYTES = 1_048_576  # 1MB
 
 
+class WorkflowDefinitionLimits:
+    """Size and complexity bounds for workflow definitions.
+
+    MAX_DEFINITION_BYTES sits well under Temporal's limit.blobSize.error
+    (2 MB, configured in development-sql.yaml) to leave headroom for
+    protobuf envelope and the other start_workflow arguments.
+    """
+
+    MAX_DEFINITION_BYTES = 1_048_576  # 1 MB
+    MAX_NODES = 200
+    MAX_EDGES = 500
+
+
 # File upload validation constants
 # Minimum file size for reliable MIME type detection (in bytes)
 # python-magic requires sufficient bytes to accurately identify file types
