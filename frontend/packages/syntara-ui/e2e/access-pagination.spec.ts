@@ -68,7 +68,7 @@ test.describe('Access Management — Dropdown Pagination', () => {
     await expect(app.getByRole('heading', { level: 1, name: 'Access Management' })).toBeVisible()
 
     const usersTable = app.getByRole('grid', { name: 'Users table' })
-    const firstUserRow = usersTable.getByRole('row').nth(1)
+    const firstUserRow = usersTable.locator('tbody tr:first-child')
     const firstUserButton = firstUserRow.getByRole('button')
     const hasUser = await firstUserButton
       .waitFor({ state: 'visible', timeout: 5000 })
@@ -114,7 +114,7 @@ test.describe('Access Management — Dropdown Pagination', () => {
       await expect(app.getByRole('heading', { level: 1, name: 'Access Management' })).toBeVisible()
 
       const groupsTable = app.getByRole('grid', { name: 'Groups table' })
-      const firstGroupRow = groupsTable.getByRole('row').nth(1)
+      const firstGroupRow = groupsTable.locator('tbody tr:first-child')
       const firstGroupButton = firstGroupRow.getByRole('button')
       const hasGroup = await firstGroupButton
         .waitFor({ state: 'visible', timeout: 5000 })

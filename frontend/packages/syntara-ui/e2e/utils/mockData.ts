@@ -3,7 +3,7 @@
  * access-management E2E specs. Centralised here so user-identity-controls.spec.ts
  * and user-identity-group-assignment.spec.ts stay DRY.
  */
-import type { Page } from '@playwright/test'
+import { type Page } from '../fixtures'
 
 export const BUILTIN_USER_ID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
 export const NON_BUILTIN_USER_ID = 'b2c3d4e5-f6a7-8901-bcde-f12345678901'
