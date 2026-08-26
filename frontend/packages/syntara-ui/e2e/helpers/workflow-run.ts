@@ -1,6 +1,6 @@
-import { type Locator, type Page } from '@playwright/test'
+import { type Locator } from '@playwright/test'
 
-import { expect } from '../fixtures'
+import { type Page, expect } from '../fixtures'
 
 /** Locator scoped to the Compass page-header region (h1, status badges, toolbar). */
 export const pageHeader = (page: Page): Locator => page.locator('.pf-v6-c-compass__main-header')

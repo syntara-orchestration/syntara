@@ -1,10 +1,10 @@
 ---
 openapi: 3.1.0
 info:
-  title: Syntara Projects API
+  title: Orchestrator Projects API
   version: 1.0.0
   description: |
-    Project management and project-scoped resource access for the Syntara platform.
+    Project management and project-scoped resource access for the Orchestrator platform.
 
     Projects provide multi-tenant isolation for workflows, approvals, and other
     resources. Each project has its own role assignments for users and groups,

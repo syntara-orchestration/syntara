@@ -120,17 +120,23 @@ test.describe('Group Detail — Navigation & Tabs', () => {
       const selectInput = dialog.getByPlaceholder('Search for a user...')
       await selectInput.click()
 
+      // Wait for either options or "No results match" to appear.
+      // PF6 Select renders the listbox in a portal outside the dialog DOM,
+      // so we must query at page level, not scoped to the dialog.
       const noResults = app.getByRole('option', { name: /No results match/ })
       const availableOptions = app.getByRole('option').filter({ hasNotText: /No results match/ })
-      const selectedOption = availableOptions.nth(0)
-      await expect(noResults.or(selectedOption)).toBeVisible({ timeout: 15_000 })
+      await expect(noResults.or(availableOptions)).toBeVisible({ timeout: 15_000 })
 
       if (await noResults.isVisible()) {
         test.skip(true, 'No available users to add (all users are already members)')
         return
       }
 
-      const userName = await selectedOption.locator('> *').nth(0).textContent()
+      // The option contains two child spans: username + display name.
+      // Extract just the username (first child text) for later verification.
+      const [selectedOption] = await availableOptions.all()
+      const [firstChild] = await selectedOption.locator('> *').all()
+      const userName = await firstChild.textContent()
       await selectedOption.click()
 
       await dialog.getByRole('button', { name: 'Add', exact: true }).click()

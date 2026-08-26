@@ -101,33 +101,31 @@ Check whether the changes follow:
 | Display strings in conditionals                                | #10 -- compare API values, not translatable labels                                                        |
 | New route in `AppRoute.tsx` without registry entry             | Add to `e2e/visual-regression/page-registry.ts` (see `frontend/packages/syntara-ui/VISUAL_REGRESSION.md`) |
 | Title Case in alert titles                                     | Use sentence case: "Workflow created", not "Created"                                                      |
-| Derived data without `useMemo` in custom hooks                 | #13 -- wrap computed maps/arrays in `useMemo`                                                             |
-| New `use*.ts` hook without `use*.test.ts(x)`                   | #14 -- every new hook needs a dedicated test file                                                         |
-| `useEffect` + `setState` for derived/computed values           | #15 -- compute during render or use `useMemo`                                                             |
-| `useEffect` + `setValue` watching form fields                  | #16 -- move cascading resets to field's `onChange` handler                                                |
-| `formState.isSubmitting` for loading state                     | #18 -- use `isPending` from mutation hooks                                                                |
-| `PlusCircleIcon` or non-`RhUi*` icons                          | #19 -- use `RhUiAddIcon`, `RhUiDuplicate`, etc.                                                           |
-| Inline style objects (`style={{ ... }}`)                       | #20 -- refactor to CSS module classes                                                                     |
-| `let` counter inside `.map()`                                  | #21 -- pre-compute indices immutably                                                                      |
-| `aria-label` on `<span>` / `<div>`                             | #22 -- only use on interactive elements, widgets, landmarks, images                                       |
-| Any `eslint-disable` or `eslint-disable-next-line`             | #23 -- never suppress rules; fix the code so it passes                                                    |
-| Hook called unconditionally but used conditionally             | #24 -- extract to a conditionally-rendered wrapper component                                              |
-| `useEffect` + `useState` for API calls                         | #25 -- use TanStack Query (`useQuery`/`useMutation`/`useQueries`)                                         |
-| Manual `Promise.all` + cancellation for parallel fetches       | #25 -- use `useQueries` from TanStack Query                                                               |
-| `// TODO` / `// FIXME` / `// HACK` / `// XXX`                  | #26 -- track deferred work in an issue, not code comments                                                 |
-| Hardcoded documentation URLs                                   | #30 -- use `useDocLink('key')` from `frontend/packages/syntara-ui/src/utils/docs/useDocLink.ts`           |
-| `SynPageHeader` without `docLink` prop                          | #30 -- every page header should pass `docLink={useDocLink('key')}`                                        |
+| Derived data without `useMemo` in custom hooks                 | #12 -- wrap computed maps/arrays in `useMemo`                                                             |
+| New `use*.ts` hook without `use*.test.ts(x)`                   | #13 -- every new hook needs a dedicated test file                                                         |
+| `useEffect` + `setState` for derived/computed values           | #14 -- compute during render or use `useMemo`                                                             |
+| `useEffect` + `setValue` watching form fields                  | #15 -- move cascading resets to field's `onChange` handler                                                |
+| `PlusCircleIcon` or non-`RhUi*` icons                          | #17 -- use `RhUiAddIcon`, `RhUiDuplicate`, etc.                                                           |
+| Inline style objects (`style={{ ... }}`)                       | #18 -- refactor to CSS module classes                                                                     |
+| `let` counter inside `.map()`                                  | #19 -- pre-compute indices immutably                                                                      |
+| `aria-label` on `<div>` (non-interactive)                      | span is ESLint; still flag `aria-label` on generic `<div>` (coding standards §27)                         |
+| Any `eslint-disable` or `eslint-disable-next-line`             | #20 -- never suppress rules; fix the code so it passes                                                    |
+| Hook called unconditionally but used conditionally             | #21 -- extract to a conditionally-rendered wrapper component                                              |
+| `useEffect` + `useState` for API calls                         | #22 -- use TanStack Query (`useQuery`/`useMutation`/`useQueries`)                                         |
+| Manual `Promise.all` + cancellation for parallel fetches       | #22 -- use `useQueries` from TanStack Query                                                               |
+| `// TODO` / `// FIXME` / `// HACK` / `// XXX`                  | #23 -- track deferred work in an issue, not code comments                                                 |
+| `SynPageHeader` without `docLink` prop                          | #27 -- hardcoded URLs are ESLint; still pass `docLink={useDocLink('key')}`                                |
 | Hardcoded colors in CSS modules                                | ESLint can't catch these; review CSS module files manually                                                |
-| `new Date()` in `syntara-mock-api/src/resources/` or `utils/`  | #31 -- use `mockDate.*` from `mockDates.ts` for deterministic visual regression                           |
+| `new Date()` in `syntara-mock-api/src/resources/` or `utils/`  | #28 -- use `mockDate.*` from `mockDates.ts` for deterministic visual regression                           |
 | `Button` with `onClick={() => navigate(...)}`                  | §34 -- use `<Link>` for navigation, `<Button>` for actions                                                |
 | Same `aria-label` on repeated checkboxes/buttons               | §35 -- each instance needs a unique label (e.g., row index or resource name)                              |
 | Raw text for invalid ID or not-found states                    | §36 -- use `SynEmptyState` or `Nx*` empty state components                                                 |
 | New page test without `expectPageTitle(...)` assertion         | testing guidelines -- add at least one `expectPageTitle` call per page component                          |
 | Empty-state CTA without permission check                       | UX §15 -- gate `addData` with permission flag (pass `undefined` if denied)                                |
-| New `forwardRef(` usage                                        | #33 -- accept `ref` as a prop (React 19); do not add `forwardRef`                                         |
-| New `useRef` + `useEffect` only to attach/detach DOM listeners | #34 -- prefer ref callback cleanup functions (coding standards §38)                                       |
-| New `useContext(` usage                                        | #35 -- use `use(Context)` instead (React 19); see coding standards §39                                    |
-| Hand-rolled pending mirror state for simple toggle mutations   | #36 -- prefer `useOptimistic` + Action/`mutateAsync` (coding standards §40)                               |
+| New `forwardRef(` usage                                        | #30 -- accept `ref` as a prop (React 19); do not add `forwardRef`                                         |
+| New `useRef` + `useEffect` only to attach/detach DOM listeners | #31 -- prefer ref callback cleanup functions (coding standards §38)                                       |
+| New `useContext(` usage                                        | #32 -- use `use(Context)` instead (React 19); see coding standards §39                                    |
+| Hand-rolled pending mirror state for simple toggle mutations   | #33 -- prefer `useOptimistic` + Action/`mutateAsync` (coding standards §40)                               |
 
 ### 3b. Rule Bypass Checks (BLOCKING -- do not approve if any are found)
 

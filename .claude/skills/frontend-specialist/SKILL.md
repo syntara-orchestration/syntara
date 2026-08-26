@@ -15,7 +15,7 @@ Standards for implementing, reviewing, and refactoring frontend code using React
 
 1. **`.claude/skills/frontend-coding-standards/SKILL.md`** — API integration rules, form patterns, shared hooks (`useCursorPagination`, `useDialogState`, `useDeleteAction`, `NxConfirmationDialog`), PatternFly guidelines, i18n rules, and enum constant usage.
 
-2. **`.claude/skills/frontend-testing-guidelines/SKILL.md`** — Testing rules (userEvent over fireEvent, accessible queries, vitest-axe), coverage requirements (80%), AAA pattern, and accessibility testing at three levels.
+2. **`.claude/skills/frontend-testing-guidelines/SKILL.md`** — Testing rules (userEvent over fireEvent, accessible queries, vitest-axe), coverage (CI: 85% global statements; authoring target ~80% on new files), AAA pattern, and accessibility testing at three levels.
 
 3. **`.claude/skills/frontend-library-references/SKILL.md`** — `llms.txt` URLs and official docs for all frontend libraries (React, Zod, Zustand, Vitest, Vite, TanStack Query/Router, React Flow, Storybook, dnd-kit, and more). **Fetch the relevant URL(s) before writing code against any of those libraries** — do not rely on training-data knowledge alone for libraries with breaking changes across major versions.
 
@@ -57,7 +57,7 @@ Standards for implementing, reviewing, and refactoring frontend code using React
 - Test user behavior, not implementation details
 - Use Testing Library queries in priority order: `getByRole` > `getByLabelText` > `getByPlaceholderText` > `getByText` > `getByTestId` (last resort)
 - Every new component must have a `vitest-axe` `toHaveNoViolations()` test
-- 80% coverage threshold on all new/modified files
+- Coverage: ~80% on new files (authoring). CI blocks merge below **85% global statements** — see testing guidelines. There is no per-file 80% script.
 
 ---
 
@@ -77,7 +77,7 @@ Standards for implementing, reviewing, and refactoring frontend code using React
 
 - [ ] Forms use Zod + react-hook-form with `zodResolver` -- no manual `useState` per field AKA controlled inputs
 - [ ] Edit modals reset form via `useEffect` keyed on `[isOpen, item]`
-- [ ] Loading states use `isPending` from mutation hooks -- not `formState.isSubmitting`
+- [ ] Loading states use `isPending` from mutation hooks (ESLint `no-restricted-syntax` bans `formState.isSubmitting`)
 
 ### Testing
 

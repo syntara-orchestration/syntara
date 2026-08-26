@@ -260,7 +260,9 @@ export function IdentityProvidersTab({ onHeaderToolbarStateChange }: Readonly<Id
 
   const handleDelete = useDeleteAction({
     deleteFn: deleteProvider,
-    buildParams: (provider: IdentityProvider) => ({ params: { path: { provider_id: provider.id! } } }),
+    buildParams: (provider: IdentityProvider) => ({
+      params: { path: { provider_id: provider.id ?? '' } },
+    }),
     entityLabel: 'identity provider',
     getItemName: (provider: IdentityProvider) => provider.name ?? '',
     onSuccess: refetch,
