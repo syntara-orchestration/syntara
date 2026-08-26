@@ -1006,7 +1006,8 @@ class TestApprovalPortValidation:
         ]
         assert len(port_errors) == 1
         assert port_errors[0].node_id == "ap1"
-        assert "approved" in port_errors[0].message
+        assert "Approved" in port_errors[0].message
+        assert "missing a connection" in port_errors[0].message
 
     def test_approved_port_present_no_error(self, validator: WorkflowValidator) -> None:
         definition = self._portless_approval_definition()

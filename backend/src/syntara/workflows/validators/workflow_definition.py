@@ -233,12 +233,7 @@ def _check_approval_node_findings(
 
     Emits:
     - An error when an ``approval`` node has no successor on the ``approved``
-      output port. The runtime requires at least one approved successor (see
-      ``WorkflowApprovalMixin._prepare_approval_args``); without this save-time
-      check a portless approval workflow validates clean, passes the publish
-      gate, and then fails on every execution with a runtime error naming a
-      port the author was never told about. This mirrors the converge-node
-      predecessor checks in ``_check_converge_node_findings``.
+      output port.
     - A warning when ``fallback_decision`` is ``approve`` without an effective
       ``continue_on_failure`` (the fallback would have no effect).
     """
@@ -263,11 +258,7 @@ def _check_approval_node_findings(
                 ValidationFinding(
                     severity=ValidationSeverity.error,
                     category=ValidationCategory.approval_configuration,
-                    message=(
-                        f"Approval node '{node_name}' has no successor on the 'approved' port. "
-                        f"Approval nodes require at least one outgoing edge with "
-                        f"from_port set to 'approved'."
-                    ),
+                    message=f"Approval \"{node_name}\" is missing a connection from the 'Approved' branch",
                     node_id=node_id,
                 ),
             )
