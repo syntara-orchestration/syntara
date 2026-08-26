@@ -141,10 +141,9 @@ export async function selectDefaultProject(page: Page) {
  */
 export async function openWorkflowKebab(page: Page, menuItemPattern: string | RegExp = /Edit workflow/i) {
   const kebabs = page.getByRole('button', { name: /Actions|Kebab toggle/i })
-  const count = await kebabs.count()
+  const allKebabs = await kebabs.all()
 
-  for (let i = 0; i < count; i++) {
-    const kebab = kebabs.nth(i)
+  for (const kebab of allKebabs) {
     await kebab.click()
     const menuItem = page.getByRole('menuitem', { name: menuItemPattern })
     if (await menuItem.isVisible().catch(() => false)) {
@@ -291,7 +290,7 @@ export const oidcProviderWizardPages: PageEntry[] = [
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
     },
     setup: async (page) => {
-      await page.locator('#provider-detail-toggle').click({ force: true })
+      await page.locator('[id="provider-detail-toggle"]').click({ force: true })
       const dialog = page.getByRole('dialog')
       await expect(dialog).toBeVisible()
       await expect(dialog.getByRole('button', { name: /Disable/i })).toBeVisible()

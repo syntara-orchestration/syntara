@@ -12,6 +12,7 @@ from datetime import timedelta
 from typing import Any, ClassVar, cast
 
 from temporalio import workflow
+from temporalio.common import RetryPolicy
 from temporalio.exceptions import ActivityError, ApplicationError
 from temporalio.exceptions import TimeoutError as TemporalTimeoutError
 
@@ -153,8 +154,9 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             return self._build_result(execution_id, include_node_results)
 
         except asyncio.CancelledError:
-            workflow.logger.info("Workflow cancelled, cleaning up pending approvals")
+            workflow.logger.info("Workflow cancelled, cleaning up pending approvals and agentic invocations")
             await self._cancel_approval_requests()
+            await self._cancel_agentic_invocations()
             raise
 
     def _initialize_state(
@@ -309,6 +311,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                         completed_node_id, node_error, graph, pending_tasks, continue_on_failure=cof
                     )
                     await self._maybe_expire_approval(completed_node_id, node, node_error)
+                    await self._maybe_cancel_agentic_invocation(node, node_error)
                     if cof:
                         self._route_failed_node(completed_node_id, node)
                         await self._handle_continued_failure(completed_node_id, node, graph, pending_tasks)
@@ -413,6 +416,44 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         if app_error is not None:
             return app_error.message or str(app_error)
         return str(error)
+
+    async def _maybe_cancel_agentic_invocation(
+        self,
+        node: ActivityNode,
+        error: Exception,
+    ) -> None:
+        """Best-effort cancel a running agentic invocation when its node times out."""
+        if node.type != NodeType.AGENTIC:
+            return
+        if not (isinstance(error, ActivityError) and isinstance(error.cause, TemporalTimeoutError)):
+            return
+        await self._cancel_agentic_invocations(node_id=node.id, reason="Node timeout")
+
+    async def _cancel_agentic_invocations(self, node_id: str | None = None, reason: str = "Workflow cancelled") -> None:
+        """Best-effort cancel running agentic invocations for this execution.
+
+        Args:
+            node_id: When set, cancel only the invocation for this node (timeout case).
+                When None, cancel all running agentic invocations (workflow cancellation).
+            reason: Cancellation reason passed to the orchestrator.
+
+        """
+        try:
+            args: list[Any] = [self.execution_id, node_id, reason]
+            await asyncio.shield(
+                workflow.execute_activity(
+                    ActivityName.CANCEL_AGENTIC,
+                    args=args,
+                    activity_id=f"__internal__cancel_agentic_{node_id or 'all'}",
+                    start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
+                    retry_policy=RetryPolicy(maximum_attempts=1),
+                )
+            )
+        except Exception:  # noqa: BLE001
+            workflow.logger.warning(
+                "Failed to cancel agentic invocations (best-effort)",
+                node_id=node_id,
+            )
 
     @staticmethod
     def _build_empty_node_output(node: ActivityNode) -> dict[str, Any]:

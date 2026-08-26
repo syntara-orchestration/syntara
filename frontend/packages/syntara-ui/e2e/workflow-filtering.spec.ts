@@ -230,7 +230,7 @@ test.describe('Workflow Filtering', () => {
     await expect(nameChipGroup.getByText('test')).toBeVisible()
 
     // Act - Remove name filter chip
-    const nameLabel = nameChipGroup.locator('.pf-v6-c-label').filter({ hasText: 'test' })
+    const nameLabel = nameChipGroup.getByRole('listitem').filter({ hasText: 'test' })
     await nameLabel.getByRole('button', { name: /close/i }).click()
 
     // Assert - Filter removed

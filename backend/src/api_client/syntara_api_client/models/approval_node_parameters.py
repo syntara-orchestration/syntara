@@ -17,7 +17,7 @@ class ApprovalNodeParameters:
     """Parameters for approval gate nodes.
 
     Attributes:
-        credential_id (None | str | Unset): Syntara credential UUID
+        credential_id (None | str | Unset): Orchestrator credential UUID
         approver_users (list[str] | None | Unset): Usernames who can approve
         approver_groups (list[str] | None | Unset): Group names whose members can approve
         prompt (None | str | Unset): Message to display to approvers
