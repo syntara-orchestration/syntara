@@ -285,6 +285,7 @@ class TestRecordLLMCall:
         durations = list(recorder.query(metric_types={MetricType.LLM_DURATION}))
         assert durations[0].labels["model"] == "anthropic/claude-3.5-sonnet"
         assert durations[0].labels["provider"] == "anthropic"
+        assert result.response_metadata is not None
         assert result.response_metadata["model_name"] == doubled
 
     @pytest.mark.asyncio
