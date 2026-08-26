@@ -801,6 +801,7 @@ class TestNodeFailurePropagation:
                     {"from": "node_b", "to": "node_c"},
                 ],
             },
+            timeout=45,
         )
 
         # Overall execution must fail.
@@ -861,6 +862,7 @@ class TestNodeFailurePropagation:
                     {"from": "node_b", "to": "node_c"},
                 ],
             },
+            timeout=45,
         )
 
         assert result.status == ExecutionStatus.FAILED, f"Expected 'failed', got '{result.status}'"
@@ -918,6 +920,7 @@ class TestNodeFailurePropagation:
                     {"from": "branch_fail", "to": "join"},
                 ],
             },
+            timeout=45,
         )
 
         # The workflow as a whole fails because one branch failed.
