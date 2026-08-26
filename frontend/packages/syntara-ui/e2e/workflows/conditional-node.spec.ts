@@ -148,11 +148,13 @@ test('user configures Conditional node with if/else-if/else branches', async ({ 
     // Configure the else-if condition (second field/value inputs)
     const allFieldInputs = app.getByRole('textbox', { name: 'Field', exact: true })
     await expect(allFieldInputs).toHaveCount(2)
-    await allFieldInputs.nth(1).fill('status')
+    const fieldInputs = await allFieldInputs.all()
+    await fieldInputs[1].fill('status')
 
     const allValueInputs = app.getByRole('textbox', { name: 'Value', exact: true })
     await expect(allValueInputs).toHaveCount(2)
-    await allValueInputs.nth(1).fill('pending')
+    const valueInputs = await allValueInputs.all()
+    await valueInputs[1].fill('pending')
 
     await waitForUIReady(app)
 

@@ -1,8 +1,9 @@
 import fs from 'node:fs/promises'
 
-import type { Page, Locator } from '@playwright/test'
+import type { Locator } from '@playwright/test'
 import type { V2WorkflowDefinition } from '@syntara/contracts'
 
+import { type Page } from './fixtures'
 import { test, expect, toAppUrl } from './fixtures'
 import { createCredentialOfTypeViaUI, deleteCredentialByName, isCredentialsResponse } from './helpers/credentials'
 import {
@@ -81,11 +82,9 @@ async function importFromWorkflowsList(
     await selectFirstProject(app)
     if ((await dialogProjectInput.count()) > 0 && (await dialogProjectInput.isVisible())) {
       await dialogProjectInput.click()
-      const realOption = app
-        .getByRole('option')
-        .filter({ hasNotText: /Create project|View more/ })
-        .nth(0)
-      await realOption.waitFor({ state: 'visible', timeout: 10_000 })
+      const realOptions = app.getByRole('option').filter({ hasNotText: /Create project|View more/ })
+      await realOptions.waitFor({ state: 'visible', timeout: 10_000 })
+      const [realOption] = await realOptions.all()
       await realOption.click()
     }
   }

@@ -5,6 +5,12 @@ syntara.* imports happen AFTER pytest-cov starts its coverage tracer.
 """
 
 pytest_plugins = [
+    # MUST stay first: preloads regopy's native library before the fixture
+    # plugins below pull in SQLAlchemy/greenlet — otherwise every in-process
+    # rego evaluation in this pytest run leaks ~69 KB natively — and guards
+    # the resulting import order for the whole session.
+    # See docs/standards/imports-and-modules.md ("Native import order").
+    "tests.fixtures.regopy_preload",
     # Logging setup, performance marker, worker_id fixture, and cleanup hooks
     "tests.fixtures.hooks",
     # Dynamic xfail from remote URL (enabled via --xfail-from-url)

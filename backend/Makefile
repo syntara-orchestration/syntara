@@ -574,6 +574,8 @@ services-clean: ## Stop all services and remove all data (destructive)
 # ========================================================
 OPENAPI_SPEC ?= src/syntara/schemas/openapi.yaml
 OPENAPI_PUBLIC_SPEC ?= src/syntara/schemas/openapi-public.yaml
+OPENAPI_PUBLIC_SPEC_JSON ?= src/syntara/schemas/openapi-public.json
+OPENAPI_GENERATED_FILES = $(OPENAPI_SPEC) $(OPENAPI_PUBLIC_SPEC) $(OPENAPI_PUBLIC_SPEC_JSON)
 OPENAPI_BASE_REF ?= devel
 VERBOSITY ?= -v
 
@@ -605,7 +607,8 @@ api-spec-bundle-public: ## Bundle public-facing spec (excludes internal endpoint
 	@echo "📦 Bundling public OpenAPI sub-specs..."
 	uv run python tools/bundle_openapi.py --public -o $(OPENAPI_PUBLIC_SPEC)
 	@uv run pre-commit run yamlfmt --files $(OPENAPI_PUBLIC_SPEC) > /dev/null 2>&1 || true
-	@echo "✅ Public spec written to $(OPENAPI_PUBLIC_SPEC)"
+	uv run python tools/bundle_openapi.py --public --format json -o $(OPENAPI_PUBLIC_SPEC_JSON)
+	@echo "✅ Public spec written to $(OPENAPI_PUBLIC_SPEC) and $(OPENAPI_PUBLIC_SPEC_JSON)"
 
 .PHONY: api-spec-drift-public
 api-spec-drift-public: ## Check that committed public spec matches the generated spec
@@ -617,6 +620,10 @@ api-spec-bundle-all: api-spec-bundle api-spec-bundle-public ## Bundle both full 
 
 .PHONY: api-spec-drift-all
 api-spec-drift-all: api-spec-drift api-spec-drift-public ## Check both specs match implementation
+
+.PHONY: print-openapi-generated-files
+print-openapi-generated-files: ## Print the list of generated OpenAPI spec files (for CI drift checks)
+	@echo $(OPENAPI_GENERATED_FILES)
 
 
 # Tools
