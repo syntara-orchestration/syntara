@@ -162,6 +162,11 @@ class ApprovalCreateRequest(SQLModel):
     project_id: UUID = Field(..., description="Project ID (denormalized from execution)")
     approval_node_id: str = Field(..., description="Canvas node ID from the workflow definition")
     name: str = Field(..., min_length=1, max_length=255, description="Display name for the approval request")
+    prompt: str | None = Field(
+        default=None,
+        max_length=FieldLimits.DESCRIPTION_MAX_LENGTH,
+        description="Resolved guidance message from the approval node, shown to approvers",
+    )
     loop_iteration_path: list[int] = Field(
         default_factory=list,
         description="Enclosing-loop indices, outermost first (empty when not inside a loop)",

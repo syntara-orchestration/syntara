@@ -176,9 +176,49 @@ class TestCreateApprovalContract:
         # Validate optional fields are handled properly
         assert data["timeout_at"] is None
         assert data["next_step_rejected"] is None
+        assert data["prompt"] is None
 
         # next_step_approved is required
         assert data["next_step_approved"]["id"] == "next_step"
+
+    @pytest.mark.asyncio
+    async def test_create_approval_persists_prompt(
+        self,
+        auth_client: AsyncClient,
+        executions_factory: ExecutionsFactory,
+        test_workflow: Workflow,
+    ) -> None:
+        """Resolved prompt is stored on the approval and returned in the response."""
+        executions = await executions_factory.create_executions(count=1)
+        execution_id = str(executions[0].id)
+        prompt = "Please review this $15,000 infrastructure budget request for Q3 cloud upgrade."
+
+        request_payload = {
+            "execution_id": execution_id,
+            "project_id": str(test_workflow.project_id),
+            "approval_node_id": "prompt_approval",
+            "name": "Budget Review",
+            "prompt": f"  {prompt}  ",
+            "next_step_approved": {
+                "id": "next_step",
+                "name": "Next Step",
+                "type": "task",
+            },
+            "workflow_context": {
+                "workflow_id": str(uuid4()),
+                "workflow_name": "Budget Workflow",
+                "inputs": {},
+            },
+        }
+
+        create_response = await auth_client.post("/api/v1/approvals", json=request_payload)
+        assert create_response.status_code == 201
+        created = create_response.json()
+        assert created["prompt"] == prompt
+
+        get_response = await auth_client.get(f"/api/v1/approvals/{created['id']}")
+        assert get_response.status_code == 200
+        assert get_response.json()["prompt"] == prompt
 
     @pytest.mark.asyncio
     async def test_create_approval_uuid_format_validation(
