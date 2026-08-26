@@ -54,12 +54,12 @@ describe('validateVariableReferences', () => {
       expect(errors[0].message).toContain('node "input" does not exist')
     })
 
-    it('accepts ${input.stdout} when a node is actually named input', () => {
+    it.each(['input', 'inputs', 'variables'])('accepts ${%s.stdout} when a node is actually named %s', (namespace) => {
       const activities: Activity[] = [
-        makeActivity({ id: 'input', type: 'script', parameters: { code: 'echo hello' } }),
-        makeActivity({ id: 'task-1', type: 'script', parameters: { code: '${input.stdout}' } }),
+        makeActivity({ id: namespace, type: 'script', parameters: { code: 'echo hello' } }),
+        makeActivity({ id: 'task-1', type: 'script', parameters: { code: `\${${namespace}.stdout}` } }),
       ]
-      const edges: EdgeConnection[] = [{ id: 'e1', source: 'input', target: 'task-1' }]
+      const edges: EdgeConnection[] = [{ id: 'e1', source: namespace, target: 'task-1' }]
 
       expect(validateVariableReferences(activities, edges)).toEqual([])
     })

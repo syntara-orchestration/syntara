@@ -4,6 +4,7 @@ import type { EdgeConnection } from '../../../types/edge'
 import { getUpstreamNodeIds } from '../../edgeHelpers'
 import type { ValidationContext, ValidationError } from '../types'
 
+// Keep in sync with BUILTIN_SCOPES in backend/src/syntara/workflows/validators/template_expressions.py
 const KNOWN_NAMESPACES = new Set(['trigger', 'workflow', 'workflow_context'])
 const VARIABLE_REF_PATTERN = /\$\{([^}]+)\}/g
 

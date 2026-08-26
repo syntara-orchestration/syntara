@@ -203,15 +203,16 @@ class TestInvalidNamespaceScope:
         assert "unknown activity or scope" in errors[0].message
         assert "leftover V1" not in errors[0].message
 
-    def test_node_named_input_is_a_valid_reference(self) -> None:
+    @pytest.mark.parametrize("node_id", ["input", "inputs", "variables"])
+    def test_node_named_reserved_word_is_a_valid_reference(self, node_id: str) -> None:
         defn = _base_definition(
             nodes=[
-                _script_node("input"),
-                _script_node("n1", environment={"X": "${input.stdout}"}),
+                _script_node(node_id),
+                _script_node("n1", environment={"X": f"${{{node_id}.stdout}}"}),
             ],
-            edges=[{"from": "t1", "to": "input"}, {"from": "input", "to": "n1"}],
+            edges=[{"from": "t1", "to": node_id}, {"from": node_id, "to": "n1"}],
         )
-        errors = check_template_expressions(defn, {"t1", "input", "n1"})
+        errors = check_template_expressions(defn, {"t1", node_id, "n1"})
         assert errors == []
 
 
