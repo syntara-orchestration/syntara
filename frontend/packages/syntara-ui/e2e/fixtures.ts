@@ -4,7 +4,13 @@ import { expect, test as base, type Page, type Request } from '@playwright/test'
 import { APP_TITLE } from './helpers/appTitle'
 import { isSkipWebServerForPlaywrightTests } from './playwrightWebServerEnv'
 import { type RoleSetupResult, setupRoleUsers } from './utils/roleSetup'
-import { type XfailEntry, loadXfailEntries, matchesXfail } from './xfailFromUrl'
+import {
+  type XfailEntry,
+  applyQuarantineAfterRun,
+  loadXfailEntries,
+  matchesXfail,
+  xfailSourceFromEnv,
+} from './xfailFromUrl'
 
 const processEnv: Record<string, string | undefined> = (
   process as unknown as { env: Record<string, string | undefined> }
@@ -72,12 +78,11 @@ const currentsBase = base.extend<CurrentsFixtures, CurrentsWorkerFixtures>({
 const xfailBase = currentsBase.extend<{ _xfailCheck: void }, { _xfailEntries: XfailEntry[] }>({
   _xfailEntries: [
     async ({}, use) => {
-      const base = processEnv['SYNTARA_XFAIL_SOURCE']
-      if (!base) {
+      const source = xfailSourceFromEnv(processEnv)
+      if (!source) {
         await use([])
         return
       }
-      const source = base.endsWith('/') ? `${base}playwright.md` : `${base}/playwright.md`
       const entries = await loadXfailEntries(source)
       if (entries.length > 0) {
         process.stderr.write(`xfail: loaded ${entries.length} pattern(s) from ${source}\n`)
@@ -88,11 +93,12 @@ const xfailBase = currentsBase.extend<{ _xfailCheck: void }, { _xfailEntries: Xf
   ],
   _xfailCheck: [
     async ({ _xfailEntries }, use, testInfo) => {
+      // Match before the test so titlePath is complete; apply quarantine after
+      // so a listed failure is skipped (Currents-style) and a listed pass is
+      // left as a pass rather than Playwright "Expected to fail, but passed".
       const match = matchesXfail(testInfo, _xfailEntries)
-      if (match) {
-        testInfo.fail(true, `xfail: ${match.reason}`)
-      }
       await use()
+      applyQuarantineAfterRun(testInfo, match)
     },
     { auto: true },
   ],
