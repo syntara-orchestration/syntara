@@ -96,7 +96,8 @@ def _check_definition_limits(workflow_definition: dict[str, Any]) -> list[Valida
                 ),
             )
         )
-    node_count = len(workflow_definition.get("nodes", []))
+    nodes = workflow_definition.get("nodes", [])
+    node_count = len(nodes) if isinstance(nodes, list) else 0
     if node_count > WorkflowDefinitionLimits.MAX_NODES:
         findings.append(
             ValidationFinding(
@@ -107,7 +108,8 @@ def _check_definition_limits(workflow_definition: dict[str, Any]) -> list[Valida
                 ),
             )
         )
-    edge_count = len(workflow_definition.get("edges", []))
+    edges = workflow_definition.get("edges", [])
+    edge_count = len(edges) if isinstance(edges, list) else 0
     if edge_count > WorkflowDefinitionLimits.MAX_EDGES:
         findings.append(
             ValidationFinding(
