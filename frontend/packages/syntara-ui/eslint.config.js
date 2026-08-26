@@ -366,8 +366,8 @@ export default tseslint.config(
     },
   },
   {
-    // Playwright globalSetup runs in Node before tests — requires default export and uses console for logging
-    files: ['e2e/global-setup.ts'],
+    // Playwright globalSetup / reporters run in Node — require default export and use console for logging
+    files: ['e2e/global-setup.ts', 'e2e/xfailReporter.ts'],
     rules: {
       'no-console': 'off',
       'no-restricted-exports': 'off',
