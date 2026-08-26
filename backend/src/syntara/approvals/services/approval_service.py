@@ -458,10 +458,15 @@ class ApprovalService(BaseService):
         )
         workflow_context_dict = request.workflow_context.model_dump(mode="json")
 
+        prompt = request.prompt.strip() if isinstance(request.prompt, str) else None
+        if not prompt:
+            prompt = None
+
         approval = ApprovalRequest(
             execution_id=request.execution_id,
             approval_node_id=request.approval_node_id,
             name=request.name,
+            prompt=prompt,
             project_id=project_id,
             status=ApprovalRequestStatus.PENDING,
             timeout_at=request.timeout_at,

@@ -217,8 +217,8 @@ def test_converge_timeout_continue_on_failure(syntara_api: SyntaraApiRegistry):
 
     assert result.status == ExecutionStatus.COMPLETED_WITH_ERRORS
     assert activities["fast_branch"].status == "completed"
-    assert activities["slow_branch"].status == "skipped"
-    assert activities["slow_intermediate"].status == "skipped"
+    assert activities["slow_branch"].status == "cancelled"  # was in-flight when timeout fired
+    assert activities["slow_intermediate"].status == "skipped"  # never scheduled
     assert activities["converge_node"].status == "failed"
     assert activities["final_action"].status == "completed"
 
@@ -371,8 +371,8 @@ def test_converge_timeout_fail_and_skip_downstream(syntara_api: SyntaraApiRegist
     activities = {a.activity_id: a for a in (result.activities or [])}
 
     assert activities["fast_branch"].status == "completed"
-    assert activities["slow_branch"].status == "skipped"
-    assert activities["intermediate"].status == "skipped"
+    assert activities["slow_branch"].status == "cancelled"  # was in-flight when timeout fired
+    assert activities["intermediate"].status == "skipped"  # never scheduled
     assert activities["converge_node"].status == "failed"
     assert activities["downstream_action"].status == "skipped"
 
@@ -595,10 +595,10 @@ def test_converge_timeout_multihop_starts_at_fork(syntara_api: SyntaraApiRegistr
     assert result.status == ExecutionStatus.FAILED
     activities = {a.activity_id: a for a in (result.activities or [])}
 
-    # Timeout fires at ~1s (from fork start). In-flight step1 nodes are detached.
-    # step2 nodes are never scheduled. All show as skipped.
-    assert activities["branch_a_step1"].status == "skipped"
-    assert activities["branch_b_step1"].status == "skipped"
+    # Timeout fires at ~1s (from fork start). In-flight step1 nodes are detached
+    # and reported as cancelled. step2 nodes are never scheduled, so they stay skipped.
+    assert activities["branch_a_step1"].status == "cancelled"
+    assert activities["branch_b_step1"].status == "cancelled"
     assert activities["branch_a_step2"].status == "skipped"
     assert activities["branch_b_step2"].status == "skipped"
     assert activities["converge_node"].status == "failed"
@@ -676,8 +676,10 @@ def test_converge_one_branch_fails_all_strategy(syntara_api: SyntaraApiRegistry)
     assert result.status == ExecutionStatus.FAILED
     activities = {a.activity_id: a for a in (result.activities or [])}
 
-    assert activities["success_branch_a"].status == "skipped"
-    assert activities["success_branch_b"].status == "skipped"
+    # success_branch_a and _b were in-flight (sleeping) when the failing_branch
+    # triggered _fail_converge_node — they are detached and reported as cancelled.
+    assert activities["success_branch_a"].status == "cancelled"
+    assert activities["success_branch_b"].status == "cancelled"
     assert activities["failing_branch"].status == "failed"
     assert activities["converge_node"].status == "failed"
     assert activities["final_action"].status == "skipped"
@@ -822,16 +824,17 @@ def test_converge_all_branches_fail(syntara_api: SyntaraApiRegistry):
 
     # Under ALL strategy the engine short-circuits when the first branch
     # fails.  Remaining branches that are still in-flight become detached
-    # and may be reported as "skipped" (never processed) rather than
-    # "failed".  Only the branch whose failure triggered the converge is
-    # guaranteed to be "failed".
+    # and are reported as "cancelled"; branches that never started are "skipped".
+    # Only the branch whose failure triggered the converge is guaranteed "failed".
     branch_statuses = [
         activities["failing_branch_a"].status,
         activities["failing_branch_b"].status,
         activities["failing_branch_c"].status,
     ]
     assert any(s == "failed" for s in branch_statuses), f"At least one branch must have failed: {branch_statuses}"
-    assert all(s in ("failed", "skipped") for s in branch_statuses), f"Unexpected branch status: {branch_statuses}"
+    assert all(s in ("failed", "skipped", "cancelled") for s in branch_statuses), (
+        f"Unexpected branch status: {branch_statuses}"
+    )
 
     assert activities["converge_node"].status in ("failed", "skipped")
     assert activities["final_action"].status == "skipped"
