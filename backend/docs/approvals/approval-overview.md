@@ -278,6 +278,7 @@ The `ApprovalRequest` model stores all data for an approval gate:
 | `updated_at` | datetime | Last update timestamp (inherited from BaseResource) |
 | `project_id` | UUID | Project this approval belongs to (denormalized from execution) |
 | `name` | str | Human-readable name for the approval request |
+| `prompt` | str or None | Resolved guidance message from the approval node, shown to approvers |
 | `execution_id` | UUID | Parent workflow execution ID (soft reference) |
 | `approval_node_id` | str | Canvas node ID from the workflow definition |
 | `loop_iteration_path` | list[int] | Enclosing-loop indices, outermost first (`[]` when not inside a loop) |
@@ -493,6 +494,10 @@ This context allows approvers to see:
 - What workflow is running and its inputs
 - What the previous step did and its output
 - What will happen next if they approve or reject
+
+The resolved `prompt` from the approval node (the author's guidance message, with
+template expressions substituted) is persisted on the approval request and returned
+by `GET /approvals` and `GET /approvals/{id}`. It is not nested under `workflow_context`.
 
 ## State Machine
 

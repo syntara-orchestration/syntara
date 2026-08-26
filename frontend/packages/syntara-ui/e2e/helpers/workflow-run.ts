@@ -1,6 +1,9 @@
-import { type Page } from '@playwright/test'
+import { type Locator, type Page } from '@playwright/test'
 
 import { expect } from '../fixtures'
+
+/** Locator scoped to the Compass page-header region (h1, status badges, toolbar). */
+export const pageHeader = (page: Page): Locator => page.locator('.pf-v6-c-compass__main-header')
 
 /**
  * Click Run in the workflow builder toolbar and wait for navigation to the
@@ -30,11 +33,14 @@ export async function runWorkflowFromBuilder(page: Page): Promise<void> {
 
 /**
  * Wait for a workflow execution to reach the approval-paused state on the
- * execution detail page.  Uses the "Pending approval" badge rather than
- * the "Paused" status label — the badge is driven by the `approval_pending`
- * boolean (set when any approval activity is in `waiting` status) and is
- * more reliable than the status label which depends on a WebSocket
+ * execution detail page.  Uses the "Pending approval" badge scoped to the
+ * page header — the badge is driven by the `approval_pending` boolean
+ * (set when any approval activity is in `waiting` status) and is more
+ * reliable than the "Paused" status label which depends on a WebSocket
  * `/status` patch that can be delayed or stale.
+ *
+ * Scoped to the page header to avoid false-matching "Pending approval"
+ * text elsewhere on the page (e.g. activity table, side panel).
  *
  * Splits the wait into two phases with a page refresh between them so that
  * a stale or late-connecting WebSocket doesn't cause a false negative —
@@ -43,7 +49,7 @@ export async function runWorkflowFromBuilder(page: Page): Promise<void> {
 export async function waitForExecutionPaused(page: Page, timeout = 90_000): Promise<boolean> {
   const half = Math.floor(timeout / 2)
   const reloadHeadingBudget = 10_000
-  const indicator = page.getByTestId('page-header').getByText('Pending approval')
+  const indicator = pageHeader(page).getByText('Pending approval')
 
   const reached = await indicator
     .waitFor({ state: 'visible', timeout: half })

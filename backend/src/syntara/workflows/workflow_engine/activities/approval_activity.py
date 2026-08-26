@@ -57,6 +57,7 @@ async def create_approval_request_activity(
     project_id: str = "",
     loop_iteration_path: list[int] | None = None,
     temporal_activity_id: str | None = None,
+    prompt: str | None = None,
 ) -> NoReturn:
     """Create an approval request via the Approvals API.
 
@@ -78,6 +79,7 @@ async def create_approval_request_activity(
         loop_iteration_path: Enclosing-loop indices, outermost first (empty if none).
         temporal_activity_id: Temporal activity ID to signal on decide. Defaults to
             ``approval_node_id`` for callers that predate this field.
+        prompt: Resolved guidance message from the approval node, or None.
 
     Raises:
         ApprovalActivityError: If approval request creation fails.
@@ -110,6 +112,7 @@ async def create_approval_request_activity(
         "approver_group_ids": approver_group_ids,
         "loop_iteration_path": loop_iteration_path or [],
         "temporal_activity_id": temporal_activity_id or approval_node_id,
+        "prompt": prompt,
     }
 
     try:

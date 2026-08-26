@@ -133,8 +133,47 @@ async def test_create_approval_request_success(
     assert request_data["name"] == "Approve deployment"
     assert request_data["next_step_approved"]["id"] == "deploy"
     assert request_data["workflow_context"]["workflow_name"] == "Production Deployment"
+    assert request_data["prompt"] is None
     assert request_data["loop_iteration_path"] == []
     assert request_data["temporal_activity_id"] == approval_node_id
+
+
+@pytest.mark.asyncio
+async def test_create_approval_request_forwards_prompt(
+    execution_id: str,
+    approval_node_id: str,
+    next_step_approved: dict[str, Any],
+    workflow_context: dict[str, Any],
+    mock_approval_response: dict[str, Any],
+    test_project_id: str,
+) -> None:
+    """Prompt is forwarded on the Approvals API create payload."""
+    mock_client = AsyncMock()
+    mock_client.create_approval = AsyncMock(return_value=mock_approval_response)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+
+    prompt = "Please review this infrastructure budget request."
+
+    with (
+        patch(
+            "syntara.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
+            return_value=mock_client,
+        ),
+        pytest.raises(CompleteAsyncError),
+    ):
+        await create_approval_request_activity(
+            execution_id=execution_id,
+            approval_node_id=approval_node_id,
+            name="Approve deployment",
+            next_step_approved=next_step_approved,
+            workflow_context=workflow_context,
+            project_id=test_project_id,
+            prompt=prompt,
+        )
+
+    request_data = mock_client.create_approval.call_args[0][0]
+    assert request_data["prompt"] == prompt
 
 
 @pytest.mark.asyncio
