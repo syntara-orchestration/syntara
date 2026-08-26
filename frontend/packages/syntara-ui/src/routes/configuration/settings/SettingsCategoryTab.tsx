@@ -16,6 +16,7 @@ function orderByDependency(items: RuntimeSetting[]): RuntimeSetting[] {
   for (const s of items) {
     if (!s.depends_on) continue
     if (!byTarget.has(s.depends_on)) byTarget.set(s.depends_on, [])
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- safe: key was just set via byTarget.set(s.depends_on, []) above
     byTarget.get(s.depends_on)!.push(s)
   }
   const parentKeys = new Set(independent.map((s) => s.key))
@@ -53,6 +54,7 @@ export function SettingsCategoryTab({
     for (const setting of settings) {
       const group = setting.group ?? ''
       if (!grouped.has(group)) grouped.set(group, [])
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- safe: key was just set via grouped.set(group, []) above
       grouped.get(group)!.push(setting)
     }
     for (const [key, groupSettings] of grouped) {

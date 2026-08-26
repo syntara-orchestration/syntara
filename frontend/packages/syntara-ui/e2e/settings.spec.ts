@@ -28,20 +28,21 @@
  * - Version conflict auto-refetches latest values
  */
 
-import { createUnavailableGuard, expect, test, toAppUrl } from './fixtures'
+import { createUnavailableGuard, type Page, expect, test, toAppUrl } from './fixtures'
 import { APP_TITLE } from './helpers/appTitle'
 import { apiRequest } from './utils/api'
 
 /** Navigate to settings and click the Context Manager tab. */
-async function goToContextManager(app: import('@playwright/test').Page) {
+async function goToContextManager(app: Page) {
   await app.goto(toAppUrl('/system-administration/settings'))
   const cmTab = app.getByRole('tab', { name: /Context Manager/i })
   await cmTab.click()
-  await expect(app.locator('.pf-v6-c-form__section-title', { hasText: 'Compression' })).toBeVisible({ timeout: 5000 })
+  // PF6 FormSection renders role="group" with the title as its accessible name.
+  await expect(app.getByRole('group', { name: 'Compression' })).toBeVisible({ timeout: 5000 })
 }
 
 /** Navigate to settings and click the System tab. */
-async function goToSystem(app: import('@playwright/test').Page) {
+async function goToSystem(app: Page) {
   await app.goto(toAppUrl('/system-administration/settings'))
   const sysTab = app.getByRole('tab', { name: 'System', exact: true })
   await sysTab.click()
@@ -49,7 +50,7 @@ async function goToSystem(app: import('@playwright/test').Page) {
 }
 
 /** Reset a single setting via its kebab menu then save. */
-async function resetSingleSetting(app: import('@playwright/test').Page, settingName: string) {
+async function resetSingleSetting(app: Page, settingName: string) {
   const kebab = app.getByLabel(`Actions for ${settingName}`)
   await expect(kebab).toBeVisible({ timeout: 5000 })
   await kebab.click()
@@ -61,7 +62,7 @@ async function resetSingleSetting(app: import('@playwright/test').Page, settingN
 }
 
 /** Reset all settings in the current tab to defaults via the confirmation modal, then save. */
-async function resetAllToDefaults(app: import('@playwright/test').Page) {
+async function resetAllToDefaults(app: Page) {
   const resetBtn = app.getByRole('button', { name: 'Reset to defaults' })
   if (await resetBtn.isEnabled()) {
     await resetBtn.click()
@@ -127,9 +128,10 @@ test.describe('Settings', () => {
       'Token limits',
     ]
     for (const group of groups) {
-      const title = app.locator('.pf-v6-c-form__section-title', { hasText: group })
-      await title.scrollIntoViewIfNeeded()
-      await expect(title).toBeVisible()
+      // PF6 FormSection renders role="group" with the title as its accessible name.
+      const section = app.getByRole('group', { name: group })
+      await section.scrollIntoViewIfNeeded()
+      await expect(section).toBeVisible()
     }
   })
 
@@ -304,7 +306,8 @@ test.describe('Settings', () => {
     test.skip(!hasTabs, 'Settings tabs not available for auditor')
 
     await cmTab.click()
-    await expect(auditorApp.locator('.pf-v6-c-form__section-title', { hasText: 'Compression' })).toBeVisible({
+    // PF6 FormSection renders role="group" with the title as its accessible name.
+    await expect(auditorApp.getByRole('group', { name: 'Compression' })).toBeVisible({
       timeout: 5000,
     })
 
@@ -408,8 +411,8 @@ test.describe('Settings', () => {
   test('modify JSON list setting', async ({ app }) => {
     await goToContextManager(app)
 
-    // Scroll to Context assembly section
-    const contextAssembly = app.locator('.pf-v6-c-form__section-title', { hasText: 'Context assembly' })
+    // Scroll to Context assembly section (PF6 FormSection renders role="group" with the title as its accessible name)
+    const contextAssembly = app.getByRole('group', { name: 'Context assembly' })
     await contextAssembly.scrollIntoViewIfNeeded()
 
     const formGroup = app.locator('[id="context_manager.priority_order"]').locator('..')
@@ -447,8 +450,8 @@ test.describe('Settings', () => {
   test('validation — out of range value shows inline error', async ({ app }) => {
     await goToContextManager(app)
 
-    // Scroll to Grounding scores section
-    const groundingSection = app.locator('.pf-v6-c-form__section-title', { hasText: 'Grounding scores' })
+    // Scroll to Grounding scores section (PF6 FormSection renders role="group" with the title as its accessible name)
+    const groundingSection = app.getByRole('group', { name: 'Grounding scores' })
     await groundingSection.scrollIntoViewIfNeeded()
 
     const formGroup = app.locator('[id="context_manager.required_grounding_score"]').locator('..')

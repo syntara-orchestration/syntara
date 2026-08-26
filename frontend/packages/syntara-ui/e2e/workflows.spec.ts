@@ -29,7 +29,11 @@ test('workflows table renders data rows', async ({ app }) => {
   const total = Number((await pagination.textContent())?.match(/of\s+(\d+)/)?.[1] ?? '0')
   test.skip(total === 0, 'No workflows in table to assert row visibility')
   // Kebab aria-label is stable when row accessible names are not (grouped table + Truncate).
-  await expect(workflowsTable.getByLabel(/^Actions for /).nth(0)).toBeVisible()
+  // PatternFly expandable tables wrap each row in its own tbody, so positional
+  // selectors like "tbody tr:first-child" match multiple elements. Filter to
+  // visible elements (`:visible`) and assert at least one is present — this is
+  // stronger than not.toHaveCount(0) which only checks DOM presence.
+  await expect(workflowsTable.getByLabel(/^Actions for /).locator(':visible')).not.toHaveCount(0)
 })
 
 test.skip('user searches, views, and deletes a workflow', async ({ app }) => {

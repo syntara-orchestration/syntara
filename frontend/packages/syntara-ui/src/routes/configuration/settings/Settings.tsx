@@ -121,7 +121,8 @@ export default function Settings() {
     for (const setting of allSettings) {
       const cat = setting.category
       if (!grouped.has(cat)) grouped.set(cat, [])
-      grouped.get(cat)!.push(setting)
+      const bucket = grouped.get(cat)
+      if (bucket) bucket.push(setting)
     }
     return grouped
   }, [allSettings])

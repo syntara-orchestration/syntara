@@ -3,9 +3,7 @@
  * Extracted from v2-nodes.ts to keep file sizes within lint limits.
  */
 
-import { type Page } from '@playwright/test'
-
-import { expect, toAppUrl } from '../fixtures'
+import { expect, type Page, toAppUrl } from '../fixtures'
 
 import { addConditionNodeWithBranch, addManualTrigger, openAddNodePanel, selectCategoryAndType } from './v2-nodes'
 import { buildUniqueName, closeNodeEditorPanel } from './workflows'

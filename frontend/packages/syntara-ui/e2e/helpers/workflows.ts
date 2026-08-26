@@ -1,8 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
-import { type Page } from '@playwright/test'
-
-import { expect, toAppUrl } from '../fixtures'
+import { type Page, expect, toAppUrl } from '../fixtures'
 import {
   createBasicWorkflowViaApi,
   deleteWorkflowViaApi,
@@ -24,20 +22,16 @@ export const addNodePanel = (page: Page) =>
  * Wait for UI to be ready by ensuring no toast notifications or loading overlays are blocking interactions
  */
 export async function waitForUIReady(page: Page) {
-  // Wait for any active toast items to disappear. The AlertGroup container is always
-  // mounted even when empty — scope to items *inside* it so an empty group resolves
-  // immediately instead of timing out.
-  const toastItems = page.locator('.pf-v6-c-alert-group .pf-v6-c-alert')
-  await toastItems
-    .first()
-    .waitFor({ state: 'hidden', timeout: 5000 })
+  // Wait for ALL PF6 toast alerts to disappear, not just the first.
+  // Scoped to the toast AlertGroup container (AlertGroup has no OUIA attribute);
+  // inline page alerts (ValidationBanner, BuilderReadOnlyBanner, etc.) are excluded.
+  await expect(page.locator('.pf-v6-c-alert-group [data-ouia-component-type="PF6/Alert"]'))
+    .toHaveCount(0, { timeout: 5000 })
     .catch(() => {})
 
-  // Wait for loading states to clear
-  const loadingStates = page.getByLabel('Loading')
-  await loadingStates
-    .first()
-    .waitFor({ state: 'hidden', timeout: 10000 })
+  // Wait for ALL loading indicators to clear, not just the first.
+  await expect(page.getByLabel('Loading'))
+    .toHaveCount(0, { timeout: 10000 })
     .catch(() => {})
 }
 
@@ -112,7 +106,7 @@ export async function closeNodeEditorPanel(page: Page) {
     return
   }
   // Scope the "Close" button query to the drawer panel to avoid matching alert close buttons
-  const drawer = page.locator('.pf-v6-c-drawer__panel')
+  const drawer = page.getByRole('dialog').or(page.locator('[class*="drawer"]'))
   const closeButton = drawer.getByRole('button', { name: 'Close node editor' })
   if ((await closeButton.count()) > 0) {
     await expect(closeButton).toBeVisible()
@@ -331,16 +325,16 @@ async function trySelectRealProject(page: Page): Promise<boolean> {
         await options.first().waitFor({ state: 'visible', timeout: 3_000 })
       }
 
-      const count = await options.count()
-      for (let i = 0; i < count; i++) {
-        const text = await options.nth(i).textContent()
+      const allOptions = await options.all()
+      for (const option of allOptions) {
+        const text = await option.textContent()
         if (
           text &&
           !text.includes('All projects') &&
           !text.includes('Create project') &&
           !text.toLowerCase().includes('built-in')
         ) {
-          await options.nth(i).click()
+          await option.click()
           return
         }
       }
@@ -645,7 +639,6 @@ export async function addScriptNodeUnconnected(page: Page, name: string, code: s
   const panel = addNodePanel(page)
   await expect(panel).toHaveCount(0, { timeout: 10000 })
   await waitForUIReady(page)
-  await page.waitForLoadState('networkidle')
 
   // Retry the entire "Add step" → Action → Script → fill name sequence,
   // because the panel can remount mid-flow when React re-renders the canvas.

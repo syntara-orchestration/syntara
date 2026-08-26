@@ -198,7 +198,7 @@ test.describe('destructive modal UX compliance (AAP-72897)', () => {
     test.skip(!hasTable, 'No user data available; seed data required')
 
     // Navigate to first user's role assignments
-    const firstRow = table.getByRole('row').nth(1) // Skip header row
+    const firstRow = table.locator('tbody tr:first-child')
     const firstUserLink = firstRow.getByRole('link')
     await expect(firstUserLink).toBeVisible()
     await firstUserLink.click()

@@ -13,9 +13,7 @@
  * fills the minimum required form fields, submits, and closes the editor.
  */
 
-import { type Page } from '@playwright/test'
-
-import { expect } from '../fixtures'
+import { expect, type Page } from '../fixtures'
 
 import {
   ensureLlmCredential,

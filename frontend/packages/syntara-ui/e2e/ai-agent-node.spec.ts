@@ -1,5 +1,4 @@
-import { type Page } from '@playwright/test'
-
+import { type Page } from './fixtures'
 import { test, expect } from './fixtures'
 import { type SeededLlmIntegration, createLlmIntegration, deleteLlmIntegration } from './helpers/llm-helpers'
 import { ensureLlmCredential, selectLlmCredential } from './helpers/v2-nodes'

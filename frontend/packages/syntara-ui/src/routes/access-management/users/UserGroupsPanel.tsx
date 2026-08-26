@@ -252,7 +252,7 @@ function removeMemberFromGroup(opts: {
       onSuccess: () => {
         opts.showAlert({
           title: 'Removed from group',
-          description: `User has been removed from group "${opts.groupToRemove!.name}".`,
+          description: `User has been removed from group "${opts.groupToRemove?.name ?? ''}".`,
           variant: 'success',
           autoDismiss: true,
         })

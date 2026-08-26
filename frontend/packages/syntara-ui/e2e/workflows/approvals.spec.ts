@@ -6,8 +6,7 @@
  * - UI-29: Self-contained approve flow — create workflow with approval node,
  *   run it, find the pending approval in the queue, approve it, verify execution resumes
  */
-import type { Page } from '@playwright/test'
-
+import { type Page } from '../fixtures'
 import { test, expect, toAppUrl } from '../fixtures'
 import { APP_TITLE } from '../helpers/appTitle'
 import { addApprovalNodeWithBranch } from '../helpers/v2-nodes'
@@ -82,7 +81,7 @@ test('user filters approvals by name and status', async ({ app }) => {
   await app.getByRole('search', { name: 'Filters' }).getByRole('button', { name: 'Name', exact: true }).click()
   await app.getByRole('option', { name: 'Status' }).click()
   await app.getByRole('button', { name: 'Filter by status' }).click()
-  await app.getByRole('listbox').getByText('Approved').click()
+  await app.getByRole('menuitem', { name: 'Approved' }).click()
 
   const statusChipGroup = app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Status' })
   await expect(nameChipGroup.getByText('Policy')).toBeVisible()
@@ -125,7 +124,7 @@ test('user filters approvals by name and status', async ({ app }) => {
 test.describe('Approval Workflow Operations', () => {
   test.skip(!process.env['SYNTARA_E2E_HAS_TEMPORAL_WORKER'], 'Temporal worker unavailable (globalSetup probe)')
 
-  test('user performs batch approval operations', { tag: ['@konflux-skip'] }, async ({ app }) => {
+  test('user bulk-approves filtered approval rows', { tag: ['@konflux-skip'] }, async ({ app }) => {
     // Create 2 pending approvals with a shared prefix for filtering
     const batchId = `batch-${Date.now()}`
     const approval1 = await createPendingApproval(app, batchId)
@@ -155,18 +154,15 @@ test.describe('Approval Workflow Operations', () => {
       await expect(rows.filter({ hasText: approval2.approvalName })).toBeVisible({ timeout: 15_000 })
       await rows.filter({ hasText: approval2.approvalName }).getByRole('checkbox').check()
 
-      // Step 2: Verify batch toolbar appears with count
-      const batchToolbar = app.getByRole('toolbar', { name: /selected/i })
-      await expect(batchToolbar).toBeVisible()
-      await expect(app.getByText('2 selected')).toBeVisible()
+      // Bulk actions live in the page header (Compass toolbar has no accessible name).
+      const pageHeader = app.getByTestId('page-header')
+      await expect(pageHeader.getByText('2 selected')).toBeVisible()
 
-      // Step 3: Verify batch action buttons are visible
-      const approveButton = app.getByRole('button', { name: 'Approve' })
-      const rejectButton = app.getByRole('button', { name: 'Reject' })
+      const approveButton = pageHeader.getByRole('button', { name: 'Approve' })
+      const rejectButton = pageHeader.getByRole('button', { name: 'Reject' })
       await expect(approveButton).toBeVisible()
       await expect(rejectButton).toBeVisible()
 
-      // Step 4: Click "Approve Selected" and verify confirmation dialog
       await approveButton.click()
 
       const dialog = app.getByRole('dialog')
@@ -186,9 +182,7 @@ test.describe('Approval Workflow Operations', () => {
       // Step 7: Verify success notification
       await expect(app.getByText('Approvals submitted')).toBeVisible({ timeout: 10_000 })
 
-      // Step 8: Verify selection cleared (batch toolbar should disappear)
-      await expect(batchToolbar).not.toBeVisible()
-      await expect(app.getByText('2 selected')).not.toBeVisible()
+      await expect(pageHeader.getByText('2 selected')).not.toBeVisible()
 
       // Step 9: Verify checkboxes are unchecked
       await expect(rows.filter({ hasText: approval1.approvalName }).getByRole('checkbox')).not.toBeChecked()
@@ -280,14 +274,18 @@ test.describe('Approval Workflow Operations', () => {
       await app.getByPlaceholder('Filter by name').fill(approval.approvalName)
       await app.getByRole('button', { name: 'Apply filter' }).click()
 
+      await expect(app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Name' })).toBeVisible({
+        timeout: 15_000,
+      })
+
       // Step 1: Select the approval using row-scoped checkbox
       const row = table.getByRole('row').filter({ hasText: approval.approvalName })
+      await expect(row).toBeVisible({ timeout: 15_000 })
       await row.getByRole('checkbox').check()
-      await expect(app.getByText('1 selected')).toBeVisible()
+      const pageHeader = app.getByTestId('page-header')
+      await expect(pageHeader.getByText('1 selected')).toBeVisible()
 
-      // Step 2: Click "Approve Selected"
-      const approveButton = app.getByRole('button', { name: 'Approve' })
-      await approveButton.click()
+      await pageHeader.getByRole('button', { name: 'Approve' }).click()
 
       // Step 3: Verify dialog appears
       const dialog = app.getByRole('dialog')
@@ -301,8 +299,7 @@ test.describe('Approval Workflow Operations', () => {
       // Step 5: Verify dialog closed
       await expect(dialog).not.toBeVisible()
 
-      // Step 6: Verify selection is still active (no API call was made)
-      await expect(app.getByText('1 selected')).toBeVisible()
+      await expect(pageHeader.getByText('1 selected')).toBeVisible()
 
       // Step 7: Deselect to clean up
       await row.getByRole('checkbox').uncheck()
@@ -432,7 +429,7 @@ test.describe('Approval Workflow Operations', () => {
     }
   })
 
-  test('user selects all approvals using header checkbox', async ({ app }) => {
+  test('user selects all filtered approvals using the header checkbox', async ({ app }) => {
     // Create 2 pending approvals with a shared prefix for filtering
     const batchId = `batch-${Date.now()}`
     const approval1 = await createPendingApproval(app, batchId)
@@ -454,35 +451,28 @@ test.describe('Approval Workflow Operations', () => {
       await expect(app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Name' })).toBeVisible({
         timeout: 15_000,
       })
-      await expect(table.getByRole('row').filter({ hasText: approval1.approvalName })).toBeVisible({
+      const rows = table.getByRole('row')
+      await expect(rows.filter({ hasText: approval1.approvalName })).toBeVisible({
         timeout: 15_000,
       })
-      await expect(table.getByRole('row').filter({ hasText: approval2.approvalName })).toBeVisible({
+      await expect(rows.filter({ hasText: approval2.approvalName })).toBeVisible({
         timeout: 15_000,
       })
 
-      // Step 1: Click header row checkbox to select all
-      const headerRow = table.getByRole('row').nth(0)
-      const selectAllCheckbox = headerRow.getByRole('checkbox')
+      // PatternFly `Th select` sets aria-label="Select all rows" on the header checkbox.
+      const selectAllCheckbox = table.getByRole('checkbox', { name: /select all/i })
+      await expect(selectAllCheckbox).toBeEnabled()
       await selectAllCheckbox.check()
 
-      // Step 2: Verify all approvals are selected (2 in this case)
-      const selectedText = app.getByText('2 selected')
+      const pageHeader = app.getByTestId('page-header')
+      const selectedText = pageHeader.getByText('2 selected')
       await expect(selectedText).toBeVisible({ timeout: 10_000 })
 
-      // Step 3: Verify batch toolbar is visible
-      const batchToolbar = app.getByRole('toolbar', { name: /selected/i })
-      await expect(batchToolbar).toBeVisible()
-
-      // Step 4: Uncheck header checkbox to deselect all
       await selectAllCheckbox.uncheck()
 
-      // Step 5: Verify selection cleared
       await expect(selectedText).not.toBeVisible()
-      await expect(batchToolbar).not.toBeVisible()
 
       // Step 6: Verify all checkboxes are unchecked
-      const rows = table.getByRole('row')
       await expect(rows.filter({ hasText: approval1.approvalName }).getByRole('checkbox')).not.toBeChecked()
       await expect(rows.filter({ hasText: approval2.approvalName }).getByRole('checkbox')).not.toBeChecked()
     } finally {

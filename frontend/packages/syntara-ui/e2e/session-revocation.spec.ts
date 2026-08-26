@@ -8,8 +8,7 @@
  *
  * Reference: ANSTRAT-1844, AAP-71181
  */
-import { type Page } from '@playwright/test'
-
+import { type Page } from './fixtures'
 import { test, expect, toAppUrl } from './fixtures'
 import { MINIMAL_OIDC_PROVIDER_CONFIGURATION } from './helpers/identity-providers'
 import { buildUniqueName } from './helpers/workflows'
