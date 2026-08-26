@@ -1,4 +1,6 @@
-import { expect, type Locator, type Page, toAppUrl } from '../fixtures'
+import type { Locator } from '@playwright/test'
+
+import { expect, type Page, toAppUrl } from '../fixtures'
 import { pollApprovalVisible } from '../utils/api'
 
 /**

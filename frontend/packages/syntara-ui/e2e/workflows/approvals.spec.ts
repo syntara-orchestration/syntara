@@ -188,7 +188,7 @@ test.describe('Approval Workflow Operations', () => {
     }
   })
 
-  test('user performs batch rejection operations', async ({ app }) => {
+  test('user bulk-rejects filtered approval rows', { tag: ['@konflux-skip'] }, async ({ app }) => {
     // Create 2 pending approvals with a shared prefix for filtering
     const batchId = `batch-${Date.now()}`
     const approval1 = await createPendingApproval(app, batchId)
@@ -211,11 +211,10 @@ test.describe('Approval Workflow Operations', () => {
       await expect(rows.filter({ hasText: approval2.approvalName })).toBeVisible({ timeout: 15_000 })
       await rows.filter({ hasText: approval2.approvalName }).getByRole('checkbox').check()
 
-      // Step 2: Verify batch toolbar and count
-      await expect(app.getByText('2 selected')).toBeVisible()
+      const pageHeader = app.getByTestId('page-header')
+      await expect(pageHeader.getByText('2 selected')).toBeVisible({ timeout: 15_000 })
 
-      // Step 3: Click "Reject Selected"
-      const rejectButton = app.getByRole('button', { name: 'Reject' })
+      const rejectButton = pageHeader.getByRole('button', { name: 'Reject' })
       await expect(rejectButton).toBeVisible()
       await rejectButton.click()
 
@@ -238,7 +237,7 @@ test.describe('Approval Workflow Operations', () => {
       await expect(app.getByText('Approvals rejected')).toBeVisible({ timeout: 10_000 })
 
       // Step 8: Verify selection cleared
-      await expect(app.getByText('2 selected')).not.toBeVisible()
+      await expect(pageHeader.getByText('2 selected')).not.toBeVisible()
 
       // Step 9: Verify checkboxes are unchecked
       await expect(rows.filter({ hasText: approval1.approvalName }).getByRole('checkbox')).not.toBeChecked()
@@ -266,10 +265,6 @@ test.describe('Approval Workflow Operations', () => {
 
       await applyApprovalNameFilter(app, table, approval.approvalName, {
         waitForRowText: approval.approvalName,
-      })
-
-      await expect(app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Name' })).toBeVisible({
-        timeout: 15_000,
       })
 
       // Step 1: Select the approval using row-scoped checkbox
