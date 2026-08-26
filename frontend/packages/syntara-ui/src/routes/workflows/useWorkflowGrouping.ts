@@ -18,13 +18,12 @@ export function useWorkflowGrouping(workflows: Workflow[], projects: ProjectRead
     const groups = new Map<string, { project: ProjectRead | null; workflows: Workflow[] }>()
     for (const workflow of sortedWorkflows) {
       const projectId = workflow.project_id
-      if (!groups.has(projectId)) {
-        groups.set(projectId, {
-          project: projects.find((p) => p.id === projectId) ?? null,
-          workflows: [],
-        })
+      let group = groups.get(projectId)
+      if (group == null) {
+        group = { project: projects.find((p) => p.id === projectId) ?? null, workflows: [] }
+        groups.set(projectId, group)
       }
-      groups.get(projectId)!.workflows.push(workflow)
+      group.workflows.push(workflow)
     }
     return groups
   }, [sortedWorkflows, projects, isAllProjects])

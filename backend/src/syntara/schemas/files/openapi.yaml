@@ -4,7 +4,7 @@ info:
   title: Files API
   version: 1.0.0
   description: |
-    File upload and management API for the Syntara platform.
+    File upload and management API for the Orchestrator platform.
 
     This specification defines the source of truth for all file operations including:
     - Standalone file uploads for agent context

@@ -50,13 +50,14 @@ test.describe('Execution URL unification', () => {
       await expect(app.getByRole('heading', { name: 'Run history' })).toBeVisible()
 
       const runHistoryPanel = app.getByRole('region', { name: 'Run history' })
-      const executionButton = runHistoryPanel.locator('button[class*="simpleList"]').nth(0)
-      const hasExecution = await executionButton
+      const executionButtons = runHistoryPanel.locator('button[class*="simpleList"]')
+      const hasExecution = await executionButtons
         .waitFor({ state: 'visible', timeout: 5000 })
         .then(() => true)
         .catch(() => false)
 
       if (hasExecution) {
+        const [executionButton] = await executionButtons.all()
         await executionButton.click()
         await expect(app).toHaveURL(/\/executions\//)
       }
@@ -122,10 +123,10 @@ test.describe('Execution URL unification', () => {
 
       // Click a different execution in the history card
       const executionItems = app.locator('button[class*="simpleList"]')
-      const itemCount = await executionItems.count()
-      if (itemCount > 1) {
+      const allExecutionItems = await executionItems.all()
+      if (allExecutionItems.length > 1) {
         const secondUrl = app.url()
-        await executionItems.nth(1).click()
+        await allExecutionItems[1].click()
         await expect(app).not.toHaveURL(secondUrl)
         await expect(app).toHaveURL(/\/executions\//)
       }
@@ -164,13 +165,14 @@ test.describe('Execution URL unification', () => {
 
       // Click an execution — should trigger unsaved changes prompt
       const runHistoryPanel = app.getByRole('region', { name: 'Run history' })
-      const executionButton = runHistoryPanel.locator('button[class*="simpleList"]').nth(0)
-      const hasExecution = await executionButton
+      const executionButtons = runHistoryPanel.locator('button[class*="simpleList"]')
+      const hasExecution = await executionButtons
         .waitFor({ state: 'visible', timeout: 5000 })
         .then(() => true)
         .catch(() => false)
 
       if (hasExecution) {
+        const [executionButton] = await executionButtons.all()
         await executionButton.click()
 
         // The unsaved changes modal should appear

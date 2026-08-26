@@ -1,10 +1,10 @@
 ---
 openapi: 3.1.0
 info:
-  title: Syntara Approvals API
+  title: Orchestrator Approvals API
   version: 1.0.0
   description: |
-    Human-in-the-loop approval API for the Syntara platform.
+    Human-in-the-loop approval API for the Orchestrator platform.
 
     This API provides endpoints for managing approval requests that pause
     automated processes pending human authorization. Approvals can be

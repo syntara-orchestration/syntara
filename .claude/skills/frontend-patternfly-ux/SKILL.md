@@ -902,7 +902,8 @@ When a user attempts to navigate away from a form or builder with unsaved change
 ### Success Feedback
 
 - Use PatternFly's [Dismissible Success Toast Alert component](https://www.patternfly.org/components/alert#alert-variations) for success messages after create, update, delete, and other actions
-- Toast alerts should auto-dismiss after a reasonable duration
+- **Success and informational** toasts auto-dismiss after a reasonable duration (`autoDismiss: true`)
+- **Actionable warnings** must set `autoDismiss: false` — if the message tells the user to do something (e.g., "Re-publish your workflow to apply changes"), auto-dismissing after 8 s means they may miss it before acting. Keep the toast visible until manually dismissed
 - Message format: Title in sentence case, past tense — `"[Resource type] [past-tense action]"` (e.g., "Role created"). Description includes entity name — `"The role {name} has been created successfully."`
 - **Verb consistency:** Toast copy must match the triggering action's verb. If the button says "Create role", the toast says "Role created" — not "Role added". Error toast titles mirror the action verb: `"Failed to create role"`
 
@@ -1187,7 +1188,7 @@ All icons **must** use the `RhUi` prefix. Examples: `RhUiAddIcon`, `RhUiEditIcon
 
 ### No Raw HTML for Text Content
 
-Never use raw `<span>`, `<p>`, or `<div>` for text content. Use PatternFly typography components instead — they pick up design tokens for font size, color, and spacing automatically and stay theme-compatible.
+Never use raw `<span>`, `<p>`, or `<div>` for text content anywhere in the component tree — this includes card bodies, stat label/value pairs, reasoning blocks, output panels, and inline helper copy, not just tab intro paragraphs. Use PatternFly typography components instead — they pick up design tokens for font size, color, and spacing automatically and stay theme-compatible.
 
 | Scenario                           | Use                                                                                        |
 | ---------------------------------- | ------------------------------------------------------------------------------------------ |

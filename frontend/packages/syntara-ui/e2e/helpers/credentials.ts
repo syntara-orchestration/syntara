@@ -1,6 +1,6 @@
-import { type Locator, type Page, type Response } from '@playwright/test'
+import { type Locator, type Response } from '@playwright/test'
 
-import { expect, toAppUrl } from '../fixtures'
+import { expect, type Page, toAppUrl } from '../fixtures'
 import {
   apiRequest,
   createCredentialViaApi,
