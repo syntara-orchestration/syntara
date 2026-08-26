@@ -21,6 +21,7 @@ if TYPE_CHECKING:
         CredentialNameConflictError,
         CredentialNotFoundError,
         CredentialValidationError,
+        ProjectCredentialInUseError,
     )
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -113,6 +114,24 @@ def credential_in_use_error_handler(request: Request, exc: "CredentialInUseError
         title="Credential In Use",
         detail=exc.message,
         code="CREDENTIAL_IN_USE",
+        retryable=False,
+        instance=str(request.url),
+    )
+
+
+def project_credential_in_use_error_handler(request: Request, exc: "ProjectCredentialInUseError") -> JSONResponse:
+    """Handle ProjectCredentialInUseError with RFC 9457 format."""
+    logger.warning(
+        "Blocked project delete: credentials still referenced by integrations",
+        project_name=exc.project_name,
+        affected_integration_count=exc.total_integration_count,
+    )
+    return create_problem_details_response(
+        status_code=status.HTTP_409_CONFLICT,
+        problem_type=PROBLEM_TYPES["resource_conflict"],
+        title="Project Credentials In Use",
+        detail=exc.message,
+        code="PROJECT_CREDENTIALS_IN_USE",
         retryable=False,
         instance=str(request.url),
     )

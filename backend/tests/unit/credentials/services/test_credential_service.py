@@ -697,7 +697,14 @@ class TestDeleteCredential:
         mock_result = MagicMock()
         mock_result.one_or_none.return_value = credential
         mock_session.exec.return_value = mock_result
-        mock_session.commit.side_effect = IntegrityError("DELETE", {}, Exception("FK violation"))
+        mock_session.commit.side_effect = IntegrityError(
+            "DELETE",
+            {},
+            Exception(
+                'update or delete on table "credentials" violates foreign key constraint '
+                '"integrations_management_credential_id_fkey" on table "integrations"'
+            ),
+        )
 
         service = CredentialService(mock_session, mock_user, mock_secret_service)
 
@@ -755,6 +762,29 @@ class TestDeleteCredential:
 
         mock_secret_service.delete_secret.assert_not_called()
         mock_session.delete.assert_not_awaited()
+
+
+class TestIsManagementCredentialFkViolation:
+    """Tests for CredentialService._is_management_credential_fk_violation."""
+
+    def test_matches_management_credential_fk(self) -> None:
+        exc = IntegrityError(
+            "DELETE",
+            {},
+            Exception(
+                'update or delete on table "credentials" violates foreign key constraint '
+                '"integrations_management_credential_id_fkey" on table "integrations"'
+            ),
+        )
+        assert CredentialService._is_management_credential_fk_violation(exc) is True
+
+    def test_does_not_match_other_constraint(self) -> None:
+        exc = IntegrityError(
+            "DELETE",
+            {},
+            Exception('duplicate key value violates unique constraint "ix_credentials_name"'),
+        )
+        assert CredentialService._is_management_credential_fk_violation(exc) is False
 
 
 _real_get_integration_counts = CredentialService.get_integration_counts

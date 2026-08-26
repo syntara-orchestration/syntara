@@ -81,3 +81,49 @@ class CredentialInUseError(CredentialError):
             f"integration{plural}{where}. Remove the credential from "
             "these integrations before deleting it."
         )
+
+
+@fastapi_exception(handler="syntara.credentials.error_handlers.project_credential_in_use_error_handler")
+class ProjectCredentialInUseError(CredentialError):
+    """Raised when a project cannot be deleted because its credentials are still used by integrations.
+
+    Integrations are not project-scoped (global LLM/MCP/AAP integrations
+    routinely reference a project credential via management_credential_id).
+    The ON DELETE RESTRICT FK makes the database reject the cascade, so
+    the project service must check upfront and surface an actionable 409
+    instead of a generic constraint error.
+    """
+
+    def __init__(
+        self,
+        project_name: str,
+        credential_names: list[str],
+        integration_names: list[str],
+        total_integration_count: int,
+    ) -> None:
+        """Initialize with project name and samples of referenced credentials/integrations."""
+        self.project_name = project_name
+        self.credential_names = credential_names
+        self.integration_names = integration_names
+        self.total_integration_count = total_integration_count
+
+        int_plural = "s" if total_integration_count != 1 else ""
+        if integration_names:
+            shown = ", ".join(f"'{n}'" for n in integration_names)
+            remaining = total_integration_count - len(integration_names)
+            suffix = f" and {remaining} more" if remaining > 0 else ""
+            int_list = f" ({shown}{suffix})"
+        else:
+            int_list = ""
+
+        cred_shown = ", ".join(f"'{n}'" for n in credential_names[:5])
+        cred_remaining = len(credential_names) - 5
+        cred_suffix = f" and {cred_remaining} more" if cred_remaining > 0 else ""
+        cred_list = f"{cred_shown}{cred_suffix}"
+
+        super().__init__(
+            f"Cannot delete project '{project_name}': {total_integration_count} "
+            f"integration{int_plural}{int_list} still reference credentials "
+            f"in this project ({cred_list}). Detach or reassign these "
+            f"integrations before deleting the project."
+        )

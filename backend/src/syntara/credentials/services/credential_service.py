@@ -635,6 +635,12 @@ class CredentialService(BaseService):
             )
             return {}
 
+    @staticmethod
+    def _is_management_credential_fk_violation(exc: IntegrityError) -> bool:
+        """Check whether *exc* was caused by the management_credential_id RESTRICT FK."""
+        error_str = str(exc)
+        return "integrations_management_credential_id_fkey" in error_str
+
     async def _get_referencing_integration_names(self, credential_id: UUID, *, limit: int) -> list[str]:
         """Fetch up to `limit` names of integrations using this credential as their management credential.
 
@@ -722,12 +728,9 @@ class CredentialService(BaseService):
         try:
             await self.session.commit()
         except IntegrityError as exc:
-            # Rare race: an integration was attached to this credential after the
-            # count check above but before this commit. The FK's ON DELETE RESTRICT
-            # (not SET NULL) makes the database reject the delete instead of
-            # silently nulling the reference — surface it as the same clean 409
-            # rather than a generic integrity-constraint response.
             await self.session.rollback()
+            if not self._is_management_credential_fk_violation(exc):
+                raise
             logger.warning(
                 "Credential delete raced with a new integration reference",
                 credential_id=str(credential_id),
@@ -735,7 +738,9 @@ class CredentialService(BaseService):
                 exc_info=exc,
             )
             int_counts = await self.get_integration_counts([credential_id])
-            int_ref_count = int_counts.get(credential_id, 0) or 1
+            int_ref_count = int_counts.get(credential_id, 0)
+            if not int_ref_count:
+                raise
             integration_names = await self._get_referencing_integration_names(credential_id, limit=5)
             raise CredentialInUseError(cred_name, integration_names, int_ref_count) from exc
         logger.info("Credential deleted", credential_id=str(credential_id))
