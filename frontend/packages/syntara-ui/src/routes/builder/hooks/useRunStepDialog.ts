@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useRef } from 'react'
 
 import { useDialogState } from '../../../hooks/useDialogState'
 import { useMockDataStore } from '../../../stores/useMockDataStore'
-import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import { getAncestorNodes } from '../../../utils/graphTraversal'
 import type { RunStepDialogData } from '../components/RunStepDialog'
 
@@ -37,18 +36,16 @@ export function useRunStepDialog(handleSaveWorkflow: () => Promise<boolean>, isT
       const node = reactFlowInstance.getNode(nodeId)
       if (!node?.data) return
 
-      const activeForm = document.querySelector<HTMLFormElement>('[data-step-editor-form]')
-      if (activeForm) {
-        suppressPanelCloseRef.current = true
-        try {
-          activeForm.requestSubmit()
-          if (!(await handleSaveWorkflow())) return
-        } finally {
-          suppressPanelCloseRef.current = false
-        }
-      } else if (useWorkflowStore.getState().isDirty && !(await handleSaveWorkflow())) {
-        return
+      // Suppress panel close during save - guardedSaveWorkflow may auto-submit
+      // the node editor form, which triggers onClose() that we need to block
+      suppressPanelCloseRef.current = true
+      try {
+        // guardedSaveWorkflow auto-submits node editor form if open, then saves
+        if (!(await handleSaveWorkflow())) return
+      } finally {
+        suppressPanelCloseRef.current = false
       }
+
       const edges = reactFlowInstance.getEdges()
       const nodes = reactFlowInstance.getNodes()
       const predecessors: RunStepDialogData['predecessors'] = getAncestorNodes(nodeId, edges, nodes, {

@@ -181,7 +181,7 @@ describe('useRunStepDialog', () => {
       expect(mockDialogOpen).not.toHaveBeenCalled()
     })
 
-    it('does not save workflow if not dirty', async () => {
+    it('always saves workflow via guardedSaveWorkflow', async () => {
       mockWorkflowStoreState.isDirty = false
       mockGetNode.mockReturnValue({ id: 'node-1', data: { name: 'Step' } })
       const handleSaveWorkflow = vi.fn().mockResolvedValue(true)
@@ -192,24 +192,26 @@ describe('useRunStepDialog', () => {
         await result.current.handleRunStep('node-1')
       })
 
-      expect(handleSaveWorkflow).not.toHaveBeenCalled()
+      // guardedSaveWorkflow is passed in and handles auto-submit + save
+      expect(handleSaveWorkflow).toHaveBeenCalledTimes(1)
       expect(mockDialogOpen).toHaveBeenCalled()
     })
 
-    it('submits active node form before checking isDirty', async () => {
-      const mockRequestSubmit = vi.fn()
-      const mockForm = { requestSubmit: mockRequestSubmit } as unknown as HTMLFormElement
-      vi.spyOn(document, 'querySelector').mockReturnValue(mockForm)
+    it('delegates form submission to guardedSaveWorkflow', async () => {
+      // guardedSaveWorkflow (passed from BuilderContent) handles auto-submit internally
+      // via useNodeEditorAutoSubmit pattern, not via direct requestSubmit() call
       mockGetNode.mockReturnValue({ id: 'node-1', data: { name: 'Step' } })
+      const handleSaveWorkflow = vi.fn().mockResolvedValue(true)
 
-      const { result } = renderRunStepDialog()
+      const { result } = renderRunStepDialog(handleSaveWorkflow)
 
       await act(async () => {
         await result.current.handleRunStep('node-1')
       })
 
-      expect(mockRequestSubmit).toHaveBeenCalledTimes(1)
-      vi.restoreAllMocks()
+      // Save is always called - guarded save handles auto-submit if needed
+      expect(handleSaveWorkflow).toHaveBeenCalledTimes(1)
+      expect(mockDialogOpen).toHaveBeenCalled()
     })
 
     it('skips form submit when no step editor form is in the DOM', async () => {
