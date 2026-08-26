@@ -5,6 +5,7 @@ import { FlowNodeType } from '../../../constants'
 import { useAlerts } from '../../../providers/alerts'
 import { getErrorMessage } from '../../../utils/apiErrors'
 import { detachPromise } from '../../../utils/detachPromise'
+import { findApprovalIndexForCanvasNode } from '../../approvals/approvalNodeId'
 import { ACTIVITY_STATUS } from '../../builder/utils/executionState/executionHelpers'
 
 import { useFetchPendingApprovals } from './useFetchPendingApprovals'
@@ -96,7 +97,7 @@ export function useExecutionApprovals(executionId: string | undefined): UseExecu
             if (executionIdRef.current !== capturedExecutionId || latestNodeIdRef.current !== node.id) return
             lastFetchErrorKeyRef.current = null
 
-            const index = fetchedApprovals.findIndex((a) => a.approval_node_id === node.id)
+            const index = findApprovalIndexForCanvasNode(fetchedApprovals, node.id)
             if (index >= 0) {
               setApprovals(fetchedApprovals)
               setCurrentIndex(index)

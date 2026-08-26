@@ -19,7 +19,7 @@ import {
 import { RhUiCloseIcon, RhUiErrorIcon } from '@patternfly/react-icons'
 import { useCallback, useMemo, useRef, useState } from 'react'
 
-import { NxSelect } from '../../../components/NxSelect'
+import { SynSelect } from '../../../components/SynSelect'
 
 // Generic item type for multi-select
 export type SelectableItem = {
@@ -209,7 +209,7 @@ export function ApproverMultiSelect<T extends SelectableItem>({
 
   return (
     <>
-      <NxSelect
+      <SynSelect
         isOpen={isOpen}
         selected={selectedValues}
         onSelect={handleSelect}
@@ -231,7 +231,7 @@ export function ApproverMultiSelect<T extends SelectableItem>({
           {filteredItems.length === 0 && !isLoading && <SelectOption isDisabled>{emptyText}</SelectOption>}
           {isLoading && <SelectOption isDisabled>{loadingText}</SelectOption>}
         </SelectList>
-      </NxSelect>
+      </SynSelect>
 
       {validationError && (
         <FormHelperText>

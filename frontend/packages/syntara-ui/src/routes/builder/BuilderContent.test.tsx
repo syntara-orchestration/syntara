@@ -1149,7 +1149,7 @@ describe('BuilderContent', () => {
       })
 
       const user = userEvent.setup()
-      const row = screen.getByRole('button', { name: /Completed/i })
+      const row = screen.getByRole('link', { name: /Execution from/ })
       expect(row).toBeInTheDocument()
       await user.click(row)
       await waitFor(() => {

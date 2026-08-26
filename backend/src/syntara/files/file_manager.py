@@ -15,7 +15,7 @@ from uuid import UUID, uuid4
 
 import structlog
 from fastapi import UploadFile
-from sqlmodel import select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.audit.dispatcher import AuditEventDispatcher
@@ -421,6 +421,120 @@ class FileManager:
 
         result = await session.exec(statement)
         return list(result.all())
+
+    async def delete_file(
+        self,
+        file_id: UUID,
+        session: AsyncSession,
+    ) -> FileMetadata:
+        """Delete a file's metadata and best-effort remove storage objects.
+
+        Hard-deletes the FileMetadata record first, then attempts to remove the
+        original object and any converted content from S3. Storage cleanup is
+        best-effort: failures after a successful DB commit are logged and do
+        not fail the request.
+
+        Args:
+            file_id: UUID of the file to delete
+            session: Database session
+
+        Returns:
+            The deleted FileMetadata (detached after commit)
+
+        Raises:
+            SafeValueError: If the file metadata is not found
+
+        """
+        file_metadata = await session.get(FileMetadata, file_id)
+        if file_metadata is None:
+            msg = f"File not found: {file_id}"
+            raise SafeValueError(msg)
+
+        file_path = file_metadata.file_path
+        converted_content_path = file_metadata.converted_content_path
+
+        await session.delete(file_metadata)
+        await session.commit()
+
+        try:
+            retriever = self.get_retriever()
+        except FileStorageUnavailableError:
+            logger.warning(
+                "File storage unavailable during cleanup after file delete",
+                file_id=str(file_id),
+                path=file_path,
+                exc_info=True,
+            )
+        else:
+            try:
+                await retriever.delete_file(file_path)
+            except (OSError, FileError):
+                logger.warning(
+                    "Failed to delete file from storage during file delete",
+                    file_id=str(file_id),
+                    path=file_path,
+                    exc_info=True,
+                )
+            if converted_content_path:
+                try:
+                    await retriever.delete_file(converted_content_path)
+                except (OSError, FileError):
+                    logger.warning(
+                        "Failed to delete converted content during file delete",
+                        file_id=str(file_id),
+                        path=converted_content_path,
+                        exc_info=True,
+                    )
+
+        logger.info(
+            "File deleted",
+            file_id=str(file_id),
+            filename=file_metadata.filename,
+            project_id=str(file_metadata.project_id),
+        )
+        return file_metadata
+
+    async def is_project_deleted(
+        self,
+        project_id: UUID,
+        session: AsyncSession,
+    ) -> bool:
+        """Return whether the owning project is soft-deleted or missing.
+
+        Mirrors the service-account pattern: files are retained after project
+        deletion, and callers learn the orphaned state via this flag.
+
+        Selecting the full row distinguishes an active project (``deleted_at``
+        is NULL) from a hard-deleted/missing project (no row). Selecting only
+        ``deleted_at`` would return ``None`` for both and incorrectly mark
+        hard-deleted projects as active.
+        """
+        from syntara.authz.models.project import Project  # noqa: PLC0415
+
+        result = await session.exec(select(Project).where(Project.id == project_id))
+        project = result.one_or_none()
+        return project is None or project.deleted_at is not None
+
+    async def batch_is_project_deleted(
+        self,
+        project_ids: set[UUID],
+        session: AsyncSession,
+    ) -> dict[UUID, bool]:
+        """Batch-check whether projects are soft-deleted or missing.
+
+        Returns a mapping of ``project_id → is_deleted``. Missing projects
+        (hard-deleted or never existed) are treated as deleted, matching the
+        single-lookup behaviour of ``is_project_deleted``.
+        """
+        if not project_ids:
+            return {}
+
+        from syntara.authz.models.project import Project  # noqa: PLC0415
+
+        result = await session.exec(select(Project).where(col(Project.id).in_(project_ids)))
+        projects = {p.id: p for p in result.all()}
+
+        return {pid: (pid not in projects or projects[pid].deleted_at is not None) for pid in project_ids}
 
     async def update_file_status(
         self,

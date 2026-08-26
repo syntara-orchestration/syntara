@@ -2,7 +2,7 @@ import { Badge, Divider, MenuToggle, SelectList, SelectOption, type MenuToggleEl
 import React, { useCallback, useMemo, useState } from 'react'
 
 import { FilterOperatorEnum, type FilterConfig, type FilterOperator } from '../../types/filters'
-import { NxSelect } from '../NxSelect'
+import { SynSelect } from '../SynSelect'
 
 const SELECT_ALL_VALUE = '__select_all__'
 const CLEAR_ALL_VALUE = '__clear_all__'
@@ -167,7 +167,7 @@ export function MultiSelectFilter({
   )
 
   return (
-    <NxSelect
+    <SynSelect
       role="menu"
       isOpen={isOpen}
       selected={selectedValues}
@@ -194,6 +194,6 @@ export function MultiSelectFilter({
           </SelectOption>
         ))}
       </SelectList>
-    </NxSelect>
+    </SynSelect>
   )
 }

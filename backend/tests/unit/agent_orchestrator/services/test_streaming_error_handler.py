@@ -10,7 +10,7 @@ from uuid import uuid4
 
 import pytest
 
-from syntara.agent_orchestrator.exceptions import ToolDiscoveryError, ToolSelectionUnavailableError
+from syntara.agent_orchestrator.exceptions import AgentTimeoutError, ToolDiscoveryError, ToolSelectionUnavailableError
 from syntara.agent_orchestrator.services.error_handler import (
     ERROR_TYPE_BASE_URI,
     classify_streaming_error,
@@ -24,6 +24,8 @@ pytestmark = pytest.mark.unit
     [
         # Timeout errors
         (TimeoutError("Request timed out after 30 seconds"), "STREAM_TIMEOUT", True),
+        # Agent timeout errors (non-retryable)
+        (AgentTimeoutError("Agent timed out after 300 seconds"), "AGENT_TIMEOUT", False),
         # Rate limit errors
         (Exception("API rate limit exceeded, please retry later"), "RATE_LIMIT_EXCEEDED", True),
         (Exception("HTTP 429: Too Many Requests"), "RATE_LIMIT_EXCEEDED", True),
@@ -84,6 +86,7 @@ pytestmark = pytest.mark.unit
     ],
     ids=[
         "timeout",
+        "agent_timeout",
         "rate_limit_message",
         "rate_limit_status",
         "auth_message",
@@ -198,6 +201,32 @@ def test_tool_discovery_zero_match_uses_client_safe_detail() -> None:
         "Required tools could not be discovered or provisioned. Check integration connectivity and tool configuration."
     )
     assert error.detail == expected_detail
+    assert error.retryable is False
+
+
+def test_agent_timeout_classified_as_non_retryable() -> None:
+    """AgentTimeoutError produces AGENT_TIMEOUT code, is non-retryable, and preserves detail."""
+    timeout_msg = "Agent execution exceeded 300s timeout"
+    exception = AgentTimeoutError(timeout_msg)
+    invocation_id = uuid4()
+
+    error = classify_streaming_error(exception, invocation_id)
+
+    assert error.code == "AGENT_TIMEOUT"
+    assert error.retryable is False
+    assert error.title == "Agent Timeout"
+    assert error.detail == timeout_msg
+    assert error.type == f"{ERROR_TYPE_BASE_URI}/timeout-error"
+    assert error.instance == f"/invocations/{invocation_id}"
+
+
+def test_agent_timeout_takes_precedence_over_builtin_timeout() -> None:
+    """AgentTimeoutError (subclass) must not fall through to TimeoutError classifier."""
+    exception = AgentTimeoutError("timeout")
+    error = classify_streaming_error(exception, uuid4())
+
+    # Must be AGENT_TIMEOUT not STREAM_TIMEOUT
+    assert error.code == "AGENT_TIMEOUT"
     assert error.retryable is False
 
 

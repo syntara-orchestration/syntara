@@ -1,4 +1,6 @@
 ---
+# Frontend CI workflow with conditional E2E execution and cost-saving gates.
+# See docs/ci/workflows.md for detailed behavior and manual trigger documentation.
 name: CI Frontend
 
 on:
@@ -8,14 +10,30 @@ on:
     branches: [devel, early-access]
   push:
     branches: [devel, early-access]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Pull request number'
+        required: true
+        type: string
+      pr_ref:
+        description: 'PR head branch ref'
+        required: true
+        type: string
 
+# Required permissions for this workflow:
+# - contents:read - checkout code in all jobs
+# - pull-requests:read - fetch PR file list via gh api for change detection
+# - statuses:read - read E2E commit status in the Konflux gate jobs
 permissions:
-  contents: read # checkout code
-  pull-requests: read # gh api needs PR file list
-  statuses: read # read E2E commit status
+  contents: read
+  pull-requests: read
+  statuses: read
 
+# workflow_dispatch runs against devel ref — scope by PR number so manual
+# triggers don't cancel each other or fight push-to-devel runs.
 concurrency:
-  group: ci-frontend-${{ github.ref }}
+  group: ci-frontend-${{ github.event_name == 'workflow_dispatch' && format('dispatch-{0}', inputs.pr_number) || github.ref }}
   cancel-in-progress: true
 
 # Scoped to this file only — other workflows pin their own.
@@ -31,22 +49,26 @@ jobs:
       backend: ${{ steps.check.outputs.backend }}
       contracts: ${{ steps.check.outputs.contracts }}
       scripts: ${{ steps.check.outputs.scripts }}
+      frontend: ${{ steps.check.outputs.frontend }}
     steps:
       - id: check
         env:
           GH_TOKEN: ${{ github.token }}
+          # Prefer the PR event number; fall back to workflow_dispatch input so
+          # manual `/run-e2e-ui-tests` runs path-filter against the real PR
+          # instead of treating the run as "no PR → enable everything".
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
         run: |
           set -euo pipefail
-          PR_NUMBER="${{ github.event.pull_request.number }}"
-          if [ -z "$PR_NUMBER" ]; then
+          if [ -z "${PR_NUMBER}" ]; then
             echo "::warning::No PR number (merge_group context), running all CI as fallback"
-            { echo "code=true"; echo "backend=true"; echo "contracts=true"; echo "scripts=true"; } >> "$GITHUB_OUTPUT"
+            { echo "code=true"; echo "backend=true"; echo "contracts=true"; echo "scripts=true"; echo "frontend=true"; } >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          FILES=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/files --paginate --jq '.[].filename')
+          FILES=$(gh api "repos/${{ github.repository }}/pulls/${PR_NUMBER}/files" --paginate --jq '.[].filename')
           if [ -z "$FILES" ]; then
             echo "::warning::No files from API, running all CI as fallback"
-            { echo "code=true"; echo "backend=true"; echo "contracts=true"; echo "scripts=true"; } >> "$GITHUB_OUTPUT"
+            { echo "code=true"; echo "backend=true"; echo "contracts=true"; echo "scripts=true"; echo "frontend=true"; } >> "$GITHUB_OUTPUT"
             exit 0
           fi
           if grep -qE '^(frontend/|backend/|\.github/)' <<< "$FILES"; then
@@ -69,6 +91,11 @@ jobs:
           else
             echo "scripts=false" >> "$GITHUB_OUTPUT"
           fi
+          if grep -qE '^(frontend/|\.github/workflows/ci-frontend\.yml)' <<< "$FILES"; then
+            echo "frontend=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "frontend=false" >> "$GITHUB_OUTPUT"
+          fi
 
   gen-contracts:
     name: (Frontend) Generate Contracts
@@ -77,6 +104,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
@@ -105,6 +134,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
@@ -130,6 +161,8 @@ jobs:
         shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
@@ -164,6 +197,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
@@ -246,6 +281,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Download coverage report
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
@@ -279,6 +315,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Download coverage report
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
@@ -303,6 +340,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
@@ -325,6 +364,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
@@ -416,16 +457,37 @@ jobs:
     steps:
       - run: echo "Frontend checks passed"
 
+  # E2E UI tests run conditionally to reduce CI costs:
+  # - Auto-run on PRs when frontend/ or ci-frontend.yml changes
+  # - Skip on backend-only PRs (save ~15-20 min on 8-core runner)
+  # - Always run in merge queue (final safety check)
+  # - Manual trigger via /run-e2e-ui-tests comment (OWNER/MEMBER only)
+  # See docs/ci/workflows.md for complete behavior table and debugging guide.
   test-compose-e2e:
     name: (Frontend) Test Podman Compose E2E
     needs: [changes, frontend-checks-gate]
-    if: needs.changes.outputs.code == 'true' && github.event_name != 'push'
+    # Only auto-trigger on same-repo PRs with frontend changes, or manual dispatch, or merge queue.
+    # Fork PRs are explicitly excluded from auto-triggering to prevent security risks.
+    # always() + gate != failure|cancelled lets workflow_dispatch still run when the
+    # checks gate is skipped (e.g. docs-only PR), while preserving fast-fail when
+    # lint/unit actually failed.
+    if: |
+      always() &&
+      needs.changes.result == 'success' &&
+      needs.frontend-checks-gate.result != 'failure' &&
+      needs.frontend-checks-gate.result != 'cancelled' &&
+      (
+        (needs.changes.outputs.frontend == 'true' && github.event_name != 'push' && github.event.pull_request.head.repo.full_name == github.repository) ||
+        github.event_name == 'merge_group' ||
+        github.event_name == 'workflow_dispatch'
+      )
     runs-on: ubuntu-latest-8-cores
     timeout-minutes: 120
     # Job-level concurrency ensures only the latest commit runs this expensive test.
     # When a new commit is pushed, any in-progress E2E run from the prior commit is cancelled.
+    # workflow_dispatch is keyed by PR number (same reason as workflow-level concurrency).
     concurrency:
-      group: e2e-frontend-${{ github.head_ref || github.ref }}
+      group: e2e-frontend-${{ github.event_name == 'workflow_dispatch' && format('dispatch-{0}', inputs.pr_number) || github.head_ref || github.ref }}
       cancel-in-progress: true
     steps:
       - name: Free disk space
@@ -434,8 +496,46 @@ jobs:
           sudo apt-get clean
           df -h /
 
+      - name: Validate workflow inputs
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553 # v9
+        env:
+          PR_NUMBER: ${{ inputs.pr_number }}
+          PR_REF: ${{ inputs.pr_ref }}
+        with:
+          script: |
+            const prNumber = process.env.PR_NUMBER;
+            const prRef = process.env.PR_REF;
+
+            if (!prNumber || !prRef) {
+              core.setFailed('workflow_dispatch requires pr_number and pr_ref inputs');
+              return;
+            }
+
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: parseInt(prNumber, 10),
+            });
+
+            const baseRepo = `${context.repo.owner}/${context.repo.repo}`;
+            if (pr.data.head.repo.full_name !== baseRepo) {
+              core.setFailed('Refusing to run on fork PRs');
+              return;
+            }
+
+            if (pr.data.head.ref !== prRef) {
+              core.setFailed(`Input pr_ref='${prRef}' does not match PR #${prNumber} head ref='${pr.data.head.ref}'`);
+              return;
+            }
+
+            core.info(`Validated: PR #${prNumber} ref=${prRef}`);
+
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.pr_ref || github.sha }}
+          persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
@@ -563,9 +663,11 @@ jobs:
           echo "SYNTARA_E2E_PASSWORD=$password" >> "$GITHUB_ENV"
 
       - name: Install npm dependencies and Playwright browsers
+        env:
+          CACHE_HIT: ${{ steps.playwright-cache.outputs.cache-hit }}
         run: |
           npm ci --prefix frontend
-          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+          if [ "$CACHE_HIT" = "true" ]; then
             (cd frontend/packages/syntara-ui && npx playwright install-deps chromium)
           else
             (cd frontend/packages/syntara-ui && npx playwright install --with-deps chromium)
@@ -623,6 +725,8 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/konflux-gate
         with:
           check-name: 'Red Hat Konflux / conforma-on-pull-request-{branch} / ansible-automation-orchestrator-ui-{branch}'
@@ -640,6 +744,8 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/konflux-gate
         with:
           check-name: 'Konflux kflux-prd-rh03 / automation-orchestrator-ui-tests-{branch}-pull-request'

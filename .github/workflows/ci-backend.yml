@@ -101,7 +101,7 @@ jobs:
   api-spec-bundle:
     name: (Backend) API Spec Bundle
     needs: changes
-    if: needs.changes.outputs.backend_py == 'true' || needs.changes.outputs.backend_yaml == 'true'
+    if: needs.changes.outputs.backend_py == 'true' || needs.changes.outputs.backend_yaml == 'true' || needs.changes.outputs.backend_schema == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -121,8 +121,9 @@ jobs:
         working-directory: backend
 
       - name: Check for uncommitted changes
+        working-directory: backend
         run: |
-          if ! git diff --exit-code -- backend/src/syntara/schemas/openapi.yaml backend/src/syntara/schemas/openapi-public.yaml 2>/dev/null; then
+          if ! git diff --exit-code -- $(make print-openapi-generated-files) 2>/dev/null; then
             echo "::error::Bundled OpenAPI specs have uncommitted changes. Run 'make -C backend api-spec-bundle-all' locally and commit the changes."
             exit 1
           fi
