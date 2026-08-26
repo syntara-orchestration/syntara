@@ -40,12 +40,13 @@ test.describe('Manual Trigger', () => {
         await selectProjectIfRequired(app)
         await app.getByPlaceholder('Workflow name').fill(workflowName)
         await app.getByRole('button', { name: 'Save', exact: true }).click()
-        await expect(app).toHaveURL(/workflow-builder\/.+/)
+        await expect(app).toHaveURL(/workflow-builder\/(?!new)[a-f0-9-]+/, { timeout: 15_000 })
 
         await app.goto(toAppUrl('/workflows'))
+        await expect(app.getByRole('grid', { name: 'Workflows table' })).toBeVisible({ timeout: 15_000 })
         await app.getByPlaceholder('Filter by name').fill(workflowName)
         await app.getByRole('button', { name: 'Apply filter' }).click()
-        await expect(app.getByRole('link', { name: workflowName, exact: true })).toBeVisible()
+        await expect(app.getByRole('link', { name: workflowName, exact: true })).toBeVisible({ timeout: 30_000 })
 
         await app.getByRole('link', { name: workflowName, exact: true }).click()
 

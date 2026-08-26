@@ -21,9 +21,13 @@ This file provides guidance to AI coding assistants when working in the frontend
 | **Before writing or modifying any component, hook, or pattern**                     | `.claude/skills/frontend-coding-standards/SKILL.md`                                       |
 | **Before writing code using React, Zod, Zustand, Vitest, Vite, or TanStack Query**  | `.claude/skills/frontend-library-references/SKILL.md` (fetch the relevant `llms.txt` URL) |
 
-### Storybook MCP (when available)
+### Storybook MCP and PatternFly MCP (when available)
 
-When the Storybook MCP is available in the session, use its tools for all component and story work — it surfaces live documentation, rendered previews, and story conventions without requiring you to read source files.
+When MCP servers are available in the session, use them so you do not invent props.
+
+- **Storybook MCP** (`localhost:5174/mcp`) — this app’s wrappers (`Nx*`). Storybook must be running or the server is dead; start it or ask.
+- **PatternFly MCP** — official PF6 component props. Use this for raw PatternFly, not for `Nx*` wrappers.
+- One browser MCP (Playwright or Chrome DevTools) — screenshots and console in `/frontend-build-ui-feature` Phase 5.
 
 **CRITICAL: Never hallucinate component properties.** Before using any prop on a component — including seemingly obvious ones like `shadow`, `size`, `variant` — you must verify it is actually documented. A story name may not reflect the underlying prop name, so always check the documentation, not just story names.
 
@@ -70,7 +74,24 @@ Treat accessibility as part of every UI change, not an optional follow-up:
 
 **CRITICAL: Address ALL of these before opening a PR. For detailed examples, see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md).**
 
-Items enforced by ESLint at error level are omitted -- ESLint is the source of truth for those. The items below cover patterns ESLint cannot catch:
+Items enforced by ESLint at **error** level are omitted -- ESLint is the source of truth for those. The following are automatically caught and do not need manual checklist review:
+
+- `formState.isSubmitting` → use `isPending` (`no-restricted-syntax`)
+- `aria-label` on `<span>` → `no-restricted-syntax`
+- Nested React component definitions → `syntara/no-nested-component-definitions` (for PatternFly `toggle` / similar props use a module-scoped child and pass data as props; see coding-standards §18)
+- Hardcoded documentation URLs → `syntara/no-hardcoded-doc-urls`
+- `// TODO` / `// FIXME` comments → `no-warning-comments` (warn, not error -- surfaced as a lint warning, does not block CI)
+- Native `<select>` / `<FormSelect>` → `no-restricted-syntax`
+- Non-null assertions (`!`) on nullable types → `@typescript-eslint/no-non-null-assertion`
+- Internal package source imports (e.g. `@syntara/contracts/src`) → `no-restricted-imports`
+- `new Date()` in mock seed data → `syntara-mock-api`'s `eslint.config.js` (`no-restricted-syntax`)
+- PatternFly CSS class selectors in Playwright `locator()`/assertions → E2E `no-restricted-syntax`
+- Playwright `.nth()` / `.first()` → E2E `no-restricted-properties`
+- `Page` imported directly from `@playwright/test` in E2E files → E2E `no-restricted-imports`
+- `waitForLoadState('networkidle')` in E2E tests → E2E `no-restricted-syntax`
+- Unnecessary `useEffect` patterns → `reactYouMightNotNeedAnEffect/*` (warn)
+
+The items below cover patterns ESLint **cannot** catch:
 
 1. **No unsafe `as` casts on API responses** -- use typed client responses or type guards
 2. **`vitest-axe` test for every new component** -- at least one `toHaveNoViolations()`
@@ -82,32 +103,29 @@ Items enforced by ESLint at error level are omitted -- ESLint is the source of t
 8. **New API endpoints need mock handlers** in `packages/syntara-mock-api/src/handlers.ts`
 9. **Use enum constants** from `@syntara/contracts` -- never string literals for discriminators
 10. **Never compare display strings in logic** -- compare API values or enum constants, not translatable labels
-11. **No nested React components (Sonar S6478)** -- do not declare components inside another component; for PatternFly `toggle` / similar props use a **module-scoped** child component and pass data as props (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §18)
-12. **`SynLabel` for system labels, `SynUserTag` for user-authored tags** -- use `SynLabel` (filled, compact by default) for all system-generated labels: statuses, categories, metadata badges, counts, and filter chips. Use `SynUserTag` (outline, compact by default) only for user-authored content such as workflow tags or user-entered values. Never use PF `Label` directly.
-13. **`useMemo` for derived data in hooks** -- wrap computed maps/arrays/filtered lists from query results in `useMemo` to avoid new references on every render (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §21)
-14. **New hooks need test files** -- every new `use*.ts` hook must have a dedicated `use*.test.ts(x)` with coverage, not just indirect coverage from a component test
-15. **No unnecessary `useEffect`** -- never use `useEffect` to compute derived state, chain state updates, or handle user events; use event handlers, `useMemo`, or inline calculations instead ([React docs](https://react.dev/learn/you-might-not-need-an-effect), [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §23)
-16. **Cascading form field resets belong in `onChange`** -- when one field change should reset another, put the `setValue()` calls in the field's `onChange` handler, not in a `useEffect` watching the field value
-17. **E2E tests must be self-contained** -- every E2E test must create ALL resources it needs and delete ALL created resources in a `try-finally` block; `test.skip()` is only acceptable for data that is impossible to create programmatically (e.g., human-approved records, external integrations) — if the test can create the data via API, it must (see [`.claude/skills/frontend-playwright-e2e/SKILL.md`](../.claude/skills/frontend-playwright-e2e/SKILL.md))
-18. **Use `isPending` from mutation hooks** -- never use `formState.isSubmitting` (it only covers the synchronous `handleSubmit` wrapper, not the async mutation lifecycle); use `isPending` from `useMutation` instead
-19. **Use `RhUi*` icons for action buttons** -- never use PatternFly icons like `PlusCircleIcon` directly; use `RhUiAddIcon`, `RhUiDuplicate`, etc. from `@patternfly/react-icons`
-20. **CSS module classes over inline style objects** -- prefer `.module.css` classes over `style={{ ... }}` props; CSS modules are more DOM-efficient, cacheable, and keep styles co-located
-21. **No mutable counters in `.map()`** -- do not use `let` counters inside `.map()` or `.forEach()`; pre-compute indices immutably or use the callback's index parameter
-22. **`aria-label` only on interactive/widget/landmark elements** -- do not put `aria-label` on generic `<span>` or `<div>`; use it on buttons, inputs, `role="region"`, images, or landmarks
-23. **Never use `eslint-disable`** -- do not add `eslint-disable` or `eslint-disable-next-line` to new or modified code. Every rule catches a real problem; fix the code so the rule passes. Pre-existing suppressions are tech debt being cleaned up. See [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §28
-24. **Conditional hook execution uses wrapper components** -- hooks must be called unconditionally per React rules; if a hook's result is used conditionally, extract to a wrapper component that is conditionally rendered (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §29)
-25. **Leverage existing libraries before custom code** -- all async server state must use TanStack Query (`useQuery`/`useMutation`/`useQueries`), not manual `useEffect` + `useState` + `fetch`; forms must use react-hook-form + Zod; styling must use PatternFly + CSS modules. Do not reimplement what the tech stack already provides (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §30)
-26. **No `// TODO` comments in shipped code** -- deferred work belongs in an issue, not buried in source. If a follow-up is needed, create a ticket and reference it inline (e.g., `// Inline type until #12345`). See [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §32
-27. **New routes must set `requiredPermissions` and/or `routePermission`** -- every route with access requirements needs permission fields in `navigationItems.tsx`; create/edit routes need a `routePermission` for `ProtectedRoute` guard (see [`docs/permissions-rbac.md`](docs/permissions-rbac.md))
-28. **New write actions must use `DisabledWithTooltip` + permission hook** -- never expose ungated create/edit/delete buttons; use a domain `use*Permissions` hook and `permissionTooltip()` for copy (see [`docs/permissions-rbac.md`](docs/permissions-rbac.md))
-29. **New permission-gated features need mock handlers** -- add role-aware responses in `packages/syntara-mock-api/src/handlers.ts` `can_i` block for all 4 roles (admin, viewer, auditor, user) and E2E tests in `permission-gating.spec.ts`
-30. **Use `useDocLink` for documentation URLs** -- never hardcode doc URLs; use `useDocLink('workflows')` from `src/utils/docs/useDocLink.ts`; pass the result to `SynPageHeader`'s `docLink` prop; add new keys to `docsUrls.json` when adding new pages (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) section 33)
-31. **No `new Date()` in mock API seed data** -- seed data in `packages/syntara-mock-api/src/resources/` and `utils/` must use deterministic timestamps from `mockDates.ts`, never `new Date()`. Dynamic timestamps cause visual regression baselines to go stale across CI runs because rendered dates change daily
-32. **New pages must render `<title>{toPageTitle(['...'])}</title>`** -- every top-level page component (default export with `<SynPage>`) must render a `<title>` as its first `<SynPage>` child. Use `toPageTitle` from `src/utils/toPageTitle.ts`
-33. **No new `forwardRef`** -- React 19 passes `ref` as a regular prop; accept `ref` on the props type instead of wrapping with `forwardRef` (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §38)
-34. **Prefer ref callback cleanup functions** -- when attaching DOM listeners or observers, return a cleanup from the ref callback instead of pairing `useRef` + `useEffect` (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §38)
-35. **No new `useContext`** -- React 19 reads context with `use(Context)`; do not add `useContext` (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §39)
-36. **Prefer `useOptimistic` for clear toggle/counter mutations** -- update UI inside a `startTransition` Action with `mutateAsync`; do not hand-roll pending mirror state for simple before/after mutations (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §40)
+11. **`SynLabel` for system labels, `SynUserTag` for user-authored tags** -- use `SynLabel` (filled, compact by default) for all system-generated labels: statuses, categories, metadata badges, counts, and filter chips. Use `SynUserTag` (outline, compact by default) only for user-authored content such as workflow tags or user-entered values. Never use PF `Label` directly.
+12. **`useMemo` for derived data in hooks** -- wrap computed maps/arrays/filtered lists from query results in `useMemo` to avoid new references on every render (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §21)
+13. **New hooks need test files** -- every new `use*.ts` hook must have a dedicated `use*.test.ts(x)` with coverage, not just indirect coverage from a component test
+14. **No unnecessary `useEffect`** -- never use `useEffect` to compute derived state, chain state updates, or handle user events; use event handlers, `useMemo`, or inline calculations instead ([React docs](https://react.dev/learn/you-might-not-need-an-effect), [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §23)
+15. **Cascading form field resets belong in `onChange`** -- when one field change should reset another, put the `setValue()` calls in the field's `onChange` handler, not in a `useEffect` watching the field value
+16. **E2E tests must be self-contained** -- every E2E test must create ALL resources it needs and delete ALL created resources in a `try-finally` block; `test.skip()` is only acceptable for data that is impossible to create programmatically (e.g., human-approved records, external integrations) — if the test can create the data via API, it must (see [`.claude/skills/frontend-playwright-e2e/SKILL.md`](../.claude/skills/frontend-playwright-e2e/SKILL.md))
+17. **Use `RhUi*` icons for action buttons** -- never use PatternFly icons like `PlusCircleIcon` directly; use `RhUiAddIcon`, `RhUiDuplicate`, etc. from `@patternfly/react-icons`
+18. **CSS module classes over inline style objects** -- prefer `.module.css` classes over `style={{ ... }}` props; CSS modules are more DOM-efficient, cacheable, and keep styles co-located
+19. **No mutable counters in `.map()`** -- do not use `let` counters inside `.map()` or `.forEach()`; pre-compute indices immutably or use the callback's index parameter
+20. **Never use `eslint-disable`** -- do not add `eslint-disable` or `eslint-disable-next-line` to new or modified code. Every rule catches a real problem; fix the code so the rule passes. Pre-existing suppressions are tech debt being cleaned up. See [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §28
+21. **Conditional hook execution uses wrapper components** -- hooks must be called unconditionally per React rules; if a hook's result is used conditionally, extract to a wrapper component that is conditionally rendered (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §29)
+22. **Leverage existing libraries before custom code** -- all async server state must use TanStack Query (`useQuery`/`useMutation`/`useQueries`), not manual `useEffect` + `useState` + `fetch`; forms must use react-hook-form + Zod; styling must use PatternFly + CSS modules. Do not reimplement what the tech stack already provides (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §30)
+23. **No `// TODO` comments in shipped code** -- surfaced as a lint warning via `no-warning-comments` (warn, not error; does not block CI but is flagged during review). Deferred work belongs in an issue, not buried in source. If a follow-up is needed, create a ticket and reference it inline (e.g., `// Inline type until #12345`). See [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §32
+24. **New routes must set `requiredPermissions` and/or `routePermission`** -- every route with access requirements needs permission fields in `navigationItems.tsx`; create/edit routes need a `routePermission` for `ProtectedRoute` guard (see [`docs/permissions-rbac.md`](docs/permissions-rbac.md))
+25. **New write actions must use `DisabledWithTooltip` + permission hook** -- never expose ungated create/edit/delete buttons; use a domain `use*Permissions` hook and `permissionTooltip()` for copy (see [`docs/permissions-rbac.md`](docs/permissions-rbac.md))
+26. **New permission-gated features need mock handlers** -- add role-aware responses in `packages/syntara-mock-api/src/handlers.ts` `can_i` block for all 4 roles (admin, viewer, auditor, user) and E2E tests in `permission-gating.spec.ts`
+27. **`SynPageHeader` must get `docLink={useDocLink('key')}`** -- hardcoded docs URLs are ESLint (`syntara/no-hardcoded-doc-urls`); still verify the header receives the hook result and new keys land in `docsUrls.json` (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) section 33)
+28. **No `new Date()` in mock API seed data** -- ESLint enforced in `syntara-mock-api`'s `eslint.config.js` for `src/resources/` and `src/utils/`; seed data must use deterministic timestamps from `mockDates.ts`, never `new Date()`. Dynamic timestamps cause visual regression baselines to go stale across CI runs because rendered dates change daily
+29. **New pages must render `<title>{toPageTitle(['...'])}</title>`** -- every top-level page component (default export with `<SynPage>`) must render a `<title>` as its first `<SynPage>` child. Use `toPageTitle` from `src/utils/toPageTitle.ts`
+30. **No new `forwardRef`** -- React 19 passes `ref` as a regular prop; accept `ref` on the props type instead of wrapping with `forwardRef` (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §38)
+31. **Prefer ref callback cleanup functions** -- when attaching DOM listeners or observers, return a cleanup from the ref callback instead of pairing `useRef` + `useEffect` (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §38)
+32. **No new `useContext`** -- React 19 reads context with `use(Context)`; do not add `useContext` (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §39)
+33. **Prefer `useOptimistic` for clear toggle/counter mutations** -- update UI inside a `startTransition` Action with `mutateAsync`; do not hand-roll pending mirror state for simple before/after mutations (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §40)
 
 ### Feature Preservation Rules
 

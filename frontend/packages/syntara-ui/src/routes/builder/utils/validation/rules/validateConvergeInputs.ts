@@ -94,6 +94,7 @@ function addConditionBranch(
   if (!branches.has(conditionId)) {
     branches.set(conditionId, new Set())
   }
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- safe: key was just set via branches.set(conditionId, new Set()) above
   branches.get(conditionId)!.add(branch)
 }
 

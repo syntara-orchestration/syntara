@@ -10,16 +10,29 @@ Tests cover:
 from collections.abc import Generator
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import UUID, uuid4
 
 import pytest
 from temporalio.exceptions import ApplicationError
 
+from syntara.approvals.models import ActivitySummary, ApprovalCreateRequest, WorkflowContext
+from syntara.core.constants import FieldLimits
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
 from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
 from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
 from tests.unit.workflows.workflow_engine.conftest import init_workflow_runtime
+
+# Value registered in ``_secret_values`` by the prompt-scrubbing tests, used to probe
+# for leaks. Its alphabet is deliberately disjoint from the padding characters those
+# tests use ("p", "q", "x", "y") and from "[REDACTED]", which is uppercase — so any of
+# these characters appearing in a stored prompt is unambiguously a leaked fragment.
+_LEAK_PROBE = "abcd"
+_LOOP_PATH_ARG = 10
+_TEMPORAL_ID_ARG = 11
+_PROMPT_ARG = 12
+_NEW_APPROVAL_ARG_COUNT = 13
 
 
 @pytest.fixture(autouse=True)
@@ -33,6 +46,7 @@ def _mock_temporal_workflow() -> Generator[MagicMock]:
         mock_wf.logger = mock_logger
         mock_wf.info.return_value = MagicMock(workflow_id="test-wf-id")
         mock_wf.now.return_value = datetime(2026, 4, 10, 12, 0, 0, tzinfo=UTC)
+        mock_wf.patched.return_value = True
         yield mock_wf
 
 
@@ -56,6 +70,7 @@ def _make_workflow(
     wf._timed_out_converge_nodes = set()
     wf._detached_nodes = set()
     wf._converge_branch_nodes = {}
+    wf._secret_values = set()
     init_workflow_runtime(wf)
     wf.pre_resolved_outputs = {}
     wf.stop_after_nodes = set()
@@ -186,7 +201,7 @@ class TestPrepareApprovalArgs:
 
     @pytest.mark.asyncio
     async def test_basic_approval_args(self) -> None:
-        """Returns a 12-element arg list with canvas node id and Temporal activity id."""
+        """Returns a 13-element arg list: loop path, Temporal id, then prompt."""
         resolver = NamespaceResolver()
         resolver.set_namespace("trigger", {"env": "production"})
         wf = _make_workflow(execution_id="exec-456", resolver=resolver)
@@ -199,14 +214,15 @@ class TestPrepareApprovalArgs:
         with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
             args = await wf._prepare_approval_args(node, graph, node.parameters)
 
-        assert len(args) == 12
+        assert len(args) == _NEW_APPROVAL_ARG_COUNT
         assert args[0] == "exec-456"  # execution_id
         assert args[1] == "approval"  # canvas approval_node_id
         assert args[2] == "Review Deployment"  # name
         assert args[7] is None  # approver_user_ids (None when no approvers configured)
         assert args[8] is None  # approver_group_ids (None when no approvers configured)
-        assert args[10] == []  # loop_iteration_path
-        assert args[11] == "approval"  # temporal_activity_id
+        assert args[_LOOP_PATH_ARG] == []  # loop_iteration_path
+        assert args[_TEMPORAL_ID_ARG] == "approval"  # temporal_activity_id
+        assert args[_PROMPT_ARG] is None  # prompt (absent from node parameters)
 
     @pytest.mark.asyncio
     async def test_approval_args_inside_loop_keeps_canvas_id(self) -> None:
@@ -244,7 +260,7 @@ class TestPrepareApprovalArgs:
 
     @pytest.mark.asyncio
     async def test_unpatched_replay_keeps_ten_approval_args(self) -> None:
-        """Pre-patch history scheduled 10 args; replay must not emit the two new ones."""
+        """Pre-#279 history scheduled 10 args; replay must not emit loop or prompt extras."""
         wf = _make_workflow()
         wf.loop_body_map["approval"] = "loop"
         wf.node_control_data["loop"] = {"current_index": 1, "next_port": "iterate"}
@@ -258,6 +274,7 @@ class TestPrepareApprovalArgs:
                 "syntara.workflows.workflow_engine.approval_mixin.use_unique_loop_iteration_ids",
                 return_value=False,
             ),
+            patch("syntara.workflows.workflow_engine.approval_mixin.workflow.patched", return_value=False),
         ):
             args = await wf._prepare_approval_args(node, graph, node.parameters)
 
@@ -288,7 +305,7 @@ class TestPrepareApprovalArgs:
         with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
             args = await wf._prepare_approval_args(node, graph, config)
 
-        assert len(args) == 12
+        assert len(args) == _NEW_APPROVAL_ARG_COUNT
         assert args[7] == [alice_id, bob_id]  # approver_user_ids
         assert args[8] == [security_team_id, admins_id]  # approver_group_ids
 
@@ -508,6 +525,311 @@ class TestPrepareApprovalArgs:
         ctx = args[4]
         assert ctx["workflow_name"] == "Unknown"
 
+    @pytest.mark.asyncio
+    async def test_prompt_passed_from_resolved_parameters(self) -> None:
+        """Resolved prompt is the last activity argument (after loop-id extras)."""
+        wf = _make_workflow()
+        graph = _build_approval_graph()
+        node = ActivityNode("approval", "approval", {}, name="Review")
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+            args = await wf._prepare_approval_args(node, graph, {"prompt": "  Please review this $15,000 request.  "})
+
+        assert args[_PROMPT_ARG] == "Please review this $15,000 request."
+
+    @pytest.mark.asyncio
+    async def test_blank_prompt_is_none(self) -> None:
+        """Whitespace, empty, and missing prompts are stored as None."""
+        wf = _make_workflow()
+        graph = _build_approval_graph()
+        node = ActivityNode("approval", "approval", {}, name="Review")
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+            empty_args = await wf._prepare_approval_args(node, graph, {"prompt": "   "})
+            missing_args = await wf._prepare_approval_args(node, graph, {})
+
+        assert empty_args[_PROMPT_ARG] is None
+        assert missing_args[_PROMPT_ARG] is None
+
+    @pytest.mark.asyncio
+    async def test_empty_container_prompt_is_none(self) -> None:
+        """Empty dict/list templates are not stored as "{}"/"[]"."""
+        wf = _make_workflow()
+        graph = _build_approval_graph()
+        node = ActivityNode("approval", "approval", {}, name="Review")
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+            dict_args = await wf._prepare_approval_args(node, graph, {"prompt": {}})
+            list_args = await wf._prepare_approval_args(node, graph, {"prompt": []})
+
+        assert dict_args[_PROMPT_ARG] is None
+        assert list_args[_PROMPT_ARG] is None
+
+    @pytest.mark.asyncio
+    async def test_bool_prompt_is_none(self) -> None:
+        """Boolean templates are not stored as "True"/"False"."""
+        wf = _make_workflow()
+        graph = _build_approval_graph()
+        node = ActivityNode("approval", "approval", {}, name="Review")
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+            true_args = await wf._prepare_approval_args(node, graph, {"prompt": True})
+            false_args = await wf._prepare_approval_args(node, graph, {"prompt": False})
+
+        assert true_args[_PROMPT_ARG] is None
+        assert false_args[_PROMPT_ARG] is None
+
+    @pytest.mark.asyncio
+    async def test_non_string_prompt_is_coerced(self) -> None:
+        """Whole-field templates can resolve to a scalar or JSON value."""
+        wf = _make_workflow()
+        graph = _build_approval_graph()
+        node = ActivityNode("approval", "approval", {}, name="Review")
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+            number_args = await wf._prepare_approval_args(node, graph, {"prompt": 15_000})
+            zero_args = await wf._prepare_approval_args(node, graph, {"prompt": 0})
+            object_args = await wf._prepare_approval_args(node, graph, {"prompt": {"amount": 15000}})
+            list_args = await wf._prepare_approval_args(node, graph, {"prompt": ["a", "b"]})
+
+        assert number_args[_PROMPT_ARG] == "15000"
+        assert zero_args[_PROMPT_ARG] == "0"
+        assert object_args[_PROMPT_ARG] == '{"amount": 15000}'
+        assert list_args[_PROMPT_ARG] == '["a", "b"]'
+
+    @pytest.mark.asyncio
+    async def test_datetime_and_uuid_prompt_is_coerced(self) -> None:
+        """Non-JSON-native values in a resolved object must not crash the node."""
+        wf = _make_workflow()
+        graph = _build_approval_graph()
+        node = ActivityNode("approval", "approval", {}, name="Review")
+        dt = datetime(2026, 1, 1, tzinfo=UTC)
+        uid = UUID("00000000-0000-0000-0000-000000000001")
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+            object_args = await wf._prepare_approval_args(node, graph, {"prompt": {"when": dt, "id": uid}})
+            scalar_args = await wf._prepare_approval_args(node, graph, {"prompt": dt})
+            key_args = await wf._prepare_approval_args(node, graph, {"prompt": {dt: "x"}})
+
+        assert (
+            object_args[_PROMPT_ARG]
+            == '{"when": "2026-01-01 00:00:00+00:00", "id": "00000000-0000-0000-0000-000000000001"}'
+        )
+        assert scalar_args[_PROMPT_ARG] == "2026-01-01 00:00:00+00:00"
+        assert key_args[_PROMPT_ARG] is None
+
+    @pytest.mark.asyncio
+    async def test_unserializable_prompt_is_none(self) -> None:
+        """A circular object must not crash the approval node."""
+        wf = _make_workflow()
+        graph = _build_approval_graph()
+        node = ActivityNode("approval", "approval", {}, name="Review")
+        cyclic: list[object] = []
+        cyclic.append(cyclic)
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+            args = await wf._prepare_approval_args(node, graph, {"prompt": cyclic})
+
+        assert args[_PROMPT_ARG] is None
+
+    @pytest.mark.asyncio
+    async def test_oversized_prompt_is_truncated(self) -> None:
+        """Resolved prompts longer than the API max_length are truncated."""
+        wf = _make_workflow()
+        graph = _build_approval_graph()
+        node = ActivityNode("approval", "approval", {}, name="Review")
+        too_long = "x" * (FieldLimits.DESCRIPTION_MAX_LENGTH + 50)
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+            args = await wf._prepare_approval_args(node, graph, {"prompt": too_long})
+
+        truncated = too_long[: FieldLimits.DESCRIPTION_MAX_LENGTH - 1] + "…"
+        assert args[_PROMPT_ARG] == truncated
+        assert args[_PROMPT_ARG].endswith("…")
+        assert len(args[_PROMPT_ARG]) == FieldLimits.DESCRIPTION_MAX_LENGTH
+
+    @pytest.mark.asyncio
+    async def test_oversized_json_prompt_is_dropped(self) -> None:
+        """Oversized JSON is not stored as a mid-key fragment."""
+        wf = _make_workflow()
+        graph = _build_approval_graph()
+        node = ActivityNode("approval", "approval", {}, name="Review")
+        oversized = {"payload": "y" * (FieldLimits.DESCRIPTION_MAX_LENGTH + 50)}
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+            args = await wf._prepare_approval_args(node, graph, {"prompt": oversized})
+
+        assert args[_PROMPT_ARG] is None
+
+    @pytest.mark.asyncio
+    async def test_prompt_omitted_when_patch_inactive(self) -> None:
+        """When the prompt patch is off, loop-id extras remain and prompt is not appended."""
+        wf = _make_workflow()
+        graph = _build_approval_graph()
+        node = ActivityNode("approval", "approval", {}, name="Review")
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with (
+            patch("syntara.workflows.workflow_engine.approval_mixin.workflow.patched", return_value=False),
+            patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute),
+        ):
+            args = await wf._prepare_approval_args(node, graph, {"prompt": "Please review"})
+
+        assert len(args) == 12
+        assert args[_LOOP_PATH_ARG] == []
+        assert args[_TEMPORAL_ID_ARG] == "approval"
+
+    @pytest.mark.asyncio
+    async def test_prompt_is_scrubbed_of_secret_values(self) -> None:
+        """Persisted prompt must not contain decrypted secret values."""
+        wf = _make_workflow()
+        wf._secret_values.add("super-secret-token")
+        graph = _build_approval_graph()
+        node = ActivityNode("approval", "approval", {}, name="Review")
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+            args = await wf._prepare_approval_args(
+                node,
+                graph,
+                {"prompt": "Token super-secret-token must not be stored."},
+            )
+
+        assert args[_PROMPT_ARG] is not None
+        assert "super-secret-token" not in args[_PROMPT_ARG]
+        assert "[REDACTED]" in args[_PROMPT_ARG]
+
+    @pytest.mark.asyncio
+    async def test_oversized_prompt_with_short_secret_stays_within_limit(self) -> None:
+        """Scrubbing must not push a truncated prompt back over the column limit.
+
+        ``[REDACTED]`` is 10 characters and a tracked secret may be as short as 4
+        (``MIN_LEAK_PROBE_LENGTH``), so redaction *lengthens* the text. Truncating before
+        scrubbing produced a value longer than ``ApprovalCreateRequest.prompt`` allows,
+        which fails validation on POST /approvals and kills the approval node
+        (approval nodes resolve to ``RetryPolicy(maximum_attempts=1)``).
+        """
+        wf = _make_workflow()
+        wf._secret_values.add(_LEAK_PROBE)
+        graph = _build_approval_graph()
+        node = ActivityNode("approval", "approval", {}, name="Review")
+        # A secret every 100 characters, total well over the limit.
+        oversized = (_LEAK_PROBE + "x" * 96) * 40 + "y" * 500
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+            args = await wf._prepare_approval_args(node, graph, {"prompt": oversized})
+
+        assert args[_PROMPT_ARG] is not None
+        assert len(args[_PROMPT_ARG]) <= FieldLimits.DESCRIPTION_MAX_LENGTH
+        # The padding alphabet is disjoint from the secret's, and "[REDACTED]" is
+        # uppercase, so no character of the secret may survive anywhere — this
+        # catches a fragment left by a cut at any offset, not just the whole value.
+        assert not set(_LEAK_PROBE) & set(args[_PROMPT_ARG])
+
+    @pytest.mark.asyncio
+    async def test_scrubbed_prompt_is_accepted_by_the_create_request_model(self) -> None:
+        """The stored prompt must satisfy the model the activity actually POSTs.
+
+        Guards the workflow-side truncation against the API-side ``max_length``;
+        they are coupled and nothing else checks that they agree.
+        """
+        wf = _make_workflow()
+        wf._secret_values.add(_LEAK_PROBE)
+        graph = _build_approval_graph()
+        node = ActivityNode("approval", "approval", {}, name="Review")
+        oversized = (_LEAK_PROBE + "x" * 96) * 40 + "y" * 500
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+            args = await wf._prepare_approval_args(node, graph, {"prompt": oversized})
+
+        ApprovalCreateRequest(
+            execution_id=uuid4(),
+            project_id=uuid4(),
+            approval_node_id="approval",
+            name="Review",
+            prompt=args[_PROMPT_ARG],
+            next_step_approved=ActivitySummary(id="step", name="Step", type="task"),
+            workflow_context=WorkflowContext(workflow_name="Test Workflow", inputs={}),
+        )
+
+    @pytest.mark.asyncio
+    async def test_secret_straddling_the_truncation_point_is_not_left_partial(self) -> None:
+        """Truncating first bisects a secret so the scrubber can no longer match it."""
+        wf = _make_workflow()
+        wf._secret_values.add(_LEAK_PROBE)
+        graph = _build_approval_graph()
+        node = ActivityNode("approval", "approval", {}, name="Review")
+        # Position the secret so a cut near the limit lands inside it.
+        straddling = "p" * (FieldLimits.DESCRIPTION_MAX_LENGTH - 3) + _LEAK_PROBE + "q" * 500
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+            args = await wf._prepare_approval_args(node, graph, {"prompt": straddling})
+
+        assert args[_PROMPT_ARG] is not None
+        # Assert on the secret's alphabet rather than the whole value or a
+        # specific tail: any surviving character is a leak regardless of where
+        # truncation cut or what marker it appended.
+        assert not set(_LEAK_PROBE) & set(args[_PROMPT_ARG])
+
+    @pytest.mark.asyncio
+    async def test_object_prompt_is_scrubbed_by_credential_key_name(self) -> None:
+        """Key-name redaction only works while the value is still a dict.
+
+        ``json.dumps`` before scrubbing turns ``{"bearer_token": ...}`` into a plain
+        string, and ``scrub_credentials`` is a no-op on strings — the token would be
+        persisted verbatim even though its key is in ``CREDENTIAL_KEYS``.
+        """
+        wf = _make_workflow()
+        graph = _build_approval_graph()
+        node = ActivityNode("approval", "approval", {}, name="Review")
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+            args = await wf._prepare_approval_args(
+                node,
+                graph,
+                {"prompt": {"bearer_token": "eyJhbGciOiJIUzI1NiJ9.leaked", "note": "deploy"}},
+            )
+
+        assert args[_PROMPT_ARG] is not None
+        assert "leaked" not in args[_PROMPT_ARG]
+        assert "[REDACTED]" in args[_PROMPT_ARG]
+        assert "deploy" in args[_PROMPT_ARG]
+
+    @pytest.mark.asyncio
+    async def test_cyclic_prompt_is_dropped_before_reaching_the_scrubber(self) -> None:
+        """The scrubbers recurse without cycle detection, so the guard must run first.
+
+        ``scrub_credentials`` and ``scrub_credential_values`` raise ``RecursionError``
+        on a self-referencing structure, and ``RecursionError`` is not caught by the
+        ``(TypeError, ValueError)`` guard — it would escape ``_prepare_approval_args``
+        and fail the node. Keep the serializability check ahead of the scrub.
+        """
+        wf = _make_workflow()
+        wf._secret_values.add(_LEAK_PROBE)
+        graph = _build_approval_graph()
+        node = ActivityNode("approval", "approval", {}, name="Review")
+        cyclic: list[object] = []
+        cyclic.append(cyclic)
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+            args = await wf._prepare_approval_args(node, graph, {"prompt": cyclic})
+
+        assert args[_PROMPT_ARG] is None
+
 
 class TestDispatchApprovalNode:
     """Tests for approval node dispatch integration."""
@@ -535,7 +857,7 @@ class TestDispatchApprovalNode:
         approval_call = mock_activity.call_args_list[0]
         assert approval_call.args[0] == ActivityName.APPROVAL
         activity_args = approval_call.kwargs["args"]
-        assert len(activity_args) == 12
+        assert len(activity_args) == _NEW_APPROVAL_ARG_COUNT
         assert activity_args[0] == "exec-789"  # execution_id
         assert activity_args[1] == "approval"  # canvas approval_node_id
         assert activity_args[2] == "Review Deployment"  # name (from node.name)
@@ -543,6 +865,7 @@ class TestDispatchApprovalNode:
         assert activity_args[4]["workflow_name"] == "Production Pipeline"  # workflow_context
         assert activity_args[10] == []
         assert activity_args[11] == "approval"
+        assert activity_args[_PROMPT_ARG] is None
         assert approval_call.kwargs["activity_id"] == "approval"
 
     @pytest.mark.asyncio
@@ -566,7 +889,7 @@ class TestDispatchApprovalNode:
 
     @pytest.mark.asyncio
     async def test_unpatched_dispatch_keeps_canvas_activity_id_and_ten_args(self) -> None:
-        """Pre-patch replay schedules the canvas Temporal id with the original 10 args."""
+        """Pre-#279 replay schedules the canvas Temporal id with the original 10 args."""
         wf = _make_workflow()
         wf.loop_body_map["approval"] = "loop"
         wf.node_control_data["loop"] = {"current_index": 2}
@@ -584,6 +907,7 @@ class TestDispatchApprovalNode:
                 "syntara.workflows.workflow_engine.utils.loop_iteration_ids.use_unique_loop_iteration_ids",
                 return_value=False,
             ),
+            patch("syntara.workflows.workflow_engine.approval_mixin.workflow.patched", return_value=False),
         ):
             await wf._dispatch_node_to_executor(node, {}, graph, timeout_seconds=300)
 

@@ -44,10 +44,13 @@ function extractActivities(definition: unknown): ActivityLike[] {
 
 function buildRunTrigger(trigger: TriggerLike, triggers: TriggerLike[], definition: unknown): WorkflowRunTrigger {
   const activities = extractActivities(definition)
-  const triggerNodeIds = triggers.filter((t) => t.id).map((t) => t.id!)
+  const triggerNodeIds = triggers.flatMap((t) => (t.id ? [t.id] : []))
   const inputSchema = trigger.parameters?.input_schema
+  if (!trigger.id) {
+    throw new Error('Trigger is missing id')
+  }
   return {
-    triggerNodeId: trigger.id!,
+    triggerNodeId: trigger.id,
     triggerName: trigger.name ?? 'Trigger',
     triggerType: trigger.type,
     inputSchema: inputSchema && typeof inputSchema === 'object' ? inputSchema : undefined,
