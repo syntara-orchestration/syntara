@@ -42,6 +42,8 @@ export default defineConfig({
     ['json', { outputFile: 'test-results/results.json' }],
     ['html', { outputFolder: 'playwright-report', open: 'never' }],
     ...(process.env.CURRENTS_PROJECT_ID && process.env.CURRENTS_RECORD_KEY ? [currentsReporter()] : []),
+    // Last: may override the run status so listed xfails that pass do not fail CI.
+    ['./e2e/xfailReporter.ts'],
   ],
   use: {
     baseURL,

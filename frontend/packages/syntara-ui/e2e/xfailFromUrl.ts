@@ -7,6 +7,94 @@ export type XfailEntry = {
   reason: string
 }
 
+/** Prefix of the `testInfo.fail()` description applied by `_xfailCheck`. */
+export const XFAIL_ANNOTATION_PREFIX = 'xfail:'
+
+export function xfailFailDescription(reason: string): string {
+  return `${XFAIL_ANNOTATION_PREFIX} ${reason}`
+}
+
+export type XfailAnnotation = {
+  type: string
+  description?: string
+}
+
+/** One finished test attempt, as seen by a Playwright reporter. */
+export type XfailRunRecord = {
+  expectedStatus: string
+  status: string
+  titlePath: string[]
+  annotations: XfailAnnotation[]
+}
+
+export type UnexpectedXfailPass = {
+  testId: string
+  reason: string
+}
+
+export function xfailReasonFromAnnotations(annotations: XfailAnnotation[]): string | null {
+  const match = annotations.find(
+    (annotation) => annotation.type === 'fail' && annotation.description?.startsWith(XFAIL_ANNOTATION_PREFIX)
+  )
+  if (!match?.description) return null
+  return match.description.slice(XFAIL_ANNOTATION_PREFIX.length).trim() || 'listed in xfail list'
+}
+
+/**
+ * A listed xfail test that passed (Playwright "Expected to fail, but passed").
+ * Ignores `test.fail()` / Currents quarantine that do not use our annotation prefix.
+ */
+export function unexpectedXfailPass(record: XfailRunRecord): UnexpectedXfailPass | null {
+  if (record.expectedStatus !== 'failed' || record.status !== 'passed') return null
+  const reason = xfailReasonFromAnnotations(record.annotations)
+  if (reason === null) return null
+  return { testId: record.titlePath.filter(Boolean).join(' > '), reason }
+}
+
+export function collectUnexpectedXfailPasses(records: XfailRunRecord[]): UnexpectedXfailPass[] {
+  return records.flatMap((record) => {
+    const found = unexpectedXfailPass(record)
+    return found ? [found] : []
+  })
+}
+
+/**
+ * True when some test failed for a reason other than a listed xfail passing.
+ * An xfail that did fail (or time out) is expected and not blocking.
+ */
+export function hasNonXfailFailure(records: XfailRunRecord[]): boolean {
+  return records.some((record) => {
+    if (record.status === 'skipped') return false
+    if (record.expectedStatus === 'passed' && record.status === 'passed') return false
+    if (record.expectedStatus === 'failed' && (record.status === 'failed' || record.status === 'timedOut')) {
+      return false
+    }
+    if (unexpectedXfailPass(record)) return false
+    return true
+  })
+}
+
+/**
+ * pytest-like non-strict xfail: listed tests that pass must not fail the run.
+ * Playwright's `testInfo.fail(true)` would otherwise exit non-zero; reporters may
+ * override that via `onEnd`.
+ */
+export function softenFailedRunForXfailPasses(runStatus: string, records: XfailRunRecord[]): 'passed' | undefined {
+  if (runStatus !== 'failed') return undefined
+  if (collectUnexpectedXfailPasses(records).length === 0) return undefined
+  if (hasNonXfailFailure(records)) return undefined
+  return 'passed'
+}
+
+/** End-of-run summary lines; empty when nothing unexpectedly passed. */
+export function formatUnexpectedXfailPasses(passes: UnexpectedXfailPass[]): string[] {
+  if (passes.length === 0) return []
+  return [
+    `xfail: ${passes.length} listed test(s) passed (remove from playwright.md):`,
+    ...passes.map(({ testId, reason }) => `  - ${testId} — ${reason.replace(/\n/g, ' ')}`),
+  ]
+}
+
 const HEADING_RE = /^#\s+(.+)$/
 
 export function parseXfailEntries(content: string): XfailEntry[] {
@@ -42,6 +130,27 @@ function isFilePath(source: string): boolean {
   return source.startsWith('/') || source.startsWith('./') || source.startsWith('../')
 }
 
+/**
+ * Resolve the xfail Markdown URL/path from SYNTARA_XFAIL_SOURCE, or null if unset.
+ * The env var is a base URL/dir; the Playwright list lives at `<base>/playwright.md`.
+ */
+export function xfailSourceFromEnv(env: Record<string, string | undefined> = process.env): string | null {
+  const base = env['SYNTARA_XFAIL_SOURCE']
+  if (!base) return null
+  return base.endsWith('/') ? `${base}playwright.md` : `${base}/playwright.md`
+}
+
+/** Human-readable summary lines for the active xfail rules, for printing at the start of a run. */
+export function formatXfailRules(entries: XfailEntry[], source: string): string[] {
+  if (entries.length === 0) {
+    return [`xfail: no rules loaded from ${source}`]
+  }
+  return [
+    `xfail: ${entries.length} rule(s) from ${source}:`,
+    ...entries.map(({ pattern, reason }) => `  - ${pattern} — ${reason.replace(/\n/g, ' ')}`),
+  ]
+}
+
 export async function loadXfailEntries(source: string): Promise<XfailEntry[]> {
   try {
     let content: string
@@ -63,14 +172,12 @@ export async function loadXfailEntries(source: string): Promise<XfailEntry[]> {
   }
 }
 
-function buildTestId(testInfo: TestInfo): string {
-  const testDir = testInfo.project.testDir
-  let relPath = testInfo.file
-  if (testDir && relPath.startsWith(testDir)) {
-    relPath = relPath.slice(testDir.length).replace(/^[/\\]/, '')
-  }
-  const titles = testInfo.titlePath.filter(Boolean)
-  return [relPath, ...titles].join(' > ')
+export function buildTestId(testInfo: Pick<TestInfo, 'titlePath'>): string {
+  // testInfo.titlePath already starts with the testDir-relative spec path, so
+  // it is the full id on its own: [relPath, ...describeTitles, testTitle].
+  // Do NOT prepend testInfo.file — that duplicates the spec path in the id
+  // (e.g. "a.spec.ts > a.spec.ts > test") and breaks exact-match patterns.
+  return testInfo.titlePath.filter(Boolean).join(' > ')
 }
 
 export function matchPattern(testId: string, pattern: string): boolean {

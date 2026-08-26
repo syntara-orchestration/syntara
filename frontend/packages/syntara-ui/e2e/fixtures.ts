@@ -4,7 +4,13 @@ import { expect, test as base, type Page, type Request } from '@playwright/test'
 import { APP_TITLE } from './helpers/appTitle'
 import { isSkipWebServerForPlaywrightTests } from './playwrightWebServerEnv'
 import { type RoleSetupResult, setupRoleUsers } from './utils/roleSetup'
-import { type XfailEntry, loadXfailEntries, matchesXfail } from './xfailFromUrl'
+import {
+  type XfailEntry,
+  loadXfailEntries,
+  matchesXfail,
+  xfailFailDescription,
+  xfailSourceFromEnv,
+} from './xfailFromUrl'
 
 const processEnv: Record<string, string | undefined> = (
   process as unknown as { env: Record<string, string | undefined> }
@@ -72,12 +78,11 @@ const currentsBase = base.extend<CurrentsFixtures, CurrentsWorkerFixtures>({
 const xfailBase = currentsBase.extend<{ _xfailCheck: void }, { _xfailEntries: XfailEntry[] }>({
   _xfailEntries: [
     async ({}, use) => {
-      const base = processEnv['SYNTARA_XFAIL_SOURCE']
-      if (!base) {
+      const source = xfailSourceFromEnv(processEnv)
+      if (!source) {
         await use([])
         return
       }
-      const source = base.endsWith('/') ? `${base}playwright.md` : `${base}/playwright.md`
       const entries = await loadXfailEntries(source)
       if (entries.length > 0) {
         process.stderr.write(`xfail: loaded ${entries.length} pattern(s) from ${source}\n`)
@@ -90,7 +95,12 @@ const xfailBase = currentsBase.extend<{ _xfailCheck: void }, { _xfailEntries: Xf
     async ({ _xfailEntries }, use, testInfo) => {
       const match = matchesXfail(testInfo, _xfailEntries)
       if (match) {
-        testInfo.fail(true, `xfail: ${match.reason}`)
+        // Mark as an expected failure (xfail). A listed test that fails is then
+        // reported as expected and does not fail the suite. A listed test that
+        // passes is still reported ("Expected to fail, but passed"); the xfail
+        // reporter prints those at the end and keeps the run green so they can
+        // be removed from the list (pytest non-strict xfail).
+        testInfo.fail(true, xfailFailDescription(match.reason))
       }
       await use()
     },
