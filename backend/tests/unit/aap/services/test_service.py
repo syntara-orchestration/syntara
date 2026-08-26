@@ -993,6 +993,23 @@ def _mock_session_with_integration(integration: MagicMock | None) -> AsyncMock:
     return mock_session
 
 
+def _bound_uuids_from_statement(stmt: object) -> set[UUID]:
+    """Collect UUID bind params from a SQLAlchemy select (e.g. ``id IN (...)``)."""
+    compiled = stmt.compile()  # type: ignore[union-attr]
+    bound: set[UUID] = set()
+    for value in compiled.params.values():
+        items: tuple[object, ...] = value if isinstance(value, (list, tuple)) else (value,)
+        for item in items:
+            if isinstance(item, UUID):
+                bound.add(item)
+            elif isinstance(item, str):
+                try:
+                    bound.add(UUID(item))
+                except ValueError:
+                    continue
+    return bound
+
+
 class TestResolveConnectionFromIntegration:
     """Tests for _resolve_connection_from_integration."""
 
@@ -1297,7 +1314,7 @@ class TestDefaultAAPIntegrationResolution:
 
     @pytest.mark.asyncio
     async def test_omitted_ids_use_unique_available_integration_and_management_credential(self) -> None:
-        """GET /proxies/aap/* without query params uses the validated AAP integration."""
+        """GET /proxies/aap/* without query params uses the unique visible enabled AAP integration."""
         management_credential_id = uuid4()
         integration = _mock_integration(
             base_url="https://aap-gw.example.com/",
@@ -1432,6 +1449,68 @@ class TestDefaultAAPIntegrationResolution:
             pytest.raises(AAPNotConfiguredError, match="pass integration_id"),
         ):
             await service._resolve_connection(user_id=uuid4())
+
+    @pytest.mark.asyncio
+    async def test_omitted_ids_use_only_the_visible_enabled_integration(self) -> None:
+        """Two enabled AAP rows: auto-default uses the one visibility returns.
+
+        ``session.exec`` returns both rows unless the statement binds the
+        visible id (the ``id IN (...)`` filter). Dropping that filter would
+        auto-select a hidden tenant integration.
+        """
+        from syntara.authz.engine import AllowedProjectsResult
+
+        visible = _mock_integration(
+            name="Visible AAP",
+            base_url="https://visible-aap.example.com",
+            management_credential_id=uuid4(),
+        )
+        hidden = _mock_integration(
+            name="Hidden AAP",
+            base_url="https://hidden-aap.example.com",
+            management_credential_id=uuid4(),
+        )
+        catalog = [hidden, visible]
+        catalog_ids = {hidden.id, visible.id}
+
+        async def fake_exec(stmt: object) -> MagicMock:
+            matched = _bound_uuids_from_statement(stmt) & catalog_ids
+            rows = [row for row in catalog if row.id in matched] if matched else catalog
+            result = MagicMock()
+            result.all.return_value = rows
+            return result
+
+        mock_session = AsyncMock()
+        mock_session.exec = AsyncMock(side_effect=fake_exec)
+        service = AAPProxyService(
+            settings=get_settings(),
+            session=mock_session,
+            allowed_projects=AllowedProjectsResult(all_projects=False, project_ids=[uuid4()]),
+        )
+        cred_connection = AAPConnection(
+            base_url="",
+            headers={"Authorization": "Bearer visible-mgmt-token"},
+            verify_ssl=True,
+            timeout=30.0,
+        )
+
+        with (
+            patch(
+                "syntara.aap.services.aap_proxy_service.IntegrationService.resolve_visible_integration_ids",
+                new_callable=AsyncMock,
+                return_value=[visible.id],
+            ),
+            patch(
+                "syntara.aap.services.aap_proxy_service.resolve_aap_connection_from_management_credential",
+                new_callable=AsyncMock,
+                return_value=cred_connection,
+            ) as mock_mgmt_resolver,
+        ):
+            result = await service._resolve_connection(user_id=uuid4())
+
+        assert result.base_url == "https://visible-aap.example.com"
+        assert result.headers == {"Authorization": "Bearer visible-mgmt-token"}
+        mock_mgmt_resolver.assert_called_once_with(session=mock_session, integration=visible)
 
 
 class TestSelectDefaultAAPIntegration:

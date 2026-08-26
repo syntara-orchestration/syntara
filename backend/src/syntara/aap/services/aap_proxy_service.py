@@ -356,8 +356,7 @@ class AAPProxyService:
 
         ``integration_id`` and ``credential_id`` are optional. When omitted, the
         proxy uses the unique visible enabled AAP integration and its
-        management credential — the same pair that successful
-        ``POST /integrations/{id}/validate`` already proved works.
+        management credential. ``validation_status`` is not considered.
 
         When the caller supplies ``credential_id``, that credential's owner
         must match ``user_id``. Omitted ``credential_id`` uses the integration's
