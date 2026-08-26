@@ -2,7 +2,7 @@ import { Button, FlexItem } from '@patternfly/react-core'
 import type { ExecutionsAPI } from '@syntara/contracts'
 
 import { ApprovalPendingBadge } from '../../components/labels/ApprovalPendingBadge'
-import { NxLabel } from '../../components/labels/NxLabel'
+import { SynLabel } from '../../components/labels/SynLabel'
 import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 import { StatusLabel } from '../builder/ExecutionStatus'
 import { RunHistoryToggleButton } from '../builder/RunHistoryToggleButton'
@@ -21,20 +21,20 @@ export function ExecutionDetailTitleRowAddons({ execution }: Readonly<{ executio
   return (
     <>
       {execution.status ? (
-        <FlexItem>
+        <FlexItem data-testid="execution-status-badge">
           <StatusLabel status={execution.status} />
         </FlexItem>
       ) : null}
       {execution.approval_pending ? (
-        <FlexItem>
+        <FlexItem data-testid="approval-status-badge">
           <ApprovalPendingBadge approvalPending={execution.approval_pending} />
         </FlexItem>
       ) : null}
       {execution.created_at ? (
         <FlexItem>
-          <NxLabel isCompact={false}>
+          <SynLabel isCompact={false}>
             Viewing run: <ExecutionTimestamp dateString={execution.created_at} />
-          </NxLabel>
+          </SynLabel>
         </FlexItem>
       ) : null}
     </>
@@ -79,12 +79,15 @@ export function ExecutionDetailHeaderToolbar({
           onReviewClick={onReviewClick}
         />
       )}
-      {isCancellable && <CancelExecutionButton executionId={executionId} />}
+      {isCancellable && execution && (
+        <CancelExecutionButton executionId={executionId} projectId={execution.project_id} />
+      )}
       {isRetryable && execution && (
         <RetryExecutionButton
           executionId={executionId}
           workflowId={execution.workflow_id}
           workflowVersionId={execution.workflow_version_id}
+          projectId={execution.project_id}
         />
       )}
       <Button variant="secondary" onClick={onCopyToEditor}>

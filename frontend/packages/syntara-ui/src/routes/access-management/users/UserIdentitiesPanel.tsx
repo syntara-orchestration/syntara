@@ -13,15 +13,15 @@ import { useAuthProviders } from '../../../app/useAuthProviders'
 import { OIDC_AUTHORIZE_PATH, identityProvidersClient, usersClient } from '../../../client'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { FilterBar } from '../../../components/filters/FilterBar'
-import { NxLabel } from '../../../components/labels/NxLabel'
-import { NxPanelContentStack } from '../../../components/layout/NxPanelContentStack'
-import { NxLink } from '../../../components/NxLink'
+import { SynLabel } from '../../../components/labels/SynLabel'
+import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
 import { ProviderIcon } from '../../../components/ProviderIcon'
-import { NxEmptyStateFilter } from '../../../components/states/NxEmptyStateFilter'
-import { NxLoadingState } from '../../../components/states/NxLoadingState'
+import { SynEmptyStateFilter } from '../../../components/states/SynEmptyStateFilter'
+import { SynLoadingState } from '../../../components/states/SynLoadingState'
 import { useQueryState } from '../../../components/states/useQueryState'
+import { SynLink } from '../../../components/SynLink'
 import { DateCell } from '../../../components/table/DateCell'
-import { NxScrollableTableContainer } from '../../../components/table/NxScrollableTableContainer'
+import { SynScrollableTableContainer } from '../../../components/table/SynScrollableTableContainer'
 import { useMutationErrorHandler } from '../../../hooks/useMutationErrorHandler'
 import { useTableSort } from '../../../hooks/useTableSort'
 import { useAlerts, type AlertConfig } from '../../../providers/alerts'
@@ -86,14 +86,14 @@ function ProviderLink({ name, providerId }: { name: string; providerId: string }
         <ProviderIcon name={name} />
       </FlexItem>
       <FlexItem>
-        <NxLink
+        <SynLink
           to={AppRoute.SystemAdministration.Authentication.IdentityProviderDetail.replace(
             ':providerId',
             providerId
           ).replace('/:tab?', '')}
         >
           {name}
-        </NxLink>
+        </SynLink>
       </FlexItem>
     </Flex>
   )
@@ -120,9 +120,9 @@ function IdentityConnectionStatusLabel({ status }: Readonly<{ status: IdentityCo
   const Icon = identityConnectionStatusIcons[status]
   const labelStatus = identityConnectionStatusMap[status]
   return (
-    <NxLabel variant="outline" status={labelStatus} icon={<Icon />}>
+    <SynLabel variant="outline" status={labelStatus} icon={<Icon />}>
       {identityConnectionStatusLabels[status]}
-    </NxLabel>
+    </SynLabel>
   )
 }
 
@@ -399,7 +399,7 @@ export function UserIdentitiesPanel({
   }
 
   // Prevent "No identity providers configured" from flashing before useAuthProviders settles.
-  if (isProvidersLoading && identities.length === 0) return <NxLoadingState />
+  if (isProvidersLoading && identities.length === 0) return <SynLoadingState />
 
   if (!showTable) {
     return (
@@ -416,7 +416,7 @@ export function UserIdentitiesPanel({
   }
 
   return (
-    <NxPanelContentStack>
+    <SynPanelContentStack>
       <StackItem>
         <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapMd' }}>
           <FlexItem grow={{ default: 'grow' }}>
@@ -448,10 +448,10 @@ export function UserIdentitiesPanel({
       </StackItem>
       {sortedRows.length === 0 ? (
         <StackItem isFilled style={flexCenteredBothAxes}>
-          <NxEmptyStateFilter clearAllFilters={identitiesFilter.clearAllFilters} />
+          <SynEmptyStateFilter clearAllFilters={identitiesFilter.clearAllFilters} />
         </StackItem>
       ) : (
-        <NxScrollableTableContainer
+        <SynScrollableTableContainer
           caption="User identities table"
           footer={{
             page,
@@ -500,9 +500,9 @@ export function UserIdentitiesPanel({
               )
             })}
           </Tbody>
-        </NxScrollableTableContainer>
+        </SynScrollableTableContainer>
       )}
       {dialogs}
-    </NxPanelContentStack>
+    </SynPanelContentStack>
   )
 }

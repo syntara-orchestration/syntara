@@ -74,7 +74,7 @@ Items enforced by ESLint at error level are omitted -- ESLint is the source of t
 
 1. **No unsafe `as` casts on API responses** -- use typed client responses or type guards
 2. **`vitest-axe` test for every new component** -- at least one `toHaveNoViolations()`
-3. **`NxErrorState` component** -- never raw error markup; pass raw error object + `onRetry`
+3. **`SynErrorState` component** -- never raw error markup; pass raw error object + `onRetry`
 4. **Zod + react-hook-form** -- never manual `useState` per field; use `zodResolver`
 5. **Reset `defaultValues` in edit modals** -- `reset()` in `useEffect` keyed on `[isOpen, item]`
 6. **Extract shared patterns** -- use `NxConfirmationDialog`, `useDialogState`, `useDeleteAction`, `useCursorPagination`
@@ -83,7 +83,7 @@ Items enforced by ESLint at error level are omitted -- ESLint is the source of t
 9. **Use enum constants** from `@syntara/contracts` -- never string literals for discriminators
 10. **Never compare display strings in logic** -- compare API values or enum constants, not translatable labels
 11. **No nested React components (Sonar S6478)** -- do not declare components inside another component; for PatternFly `toggle` / similar props use a **module-scoped** child component and pass data as props (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §18)
-12. **`NxLabel` for system labels, `NxUserTag` for user-authored tags** -- use `NxLabel` (filled, compact by default) for all system-generated labels: statuses, categories, metadata badges, counts, and filter chips. Use `NxUserTag` (outline, compact by default) only for user-authored content such as workflow tags or user-entered values. Never use PF `Label` directly.
+12. **`SynLabel` for system labels, `SynUserTag` for user-authored tags** -- use `SynLabel` (filled, compact by default) for all system-generated labels: statuses, categories, metadata badges, counts, and filter chips. Use `SynUserTag` (outline, compact by default) only for user-authored content such as workflow tags or user-entered values. Never use PF `Label` directly.
 13. **`useMemo` for derived data in hooks** -- wrap computed maps/arrays/filtered lists from query results in `useMemo` to avoid new references on every render (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §21)
 14. **New hooks need test files** -- every new `use*.ts` hook must have a dedicated `use*.test.ts(x)` with coverage, not just indirect coverage from a component test
 15. **No unnecessary `useEffect`** -- never use `useEffect` to compute derived state, chain state updates, or handle user events; use event handlers, `useMemo`, or inline calculations instead ([React docs](https://react.dev/learn/you-might-not-need-an-effect), [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §23)
@@ -101,9 +101,9 @@ Items enforced by ESLint at error level are omitted -- ESLint is the source of t
 27. **New routes must set `requiredPermissions` and/or `routePermission`** -- every route with access requirements needs permission fields in `navigationItems.tsx`; create/edit routes need a `routePermission` for `ProtectedRoute` guard (see [`docs/permissions-rbac.md`](docs/permissions-rbac.md))
 28. **New write actions must use `DisabledWithTooltip` + permission hook** -- never expose ungated create/edit/delete buttons; use a domain `use*Permissions` hook and `permissionTooltip()` for copy (see [`docs/permissions-rbac.md`](docs/permissions-rbac.md))
 29. **New permission-gated features need mock handlers** -- add role-aware responses in `packages/syntara-mock-api/src/handlers.ts` `can_i` block for all 4 roles (admin, viewer, auditor, user) and E2E tests in `permission-gating.spec.ts`
-30. **Use `useDocLink` for documentation URLs** -- never hardcode doc URLs; use `useDocLink('workflows')` from `src/utils/docs/useDocLink.ts`; pass the result to `NxPageHeader`'s `docLink` prop; add new keys to `docsUrls.json` when adding new pages (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) section 33)
+30. **Use `useDocLink` for documentation URLs** -- never hardcode doc URLs; use `useDocLink('workflows')` from `src/utils/docs/useDocLink.ts`; pass the result to `SynPageHeader`'s `docLink` prop; add new keys to `docsUrls.json` when adding new pages (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) section 33)
 31. **No `new Date()` in mock API seed data** -- seed data in `packages/syntara-mock-api/src/resources/` and `utils/` must use deterministic timestamps from `mockDates.ts`, never `new Date()`. Dynamic timestamps cause visual regression baselines to go stale across CI runs because rendered dates change daily
-32. **New pages must render `<title>{toPageTitle(['...'])}</title>`** -- every top-level page component (default export with `<NxPage>`) must render a `<title>` as its first `<NxPage>` child. Use `toPageTitle` from `src/utils/toPageTitle.ts`
+32. **New pages must render `<title>{toPageTitle(['...'])}</title>`** -- every top-level page component (default export with `<SynPage>`) must render a `<title>` as its first `<SynPage>` child. Use `toPageTitle` from `src/utils/toPageTitle.ts`
 33. **No new `forwardRef`** -- React 19 passes `ref` as a regular prop; accept `ref` on the props type instead of wrapping with `forwardRef` (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §38)
 34. **Prefer ref callback cleanup functions** -- when attaching DOM listeners or observers, return a cleanup from the ref callback instead of pairing `useRef` + `useEffect` (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §38)
 35. **No new `useContext`** -- React 19 reads context with `use(Context)`; do not add `useContext` (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §39)
@@ -140,6 +140,25 @@ npm run e2e                 # Run e2e playwright tests
 npm run e2e:ui              # Run e2e playwright tests in the playwright UI
 npm run e2e:visual-regression        # Page screenshot visual regression (mock API + UI via Playwright webServer)
 npm run e2e:visual-regression:update # Same, with --update-snapshots (see packages/syntara-ui/VISUAL_REGRESSION.md)
+
+# E2E test suite tags — Playwright tags that control where each test runs:
+#   @pr-check      Fast critical-path tests; select with --grep @pr-check
+#   @konflux-skip  Tests excluded from Konflux pipelines via --grep-invert @konflux-skip (flaky in that env only)
+#   @local-only    Visual regression tests; excluded from all CI automatically
+# Full rules: .claude/skills/frontend-playwright-e2e/SKILL.md → "Test Suite Tags"
+#
+# When to apply @konflux-skip:
+#   - Test creates a real workflow execution and waits for Temporal to complete it
+#     (approval flows, multi-step runs, badge checks) — Temporal under Konflux cluster
+#     load frequently times out or returns unexpected states.
+#   - Test has a wall-clock budget >25s; Konflux runner load regularly pushes it over.
+#   - Test relies on the backend Temporal worker reaching an external URL (httpbin,
+#     webhooks, LLM APIs) — the worker's network is more restricted than the test runner.
+# How to apply:
+#   test('name', { tag: ['@konflux-skip'] }, async ({ app }) => { ... })
+#   After editing, run: npx --prefix .. prettier --write <file>
+#   (Prettier may reformat to multi-line — that is correct and expected.)
+# See also: root CLAUDE.md → "Konflux CI Environment" for backend skip patterns.
 
 # Run a specific test or coverage
 npx vitest run packages/syntara-ui/path/to/specific/test.test.ts
@@ -207,7 +226,7 @@ For how the UI is structured, see these comprehensive guides:
 | **UX / PatternFly design system**   | [`.claude/skills/frontend-patternfly-ux/SKILL.md`](../.claude/skills/frontend-patternfly-ux/SKILL.md) -- PF6 patterns                                                                                                                                                                                   |
 | **Library docs / llms.txt links**   | [`.claude/skills/frontend-library-references/SKILL.md`](../.claude/skills/frontend-library-references/SKILL.md) -- fetch before writing React, Zod, Zustand, Vitest, Vite, or TanStack Query code                                                                                                       |
 | **Permission gating / RBAC**        | [`docs/permissions-rbac.md`](docs/permissions-rbac.md) -- `useCanI`, `DisabledWithTooltip`, `ProtectedRoute`, nav filtering, mock API roles, ungated inventory                                                                                                                                          |
-| **Page content frame (`NxPanel`)**  | `packages/syntara-ui/src/components/layout/NxPanel.tsx` -- `Panel` -> `PanelMain` -> `PanelMainBody`; see JSDoc (glass vs `opaqueFloatingFill` vs `variant="raised"`) and [patternfly-react#12372](https://github.com/patternfly/patternfly-react/pull/12372)                                           |
+| **Page content frame (`SynPanel`)** | `packages/syntara-ui/src/components/layout/SynPanel.tsx` -- `Panel` -> `PanelMain` -> `PanelMainBody`; see JSDoc (glass vs `opaqueFloatingFill` vs `variant="raised"`) and [patternfly-react#12372](https://github.com/patternfly/patternfly-react/pull/12372)                                          |
 | **Documentation links**             | [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) -- `useDocLink` hook, `DocKey` type, community vs extended URL resolution                                                                                                                   |
 
 ### Quick Reference: Common Tasks
@@ -230,7 +249,7 @@ See: [`docs/data-flow.md`](docs/data-flow.md) — "Type-Safe API Clients"
 1. Add route constant to `packages/syntara-ui/src/app/AppRoute.tsx`
 2. Add navigation item to `packages/syntara-ui/src/app/navigationItems.tsx` with lazy-loaded component
 3. The router auto-discovers it from `navigationItems` — no manual route config needed
-4. In the page component, render `<title>{toPageTitle(['Page Name'])}</title>` as the first child of `<NxPage>`; import `toPageTitle` from `src/utils/toPageTitle`
+4. In the page component, render `<title>{toPageTitle(['Page Name'])}</title>` as the first child of `<SynPage>`; import `toPageTitle` from `src/utils/toPageTitle`
 
 #### How do I add filters to a list page?
 
@@ -240,7 +259,7 @@ Use **`FilterBar` + `useCursorPagination`** (not a hand-rolled cursor/`useFilter
 2. **Wire pagination + filters + sort** with `useCursorPagination` — it owns URL-synced filters, sort (`defaultSort` / `columns`), cursor reset, and `queryParams`.
 3. **Render** `FilterBar` (or `NxListPanelToolbar`) with `fieldDefinitions`, `filters`, `onFilterChange={handleFilterChange}`, and `clearAllFilters={handleClearAllFilters}`.
 4. **Query** with the typed client: `client.useQuery('get', '/resource', { params: { query: queryParams } })`.
-5. **Empty filtered results** → `NxEmptyStateFilter` with clear-all; unfiltered empty → `NxEmptyStateNoData`.
+5. **Empty filtered results** → `SynEmptyStateFilter` with clear-all; unfiltered empty → `SynEmptyStateNoData`.
 
 ```typescript
 import { FilterBar } from '../../components/filters/FilterBar'
@@ -363,7 +382,7 @@ import { useDocLink } from '../../utils/docs/useDocLink'
 
 function MyPage() {
   const docLink = useDocLink('workflows') // DocKey is type-safe — only keys from docsUrls.json
-  return <NxPageHeader title="Workflows" docLink={docLink} />
+  return <SynPageHeader title="Workflows" docLink={docLink} />
 }
 ```
 

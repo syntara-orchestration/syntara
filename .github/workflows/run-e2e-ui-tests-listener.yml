@@ -1,0 +1,62 @@
+---
+name: '/run-e2e-ui-tests'
+
+# Lightweight listener: validates the PR comment and dispatches the real
+# E2E UI test workflow. Keeps ghost "skipped" runs out of the heavy
+# workflow's Actions history.
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  actions: write
+  pull-requests: read
+
+jobs:
+  dispatch:
+    name: Validate & Dispatch
+    if: >-
+      github.event.issue.pull_request
+      && github.event.comment.user.type != 'Bot'
+      && contains(github.event.comment.body, '/run-e2e-ui-tests')
+      && contains(fromJson('["OWNER","MEMBER"]'), github.event.comment.author_association)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Get PR metadata
+        id: pr
+        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553 # v9
+        with:
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+            const baseRepo = `${context.repo.owner}/${context.repo.repo}`;
+            if (pr.data.head.repo.full_name !== baseRepo) {
+              core.setFailed('Refusing to run /run-e2e-ui-tests on fork PRs.');
+              return;
+            }
+            core.setOutput('ref', pr.data.head.ref);
+            core.setOutput('pr_number', context.issue.number);
+
+      - name: Dispatch E2E UI workflow
+        if: steps.pr.outcome == 'success'
+        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553 # v9
+        env:
+          PR_REF: ${{ steps.pr.outputs.ref }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+        with:
+          script: |
+            const prRef = process.env.PR_REF;
+            const prNumber = process.env.PR_NUMBER;
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'ci-frontend.yml',
+              ref: 'devel',
+              inputs: {
+                pr_number: prNumber,
+                pr_ref: prRef,
+              },
+            });

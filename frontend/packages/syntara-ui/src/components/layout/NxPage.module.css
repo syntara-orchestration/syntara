@@ -1,8 +1,0 @@
-/**
- * Filled flex child under `NxPage`’s `Stack`: default `min-height: auto` blocks nested
- * `height: 100%` / scroll regions from shrinking; `0` opts into correct flex behavior.
- * See `NxPanel` JSDoc — avoid `overflow: hidden` here (clips raised `box-shadow`).
- */
-.main {
-  min-height: 0;
-}

@@ -5,10 +5,10 @@ import { useCallback, useMemo, useState } from 'react'
 
 import { AppRoute } from '../../../app/AppRoute'
 import { credentialsClient } from '../../../client'
-import { NxLabel } from '../../../components/labels/NxLabel'
-import { NxPanelContentStack } from '../../../components/layout/NxPanelContentStack'
+import { SynLabel } from '../../../components/labels/SynLabel'
+import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
 import { NxListPanelTable, NxListPanelView } from '../../../components/panels/list/NxListPanel'
-import { NxEmptyStateNoData } from '../../../components/states/NxEmptyStateNoData'
+import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import { DateCell } from '../../../components/table/DateCell'
 import { LinkCell } from '../../../components/table/LinkCell'
 import { UserTimestamp } from '../../../components/table/UserTimestamp'
@@ -99,9 +99,9 @@ function WorkflowsTable({
                 {workflow.node_names && workflow.node_names.length > 0 ? (
                   <LabelGroup numLabels={5}>
                     {workflow.node_names.map((nodeName) => (
-                      <NxLabel key={nodeName} variant="outline">
+                      <SynLabel key={nodeName} variant="outline">
                         {nodeName}
-                      </NxLabel>
+                      </SynLabel>
                     ))}
                   </LabelGroup>
                 ) : (
@@ -151,7 +151,7 @@ export function CredentialWorkflowsTab({ credentialId }: Readonly<CredentialWork
   const { expandedRows, allRowsExpanded, handleToggleRow, handleCollapseAll } = useExpandableRowIds(expandableIds)
 
   return (
-    <NxPanelContentStack>
+    <SynPanelContentStack>
       <NxListPanelView
         isPending={query.isPending}
         error={query.error}
@@ -161,7 +161,7 @@ export function CredentialWorkflowsTab({ credentialId }: Readonly<CredentialWork
         hasActiveFilters={false}
         onClearAllFilters={noop}
         noDataState={
-          <NxEmptyStateNoData
+          <SynEmptyStateNoData
             title="No workflows using this credential"
             description="This credential is not currently referenced by any workflows. Workflows will appear here once they are configured to use this credential."
           />
@@ -190,6 +190,6 @@ export function CredentialWorkflowsTab({ credentialId }: Readonly<CredentialWork
           </NxListPanelTable>
         }
       />
-    </NxPanelContentStack>
+    </SynPanelContentStack>
   )
 }

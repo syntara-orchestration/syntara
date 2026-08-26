@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { executionsClient } from '../../client'
 import { FilterBar } from '../../components/filters/FilterBar'
-import { NxPanel } from '../../components/layout/NxPanel'
-import { NxEmptyStateFilter } from '../../components/states/NxEmptyStateFilter'
+import { SynPanel } from '../../components/layout/SynPanel'
+import { SynEmptyStateFilter } from '../../components/states/SynEmptyStateFilter'
 import { useQueryState } from '../../components/states/useQueryState'
 import { useElapsedTime } from '../../hooks/useElapsedTime'
 import type { FilterConfig } from '../../types/filters'
@@ -97,7 +97,7 @@ function ThreePanelLayout({
   onClosePanel,
 }: Readonly<ThreePanelLayoutProps>) {
   return (
-    <NxPanel
+    <SynPanel
       hasNoPadding
       isFullHeight
       style={{
@@ -139,7 +139,7 @@ function ThreePanelLayout({
           <Stack className={styles.activityListScrollWrapper}>
             {activityOrder.length === 0 && hasFilteredOutActivities ? (
               <StackItem isFilled>
-                <NxEmptyStateFilter clearAllFilters={() => onFilterChange([])} />
+                <SynEmptyStateFilter clearAllFilters={() => onFilterChange([])} />
               </StackItem>
             ) : (
               <CompactActivityList
@@ -168,7 +168,7 @@ function ThreePanelLayout({
           )}
         </FlexItem>
       </Flex>
-    </NxPanel>
+    </SynPanel>
   )
 }
 
@@ -231,7 +231,7 @@ function SinglePanelLayout({
     [execution.error_details, nameMap]
   )
   return (
-    <NxPanel
+    <SynPanel
       hasNoPadding
       isFullHeight
       style={{
@@ -277,7 +277,7 @@ function SinglePanelLayout({
 
         {activityOrder.length === 0 && hasFilteredOutActivities ? (
           <StackItem isFilled style={{ minHeight: 0 }}>
-            <NxEmptyStateFilter clearAllFilters={() => onFilterChange([])} />
+            <SynEmptyStateFilter clearAllFilters={() => onFilterChange([])} />
           </StackItem>
         ) : (
           <ExecutionActivityTable
@@ -290,7 +290,7 @@ function SinglePanelLayout({
           />
         )}
       </Stack>
-    </NxPanel>
+    </SynPanel>
   )
 }
 

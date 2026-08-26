@@ -38,6 +38,7 @@ COPY . .
 RUN --mount=from=override,source=/,target=/tmp/override \
     if [ "$BRANDING" = "true" ] && [ -d /tmp/override/frontend ]; then \
         export NEXUS_UI_ASSETS_DIR=/app/packages/syntara-ui/src/assets && \
+        export SYNTARA_UI_ASSETS_DIR=/app/packages/syntara-ui/src/assets && \
         bash /tmp/override/frontend/scripts/apply-downstream-brand.sh && \
         bash /tmp/override/frontend/scripts/assert-downstream-brand.sh; \
     fi

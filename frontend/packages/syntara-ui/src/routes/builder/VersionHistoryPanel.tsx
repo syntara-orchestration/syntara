@@ -37,10 +37,10 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type
 
 import { AppRoute } from '../../app/AppRoute'
 import { MultiSelectFilter } from '../../components/filters/MultiSelectFilter'
-import pageMainSlotStyles from '../../components/layout/NxPage.module.css'
-import { NxPanel } from '../../components/layout/NxPanel'
-import { NxLink } from '../../components/NxLink'
-import { NxEmptyStateFilter } from '../../components/states/NxEmptyStateFilter'
+import pageMainSlotStyles from '../../components/layout/SynPage.module.css'
+import { SynPanel } from '../../components/layout/SynPanel'
+import { SynEmptyStateFilter } from '../../components/states/SynEmptyStateFilter'
+import { SynLink } from '../../components/SynLink'
 import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 import type { PaginationFooterProps } from '../../components/table/PaginationFooter'
 import { PaginationFooter } from '../../components/table/PaginationFooter'
@@ -275,13 +275,13 @@ function VersionRow({
               {version.created_by_username ? (
                 <>
                   {showSecondaryDatetime && version.created_at ? ' by ' : null}
-                  <NxLink
+                  <SynLink
                     to={AppRoute.AccessManagement.UserDetail.replace(':userId', version.created_by)}
                     className={styles.usernameLink}
                     onClick={(e) => e.stopPropagation()}
                   >
                     {version.created_by_username}
-                  </NxLink>
+                  </SynLink>
                 </>
               ) : null}
             </Content>
@@ -375,7 +375,7 @@ export function VersionHistoryPanel(props: VersionHistoryPanelProps) {
 
   let listBody: ReactNode
   if (versions.length === 0 && statusFilter.length > 0) {
-    listBody = <NxEmptyStateFilter clearAllFilters={() => onStatusFilterChange([])} />
+    listBody = <SynEmptyStateFilter clearAllFilters={() => onStatusFilterChange([])} />
   } else if (versions.length === 0) {
     listBody = (
       <Content component={ContentVariants.p} className={styles.emptyStateText}>
@@ -427,7 +427,7 @@ export function VersionHistoryPanel(props: VersionHistoryPanelProps) {
   }
 
   return (
-    <NxPanel hasNoPadding isFullHeight className={styles.panelRoot}>
+    <SynPanel hasNoPadding isFullHeight className={styles.panelRoot}>
       <div className={styles.panelInner}>
         <Stack className={styles.panelStack}>
           <StackItem className={styles.panelHeader}>
@@ -495,6 +495,6 @@ export function VersionHistoryPanel(props: VersionHistoryPanelProps) {
           )}
         </Stack>
       </div>
-    </NxPanel>
+    </SynPanel>
   )
 }

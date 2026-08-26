@@ -8,9 +8,11 @@ import pytest
 from temporalio.exceptions import ApplicationError
 
 from syntara.workflows.workflow_engine.activities.agentic_activity import (
+    _build_agent_metadata,
     _inject_runtime_settings,
     execute_agentic_activity,
 )
+from syntara.workflows.workflow_engine.models import AgenticExecutorParameters
 
 
 @pytest.fixture(autouse=True)
@@ -84,3 +86,46 @@ class TestExecuteAgenticActivitySettingsIntegration:
         )
         assert "project_id" not in exc_info.value.message
         assert "requires non-empty" not in exc_info.value.message
+
+
+class TestBuildAgentMetadata:
+    """Tests for _build_agent_metadata helper."""
+
+    def test_timeout_not_in_metadata_dict(self) -> None:
+        """Verify timeout is NOT in the metadata dict.
+
+        Timeout flows via invoke_agent_async parameter, not metadata.
+        """
+        config = AgenticExecutorParameters(prompt="test prompt")
+        input_config: dict[str, object] = {"prompt": "test prompt", "timeout": 60}
+        metadata = _build_agent_metadata(
+            config,
+            input_config,
+            workflow_id="wf-1",
+            activity_id="act-1",
+            execution_id="exec-1",
+            callback_url="https://example.com/callback",
+            request_id=None,
+        )
+        assert "timeout" not in metadata
+        assert "timeout_seconds" not in metadata
+
+    def test_includes_core_fields(self) -> None:
+        """Verify workflow_id, activity_id, etc are in metadata."""
+        config = AgenticExecutorParameters(prompt="test prompt")
+        input_config: dict[str, object] = {"prompt": "test prompt"}
+        metadata = _build_agent_metadata(
+            config,
+            input_config,
+            workflow_id="wf-123",
+            activity_id="act-456",
+            execution_id="exec-789",
+            callback_url="https://example.com/cb",
+            request_id="req-abc",
+        )
+        assert metadata["workflow_id"] == "wf-123"
+        assert metadata["activity_id"] == "act-456"
+        assert metadata["execution_id"] == "exec-789"
+        assert metadata["activity_name"] == "agentic_v2"
+        assert metadata["callback_url"] == "https://example.com/cb"
+        assert metadata["request_id"] == "req-abc"

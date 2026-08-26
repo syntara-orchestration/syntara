@@ -24,10 +24,10 @@ import { useCallback, useMemo, useState } from 'react'
 import { Controller, type Control } from 'react-hook-form'
 
 import { FilterBar } from '../../../../components/filters/FilterBar'
-import { NxPanelContentStack } from '../../../../components/layout/NxPanelContentStack'
-import { NxEmptyStateFilter } from '../../../../components/states/NxEmptyStateFilter'
-import { NxEmptyStateNoData } from '../../../../components/states/NxEmptyStateNoData'
-import { NxScrollableTableContainer } from '../../../../components/table/NxScrollableTableContainer'
+import { SynPanelContentStack } from '../../../../components/layout/SynPanelContentStack'
+import { SynEmptyStateFilter } from '../../../../components/states/SynEmptyStateFilter'
+import { SynEmptyStateNoData } from '../../../../components/states/SynEmptyStateNoData'
+import { SynScrollableTableContainer } from '../../../../components/table/SynScrollableTableContainer'
 import type { FilterConfig, FilterFieldDefinition } from '../../../../types/filters'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../../../types/filters'
 import { APP_TITLE } from '../../../../utils/appTitle'
@@ -218,7 +218,7 @@ export function MappingTable({
   const showAddButton = !isReadOnly && showAddMappingAction
 
   const table = (
-    <NxScrollableTableContainer caption="Group mappings" variant="compact">
+    <SynScrollableTableContainer caption="Group mappings" variant="compact">
       <GroupMappingTableHead showActionsColumn={showActionsColumn} showWildcardHelp={showWildcardHelp} />
       <Tbody>
         {rows.map((row) => {
@@ -260,7 +260,7 @@ export function MappingTable({
           )
         })}
       </Tbody>
-    </NxScrollableTableContainer>
+    </SynScrollableTableContainer>
   )
 
   if (!showAddButton) {
@@ -408,7 +408,7 @@ export function ReadOnlyView({ entries, mappedGroups, onEditMapping }: Readonly<
   /** Defensive: parent normally switches to empty state before rendering read-only with zero rows */
   if (entries.length === 0) {
     return (
-      <NxEmptyStateNoData
+      <SynEmptyStateNoData
         title="No group mappings"
         description="There are no group mappings to display for this identity provider."
       />
@@ -416,7 +416,7 @@ export function ReadOnlyView({ entries, mappedGroups, onEditMapping }: Readonly<
   }
 
   return (
-    <NxPanelContentStack hasGutter>
+    <SynPanelContentStack hasGutter>
       <GroupMappingReadOnlyToolbar
         filters={filters}
         onFilterChange={handleFilterChange}
@@ -425,10 +425,10 @@ export function ReadOnlyView({ entries, mappedGroups, onEditMapping }: Readonly<
       />
       {filteredEntries.length === 0 ? (
         <StackItem isFilled style={READ_ONLY_EMPTY_FILTER_STATE_STYLE}>
-          <NxEmptyStateFilter clearAllFilters={clearFiltersAndPage} />
+          <SynEmptyStateFilter clearAllFilters={clearFiltersAndPage} />
         </StackItem>
       ) : (
-        <NxScrollableTableContainer
+        <SynScrollableTableContainer
           caption="Group mappings"
           variant="compact"
           footer={{
@@ -459,8 +459,8 @@ export function ReadOnlyView({ entries, mappedGroups, onEditMapping }: Readonly<
               />
             ))}
           </Tbody>
-        </NxScrollableTableContainer>
+        </SynScrollableTableContainer>
       )}
-    </NxPanelContentStack>
+    </SynPanelContentStack>
   )
 }

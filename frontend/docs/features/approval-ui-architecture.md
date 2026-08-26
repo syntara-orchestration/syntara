@@ -165,7 +165,7 @@ Both dialogs accept `isOpen`, `onClose`, `onConfirm(note)`, `approvalCount`, and
 
 **File:** `packages/syntara-ui/src/routes/approvals/approvalUtils.tsx`
 
-Renders a status badge using `NxLabel` with `variant="outline"` and status-specific icons.
+Renders a status badge using `SynLabel` with `variant="outline"` and status-specific icons.
 
 | Status      | Color   | Icon                  | Label     |
 | ----------- | ------- | --------------------- | --------- |
@@ -279,7 +279,7 @@ The `what_can_i` authorization endpoint returns project **names**, not IDs. The 
 │                                                                           │
 │ ┌─────────────────────────────────────────────────────────────────────┐ │
 │ │ Render                                                               │ │
-│ │ ├─ NxPageHeader (title, ProjectSelector, ApprovalsBulkActions)     │ │
+│ │ ├─ SynPageHeader (title, ProjectSelector, ApprovalsBulkActions)     │ │
 │ │ ├─ FilterBar (name, status filters)                                │ │
 │ │ ├─ ApprovalsTableHead (sort, select-all checkbox)                  │ │
 │ │ ├─ GroupedApprovalsTableBody (if isAllProjects)                    │ │

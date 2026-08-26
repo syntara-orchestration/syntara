@@ -93,7 +93,7 @@ Check whether the changes follow:
 | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | `as` casts on API responses                                    | #1 -- unsafe casts (flag for contract fix, not more casts)                                                |
 | New component without `toHaveNoViolations()`                   | #2 -- missing vitest-axe test                                                                             |
-| Raw error JSX (`<span>Error`, `<p>Error`, `<div>Error`)        | #3 -- should use `NxErrorState` component                                                                 |
+| Raw error JSX (`<span>Error`, `<p>Error`, `<div>Error`)        | #3 -- should use `SynErrorState` component                                                                 |
 | Manual `useState` per form field                               | #4 -- should use Zod + react-hook-form                                                                    |
 | `useForm` with `defaultValues` in modals                       | #5 -- verify `reset()` in `useEffect([isOpen, item])`                                                     |
 | Copy-pasted dialogs or action handlers                         | #6 -- extract to shared component/hook                                                                    |
@@ -116,12 +116,12 @@ Check whether the changes follow:
 | Manual `Promise.all` + cancellation for parallel fetches       | #25 -- use `useQueries` from TanStack Query                                                               |
 | `// TODO` / `// FIXME` / `// HACK` / `// XXX`                  | #26 -- track deferred work in an issue, not code comments                                                 |
 | Hardcoded documentation URLs                                   | #30 -- use `useDocLink('key')` from `frontend/packages/syntara-ui/src/utils/docs/useDocLink.ts`           |
-| `NxPageHeader` without `docLink` prop                          | #30 -- every page header should pass `docLink={useDocLink('key')}`                                        |
+| `SynPageHeader` without `docLink` prop                          | #30 -- every page header should pass `docLink={useDocLink('key')}`                                        |
 | Hardcoded colors in CSS modules                                | ESLint can't catch these; review CSS module files manually                                                |
 | `new Date()` in `syntara-mock-api/src/resources/` or `utils/`  | #31 -- use `mockDate.*` from `mockDates.ts` for deterministic visual regression                           |
 | `Button` with `onClick={() => navigate(...)}`                  | §34 -- use `<Link>` for navigation, `<Button>` for actions                                                |
 | Same `aria-label` on repeated checkboxes/buttons               | §35 -- each instance needs a unique label (e.g., row index or resource name)                              |
-| Raw text for invalid ID or not-found states                    | §36 -- use `NxEmptyState` or `Nx*` empty state components                                                 |
+| Raw text for invalid ID or not-found states                    | §36 -- use `SynEmptyState` or `Nx*` empty state components                                                 |
 | New page test without `expectPageTitle(...)` assertion         | testing guidelines -- add at least one `expectPageTitle` call per page component                          |
 | Empty-state CTA without permission check                       | UX §15 -- gate `addData` with permission flag (pass `undefined` if denied)                                |
 | New `forwardRef(` usage                                        | #33 -- accept `ref` as a prop (React 19); do not add `forwardRef`                                         |
@@ -204,7 +204,7 @@ Ask:
 Examples:
 
 - Use typed API clients (`workflowClient`, `credentialsClient`, `authClient`) instead of raw `fetch()`
-- Use `NxErrorState` component instead of custom error markup
+- Use `SynErrorState` component instead of custom error markup
 - Use `useQueryState` with `onRetry` instead of manual loading/error state management
 - Use `useFormMutationErrorHandler` instead of manual 422 error parsing
 - Use `getErrorMessage()` / `isConflictError()` from `apiErrors.ts` instead of manual error field checks

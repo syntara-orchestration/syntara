@@ -10,17 +10,18 @@ import { AppRoute } from '../../../app/AppRoute'
 import { integrationsClient } from '../../../client'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
-import { NxPage, NxPageBody } from '../../../components/layout/NxPage'
-import { NxPageHeader } from '../../../components/layout/NxPageHeader'
-import type { KebabAction } from '../../../components/NxKebabMenu'
-import { NxKebabMenu } from '../../../components/NxKebabMenu'
-import { NxPageTitle } from '../../../components/NxPageTitle'
+import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
+import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import {
   NxListPanel,
   NxListPanelTable,
   NxListPanelToolbar,
   NxListPanelView,
 } from '../../../components/panels/list/NxListPanel'
+import type { KebabAction } from '../../../components/SynKebabMenu'
+import { SynKebabMenu } from '../../../components/SynKebabMenu'
+import { SynPageTitle } from '../../../components/SynPageTitle'
+import { DateCell } from '../../../components/table/DateCell'
 import { LinkCell } from '../../../components/table/LinkCell'
 import { useCursorPagination, useCursorReset } from '../../../hooks/useCursorPagination'
 import type { FilterFieldDefinition } from '../../../types/filters'
@@ -93,6 +94,7 @@ function IntegrationsTableContent({
           <Th sort={getSortParams('integration_type')}>Integration type</Th>
           <Th>API URL</Th>
           <Th>Enabled resources</Th>
+          <Th sort={getSortParams('last_validated_at')}>Last checked</Th>
           <Th sort={getSortParams('enabled')}>State</Th>
           <Th screenReaderText="Actions" />
         </Tr>
@@ -122,6 +124,9 @@ function IntegrationsTableContent({
             <Td dataLabel="Enabled resources">
               <Badge isRead>{getEnabledResourceCount(integration)}</Badge>
             </Td>
+            <Td dataLabel="Last checked">
+              <DateCell dateString={integration.last_validated_at} />
+            </Td>
             <Td dataLabel="State">
               {permissions.isLoading || !permissions.canUpdate ? (
                 <Tooltip content={permissions.tooltips.enable}>
@@ -144,7 +149,7 @@ function IntegrationsTableContent({
               )}
             </Td>
             <Td isActionCell>
-              <NxKebabMenu
+              <SynKebabMenu
                 actions={buildRowActions(integration, validateDialog, deleteDialog, permissions)}
                 aria-label={`Actions for ${integration.name}`}
               />
@@ -214,9 +219,9 @@ export default function Integrations() {
   const isEmpty = results.length === 0
 
   return (
-    <NxPage>
-      <NxPageTitle segments={['Integrations']} />
-      <NxPageHeader
+    <SynPage>
+      <SynPageTitle segments={['Integrations']} />
+      <SynPageHeader
         title="Integrations"
         docLink={docLink}
         toolbar={
@@ -241,7 +246,7 @@ export default function Integrations() {
         }
       />
 
-      <NxPageBody>
+      <SynPageBody>
         <NxListPanel>
           <NxListPanelView
             isPending={query.isPending}
@@ -275,7 +280,7 @@ export default function Integrations() {
             }
           />
         </NxListPanel>
-      </NxPageBody>
+      </SynPageBody>
 
       <IntegrationDialogs
         validateDialog={validateDialog}
@@ -285,6 +290,6 @@ export default function Integrations() {
         onDelete={handleDelete}
         onDisable={handleDisable}
       />
-    </NxPage>
+    </SynPage>
   )
 }

@@ -6,13 +6,13 @@ import type { ReactNode } from 'react'
 
 import type { FilterConfig, FilterFieldDefinition } from '../../../types/filters'
 import { FilterBar } from '../../filters/FilterBar'
-import { NxPanel } from '../../layout/NxPanel'
-import { NxPanelContentStack } from '../../layout/NxPanelContentStack'
-import { NxEmptyStateFilter } from '../../states/NxEmptyStateFilter'
-import { NxEmptyStateNoData } from '../../states/NxEmptyStateNoData'
-import { NxErrorState } from '../../states/NxErrorState'
-import { NxLoadingState } from '../../states/NxLoadingState'
-import { type TableFooterProps, NxScrollableTableContainer } from '../../table/NxScrollableTableContainer'
+import { SynPanel } from '../../layout/SynPanel'
+import { SynPanelContentStack } from '../../layout/SynPanelContentStack'
+import { SynEmptyStateFilter } from '../../states/SynEmptyStateFilter'
+import { SynEmptyStateNoData } from '../../states/SynEmptyStateNoData'
+import { SynErrorState } from '../../states/SynErrorState'
+import { SynLoadingState } from '../../states/SynLoadingState'
+import { type TableFooterProps, SynScrollableTableContainer } from '../../table/SynScrollableTableContainer'
 import { NxUrlTabs } from '../../tabs/NxUrlTabs'
 
 import styles from './NxListPanel.module.css'
@@ -46,9 +46,9 @@ export function NxListPanel({ children }: NxListPanelProps) {
   )
   return (
     <NxListPanelTabContext.Provider value={tabContextValue}>
-      <NxPanel isFullHeight>
-        <NxPanelContentStack hasGutter>{children}</NxPanelContentStack>
-      </NxPanel>
+      <SynPanel isFullHeight>
+        <SynPanelContentStack hasGutter>{children}</SynPanelContentStack>
+      </SynPanel>
     </NxListPanelTabContext.Provider>
   )
 }
@@ -78,7 +78,7 @@ export type NxListPanelViewProps = {
   hasActiveFilters: boolean
   /** Called when the user clicks "Clear all filters". */
   onClearAllFilters: () => void
-  /** Custom no-data empty state. Defaults to `NxEmptyStateNoData`. */
+  /** Custom no-data empty state. Defaults to `SynEmptyStateNoData`. */
   noDataState?: ReactNode
 
   /**
@@ -125,10 +125,10 @@ function ListPanelStateContent({
   onClearAllFilters,
   noDataState,
 }: Omit<NxListPanelViewProps, 'body' | 'toolbar'>) {
-  if (isPending) return <NxLoadingState />
-  if (error) return <NxErrorState title={errorTitle} message={error} onRetry={onRetry} />
-  if (isEmpty && hasActiveFilters) return <NxEmptyStateFilter clearAllFilters={onClearAllFilters} />
-  if (isEmpty) return noDataState ?? <NxEmptyStateNoData />
+  if (isPending) return <SynLoadingState />
+  if (error) return <SynErrorState title={errorTitle} message={error} onRetry={onRetry} />
+  if (isEmpty && hasActiveFilters) return <SynEmptyStateFilter clearAllFilters={onClearAllFilters} />
+  if (isEmpty) return noDataState ?? <SynEmptyStateNoData />
   return null
 }
 
@@ -188,7 +188,7 @@ export function NxListPanelView({
 
     return (
       // CSS `display: contents` makes this wrapper invisible to flex layout — inner StackItems remain
-      // direct flex children of NxPanelContentStack despite the extra DOM node.
+      // direct flex children of SynPanelContentStack despite the extra DOM node.
       <div id={panelId} role="tabpanel" aria-label={tabLabel} className={styles.tabPanelContents}>
         {content}
       </div>
@@ -255,14 +255,14 @@ export type NxListPanelTableProps = {
 /** Paginated scrollable table for use inside `NxListPanel`. */
 export function NxListPanelTable({ children, caption, footer, isExpandable, useFixedLayout }: NxListPanelTableProps) {
   return (
-    <NxScrollableTableContainer
+    <SynScrollableTableContainer
       caption={caption}
       footer={footer}
       isExpandable={isExpandable}
       useFixedLayout={useFixedLayout}
     >
       {children}
-    </NxScrollableTableContainer>
+    </SynScrollableTableContainer>
   )
 }
 

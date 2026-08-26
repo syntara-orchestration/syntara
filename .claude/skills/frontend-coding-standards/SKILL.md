@@ -98,16 +98,16 @@ function isCredentialArray(value: unknown): value is Credential[] {
 
 ---
 
-## 4. Always Use `NxErrorState` Component — Never Raw Error Markup
+## 4. Always Use `SynErrorState` Component — Never Raw Error Markup
 
-The project has a standard `NxErrorState` component that handles retryable errors, displays consistent UI, and shows a retry button automatically for 5xx errors.
+The project has a standard `SynErrorState` component that handles retryable errors, displays consistent UI, and shows a retry button automatically for 5xx errors.
 
 ```typescript
 // ❌ BAD
 {error && <span>Unable to load profile information.</span>}
 
 // ✅ GOOD
-<NxErrorState
+<SynErrorState
   title="Unable to load profile"
   message={error}
   onRetry={() => detachPromise(refetch())}
@@ -338,13 +338,13 @@ export function MyListPage() {
   useCursorReset(items.length, hasActiveFilters, cursor, query.isFetching, setCursor)
 
   return (
-    <NxPage>
+    <SynPage>
       <FilterBar ... />
-      <NxScrollableTableContainer
+      <SynScrollableTableContainer
         footer={getFooterProps(query.data)}
       >
         {/* <Th sort={getSortParams('name')}>Name</Th> */}
-      </NxScrollableTableContainer>
+      </SynScrollableTableContainer>
       <NxConfirmationDialog
         isOpen={deleteDialog.isOpen}
         onClose={deleteDialog.close}
@@ -355,7 +355,7 @@ export function MyListPage() {
       >
         Are you sure?
       </NxConfirmationDialog>
-    </NxPage>
+    </SynPage>
   )
 }
 ```
@@ -768,11 +768,11 @@ mutate(data, {
 
 ### Retry Button in Error States
 
-The `NxErrorState` component automatically shows a retry button for retryable errors when `onRetry` is provided:
+The `SynErrorState` component automatically shows a retry button for retryable errors when `onRetry` is provided:
 
 ```typescript
 // Retry button appears automatically for 5xx errors or errors with retryable=true
-<NxErrorState
+<SynErrorState
   title="Failed to load data"
   message={error}
   onRetry={() => detachPromise(refetch())}
@@ -1403,7 +1403,7 @@ function UserFormFields({ isEdit, control }: Props) {
 | **Client state (global)**    | Zustand stores (workflow builder)                              | React Context with manual reducers           |
 | **Styling**                  | PatternFly components + PF6 design tokens + CSS modules        | Inline style objects, raw HTML, hardcoded px |
 | **API calls**                | Typed clients from `client.tsx`                                | Raw `fetch()`                                |
-| **Error handling**           | `useQueryState`, `useMutationErrorHandler`, `NxErrorState`     | Ad-hoc try/catch with custom JSX             |
+| **Error handling**           | `useQueryState`, `useMutationErrorHandler`, `SynErrorState`     | Ad-hoc try/catch with custom JSX             |
 | **Pagination**               | `useCursorPagination`                                          | Manual cursor/filter/queryParams state       |
 | **Dialogs**                  | `NxConfirmationDialog` + `useDialogState`                      | Raw `Modal` + manual open/close state        |
 
@@ -1670,11 +1670,11 @@ import { useDocLink } from '../../utils/docs/useDocLink'
 
 function WorkflowsPage() {
   const docLink = useDocLink('workflows')  // type-safe DocKey
-  return <NxPageHeader title="Workflows" docLink={docLink} />
+  return <SynPageHeader title="Workflows" docLink={docLink} />
 }
 ```
 
-`NxPageHeader` renders the `docLink` as an external link icon next to the page title.
+`SynPageHeader` renders the `docLink` as an external link icon next to the page title.
 
 For the workflow builder's node editor panel, pass `docLink` as a prop to `NodeEditorLayout`, which enables its "Documentation" button (previously disabled with "Coming soon").
 
@@ -1696,10 +1696,10 @@ The sidebar help icon (`AppDockedNav`) uses the `home` key. In community mode th
 const docLink = useDocLink('myNewPage')
 ```
 
-3. Pass it to `NxPageHeader`:
+3. Pass it to `SynPageHeader`:
 
 ```typescript
-<NxPageHeader title="My New Page" docLink={docLink} />
+<SynPageHeader title="My New Page" docLink={docLink} />
 ```
 
 ### Community vs extended
@@ -1714,7 +1714,7 @@ Controlled by **`VITE_EXTENDED`** (`true` / `1` = extended; unset = community). 
 ### Rules
 
 1. **Never hardcode doc URLs** -- always use `useDocLink(key)` so links follow community vs extended resolution
-2. **Every page with `NxPageHeader` should have a `docLink`** -- pass the hook result to the `docLink` prop
+2. **Every page with `SynPageHeader` should have a `docLink`** -- pass the hook result to the `docLink` prop
 3. **`DocKey` is enforced by TypeScript** -- passing a string not in `docsUrls.json` is a compile error
 4. **Keep paths as obvious placeholders until real URLs exist** -- use `__PLACEHOLDER__/...` (not subtle strings that could look real)
 
@@ -1794,9 +1794,9 @@ When interactive elements (checkboxes, buttons, toggles) repeat inside a list or
 
 ---
 
-## 36. Invalid and Not-Found States Must Use `NxEmptyState*` Components
+## 36. Invalid and Not-Found States Must Use `SynEmptyState*` Components
 
-When a detail page receives an invalid ID or the resource is not found (404), render a structured `NxEmptyState*` component (`NxEmptyStateNoData`, `NxEmptyStateFilter`, `NxEmptyStateServiceUnavailable`, or `NxEmptyState` for generic cases) -- never raw text or a bare paragraph. This ensures visual consistency, accessible heading hierarchy, and a clear recovery path.
+When a detail page receives an invalid ID or the resource is not found (404), render a structured `SynEmptyState*` component (`SynEmptyStateNoData`, `SynEmptyStateFilter`, `SynEmptyStateServiceUnavailable`, or `SynEmptyState` for generic cases) -- never raw text or a bare paragraph. This ensures visual consistency, accessible heading hierarchy, and a clear recovery path.
 
 **Reference:** [PatternFly Empty State](https://www.patternfly.org/components/empty-state), [Nielsen Norman: Error Messages](https://www.nngroup.com/articles/error-message-guidelines/)
 
@@ -1819,9 +1819,9 @@ if (isNotFound) {
 if (!isValidId) {
   return (
     <PageShell title={pageTitle} breadcrumbs={breadcrumbs}>
-      <NxEmptyState headingLevel="h2" titleText="Invalid identity provider" icon={RhUiSearchIcon} isFullHeight>
+      <SynEmptyState headingLevel="h2" titleText="Invalid identity provider" icon={RhUiSearchIcon} isFullHeight>
         The identity provider ID in the URL is not valid.
-      </NxEmptyState>
+      </SynEmptyState>
     </PageShell>
   )
 }
@@ -1830,14 +1830,14 @@ if (!isValidId) {
 if (isNotFound) {
   return (
     <PageShell title={pageTitle} breadcrumbs={breadcrumbs}>
-      <NxEmptyStateNoData
+      <SynEmptyStateNoData
         headingLevel="h2"
         titleText="Identity provider not found"
         isFullHeight
       >
         The identity provider may have been deleted.{' '}
         <Link to="/system-administration/authentication">Return to Authentication</Link>.
-      </NxEmptyStateNoData>
+      </SynEmptyStateNoData>
     </PageShell>
   )
 }
@@ -1847,27 +1847,27 @@ if (isNotFound) {
 
 | Scenario                          | Component                              | Icon             |
 | --------------------------------- | -------------------------------------- | ---------------- |
-| Invalid ID format (bad URL param) | `NxEmptyState`                         | `RhUiSearchIcon` |
-| Resource not found (404 from API) | `NxEmptyStateNoData` or `NxEmptyState` | `SearchIcon`     |
-| No permission to view             | `NxEmptyState` with `status="danger"`  | `LockIcon`       |
+| Invalid ID format (bad URL param) | `SynEmptyState`                         | `RhUiSearchIcon` |
+| Resource not found (404 from API) | `SynEmptyStateNoData` or `SynEmptyState` | `SearchIcon`     |
+| No permission to view             | `SynEmptyState` with `status="danger"`  | `LockIcon`       |
 
 ### Consistency Rule
 
-Look at sibling pages in the same route directory. If `IdentityProviderDetail.tsx` uses `<NxEmptyState>` for its not-found state, the new `EditGroupMapping.tsx` in the same directory must match that pattern -- not introduce raw text.
+Look at sibling pages in the same route directory. If `IdentityProviderDetail.tsx` uses `<SynEmptyState>` for its not-found state, the new `EditGroupMapping.tsx` in the same directory must match that pattern -- not introduce raw text.
 
 ## 37. Browser Tab Titles -- `toPageTitle`
 
-Every top-level page component (default export with an `<NxPage>` render) must include `<title>` as the first child of `<NxPage>`. React 19 hoists it to `<head>` automatically — no third-party library needed.
+Every top-level page component (default export with an `<SynPage>` render) must include `<title>` as the first child of `<SynPage>`. React 19 hoists it to `<head>` automatically — no third-party library needed.
 
 ```tsx
 import { toPageTitle } from '../../utils/toPageTitle'
 
 export default function Workflows() {
   return (
-    <NxPage>
+    <SynPage>
       <title>{toPageTitle(['Workflows'])}</title>
-      <NxPageHeader title="Workflows" ... />
-    </NxPage>
+      <SynPageHeader title="Workflows" ... />
+    </SynPage>
   )
 }
 ```
@@ -1885,12 +1885,12 @@ React 19 passes `ref` as a regular prop. Prefer the patterns below for all new a
 
 ```tsx
 // ❌ BAD — React 19 makes forwardRef unnecessary
-export const NxPanel = forwardRef<HTMLDivElement, NxPanelProps>(function NxPanel(props, ref) {
+export const SynPanel = forwardRef<HTMLDivElement, SynPanelProps>(function SynPanel(props, ref) {
   return <Panel ref={ref} {...props} />
 })
 
 // ✅ GOOD — accept ref as a regular prop
-export function NxPanel({ ref, ...props }: NxPanelProps & { ref?: Ref<HTMLDivElement> }) {
+export function SynPanel({ ref, ...props }: SynPanelProps & { ref?: Ref<HTMLDivElement> }) {
   return <Panel ref={ref} {...props} />
 }
 ```

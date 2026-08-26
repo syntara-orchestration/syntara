@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { getApprovalPromptFromNode } from './approvalPrompt'
+import { getApprovalPromptFromNode, getApprovalPromptFromRecord } from './approvalPrompt'
 
 describe('getApprovalPromptFromNode', () => {
   it('returns parameters.prompt for v2 approval nodes', () => {
@@ -48,5 +48,23 @@ describe('getApprovalPromptFromNode', () => {
 
   it('returns undefined when parameters and config are not objects', () => {
     expect(getApprovalPromptFromNode({ parameters: 'invalid', config: null })).toBeUndefined()
+  })
+})
+
+describe('getApprovalPromptFromRecord', () => {
+  it('returns the persisted prompt', () => {
+    expect(getApprovalPromptFromRecord({ prompt: 'Please review this change.' })).toBe('Please review this change.')
+  })
+
+  it('trims whitespace', () => {
+    expect(getApprovalPromptFromRecord({ prompt: '  Please review.  ' })).toBe('Please review.')
+  })
+
+  it('returns undefined for missing, blank, or non-string prompts', () => {
+    expect(getApprovalPromptFromRecord(undefined)).toBeUndefined()
+    expect(getApprovalPromptFromRecord({})).toBeUndefined()
+    expect(getApprovalPromptFromRecord({ prompt: null })).toBeUndefined()
+    expect(getApprovalPromptFromRecord({ prompt: '' })).toBeUndefined()
+    expect(getApprovalPromptFromRecord({ prompt: '   ' })).toBeUndefined()
   })
 })

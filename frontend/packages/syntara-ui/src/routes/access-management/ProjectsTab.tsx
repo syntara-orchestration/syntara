@@ -10,7 +10,7 @@ import { NxConfirmationDialog } from '../../components/dialogs/NxConfirmationDia
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { IconLabel } from '../../components/IconLabel'
 import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../components/panels/list/NxListPanel'
-import { NxEmptyStateNoData } from '../../components/states/NxEmptyStateNoData'
+import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 import { DateCell } from '../../components/table/DateCell'
 import { useCursorPagination, useCursorReset } from '../../hooks/useCursorPagination'
 import { useDialogState } from '../../hooks/useDialogState'
@@ -177,6 +177,10 @@ function DeleteProjectDialog({
           <List>
             <ListItem>All workflows in this project will be permanently deleted.</ListItem>
             <ListItem>All project role assignments will be removed.</ListItem>
+            <ListItem>
+              Uploaded files are kept after the project is deleted. There is no in-product list or delete flow for them
+              yet.
+            </ListItem>
           </List>
         </StackItem>
       </Stack>
@@ -270,7 +274,7 @@ export function ProjectsTab() {
         hasActiveFilters={hasActiveFilters}
         onClearAllFilters={handleClearAllFilters}
         noDataState={
-          <NxEmptyStateNoData
+          <SynEmptyStateNoData
             title="No projects yet"
             description="Create a project to organize workflows and manage access."
             buttonText="Create project"
