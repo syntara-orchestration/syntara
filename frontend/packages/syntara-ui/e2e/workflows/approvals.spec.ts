@@ -124,7 +124,7 @@ test('user filters approvals by name and status', async ({ app }) => {
 test.describe('Approval Workflow Operations', () => {
   test.skip(!process.env['SYNTARA_E2E_HAS_TEMPORAL_WORKER'], 'Temporal worker unavailable (globalSetup probe)')
 
-  test('user performs batch approval operations', { tag: ['@konflux-skip'] }, async ({ app }) => {
+  test('user bulk-approves filtered approval rows', { tag: ['@konflux-skip'] }, async ({ app }) => {
     // Create 2 pending approvals with a shared prefix for filtering
     const batchId = `batch-${Date.now()}`
     const approval1 = await createPendingApproval(app, batchId)
@@ -429,7 +429,7 @@ test.describe('Approval Workflow Operations', () => {
     }
   })
 
-  test('user selects all approvals using header checkbox', async ({ app }) => {
+  test('user selects all filtered approvals using the header checkbox', async ({ app }) => {
     // Create 2 pending approvals with a shared prefix for filtering
     const batchId = `batch-${Date.now()}`
     const approval1 = await createPendingApproval(app, batchId)
