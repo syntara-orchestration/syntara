@@ -856,7 +856,7 @@ export interface components {
   }
   parameters: {
     /**
-     * @description Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
+     * @description Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
      *     If provided, the credential is decrypted and used instead of environment variables.
      *     Credential must be of type "Ansible Automation Platform".
      */
@@ -879,7 +879,7 @@ export interface operations {
         search?: string | null
         page_size?: number
         /**
-         * @description Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
+         * @description Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
          *     If provided, the credential is decrypted and used instead of environment variables.
          *     Credential must be of type "Ansible Automation Platform".
          */
@@ -921,7 +921,7 @@ export interface operations {
         search?: string | null
         page_size?: number
         /**
-         * @description Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
+         * @description Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
          *     If provided, the credential is decrypted and used instead of environment variables.
          *     Credential must be of type "Ansible Automation Platform".
          */
@@ -964,7 +964,7 @@ export interface operations {
         search?: string | null
         page_size?: number
         /**
-         * @description Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
+         * @description Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
          *     If provided, the credential is decrypted and used instead of environment variables.
          *     Credential must be of type "Ansible Automation Platform".
          */
@@ -1008,7 +1008,7 @@ export interface operations {
         search?: string | null
         page_size?: number
         /**
-         * @description Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
+         * @description Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
          *     If provided, the credential is decrypted and used instead of environment variables.
          *     Credential must be of type "Ansible Automation Platform".
          */
@@ -1051,7 +1051,7 @@ export interface operations {
         search?: string | null
         page_size?: number
         /**
-         * @description Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
+         * @description Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
          *     If provided, the credential is decrypted and used instead of environment variables.
          *     Credential must be of type "Ansible Automation Platform".
          */
@@ -1095,7 +1095,7 @@ export interface operations {
         search?: string | null
         page_size?: number
         /**
-         * @description Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
+         * @description Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
          *     If provided, the credential is decrypted and used instead of environment variables.
          *     Credential must be of type "Ansible Automation Platform".
          */
@@ -1138,7 +1138,7 @@ export interface operations {
         search?: string | null
         page_size?: number
         /**
-         * @description Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
+         * @description Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
          *     If provided, the credential is decrypted and used instead of environment variables.
          *     Credential must be of type "Ansible Automation Platform".
          */
@@ -1181,7 +1181,7 @@ export interface operations {
         search?: string | null
         page_size?: number
         /**
-         * @description Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
+         * @description Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
          *     If provided, the credential is decrypted and used instead of environment variables.
          *     Credential must be of type "Ansible Automation Platform".
          */
@@ -1223,7 +1223,7 @@ export interface operations {
         search?: string | null
         page_size?: number
         /**
-         * @description Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
+         * @description Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
          *     If provided, the credential is decrypted and used instead of environment variables.
          *     Credential must be of type "Ansible Automation Platform".
          */
@@ -1265,7 +1265,7 @@ export interface operations {
         search?: string | null
         page_size?: number
         /**
-         * @description Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
+         * @description Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
          *     If provided, the credential is decrypted and used instead of environment variables.
          *     Credential must be of type "Ansible Automation Platform".
          */

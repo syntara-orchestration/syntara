@@ -1,10 +1,10 @@
 ---
 openapi: 3.0.3
 info:
-  title: Syntara Admin API
+  title: Orchestrator Admin API
   version: 1.0.0
   description: |
-    Administrative operations for the Syntara platform.
+    Administrative operations for the Orchestrator platform.
 
     Provides endpoints for global session revocation, per-user session
     revocation, and per-identity-provider session revocation.
