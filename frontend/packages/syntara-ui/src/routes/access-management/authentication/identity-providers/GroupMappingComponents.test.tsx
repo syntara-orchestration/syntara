@@ -407,10 +407,8 @@ describe('MappingTable', () => {
         rows={[{ rowId: 'k1', index: 0, idpGroupValue: 'idp-admin', mappedGroupId: 'g1' }]}
         isReadOnly
         showValidation
-        entryErrors={
-          // @ts-expect-error -- defensive runtime guard when form state is malformed
-          'not-an-array'
-        }
+        // @ts-expect-error defensive runtime guard when form state is malformed
+        entryErrors="not-an-array"
       />
     )
 

@@ -21,7 +21,7 @@ import {
 import { RhUiAddIcon, RhUiEditIcon, RhUiSyncIcon } from '@patternfly/react-icons'
 import { Tbody } from '@patternfly/react-table'
 import { useCallback, useMemo, useState } from 'react'
-import { Controller, type Control, type FieldErrors } from 'react-hook-form'
+import { Controller, type Control, type FieldError, type FieldErrors } from 'react-hook-form'
 
 import { FilterBar } from '../../../../components/filters/FilterBar'
 import { SynPanelContentStack } from '../../../../components/layout/SynPanelContentStack'
@@ -40,7 +40,13 @@ import type { GroupMappingEntry, MappedGroup } from './groupMappingUtils'
 import { idpHelp } from './idpFieldHelp'
 import { IDP_TYPE_PRESETS } from './idpTypePresets'
 
+type GroupMappingEntryFieldErrors = FieldErrors<GroupMappingEditFormValues['entries'][number]>
 type GroupMappingEntryErrors = FieldErrors<GroupMappingEditFormValues>['entries']
+
+function fieldErrorMessage(error: FieldError | undefined): string | undefined {
+  const message = error?.message
+  return typeof message === 'string' ? message : undefined
+}
 
 function entryFieldErrorMessage(
   entryErrors: GroupMappingEntryErrors | undefined,
@@ -48,14 +54,10 @@ function entryFieldErrorMessage(
   field: 'idpGroupValue' | 'mappedGroupId'
 ): string | undefined {
   if (!Array.isArray(entryErrors)) return undefined
-  const row = entryErrors[index]
-  if (!row || typeof row !== 'object') return undefined
-  const fieldError: unknown = row[field]
-  if (fieldError && typeof fieldError === 'object' && 'message' in fieldError) {
-    const message: unknown = fieldError.message
-    return typeof message === 'string' ? message : undefined
-  }
-  return undefined
+  const rows = entryErrors as Array<GroupMappingEntryFieldErrors | undefined>
+  const row = rows.at(index)
+  if (!row) return undefined
+  return fieldErrorMessage(field === 'idpGroupValue' ? row.idpGroupValue : row.mappedGroupId)
 }
 
 const GROUP_MAPPING_KEYWORD_FILTER_FIELDS: FilterFieldDefinition[] = [
