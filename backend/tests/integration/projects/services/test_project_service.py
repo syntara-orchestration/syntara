@@ -526,22 +526,27 @@ async def test_delete_project_blocked_when_credential_referenced_by_integration(
     seeded_db.add(integration)
     await seeded_db.commit()
 
+    cred_id = credential.id
+    int_id = integration.id
+    project_id = project.id
+
     with pytest.raises(ProjectCredentialInUseError) as exc_info:
-        await svc.delete_project(project.id)
+        await svc.delete_project(project_id)
 
     assert "blocking-integration" in str(exc_info.value)
     assert "proj-cred-blocked" in str(exc_info.value)
 
     # Project, credential, and integration are all still intact
     seeded_db.expire_all()
-    assert (await seeded_db.exec(select(Credential).where(Credential.id == credential.id))).first() is not None
-    assert (await seeded_db.exec(select(Integration).where(Integration.id == integration.id))).first() is not None
+    assert (await seeded_db.exec(select(Credential).where(Credential.id == cred_id))).first() is not None
+    assert (await seeded_db.exec(select(Integration).where(Integration.id == int_id))).first() is not None
 
     # Clean up: detach integration then delete
-    integration.management_credential_id = None
-    seeded_db.add(integration)
+    int_row = (await seeded_db.exec(select(Integration).where(Integration.id == int_id))).one()
+    int_row.management_credential_id = None
+    seeded_db.add(int_row)
     await seeded_db.commit()
-    await svc.delete_project(project.id)
+    await svc.delete_project(project_id)
 
 
 @pytest.mark.asyncio
