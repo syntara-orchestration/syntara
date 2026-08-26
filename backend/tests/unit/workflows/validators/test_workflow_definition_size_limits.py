@@ -117,3 +117,45 @@ class TestNodeCountLimits:
             if f.severity == ValidationSeverity.error and f.category == ValidationCategory.definition_limits
         ]
         assert len(limit_errors) == 0
+
+
+def _many_edges_definition(edge_count: int) -> dict[str, Any]:
+    """Build a definition with *edge_count* total edges.
+
+    The limit check runs before graph validation, so edges don't need
+    to reference real nodes — we just need the right count.
+    """
+    trigger_id = "t1"
+    return {
+        "schema_version": "2.0.0",
+        "name": f"edges-{edge_count}",
+        "triggers": [{"id": trigger_id, "type": "manual_trigger", "parameters": {}}],
+        "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}}],
+        "edges": [{"from": trigger_id, "to": "n1"}] * edge_count,
+    }
+
+
+class TestEdgeCountLimits:
+    """High edge-count definitions are rejected."""
+
+    def test_too_many_edges_raises(self, validator: WorkflowValidator) -> None:
+        defn = _many_edges_definition(edge_count=WorkflowDefinitionLimits.MAX_EDGES + 1)
+        with pytest.raises(SafeValueError, match="too many edges"):
+            validator.validate_workflow_definition(defn)
+
+    def test_too_many_edges_error_findings(self, validator: WorkflowValidator) -> None:
+        defn = _many_edges_definition(edge_count=WorkflowDefinitionLimits.MAX_EDGES + 1)
+        result = validator.collect_findings(defn)
+        errors = [f for f in result.findings if f.severity == ValidationSeverity.error]
+        assert any(f.category == ValidationCategory.definition_limits for f in errors)
+        assert any("too many edges" in f.message for f in errors)
+
+    def test_at_edge_limit_accepted(self, validator: WorkflowValidator) -> None:
+        defn = _many_edges_definition(edge_count=WorkflowDefinitionLimits.MAX_EDGES)
+        result = validator.collect_findings(defn)
+        limit_errors = [
+            f
+            for f in result.findings
+            if f.severity == ValidationSeverity.error and f.category == ValidationCategory.definition_limits
+        ]
+        assert len(limit_errors) == 0
