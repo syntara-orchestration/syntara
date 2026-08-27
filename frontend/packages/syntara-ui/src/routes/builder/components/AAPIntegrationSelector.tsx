@@ -141,8 +141,6 @@ export function AAPIntegrationSelector({
         onSelect={handleSelect}
         onOpenChange={handleOpenChange}
         toggle={renderToggle}
-        isScrollable
-        maxMenuHeight="300px"
         shouldFocusToggleOnSelect
       >
         <SelectList>
