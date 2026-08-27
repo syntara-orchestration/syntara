@@ -10,7 +10,8 @@
  * - Manage group membership from user detail page
  */
 import { createUnavailableGuard, test, expect, toAppUrl } from './fixtures'
-import { ensureGroupExists } from './seeds/iam'
+import { buildUniqueName } from './helpers/workflows'
+import { createUserViaApi, deleteGroupViaApi, deleteUserViaApi, ensureGroupExists } from './seeds/iam'
 import { getAuthToken } from './utils/api'
 
 test.beforeAll(async ({ browser }) => {
@@ -89,60 +90,6 @@ test.describe('Group Detail — Navigation & Tabs', () => {
     await expect(table.getByRole('button', { name: 'admins', exact: true })).toBeVisible()
   })
 
-  test.describe('Member add/remove (typeahead)', () => {
-    test.skip(!!process.env.CI, "Typeahead dropdown timing is unreliable in CI — options don't render within timeout")
-
-    test('add and remove a member from the group detail', async ({ app }) => {
-      const table = app.getByRole('grid', { name: 'Groups table' })
-      await table.getByRole('button', { name: 'admins', exact: true }).click()
-      await expect(app.getByRole('heading', { level: 1, name: 'admins', exact: true })).toBeVisible()
-
-      await app.getByRole('tab', { name: /members/i }).click()
-      await app.getByRole('button', { name: 'Add member' }).click()
-
-      const dialog = app.getByRole('dialog')
-      await expect(dialog).toBeVisible()
-
-      const selectInput = dialog.getByPlaceholder('Search for a user...')
-      await selectInput.click()
-
-      // Wait for either options or "No results match" to appear.
-      // PF6 Select renders the listbox in a portal outside the dialog DOM,
-      // so we must query at page level, not scoped to the dialog.
-      const noResults = app.getByRole('option', { name: /No results match/ })
-      const availableOptions = app.getByRole('option').filter({ hasNotText: /No results match/ })
-      await expect(noResults.or(availableOptions)).toBeVisible({ timeout: 15_000 })
-
-      expect(await noResults.isVisible(), 'No available users to add (all users are already members)').toBe(false)
-
-      // The option contains two child spans: username + display name.
-      // Extract just the username (first child text) for later verification.
-      const [selectedOption] = await availableOptions.all()
-      const [firstChild] = await selectedOption.locator('> *').all()
-      const userName = await firstChild.textContent()
-      await selectedOption.click()
-
-      await dialog.getByRole('button', { name: 'Add', exact: true }).click()
-
-      await expect(dialog).not.toBeVisible()
-      await expect(app.getByText(/member added/i)).toBeVisible()
-
-      if (userName) {
-        const memberName = userName.trim()
-        await expect(app.getByRole('gridcell', { name: memberName, exact: true })).toBeVisible({ timeout: 10_000 })
-
-        const memberRow = app.getByRole('row').filter({ hasText: memberName })
-        await memberRow.getByRole('button', { name: /^Actions for / }).click()
-        await app.getByRole('menuitem', { name: 'Remove member' }).click()
-
-        await expect(app.getByRole('dialog')).toBeVisible()
-        await app.getByRole('button', { name: 'Remove', exact: true }).click()
-
-        await expect(app.getByText(/member removed/i)).toBeVisible()
-      }
-    })
-  })
-
   test('navigating to a different group shows its details', async ({ app }) => {
     const table = app.getByRole('grid', { name: 'Groups table' })
 
@@ -169,6 +116,64 @@ test.describe('Group Detail — Navigation & Tabs', () => {
 
     // Should not show edit button (builtin groups can't be edited)
     await expect(app.getByRole('button', { name: 'Edit group' })).not.toBeVisible()
+  })
+})
+
+// Separate describe so a typeahead failure does not skip the navigation tests above
+// (parent describe is serial via createUnavailableGuard).
+test.describe('Group Detail — Member add/remove (typeahead)', () => {
+  test.skip(!!process.env.CI, "Typeahead dropdown timing is unreliable in CI — options don't render within timeout")
+
+  test('add and remove a member from the group detail', async ({ app }) => {
+    const prefix = buildUniqueName('e2e-gm')
+    const group = await ensureGroupExists(app, prefix)
+    const user = await createUserViaApi(app, { username: `${prefix}-user` })
+    expect(group, 'Failed to create group via API').toBeTruthy()
+    expect(user, 'Failed to create user via API').toBeTruthy()
+    if (!group || !user) return
+
+    try {
+      await app.goto(toAppUrl('/system-administration/access-management/groups'))
+      const table = app.getByRole('grid', { name: 'Groups table' })
+      await app.getByPlaceholder('Filter by name').fill(group.name)
+      await app.getByRole('button', { name: 'Apply filter' }).click()
+      await table.getByRole('button', { name: group.name, exact: true }).click()
+      await expect(app.getByRole('heading', { level: 1, name: group.name, exact: true })).toBeVisible()
+
+      await app.getByRole('tab', { name: /members/i }).click()
+      await app.getByRole('button', { name: 'Add member' }).click()
+
+      const dialog = app.getByRole('dialog')
+      await expect(dialog).toBeVisible()
+
+      const selectInput = dialog.getByPlaceholder('Search for a user...')
+      await selectInput.click()
+      await selectInput.fill(user.username)
+
+      // PF6 Select renders the listbox in a portal outside the dialog DOM.
+      const userOption = app.getByRole('option').filter({ hasText: user.username })
+      await expect(userOption).toBeVisible({ timeout: 15_000 })
+      await userOption.click()
+
+      await dialog.getByRole('button', { name: 'Add', exact: true }).click()
+
+      await expect(dialog).not.toBeVisible()
+      await expect(app.getByText(/member added/i)).toBeVisible()
+
+      await expect(app.getByRole('gridcell', { name: user.username, exact: true })).toBeVisible({ timeout: 10_000 })
+
+      const memberRow = app.getByRole('row').filter({ hasText: user.username })
+      await memberRow.getByRole('button', { name: /^Actions for / }).click()
+      await app.getByRole('menuitem', { name: 'Remove member' }).click()
+
+      await expect(app.getByRole('dialog')).toBeVisible()
+      await app.getByRole('button', { name: 'Remove', exact: true }).click()
+
+      await expect(app.getByText(/member removed/i)).toBeVisible()
+    } finally {
+      if (user) await deleteUserViaApi(app, user.id)
+      if (group.createdByUs) await deleteGroupViaApi(app, group.id)
+    }
   })
 })
 

@@ -100,9 +100,15 @@ test.describe('Settings', () => {
       .catch(() => false)
     if (!hasPage) guard.markUnavailable()
     expect(hasPage, 'Settings page not available; backend may not be running').toBeTruthy()
-    const hasTabs = await app
-      .getByRole('tab', { name: /Context Manager|System|Authentication/i })
-      .waitFor({ state: 'visible', timeout: 10_000 })
+    const accessDenied = await app
+      .getByText(/don't have permission to view settings/i)
+      .isVisible()
+      .catch(() => false)
+    expect(accessDenied, 'Admin was denied access to Settings').toBe(false)
+    // Category names come from GET /settings/categories (e.g. Context Manager, Application).
+    const categoryTabs = app.getByRole('tab', { name: /Context Manager|Application|System|Authentication/i })
+    const hasTabs = await expect(categoryTabs)
+      .not.toHaveCount(0, { timeout: 30_000 })
       .then(() => true)
       .catch(() => false)
     if (!hasTabs) guard.markUnavailable()

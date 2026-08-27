@@ -47,41 +47,34 @@ export async function triggerLayout(page: Page) {
   await waitForUIReady(page)
 }
 
-/**
- * Click "Layout" to position nodes and reveal edge buttons,
- * then click "Add connected step" and return the add-node panel.
- */
-export async function clickAddConnectedStep(page: Page) {
-  // Wait for any toast notifications or loading states to clear
+async function revealConnectedStepButtons(page: Page) {
   await waitForUIReady(page)
-
+  await expect(page.getByRole('button', { name: 'Create', exact: true }))
+    .not.toBeAttached({ timeout: 10_000 })
+    .catch(() => {})
   const layoutButton = page.getByRole('button', { name: 'Reset layout', exact: true })
-  await expect(layoutButton).toBeVisible({ timeout: 10000 })
+  await expect(layoutButton).toBeVisible({ timeout: 10_000 })
   await layoutButton.click()
-
-  // Wait again after layout completes
+  const fitViewButton = page.getByRole('button', { name: 'Fit view' })
+  if ((await fitViewButton.count()) > 0) await fitViewButton.click()
+  await expect(page.locator('[role="group"][aria-roledescription="node"]')).not.toHaveCount(0, { timeout: 10_000 })
   await waitForUIReady(page)
+}
 
-  // Wait for canvas to finish re-rendering after layout and "Add connected step" buttons to appear.
-  // Konflux CI can be slow to re-render after layout — use a generous timeout.
-  await expect(async () => {
-    const addBtn = page.getByRole('button', { name: 'Add connected step' })
-    await expect(addBtn.first()).toBeVisible()
-  }).toPass({ timeout: 25000, intervals: [500] })
-
+/** Layout + fit view, then click an edge "Add connected step" button and return the add-node panel. */
+export async function clickAddConnectedStep(page: Page) {
+  await revealConnectedStepButtons(page)
   const addBtn = page.getByRole('button', { name: 'Add connected step' })
-  await addBtn.first().click()
-
-  const panel = addNodePanel(page)
-  await expect(panel).toHaveCount(1)
-
-  // Wait for panel to be fully loaded and stable
+  await expect(addBtn).not.toHaveCount(0, { timeout: 25_000 })
   await expect(async () => {
-    const firstCategoryBtn = panel.getByRole('button', { name: 'Action', exact: true })
-    await expect(firstCategoryBtn).toBeVisible()
-    await expect(firstCategoryBtn).toBeEnabled()
-  }).toPass({ timeout: 15000, intervals: [500, 1000] })
-
+    if ((await addBtn.count()) === 0) await revealConnectedStepButtons(page)
+    await addBtn.click({ force: true, timeout: 5_000 })
+    await expect(addNodePanel(page)).toHaveCount(1)
+  }).toPass({ timeout: 15_000, intervals: [500, 1_000] })
+  const panel = addNodePanel(page)
+  const actionBtn = panel.getByRole('button', { name: 'Action', exact: true })
+  await expect(actionBtn).toBeVisible({ timeout: 15_000 })
+  await expect(actionBtn).toBeEnabled()
   return panel
 }
 

@@ -376,16 +376,16 @@ test.describe('Access Management — Policies Tab Columns', () => {
   })
 
   test('project-scoped policies show a clickable project link', async ({ app }) => {
+    const policy = seededPolicies[0]
+    expect(policy, 'Failed to create a project-scoped policy via API').toBeTruthy()
+    if (!policy) return
+
     const table = app.getByRole('grid', { name: 'Policies' })
+    await app.getByPlaceholder('Filter by name').fill(policy.name)
+    await app.getByRole('button', { name: 'Apply filter' }).click()
+    await expect(table.getByRole('row').filter({ hasText: policy.name })).toBeVisible({ timeout: 15_000 })
 
-    // Scope into Project column cells via data-label, then look for the link button rendered by ProjectLabel
-    const projectButtons = table.locator('td[data-label="Project"]').getByRole('button')
-    const hasProjectLink = (await projectButtons.count()) > 0
-
-    expect(hasProjectLink, 'No project-scoped policies on this page; seed data required').toBeTruthy()
-
-    // toBeVisible() triggers Playwright strict mode when projectButtons matches multiple rows.
-    // Filter to visible elements and assert at least one is present instead.
-    await expect(projectButtons.locator(':visible')).not.toHaveCount(0)
+    const policyRow = table.getByRole('row').filter({ hasText: policy.name })
+    await expect(policyRow.locator('td[data-label="Project"]').getByRole('button')).toBeVisible()
   })
 })
