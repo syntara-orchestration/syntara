@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "gh-stack": {
+      "source": "github/gh-stack",
+      "sourceType": "github",
+      "skillPath": "skills/gh-stack/SKILL.md",
+      "computedHash": "ec57d99a1a8f3adc779b79d3c40c272753ca18ce2f812efad349a6f6135c01c2"
+    }
+  }
+}
