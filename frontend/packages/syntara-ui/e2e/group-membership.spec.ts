@@ -149,8 +149,8 @@ test.describe('Group Detail — Navigation & Tabs', () => {
         await expect(app.getByRole('gridcell', { name: memberName, exact: true })).toBeVisible({ timeout: 10_000 })
 
         const memberRow = app.getByRole('row').filter({ hasText: memberName })
-        await memberRow.getByRole('button', { name: /kebab toggle/i }).click()
-        await app.getByRole('menuitem', { name: 'Remove' }).click()
+        await memberRow.getByRole('button', { name: /^Actions for / }).click()
+        await app.getByRole('menuitem', { name: 'Remove member' }).click()
 
         await expect(app.getByRole('dialog')).toBeVisible()
         await app.getByRole('button', { name: 'Remove', exact: true }).click()

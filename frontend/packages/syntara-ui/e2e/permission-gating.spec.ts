@@ -948,7 +948,7 @@ test.describe('Permission gating — Detail page header actions', () => {
           timeout: 20_000,
         }
       )
-      await expect(auditorApp.getByRole('menuitem', { name: 'Delete identity provider' })).toHaveAttribute(
+      await expect(auditorApp.getByRole('menuitem', { name: 'Delete provider' })).toHaveAttribute(
         'aria-disabled',
         'true',
         { timeout: 20_000 }
