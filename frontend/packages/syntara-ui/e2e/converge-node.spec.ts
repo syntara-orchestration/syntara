@@ -332,7 +332,7 @@ test.describe('Converge Node - E2E Tests', () => {
       }
     })
 
-    test('Edit existing converge node with timeout', async ({ app }) => {
+    test('Edit existing converge node with timeout', { tag: ['@konflux-skip'] }, async ({ app }) => {
       const wfName = await createWorkflowWithBranchesForConverge(app)
 
       try {

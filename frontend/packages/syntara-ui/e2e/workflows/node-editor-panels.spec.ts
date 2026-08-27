@@ -940,7 +940,7 @@ test.describe('Node editor panels', () => {
     await expect(runStepButton).toBeVisible({ timeout: 15_000 })
   })
 
-  test('mock data pin flow in Input panel', async ({ app }) => {
+  test('mock data pin flow in Input panel', { tag: ['@konflux-skip'] }, async ({ app }) => {
     const workflowName = buildUniqueName('e2e-mock-pin')
     await app.goto(toAppUrl('/workflow-builder/new'))
     await selectProjectIfRequired(app)

@@ -70,7 +70,7 @@ test.describe('Credential Enable/Disable State Management', () => {
     }
   })
 
-  test('confirm disable changes credential state', async ({ app }) => {
+  test('confirm disable changes credential state', { tag: ['@konflux-skip'] }, async ({ app }) => {
     const { name } = await createTestCredential(app, { prefix: 'e2e-toggle-confirm' })
     try {
       await goToCredentialsList(app)
@@ -89,7 +89,7 @@ test.describe('Credential Enable/Disable State Management', () => {
     }
   })
 
-  test('cancel disable keeps credential enabled', async ({ app }) => {
+  test('cancel disable keeps credential enabled', { tag: ['@konflux-skip'] }, async ({ app }) => {
     const { name } = await createTestCredential(app, { prefix: 'e2e-toggle-cancel' })
     try {
       await goToCredentialsList(app)
