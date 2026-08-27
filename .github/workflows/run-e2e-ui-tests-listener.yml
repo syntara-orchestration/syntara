@@ -7,6 +7,12 @@ name: '/run-e2e-ui-tests'
 on:
   issue_comment:
     types: [created]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to test with'
+        required: true
+        type: string
 
 permissions:
   actions: write
@@ -15,11 +21,14 @@ permissions:
 jobs:
   dispatch:
     name: Validate & Dispatch
+    # For issue_comment: validate comment and permissions
+    # For workflow_dispatch: allow manual testing
     if: >-
-      github.event.issue.pull_request
-      && github.event.comment.user.type != 'Bot'
-      && contains(github.event.comment.body, '/run-e2e-ui-tests')
-      && contains(fromJson('["OWNER","MEMBER"]'), github.event.comment.author_association)
+      github.event_name == 'workflow_dispatch'
+      || (github.event.issue.pull_request
+          && github.event.comment.user.type != 'Bot'
+          && contains(github.event.comment.body, '/run-e2e-ui-tests')
+          && contains(fromJson('["OWNER","MEMBER"]'), github.event.comment.author_association))
     runs-on: ubuntu-24.04
     steps:
       - name: Get PR metadata
@@ -27,10 +36,15 @@ jobs:
         uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553 # v9
         with:
           script: |
+            // For workflow_dispatch, use the input; for issue_comment, use context
+            const prNumber = '${{ github.event_name }}' === 'workflow_dispatch'
+              ? '${{ inputs.pr_number }}'
+              : context.issue.number;
+
             const pr = await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              pull_number: context.issue.number,
+              pull_number: prNumber,
             });
             const baseRepo = `${context.repo.owner}/${context.repo.repo}`;
             if (pr.data.head.repo.full_name !== baseRepo) {
@@ -38,7 +52,7 @@ jobs:
               return;
             }
             core.setOutput('ref', pr.data.head.ref);
-            core.setOutput('pr_number', context.issue.number);
+            core.setOutput('pr_number', prNumber);
 
       - name: Get PR head SHA
         id: sha
