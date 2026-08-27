@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { getEnvironment } from '../env.js'
+import { getEnvironment, getUnhealthyAlertEnvironment } from '../env.js'
 
 describe('getEnvironment', () => {
   let originalEnv: NodeJS.ProcessEnv
@@ -82,5 +82,36 @@ describe('getEnvironment', () => {
     const env = getEnvironment()
 
     expect(env.headRef).toBeUndefined()
+  })
+
+  it('validates and coerces unhealthy alert environment values', () => {
+    process.env.GITHUB_TOKEN = 'test-token'
+    process.env.SLACK_CI_MONITORING_WEBHOOK_URL = 'https://hooks.example.com/test'
+    process.env.GITHUB_REPOSITORY = 'owner/repo'
+    process.env.GITHUB_RUN_ID = '12345'
+    process.env.QUEUE_DEPTH = '3'
+    process.env.MINUTES_SINCE_MERGE = '121'
+    process.env.TIMEOUT_MINUTES = '120'
+    process.env.QUEUE_URL = 'https://github.com/owner/repo/queue/main'
+
+    expect(getUnhealthyAlertEnvironment()).toMatchObject({
+      queueDepth: 3,
+      minutesSinceMerge: 121,
+      timeoutMinutes: 120,
+      queueUrl: 'https://github.com/owner/repo/queue/main',
+    })
+  })
+
+  it('rejects missing or invalid unhealthy alert environment values', () => {
+    process.env.GITHUB_TOKEN = 'test-token'
+    process.env.SLACK_CI_MONITORING_WEBHOOK_URL = 'https://hooks.example.com/test'
+    process.env.GITHUB_REPOSITORY = 'owner/repo'
+    process.env.GITHUB_RUN_ID = '12345'
+    process.env.QUEUE_DEPTH = ''
+    process.env.MINUTES_SINCE_MERGE = 'not-a-number'
+    process.env.TIMEOUT_MINUTES = '120'
+    process.env.QUEUE_URL = 'not-a-url'
+
+    expect(() => getUnhealthyAlertEnvironment()).toThrow('Environment validation failed')
   })
 })
