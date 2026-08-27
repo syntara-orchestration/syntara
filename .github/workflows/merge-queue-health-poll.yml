@@ -34,6 +34,7 @@ jobs:
         working-directory: .github/scripts
 
       - name: Check queue health and notify
+        id: health
         if: env.SLACK_CI_MONITORING_WEBHOOK_URL != ''
         run: npm run check-queue-health
         working-directory: .github/scripts
@@ -52,7 +53,7 @@ jobs:
         run: echo "Recorded healthy state for next run"
 
       - name: Send unhealthy alert
-        if: steps.health.outputs.alert == 'unhealthy'
+        if: steps.health.outputs.should_alert_unhealthy == 'true'
         run: npm run send-unhealthy-alert
         working-directory: .github/scripts
         env:
@@ -66,7 +67,7 @@ jobs:
           QUEUE_URL: ${{ steps.health.outputs.queue_url }}
 
       - name: Send recovery alert
-        if: steps.health.outputs.alert == 'recovery'
+        if: steps.health.outputs.should_alert_recovery == 'true'
         run: npm run send-recovery-alert
         working-directory: .github/scripts
         env:
