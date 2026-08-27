@@ -1,7 +1,5 @@
 import { type Ref } from 'react'
 
-import { LONG_SELECT_MAX_MENU_HEIGHT, longSelectMenuPopperProps } from '../../components/longSelectMenu'
-import longSelectMenuStyles from '../../components/longSelectMenu.module.css'
 import { SynSelect } from '../../components/SynSelect'
 
 import { PolicySelectOptionsList } from './PolicySelectOptionsList'
@@ -77,10 +75,6 @@ export function PolicySelectField({
       selected={selected}
       toggle={toggle}
       shouldFocusToggleOnSelect={false}
-      isScrollable
-      maxMenuHeight={LONG_SELECT_MAX_MENU_HEIGHT}
-      popperProps={longSelectMenuPopperProps}
-      className={longSelectMenuStyles.containScroll}
     >
       <PolicySelectOptionsList
         isLoading={isLoading}

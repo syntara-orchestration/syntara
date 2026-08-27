@@ -212,9 +212,16 @@ test.describe('Approval Workflow Operations', () => {
       await app.getByPlaceholder('Filter by name').fill(batchId)
       await app.getByRole('button', { name: 'Apply filter' }).click()
 
-      // Step 1: Select both approvals using row-scoped checkboxes
+      // Wait for the filter chip to confirm the filter was applied and the table to refresh
+      await expect(app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Name' })).toBeVisible({
+        timeout: 15_000,
+      })
+
+      // Step 1: Select both approvals using row-scoped checkboxes — wait for each row before interacting
       const rows = table.getByRole('row')
+      await expect(rows.filter({ hasText: approval1.approvalName })).toBeVisible({ timeout: 15_000 })
       await rows.filter({ hasText: approval1.approvalName }).getByRole('checkbox').check()
+      await expect(rows.filter({ hasText: approval2.approvalName })).toBeVisible({ timeout: 15_000 })
       await rows.filter({ hasText: approval2.approvalName }).getByRole('checkbox').check()
 
       // Step 2: Verify batch toolbar and count
@@ -274,11 +281,12 @@ test.describe('Approval Workflow Operations', () => {
       await app.getByPlaceholder('Filter by name').fill(approval.approvalName)
       await app.getByRole('button', { name: 'Apply filter' }).click()
 
+      // Wait for the filter chip to confirm the filter was applied and the table to refresh
       await expect(app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Name' })).toBeVisible({
         timeout: 15_000,
       })
 
-      // Step 1: Select the approval using row-scoped checkbox
+      // Step 1: Select the approval using row-scoped checkbox — wait for the row before interacting
       const row = table.getByRole('row').filter({ hasText: approval.approvalName })
       await expect(row).toBeVisible({ timeout: 15_000 })
       await row.getByRole('checkbox').check()
