@@ -122,7 +122,7 @@ describe('ExpressionFormField', () => {
     })
 
     // Assert on the literal inline style rather than toHaveStyle(): getComputedStyle can't
-    // resolve var() (neither jsdom nor happy-dom performs real CSS cascade), so it isn't a
+    // resolve var() (happy-dom does not perform real CSS cascade), so it isn't a
     // meaningful check for DROP_TARGET_OUTLINE's outlineColor token.
     expect(input.style.outlineWidth).toBe(DROP_TARGET_OUTLINE.outlineWidth)
     expect(input.style.outlineStyle).toBe(DROP_TARGET_OUTLINE.outlineStyle)

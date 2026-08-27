@@ -82,9 +82,8 @@ vi.mock('@tanstack/react-router', async () => {
 })
 
 // Stub the Monaco-backed CodeEditor: @monaco-editor/loader defaults to injecting a
-// <script src="https://cdn..."> tag to fetch Monaco from a CDN. jsdom silently drops external
-// script tags (no request, no event), so this quietly never resolved; happy-dom correctly throws
-// a DOMException for the blocked load, which surfaces as an unhandled rejection and fails the
+// <script src="https://cdn..."> tag to fetch Monaco from a CDN. happy-dom throws a
+// DOMException for the blocked load, which surfaces as an unhandled rejection and fails the
 // vitest process (non-zero exit) even though every assertion still passes. Test files that need
 // finer control over the editor (drag/drop, expand button, etc.) already declare their own
 // vi.mock('@patternfly/react-code-editor', ...), which takes precedence over this one.
@@ -159,14 +158,14 @@ afterAll(() => {
 })
 /* eslint-enable no-console */
 
-// Polyfill for Web Animations API getAnimations method (not supported in jsdom)
+// Polyfill for Web Animations API getAnimations method (not supported in happy-dom)
 if (typeof Element !== 'undefined' && !Element.prototype.getAnimations) {
   Element.prototype.getAnimations = function () {
     return []
   }
 }
 
-// Polyfill for ResizeObserver (not supported in jsdom)
+// Polyfill for ResizeObserver (not supported in happy-dom)
 if (typeof globalThis !== 'undefined' && !globalThis.ResizeObserver) {
   globalThis.ResizeObserver = class ResizeObserver {
     observe() {

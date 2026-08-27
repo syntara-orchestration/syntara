@@ -91,7 +91,7 @@ describe('renderNodeIcon', () => {
 
     const iconWrapper = screen.getByTestId('node-icon-wrapper')
     // Assert on the literal inline style rather than toHaveStyle(): getComputedStyle can't
-    // resolve var() (neither jsdom nor happy-dom performs real CSS cascade), so it isn't a
+    // resolve var() (happy-dom does not perform real CSS cascade), so it isn't a
     // meaningful check for this brand-color token.
     expect(iconWrapper.style.color).toBe(token)
     expect(iconWrapper.style.getPropertyValue('--pf-v6-c-icon__content--Color')).toBe(token)

@@ -38,7 +38,7 @@ describe('NodeHeader', () => {
 
     const headerDiv = screen.getByTestId('node-header')
     // Assert on the literal inline style rather than toHaveStyle(): getComputedStyle can't
-    // resolve var() (neither jsdom nor happy-dom performs real CSS cascade), so it isn't a
+    // resolve var() (happy-dom does not perform real CSS cascade), so it isn't a
     // meaningful check for these spacer tokens.
     expect(headerDiv.style.paddingTop).toBe('var(--pf-t--global--spacer--md)')
     expect(headerDiv.style.paddingLeft).toBe('var(--pf-t--global--spacer--md)')

@@ -14,8 +14,8 @@ describe('SynPanelContentStack', () => {
 
     const child = screen.getByText('Main')
     // Assert on the literal inline style rather than toHaveStyle()/getComputedStyle: happy-dom
-    // serializes a zero-length computed min-height as "0" (no unit), unlike jsdom's "0px", so a
-    // computed-style comparison is engine-dependent here even though nothing else is happy-dom-specific.
+    // serializes a zero-length computed min-height as "0" (no unit), so a computed-style
+    // comparison is unreliable here.
     const stackStyle = child.parentElement?.style
     expect(stackStyle?.height).toBe('100%')
     expect(stackStyle?.flexGrow).toBe('1')
