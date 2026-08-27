@@ -1,5 +1,7 @@
 """Tests for JSONB field size validation helpers."""
 
+from typing import Any
+
 import pytest
 
 from syntara.core.constants import FieldLimits, JsonbLimits
@@ -66,11 +68,11 @@ class TestValidateWorkflowDefinitionJson:
     """Tests for validate_workflow_definition_json."""
 
     def test_accepts_small_definition(self) -> None:
-        definition = {"nodes": [], "edges": []}
+        definition: dict[str, list[Any]] = {"nodes": [], "edges": []}
         assert validate_workflow_definition_json(definition) == definition
 
     def test_rejects_oversized_definition(self) -> None:
-        definition = {"blob": "x" * JsonbLimits.MAX_WORKFLOW_DEFINITION_BYTES}
+        definition: dict[str, str] = {"blob": "x" * JsonbLimits.MAX_WORKFLOW_DEFINITION_BYTES}
         with pytest.raises(SafeValueError, match="workflow_definition exceeds maximum"):
             validate_workflow_definition_json(definition)
 

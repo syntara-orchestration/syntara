@@ -1,6 +1,8 @@
 """Tests for global request body size middleware."""
 
 import json
+from collections.abc import MutableMapping
+from typing import Any
 
 import pytest
 from starlette.applications import Starlette
@@ -38,9 +40,9 @@ async def test_rejects_content_length_above_limit() -> None:
         "scheme": "http",
         "http_version": "1.1",
     }
-    messages: list[dict[str, object]] = []
+    messages: list[MutableMapping[str, Any]] = []
 
-    async def send(message: dict[str, object]) -> None:
+    async def send(message: MutableMapping[str, Any]) -> None:
         messages.append(message)
 
     async def receive() -> dict[str, object]:
@@ -75,9 +77,9 @@ async def test_allows_small_body() -> None:
         "scheme": "http",
         "http_version": "1.1",
     }
-    messages: list[dict[str, object]] = []
+    messages: list[MutableMapping[str, Any]] = []
 
-    async def send(message: dict[str, object]) -> None:
+    async def send(message: MutableMapping[str, Any]) -> None:
         messages.append(message)
 
     async def receive() -> dict[str, object]:
@@ -104,9 +106,9 @@ async def test_skips_get_requests() -> None:
         "scheme": "http",
         "http_version": "1.1",
     }
-    messages: list[dict[str, object]] = []
+    messages: list[MutableMapping[str, Any]] = []
 
-    async def send(message: dict[str, object]) -> None:
+    async def send(message: MutableMapping[str, Any]) -> None:
         messages.append(message)
 
     async def receive() -> dict[str, object]:

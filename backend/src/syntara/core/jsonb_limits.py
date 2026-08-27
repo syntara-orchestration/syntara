@@ -17,12 +17,12 @@ def serialized_json_size(value: Any) -> int:  # noqa: ANN401
         return len(str(value).encode("utf-8"))
 
 
-def validate_jsonb_size(
-    value: Any,  # noqa: ANN401
+def validate_jsonb_size[T](
+    value: T,
     *,
     field_name: str,
     max_bytes: int = JsonbLimits.MAX_FIELD_BYTES,
-) -> Any:  # noqa: ANN401
+) -> T:
     """Reject values whose JSON serialization exceeds max_bytes."""
     if value is None:
         return value
@@ -74,9 +74,7 @@ def validate_labels_dict(labels: dict[str, str] | None) -> dict[str, str] | None
     return labels
 
 
-def validate_workflow_definition_json(
-    value: Any,  # noqa: ANN401
-) -> Any:  # noqa: ANN401
+def validate_workflow_definition_json[T](value: T) -> T:
     """Reject oversized raw workflow_definition dict payloads."""
     if value is None or not isinstance(value, dict):
         return value
