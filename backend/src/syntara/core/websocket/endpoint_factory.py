@@ -1323,6 +1323,7 @@ def create_websocket_endpoint(  # noqa: PLR0915
             channel=channel_name,
             client_ip=client_address,
             websocket=websocket,
+            user_agent=websocket.headers.get("user-agent"),
             metadata={"component": component_name},
         )
         lifecycle_manager.activate_connection(lifecycle_conn_id)

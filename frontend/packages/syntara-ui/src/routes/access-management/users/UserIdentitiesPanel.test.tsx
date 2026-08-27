@@ -48,13 +48,17 @@ vi.mock('../../../app/useAuthProviders', () => ({
 }))
 
 vi.mock('./useUserIdentityPermissions', () => ({
-  useUserIdentityPermissions: () => ({
-    canAttach: true,
-    canDetach: true,
-    isLoading: false,
-    tooltips: { attach: '', detach: '' },
-  }),
+  useUserIdentityPermissions: () => mockUseUserIdentityPermissions(),
 }))
+
+const defaultIdentityPermissions = {
+  canAttach: true,
+  canDetach: true,
+  isLoading: false,
+  tooltips: { attach: 'You need permission to attach identities.', detach: '' },
+}
+
+const mockUseUserIdentityPermissions = vi.hoisted(() => vi.fn(() => defaultIdentityPermissions))
 
 // ---------------------------------------------------------------------------
 // Test data
@@ -147,6 +151,7 @@ describe('UserIdentitiesPanel', () => {
       defaultOptions: { queries: { retry: false } },
     })
     mockMutate.mockClear()
+    mockUseUserIdentityPermissions.mockImplementation(() => defaultIdentityPermissions)
     mockUseAuthProviders.mockReturnValue({ providers: [], isLoading: false })
     vi.mocked(identityProvidersClient.useQuery).mockReturnValue({
       data: { resources: mockFullProviders, next: null, prev: null },
@@ -164,7 +169,7 @@ describe('UserIdentitiesPanel', () => {
 
       render(<UserIdentitiesPanel userId="user-1" hasPassword={false} />, { wrapper })
 
-      expect(screen.getByRole('heading', { name: 'No identity providers configured' })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'No identity providers configured yet' })).toBeInTheDocument()
     })
   })
 
@@ -377,6 +382,15 @@ describe('UserIdentitiesPanel', () => {
 
       expect(screen.getByRole('progressbar', { name: 'Loading' })).toBeInTheDocument()
     })
+
+    it('shows loading spinner while auth providers load with no identities', () => {
+      setupMocks([])
+      mockUseAuthProviders.mockReturnValue({ providers: [], isLoading: true })
+
+      render(<UserIdentitiesPanel userId="user-1" hasPassword={false} />, { wrapper })
+
+      expect(screen.getByRole('progressbar', { name: 'Loading' })).toBeInTheDocument()
+    })
   })
 
   // ---- Error state --------------------------------------------------------
@@ -389,6 +403,23 @@ describe('UserIdentitiesPanel', () => {
 
       expect(screen.getByRole('heading', { name: 'Error loading identities' })).toBeInTheDocument()
     })
+
+    it('calls refetch when Retry is clicked on a retryable query error', async () => {
+      const mockRefetch = vi.fn()
+      setupMocks([], {
+        data: undefined,
+        isPending: false,
+        isError: true,
+        error: { message: 'Network error', retryable: true },
+        refetch: mockRefetch,
+      })
+
+      const user = userEvent.setup()
+      render(<UserIdentitiesPanel userId="user-1" hasPassword={false} />, { wrapper })
+
+      await user.click(screen.getByRole('button', { name: /retry/i }))
+      expect(mockRefetch).toHaveBeenCalled()
+    })
   })
 
   // ---- Transfer identity button (table view) --------------------------------
@@ -400,6 +431,19 @@ describe('UserIdentitiesPanel', () => {
       render(<UserIdentitiesPanel userId="user-1" hasPassword={false} />, { wrapper })
 
       expect(screen.getByRole('button', { name: /transfer identity/i })).toBeInTheDocument()
+    })
+
+    it('disables Transfer identity when user lacks attach permission', () => {
+      mockUseUserIdentityPermissions.mockReturnValue({
+        ...defaultIdentityPermissions,
+        canAttach: false,
+        tooltips: { attach: 'You need permission to attach identities.', detach: '' },
+      })
+      setupMocks(mockIdentities)
+
+      render(<UserIdentitiesPanel userId="user-1" hasPassword={false} />, { wrapper })
+
+      expect(screen.getByRole('button', { name: /transfer identity/i })).toHaveAttribute('aria-disabled', 'true')
     })
   })
 
@@ -620,7 +664,7 @@ describe('UserIdentitiesPanel', () => {
       render(<UserIdentitiesPanel userId="user-1" currentUserId="user-1" hasPassword={false} />, { wrapper })
 
       // Should show the table, not the empty state
-      expect(screen.queryByRole('heading', { name: 'No identity providers configured' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: 'No identity providers configured yet' })).not.toBeInTheDocument()
       // Both providers are unlinked so there are two "Not connected" labels
       const notConnectedLabels = screen.getAllByText('Not connected')
       expect(notConnectedLabels).toHaveLength(2)
@@ -699,6 +743,23 @@ describe('UserIdentitiesPanel', () => {
       expect(screen.getByRole('link', { name: 'Azure' })).toBeInTheDocument()
       expect(screen.getByRole('link', { name: 'Okta' })).toBeInTheDocument()
       expect(screen.getByRole('link', { name: 'GitHub' })).toBeInTheDocument()
+    })
+
+    it('shows filter empty state when provider filter matches no rows', async () => {
+      const user = userEvent.setup()
+      const mockProviders = [{ id: 'provider-3', name: 'GitHub', provider_type: 'oidc' }]
+      mockUseAuthProviders.mockReturnValue({ providers: mockProviders, isLoading: false })
+      setupMocks(twoIdentities)
+
+      render(<UserIdentitiesPanel userId="user-1" hasPassword={false} />, { wrapper })
+
+      const providerFilter = screen.getByRole('textbox', { name: /provider filter/i })
+      await user.type(providerFilter, 'zzz-nonexistent')
+      await user.keyboard('{Enter}')
+
+      await waitFor(() => {
+        expect(screen.getByText('No results found')).toBeInTheDocument()
+      })
     })
   })
 
