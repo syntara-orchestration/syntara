@@ -116,7 +116,8 @@ test.describe('Webhook Trigger', () => {
         .filter({ hasText: /select service accounts/i })
       await expect(saToggle).toBeVisible({ timeout: 30_000 })
       await saToggle.click()
-      await app.getByRole('option', { name: sa.name }).click()
+      // PF v6 SelectOption with hasCheckbox renders <li role="menuitem">, NOT role="option".
+      await app.getByRole('listbox').getByRole('menuitem').filter({ hasText: sa.name }).click()
       await app.keyboard.press('Escape')
 
       await app.getByRole('button', { name: 'Create' }).click()

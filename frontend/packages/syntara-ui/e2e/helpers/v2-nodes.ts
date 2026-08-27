@@ -105,7 +105,9 @@ async function selectServiceAccount(page: Page, serviceAccountName: string) {
     .getByRole('button', { name: /authorized service accounts/i })
     .filter({ hasText: /select service accounts/i })
   await toggle.click()
-  await page.getByRole('option', { name: serviceAccountName }).click()
+  // PF v6 SelectOption with hasCheckbox renders <li role="menuitem">, NOT role="option".
+  // getByRole('option') would find zero elements here. Scope to the listbox and match by text.
+  await page.getByRole('listbox').getByRole('menuitem').filter({ hasText: serviceAccountName }).click()
   await page.keyboard.press('Escape')
 }
 
