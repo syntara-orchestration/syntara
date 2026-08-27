@@ -25,7 +25,7 @@ from syntara.agent_orchestrator.context_manager import (
 )
 from syntara.agent_orchestrator.exceptions import InvocationCancelledError
 from syntara.agent_orchestrator.models import Invocation, InvocationStatus
-from syntara.agent_orchestrator.services.streaming_service import get_invocation_cancel_key
+from syntara.agent_orchestrator.utils.cancellation import get_invocation_cancel_key
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.audit.models.audit_event import AuditEvent, EventCategory, EventSeverity, EventStatus
 from syntara.core.cache.stream import StreamClient

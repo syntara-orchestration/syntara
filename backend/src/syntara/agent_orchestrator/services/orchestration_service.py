@@ -43,13 +43,17 @@ from syntara.agent_orchestrator.models.streaming_events import (
     ToolResultEventData,
 )
 from syntara.agent_orchestrator.services.error_handler import classify_streaming_error
-from syntara.agent_orchestrator.services.streaming_service import get_invocation_cancel_key, get_invocation_stream_id
+from syntara.agent_orchestrator.services.streaming_service import get_invocation_stream_id
 from syntara.agent_orchestrator.tool_manager import ToolRetriever
 from syntara.agent_orchestrator.tool_manager.execution_failure_handler import (
     create_tool_awrapper,
     create_tool_wrapper,
 )
-from syntara.agent_orchestrator.utils.cancellation import is_invocation_cancelled, raise_if_invocation_cancelled
+from syntara.agent_orchestrator.utils.cancellation import (
+    get_invocation_cancel_key,
+    is_invocation_cancelled,
+    raise_if_invocation_cancelled,
+)
 from syntara.agent_orchestrator.utils.context_helpers import extract_request_id
 from syntara.agent_orchestrator.utils.token_usage import aggregate_token_usage
 from syntara.agent_orchestrator.utils.used_tools import aggregate_used_tools

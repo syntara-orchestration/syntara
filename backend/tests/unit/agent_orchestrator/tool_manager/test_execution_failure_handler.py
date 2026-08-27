@@ -647,6 +647,64 @@ class TestMetricsEmissionAndDbPersistence:
 
     @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._persist_tool_execution_to_db")
     @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._emit_tool_metrics")
+    async def test_async_wrapper_cancelled_skips_metrics_and_db(self, mock_emit: Mock, mock_persist: AsyncMock) -> None:
+        """InvocationCancelledError must not increment tool error_count or emit error metrics."""
+        tool = Mock(spec=BaseTool)
+        tool.name = "my_tool"
+        tool.metadata = {"tool_id": str(uuid4()), "namespaced_name": "provider::my_tool"}
+
+        cancelled_id = "inv"
+
+        async def _raise_cancelled(_invocation_id: object, _phase: str) -> None:
+            raise InvocationCancelledError(cancelled_id, "tool_execution")
+
+        wrapper = create_tool_awrapper(session_id="session-abc", invocation_id=uuid4(), execution_id=uuid4())
+        request = ToolCallRequest(
+            tool_call=ToolCall(name="my_tool", args={}, id="call-cancel"),
+            tool=tool,
+            state={},
+            runtime=Mock(),
+        )
+
+        async def mock_execute(_request: ToolCallRequest) -> ToolMessage:
+            return ToolMessage(content="should not run", tool_call_id="call-cancel", name="my_tool")
+
+        with (
+            patch(
+                "syntara.agent_orchestrator.tool_manager.execution_failure_handler.raise_if_invocation_cancelled",
+                side_effect=_raise_cancelled,
+            ),
+            pytest.raises(InvocationCancelledError),
+        ):
+            await wrapper(request, mock_execute)
+
+        mock_emit.assert_not_called()
+        mock_persist.assert_not_awaited()
+
+    @pytest.mark.usefixtures("fast_retry_settings")
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._run_coroutine_from_sync")
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._emit_tool_metrics")
+    def test_sync_wrapper_cancelled_skips_metrics(self, mock_emit: Mock, mock_run_coro: Mock) -> None:
+        """Sync wrapper must not emit error metrics for InvocationCancelledError."""
+        tool = Mock(spec=BaseTool)
+        tool.name = "my_tool"
+        tool.metadata = {"tool_id": str(uuid4()), "namespaced_name": "provider::my_tool"}
+
+        _execute_sync_wrapper(
+            tool_name="my_tool",
+            tool_call_id="call-cancel",
+            exception=InvocationCancelledError("inv", "tool_execution"),
+            tool=tool,
+        )
+
+        mock_emit.assert_not_called()
+        persist_calls = [
+            call for call in mock_run_coro.call_args_list if call.args and "tool execution DB persistence" in call.args
+        ]
+        assert persist_calls == []
+
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._persist_tool_execution_to_db")
+    @patch("syntara.agent_orchestrator.tool_manager.execution_failure_handler._emit_tool_metrics")
     async def test_async_wrapper_timeout_emits_timeout_status(self, mock_emit: Mock, mock_persist: AsyncMock) -> None:
         """Test that TimeoutError emits TIMEOUT status and persists with error message."""
         tool = Mock(spec=BaseTool)

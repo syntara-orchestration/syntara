@@ -407,13 +407,19 @@ def create_tool_awrapper(
                 await _report_tool_failure(tool_id, error)
             return error_msg
         finally:
-            duration_ms, status = _finalize_tool_execution(request, start_time, caught_error, execution_id)
-            await _persist_tool_execution_to_db(
-                request.tool,
-                duration_ms,
-                status,
-                error_message=str(caught_error) if caught_error else None,
-            )
+            if isinstance(caught_error, InvocationCancelledError):
+                logger.debug(
+                    "Skipping tool execution metrics for cancelled invocation",
+                    invocation_id=ctx.invocation_id,
+                )
+            else:
+                duration_ms, status = _finalize_tool_execution(request, start_time, caught_error, execution_id)
+                await _persist_tool_execution_to_db(
+                    request.tool,
+                    duration_ms,
+                    status,
+                    error_message=str(caught_error) if caught_error else None,
+                )
 
     return tool_awrapper
 
@@ -513,17 +519,23 @@ def create_tool_wrapper(
                 _run_coroutine_from_sync(_report_tool_failure(tool_id, error), loop, "tool failure report")
             return error_msg
         finally:
-            duration_ms, status = _finalize_tool_execution(request, start_time, caught_error, execution_id)
-            _run_coroutine_from_sync(
-                _persist_tool_execution_to_db(
-                    request.tool,
-                    duration_ms,
-                    status,
-                    error_message=str(caught_error) if caught_error else None,
-                ),
-                loop,
-                "tool execution DB persistence",
-            )
+            if isinstance(caught_error, InvocationCancelledError):
+                logger.debug(
+                    "Skipping tool execution metrics for cancelled invocation",
+                    invocation_id=ctx.invocation_id,
+                )
+            else:
+                duration_ms, status = _finalize_tool_execution(request, start_time, caught_error, execution_id)
+                _run_coroutine_from_sync(
+                    _persist_tool_execution_to_db(
+                        request.tool,
+                        duration_ms,
+                        status,
+                        error_message=str(caught_error) if caught_error else None,
+                    ),
+                    loop,
+                    "tool execution DB persistence",
+                )
 
     return tool_wrapper
 

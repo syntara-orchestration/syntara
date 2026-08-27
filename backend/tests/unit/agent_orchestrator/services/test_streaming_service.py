@@ -14,7 +14,6 @@ from syntara.agent_orchestrator.services.streaming_service import (
     InvocationNotFoundError,
     StreamingService,
     WebSocketStreamingHandler,
-    get_invocation_cancel_key,
     get_invocation_stream_id,
 )
 from syntara.core.websocket.close_codes import POLICY_VIOLATION
@@ -61,16 +60,6 @@ class TestGetInvocationStreamId:
         invocation_id = uuid4()
         stream_id = get_invocation_stream_id(invocation_id)
         assert stream_id == f"invocation:{invocation_id}:events"
-
-
-class TestGetInvocationCancelKey:
-    """Test get_invocation_cancel_key helper function."""
-
-    def test_generates_correct_cancel_key(self) -> None:
-        """Test that cancel key has correct format."""
-        invocation_id = uuid4()
-        cancel_key = get_invocation_cancel_key(invocation_id)
-        assert cancel_key == f"invocation:{invocation_id}:cancelled"
 
 
 class TestWebSocketStreamingHandlerCreateContext:
@@ -503,7 +492,72 @@ class TestCheckBeforeStreaming:
         invocation_id = uuid4()
         session_state = {"invocation_id": invocation_id, "invocation_status": InvocationStatus.RUNNING}
 
-        await handler.check_before_streaming(session_state)  # should not raise
+        mock_client = AsyncMock()
+        mock_client.key_exists.return_value = False
+
+        with patch("syntara.agent_orchestrator.services.streaming_service.StreamClient") as mock_cls:
+            mock_cls.return_value.__aenter__.return_value = mock_client
+            mock_cls.return_value.__aexit__.return_value = None
+            await handler.check_before_streaming(session_state)
+
+        mock_client.key_exists.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_raises_when_live_redis_cancel_key_set(self, handler: WebSocketStreamingHandler) -> None:
+        """Stale RUNNING snapshot must still abort when the cancel key exists."""
+        invocation_id = uuid4()
+        session_state = {"invocation_id": invocation_id, "invocation_status": InvocationStatus.RUNNING}
+
+        mock_client = AsyncMock()
+        mock_client.key_exists.return_value = True
+
+        with (
+            patch("syntara.agent_orchestrator.services.streaming_service.StreamClient") as mock_cls,
+            pytest.raises(InvocationCancelledStreamError),
+        ):
+            mock_cls.return_value.__aenter__.return_value = mock_client
+            mock_cls.return_value.__aexit__.return_value = None
+            await handler.check_before_streaming(session_state)
+
+    @pytest.mark.asyncio
+    async def test_raises_on_db_fallback_when_redis_errors(self, handler: WebSocketStreamingHandler) -> None:
+        """Redis errors fall back to the invocation row before streaming."""
+        invocation_id = uuid4()
+        session_state = {"invocation_id": invocation_id, "invocation_status": InvocationStatus.RUNNING}
+
+        mock_client = AsyncMock()
+        mock_client.key_exists.side_effect = ConnectionError("redis down")
+
+        with (
+            patch("syntara.agent_orchestrator.services.streaming_service.StreamClient") as mock_cls,
+            patch.object(handler, "_check_invocation_exists", new_callable=AsyncMock) as mock_db,
+            pytest.raises(InvocationCancelledStreamError),
+        ):
+            mock_cls.return_value.__aenter__.return_value = mock_client
+            mock_cls.return_value.__aexit__.return_value = None
+            mock_db.return_value = InvocationStatus.CANCELLED
+            await handler.check_before_streaming(session_state)
+
+        mock_db.assert_awaited_once_with(invocation_id)
+
+    @pytest.mark.asyncio
+    async def test_skips_db_when_redis_says_not_cancelled(self, handler: WebSocketStreamingHandler) -> None:
+        """Healthy Redis miss must not consult the DB (same as other cancel checks)."""
+        invocation_id = uuid4()
+        session_state = {"invocation_id": invocation_id, "invocation_status": InvocationStatus.RUNNING}
+
+        mock_client = AsyncMock()
+        mock_client.key_exists.return_value = False
+
+        with (
+            patch("syntara.agent_orchestrator.services.streaming_service.StreamClient") as mock_cls,
+            patch.object(handler, "_check_invocation_exists", new_callable=AsyncMock) as mock_db,
+        ):
+            mock_cls.return_value.__aenter__.return_value = mock_client
+            mock_cls.return_value.__aexit__.return_value = None
+            await handler.check_before_streaming(session_state)
+
+        mock_db.assert_not_awaited()
 
 
 class TestCheckBeforeStreamingWiring:

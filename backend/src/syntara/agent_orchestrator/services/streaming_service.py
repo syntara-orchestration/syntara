@@ -15,6 +15,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette.websockets import WebSocket
 
 from syntara.agent_orchestrator.models.invocation import Invocation, InvocationStatus
+from syntara.agent_orchestrator.utils.cancellation import get_invocation_cancel_key
 from syntara.core.cache.stream import StreamClient
 from syntara.core.database.session import AsyncSessionLocal
 from syntara.core.models.error import ErrorData
@@ -48,19 +49,6 @@ def get_invocation_stream_id(invocation_id: UUID) -> str:
 
     """
     return f"invocation:{invocation_id}:events"
-
-
-def get_invocation_cancel_key(invocation_id: UUID) -> str:
-    """Get Redis key for an invocation's cancellation signal.
-
-    Args:
-        invocation_id: UUID of the invocation
-
-    Returns:
-        Redis key (e.g., "invocation:UUID:cancelled")
-
-    """
-    return f"invocation:{invocation_id}:cancelled"
 
 
 # Custom exceptions for invocation streaming errors
@@ -166,16 +154,54 @@ class WebSocketStreamingHandler(BaseWebSocketStreamingHandler):
         return str(session_state["invocation_id"])
 
     async def check_before_streaming(self, session_state: dict[str, Any]) -> None:
-        """Raise if the invocation is already CANCELLED before reading events.
+        """Raise if the invocation is CANCELLED before reading events.
 
-        Uses the ``invocation_status`` snapshot from ``create_session_state``.
-        Mid-stream cancel is detected via the Redis cancel key in ``on_idle``.
+        The connect-time ``invocation_status`` snapshot can be stale after
+        ``wait_for_stream_ready``. A live Redis cancel-key check (DB fallback
+        only when Redis itself errors) prevents replaying a raced
+        ``completion`` event for an invocation that was cancelled while waiting.
         """
         invocation_id = session_state["invocation_id"]
 
         if session_state.get("invocation_status") == InvocationStatus.CANCELLED:
             logger.info(
                 "Invocation already cancelled, aborting before streaming",
+                invocation_id=invocation_id,
+            )
+            raise InvocationCancelledStreamError(
+                resource_id=str(invocation_id),
+                resource_type="invocation",
+            )
+
+        cancel_key = get_invocation_cancel_key(invocation_id)
+        cancelled = False
+        redis_available = True
+        try:
+            async with StreamClient() as client:
+                cancelled = await client.key_exists(cancel_key) is True
+        except Exception:  # noqa: BLE001
+            redis_available = False
+            logger.debug(
+                "Pre-stream cancel key check failed, falling back to DB",
+                invocation_id=invocation_id,
+            )
+
+        if not redis_available and not cancelled:
+            try:
+                status = await self._check_invocation_exists(invocation_id)
+                cancelled = status == InvocationStatus.CANCELLED
+            except StreamingValidationError:
+                raise
+            except Exception:  # noqa: BLE001
+                logger.debug(
+                    "DB fallback also failed before streaming",
+                    invocation_id=invocation_id,
+                )
+                return
+
+        if cancelled:
+            logger.info(
+                "Invocation cancelled before streaming (live check)",
                 invocation_id=invocation_id,
             )
             raise InvocationCancelledStreamError(

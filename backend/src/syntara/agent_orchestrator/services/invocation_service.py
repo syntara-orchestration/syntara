@@ -35,7 +35,7 @@ from syntara.agent_orchestrator.models import (
     InvocationStatus,
 )
 from syntara.agent_orchestrator.models.request import CancellationResult
-from syntara.agent_orchestrator.services.streaming_service import get_invocation_cancel_key
+from syntara.agent_orchestrator.utils.cancellation import get_invocation_cancel_key
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.audit.emitter import request_id_context_var
 from syntara.authz.engine import AllowedProjectsResult

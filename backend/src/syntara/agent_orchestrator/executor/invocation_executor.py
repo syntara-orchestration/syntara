@@ -43,8 +43,8 @@ from syntara.agent_orchestrator.models import (
 )
 from syntara.agent_orchestrator.services.error_handler import classify_streaming_error
 from syntara.agent_orchestrator.services.orchestration_service import OrchestrationService
-from syntara.agent_orchestrator.services.streaming_service import get_invocation_cancel_key
 from syntara.agent_orchestrator.token_manager.repository import TokenUsageRepository
+from syntara.agent_orchestrator.utils.cancellation import get_invocation_cancel_key
 from syntara.agent_orchestrator.utils.context_helpers import (
     extract_execution_id,
     extract_request_id,

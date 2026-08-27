@@ -23,9 +23,8 @@ from syntara.agent_orchestrator.audit.context_planning import (
 )
 from syntara.agent_orchestrator.exceptions import InvocationCancelledError
 from syntara.agent_orchestrator.models import LLMCredentialConfig
-from syntara.agent_orchestrator.services.streaming_service import get_invocation_cancel_key
 from syntara.agent_orchestrator.token_manager import TokenValidationService
-from syntara.agent_orchestrator.utils.cancellation import is_invocation_cancelled
+from syntara.agent_orchestrator.utils.cancellation import get_invocation_cancel_key, is_invocation_cancelled
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.core.cache.stream import StreamClient
 from syntara.core.database.session import get_db
