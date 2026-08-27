@@ -1,8 +1,6 @@
 import { MenuToggle, type MenuToggleElement, SelectList, SelectOption, Spinner } from '@patternfly/react-core'
 import { useState, type Ref } from 'react'
 
-import { LONG_SELECT_MAX_MENU_HEIGHT, longSelectMenuPopperProps } from '../../../../components/longSelectMenu'
-import longSelectMenuStyles from '../../../../components/longSelectMenu.module.css'
 import { SynSelect } from '../../../../components/SynSelect'
 
 export function ProjectSelect({
@@ -33,10 +31,6 @@ export function ProjectSelect({
         setIsOpen(false)
       }}
       onOpenChange={setIsOpen}
-      isScrollable
-      maxMenuHeight={LONG_SELECT_MAX_MENU_HEIGHT}
-      popperProps={longSelectMenuPopperProps}
-      className={longSelectMenuStyles.containScroll}
       toggle={(toggleRef: Ref<MenuToggleElement>) => (
         <MenuToggle
           ref={toggleRef}
@@ -101,10 +95,6 @@ export function CredentialTypeSelect({
       }}
       onOpenChange={setIsOpen}
       shouldFocusToggleOnSelect
-      isScrollable
-      maxMenuHeight={LONG_SELECT_MAX_MENU_HEIGHT}
-      popperProps={longSelectMenuPopperProps}
-      className={longSelectMenuStyles.containScroll}
       toggle={(toggleRef: Ref<MenuToggleElement>) => (
         <MenuToggle
           ref={toggleRef}

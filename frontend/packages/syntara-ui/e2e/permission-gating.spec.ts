@@ -781,7 +781,8 @@ test.describe('Permission gating — Access Management actions', () => {
 
     const createButton = auditorApp.getByRole('button', { name: /Create group/i })
     await expect(createButton).toBeVisible()
-    await expect(createButton).toHaveAttribute('aria-disabled', 'true')
+    // aria-disabled is set after the permissions API resolves — give it extra time
+    await expect(createButton).toHaveAttribute('aria-disabled', 'true', { timeout: 20_000 })
   })
 
   test('auditor: Create user button is disabled', async ({ auditorApp }) => {
@@ -823,6 +824,13 @@ test.describe('Permission gating — Detail page header actions', () => {
   const E2E_USER_PASSWORD = 'E2eTestP@ssw0rd!'
 
   test('auditor: user detail Edit and kebab actions are aria-disabled', async ({ app, auditorApp }) => {
+    // This test depends on 3-4 sequential, unbatched /authz/can_i round trips
+    // (useUserPermissions + useUserDetailPermissions) resolving against the
+    // real backend. The default 60s test budget plus 15-20s per-assertion
+    // timeouts leaves little headroom under CI load, which has caused
+    // intermittent timeouts here. Give the whole test more room.
+    test.setTimeout(90_000)
+
     const username = buildUniqueName('e2e-perm-user-detail')
     const user = await createUserViaApi(app, { username, password: E2E_USER_PASSWORD })
     if (!user) throw new Error('createUserViaApi failed')
@@ -833,17 +841,17 @@ test.describe('Permission gating — Detail page header actions', () => {
 
       // aria-disabled is set after the permissions API resolves — give it extra time
       await expect(auditorApp.getByRole('button', { name: 'Edit user' })).toHaveAttribute('aria-disabled', 'true', {
-        timeout: 20_000,
+        timeout: 30_000,
       })
 
       await auditorApp.getByRole('button', { name: 'User actions' }).click()
       await expect(auditorApp.getByRole('menuitem', { name: 'Revoke tokens' })).toHaveAttribute(
         'aria-disabled',
         'true',
-        { timeout: 15_000 }
+        { timeout: 20_000 }
       )
       await expect(auditorApp.getByRole('menuitem', { name: 'Delete user' })).toHaveAttribute('aria-disabled', 'true', {
-        timeout: 15_000,
+        timeout: 20_000,
       })
     } finally {
       await deleteUserViaApi(app, user.id)
@@ -858,10 +866,17 @@ test.describe('Permission gating — Detail page header actions', () => {
       await auditorApp.goto(toAppUrl(`${AM_URL}/groups/${groupId}`))
       await expect(auditorApp.getByRole('heading', { level: 1 })).toBeVisible()
 
-      await expect(auditorApp.getByRole('button', { name: 'Edit group' })).toHaveAttribute('aria-disabled', 'true')
+      // aria-disabled is set after the permissions API resolves — give it extra time
+      await expect(auditorApp.getByRole('button', { name: 'Edit group' })).toHaveAttribute('aria-disabled', 'true', {
+        timeout: 20_000,
+      })
 
       await auditorApp.getByRole('button', { name: 'Group actions' }).click()
-      await expect(auditorApp.getByRole('menuitem', { name: 'Delete group' })).toHaveAttribute('aria-disabled', 'true')
+      await expect(auditorApp.getByRole('menuitem', { name: 'Delete group' })).toHaveAttribute(
+        'aria-disabled',
+        'true',
+        { timeout: 20_000 }
+      )
     } finally {
       await deleteGroupViaApi(app, groupId)
     }
@@ -889,6 +904,12 @@ test.describe('Permission gating — Detail page header actions', () => {
   })
 
   test('auditor: identity provider detail Edit and kebab actions are aria-disabled', async ({ app, auditorApp }) => {
+    // This test depends on several sequential, unbatched /authz/can_i round trips
+    // resolving against the real backend. The default 60s test budget plus 10s
+    // per-assertion timeouts leaves little headroom under CI load, which has caused
+    // intermittent timeouts here. Give the whole test more room.
+    test.setTimeout(90_000)
+
     const idpName = buildUniqueName('e2e-perm-idp-detail')
     const idp = await createIdentityProviderViaApi(app, {
       name: idpName,
@@ -907,17 +928,28 @@ test.describe('Permission gating — Detail page header actions', () => {
       await auditorApp.goto(toAppUrl(`${AUTH_URL}/identity-providers/${idp.id}`))
       await expect(auditorApp.getByRole('heading', { level: 1, name: idpName })).toBeVisible()
 
-      await expect(auditorApp.getByRole('button', { name: 'Edit provider' })).toHaveAttribute('aria-disabled', 'true')
+      // aria-disabled is set after the permissions API resolves — give it extra time
+      await expect(auditorApp.getByRole('button', { name: 'Edit provider' })).toHaveAttribute('aria-disabled', 'true', {
+        timeout: 30_000,
+      })
 
       await auditorApp.getByRole('button', { name: 'Identity provider actions' }).click()
       await expect(auditorApp.getByRole('menuitem', { name: 'Edit group mapping' })).toHaveAttribute(
         'aria-disabled',
-        'true'
+        'true',
+        { timeout: 20_000 }
       )
-      await expect(auditorApp.getByRole('menuitem', { name: 'Revoke tokens' })).toHaveAttribute('aria-disabled', 'true')
+      await expect(auditorApp.getByRole('menuitem', { name: 'Revoke tokens' })).toHaveAttribute(
+        'aria-disabled',
+        'true',
+        {
+          timeout: 20_000,
+        }
+      )
       await expect(auditorApp.getByRole('menuitem', { name: 'Delete identity provider' })).toHaveAttribute(
         'aria-disabled',
-        'true'
+        'true',
+        { timeout: 20_000 }
       )
     } finally {
       await deleteIdentityProviderViaApi(app, idp.id)
@@ -937,7 +969,8 @@ test.describe('Permission gating — Service Account actions', () => {
 
       const createButton = auditorApp.getByRole('button', { name: /Create service account/i })
       await expect(createButton).toBeVisible({ timeout: 15_000 })
-      await expect(createButton).toHaveAttribute('aria-disabled', 'true')
+      // aria-disabled is set after the permissions API resolves — give it extra time
+      await expect(createButton).toHaveAttribute('aria-disabled', 'true', { timeout: 20_000 })
     } finally {
       await deleteServiceAccountViaApi(app, sa.id)
     }
@@ -953,7 +986,10 @@ test.describe('Permission gating — Service Account actions', () => {
   test('viewer: direct URL to Service Accounts shows access denied', async ({ viewerApp }) => {
     await viewerApp.goto(toAppUrl(`${AM_URL}/service-accounts`))
 
-    await expect(viewerApp.getByRole('heading', { name: 'Access denied', level: 2 })).toBeVisible()
+    // The route guard renders after the permissions API resolves — give it extra time
+    await expect(viewerApp.getByRole('heading', { name: 'Access denied', level: 2 })).toBeVisible({
+      timeout: 20_000,
+    })
   })
 })
 

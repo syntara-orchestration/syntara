@@ -485,6 +485,71 @@ async def test_delete_project_hard_deletes_credentials_and_cleans_secrets(
 
 
 @pytest.mark.asyncio
+async def test_delete_project_blocked_when_credential_referenced_by_integration(
+    seeded_db: AsyncSession, test_user: User
+) -> None:
+    """Deleting a project fails with 409 when an integration references one of its credentials."""
+    from syntara.credentials.exceptions import ProjectCredentialInUseError
+    from syntara.integrations.models.integration import Integration
+
+    svc = ProjectService(seeded_db, test_user)
+    user_id = test_user.id
+    project = await svc.create_project(name="cascade-blocked")
+    project_id = project.id
+
+    cred_type = CredentialType(
+        name=f"test-type-{uuid4().hex[:8]}",
+        description="test",
+        inputs={"fields": [], "required": []},
+        injectors={"extra_vars": {}, "env": {}, "file": {}},
+        managed=False,
+    )
+    seeded_db.add(cred_type)
+    await seeded_db.flush()
+
+    credential = Credential(
+        name="proj-cred-blocked",
+        credential_type_id=cred_type.id,
+        project_id=project_id,
+        created_by=user_id,
+        labels={},
+    )
+    seeded_db.add(credential)
+    await seeded_db.flush()
+    cred_id = credential.id
+
+    integration = Integration(
+        name="blocking-integration",
+        integration_type="mcp_server",
+        configuration={"integration_type": "mcp_server", "base_url": "https://example.com"},
+        management_credential_id=cred_id,
+        created_by=user_id,
+    )
+    seeded_db.add(integration)
+    await seeded_db.flush()
+    int_id = integration.id
+    await seeded_db.commit()
+
+    with pytest.raises(ProjectCredentialInUseError) as exc_info:
+        await svc.delete_project(project_id)
+
+    assert "blocking-integration" in str(exc_info.value)
+    assert "proj-cred-blocked" in str(exc_info.value)
+
+    # Clean up: detach integration via raw update, then retry delete.
+    # Avoid expire_all() here — it would expire test_user (self.user on
+    # the service), causing MissingGreenlet when _cascade_cleanup accesses
+    # self.user.id in the second delete_project call below.
+    from sqlalchemy import update
+
+    await seeded_db.exec(
+        update(Integration).where(Integration.id == int_id).values(management_credential_id=None)  # type: ignore[arg-type]
+    )
+    await seeded_db.commit()
+    await svc.delete_project(project_id)
+
+
+@pytest.mark.asyncio
 async def test_delete_project_hard_deletes_approval_requests(seeded_db: AsyncSession, test_user: User) -> None:
     """Deleting a project hard-deletes all approval requests within it."""
     from syntara.approvals.models.approval_request import ApprovalRequest

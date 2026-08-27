@@ -213,8 +213,6 @@ export function ProjectMultiSelect({ selectedIds, onChange, validated }: Project
       onSelect={handleSelect}
       onOpenChange={handleOpenChange}
       toggle={renderToggle}
-      isScrollable
-      maxMenuHeight="200px"
     >
       <SelectList>{renderProjectOptions(filteredOptions, filterValue, isLoading, selectedIds)}</SelectList>
     </SynSelect>
