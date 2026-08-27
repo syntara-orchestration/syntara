@@ -12,8 +12,7 @@
  * - Save with mixed enabled/disabled tools persists state
  * - Resources tab heading shows enabled count
  */
-import { type Page } from '@playwright/test'
-
+import { type Page } from './fixtures'
 import { test, expect, toAppUrl } from './fixtures'
 import { buildUniqueName } from './helpers/workflows'
 import { createIntegrationViaApi, deleteIntegrationViaApi, type SeededIntegration } from './seeds/resources'

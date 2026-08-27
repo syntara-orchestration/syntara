@@ -17,8 +17,6 @@ import type { CredentialsAPI } from '@syntara/contracts'
 import React, { type ReactElement, useCallback, useMemo, useState } from 'react'
 
 import { credentialsClient } from '../../../client'
-import { LONG_SELECT_MAX_MENU_HEIGHT, longSelectMenuPopperProps } from '../../../components/longSelectMenu'
-import longSelectMenuStyles from '../../../components/longSelectMenu.module.css'
 import { SynSelect } from '../../../components/SynSelect'
 import { detachPromise } from '../../../utils/detachPromise'
 import type { Credential, CredentialType } from '../../configuration/credentials/credentialConstants'
@@ -84,7 +82,7 @@ function buildTypeGroups(credentials: Credential[], credentialTypes: CredentialT
   }
   const typeMap = new Map<string, CredentialType>()
   for (const ct of credentialTypes) {
-    typeMap.set(ct.id!, ct)
+    if (ct.id) typeMap.set(ct.id, ct)
   }
   const groupMap = new Map<string, TypeGroup>()
   for (const cred of credentials) {
@@ -93,6 +91,7 @@ function buildTypeGroups(credentials: Credential[], credentialTypes: CredentialT
       const ct = typeMap.get(typeId)
       groupMap.set(typeId, { typeId, typeName: ct?.name ?? 'Unknown', credentials: [] })
     }
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- safe: key was just set via groupMap.set(typeId, ...) above
     groupMap.get(typeId)!.credentials.push(cred)
   }
   return Array.from(groupMap.values())
@@ -334,10 +333,6 @@ export function CredentialSelector({
         onSelect={handleSelect}
         onOpenChange={setIsOpen}
         toggle={renderToggle}
-        isScrollable
-        maxMenuHeight={LONG_SELECT_MAX_MENU_HEIGHT}
-        popperProps={longSelectMenuPopperProps}
-        className={longSelectMenuStyles.containScroll}
       >
         <SelectList aria-label={`${label} options`}>
           <NoCredentialOption isRequired={isRequired} value={value} />

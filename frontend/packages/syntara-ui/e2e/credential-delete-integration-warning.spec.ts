@@ -63,15 +63,15 @@ test.describe('Credential Delete — Integration Impact Warning', () => {
       await expect(modal).toBeVisible()
       await expect(modal.getByText('Delete credential?')).toBeVisible()
 
-      // Ripple-effect summary: header, named integration, and ack copy
-      await expect(modal.getByText('Resources that will be affected')).toBeVisible({ timeout: 15_000 })
-      await expect(modal.getByText('Integrations')).toBeVisible()
-      await expect(modal.getByText(new RegExp(integrationName))).toBeVisible()
+      // The backend rejects this delete outright while the integration references the
+      // credential — the dialog must say so and block confirmation, not just list the
+      // integration as an "affected" resource and let the user ack a doomed deletion.
       await expect(
-        modal.getByRole('checkbox', {
-          name: 'I understand this credential and the resources shown above will be affected by this deletion.',
-        })
-      ).toBeVisible()
+        modal.getByText("This credential can't be deleted until it's detached from these integrations")
+      ).toBeVisible({ timeout: 15_000 })
+      await expect(modal.getByText(new RegExp(integrationName))).toBeVisible()
+      await expect(modal.getByRole('checkbox')).not.toBeVisible()
+      await expect(modal.getByRole('button', { name: 'Detach integrations first' })).toBeDisabled()
 
       // Cancel to leave both credential and integration intact
       await modal.getByRole('button', { name: 'Cancel' }).click()
@@ -85,7 +85,15 @@ test.describe('Credential Delete — Integration Impact Warning', () => {
     }
   })
 
-  test('deleting a linked credential removes it and clears the integration credential field', async ({ app }) => {
+  test('DELETE /credentials/{id} is rejected while an integration still references it', async ({ app }) => {
+    // DELETE /credentials/{id} used to succeed silently and null out the
+    // integration's management_credential_id. The backend now rejects the delete
+    // (409 CREDENTIAL_IN_USE) while any integration still references the credential.
+    //
+    // The UI disables the delete confirmation entirely in this state (see the
+    // previous test), so there's no click-path through the dialog to exercise here.
+    // This hits the API directly as a defense-in-depth regression check for the
+    // backend contract, independent of the frontend.
     const credName = buildUniqueName('e2e-cred-t37-del')
     const integrationName = buildUniqueName('e2e-int-t37-del')
     let credentialId: string | undefined
@@ -116,30 +124,22 @@ test.describe('Credential Delete — Integration Impact Warning', () => {
       const integration = (await intResp.json()) as { id: string }
       integrationId = integration.id
 
-      await app.goto(toAppUrl('/configuration/credentials'))
-      await expect(app.getByRole('heading', { level: 1, name: 'Credentials' })).toBeVisible({ timeout: 20_000 })
+      const deleteResp = await apiRequest(app, 'delete', `/credentials/${credentialId}`, {
+        token: token ?? undefined,
+      })
+      expect(deleteResp.status()).toBe(409)
+      const body = (await deleteResp.json()) as { code?: string; detail?: string }
+      expect(body.code).toBe('CREDENTIAL_IN_USE')
+      expect(body.detail).toContain(integrationName)
 
-      await app.getByPlaceholder('Filter by keyword').fill(credName)
-      await app.getByRole('button', { name: 'Apply filter' }).click()
-
-      const row = app.getByRole('row', { name: new RegExp(credName) })
-      await expect(row).toBeVisible({ timeout: 30_000 })
-
-      await row.getByRole('button', { name: /Actions|Kebab toggle/i }).click({ force: true })
-      await app.getByRole('menuitem', { name: /Delete credential/i }).click()
-
-      const modal = app.getByRole('dialog')
-      await expect(modal).toBeVisible()
-      await expect(modal.getByText(new RegExp(integrationName))).toBeVisible({ timeout: 15_000 })
-
-      await modal.getByRole('checkbox').click()
-      await modal.getByRole('button', { name: 'Delete' }).click()
-
-      await expect(app.getByText('Credential deleted')).toBeVisible({ timeout: 10_000 })
-      await expect(row).not.toBeVisible({ timeout: 10_000 })
-
-      credentialId = undefined
+      // Both the credential and the integration's link to it remain intact.
+      const detailResp = await apiRequest(app, 'get', `/integrations/${integrationId}`, { token: token ?? undefined })
+      expect(detailResp.ok()).toBeTruthy()
+      const detail = (await detailResp.json()) as { management_credential_id: string | null }
+      expect(detail.management_credential_id).toBe(credentialId)
     } finally {
+      // Detach before cleanup: the credential can't be deleted while the
+      // integration still references it.
       if (integrationId) await deleteIntegrationViaApi(app, integrationId)
       if (credentialId) await deleteCredentialViaApi(app, credentialId)
     }
