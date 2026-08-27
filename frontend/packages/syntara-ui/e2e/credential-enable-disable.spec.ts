@@ -22,8 +22,10 @@ function detailPageToggle(app: Page) {
 /** Wait until usage checks finish so the Disable action is actually clickable. */
 async function waitForDisableDialogReady(dialog: import('@playwright/test').Locator, credentialName?: string) {
   await expect(dialog.getByText('Disable credential?')).toBeVisible()
+  // The spinner only clears once the affected-workflows and affected-integrations
+  // API calls both resolve — give it extra time under CI load
   await expect(dialog.getByText(/Checking for workflows and integrations/)).toHaveCount(0, {
-    timeout: 15_000,
+    timeout: 25_000,
   })
   if (credentialName) {
     await expect(dialog.getByText(new RegExp(credentialName))).toBeVisible()

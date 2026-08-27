@@ -10,6 +10,9 @@ on:
     branches: [devel, early-access]
   push:
     branches: [devel, early-access]
+  schedule:
+    # Daily E2E run with Currents reporting at 2 AM UTC
+    - cron: '0 2 * * *'
   workflow_dispatch:
     inputs:
       pr_number:
@@ -20,6 +23,11 @@ on:
         description: 'PR head branch ref'
         required: true
         type: string
+      enable_currents:
+        description: 'Enable Currents reporting'
+        required: false
+        type: boolean
+        default: false
 
 # Required permissions for this workflow:
 # - contents:read - checkout code in all jobs
@@ -461,25 +469,31 @@ jobs:
   # - Auto-run on PRs when frontend/ or ci-frontend.yml changes
   # - Skip on backend-only PRs (save ~15-20 min on 8-core runner)
   # - Always run in merge queue (final safety check)
+  # - Daily scheduled run with Currents reporting (2 AM UTC)
   # - Manual trigger via /run-e2e-ui-tests comment (OWNER/MEMBER only)
   # See docs/ci/workflows.md for complete behavior table and debugging guide.
   test-compose-e2e:
     name: (Frontend) Test Podman Compose E2E
     needs: [changes, frontend-checks-gate]
-    # Only auto-trigger on same-repo PRs with frontend changes, or manual dispatch, or merge queue.
+    # Only auto-trigger on same-repo PRs with frontend changes, or manual dispatch, or merge queue, or schedule.
     # Fork PRs are explicitly excluded from auto-triggering to prevent security risks.
     # always() + gate != failure|cancelled lets workflow_dispatch still run when the
     # checks gate is skipped (e.g. docs-only PR), while preserving fast-fail when
     # lint/unit actually failed.
     if: |
       always() &&
-      needs.changes.result == 'success' &&
-      needs.frontend-checks-gate.result != 'failure' &&
-      needs.frontend-checks-gate.result != 'cancelled' &&
       (
-        (needs.changes.outputs.frontend == 'true' && github.event_name != 'push' && github.event.pull_request.head.repo.full_name == github.repository) ||
-        github.event_name == 'merge_group' ||
-        github.event_name == 'workflow_dispatch'
+        github.event_name == 'schedule' ||
+        (
+          needs.changes.result == 'success' &&
+          needs.frontend-checks-gate.result != 'failure' &&
+          needs.frontend-checks-gate.result != 'cancelled' &&
+          (
+            (needs.changes.outputs.frontend == 'true' && github.event_name != 'push' && github.event.pull_request.head.repo.full_name == github.repository) ||
+            github.event_name == 'merge_group' ||
+            github.event_name == 'workflow_dispatch'
+          )
+        )
       )
     runs-on: ubuntu-latest-8-cores
     timeout-minutes: 120
@@ -534,7 +548,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.pr_ref || github.sha }}
+          # Schedule runs use devel, workflow_dispatch uses PR ref, others use commit SHA
+          ref: ${{ github.event_name == 'schedule' && 'devel' || (github.event_name == 'workflow_dispatch' && inputs.pr_ref || github.sha) }}
           persist-credentials: false
 
       - name: Set up Node.js
@@ -675,9 +690,10 @@ jobs:
           SYNTARA_E2E_BASE_URL: http://localhost:8080
           SYNTARA_E2E_PASSWORD: ${{ env.SYNTARA_E2E_PASSWORD }}
           SYNTARA_XFAIL_SOURCE: https://raw.githubusercontent.com/syntara-orchestration/syntara-ci/refs/heads/main/
-          CURRENTS_PROJECT_ID: ${{ secrets.CURRENTS_PROJECT_ID }}
-          CURRENTS_RECORD_KEY: ${{ secrets.CURRENTS_RECORD_KEY }}
-          CURRENTS_API_KEY: ${{ secrets.CURRENTS_API_KEY }}
+          # Enable Currents reporting only for scheduled daily runs or when manually enabled
+          CURRENTS_PROJECT_ID: ${{ (github.event_name == 'schedule' || inputs.enable_currents) && secrets.CURRENTS_PROJECT_ID || '' }}
+          CURRENTS_RECORD_KEY: ${{ (github.event_name == 'schedule' || inputs.enable_currents) && secrets.CURRENTS_RECORD_KEY || '' }}
+          CURRENTS_API_KEY: ${{ (github.event_name == 'schedule' || inputs.enable_currents) && secrets.CURRENTS_API_KEY || '' }}
 
       - name: Upload Playwright report
         if: always()
