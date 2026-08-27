@@ -1,11 +1,12 @@
 """LLM provider adapter implementing validate() and discover().
 
-validate(): Lightweight connectivity ping — hits the provider's model listing
-  endpoint to verify reachability and credential validity without parsing the
-  full response.
+validate(): Hits the provider's model listing endpoint, then (for
+  OpenAI-compatible providers) GET {base_url}/key so a public catalog 200
+  cannot mark an invalid API key as healthy. The listing body is not parsed.
 
-discover(): Calls the provider's model listing endpoint and parses the
-  response into DiscoveredLLMModel objects. Does not persist anything.
+discover(): Paginated model listing parsed into DiscoveredLLMModel objects.
+  Does not persist anything and does not run the /key probe — listing is a
+  catalog fetch. Refresh uses this path.
 
 Provider dispatch uses LLMProviderConfiguration.provider_hint to select the
 correct provider implementation (OpenAI-compatible, Anthropic, or Gemini).
@@ -22,7 +23,7 @@ if TYPE_CHECKING:
 
 import httpx
 import structlog
-from httpx import HTTPStatusError
+from httpx import HTTPStatusError, codes
 
 from syntara.core.lib.tls_utils import build_integration_httpx_verify
 from syntara.integrations.adapters.factory import register_health_check_adapter
@@ -48,6 +49,12 @@ from syntara.integrations.models.integration_configuration import (
 logger = structlog.stdlib.get_logger(__name__)
 
 _MAX_PAGINATION_PAGES = 10
+
+# 404/405/501 on the credential probe means the gateway has no /key-style
+# endpoint (OpenAI, vLLM). Trust the models listing instead of failing.
+_PROBE_ABSENT_STATUSES = frozenset(
+    {codes.NOT_FOUND, codes.METHOD_NOT_ALLOWED, codes.NOT_IMPLEMENTED},
+)
 
 _PROVIDER_CONSTRUCTORS: dict[LLMProviderHint, Callable[[], LLMProviderBase]] = {
     LLMProviderHint.OPENAI: OpenAICompatibleProvider,
@@ -103,8 +110,12 @@ class LLMProviderAdapter:
         params: dict[str, str] | None = None,
         *,
         timeout_seconds: int | None = None,
+        allow_absent_statuses: frozenset[int] | None = None,
     ) -> tuple[bool, str | None, HealthCheckErrorType | None, httpx.Response | None]:
         """Execute a single GET request with standardized error handling.
+
+        ``allow_absent_statuses`` HTTP codes are treated as success (used by
+        the credential probe when GET /key is not implemented).
 
         Returns:
             (success, error_msg, error_type, response) tuple.
@@ -120,9 +131,10 @@ class LLMProviderAdapter:
             result_response = await client.get(url, headers=headers, params=params)
             result_response.raise_for_status()
             logger.debug(
-                "Received LLM models response",
+                "Received LLM HTTP response",
                 provider=self._config.provider_hint,
                 status_code=result_response.status_code,
+                url=url,
             )
 
         except (TimeoutError, httpx.TimeoutException):
@@ -136,6 +148,14 @@ class LLMProviderAdapter:
             )
 
         except HTTPStatusError as exc:
+            if allow_absent_statuses and exc.response.status_code in allow_absent_statuses:
+                logger.debug(
+                    "LLM credential probe endpoint absent",
+                    provider=self._config.provider_hint,
+                    status_code=exc.response.status_code,
+                    url=url,
+                )
+                return True, None, None, exc.response
             success = False
             error_type, error_msg = classify_http_error([exc])
             logger.warning(
@@ -165,12 +185,44 @@ class LLMProviderAdapter:
 
         return success, error_msg, error_type, result_response if success else None
 
+    async def _confirm_credential(
+        self,
+        client: httpx.AsyncClient,
+        base_url: str,
+        headers: dict[str, str],
+        *,
+        timeout_seconds: int,
+    ) -> tuple[bool, str | None, HealthCheckErrorType | None]:
+        """Prove the API key on an auth-gated path when the provider has one.
+
+        Called after the models catalog returns 200. A public catalog must
+        not mark a rejected key as healthy.
+        """
+        url = self._provider.build_credential_confirmation_url(base_url)
+        if url is None:
+            return True, None, None
+
+        logger.debug(
+            "Sending LLM credential confirmation request",
+            provider=self._config.provider_hint,
+            url=url,
+        )
+        success, error_msg, error_type, _ = await self._do_get(
+            client,
+            url,
+            headers,
+            timeout_seconds=timeout_seconds,
+            allow_absent_statuses=_PROBE_ABSENT_STATUSES,
+        )
+        return success, error_msg, error_type
+
     async def _fetch_models(
         self,
         resolved_credential: dict[str, Any],
         timeout_seconds: int,
         *,
         paginate: bool = False,
+        confirm_credential: bool = False,
     ) -> tuple[bool, str | None, HealthCheckErrorType | None, list[httpx.Response]]:
         """Hit the provider's models endpoint.
 
@@ -180,6 +232,8 @@ class LLMProviderAdapter:
             timeout_seconds: Maximum seconds to wait for the HTTP response.
             paginate: If True, follow pagination until exhausted (up to
                 ``_MAX_PAGINATION_PAGES``). If False, make a single request.
+            confirm_credential: If True, after the first catalog 200 run the
+                provider's auth-gated probe (validate only).
 
         Returns:
             (success, error_msg, error_type, responses) tuple.
@@ -202,6 +256,7 @@ class LLMProviderAdapter:
 
         responses: list[httpx.Response] = []
         params: dict[str, str] | None = None
+        credential_confirmed = not confirm_credential
 
         verify = build_integration_httpx_verify(
             insecure_skip_tls_verify=self._config.insecure_skip_tls_verify,
@@ -219,6 +274,17 @@ class LLMProviderAdapter:
                 )
                 if not success or response is None:
                     return success, error_msg, error_type, []
+
+                if not credential_confirmed:
+                    confirmed, confirm_error, confirm_type = await self._confirm_credential(
+                        client,
+                        base_url,
+                        headers,
+                        timeout_seconds=timeout_seconds,
+                    )
+                    if not confirmed:
+                        return False, confirm_error, confirm_type, []
+                    credential_confirmed = True
 
                 responses.append(response)
 
@@ -251,14 +317,18 @@ class LLMProviderAdapter:
         resolved_credential: dict[str, Any],
         timeout_seconds: int,
     ) -> ValidateResult:
-        """Lightweight connectivity ping against the LLM provider's models endpoint.
+        """Check provider reachability and credential acceptance.
 
         Args:
             resolved_credential: Decrypted credential extra_vars dict.
             timeout_seconds: HTTP request timeout.
 
         """
-        success, error_msg, error_type, _ = await self._fetch_models(resolved_credential, timeout_seconds)
+        success, error_msg, error_type, _ = await self._fetch_models(
+            resolved_credential,
+            timeout_seconds,
+            confirm_credential=True,
+        )
         if success:
             logger.info("LLM validate succeeded", provider=self._config.provider_hint)
         return ValidateResult(
