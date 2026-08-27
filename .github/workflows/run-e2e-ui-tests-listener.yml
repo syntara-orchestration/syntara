@@ -54,16 +54,6 @@ jobs:
             core.setOutput('ref', pr.data.head.ref);
             core.setOutput('pr_number', prNumber);
 
-      - name: Get PR head SHA
-        id: sha
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
-        run: |
-          HEAD_SHA=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.head.sha')
-          echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
-
       - name: Dispatch E2E UI workflow
         if: steps.pr.outcome == 'success'
         env:
@@ -86,7 +76,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
-          HEAD_SHA: ${{ steps.sha.outputs.head_sha }}
         run: |
           # Find the most recent workflow_dispatch run for ci-frontend.yml
           RUN_ID=$(gh api "repos/$REPO/actions/workflows/ci-frontend.yml/runs?event=workflow_dispatch&per_page=5" \
@@ -99,9 +88,4 @@ jobs:
 
           RUN_URL="https://github.com/$REPO/actions/runs/$RUN_ID"
 
-          BODY="<!-- e2e-ui-tests-status run_id=$RUN_ID sha=$HEAD_SHA -->
-          🚀 E2E UI tests triggered: [View workflow run]($RUN_URL)
-
-          _Status: Running..._"
-
-          gh pr comment "$PR_NUMBER" --repo "$REPO" --body "$BODY"
+          gh pr comment "$PR_NUMBER" --repo "$REPO" --body "🚀 E2E UI tests triggered: [View workflow run]($RUN_URL)"

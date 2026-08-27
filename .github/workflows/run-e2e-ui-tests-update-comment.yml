@@ -1,8 +1,8 @@
 ---
-name: "/run-e2e-ui-tests Update Comment"
+name: "/run-e2e-ui-tests Post Results"
 
-# Watches for ci-frontend.yml workflow_dispatch completions and updates
-# the initial comment posted by run-e2e-ui-tests-listener.yml with results.
+# Watches for ci-frontend.yml workflow_dispatch completions and posts
+# a follow-up comment with results on the PR.
 #
 # SECURITY NOTE: This workflow uses workflow_run, which runs in the base
 # repository context. This usage is safe because:
@@ -46,8 +46,8 @@ permissions:
   contents: read
 
 jobs:
-  update-comment:
-    name: Update E2E Comment
+  post-results:
+    name: Post E2E Results
     runs-on: ubuntu-latest
     # For workflow_run: only update for workflow_dispatch events (manual /run-e2e-ui-tests triggers).
     # For workflow_dispatch: allow manual testing.
@@ -83,7 +83,7 @@ jobs:
 
           echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
 
-      - name: Update comment with results
+      - name: Post results comment
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -92,39 +92,26 @@ jobs:
           CONCLUSION: ${{ github.event_name == 'workflow_dispatch' && inputs.conclusion || github.event.workflow_run.conclusion }}
           RUN_URL: ${{ github.event.workflow_run.html_url || format('https://github.com/{0}/actions/runs/{1}', github.repository, inputs.run_id) }}
         run: |
-          # Find the comment posted by the listener workflow
-          COMMENT_ID=$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \
-            --jq ".[] | select(.body | contains(\"<!-- e2e-ui-tests-status run_id=$RUN_ID\")) | .id" | tail -1)
-
-          if [ -z "$COMMENT_ID" ]; then
-            echo "No comment found for run_id=$RUN_ID"
-            exit 0
-          fi
-
           # Build the status message based on conclusion
           case "$CONCLUSION" in
             success)
               STATUS_EMOJI="✅"
-              STATUS_TEXT="Completed successfully"
+              STATUS_TEXT="completed successfully"
               ;;
             failure)
               STATUS_EMOJI="❌"
-              STATUS_TEXT="Failed"
+              STATUS_TEXT="failed"
               ;;
             cancelled)
               STATUS_EMOJI="⚠️"
-              STATUS_TEXT="Cancelled"
+              STATUS_TEXT="was cancelled"
               ;;
             *)
               STATUS_EMOJI="⚠️"
-              STATUS_TEXT="Completed with status: $CONCLUSION"
+              STATUS_TEXT="completed with status: $CONCLUSION"
               ;;
           esac
 
-          # Update the comment with results
-          BODY="<!-- e2e-ui-tests-status run_id=$RUN_ID -->
-          $STATUS_EMOJI E2E UI tests $STATUS_TEXT: [View results]($RUN_URL)"
-
-          gh api "repos/$REPO/issues/comments/$COMMENT_ID" \
-            -X PATCH \
-            -f body="$BODY"
+          # Post a new comment with results
+          gh pr comment "$PR_NUMBER" --repo "$REPO" \
+            --body "$STATUS_EMOJI E2E UI tests $STATUS_TEXT: [View results]($RUN_URL)"
