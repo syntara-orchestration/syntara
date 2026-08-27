@@ -108,11 +108,13 @@ test.describe('Webhook Trigger', () => {
       // Clear the auto-generated path — trigger fields are optional by design
       await app.getByRole('textbox', { name: 'Webhook path' }).clear()
 
-      // Select a service account (required)
-      // Chromium computes accessible name from the FormGroup <label for>, not the button text.
-      const saToggle = app.getByRole('button', { name: /authorized service accounts/i })
+      // Select a service account (required). Filter by text to distinguish the SA toggle
+      // from the FormLabelWithHelp icon button (both match /authorized service accounts/i).
+      // The filter also implicitly waits for the loading spinner to clear.
+      const saToggle = app
+        .getByRole('button', { name: /authorized service accounts/i })
+        .filter({ hasText: /select service accounts/i })
       await expect(saToggle).toBeVisible({ timeout: 30_000 })
-      await expect(saToggle).toHaveText(/select service accounts/i, { timeout: 30_000 })
       await saToggle.click()
       await app.getByRole('option', { name: sa.name }).click()
       await app.keyboard.press('Escape')
