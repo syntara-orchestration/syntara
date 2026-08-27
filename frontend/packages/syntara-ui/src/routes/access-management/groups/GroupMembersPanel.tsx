@@ -9,11 +9,11 @@ import { FilterBar } from '../../../components/filters'
 import { IconLabel } from '../../../components/IconLabel'
 import { SynPageBody } from '../../../components/layout/SynPage'
 import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
-import type { KebabAction } from '../../../components/NxKebabMenu'
-import { NxKebabMenu } from '../../../components/NxKebabMenu'
 import { SynEmptyStateFilter } from '../../../components/states/SynEmptyStateFilter'
 import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import { useQueryState } from '../../../components/states/useQueryState'
+import { SynKebabMenu } from '../../../components/SynKebabMenu'
+import type { KebabAction } from '../../../components/SynKebabMenu'
 import { LinkCell } from '../../../components/table/LinkCell'
 import { SynScrollableTableContainer } from '../../../components/table/SynScrollableTableContainer'
 import { useFilterState } from '../../../hooks/useFilterState'
@@ -257,7 +257,7 @@ export function GroupMembersPanel({ groupId, onMembershipChange }: Readonly<Grou
                   </Td>
                   <Td isActionCell>
                     {!member.is_builtin && (
-                      <NxKebabMenu
+                      <SynKebabMenu
                         actions={getMemberActions(
                           { id: member.id, username: member.username },
                           setMemberToRemove,

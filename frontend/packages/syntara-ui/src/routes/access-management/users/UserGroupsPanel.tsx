@@ -29,11 +29,11 @@ import { IconLabel } from '../../../components/IconLabel'
 import { SynLabel } from '../../../components/labels/SynLabel'
 import { SynPageBody } from '../../../components/layout/SynPage'
 import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
-import { NxKebabMenu } from '../../../components/NxKebabMenu'
-import type { KebabAction } from '../../../components/NxKebabMenu'
 import { SynEmptyStateFilter } from '../../../components/states/SynEmptyStateFilter'
 import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import { useQueryState } from '../../../components/states/useQueryState'
+import type { KebabAction } from '../../../components/SynKebabMenu'
+import { SynKebabMenu } from '../../../components/SynKebabMenu'
 import { LinkCell } from '../../../components/table/LinkCell'
 import { SynScrollableTableContainer } from '../../../components/table/SynScrollableTableContainer'
 import { useFilterState } from '../../../hooks/useFilterState'
@@ -424,7 +424,7 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
                   </Td>
                   <Td isActionCell>
                     {group.name !== BUILTIN_AUTHENTICATED_GROUP_NAME && (
-                      <NxKebabMenu
+                      <SynKebabMenu
                         actions={getGroupActions(group as Group, setGroupToRemove, groupPermissions)}
                         aria-label={`Actions for ${group.name}`}
                       />

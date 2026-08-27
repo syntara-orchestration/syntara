@@ -21,7 +21,6 @@ import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmati
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
 import type { KebabAction } from '../../../components/SynKebabMenu'
-import { SynKebabMenu } from '../../../components/SynKebabMenu'
 import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../../components/panels/list/SynListPanel'
 import { ProviderIcon } from '../../../components/ProviderIcon'
 import { SynLink } from '../../../components/SynLink'

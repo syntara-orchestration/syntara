@@ -12,12 +12,12 @@ import { IconLabel } from '../../components/IconLabel'
 import { SynLabel } from '../../components/labels/SynLabel'
 import { SynPageBody } from '../../components/layout/SynPage'
 import { SynPanelContentStack } from '../../components/layout/SynPanelContentStack'
-import { NxKebabMenu } from '../../components/NxKebabMenu'
-import type { KebabAction } from '../../components/NxKebabMenu'
 import { SynEmptyStateFilter } from '../../components/states/SynEmptyStateFilter'
 import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 import { SynErrorState } from '../../components/states/SynErrorState'
 import { SynLoadingState } from '../../components/states/SynLoadingState'
+import type { KebabAction } from '../../components/SynKebabMenu'
+import { SynKebabMenu } from '../../components/SynKebabMenu'
 import { LinkCell } from '../../components/table/LinkCell'
 import { SynScrollableTableContainer } from '../../components/table/SynScrollableTableContainer'
 import { invalidateAuthzCaches } from '../../hooks/invalidateAuthzCaches'
@@ -185,7 +185,7 @@ function RoleAssignmentsTable({
                 </Td>
               )}
               <Td isActionCell>
-                <NxKebabMenu
+                <SynKebabMenu
                   actions={getAssignmentActions(row, onUnassign, permissions)}
                   aria-label={`Actions for ${row.roleName} (${row.scope})`}
                 />
