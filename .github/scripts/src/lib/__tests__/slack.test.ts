@@ -1,26 +1,26 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { http, HttpResponse } from 'msw';
-import { server } from '../../__tests__/setup.js';
-import { SlackNotifier } from '../slack.js';
+import { describe, it, expect, beforeEach } from 'vitest'
+import { http, HttpResponse } from 'msw'
+import { server } from '../../__tests__/setup.js'
+import { SlackNotifier } from '../slack.js'
 
 describe('SlackNotifier', () => {
-  let notifier: SlackNotifier;
-  const webhookUrl = 'https://hooks.example.com/test-webhook';
+  let notifier: SlackNotifier
+  const webhookUrl = 'https://hooks.example.com/test-webhook'
 
   beforeEach(() => {
-    notifier = new SlackNotifier(webhookUrl);
-  });
+    notifier = new SlackNotifier(webhookUrl)
+  })
 
   describe('sendDequeueBurstAlert', () => {
     it('sends a red alert with dequeue details', async () => {
-      let requestBody: unknown = null;
+      let requestBody: unknown = null
 
       server.use(
         http.post(webhookUrl, async ({ request }) => {
-          requestBody = await request.json();
-          return HttpResponse.text('ok');
+          requestBody = await request.json()
+          return HttpResponse.text('ok')
         })
-      );
+      )
 
       await notifier.sendDequeueBurstAlert({
         dequeues: [
@@ -42,7 +42,7 @@ describe('SlackNotifier', () => {
         ],
         timeWindowMinutes: 45,
         queueUrl: 'https://github.com/owner/repo/queue/devel',
-      });
+      })
 
       expect(requestBody).toMatchObject({
         attachments: [
@@ -69,56 +69,52 @@ describe('SlackNotifier', () => {
               expect.objectContaining({
                 type: 'section',
                 text: expect.objectContaining({
-                  text: expect.stringContaining(
-                    'Multiple PRs were removed from the merge queue.'
-                  ),
+                  text: expect.stringContaining('Multiple PRs were removed from the merge queue.'),
                 }),
               }),
             ]),
           },
         ],
-      });
+      })
 
-      const bodyText = JSON.stringify(requestBody);
-      expect(bodyText).not.toContain('failed checks');
-    });
+      const bodyText = JSON.stringify(requestBody)
+      expect(bodyText).not.toContain('failed checks')
+    })
 
     it('throws when webhook returns non-200 status', async () => {
       server.use(
         http.post(webhookUrl, () => {
-          return new HttpResponse(null, { status: 500 });
+          return new HttpResponse(null, { status: 500 })
         })
-      );
+      )
 
       await expect(
         notifier.sendDequeueBurstAlert({
-          dequeues: [
-            { number: 42, url: 'https://pr', title: 'Test' },
-          ],
+          dequeues: [{ number: 42, url: 'https://pr', title: 'Test' }],
           timeWindowMinutes: 45,
           queueUrl: 'https://queue',
         })
-      ).rejects.toThrow('Slack notification failed: 500');
-    });
-  });
+      ).rejects.toThrow('Slack notification failed: 500')
+    })
+  })
 
   describe('sendQueueBackupAlert', () => {
     it('sends a red alert with queue backup details', async () => {
-      let requestBody: unknown = null;
+      let requestBody: unknown = null
 
       server.use(
         http.post(webhookUrl, async ({ request }) => {
-          requestBody = await request.json();
-          return HttpResponse.text('ok');
+          requestBody = await request.json()
+          return HttpResponse.text('ok')
         })
-      );
+      )
 
       await notifier.sendQueueBackupAlert({
         queueDepth: 5,
         minutesSinceMerge: 75,
         timeoutMinutes: 120,
         queueUrl: 'https://github.com/owner/repo/queue/devel',
-      });
+      })
 
       expect(requestBody).toMatchObject({
         attachments: [
@@ -145,22 +141,22 @@ describe('SlackNotifier', () => {
             ]),
           },
         ],
-      });
-    });
-  });
+      })
+    })
+  })
 
   describe('sendQueueRecoveryAlert', () => {
     it('sends a green recovery notification', async () => {
-      let requestBody: unknown = null;
+      let requestBody: unknown = null
 
       server.use(
         http.post(webhookUrl, async ({ request }) => {
-          requestBody = await request.json();
-          return HttpResponse.text('ok');
+          requestBody = await request.json()
+          return HttpResponse.text('ok')
         })
-      );
+      )
 
-      await notifier.sendQueueRecoveryAlert('https://github.com/owner/repo/queue/devel');
+      await notifier.sendQueueRecoveryAlert('https://github.com/owner/repo/queue/devel')
 
       expect(requestBody).toMatchObject({
         attachments: [
@@ -184,7 +180,7 @@ describe('SlackNotifier', () => {
             ]),
           },
         ],
-      });
-    });
-  });
-});
+      })
+    })
+  })
+})

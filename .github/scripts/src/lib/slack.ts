@@ -1,26 +1,26 @@
 type SlackBlock = {
-  type: string;
-  [key: string]: unknown;
-};
+  type: string
+  [key: string]: unknown
+}
 
 type SlackAttachment = {
-  color: string;
-  blocks: SlackBlock[];
-};
+  color: string
+  blocks: SlackBlock[]
+}
 
 type SlackMessage = {
-  attachments: SlackAttachment[];
-};
+  attachments: SlackAttachment[]
+}
 
 /**
  * Slack notification client using Block Kit formatted messages.
  * Sends color-coded alerts for merge queue health events.
  */
 export class SlackNotifier {
-  private readonly webhookUrl: string;
+  private readonly webhookUrl: string
 
   constructor(webhookUrl: string) {
-    this.webhookUrl = webhookUrl;
+    this.webhookUrl = webhookUrl
   }
 
   /**
@@ -28,15 +28,13 @@ export class SlackNotifier {
    * Indicates a possible systemic issue with the merge queue.
    */
   async sendDequeueBurstAlert(params: {
-    dequeues: Array<{ number: number; url: string; title: string }>;
-    timeWindowMinutes: number;
-    queueUrl: string;
+    dequeues: Array<{ number: number; url: string; title: string }>
+    timeWindowMinutes: number
+    queueUrl: string
   }): Promise<void> {
-    const { dequeues, timeWindowMinutes, queueUrl } = params;
+    const { dequeues, timeWindowMinutes, queueUrl } = params
 
-    const prLinks = dequeues
-      .map((pr) => `<${pr.url}|#${pr.number}>`)
-      .join(', ');
+    const prLinks = dequeues.map((pr) => `<${pr.url}|#${pr.number}>`).join(', ')
 
     const message: SlackMessage = {
       attachments: [
@@ -86,9 +84,9 @@ export class SlackNotifier {
           ],
         },
       ],
-    };
+    }
 
-    await this.send(message);
+    await this.send(message)
   }
 
   /**
@@ -96,12 +94,12 @@ export class SlackNotifier {
    * Fires when PRs are waiting but nothing has merged beyond the timeout threshold.
    */
   async sendQueueBackupAlert(params: {
-    queueDepth: number;
-    minutesSinceMerge: number;
-    timeoutMinutes: number;
-    queueUrl: string;
+    queueDepth: number
+    minutesSinceMerge: number
+    timeoutMinutes: number
+    queueUrl: string
   }): Promise<void> {
-    const { queueDepth, minutesSinceMerge, timeoutMinutes, queueUrl } = params;
+    const { queueDepth, minutesSinceMerge, timeoutMinutes, queueUrl } = params
     const message: SlackMessage = {
       attachments: [
         {
@@ -150,9 +148,9 @@ export class SlackNotifier {
           ],
         },
       ],
-    };
+    }
 
-    await this.send(message);
+    await this.send(message)
   }
 
   /**
@@ -208,9 +206,9 @@ export class SlackNotifier {
           ],
         },
       ],
-    };
+    }
 
-    await this.send(message);
+    await this.send(message)
   }
 
   /**
@@ -222,12 +220,10 @@ export class SlackNotifier {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(message),
-    });
+    })
 
     if (!response.ok) {
-      throw new Error(
-        `Slack notification failed: ${response.status} ${response.statusText}`
-      );
+      throw new Error(`Slack notification failed: ${response.status} ${response.statusText}`)
     }
   }
 }

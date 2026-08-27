@@ -78,6 +78,13 @@ repos:
         pass_filenames: true
         files: ^frontend/.*\.(ts|tsx|js|jsx|json|yml|yaml|md|css)$
 
+      - id: github-scripts-prettier
+        name: 'github-scripts: prettier format'
+        entry: npx --prefix frontend prettier --config frontend/.prettierrc --write --
+        language: system
+        pass_filenames: true
+        files: ^\.github/scripts/.*\.(ts|js|json|md)$
+
       - id: frontend-eslint
         name: 'frontend: eslint'
         # --flag v10_config_lookup_from_file makes ESLint resolve eslint.config.js
