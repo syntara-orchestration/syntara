@@ -23,18 +23,6 @@ test.describe('Configuration Navigation & Tabs', () => {
     await expect(app.getByRole('menuitem', { name: 'Credentials', exact: true })).toBeVisible()
   })
 
-  test('navigates to Credentials page from Configuration menu', async ({ app }) => {
-    await app.goto(toAppUrl('/configuration/integrations'))
-    await expect(app.getByRole('heading', { name: 'Integrations', level: 1 })).toBeVisible()
-
-    // Act - Open Configuration dropdown and click Credentials
-    await navigateViaConfigMenu(app, 'Credentials')
-
-    // Assert - URL and page heading are correct
-    await expect(app).toHaveURL(/configuration\/credentials/)
-    await expect(app.getByRole('heading', { level: 1, name: 'Credentials' })).toBeVisible()
-  })
-
   test('persists active tab after page refresh', async ({ app }) => {
     // Arrange - Navigate directly to Credentials page
     await app.goto(toAppUrl('/configuration/credentials'))

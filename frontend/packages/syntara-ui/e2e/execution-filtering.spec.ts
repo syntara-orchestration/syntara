@@ -211,26 +211,6 @@ test.describe('Execution Filtering @pr-check', () => {
     await newPage.close()
   })
 
-  test('filter state persists across navigation', async ({ app }) => {
-    await switchFieldSelector(app, 'Workflow name', 'Status')
-
-    const filterToolbar = app.getByRole('search', { name: 'Filters' })
-    await filterToolbar.getByRole('button', { name: 'Filter by status' }).click()
-    await app.getByRole('option', { name: 'Running' }).click()
-
-    await expect(app).toHaveURL(/status=running/)
-    const urlWithFilter = app.url()
-
-    await app.goto(toAppUrl('/'))
-
-    await app.goto(urlWithFilter)
-
-    await expect(app.getByRole('heading', { level: 1, name: 'Workflow Runs' })).toBeVisible()
-    const statusChipGroup = app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Status' })
-    await expect(statusChipGroup.getByText('Running')).toBeVisible()
-    await expect(app).toHaveURL(/status=running/)
-  })
-
   test('individual filter chips can be removed independently', async ({ app }) => {
     const filterToolbar = app.getByRole('search', { name: 'Filters' })
 

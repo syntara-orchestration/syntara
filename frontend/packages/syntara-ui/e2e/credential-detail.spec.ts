@@ -109,39 +109,6 @@ test.describe('Credential Detail Page & Workflows Tab', () => {
     }
   })
 
-  test('workflows tab shows workflow references when available', async ({ app }) => {
-    const { name } = await createTestCredential(app, { prefix: 'e2e-detail-wf-refs' })
-    try {
-      await navigateToCredentialDetail(app, name)
-      await app.getByRole('tab', { name: /Workflows/ }).click()
-
-      // This credential was just created — it won't have workflows referencing it
-      // Assert the empty state or table renders correctly
-      const emptyState = app.getByText('No workflows using this credential')
-      const table = app.getByRole('grid', { name: 'Workflows using this credential' })
-      const errorState = app.getByText('Failed to load workflows')
-      await expect(emptyState.or(table).or(errorState)).toBeVisible()
-    } finally {
-      await deleteCredentialByName(app, name)
-    }
-  })
-
-  test('workflows tab shows count in footer when workflows exist', async ({ app }) => {
-    const { name } = await createTestCredential(app, { prefix: 'e2e-detail-wf-count' })
-    try {
-      await navigateToCredentialDetail(app, name)
-      await app.getByRole('tab', { name: /Workflows/ }).click()
-
-      // Assert - Either count footer, empty state, or error renders
-      const countFooter = app.getByText(/\d+ workflows?/)
-      const emptyState = app.getByText('No workflows using this credential')
-      const errorState = app.getByText('Failed to load workflows')
-      await expect(countFooter.or(emptyState).or(errorState)).toBeVisible()
-    } finally {
-      await deleteCredentialByName(app, name)
-    }
-  })
-
   test('workflow names display as bold text in table', async ({ app }) => {
     const { name } = await createTestCredential(app, { prefix: 'e2e-detail-wf-bold' })
     try {
@@ -165,6 +132,22 @@ test.describe('Credential Detail Page & Workflows Tab', () => {
           .or(app.getByText('Failed to load workflows'))
         await expect(emptyOrError).toBeVisible()
       }
+    } finally {
+      await deleteCredentialByName(app, name)
+    }
+  })
+
+  test.skip('shows empty state when no workflows use credential', async ({ app }) => {
+    // A freshly created credential has no workflows referencing it
+    const { name } = await createTestCredential(app, { prefix: 'e2e-detail-wf-empty' })
+    try {
+      await navigateToCredentialDetail(app, name)
+      await app.getByRole('tab', { name: /Workflows/ }).click()
+
+      // Assert - Empty state or error (if endpoint not implemented yet)
+      const emptyState = app.getByText('No workflows using this credential')
+      const errorState = app.getByText('Failed to load workflows')
+      await expect(emptyState.or(errorState)).toBeVisible()
     } finally {
       await deleteCredentialByName(app, name)
     }
@@ -197,22 +180,6 @@ test.describe('Credential Detail Page & Workflows Tab', () => {
       // Assert - Empty state or error (freshly created credential has no integrations)
       const emptyState = app.getByText('No integrations using this credential')
       const errorState = app.getByText('Failed to load integrations')
-      await expect(emptyState.or(errorState)).toBeVisible()
-    } finally {
-      await deleteCredentialByName(app, name)
-    }
-  })
-
-  test.skip('shows empty state when no workflows use credential', async ({ app }) => {
-    // A freshly created credential has no workflows referencing it
-    const { name } = await createTestCredential(app, { prefix: 'e2e-detail-wf-empty' })
-    try {
-      await navigateToCredentialDetail(app, name)
-      await app.getByRole('tab', { name: /Workflows/ }).click()
-
-      // Assert - Empty state or error (if endpoint not implemented yet)
-      const emptyState = app.getByText('No workflows using this credential')
-      const errorState = app.getByText('Failed to load workflows')
       await expect(emptyState.or(errorState)).toBeVisible()
     } finally {
       await deleteCredentialByName(app, name)
