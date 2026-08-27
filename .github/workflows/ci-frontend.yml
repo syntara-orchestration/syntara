@@ -23,6 +23,10 @@ on:
         description: 'PR head branch ref'
         required: true
         type: string
+      actor:
+        description: 'GitHub actor who triggered the workflow (for comment correlation)'
+        required: false
+        type: string
       enable_currents:
         description: 'Enable Currents reporting'
         required: false

@@ -9,11 +9,16 @@ name: "/run-e2e-ui-tests Post Results"
 # 1. We never check out any code from the PR or triggering workflow
 # 2. We never execute any code from the PR
 # 3. We only read workflow metadata (conclusion, run ID, inputs)
-# 4. We only update a PR comment with status information
+# 4. We only post a follow-up comment with status information
 # 5. All data comes from GitHub's workflow_run event, not PR-controlled sources
 #
 # The workflow_run trigger is necessary to watch for workflow completions.
 # There is no alternative trigger that provides this functionality.
+#
+# WARNING: The workflow_dispatch trigger is for testing only and has no
+# authorization checks. Anyone who can dispatch workflows can post fabricated
+# status comments via this path. This is acceptable for temporary testing but
+# consider removing before merge or restricting to repository admins.
 on:
   workflow_run:
     workflows:
@@ -42,8 +47,6 @@ on:
 permissions:
   actions: read
   pull-requests: write
-  issues: write
-  contents: read
 
 jobs:
   post-results:
@@ -84,6 +87,7 @@ jobs:
           echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
 
       - name: Post results comment
+        if: steps.pr.outputs.number != ''
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
