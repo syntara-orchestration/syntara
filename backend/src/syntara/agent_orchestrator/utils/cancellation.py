@@ -1,5 +1,6 @@
 """Helpers for detecting invocation cancellation from a running agent."""
 
+import asyncio
 from uuid import UUID
 
 import structlog
@@ -12,6 +13,10 @@ from syntara.core.cache.stream import StreamClient
 from syntara.core.database.session import AsyncSessionLocal
 
 logger = structlog.stdlib.get_logger(__name__)
+
+# StreamClient has no socket_timeout, so EXISTS can block forever. Bound it so a
+# hung Redis is treated as unavailable and we fall back to the invocation row.
+_REDIS_CANCEL_CHECK_TIMEOUT_SECONDS = 2.0
 
 
 def get_invocation_cancel_key(invocation_id: UUID) -> str:
@@ -36,7 +41,8 @@ async def is_invocation_cancelled(session: AsyncSession, invocation_id: UUID) ->
 async def raise_if_invocation_cancelled(invocation_id: UUID, phase: str) -> None:
     """Raise ``InvocationCancelledError`` if the invocation was cancelled.
 
-    Redis-first (cancel key), with a DB fallback only when Redis itself errors.
+    Redis-first (cancel key), with a DB fallback only when Redis itself errors
+    or the EXISTS check exceeds ``_REDIS_CANCEL_CHECK_TIMEOUT_SECONDS``.
     Database errors are logged and swallowed so a failed status check cannot
     take down an otherwise healthy agent run.
     """
@@ -45,7 +51,13 @@ async def raise_if_invocation_cancelled(invocation_id: UUID, phase: str) -> None
 
     try:
         async with StreamClient() as client:
-            cancelled = await client.key_exists(get_invocation_cancel_key(invocation_id)) is True
+            cancelled = (
+                await asyncio.wait_for(
+                    client.key_exists(get_invocation_cancel_key(invocation_id)),
+                    timeout=_REDIS_CANCEL_CHECK_TIMEOUT_SECONDS,
+                )
+                is True
+            )
     except Exception:  # noqa: BLE001
         redis_available = False
         logger.debug(

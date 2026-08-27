@@ -1,5 +1,6 @@
 """Unit tests for invocation cancellation helpers."""
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
@@ -129,6 +130,38 @@ async def test_raise_if_cancelled_db_fallback_on_redis_error() -> None:
         pytest.raises(InvocationCancelledError),
     ):
         await raise_if_invocation_cancelled(invocation_id, "orchestration")
+
+    session.get.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_raise_if_cancelled_db_fallback_on_redis_hang() -> None:
+    """A hung Redis EXISTS must fall back to the invocation row, not block."""
+    invocation_id = uuid4()
+    invocation = MagicMock()
+    invocation.status = InvocationStatus.CANCELLED
+    session = _db_session(invocation)
+
+    async def _hang(_key: str) -> bool:
+        await asyncio.sleep(60)
+        return False
+
+    mock_client = AsyncMock()
+    mock_client.key_exists = _hang
+    mock_cls = MagicMock()
+    mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
+
+    with (
+        patch("syntara.agent_orchestrator.utils.cancellation._REDIS_CANCEL_CHECK_TIMEOUT_SECONDS", 0.05),
+        patch("syntara.agent_orchestrator.utils.cancellation.StreamClient", mock_cls),
+        patch(
+            "syntara.agent_orchestrator.utils.cancellation.AsyncSessionLocal",
+            return_value=session,
+        ),
+        pytest.raises(InvocationCancelledError),
+    ):
+        await raise_if_invocation_cancelled(invocation_id, "tool_execution")
 
     session.get.assert_awaited_once()
 

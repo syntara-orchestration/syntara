@@ -369,7 +369,6 @@ def create_tool_awrapper(
     async def _execute(
         request: ToolCallRequest, execute: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command[Any]]]
     ) -> ToolMessage | Command[Any]:
-        await raise_if_invocation_cancelled(ctx.invocation_id, "tool_execution")
         return await execute(request)
 
     async def tool_awrapper(
@@ -394,6 +393,9 @@ def create_tool_awrapper(
         _emit_start_audit(ctx, tool_name, tool_input)
 
         try:
+            # Outside retry_with_backoff's wait_for so a hung Redis EXISTS
+            # cannot be classified as a retryable tool TimeoutError.
+            await raise_if_invocation_cancelled(ctx.invocation_id, "tool_execution")
             result = await _execute(request, execute)
             _emit_success_audit(ctx, tool_name, result)
             return result
