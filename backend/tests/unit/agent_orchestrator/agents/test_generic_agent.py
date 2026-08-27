@@ -112,8 +112,9 @@ class TestGenericAgentLLMIntegration:
             response_metadata={
                 "finish_reason": "stopstop",
                 "model_name": "anthropic/claude-opus-4.6anthropic/claude-opus-4.6",
-                "token_usage": {"prompt_tokens": 12, "completion_tokens": 8},
+                "token_usage": {"prompt_tokens": 24, "completion_tokens": 16, "total_tokens": 40},
             },
+            usage_metadata={"input_tokens": 12, "output_tokens": 8, "total_tokens": 20},
         )
         mock_llm.bind_tools.return_value = mock_llm_with_tools
         mock_llm.model_name = "anthropic/claude-opus-4.6"
@@ -141,7 +142,11 @@ class TestGenericAgentLLMIntegration:
         assert meta is not None
         assert meta["finish_reason"] == "stop"
         assert meta["model_name"] == "anthropic/claude-opus-4.6"
-        assert meta["token_usage"] == {"prompt_tokens": 12, "completion_tokens": 8}
+        assert meta["token_usage"] == {
+            "prompt_tokens": 12,
+            "completion_tokens": 8,
+            "total_tokens": 20,
+        }
 
     @pytest.mark.asyncio
     async def test_generic_agent_raises_configuration_error_for_invalid_api_key(

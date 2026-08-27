@@ -131,6 +131,11 @@ class TestGenericAgentStructuredOutputNoTools:
         assert meta is not None
         assert meta["finish_reason"] == "stop"
         assert meta["model_name"] == "gpt-4"
+        assert meta["token_usage"] == {
+            "prompt_tokens": 80,
+            "completion_tokens": 20,
+            "total_tokens": 100,
+        }
 
     @pytest.mark.asyncio
     async def test_execute_structured_output_no_tools_fallback(

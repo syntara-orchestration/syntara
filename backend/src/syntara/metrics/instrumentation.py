@@ -73,20 +73,20 @@ class LLMCallMetrics:
 
 
 def _collapse_concatenated_scalar(value: str) -> str:
-    """Undo LangChain stream-merge doubling of string scalars (AAP-86784).
+    """Undo LangChain stream-merge concatenation of string scalars (AAP-86784).
 
     Same algorithm as ``collapse_concatenated_scalar`` in
     ``syntara.agent_orchestrator.utils.response_metadata``. Kept local so this
     module does not import ``agent_orchestrator``.
     """
-    collapsed = value
-    while True:
-        half, odd = divmod(len(collapsed), 2)
-        if odd or not half:
-            return collapsed
-        if collapsed[:half] != collapsed[half:]:
-            return collapsed
-        collapsed = collapsed[:half]
+    length = len(value)
+    for unit_len in range(1, length // 2 + 1):
+        if length % unit_len:
+            continue
+        unit = value[:unit_len]
+        if unit * (length // unit_len) == value:
+            return unit
+    return value
 
 
 def _extract_token_usage(response: Any) -> tuple[int, int]:  # noqa: ANN401
