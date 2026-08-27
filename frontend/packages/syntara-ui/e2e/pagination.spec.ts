@@ -144,7 +144,7 @@ test.describe('Pagination Footer — Users Tab', () => {
       .then(() => true)
       .catch(() => false)
     if (!hasTable) guard.markUnavailable()
-    test.skip(!hasTable, 'No users data available')
+    expect(hasTable, 'No users data available').toBeTruthy()
   })
 
   test('pagination footer is visible with per-page toggle', async ({ app }) => {
@@ -174,7 +174,7 @@ test.describe('Pagination Footer — Groups Tab', () => {
       .waitFor({ state: 'visible', timeout: 30_000 })
       .then(() => true)
       .catch(() => false)
-    test.skip(!hasTable, 'No groups data available')
+    expect(hasTable, 'No groups data available').toBeTruthy()
 
     const perPageToggle = paginationFooter(app).getByRole('button', { name: /\d+ - \d+/ })
     await expect(perPageToggle).toBeVisible()
@@ -195,9 +195,8 @@ test.describe('Project Selector — Workflows', () => {
       .catch(() => false)
     if (!hasTable) {
       guard.markUnavailable()
-      test.skip(true, 'No workflows available — create workflows first')
-      return
     }
+    expect(hasTable, 'No workflows available — create workflows first').toBeTruthy()
 
     const projectInput = app.getByPlaceholder('All projects')
     const selectorVisible = await projectInput
@@ -235,10 +234,10 @@ test.describe('Project Selector — Workflows', () => {
 
   test('selecting a project sends project_id to the API', async ({ app }) => {
     const workflowCountAllProjects = await workflowNameButtons(app).count()
-    test.skip(
-      workflowCountAllProjects === 0,
+    expect(
+      workflowCountAllProjects > 0,
       'No workflow builder links visible — need at least one workflow to test project filter'
-    )
+    ).toBeTruthy()
 
     const requestPromise = app.waitForRequest((req) => {
       const u = req.url()
@@ -259,7 +258,7 @@ test.describe('Project Selector — Workflows', () => {
         break
       }
     }
-    test.skip(!clicked, 'No real projects available')
+    expect(clicked, 'No real projects available').toBeTruthy()
 
     const request = await requestPromise
     const rawUrl = request.url()
@@ -287,7 +286,7 @@ test.describe('Project Selector — Workflows', () => {
         break
       }
     }
-    test.skip(!clicked, 'No real projects available')
+    expect(clicked, 'No real projects available').toBeTruthy()
 
     // Wait for table to update after project selection
     await app.getByRole('grid', { name: 'Workflows table' }).waitFor({ state: 'visible', timeout: 10_000 })
@@ -323,9 +322,8 @@ test.describe('Pagination Navigation — Workflows', () => {
       .catch(() => false)
     if (!hasTable) {
       guard.markUnavailable()
-      test.skip(true, 'No workflows available')
-      return
     }
+    expect(hasTable, 'No workflows available').toBeTruthy()
 
     // Set per-page to 10 so pagination activates even with fewer items
     const perPageToggle = paginationFooter(app).getByRole('button', { name: /\d+ - \d+/ })
@@ -341,7 +339,7 @@ test.describe('Pagination Navigation — Workflows', () => {
       .catch(() => false)
     const hasNextPage = buttonVisible && (await nextButton.isEnabled().catch(() => false))
     if (!hasNextPage) guard.markUnavailable()
-    test.skip(!hasNextPage, 'Not enough data to paginate — need more than 10 workflows')
+    expect(hasNextPage, 'Not enough data to paginate — need more than 10 workflows').toBeTruthy()
   })
 
   test('next/previous page buttons navigate between pages', async ({ app }) => {
@@ -384,7 +382,7 @@ test.describe('Pagination Footer — Credentials', () => {
       .then(() => true)
       .catch(() => false)
     if (!hasTable) guard.markUnavailable()
-    test.skip(!hasTable, 'No credentials data available')
+    expect(hasTable, 'No credentials data available').toBeTruthy()
   })
 
   test('credentials table renders with footer', async ({ app }) => {
@@ -405,7 +403,7 @@ test.describe('Pagination Footer — Integrations', () => {
       .then(() => true)
       .catch(() => false)
     if (!hasTable) guard.markUnavailable()
-    test.skip(!hasTable, 'No integrations data available')
+    expect(hasTable, 'No integrations data available').toBeTruthy()
   })
 
   test('pagination footer is visible', async ({ app }) => {
@@ -434,7 +432,7 @@ test.describe('Pagination Footer — Identity Providers', () => {
       .then(() => true)
       .catch(() => false)
     if (!hasTable) guard.markUnavailable()
-    test.skip(!hasTable, 'No identity provider data available')
+    expect(hasTable, 'No identity provider data available').toBeTruthy()
   })
 
   test('pagination footer is visible on identity providers tab', async ({ app }) => {

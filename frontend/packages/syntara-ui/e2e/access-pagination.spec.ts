@@ -67,14 +67,14 @@ test.describe('Access Management — Dropdown Pagination', () => {
     await app.goto(toAppUrl('/system-administration/access-management/users'))
     await expect(app.getByRole('heading', { level: 1, name: 'Access Management' })).toBeVisible()
 
-    const usersTable = app.getByRole('grid', { name: 'Users table' })
+    const usersTable = app.getByRole('grid', { name: 'Users' })
     const firstUserRow = usersTable.locator('tbody tr:first-child')
     const firstUserLink = firstUserRow.getByRole('link')
     const hasUser = await firstUserLink
       .waitFor({ state: 'visible', timeout: 5000 })
       .then(() => true)
       .catch(() => false)
-    test.skip(!hasUser, 'No users available; seed data required')
+    expect(hasUser, 'No users available; seed data required').toBeTruthy()
 
     await firstUserLink.click()
 
@@ -123,7 +123,7 @@ test.describe('Access Management — Dropdown Pagination', () => {
         .waitFor({ state: 'visible', timeout: 5000 })
         .then(() => true)
         .catch(() => false)
-      test.skip(!hasGroup, 'No groups available; seed data required')
+      expect(hasGroup, 'No groups available; seed data required').toBeTruthy()
 
       await firstGroupButton.click()
 
@@ -134,7 +134,7 @@ test.describe('Access Management — Dropdown Pagination', () => {
         .waitFor({ state: 'visible', timeout: 5000 })
         .then(() => true)
         .catch(() => false)
-      test.skip(!hasMembersTab, 'First group has no Members tab (may be the "authenticated" group)')
+      expect(hasMembersTab, 'First group has no Members tab (may be the "authenticated" group)').toBeTruthy()
 
       await membersTab.click()
 
@@ -156,7 +156,7 @@ test.describe('Access Management — Dropdown Pagination', () => {
         .waitFor({ state: 'visible', timeout: 15_000 })
         .then(() => true)
         .catch(() => false)
-      test.skip(!hasOptions, 'Typeahead dropdown did not populate')
+      expect(hasOptions, 'Typeahead dropdown did not populate').toBeTruthy()
       expect(await userOptions.count()).toBeGreaterThan(0)
 
       await dialog.getByRole('button', { name: 'Cancel' }).click()

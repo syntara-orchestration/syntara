@@ -49,7 +49,7 @@ test.describe('Group Detail — Navigation & Tabs', () => {
       .then(() => true)
       .catch(() => false)
     if (!hasAdmins) guard.markUnavailable()
-    test.skip(!hasAdmins, 'No "admins" group found; seed data required')
+    expect(hasAdmins, 'No "admins" group found; seed data required').toBeTruthy()
   })
 
   test('clicking a group name navigates to the detail page', async ({ app }) => {
@@ -127,10 +127,7 @@ test.describe('Group Detail — Navigation & Tabs', () => {
       const availableOptions = app.getByRole('option').filter({ hasNotText: /No results match/ })
       await expect(noResults.or(availableOptions)).toBeVisible({ timeout: 15_000 })
 
-      if (await noResults.isVisible()) {
-        test.skip(true, 'No available users to add (all users are already members)')
-        return
-      }
+      expect(await noResults.isVisible(), 'No available users to add (all users are already members)').toBe(false)
 
       // The option contains two child spans: username + display name.
       // Extract just the username (first child text) for later verification.
@@ -202,7 +199,7 @@ test.describe('User Detail — Group Membership', () => {
       .waitFor({ state: 'visible', timeout: 5000 })
       .then(() => true)
       .catch(() => false)
-    test.skip(!hasUser, 'No admin user in mock data')
+    expect(hasUser, 'No admin user in mock data').toBeTruthy()
 
     await userLink.click()
     await expect(app).toHaveURL(/\/system-administration\/access-management\/users\/[^/]+$/, { timeout: 30_000 })

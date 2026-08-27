@@ -36,7 +36,7 @@ import {
 } from './helpers/v2-nodes'
 import { addConvergeNode } from './helpers/v2-nodes-converge'
 import { buildUniqueName, selectProjectIfRequired, deleteWorkflow, triggerLayout } from './helpers/workflows'
-import { createWorkflowViaApi, deleteWorkflowViaApi } from './utils/api'
+import { apiRequest, createWorkflowViaApi, deleteWorkflowViaApi } from './utils/api'
 
 /** Inline v2 schema type (formerly in toV2Definition.ts stub, now replaced by generated contracts). */
 type V2WorkflowDefinition = {
@@ -324,6 +324,9 @@ test.describe('V2 Workflow Schema Migration', () => {
     )
 
     try {
+      const getResp = await apiRequest(app, 'get', `/workflows/${workflowId}`)
+      expectV2SchemaStructure(getV2DefFromResponse(await getResp.json()))
+
       // Navigate to the workflow in the builder
       await app.goto(toAppUrl('/workflow-builder/' + workflowId))
 

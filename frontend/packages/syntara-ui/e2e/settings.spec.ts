@@ -99,14 +99,14 @@ test.describe('Settings', () => {
       .then(() => true)
       .catch(() => false)
     if (!hasPage) guard.markUnavailable()
-    test.skip(!hasPage, 'Settings page not available; backend may not be running')
+    expect(hasPage, 'Settings page not available; backend may not be running').toBeTruthy()
     const hasTabs = await app
       .getByRole('tab', { name: /Context Manager|System|Authentication/i })
       .waitFor({ state: 'visible', timeout: 10_000 })
       .then(() => true)
       .catch(() => false)
     if (!hasTabs) guard.markUnavailable()
-    test.skip(!hasTabs, 'Settings page has no tabs; backend may not have settings configured')
+    expect(hasTabs, 'Settings page has no tabs; backend may not have settings configured').toBeTruthy()
   })
 
   test('page renders with category tabs', async ({ app }) => {
@@ -121,7 +121,7 @@ test.describe('Settings', () => {
       .waitFor({ state: 'visible', timeout: 5000 })
       .then(() => true)
       .catch(() => false)
-    test.skip(!hasCmTab, 'Context Manager tab not available')
+    expect(hasCmTab, 'Context Manager tab not available').toBeTruthy()
 
     await cmTab.click()
 
@@ -154,7 +154,7 @@ test.describe('Settings', () => {
       .waitFor({ state: 'visible', timeout: 5000 })
       .then(() => true)
       .catch(() => false)
-    test.skip(!hasCmTab, 'Context Manager tab not available')
+    expect(hasCmTab, 'Context Manager tab not available').toBeTruthy()
 
     await cmTab.click()
 
@@ -193,7 +193,7 @@ test.describe('Settings', () => {
       .waitFor({ state: 'visible', timeout: 5000 })
       .then(() => true)
       .catch(() => false)
-    test.skip(!hasSysTab, 'System tab not available')
+    expect(hasSysTab, 'System tab not available').toBeTruthy()
 
     await sysTab.click()
 
@@ -203,7 +203,7 @@ test.describe('Settings', () => {
       .waitFor({ state: 'visible', timeout: 5000 })
       .then(() => true)
       .catch(() => false)
-    test.skip(!hasToggle, 'Performance test mode toggle not found')
+    expect(hasToggle, 'Performance test mode toggle not found').toBeTruthy()
 
     // PF6 Switch renders a visual <span> overlay that intercepts pointer events
     const wasChecked = await toggle.isChecked()
@@ -226,7 +226,7 @@ test.describe('Settings', () => {
       .waitFor({ state: 'visible', timeout: 5000 })
       .then(() => true)
       .catch(() => false)
-    test.skip(!hasCmTab, 'Context Manager tab not available')
+    expect(hasCmTab, 'Context Manager tab not available').toBeTruthy()
 
     await cmTab.click()
 
@@ -259,7 +259,7 @@ test.describe('Settings', () => {
       .waitFor({ state: 'visible', timeout: 5000 })
       .then(() => true)
       .catch(() => false)
-    test.skip(!hasCmTab, 'Context Manager tab not available')
+    expect(hasCmTab, 'Context Manager tab not available').toBeTruthy()
 
     await cmTab.click()
 
@@ -305,7 +305,7 @@ test.describe('Settings', () => {
       .waitFor({ state: 'visible', timeout: 10_000 })
       .then(() => true)
       .catch(() => false)
-    test.skip(!hasTabs, 'Settings tabs not available for auditor')
+    expect(hasTabs, 'Settings tabs not available for auditor').toBeTruthy()
 
     await cmTab.click()
     // PF6 FormSection renders role="group" with the title as its accessible name.
@@ -577,7 +577,7 @@ test.describe('Settings', () => {
       .waitFor({ state: 'visible', timeout: 5000 })
       .then(() => true)
       .catch(() => false)
-    test.skip(!hasAuthTab, 'Authentication tab not available')
+    expect(hasAuthTab, 'Authentication tab not available').toBeTruthy()
 
     await authTab.click()
 

@@ -125,7 +125,7 @@ test.describe('Access Management — Roles Tab Filtering', () => {
       .then(() => true)
       .catch(() => false)
     if (!hasTable) guard.markUnavailable()
-    test.skip(!hasTable, 'No roles data available; seed data required')
+    expect(hasTable, 'No roles data available; seed data required').toBeTruthy()
   })
 
   test('filter by name syncs to URL', async ({ app }) => {
@@ -188,7 +188,7 @@ test.describe('Access Management — Roles Tab Sorting', () => {
       .then(() => true)
       .catch(() => false)
     if (!hasTable) guard.markUnavailable()
-    test.skip(!hasTable, 'No roles data available; seed data required')
+    expect(hasTable, 'No roles data available; seed data required').toBeTruthy()
   })
 
   test('clicking column header updates sort in URL', async ({ app }) => {
@@ -261,7 +261,7 @@ test.describe('Access Management — Shareable URLs', () => {
       .waitFor({ state: 'visible', timeout: 5000 })
       .then(() => true)
       .catch(() => false)
-    test.skip(!hasTable, 'No roles data available; seed data required')
+    expect(hasTable, 'No roles data available; seed data required').toBeTruthy()
 
     await app.getByPlaceholder('Filter by name').fill('admin')
     await app.getByRole('button', { name: 'Apply filter' }).click()
@@ -303,7 +303,7 @@ test.describe('Access Management — User Detail Tabs', () => {
       .waitFor({ state: 'visible', timeout: 5000 })
       .then(() => true)
       .catch(() => false)
-    test.skip(!hasTable, 'No users data available; seed data required')
+    expect(hasTable, 'No users data available; seed data required').toBeTruthy()
 
     // Click the first username link in the table to navigate to detail
     const firstRow = table.locator('tbody tr:first-child')
@@ -343,7 +343,7 @@ test.describe('Access Management — Policies Tab Columns', () => {
       .then(() => true)
       .catch(() => false)
     if (!hasTable) guard.markUnavailable()
-    test.skip(!hasTable, 'No policies data available; seed data required')
+    expect(hasTable, 'No policies data available; seed data required').toBeTruthy()
   })
 
   test('Statements, Scope, Description and Project columns are visible', async ({ app }) => {
@@ -362,7 +362,7 @@ test.describe('Access Management — Policies Tab Columns', () => {
     const hasAllowLabel = (await statementsColumn.getByText('Allow').count()) > 0
     const hasDenyLabel = (await statementsColumn.getByText('Deny').count()) > 0
 
-    test.skip(!hasAllowLabel && !hasDenyLabel, 'No statement effect labels rendered; statements data required')
+    expect(hasAllowLabel || hasDenyLabel, 'No statement effect labels rendered; statements data required').toBeTruthy()
 
     // At least one scope label should be visible (e.g. "scope: any").
     // Use count check rather than toBeVisible so strict mode is not triggered by
@@ -377,7 +377,7 @@ test.describe('Access Management — Policies Tab Columns', () => {
     const projectButtons = table.locator('td[data-label="Project"]').getByRole('button')
     const hasProjectLink = (await projectButtons.count()) > 0
 
-    test.skip(!hasProjectLink, 'No project-scoped policies on this page; seed data required')
+    expect(hasProjectLink, 'No project-scoped policies on this page; seed data required').toBeTruthy()
 
     // toBeVisible() triggers Playwright strict mode when projectButtons matches multiple rows.
     // Filter to visible elements and assert at least one is present instead.

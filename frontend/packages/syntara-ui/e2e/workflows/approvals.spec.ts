@@ -63,25 +63,19 @@ async function createPendingApproval(
   const runResp = await apiRequest(app, 'post', `/workflows/${workflowId}/run`, { data: {} })
   const execution = (await runResp.json()) as { id?: string; execution_id?: string }
   const executionId = execution.id ?? execution.execution_id
+  expect(executionId, 'POST /workflows/{id}/run did not return an execution ID').toBeTruthy()
   if (!executionId) {
-    test.skip(true, 'POST /workflows/{id}/run did not return an execution ID — Temporal may not be running')
-    return { workflowId, approvalName }
+    throw new Error('POST /workflows/{id}/run did not return an execution ID')
   }
 
-  // Wait for execution to pause at the approval node (requires Temporal)
-  const reachedPaused = await pollExecutionStatus(app, executionId, ['paused'])
-    .then(() => true)
-    .catch(() => false)
-  test.skip(!reachedPaused, 'Execution did not reach paused state — Temporal worker may not be running')
+  // Wait for execution to pause at the approval node (requires Temporal).
+  // Describe-level SYNTARA_E2E_HAS_TEMPORAL_WORKER already gates environment availability.
+  await pollExecutionStatus(app, executionId, ['paused'])
 
   // Wait for the approval record to be queryable in the listing API before returning.
   // There is a brief async gap between the execution reaching "paused" and the approval
   // appearing in the approvals index — polling here prevents the race in the test setup.
-  // In Konflux's environment the indexing lag can exceed 30s; treat as a skip (not a failure).
-  const approvalVisible = await pollApprovalVisible(app, approvalName, { timeout: 45_000 })
-    .then(() => true)
-    .catch(() => false)
-  test.skip(!approvalVisible, 'Approval record not visible in listing API — async indexing lag in Konflux')
+  await pollApprovalVisible(app, approvalName, { timeout: 45_000 })
 
   return { workflowId, approvalName }
 }

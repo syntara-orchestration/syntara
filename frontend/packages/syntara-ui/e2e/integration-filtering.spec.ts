@@ -38,7 +38,7 @@ test.describe('Integration Filtering', () => {
       .then(() => true)
       .catch(() => false)
     if (!hasGrid) guard.markUnavailable()
-    test.skip(!hasGrid, 'No integration data available; seed data required')
+    expect(hasGrid, 'No integration data available; seed data required').toBeTruthy()
   })
 
   test('keyword search: filter by integration name', async ({ app }) => {
@@ -69,7 +69,7 @@ test.describe('Integration Filtering', () => {
       .waitFor({ state: 'visible', timeout: 3000 })
       .then(() => true)
       .catch(() => false)
-    test.skip(!hasResults, 'No integrations matching "copilot" filter; seed data required')
+    expect(hasResults, 'No integrations matching "copilot" filter; seed data required').toBeTruthy()
   })
 
   test('name filter: apply and clear name filter', async ({ app }) => {
@@ -127,7 +127,7 @@ test.describe('Integration Filtering', () => {
       .waitFor({ state: 'visible', timeout: 3000 })
       .then(() => true)
       .catch(() => false)
-    test.skip(!hasAvailable, 'No integrations with "Available" status; seed data required')
+    expect(hasAvailable, 'No integrations with "Available" status; seed data required').toBeTruthy()
 
     // Act - Switch to "Error" status (replaces "Available")
     await app.getByRole('search', { name: 'Filters' }).getByRole('button', { name: 'Available', exact: true }).click()
@@ -395,7 +395,7 @@ test.describe('Integration Filtering', () => {
     await expect(grid).toBeVisible()
 
     const rowCount = await grid.getByRole('row').count()
-    test.skip(rowCount < 6, 'Insufficient integration data for pagination; seed data required')
+    expect(rowCount >= 6, 'Insufficient integration data for pagination; seed data required').toBeTruthy()
 
     // Skip if not enough data for pagination
     const nextButton = app.getByRole('button', { name: 'Go to next page' })
@@ -405,7 +405,7 @@ test.describe('Integration Filtering', () => {
       .then(() => true)
       .catch(() => false)
     const hasPagination = nextVisible && (await nextButton.isEnabled().catch(() => false))
-    test.skip(!hasPagination, 'Not enough integrations to trigger pagination')
+    expect(hasPagination, 'Not enough integrations to trigger pagination').toBeTruthy()
 
     // Act - Navigate to page 2
     await expect(prevButton).toBeDisabled()
