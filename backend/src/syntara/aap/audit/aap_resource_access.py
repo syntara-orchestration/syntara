@@ -57,8 +57,8 @@ class AAPResourceAccessEvent:
 
     Captures the resource type, action (list/get), result metadata, and
     whether an Orchestrator credential authenticated the request (explicit
-    ``credential_id`` or the integration's management credential). Env-var
-    auth is not used by the AAP proxy.
+    ``credential_id`` or the integration's management credential). False when
+    the request failed before decrypt. Env-var auth is not used by the AAP proxy.
     """
 
     resource_type: AAPResourceType
