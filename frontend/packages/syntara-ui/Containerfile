@@ -1,29 +1,103 @@
-# Build stage - use native platform for faster builds
-FROM --platform=$BUILDPLATFORM mirror.gcr.io/library/node:24.17.0-alpine@sha256:156b55f92e98ccd5ef49578a8cea0df4679826564bad1c9d4ef04462b9f0ded6 AS builder
+# Syntara UI — unified Containerfile for dev and production (Konflux) builds.
+#
+# Local dev:
+#   podman build -f packages/syntara-ui/Containerfile -t syntara-ui .
+#   podman run --rm -p 4000:8080 -e APP_API_URL=http://host.containers.internal:8000 syntara-ui
+#
+# Without APP_API_URL the image serves static files only (production behavior).
+# With APP_API_URL set, an nginx proxy config is generated at startup for local
+# API and WebSocket routing.
 
-ARG TARGETPLATFORM
-ARG BUILDPLATFORM
+# Downstream brand override layer — digest injected by Konflux build-nudge.
+# Defaults to scratch (empty, built-in) so builds without --build-arg succeed.
+ARG DOWNSTREAM_OVERRIDE=scratch
+ARG BRANDING=false
+
+FROM ${DOWNSTREAM_OVERRIDE} AS override
+
+# ── Build stage ───────────────────────────────────────────────────────────────
+FROM registry.access.redhat.com/ubi9/nodejs-24:latest@sha256:3f9a88954bdc197c910f233d04b2071fad68f69dde598691ee92e5193300266f AS builder
+
+ARG BRANDING
+
+USER root
 
 WORKDIR /app
 
+# Copy license files for Red Hat certification (HasLicense check)
 COPY LICENSE /licenses/LICENSE
 COPY packages/syntara-ui/LICENSE /licenses/syntara-ui-LICENSE
 
+# Copy package files for dependency installation
 COPY package.json package-lock.json ./
 COPY packages/syntara-contracts/package.json ./packages/syntara-contracts/
 COPY packages/syntara-ui/package.json ./packages/syntara-ui/
-RUN npm ci --no-fund --no-audit --ignore-scripts
+
+# Install dependencies (CI=true for deterministic builds)
+RUN CI=true npm ci --no-fund --no-audit --ignore-scripts
+
+# Copy source code
 COPY . .
+
 # Rebuild workspace packages to ensure symlinks are valid after source copy
 RUN npm rebuild
+
+# Apply downstream brand overrides when BRANDING=true.
+# Uses --mount instead of COPY so that scratch (empty) override stages don't fail.
+RUN --mount=from=override,source=/,target=/tmp/override \
+    if [ "$BRANDING" = "true" ] && [ -d /tmp/override/frontend ]; then \
+        export NEXUS_UI_ASSETS_DIR=/app/packages/syntara-ui/src/assets && \
+        export SYNTARA_UI_ASSETS_DIR=/app/packages/syntara-ui/src/assets && \
+        bash /tmp/override/frontend/scripts/apply-downstream-brand.sh && \
+        bash /tmp/override/frontend/scripts/assert-downstream-brand.sh; \
+    fi
+
+# Build the application
 RUN npm run build
 
-# Production stage - target platform will be used automatically
-FROM mirror.gcr.io/library/nginx:1.27.4-alpine@sha256:4ff102c5d78d254a6f0da062b3cf39eaf07f01eec0927fd21e219d0af8bc0591
+# ── Runtime stage ─────────────────────────────────────────────────────────────
+FROM registry.access.redhat.com/ubi9/nginx-124:latest@sha256:3292e9a046b72b18e51229a448f97568a9af26b26bf54488bfd78094800f2e61
 
+USER 0
+
+# Copy licenses from builder stage for Red Hat certification (HasLicense check)
 COPY --from=builder /licenses /licenses
 
-COPY --from=builder /app/packages/syntara-ui/dist /usr/share/nginx/html
-COPY packages/syntara-ui/nginx.conf.template /etc/nginx/templates/default.conf.template
-EXPOSE 80
+# Copy built application to the location expected by ubi9/nginx-124
+COPY --from=builder --chown=1001:0 /app/packages/syntara-ui/dist /opt/app-root/src
+
+# Drop nginx config snippets into the UBI9 nginx default server block include path.
+# The base nginx.conf includes /opt/app-root/etc/nginx.default.d/*.conf inside the
+# default server block (port 8080, root /opt/app-root/src).
+COPY --chown=1001:0 packages/syntara-ui/nginx/syntara.conf \
+    /opt/app-root/etc/nginx.default.d/syntara.conf
+
+# API proxy template and entrypoint — proxy config is generated at startup only
+# when APP_API_URL is set.
+COPY --chown=1001:0 packages/syntara-ui/nginx/api-proxy.conf.template \
+    /opt/app-root/etc/nginx/api-proxy.conf.template
+COPY --chown=1001:0 packages/syntara-ui/nginx/entrypoint.sh \
+    /opt/app-root/etc/nginx/entrypoint.sh
+RUN chmod +x /opt/app-root/etc/nginx/entrypoint.sh
+
+# Switch to non-root user
+USER 1001
+
+EXPOSE 8080
+
+ENTRYPOINT ["/opt/app-root/etc/nginx/entrypoint.sh"]
 CMD ["nginx", "-g", "daemon off;"]
+
+# Downstream specific labels and metadata
+ENV DESCRIPTION="Syntara UI" \
+    container=oci
+
+LABEL com.redhat.component="ansible-automation-orchestrator-ui-container" \
+      name="ansible-automation-platform/ansible-automation-orchestrator-ui-rhel9" \
+      summary="${DESCRIPTION}" \
+      io.openshift.expose-services="" \
+      io.openshift.tags="automation,ansible,orchestrator" \
+      io.k8s.display-name="ansible-automation-orchestrator-ui-rhel9" \
+      io.k8s.description="${DESCRIPTION}" \
+      maintainer="Ansible Automation Platform Productization Team" \
+      description="${DESCRIPTION}"
