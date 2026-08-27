@@ -16,10 +16,12 @@ from syntara.authz.dependencies import PermissionChecker
 from syntara.core.config.base import get_settings
 from syntara.core.database.session import get_db
 from syntara.core.models import User, UserIdentity
+from syntara.core.openapi.filterable import FilterableModel
 from syntara.core.services.secret_service import create_secret_service
 from syntara.identity_providers.models import IdentityProviderListParams
 from syntara.identity_providers.models.aap_setup import AAPOIDCSetupRequest
 from syntara.identity_providers.models.identity_provider import (
+    IdentityProvider,
     IdentityProviderCreate,
     IdentityProviderListResponse,
     IdentityProviderRead,
@@ -124,6 +126,7 @@ async def list_identity_providers(
     request: Request,
     service: Annotated[IdentityProviderService, Depends(get_identity_provider_service)],
     params: Annotated[IdentityProviderListParams, Query()],
+    _filterable: Annotated[None, Depends(FilterableModel(IdentityProvider))],
 ) -> IdentityProviderListResponse:
     """List identity providers with filtering, sorting, and pagination."""
     return await service.list_providers(

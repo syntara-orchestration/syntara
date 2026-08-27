@@ -84,7 +84,7 @@ Services are injected via `Annotated` with `Depends()`:
 @router.get("")
 async def list_workflows(
     service: Annotated[WorkflowService, Depends(get_workflow_service)],
-    params: Annotated[WorkflowListParams, Depends()],
+    params: Annotated[BaseListParams, Depends()],
 ) -> WorkflowListResponse:
     return await service.list(...)
 ```

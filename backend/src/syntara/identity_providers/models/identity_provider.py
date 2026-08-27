@@ -53,12 +53,11 @@ class IdentityProvider(IdentityProviderBase, table=True):
 
     __tablename__ = "identity_providers"
 
-    __filterable_fields__: ClassVar[list[str]] = [
-        *NamedResource.__filterable_fields__,
-        "enabled",
-        "provider_type",
-        "configuration.provider_type",
-    ]
+    __filterable_fields__: ClassVar[dict[str, type | None]] = {  # type: ignore[assignment]
+        **dict.fromkeys(NamedResource.__filterable_fields__),
+        "enabled": None,
+        "provider_type": str,  # Virtual field: JSONB query configuration->>'provider_type'
+    }
 
     __sortable_fields__: ClassVar[list[str]] = [
         *NamedResource.__sortable_fields__,

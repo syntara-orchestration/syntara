@@ -633,8 +633,9 @@ generate-api-client: ## Generate the Syntara Python API client from the OpenAPI 
 	@echo "Generating client from $(OPENAPI_SPEC)..."
 	$(eval TMPDIR := $(shell mktemp -d))
 	$(eval BACKEND_DIR := $(shell pwd))
+	@uv run python tools/simplify_spec_for_client.py $(OPENAPI_SPEC) $(TMPDIR)/openapi-client.yaml
 	BACKEND_DIR=$(BACKEND_DIR) uv run openapi-python-client generate \
-		--path $(OPENAPI_SPEC) \
+		--path $(TMPDIR)/openapi-client.yaml \
 		--output-path $(TMPDIR)/syntara_api_client \
 		--custom-template-path tools/api_custom_templates \
 		--config tools/openapi-python-client.yaml \

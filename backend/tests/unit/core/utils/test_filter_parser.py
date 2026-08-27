@@ -726,6 +726,73 @@ class TestFilterValueConversion:
         result = _convert_filter_value("any_value", field_attr)
         assert result == "any_value"
 
+    def test_convert_filter_value_uuid_valid(self) -> None:
+        """Test converting valid UUID values against a real SQLModel UUID column."""
+        from uuid import UUID, uuid4
+
+        from sqlmodel import Field as SMField
+        from sqlmodel import SQLModel
+
+        class UUIDModel(SQLModel, table=True):
+            __tablename__ = "uuid_test_model"
+            id: UUID = SMField(default_factory=uuid4, primary_key=True)
+
+        field_attr = getattr(UUIDModel, "id")  # noqa: B009
+
+        # Confirm real column exposes python_type as UUID
+        assert field_attr.type.python_type is UUID
+
+        valid_uuid = "550e8400-e29b-41d4-a716-446655440000"
+        result = _convert_filter_value(valid_uuid, field_attr)
+        assert result == valid_uuid
+        assert isinstance(result, str)
+
+    def test_convert_filter_value_uuid_invalid(self) -> None:
+        """Test that invalid UUID values raise SafeValueError against a real column."""
+        from uuid import UUID, uuid4
+
+        from sqlmodel import Field as SMField
+        from sqlmodel import SQLModel
+
+        class UUIDModel2(SQLModel, table=True):
+            __tablename__ = "uuid_test_model_2"
+            id: UUID = SMField(default_factory=uuid4, primary_key=True)
+
+        field_attr = getattr(UUIDModel2, "id")  # noqa: B009
+
+        with pytest.raises(SafeValueError, match="Invalid UUID value") as exc_info:
+            _convert_filter_value("not-a-uuid", field_attr)
+
+        error_message = str(exc_info.value)
+        assert "not-a-uuid" in error_message
+        assert "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" in error_message
+
+        with pytest.raises(SafeValueError, match="Invalid UUID value"):
+            _convert_filter_value("garbage", field_attr)
+
+    def test_convert_filter_value_uuid_in_operator_invalid(self) -> None:
+        """Test that id[in]=valid,invalid rejects the invalid value."""
+        from uuid import UUID, uuid4
+
+        from sqlmodel import Field as SMField
+        from sqlmodel import SQLModel
+
+        from syntara.core.utils.filters import apply_filters
+
+        class UUIDModel3(SQLModel, table=True):
+            __tablename__ = "uuid_test_model_3"
+            id: UUID = SMField(default_factory=uuid4, primary_key=True)
+
+        valid = "550e8400-e29b-41d4-a716-446655440000"
+        filters = parse_filters({"id[in]": f"{valid},not-a-uuid"}, ["id"])
+        assert len(filters) == 2
+
+        from sqlmodel import select
+
+        query = select(UUIDModel3)
+        with pytest.raises(SafeValueError, match="Invalid UUID value"):
+            apply_filters(query, filters, UUIDModel3)
+
 
 class TestSQLInjectionProtection:
     """Test SQL injection protection in filter values."""

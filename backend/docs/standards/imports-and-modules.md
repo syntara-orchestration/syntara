@@ -227,7 +227,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from syntara.api.auth import get_current_user
 from syntara.core.database.session import get_db
 from syntara.core.models import User
-from syntara.workflows.models import WorkflowListParams
+from syntara.core.models.base import BaseListParams
 from syntara.workflows.services import WorkflowService
 
 router = APIRouter(prefix="/workflows", tags=["workflows"])
