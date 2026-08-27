@@ -256,6 +256,8 @@ test.describe('Approval Workflow Operations', () => {
     const approval = await createPendingApproval(app)
 
     try {
+      await pollApprovalVisible(app, approval.approvalName)
+
       // Navigate to approvals page
       await app.goto(toAppUrl('/approvals'))
       await expect(app.getByRole('heading', { level: 1, name: 'Approvals' })).toBeVisible()
