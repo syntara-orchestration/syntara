@@ -219,10 +219,54 @@ class ProjectService(BaseService):
 
             msg = "Default project cannot be deleted"
             raise DefaultProjectProtectionError(msg)
+        await self._check_credentials_not_referenced_by_integrations(project.id, project.name)
         await self._cascade_cleanup_project_resources(project_id)
         project.soft_delete(self.user.id)
         self.session.add(project)
         await self.session.commit()
+
+    async def _check_credentials_not_referenced_by_integrations(self, project_id: UUID, project_name: str) -> None:
+        """Raise 409 if any credential in this project is still referenced by an integration.
+
+        Integrations are not project-scoped — a global integration can reference
+        a project credential as its management credential. The ON DELETE RESTRICT
+        FK on integrations.management_credential_id makes the database reject the
+        bulk credential DELETE in the cascade, so we fail early with an actionable
+        message instead of letting PostgreSQL surface a generic constraint error.
+
+        Accepts plain values instead of the Project ORM object to avoid any risk
+        of lazy-loading ORM attributes outside a greenlet context after the async
+        queries inside this method.
+        """
+        from sqlalchemy import func  # noqa: PLC0415
+
+        from syntara.credentials.exceptions import ProjectCredentialInUseError  # noqa: PLC0415
+        from syntara.credentials.models.credential import Credential  # noqa: PLC0415
+        from syntara.integrations.models.integration import Integration  # noqa: PLC0415
+
+        cred_ids_subq = select(Credential.id).where(Credential.project_id == project_id).scalar_subquery()
+
+        count_result = await self.session.exec(
+            select(func.count()).where(
+                Integration.management_credential_id.in_(cred_ids_subq)  # type: ignore[union-attr]
+            )
+        )
+        total_count = count_result.one()
+        if not total_count:
+            return
+
+        names_result = await self.session.exec(
+            select(Integration.name, Credential.name)
+            .join(Credential, Integration.management_credential_id == Credential.id)  # type: ignore[arg-type]
+            .where(Integration.management_credential_id.in_(cred_ids_subq))  # type: ignore[union-attr]
+            .order_by(Integration.name)
+            .limit(5)
+        )
+        rows = list(names_result.all())
+        integration_names = [r[0] for r in rows]
+        credential_names = list(dict.fromkeys(r[1] for r in rows))
+
+        raise ProjectCredentialInUseError(project_name, credential_names, integration_names, total_count)
 
     async def _cascade_cleanup_project_resources(self, project_id: UUID) -> None:
         """Remove all project-scoped resources before soft-deleting the project.

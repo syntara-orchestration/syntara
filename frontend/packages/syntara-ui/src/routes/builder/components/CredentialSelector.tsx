@@ -17,8 +17,6 @@ import type { CredentialsAPI } from '@syntara/contracts'
 import React, { type ReactElement, useCallback, useMemo, useState } from 'react'
 
 import { credentialsClient } from '../../../client'
-import { LONG_SELECT_MAX_MENU_HEIGHT, longSelectMenuPopperProps } from '../../../components/longSelectMenu'
-import longSelectMenuStyles from '../../../components/longSelectMenu.module.css'
 import { SynSelect } from '../../../components/SynSelect'
 import { detachPromise } from '../../../utils/detachPromise'
 import type { Credential, CredentialType } from '../../configuration/credentials/credentialConstants'
@@ -335,10 +333,6 @@ export function CredentialSelector({
         onSelect={handleSelect}
         onOpenChange={setIsOpen}
         toggle={renderToggle}
-        isScrollable
-        maxMenuHeight={LONG_SELECT_MAX_MENU_HEIGHT}
-        popperProps={longSelectMenuPopperProps}
-        className={longSelectMenuStyles.containScroll}
       >
         <SelectList aria-label={`${label} options`}>
           <NoCredentialOption isRequired={isRequired} value={value} />
