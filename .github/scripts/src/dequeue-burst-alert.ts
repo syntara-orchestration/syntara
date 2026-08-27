@@ -3,13 +3,13 @@ import { GitHubClient } from './lib/github.js'
 import { SlackNotifier } from './lib/slack.js'
 import { getEnvironment } from './lib/env.js'
 import { runScript } from './lib/run-script.js'
+import { hasNewDequeueSince } from './lib/dequeue-state.js'
 
 /** Number of dequeues within the time window that triggers an alert */
 const DEQUEUE_THRESHOLD = 3
 
 /** Time window in minutes for detecting dequeue bursts */
 const TIME_WINDOW_MINUTES = 45
-const POLL_INTERVAL_MINUTES = 15
 
 /**
  * Detects dequeue bursts in the merge queue and sends Slack alerts.
@@ -34,6 +34,13 @@ async function main() {
     return
   }
 
+  const previousRuns = await github.getWorkflowRuns(
+    'merge-queue-dequeue-alert.yml',
+    new Date(Date.now() - TIME_WINDOW_MINUTES * 60 * 1000),
+    env.runId,
+    env.eventName
+  )
+  const previousRun = previousRuns[0]
   const timeWindowAgo = new Date(Date.now() - TIME_WINDOW_MINUTES * 60 * 1000)
   const recentDequeues = await github.getRecentDequeues(defaultBranch, timeWindowAgo)
 
@@ -46,8 +53,8 @@ async function main() {
     )
   }
 
-  const pollWindowAgo = new Date(Date.now() - POLL_INTERVAL_MINUTES * 60 * 1000)
-  const hasNewDequeue = recentDequeues.some((dequeue) => new Date(dequeue.dequeuedAt) >= pollWindowAgo)
+  // Alert if we see multiple dequeues (indicates systemic issue)
+  const hasNewDequeue = hasNewDequeueSince(recentDequeues, previousRun ? new Date(previousRun.created_at) : undefined)
 
   if (recentDequeues.length < DEQUEUE_THRESHOLD || !hasNewDequeue) {
     console.log(
