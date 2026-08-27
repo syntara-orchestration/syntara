@@ -37,7 +37,7 @@ export const IDP_TYPE_PRESETS: Record<string, IdpTypePreset> = {
       lastName: 'family_name',
     },
     groupMappingExpression: "[aap_teams[*].join('/', [organization, name]), aap_organizations[*].name] | []",
-    enableRpInitiatedLogout: true,
+    enableRpInitiatedLogout: false,
     aapRoleMappingEnabled: true,
   },
   [IdpTypeKey.CUSTOM]: {

@@ -165,7 +165,12 @@ function IdpTypeField({
   )
 }
 
-function RpInitiatedLogoutField({ control }: Readonly<{ control: Control<IdentityProviderFormData> }>) {
+function RpInitiatedLogoutField({
+  control,
+  idpType,
+}: Readonly<{ control: Control<IdentityProviderFormData>; idpType: string | undefined }>) {
+  const isAapProvider = idpType === IdpTypeKey.AAP
+
   return (
     <Controller
       name="enableRpInitiatedLogout"
@@ -184,6 +189,13 @@ function RpInitiatedLogoutField({ control }: Readonly<{ control: Control<Identit
               <HelperTextItem>
                 When enabled, users will be redirected to the identity provider&apos;s logout page on sign-out.
               </HelperTextItem>
+              {isAapProvider && (
+                <HelperTextItem variant="warning">
+                  For Ansible Automation Platform, enabling single logout may delete API tokens tied to the shared OAuth
+                  application across all users when AAP processes the end-session request. Leave disabled unless AAP
+                  revoke-on-logout is scoped to the current session only.
+                </HelperTextItem>
+              )}
             </HelperText>
           </FormHelperText>
         </FormGroup>
@@ -442,7 +454,7 @@ export function IdentityProviderFormFields({
                 <ScopesField control={control} isPresetTemplate={isPresetTemplate} />
                 <AllowAllAuthenticatedField control={control} />
                 {idpType === IdpTypeKey.AAP && <AapRoleMappingField control={control} />}
-                <RpInitiatedLogoutField control={control} />
+                <RpInitiatedLogoutField control={control} idpType={idpType} />
               </FormSection>
             </Form>
           </StackItem>

@@ -2489,7 +2489,7 @@ export const handlers = [
         scopes: 'read write openid roles',
         claim_mapping: { subject: 'sub', email: 'email', username: 'preferred_username', full_name: 'name' },
         aap_role_mapping_enabled: true,
-        enable_rp_initiated_logout: true,
+        enable_rp_initiated_logout: false,
         allow_all_authenticated: false,
         disable_tls_verify: body.insecure_skip_tls_verify ?? false,
         group_jmespath_expression: "[aap_teams[*].join('/', [organization, name]), aap_organizations[*].name] | []",

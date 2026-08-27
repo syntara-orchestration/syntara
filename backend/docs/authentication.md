@@ -62,6 +62,8 @@ When `enable_rp_initiated_logout` is set to `true` on an OIDC provider's configu
 
 **Configuration:** Set `enable_rp_initiated_logout: true` and optionally `end_session_endpoint` in the provider's OIDC configuration. If `end_session_endpoint` is not set, it is discovered automatically via the OIDC well-known endpoint.
 
+**AAP warning:** For Ansible Automation Platform (`idp_type: "aap"`), keep `enable_rp_initiated_logout` disabled. The AAP push-button setup registers a single shared OAuth2 application for all users; RP-initiated logout redirects the browser to AAP's `end_session_endpoint`, which triggers django-oauth-toolkit to delete API tokens tied to that shared application — including tokens belonging to other users. Syntara does not call AAP token-revocation APIs directly; disabling RP-initiated logout is the safe mitigation until AAP scopes revoke-on-logout.
+
 ## CSRF Protection
 
 Cookie-authenticated endpoints (`POST /auth/refresh`, `POST /auth/logout`) are protected against Cross-Site Request Forgery using the **Synchronizer Token** pattern with HMAC derivation.
@@ -903,9 +905,17 @@ The `POST /identity_providers/setup-aap-oidc` endpoint automates the full AAP OI
    - `scopes` = `"read write openid roles"`
    - JMESPath group extraction for AAP teams and organizations
    - `aap_role_mapping_enabled` = `true` (see [AAP Role Mapping](#aap-role-mapping))
-   - `enable_rp_initiated_logout` = `true`
+   - `enable_rp_initiated_logout` = `false` (see [AAP warning](#rp-initiated-logout-oidc) — must stay off for shared AAP OAuth apps)
    - `disable_tls_verify` mirrors the request's `insecure_skip_tls_verify` value
 4. The created identity provider is returned (201).
+
+**Existing deployments:** Upgrades apply a one-time migration that sets `enable_rp_initiated_logout` to `false` on all AAP identity providers. Admins can still enable single logout manually per provider, but doing so on AAP risks deleting OAuth application API tokens (see AAP warning above).
+
+**Manual verification (requires a real AAP):**
+
+1. Two AAP users each create API tokens assigned to the shared Syntara OAuth application.
+2. User A logs into Syntara via AAP OIDC, then logs out.
+3. Confirm User B's tokens still exist in AAP.
 
 **Prerequisites:**
 
