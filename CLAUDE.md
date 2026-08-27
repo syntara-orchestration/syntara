@@ -152,12 +152,6 @@ Konflux excludes these tests via `--grep-invert @konflux-skip`. They still run l
 - Test creates real workflow executions and waits for Temporal to complete them (approval flows, multi-step runs) — Temporal under Konflux load frequently times out
 - Test has a >25s wall-clock time; Konflux runner load pushes it over the timeout
 
-**E2E test deduplication rules** (when writing or removing tests): see [`frontend/AGENTS.md` — "E2E Test Deduplication Rules"](frontend/AGENTS.md). Key rules:
-- **Search before writing** — grep the e2e directory for the scenario before adding a new test.
-- **Never clone filter-persistence or shareable-URL tests per resource type** — these cross-cutting behaviors are implemented once by a shared hook; one representative spec is enough.
-- **Navigation sub-steps covered by a superset test can be deleted** — if test A navigates somewhere and test B does the same then more, A is redundant.
-- **Never delete `test.skip` or `test.fixme` tests** — they document known-broken or in-progress scenarios and must be kept.
-
 #### Backend pytest skip patterns (`backend/tests/e2e/`)
 
 **`@requires_httpbin` class marker**: Applied at class level when all tests in a class call httpbin. Skip fires if httpbin is unreachable from the *test runner*. This does not handle the case where the backend Temporal worker can't reach httpbin.
