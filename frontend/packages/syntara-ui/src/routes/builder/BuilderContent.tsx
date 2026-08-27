@@ -465,9 +465,11 @@ export function BuilderContent(props: BuilderContentProps) {
   const handleSaveBeforeDuplicateNavigation = useCallback(async (): Promise<boolean> => {
     const destinationPath = pendingDuplicateNavigation
     const saved = await guardedSaveWorkflow()
-    setPendingDuplicateNavigation(null)
-    if (saved && destinationPath) {
-      setLocation(destinationPath)
+    if (saved) {
+      setPendingDuplicateNavigation(null)
+      if (destinationPath) {
+        setLocation(destinationPath)
+      }
     }
     return saved
   }, [pendingDuplicateNavigation, guardedSaveWorkflow, setLocation])
