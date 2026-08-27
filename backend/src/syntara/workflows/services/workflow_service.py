@@ -923,7 +923,18 @@ class WorkflowService(BaseService):
     async def _get_webhook_sync_definition(
         self, workflow_id: UUID, workflow: Workflow, fallback_definition: dict[str, Any]
     ) -> dict[str, Any]:
-        """Determine the workflow definition to sync to webhook triggers."""
+        """Determine the workflow definition to sync to webhook triggers.
+
+        When the workflow is currently published, returns the published version's definition
+        rather than the new draft being saved. This preserves live webhook behaviour during
+        saves so that in-flight requests are not affected by an unfinished draft.
+
+        Consequence: existing published workflows whose trigger configuration contains an
+        empty ``authorized_service_account_ids`` list cannot be *saved* while published —
+        the sync validates the OLD published JSON and 422s. The repair path is to add a
+        service account to the trigger and then **Publish** the updated definition directly
+        (the Publish flow supplies the new definition inline, bypassing this lookup).
+        """
         if workflow.published_version_id is not None:
             pub_result = await self.session.exec(
                 select(WorkflowVersion).filter(
