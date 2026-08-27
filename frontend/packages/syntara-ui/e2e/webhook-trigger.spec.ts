@@ -109,7 +109,8 @@ test.describe('Webhook Trigger', () => {
       await app.getByRole('textbox', { name: 'Webhook path' }).clear()
 
       // Select a service account (required)
-      const saToggle = app.getByRole('button', { name: /select service accounts|loading/i })
+      // Chromium computes accessible name from the FormGroup <label for>, not the button text.
+      const saToggle = app.getByRole('button', { name: /authorized service accounts/i })
       await expect(saToggle).toBeVisible({ timeout: 30_000 })
       await expect(saToggle).toHaveText(/select service accounts/i, { timeout: 30_000 })
       await saToggle.click()

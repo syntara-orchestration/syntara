@@ -97,7 +97,9 @@ export async function addManualTrigger(page: Page, name = 'Manual trigger') {
 
 /** Select a service account in the trigger form's "Authorized service accounts" dropdown. */
 async function selectServiceAccount(page: Page, serviceAccountName: string) {
-  const toggle = page.getByRole('button', { name: /select service accounts|loading/i })
+  // Chromium computes the accessible name from the FormGroup's <label for>, not the
+  // button's text content — so match "Authorized service accounts", not "Select service accounts".
+  const toggle = page.getByRole('button', { name: /authorized service accounts/i })
   await expect(toggle).toBeVisible({ timeout: 30_000 })
   await expect(toggle).toHaveText(/select service accounts/i, { timeout: 30_000 })
   await toggle.click()
