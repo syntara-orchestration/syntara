@@ -97,7 +97,10 @@ export async function addManualTrigger(page: Page, name = 'Manual trigger') {
 
 /** Select a service account in the trigger form's "Authorized service accounts" dropdown. */
 async function selectServiceAccount(page: Page, serviceAccountName: string) {
-  await page.getByRole('button', { name: 'Select service accounts' }).click()
+  const toggle = page.getByRole('button', { name: /select service accounts|loading/i })
+  await expect(toggle).toBeVisible({ timeout: 30_000 })
+  await expect(toggle).toHaveText(/select service accounts/i, { timeout: 30_000 })
+  await toggle.click()
   await page.getByRole('option', { name: serviceAccountName }).click()
   await page.keyboard.press('Escape')
 }

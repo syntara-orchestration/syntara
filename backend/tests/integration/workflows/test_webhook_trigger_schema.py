@@ -59,6 +59,19 @@ async def test_webhook_config_valid_with_input_schema(webhook_schema: dict[str, 
     jsonschema.validate(instance=config, schema=webhook_schema["parameterSchema"])
 
 
+async def test_webhook_config_requires_authorized_service_account_ids(webhook_schema: dict[str, Any]) -> None:
+    """Config schema should require authorized_service_account_ids."""
+    config_schema = webhook_schema["parameterSchema"]
+    assert "authorized_service_account_ids" in config_schema.get("required", [])
+
+
+async def test_webhook_config_rejects_empty_authorized_service_account_ids(webhook_schema: dict[str, Any]) -> None:
+    """Config with empty authorized_service_account_ids should be rejected (minItems: 1)."""
+    config = {"webhook_path": "test", "authorized_service_account_ids": []}
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(instance=config, schema=webhook_schema["parameterSchema"])
+
+
 async def test_webhook_config_rejects_missing_path(webhook_schema: dict[str, Any]) -> None:
     """Config without webhook_path should be rejected."""
     config = {"input_schema": {"type": "object"}}

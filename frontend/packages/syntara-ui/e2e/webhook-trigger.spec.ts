@@ -109,7 +109,10 @@ test.describe('Webhook Trigger', () => {
       await app.getByRole('textbox', { name: 'Webhook path' }).clear()
 
       // Select a service account (required)
-      await app.getByRole('button', { name: 'Select service accounts' }).click()
+      const saToggle = app.getByRole('button', { name: /select service accounts|loading/i })
+      await expect(saToggle).toBeVisible({ timeout: 30_000 })
+      await expect(saToggle).toHaveText(/select service accounts/i, { timeout: 30_000 })
+      await saToggle.click()
       await app.getByRole('option', { name: sa.name }).click()
       await app.keyboard.press('Escape')
 

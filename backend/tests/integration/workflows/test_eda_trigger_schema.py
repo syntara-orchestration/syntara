@@ -59,6 +59,19 @@ async def test_eda_config_valid_with_input_schema(eda_schema: dict[str, Any]) ->
     jsonschema.validate(instance=config, schema=eda_schema["parameterSchema"])
 
 
+async def test_eda_config_requires_authorized_service_account_ids(eda_schema: dict[str, Any]) -> None:
+    """Config schema should require authorized_service_account_ids."""
+    config_schema = eda_schema["parameterSchema"]
+    assert "authorized_service_account_ids" in config_schema.get("required", [])
+
+
+async def test_eda_config_rejects_empty_authorized_service_account_ids(eda_schema: dict[str, Any]) -> None:
+    """Config with empty authorized_service_account_ids should be rejected (minItems: 1)."""
+    config = {"webhook_path": "test", "authorized_service_account_ids": []}
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(instance=config, schema=eda_schema["parameterSchema"])
+
+
 async def test_eda_config_rejects_missing_path(eda_schema: dict[str, Any]) -> None:
     """Config without webhook_path should be rejected."""
     config = {"input_schema": {"type": "object"}}
