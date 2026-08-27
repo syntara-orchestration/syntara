@@ -66,12 +66,14 @@ jobs:
           REPO: ${{ github.repository }}
           RUN_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.run_id || github.event.workflow_run.id }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER_INPUT: ${{ inputs.pr_number }}
         run: |
           # Get the PR number.
           # For workflow_dispatch: use the input
           # For workflow_run: get from the workflow run inputs
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            PR_NUMBER="${{ inputs.pr_number }}"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            PR_NUMBER="$PR_NUMBER_INPUT"
           else
             # This data comes from GitHub's workflow_run event, not from PR code.
             # The pr_number was passed as an input when ci-frontend.yml was dispatched.
