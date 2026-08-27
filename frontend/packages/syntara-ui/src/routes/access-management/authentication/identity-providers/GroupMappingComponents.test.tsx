@@ -387,15 +387,7 @@ describe('MappingTable', () => {
       undefined,
     ]
 
-    render(
-      <MappingTable
-        {...defaultProps}
-        rows={mockRows}
-        isReadOnly
-        showValidation
-        entryErrors={entryErrors}
-      />
-    )
+    render(<MappingTable {...defaultProps} rows={mockRows} isReadOnly showValidation entryErrors={entryErrors} />)
 
     expect(screen.getByText('idp-admin')).toBeInTheDocument()
   })

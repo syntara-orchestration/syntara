@@ -204,7 +204,7 @@ test.describe('Approval Workflow Operations', () => {
 
       await applyApprovalNameFilter(app, table, batchId)
 
-      // Step 1: Select both approvals using row-scoped checkboxes
+      // Step 1: Select both approvals using row-scoped checkboxes — wait for each row before interacting
       const rows = table.getByRole('row')
       await expect(rows.filter({ hasText: approval1.approvalName })).toBeVisible({ timeout: 15_000 })
       await rows.filter({ hasText: approval1.approvalName }).getByRole('checkbox').check()
@@ -267,7 +267,7 @@ test.describe('Approval Workflow Operations', () => {
         waitForRowText: approval.approvalName,
       })
 
-      // Step 1: Select the approval using row-scoped checkbox
+      // Step 1: Select the approval using row-scoped checkbox — wait for the row before interacting
       const row = table.getByRole('row').filter({ hasText: approval.approvalName })
       await expect(row).toBeVisible({ timeout: 15_000 })
       await row.getByRole('checkbox').check()
