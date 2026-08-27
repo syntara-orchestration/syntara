@@ -88,20 +88,17 @@ describe('SlackNotifier', () => {
               expect.objectContaining({
                 type: 'section',
                 text: expect.objectContaining({
-                  text: expect.stringContaining(
-                    'Multiple PRs were removed from the merge queue.'
-                  ),
+                  text: expect.stringContaining('Multiple PRs were removed from the merge queue.'),
                 }),
               }),
             ]),
           },
         ],
       })
-    })
 
-      const bodyText = JSON.stringify(requestBody);
-      expect(bodyText).not.toContain('failed checks');
-    });
+      const bodyText = JSON.stringify(requestBody)
+      expect(bodyText).not.toContain('failed checks')
+    })
 
     it('throws when webhook returns non-200 status', async () => {
       server.use(

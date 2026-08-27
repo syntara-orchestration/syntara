@@ -1,6 +1,5 @@
 import { beforeAll, afterEach, afterAll } from 'vitest'
-import { http, HttpResponse } from 'msw/http'
-import { graphql } from 'msw/graphql'
+import { http, HttpResponse, graphql } from 'msw'
 import { setupServer } from 'msw/node'
 
 /**
@@ -62,7 +61,7 @@ export const handlers = [
 export const server = setupServer(...handlers)
 
 beforeAll(() => {
-  server.listen({ onUnhandledFrame: 'error' })
+  server.listen({ onUnhandledRequest: 'error' })
   // Set up mock environment variables for all tests
   Object.assign(process.env, mockEnv)
 })

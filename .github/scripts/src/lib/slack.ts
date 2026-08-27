@@ -62,9 +62,9 @@ export class SlackNotifier {
    * Indicates a possible systemic issue with the merge queue.
    */
   async sendDequeueBurstAlert(params: {
-    dequeues: Array<{ number: number; url: string; title: string }>;
-    timeWindowMinutes: number;
-    queueUrl: string;
+    dequeues: Array<{ number: number; url: string; title: string }>
+    timeWindowMinutes: number
+    queueUrl: string
   }): Promise<void> {
     const { dequeues, timeWindowMinutes, queueUrl } = params
 
