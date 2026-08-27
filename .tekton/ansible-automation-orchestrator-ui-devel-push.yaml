@@ -28,7 +28,7 @@ spec:
     - name: output-image
       value: quay.io/redhat-user-workloads/nexus-tenant/ansible-automation-platform/automation-orchestrator-ui-rhel9:{{revision}}
     - name: dockerfile
-      value: frontend/packages/syntara-ui/Containerfile.konflux
+      value: frontend/packages/syntara-ui/Containerfile
     - name: path-context
       value: frontend
     - name: build-args
