@@ -12,8 +12,8 @@ import { useQueries } from '@tanstack/react-query'
 import React, { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { integrationsClient } from '../../../client'
-import { NxLabel } from '../../../components/labels/NxLabel'
-import { NxSelect } from '../../../components/NxSelect'
+import { SynLabel } from '../../../components/labels/SynLabel'
+import { SynSelect } from '../../../components/SynSelect'
 import { projectIdParam } from '../../../utils/queryParams'
 import { fetchAllIntegrationModels } from '../../configuration/integrations/useAllIntegrationModels'
 
@@ -248,15 +248,13 @@ export function LLMModelSelector({
 
   return (
     <FormGroup label={label} labelHelp={resolvedLabelHelp} fieldId={fieldId} isRequired>
-      <NxSelect
+      <SynSelect
         id={fieldId}
         isOpen={isOpen}
         selected={selectedKey}
         onSelect={handleSelect}
         onOpenChange={handleOpenChange}
         toggle={renderToggle}
-        isScrollable
-        maxMenuHeight="300px"
         shouldFocusToggleOnSelect
       >
         <SelectList>
@@ -295,7 +293,7 @@ export function LLMModelSelector({
                   >
                     <span className={styles.modelOptionContent}>
                       <span>{model.name}</span>
-                      {model.is_default === true && <NxLabel color="blue">Default</NxLabel>}
+                      {model.is_default === true && <SynLabel color="blue">Default</SynLabel>}
                     </span>
                   </SelectOption>
                 ))}
@@ -303,7 +301,7 @@ export function LLMModelSelector({
             </SelectGroup>
           </React.Fragment>
         ))}
-      </NxSelect>
+      </SynSelect>
 
       {hasNoIntegrations && (
         <IntegrationRequiredHelper

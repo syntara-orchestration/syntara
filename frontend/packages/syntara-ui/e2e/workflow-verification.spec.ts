@@ -11,8 +11,8 @@
  */
 
 import AxeBuilder from '@axe-core/playwright'
-import { type Page } from '@playwright/test'
 
+import { type Page } from './fixtures'
 import { test, expect } from './fixtures'
 import { WCAG_TAGS } from './fixtures/accessibility'
 import { triggerVerifyWorkflow, VALIDATE_ROUTE } from './helpers/workflow-verify'
@@ -52,10 +52,14 @@ async function mockValidateEndpoint(app: Page, options: MockValidateOptions = {}
     ...warnings.map((w) => ({ ...w, severity: 'warning', category: 'schema_violation' })),
   ]
   const is_valid = valid && errors.length === 0
-  // Wait for any in-flight requests to settle before setting up the route mock.
-  // Without this, a pending validation request from save/load can race with the
-  // mock, causing the real response to overwrite the mocked error state.
-  await app.waitForLoadState('networkidle')
+  // Drain an in-flight validate from save/load before installing the mock, or a
+  // live response can overwrite mocked error state. Do not use networkidle —
+  // WebSockets keep the network busy (E2E lint). Wait for the canvas, then for
+  // a validate response if one is already in flight.
+  await expect(app.locator('.react-flow')).toBeVisible()
+  await app
+    .waitForResponse((response) => response.url().includes('/api/v1/workflows/validate'), { timeout: 3_000 })
+    .catch(() => undefined)
   await app.route(VALIDATE_ROUTE, (route) =>
     route.fulfill({
       status: 200,

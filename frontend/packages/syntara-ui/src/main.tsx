@@ -14,6 +14,7 @@ ensureDocumentColorScheme()
 
 const App = lazy(() => import('./app/App.js'))
 
+// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- standard React entry point: root element is always present in index.html
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>

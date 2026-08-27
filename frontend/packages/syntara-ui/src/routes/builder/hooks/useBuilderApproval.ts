@@ -3,7 +3,8 @@ import type { Node } from '@xyflow/react'
 import { useCallback, useMemo, useState } from 'react'
 
 import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
-import { getApprovalPromptFromNode } from '../../approvals/approvalPrompt'
+import { findNodeByApprovalNodeId } from '../../approvals/approvalNodeId'
+import { getApprovalPromptFromNode, getApprovalPromptFromRecord } from '../../approvals/approvalPrompt'
 import { useAutoApprovalDetection } from '../../executions/hooks/useAutoApprovalDetection'
 import {
   type ExecutionNode,
@@ -26,7 +27,7 @@ type UseBuilderApprovalResult = {
   isApprovalLoading: boolean
   approvalViewOpen: boolean
   activityNameMap: Map<string, string>
-  /** The prompt/message from the approval node's activity config, if available. */
+  /** Persisted approval prompt, falling back to the node's Message field. */
   approvalMessage: string | undefined
   wrappedHandleNodeClick: (event: React.MouseEvent, node: Node<NodeType['data']>) => void
   handleApprovalClose: () => void
@@ -90,8 +91,12 @@ export function useBuilderApproval({
   }, [currentWorkflow])
 
   const approvalMessage = useMemo(() => {
-    if (!pendingApproval || !currentWorkflow) return undefined
-    const activity = currentWorkflow.workflow?.activities?.find((a) => a.id === pendingApproval.approval_node_id)
+    if (!pendingApproval) return undefined
+    const fromRecord = getApprovalPromptFromRecord(pendingApproval)
+    if (fromRecord) return fromRecord
+    if (!currentWorkflow) return undefined
+    const activities = currentWorkflow.workflow?.activities ?? []
+    const activity = findNodeByApprovalNodeId(activities, pendingApproval.approval_node_id)
     if (activity?.type !== ActivityTypeEnum.APPROVAL) return undefined
     return getApprovalPromptFromNode(activity)
   }, [pendingApproval, currentWorkflow])

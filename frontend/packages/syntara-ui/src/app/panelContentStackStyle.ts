@@ -9,7 +9,7 @@ import type { CSSProperties } from 'react'
  *
  * PatternFly `Stack` props for the main content column inside `SynPanel` with `isFullHeight`.
  * `height: '100%'` alone often fails to fill a flex parent; `flex: 1` + `minHeight: 0` opts into
- * correct flex shrink/growth so nested `NxScrollableTableContainer` / scroll regions get a real height.
+ * correct flex shrink/growth so nested `SynScrollableTableContainer` / scroll regions get a real height.
  */
 export const panelContentStackStyle = {
   height: '100%',

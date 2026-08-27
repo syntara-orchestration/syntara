@@ -33,12 +33,18 @@ vi.mock('../../../utils/downloadFile', () => ({
   downloadFileById: vi.fn(),
 }))
 
+vi.mock('../../../utils/deleteFile', () => ({
+  deleteFileById: vi.fn(() => Promise.resolve()),
+}))
+
 vi.mock('../components/file-upload', () => ({
   FileUpload: ({
     files = [],
     onFileDownload,
     onFileDownloadCancel,
+    onFileRemove,
     downloadingFileIds,
+    deletingFileIds,
     disabled,
     disabledTooltip,
     canRemove,
@@ -46,7 +52,9 @@ vi.mock('../components/file-upload', () => ({
     files?: UploadedFile[]
     onFileDownload?: (fileId: string, fileName: string) => void
     onFileDownloadCancel?: (fileId: string) => void
+    onFileRemove?: (fileId: string) => void
     downloadingFileIds?: Set<string>
+    deletingFileIds?: Set<string>
     disabled?: boolean
     disabledTooltip?: string
     canRemove?: boolean
@@ -59,6 +67,7 @@ vi.mock('../components/file-upload', () => ({
     >
       {(files || []).map((f) => {
         const isDownloading = downloadingFileIds?.has(f.id) ?? false
+        const isDeleting = deletingFileIds?.has(f.id) ?? false
         return (
           <div key={f.id} data-testid={`file-${f.id}`}>
             <span>{f.file.name}</span>
@@ -75,6 +84,15 @@ vi.mock('../components/file-upload', () => ({
                 Cancel
               </button>
             )}
+            <button
+              type="button"
+              data-testid={`remove-${f.id}`}
+              aria-busy={isDeleting}
+              disabled={isDeleting}
+              onClick={() => onFileRemove?.(f.id)}
+            >
+              Remove
+            </button>
           </div>
         )
       })}
@@ -341,5 +359,16 @@ describe('AIAgentFileUploadSection', () => {
     const { container } = renderSection()
     const results = await axe(container)
     expect(results).toHaveNoViolations()
+  })
+
+  it('detaches hydrated files on remove without calling the delete API', async () => {
+    const user = userEvent.setup()
+    const { deleteFileById } = await import('../../../utils/deleteFile')
+
+    renderSection()
+    await user.click(screen.getByTestId('remove-file-1'))
+
+    expect(deleteFileById).not.toHaveBeenCalled()
+    expect(fileContext.removeFile).toHaveBeenCalledWith('file-1')
   })
 })

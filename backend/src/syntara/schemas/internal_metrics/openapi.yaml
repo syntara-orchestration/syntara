@@ -136,7 +136,7 @@ paths:
       tags:
         - Internal Metrics
       summary: Metrics store KPIs
-      description: "Return a computed KPI dashboard covering all Syntara components.\n\nMaps metrics to the KPIs defined in the Syntara KPI documents:\n- Syntara Key Performance Indicators (KPIs)\n- Syntara LLM/Agent Performance KPIs"
+      description: "Return a computed KPI dashboard covering all Orchestrator components.\n\nMaps metrics to the KPIs defined in the Orchestrator KPI documents:\n- Orchestrator Key Performance Indicators (KPIs)\n- Orchestrator LLM/Agent Performance KPIs"
       operationId: get_internal_metrics_kpis
       responses:
         '200':
@@ -272,7 +272,7 @@ components:
       required:
         - component
       title: ComponentKPISummary
-      description: KPI summary for a single Syntara component.
+      description: KPI summary for a single Orchestrator component.
     KPIDashboard:
       properties:
         generated_at:
@@ -290,7 +290,7 @@ components:
       required:
         - generated_at
       title: KPIDashboard
-      description: Full KPI dashboard covering all Syntara components.
+      description: Full KPI dashboard covering all Orchestrator components.
     MetricRecord:
       description: "Lightweight in-memory metric data point.\n\n\n  Uses a slotted dataclass instead of SQLModel to reduce per-instance\n\n  memory from ~4.1KB to ~72 bytes.  This record never touches a database."
       properties:
@@ -370,7 +370,7 @@ components:
         - authz_duration_ms
         - opa_request_duration_ms
       title: MetricType
-      description: "Categories of metrics recorded by Syntara.\n\nEach value corresponds to a specific measurable quantity exposed via the\nmetrics REST API and (where applicable) Prometheus endpoint."
+      description: "Categories of metrics recorded by Orchestrator.\n\nEach value corresponds to a specific measurable quantity exposed via the\nmetrics REST API and (where applicable) Prometheus endpoint."
     MetricsCategoryType:
       type: string
       enum:

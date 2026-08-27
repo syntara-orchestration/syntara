@@ -12,6 +12,7 @@ from datetime import timedelta
 from typing import Any, ClassVar, cast
 
 from temporalio import workflow
+from temporalio.common import RetryPolicy
 from temporalio.exceptions import ActivityError, ApplicationError
 from temporalio.exceptions import TimeoutError as TemporalTimeoutError
 
@@ -53,6 +54,7 @@ from syntara.workflows.workflow_engine.models.workflow_definition import (
     NodeType,
 )
 from syntara.workflows.workflow_engine.unified_eval import safe_eval_with_namespace
+from syntara.workflows.workflow_engine.utils.loop_iteration_ids import loop_control_activity_id
 
 # Trigger types allowed for dynamic dispatch via Temporal activities.
 # Each entry must have a corresponding @activity.defn with a matching name.
@@ -152,8 +154,9 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             return self._build_result(execution_id, include_node_results)
 
         except asyncio.CancelledError:
-            workflow.logger.info("Workflow cancelled, cleaning up pending approvals")
+            workflow.logger.info("Workflow cancelled, cleaning up pending approvals and agentic invocations")
             await self._cancel_approval_requests()
+            await self._cancel_agentic_invocations()
             raise
 
     def _initialize_state(
@@ -308,6 +311,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                         completed_node_id, node_error, graph, pending_tasks, continue_on_failure=cof
                     )
                     await self._maybe_expire_approval(completed_node_id, node, node_error)
+                    await self._maybe_cancel_agentic_invocation(node, node_error)
                     if cof:
                         self._route_failed_node(completed_node_id, node)
                         await self._handle_continued_failure(completed_node_id, node, graph, pending_tasks)
@@ -412,6 +416,44 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         if app_error is not None:
             return app_error.message or str(app_error)
         return str(error)
+
+    async def _maybe_cancel_agentic_invocation(
+        self,
+        node: ActivityNode,
+        error: Exception,
+    ) -> None:
+        """Best-effort cancel a running agentic invocation when its node times out."""
+        if node.type != NodeType.AGENTIC:
+            return
+        if not (isinstance(error, ActivityError) and isinstance(error.cause, TemporalTimeoutError)):
+            return
+        await self._cancel_agentic_invocations(node_id=node.id, reason="Node timeout")
+
+    async def _cancel_agentic_invocations(self, node_id: str | None = None, reason: str = "Workflow cancelled") -> None:
+        """Best-effort cancel running agentic invocations for this execution.
+
+        Args:
+            node_id: When set, cancel only the invocation for this node (timeout case).
+                When None, cancel all running agentic invocations (workflow cancellation).
+            reason: Cancellation reason passed to the orchestrator.
+
+        """
+        try:
+            args: list[Any] = [self.execution_id, node_id, reason]
+            await asyncio.shield(
+                workflow.execute_activity(
+                    ActivityName.CANCEL_AGENTIC,
+                    args=args,
+                    activity_id=f"__internal__cancel_agentic_{node_id or 'all'}",
+                    start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
+                    retry_policy=RetryPolicy(maximum_attempts=1),
+                )
+            )
+        except Exception:  # noqa: BLE001
+            workflow.logger.warning(
+                "Failed to cancel agentic invocations (best-effort)",
+                node_id=node_id,
+            )
 
     @staticmethod
     def _build_empty_node_output(node: ActivityNode) -> dict[str, Any]:
@@ -950,10 +992,14 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                         loop_results[namespaced_key] = []
                     loop_results[namespaced_key].append(field_value)
 
-        # Clear from loop_body_map to allow fresh tracking on next iteration
-        # Results stay in resolver for query access
+        # Clear from loop_body_map to allow fresh tracking on next iteration.
+        # Also reset loop_state / iteration_results for body nodes that are
+        # themselves loops so nested loops re-initialize when the outer loop
+        # advances to the next iteration.
         for node_id in loop_body_nodes:
             del self.loop_body_map[node_id]
+            self.loop_state.pop(node_id, None)
+            self.loop_iteration_results.pop(node_id, None)
 
         workflow.logger.info(f"Cleared {len(loop_body_nodes)} loop body nodes from tracking for loop {loop_id}")
 
@@ -1175,7 +1221,9 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             await workflow.execute_activity(
                 ActivityName.LOOP,
                 args=[loop_parameters, node.outputs, self.loop_iteration_results[node_id]],
-                activity_id=f"{node_id}_iter_{state.current_index}",
+                activity_id=loop_control_activity_id(
+                    node_id, state.current_index, self.loop_body_map, self.node_control_data
+                ),
                 start_to_close_timeout=timedelta(seconds=timeout_seconds),
             ),
         )
@@ -1553,6 +1601,19 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
 
         """
         return list(self.skipped_nodes)
+
+    @workflow.query
+    def get_detached_nodes(self) -> list[str]:
+        """Query to get list of detached node IDs.
+
+        Detached nodes were in-flight when a converge ANY strategy fired.
+        ActivitySyncService marks these CANCELLED rather than SKIPPED.
+
+        Returns:
+            List of node IDs that were detached due to converge ANY completion
+
+        """
+        return list(self._detached_nodes)
 
     @workflow.query
     def get_pre_resolved_nodes(self) -> list[str]:

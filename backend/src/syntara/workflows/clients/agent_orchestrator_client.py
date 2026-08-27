@@ -218,6 +218,7 @@ class AgentOrchestratorClient:
         file_ids: list[str] | None,
         metadata: dict[str, Any] | None,
         project_id: str,
+        timeout_seconds: int | None = None,
     ) -> dict[str, Any]:
         """Build the request payload for agent invocation.
 
@@ -231,6 +232,7 @@ class AgentOrchestratorClient:
             file_ids: Optional list of file IDs
             metadata: Optional metadata (callback_url will be extracted to top level)
             project_id: Project ID to include in the payload
+            timeout_seconds: Optional timeout in seconds for the agent execution
 
         Returns:
             Request payload dictionary
@@ -268,6 +270,7 @@ class AgentOrchestratorClient:
                     "activity_name": activity_name,
                     "execution_id": execution_id,
                     "callback_url": callback_url,
+                    "timeout_seconds": timeout_seconds,
                     "metadata": metadata,
                 }.items()
                 if v is not None
@@ -362,6 +365,7 @@ class AgentOrchestratorClient:
         input_data: dict[str, Any] | None = None,
         file_ids: list[str] | None = None,
         metadata: dict[str, Any] | None = None,
+        timeout_seconds: int | None = None,
     ) -> str:
         """Invoke Agent Orchestrator asynchronously and return immediately with invocation ID.
 
@@ -379,6 +383,7 @@ class AgentOrchestratorClient:
             input_data: Optional input data for the agent
             file_ids: Optional list of file IDs to include as context
             metadata: Optional additional metadata (should include callback_url)
+            timeout_seconds: Optional timeout in seconds for the agent execution
 
         Returns:
             str: The invocation ID for tracking
@@ -400,7 +405,7 @@ class AgentOrchestratorClient:
 
         # Build request payload
         payload = self._build_invocation_payload(
-            prompt, user_id, session_id, agent, model, input_data, file_ids, metadata, project_id
+            prompt, user_id, session_id, agent, model, input_data, file_ids, metadata, project_id, timeout_seconds
         )
 
         # Invoke with retry logic for transient failures
@@ -437,3 +442,26 @@ class AgentOrchestratorClient:
             code=ErrorCode.UNEXPECTED_ERROR,
             details=str(last_error) if last_error else None,
         ) from last_error
+
+    async def cancel_invocation(self, invocation_id: str, reason: str = "Workflow timeout") -> None:
+        """Cancel a running invocation (best-effort).
+
+        Args:
+            invocation_id: UUID of the invocation to cancel
+            reason: Reason for cancellation
+
+        """
+        try:
+            response = await self.http_client.post(
+                f"/invocations/{invocation_id}/cancel",
+                json={"reason": reason},
+                timeout=self.timeout,
+            )
+            response.raise_for_status()
+            logger.info("Invocation cancelled", invocation_id=invocation_id, reason=reason)
+        except Exception:  # noqa: BLE001
+            logger.warning(
+                "Failed to cancel invocation (best-effort)",
+                invocation_id=invocation_id,
+                exc_info=True,
+            )
