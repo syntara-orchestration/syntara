@@ -523,7 +523,7 @@ components:
     OIDCClaimMapping:
       type: object
       title: OIDCClaimMapping
-      description: Maps Syntara user fields to IdP-specific OIDC claim names.
+      description: Maps Orchestrator user fields to IdP-specific OIDC claim names.
       additionalProperties: false
       properties:
         subject:
@@ -551,7 +551,7 @@ components:
       type: object
       title: OIDCGroupMappingEntry
       description: |-
-        API-facing schema for a single IdP-to-Syntara group mapping entry.
+        API-facing schema for a single IdP-to-Orchestrator group mapping entry.
 
         Used in API requests/responses. Actual storage is in the
         ``idp_group_mapping_entries`` table.
@@ -689,7 +689,7 @@ components:
           items:
             $ref: '#/components/schemas/OIDCGroupMappingEntry'
           title: Group Mapping Entries
-          description: IdP-to-Syntara group mapping entries
+          description: IdP-to-Orchestrator group mapping entries
         allow_all_authenticated:
           type: boolean
           default: false
@@ -818,7 +818,7 @@ components:
           items:
             $ref: '#/components/schemas/OIDCGroupMappingEntry'
           title: Group Mapping Entries
-          description: IdP-to-Syntara group mapping entries
+          description: IdP-to-Orchestrator group mapping entries
         allow_all_authenticated:
           type: boolean
           default: false
@@ -959,7 +959,7 @@ components:
                 $ref: '#/components/schemas/OIDCGroupMappingEntry'
             - type: 'null'
           title: Group Mapping Entries
-          description: IdP-to-Syntara group mapping entries (omit to keep existing)
+          description: IdP-to-Orchestrator group mapping entries (omit to keep existing)
         allow_all_authenticated:
           anyOf:
             - type: boolean

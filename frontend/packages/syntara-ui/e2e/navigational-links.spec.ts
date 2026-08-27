@@ -8,7 +8,7 @@ test.describe('Navigational link affordance @pr-check', () => {
       try {
         await goToCredentialsList(app)
 
-        // The credential name must render as an anchor link (NxLink renders <a> via TanStack Router),
+        // The credential name must render as an anchor link (SynLink renders <a> via TanStack Router),
         // not as plain text — verifies proper anchor semantics and PatternFly underline affordance.
         // Scoped to [data-label="Name"] to avoid matching the kebab "Actions for <name>" toggle.
         const credLink = app.locator('[data-label="Name"]').getByRole('link', { name })

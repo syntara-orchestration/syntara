@@ -1386,7 +1386,7 @@ Examples:
 2. Prefer `daterange` in the UI; the `date` enum value has no dedicated control in current FilterBar usage.
 3. Confirm the backend supports the operator you choose (`in`, AND date ranges, etc.) — some endpoints do not.
 4. Put scoped params like `project_id` in `useCursorPagination({ extraParams })`, not as fake filters.
-5. Filter chips / system badges use `NxLabel` (not raw PatternFly `Label`).
+5. Filter chips / system badges use `SynLabel` (not raw PatternFly `Label`).
 
 ---
 

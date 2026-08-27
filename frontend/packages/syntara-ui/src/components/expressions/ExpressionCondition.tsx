@@ -28,7 +28,7 @@ import { useCallback, useState } from 'react'
 
 import { isUnaryOperator, OPERATOR_LABELS, OPERATOR_GROUPS } from '../../utils/expressions/defaults'
 import type { ExpressionCondition as ExpressionConditionType, ComparisonOperator } from '../../utils/expressions/types'
-import { NxSelect } from '../NxSelect'
+import { SynSelect } from '../SynSelect'
 
 import { HelpPopover } from './HelpPopover'
 
@@ -263,14 +263,12 @@ export function ExpressionCondition(props: ExpressionConditionProps) {
           {/* Operator */}
           <StackItem>
             <FormGroup label="Operator" labelHelp={<OperatorHelp />} isRequired fieldId={`operator-${condition.id}`}>
-              <NxSelect
+              <SynSelect
                 isOpen={isOperatorOpen}
                 onSelect={handleOperatorSelect}
                 onOpenChange={setIsOperatorOpen}
                 toggle={operatorToggle}
                 selected={condition.operator}
-                maxMenuHeight="40vh"
-                isScrollable
               >
                 <SelectList aria-label="Comparison operator">
                   {OPERATOR_GROUPS.map((opGroup) => (
@@ -283,7 +281,7 @@ export function ExpressionCondition(props: ExpressionConditionProps) {
                     </SelectGroup>
                   ))}
                 </SelectList>
-              </NxSelect>
+              </SynSelect>
             </FormGroup>
           </StackItem>
 

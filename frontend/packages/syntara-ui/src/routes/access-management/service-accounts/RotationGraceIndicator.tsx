@@ -1,7 +1,7 @@
 import { Content, ContentVariants, Tooltip } from '@patternfly/react-core'
 import { RhUiInformationIcon } from '@patternfly/react-icons'
 
-import { NxLabel } from '../../../components/labels/NxLabel'
+import { SynLabel } from '../../../components/labels/SynLabel'
 
 import { computeRemainingGracePeriod } from './rotateDialogUtils'
 import styles from './RotationGraceIndicator.module.css'
@@ -19,9 +19,9 @@ export function RotationGraceIndicator({
   return (
     <div className={styles.container}>
       <Tooltip content={tooltipContent}>
-        <NxLabel tabIndex={0} variant="outline" status="info" icon={<RhUiInformationIcon />}>
+        <SynLabel tabIndex={0} variant="outline" status="info" icon={<RhUiInformationIcon />}>
           Rotating — {gracePeriod.remainingLabel} left
-        </NxLabel>
+        </SynLabel>
       </Tooltip>
       <Content component={ContentVariants.small} className={styles.expiryText}>
         Expires {gracePeriod.expiryShort}

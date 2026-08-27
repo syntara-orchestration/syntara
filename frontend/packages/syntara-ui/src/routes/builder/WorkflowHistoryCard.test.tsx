@@ -1,7 +1,7 @@
 import { SimpleList } from '@patternfly/react-core'
 import type { ExecutionsAPI } from '@syntara/contracts'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -185,7 +185,7 @@ describe('WorkflowHistoryCard', () => {
   it('calls onExecutionSelect with the execution id when row is clicked', async () => {
     const user = userEvent.setup()
     renderCard(<WorkflowHistoryCard {...defaultProps} executions={[baseExecution]} />)
-    const row = screen.getByRole('button', { name: /running/i })
+    const row = screen.getByRole('link', { name: /Execution from/ })
     await user.click(row)
     expect(mockOnExecutionSelect).toHaveBeenCalledWith(baseExecution.id)
   })
@@ -194,15 +194,14 @@ describe('WorkflowHistoryCard', () => {
     renderCard(
       <WorkflowHistoryCard {...defaultProps} executions={[baseExecution]} selectedExecutionId={baseExecution.id} />
     )
-    const buttons = screen.getAllByRole('button')
-    const rowButton = buttons.find((btn) => btn.textContent?.includes('Jan 15, 2024'))!
-    expect(rowButton).toHaveClass('pf-m-current')
+    const rowLink = screen.getByRole('link', { name: /Execution from/ })
+    expect(rowLink).toHaveClass('pf-m-current')
   })
 
   it('does not highlight an unselected row', () => {
     renderCard(<WorkflowHistoryCard {...defaultProps} executions={[baseExecution]} selectedExecutionId="other-id" />)
-    const rowButton = screen.getByRole('button', { name: /running/i })
-    expect(rowButton).not.toHaveClass('pf-m-current')
+    const rowLink = screen.getByRole('link', { name: /Execution from/ })
+    expect(rowLink).not.toHaveClass('pf-m-current')
   })
 
   it('renders a SimpleList when executions are present', () => {
@@ -406,25 +405,27 @@ describe('ExecutionHistoryRow', () => {
   it('calls onSelect when row is clicked', async () => {
     const user = userEvent.setup()
     renderRow(baseExecution)
-    await user.click(screen.getByRole('button'))
+    const rowLink = screen.getByRole('link', { name: /Execution from/ })
+    await user.click(rowLink)
     expect(mockOnSelect).toHaveBeenCalledTimes(1)
   })
 
   it('applies pf-m-current class when isSelected is true', () => {
     renderRow(baseExecution, true)
-    expect(screen.getByRole('button')).toHaveClass('pf-m-current')
+    const rowLink = screen.getByRole('link', { name: /Execution from/ })
+    expect(rowLink).toHaveClass('pf-m-current')
   })
 
   it('does not apply pf-m-current class when isSelected is false', () => {
     renderRow(baseExecution, false)
-    expect(screen.getByRole('button')).not.toHaveClass('pf-m-current')
+    const rowLink = screen.getByRole('link', { name: /Execution from/ })
+    expect(rowLink).not.toHaveClass('pf-m-current')
   })
 
-  it('uses within to check layout structure', () => {
+  it('renders row metadata in the list item', () => {
     renderRow(baseExecution)
-    const row = screen.getByRole('button')
-    expect(within(row).getByText(/Jan 15, 2024/)).toBeInTheDocument()
-    expect(within(row).getByText('Run ID: 12345678')).toBeInTheDocument()
+    expect(screen.getByText(/Jan 15, 2024/)).toBeInTheDocument()
+    expect(screen.getByText('Run ID: 12345678')).toBeInTheDocument()
   })
 
   it('displays version publish name when available', () => {
@@ -452,8 +453,8 @@ describe('ExecutionHistoryRow', () => {
       workflow_version: 5,
       workflow_version_name: 'v5 release',
     })
-    const link = screen.getByRole('link', { name: /v5 release/ })
-    expect(link).toHaveAttribute('href', '/workflow-builder/wf-1?version=5')
+    const versionLink = screen.getByRole('link', { name: /v5 release/ })
+    expect(versionLink).toHaveAttribute('href', '/workflow-builder/wf-1?version=5')
   })
 
   it('does not display version when workflow_version is null', () => {

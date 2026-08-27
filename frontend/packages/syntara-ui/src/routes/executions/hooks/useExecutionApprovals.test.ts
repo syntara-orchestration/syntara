@@ -297,6 +297,36 @@ describe('useExecutionApprovals', () => {
     })
   })
 
+  it('handleNodeClick matches a loop-iteration approval_node_id to the canvas node', async () => {
+    const loopApproval = { ...mockApproval, approval_node_id: 'node-1_iter_0' }
+    const mockFetchApprovals = vi.fn().mockResolvedValue([loopApproval])
+
+    const { useFetchPendingApprovals } = await import('./useFetchPendingApprovals')
+    vi.mocked(useFetchPendingApprovals).mockReturnValue({
+      isLoading: false,
+      fetchApprovals: mockFetchApprovals,
+      clear: vi.fn(),
+    })
+
+    const { result } = renderHook(() => useExecutionApprovals('exec-1'))
+
+    const node: ExecutionNode = {
+      id: 'node-1',
+      type: FlowNodeType.APPROVAL,
+      data: {
+        __executionState: { status: ACTIVITY_STATUS.WAITING },
+      },
+    }
+
+    act(() => {
+      result.current.handleNodeClick({} as React.MouseEvent, node)
+    })
+
+    await waitFor(() => {
+      expect(result.current.currentApproval).toEqual(loopApproval)
+    })
+  })
+
   it('handleNodeClick shows info when approval is no longer pending', async () => {
     const mockShowInfo = vi.fn()
     const mockFetchApprovals = vi.fn().mockResolvedValue([mockApproval])

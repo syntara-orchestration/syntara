@@ -15,8 +15,7 @@
  * - Filter with no results shows empty filter state
  * - Clear filter restores full list
  */
-import { type Page } from '@playwright/test'
-
+import { type Page } from './fixtures'
 import { test, expect, toAppUrl } from './fixtures'
 import { buildUniqueName, clickAddConnectedStep, startWorkflowWithTrigger } from './helpers/workflows'
 import { deleteIntegrationViaApi, type SeededIntegration } from './seeds/resources'
@@ -164,16 +163,15 @@ test.describe('LLM Provider Models Tab', () => {
       const selectAllCheckbox = modelsTable.locator('thead').getByRole('checkbox')
       await selectAllCheckbox.click()
 
-      const bodyCheckboxes = modelsTable.locator('tbody').getByRole('checkbox')
-      const count = await bodyCheckboxes.count()
-      for (let i = 0; i < count; i++) {
-        await expect(bodyCheckboxes.nth(i)).toBeChecked()
+      const bodyCheckboxes = await modelsTable.locator('tbody').getByRole('checkbox').all()
+      for (const checkbox of bodyCheckboxes) {
+        await expect(checkbox).toBeChecked()
       }
 
       await selectAllCheckbox.click()
 
-      for (let i = 0; i < count; i++) {
-        await expect(bodyCheckboxes.nth(i)).not.toBeChecked()
+      for (const checkbox of bodyCheckboxes) {
+        await expect(checkbox).not.toBeChecked()
       }
     } finally {
       await deleteIntegrationViaApi(app, integration.id)
@@ -275,7 +273,7 @@ test.describe('LLM Provider Models Tab', () => {
 
       const visibleRows = modelsTable.locator('tbody tr')
       await expect(visibleRows).toHaveCount(1)
-      await expect(visibleRows.nth(0)).toContainText('Alpha Model')
+      await expect(visibleRows).toContainText('Alpha Model')
     } finally {
       await deleteIntegrationViaApi(app, integration.id)
       await deleteCredentialViaApi(app, integration.credentialId)

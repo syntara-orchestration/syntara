@@ -5,8 +5,7 @@
  * that project's workflow builder tool selector, and that integrations
  * scoped to other projects are excluded.
  */
-import { type Page } from '@playwright/test'
-
+import { type Page } from './fixtures'
 import { test, expect, toAppUrl } from './fixtures'
 import { buildUniqueName, clickAddConnectedStep } from './helpers/workflows'
 import {

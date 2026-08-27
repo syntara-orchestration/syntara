@@ -8,17 +8,23 @@ Tool sync is handled by the separate /refresh endpoint.
 
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy.exc import IntegrityError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.core.models import User
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
 from syntara.integrations.adapters.protocol import ValidateResult
-from syntara.integrations.models.integration import IntegrationCreate, IntegrationStatus, IntegrationType
+from syntara.integrations.models.integration import (
+    Integration,
+    IntegrationCreate,
+    IntegrationStatus,
+    IntegrationType,
+)
 from syntara.integrations.services.integration_service import IntegrationService
 
 BASE_URL = "/api/v1/integrations"
@@ -194,6 +200,47 @@ class TestIntegrationValidateContract:
         # No Tool records should have been created
         tools = (await test_db_session.exec(select(Tool).where(Tool.integration_id == integration_id))).all()
         assert len(tools) == 0
+
+    async def test_validate_persists_error_when_commit_aborts(
+        self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User
+    ) -> None:
+        """A DB failure while persisting validation success leaves ERROR recorded.
+
+        validate_integration's unexpected-error handler must roll back the session
+        before persisting ERROR state. Without rollback, _get_or_raise raises
+        PendingRollbackError and validation_error is never written — the integration
+        stays validation_status=VALIDATING with validation_error=null.
+        """
+        integration_id = await _create_integration_with_mocked_credential(test_db_session, test_user, "validate-wedge")
+
+        success_result = ValidateResult(success=True, checked_at=datetime.now(UTC))
+        real_commit = test_db_session.commit
+        commit_calls = 0
+
+        async def commit_side_effect(*args: object, **kwargs: object) -> None:
+            nonlocal commit_calls
+            commit_calls += 1
+            if commit_calls == 2:
+                statement = "UPDATE integrations SET validation_status"
+                orig = Exception("simulated constraint violation")
+                raise IntegrityError(statement, {}, orig)
+            await real_commit(*args, **kwargs)
+
+        with (
+            patch(MCP_VALIDATE_PATCH, new=AsyncMock(return_value=success_result)),
+            patch.object(test_db_session, "commit", side_effect=commit_side_effect),
+        ):
+            response = await auth_client.post(f"{BASE_URL}/{integration_id}/validate")
+
+        assert response.status_code == 400
+
+        test_db_session.expire_all()
+        refreshed = await test_db_session.get(Integration, UUID(integration_id))
+        assert refreshed is not None
+        assert refreshed.validation_status == IntegrationStatus.ERROR
+        assert refreshed.validation_error is not None
+        assert "IntegrityError" in refreshed.validation_error
+        assert refreshed.last_validated_at is not None
 
 
 # ---------------------------------------------------------------------------

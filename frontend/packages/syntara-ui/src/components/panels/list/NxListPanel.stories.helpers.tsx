@@ -18,7 +18,7 @@ import {
   FilterTypeEnum,
 } from '../../../types/filters'
 import { IconLabel } from '../../IconLabel'
-import { NxKebabMenu } from '../../NxKebabMenu'
+import { SynKebabMenu } from '../../SynKebabMenu'
 
 import {
   NxListPanel,
@@ -32,7 +32,7 @@ import {
 /** Overflow kebab with Import / Export actions; for use in WithActionOverflowMenu story. */
 export function ResourceActionsOverflowMenu() {
   return (
-    <NxKebabMenu
+    <SynKebabMenu
       aria-label="More resource actions"
       actions={[
         { key: 'import', title: <IconLabel icon={<RhUiImportIcon />}>Import resource</IconLabel>, onClick: () => {} },

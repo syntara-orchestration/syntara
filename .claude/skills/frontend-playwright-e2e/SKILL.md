@@ -24,7 +24,7 @@ Your goal is to author comprehensive, production-grade end-to-end tests using Pl
 
 ### Key Conventions (extracted from existing tests)
 
-- **Imports:** `test, expect, toAppUrl` from `'./fixtures'` (NOT `'@playwright/test'`)
+- **Imports:** `test, expect, toAppUrl`, and `type Page` from `'./fixtures'` (NOT `'@playwright/test'`) — the fixtures module re-exports all Playwright primitives; importing directly bypasses project conventions and is caught by ESLint
 - **Fixture:** `{ app }` (NOT `{ page }`) — pre-navigated to base URL with nav visible
 - **Navigation:** `toAppUrl('/path')` helper for all URLs
 - **Unique names:** `buildUniqueName(prefix)` for all test data
@@ -453,9 +453,17 @@ await app.getByRole('grid', { name: 'Workflows table' })
 // ⚠️ ACCEPTABLE: When no semantic alternative exists
 await app.getByTestId('workflow-builder-canvas').click()
 
-// ❌ BAD: CSS selectors
+// ❌ BAD: CSS selectors — fragile, breaks on PF version bumps
 await app.locator('.pf-v6-c-button').click()
+
+// ❌ BAD: Internal PF BEM classes in assertions — same risk applies to expect() calls
+await expect(app.locator('.pf-v6-c-alert__description')).toContainText('Error')
+
+// ✅ GOOD: Role/text-based assertion — survives PF prefix changes
+await expect(app.getByRole('alert').getByText('Error')).toBeVisible()
 ```
+
+The CSS-selector ban applies equally to **locators** and **assertions**. Any `.pf-v6-c-*` class can silently stop matching when PatternFly bumps its prefix in a major release.
 
 **Scoping locators to containers:**
 
@@ -466,14 +474,14 @@ await panel.getByRole('button', { name: 'Action', exact: true }).click()
 
 // ✅ Scoped to a row
 const row = app.getByRole('row', { name: new RegExp(workflowName) })
-await row
-  .getByRole('button', { name: /Actions|Kebab toggle/i })
-  .first()
-  .click({ force: true })
+await row.getByRole('button', { name: /Actions|Kebab toggle/i }).click()
 
-// ✅ Scoped to toolbar (PatternFly filter chips)
-const nameChipGroup = app.locator('#filter-toolbar').getByRole('list', { name: 'Name' })
+// ✅ Filter chips via FilterBar (`helpers/patternfly.ts`)
+const nameChipGroup = filterChipGroup(app, 'Name')
 await expect(nameChipGroup.getByText('workflow')).toBeVisible()
+
+// ✅ Table header "select all" — PatternFly `Th select` sets aria-label="Select all rows"
+await table.getByRole('checkbox', { name: /select all/i }).check()
 ```
 
 **Use heading level to avoid strict mode violations in empty states:**
@@ -670,6 +678,28 @@ test('edits a workflow name', async ({ app }) => {
 ```
 
 **Read-only tests** (filtering, viewing, accessibility scans) that don't create resources don't need cleanup.
+
+**Prefer API-based cleanup over UI-based cleanup.** If a test fails mid-flow before the resource is saved or visible in the list, navigating back and interacting with the table to delete is unreliable — the page state is undefined. Use the API client directly in `finally`:
+
+```typescript
+// ✅ GOOD: API-based cleanup — works regardless of UI state
+let workflowId: string | undefined
+try {
+  workflowId = await createWorkflowViaApi({ name: workflowName })
+  // ... test interactions
+} finally {
+  if (workflowId) await deleteWorkflowViaApi(workflowId)
+}
+
+// ❌ AVOID: UI-based cleanup when the test may have failed before saving
+} finally {
+  await app.goto(toAppUrl('/workflows'))
+  await app.getByPlaceholder('Filter by name').fill(workflowName)
+  // If the test failed on step 2, the workflow may not exist in the list
+}
+```
+
+API helpers are in `e2e/utils/api.ts`. Use them for setup and teardown; reserve UI interactions for the assertions under test.
 
 ---
 
@@ -1084,6 +1114,46 @@ await app.routeWebSocket('wss://example.com/ws', ws => {
 })
 ```
 
+### Assertion Anti-Patterns
+
+**Don't hardcode counts or detail strings in assertions.** Fragile strings like `/1 issue found/` break the moment a second validation fires. Assert the meaningful label instead:
+
+```typescript
+// ❌ BAD: Breaks if a second validation error appears
+await expect(app.getByText(/1 issue found/)).toBeVisible()
+
+// ✅ GOOD: Asserts what the user cares about — independent of count
+await expect(app.getByRole('heading', { name: /Verification failed/i })).toBeVisible()
+await expect(app.getByTestId('validation-error-badge')).toBeVisible()
+```
+
+**Don't test sequential WebSocket/async state transitions.** Tests that assert `Pending → Running → Success` in order are inherently flaky — the intermediate states may resolve faster than the assertion can fire. Test the final outcome only, or `test.skip` with a clear explanation:
+
+```typescript
+// ❌ BAD: Racing against WebSocket update timing
+await expect(app.getByText('Pending')).toBeVisible()
+await expect(app.getByText('Running')).toBeVisible()
+await expect(app.getByText('Success')).toBeVisible()
+
+// ✅ GOOD: Assert only the final state
+await expect(app.getByText('Success')).toBeVisible()
+
+// ✅ ACCEPTABLE: Skip when live state depends on non-deterministic timing
+test.skip('live status transitions', 'depends on WebSocket update timing — not reliably testable in E2E')
+```
+
+### No `waitForLoadState('networkidle')`
+
+`networkidle` waits for 500ms of no network activity, which is unreliable in apps with polling, WebSockets, or long-running background requests — the wait can time out or resolve before the UI is actually ready. Use a web-first assertion on the specific element or state you're waiting for instead.
+
+```typescript
+// ❌ BAD — networkidle never resolves cleanly against polling/WebSocket traffic
+await app.waitForLoadState('networkidle')
+
+// ✅ GOOD — wait for the actual UI signal
+await expect(app.getByRole('heading', { name: 'Workflows' })).toBeVisible()
+```
+
 ---
 
 ## Constraints
@@ -1104,15 +1174,18 @@ await app.routeWebSocket('wss://example.com/ws', ws => {
 - ❌ Use `{ timeout: 5000 }` on assertions -- 5000ms is the default Playwright timeout, restating it is redundant
 - ❌ Use `.first()` when only one element should match -- make the locator specific enough to match exactly one element
 - ❌ Use try-catch to silently skip assertions -- when mock data is deterministic, let assertions fail naturally to surface mock setup bugs
-- ❌ Use raw CSS selectors (`.pf-v6-c-button`) -- use `getByRole`, `getByLabel`, or `getByText`
+- ❌ Use raw CSS selectors or PF BEM classes (`.pf-v6-c-button`) in locators **or assertions** -- use `getByRole`, `getByLabel`, or `getByText`
 - ❌ Include `.ts` extension in imports -- follow the codebase convention of extensionless imports
 - ❌ Assert on CSS classes or internal state
 - ❌ Access React internals via `page.evaluate()`
 - ❌ Leave test data in database when testing against real backend
+- ❌ Use `waitForLoadState('networkidle')` -- unreliable with polling/WebSocket traffic; assert on the specific UI signal instead
+- ❌ Assert sequential async/WebSocket state transitions (`Pending → Running → Success`) -- race-prone; assert only the final state
 
 **ALWAYS:**
 
-- ✅ Import `{ test, expect, toAppUrl }` from `'./fixtures'`
+- ✅ Import `{ test, expect, toAppUrl }` and `type Page` from `'./fixtures'`
+- ✅ Prefer API-based cleanup (`e2e/utils/api.ts`) over UI-based cleanup when a test may fail before the resource is visible in the UI
 - ✅ Use `{ app }` fixture
 - ✅ Use `buildUniqueName(prefix)` for all test data
 - ✅ Each test creates ALL resources it needs (fully self-contained)
@@ -1136,7 +1209,7 @@ Before considering tests complete:
 
 ### Test Quality
 
-- [ ] Tests import from `'./fixtures'` (not `'@playwright/test'`)
+- [ ] Tests import `test, expect, toAppUrl`, and `type Page` from `'./fixtures'` (not `'@playwright/test'`)
 - [ ] Tests use `{ app }` fixture (not `{ page }`)
 - [ ] Navigation uses `toAppUrl('/path')`
 - [ ] Semantic locators used (minimal `getByTestId`)
