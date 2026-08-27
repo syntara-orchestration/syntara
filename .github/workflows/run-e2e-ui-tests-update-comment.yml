@@ -1,5 +1,5 @@
 ---
-name: '/run-e2e-ui-tests' Update Comment
+name: "/run-e2e-ui-tests Update Comment"
 
 # Watches for ci-frontend.yml workflow_dispatch completions and updates
 # the initial comment posted by run-e2e-ui-tests-listener.yml with results.
