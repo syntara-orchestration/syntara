@@ -3,6 +3,17 @@ name: "/run-e2e-ui-tests Update Comment"
 
 # Watches for ci-frontend.yml workflow_dispatch completions and updates
 # the initial comment posted by run-e2e-ui-tests-listener.yml with results.
+#
+# SECURITY NOTE: This workflow uses workflow_run, which runs in the base
+# repository context. This usage is safe because:
+# 1. We never check out any code from the PR or triggering workflow
+# 2. We never execute any code from the PR
+# 3. We only read workflow metadata (conclusion, run ID, inputs)
+# 4. We only update a PR comment with status information
+# 5. All data comes from GitHub's workflow_run event, not PR-controlled sources
+#
+# The workflow_run trigger is necessary to watch for workflow completions.
+# There is no alternative trigger that provides this functionality.
 on:
   workflow_run:
     workflows:
@@ -20,7 +31,8 @@ jobs:
   update-comment:
     name: Update E2E Comment
     runs-on: ubuntu-latest
-    # Only update for workflow_dispatch events (manual /run-e2e-ui-tests triggers)
+    # Only update for workflow_dispatch events (manual /run-e2e-ui-tests triggers).
+    # This prevents updating comments for regular PR runs or scheduled runs.
     if: github.event.workflow_run.event == 'workflow_dispatch'
     steps:
       - name: Find PR from workflow inputs
@@ -31,8 +43,9 @@ jobs:
           RUN_ID: ${{ github.event.workflow_run.id }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
-          # Get the PR number from the workflow run inputs
-          # (ci-frontend.yml workflow_dispatch accepts pr_number as input)
+          # Get the PR number from the workflow run inputs.
+          # This data comes from GitHub's workflow_run event, not from PR code.
+          # The pr_number was passed as an input when ci-frontend.yml was dispatched.
           PR_NUMBER=$(gh api "repos/$REPO/actions/runs/$RUN_ID" \
             --jq '.inputs.pr_number // empty')
 
