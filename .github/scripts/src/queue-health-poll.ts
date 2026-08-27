@@ -2,8 +2,14 @@
 import { GitHubClient } from './lib/github.js'
 import { getEnvironment } from './lib/env.js'
 import { setOutput } from './lib/actions-output.js'
-import { decideAlert, inferPreviousHealthFromJobs } from './lib/health-state.js'
+import {
+  decideAlert,
+  inferPreviousHealthFromJobs,
+  UNHEALTHY_ALERT_OUTPUT,
+  RECOVERY_ALERT_OUTPUT,
+} from './lib/health-state.js'
 import type { HealthState } from './lib/types.js'
+import { runScript } from './lib/run-script.js'
 
 const MERGE_TIMEOUT_MINUTES = 120
 
@@ -64,7 +70,8 @@ async function assessHealth(github: GitHubClient, branch: string): Promise<Healt
  */
 async function getPreviousHealthState(
   github: GitHubClient,
-  currentRunId: number
+  currentRunId: number,
+  eventName?: string
 ): Promise<'healthy' | 'unhealthy' | 'unknown'> {
   console.log('Getting previous run state...')
 
@@ -73,7 +80,8 @@ async function getPreviousHealthState(
     const recentRuns = await github.getWorkflowRuns(
       'merge-queue-health-poll.yml',
       oneHourAgo,
-      currentRunId
+      currentRunId,
+      eventName
     )
 
     if (recentRuns.length === 0) {
@@ -106,14 +114,17 @@ async function main() {
   const currentState = await assessHealth(github, defaultBranch)
   console.log(`Current health: ${currentState.health} (${currentState.reason})`)
 
-  const previousHealth = await getPreviousHealthState(github, env.runId)
+  const previousHealth = await getPreviousHealthState(github, env.runId, env.eventName)
   console.log(`Previous health: ${previousHealth}`)
 
   const alert = decideAlert(currentState.health, previousHealth)
 
   setOutput('health', currentState.health)
   setOutput('alert', alert)
-  setOutput('queue_url', github.getQueueUrl(defaultBranch))
+  const queueUrl = github.getQueueUrl(defaultBranch)
+  setOutput(UNHEALTHY_ALERT_OUTPUT, String(alert === 'unhealthy'))
+  setOutput(RECOVERY_ALERT_OUTPUT, String(alert === 'recovery'))
+  setOutput('queue_url', queueUrl)
   setOutput('timeout_minutes', String(MERGE_TIMEOUT_MINUTES))
   setOutput('queue_depth', String(currentState.queueDepth ?? 0))
   setOutput('minutes_since_merge', String(currentState.minutesSinceMerge ?? 0))
@@ -127,7 +138,4 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error('Error:', error)
-  process.exit(1)
-})
+runScript(main)

@@ -11,6 +11,7 @@ export function getEnvironment(): Environment {
     repository: process.env.GITHUB_REPOSITORY,
     runId: process.env.GITHUB_RUN_ID ? parseInt(process.env.GITHUB_RUN_ID, 10) : undefined,
     headRef: process.env.GITHUB_HEAD_REF,
+    eventName: process.env.GITHUB_EVENT_NAME,
   }
 
   // Validate using Zod schema with descriptive error messages

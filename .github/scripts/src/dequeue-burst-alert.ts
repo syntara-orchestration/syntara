@@ -2,12 +2,14 @@
 import { GitHubClient } from './lib/github.js'
 import { SlackNotifier } from './lib/slack.js'
 import { getEnvironment } from './lib/env.js'
+import { runScript } from './lib/run-script.js'
 
 /** Number of dequeues within the time window that triggers an alert */
 const DEQUEUE_THRESHOLD = 3
 
 /** Time window in minutes for detecting dequeue bursts */
 const TIME_WINDOW_MINUTES = 45
+const POLL_INTERVAL_MINUTES = 15
 
 /**
  * Detects dequeue bursts in the merge queue and sends Slack alerts.
@@ -26,13 +28,14 @@ async function main() {
   console.log(`Monitoring dequeue activity for branch: ${defaultBranch}`)
 
   const currentEntries = await github.getMergeQueueEntries(defaultBranch)
+  console.log(`Current queue depth: ${currentEntries.length}`)
   if (currentEntries.length === 0) {
     console.log('No alert needed (merge queue is empty)')
     return
   }
 
   const timeWindowAgo = new Date(Date.now() - TIME_WINDOW_MINUTES * 60 * 1000)
-  const recentDequeues = await github.getRecentDequeues(timeWindowAgo)
+  const recentDequeues = await github.getRecentDequeues(defaultBranch, timeWindowAgo)
 
   console.log(`Found ${recentDequeues.length} dequeued PRs in the last ${TIME_WINDOW_MINUTES} minutes`)
 
@@ -43,9 +46,13 @@ async function main() {
     )
   }
 
-  if (recentDequeues.length < DEQUEUE_THRESHOLD) {
+  const pollWindowAgo = new Date(Date.now() - POLL_INTERVAL_MINUTES * 60 * 1000)
+  const hasNewDequeue = recentDequeues.some((dequeue) => new Date(dequeue.dequeuedAt) >= pollWindowAgo)
+
+  if (recentDequeues.length < DEQUEUE_THRESHOLD || !hasNewDequeue) {
     console.log(
-      `No alert needed (${recentDequeues.length} dequeues, threshold is ${DEQUEUE_THRESHOLD})`
+      `No alert needed (${recentDequeues.length} dequeues, ${currentEntries.length} queued, ` +
+        `new event: ${hasNewDequeue}, threshold is ${DEQUEUE_THRESHOLD})`
     )
     return
   }
@@ -65,7 +72,4 @@ async function main() {
   console.log('✅ Alert sent to Slack')
 }
 
-main().catch((error) => {
-  console.error('Error:', error)
-  process.exit(1)
-})
+runScript(main)

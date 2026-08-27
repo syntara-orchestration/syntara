@@ -9,6 +9,7 @@ export const WorkflowRunSchema = z.object({
   name: z.string(),
   head_branch: z.string(),
   status: z.string(),
+  event: z.string(),
   conclusion: z.string().nullable(),
   created_at: z.string(),
 })
@@ -69,6 +70,7 @@ export const EnvironmentSchema = z.object({
   repository: z.string().min(1, 'GITHUB_REPOSITORY is required'),
   runId: z.number().int().positive('GITHUB_RUN_ID must be a positive integer'),
   headRef: z.string().optional(),
+  eventName: z.string().optional(),
 })
 
 export type WorkflowRun = z.infer<typeof WorkflowRunSchema>
