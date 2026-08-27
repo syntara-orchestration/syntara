@@ -1,10 +1,12 @@
 import { MenuToggle, SelectList, SelectOption } from '@patternfly/react-core'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { useState } from 'react'
+import { type ComponentProps, useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
+import { LONG_SELECT_MAX_MENU_HEIGHT } from './longSelectMenu'
+import longSelectMenuStyles from './longSelectMenu.module.css'
 import { SynSelect } from './SynSelect'
 
 function TestSynSelect({
@@ -12,11 +14,13 @@ function TestSynSelect({
   isScrollable,
   maxMenuHeight,
   className,
+  popperProps,
 }: Readonly<{
   onOpenChange?: (open: boolean) => void
   isScrollable?: boolean
   maxMenuHeight?: string
   className?: string
+  popperProps?: ComponentProps<typeof SynSelect>['popperProps']
 }>) {
   const [isOpen, setIsOpen] = useState(false)
 
@@ -31,6 +35,7 @@ function TestSynSelect({
         isScrollable={isScrollable}
         maxMenuHeight={maxMenuHeight}
         className={className}
+        popperProps={popperProps}
         toggle={(toggleRef) => (
           <MenuToggle ref={toggleRef} onClick={() => setIsOpen((open) => !open)} isExpanded={isOpen}>
             Toggle
@@ -72,6 +77,25 @@ async function openMenu() {
   const user = userEvent.setup()
   await user.click(screen.getByRole('button', { name: 'Toggle' }))
   return screen.getByRole('listbox')
+}
+
+function getOpenMenu() {
+  const listbox = screen.getByRole('listbox')
+  // PatternFly puts scrollable/className on the Menu root and maxMenuHeight on MenuContent.
+  // neither has an accessible role of its own.
+  /* eslint-disable testing-library/no-node-access */
+  const menu = listbox.closest('.pf-v6-c-menu')
+  expect(menu).toBeInstanceOf(HTMLElement)
+  return menu as HTMLElement
+  /* eslint-enable testing-library/no-node-access */
+}
+
+function getMenuContentMaxHeight(menu: HTMLElement) {
+  /* eslint-disable testing-library/no-node-access */
+  const content = menu.querySelector('.pf-v6-c-menu__content')
+  /* eslint-enable testing-library/no-node-access */
+  expect(content).toBeInstanceOf(HTMLElement)
+  return (content as HTMLElement).style.getPropertyValue('--pf-v6-c-menu__content--MaxHeight')
 }
 
 describe('SynSelect', () => {
@@ -121,19 +145,51 @@ describe('SynSelect', () => {
     }).not.toThrow()
   })
 
-  it('opens with an explicit maxMenuHeight override', async () => {
+  it('applies scrollable menu height defaults when opened', async () => {
+    render(<TestSynSelect />)
+
+    await openMenu()
+
+    const menu = getOpenMenu()
+    expect(menu).toHaveClass('pf-m-scrollable')
+    expect(menu).toHaveClass(longSelectMenuStyles.containScroll)
+    expect(getMenuContentMaxHeight(menu)).toBe(LONG_SELECT_MAX_MENU_HEIGHT)
+  })
+
+  it('applies an explicit maxMenuHeight override on the open menu', async () => {
     render(<TestSynSelect maxMenuHeight="10rem" />)
-    expect(await openMenu()).toBeInTheDocument()
+
+    await openMenu()
+
+    expect(getMenuContentMaxHeight(getOpenMenu())).toBe('10rem')
   })
 
-  it('opens with a caller className', async () => {
+  it('merges a caller className onto the open menu', async () => {
     render(<TestSynSelect className="extra-select-class" />)
-    expect(await openMenu()).toBeInTheDocument()
+
+    await openMenu()
+
+    const menu = getOpenMenu()
+    expect(menu).toHaveClass(longSelectMenuStyles.containScroll)
+    expect(menu).toHaveClass('extra-select-class')
   })
 
-  it('accepts an isScrollable override', async () => {
+  it('honors an isScrollable override on the open menu', async () => {
     render(<TestSynSelect isScrollable={false} />)
-    expect(await openMenu()).toBeInTheDocument()
+
+    await openMenu()
+
+    expect(getOpenMenu()).not.toHaveClass('pf-m-scrollable')
+  })
+
+  it('keeps default maxMenuHeight when caller popperProps are merged', async () => {
+    render(<TestSynSelect popperProps={{ position: 'start' }} />)
+
+    await openMenu()
+
+    const menu = getOpenMenu()
+    expect(menu).toHaveClass('pf-m-scrollable')
+    expect(getMenuContentMaxHeight(menu)).toBe(LONG_SELECT_MAX_MENU_HEIGHT)
   })
 
   it('has no accessibility violations when closed', async () => {
