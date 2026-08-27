@@ -1525,10 +1525,10 @@ class TestSelectDefaultAAPIntegration:
         assert AAPProxyService._select_default_aap_integration([integration]) is integration
 
     def test_two_enabled_integrations_raise(self) -> None:
+        one = _mock_integration(name="one")
+        two = _mock_integration(name="two")
         with pytest.raises(AAPNotConfiguredError, match="pass integration_id"):
-            AAPProxyService._select_default_aap_integration(
-                [_mock_integration(name="one"), _mock_integration(name="two")]
-            )
+            AAPProxyService._select_default_aap_integration([one, two])
 
 
 class TestListVisibleAAPIntegrations:

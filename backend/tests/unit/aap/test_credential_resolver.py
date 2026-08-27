@@ -613,6 +613,7 @@ class TestResolveAAPConnectionFromCredential:
         integration = MagicMock()
         integration.name = "AAP Gateway"
         integration.management_credential_id = None
+        session = AsyncMock()
 
         with pytest.raises(AAPNotConfiguredError, match="no management credential"):
-            await resolve_aap_connection_from_management_credential(AsyncMock(), integration)
+            await resolve_aap_connection_from_management_credential(session, integration)
