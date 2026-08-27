@@ -1386,6 +1386,73 @@ class TestErrorHandlingDownstreamSkipping:
         wf._mark_remaining_unreachable_nodes(graph)
         assert "node_b" in wf.skipped_nodes
 
+    def test_mark_downstream_as_skipped_no_boundary_cascades_fully(self) -> None:
+        """Without a boundary, the skip cascades to every reachable downstream node."""
+        backend = InMemoryGraphBackend()
+        for nid, ntype in [("trigger", "manual_trigger"), ("a", "script"), ("b", "script"), ("c", "script")]:
+            backend.add_node(nid, {"id": nid, "type": ntype, "parameters": {}})
+        backend.add_edge("trigger", "a", None)
+        backend.add_edge("a", "b", None)
+        backend.add_edge("b", "c", None)
+        graph = WorkflowGraph(backend)
+
+        wf = _make_workflow(skipped_nodes={"a"})
+        wf._mark_downstream_as_skipped("a", graph)
+
+        assert "b" in wf.skipped_nodes
+        assert "c" in wf.skipped_nodes
+
+    def test_mark_downstream_as_skipped_boundary_blocks_out_of_section_nodes(self) -> None:
+        """With boundary, only nodes in the set are eligible for skip propagation.
+
+        Graph: a → b (in-section) and a → side (off-section).
+        Boundary = {b}. Starting from a: b is skipped, side is not.
+        """
+        backend = InMemoryGraphBackend()
+        for nid, ntype in [
+            ("trigger", "manual_trigger"),
+            ("a", "script"),
+            ("b", "script"),
+            ("side", "script"),
+        ]:
+            backend.add_node(nid, {"id": nid, "type": ntype, "parameters": {}})
+        backend.add_edge("trigger", "a", None)
+        backend.add_edge("a", "b", None)
+        backend.add_edge("a", "side", None)
+        graph = WorkflowGraph(backend)
+
+        wf = _make_workflow(skipped_nodes={"a"})
+        wf._mark_downstream_as_skipped("a", graph, boundary={"a", "b"})
+
+        assert "b" in wf.skipped_nodes, "b is in-section and should be skipped"
+        assert "side" not in wf.skipped_nodes, "side is outside boundary and must not be skipped"
+
+    def test_mark_downstream_as_skipped_boundary_respects_unsatisfied_predecessors(self) -> None:
+        """A boundary node with a non-skipped predecessor is not skipped.
+
+        Graph: a → b ← other (other is not skipped).
+        Starting from a with boundary={a, b}: b has a live predecessor (other),
+        so b must not be skipped.
+        """
+        backend = InMemoryGraphBackend()
+        for nid, ntype in [
+            ("trigger", "manual_trigger"),
+            ("a", "script"),
+            ("b", "script"),
+            ("other", "script"),
+        ]:
+            backend.add_node(nid, {"id": nid, "type": ntype, "parameters": {}})
+        backend.add_edge("trigger", "a", None)
+        backend.add_edge("trigger", "other", None)
+        backend.add_edge("a", "b", None)
+        backend.add_edge("other", "b", None)
+        graph = WorkflowGraph(backend)
+
+        wf = _make_workflow(skipped_nodes={"a"})
+        wf._mark_downstream_as_skipped("a", graph, boundary={"a", "b"})
+
+        assert "b" not in wf.skipped_nodes, "b has a live predecessor (other) and must not be skipped"
+
 
 class TestBuildResultStatus:
     """_build_result reports the correct workflow status."""

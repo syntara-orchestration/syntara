@@ -443,6 +443,74 @@ class TestConvergeStrategies:
         assert "join" in result["completed_activities"]
         assert "final" in result["completed_activities"]
 
+    async def test_converge_any_off_section_node_is_skipped_not_engine_error(
+        self, temporal_env: WorkflowEnvironment
+    ) -> None:
+        """Converge ANY must not cause the engine to error when a predecessor also has off-section successors.
+
+        This is an invalid graph shape (per AAP-87746) that will be rejected by future validation,
+        but the engine must handle it gracefully today: the main path completes and the off-section
+        node ends up skipped (by _mark_remaining_unreachable_nodes, not by the converge BFS).
+
+        Graph:
+            trigger -> branch_a -> join (ANY n=1) -> final
+                    -> branch_b -> join
+                       branch_b -> side_action   (off-section: not on any path to join)
+        """
+        result = await _run_workflow(
+            temporal_env,
+            "v2-converge-any-off-section",
+            {
+                "schema_version": "2.0.0",
+                "triggers": [_manual_trigger()],
+                "nodes": [
+                    {
+                        "id": "branch_a",
+                        "type": "script",
+                        "parameters": {"language": "bash", "code": "echo A"},
+                    },
+                    {
+                        "id": "branch_b",
+                        "type": "script",
+                        "parameters": {"language": "bash", "code": "echo B"},
+                    },
+                    {
+                        "id": "join",
+                        "type": "converge",
+                        "parameters": {"strategy": "any", "n_required": 1},
+                    },
+                    {
+                        "id": "side_action",
+                        "type": "script",
+                        "parameters": {"language": "bash", "code": "echo side"},
+                    },
+                    {
+                        "id": "final",
+                        "type": "script",
+                        "parameters": {"language": "bash", "code": "echo done"},
+                    },
+                ],
+                "edges": [
+                    {"from": "trigger", "to": "branch_a"},
+                    {"from": "trigger", "to": "branch_b"},
+                    {"from": "branch_a", "to": "join"},
+                    {"from": "branch_b", "to": "join"},
+                    {"from": "branch_b", "to": "side_action"},
+                    {"from": "join", "to": "final"},
+                ],
+            },
+        )
+
+        # Main path must complete successfully.
+        assert result["status"] == "completed"
+        assert "join" in result["completed_activities"]
+        assert "final" in result["completed_activities"]
+
+        # side_action is off-section: it is skipped (not completed, not failed).
+        # This is the intended behavior — graph validation will reject this shape upstream.
+        assert "side_action" not in result["completed_activities"]
+        assert "side_action" not in result.get("failed_activities", {})
+
 
 @pytest.mark.integration
 @pytest.mark.asyncio
