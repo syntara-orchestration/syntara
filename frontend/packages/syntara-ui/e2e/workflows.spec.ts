@@ -81,7 +81,7 @@ test.skip('user searches, views, and deletes a workflow', async ({ app }) => {
   }
 })
 
-test('duplicates workflow from builder toolbar kebab menu', async ({ app }) => {
+test('duplicates workflow from builder toolbar kebab menu', { tag: ['@konflux-skip'] }, async ({ app }) => {
   const workflowName = buildUniqueName('duplicate-source')
   let duplicatedWorkflowName: string | undefined
 

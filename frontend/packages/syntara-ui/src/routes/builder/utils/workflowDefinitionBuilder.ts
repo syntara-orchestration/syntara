@@ -211,7 +211,7 @@ export function transformNodeParameters(type: string, parameters: Record<string,
     )
   }
 
-  if (type === 'approval') {
+  if (type === ActivityTypeEnum.APPROVAL) {
     result = transformApprovalApprovers(result)
   }
 
