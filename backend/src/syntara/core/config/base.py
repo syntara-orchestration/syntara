@@ -28,7 +28,7 @@ from pydantic import Field, HttpUrl, SecretStr, computed_field, field_validator,
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL, make_url
 
-from syntara.core.constants import RetrieverServiceDefaults
+from syntara.core.constants import RequestLimits, RetrieverServiceDefaults
 from syntara.core.exceptions import SafeValueError
 
 # =============================================================================
@@ -656,6 +656,13 @@ class ServerSettings(BaseSettings):
     cors_allow_headers: list[str] = Field(
         default=["Authorization", "Content-Type", "Accept"],
         description="Allowed headers for CORS",
+    )
+
+    api_max_request_body_mb: int = Field(
+        default=RequestLimits.DEFAULT_MAX_BODY_MB,
+        description="Maximum JSON/text request body size in MB (multipart uses file upload limits)",
+        ge=1,
+        le=120,
     )
 
     # OIDC security

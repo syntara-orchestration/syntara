@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, ClassVar, Literal
 from uuid import UUID
 
-from pydantic import ConfigDict
+from pydantic import ConfigDict, field_validator
 from sqlalchemy import String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, Index, Relationship, SQLModel
@@ -16,6 +16,7 @@ from sqlmodel import Field, Index, Relationship, SQLModel
 from syntara.core.constants import FieldLimits
 from syntara.core.models.base import SoftDeletableResource, UserOwnedResource
 from syntara.core.models.pagination import ResourcesResponse
+from syntara.core.jsonb_limits import validate_workflow_definition_json
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 
 if TYPE_CHECKING:
@@ -87,6 +88,11 @@ class WorkflowVersion(UserOwnedResource, SoftDeletableResource, table=True):
         sa_type=JSONB,
         description="Complete workflow definition as JSONB",
     )
+
+    @field_validator("workflow_definition", mode="before")
+    @classmethod
+    def validate_workflow_definition_size(cls, v: dict[str, Any]) -> dict[str, Any]:
+        return validate_workflow_definition_json(v)
 
     change_description: str | None = Field(
         default=None,
@@ -192,6 +198,13 @@ class PublishVersionRequest(SQLModel):
         None,
         description="Version the client was editing. If the server's current_version is higher, returns 409 Conflict.",
     )
+
+    @field_validator("workflow_definition", mode="before")
+    @classmethod
+    def validate_workflow_definition_size(
+        cls, v: WorkflowDefinition | dict[str, Any] | None
+    ) -> WorkflowDefinition | dict[str, Any] | None:
+        return validate_workflow_definition_json(v)
 
 
 # Rebuild models to resolve forward references

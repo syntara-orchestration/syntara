@@ -8,12 +8,13 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, ClassVar
 from uuid import UUID
 
-from pydantic import ConfigDict
+from pydantic import ConfigDict, field_validator
 from sqlmodel import CheckConstraint, Field, Index, Relationship, SQLModel, text
 
 from syntara.core.constants import FieldLimits
 from syntara.core.models.base import Resource
 from syntara.core.models.pagination import ResourcesResponse
+from syntara.core.jsonb_limits import validate_jsonb_size, validate_labels_dict, validate_workflow_definition_json
 from syntara.workflows.models.validation_finding import ValidationResult
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 
@@ -179,6 +180,12 @@ class WorkflowBase(SQLModel):
     )
     labels: dict[str, Any] = Field(default_factory=dict, description="Workflow labels")
 
+    @field_validator("labels", mode="before")
+    @classmethod
+    def validate_labels(cls, v: dict[str, str] | None) -> dict[str, str] | None:
+        """Validate labels structure and serialized size."""
+        return validate_labels_dict(v)
+
 
 class WorkflowCreate(WorkflowBase):
     """Schema for creating a new workflow (POST /workflows).
@@ -195,6 +202,13 @@ class WorkflowCreate(WorkflowBase):
         description="When true, unavailable LLM models are cleared with warnings "
         "instead of rejecting the request. Use when importing workflows from other instances.",
     )
+
+    @field_validator("workflow_definition", mode="before")
+    @classmethod
+    def validate_workflow_definition_size(
+        cls, v: WorkflowDefinition | dict[str, Any]
+    ) -> WorkflowDefinition | dict[str, Any]:
+        return validate_workflow_definition_json(v)
 
 
 class WorkflowUpdate(SQLModel):
@@ -222,6 +236,13 @@ class WorkflowUpdate(SQLModel):
         None,
         description="Version the client was editing. If the server's current_version is higher, returns 409 Conflict.",
     )
+
+    @field_validator("workflow_definition", mode="before")
+    @classmethod
+    def validate_workflow_definition_size(
+        cls, v: WorkflowDefinition | dict[str, Any] | None
+    ) -> WorkflowDefinition | dict[str, Any] | None:
+        return validate_workflow_definition_json(v)
 
 
 class WorkflowRead(WorkflowBase):

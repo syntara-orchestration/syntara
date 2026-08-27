@@ -15,6 +15,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import CheckConstraint, Column, DateTime, Field, Index, Relationship, SQLModel
 
 from syntara.core.constants import FieldLimits
+from syntara.core.jsonb_limits import validate_jsonb_size
 from syntara.core.models.base import SoftDeletableResource, UserOwnedResource
 from syntara.core.models.pagination import ResourcesResponse
 from syntara.core.utils.sqlmodel import postgres_enum_column
@@ -339,6 +340,11 @@ class ExecutionCreate(SQLModel):
         default=False, description="If true, run the published version instead of the current version"
     )
 
+    @field_validator("input_data", mode="before")
+    @classmethod
+    def validate_input_data_size(cls, v: dict[str, Any]) -> dict[str, Any]:
+        return validate_jsonb_size(v, field_name="input_data")
+
 
 class PreResolvedNodeOutput(SQLModel):
     """Typed structure for a single pre-resolved node's mock output."""
@@ -367,6 +373,18 @@ class TestExecutionCreate(SQLModel):
         "When True (default), target_node_id must not appear in pre_resolved_nodes.",
     )
     trigger_node_id: str = Field(description="Trigger node ID to start from")
+
+    @field_validator("pre_resolved_nodes", mode="before")
+    @classmethod
+    def validate_pre_resolved_nodes_payload(
+        cls, v: dict[str, PreResolvedNodeOutput]
+    ) -> dict[str, PreResolvedNodeOutput]:
+        return validate_jsonb_size(v, field_name="pre_resolved_nodes")
+
+    @field_validator("trigger_inputs", mode="before")
+    @classmethod
+    def validate_trigger_inputs_size(cls, v: dict[str, Any]) -> dict[str, Any]:
+        return validate_jsonb_size(v, field_name="trigger_inputs")
 
     @field_validator("target_node_id")
     @classmethod
