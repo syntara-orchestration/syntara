@@ -140,9 +140,31 @@ class TestSetupHappyPath:
         assert str(config.issuer_url) == f"{_AAP_URL}/o/"
         assert config.scopes == "read write openid roles"
         assert config.aap_role_mapping_enabled is True
-        assert config.enable_rp_initiated_logout is True
+        assert config.enable_rp_initiated_logout is False
         assert config.auto_discovery is True
         assert config.allow_all_authenticated is False
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_rp_initiated_logout_disabled_to_prevent_token_wipe(self) -> None:
+        """Ensure the AAP push-button setup never re-enables RP-initiated logout.
+
+        The AAP push-button setup registers a single OAuth2 application shared by
+        all users. If RP-initiated logout is enabled, logging out of AO redirects
+        to AAP's OIDC end-session endpoint, and AAP deletes every API token tied
+        to that shared application across all users. The setup must therefore leave
+        ``enable_rp_initiated_logout`` disabled. This test fails if the setup ever
+        re-enables it.
+        """
+        respx.get(f"{_AAP_API}/organizations/").mock(return_value=httpx.Response(200, json=_org_response()))
+        respx.post(f"{_AAP_API}/applications/").mock(return_value=httpx.Response(201, json=_app_response()))
+
+        idp_service = _mock_idp_service()
+        service = _make_service(idp_service=idp_service)
+        await service.setup(_make_request())
+
+        config = idp_service.create_provider.call_args[0][0].configuration
+        assert config.enable_rp_initiated_logout is False
 
     @pytest.mark.asyncio
     @respx.mock
