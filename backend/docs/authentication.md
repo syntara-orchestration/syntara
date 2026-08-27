@@ -903,7 +903,7 @@ The `POST /identity_providers/setup-aap-oidc` endpoint automates the full AAP OI
    - `scopes` = `"read write openid roles"`
    - JMESPath group extraction for AAP teams and organizations
    - `aap_role_mapping_enabled` = `true` (see [AAP Role Mapping](#aap-role-mapping))
-   - `enable_rp_initiated_logout` = `true`
+   - `enable_rp_initiated_logout` = `false` — the push-button setup registers a single OAuth2 application shared by all users; enabling RP-initiated logout makes AAP delete every API token tied to that shared application on logout, across all users. Admins can still enable single sign-out per identity provider.
    - `disable_tls_verify` mirrors the request's `insecure_skip_tls_verify` value
 4. The created identity provider is returned (201).
 

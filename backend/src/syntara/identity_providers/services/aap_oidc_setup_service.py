@@ -137,7 +137,14 @@ class AAPOIDCSetupService:
                 claim_mapping=OIDCClaimMapping(),
                 group_jmespath_expression=_AAP_GROUP_JMESPATH,
                 aap_role_mapping_enabled=True,
-                enable_rp_initiated_logout=True,
+                # RP-initiated logout must stay disabled for the AAP push-button setup.
+                # The OAuth2 application created above is a single application shared by
+                # every AO user; redirecting logout to AAP's OIDC end-session endpoint
+                # makes AAP (django-oauth-toolkit) purge every API token tied to that
+                # shared application across all users, not just the one logging out.
+                # Admins who want OIDC single sign-out can still enable it per identity
+                # provider.
+                enable_rp_initiated_logout=False,
                 allow_all_authenticated=False,
                 disable_tls_verify=request.insecure_skip_tls_verify,
             ),

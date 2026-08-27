@@ -37,7 +37,10 @@ export const IDP_TYPE_PRESETS: Record<string, IdpTypePreset> = {
       lastName: 'family_name',
     },
     groupMappingExpression: "[aap_teams[*].join('/', [organization, name]), aap_organizations[*].name] | []",
-    enableRpInitiatedLogout: true,
+    // Keep RP-initiated logout off for AAP: the push-button setup registers a single
+    // shared OAuth2 application, and RP logout makes AAP delete every API token tied to
+    // it across all users, not just the one logging out.
+    enableRpInitiatedLogout: false,
     aapRoleMappingEnabled: true,
   },
   [IdpTypeKey.CUSTOM]: {
