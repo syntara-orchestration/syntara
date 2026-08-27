@@ -115,7 +115,7 @@ To test against the real Syntara backend instead of the mock API:
 
 **Important:** When running against a real backend, test isolation and cleanup are critical — tests operate on a shared persistent database. The patterns in this skill (unique names, try-finally cleanup) ensure tests work reliably in both modes.
 
-**Note on data-dependent tests:** Some tests (integration-filtering, approvals, pagination) require seed data that the mock API provides. These tests use `expect()` guards that fail loudly when data is missing, surfacing the problem in CI. Tests that CREATE their own data (builder, workflows, integrations) work in both modes. `test.skip()` is reserved for environment constraints (CI vs local, real vs mock backend).
+**Note on data-dependent tests:** Some tests (integration-filtering, approvals, pagination) require seed data that the mock API provides. These tests use a guard pattern: `test.beforeEach()` marks the entire describe block unavailable if seed data is missing, and `expect()` assertions fail loudly so CI surface the data problem. Tests that CREATE their own data (builder, workflows, integrations) work in both modes. `test.skip()` is reserved for environment constraints (CI vs local, real vs mock backend), not for missing seed data.
 
 ---
 

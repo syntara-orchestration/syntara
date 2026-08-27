@@ -252,7 +252,9 @@ test.describe('Access Management — Roles Tab Sorting', () => {
 })
 
 test.describe('Access Management — Shareable URLs', () => {
-  test('filters + sort + tab in URL restore correctly after navigation', async ({ app }) => {
+  const guard = createUnavailableGuard('No roles data available; seed data required')
+
+  test.beforeEach(async ({ app }) => {
     await app.goto(toAppUrl(`${ACCESS_URL}/roles`))
     await expect(app.getByRole('tab', { name: /Roles/i })).toHaveAttribute('aria-selected', 'true')
 
@@ -261,8 +263,11 @@ test.describe('Access Management — Shareable URLs', () => {
       .waitFor({ state: 'visible', timeout: 5000 })
       .then(() => true)
       .catch(() => false)
+    if (!hasTable) guard.markUnavailable()
     expect(hasTable, 'No roles data available; seed data required').toBeTruthy()
+  })
 
+  test('filters + sort + tab in URL restore correctly after navigation', async ({ app }) => {
     await app.getByPlaceholder('Filter by name').fill('admin')
     await app.getByRole('button', { name: 'Apply filter' }).click()
 
