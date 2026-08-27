@@ -156,7 +156,7 @@ test.describe('Credential Detail Page & Workflows Tab', () => {
 
       if (tableVisible) {
         // Verify workflow names appear as bold text (first data row)
-        const firstDataRow = table.getByRole('row').nth(1)
+        const firstDataRow = table.locator('tbody tr:first-child')
         await expect(firstDataRow.locator('strong')).toBeVisible()
       } else {
         // No workflows or endpoint not available — empty/error state is valid

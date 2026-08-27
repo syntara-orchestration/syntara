@@ -69,9 +69,10 @@ test.describe('UI-26: Workflow Runs Table with Filtering', () => {
     await expect(table.getByRole('columnheader', { name: 'Created at' })).toBeVisible()
     await expect(table.getByRole('columnheader', { name: 'Completed at' })).toBeVisible()
 
-    // At least one data row must be present (created in beforeAll)
-    const firstDataRow = table.getByRole('row').nth(1)
-    await expect(firstDataRow).toBeVisible()
+    // At least one data row must be present (created in beforeAll).
+    // Exclude the header row — `tbody tr:first-child` can match a hidden PF control row.
+    const dataRows = table.getByRole('row').filter({ hasNot: table.getByRole('columnheader') })
+    await expect(dataRows).not.toHaveCount(0)
   })
 
   test('status filter narrows results to matching executions', async ({ app }) => {

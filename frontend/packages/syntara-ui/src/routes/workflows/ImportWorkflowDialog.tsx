@@ -145,9 +145,10 @@ export function ImportWorkflowDialog({ isOpen, onClose, onSuccess }: ImportWorkf
 
     try {
       // handleImportClick validates file presence before invoking handleSubmit
-      validateFileSize(file!)
-      const content = await file!.text()
-      const parsed = parseWorkflowFile(content, file!.name)
+      if (!file) return
+      validateFileSize(file)
+      const content = await file.text()
+      const parsed = parseWorkflowFile(content, file.name)
       const fullDefinition = buildFullDefinition(parsed, data.name)
 
       const { data: result, error } = await workflowFetchClient.POST('/workflows', {

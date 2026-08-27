@@ -683,7 +683,7 @@ describe('DeleteCredentialDialog', () => {
     ).toBeInTheDocument()
   })
 
-  it('shows ripple-effect acknowledgement checkbox text with dependencies', () => {
+  it('blocks deletion and disables confirm when integrations reference the credential', () => {
     render(
       <DeleteCredentialDialog
         credential={mockCredential}
@@ -692,11 +692,29 @@ describe('DeleteCredentialDialog', () => {
       />
     )
 
+    // The backend rejects the delete outright while any integration references the
+    // credential — there's nothing to acknowledge, so no checkbox is shown, and the
+    // confirm action stays disabled instead of inviting a doomed confirmation.
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Detach integrations first' })).toBeDisabled()
+    expect(screen.getByText(/can.t be deleted while it.s still used by the integration\(s\) below/)).toBeInTheDocument()
     expect(
-      screen.getByRole('checkbox', {
-        name: 'I understand this credential and the resources shown above will be affected by this deletion.',
-      })
+      screen.getByText("This credential can't be deleted until it's detached from these integrations")
     ).toBeInTheDocument()
+  })
+
+  it('keeps confirm disabled for blocking integrations even when workflows also reference the credential', () => {
+    render(
+      <DeleteCredentialDialog
+        credential={mockCredential}
+        {...defaultDeleteProps}
+        affectedWorkflows={[{ id: 'wf-1', name: 'Deploy Pipeline' }]}
+        affectedIntegrations={mockAffectedIntegrations}
+      />
+    )
+
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Detach integrations first' })).toBeDisabled()
   })
 
   it('enables Delete button (after checkbox) when both isLoading and isLoadingWorkflows are explicitly false', async () => {

@@ -37,6 +37,9 @@ type NxConfirmationDialogProps = {
   }
   /** When true, confirm shows a spinner and both footer actions are disabled */
   confirmLoading?: boolean
+  /** When true, confirm stays disabled regardless of the acknowledgement checkbox
+   *  (e.g. the action is blocked server-side and there is nothing to confirm). */
+  confirmDisabled?: boolean
   /** Optional aria-labelledby id */
   'aria-labelledby'?: string
   /** Optional aria-describedby id */
@@ -83,6 +86,7 @@ export function NxConfirmationDialog({
   titleIconVariant,
   destructiveAcknowledgement,
   confirmLoading = false,
+  confirmDisabled = false,
   'aria-labelledby': ariaLabelledby,
   'aria-describedby': ariaDescribedby,
 }: Readonly<NxConfirmationDialogProps>) {
@@ -94,7 +98,7 @@ export function NxConfirmationDialog({
     setDestructiveAcknowledged(false)
   }
 
-  const confirmDisabled = Boolean(destructiveAcknowledgement) && !destructiveAcknowledged
+  const isConfirmDisabled = confirmDisabled || (Boolean(destructiveAcknowledgement) && !destructiveAcknowledged)
 
   const body = destructiveAcknowledgement ? (
     <Stack hasGutter>
@@ -128,7 +132,7 @@ export function NxConfirmationDialog({
         <Button
           variant={confirmVariant}
           onClick={onConfirm}
-          isDisabled={confirmDisabled || confirmLoading}
+          isDisabled={isConfirmDisabled || confirmLoading}
           isLoading={confirmLoading}
         >
           {confirmLabel}
