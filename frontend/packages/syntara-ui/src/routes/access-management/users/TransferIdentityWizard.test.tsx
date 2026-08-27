@@ -375,7 +375,7 @@ describe('TransferIdentityWizard', () => {
       await user.click(screen.getByText('bob@example.com'))
       await user.click(screen.getByRole('button', { name: 'Next' }))
 
-      expect(screen.getByText('No identities')).toBeInTheDocument()
+      expect(screen.getByText('No identities yet')).toBeInTheDocument()
       expect(screen.getByText('This user has no federated identities to attach.')).toBeInTheDocument()
       expect(screen.queryByRole('heading', { level: 2, name: 'Select an identity' })).not.toBeInTheDocument()
       expect(screen.queryByText(/Choose one of/i)).not.toBeInTheDocument()
@@ -393,7 +393,7 @@ describe('TransferIdentityWizard', () => {
       expect(await screen.findByText('No results found')).toBeInTheDocument()
       expect(screen.getByText(/Choose one of/i)).toBeInTheDocument()
       expect(screen.getByRole('search', { name: 'Filters' })).toBeInTheDocument()
-      expect(screen.queryByText('No identities')).not.toBeInTheDocument()
+      expect(screen.queryByText('No identities yet')).not.toBeInTheDocument()
     })
 
     it('has Transfer identity button disabled until an identity is selected', async () => {

@@ -246,7 +246,7 @@ export function ProjectRoleAssignmentsTab({ projectId }: Readonly<{ projectId: s
         onClearAllFilters={handleClearAllFilters}
         noDataState={
           <SynEmptyStateNoData
-            title="No role assignments"
+            title="No role assignments yet"
             description="No roles have been assigned in this project."
             buttonText="Assign role"
             addData={assignmentPermissions.canAssign ? () => setAssignModalOpen(true) : undefined}

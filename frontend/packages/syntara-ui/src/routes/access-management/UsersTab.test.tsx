@@ -454,7 +454,7 @@ describe('UsersTab Component', () => {
 
       render(<UsersTab />, { wrapper })
 
-      expect(screen.getByText('No users')).toBeInTheDocument()
+      expect(screen.getByText('No users yet')).toBeInTheDocument()
       expect(screen.getByText('Create a user to manage access to the platform.')).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Create user' })).toBeInTheDocument()
     })

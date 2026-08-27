@@ -892,7 +892,9 @@ test.describe('Permission gating — Detail page header actions', () => {
 
       await expect(auditorApp.getByRole('button', { name: 'Edit project' })).toHaveAttribute('aria-disabled', 'true')
 
-      await auditorApp.getByRole('button', { name: 'Project actions' }).click()
+      const projectActions = auditorApp.getByRole('button', { name: 'Project actions' })
+      await expect(projectActions).toBeVisible({ timeout: 15_000 })
+      await projectActions.click()
       await expect(auditorApp.getByRole('menuitem', { name: 'Delete project' })).toHaveAttribute(
         'aria-disabled',
         'true'
