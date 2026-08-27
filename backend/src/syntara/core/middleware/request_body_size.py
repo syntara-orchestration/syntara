@@ -113,6 +113,53 @@ async def _reject_from_content_length(
     return False
 
 
+class _ResponseStartGuard:
+    """Track whether http.response.start has already been sent."""
+
+    def __init__(self, send: Send) -> None:
+        self._send = send
+        self.started = False
+
+    async def __call__(self, message: Message) -> None:
+        if message["type"] == "http.response.start":
+            self.started = True
+        await self._send(message)
+
+
+class _LimitedBodyReceiver:
+    """Wrap receive() and reject bodies that exceed max_bytes."""
+
+    def __init__(self, receive: Receive, max_bytes: int, path: str) -> None:
+        self._receive = receive
+        self._max_bytes = max_bytes
+        self._path = path
+        self._body_complete = False
+        self._received_bytes = 0
+
+    async def __call__(self) -> Message:
+        if self._body_complete:
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        message = await self._receive()
+        if message["type"] != "http.request":
+            return message
+
+        self._received_bytes += len(message.get("body", b""))
+        if self._received_bytes > self._max_bytes:
+            detail = f"Request body exceeds maximum of {self._max_bytes} bytes"
+            logger.warning(
+                "request_body_too_large",
+                path=self._path,
+                received_bytes=self._received_bytes,
+                max_bytes=self._max_bytes,
+            )
+            raise _BodyTooLargeError(detail)
+
+        if not message.get("more_body", False):
+            self._body_complete = True
+        return message
+
+
 class RequestBodySizeMiddleware:
     """Reject HTTP request bodies that exceed configured size limits."""
 
@@ -129,41 +176,17 @@ class RequestBodySizeMiddleware:
         headers = list(scope.get("headers", []))
         content_type = _header_value(headers, _CONTENT_TYPE_HEADER)
         max_bytes = _max_body_bytes_for_request(content_type)
+        guard = _ResponseStartGuard(send)
 
         content_length_raw = _header_value(headers, _CONTENT_LENGTH_HEADER)
         if content_length_raw is not None and await _reject_from_content_length(
-            scope, send, content_length_raw, max_bytes
+            scope, guard, content_length_raw, max_bytes
         ):
             return
 
-        body_complete = False
-        received_bytes = 0
-
-        async def limited_receive() -> Message:
-            nonlocal body_complete, received_bytes
-            if body_complete:
-                return {"type": "http.request", "body": b"", "more_body": False}
-
-            message = await receive()
-            if message["type"] != "http.request":
-                return message
-
-            received_bytes += len(message.get("body", b""))
-            if received_bytes > max_bytes:
-                detail = f"Request body exceeds maximum of {max_bytes} bytes"
-                logger.warning(
-                    "request_body_too_large",
-                    path=scope["path"],
-                    received_bytes=received_bytes,
-                    max_bytes=max_bytes,
-                )
-                raise _BodyTooLargeError(detail)
-
-            if not message.get("more_body", False):
-                body_complete = True
-            return message
-
+        limited_receive = _LimitedBodyReceiver(receive, max_bytes, scope["path"])
         try:
-            await self.app(scope, limited_receive, send)
+            await self.app(scope, limited_receive, guard)
         except _BodyTooLargeError as exc:
-            await _send_413(send, exc.detail)
+            if not guard.started:
+                await _send_413(guard, exc.detail)

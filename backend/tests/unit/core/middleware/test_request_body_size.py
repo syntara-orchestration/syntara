@@ -9,6 +9,7 @@ from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
+from starlette.types import Receive, Scope, Send
 
 from syntara.core.middleware.request_body_size import RequestBodySizeMiddleware
 
@@ -60,6 +61,57 @@ async def test_rejects_content_length_above_limit() -> None:
 
 
 @pytest.mark.asyncio
+async def test_rejects_streaming_body_above_limit() -> None:
+    """Reject when streamed chunks exceed the limit without Content-Length."""
+
+    async def drain_app(scope: Scope, receive: Receive, send: Send) -> None:
+        while True:
+            message = await receive()
+            if not message.get("more_body", False):
+                break
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b""})
+
+    middleware = RequestBodySizeMiddleware(drain_app)
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/v1/test",
+        "headers": [
+            (b"content-type", b"application/json"),
+        ],
+        "query_string": b"",
+        "client": ("testclient", 50000),
+        "server": ("testserver", 80),
+        "scheme": "http",
+        "http_version": "1.1",
+    }
+    chunks = [b"x" * 5_000_000, b"x" * 5_000_000, b"x" * 5_000_000]
+    chunk_iter = iter(chunks)
+    messages: list[MutableMapping[str, Any]] = []
+
+    async def send(message: MutableMapping[str, Any]) -> None:
+        messages.append(message)
+
+    async def receive() -> dict[str, object]:
+        try:
+            chunk = next(chunk_iter)
+            return {"type": "http.request", "body": chunk, "more_body": True}
+        except StopIteration:
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+    await middleware(scope, receive, send)
+
+    start = messages[0]
+    assert start["type"] == "http.response.start"
+    assert start["status"] == 413
+    body = messages[1]["body"]
+    assert isinstance(body, bytes)
+    payload = json.loads(body.decode())
+    assert payload["code"] == "PAYLOAD_TOO_LARGE"
+
+
+@pytest.mark.asyncio
 async def test_allows_small_body() -> None:
     middleware = _build_app()
     payload = b'{"hello":"world"}'
@@ -90,6 +142,53 @@ async def test_allows_small_body() -> None:
     start = messages[0]
     assert start["type"] == "http.response.start"
     assert start["status"] == 200
+
+
+@pytest.mark.asyncio
+async def test_does_not_send_413_after_response_started() -> None:
+    """Skip 413 when the downstream app already sent http.response.start."""
+
+    async def early_response_app(scope: Scope, receive: Receive, send: Send) -> None:
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b"ok"})
+        while True:
+            message = await receive()
+            if not message.get("more_body", False):
+                break
+
+    middleware = RequestBodySizeMiddleware(early_response_app)
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/v1/test",
+        "headers": [
+            (b"content-type", b"application/json"),
+        ],
+        "query_string": b"",
+        "client": ("testclient", 50000),
+        "server": ("testserver", 80),
+        "scheme": "http",
+        "http_version": "1.1",
+    }
+    chunks = [b"x" * 5_000_000, b"x" * 5_000_000, b"x" * 5_000_000]
+    chunk_iter = iter(chunks)
+    messages: list[MutableMapping[str, Any]] = []
+
+    async def send(message: MutableMapping[str, Any]) -> None:
+        messages.append(message)
+
+    async def receive() -> dict[str, object]:
+        try:
+            chunk = next(chunk_iter)
+            return {"type": "http.request", "body": chunk, "more_body": True}
+        except StopIteration:
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+    await middleware(scope, receive, send)
+
+    starts = [m for m in messages if m["type"] == "http.response.start"]
+    assert len(starts) == 1
+    assert starts[0]["status"] == 200
 
 
 @pytest.mark.asyncio

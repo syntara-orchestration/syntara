@@ -429,12 +429,12 @@ app.add_middleware(MetricsMiddleware, recorder=get_metrics_recorder())
 # Register audit middleware.
 app.add_middleware(AuditMiddleware, fastapi_app=app)
 
+# Reject oversized request bodies before handlers buffer or parse JSON/multipart bodies.
+app.add_middleware(RequestBodySizeMiddleware)
+
 # Register mTLS client certificate authentication middleware (outermost).
 # Must be outermost to access the raw uvicorn transport for cert extraction.
 app.add_middleware(ClientCertAuthMiddleware)
-
-# Reject oversized request bodies before handlers buffer or parse JSON/multipart bodies.
-app.add_middleware(RequestBodySizeMiddleware)
 
 # RFC 9457 compliant error handlers
 # Import exception modules so @fastapi_exception decorators populate the registry
