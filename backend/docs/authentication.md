@@ -64,6 +64,8 @@ When `enable_rp_initiated_logout` is set to `true` on an OIDC provider's configu
 
 **AAP warning:** For Ansible Automation Platform (`idp_type: "aap"`), keep `enable_rp_initiated_logout` disabled. The AAP push-button setup registers a single shared OAuth2 application for all users; RP-initiated logout redirects the browser to AAP's `end_session_endpoint`, which triggers django-oauth-toolkit to delete API tokens tied to that shared application — including tokens belonging to other users. Syntara does not call AAP token-revocation APIs directly; disabling RP-initiated logout is the safe mitigation until AAP scopes revoke-on-logout.
 
+**AAP platform follow-up (recommended):** File an AAP-side issue to scope django-oauth-toolkit revoke-on-logout (`token_types_to_delete`) so OIDC single sign-out revokes only the current user's session tokens, not all OAuth application API tokens. That would allow Syntara to re-enable RP-initiated logout safely. See [Django OAuth Toolkit OIDC settings](https://django-oauth-toolkit.readthedocs.io/en/latest/oidc.html).
+
 ## CSRF Protection
 
 Cookie-authenticated endpoints (`POST /auth/refresh`, `POST /auth/logout`) are protected against Cross-Site Request Forgery using the **Synchronizer Token** pattern with HMAC derivation.
