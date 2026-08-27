@@ -422,7 +422,7 @@ expect(hasRunning, 'Mock API has no running execution; seed data required').toBe
 // ✅ test.skip — legitimate environment constraints the test cannot control
 test.skip(!!process.env.CI, 'Visual baselines are OS-specific; run locally only')
 test.skip(isRealBackend, 'Relies on mock API seed data')
-test.skip(!isLiveBackend, 'Requires a live backend with NEXUS_E2E_PASSWORD')
+test.skip(!isLiveBackend, 'Requires a live backend with SYNTARA_E2E_PASSWORD')
 
 // ✅ expect — setup failures that should surface as test failures
 // If beforeAll/beforeEach creates data via API and that fails, fail loudly:

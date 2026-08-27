@@ -30,21 +30,20 @@ let seededGroup: SeededGroup | null = null
 test.beforeAll(async ({ browser }) => {
   const page = await browser.newPage()
   const token = await getAuthToken(page)
-  if (token) {
-    const prefix = buildUniqueName('e2e-accpag')
+  if (!token) throw new Error('access-pagination beforeAll: could not obtain auth token')
+  const prefix = buildUniqueName('e2e-accpag')
 
-    for (let i = 1; i <= 3; i++) {
-      const user = await createUserViaApi(page, { username: `${prefix}-user-${i}`, token })
-      if (user) seededUsers.push(user)
-    }
-
-    for (let i = 1; i <= 3; i++) {
-      const role = await createRoleViaApi(page, { name: `${prefix}-role-${i}`, token })
-      if (role) seededRoles.push(role)
-    }
-
-    seededGroup = await ensureGroupExists(page, `${prefix}-group`)
+  for (let i = 1; i <= 3; i++) {
+    const user = await createUserViaApi(page, { username: `${prefix}-user-${i}`, token })
+    if (user) seededUsers.push(user)
   }
+
+  for (let i = 1; i <= 3; i++) {
+    const role = await createRoleViaApi(page, { name: `${prefix}-role-${i}`, token })
+    if (role) seededRoles.push(role)
+  }
+
+  seededGroup = await ensureGroupExists(page, `${prefix}-group`)
   await page.close()
 })
 
@@ -64,19 +63,10 @@ test.afterAll(async ({ browser }) => {
 
 test.describe('Access Management — Dropdown Pagination', () => {
   test('Assign Role modal shows roles in the multi-select dropdown', async ({ app }) => {
-    await app.goto(toAppUrl('/system-administration/access-management/users'))
-    await expect(app.getByRole('heading', { level: 1, name: 'Access Management' })).toBeVisible()
+    expect(seededUsers.length, 'No seeded users created in beforeAll').toBeGreaterThan(0)
 
-    const usersTable = app.getByRole('grid', { name: 'Users' })
-    const firstUserRow = usersTable.locator('tbody tr:first-child')
-    const firstUserLink = firstUserRow.getByRole('link')
-    const hasUser = await firstUserLink
-      .waitFor({ state: 'visible', timeout: 5000 })
-      .then(() => true)
-      .catch(() => false)
-    expect(hasUser, 'No users available; seed data required').toBeTruthy()
-
-    await firstUserLink.click()
+    await app.goto(toAppUrl(`/system-administration/access-management/users/${seededUsers[0].id}`))
+    await expect(app.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 10_000 })
 
     await expect(app).toHaveURL(/system-administration\/access-management\/users\//)
 
@@ -113,29 +103,13 @@ test.describe('Access Management — Dropdown Pagination', () => {
     test.skip(!!process.env.SYNTARA_E2E_SKIP_WEB_SERVER, 'Group typeahead unreliable against real backend')
 
     test('Add Member modal shows users in the typeahead dropdown', async ({ app }) => {
-      await app.goto(toAppUrl('/system-administration/access-management/groups'))
-      await expect(app.getByRole('heading', { level: 1, name: 'Access Management' })).toBeVisible()
+      if (!seededGroup) throw new Error('No seeded group created in beforeAll')
 
-      const groupsTable = app.getByRole('grid', { name: 'Groups table' })
-      const firstGroupRow = groupsTable.locator('tbody tr:first-child')
-      const firstGroupButton = firstGroupRow.getByRole('button')
-      const hasGroup = await firstGroupButton
-        .waitFor({ state: 'visible', timeout: 5000 })
-        .then(() => true)
-        .catch(() => false)
-      expect(hasGroup, 'No groups available; seed data required').toBeTruthy()
-
-      await firstGroupButton.click()
-
-      await expect(app).toHaveURL(/system-administration\/access-management\/groups\//)
+      await app.goto(toAppUrl(`/system-administration/access-management/groups/${seededGroup.id}`))
+      await expect(app.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 10_000 })
 
       const membersTab = app.getByRole('tab', { name: /members/i })
-      const hasMembersTab = await membersTab
-        .waitFor({ state: 'visible', timeout: 5000 })
-        .then(() => true)
-        .catch(() => false)
-      expect(hasMembersTab, 'First group has no Members tab (may be the "authenticated" group)').toBeTruthy()
-
+      await expect(membersTab).toBeVisible({ timeout: 5000 })
       await membersTab.click()
 
       const addMemberButton = app.getByRole('button', { name: /add member/i })

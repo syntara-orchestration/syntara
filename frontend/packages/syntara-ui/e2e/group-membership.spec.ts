@@ -10,28 +10,14 @@
  * - Manage group membership from user detail page
  */
 import { createUnavailableGuard, test, expect, toAppUrl } from './fixtures'
-import { buildUniqueName } from './helpers/workflows'
-import { createUserViaApi, deleteUserViaApi, ensureGroupExists, type SeededUser } from './seeds/iam'
+import { ensureGroupExists } from './seeds/iam'
 import { getAuthToken } from './utils/api'
-
-let seededUser: SeededUser | null = null
 
 test.beforeAll(async ({ browser }) => {
   const page = await browser.newPage()
   const token = await getAuthToken(page)
   if (token) {
     await ensureGroupExists(page, 'admins')
-
-    const prefix = buildUniqueName('e2e-gm')
-    seededUser = await createUserViaApi(page, { username: `${prefix}-user`, token })
-  }
-  await page.close()
-})
-
-test.afterAll(async ({ browser }) => {
-  const page = await browser.newPage()
-  if (seededUser) {
-    await deleteUserViaApi(page, seededUser.id)
   }
   await page.close()
 })
