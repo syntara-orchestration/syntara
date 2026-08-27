@@ -190,7 +190,13 @@ describe('SynListPanelView', () => {
     it('shows filter empty state and toolbar when filters are active', () => {
       renderPanel(
         <SynListPanel>
-          <SynListPanelView {...baseViewProps()} isEmpty hasActiveFilters toolbar={minimalToolbar} body={minimalTable} />
+          <SynListPanelView
+            {...baseViewProps()}
+            isEmpty
+            hasActiveFilters
+            toolbar={minimalToolbar}
+            body={minimalTable}
+          />
         </SynListPanel>
       )
 
@@ -223,7 +229,13 @@ describe('SynListPanelView', () => {
     it('has no accessibility violations in the filtered empty state', async () => {
       const { container } = renderPanel(
         <SynListPanel>
-          <SynListPanelView {...baseViewProps()} isEmpty hasActiveFilters toolbar={minimalToolbar} body={minimalTable} />
+          <SynListPanelView
+            {...baseViewProps()}
+            isEmpty
+            hasActiveFilters
+            toolbar={minimalToolbar}
+            body={minimalTable}
+          />
         </SynListPanel>
       )
 

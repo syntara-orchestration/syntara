@@ -25,8 +25,8 @@ This file provides guidance to AI coding assistants when working in the frontend
 
 When MCP servers are available in the session, use them so you do not invent props.
 
-- **Storybook MCP** (`localhost:5174/mcp`) — this app’s wrappers (`Nx*`). Storybook must be running or the server is dead; start it or ask.
-- **PatternFly MCP** — official PF6 component props. Use this for raw PatternFly, not for `Nx*` wrappers.
+- **Storybook MCP** (`localhost:5174/mcp`) — this app’s wrappers (`Syn*`). Storybook must be running or the server is dead; start it or ask.
+- **PatternFly MCP** — official PF6 component props. Use this for raw PatternFly, not for `Syn*` wrappers.
 - One browser MCP (Playwright or Chrome DevTools) — screenshots and console in `/frontend-build-ui-feature` Phase 5.
 
 **CRITICAL: Never hallucinate component properties.** Before using any prop on a component — including seemingly obvious ones like `shadow`, `size`, `variant` — you must verify it is actually documented. A story name may not reflect the underlying prop name, so always check the documentation, not just story names.
@@ -39,7 +39,7 @@ When MCP servers are available in the session, use them so you do not invent pro
 4. Before creating or editing any `.stories.*` file, call `get-storybook-story-instructions` for current conventions.
 5. After any component or story change, call `preview-stories` and **always include every returned preview URL in your response**.
 6. If `get-documentation` doesn't show the variant you need, call `get-documentation-for-story` for that specific story.
-7. **Before implementing any confirmation dialog**, call `get-documentation` with id `"components-dialogs-nxconfirmationdialog"` — the `SynConfirmationDialog` stories are the primary source of truth for tier selection, prop usage, title format, body copy, checkbox labels, and button labels.
+7. **Before implementing any confirmation dialog**, call `get-documentation` with id `"components-dialogs-synconfirmationdialog"` — the `SynConfirmationDialog` stories are the primary source of truth for tier selection, prop usage, title format, body copy, checkbox labels, and button labels.
 
 ### Shell Command Rules
 
@@ -236,7 +236,7 @@ For how the UI is structured, see these comprehensive guides:
 | **PR sizing / stacking**            | [`.github/pull_request_template.md`](../.github/pull_request_template.md) -- PR template and guidelines                                                                                                                                                                                                 |
 | **List page with pagination**       | [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) -- `useCursorPagination` pattern                                                                                                                                                            |
 | **Full list (dropdowns, settings)** | [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) -- section 22: `fetchAllPages` + `useAll*` hooks (not `limit: 100` single queries)                                                                                                          |
-| **Confirmation dialogs**            | [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) -- `SynConfirmationDialog` component; for content patterns (tier copy, checkbox labels, button labels) use Storybook MCP: `get-documentation` -> `"components-dialogs-nxconfirmationdialog"` |
+| **Confirmation dialogs**            | [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) -- `SynConfirmationDialog` component; for content patterns (tier copy, checkbox labels, button labels) use Storybook MCP: `get-documentation` -> `"components-dialogs-synconfirmationdialog"` |
 | **Sonar S6478 / PF `toggle` props** | [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) -- nested components and PatternFly render props                                                                                                                                            |
 | **Dialog state management**         | [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) -- `useDialogState` hook                                                                                                                                                                    |
 | **Error handling patterns**         | [`docs/error-handling.md`](docs/error-handling.md) -- RFC 9457, error utilities, retry support                                                                                                                                                                                                          |

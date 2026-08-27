@@ -773,7 +773,7 @@ The `SynErrorState` component automatically shows a retry button for retryable e
 
 Use `SynConfirmationDialog` for all confirmation prompts. Never use raw `Modal` + `ModalHeader` + `ModalBody` + `ModalFooter`. ESLint rule `syntara/prefer-confirmation-dialog` (error) catches raw destructive Modal patterns automatically; the guidance below teaches the correct tier selection and content patterns.
 
-> **Check Storybook first:** Before implementing any confirmation dialog, call the Storybook MCP `get-documentation` tool with id `"components-dialogs-nxconfirmationdialog"`. The stories are the primary source of truth for tier selection, correct prop usage, title format, body copy, checkbox labels, and button labels — and take precedence over the static examples below.
+> **Check Storybook first:** Before implementing any confirmation dialog, call the Storybook MCP `get-documentation` tool with id `"components-dialogs-synconfirmationdialog"`. The stories are the primary source of truth for tier selection, correct prop usage, title format, body copy, checkbox labels, and button labels — and take precedence over the static examples below.
 
 There are **two tiers** of destructive modals depending on reversibility:
 
