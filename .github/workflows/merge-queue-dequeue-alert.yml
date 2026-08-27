@@ -6,6 +6,10 @@ on:
     - cron: '*/15 * * * *'
   workflow_dispatch:
 
+concurrency:
+  group: merge-queue-dequeue-alert
+  cancel-in-progress: false
+
 jobs:
   dequeue-burst-detection:
     runs-on: ubuntu-latest
