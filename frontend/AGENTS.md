@@ -194,6 +194,8 @@ npm run lint               # Run ESLint
 npm run tsc                # Type check only
 ```
 
+GitHub `CI Frontend` treats a PR as frontend code when it touches `frontend/`, `backend/`, `.github/workflows/ci-frontend.yml`, or `.github/actions/`. Paths like `.github/CODEOWNERS` do not turn on that suite.
+
 ## Connecting to Real Backend
 
 To use the real backend instead of the mock API:

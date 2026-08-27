@@ -37,6 +37,7 @@ spec:
         - DOWNSTREAM_OVERRIDE=quay.io/redhat-user-workloads/nexus-tenant/ansible-automation-platform/automation-orchestrator-downstream-override:latest@sha256:65b73e30b53acecd365311202765d8b61d2dfbb6db1862839785c0a44353abd1
         - BRANDING=true
         - BUILDER_IMAGE=registry.redhat.io/ansible-automation-platform/uv-builder-rhel9:latest@sha256:bdd64fcb4597cfb665c15c4b4841ded098baa26dce1f544b4dbd17a575b8984a
+        - APP_SEGMENT_WRITE_KEY=DSK0nCJ1FDoDLQQ3RpX3faYuaWWkH8b8
     - name: build-platforms
       value:
         - linux-c4xlarge/amd64
