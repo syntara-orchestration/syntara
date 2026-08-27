@@ -362,6 +362,7 @@ export function BuilderEditorToolbar({
       <RunWorkflowSection
         triggers={triggers}
         isSaved={!!workflow?.id}
+        validationErrorCount={validationErrorCount}
         dispatch={dispatch}
         builderPermissions={builderPermissions}
         isNodeEditorOpen={isNodeEditorOpen}

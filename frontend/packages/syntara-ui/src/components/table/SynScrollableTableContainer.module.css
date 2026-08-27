@@ -77,6 +77,39 @@
 
 .table {
   width: 100%;
+  --pf-v6-c-table--m-sticky-header--BorderRadius: 0;
+}
+
+/*
+ * Sticky header glass: isPlain sets thead background to transparent so rows show through
+ * while scrolling. Triple-layer the glass color (~87.5% effective opacity).
+ */
+.table thead {
+  background:
+    linear-gradient(
+      var(--pf-t--global--background--color--glass--primary--default),
+      var(--pf-t--global--background--color--glass--primary--default)
+    ),
+    linear-gradient(
+      var(--pf-t--global--background--color--glass--primary--default),
+      var(--pf-t--global--background--color--glass--primary--default)
+    ),
+    linear-gradient(
+      var(--pf-t--global--background--color--glass--primary--default),
+      var(--pf-t--global--background--color--glass--primary--default)
+    );
+  backdrop-filter: var(--pf-t--global--background--filter--glass--blur--primary);
+}
+
+/*
+ * Safari only: PF sticky-header ::before uses inset:0 on a sticky thead; WebKit sizes it to the
+ * scrollport height and covers tbody rows. Chrome/Firefox keep PF ::before/::after (header shadow).
+ */
+@supports (hanging-punctuation: first) and (font: -apple-system-body) and (-webkit-appearance: none) {
+  .table thead::before,
+  .table thead::after {
+    display: none;
+  }
 }
 
 /*
