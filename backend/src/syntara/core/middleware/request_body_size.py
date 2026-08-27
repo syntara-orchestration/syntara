@@ -53,9 +53,7 @@ def _max_body_bytes_for_request(content_type: str | None) -> int:
     settings = get_settings()
     if _is_multipart(content_type):
         # One MB headroom for form field metadata beyond raw file bytes.
-        return (
-            settings.file_upload_max_size_mb * settings.file_upload_max_files + 1
-        ) * 1024 * 1024
+        return (settings.file_upload_max_size_mb * settings.file_upload_max_files + 1) * 1024 * 1024
     return settings.api_max_request_body_mb * 1024 * 1024
 
 
@@ -103,9 +101,7 @@ async def _reject_from_content_length(
         return True
 
     if content_length > max_bytes:
-        detail = (
-            f"Request body size {content_length} bytes exceeds maximum of {max_bytes} bytes"
-        )
+        detail = f"Request body size {content_length} bytes exceeds maximum of {max_bytes} bytes"
         logger.warning(
             "request_body_too_large",
             path=scope["path"],

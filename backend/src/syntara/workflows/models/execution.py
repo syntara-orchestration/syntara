@@ -343,6 +343,7 @@ class ExecutionCreate(SQLModel):
     @field_validator("input_data", mode="before")
     @classmethod
     def validate_input_data_size(cls, v: dict[str, Any]) -> dict[str, Any]:
+        """Reject oversized input_data payloads."""
         return validate_jsonb_size(v, field_name="input_data")
 
 
@@ -379,11 +380,13 @@ class TestExecutionCreate(SQLModel):
     def validate_pre_resolved_nodes_payload(
         cls, v: dict[str, PreResolvedNodeOutput]
     ) -> dict[str, PreResolvedNodeOutput]:
+        """Reject oversized pre_resolved_nodes payloads."""
         return validate_jsonb_size(v, field_name="pre_resolved_nodes")
 
     @field_validator("trigger_inputs", mode="before")
     @classmethod
     def validate_trigger_inputs_size(cls, v: dict[str, Any]) -> dict[str, Any]:
+        """Reject oversized trigger_inputs payloads."""
         return validate_jsonb_size(v, field_name="trigger_inputs")
 
     @field_validator("target_node_id")

@@ -12,9 +12,9 @@ from pydantic import ConfigDict, field_validator
 from sqlmodel import CheckConstraint, Field, Index, Relationship, SQLModel, text
 
 from syntara.core.constants import FieldLimits
+from syntara.core.jsonb_limits import validate_labels_dict, validate_workflow_definition_json
 from syntara.core.models.base import Resource
 from syntara.core.models.pagination import ResourcesResponse
-from syntara.core.jsonb_limits import validate_jsonb_size, validate_labels_dict, validate_workflow_definition_json
 from syntara.workflows.models.validation_finding import ValidationResult
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 
@@ -208,6 +208,7 @@ class WorkflowCreate(WorkflowBase):
     def validate_workflow_definition_size(
         cls, v: WorkflowDefinition | dict[str, Any]
     ) -> WorkflowDefinition | dict[str, Any]:
+        """Reject oversized workflow_definition payloads."""
         return validate_workflow_definition_json(v)
 
 
@@ -242,6 +243,7 @@ class WorkflowUpdate(SQLModel):
     def validate_workflow_definition_size(
         cls, v: WorkflowDefinition | dict[str, Any] | None
     ) -> WorkflowDefinition | dict[str, Any] | None:
+        """Reject oversized workflow_definition payloads."""
         return validate_workflow_definition_json(v)
 
 

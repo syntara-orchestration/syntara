@@ -14,9 +14,9 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, Index, Relationship, SQLModel
 
 from syntara.core.constants import FieldLimits
+from syntara.core.jsonb_limits import validate_workflow_definition_json
 from syntara.core.models.base import SoftDeletableResource, UserOwnedResource
 from syntara.core.models.pagination import ResourcesResponse
-from syntara.core.jsonb_limits import validate_workflow_definition_json
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 
 if TYPE_CHECKING:
@@ -92,6 +92,7 @@ class WorkflowVersion(UserOwnedResource, SoftDeletableResource, table=True):
     @field_validator("workflow_definition", mode="before")
     @classmethod
     def validate_workflow_definition_size(cls, v: dict[str, Any]) -> dict[str, Any]:
+        """Reject oversized workflow_definition payloads."""
         return validate_workflow_definition_json(v)
 
     change_description: str | None = Field(
@@ -204,6 +205,7 @@ class PublishVersionRequest(SQLModel):
     def validate_workflow_definition_size(
         cls, v: WorkflowDefinition | dict[str, Any] | None
     ) -> WorkflowDefinition | dict[str, Any] | None:
+        """Reject oversized workflow_definition payloads."""
         return validate_workflow_definition_json(v)
 
 

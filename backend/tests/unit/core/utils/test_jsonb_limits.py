@@ -13,6 +13,8 @@ from syntara.core.jsonb_limits import (
 
 
 class TestSerializedJsonSize:
+    """Tests for serialized_json_size."""
+
     def test_empty_dict(self) -> None:
         assert serialized_json_size({}) == 2
 
@@ -21,6 +23,8 @@ class TestSerializedJsonSize:
 
 
 class TestValidateJsonbSize:
+    """Tests for validate_jsonb_size."""
+
     def test_accepts_small_payload(self) -> None:
         assert validate_jsonb_size({"a": 1}, field_name="input_data") == {"a": 1}
 
@@ -31,6 +35,8 @@ class TestValidateJsonbSize:
 
 
 class TestValidateLabelsDict:
+    """Tests for validate_labels_dict."""
+
     def test_accepts_valid_labels(self) -> None:
         labels = {"env": "prod", "team": "platform"}
         assert validate_labels_dict(labels) == labels
@@ -57,6 +63,8 @@ class TestValidateLabelsDict:
 
 
 class TestValidateWorkflowDefinitionJson:
+    """Tests for validate_workflow_definition_json."""
+
     def test_accepts_small_definition(self) -> None:
         definition = {"nodes": [], "edges": []}
         assert validate_workflow_definition_json(definition) == definition

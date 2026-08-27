@@ -29,10 +29,7 @@ def validate_jsonb_size(
 
     size = serialized_json_size(value)
     if size > max_bytes:
-        msg = (
-            f"{field_name} exceeds maximum serialized size of {max_bytes} bytes "
-            f"({size} bytes after JSON encoding)"
-        )
+        msg = f"{field_name} exceeds maximum serialized size of {max_bytes} bytes ({size} bytes after JSON encoding)"
         raise SafeValueError(msg)
     return value
 
@@ -46,9 +43,7 @@ def validate_labels_dict(labels: dict[str, str] | None) -> dict[str, str] | None
         raise SafeValueError(ValidationMessages.LABELS_MUST_BE_DICT)
 
     if len(labels) > FieldLimits.MAX_LABELS_COUNT:
-        msg = (
-            f"labels contains {len(labels)} entries, maximum is {FieldLimits.MAX_LABELS_COUNT}"
-        )
+        msg = f"labels contains {len(labels)} entries, maximum is {FieldLimits.MAX_LABELS_COUNT}"
         raise SafeValueError(msg)
 
     for key, value in labels.items():
@@ -56,9 +51,7 @@ def validate_labels_dict(labels: dict[str, str] | None) -> dict[str, str] | None
             msg = ValidationMessages.LABELS_KEY_MUST_BE_STRING.format(key=key, type_name=type(key).__name__)  # type: ignore[unreachable]
             raise SafeValueError(msg)
         if len(key) > FieldLimits.MAX_LABEL_KEY_LENGTH:
-            msg = (
-                f"labels key exceeds maximum length of {FieldLimits.MAX_LABEL_KEY_LENGTH} characters"
-            )
+            msg = f"labels key exceeds maximum length of {FieldLimits.MAX_LABEL_KEY_LENGTH} characters"
             raise SafeValueError(msg)
         if not isinstance(value, str):
             msg = ValidationMessages.LABELS_VALUE_MUST_BE_STRING.format(key=key, type_name=type(value).__name__)  # type: ignore[unreachable]

@@ -21,6 +21,7 @@ class WorkflowValidateRequest(SQLModel):
     @field_validator("workflow_definition", mode="before")
     @classmethod
     def validate_workflow_definition_size(cls, v: dict[str, Any]) -> dict[str, Any]:
+        """Reject oversized workflow_definition payloads."""
         return validate_workflow_definition_json(v)
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]
