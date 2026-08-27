@@ -73,6 +73,22 @@ export const EnvironmentSchema = z.object({
   eventName: z.string().optional(),
 })
 
+const requiredFiniteNumber = (name: string) =>
+  z
+    .string({ required_error: `${name} is required` })
+    .trim()
+    .min(1, `${name} is required`)
+    .transform(Number)
+    .refine(Number.isFinite, `${name} must be a finite number`)
+
+/** Validates values passed from the queue-health workflow to the unhealthy alert. */
+export const UnhealthyAlertEnvironmentSchema = z.object({
+  queueDepth: requiredFiniteNumber('QUEUE_DEPTH'),
+  minutesSinceMerge: requiredFiniteNumber('MINUTES_SINCE_MERGE'),
+  timeoutMinutes: requiredFiniteNumber('TIMEOUT_MINUTES'),
+  queueUrl: z.string({ required_error: 'QUEUE_URL is required' }).url('QUEUE_URL must be a valid URL'),
+})
+
 export type WorkflowRun = z.infer<typeof WorkflowRunSchema>
 export type MergeQueueEntry = z.infer<typeof MergeQueueEntrySchema>
 export type Commit = z.infer<typeof CommitSchema>
@@ -90,3 +106,4 @@ export type HealthState = {
 }
 
 export type Environment = z.infer<typeof EnvironmentSchema>
+export type UnhealthyAlertEnvironment = z.infer<typeof UnhealthyAlertEnvironmentSchema>
