@@ -142,7 +142,7 @@ describe('AccessManagement', () => {
   it('defaults to Users tab', async () => {
     await renderAndSettle(<AccessManagement />)
 
-    expect(screen.getByText('No users')).toBeInTheDocument()
+    expect(screen.getByText('No users yet')).toBeInTheDocument()
   })
 
   it('replaces bare /system-administration/access-management with the Users tab URL', async () => {
@@ -172,7 +172,7 @@ describe('AccessManagement', () => {
     routerTestState.pathname = '/access-management/unknown-path'
     await renderAndSettle(<AccessManagement />)
 
-    expect(screen.getByText('No users')).toBeInTheDocument()
+    expect(screen.getByText('No users yet')).toBeInTheDocument()
   })
 
   it('navigates to Groups tab when clicked', async () => {

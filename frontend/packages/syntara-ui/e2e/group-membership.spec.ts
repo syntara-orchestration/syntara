@@ -83,7 +83,7 @@ test.describe('Group Detail — Navigation & Tabs', () => {
       .then(() => true)
       .catch(() => false)
     const hasEmptyState = await app
-      .getByText('No members')
+      .getByText('No members yet', { exact: true })
       .waitFor({ state: 'visible', timeout: 2000 })
       .then(() => true)
       .catch(() => false)

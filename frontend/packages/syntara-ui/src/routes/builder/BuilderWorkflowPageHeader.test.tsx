@@ -7,6 +7,7 @@ import { axe } from 'vitest-axe'
 import { expectPageTitle } from '../../test/pageTitle'
 
 import { BuilderWorkflowPageHeader, type BuilderWorkflowPageHeaderProps } from './BuilderWorkflowPageHeader'
+import styles from './BuilderWorkflowPageHeader.module.css'
 
 const mockWorkflowStoreState = vi.hoisted(() => ({
   isDirty: false,
@@ -145,6 +146,41 @@ describe('BuilderWorkflowPageHeader', () => {
 
     expect(screen.getByRole('button', { name: 'Review approval' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Back to editor' })).toBeInTheDocument()
+  })
+
+  it('keeps the workflow name field visible next to the edit control', () => {
+    render(<BuilderWorkflowPageHeader {...baseProps} workflowName="Deploy app" />)
+
+    const nameInput = screen.getByRole('textbox', { name: 'Workflow name' })
+    expect(nameInput).toBeVisible()
+    expect(nameInput).toHaveValue('Deploy app')
+    expect(screen.getByRole('button', { name: 'Apply details' })).toBeInTheDocument()
+  })
+
+  it('still shows the workflow name when the title row includes project and status controls', () => {
+    render(
+      <BuilderWorkflowPageHeader
+        {...baseProps}
+        isNew={false}
+        workflow={{ id: 'wf-1' }}
+        publishedVersionId={null}
+        workflowName="Deploy app"
+      />
+    )
+
+    const nameInput = screen.getByRole('textbox', { name: 'Workflow name' })
+    expect(nameInput).toBeVisible()
+    expect(nameInput).toHaveValue('Deploy app')
+    expect(screen.getByText('Draft')).toBeInTheDocument()
+
+    const nameSlot = screen.getByTestId('builder-workflow-name')
+    expect(nameSlot).toHaveClass(styles.workflowName)
+    expect(screen.getByTestId('builder-title-slot')).toHaveClass('pf-m-wrap')
+
+    const computed = window.getComputedStyle(nameSlot)
+    expect(computed.minWidth).toBe('16ch')
+    expect(computed.maxWidth).toBe('24ch')
+    expect(computed.flexShrink).toBe('1')
   })
 
   it('updates workflow name and marks dirty on change', async () => {

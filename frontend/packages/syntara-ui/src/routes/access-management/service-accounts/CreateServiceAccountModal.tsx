@@ -25,8 +25,6 @@ import { Controller, useForm } from 'react-hook-form'
 
 import { tanstackRouter } from '../../../app/tanstackRouter'
 import { FormFieldError } from '../../../components/FormFieldError'
-import { LONG_SELECT_MAX_MENU_HEIGHT, longSelectMenuPopperProps } from '../../../components/longSelectMenu'
-import longSelectMenuStyles from '../../../components/longSelectMenu.module.css'
 import { SynSelect } from '../../../components/SynSelect'
 import { useFormMutationErrorHandler } from '../../../hooks/useFormMutationErrorHandler'
 import { useAlerts } from '../../../providers/alerts'
@@ -101,10 +99,6 @@ function ProjectSelect({
         setIsOpen(false)
       }}
       selected={value}
-      isScrollable
-      maxMenuHeight={LONG_SELECT_MAX_MENU_HEIGHT}
-      popperProps={longSelectMenuPopperProps}
-      className={longSelectMenuStyles.containScroll}
       toggle={(ref) => (
         <ProjectSelectToggle
           toggleRef={ref}
