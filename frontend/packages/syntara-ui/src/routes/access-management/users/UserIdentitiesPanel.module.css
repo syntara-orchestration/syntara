@@ -1,8 +1,0 @@
-.modalBody {
-  height: 500px;
-  overflow: hidden;
-}
-
-.modalWarning {
-  padding: 0 var(--pf-t--global--spacer--lg) var(--pf-t--global--spacer--md);
-}

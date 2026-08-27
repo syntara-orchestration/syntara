@@ -2,7 +2,7 @@ import { test, expect, toAppUrl } from './fixtures'
 import { APP_TITLE } from './helpers/appTitle'
 import { buildUniqueName, createBasicWorkflowViaApi, deleteWorkflow } from './helpers/workflows'
 
-test.skip('workflows page toolbar shows Import workflow before Create workflow', async ({ app }) => {
+test('workflows page toolbar shows Import workflow before Create workflow', async ({ app }) => {
   await app.goto(toAppUrl('/workflows'))
   await expect(app.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
 
@@ -36,7 +36,7 @@ test('workflows table renders data rows', async ({ app }) => {
   await expect(workflowsTable.getByLabel(/^Actions for /).locator(':visible')).not.toHaveCount(0)
 })
 
-test.skip('user searches, views, and deletes a workflow', async ({ app }) => {
+test('user searches, views, and deletes a workflow', async ({ app }) => {
   test.setTimeout(90_000)
   // Arrange - Create a workflow to manage
   const workflowName = buildUniqueName('e2e-workflow')

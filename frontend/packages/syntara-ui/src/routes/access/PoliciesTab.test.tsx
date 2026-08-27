@@ -111,7 +111,7 @@ describe('PoliciesTab', () => {
 
     render(<PoliciesTab />, { wrapper })
 
-    expect(screen.getByText('No policies found')).toBeInTheDocument()
+    expect(screen.getByText('No policies yet')).toBeInTheDocument()
     expect(screen.getByText('No policies are available.')).toBeInTheDocument()
   })
 
@@ -471,7 +471,7 @@ describe('PoliciesTab', () => {
       } as never)
       render(<PoliciesTab />, { wrapper })
 
-      expect(screen.getByText('No policies found')).toBeInTheDocument()
+      expect(screen.getByText('No policies yet')).toBeInTheDocument()
     })
 
     it('handles null data gracefully', () => {
@@ -485,7 +485,7 @@ describe('PoliciesTab', () => {
       } as never)
       render(<PoliciesTab />, { wrapper })
 
-      expect(screen.getByText('No policies found')).toBeInTheDocument()
+      expect(screen.getByText('No policies yet')).toBeInTheDocument()
     })
 
     it('opens JSON dialog for second policy', async () => {

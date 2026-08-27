@@ -110,7 +110,7 @@ function NoProvidersEmptyState({
   permissions: ReturnType<typeof useIdentityProviderPermissions>
 }>) {
   return (
-    <EmptyState headingLevel="h2" titleText="No identity providers configured" icon={RhUiSecurityIcon}>
+    <EmptyState headingLevel="h2" titleText="No identity providers configured yet" icon={RhUiSecurityIcon}>
       <EmptyStateBody>
         Configure an external identity provider to enable single sign-on for your organization. OIDC (OpenID Connect) is
         the recommended protocol.

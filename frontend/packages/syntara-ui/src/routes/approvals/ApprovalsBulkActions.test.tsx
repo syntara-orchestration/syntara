@@ -81,6 +81,19 @@ describe('ApprovalsBulkActions', () => {
     expect(results).toHaveNoViolations()
   })
 
+  it('disables approve and reject when permission is denied via tooltip', () => {
+    render(
+      <ApprovalsBulkActions
+        {...defaultProps}
+        selectedCount={2}
+        permissionTooltip="To approve or reject approvals, you need a role with the approval:decide policy."
+      />
+    )
+
+    expect(screen.getByRole('button', { name: /approve/i })).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByRole('button', { name: /reject/i })).toHaveAttribute('aria-disabled', 'true')
+  })
+
   it('has no accessibility violations when disabled', async () => {
     const { container } = render(<ApprovalsBulkActions {...defaultProps} selectedCount={0} />)
 
