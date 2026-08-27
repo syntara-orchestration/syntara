@@ -147,7 +147,7 @@ export function CredentialIntegrationsTab({ credentialId }: Readonly<CredentialI
         onClearAllFilters={noop}
         noDataState={
           <SynEmptyStateNoData
-            title="No integrations using this credential"
+            title="No integrations yet"
             description="This credential is not currently referenced by any integrations. Integrations will appear here once they are configured to use this credential."
           />
         }

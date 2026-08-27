@@ -16,6 +16,7 @@ describe('RunWorkflowSection', () => {
 
   const defaultProps = {
     isSaved: true,
+    validationErrorCount: 0,
     triggers: [{ id: 'trigger-1', name: 'Manual' }],
     dispatch: vi.fn(),
     builderPermissions: defaultPermissions,
@@ -117,6 +118,35 @@ describe('RunWorkflowSection', () => {
 
       expect(await screen.findByText('No run permission')).toBeInTheDocument()
     })
+
+    it('shows validation tooltip (singular) when saved with a single validation issue', async () => {
+      const user = userEvent.setup()
+      render(<RunWorkflowSection {...defaultProps} validationErrorCount={1} />)
+
+      await user.hover(screen.getByRole('button', { name: /^Run$/i }))
+
+      expect(await screen.findByText('Resolve validation issue before running — 1 found')).toBeInTheDocument()
+    })
+
+    it('shows validation tooltip (plural) when saved with multiple validation issues', async () => {
+      const user = userEvent.setup()
+      render(<RunWorkflowSection {...defaultProps} validationErrorCount={3} />)
+
+      await user.hover(screen.getByRole('button', { name: /^Run$/i }))
+
+      expect(await screen.findByText('Resolve validation issues before running — 3 found')).toBeInTheDocument()
+    })
+
+    it('shows no-triggers tooltip over validation issues when both apply', async () => {
+      const user = userEvent.setup()
+      render(<RunWorkflowSection {...defaultProps} triggers={undefined} validationErrorCount={2} />)
+
+      await user.hover(screen.getByRole('button', { name: /^Run$/i }))
+
+      expect(
+        await screen.findByText('At least one trigger step needs to be placed on the canvas for this workflow to run')
+      ).toBeInTheDocument()
+    })
   })
 
   describe('disabled state', () => {
@@ -149,6 +179,27 @@ describe('RunWorkflowSection', () => {
 
       expect(screen.getByRole('button', { name: /^Run$/i })).toHaveAttribute('aria-disabled', 'true')
     })
+
+    it('is disabled when saved but validationErrorCount is greater than zero', () => {
+      render(<RunWorkflowSection {...defaultProps} validationErrorCount={1} />)
+
+      expect(screen.getByRole('button', { name: /^Run$/i })).toHaveAttribute('aria-disabled', 'true')
+    })
+
+    it('disables the multi-trigger toggle when validationErrorCount is greater than zero', () => {
+      render(
+        <RunWorkflowSection
+          {...defaultProps}
+          validationErrorCount={1}
+          triggers={[
+            { id: 'trigger-1', name: 'Manual' },
+            { id: 'trigger-2', name: 'Webhook' },
+          ]}
+        />
+      )
+
+      expect(screen.getByRole('button', { name: /Run workflow/i })).toBeDisabled()
+    })
   })
 
   describe('click behavior', () => {
@@ -166,6 +217,16 @@ describe('RunWorkflowSection', () => {
       const user = userEvent.setup()
       const dispatch = vi.fn()
       render(<RunWorkflowSection {...defaultProps} isSaved={false} dispatch={dispatch} />)
+
+      await user.click(screen.getByRole('button', { name: /^Run$/i }))
+
+      expect(dispatch).not.toHaveBeenCalled()
+    })
+
+    it('does not dispatch when there are validation issues and clicked', async () => {
+      const user = userEvent.setup()
+      const dispatch = vi.fn()
+      render(<RunWorkflowSection {...defaultProps} validationErrorCount={1} dispatch={dispatch} />)
 
       await user.click(screen.getByRole('button', { name: /^Run$/i }))
 
