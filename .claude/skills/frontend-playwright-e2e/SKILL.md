@@ -734,7 +734,7 @@ test.describe('Integration Filtering', () => {
   test.beforeEach(async ({ app }) => {
     await app.goto(toAppUrl('/configuration/integrations'))
     await expect(app.getByRole('heading', { level: 1, name: 'Integrations' })).toBeVisible()
-    const table = app.getByRole('grid', { name: 'Integrations table' })
+    const table = app.getByRole('grid', { name: 'Integrations' })
     const hasTable = await table
       .waitFor({ state: 'visible', timeout: 5000 })
       .then(() => true)

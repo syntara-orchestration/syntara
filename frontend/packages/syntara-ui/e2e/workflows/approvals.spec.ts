@@ -16,6 +16,7 @@ import { buildUniqueName, openWorkflowInBuilder } from '../helpers/workflows'
 import {
   apiRequest,
   createWorkflowViaApi,
+  deleteWorkflowViaApi,
   pollApprovalVisible,
   publishWorkflowViaApi,
   pollExecutionStatus,
@@ -59,13 +60,15 @@ async function createPendingApproval(
   // Publish the workflow so it can be run
   await publishWorkflowViaApi(app, workflowId, versionNumber)
 
-  // Run the workflow via API
-  const runResp = await apiRequest(app, 'post', `/workflows/${workflowId}/run`, { data: {} })
+  // Run the workflow via API (POST /executions is the public start-run endpoint)
+  const runResp = await apiRequest(app, 'post', '/executions', {
+    data: { workflow_id: workflowId, trigger_node_id: 'trigger_1', use_published: true },
+  })
   const execution = (await runResp.json()) as { id?: string; execution_id?: string }
   const executionId = execution.id ?? execution.execution_id
-  expect(executionId, 'POST /workflows/{id}/run did not return an execution ID').toBeTruthy()
+  expect(executionId, 'POST /executions did not return an execution ID').toBeTruthy()
   if (!executionId) {
-    throw new Error('POST /workflows/{id}/run did not return an execution ID')
+    throw new Error('POST /executions did not return an execution ID')
   }
 
   // Wait for execution to pause at the approval node (requires Temporal).
@@ -80,74 +83,68 @@ async function createPendingApproval(
   return { workflowId, approvalName }
 }
 
-test('user filters approvals by name and status', async ({ app }) => {
-  // Navigate to approvals page
-  await app.goto(toAppUrl('/approvals'))
-  await expect(app.getByRole('heading', { level: 1, name: 'Approvals' })).toBeVisible()
-  await expect(app).toHaveTitle(`Approvals | ${APP_TITLE}`)
-
-  // Wait for table to load (skip if no approval data exists)
-  const table = app.getByRole('grid', { name: 'Approvals table' })
-  const hasTable = await table
-    .waitFor({ state: 'visible', timeout: 5000 })
-    .then(() => true)
-    .catch(() => false)
-  expect(hasTable, 'No approval data available; seed data required').toBeTruthy()
-
-  // Step 1: Apply name filter
-  await app.getByPlaceholder('Filter by name').fill('Policy')
-  await app.getByRole('button', { name: 'Apply filter' }).click()
-
-  const nameChipGroup = app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Name' })
-  await expect(nameChipGroup.getByText('Policy')).toBeVisible()
-  await expect(app).toHaveURL(/name%5Bcontains%5D=Policy/)
-
-  // Step 2: Switch to Status field in attribute search and apply filter
-  await app.getByRole('search', { name: 'Filters' }).getByRole('button', { name: 'Name', exact: true }).click()
-  await app.getByRole('option', { name: 'Status' }).click()
-  await app.getByRole('button', { name: 'Filter by status' }).click()
-  await app.getByRole('menuitem', { name: 'Approved' }).click()
-
-  const statusChipGroup = app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Status' })
-  await expect(nameChipGroup.getByText('Policy')).toBeVisible()
-  await expect(statusChipGroup.getByText('Approved')).toBeVisible()
-  await expect(app).toHaveURL(/name%5Bcontains%5D=Policy/)
-  await expect(app).toHaveURL(/status%5Bin%5D=approved|status\[in\]=approved/)
-
-  // Step 3: Remove name chip individually
-  await nameChipGroup.getByRole('button', { name: /close/i }).click()
-
-  await expect(nameChipGroup).not.toBeVisible()
-  await expect(statusChipGroup.getByText('Approved')).toBeVisible()
-  await expect(app).not.toHaveURL(/name%5Bcontains%5D/)
-  await expect(app).toHaveURL(/status%5Bin%5D=approved|status\[in\]=approved/)
-
-  // Step 4: Clear all filters
-  await app.getByRole('search', { name: 'Filters' }).getByRole('button', { name: 'Clear all filters' }).click()
-
-  await expect(app.getByRole('search', { name: 'Filters' }).getByRole('list')).toHaveCount(0)
-  await expect(app).not.toHaveURL(/name%5Bcontains%5D/)
-  await expect(app).not.toHaveURL(/status/)
-
-  // Step 5: Empty state when filters match nothing
-  // Switch field selector back to Name (still on Status from step 2)
-  await app.getByRole('search', { name: 'Filters' }).getByRole('button', { name: 'Status', exact: true }).click()
-  await app.getByRole('option', { name: 'Name' }).click()
-
-  const impossibleName = buildUniqueName('zzz-nonexistent')
-  await app.getByPlaceholder('Filter by name').fill(impossibleName)
-  await app.getByRole('button', { name: 'Apply filter' }).click()
-
-  const filterChipGroup = app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Name' })
-  await expect(filterChipGroup).toBeVisible()
-
-  await expect(app.getByRole('heading', { name: 'No results found' })).toBeVisible()
-  await app.getByRole('button', { name: 'Clear all filters' }).last().click()
-  await expect(table).toBeVisible()
-})
-
 test.describe('Approval Workflow Operations', () => {
   test.skip(!process.env['SYNTARA_E2E_HAS_TEMPORAL_WORKER'], 'Temporal worker unavailable (globalSetup probe)')
+
+  test('user filters approvals by name and status', async ({ app }) => {
+    const approval = await createPendingApproval(app, 'e2e-filter')
+
+    try {
+      await app.goto(toAppUrl('/approvals'))
+      await expect(app.getByRole('heading', { level: 1, name: 'Approvals' })).toBeVisible()
+      await expect(app).toHaveTitle(`Approvals | ${APP_TITLE}`)
+
+      const table = app.getByRole('grid', { name: 'Approvals table' })
+      await expect(table).toBeVisible({ timeout: 15_000 })
+
+      await applyApprovalNameFilter(app, table, approval.approvalName, { waitForRowText: approval.approvalName })
+
+      const nameChipGroup = app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Name' })
+      await expect(nameChipGroup.getByText(approval.approvalName)).toBeVisible()
+      await expect(app).toHaveURL(new RegExp(`name%5Bcontains%5D=${encodeURIComponent(approval.approvalName)}`))
+
+      await app.getByRole('search', { name: 'Filters' }).getByRole('button', { name: 'Name', exact: true }).click()
+      await app.getByRole('option', { name: 'Status' }).click()
+      await app.getByRole('button', { name: 'Filter by status' }).click()
+      await app.getByRole('menuitem', { name: 'Pending' }).click()
+
+      const statusChipGroup = app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Status' })
+      await expect(nameChipGroup.getByText(approval.approvalName)).toBeVisible()
+      await expect(statusChipGroup.getByText('Pending')).toBeVisible()
+      await expect(app).toHaveURL(new RegExp(`name%5Bcontains%5D=${encodeURIComponent(approval.approvalName)}`))
+      await expect(app).toHaveURL(/status%5Bin%5D=pending|status\[in\]=pending/)
+      await expect(table.getByRole('row').filter({ hasText: approval.approvalName })).toBeVisible()
+
+      await nameChipGroup.getByRole('button', { name: /close/i }).click()
+
+      await expect(nameChipGroup).not.toBeVisible()
+      await expect(statusChipGroup.getByText('Pending')).toBeVisible()
+      await expect(app).not.toHaveURL(/name%5Bcontains%5D/)
+      await expect(app).toHaveURL(/status%5Bin%5D=pending|status\[in\]=pending/)
+
+      await app.getByRole('search', { name: 'Filters' }).getByRole('button', { name: 'Clear all filters' }).click()
+
+      await expect(app.getByRole('search', { name: 'Filters' }).getByRole('list')).toHaveCount(0)
+      await expect(app).not.toHaveURL(/name%5Bcontains%5D/)
+      await expect(app).not.toHaveURL(/status/)
+
+      await app.getByRole('search', { name: 'Filters' }).getByRole('button', { name: 'Status', exact: true }).click()
+      await app.getByRole('option', { name: 'Name' }).click()
+
+      const impossibleName = buildUniqueName('zzz-nonexistent')
+      await app.getByPlaceholder('Filter by name').fill(impossibleName)
+      await app.getByRole('button', { name: 'Apply filter' }).click()
+
+      const filterChipGroup = app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Name' })
+      await expect(filterChipGroup).toBeVisible()
+
+      await expect(app.getByRole('heading', { name: 'No results found' })).toBeVisible()
+      await app.getByRole('button', { name: 'Clear all filters' }).last().click()
+      await expect(table).toBeVisible()
+    } finally {
+      await deleteWorkflowViaApi(app, approval.workflowId)
+    }
+  })
 
   test('user bulk-approves filtered approval rows', async ({ app }) => {
     // Create 2 pending approvals with a shared prefix for filtering

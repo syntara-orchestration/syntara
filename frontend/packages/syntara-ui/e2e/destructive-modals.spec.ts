@@ -72,6 +72,7 @@ test.describe('destructive modal UX compliance (AAP-72897)', () => {
       // Create integration via API
       const token = await getAuthToken(app)
       seededIntegration = await createIntegrationViaApi(app, { name: integrationName, token: token ?? undefined })
+      expect(seededIntegration, 'Failed to create integration via API').toBeTruthy()
 
       await app.goto(toAppUrl('/configuration/integrations'))
       await expect(app.getByRole('heading', { level: 1, name: 'Integrations' })).toBeVisible()
@@ -180,9 +181,12 @@ test.describe('destructive modal UX compliance (AAP-72897)', () => {
   test('unassign role modal has Tier 2 pattern: warning icon, no checkbox', async ({ app }) => {
     expect(seededUser, 'Seeded user not created in beforeAll').toBeTruthy()
     expect(seededAssignment, 'Seeded role assignment not created in beforeAll').toBeTruthy()
+    if (!seededUser) {
+      throw new Error('Seeded user not created in beforeAll')
+    }
 
     // Navigate directly to the seeded user's detail page (they have a role assignment)
-    await app.goto(toAppUrl(`/system-administration/access-management/users/${seededUser!.id}`))
+    await app.goto(toAppUrl(`/system-administration/access-management/users/${seededUser.id}`))
     await expect(app.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 10_000 })
 
     // Go to the Assignments tab

@@ -59,8 +59,11 @@ test.describe('Credential Username Links', () => {
 
   test('credential detail shows Created username as a link to user detail', async ({ app }) => {
     expect(seededCred, 'Credential seed not available').toBeTruthy()
+    if (!seededCred) {
+      throw new Error('Credential seed not available')
+    }
 
-    await app.goto(toAppUrl(`/configuration/credentials/${seededCred!.id}`))
+    await app.goto(toAppUrl(`/configuration/credentials/${seededCred.id}`))
     await expect(app.getByRole('heading', { name: credName, level: 1 })).toBeVisible({ timeout: 15_000 })
 
     const detailsTab = app.getByRole('tabpanel', { name: 'Details' })

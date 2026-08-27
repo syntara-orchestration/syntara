@@ -57,7 +57,12 @@ test.describe('Navigational link affordance @pr-check', () => {
         const runResp = await apiRequest(app, 'post', '/executions', {
           data: { workflow_id: workflowId, trigger_node_id: 'trigger_1' },
         })
-        const { id: executionId } = (await runResp.json()) as { id: string }
+        const body = (await runResp.json()) as { id?: string }
+        expect(body.id, 'POST /executions did not return an execution ID').toBeTruthy()
+        if (!body.id) {
+          throw new Error('POST /executions did not return an execution ID')
+        }
+        const executionId = body.id
 
         await app.goto(toAppUrl('/executions'))
         await expect(app.getByRole('heading', { level: 1, name: 'Workflow Runs' })).toBeVisible()
@@ -65,7 +70,7 @@ test.describe('Navigational link affordance @pr-check', () => {
         const grid = app.getByRole('grid')
         await expect(grid).toBeVisible({ timeout: 10_000 })
 
-        const runLink = grid.locator(`a[href*="/executions/${executionId}"]`)
+        const runLink = grid.locator('[data-label="Run ID"]').getByRole('link', { name: executionId })
         await expect(runLink).toBeVisible({ timeout: 10_000 })
 
         await runLink.click()
