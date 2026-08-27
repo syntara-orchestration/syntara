@@ -1,0 +1,91 @@
+---
+name: '/run-e2e-ui-tests' Update Comment
+
+# Watches for ci-frontend.yml workflow_dispatch completions and updates
+# the initial comment posted by run-e2e-ui-tests-listener.yml with results.
+on:
+  workflow_run:
+    workflows:
+      - CI Frontend
+    types:
+      - completed
+
+permissions:
+  actions: read
+  pull-requests: write
+  issues: write
+  contents: read
+
+jobs:
+  update-comment:
+    name: Update E2E Comment
+    runs-on: ubuntu-latest
+    # Only update for workflow_dispatch events (manual /run-e2e-ui-tests triggers)
+    if: github.event.workflow_run.event == 'workflow_dispatch'
+    steps:
+      - name: Find PR from workflow inputs
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          # Get the PR number from the workflow run inputs
+          # (ci-frontend.yml workflow_dispatch accepts pr_number as input)
+          PR_NUMBER=$(gh api "repos/$REPO/actions/runs/$RUN_ID" \
+            --jq '.inputs.pr_number // empty')
+
+          if [ -z "$PR_NUMBER" ]; then
+            echo "No PR number found in workflow inputs, this might be a scheduled run"
+            exit 0
+          fi
+
+          echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Update comment with results
+        if: steps.pr.outputs.number
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        run: |
+          # Find the comment posted by the listener workflow
+          COMMENT_ID=$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \
+            --jq ".[] | select(.body | contains(\"<!-- e2e-ui-tests-status run_id=$RUN_ID\")) | .id" | tail -1)
+
+          if [ -z "$COMMENT_ID" ]; then
+            echo "No comment found for run_id=$RUN_ID"
+            exit 0
+          fi
+
+          # Build the status message based on conclusion
+          case "$CONCLUSION" in
+            success)
+              STATUS_EMOJI="✅"
+              STATUS_TEXT="Completed successfully"
+              ;;
+            failure)
+              STATUS_EMOJI="❌"
+              STATUS_TEXT="Failed"
+              ;;
+            cancelled)
+              STATUS_EMOJI="⚠️"
+              STATUS_TEXT="Cancelled"
+              ;;
+            *)
+              STATUS_EMOJI="⚠️"
+              STATUS_TEXT="Completed with status: $CONCLUSION"
+              ;;
+          esac
+
+          # Update the comment with results
+          BODY="<!-- e2e-ui-tests-status run_id=$RUN_ID -->
+          $STATUS_EMOJI E2E UI tests $STATUS_TEXT: [View results]($RUN_URL)"
+
+          gh api "repos/$REPO/issues/comments/$COMMENT_ID" \
+            -X PATCH \
+            -f body="$BODY"

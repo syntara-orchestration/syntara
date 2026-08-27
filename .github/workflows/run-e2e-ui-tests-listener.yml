@@ -40,23 +40,54 @@ jobs:
             core.setOutput('ref', pr.data.head.ref);
             core.setOutput('pr_number', context.issue.number);
 
+      - name: Get PR head SHA
+        id: sha
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+        run: |
+          HEAD_SHA=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.head.sha')
+          echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+
       - name: Dispatch E2E UI workflow
         if: steps.pr.outcome == 'success'
-        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553 # v9
         env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
           PR_REF: ${{ steps.pr.outputs.ref }}
           PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
-        with:
-          script: |
-            const prRef = process.env.PR_REF;
-            const prNumber = process.env.PR_NUMBER;
-            await github.rest.actions.createWorkflowDispatch({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'ci-frontend.yml',
-              ref: 'devel',
-              inputs: {
-                pr_number: prNumber,
-                pr_ref: prRef,
-              },
-            });
+        run: |
+          gh workflow run ci-frontend.yml \
+            --repo "$REPO" \
+            --ref devel \
+            --field pr_number="$PR_NUMBER" \
+            --field pr_ref="$PR_REF"
+
+      - name: Wait for workflow run to be created
+        run: sleep 3
+
+      - name: Find and post workflow run link
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+          HEAD_SHA: ${{ steps.sha.outputs.head_sha }}
+        run: |
+          # Find the most recent workflow_dispatch run for ci-frontend.yml
+          RUN_ID=$(gh api "repos/$REPO/actions/workflows/ci-frontend.yml/runs?event=workflow_dispatch&per_page=5" \
+            --jq "[.workflow_runs[] | select(.created_at > \"$(date -u -v-2M '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -u -d '2 minutes ago' '+%Y-%m-%dT%H:%M:%SZ')\")][0].id")
+
+          if [ -z "$RUN_ID" ]; then
+            echo "Warning: Could not find the dispatched workflow run"
+            exit 0
+          fi
+
+          RUN_URL="https://github.com/$REPO/actions/runs/$RUN_ID"
+
+          BODY="<!-- e2e-ui-tests-status run_id=$RUN_ID sha=$HEAD_SHA -->
+          🚀 E2E UI tests triggered: [View workflow run]($RUN_URL)
+
+          _Status: Running..._"
+
+          gh pr comment "$PR_NUMBER" --repo "$REPO" --body "$BODY"
