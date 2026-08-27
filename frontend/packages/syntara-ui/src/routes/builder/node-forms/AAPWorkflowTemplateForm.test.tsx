@@ -51,8 +51,9 @@ vi.mock('../components/useAllCredentials', () => ({
       {
         id: 'test-credential-id',
         name: 'Test AAP Credential',
-        credential_type: 'ansible-automation-platform',
+        credential_type_id: 'type-aap',
         description: 'Test credential for AAP',
+        project_id: 'proj-1',
       },
     ],
     isLoading: false,
@@ -183,14 +184,15 @@ describe('AAPWorkflowTemplateForm', () => {
         {
           id: 'test-credential-id',
           name: 'Test AAP Credential',
-          credential_type: 'ansible-automation-platform',
+          credential_type_id: 'type-aap',
           description: 'Test credential for AAP',
+          project_id: 'proj-1',
         },
       ],
       isLoading: false,
       error: null,
-      refetch: vi.fn(),
-    } as never)
+      refetch: vi.fn() as unknown as ReturnType<typeof useAllCredentials>['refetch'],
+    })
   })
 
   it('renders form with required fields', () => {

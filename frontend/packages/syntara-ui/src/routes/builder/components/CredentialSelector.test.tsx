@@ -7,6 +7,7 @@ import { axe } from 'vitest-axe'
 
 import { credentialsClient } from '../../../client'
 import { FieldHelpPopover } from '../../../components/FieldHelpPopover'
+import type { Credential } from '../../configuration/credentials/credentialConstants'
 
 import { CredentialSelector, type CredentialSelectorProps } from './CredentialSelector'
 import { useAllCredentials } from './useAllCredentials'
@@ -147,11 +148,11 @@ function mockUseQuery(
   const credentialsOverride = overrides.credentials ?? {}
   const listData = 'data' in credentialsOverride ? credentialsOverride.data : { resources: mockCredentials }
   vi.mocked(useAllCredentials).mockReturnValue({
-    credentials: listData?.resources ?? [],
+    credentials: (listData?.resources ?? []) as Credential[],
     isLoading: credentialsOverride.isPending ?? false,
     error: null,
-    refetch: vi.fn(),
-  } as never)
+    refetch: vi.fn() as unknown as ReturnType<typeof useAllCredentials>['refetch'],
+  })
 
   const typesResponse = {
     data: { resources: mockCredentialTypes },

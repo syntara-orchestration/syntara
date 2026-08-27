@@ -87,8 +87,8 @@ beforeEach(() => {
     credentials: [],
     isLoading: false,
     error: null,
-    refetch: vi.fn(),
-  } as never)
+    refetch: vi.fn() as unknown as ReturnType<typeof useAllCredentials>['refetch'],
+  })
 })
 
 const NONE: ToolSelection = { strategy: 'NONE' }

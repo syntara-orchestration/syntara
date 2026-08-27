@@ -70,8 +70,8 @@ describe('ActionNodeForm', () => {
       credentials: [],
       isLoading: false,
       error: null,
-      refetch: vi.fn(),
-    } as never)
+      refetch: vi.fn() as unknown as ReturnType<typeof useAllCredentials>['refetch'],
+    })
     vi.mocked(credentialsClient.useMutation).mockReturnValue({
       mutate: vi.fn(),
       isPending: false,
@@ -339,9 +339,9 @@ describe('ActionNodeForm', () => {
       credential_type_id: 'type-secret-url',
       enabled: true,
       inputs: {},
+      project_id: 'proj-1',
       created_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-01-01T00:00:00Z',
-      created_by: 'user-1',
     }
     const mockBearerType = {
       id: 'type-bearer',
@@ -360,9 +360,9 @@ describe('ActionNodeForm', () => {
       credential_type_id: 'type-bearer',
       enabled: true,
       inputs: {},
+      project_id: 'proj-1',
       created_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-01-01T00:00:00Z',
-      created_by: 'user-1',
     }
 
     // `credentialsClient.useQuery` is still mocked with path-based branching here because
@@ -396,8 +396,8 @@ describe('ActionNodeForm', () => {
         credentials: [mockSecretUrlCredential],
         isLoading: false,
         error: null,
-        refetch: vi.fn(),
-      } as never)
+        refetch: vi.fn() as unknown as ReturnType<typeof useAllCredentials>['refetch'],
+      })
     }
 
     function setupMixedCredentialMocks() {
@@ -425,8 +425,8 @@ describe('ActionNodeForm', () => {
         credentials: [mockSecretUrlCredential, mockBearerCredential],
         isLoading: false,
         error: null,
-        refetch: vi.fn(),
-      } as never)
+        refetch: vi.fn() as unknown as ReturnType<typeof useAllCredentials>['refetch'],
+      })
     }
 
     it('disables URL field and shows locked placeholder when Secret URL credential is selected', async () => {
@@ -536,8 +536,8 @@ describe('ActionNodeForm', () => {
         credentials: [mockBearerCredential],
         isLoading: false,
         error: null,
-        refetch: vi.fn(),
-      } as never)
+        refetch: vi.fn() as unknown as ReturnType<typeof useAllCredentials>['refetch'],
+      })
       renderWithHeader(<ActionNodeForm onSubmit={mockOnSubmit} initialData={{ executor: 'http_request' }} />)
 
       await user.click(screen.getByRole('button', { name: 'Authentication credential' }))
