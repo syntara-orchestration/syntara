@@ -65,16 +65,24 @@ jobs:
           PR_REF: ${{ steps.pr.outputs.ref }}
           PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
           ACTOR: ${{ steps.pr.outputs.actor }}
+          EVENT_NAME: ${{ github.event_name }}
+          GITHUB_REF: ${{ github.ref }}
         with:
           script: |
             const prRef = process.env.PR_REF;
             const prNumber = process.env.PR_NUMBER;
             const actor = process.env.ACTOR;
+            // For testing via workflow_dispatch, use the current branch ref
+            // (since devel may not have the actor input yet).
+            // For production issue_comment, always use devel.
+            const dispatchRef = process.env.EVENT_NAME === 'workflow_dispatch'
+              ? process.env.GITHUB_REF.replace('refs/heads/', '')
+              : 'devel';
             await github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
               repo: context.repo.repo,
               workflow_id: 'ci-frontend.yml',
-              ref: 'devel',
+              ref: dispatchRef,
               inputs: {
                 pr_number: prNumber,
                 pr_ref: prRef,
