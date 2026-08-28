@@ -1,7 +1,7 @@
 ---
 version: 2
 updates:
-  - package-ecosystem: "pip"
+  - package-ecosystem: "uv"
     directory: "/docs"
     groups:
       dependencies:
@@ -10,6 +10,8 @@ updates:
     schedule:
       interval: "weekly"
       day: "wednesday"
+    cooldown:
+      default-days: 3
     open-pull-requests-limit: 1
     labels:
       - "docs"
