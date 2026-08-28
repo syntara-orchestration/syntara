@@ -106,9 +106,9 @@ Use when a spec change has no impact on generated types — for example, updatin
 
 Breaking changes are **always blocked in place** — full stop. A new major version is a new spec served from a separate URL path (e.g., `/api/v2/`), so it does not register as a breaking change to the current spec.
 
-The only override for an in-place breaking change is the privileged `breaking-change-approved` GitHub label, requested from engineering leadership. The label must be restricted in GitHub so typical contributors cannot apply it. An approved breaking change must still bump `info.version`.
+The only override for an in-place breaking change is the privileged `breaking-change-approved` GitHub label, sanctioned only for a CVE / critical vulnerability with no non-breaking remediation, after escalation to engineering leadership. Who may apply it is enforced by the **Breaking Change Label Guard** workflow (restricted to the `syntara-leads` team). An approved breaking change must still bump `info.version` by a **minor** segment.
 
-**Every spec change must bump `info.version`** (major/minor/patch). A spec change with no bump is blocked. CI does not enforce a specific bump type — it is the engineer's signal to reviewers and consumers.
+**Every meaningful spec change must bump `info.version`.** Comparison is canonical, so serialization-only diffs (whitespace, key order, quotes) do not require a bump. The bump segment is enforced: **minor** for additive changes (new endpoint, field, or enum value), **patch** for spec-only edits (description, example, annotation). A missing or wrong-segment bump is blocked.
 
 **Severity:** Blocking via the pre-commit hook `backend-check-openapi-breaking` and the `openapi-breaking-changes` CI job.
 

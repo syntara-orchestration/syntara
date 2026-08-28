@@ -4,16 +4,29 @@
 This script compares two OpenAPI specs and detects breaking changes,
 returning structured JSON output for consumption by CI or local tooling.
 
-The gate enforces two rules:
+The gate enforces these rules (per the AO REST API Versioning and Deprecation
+Policy):
 
-  1. Every OpenAPI spec change MUST bump ``info.version`` (major/minor/patch).
-     The bump is how the engineer signals their interpretation of the change to
-     reviewers and how API consumers become aware of spec updates.
-  2. Breaking changes are never allowed in place. A breaking change is only
+  1. Every *meaningful* OpenAPI spec change MUST bump ``info.version``.
+     Comparison is **canonical** (semantic): the two specs are parsed and
+     compared as data structures, so serialization-only diffs (whitespace,
+     indentation, line endings, key order, quote style) do not count as a change
+     and do not require a bump.
+  2. The bump segment MUST match the change type:
+       * ``minor`` for additive changes (new endpoint, field, or enum value),
+       * ``patch`` for spec-only edits (description, example, or annotation).
+     A bump of the wrong segment is blocked with an error naming the expected
+     segment.
+  3. Breaking changes are never allowed in place. A breaking change is only
      permitted when the privileged ``breaking-change-approved`` label is present
-     (a formal override restricted to engineering leadership). Otherwise it is
-     blocked, full stop. A genuinely new major version is a new spec served from
-     a separate URL path, so it would not register as a breaking change here.
+     (a formal override restricted to engineering leadership) AND ``info.version``
+     is bumped by a ``minor`` increment. Otherwise it is blocked, full stop. A
+     genuinely new major version is a new spec served from a separate URL path,
+     so it would not register as a breaking change here.
+
+Dynamic-map / ``additionalProperties`` content (labels, context_data,
+input_data, output_data, result) is not treated as breaking — oasdiff reports
+such changes as non-breaking.
 
 Usage:
     ./check-breaking-changes.py --base devel --head HEAD
@@ -31,16 +44,17 @@ Returns:
         "base_version": str,
         "head_version": str,
         "version_bump_type": str | null,
+        "expected_bump_type": str | null,
         "breaking_approved": bool,
         "spec_path": str,
         "gate_code": str
     }
 
 Exit codes:
-    0 - Change is allowed (no changes, non-breaking change with a version bump,
-        or an approved breaking change with a version bump)
-    1 - Change is blocked (breaking without approval, or any spec change with no
-        version bump)
+    0 - Change is allowed (no changes, non-breaking change bumped by the correct
+        segment, or an approved breaking change bumped by a minor segment)
+    1 - Change is blocked (breaking without approval, any meaningful spec change
+        with no version bump, or a wrong-segment bump)
     2 - Error running oasdiff or processing specs
 """
 
@@ -53,11 +67,15 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
+
+import yaml
 
 
 DEFAULT_SPEC_PATH = "backend/src/syntara/schemas/openapi.yaml"
-# Privileged override label for breaking changes. Restricted to engineering
-# leadership at the repo level; CI only checks for its presence.
+# Privileged override label for breaking changes. Restricted to the
+# ``syntara-leads`` team via the Breaking Change Label Guard workflow; CI here
+# only checks for its presence.
 BREAKING_CHANGE_APPROVED_LABEL = "breaking-change-approved"
 
 
@@ -206,6 +224,26 @@ def get_all_changes(base_spec: str, head_spec: str) -> str:
     return (result.stdout + result.stderr).strip()
 
 
+def get_changelog_entries(base_spec: str, head_spec: str) -> list[dict[str, Any]]:
+    """Get structured changelog entries from oasdiff (JSON format).
+
+    Each entry describes a *structural* change (added endpoint, field, enum
+    value, etc.). oasdiff does NOT report spec-only edits (description, summary,
+    example, annotation) here — those are detected via canonical comparison
+    instead. Returns an empty list when there are no structural changes or the
+    JSON cannot be parsed.
+    """
+    result = run_command(["oasdiff", "changelog", base_spec, head_spec, "--format", "json"])
+    text = (result.stdout or "").strip()
+    if not text:
+        return []
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        return []
+    return parsed if isinstance(parsed, list) else []
+
+
 def check_approval_label(pr_labels: str) -> bool:
     """Check if the breaking-change approval label is present on the PR.
 
@@ -221,32 +259,77 @@ def check_approval_label(pr_labels: str) -> bool:
     return BREAKING_CHANGE_APPROVED_LABEL.lower() in labels
 
 
-def spec_has_changes(
-    base_content: str,
-    head_content: str,
+def canonicalize_spec(content: str | None) -> tuple[bool, Any]:
+    """Parse spec content into a canonical (semantic) data structure.
+
+    ``info.version`` is stripped so that a version bump on its own is not counted
+    as a meaningful change. Returns ``(parsed_ok, data)``; ``parsed_ok`` is False
+    when the content is not valid YAML (the caller then falls back to a raw
+    string comparison).
+    """
+    if not content:
+        return True, None
+    try:
+        data = yaml.safe_load(content)
+    except yaml.YAMLError:
+        return False, None
+    if isinstance(data, dict) and isinstance(data.get("info"), dict):
+        data["info"] = {k: v for k, v in data["info"].items() if k != "version"}
+    return True, data
+
+
+def has_meaningful_change(
+    base_content: str | None,
+    head_content: str | None,
     *,
     has_breaking: bool,
-    all_changes: str,
 ) -> bool:
-    """True if the spec changed, including edits oasdiff does not report.
+    """True if the spec changed semantically (ignoring ``info.version``).
 
-    File content is the source of truth so whitespace, description, and other
-    metadata edits still require an info.version bump. Changelog/breaking
-    output is a fallback when the files cannot be compared.
+    Comparison is canonical: whitespace, indentation, line endings, key order,
+    and quote style do not count as changes. Breaking changes always count.
+    Falls back to a raw string comparison if either spec cannot be parsed.
     """
     if has_breaking:
         return True
-    if (base_content or "") != (head_content or ""):
-        return True
-    text = (all_changes or "").strip()
-    return bool(text) and not re.match(r"^no changes\b", text, re.IGNORECASE)
+    base_ok, base_data = canonicalize_spec(base_content)
+    head_ok, head_data = canonicalize_spec(head_content)
+    if base_ok and head_ok:
+        return base_data != head_data
+    return (base_content or "") != (head_content or "")
+
+
+def classify_expected_segment(
+    *,
+    has_breaking: bool,
+    has_changes: bool,
+    changelog_entries: list[dict[str, Any]],
+) -> str | None:
+    """Determine the version-bump segment a change is expected to use.
+
+    Rules (see module docstring):
+      * No meaningful change -> None (no bump required).
+      * Breaking change (approved in place) -> "minor" (never "major"; a new
+        major version is a new spec at a new URL path, outside this gate).
+      * Additive change (oasdiff reports structural entries) -> "minor".
+      * Spec-only edit (canonical diff with no structural entries, e.g. a
+        description/example/annotation change) -> "patch".
+    """
+    if not has_changes and not has_breaking:
+        return None
+    if has_breaking:
+        return "minor"
+    if changelog_entries:
+        return "minor"
+    return "patch"
 
 
 def evaluate_gate(
     *,
     has_breaking: bool,
     has_changes: bool,
-    version_bumped: bool,
+    version_bump_type: str | None,
+    expected_bump_type: str | None,
     breaking_approved: bool,
 ) -> GateDecision:
     """Apply the OpenAPI versioning gate. Returns whether the PR is allowed.
@@ -254,10 +337,13 @@ def evaluate_gate(
     Rules:
       * No spec changes -> allowed.
       * Breaking changes without the approval label -> blocked, full stop.
-      * Any spec change without an info.version bump -> blocked.
-      * Approved breaking change (with bump) or non-breaking change (with bump)
-        -> allowed.
+      * Any meaningful spec change without an info.version bump -> blocked.
+      * A bump using the wrong segment -> blocked (names the expected segment).
+      * Approved breaking change (minor bump) or non-breaking change (correct
+        segment) -> allowed.
     """
+    version_bumped = version_bump_type is not None
+
     if not has_breaking and not has_changes:
         return GateDecision(
             allowed=True,
@@ -275,7 +361,7 @@ def evaluate_gate(
                 "  - A new major version must be a new spec served from a separate URL path "
                 "(it would not register as a breaking change here).\n"
                 f"  - For an approved emergency override, request the '{BREAKING_CHANGE_APPROVED_LABEL}' "
-                "label from engineering leadership."
+                "label from engineering leadership (syntara-leads)."
             ),
         )
 
@@ -285,8 +371,26 @@ def evaluate_gate(
             code="version_bump_required",
             message=(
                 "BLOCKED: The OpenAPI spec changed but info.version was not bumped. "
-                "Every spec change must bump info.version (major/minor/patch) to signal "
-                "the change to reviewers and API consumers."
+                "Every meaningful spec change must bump info.version to signal the change "
+                f"to reviewers and API consumers (expected a '{expected_bump_type}' bump)."
+            ),
+        )
+
+    if expected_bump_type is not None and version_bump_type != expected_bump_type:
+        return GateDecision(
+            allowed=False,
+            code="wrong_bump_segment",
+            message=(
+                f"BLOCKED: info.version was bumped by a '{version_bump_type}' segment, but this "
+                f"change requires a '{expected_bump_type}' bump. "
+                + (
+                    "Additive changes (new endpoint, field, or enum value) require a minor bump; "
+                    "spec-only edits (description, example, annotation) require a patch bump. "
+                    if not has_breaking
+                    else "An approved in-place breaking change requires a minor bump, not a major "
+                    "one — a new major version is a new spec at a new URL path. "
+                )
+                + f"Set info.version to a '{expected_bump_type}' increment."
             ),
         )
 
@@ -296,14 +400,14 @@ def evaluate_gate(
             code="breaking_approved",
             message=(
                 f"ALLOWED: Breaking change permitted via the '{BREAKING_CHANGE_APPROVED_LABEL}' "
-                "label (privileged override)."
+                "label (privileged override) with a minor version bump."
             ),
         )
 
     return GateDecision(
         allowed=True,
         code="ok",
-        message="Non-breaking spec change with a version bump",
+        message=f"Non-breaking spec change with a correct '{version_bump_type}' version bump",
     )
 
 
@@ -385,6 +489,9 @@ def main():
             )
             base_spec_content = get_spec_from_git(args.base, args.fallback_spec_path)
         if base_spec_content is None:
+            # A spec that does not exist on the base ref is a *new* spec (e.g. a
+            # new major version introduced at a new URL path). It has no prior
+            # baseline to compare against, so the gate does not fire.
             print(
                 f"Spec path not found on base ref '{args.base}' (file is new or renamed). "
                 f"Skipping breaking changes check.",
@@ -423,14 +530,20 @@ def main():
     # Check for breaking changes
     has_breaking, breaking_output = check_breaking_changes(base_spec_path, head_spec_path)
 
-    # Get all changes
+    # Get all changes (human-readable) and structured entries (for classification)
     all_changes = get_all_changes(base_spec_path, head_spec_path)
+    changelog_entries = get_changelog_entries(base_spec_path, head_spec_path)
 
-    has_changes = spec_has_changes(
+    has_changes = has_meaningful_change(
         base_spec_content or "",
         head_spec_content or "",
         has_breaking=has_breaking,
-        all_changes=all_changes,
+    )
+
+    expected_bump_type = classify_expected_segment(
+        has_breaking=has_breaking,
+        has_changes=has_changes,
+        changelog_entries=changelog_entries,
     )
 
     # Check the breaking-change approval label
@@ -439,7 +552,8 @@ def main():
     decision = evaluate_gate(
         has_breaking=has_breaking,
         has_changes=has_changes,
-        version_bumped=version_bumped,
+        version_bump_type=version_bump_type,
+        expected_bump_type=expected_bump_type,
         breaking_approved=breaking_approved,
     )
 
@@ -453,6 +567,7 @@ def main():
         "base_version": base_version or "",
         "head_version": head_version or "",
         "version_bump_type": version_bump_type,
+        "expected_bump_type": expected_bump_type,
         "breaking_approved": breaking_approved,
         "spec_path": args.spec_path,
         "gate_code": decision.code,
@@ -469,7 +584,9 @@ def main():
             decision=decision,
             base_version=base_version,
             head_version=head_version,
+            version_bumped=version_bumped,
             version_bump_type=version_bump_type,
+            expected_bump_type=expected_bump_type,
             spec_path=args.spec_path,
         )
         output_text = "\n".join(lines)
@@ -479,6 +596,28 @@ def main():
         Path(args.output).write_text(output_text)
     else:
         print(output_text)
+
+    # JSON mode writes a machine-readable file (or stdout). Always also emit an
+    # actionable text error on stderr when the gate blocks, so CI job logs name
+    # the spec, versions, version_bumped, and breaking changes.
+    if not decision.allowed and args.format == "json":
+        print(
+            "\n".join(
+                _format_text_output(
+                    has_breaking=has_breaking,
+                    breaking_output=breaking_output,
+                    all_changes=all_changes,
+                    decision=decision,
+                    base_version=base_version,
+                    head_version=head_version,
+                    version_bumped=version_bumped,
+                    version_bump_type=version_bump_type,
+                    expected_bump_type=expected_bump_type,
+                    spec_path=args.spec_path,
+                )
+            ),
+            file=sys.stderr,
+        )
 
     sys.exit(0 if decision.allowed else 1)
 
@@ -491,17 +630,22 @@ def _format_text_output(
     decision: GateDecision,
     base_version: str,
     head_version: str,
+    version_bumped: bool,
     version_bump_type: str | None,
+    expected_bump_type: str | None,
     spec_path: str,
 ) -> list[str]:
     """Format results as human-readable text lines."""
     lines = []
 
-    # Version info header — always include spec path and versions for CI errors
+    # Version info header — always include spec path, versions, and bump state
     lines.append(f"Spec: {spec_path}")
     lines.append(f"Version: {base_version or 'unknown'} -> {head_version or 'unknown'}")
+    lines.append(f"version_bumped: {str(version_bumped).lower()}")
     if version_bump_type:
         lines.append(f"Bump type: {version_bump_type}")
+    if expected_bump_type:
+        lines.append(f"Expected bump: {expected_bump_type}")
     lines.append("")
 
     if has_breaking:

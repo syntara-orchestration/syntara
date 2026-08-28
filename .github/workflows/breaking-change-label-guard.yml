@@ -1,0 +1,106 @@
+---
+# Restrict who may apply the privileged `breaking-change-approved` label.
+#
+# GitHub has no native per-label permission, so this guard enforces it: when the
+# label is added, it verifies the actor who added it is a member of the
+# `syntara-leads` team. If not, it fails the check, removes the label, and posts
+# a PR comment explaining why. This is the enforcement point for the AO REST API
+# Versioning and Deprecation Policy — the label sanctions an in-place breaking
+# change only for a CVE/critical security vulnerability with no non-breaking
+# remediation, after escalation to engineering and BU leadership.
+#
+# Team membership requires an `read:org` scoped token. Provision the
+# `SYNTARA_LEADS_READ_TOKEN` secret (a fine-grained PAT or GitHub App token with
+# organization "Members: read"). Without it the guard fails closed: it cannot
+# confirm membership, so it removes the label and asks for a re-apply by a lead.
+name: Breaking Change Label Guard
+
+on:
+  # pull_request_target so the token has write access to manage labels/comments,
+  # including on fork PRs. No fork code is checked out or executed here.
+  pull_request_target:
+    types: [labeled]
+
+concurrency:
+  group: breaking-change-label-guard-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  verify-label-authority:
+    # Only act when the privileged label is the one that was added.
+    if: github.event.label.name == 'breaking-change-approved'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify actor is a member of syntara-leads
+        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553 # v9
+        with:
+          # Prefer a read:org token; fall back to GITHUB_TOKEN (which cannot read
+          # team membership and will therefore fail closed).
+          github-token: ${{ secrets.SYNTARA_LEADS_READ_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const org = context.repo.owner;
+            const repo = context.repo.repo;
+            const team = 'syntara-leads';
+            const label = 'breaking-change-approved';
+            const prNumber = context.payload.pull_request.number;
+            const actor = context.payload.sender.login;
+
+            let isMember = false;
+            try {
+              const res = await github.rest.teams.getMembershipForUserInOrg({
+                org,
+                team_slug: team,
+                username: actor,
+              });
+              isMember = res.data.state === 'active';
+            } catch (err) {
+              // 404 => not a member (or the token cannot read org membership).
+              core.warning(
+                `Could not confirm '${actor}' is an active member of '${org}/${team}': ` +
+                `${err.status || ''} ${err.message}`
+              );
+              isMember = false;
+            }
+
+            if (isMember) {
+              core.info(`'${actor}' is an active member of '${org}/${team}'. Label authorized.`);
+              return;
+            }
+
+            // Unauthorized: remove the label, comment, and fail the check.
+            try {
+              await github.rest.issues.removeLabel({
+                owner: org,
+                repo,
+                issue_number: prNumber,
+                name: label,
+              });
+            } catch (err) {
+              core.warning(`Failed to remove label '${label}': ${err.status || ''} ${err.message}`);
+            }
+
+            const body =
+              `### 🚫 \`${label}\` label removed\n\n` +
+              `@${actor} is not an authorized member of the **${team}** team, so the ` +
+              `privileged \`${label}\` label has been removed.\n\n` +
+              `Per the AO REST API Versioning and Deprecation Policy, this label sanctions an ` +
+              `**in-place breaking change** only for a CVE / critical security vulnerability with ` +
+              `no non-breaking remediation, applied to all supported versions, after escalation to ` +
+              `engineering and BU leadership (Senior Director or above). Only members of ` +
+              `\`${org}/${team}\` may apply it.\n\n` +
+              `If this override is warranted, ask a member of **${team}** to review and re-apply the label.`;
+
+            await github.rest.issues.createComment({
+              owner: org,
+              repo,
+              issue_number: prNumber,
+              body,
+            });
+
+            core.setFailed(
+              `'${actor}' is not authorized to apply the '${label}' label; it has been removed.`
+            );

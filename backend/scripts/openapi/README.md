@@ -24,9 +24,10 @@ Installs the `oasdiff` tool with checksum verification to prevent supply chain a
 #### `check-breaking-changes.py`
 Checks for breaking changes in OpenAPI spec using `oasdiff`. Automatically resolves the spec path relative to the git root, so it works from any subdirectory (e.g., `backend/` in the monorepo).
 
-The gate enforces two rules:
-1. **Every spec change must bump `info.version`** (major/minor/patch). A spec change with no bump is blocked. CI does not enforce a specific bump type — it is the engineer's signal to reviewers and consumers.
-2. **Breaking changes are blocked in place** — full stop. The only override is the privileged `breaking-change-approved` label (restricted to engineering leadership). A new major version is a new spec at a new path and does not register as a breaking change here. An approved breaking change must still bump `info.version`.
+The gate enforces these rules:
+1. **Every meaningful spec change must bump `info.version`.** Comparison is canonical (semantic), so serialization-only diffs (whitespace, key order, quote style) do not require a bump. A meaningful change with no bump is blocked (`version_bump_required`).
+2. **The bump segment must match the change type**: `minor` for additive changes (new endpoint, field, or enum value), `patch` for spec-only edits (description, example, annotation). A wrong-segment bump is blocked (`wrong_bump_segment`).
+3. **Breaking changes are blocked in place** — full stop (`breaking_blocked`). The only override is the privileged `breaking-change-approved` label (restricted to the `syntara-leads` team via the Breaking Change Label Guard workflow). A new major version is a new spec at a new path and does not register as a breaking change here. An approved breaking change must still bump `info.version` by a `minor` segment.
 
 ```bash
 # Compare current branch against devel
@@ -44,9 +45,11 @@ The gate enforces two rules:
 ```
 
 **Exit Codes:**
-- `0` - Allowed: no changes, non-breaking change with a version bump, or approved breaking change with a version bump
-- `1` - Blocked: breaking change without approval, or any spec change with no version bump
+- `0` - Allowed: no meaningful change, non-breaking change with the correct-segment bump, or approved breaking change with a minor bump
+- `1` - Blocked: breaking change without approval, a meaningful change with no version bump, or a wrong-segment bump
 - `2` - Error running oasdiff or processing specs
+
+When the gate blocks and `--format json` is used, a human-readable summary (spec path, versions, `version_bumped`, breaking changes) is also written to stderr so CI logs stay actionable.
 
 **Output (JSON):**
 ```json
@@ -59,9 +62,10 @@ The gate enforces two rules:
   "base_version": "1.0.0",
   "head_version": "1.0.0",
   "version_bump_type": "major" | "minor" | "patch" | null,
+  "expected_bump_type": "minor" | "patch" | null,
   "breaking_approved": bool,
   "spec_path": "backend/src/syntara/schemas/openapi.yaml",
-  "gate_code": "ok" | "breaking_approved" | "breaking_blocked" | "version_bump_required"
+  "gate_code": "ok" | "breaking_approved" | "breaking_blocked" | "version_bump_required" | "wrong_bump_segment"
 }
 ```
 
@@ -260,7 +264,10 @@ The CI `pre-commit` job:
 The `openapi-breaking-changes` job:
 1. Detects changes to `backend/src/syntara/schemas/openapi.yaml`
 2. Runs `check-breaking-changes.py` and posts results via `post-breaking-changes-comment.py`
-3. Runs `check-contract-regeneration.py` to verify contracts are regenerated and posts results via `post-contract-regeneration-comment.py`
+3. On failure, prints `breaking-results.json` (spec path, versions, `version_bumped`, breaking changes) to the job log
+4. Runs `check-contract-regeneration.py` to verify contracts are regenerated and posts results via `post-contract-regeneration-comment.py`
+
+The **Breaking Change Label Guard** workflow (`.github/workflows/breaking-change-label-guard.yml`) fires when `breaking-change-approved` is added. Unauthorized actors have the label removed, the check fails, and a PR comment explains why.
 
 ## Security Features
 

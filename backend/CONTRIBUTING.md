@@ -177,11 +177,25 @@ CI posts an informational warning if the spec changed but contracts were not reg
 
 The pre-commit hook (enforced in CI) compares your spec against `devel` to detect breaking changes (removed fields, type changes, deleted endpoints).
 
-**Every OpenAPI spec change must bump `info.version`** (major/minor/patch). The bump is how you signal your interpretation of the change to reviewers and how API consumers become aware of spec updates. A spec change with no version bump is blocked.
+**Every meaningful OpenAPI spec change must bump `info.version`.** Comparison is canonical, so serialization-only diffs (whitespace, key order, quotes) do not require a bump. The bump segment is enforced: use a **minor** bump for additive changes (new endpoint, field, or enum value) and a **patch** bump for spec-only edits (description, example, annotation). A missing bump or a wrong-segment bump is blocked.
 
-**If breaking changes are detected**, they are blocked in place — full stop. A new major version is a new spec served from a separate URL path (e.g., `/api/v2/`), so it does not register as a breaking change to the current spec. The only override for an in-place breaking change is the privileged `breaking-change-approved` GitHub label, restricted to engineering leadership. A PR-body annotation is not enough.
+**If breaking changes are detected**, they are blocked in place — full stop. A new major version is a new spec served from a separate URL path (e.g., `/api/v2/`), so it does not register as a breaking change to the current spec. A PR-body annotation is not enough.
 
-See [OpenAPI Spec Management](docs/standards/openapi-spec-management.md) for the full policy.
+See [OpenAPI Spec Management](docs/standards/openapi-spec-management.md) for gate codes and repo configuration.
+
+#### Breaking-change override process
+
+This is the handbook for the AO REST API Versioning and Deprecation Policy as enforced in Syntara.
+
+1. **Do not break the current version in place.** Ship a non-breaking change, or introduce a new major version as a new spec at a new URL path (for example `/api/v2/`). Each spec is compared only against its own prior state.
+2. **Bump `info.version` on every meaningful spec change.** Canonical (semantic) comparison means serialization-only diffs do not require a bump. Use **minor** for additive changes (new endpoint, field, or enum value) and **patch** for spec-only edits (description, example, annotation).
+3. **CVE / critical security escape hatch.** An in-place breaking change is allowed only when all of the following are true:
+   - there is no non-breaking remediation
+   - the change is applied to all supported versions
+   - engineering and BU leadership (Senior Director or above) have approved
+   - a member of `syntara-leads` applies the `breaking-change-approved` label
+   - `info.version` is bumped by a **minor** segment (never major — a new major version is a new spec at a new path)
+4. **Label restriction.** GitHub has no native per-label permission. The Breaking Change Label Guard workflow (`.github/workflows/breaking-change-label-guard.yml`) verifies the actor who added the label is in `syntara-leads`. If not, it fails the check, removes the label, and comments on the PR. Provision `SYNTARA_LEADS_READ_TOKEN` (org Members: read); without it the guard fails closed.
 
 ### Submitting a Pull Request
 

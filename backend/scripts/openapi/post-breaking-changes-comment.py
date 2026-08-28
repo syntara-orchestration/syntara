@@ -33,31 +33,106 @@ def escape_markdown(text: str) -> str:
     )
 
 
+def _json_bool(*, value: bool) -> str:
+    """Return a JSON true/false string for *value*."""
+    return "true" if value else "false"
+
+
+def _coerce_version_bumped(results: dict) -> bool:
+    """Read version_bumped from results, falling back to version_bump_type."""
+    if results.get("version_bumped") is not None:
+        return bool(results["version_bumped"])
+    return results.get("version_bump_type") is not None
+
+
+def _gate_context_lines(
+    *,
+    spec_path: str,
+    base_version: str,
+    head_version: str,
+    version_bumped: bool,
+    version_line_suffix: str = "",
+) -> list[str]:
+    """Return spec, version, and version_bumped lines for blocked PR comments."""
+    lines: list[str] = []
+    if spec_path:
+        lines.append(f"**Spec:** `{escape_markdown(spec_path)}`")
+    if base_version or head_version:
+        lines.append(
+            f"**Version:** {escape_markdown(base_version or 'unknown')} → "
+            f"{escape_markdown(head_version or 'unknown')}{version_line_suffix}"
+        )
+    lines.append(f"**version_bumped:** `{_json_bool(value=version_bumped)}`")
+    lines.append("")
+    return lines
+
+
 def _version_bump_required_lines(
     *,
     spec_path: str,
     base_version: str,
     head_version: str,
+    version_bumped: bool,
+    expected_bump_type: str | None,
 ) -> list[str]:
     """Format the blocked missing-version-bump PR comment section."""
     lines = [
         "### Version Bump Required (Blocked)\n",
         (
             "This PR changes the OpenAPI spec but does **not** bump `info.version`. "
-            "Every spec change must include an `info.version` bump so reviewers can see "
+            "Every meaningful spec change must include an `info.version` bump so reviewers can see "
             "your interpretation of the change and API consumers are aware of the update.\n"
         ),
     ]
-    if spec_path:
-        lines.append(f"**Spec:** `{escape_markdown(spec_path)}`")
-    if base_version or head_version:
-        lines.append(
-            f"**Version:** {escape_markdown(base_version or 'unknown')} → "
-            f"{escape_markdown(head_version or 'unknown')} (no bump)\n"
+    lines.extend(
+        _gate_context_lines(
+            spec_path=spec_path,
+            base_version=base_version,
+            head_version=head_version,
+            version_bumped=version_bumped,
+            version_line_suffix=" (no bump)",
         )
+    )
+    if expected_bump_type:
+        lines.append(f"**Expected bump:** `{escape_markdown(expected_bump_type)}`\n")
     lines.append(
-        "Bump `info.version` (major/minor/patch) to reflect the change — "
-        "for example `1.0.0` → `1.1.0` for additive changes, or `1.0.1` for fixes.\n"
+        "Bump `info.version` to reflect the change — a **minor** bump for additive changes "
+        "(new endpoint, field, or enum value) or a **patch** bump for spec-only edits "
+        "(description, example, annotation).\n"
+    )
+    return lines
+
+
+def _wrong_bump_segment_lines(
+    *,
+    spec_path: str,
+    base_version: str,
+    head_version: str,
+    version_bumped: bool,
+    version_bump_type: str | None,
+    expected_bump_type: str | None,
+) -> list[str]:
+    """Format the blocked wrong-bump-segment PR comment section."""
+    lines = [
+        "### Wrong Version Bump Segment (Blocked)\n",
+        (
+            f"This PR bumped `info.version` by a **{escape_markdown(version_bump_type or 'unknown')}** "
+            f"segment, but the change requires a **{escape_markdown(expected_bump_type or 'unknown')}** bump.\n"
+        ),
+    ]
+    lines.extend(
+        _gate_context_lines(
+            spec_path=spec_path,
+            base_version=base_version,
+            head_version=head_version,
+            version_bumped=version_bumped,
+        )
+    )
+    lines.append(
+        "- **minor** for additive changes (new endpoint, field, or enum value)\n"
+        "- **patch** for spec-only edits (description, example, annotation)\n"
+        "- an approved in-place breaking change uses **minor** (not major — a new major "
+        "version is a new spec at a new URL path)\n"
     )
     return lines
 
@@ -79,6 +154,8 @@ def format_breaking_changes_comment(results: dict, repo_owner: str, repo_name: s
     base_version = results.get("base_version", "")
     head_version = results.get("head_version", "")
     version_bump_type = results.get("version_bump_type")
+    expected_bump_type = results.get("expected_bump_type")
+    version_bumped = _coerce_version_bumped(results)
     breaking_approved = results.get("breaking_approved", False)
     spec_path = results.get("spec_path", "")
     gate_code = results.get("gate_code", "")
@@ -110,7 +187,8 @@ def format_breaking_changes_comment(results: dict, repo_owner: str, repo_name: s
                 lines.append(f"**Spec:** `{escape_markdown(spec_path)}`")
             if base_version or head_version:
                 lines.append(f"**Current version:** {escape_markdown(base_version or 'unknown')}")
-                lines.append(f"**PR version:** {escape_markdown(head_version or 'unknown')}\n")
+                lines.append(f"**PR version:** {escape_markdown(head_version or 'unknown')}")
+            lines.append(f"**version_bumped:** `{_json_bool(value=version_bumped)}`\n")
 
             lines.append("**To resolve, choose one of:**\n")
             lines.append(
@@ -150,6 +228,19 @@ def format_breaking_changes_comment(results: dict, repo_owner: str, repo_name: s
                 spec_path=spec_path,
                 base_version=base_version,
                 head_version=head_version,
+                version_bumped=version_bumped,
+                expected_bump_type=expected_bump_type,
+            )
+        )
+    elif gate_code == "wrong_bump_segment":
+        lines.extend(
+            _wrong_bump_segment_lines(
+                spec_path=spec_path,
+                base_version=base_version,
+                head_version=head_version,
+                version_bumped=version_bumped,
+                version_bump_type=version_bump_type,
+                expected_bump_type=expected_bump_type,
             )
         )
     else:

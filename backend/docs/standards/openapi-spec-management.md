@@ -69,33 +69,57 @@ These hooks run automatically on commit (and in CI via the `pre-commit` job):
 
 ### Mandatory version bump
 
-**Every OpenAPI spec change must bump `info.version`** (major, minor, or patch). The bump is how the engineer signals their interpretation of the change to reviewers and how API consumers become aware of spec updates. A spec change with no `info.version` bump is **blocked** (`gate_code: version_bump_required`). The gate treats any difference in the spec file as a change (not only diffs that oasdiff reports), so description and metadata edits still require a bump.
+**Every meaningful OpenAPI spec change must bump `info.version`.** The bump is how the engineer signals their interpretation of the change to reviewers and how API consumers become aware of spec updates. A meaningful spec change with no `info.version` bump is **blocked** (`gate_code: version_bump_required`).
 
-CI does not enforce a specific bump *type* for non-breaking changes — choosing minor vs. patch is the engineer's signal and the reviewer's judgment call. Use a **minor** bump for additive changes (new endpoints/fields) and a **patch** bump for fixes and metadata-only edits.
+Comparison is **canonical** (semantic): the two specs are parsed and compared as data structures. Serialization-only diffs — whitespace, indentation, line endings, key order, quote style — are **not** a meaningful change and do **not** require a bump.
+
+### Correct bump segment (enforced)
+
+CI validates that the bump segment matches the change type, not just that `info.version` changed. A bump of the wrong segment is **blocked** (`gate_code: wrong_bump_segment`) with an error naming the expected segment.
+
+| Change type | Detected via | Required segment |
+|-------------|--------------|------------------|
+| Additive — new endpoint, field, or enum value | oasdiff reports a structural change entry | **minor** |
+| Spec-only — description, example, or annotation edit | canonical diff with no oasdiff structural entry | **patch** |
+| Approved in-place breaking change | oasdiff reports a breaking change + `breaking-change-approved` label | **minor** (never major — a new major version is a new spec at a new URL path) |
+
+Note: oasdiff does not report pure description/summary/example edits, so those are detected only by the canonical comparison and classified as `patch`.
+
+### Dynamic-map / `additionalProperties` content
+
+Changes to dynamic-map fields (`additionalProperties` schemas such as `labels`, `context_data`, `input_data`, `output_data`, `result`) are **not** treated as breaking — oasdiff reports them as non-breaking. Such a change is still a spec change and requires a `patch` bump.
+
+### New major version at a new path
+
+The gate compares each spec only against its own prior state on the base ref. A new major version introduced as a **new spec at a new URL path** (e.g. `/api/v2/`) has no baseline on the base ref, so the check is skipped for it — it does not register as a breaking change to the current spec.
 
 ### Breaking Change Policy
 
-Breaking changes are **always blocked in place** — full stop. Per the AO REST API Versioning and Deprecation Policy, breaking changes never apply in place: v1 and v2 are separate specs served from different URL paths. A genuinely new major version is a new spec at a new path, so it does not register as a breaking change to the current spec.
+Breaking changes are **always blocked in place** — full stop. Per the AO REST API Versioning and Deprecation Policy, breaking changes never apply in place: v1 and v2 are separate specs served from different URL paths.
 
-The only override for an in-place breaking change is the privileged `breaking-change-approved` GitHub label (a formal override restricted to engineering leadership). An approved breaking change must still bump `info.version`.
+The only override for an in-place breaking change is the privileged `breaking-change-approved` GitHub label. The label is sanctioned **only** for a CVE / critical security vulnerability with no non-breaking remediation, applied to all supported versions, after escalation to engineering and BU leadership (Senior Director or above). An approved breaking change must still bump `info.version` by a **minor** segment.
 
 | Change type | Gate |
 |-------------|------|
-| No spec change | Allowed |
-| Non-breaking change, with version bump | Allowed |
-| Non-breaking change, no version bump | Blocked (`version_bump_required`) |
+| No meaningful spec change (incl. serialization-only) | Allowed (`ok`) |
+| Additive change, minor bump | Allowed (`ok`) |
+| Spec-only change, patch bump | Allowed (`ok`) |
+| Meaningful change, no version bump | Blocked (`version_bump_required`) |
+| Meaningful change, wrong bump segment | Blocked (`wrong_bump_segment`) |
 | Breaking change, no approval label | Blocked (`breaking_blocked`) |
-| Breaking change, with `breaking-change-approved` label + version bump | Allowed (`breaking_approved`) |
+| Breaking change, `breaking-change-approved` label + minor bump | Allowed (`breaking_approved`) |
 
-### Privileged approval label (repo configuration)
+### Privileged approval label (enforcement)
 
-CI accepts the override when the PR has the label `breaking-change-approved`. That check is not a substitute for restricting *who can apply* the label. Repo admins must create this label and restrict it so only authorized personnel (engineering leadership) can add it:
+CI accepts the override when the PR has the `breaking-change-approved` label, but who may **apply** it is enforced by the **Breaking Change Label Guard** workflow (`.github/workflows/breaking-change-label-guard.yml`):
 
 1. Create the label named exactly `breaking-change-approved`.
-2. On GitHub Enterprise Cloud, configure it as a [restricted label](https://docs.github.com/en/enterprise-cloud@latest/organizations/managing-peoples-access-to-your-organization-with-roles/managing-custom-repository-roles-for-an-organization) (or equivalent org role) so typical contributors cannot apply it.
-3. After the label is applied to a failed PR, the OpenAPI Breaking Changes workflow re-runs on `labeled` / `unlabeled`. Re-run **(Backend) Check OpenAPI Breaking Changes** if that required check still shows the pre-label failure.
+2. When the label is added, the guard verifies the actor who added it is an active member of the `syntara-leads` team. If not, it **fails the check, removes the label, and posts a PR comment** explaining why.
+3. Team-membership lookups require an `read:org`-scoped token. Provision the `SYNTARA_LEADS_READ_TOKEN` secret (a fine-grained PAT or GitHub App token with organization **Members: read**). Without it the guard **fails closed** — it cannot confirm membership, so it removes the label and asks a lead to re-apply.
+4. After a lead applies the label to a failed PR, the OpenAPI Breaking Changes workflow re-runs on `labeled` / `unlabeled`. Re-run **(Backend) Check OpenAPI Breaking Changes** if that required check still shows the pre-label failure.
+5. Make **Breaking Change Label Guard** a required status check so an unauthorized label cannot merge during the window before the OpenAPI job re-runs.
 
-Python cannot enforce leadership approval by itself; the restricted label is the enforcement point.
+GitHub has no native per-label permission; the label guard is the enforcement point. The contributor handbook for this process is in [CONTRIBUTING.md](../../CONTRIBUTING.md#breaking-change-override-process).
 
 ## CI Checks
 

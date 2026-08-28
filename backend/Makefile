@@ -811,17 +811,13 @@ check-openapi-breaking: ## Check OpenAPI spec for breaking changes against devel
 	fi; \
 	eval $$CMD
 	@echo "Checking public OpenAPI spec for breaking changes..."
-	@PR_BODY_TEXT="$${PR_BODY:-$${OPENAPI_PR_BODY:-}}"; \
-	PR_LABELS_TEXT="$${PR_LABELS:-$${OPENAPI_PR_LABELS:-}}"; \
+	@PR_LABELS_TEXT="$${PR_LABELS:-$${OPENAPI_PR_LABELS:-}}"; \
 	CMD="./scripts/openapi/check-breaking-changes.py \
 		--base $(OPENAPI_BASE_REF) \
 		--head HEAD \
 		--format text \
 		--spec-path backend/src/syntara/schemas/openapi-public.yaml \
 		--fallback-spec-path backend/src/syntara/schemas/openapi-public.yaml"; \
-	if [ -n "$$PR_BODY_TEXT" ]; then \
-		CMD="$$CMD --pr-body \"$$PR_BODY_TEXT\""; \
-	fi; \
 	if [ -n "$$PR_LABELS_TEXT" ]; then \
 		CMD="$$CMD --pr-labels \"$$PR_LABELS_TEXT\""; \
 	fi; \

@@ -87,6 +87,15 @@ jobs:
             --pr-labels "${{ steps.labels.outputs.labels }}"
         working-directory: backend
 
+      - name: Show breaking-change results on failure
+        if: failure() && steps.detect.outputs.changed == 'true'
+        run: |
+          if [ -f breaking-results.json ]; then
+            echo "OpenAPI breaking-change gate failed. Results (spec_path, base_version, head_version, version_bumped, breaking_changes):"
+            cat breaking-results.json
+          fi
+        working-directory: backend
+
       - name: Check contract regeneration
         if: always() && steps.detect.outputs.changed == 'true'
         run: |
