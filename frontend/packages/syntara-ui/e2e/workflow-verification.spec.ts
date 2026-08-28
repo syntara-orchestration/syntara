@@ -386,7 +386,7 @@ test.describe('Variable reference validation', () => {
     }
   })
 
-  test('reference to undefined input field shows validation error', async ({ app }) => {
+  test('reference to undefined trigger field shows validation error', async ({ app }) => {
     test.setTimeout(90_000)
     const workflowName = buildUniqueName('e2e-varref-field')
 
@@ -394,14 +394,14 @@ test.describe('Variable reference validation', () => {
     const workflowId = getWorkflowIdFromUrl(app)
 
     try {
-      await addScriptNode(app, 'Field ref step', 'echo ${input.missing_field}')
+      await addScriptNode(app, 'Field ref step', 'echo ${trigger.missing_field}')
 
       await app.getByRole('button', { name: 'Save' }).click()
       await expect(app).toHaveURL(/workflow-builder\/.+/, { timeout: SAVE_URL_TIMEOUT })
 
       await mockValidateEndpoint(app, {
         valid: false,
-        errors: [{ message: '"missing_field" is not a defined input field on this trigger', node_id: null }],
+        errors: [{ message: '"missing_field" is not a defined trigger field on this trigger', node_id: null }],
       })
 
       await triggerVerifyWorkflow(app)
@@ -409,7 +409,11 @@ test.describe('Variable reference validation', () => {
       await expect(app.getByText(/Verification failed/)).toBeVisible({ timeout: VERIFY_BANNER_TIMEOUT })
 
       await app.getByRole('button', { name: /alert details/i }).click()
-      await expect(app.getByText(/^".*" is not a defined input field/i)).toBeVisible({ timeout: VERIFY_BANNER_TIMEOUT })
+      // Anchor at a leading quote so this matches only the mocked API finding, not the
+      // client-side "Step \"...\"" row (Playwright strict mode fails if both match).
+      await expect(app.getByText(/^".*" is not a defined trigger field/i)).toBeVisible({
+        timeout: VERIFY_BANNER_TIMEOUT,
+      })
     } finally {
       await app.unroute(VALIDATE_ROUTE)
       await deleteWorkflowViaApi(app, workflowId)

@@ -4,7 +4,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 import { createTestRouter } from '../../test/createTestRouter'
 import { SynPanel } from '../layout/SynPanel'
 
-import { NxUrlTabs } from './NxUrlTabs'
+import { SynUrlTabs } from './SynUrlTabs'
 
 // Tab content follows the real-world pattern: each Tab panel owns its inner padding.
 function TabPane({ label }: { label: string }) {
@@ -19,7 +19,7 @@ function TabPane({ label }: { label: string }) {
 // Multi-word labels ("Activity log", "Access roles") demonstrate the sentence-case rule.
 function StandardTabs({ basePath, defaultTab }: { basePath: string; defaultTab?: string }) {
   return (
-    <NxUrlTabs basePath={basePath} defaultTab={defaultTab ?? 'details'} aria-label="Resource tabs">
+    <SynUrlTabs basePath={basePath} defaultTab={defaultTab ?? 'details'} aria-label="Resource tabs">
       <Tab eventKey="details" title="Details">
         <TabPane label="Details" />
       </Tab>
@@ -29,7 +29,7 @@ function StandardTabs({ basePath, defaultTab }: { basePath: string; defaultTab?:
       <Tab eventKey="access-roles" title="Access roles">
         <TabPane label="Access roles" />
       </Tab>
-    </NxUrlTabs>
+    </SynUrlTabs>
   )
 }
 
@@ -72,7 +72,7 @@ function ValidTabsStory() {
   return (
     <ValidTabsRouter>
       <SynPanel>
-        <NxUrlTabs
+        <SynUrlTabs
           basePath="/resource"
           defaultTab="details"
           validTabs={['details', 'activity-log', 'access-roles']}
@@ -87,7 +87,7 @@ function ValidTabsStory() {
           <Tab eventKey="access-roles" title="Access roles">
             <TabPane label="Access roles" />
           </Tab>
-        </NxUrlTabs>
+        </SynUrlTabs>
       </SynPanel>
     </ValidTabsRouter>
   )
@@ -104,8 +104,8 @@ function TabNavigationStory() {
   )
 }
 
-const meta: Meta<typeof NxUrlTabs> = {
-  component: NxUrlTabs,
+const meta: Meta<typeof SynUrlTabs> = {
+  component: SynUrlTabs,
   tags: ['autodocs'],
   parameters: {
     docs: {
@@ -131,7 +131,7 @@ export default meta
 
 type Story = StoryObj<typeof meta>
 
-/** First tab active — the URL segment matches the first tab key. `NxUrlTabs` lives inside `SynPanel`. */
+/** First tab active — the URL segment matches the first tab key. `SynUrlTabs` lives inside `SynPanel`. */
 export const Default: Story = {
   render: () => <DefaultStory />,
   parameters: {
@@ -180,7 +180,7 @@ export const DefaultTabFallback: Story = {
 
 /**
  * `validTabs` guards against stale or dynamically removed tabs.
- * When the current URL names a tab outside this list, `NxUrlTabs` replaces the history
+ * When the current URL names a tab outside this list, `SynUrlTabs` replaces the history
  * entry with `defaultTab` (or the first entry in `validTabs`).
  */
 export const WithValidTabs: Story = {

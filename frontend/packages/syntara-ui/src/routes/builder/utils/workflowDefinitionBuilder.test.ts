@@ -1,9 +1,13 @@
-import { TriggerTypeEnum, type Activity } from '@syntara/contracts'
+import { ActivityTypeEnum, TriggerTypeEnum, type Activity } from '@syntara/contracts'
 import { describe, expect, it } from 'vitest'
 
 import type { EdgeConnection } from '../types/edge'
 
-import { buildWorkflowDefinition } from './workflowDefinitionBuilder'
+import {
+  buildWorkflowDefinition,
+  transformApprovalApprovers,
+  transformNodeParameters,
+} from './workflowDefinitionBuilder'
 
 /** Helper to create a minimal activity with a given ID for edge validation tests */
 function activity(id: string): Activity {
@@ -759,6 +763,294 @@ describe('buildWorkflowDefinition', () => {
       const result = buildWorkflowDefinition('Test', '', activities, [], { edges: [] })
 
       expect(result.nodes[0]).not.toHaveProperty('position')
+    })
+  })
+})
+
+describe('transformApprovalApprovers', () => {
+  it('transforms approver_users from objects to strings', () => {
+    const input = {
+      approver_users: [
+        { id: 1, username: 'alice' },
+        { id: 2, username: 'bob' },
+      ],
+    }
+
+    const result = transformApprovalApprovers(input)
+
+    expect(result.approver_users).toEqual(['alice', 'bob'])
+  })
+
+  it('transforms approver_groups from objects to strings', () => {
+    const input = {
+      approver_groups: [
+        { id: 1, name: 'admins' },
+        { id: 2, name: 'developers' },
+      ],
+    }
+
+    const result = transformApprovalApprovers(input)
+
+    expect(result.approver_groups).toEqual(['admins', 'developers'])
+  })
+
+  it('transforms both users and groups simultaneously', () => {
+    const input = {
+      approver_users: [{ id: 1, username: 'alice' }],
+      approver_groups: [{ id: 1, name: 'admins' }],
+    }
+
+    const result = transformApprovalApprovers(input)
+
+    expect(result.approver_users).toEqual(['alice'])
+    expect(result.approver_groups).toEqual(['admins'])
+  })
+
+  it('is idempotent - transforms strings to same strings', () => {
+    const input = {
+      approver_users: ['alice', 'bob'],
+      approver_groups: ['admins', 'developers'],
+    }
+
+    const result = transformApprovalApprovers(input)
+
+    expect(result.approver_users).toEqual(['alice', 'bob'])
+    expect(result.approver_groups).toEqual(['admins', 'developers'])
+  })
+
+  it('handles missing approver fields', () => {
+    const input = { other_field: 'value' }
+
+    const result = transformApprovalApprovers(input)
+
+    expect(result).toEqual({ other_field: 'value' })
+  })
+
+  it('handles null values gracefully', () => {
+    const input = {
+      approver_users: null,
+      approver_groups: null,
+    }
+
+    const result = transformApprovalApprovers(input)
+
+    expect(result.approver_users).toBeNull()
+    expect(result.approver_groups).toBeNull()
+  })
+
+  it('handles undefined values gracefully', () => {
+    const input = {
+      approver_users: undefined,
+      approver_groups: undefined,
+    }
+
+    const result = transformApprovalApprovers(input)
+
+    expect(result.approver_users).toBeUndefined()
+    expect(result.approver_groups).toBeUndefined()
+  })
+
+  it('preserves other parameters unchanged', () => {
+    const input = {
+      approver_users: [{ id: 1, username: 'alice' }],
+      timeout: 300,
+      message: 'Please approve',
+      continue_on_failure: true,
+    }
+
+    const result = transformApprovalApprovers(input)
+
+    expect(result.approver_users).toEqual(['alice'])
+    expect(result.timeout).toBe(300)
+    expect(result.message).toBe('Please approve')
+    expect(result.continue_on_failure).toBe(true)
+  })
+
+  it('handles mixed array types gracefully - objects and strings', () => {
+    const input = {
+      approver_users: [{ id: 1, username: 'alice' }, 'bob'],
+    }
+
+    const result = transformApprovalApprovers(input)
+
+    expect(result.approver_users).toEqual(['alice', 'bob'])
+  })
+
+  it('handles objects without username property', () => {
+    const input = {
+      approver_users: [
+        { id: 1, invalid: 'value' },
+        { id: 2, username: 'bob' },
+      ],
+    }
+
+    const result = transformApprovalApprovers(input)
+
+    expect(result.approver_users).toEqual(['[object Object]', 'bob'])
+  })
+
+  it('handles objects without name property in groups', () => {
+    const input = {
+      approver_groups: [
+        { id: 1, invalid: 'value' },
+        { id: 2, name: 'admins' },
+      ],
+    }
+
+    const result = transformApprovalApprovers(input)
+
+    expect(result.approver_groups).toEqual(['[object Object]', 'admins'])
+  })
+
+  it('handles null in array', () => {
+    const input = {
+      approver_users: [{ id: 1, username: 'alice' }, null, { id: 2, username: 'bob' }],
+    }
+
+    const result = transformApprovalApprovers(input)
+
+    expect(result.approver_users).toEqual(['alice', 'null', 'bob'])
+  })
+
+  it('handles empty arrays', () => {
+    const input = {
+      approver_users: [],
+      approver_groups: [],
+    }
+
+    const result = transformApprovalApprovers(input)
+
+    expect(result.approver_users).toEqual([])
+    expect(result.approver_groups).toEqual([])
+  })
+
+  it('does not mutate the original object', () => {
+    const input = {
+      approver_users: [{ id: 1, username: 'alice' }],
+    }
+
+    const result = transformApprovalApprovers(input)
+
+    expect(input.approver_users).toEqual([{ id: 1, username: 'alice' }])
+    expect(result.approver_users).toEqual(['alice'])
+    expect(result).not.toBe(input)
+  })
+})
+
+describe('transformNodeParameters', () => {
+  describe('condition and loop', () => {
+    it('transforms UI negation syntax to backend syntax for condition nodes', () => {
+      const result = transformNodeParameters(ActivityTypeEnum.CONDITION, {
+        condition: '!(${status} == "completed")',
+      })
+
+      expect(result.condition).toBe('not (${status} == "completed")')
+    })
+
+    it('transforms UI negation syntax to backend syntax for loop nodes', () => {
+      const result = transformNodeParameters(ActivityTypeEnum.LOOP, {
+        type: 'while',
+        condition: '!(${done} == true)',
+      })
+
+      expect(result.condition).toBe('not (${done} == true)')
+    })
+
+    it('transforms contains to Python in with reversed operands', () => {
+      const result = transformNodeParameters(ActivityTypeEnum.CONDITION, {
+        condition: '${message.text} contains "Hello"',
+      })
+
+      expect(result.condition).toBe('"Hello" in ${message.text}')
+    })
+
+    it('leaves already-backend condition expressions unchanged', () => {
+      const result = transformNodeParameters(ActivityTypeEnum.CONDITION, {
+        condition: 'not (${value} == "test")',
+      })
+
+      expect(result.condition).toBe('not (${value} == "test")')
+    })
+
+    it('leaves non-string condition values unchanged', () => {
+      const result = transformNodeParameters(ActivityTypeEnum.CONDITION, { condition: 42 })
+
+      expect(result.condition).toBe(42)
+    })
+
+    it('does not transform condition on unrelated node types', () => {
+      const result = transformNodeParameters(ActivityTypeEnum.SCRIPT, {
+        condition: '!(${status} == "completed")',
+      })
+
+      expect(result.condition).toBe('!(${status} == "completed")')
+    })
+  })
+
+  describe('switch', () => {
+    it('transforms switch case conditions from UI to backend format', () => {
+      const result = transformNodeParameters(ActivityTypeEnum.SWITCH, {
+        cases: [
+          { port: 'case_0', label: 'Path 1', condition: '!(${status} == "blocked")' },
+          { port: 'case_1', label: 'Path 2', condition: '${priority} > 5' },
+        ],
+        default_port: 'default',
+        _uiOnly: true,
+      })
+
+      const cases = result.cases as Array<{ condition: string }>
+      expect(cases[0].condition).toBe('not (${status} == "blocked")')
+      expect(cases[1].condition).toBe('${priority} > 5')
+      expect(result.default_port).toBe('default')
+      expect(result).not.toHaveProperty('_uiOnly')
+    })
+
+    it('leaves cases unchanged when they are not a valid switch case array', () => {
+      const cases = [{ port: 'case_0' }]
+      const result = transformNodeParameters(ActivityTypeEnum.SWITCH, { cases })
+
+      expect(result.cases).toEqual(cases)
+    })
+  })
+
+  describe('approval', () => {
+    it('transforms approver objects to username and group name strings', () => {
+      const result = transformNodeParameters(ActivityTypeEnum.APPROVAL, {
+        approver_users: [{ id: 'user-1', username: 'alice' }],
+        approver_groups: [{ id: 'group-1', name: 'admins' }],
+        timeout: 300,
+      })
+
+      expect(result).toEqual({
+        approver_users: ['alice'],
+        approver_groups: ['admins'],
+        timeout: 300,
+      })
+    })
+
+    it('does not transform approvers for non-approval nodes', () => {
+      const result = transformNodeParameters(ActivityTypeEnum.SCRIPT, {
+        approver_users: [{ id: 'user-1', username: 'alice' }],
+      })
+
+      expect(result.approver_users).toEqual([{ id: 'user-1', username: 'alice' }])
+    })
+  })
+
+  describe('converge', () => {
+    it('strips branches and keeps other parameters', () => {
+      const result = transformNodeParameters(ActivityTypeEnum.CONVERGE, {
+        branches: ['a', 'b'],
+        timeout: 30,
+      })
+
+      expect(result).toEqual({ timeout: 30 })
+    })
+
+    it('leaves parameters unchanged when branches is absent', () => {
+      const result = transformNodeParameters(ActivityTypeEnum.CONVERGE, { timeout: 30 })
+
+      expect(result).toEqual({ timeout: 30 })
     })
   })
 })

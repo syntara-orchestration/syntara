@@ -24,7 +24,7 @@ import {
 } from '@patternfly/react-core'
 import type { Approval } from '@syntara/contracts'
 
-import { NxCodeBlock } from '../../components/details/NxCodeBlock'
+import { SynCodeBlock } from '../../components/details/SynCodeBlock'
 import { SynPanel } from '../../components/layout/SynPanel'
 import { lookupMapByApprovalNodeId } from '../approvals/approvalNodeId'
 import { ApprovalSummaryList } from '../approvals/ApprovalSummaryList'
@@ -124,7 +124,7 @@ export function ApprovalReadOnlyView({
 
         <StackItem isFilled className={styles.scrollContent}>
           <Title headingLevel="h3">Approval context</Title>
-          <NxCodeBlock jsonObject={approval} enableCopy />
+          <SynCodeBlock jsonObject={approval} enableCopy />
         </StackItem>
 
         {(approverUsernames.length > 0 || approverGroups.length > 0) && (

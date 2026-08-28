@@ -4,7 +4,7 @@ import { DescriptionListDescription, DescriptionListGroup, DescriptionListTerm }
  * A single label/value row used inside detail pages (credentials, approvals, etc.).
  * Renders nothing when the value is absent, so optional fields can be passed unconditionally.
  */
-export function NxDetail(props: { label: string; children?: React.ReactNode }) {
+export function SynDetail(props: { label: string; children?: React.ReactNode }) {
   if (!props.children || props.children === null) {
     return null
   }

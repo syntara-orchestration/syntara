@@ -26,7 +26,7 @@ import { Controller, useForm, useWatch, type Resolver } from 'react-hook-form'
 import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsIntegrationEdit } from '../../../app/breadcrumbBuilders'
 import { integrationsClient } from '../../../client'
-import { NxDetail } from '../../../components/details/NxDetail'
+import { SynDetail } from '../../../components/details/SynDetail'
 import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../components/layout/SynPanel'
@@ -104,13 +104,13 @@ function EditIntegrationFormFields({
       </Title>
 
       <DescriptionList isCompact isHorizontal>
-        <NxDetail label="Integration type">
+        <SynDetail label="Integration type">
           {INTEGRATION_TYPE_LABELS[integration.integration_type ?? ''] ?? integration.integration_type ?? ''}
-        </NxDetail>
+        </SynDetail>
         {isLLM && (
-          <NxDetail label="Provider type">
+          <SynDetail label="Provider type">
             {PROVIDER_HINT_LABELS[getProviderHint(integration)] ?? getProviderHint(integration)}
-          </NxDetail>
+          </SynDetail>
         )}
       </DescriptionList>
 

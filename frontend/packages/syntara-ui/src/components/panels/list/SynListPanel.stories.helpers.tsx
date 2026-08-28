@@ -1,5 +1,5 @@
 /**
- * Story-only helpers for NxListPanel.stories.tsx.
+ * Story-only helpers for SynListPanel.stories.tsx.
  * Extracted to keep the stories file within the max-lines limit.
  * Not part of the public component API.
  */
@@ -21,13 +21,13 @@ import { IconLabel } from '../../IconLabel'
 import { SynKebabMenu } from '../../SynKebabMenu'
 
 import {
-  NxListPanel,
-  NxListPanelSkeletonTbody,
-  NxListPanelTable,
-  NxListPanelTabs,
-  NxListPanelToolbar,
-  NxListPanelView,
-} from './NxListPanel'
+  SynListPanel,
+  SynListPanelSkeletonTbody,
+  SynListPanelTable,
+  SynListPanelTabs,
+  SynListPanelToolbar,
+  SynListPanelView,
+} from './SynListPanel'
 
 /** Overflow kebab with Import / Export actions; for use in WithActionOverflowMenu story. */
 export function ResourceActionsOverflowMenu() {
@@ -73,8 +73,8 @@ function TabbedListContent() {
   const [activeTab] = useUrlTab(TABBED_BASE_PATH, 'members')
 
   return (
-    <NxListPanel>
-      <NxListPanelTabs basePath={TABBED_BASE_PATH} defaultTab="members" aria-label="Group resources">
+    <SynListPanel>
+      <SynListPanelTabs basePath={TABBED_BASE_PATH} defaultTab="members" aria-label="Group resources">
         <Tab
           eventKey="members"
           title={
@@ -91,10 +91,10 @@ function TabbedListContent() {
             </TabTitleText>
           }
         />
-      </NxListPanelTabs>
+      </SynListPanelTabs>
 
       {activeTab === 'members' && (
-        <NxListPanelView
+        <SynListPanelView
           isPending={false}
           error={null}
           onRetry={() => {}}
@@ -104,10 +104,10 @@ function TabbedListContent() {
           tabKey="members"
           tabLabel="Members"
           toolbar={
-            <NxListPanelToolbar filters={[]} filterDefinitions={TABBED_FILTER_DEFINITIONS} onFilterChange={() => {}} />
+            <SynListPanelToolbar filters={[]} filterDefinitions={TABBED_FILTER_DEFINITIONS} onFilterChange={() => {}} />
           }
           body={
-            <NxListPanelTable caption="Members">
+            <SynListPanelTable caption="Members">
               <Thead>
                 <Tr>
                   <Th>Name</Th>
@@ -122,13 +122,13 @@ function TabbedListContent() {
                   </Tr>
                 ))}
               </Tbody>
-            </NxListPanelTable>
+            </SynListPanelTable>
           }
         />
       )}
 
       {activeTab === 'roles' && (
-        <NxListPanelView
+        <SynListPanelView
           isPending={false}
           error={null}
           onRetry={() => {}}
@@ -138,10 +138,10 @@ function TabbedListContent() {
           tabKey="roles"
           tabLabel="Assignments"
           toolbar={
-            <NxListPanelToolbar filters={[]} filterDefinitions={TABBED_FILTER_DEFINITIONS} onFilterChange={() => {}} />
+            <SynListPanelToolbar filters={[]} filterDefinitions={TABBED_FILTER_DEFINITIONS} onFilterChange={() => {}} />
           }
           body={
-            <NxListPanelTable caption="Role assignments">
+            <SynListPanelTable caption="Role assignments">
               <Thead>
                 <Tr>
                   <Th>Name</Th>
@@ -156,11 +156,11 @@ function TabbedListContent() {
                   </Tr>
                 ))}
               </Tbody>
-            </NxListPanelTable>
+            </SynListPanelTable>
           }
         />
       )}
-    </NxListPanel>
+    </SynListPanel>
   )
 }
 
@@ -258,8 +258,8 @@ export function KitchenSinkListStory() {
   }
 
   return (
-    <NxListPanel>
-      <NxListPanelView
+    <SynListPanel>
+      <SynListPanelView
         isPending={false}
         isFetching={isFetching}
         error={null}
@@ -268,7 +268,7 @@ export function KitchenSinkListStory() {
         hasActiveFilters={hasActiveFilters}
         onClearAllFilters={clearFilters}
         toolbar={
-          <NxListPanelToolbar
+          <SynListPanelToolbar
             filters={filters}
             filterDefinitions={KITCHEN_FILTER_DEFINITIONS}
             onFilterChange={setFilters}
@@ -298,7 +298,7 @@ export function KitchenSinkListStory() {
               Manage your resources below. Use the Name and Status filters to narrow results, click column headers to
               sort, and use the refresh icon or action menu to manage resources.
             </Content>
-            <NxListPanelTable
+            <SynListPanelTable
               caption="Resources"
               footer={{
                 page: 1,
@@ -319,7 +319,7 @@ export function KitchenSinkListStory() {
                 </Tr>
               </Thead>
               {isFetching ? (
-                <NxListPanelSkeletonTbody columnsCount={4} />
+                <SynListPanelSkeletonTbody columnsCount={4} />
               ) : (
                 <Tbody>
                   {sortedRows.map((row) => (
@@ -334,10 +334,10 @@ export function KitchenSinkListStory() {
                   ))}
                 </Tbody>
               )}
-            </NxListPanelTable>
+            </SynListPanelTable>
           </>
         }
       />
-    </NxListPanel>
+    </SynListPanel>
   )
 }

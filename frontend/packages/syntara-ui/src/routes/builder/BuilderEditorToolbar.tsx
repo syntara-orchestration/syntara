@@ -1,33 +1,12 @@
-import {
-  Button,
-  Divider,
-  Dropdown,
-  DropdownGroup,
-  DropdownItem,
-  DropdownList,
-  Icon,
-  MenuToggle,
-  type MenuToggleElement,
-} from '@patternfly/react-core'
-import {
-  RhUiCodeIcon,
-  RhUiCheckCircleIcon,
-  RhUiExportIcon,
-  RhUiClockIcon,
-  RhUiHistoryIcon,
-  RhUiImportIcon,
-  RhUiTrashIcon,
-  RhUiEllipsisVerticalFillIcon,
-  RhUiAddSquareIcon,
-  RhUiMinusCircleFillIcon,
-} from '@patternfly/react-icons'
+import { Button, Divider, Dropdown, Icon, MenuToggle, type MenuToggleElement } from '@patternfly/react-core'
+import { RhUiEllipsisVerticalFillIcon, RhUiAddSquareIcon } from '@patternfly/react-icons'
 import { useCallback, type Dispatch, type Ref } from 'react'
 
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { useWorkflowStore } from '../../stores/useWorkflowStore'
 
-import toolbarStyles from './BuilderEditorToolbar.module.css'
 import type { BuilderAction } from './builderReducer'
+import { KebabMenuViewsGroup, KebabMenuActionsGroup } from './kebabMenuItems'
 import { PublishWorkflowButton } from './PublishWorkflowButton'
 import { RunWorkflowSection } from './RunWorkflowSection'
 import { SaveWorkflowButton } from './SaveWorkflowButton'
@@ -70,6 +49,7 @@ type WorkflowKebabMenuProps = Readonly<{
   handleImportFile: (event: React.ChangeEvent<HTMLInputElement>) => void
   handleExport: () => void
   handleVerify: (onValid?: () => void) => void
+  handleDuplicate: () => void
 }>
 
 function WorkflowKebabMenu({
@@ -88,6 +68,7 @@ function WorkflowKebabMenu({
   handleImportFile,
   handleExport,
   handleVerify,
+  handleDuplicate,
 }: WorkflowKebabMenuProps) {
   const renderKebabMenuToggle = useCallback(
     (toggleRef: Ref<MenuToggleElement>) => (
@@ -96,8 +77,6 @@ function WorkflowKebabMenu({
     [dispatch, isKebabOpen]
   )
   const showExistingWorkflowItems = !isNew && !!workflow?.id
-  const canEdit = builderPermissions.canEdit
-  const canDelete = builderPermissions.canDelete
   const closeKebab = () => dispatch({ type: 'SET_KEBAB_OPEN', payload: false })
 
   return (
@@ -108,121 +87,30 @@ function WorkflowKebabMenu({
         popperProps={{ position: 'right' }}
         toggle={renderKebabMenuToggle}
       >
-        <DropdownGroup label="Views">
-          <DropdownList>
-            {showExistingWorkflowItems && (
-              <DropdownItem
-                onClick={() => {
-                  handleToggleHistory()
-                  closeKebab()
-                }}
-              >
-                <Icon isInline className={toolbarStyles.menuIcon}>
-                  <RhUiHistoryIcon />
-                </Icon>
-                Run history
-              </DropdownItem>
-            )}
-            {showExistingWorkflowItems && (
-              <DropdownItem
-                onClick={() => {
-                  handleToggleVersionHistory()
-                  closeKebab()
-                }}
-              >
-                <Icon isInline className={toolbarStyles.menuIcon}>
-                  <RhUiClockIcon />
-                </Icon>
-                Version history
-              </DropdownItem>
-            )}
-            <DropdownItem
-              onClick={() => {
-                handleToggleDetails()
-                closeKebab()
-              }}
-            >
-              <Icon isInline className={toolbarStyles.menuIcon}>
-                <RhUiCodeIcon />
-              </Icon>
-              Workflow details
-            </DropdownItem>
-          </DropdownList>
-        </DropdownGroup>
+        <KebabMenuViewsGroup
+          showExistingWorkflowItems={showExistingWorkflowItems}
+          handleToggleHistory={handleToggleHistory}
+          handleToggleVersionHistory={handleToggleVersionHistory}
+          handleToggleDetails={handleToggleDetails}
+          closeKebab={closeKebab}
+        />
         {!isBuiltin && <Divider />}
         {!isBuiltin && (
-          <DropdownGroup label="Actions">
-            <DropdownList>
-              <DropdownItem onClick={() => handleVerify()}>
-                <Icon isInline className={toolbarStyles.menuIcon}>
-                  <RhUiCheckCircleIcon />
-                </Icon>
-                Verify workflow
-              </DropdownItem>
-              <DropdownItem onClick={handleExport}>
-                <Icon isInline className={toolbarStyles.menuIcon}>
-                  <RhUiExportIcon />
-                </Icon>
-                Export workflow
-              </DropdownItem>
-              <DropdownItem
-                isAriaDisabled={!canEdit}
-                tooltipProps={canEdit ? undefined : { content: builderPermissions.tooltips.edit }}
-                onClick={
-                  canEdit
-                    ? () => {
-                        importFileRef.current?.click()
-                        closeKebab()
-                      }
-                    : undefined
-                }
-              >
-                <Icon isInline className={toolbarStyles.menuIcon}>
-                  <RhUiImportIcon />
-                </Icon>
-                Import workflow
-              </DropdownItem>
-              {showExistingWorkflowItems && publishedVersionId != null && (
-                <DropdownItem
-                  isAriaDisabled={!canEdit}
-                  tooltipProps={canEdit ? undefined : { content: builderPermissions.tooltips.unpublish }}
-                  onClick={
-                    canEdit
-                      ? () => {
-                          onUnpublish()
-                          closeKebab()
-                        }
-                      : undefined
-                  }
-                >
-                  <Icon isInline className={toolbarStyles.menuIcon}>
-                    <RhUiMinusCircleFillIcon />
-                  </Icon>
-                  Unpublish workflow
-                </DropdownItem>
-              )}
-              {showExistingWorkflowItems && (
-                <DropdownItem
-                  isAriaDisabled={!canDelete}
-                  tooltipProps={canDelete ? undefined : { content: builderPermissions.tooltips.delete }}
-                  onClick={
-                    canDelete
-                      ? () => {
-                          dispatch({ type: 'SET_DELETE_DIALOG', payload: true })
-                          closeKebab()
-                        }
-                      : undefined
-                  }
-                  isDanger={canDelete}
-                >
-                  <Icon isInline className={toolbarStyles.menuIcon}>
-                    <RhUiTrashIcon />
-                  </Icon>
-                  Delete workflow
-                </DropdownItem>
-              )}
-            </DropdownList>
-          </DropdownGroup>
+          <KebabMenuActionsGroup
+            showExistingWorkflowItems={showExistingWorkflowItems}
+            publishedVersionId={publishedVersionId}
+            canEdit={builderPermissions.canEdit}
+            canCreate={builderPermissions.canCreate}
+            canDelete={builderPermissions.canDelete}
+            tooltips={builderPermissions.tooltips}
+            handleVerify={handleVerify}
+            handleDuplicate={handleDuplicate}
+            handleExport={handleExport}
+            importFileRef={importFileRef}
+            onUnpublish={onUnpublish}
+            dispatch={dispatch}
+            closeKebab={closeKebab}
+          />
         )}
       </Dropdown>
       <input ref={importFileRef} type="file" accept=".json" onChange={handleImportFile} style={{ display: 'none' }} />
@@ -252,6 +140,7 @@ type BuilderEditorToolbarProps = Readonly<{
   handleSaveWorkflow: () => Promise<boolean>
   onPublishClick: () => void
   onUnpublish: () => void
+  onDuplicate: () => void
   onPendingImport: (data: PendingImportData) => void
   triggers?: { id: string; name?: string }[]
   builderPermissions: BuilderPermissions
@@ -280,6 +169,7 @@ export function BuilderEditorToolbar({
   handleSaveWorkflow,
   onPublishClick,
   onUnpublish,
+  onDuplicate,
   onPendingImport,
   triggers,
   builderPermissions,
@@ -323,6 +213,7 @@ export function BuilderEditorToolbar({
         handleImportFile={handleImportFile}
         handleExport={handleExport}
         handleVerify={handleVerify}
+        handleDuplicate={onDuplicate}
       />
     )
   }
@@ -424,6 +315,7 @@ export function BuilderEditorToolbar({
         handleImportFile={handleImportFile}
         handleExport={handleExport}
         handleVerify={handleVerify}
+        handleDuplicate={onDuplicate}
       />
     </>
   )
