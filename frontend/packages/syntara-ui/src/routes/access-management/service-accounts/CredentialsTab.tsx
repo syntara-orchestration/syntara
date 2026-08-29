@@ -3,10 +3,10 @@ import { RhUiAddIcon, RhUiRefreshIcon, RhUiTrashIcon } from '@patternfly/react-i
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import { useCallback, useMemo, useState } from 'react'
 
-import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
-import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../../components/panels/list/NxListPanel'
+import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../../components/panels/list/SynListPanel'
 import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import type { KebabAction } from '../../../components/SynKebabMenu'
 import { SynKebabMenu } from '../../../components/SynKebabMenu'
@@ -365,7 +365,7 @@ export function CredentialsTab({
 
   return (
     <>
-      <NxListPanelView
+      <SynListPanelView
         tabKey="credentials"
         tabLabel="Credentials"
         isPending={query.isPending}
@@ -385,7 +385,7 @@ export function CredentialsTab({
         }
         toolbar={
           credentials.length > 0 || hasActiveFilters ? (
-            <NxListPanelToolbar
+            <SynListPanelToolbar
               filterDefinitions={credentialFilterDefs}
               filters={filters}
               onFilterChange={handleFilterChange}
@@ -406,7 +406,7 @@ export function CredentialsTab({
           ) : undefined
         }
         body={
-          <NxListPanelTable caption="Service account credentials table" footer={getFooterProps(query.data)}>
+          <SynListPanelTable caption="Service account credentials table" footer={getFooterProps(query.data)}>
             <CredentialsTable
               credentials={credentials}
               getSortParams={getSortParams}
@@ -415,11 +415,11 @@ export function CredentialsTab({
               onToggleStatus={actions.handleToggleStatus}
               onDelete={(cred) => deleteDialog.open(cred)}
             />
-          </NxListPanelTable>
+          </SynListPanelTable>
         }
       />
 
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={deleteDialog.isOpen}
         onClose={deleteDialog.close}
         onConfirm={() => actions.handleDeleteConfirm(deleteDialog.item, deleteDialog.close)}
@@ -433,9 +433,9 @@ export function CredentialsTab({
         }}
       >
         The credential <strong>{deleteDialog.item?.identifier}</strong> will be deleted. This cannot be undone.
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
 
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={disableDialog.isOpen}
         onClose={disableDialog.close}
         onConfirm={() => actions.handleDisableConfirm(disableDialog.item, disableDialog.close)}
@@ -445,9 +445,9 @@ export function CredentialsTab({
       >
         You are about to disable the credential <strong>{disableDialog.item?.identifier}</strong>. You can re-enable it
         at any time.
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
 
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={rotateDialog.isOpen}
         onClose={() => {
           rotateDialog.close()
@@ -468,7 +468,7 @@ export function CredentialsTab({
           gracePeriod={rotateGracePeriod}
           onGracePeriodChange={setRotateGracePeriod}
         />
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
 
       <CreateCredentialModal
         isOpen={actions.createModalOpen}

@@ -62,10 +62,7 @@ How this UI is anchored, and how it relates to other design tooling:
   3. **Engage PatternFly.** If UX confirms the gap, UX coordinates with PatternFly on resolution — new component, variant, token, or an accepted override — often via a PatternFly GitHub issue or direct conversation.
   4. **Document and track.** If a temporary override is approved, create an issue with the label `patternfly-override` to track technical debt. Link the PatternFly issue if one exists.
   5. **Resolve upstream.** The aim is to remove the override by contributing back to PatternFly. Overrides without a resolution path should be periodically reviewed.
-- **Opinionated component prefixes** — global wrappers live in `frontend/packages/syntara-ui/src/components/` organized by subdirectory: `layout/`, `dialogs/`, `details/`, `tabs/`, `states/`, `labels/`, `table/`, `panels/`. Two prefixes are in use:
-  - **`Syn*`** — layout, state, tables, labels, links, kebab menus, and selects (e.g., `SynPage`, `SynPanel`, `SynPageHeader`, `SynErrorState`, `SynScrollableTableContainer`, `SynLabel`, `SynKebabMenu`, `SynLink`, `SynSelect`)
-  - **`Nx*`** — dialogs, details, tabs, and list panels (e.g., `NxConfirmationDialog`, `NxDetailList`, `NxUrlTabs`, `NxListPanel`)
-  - Always use the `Syn*` / `Nx*` wrapper, not the raw PatternFly component, for these patterns.
+- **`Syn` prefix convention** — opinionated global components use the `Syn` prefix (e.g., `SynPage`, `SynPanel`, `SynConfirmationDialog`, `SynDetailList`, `SynUrlTabs`, `SynListPanel`) and live in `frontend/packages/syntara-ui/src/components/` organized by subdirectory: `layout/`, `dialogs/`, `details/`, `tabs/`, `states/`, `labels/`, `table/`, `panels/`. These wrap raw PatternFly primitives with project-specific defaults and behavior — use the `Syn*` wrapper, not the raw PF component, for these patterns.
 - **What this is not** — The experience is **not** built on custom libraries. This product deliberately uses a PatternFly-first stack.
 
 ---
@@ -210,13 +207,13 @@ Form submit and cancel buttons live in a **pinned footer at the bottom of the co
 - **Does NOT apply to:** Builder forms (use node editor panel footer), modals/dialogs (buttons inside modal footer)
 - **Does NOT apply to:** Check Access / Who Can forms — these are inline query forms inside a tab panel with no header buttons to move
 
-**`NxListPanel` — canonical list page implementation:**
+**`SynListPanel` — canonical list page implementation:**
 
-List pages should use the `NxListPanel` compound component API instead of manually assembling `SynPanelContentStack` + `useQueryState` + three-state branching:
+List pages should use the `SynListPanel` compound component API instead of manually assembling `SynPanelContentStack` + `useQueryState` + three-state branching:
 
-- **`NxListPanelView`** — handles loading/error/empty/filter states declaratively via props: `tabKey`, `isPending`, `isFetching`, `isEmpty`, `hasActiveFilters`, `noDataState`, `toolbar`, `children`
-- **`NxListPanelToolbar`** — wraps `FilterBar` + action buttons; automatically wraps content in `<fieldset disabled={isFetching}>` with a screen-reader legend during refetch
-- **`NxListPanelTable`** — standardized table slot inside the list panel
+- **`SynListPanelView`** — handles loading/error/empty/filter states declaratively via props: `tabKey`, `isPending`, `isFetching`, `isEmpty`, `hasActiveFilters`, `noDataState`, `toolbar`, `children`
+- **`SynListPanelToolbar`** — wraps `FilterBar` + action buttons; automatically wraps content in `<fieldset disabled={isFetching}>` with a screen-reader legend during refetch
+- **`SynListPanelTable`** — standardized table slot inside the list panel
 
 ### Page Header Structure
 
@@ -264,7 +261,7 @@ When a page uses tabs, the tabs must live inside `SynPanel`, not outside it.
 - Avoid punctuation in tab labels (no question marks, exclamation points)
 - **Tab intro paragraphs:** For complex admin sections (e.g., Access Management — Groups, Projects, Users, Assignments, Policies, Roles), add a descriptive `<Content component={ContentVariants.p}>` block above the tab content (before filters/toolbars) explaining what the section does and how it relates to RBAC. Use `marginBottom: var(--pf-t--global--spacer--md)` below the intro text. This is not a page header description — it lives inside the tab panel content.
 
-**`NxUrlTabs` API:**
+**`SynUrlTabs` API:**
 
 - `basePath` — the URL path prefix for the tabs
 - `defaultTab` — tab to show when no tab segment is in the URL (defaults to `"details"`)
@@ -275,8 +272,8 @@ When a page uses tabs, the tabs must live inside `SynPanel`, not outside it.
 For live examples and story-driven documentation, use the Storybook MCP:
 
 ```
-list-all-documentation → find "NxUrlTabs" / "SynPage" / "SynPageHeader" / "SynPanel" /
-"SynPageBreadcrumbs" / "NxConfirmationDialog" / "NxDetailList" / "NxCodeBlock" → get-documentation(...)
+list-all-documentation → find "SynUrlTabs" / "SynPage" / "SynPageHeader" / "SynPanel" /
+"SynPageBreadcrumbs" / "SynConfirmationDialog" / "SynDetailList" / "SynCodeBlock" → get-documentation(...)
 ```
 
 ---
@@ -417,11 +414,11 @@ For fields where users can select multiple items (e.g., group assignment on user
 
 ### Details Component
 
-- Use `NxDetailList` + `NxDetail` for detail page fields (from `frontend/packages/syntara-ui/src/components/details/`)
+- Use `SynDetailList` + `SynDetail` for detail page fields (from `frontend/packages/syntara-ui/src/components/details/`)
   - **Vertical** (default) for standard detail pages
   - **`isHorizontal`** for compact contexts (e.g., canvas step detail panels)
-- `NxDetail` with empty/null/undefined children **renders nothing automatically** — optional fields can be passed unconditionally without manual null checks
-- Use `NxCodeBlock` (from `frontend/packages/syntara-ui/src/components/details/NxCodeBlock.tsx`) for scripts, JSON payloads, or log output
+- `SynDetail` with empty/null/undefined children **renders nothing automatically** — optional fields can be passed unconditionally without manual null checks
+- Use `SynCodeBlock` (from `frontend/packages/syntara-ui/src/components/details/SynCodeBlock.tsx`) for scripts, JSON payloads, or log output
   - Supports `enableCopy` (clipboard), `enableExpand` (full-screen modal), and `jsonObject` (auto-formatted JSON)
   - Default max height of 24rem with scroll; use `noMaxHeight` when inside a height-constrained parent
 - Use consistent formatting for dates and durations — follow PatternFly's [Date/Time guidelines](https://www.patternfly.org/ux-writing/numerics/#date-and-time-formats)
@@ -440,7 +437,7 @@ For fields where users can select multiple items (e.g., group assignment on user
 For live examples and story-driven documentation:
 
 ```
-list-all-documentation → find "NxDetailList" / "NxDetail" / "NxCodeBlock" → get-documentation(...)
+list-all-documentation → find "SynDetailList" / "SynDetail" / "SynCodeBlock" → get-documentation(...)
 ```
 
 ---
@@ -673,7 +670,7 @@ Use when users need to inspect structured data (JSON, policy definitions, config
 
 ### Confirmation Dialog — Three-Tier Severity Model
 
-`NxConfirmationDialog` supports three escalation tiers. Each tier maps to a Storybook story with canonical copy examples.
+`SynConfirmationDialog` supports three escalation tiers. Each tier maps to a Storybook story with canonical copy examples.
 
 | Tier                            | Story                        | When                                     | Title icon | Confirm button | Checkbox |
 | ------------------------------- | ---------------------------- | ---------------------------------------- | ---------- | -------------- | -------- |
@@ -681,11 +678,11 @@ Use when users need to inspect structured data (JSON, policy definitions, config
 | **Danger**                      | `Danger`                     | Reversible but risky (remove / unassign) | Warning    | `danger`       | No       |
 | **Destructive Acknowledgement** | `DestructiveAcknowledgement` | Permanent delete                         | Warning    | `danger`       | Required |
 
-For canonical copy patterns per tier → see Storybook: `list-all-documentation → find "NxConfirmationDialog" → get-documentation("NxConfirmationDialog")`
+For canonical copy patterns per tier → see Storybook: `list-all-documentation → find "SynConfirmationDialog" → get-documentation("SynConfirmationDialog")`
 
 ### Delete: Destructive Confirmation Modal with Checkbox
 
-**Always** use `NxConfirmationDialog` from `frontend/packages/syntara-ui/src/components/dialogs/NxConfirmationDialog.tsx` for delete actions. Never build modals from raw `Modal` + `ModalHeader` + `ModalBody` + `ModalFooter`.
+**Always** use `SynConfirmationDialog` from `frontend/packages/syntara-ui/src/components/dialogs/SynConfirmationDialog.tsx` for delete actions. Never build modals from raw `Modal` + `ModalHeader` + `ModalBody` + `ModalFooter`.
 
 There are three delete variants depending on what happens downstream when the resource is deleted.
 
@@ -695,12 +692,12 @@ Use when deleting a standalone resource with no downstream effects (e.g., role, 
 
 | Element       | Specification                                                 |
 | ------------- | ------------------------------------------------------------- |
-| Component     | `NxConfirmationDialog` with `destructiveAcknowledgement` prop |
+| Component     | `SynConfirmationDialog` with `destructiveAcknowledgement` prop |
 | Modal variant | Small (default)                                               |
 | Action button | `confirmVariant="danger"`, `confirmLabel="Delete"`            |
-| Cancel button | `variant="link"` (handled by NxConfirmationDialog)            |
+| Cancel button | `variant="link"` (handled by SynConfirmationDialog)            |
 
-For title, body copy, and checkbox label patterns → see Storybook `NxConfirmationDialog` → **DestructiveAcknowledgement** story.
+For title, body copy, and checkbox label patterns → see Storybook `SynConfirmationDialog` → **DestructiveAcknowledgement** story.
 
 #### Cascade Delete
 
@@ -708,14 +705,14 @@ Use when deleting the resource also permanently deletes other records (e.g., wor
 
 | Element       | Specification                                                                                                                                                                                            |
 | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Component     | `NxConfirmationDialog` with `destructiveAcknowledgement` prop                                                                                                                                            |
+| Component     | `SynConfirmationDialog` with `destructiveAcknowledgement` prop                                                                                                                                            |
 | Modal variant | Small (default)                                                                                                                                                                                          |
 | Title         | `"Delete [resource type]?"` with `titleIconVariant="warning"`                                                                                                                                            |
 | Body          | `"The [resource] <strong>[name]</strong> will be deleted. This cannot be undone."`                                                                                                                       |
 | Body 2        | `"Resources that will be deleted"` as a header, then one row per resource type each with its own [Badge](https://www.patternfly.org/components/badge/#read) count — e.g., "Executions [12]", "Tools [3]" |
 | Checkbox      | `"I understand this [resource] and the resources shown above will be permanently deleted."` — Delete button stays disabled until checked                                                                 |
 | Action button | `confirmVariant="danger"`, `confirmLabel="Delete"`                                                                                                                                                       |
-| Cancel button | `variant="link"` (handled by NxConfirmationDialog)                                                                                                                                                       |
+| Cancel button | `variant="link"` (handled by SynConfirmationDialog)                                                                                                                                                       |
 
 #### Ripple Effect Delete
 
@@ -723,14 +720,14 @@ Use when deleting the resource leaves other resources in a broken or invalid sta
 
 | Element       | Specification                                                                                                                                                                                                 |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Component     | `NxConfirmationDialog` with `destructiveAcknowledgement` prop                                                                                                                                                 |
+| Component     | `SynConfirmationDialog` with `destructiveAcknowledgement` prop                                                                                                                                                 |
 | Modal variant | Small (default)                                                                                                                                                                                               |
 | Title         | `"Delete [resource type]?"` with `titleIconVariant="warning"`                                                                                                                                                 |
 | Body          | `"The [resource] <strong>[name]</strong> will be deleted. This cannot be undone."`                                                                                                                            |
 | Body 2        | `"Resources that will be affected"` as a header, then one row per resource type each with its own [Badge](https://www.patternfly.org/components/badge/#read) count — e.g., "Workflows [2]", "Credentials [5]" |
 | Checkbox      | `"I understand this [resource] and the resources shown above will be affected by this deletion."` — Delete button stays disabled until checked                                                                |
 | Action button | `confirmVariant="danger"`, `confirmLabel="Delete"`                                                                                                                                                            |
-| Cancel button | `variant="link"` (handled by NxConfirmationDialog)                                                                                                                                                            |
+| Cancel button | `variant="link"` (handled by SynConfirmationDialog)                                                                                                                                                            |
 
 **When badge counts are unavailable:** Use a `Stack` layout with an introductory sentence (e.g., "This will immediately:") followed by PatternFly `List` / `ListItem` bullet points enumerating the downstream consequences. **Never use raw `<ul>`, `<ol>`, or `<li>`** — always use PF `List` / `ListItem` components (enforced by the `prefer-pf-list-components` ESLint rule).
 
@@ -748,16 +745,16 @@ Use when deleting the resource leaves other resources in a broken or invalid sta
 
 ### Remove/Unassign/Cancel/Stop: Confirmation Modal without Checkbox
 
-These are reversible actions. Use `NxConfirmationDialog` with warning icon but no checkbox.
+These are reversible actions. Use `SynConfirmationDialog` with warning icon but no checkbox.
 
 | Element       | Specification                                                      |
 | ------------- | ------------------------------------------------------------------ |
-| Component     | `NxConfirmationDialog` (no `destructiveAcknowledgement`)           |
+| Component     | `SynConfirmationDialog` (no `destructiveAcknowledgement`)           |
 | Modal variant | Small (default)                                                    |
 | Action button | `confirmVariant="danger"`, `confirmLabel="[Remove/Unassign/etc.]"` |
-| Cancel button | `variant="link"` (handled by NxConfirmationDialog)                 |
+| Cancel button | `variant="link"` (handled by SynConfirmationDialog)                 |
 
-For title and body copy patterns → see Storybook `NxConfirmationDialog` → **Danger** story.
+For title and body copy patterns → see Storybook `SynConfirmationDialog` → **Danger** story.
 
 **Post-cancel/stop behavior:**
 
@@ -771,7 +768,7 @@ When the same destructive action exists at multiple scopes (global, user, resour
 
 | Scope                      | Location           | Trigger                      | Confirmation depth                                                |
 | -------------------------- | ------------------ | ---------------------------- | ----------------------------------------------------------------- |
-| **Global** (platform-wide) | Dedicated page/tab | `variant="danger"` button    | `NxConfirmationDialog` + **destructive acknowledgement checkbox** |
+| **Global** (platform-wide) | Dedicated page/tab | `variant="danger"` button    | `SynConfirmationDialog` + **destructive acknowledgement checkbox** |
 | **User-scoped**            | Table kebab menu   | `RhUiBanIcon` + action label | Standard danger confirmation naming the user                      |
 | **Resource-scoped**        | Table kebab menu   | Same icon/label              | Standard danger confirmation naming the resource                  |
 
@@ -791,7 +788,7 @@ Disable is **not** a destructive action — use a standard confirmation modal (n
 | Confirm button | `variant="primary"`                                                                                 |
 | Cancel button  | `variant="link"`                                                                                    |
 
-For title and body copy patterns → see Storybook `NxConfirmationDialog` → **Disable** story.
+For title and body copy patterns → see Storybook `SynConfirmationDialog` → **Disable** story.
 
 **Post-disable behavior:**
 
@@ -846,7 +843,7 @@ Modal size is chosen by content, not a single fixed default — pick the [varian
 
 | Variant    | When to use                                                                                                  | Examples                                                                                        |
 | ---------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| **Small**  | Confirmation dialogs (`NxConfirmationDialog` defaults to `small` — see §6) and single-purpose forms with ~1–3 fields | Publish workflow, edit version name/description, assign a single role, import workflow           |
+| **Small**  | Confirmation dialogs (`SynConfirmationDialog` defaults to `small` — see §6) and single-purpose forms with ~1–3 fields | Publish workflow, edit version name/description, assign a single role, import workflow           |
 | **Medium** | The default for most create/edit forms — typeahead/multi-select fields, dynamic schema-driven forms, JSON editors used for input. This is the right starting point for a new create/edit modal, not Small. | Create/edit credential, create/edit project, assign roles, add member, run workflow (mock input) |
 | **Large**  | Read-only dense content or review panels with substantial body content                                       | View JSON/policy definition, expanded code block, run-step mock data editor, approval review     |
 
@@ -1278,7 +1275,7 @@ Can user read this section?
 ### Tab Gating
 
 - Hub pages (Access Management): filter tab array by permission; redirect to first visible tab
-- Detail pages: use `NxUrlTabs validTabs={visibleTabs}` to hide unauthorized tabs
+- Detail pages: use `SynUrlTabs validTabs={visibleTabs}` to hide unauthorized tabs
 - **Loading stability:** Hide permission-gated tabs until permissions resolve (see "Hide-Until-Confirmed" below). Never show gated tabs during loading -- a brief absence is less disruptive than a flash of unauthorized content.
 - **Self-permission override:** Users viewing their own profile always see their Groups/Identities/Assignments tabs
 
@@ -1467,7 +1464,7 @@ These badges use `Label` with no icons — text and color only.
 
 **Unpublish confirmation:**
 
-- `NxConfirmationDialog` with warning icon, `confirmVariant="danger"`, label "Unpublish"
+- `SynConfirmationDialog` with warning icon, `confirmVariant="danger"`, label "Unpublish"
 - Body explains workflow will no longer be executable until republished
 
 **Workflow list changes:**
@@ -1747,7 +1744,7 @@ During active execution, Wait nodes display a live countdown timer on the canvas
 Importing a workflow into an existing saved builder shows a choice dialog before proceeding.
 
 - **Condition:** Only shown for existing saved workflows; new/empty builders import directly without modal
-- **Component:** `ImportConfirmationDialog` — small `Modal` (not `NxConfirmationDialog`) with **radio choices**:
+- **Component:** `ImportConfirmationDialog` — small `Modal` (not `SynConfirmationDialog`) with **radio choices**:
   - "Import as new workflow" — creates a fresh workflow from the import
   - "Import into current workflow" — replaces the current builder content
 - **Unsaved changes:** When `isDirty`, the dialog includes a warning about losing unsaved changes
@@ -1782,7 +1779,7 @@ Agentic node execution details use a second tab, alongside the standard Input/Ou
 - **Tab:** "Agent steps" — only shown for agentic-type activities
 - **Header:** A stats strip (model, tokens used, trace time, tool-call count)
 - **Body:** Reasoning blocks, tool-call cards with expandable request/response detail, and a final-answer block
-- **Structured content rendering:** Structured JSON content (tool call args/results) renders as a detail list plus a copyable code block — never dump raw JSON as plain text; use the same `NxCodeBlock` conventions as elsewhere (§3 Details Component)
+- **Structured content rendering:** Structured JSON content (tool call args/results) renders as a detail list plus a copyable code block — never dump raw JSON as plain text; use the same `SynCodeBlock` conventions as elsewhere (§3 Details Component)
 
 ### Run History Panel
 
@@ -1962,13 +1959,13 @@ This project ships with a Chrome DevTools MCP server configured in `.mcp.json`. 
 
 ## 21. Storybook Review Workflow
 
-The project ships with Storybook for documenting and reviewing `Syn*` / `Nx*` components. Use it alongside the dev server for UI verification.
+The project ships with Storybook for documenting and reviewing `Syn*` components. Use it alongside the dev server for UI verification.
 
 - **Start Storybook:** `npm run storybook` (port 5174)
 - **Light and dark mode:** Preview components in both themes via the Storybook toolbar (System / Light / Dark) before sign-off
 - **Composed stories over isolated demos:** Stories should reflect real app compositions (e.g., a full list page layout), not isolated prop playgrounds
-- **Autodocs:** Foundational `Syn*` / `Nx*` components have `autodocs` enabled — browse auto-generated API docs alongside live examples
-- **Available stories:** `SynPage`, `SynPageHeader`, `SynPageBreadcrumbs`, `SynPanel`, `SynPanelContentStack`, `NxUrlTabs`, `NxConfirmationDialog`, `NxCodeBlock`, `NxDetail`, `NxDetailList`, `SynErrorState`, `SynLoadingState`, `SynEmptyStateNoData`, `SynEmptyStateFilter`, `SynEmptyStateServiceUnavailable`, `NxListPanel`, `SynKebabMenu`, `SynLabel`, `SynUserTag`, `SynScrollableTableContainer`
+- **Autodocs:** Foundational `Syn*` components have `autodocs` enabled — browse auto-generated API docs alongside live examples
+- **Available stories:** `SynPage`, `SynPageHeader`, `SynPageBreadcrumbs`, `SynPanel`, `SynPanelContentStack`, `SynUrlTabs`, `SynConfirmationDialog`, `SynCodeBlock`, `SynDetail`, `SynDetailList`, `SynErrorState`, `SynLoadingState`, `SynEmptyStateNoData`, `SynEmptyStateFilter`, `SynEmptyStateServiceUnavailable`, `SynListPanel`, `SynKebabMenu`, `SynLabel`, `SynUserTag`, `SynScrollableTableContainer`
 
 ---
 
@@ -1979,7 +1976,7 @@ The project ships with Storybook for documenting and reviewing `Syn*` / `Nx*` co
 - Follow the accessibility guidelines in section 18
 - Follow the styling rules in section 19
 - Use Chrome DevTools MCP (section 20) to verify your implementation against the live app
-- Use Storybook (section 21) to review `Syn*` / `Nx*` component documentation and test in light/dark mode
+- Use Storybook (section 21) to review `Syn*` component documentation and test in light/dark mode
 
 ---
 
@@ -1998,10 +1995,10 @@ What are you building?
 │   └── Handle 3 empty states (no data / no results / error)
 │
 ├── Detail view
-│   ├── Use NxDetailList + NxDetail (vertical default; isHorizontal for compact)
+│   ├── Use SynDetailList + SynDetail (vertical default; isHorizontal for compact)
 │   ├── Add SynPageBreadcrumbs + SynPageHeader with title + resource actions
-│   ├── NxDetail with empty children renders nothing (no placeholder needed)
-│   └── Use NxCodeBlock for JSON/script/log display
+│   ├── SynDetail with empty children renders nothing (no placeholder needed)
+│   └── Use SynCodeBlock for JSON/script/log display
 │
 ├── Create/Edit form
 │   ├── 5+ fields or multi-step? → Full page

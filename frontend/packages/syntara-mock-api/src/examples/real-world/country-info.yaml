@@ -26,7 +26,7 @@ nodes:
     type: http_request
     parameters:
       method: GET
-      url: https://restcountries.com/v3.1/alpha/${input.country_code}
+      url: https://restcountries.com/v3.1/alpha/${trigger.country_code}
       headers:
         Accept: application/json
     outputs:
@@ -49,7 +49,7 @@ nodes:
     type: http_request
     parameters:
       method: GET
-      url: https://restcountries.com/v3.1/alpha/${input.country_code}?fields=borders
+      url: https://restcountries.com/v3.1/alpha/${trigger.country_code}?fields=borders
       headers:
         Accept: application/json
     outputs:

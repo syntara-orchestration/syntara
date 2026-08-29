@@ -172,7 +172,7 @@ describe('GroupsTab Component', () => {
 
       render(<GroupsTab />, { wrapper })
 
-      expect(screen.getByText('No groups')).toBeInTheDocument()
+      expect(screen.getByText('No groups yet')).toBeInTheDocument()
       expect(screen.getByText('Create a group to organize users and manage access.')).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Create group' })).toBeInTheDocument()
     })

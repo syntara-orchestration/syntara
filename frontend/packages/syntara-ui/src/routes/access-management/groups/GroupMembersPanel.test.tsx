@@ -211,7 +211,7 @@ describe('GroupMembersPanel', () => {
 
       render(<GroupMembersPanel {...defaultProps} />, { wrapper })
 
-      expect(screen.getByText('No members')).toBeInTheDocument()
+      expect(screen.getByText('No members yet')).toBeInTheDocument()
       expect(screen.getByText(/add users to this group/i)).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /add member/i })).toBeInTheDocument()
     })

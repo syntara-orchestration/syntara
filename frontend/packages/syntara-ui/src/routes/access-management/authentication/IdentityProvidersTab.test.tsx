@@ -183,7 +183,7 @@ describe('IdentityProvidersTab', () => {
       setupEmptyProviders()
       render(<IdentityProvidersTab />, { wrapper })
 
-      expect(screen.getByText('No identity providers configured')).toBeInTheDocument()
+      expect(screen.getByText('No identity providers configured yet')).toBeInTheDocument()
       expect(screen.getByText(/Configure an external identity provider to enable single sign-on/)).toBeInTheDocument()
     })
 
@@ -862,7 +862,7 @@ describe('IdentityProvidersTab', () => {
       render(<IdentityProvidersTab />, { wrapper })
 
       // Should show the filter empty state, not the "no providers" empty state
-      expect(screen.queryByText('No identity providers configured')).not.toBeInTheDocument()
+      expect(screen.queryByText('No identity providers configured yet')).not.toBeInTheDocument()
       expect(screen.getByText(/No results found/i)).toBeInTheDocument()
     })
 

@@ -3,7 +3,7 @@ import { EdgeHandleEnum, type SwitchActivity, type SwitchConfig } from '@syntara
 import { type Node, type NodeProps } from '@xyflow/react'
 import { useEffect, useRef, useState } from 'react'
 
-import { NxDetailList } from '../../../../components/details/NxDetailList'
+import { SynDetailList } from '../../../../components/details/SynDetailList'
 import { RegistryNodeId } from '../../../../constants'
 import { buildSwitchCasePort } from '../../../builder/utils/switchCaseHelpers'
 import type { ActivityStatus } from '../../execution/types'
@@ -134,10 +134,10 @@ function SwitchNodeDetails(props: {
       <Flex justifyContent={{ default: 'justifyContentFlexEnd' }} gap={{ default: 'gapNone' }}>
         <FlexItem grow={{ default: 'grow' }} className={styles.nodeBodyWrapper}>
           <NodeBody>
-            <NxDetailList>
+            <SynDetailList>
               {renderOutputs(props.switchActivity.outputs)}
               {renderJson(props.switchActivity, props.showJson, 'Full Definition')}
-            </NxDetailList>
+            </SynDetailList>
           </NodeBody>
         </FlexItem>
         <div className={styles.branchHandlesWrapper}>{props.children}</div>

@@ -24,7 +24,7 @@ nodes:
       headers:
         Content-Type: application/json
         X-Custom-Header: test-value
-      body: ${input.data}
+      body: ${trigger.data}
     inputs:
-      data: ${inputs.data}
+      data: ${trigger.data}
 edges: []

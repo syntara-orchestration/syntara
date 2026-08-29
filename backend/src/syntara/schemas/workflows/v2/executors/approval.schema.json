@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://automation.example.com/schemas/workflows/v2/executors/approval",
   "title": "Approval Node",
-  "description": "Human approval gate that pauses workflow execution until approved or rejected",
+  "description": "Human approval gate that pauses workflow execution until approved or rejected. Routes to successors by output port: outgoing edges must set from_port to 'approved' or 'rejected'. At least one successor on the 'approved' port is required; a 'rejected' successor is optional.",
   "parameterSchema": {
     "type": "object",
     "properties": {

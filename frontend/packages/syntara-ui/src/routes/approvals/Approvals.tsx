@@ -1,5 +1,4 @@
 import { Spinner, StackItem } from '@patternfly/react-core'
-import type { ThProps } from '@patternfly/react-table'
 import type { Approval } from '@syntara/contracts'
 import { useMemo, useReducer, useState } from 'react'
 
@@ -9,12 +8,8 @@ import { SynPage, SynPageBody } from '../../components/layout/SynPage'
 import { SynPageHeader } from '../../components/layout/SynPageHeader'
 import { SynPanel } from '../../components/layout/SynPanel'
 import { SynPanelContentStack } from '../../components/layout/SynPanelContentStack'
-import { SynEmptyStateFilter } from '../../components/states/SynEmptyStateFilter'
-import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 import { useQueryState } from '../../components/states/useQueryState'
 import { SynPageTitle } from '../../components/SynPageTitle'
-import type { PaginationFooterProps } from '../../components/table/PaginationFooter'
-import { SynScrollableTableContainer } from '../../components/table/SynScrollableTableContainer'
 import { permissionTooltip } from '../../hooks/permissionUtils'
 import { useCursorPagination, useCursorReset } from '../../hooks/useCursorPagination'
 import { useProjectSelector } from '../../hooks/useProjectSelector'
@@ -25,11 +20,10 @@ import { useDocLink } from '../../utils/docs/useDocLink'
 import { getApprovalNameFilterDefinition, getApprovalStatusFilterDefinition } from './approvalFilters'
 import { hasExpandableNotes } from './approvalNotes'
 import { ApprovalsBulkActions } from './ApprovalsBulkActions'
-import { FlatApprovalsTableBody, GroupedApprovalsTableBody } from './ApprovalsTableBody'
-import { ApprovalsTableHead } from './ApprovalsTableHead'
+import { ApprovalsContent } from './ApprovalsContent'
+import { approvalsReducer } from './approvalsReducer'
 import { approvalDefaultSort, approvalTableColumns } from './approvalTableColumns'
-import { BulkApproveDialog } from './BulkApproveDialog'
-import { BulkRejectDialog } from './BulkRejectDialog'
+import { BulkActionDialogs } from './BulkActionDialogs'
 import { canDecideOnApproval } from './canDecideOnApproval'
 import { useApprovalDecideProjects } from './useApprovalDecideProjects'
 import { useApprovalPermissions } from './useApprovalPermissions'
@@ -43,252 +37,6 @@ export type ApprovalWithDetails = Approval & {
   workflowName?: string
   workflowId?: string
   workflowVersion?: number
-}
-
-type ApprovalsAction = { type: 'SET_EXPANDED_ROWS'; payload: Set<string> } | { type: 'TOGGLE_ROW'; payload: string }
-
-function approvalsReducer(state: { expandedRows: Set<string> }, action: ApprovalsAction) {
-  switch (action.type) {
-    case 'SET_EXPANDED_ROWS':
-      return { ...state, expandedRows: action.payload }
-    case 'TOGGLE_ROW': {
-      const next = new Set(state.expandedRows)
-      if (next.has(action.payload)) {
-        next.delete(action.payload)
-      } else {
-        next.add(action.payload)
-      }
-      return { ...state, expandedRows: next }
-    }
-    default:
-      return state
-  }
-}
-
-type BulkActionDialogsProps = {
-  bulkApproveDialogOpen: boolean
-  setBulkApproveDialogOpen: (open: boolean) => void
-  bulkRejectDialogOpen: boolean
-  setBulkRejectDialogOpen: (open: boolean) => void
-  handleBulkApprove: (note: string | null) => void
-  handleBulkReject: (note: string | null) => void
-  selectedCount: number
-  isBulkActionPending: boolean
-}
-
-function BulkActionDialogs({
-  bulkApproveDialogOpen,
-  setBulkApproveDialogOpen,
-  bulkRejectDialogOpen,
-  setBulkRejectDialogOpen,
-  handleBulkApprove,
-  handleBulkReject,
-  selectedCount,
-  isBulkActionPending,
-}: Readonly<BulkActionDialogsProps>) {
-  return (
-    <>
-      <BulkApproveDialog
-        isOpen={bulkApproveDialogOpen}
-        onClose={() => setBulkApproveDialogOpen(false)}
-        onConfirm={handleBulkApprove}
-        approvalCount={selectedCount}
-        isLoading={isBulkActionPending}
-      />
-
-      <BulkRejectDialog
-        isOpen={bulkRejectDialogOpen}
-        onClose={() => setBulkRejectDialogOpen(false)}
-        onConfirm={handleBulkReject}
-        approvalCount={selectedCount}
-        isLoading={isBulkActionPending}
-      />
-    </>
-  )
-}
-
-type ApprovalsContentProps = {
-  sortedApprovals: ApprovalWithDetails[]
-  hasActiveFilters: boolean
-  handleClearAllFilters: () => void
-  expandedRows: Set<string>
-  onToggleRow: (approvalId: string) => void
-  getSortParams: (columnField: string) => ThProps['sort']
-  allRowsExpanded: boolean
-  collapseAllAriaLabel: string
-  onCollapseAll: (event: unknown, rowIndex: number, isOpen: boolean) => void
-  hasExpandableRows: boolean
-  allPendingSelected: boolean
-  onSelectAll: (checked: boolean) => void
-  hasPendingApprovals: boolean
-  canDecideAnyApproval: boolean
-  isAllProjects: boolean
-  groupedApprovals: ReturnType<typeof useApprovalsData>['groupedApprovals']
-  collapsedProjects: Set<string>
-  onToggleProject: (id: string) => void
-  selectedApprovalIds: Set<string>
-  onSelectRow: (approval: ApprovalWithDetails, checked: boolean) => void
-  footerProps: PaginationFooterProps
-  approvalPermissions: Map<string, boolean>
-  isLoadingPermissions: boolean
-}
-
-function ApprovalsContent({
-  sortedApprovals,
-  hasActiveFilters,
-  handleClearAllFilters,
-  expandedRows,
-  onToggleRow,
-  getSortParams,
-  allRowsExpanded,
-  collapseAllAriaLabel,
-  onCollapseAll,
-  hasExpandableRows,
-  allPendingSelected,
-  onSelectAll,
-  hasPendingApprovals,
-  canDecideAnyApproval,
-  isAllProjects,
-  groupedApprovals,
-  collapsedProjects,
-  onToggleProject,
-  selectedApprovalIds,
-  onSelectRow,
-  footerProps,
-  approvalPermissions,
-  isLoadingPermissions,
-}: Readonly<ApprovalsContentProps>) {
-  if (sortedApprovals.length === 0) {
-    return (
-      <SynPageBody isCentered>
-        {hasActiveFilters ? (
-          <SynEmptyStateFilter clearAllFilters={handleClearAllFilters} />
-        ) : (
-          <SynEmptyStateNoData
-            title="No approvals found"
-            description="No approvals are currently pending or available."
-          />
-        )}
-      </SynPageBody>
-    )
-  }
-
-  return (
-    <ApprovalsTableContent
-      sortedApprovals={sortedApprovals}
-      expandedRows={expandedRows}
-      onToggleRow={onToggleRow}
-      getSortParams={getSortParams}
-      allRowsExpanded={allRowsExpanded}
-      collapseAllAriaLabel={collapseAllAriaLabel}
-      onCollapseAll={onCollapseAll}
-      hasExpandableRows={hasExpandableRows}
-      allPendingSelected={allPendingSelected}
-      onSelectAll={onSelectAll}
-      hasPendingApprovals={hasPendingApprovals}
-      canDecideAnyApproval={canDecideAnyApproval}
-      isAllProjects={isAllProjects}
-      groupedApprovals={groupedApprovals}
-      collapsedProjects={collapsedProjects}
-      onToggleProject={onToggleProject}
-      selectedApprovalIds={selectedApprovalIds}
-      onSelectRow={onSelectRow}
-      footerProps={footerProps}
-      approvalPermissions={approvalPermissions}
-      isLoadingPermissions={isLoadingPermissions}
-    />
-  )
-}
-
-type ApprovalsTableContentProps = {
-  sortedApprovals: ApprovalWithDetails[]
-  expandedRows: Set<string>
-  onToggleRow: (approvalId: string) => void
-  getSortParams: (columnField: string) => ThProps['sort']
-  allRowsExpanded: boolean
-  collapseAllAriaLabel: string
-  onCollapseAll: (event: unknown, rowIndex: number, isOpen: boolean) => void
-  hasExpandableRows: boolean
-  allPendingSelected: boolean
-  onSelectAll: (checked: boolean) => void
-  hasPendingApprovals: boolean
-  canDecideAnyApproval: boolean
-  isAllProjects: boolean
-  groupedApprovals: ReturnType<typeof useApprovalsData>['groupedApprovals']
-  collapsedProjects: Set<string>
-  onToggleProject: (id: string) => void
-  selectedApprovalIds: Set<string>
-  onSelectRow: (approval: ApprovalWithDetails, checked: boolean) => void
-  footerProps: PaginationFooterProps
-  approvalPermissions: Map<string, boolean>
-  isLoadingPermissions: boolean
-}
-
-function ApprovalsTableContent({
-  sortedApprovals,
-  expandedRows,
-  onToggleRow,
-  getSortParams,
-  allRowsExpanded,
-  collapseAllAriaLabel,
-  onCollapseAll,
-  hasExpandableRows,
-  allPendingSelected,
-  onSelectAll,
-  hasPendingApprovals,
-  canDecideAnyApproval,
-  isAllProjects,
-  groupedApprovals,
-  collapsedProjects,
-  onToggleProject,
-  selectedApprovalIds,
-  onSelectRow,
-  footerProps,
-  approvalPermissions,
-  isLoadingPermissions,
-}: Readonly<ApprovalsTableContentProps>) {
-  return (
-    <SynScrollableTableContainer caption="Approvals table" isExpandable footer={footerProps}>
-      <ApprovalsTableHead
-        getSortParams={getSortParams}
-        allRowsExpanded={allRowsExpanded}
-        collapseAllAriaLabel={collapseAllAriaLabel}
-        onCollapseAll={onCollapseAll}
-        hasExpandableRows={hasExpandableRows}
-        showSelect={true}
-        allPendingSelected={allPendingSelected}
-        onSelectAll={onSelectAll}
-        hasPendingApprovals={hasPendingApprovals}
-        canDecideAnyApproval={canDecideAnyApproval}
-        isLoadingPermissions={isLoadingPermissions}
-      />
-      {isAllProjects && groupedApprovals ? (
-        <GroupedApprovalsTableBody
-          groupedApprovals={groupedApprovals}
-          collapsedProjects={collapsedProjects}
-          onToggleProject={onToggleProject}
-          expandedRows={expandedRows}
-          onToggleRow={onToggleRow}
-          showSelect={true}
-          selectedApprovalIds={selectedApprovalIds}
-          onSelectRow={onSelectRow}
-          approvalPermissions={approvalPermissions}
-          isLoadingPermissions={isLoadingPermissions}
-        />
-      ) : (
-        <FlatApprovalsTableBody
-          approvals={sortedApprovals}
-          expandedRows={expandedRows}
-          onToggleRow={onToggleRow}
-          showSelect={true}
-          selectedApprovalIds={selectedApprovalIds}
-          onSelectRow={onSelectRow}
-          approvalPermissions={approvalPermissions}
-          isLoadingPermissions={isLoadingPermissions}
-        />
-      )}
-    </SynScrollableTableContainer>
-  )
 }
 
 export default function Approvals() {

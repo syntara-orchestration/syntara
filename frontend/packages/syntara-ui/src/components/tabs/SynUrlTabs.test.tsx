@@ -6,37 +6,37 @@ import { axe } from 'vitest-axe'
 
 import { routerTestState } from '../../test/setup'
 
-import { NxUrlTabs } from './NxUrlTabs'
+import { SynUrlTabs } from './SynUrlTabs'
 
-describe('NxUrlTabs', () => {
+describe('SynUrlTabs', () => {
   beforeEach(() => {
     routerTestState.pathname = '/base/tab-a'
   })
 
   it('has no accessibility violations', async () => {
     const { container } = render(
-      <NxUrlTabs basePath="/base" defaultTab="tab-a" aria-label="Test tabs">
+      <SynUrlTabs basePath="/base" defaultTab="tab-a" aria-label="Test tabs">
         <Tab eventKey="tab-a" title="Tab A">
           Content A
         </Tab>
         <Tab eventKey="tab-b" title="Tab B">
           Content B
         </Tab>
-      </NxUrlTabs>
+      </SynUrlTabs>
     )
     expect(await axe(container)).toHaveNoViolations()
   })
 
   it('sets active tab from URL path segment', () => {
     render(
-      <NxUrlTabs basePath="/base" aria-label="Test tabs">
+      <SynUrlTabs basePath="/base" aria-label="Test tabs">
         <Tab eventKey="tab-a" title="Tab A">
           Content A
         </Tab>
         <Tab eventKey="tab-b" title="Tab B">
           Content B
         </Tab>
-      </NxUrlTabs>
+      </SynUrlTabs>
     )
 
     expect(screen.getByRole('tab', { name: 'Tab A' })).toHaveAttribute('aria-selected', 'true')
@@ -46,14 +46,14 @@ describe('NxUrlTabs', () => {
   it('navigates to the correct URL when a tab is clicked', async () => {
     const user = userEvent.setup()
     render(
-      <NxUrlTabs basePath="/base" aria-label="Test tabs">
+      <SynUrlTabs basePath="/base" aria-label="Test tabs">
         <Tab eventKey="tab-a" title="Tab A">
           Content A
         </Tab>
         <Tab eventKey="tab-b" title="Tab B">
           Content B
         </Tab>
-      </NxUrlTabs>
+      </SynUrlTabs>
     )
 
     await user.click(screen.getByRole('tab', { name: 'Tab B' }))
@@ -64,14 +64,14 @@ describe('NxUrlTabs', () => {
   it('uses defaultTab when URL has no tab segment', () => {
     routerTestState.pathname = '/base'
     render(
-      <NxUrlTabs basePath="/base" defaultTab="tab-b" aria-label="Test tabs">
+      <SynUrlTabs basePath="/base" defaultTab="tab-b" aria-label="Test tabs">
         <Tab eventKey="tab-a" title="Tab A">
           Content A
         </Tab>
         <Tab eventKey="tab-b" title="Tab B">
           Content B
         </Tab>
-      </NxUrlTabs>
+      </SynUrlTabs>
     )
 
     expect(screen.getByRole('tab', { name: 'Tab B' })).toHaveAttribute('aria-selected', 'true')
@@ -80,14 +80,14 @@ describe('NxUrlTabs', () => {
   it('redirects to defaultTab when URL tab is not in validTabs', async () => {
     routerTestState.pathname = '/base/invalid'
     render(
-      <NxUrlTabs basePath="/base" defaultTab="tab-a" validTabs={['tab-a', 'tab-b']} aria-label="Test tabs">
+      <SynUrlTabs basePath="/base" defaultTab="tab-a" validTabs={['tab-a', 'tab-b']} aria-label="Test tabs">
         <Tab eventKey="tab-a" title="Tab A">
           Content A
         </Tab>
         <Tab eventKey="tab-b" title="Tab B">
           Content B
         </Tab>
-      </NxUrlTabs>
+      </SynUrlTabs>
     )
 
     await act(() => new Promise((r) => requestAnimationFrame(r)))
@@ -96,14 +96,14 @@ describe('NxUrlTabs', () => {
 
   it('does not redirect when URL tab is valid', () => {
     render(
-      <NxUrlTabs basePath="/base" defaultTab="tab-a" validTabs={['tab-a', 'tab-b']} aria-label="Test tabs">
+      <SynUrlTabs basePath="/base" defaultTab="tab-a" validTabs={['tab-a', 'tab-b']} aria-label="Test tabs">
         <Tab eventKey="tab-a" title="Tab A">
           Content A
         </Tab>
         <Tab eventKey="tab-b" title="Tab B">
           Content B
         </Tab>
-      </NxUrlTabs>
+      </SynUrlTabs>
     )
 
     expect(routerTestState.navigate).not.toHaveBeenCalled()
@@ -112,14 +112,14 @@ describe('NxUrlTabs', () => {
   it('redirects to first validTab when no defaultTab is provided', async () => {
     routerTestState.pathname = '/base'
     render(
-      <NxUrlTabs basePath="/base" validTabs={['first', 'second']} aria-label="Test tabs">
+      <SynUrlTabs basePath="/base" validTabs={['first', 'second']} aria-label="Test tabs">
         <Tab eventKey="first" title="First">
           Content
         </Tab>
         <Tab eventKey="second" title="Second">
           Content
         </Tab>
-      </NxUrlTabs>
+      </SynUrlTabs>
     )
 
     await act(() => new Promise((r) => requestAnimationFrame(r)))
@@ -128,11 +128,11 @@ describe('NxUrlTabs', () => {
 
   it('passes through additional Tabs props', () => {
     render(
-      <NxUrlTabs basePath="/base" defaultTab="tab-a" aria-label="Custom label" isBox>
+      <SynUrlTabs basePath="/base" defaultTab="tab-a" aria-label="Custom label" isBox>
         <Tab eventKey="tab-a" title="Tab A">
           Content A
         </Tab>
-      </NxUrlTabs>
+      </SynUrlTabs>
     )
 
     expect(screen.getByRole('tab', { name: 'Tab A' })).toBeInTheDocument()
@@ -140,14 +140,14 @@ describe('NxUrlTabs', () => {
 
   it('blurs focused tab on popstate (browser back/forward)', () => {
     render(
-      <NxUrlTabs basePath="/base" aria-label="Test tabs">
+      <SynUrlTabs basePath="/base" aria-label="Test tabs">
         <Tab eventKey="tab-a" title="Tab A">
           Content A
         </Tab>
         <Tab eventKey="tab-b" title="Tab B">
           Content B
         </Tab>
-      </NxUrlTabs>
+      </SynUrlTabs>
     )
 
     const tabA = screen.getByRole('tab', { name: 'Tab A' })

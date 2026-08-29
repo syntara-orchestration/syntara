@@ -43,6 +43,7 @@ function RunMenuToggle({ toggleRef, isExpanded, isDisabled, onClick }: RunMenuTo
 export type RunWorkflowSectionProps = Readonly<{
   triggers?: { id: string; name?: string }[]
   isSaved: boolean
+  validationErrorCount: number
   dispatch: Dispatch<BuilderAction>
   builderPermissions: BuilderPermissions
   isNodeEditorOpen?: boolean
@@ -55,6 +56,7 @@ const NODE_EDITOR_TOOLTIP = 'Finish editing the current step before running'
 export function RunWorkflowSection({
   triggers,
   isSaved,
+  validationErrorCount,
   dispatch,
   builderPermissions,
   isNodeEditorOpen,
@@ -62,8 +64,10 @@ export function RunWorkflowSection({
   const [isRunDropdownOpen, setIsRunDropdownOpen] = useState(false)
   const hasTriggers = (triggers?.length ?? 0) > 0
   const hasMultipleTriggers = (triggers?.length ?? 0) > 1
+  const hasValidationErrors = validationErrorCount > 0
 
-  const isRunDisabled = !builderPermissions.canRun || !!isNodeEditorOpen || !hasTriggers || !isSaved
+  const isRunDisabled =
+    !builderPermissions.canRun || !!isNodeEditorOpen || !hasTriggers || !isSaved || hasValidationErrors
 
   let runTooltipContent = ''
   if (!builderPermissions.canRun) {
@@ -74,6 +78,9 @@ export function RunWorkflowSection({
     runTooltipContent = SAVE_FIRST_TOOLTIP
   } else if (!hasTriggers) {
     runTooltipContent = NO_TRIGGERS_TOOLTIP
+  } else if (hasValidationErrors) {
+    const suffix = validationErrorCount === 1 ? '' : 's'
+    runTooltipContent = `Resolve validation issue${suffix} before running — ${validationErrorCount} found`
   }
 
   const renderRunToggle = useCallback(
