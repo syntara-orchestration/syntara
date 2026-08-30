@@ -2,9 +2,7 @@ import { Th, Thead, Tr } from '@patternfly/react-table'
 
 import { GroupColumnLabel, IdpGroupValueColumnLabel } from './groupMappingFields'
 
-export function GroupMappingTableHead({
-  showActionsColumn,
-}: Readonly<{ showActionsColumn: boolean }>) {
+export function GroupMappingTableHead({ showActionsColumn }: Readonly<{ showActionsColumn: boolean }>) {
   return (
     <Thead>
       <Tr>
