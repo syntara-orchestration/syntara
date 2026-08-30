@@ -227,7 +227,7 @@ export function GroupedCredentialsTableBody({
                   credential={credential}
                   credType={typeMap.get(credential.credential_type_id)}
                   rowIndex={(credential.id ? credentialIndexMap.get(credential.id) : undefined) ?? 0}
-                  isExpanded={expandedRows.has(credential.id!)}
+                  isExpanded={credential.id != null && expandedRows.has(credential.id)}
                   isBuiltinProject={getIsBuiltinProject(credential)}
                   onToggleRow={onToggleRow}
                   onEdit={onEdit}
@@ -271,7 +271,7 @@ export function FlatCredentialsTableBody({
           credential={credential}
           credType={typeMap.get(credential.credential_type_id)}
           rowIndex={rowIndex}
-          isExpanded={expandedRows.has(credential.id!)}
+          isExpanded={credential.id != null && expandedRows.has(credential.id)}
           isBuiltinProject={getIsBuiltinProject(credential)}
           onToggleRow={onToggleRow}
           onEdit={onEdit}
