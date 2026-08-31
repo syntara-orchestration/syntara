@@ -38,7 +38,7 @@ spec:
       value:
         - DESCRIPTION_LABEL=Syntara UI
         - REDHAT_COMPONENT=ansible-automation-orchestrator-ui-container
-        - IMAGE_NAME=ansible-automation-platform/ansible-automation-orchestrator-ui-rhel9
+        - IMAGE_NAME=ansible-automation-platform/automation-orchestrator-ui-rhel9
         - MAINTAINER=Ansible Automation Platform Productization Team
         - DOWNSTREAM_OVERRIDE=quay.io/redhat-user-workloads/nexus-tenant/ansible-automation-platform/automation-orchestrator-downstream-override:latest@sha256:65b73e30b53acecd365311202765d8b61d2dfbb6db1862839785c0a44353abd1
         - BRANDING=true
