@@ -143,6 +143,8 @@ describe('getAdjacentNodesFromFlow', () => {
         { type: ExecutorTypeEnum.AGENTIC, iconId: RegistryNodeId.AGENT },
         { type: ExecutorTypeEnum.AAP_JOB_TEMPLATE, iconId: RegistryNodeId.AAP_EXECUTION },
         { type: 'approval', iconId: RegistryNodeId.APPROVAL },
+        { type: 'wait', iconId: RegistryNodeId.LOGIC_WAIT },
+        { type: 'switch', iconId: RegistryNodeId.LOGIC_SWITCH },
       ]
 
       for (const { type, iconId } of cases) {
@@ -151,6 +153,54 @@ describe('getAdjacentNodesFromFlow', () => {
         expect(result.upstream[0]).toMatchObject({ id: 'source', name: 'Source', type, iconId })
         expect(result.upstream[0]?.icon).toBeDefined()
       }
+    })
+
+    it('omits icon data for unknown canvas node types', () => {
+      const nodes: Node[] = [
+        {
+          id: 'source',
+          type: 'unknown',
+          position: { x: 0, y: 0 },
+          data: { name: 'Custom', type: 'custom' },
+        },
+        makeNode('next', 'Next'),
+      ]
+
+      const result = getAdjacentNodesFromFlow('next', [makeEdge('source', 'next')], nodes)
+
+      expect(result.upstream[0]).toMatchObject({ id: 'source', name: 'Custom', type: 'custom' })
+      expect(result.upstream[0]?.icon).toBeUndefined()
+      expect(result.upstream[0]?.iconId).toBeUndefined()
+    })
+
+    it('falls back to node type and still resolves icons when activity data is empty', () => {
+      const nodes: Node[] = [
+        { id: 'source', type: 'loop', position: { x: 0, y: 0 }, data: {} },
+        makeNode('next', 'Next'),
+      ]
+
+      const result = getAdjacentNodesFromFlow('next', [makeEdge('source', 'next')], nodes)
+
+      expect(result.upstream[0]).toMatchObject({
+        id: 'source',
+        type: 'loop',
+        iconId: RegistryNodeId.LOGIC_LOOP,
+      })
+      expect(result.upstream[0]?.name).toBeUndefined()
+      expect(result.upstream[0]?.icon).toBeDefined()
+    })
+
+    it('falls back to unknown and omits icons when type and data type are missing', () => {
+      const nodes: Node[] = [
+        { id: 'source', position: { x: 0, y: 0 }, data: { name: 'Orphan' } },
+        makeNode('next', 'Next'),
+      ]
+
+      const result = getAdjacentNodesFromFlow('next', [makeEdge('source', 'next')], nodes)
+
+      expect(result.upstream[0]).toMatchObject({ id: 'source', name: 'Orphan', type: 'unknown' })
+      expect(result.upstream[0]?.icon).toBeUndefined()
+      expect(result.upstream[0]?.iconId).toBeUndefined()
     })
   })
 })

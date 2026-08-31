@@ -91,6 +91,22 @@ describe('NodePanelNavigationArrow', () => {
     expect(screen.getAllByTestId('mock-nav-icon')).toHaveLength(2)
   })
 
+  it('renders dropdown step names without icons when nodes have no icon or iconId', async () => {
+    const user = userEvent.setup()
+    const nodesWithoutIcons: UpstreamNodeInfo[] = [
+      { id: 'node-a', name: 'Task A', type: 'script' },
+      { id: 'node-b', name: 'Task B', type: 'wait' },
+    ]
+
+    render(<NodePanelNavigationArrow direction="previous" nodes={nodesWithoutIcons} onNavigate={vi.fn()} />)
+
+    await user.click(screen.getByRole('button', { name: /Previous step/i }))
+
+    expect(screen.getByRole('menuitem', { name: 'Task A' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Task B' })).toBeInTheDocument()
+    expect(screen.queryByTestId('node-icon-wrapper')).not.toBeInTheDocument()
+  })
+
   it('has no accessibility violations for single-target arrow', async () => {
     const { container } = render(
       <NodePanelNavigationArrow direction="previous" nodes={singleNode} onNavigate={vi.fn()} />
