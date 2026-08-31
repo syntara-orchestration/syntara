@@ -1023,7 +1023,16 @@ class TestResolveConnectionFromIntegration:
         """
         integration = _mock_integration(base_url="https://aap-gw.example.com/")
         mock_session = _mock_session_with_integration(integration)
-        service = AAPProxyService(settings=get_settings(), session=mock_session)
+        mock_evaluator = MagicMock()
+        mock_user = MagicMock()
+        mock_user.labels = {"env": "test"}
+        mock_user.authz_metadata = {"org": "test-org"}
+        service = AAPProxyService(
+            settings=get_settings(),
+            session=mock_session,
+            evaluator=mock_evaluator,
+            user=mock_user,
+        )
 
         cred_connection = AAPConnection(
             base_url="https://ignored.example.com",
@@ -1052,14 +1061,14 @@ class TestResolveConnectionFromIntegration:
         assert result.headers == {"Authorization": "Bearer cred-token"}
         # verify_ssl from integration config (insecure_skip_tls_verify=False -> verify_ssl=True)
         assert result.verify_ssl is True
-        # Credential resolver was called
+        # Credential resolver was called with evaluator and user context
         mock_cred_resolver.assert_called_once_with(
             session=mock_session,
             credential_id=credential_id,
             user_id=user_id,
-            evaluator=service._evaluator,
-            user_labels=None,
-            user_metadata=None,
+            evaluator=mock_evaluator,
+            user_labels=mock_user.labels,
+            user_metadata=mock_user.authz_metadata,
         )
 
     @pytest.mark.asyncio
@@ -1112,7 +1121,15 @@ class TestResolveConnectionFromIntegration:
         integration_id = uuid4()
         integration = _mock_integration(integration_id=integration_id, base_url="https://aap-str.example.com")
         mock_session = _mock_session_with_integration(integration)
-        service = AAPProxyService(settings=get_settings(), session=mock_session)
+        mock_user = MagicMock()
+        mock_user.labels = {}
+        mock_user.authz_metadata = {}
+        service = AAPProxyService(
+            settings=get_settings(),
+            session=mock_session,
+            evaluator=MagicMock(),
+            user=mock_user,
+        )
 
         cred_connection = AAPConnection(
             base_url="https://ignored.example.com",
@@ -1157,7 +1174,15 @@ class TestResolveConnectionFromIntegration:
             insecure_skip_tls_verify=True,
         )
         mock_session = _mock_session_with_integration(integration)
-        service = AAPProxyService(settings=get_settings(), session=mock_session)
+        mock_user = MagicMock()
+        mock_user.labels = {}
+        mock_user.authz_metadata = {}
+        service = AAPProxyService(
+            settings=get_settings(),
+            session=mock_session,
+            evaluator=MagicMock(),
+            user=mock_user,
+        )
 
         cred_connection = AAPConnection(
             base_url="https://ignored.example.com",
@@ -1251,7 +1276,16 @@ class TestEnforceIntegrationVisibility:
         mock_session = _mock_session_with_integration(integration)
 
         restricted_projects = AllowedProjectsResult(all_projects=False, project_ids=[uuid4()])
-        service = AAPProxyService(settings=get_settings(), session=mock_session, allowed_projects=restricted_projects)
+        mock_user = MagicMock()
+        mock_user.labels = {}
+        mock_user.authz_metadata = {}
+        service = AAPProxyService(
+            settings=get_settings(),
+            session=mock_session,
+            allowed_projects=restricted_projects,
+            evaluator=MagicMock(),
+            user=mock_user,
+        )
 
         cred_connection = AAPConnection(
             base_url="https://ignored.example.com",
@@ -1389,7 +1423,16 @@ class TestDefaultAAPIntegrationResolution:
             management_credential_id=uuid4(),
         )
         mock_session = _mock_session_with_integration(integration)
-        service = AAPProxyService(settings=get_settings(), session=mock_session)
+        mock_evaluator = MagicMock()
+        mock_user = MagicMock()
+        mock_user.labels = {}
+        mock_user.authz_metadata = {}
+        service = AAPProxyService(
+            settings=get_settings(),
+            session=mock_session,
+            evaluator=mock_evaluator,
+            user=mock_user,
+        )
         credential_id = uuid4()
         user_id = uuid4()
         cred_connection = AAPConnection(
@@ -1414,9 +1457,9 @@ class TestDefaultAAPIntegrationResolution:
             session=mock_session,
             credential_id=credential_id,
             user_id=user_id,
-            evaluator=service._evaluator,
-            user_labels=None,
-            user_metadata=None,
+            evaluator=mock_evaluator,
+            user_labels=mock_user.labels,
+            user_metadata=mock_user.authz_metadata,
         )
 
     @pytest.mark.asyncio

@@ -517,13 +517,16 @@ class AAPProxyService:
                 integration_id=str(integration.id),
                 credential_id=str(credential_id),
             )
+            if self._evaluator is None or self._user is None:
+                msg = "Authorization evaluator and user context are required for credential access"
+                raise AAPAuthenticationError(msg)
             cred_connection = await resolve_aap_connection_from_credential(
                 session=self._session,
                 credential_id=credential_id,
                 user_id=user_id,
-                evaluator=self._evaluator,  # type: ignore[arg-type]
-                user_labels=self._user.labels if self._user else None,
-                user_metadata=self._user.authz_metadata if self._user else None,
+                evaluator=self._evaluator,
+                user_labels=self._user.labels,
+                user_metadata=self._user.authz_metadata,
             )
         else:
             logger.info(
