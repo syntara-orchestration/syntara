@@ -1,7 +1,7 @@
 import { Button, Content } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiImportIcon } from '@patternfly/react-icons'
 import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
-import type { Decorator, Meta, StoryObj } from '@storybook/react-vite'
+import type { Decorator, Meta, StoryObj } from '@storybook/tanstack-react'
 
 import { useTableSort } from '../../../hooks/useTableSort'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../../types/filters'

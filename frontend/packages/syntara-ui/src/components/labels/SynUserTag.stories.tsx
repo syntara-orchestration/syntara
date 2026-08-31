@@ -1,5 +1,5 @@
 import { Flex, FlexItem, LabelGroup } from '@patternfly/react-core'
-import type { Meta, StoryObj } from '@storybook/react-vite'
+import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import { fn } from 'storybook/test'
 
 import { SynUserTag } from './SynUserTag'
