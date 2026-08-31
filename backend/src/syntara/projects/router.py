@@ -261,7 +261,7 @@ async def delete_project(
     project_id: UUID,
     service: Annotated[ProjectService, Depends(get_project_service)],
 ) -> None:
-    """Delete a project (soft-delete). Requires: project:delete permission scoped to this project."""
+    """Delete a project (hard-delete). Requires: project:delete permission scoped to this project."""
     await service.delete_project(project_id)
 
 

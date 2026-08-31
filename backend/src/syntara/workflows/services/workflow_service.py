@@ -458,9 +458,7 @@ class WorkflowService(BaseService):
         if not new_credentials:
             return
 
-        proj_result = await self.session.exec(
-            select(Project.name).where(Project.id == project_id, Project.deleted_at.is_(None))  # type: ignore[union-attr]
-        )
+        proj_result = await self.session.exec(select(Project.name).where(Project.id == project_id))
         project_name = proj_result.first() or ""
 
         for cred_id in new_credentials:

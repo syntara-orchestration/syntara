@@ -1,4 +1,4 @@
-import { Button, Content, List, ListItem, Stack, StackItem, Truncate } from '@patternfly/react-core'
+import { Button, Content, Truncate } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiEditFillIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { IAction, ThProps } from '@patternfly/react-table'
@@ -6,7 +6,6 @@ import { useNavigate } from '@tanstack/react-router'
 import { useCallback, useMemo } from 'react'
 
 import { AppRoute } from '../../app/AppRoute'
-import { SynConfirmationDialog } from '../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { IconLabel } from '../../components/IconLabel'
 import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../components/panels/list/SynListPanel'
@@ -24,6 +23,7 @@ import { accessClient } from '../access/accessClient'
 import type { ProjectRead } from '../access/types'
 
 import { ProjectFormModal } from './ProjectFormModal'
+import { ProjectDeleteDialog } from './projects/ProjectDeleteDialog'
 import { useProjectPermissions } from './useProjectPermissions'
 
 const filterFieldDefinitions: FilterFieldDefinition[] = [
@@ -141,50 +141,6 @@ function ProjectsTable({
         ))}
       </Tbody>
     </>
-  )
-}
-
-function DeleteProjectDialog({
-  project,
-  isOpen,
-  onClose,
-  onDelete,
-}: Readonly<{
-  project: ProjectRead | null
-  isOpen: boolean
-  onClose: () => void
-  onDelete: () => void
-}>) {
-  return (
-    <SynConfirmationDialog
-      isOpen={isOpen}
-      onClose={onClose}
-      onConfirm={onDelete}
-      title="Delete project?"
-      confirmLabel="Delete"
-      confirmVariant="danger"
-      titleIconVariant="warning"
-      destructiveAcknowledgement={{
-        checkboxId: 'delete-project-ack',
-        label: 'I understand this project, its workflows, and role assignments will be permanently deleted or removed.',
-      }}
-    >
-      <Stack hasGutter>
-        <StackItem>
-          The project <strong>{project?.name}</strong> will be deleted. This cannot be undone.
-        </StackItem>
-        <StackItem>
-          <List>
-            <ListItem>All workflows in this project will be permanently deleted.</ListItem>
-            <ListItem>All project role assignments will be removed.</ListItem>
-            <ListItem>
-              Uploaded files are kept after the project is deleted. There is no in-product list or delete flow for them
-              yet.
-            </ListItem>
-          </List>
-        </StackItem>
-      </Stack>
-    </SynConfirmationDialog>
   )
 }
 
@@ -329,11 +285,11 @@ export function ProjectsTab() {
         onSuccess={refetch}
       />
 
-      <DeleteProjectDialog
-        project={deleteDialog.item}
+      <ProjectDeleteDialog
+        projectName={deleteDialog.item?.name}
         isOpen={deleteDialog.isOpen}
         onClose={deleteDialog.close}
-        onDelete={handleDelete}
+        onConfirm={handleDelete}
       />
     </>
   )
