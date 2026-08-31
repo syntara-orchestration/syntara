@@ -50,7 +50,7 @@ vi.mock('../access/useAllProjects', () => ({
 // 1. projectSelectorReady is true (queries are enabled)
 // 2. the flat table body is rendered (most tests expect flat rows)
 const mockUseProjectSelector = vi.fn(() => ({
-  selectedProject: { id: 'proj-default', name: 'Default Project' } as { id: string; name: string } | null,
+  selectedProject: { id: 'proj-default', name: 'Default Project' },
   isAllProjects: false,
   projects: [{ id: 'proj-default', name: 'Default Project' }],
   ProjectSelector: null,
@@ -179,7 +179,7 @@ describe('Workflows Component', () => {
       isError: false,
       error: null,
       refetch: vi.fn(),
-    } as never)
+    })
 
     // Then set up workflow query (mockWorkflowQuery will override accessClient.useQuery)
     const defaultQueryReturn = {
@@ -231,7 +231,7 @@ describe('Workflows Component', () => {
     vi.mocked(executionsFetchClient.POST).mockResolvedValue({
       data: { id: 'exec-default' },
       error: undefined,
-    } as never)
+    })
 
     // Mock workflowClient.useMutation for delete workflow
     vi.mocked(workflowClient.useMutation).mockReturnValue({
@@ -410,7 +410,7 @@ describe('Workflows Component', () => {
       vi.mocked(executionsFetchClient.POST).mockResolvedValue({
         data: { id: 'exec-123' },
         error: undefined,
-      } as never)
+      })
 
       const user = userEvent.setup()
       render(<Workflows />, { wrapper })
@@ -450,7 +450,7 @@ describe('Workflows Component', () => {
       vi.mocked(executionsFetchClient.POST).mockResolvedValue({
         data: undefined,
         error: { detail: 'Network error' },
-      } as never)
+      })
 
       const user = userEvent.setup()
       render(<Workflows />, { wrapper })
@@ -490,7 +490,7 @@ describe('Workflows Component', () => {
       vi.mocked(executionsFetchClient.POST).mockResolvedValue({
         data: undefined,
         error: {},
-      } as never)
+      })
 
       const user = userEvent.setup()
       render(<Workflows />, { wrapper })
@@ -633,7 +633,7 @@ describe('Workflows Component', () => {
       vi.mocked(executionsFetchClient.POST).mockResolvedValue({
         data: { id: 'exec-with-inputs' },
         error: undefined,
-      } as never)
+      })
 
       const user = userEvent.setup()
       render(<Workflows />, { wrapper })
@@ -1270,7 +1270,7 @@ describe('Workflows Component', () => {
       vi.mocked(executionsFetchClient.POST).mockResolvedValue({
         data: { id: 'exec-123' },
         error: undefined,
-      } as never)
+      })
 
       const user = userEvent.setup()
       render(<Workflows />, { wrapper })

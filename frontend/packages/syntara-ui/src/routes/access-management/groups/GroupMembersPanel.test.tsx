@@ -109,12 +109,12 @@ describe('GroupMembersPanel', () => {
       error: null,
       isFetching: false,
       refetch: vi.fn().mockResolvedValue({}),
-    } as never)
+    })
 
     vi.mocked(accessClient.useMutation).mockReturnValue({
       mutate: vi.fn(),
       isPending: false,
-    } as never)
+    })
   })
 
   describe('Rendering', () => {
@@ -176,7 +176,7 @@ describe('GroupMembersPanel', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<GroupMembersPanel {...defaultProps} />, { wrapper })
 
@@ -207,7 +207,7 @@ describe('GroupMembersPanel', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<GroupMembersPanel {...defaultProps} />, { wrapper })
 
@@ -224,7 +224,7 @@ describe('GroupMembersPanel', () => {
         isPending: true,
         isError: false,
         error: null,
-      } as never)
+      })
 
       render(<GroupMembersPanel {...defaultProps} />, { wrapper })
 
@@ -239,7 +239,7 @@ describe('GroupMembersPanel', () => {
         isPending: false,
         isError: true,
         error: new Error('Failed'),
-      } as never)
+      })
 
       render(<GroupMembersPanel {...defaultProps} />, { wrapper })
 
@@ -305,7 +305,7 @@ describe('GroupMembersPanel', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         mutate: mockMutate,
         isPending: false,
-      } as never)
+      })
 
       const user = userEvent.setup()
       render(<GroupMembersPanel {...defaultProps} />, { wrapper })
@@ -369,7 +369,7 @@ describe('GroupMembersPanel', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<GroupMembersPanel {...defaultProps} />, { wrapper })
 
@@ -411,7 +411,7 @@ describe('GroupMembersPanel', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       const user = userEvent.setup()
       render(<GroupMembersPanel {...defaultProps} />, { wrapper })
@@ -477,7 +477,7 @@ describe('GroupMembersPanel', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         mutate: mockMutate,
         isPending: false,
-      } as never)
+      })
 
       const user = userEvent.setup()
       render(<GroupMembersPanel {...defaultProps} />, { wrapper })
@@ -507,7 +507,7 @@ describe('GroupMembersPanel', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         mutate: mockMutate,
         isPending: false,
-      } as never)
+      })
 
       const user = userEvent.setup()
       render(<GroupMembersPanel groupId="group-123" onMembershipChange={onMembershipChange} />, { wrapper })
@@ -550,7 +550,7 @@ describe('GroupMembersPanel', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn().mockResolvedValue({}),
-      } as never)
+      })
 
       render(<GroupMembersPanel {...defaultProps} />, { wrapper })
 
@@ -577,7 +577,7 @@ describe('GroupMembersPanel', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn().mockResolvedValue({}),
-      } as never)
+      })
 
       render(<GroupMembersPanel {...defaultProps} />, { wrapper })
 
@@ -630,7 +630,7 @@ describe('GroupMembersPanel', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       const { container } = render(<GroupMembersPanel {...defaultProps} />, { wrapper })
       const results = await axe(container)

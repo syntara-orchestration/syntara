@@ -68,7 +68,7 @@ describe('useEdgeExecutionStatus', () => {
             storedEdges: [],
             setEdges,
           }),
-        { initialProps: { status: 'running' as string | null } }
+        { initialProps: { status: 'running' } }
       )
       rerender({ status: null })
       expect(setEdges).not.toHaveBeenCalled()
@@ -90,7 +90,7 @@ describe('useEdgeExecutionStatus', () => {
             storedEdges: [],
             setEdges,
           }),
-        { initialProps: { status: 'running' as string | null } }
+        { initialProps: { status: 'running' } }
       )
 
       setEdges.mockClear()
@@ -116,7 +116,7 @@ describe('useEdgeExecutionStatus', () => {
             storedEdges: [],
             setEdges,
           }),
-        { initialProps: { status: 'running' as string | null } }
+        { initialProps: { status: 'running' } }
       )
 
       setEdges.mockClear()
@@ -244,7 +244,7 @@ describe('useEdgeExecutionStatus', () => {
             storedEdges: [],
             setEdges,
           }),
-        { initialProps: { status: 'running' as string | null } }
+        { initialProps: { status: 'running' } }
       )
 
       setEdges.mockClear()
@@ -270,7 +270,7 @@ describe('useEdgeExecutionStatus', () => {
             storedEdges: [],
             setEdges,
           }),
-        { initialProps: { status: 'running' as string | null } }
+        { initialProps: { status: 'running' } }
       )
 
       setEdges.mockClear()
@@ -296,7 +296,7 @@ describe('useEdgeExecutionStatus', () => {
             storedEdges: [],
             setEdges,
           }),
-        { initialProps: { status: 'running' as string | null } }
+        { initialProps: { status: 'running' } }
       )
 
       setEdges.mockClear()
@@ -323,7 +323,7 @@ describe('useEdgeExecutionStatus', () => {
             storedEdges: [],
             setEdges,
           }),
-        { initialProps: { status: 'running' as string | null } }
+        { initialProps: { status: 'running' } }
       )
 
       setEdges.mockClear()
@@ -351,7 +351,7 @@ describe('useEdgeExecutionStatus', () => {
             storedEdges: [],
             setEdges,
           }),
-        { initialProps: { status: 'completed' as string | null } }
+        { initialProps: { status: 'completed' } }
       )
 
       setEdges.mockClear()

@@ -200,7 +200,7 @@ function setupDefaultMocks() {
     }
     return { ...defaultQueryReturn } as never
   })
-  vi.mocked(accessClient.useMutation).mockReturnValue(mockMutationReturn as never)
+  vi.mocked(accessClient.useMutation).mockReturnValue(mockMutationReturn)
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -410,7 +410,7 @@ describe('AssignRoleDialog', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         ...mockMutationReturn,
         mutate: mockMutate,
-      } as never)
+      })
 
       const user = userEvent.setup()
       render(<AssignRoleDialog {...defaultProps} />, { wrapper })
@@ -427,7 +427,7 @@ describe('AssignRoleDialog', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         ...mockMutationReturn,
         mutate: mockMutate,
-      } as never)
+      })
 
       const user = userEvent.setup()
       render(<AssignRoleDialog {...defaultProps} />, { wrapper })
@@ -467,7 +467,7 @@ describe('AssignRoleDialog', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         ...mockMutationReturn,
         mutate: mockMutate,
-      } as never)
+      })
 
       const onSuccess = vi.fn()
       const onClose = vi.fn()
@@ -501,7 +501,7 @@ describe('AssignRoleDialog', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         ...mockMutationReturn,
         mutate: mockMutate,
-      } as never)
+      })
 
       const user = userEvent.setup()
       render(<AssignRoleDialog {...defaultProps} />, { wrapper })
@@ -538,7 +538,7 @@ describe('AssignRoleDialog', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         ...mockMutationReturn,
         mutate: mockMutate,
-      } as never)
+      })
 
       const user = userEvent.setup()
       render(<AssignRoleDialog {...defaultProps} />, { wrapper })
@@ -576,7 +576,7 @@ describe('AssignRoleDialog', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         ...mockMutationReturn,
         mutate: mockMutate,
-      } as never)
+      })
 
       const user = userEvent.setup()
       render(<AssignRoleDialog {...defaultProps} />, { wrapper })
@@ -680,7 +680,7 @@ describe('AssignRoleDialog', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         ...mockMutationReturn,
         mutate: mockMutate,
-      } as never)
+      })
 
       const user = userEvent.setup()
       render(<AssignRoleDialog {...defaultProps} />, { wrapper })
@@ -774,7 +774,7 @@ describe('AssignRoleDialog', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         ...mockMutationReturn,
         mutate: mockMutate,
-      } as never)
+      })
 
       const user = userEvent.setup()
       render(<AssignRoleDialog {...defaultProps} />, { wrapper })

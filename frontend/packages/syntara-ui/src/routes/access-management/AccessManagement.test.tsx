@@ -58,11 +58,11 @@ describe('AccessManagement', () => {
       error: null,
       isFetching: false,
       refetch: vi.fn(),
-    } as never)
+    })
     vi.mocked(usersClient.useMutation).mockReturnValue({
       mutate: vi.fn(),
       isPending: false,
-    } as never)
+    })
     vi.mocked(accessClient.useQuery).mockReturnValue({
       data: { resources: [] },
       isPending: false,
@@ -70,15 +70,15 @@ describe('AccessManagement', () => {
       error: null,
       isFetching: false,
       refetch: vi.fn(),
-    } as never)
+    })
     vi.mocked(accessClient.useMutation).mockReturnValue({
       mutate: vi.fn(),
       isPending: false,
-    } as never)
+    })
     vi.mocked(adminClient.useMutation).mockReturnValue({
       mutate: vi.fn(),
       isPending: false,
-    } as never)
+    })
     vi.mocked(accessFetchClient.POST).mockImplementation((path: string) => {
       if (path === '/authz/what_can_i') {
         return Promise.resolve({ data: { resources: [], next: null } } as never)

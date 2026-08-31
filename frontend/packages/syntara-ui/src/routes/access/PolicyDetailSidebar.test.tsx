@@ -257,7 +257,7 @@ describe('PolicyDetailSidebar', () => {
   it('renders scope as "Any" when policy.scope is undefined', () => {
     const policyWithUndefinedScope: PolicyRead = {
       ...customPolicy,
-      scope: undefined as unknown as string,
+      scope: undefined,
       project_id: null,
     }
     render(<PolicyDetailSidebar policy={policyWithUndefinedScope} onClose={onClose} />)

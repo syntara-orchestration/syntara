@@ -94,7 +94,7 @@ describe('GroupsTab Component', () => {
       error: null,
       isFetching: false,
       refetch: vi.fn(),
-    } as never)
+    })
 
     vi.mocked(usersClient.useMutation).mockReturnValue({
       mutate: vi.fn(),
@@ -113,7 +113,7 @@ describe('GroupsTab Component', () => {
       variables: undefined,
       status: 'idle',
       isPaused: false,
-    } as never)
+    })
   })
 
   describe('Rendering', () => {
@@ -168,7 +168,7 @@ describe('GroupsTab Component', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<GroupsTab />, { wrapper })
 
@@ -329,7 +329,7 @@ describe('GroupsTab Component', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<GroupsTab />, { wrapper })
 
@@ -352,7 +352,7 @@ describe('GroupsTab Component', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<GroupsTab />, { wrapper })
 
@@ -375,7 +375,7 @@ describe('GroupsTab Component', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<GroupsTab />, { wrapper })
 
@@ -396,7 +396,7 @@ describe('GroupsTab Component', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<GroupsTab />, { wrapper })
 
@@ -420,7 +420,7 @@ describe('GroupsTab Component', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<GroupsTab />, { wrapper })
 
@@ -500,7 +500,7 @@ describe('GroupsTab Component', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<GroupsTab />, { wrapper })
 
@@ -567,12 +567,12 @@ describe('GroupsTab Component', () => {
         error: null,
         isFetching: false,
         refetch: mockRefetch,
-      } as never)
+      })
 
       vi.mocked(usersClient.useMutation).mockReturnValue({
         mutate: mockDeleteMutate,
         isPending: false,
-      } as never)
+      })
 
       render(<GroupsTab />, { wrapper })
 
@@ -607,12 +607,12 @@ describe('GroupsTab Component', () => {
         error: null,
         isFetching: false,
         refetch: mockRefetch,
-      } as never)
+      })
 
       vi.mocked(usersClient.useMutation).mockReturnValue({
         mutate: mockDeleteMutate,
         isPending: false,
-      } as never)
+      })
 
       render(<GroupsTab />, { wrapper })
 
@@ -650,7 +650,7 @@ describe('GroupsTab Component', () => {
       vi.mocked(usersClient.useMutation).mockReturnValue({
         mutate: mockDeleteMutate,
         isPending: false,
-      } as never)
+      })
 
       render(<GroupsTab />, { wrapper })
 
@@ -714,7 +714,7 @@ describe('GroupsTab Component', () => {
       vi.mocked(usersClient.useMutation).mockReturnValue({
         mutate: mockDeleteMutate,
         isPending: false,
-      } as never)
+      })
 
       render(<GroupsTab />, { wrapper })
 
@@ -746,7 +746,7 @@ describe('GroupsTab Component', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<GroupsTab />, { wrapper })
 
@@ -772,7 +772,7 @@ describe('GroupsTab Component', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<GroupsTab />, { wrapper })
 

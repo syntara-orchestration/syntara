@@ -177,7 +177,7 @@ describe('Integrations Component', () => {
       isError: false,
       error: null,
       refetch: vi.fn(),
-    } as never)
+    })
 
     vi.mocked(integrationsClient.useMutation).mockReturnValue({
       mutate: vi.fn(),
@@ -196,7 +196,7 @@ describe('Integrations Component', () => {
       variables: undefined,
       status: 'idle',
       isPaused: false,
-    } as never)
+    })
   })
 
   describe('Rendering', () => {
@@ -298,7 +298,7 @@ describe('Integrations Component', () => {
         isError: false,
         error: null,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<Integrations />, { wrapper })
 
@@ -317,7 +317,7 @@ describe('Integrations Component', () => {
         isError: false,
         error: null,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<Integrations />, { wrapper })
 
@@ -976,7 +976,7 @@ describe('Integrations Component', () => {
         isError: false,
         error: null,
         refetch: mockRefetch,
-      } as never)
+      })
 
       vi.mocked(integrationsClient.useMutation).mockImplementation((_method: string, path: string) => {
         if (path.includes('validate')) {
@@ -1014,7 +1014,7 @@ describe('Integrations Component', () => {
         isError: false,
         error: null,
         refetch: mockRefetch,
-      } as never)
+      })
 
       vi.mocked(integrationsClient.useMutation).mockImplementation((_method: string, path: string) => {
         if (path.includes('validate')) {
@@ -1070,14 +1070,14 @@ describe('Integrations Component', () => {
           isError: false,
           error: null,
           refetch: mockRefetch,
-        } as never)
+        })
         .mockReturnValue({
           data: { resources: updatedIntegrations },
           isPending: false,
           isError: false,
           error: null,
           refetch: mockRefetch,
-        } as never)
+        })
 
       vi.mocked(integrationsClient.useMutation).mockImplementation((_method: string, path: string) => {
         if (path.includes('validate')) {
@@ -1130,7 +1130,7 @@ describe('Integrations Component', () => {
         isError: false,
         error: null,
         refetch: mockRefetch,
-      } as never)
+      })
 
       vi.mocked(integrationsClient.useMutation).mockImplementation((_method: string, path: string) => {
         if (path.includes('validate')) {
@@ -1250,7 +1250,7 @@ describe('Integrations Component', () => {
         isError: false,
         error: null,
         refetch: mockRefetch,
-      } as never)
+      })
 
       vi.mocked(integrationsClient.useMutation).mockImplementation((method: string) => {
         if (method === 'delete') {
@@ -1291,7 +1291,7 @@ describe('Integrations Component', () => {
         isError: false,
         error: null,
         refetch: mockRefetch,
-      } as never)
+      })
 
       vi.mocked(integrationsClient.useMutation).mockImplementation((method: string) => {
         if (method === 'delete') {
@@ -1452,7 +1452,7 @@ describe('Integrations Component', () => {
         isError: false,
         error: null,
         refetch: vi.fn(),
-      } as never)
+      })
 
       const user = userEvent.setup()
       render(<Integrations />, { wrapper })
@@ -1525,7 +1525,7 @@ describe('Integrations Component', () => {
         isError: false,
         error: null,
         refetch: vi.fn(),
-      } as never)
+      })
 
       // Make patch call onError
       mockPatchMutate.mockImplementation((_variables: unknown, options?: { onError?: (error: unknown) => void }) => {
@@ -1557,7 +1557,7 @@ describe('Integrations Component', () => {
         isError: false,
         error: null,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<Integrations />, { wrapper })
 
@@ -1630,7 +1630,7 @@ describe('Integrations Component', () => {
         isError: false,
         error: null,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<Integrations />, { wrapper })
 

@@ -72,7 +72,7 @@ describe('EditRoleDialog', () => {
       isFetching: false,
       isLoading: false,
       refetch: vi.fn(),
-    } as never)
+    })
 
     vi.mocked(accessClient.useMutation).mockReturnValue({
       mutate: mockMutate,
@@ -91,7 +91,7 @@ describe('EditRoleDialog', () => {
       variables: undefined,
       status: 'idle',
       isPaused: false,
-    } as never)
+    })
   })
 
   function renderDialog(role: RoleRead = mockRole) {

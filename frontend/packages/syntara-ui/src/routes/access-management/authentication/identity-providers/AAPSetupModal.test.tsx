@@ -57,7 +57,7 @@ describe('AAPSetupModal', () => {
       variables: undefined,
       status: 'idle',
       isPaused: false,
-    } as never)
+    })
   })
 
   function renderModal(isOpen = true) {
@@ -257,7 +257,7 @@ describe('AAPSetupModal', () => {
         variables: undefined,
         status: 'pending',
         isPaused: false,
-      } as never)
+      })
 
       renderModal()
 

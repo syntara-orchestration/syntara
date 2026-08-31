@@ -171,7 +171,7 @@ export class ExecutionStateEnricher {
 
     // If not in execution view, return as-is
     if (!executionStatus) {
-      return activity as ActivityWithMetadata
+      return activity
     }
 
     // Step 1: Add direct backend state if available.
@@ -182,7 +182,7 @@ export class ExecutionStateEnricher {
 
     // Nodes added after copy-to-editor were never part of the run — no status indicators
     if (!activityState && skipInferenceActivityIds && !skipInferenceActivityIds.has(activity.id)) {
-      return activity as ActivityWithMetadata
+      return activity
     }
 
     // Add execution badge flag to metadata

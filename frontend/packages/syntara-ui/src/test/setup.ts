@@ -177,7 +177,7 @@ if (typeof globalThis !== 'undefined' && !globalThis.ResizeObserver) {
     disconnect() {
       // No-op in test environment
     }
-  } as typeof ResizeObserver
+  }
 }
 
 // Polyfill the `[hidden] { display: none }` UA-stylesheet rule (missing in happy-dom,

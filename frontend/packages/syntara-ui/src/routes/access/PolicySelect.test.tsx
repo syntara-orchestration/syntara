@@ -91,8 +91,8 @@ describe('PolicySelect', () => {
       isFetching: false,
       isLoading: false,
       refetch: vi.fn(),
-    } as never)
-    vi.mocked(fetchAllPoliciesForSelect).mockResolvedValue(mockPolicies as never)
+    })
+    vi.mocked(fetchAllPoliciesForSelect).mockResolvedValue(mockPolicies)
   })
 
   describe('Accessibility', () => {
@@ -207,7 +207,7 @@ describe('PolicySelect', () => {
         isFetching: true,
         isLoading: true,
         refetch: vi.fn(),
-      } as never)
+      })
 
       const user = userEvent.setup()
       renderPolicySelect()
@@ -228,7 +228,7 @@ describe('PolicySelect', () => {
         isFetching: false,
         isLoading: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       const user = userEvent.setup()
       renderPolicySelect()
@@ -343,7 +343,7 @@ describe('PolicySelect', () => {
         isFetching: false,
         isLoading: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       const user = userEvent.setup()
       renderPolicySelect()
@@ -367,7 +367,7 @@ describe('PolicySelect', () => {
         isFetching: false,
         isLoading: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       const user = userEvent.setup()
       renderPolicySelect()
@@ -420,7 +420,7 @@ describe('PolicySelect', () => {
         isFetching: false,
         isLoading: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       const user = userEvent.setup()
       renderPolicySelect({ selected: ['orphan-policy'] })

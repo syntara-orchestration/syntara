@@ -1,7 +1,6 @@
 import { Breadcrumb, BreadcrumbItem } from '@patternfly/react-core'
 import type { BreadcrumbItemRenderArgs } from '@patternfly/react-core'
 import { Link } from '@tanstack/react-router'
-import type { ComponentProps } from 'react'
 import { useSyncExternalStore } from 'react'
 
 import type { AppBreadcrumbItem } from '../../app/breadcrumbs/appBreadcrumbItem'
@@ -10,12 +9,10 @@ import { SynPageBreadcrumbsCollapsedMiddle } from './SynPageBreadcrumbsCollapsed
 
 export type { AppBreadcrumbItem }
 
-type TanStackTo = ComponentProps<typeof Link>['to']
-
 function renderBreadcrumbLink(href: string, label: string) {
   return ({ className, ariaCurrent }: BreadcrumbItemRenderArgs) => (
     // TanStack Router expects literal route strings; breadcrumb hrefs are dynamic
-    <Link to={href as TanStackTo} className={className} aria-current={ariaCurrent}>
+    <Link to={href} className={className} aria-current={ariaCurrent}>
       {label}
     </Link>
   )

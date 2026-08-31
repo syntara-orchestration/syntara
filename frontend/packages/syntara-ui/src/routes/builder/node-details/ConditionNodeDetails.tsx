@@ -38,7 +38,7 @@ export function ConditionNodeDetails({
         parameters: {
           condition: data.condition ?? '',
         },
-      } as ConditionActivity
+      }
 
       updateActivity(nodeId, updatedActivity)
       onClose()

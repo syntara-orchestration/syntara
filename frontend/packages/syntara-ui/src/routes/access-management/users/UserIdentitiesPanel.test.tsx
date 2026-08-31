@@ -126,19 +126,19 @@ function setupMocks(identities: unknown[] = [], queryOverrides: Record<string, u
     error: null,
     refetch: vi.fn(),
     ...queryOverrides,
-  } as never)
+  })
 
   vi.mocked(usersClient.useMutation).mockReturnValue({
     mutate: mockMutate,
     isPending: false,
-  } as never)
+  })
 
   vi.mocked(identityProvidersClient.useQuery).mockReturnValue({
     data: { resources: mockFullProviders, next: null, prev: null },
     isPending: false,
     isError: false,
     error: null,
-  } as never)
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -158,7 +158,7 @@ describe('UserIdentitiesPanel', () => {
       isPending: false,
       isError: false,
       error: null,
-    } as never)
+    })
   })
 
   // ---- Empty state --------------------------------------------------------
@@ -319,12 +319,12 @@ describe('UserIdentitiesPanel', () => {
         isError: false,
         error: null,
         refetch: mockRefetch,
-      } as never)
+      })
 
       vi.mocked(usersClient.useMutation).mockReturnValue({
         mutate: mockMutate,
         isPending: false,
-      } as never)
+      })
 
       render(<UserIdentitiesPanel userId="user-1" hasPassword={false} />, { wrapper })
 
@@ -685,7 +685,7 @@ describe('UserIdentitiesPanel', () => {
         isPending: false,
         isError: false,
         error: null,
-      } as never)
+      })
 
       render(<UserIdentitiesPanel userId="user-1" currentUserId="user-1" hasPassword={false} />, { wrapper })
 
@@ -775,7 +775,7 @@ describe('UserIdentitiesPanel', () => {
         isPending: false,
         isError: true,
         error: new Error('Network error'),
-      } as never)
+      })
 
       render(<UserIdentitiesPanel userId="user-1" hasPassword={false} />, { wrapper })
 
@@ -1007,7 +1007,7 @@ describe('useDetachIdentity', () => {
     vi.mocked(usersClient.useMutation).mockReturnValue({
       mutate: mockMutate,
       isPending: false,
-    } as never)
+    })
   })
 
   const hookWrapper = ({ children }: { children: ReactNode }) => {

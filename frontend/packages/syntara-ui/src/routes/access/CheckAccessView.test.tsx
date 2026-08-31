@@ -75,7 +75,7 @@ function mockMutationState(overrides: Record<string, unknown>) {
     variables: undefined,
     isPaused: false,
     ...overrides,
-  } as never)
+  })
 }
 
 /** Helper to fill the form with resource type "project" and action "read" */
@@ -135,7 +135,7 @@ describe('CheckAccessView', () => {
       submittedAt: 0,
       variables: undefined,
       isPaused: false,
-    } as never)
+    })
   })
 
   it('renders the empty state initially', () => {

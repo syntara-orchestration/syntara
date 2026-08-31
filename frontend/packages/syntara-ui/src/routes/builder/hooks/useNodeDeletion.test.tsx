@@ -709,7 +709,7 @@ describe('useNodeDeletion', () => {
         ...(Array.from({ length: nodeCount }, (_, i) => ({
           id: `node-${i}`,
           type: 'task' as const,
-          data: { label: `Task ${i}` } as unknown,
+          data: { label: `Task ${i}` },
           position: { x: 0, y: i * 100 },
         })) as NodeType[]),
       ]

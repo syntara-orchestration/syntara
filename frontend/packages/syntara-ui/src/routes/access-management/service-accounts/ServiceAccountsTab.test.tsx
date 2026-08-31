@@ -129,7 +129,7 @@ describe('ServiceAccountsTab', () => {
     })
 
     vi.mocked(accessClient.useQuery).mockReturnValue(
-      buildQueryResult({ resources: mockServiceAccounts, next_cursor: null }) as never
+      buildQueryResult({ resources: mockServiceAccounts, next_cursor: null })
     )
 
     vi.mocked(accessClient.useMutation).mockReturnValue(buildMutationResult() as never)

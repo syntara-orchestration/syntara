@@ -10,7 +10,7 @@ const baseTask: TaskActivity = {
   name: 'Task',
   type: ExecutorTypeEnum.SCRIPT,
   parameters: { language: 'python', code: 'print(1)' },
-} as TaskActivity
+}
 
 describe('taskNodeSubmitHelpers', () => {
   describe('safeJSONReviver', () => {

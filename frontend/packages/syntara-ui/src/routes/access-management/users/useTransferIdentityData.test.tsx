@@ -112,7 +112,7 @@ describe('useIdentitiesData', () => {
       isError: false,
       error: null,
       refetch: vi.fn(),
-    } as never)
+    })
 
     const { result } = renderHook(() => useIdentitiesData(undefined), { wrapper })
 
@@ -126,7 +126,7 @@ describe('useIdentitiesData', () => {
       isError: false,
       error: null,
       refetch: vi.fn(),
-    } as never)
+    })
 
     const { result } = renderHook(() => useIdentitiesData('user-2'), { wrapper })
 
@@ -142,7 +142,7 @@ describe('useIdentitiesData', () => {
       isError: false,
       error: null,
       refetch: vi.fn(),
-    } as never)
+    })
 
     const { result } = renderHook(() => useIdentitiesData('user-2'), { wrapper })
 

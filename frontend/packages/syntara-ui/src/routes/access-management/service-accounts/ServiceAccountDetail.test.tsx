@@ -304,7 +304,7 @@ describe('ServiceAccountDetail', () => {
 
   it('renders owning project as a link when project_name is present', () => {
     vi.mocked(accessClient.useQuery).mockReturnValue(
-      buildQueryResult({ ...mockServiceAccount, project_name: 'my-project' }) as never
+      buildQueryResult({ ...mockServiceAccount, project_name: 'my-project' })
     )
 
     render(<ServiceAccountDetail />, { wrapper })

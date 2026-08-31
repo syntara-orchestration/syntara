@@ -70,11 +70,11 @@ function setupMocks() {
     isError: false,
     error: null,
     refetch: vi.fn(),
-  } as never)
+  })
   vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
     mutate: vi.fn(),
     isPending: false,
-  } as never)
+  })
 }
 
 describe('EditIdentityProvider', () => {
@@ -111,11 +111,11 @@ describe('EditIdentityProvider', () => {
       isError: true,
       error: notFoundError,
       refetch: vi.fn(),
-    } as never)
+    })
     vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
       mutate: vi.fn(),
       isPending: false,
-    } as never)
+    })
 
     render(<EditIdentityProvider />, { wrapper })
 

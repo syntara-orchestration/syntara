@@ -71,7 +71,7 @@ describe('EditServiceAccountModal', () => {
       variables: undefined,
       status: 'idle',
       isPaused: false,
-    } as never)
+    })
   })
 
   it('renders with "Edit service account" title', () => {

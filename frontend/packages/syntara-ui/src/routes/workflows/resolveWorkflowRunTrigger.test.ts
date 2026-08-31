@@ -113,7 +113,7 @@ describe('resolveWorkflowRunTrigger', () => {
           },
         })
       )
-    }) as never)
+    }))
 
     await expect(resolveWorkflowRunTrigger(mockWorkflow({ published_version_number: 1 }))).resolves.toEqual({
       triggerNodeId: 'published-trigger',
@@ -180,7 +180,7 @@ describe('resolveWorkflowRunTrigger', () => {
           },
         })
       )
-    }) as never)
+    }))
 
     await expect(resolveWorkflowRunTrigger(mockWorkflow({ published_version_number: 1 }))).resolves.toEqual({
       triggerNodeId: 'draft-trigger',

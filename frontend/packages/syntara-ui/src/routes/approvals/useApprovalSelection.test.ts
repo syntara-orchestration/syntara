@@ -358,7 +358,7 @@ describe('useApprovalSelection', () => {
           selectableApprovalIds: mockSelectableApprovalIds,
         }),
       {
-        initialProps: { sortParam: '-created_at' as string | undefined },
+        initialProps: { sortParam: '-created_at' },
       }
     )
 

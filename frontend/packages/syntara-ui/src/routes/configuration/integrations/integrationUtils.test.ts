@@ -76,7 +76,7 @@ describe('integrationUtils', () => {
     })
 
     it('returns empty string when configuration is undefined', () => {
-      expect(getProviderHint(buildIntegration({ configuration: undefined } as never))).toBe('')
+      expect(getProviderHint(buildIntegration({ configuration: undefined }))).toBe('')
     })
   })
 
@@ -98,7 +98,7 @@ describe('integrationUtils', () => {
     })
 
     it('returns empty string when configuration is undefined', () => {
-      expect(getBaseUrl(buildIntegration({ configuration: undefined } as never))).toBe('')
+      expect(getBaseUrl(buildIntegration({ configuration: undefined }))).toBe('')
     })
 
     it('resolves default URL for well-known provider when base_url is null', () => {
