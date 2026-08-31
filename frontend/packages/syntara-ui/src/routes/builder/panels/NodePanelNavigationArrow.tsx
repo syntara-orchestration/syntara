@@ -3,6 +3,7 @@ import type { MenuToggleElement } from '@patternfly/react-core'
 import { RhUiCaretLeftIcon, RhUiCaretRightIcon } from '@patternfly/react-icons'
 import { useCallback, useMemo, useState, type Ref } from 'react'
 
+import { IconLabel } from '../../../components/IconLabel'
 import { renderNodeIcon } from '../../workflows/canvas/nodes/renderNodeIcon'
 
 import type { UpstreamNodeInfo } from './hooks/useUpstreamNodes'
@@ -42,12 +43,7 @@ function NavTargetLabel({ node }: Readonly<{ node: UpstreamNodeInfo }>) {
   const name = getUpstreamNodeDisplayName(node)
   const icon = renderNodeIcon(node.icon, node.iconId, 'legend')
 
-  return (
-    <span className={styles.navTargetLabel}>
-      {icon ? <span aria-hidden="true">{icon}</span> : null}
-      {name}
-    </span>
-  )
+  return <IconLabel icon={icon ? <span aria-hidden="true">{icon}</span> : undefined}>{name}</IconLabel>
 }
 
 type SingleTargetArrowProps = {
