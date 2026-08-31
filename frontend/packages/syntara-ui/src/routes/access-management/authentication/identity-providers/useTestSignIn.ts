@@ -22,8 +22,10 @@ export function useTestSignIn({ providerId, onResult, onError }: UseTestSignInOp
   const nonceRef = useRef<string | null>(null)
   const popupRef = useRef<Window | null>(null)
   const onResultRef = useRef(onResult)
+  // eslint-disable-next-line react-hooks/refs -- keep callback refs current for the poll effect without re-subscribing
   onResultRef.current = onResult
   const onErrorRef = useRef(onError)
+  // eslint-disable-next-line react-hooks/refs -- keep callback refs current for the poll effect without re-subscribing
   onErrorRef.current = onError
 
   useEffect(() => {

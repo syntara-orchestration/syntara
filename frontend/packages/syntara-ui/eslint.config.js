@@ -232,10 +232,10 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
       'react-hooks/exhaustive-deps': 'error',
-      // React Compiler–aligned rules from eslint-plugin-react-hooks ≥7.1. Defer enabling
-      // until call sites that intentionally update refs / sync state in effects are migrated.
-      'react-hooks/refs': 'off',
-      'react-hooks/set-state-in-effect': 'off',
+      // React Compiler–aligned rules from eslint-plugin-react-hooks ≥7.1.
+      // Existing call sites are eslint-disable'd; new instances fail lint.
+      'react-hooks/refs': 'error',
+      'react-hooks/set-state-in-effect': 'error',
       // Strict accessibility linting for JSX (labels, roles, alt text, etc.)
       ...jsxA11y.configs.strict.rules,
       // Allow tabIndex={0} on role="region" elements (e.g. SynScrollableTableContainer scroll region).
