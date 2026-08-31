@@ -28,8 +28,8 @@ vi.mock('../../providers/alerts', () => ({
   }),
 }))
 
-vi.mock('../../components/details/NxCodeBlock', () => ({
-  NxCodeBlock: ({ jsonObject }: { jsonObject: unknown }) => (
+vi.mock('../../components/details/SynCodeBlock', () => ({
+  SynCodeBlock: ({ jsonObject }: { jsonObject: unknown }) => (
     <pre data-testid="code-block">{JSON.stringify(jsonObject, null, 2)}</pre>
   ),
 }))

@@ -3,7 +3,7 @@ import { useState, type ReactNode } from 'react'
 
 import { useBlurOnOpen } from '../../hooks/useBlurOnOpen'
 
-type NxConfirmationDialogProps = {
+type SynConfirmationDialogProps = {
   /** Whether the dialog is open */
   isOpen: boolean
   /** Called when the dialog is closed
@@ -37,6 +37,9 @@ type NxConfirmationDialogProps = {
   }
   /** When true, confirm shows a spinner and both footer actions are disabled */
   confirmLoading?: boolean
+  /** When true, confirm stays disabled regardless of the acknowledgement checkbox
+   *  (e.g. the action is blocked server-side and there is nothing to confirm). */
+  confirmDisabled?: boolean
   /** Optional aria-labelledby id */
   'aria-labelledby'?: string
   /** Optional aria-describedby id */
@@ -51,7 +54,7 @@ type NxConfirmationDialogProps = {
  *
  * @example
  * ```tsx
- * <NxConfirmationDialog
+ * <SynConfirmationDialog
  *   isOpen={deleteDialogOpen}
  *   onClose={closeDialog}
  *   onConfirm={handleDelete}
@@ -67,10 +70,10 @@ type NxConfirmationDialogProps = {
  *   <Content component="p">
  *     The user <strong>{user.name}</strong> will be deleted. This cannot be undone.
  *   </Content>
- * </NxConfirmationDialog>
+ * </SynConfirmationDialog>
  * ```
  */
-export function NxConfirmationDialog({
+export function SynConfirmationDialog({
   isOpen,
   onClose,
   onConfirm,
@@ -83,9 +86,10 @@ export function NxConfirmationDialog({
   titleIconVariant,
   destructiveAcknowledgement,
   confirmLoading = false,
+  confirmDisabled = false,
   'aria-labelledby': ariaLabelledby,
   'aria-describedby': ariaDescribedby,
-}: Readonly<NxConfirmationDialogProps>) {
+}: Readonly<SynConfirmationDialogProps>) {
   useBlurOnOpen(isOpen)
   const [destructiveAcknowledged, setDestructiveAcknowledged] = useState(false)
 
@@ -94,7 +98,7 @@ export function NxConfirmationDialog({
     setDestructiveAcknowledged(false)
   }
 
-  const confirmDisabled = Boolean(destructiveAcknowledgement) && !destructiveAcknowledged
+  const isConfirmDisabled = confirmDisabled || (Boolean(destructiveAcknowledgement) && !destructiveAcknowledged)
 
   const body = destructiveAcknowledgement ? (
     <Stack hasGutter>
@@ -128,7 +132,7 @@ export function NxConfirmationDialog({
         <Button
           variant={confirmVariant}
           onClick={onConfirm}
-          isDisabled={confirmDisabled || confirmLoading}
+          isDisabled={isConfirmDisabled || confirmLoading}
           isLoading={confirmLoading}
         >
           {confirmLabel}

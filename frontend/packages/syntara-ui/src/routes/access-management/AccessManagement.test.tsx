@@ -142,7 +142,7 @@ describe('AccessManagement', () => {
   it('defaults to Users tab', async () => {
     await renderAndSettle(<AccessManagement />)
 
-    expect(screen.getByText('No users')).toBeInTheDocument()
+    expect(screen.getByText('No users yet')).toBeInTheDocument()
   })
 
   it('replaces bare /system-administration/access-management with the Users tab URL', async () => {
@@ -172,7 +172,7 @@ describe('AccessManagement', () => {
     routerTestState.pathname = '/access-management/unknown-path'
     await renderAndSettle(<AccessManagement />)
 
-    expect(screen.getByText('No users')).toBeInTheDocument()
+    expect(screen.getByText('No users yet')).toBeInTheDocument()
   })
 
   it('navigates to Groups tab when clicked', async () => {
@@ -181,7 +181,7 @@ describe('AccessManagement', () => {
 
     await user.click(screen.getByRole('tab', { name: 'Groups' }))
 
-    // NxListPanelTabs uses useNavigate (via useUrlTab) for tab navigation
+    // SynListPanelTabs uses useNavigate (via useUrlTab) for tab navigation
     expect(routerTestState.navigate).toHaveBeenCalledWith({ to: AppRoute.AccessManagement.Groups })
   })
 
@@ -338,7 +338,7 @@ describe('AccessManagement', () => {
     await renderAndSettle(<AccessManagement />)
 
     await waitFor(() => {
-      // NxUrlTabs redirects via navigate({ to, replace: true }) when the active tab is hidden
+      // SynUrlTabs redirects via navigate({ to, replace: true }) when the active tab is hidden
       expect(routerTestState.navigate).toHaveBeenCalledWith({ to: AppRoute.AccessManagement.Users, replace: true })
     })
   })

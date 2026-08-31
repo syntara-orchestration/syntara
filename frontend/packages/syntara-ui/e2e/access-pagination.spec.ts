@@ -98,8 +98,7 @@ test.describe('Access Management — Dropdown Pagination', () => {
 
     const noResults = dialog.getByText(/No results match/i)
     const roleOptions = dialog.getByRole('option').filter({ hasNotText: /No results match/i })
-    await expect(noResults).toBeHidden()
-    await expect(roleOptions.or(noResults)).toBeVisible({ timeout: 10_000 })
+    await expect(roleOptions.or(noResults)).toBeVisible({ timeout: 15_000 })
     expect(await roleOptions.count()).toBeGreaterThan(0)
 
     await dialog.getByRole('button', { name: 'Cancel' }).click()

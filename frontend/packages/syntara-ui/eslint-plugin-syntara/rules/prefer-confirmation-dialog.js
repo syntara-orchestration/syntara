@@ -4,18 +4,18 @@ export default {
     type: 'suggestion',
     docs: {
       description:
-        'Flag raw Modal + ModalHeader + ModalBody + ModalFooter compositions that look like destructive confirmation dialogs. Use <NxConfirmationDialog> instead.',
+        'Flag raw Modal + ModalHeader + ModalBody + ModalFooter compositions that look like destructive confirmation dialogs. Use <SynConfirmationDialog> instead.',
     },
     messages: {
       preferConfirmationDialog:
-        'This Modal appears to be a destructive confirmation dialog. Use the <NxConfirmationDialog> component instead for consistent UX. See src/components/dialogs/NxConfirmationDialog.tsx.',
+        'This Modal appears to be a destructive confirmation dialog. Use the <SynConfirmationDialog> component instead for consistent UX. See src/components/dialogs/SynConfirmationDialog.tsx.',
     },
     schema: [],
   },
   create(context) {
     /** Local name(s) for the PF Modal import */
     const modalImportNames = new Set()
-    let hasNxConfirmationDialogImport = false
+    let hasSynConfirmationDialogImport = false
 
     const DESTRUCTIVE_KEYWORDS = /\b(delete|remove|cancel|stop|revoke|unassign|detach|disconnect)\b/i
 
@@ -90,18 +90,18 @@ export default {
           }
         }
 
-        // Track NxConfirmationDialog imports from any source
+        // Track SynConfirmationDialog imports from any source
         for (const specifier of node.specifiers) {
           const importedName = specifier.type === 'ImportSpecifier' ? specifier.imported.name : specifier.local.name
-          if (importedName === 'NxConfirmationDialog') {
-            hasNxConfirmationDialogImport = true
+          if (importedName === 'SynConfirmationDialog') {
+            hasSynConfirmationDialogImport = true
           }
         }
       },
 
       JSXElement(node) {
-        // Skip the entire file if NxConfirmationDialog is already imported
-        if (hasNxConfirmationDialogImport) return
+        // Skip the entire file if SynConfirmationDialog is already imported
+        if (hasSynConfirmationDialogImport) return
 
         const elementName = getElementName(node.openingElement)
         if (!elementName || !modalImportNames.has(elementName)) return

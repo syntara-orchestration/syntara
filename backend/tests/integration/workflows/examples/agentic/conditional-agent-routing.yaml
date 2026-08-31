@@ -26,7 +26,7 @@ nodes:
       model: claude-3-5-sonnet-20241022
       prompt: |
         Classify the following request and determine the appropriate domain:
-        ${inputs.user_request}
+        ${trigger.user_request}
 
         Domains:
         - technical: Technical questions, coding, architecture
@@ -35,7 +35,7 @@ nodes:
 
         Respond with ONLY one word: technical, business, or creative
     inputs:
-      user_request: ${inputs.user_request}
+      user_request: ${trigger.user_request}
     outputs:
       domain: $.result.content
 
@@ -51,9 +51,9 @@ nodes:
       agent: production://technical-specialist
       model: claude-3-5-sonnet-20241022
       prompt: |
-        Provide technical assistance for: ${inputs.user_request}
+        Provide technical assistance for: ${trigger.user_request}
     inputs:
-      user_request: ${inputs.user_request}
+      user_request: ${trigger.user_request}
     outputs:
       response: $.result.content
 
@@ -69,9 +69,9 @@ nodes:
       agent: production://business-specialist
       model: claude-3-5-sonnet-20241022
       prompt: |
-        Provide business guidance for: ${inputs.user_request}
+        Provide business guidance for: ${trigger.user_request}
     inputs:
-      user_request: ${inputs.user_request}
+      user_request: ${trigger.user_request}
     outputs:
       response: $.result.content
 
@@ -82,9 +82,9 @@ nodes:
       agent: production://creative-specialist
       model: claude-3-5-sonnet-20241022
       prompt: |
-        Provide creative assistance for: ${inputs.user_request}
+        Provide creative assistance for: ${trigger.user_request}
     inputs:
-      user_request: ${inputs.user_request}
+      user_request: ${trigger.user_request}
     outputs:
       response: $.result.content
 edges:

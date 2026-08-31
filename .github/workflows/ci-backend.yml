@@ -48,8 +48,9 @@ jobs:
             exit 0
           fi
 
-          # Detect overall backend changes (for jobs that need any backend change)
-          if grep -qE '^(backend/|\.github/)' <<< "$FILES"; then
+          # Detect overall backend changes (for jobs that need any backend change).
+          # Do not treat all of .github/ as backend (CODEOWNERS, PR template, etc.).
+          if grep -qE '^(backend/|\.github/workflows/ci-backend\.yml|\.github/actions/)' <<< "$FILES"; then
             echo "backend=true" >> "$GITHUB_OUTPUT"
           else
             echo "backend=false" >> "$GITHUB_OUTPUT"

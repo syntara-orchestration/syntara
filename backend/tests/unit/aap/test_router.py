@@ -8,6 +8,8 @@ import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
+from syntara.aap.audit.aap_resource_access import AAPResourceAccessEvent
+from syntara.aap.exceptions import AAPNotConfiguredError
 from syntara.aap.models.responses import (
     AAPCredential,
     AAPExecutionEnvironment,
@@ -238,3 +240,48 @@ class TestListLabels:
         assert data["results"][0]["organization"] == 1
         assert data["results"][1]["name"] == "staging"
         assert data["results"][1]["organization"] is None
+
+
+class TestCredentialUsedForAudit:
+    """Audit credential_used is true only after a credential was resolved."""
+
+    def test_success_is_true(self) -> None:
+        from syntara.aap.router import _credential_used_for_audit
+
+        assert _credential_used_for_audit(None) is True
+
+    def test_not_configured_is_false(self) -> None:
+        from syntara.aap.router import _credential_used_for_audit
+
+        assert _credential_used_for_audit("AAPNotConfiguredError") is False
+
+    def test_auth_and_upstream_errors_are_true(self) -> None:
+        from syntara.aap.router import _credential_used_for_audit
+
+        assert _credential_used_for_audit("AAPAuthenticationError") is True
+        assert _credential_used_for_audit("AAPConnectionError") is True
+        assert _credential_used_for_audit("AAPUpstreamError") is True
+
+    @pytest.mark.asyncio
+    async def test_endpoint_records_false_when_not_configured(
+        self, app: FastAPI, mock_service: AsyncMock, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """503-before-decrypt must not look credential-backed in audit."""
+        captured: list[AAPResourceAccessEvent] = []
+        monkeypatch.setattr(
+            "syntara.aap.router.AuditEventDispatcher.dispatch",
+            captured.append,
+        )
+        mock_service.list_organizations.side_effect = AAPNotConfiguredError(
+            "Multiple AAP Controller integrations are configured; pass integration_id to select one"
+        )
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            with pytest.raises(AAPNotConfiguredError):
+                await client.get("/api/v1/proxies/aap/organizations")
+
+        assert len(captured) == 1
+        event = captured[0]
+        assert isinstance(event, AAPResourceAccessEvent)
+        assert event.credential_used is False
+        assert event.error_type == "AAPNotConfiguredError"

@@ -12,13 +12,13 @@ import { createTestRouter } from '../../../test/createTestRouter'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../../types/filters'
 
 import {
-  NxListPanel,
-  NxListPanelSkeletonTbody,
-  NxListPanelTable,
-  NxListPanelTabs,
-  NxListPanelToolbar,
-  NxListPanelView,
-} from './NxListPanel'
+  SynListPanel,
+  SynListPanelSkeletonTbody,
+  SynListPanelTable,
+  SynListPanelTabs,
+  SynListPanelToolbar,
+  SynListPanelView,
+} from './SynListPanel'
 
 const FILTER_DEFINITIONS = [
   {
@@ -32,10 +32,10 @@ const FILTER_DEFINITIONS = [
 
 const NOOP = () => {}
 
-const minimalToolbar = <NxListPanelToolbar filters={[]} filterDefinitions={FILTER_DEFINITIONS} onFilterChange={NOOP} />
+const minimalToolbar = <SynListPanelToolbar filters={[]} filterDefinitions={FILTER_DEFINITIONS} onFilterChange={NOOP} />
 
 const minimalTable = (
-  <NxListPanelTable caption="Test table">
+  <SynListPanelTable caption="Test table">
     <Thead>
       <Tr>
         <Th>Name</Th>
@@ -46,7 +46,7 @@ const minimalTable = (
         <Td>Row 1</Td>
       </Tr>
     </Tbody>
-  </NxListPanelTable>
+  </SynListPanelTable>
 )
 
 function baseViewProps() {
@@ -72,25 +72,25 @@ function withRouter(ui: ReactElement, path = '/group/tabs') {
   return renderPanel(<Wrapper>{ui}</Wrapper>)
 }
 
-describe('NxListPanel', () => {
+describe('SynListPanel', () => {
   it('renders toolbar and table in the data state', () => {
     renderPanel(
-      <NxListPanel>
-        <NxListPanelView {...baseViewProps()} toolbar={minimalToolbar} body={minimalTable} />
-      </NxListPanel>
+      <SynListPanel>
+        <SynListPanelView {...baseViewProps()} toolbar={minimalToolbar} body={minimalTable} />
+      </SynListPanel>
     )
     expect(screen.getByRole('search', { name: 'Filters' })).toBeInTheDocument()
     expect(screen.getByRole('grid')).toBeInTheDocument()
   })
 })
 
-describe('NxListPanelView', () => {
+describe('SynListPanelView', () => {
   describe('data state', () => {
     it('renders toolbar and table when data is available', () => {
       renderPanel(
-        <NxListPanel>
-          <NxListPanelView {...baseViewProps()} toolbar={minimalToolbar} body={minimalTable} />
-        </NxListPanel>
+        <SynListPanel>
+          <SynListPanelView {...baseViewProps()} toolbar={minimalToolbar} body={minimalTable} />
+        </SynListPanel>
       )
 
       expect(screen.getByRole('search', { name: 'Filters' })).toBeInTheDocument()
@@ -99,9 +99,9 @@ describe('NxListPanelView', () => {
 
     it('has no accessibility violations in the data state', async () => {
       const { container } = renderPanel(
-        <NxListPanel>
-          <NxListPanelView {...baseViewProps()} toolbar={minimalToolbar} body={minimalTable} />
-        </NxListPanel>
+        <SynListPanel>
+          <SynListPanelView {...baseViewProps()} toolbar={minimalToolbar} body={minimalTable} />
+        </SynListPanel>
       )
 
       expect(await axe(container)).toHaveNoViolations()
@@ -111,9 +111,9 @@ describe('NxListPanelView', () => {
   describe('loading state (isPending)', () => {
     it('shows loading spinner and hides both the table and toolbar', () => {
       renderPanel(
-        <NxListPanel>
-          <NxListPanelView {...baseViewProps()} isPending toolbar={minimalToolbar} body={minimalTable} />
-        </NxListPanel>
+        <SynListPanel>
+          <SynListPanelView {...baseViewProps()} isPending toolbar={minimalToolbar} body={minimalTable} />
+        </SynListPanel>
       )
 
       expect(screen.getByTestId('loading-state')).toBeInTheDocument()
@@ -123,9 +123,9 @@ describe('NxListPanelView', () => {
 
     it('has no accessibility violations in the loading state', async () => {
       const { container } = renderPanel(
-        <NxListPanel>
-          <NxListPanelView {...baseViewProps()} isPending toolbar={minimalToolbar} body={minimalTable} />
-        </NxListPanel>
+        <SynListPanel>
+          <SynListPanelView {...baseViewProps()} isPending toolbar={minimalToolbar} body={minimalTable} />
+        </SynListPanel>
       )
 
       expect(await axe(container)).toHaveNoViolations()
@@ -139,15 +139,15 @@ describe('NxListPanelView', () => {
       const error = { status: 500, title: 'Internal Server Error', retryable: true }
 
       renderPanel(
-        <NxListPanel>
-          <NxListPanelView
+        <SynListPanel>
+          <SynListPanelView
             {...baseViewProps()}
             error={error}
             onRetry={onRetry}
             toolbar={minimalToolbar}
             body={minimalTable}
           />
-        </NxListPanel>
+        </SynListPanel>
       )
 
       expect(screen.getByTestId('error-state')).toBeInTheDocument()
@@ -161,9 +161,9 @@ describe('NxListPanelView', () => {
     it('has no accessibility violations in the error state', async () => {
       const error = { status: 500, title: 'Internal Server Error', retryable: true }
       const { container } = renderPanel(
-        <NxListPanel>
-          <NxListPanelView {...baseViewProps()} error={error} toolbar={minimalToolbar} body={minimalTable} />
-        </NxListPanel>
+        <SynListPanel>
+          <SynListPanelView {...baseViewProps()} error={error} toolbar={minimalToolbar} body={minimalTable} />
+        </SynListPanel>
       )
 
       expect(await axe(container)).toHaveNoViolations()
@@ -175,9 +175,9 @@ describe('NxListPanelView', () => {
       const error = { status: 503, title: 'Service Unavailable', retryable: true }
 
       renderPanel(
-        <NxListPanel>
-          <NxListPanelView {...baseViewProps()} error={error} toolbar={minimalToolbar} body={minimalTable} />
-        </NxListPanel>
+        <SynListPanel>
+          <SynListPanelView {...baseViewProps()} error={error} toolbar={minimalToolbar} body={minimalTable} />
+        </SynListPanel>
       )
 
       expect(screen.getByText('Service Unavailable')).toBeInTheDocument()
@@ -189,9 +189,15 @@ describe('NxListPanelView', () => {
   describe('filtered empty state', () => {
     it('shows filter empty state and toolbar when filters are active', () => {
       renderPanel(
-        <NxListPanel>
-          <NxListPanelView {...baseViewProps()} isEmpty hasActiveFilters toolbar={minimalToolbar} body={minimalTable} />
-        </NxListPanel>
+        <SynListPanel>
+          <SynListPanelView
+            {...baseViewProps()}
+            isEmpty
+            hasActiveFilters
+            toolbar={minimalToolbar}
+            body={minimalTable}
+          />
+        </SynListPanel>
       )
 
       expect(screen.getByText('No results found')).toBeInTheDocument()
@@ -204,8 +210,8 @@ describe('NxListPanelView', () => {
       const onClearAllFilters = vi.fn()
 
       renderPanel(
-        <NxListPanel>
-          <NxListPanelView
+        <SynListPanel>
+          <SynListPanelView
             {...baseViewProps()}
             isEmpty
             hasActiveFilters
@@ -213,7 +219,7 @@ describe('NxListPanelView', () => {
             toolbar={minimalToolbar}
             body={minimalTable}
           />
-        </NxListPanel>
+        </SynListPanel>
       )
 
       await user.click(screen.getByRole('button', { name: 'Clear all filters' }))
@@ -222,9 +228,15 @@ describe('NxListPanelView', () => {
 
     it('has no accessibility violations in the filtered empty state', async () => {
       const { container } = renderPanel(
-        <NxListPanel>
-          <NxListPanelView {...baseViewProps()} isEmpty hasActiveFilters toolbar={minimalToolbar} body={minimalTable} />
-        </NxListPanel>
+        <SynListPanel>
+          <SynListPanelView
+            {...baseViewProps()}
+            isEmpty
+            hasActiveFilters
+            toolbar={minimalToolbar}
+            body={minimalTable}
+          />
+        </SynListPanel>
       )
 
       expect(await axe(container)).toHaveNoViolations()
@@ -234,9 +246,9 @@ describe('NxListPanelView', () => {
   describe('no-data empty state', () => {
     it('shows default no-data empty state when isEmpty and no active filters, shows toolbar', () => {
       renderPanel(
-        <NxListPanel>
-          <NxListPanelView {...baseViewProps()} isEmpty toolbar={minimalToolbar} body={minimalTable} />
-        </NxListPanel>
+        <SynListPanel>
+          <SynListPanelView {...baseViewProps()} isEmpty toolbar={minimalToolbar} body={minimalTable} />
+        </SynListPanel>
       )
 
       expect(screen.getByText('No data available')).toBeInTheDocument()
@@ -246,15 +258,15 @@ describe('NxListPanelView', () => {
 
     it('renders custom noDataState when provided', () => {
       renderPanel(
-        <NxListPanel>
-          <NxListPanelView
+        <SynListPanel>
+          <SynListPanelView
             {...baseViewProps()}
             isEmpty
             noDataState={<div>Custom empty state</div>}
             toolbar={minimalToolbar}
             body={minimalTable}
           />
-        </NxListPanel>
+        </SynListPanel>
       )
 
       expect(screen.getByText('Custom empty state')).toBeInTheDocument()
@@ -262,9 +274,9 @@ describe('NxListPanelView', () => {
 
     it('has no accessibility violations in the no-data empty state', async () => {
       const { container } = renderPanel(
-        <NxListPanel>
-          <NxListPanelView {...baseViewProps()} isEmpty toolbar={minimalToolbar} body={minimalTable} />
-        </NxListPanel>
+        <SynListPanel>
+          <SynListPanelView {...baseViewProps()} isEmpty toolbar={minimalToolbar} body={minimalTable} />
+        </SynListPanel>
       )
 
       expect(await axe(container)).toHaveNoViolations()
@@ -274,9 +286,9 @@ describe('NxListPanelView', () => {
   describe('toolbar slot', () => {
     it('renders toolbar in the data state', () => {
       renderPanel(
-        <NxListPanel>
-          <NxListPanelView {...baseViewProps()} toolbar={minimalToolbar} body={minimalTable} />
-        </NxListPanel>
+        <SynListPanel>
+          <SynListPanelView {...baseViewProps()} toolbar={minimalToolbar} body={minimalTable} />
+        </SynListPanel>
       )
 
       expect(screen.getByRole('search', { name: 'Filters' })).toBeInTheDocument()
@@ -284,9 +296,9 @@ describe('NxListPanelView', () => {
 
     it('hides toolbar when no toolbar prop is provided', () => {
       renderPanel(
-        <NxListPanel>
-          <NxListPanelView {...baseViewProps()} body={minimalTable} />
-        </NxListPanel>
+        <SynListPanel>
+          <SynListPanelView {...baseViewProps()} body={minimalTable} />
+        </SynListPanel>
       )
 
       expect(screen.queryByRole('search', { name: 'Filters' })).not.toBeInTheDocument()
@@ -294,11 +306,11 @@ describe('NxListPanelView', () => {
 
     it('shows actions rendered inside toolbar', () => {
       renderPanel(
-        <NxListPanel>
-          <NxListPanelView
+        <SynListPanel>
+          <SynListPanelView
             {...baseViewProps()}
             toolbar={
-              <NxListPanelToolbar
+              <SynListPanelToolbar
                 filters={[]}
                 filterDefinitions={FILTER_DEFINITIONS}
                 onFilterChange={NOOP}
@@ -307,7 +319,7 @@ describe('NxListPanelView', () => {
             }
             body={minimalTable}
           />
-        </NxListPanel>
+        </SynListPanel>
       )
 
       expect(screen.getByRole('button', { name: 'Create item' })).toBeInTheDocument()
@@ -317,9 +329,9 @@ describe('NxListPanelView', () => {
   describe('isFetching state (background refetch)', () => {
     it('still renders body and toolbar when isFetching', () => {
       renderPanel(
-        <NxListPanel>
-          <NxListPanelView {...baseViewProps()} isFetching toolbar={minimalToolbar} body={minimalTable} />
-        </NxListPanel>
+        <SynListPanel>
+          <SynListPanelView {...baseViewProps()} isFetching toolbar={minimalToolbar} body={minimalTable} />
+        </SynListPanel>
       )
 
       expect(screen.getByRole('grid')).toBeInTheDocument()
@@ -328,9 +340,9 @@ describe('NxListPanelView', () => {
 
     it('wraps toolbar in a disabled fieldset when isFetching', () => {
       renderPanel(
-        <NxListPanel>
-          <NxListPanelView {...baseViewProps()} isFetching toolbar={minimalToolbar} body={minimalTable} />
-        </NxListPanel>
+        <SynListPanel>
+          <SynListPanelView {...baseViewProps()} isFetching toolbar={minimalToolbar} body={minimalTable} />
+        </SynListPanel>
       )
 
       expect(screen.getByRole('group', { name: 'Filters — loading' })).toBeDisabled()
@@ -338,9 +350,9 @@ describe('NxListPanelView', () => {
 
     it('has no accessibility violations when isFetching', async () => {
       const { container } = renderPanel(
-        <NxListPanel>
-          <NxListPanelView {...baseViewProps()} isFetching toolbar={minimalToolbar} body={minimalTable} />
-        </NxListPanel>
+        <SynListPanel>
+          <SynListPanelView {...baseViewProps()} isFetching toolbar={minimalToolbar} body={minimalTable} />
+        </SynListPanel>
       )
 
       expect(await axe(container)).toHaveNoViolations()
@@ -350,8 +362,8 @@ describe('NxListPanelView', () => {
   describe('body prop', () => {
     it('renders body content in the data state', () => {
       renderPanel(
-        <NxListPanel>
-          <NxListPanelView
+        <SynListPanel>
+          <SynListPanelView
             {...baseViewProps()}
             toolbar={minimalToolbar}
             body={
@@ -361,7 +373,7 @@ describe('NxListPanelView', () => {
               </>
             }
           />
-        </NxListPanel>
+        </SynListPanel>
       )
 
       expect(screen.getByText('Descriptive text')).toBeInTheDocument()
@@ -369,8 +381,8 @@ describe('NxListPanelView', () => {
 
     it('hides body during empty state', () => {
       renderPanel(
-        <NxListPanel>
-          <NxListPanelView
+        <SynListPanel>
+          <SynListPanelView
             {...baseViewProps()}
             isEmpty
             toolbar={minimalToolbar}
@@ -381,7 +393,7 @@ describe('NxListPanelView', () => {
               </>
             }
           />
-        </NxListPanel>
+        </SynListPanel>
       )
 
       expect(screen.queryByText('Descriptive text')).not.toBeInTheDocument()
@@ -389,14 +401,14 @@ describe('NxListPanelView', () => {
   })
 })
 
-describe('NxListPanelTable', () => {
+describe('SynListPanelTable', () => {
   it('renders the table caption accessibly', () => {
     renderPanel(
-      <NxListPanel>
-        <NxListPanelView
+      <SynListPanel>
+        <SynListPanelView
           {...baseViewProps()}
           body={
-            <NxListPanelTable caption="My resources">
+            <SynListPanelTable caption="My resources">
               <Thead>
                 <Tr>
                   <Th>Name</Th>
@@ -407,10 +419,10 @@ describe('NxListPanelTable', () => {
                   <Td>Item 1</Td>
                 </Tr>
               </Tbody>
-            </NxListPanelTable>
+            </SynListPanelTable>
           }
         />
-      </NxListPanel>
+      </SynListPanel>
     )
 
     expect(screen.getByRole('grid', { name: 'My resources' })).toBeInTheDocument()
@@ -418,11 +430,11 @@ describe('NxListPanelTable', () => {
 
   it('renders pagination footer when footer props are provided', () => {
     renderPanel(
-      <NxListPanel>
-        <NxListPanelView
+      <SynListPanel>
+        <SynListPanelView
           {...baseViewProps()}
           body={
-            <NxListPanelTable
+            <SynListPanelTable
               caption="Test table"
               footer={{ page: 1, perPage: 20, hasNext: false, onPrev: NOOP, onNext: NOOP, onPerPageChange: NOOP }}
             >
@@ -436,21 +448,21 @@ describe('NxListPanelTable', () => {
                   <Td>Row 1</Td>
                 </Tr>
               </Tbody>
-            </NxListPanelTable>
+            </SynListPanelTable>
           }
         />
-      </NxListPanel>
+      </SynListPanel>
     )
 
     expect(screen.getByRole('navigation', { name: 'Pagination' })).toBeInTheDocument()
   })
 })
 
-describe('NxListPanelSkeletonTbody', () => {
+describe('SynListPanelSkeletonTbody', () => {
   function renderSkeletonTbody(columnsCount: number, rowCount?: number) {
     return render(
       <table>
-        <NxListPanelSkeletonTbody columnsCount={columnsCount} rowCount={rowCount} />
+        <SynListPanelSkeletonTbody columnsCount={columnsCount} rowCount={rowCount} />
       </table>
     )
   }
@@ -478,15 +490,15 @@ describe('NxListPanelSkeletonTbody', () => {
   })
 })
 
-describe('NxListPanelTabs', () => {
+describe('SynListPanelTabs', () => {
   it('renders tab bar with the correct tabs', async () => {
     withRouter(
-      <NxListPanel>
-        <NxListPanelTabs basePath="/group/tabs" defaultTab="members" aria-label="Group tabs">
+      <SynListPanel>
+        <SynListPanelTabs basePath="/group/tabs" defaultTab="members" aria-label="Group tabs">
           <Tab eventKey="members" title="Members" />
           <Tab eventKey="roles" title="Roles" />
-        </NxListPanelTabs>
-      </NxListPanel>,
+        </SynListPanelTabs>
+      </SynListPanel>,
       '/group/tabs/members'
     )
 
@@ -496,12 +508,12 @@ describe('NxListPanelTabs', () => {
 
   it('activates the tab that matches the URL', async () => {
     withRouter(
-      <NxListPanel>
-        <NxListPanelTabs basePath="/group/tabs" defaultTab="members" aria-label="Group tabs">
+      <SynListPanel>
+        <SynListPanelTabs basePath="/group/tabs" defaultTab="members" aria-label="Group tabs">
           <Tab eventKey="members" title="Members" />
           <Tab eventKey="roles" title="Roles" />
-        </NxListPanelTabs>
-      </NxListPanel>,
+        </SynListPanelTabs>
+      </SynListPanel>,
       '/group/tabs/roles'
     )
 
@@ -510,19 +522,19 @@ describe('NxListPanelTabs', () => {
 
   it('tab aria-controls targets the matching tabpanel id', async () => {
     withRouter(
-      <NxListPanel>
-        <NxListPanelTabs basePath="/group/tabs" defaultTab="members" aria-label="Group tabs">
+      <SynListPanel>
+        <SynListPanelTabs basePath="/group/tabs" defaultTab="members" aria-label="Group tabs">
           <Tab eventKey="members" title="Members" />
           <Tab eventKey="roles" title="Roles" />
-        </NxListPanelTabs>
-        <NxListPanelView
+        </SynListPanelTabs>
+        <SynListPanelView
           {...baseViewProps()}
           tabKey="members"
           tabLabel="Members"
           toolbar={minimalToolbar}
           body={minimalTable}
         />
-      </NxListPanel>,
+      </SynListPanel>,
       '/group/tabs/members'
     )
 
@@ -533,19 +545,19 @@ describe('NxListPanelTabs', () => {
 
   it('has no accessibility violations', async () => {
     const { container } = withRouter(
-      <NxListPanel>
-        <NxListPanelTabs basePath="/group/tabs" defaultTab="members" aria-label="Group tabs">
+      <SynListPanel>
+        <SynListPanelTabs basePath="/group/tabs" defaultTab="members" aria-label="Group tabs">
           <Tab eventKey="members" title="Members" />
           <Tab eventKey="roles" title="Roles" />
-        </NxListPanelTabs>
-        <NxListPanelView
+        </SynListPanelTabs>
+        <SynListPanelView
           {...baseViewProps()}
           tabKey="members"
           tabLabel="Members"
           toolbar={minimalToolbar}
           body={minimalTable}
         />
-      </NxListPanel>,
+      </SynListPanel>,
       '/group/tabs/members'
     )
 
