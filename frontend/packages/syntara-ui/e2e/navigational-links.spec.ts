@@ -35,9 +35,12 @@ test.describe('Navigational link affordance @pr-check', () => {
         await app.goto(toAppUrl('/workflows'))
         await expect(app.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
 
-        // Wait for the seeded workflow to appear as a link in the Name column
+        // Konflux seed volume paginates the list; filter so the row is on page one.
+        await app.getByPlaceholder('Filter by name').fill(workflowName)
+        await app.getByRole('button', { name: 'Apply filter' }).click()
+
         const workflowLink = app.locator('[data-label="Name"]').getByRole('link', { name: workflowName })
-        await expect(workflowLink).toBeVisible({ timeout: 10_000 })
+        await expect(workflowLink).toBeVisible({ timeout: 15_000 })
 
         // Clicking it must navigate to the workflow builder.
         await workflowLink.click()

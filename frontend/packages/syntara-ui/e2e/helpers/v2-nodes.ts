@@ -22,7 +22,7 @@ import {
   deleteLlmIntegration,
   selectLlmCredential,
 } from './llm-helpers'
-import { addNodePanel, closeNodeEditorPanel, fillCodeEditor } from './workflows'
+import { addNodePanel, clickAddConnectedStep, closeNodeEditorPanel, fillCodeEditor } from './workflows'
 
 export { ensureLlmCredential, createLlmIntegration, deleteLlmIntegration, selectLlmCredential }
 
@@ -51,34 +51,9 @@ async function selectDirectNodeType(page: Page, label: string | RegExp) {
 // Trigger
 // ---------------------------------------------------------------------------
 
-/** Click "Add connected step" button on an edge and wait for the add-node panel to appear. */
+/** Click "Add connected step" on an edge and wait for the add-node panel. */
 export async function openAddNodePanel(page: Page) {
-  const layoutButton = page.getByRole('button', { name: 'Layout' })
-  if ((await layoutButton.count()) > 0) {
-    await layoutButton.click()
-  }
-
-  // Fit the view so all nodes and edge buttons are visible in the viewport
-  const fitViewButton = page.getByRole('button', { name: 'Fit view' })
-  if ((await fitViewButton.count()) > 0) {
-    await fitViewButton.click()
-  }
-
-  const addBtn = page.getByRole('button', { name: 'Add connected step' })
-  await expect(addBtn.first()).toBeVisible({ timeout: 20_000 })
-
-  // Retry clicking — React Flow edge buttons can be briefly detached during layout animations
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      await addBtn.first().click({ force: true, timeout: 5_000 })
-      await expect(addNodePanel(page)).toHaveCount(1, { timeout: 5_000 })
-      return
-    } catch {
-      if (attempt === 2) throw new Error('Failed to open add-node panel after 3 attempts')
-      await layoutButton.click()
-      await expect(addBtn.first()).toBeVisible({ timeout: 5_000 })
-    }
-  }
+  await clickAddConnectedStep(page)
 }
 
 /** Add a manual trigger. Must be called on a fresh /workflow-builder/new page. */
