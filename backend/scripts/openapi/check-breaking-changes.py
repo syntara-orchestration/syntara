@@ -31,7 +31,7 @@ such changes as non-breaking.
 Usage:
     ./check-breaking-changes.py --base devel --head HEAD
     ./check-breaking-changes.py --base-spec baseline.yaml --head-spec current.yaml
-    ./check-breaking-changes.py --base devel --head HEAD --pr-labels "breaking-change-approved"
+    ./check-breaking-changes.py --base devel --head HEAD --pr-labels '["breaking-change-approved"]'
 
 Returns:
     JSON with structure:
@@ -244,19 +244,31 @@ def get_changelog_entries(base_spec: str, head_spec: str) -> list[dict[str, Any]
     return parsed if isinstance(parsed, list) else []
 
 
-def check_approval_label(pr_labels: str) -> bool:
+def check_approval_label(pr_labels_json: str) -> bool:
     """Check if the breaking-change approval label is present on the PR.
 
+    The contract is a JSON-encoded array of the PR's label names (e.g.
+    ``["bug", "breaking-change-approved"]``), matched **exactly**. A JSON array
+    is used instead of a comma-joined string so that a label name that itself
+    contains a comma cannot be split into two and forge the approval label. The
+    match is case-sensitive to stay consistent with the exact-case ``if:``
+    conditions in ``breaking-change-label-guard.yml`` and
+    ``openapi-breaking-changes.yml`` — a case-variant label that never triggers
+    those guards must not be accepted here either.
+
     Args:
-        pr_labels: Comma-separated list of PR label names
+        pr_labels_json: JSON-encoded array of PR label names
 
     Returns:
         True if the ``breaking-change-approved`` label is present
     """
-    if not pr_labels:
+    if not pr_labels_json:
         return False
-    labels = [label.strip().lower() for label in pr_labels.split(",")]
-    return BREAKING_CHANGE_APPROVED_LABEL.lower() in labels
+    try:
+        labels = json.loads(pr_labels_json)
+    except json.JSONDecodeError:
+        return False
+    return isinstance(labels, list) and BREAKING_CHANGE_APPROVED_LABEL in labels
 
 
 def canonicalize_spec(content: str | None) -> tuple[bool, Any]:
@@ -379,7 +391,7 @@ def evaluate_gate(
     if expected_bump_type is not None and version_bump_type != expected_bump_type:
         return GateDecision(
             allowed=False,
-            code="wrong_bump_segment",
+            code="incorrect_version_increment",
             message=(
                 f"BLOCKED: info.version was bumped by a '{version_bump_type}' segment, but this "
                 f"change requires a '{expected_bump_type}' bump. "
@@ -453,7 +465,7 @@ def main():
     # PR labels for the breaking-change approval override
     parser.add_argument(
         "--pr-labels",
-        help="Comma-separated list of PR label names",
+        help='JSON-encoded array of PR label names, e.g. \'["bug", "breaking-change-approved"]\'',
         default="",
     )
 
@@ -512,6 +524,13 @@ def main():
     if args.head:
         # Get spec from git reference - write to temp file
         head_spec_content = get_spec_from_git(args.head, args.spec_path)
+        if head_spec_content is None:
+            print(
+                f"ERROR: Spec path '{args.spec_path}' not found on head ref '{args.head}'. "
+                f"If the spec was intentionally deleted, this is a breaking change.",
+                file=sys.stderr,
+            )
+            sys.exit(2)
         import tempfile
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:

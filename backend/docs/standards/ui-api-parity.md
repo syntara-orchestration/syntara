@@ -102,13 +102,9 @@ Use when a spec change has no impact on generated types — for example, updatin
 
 **Severity:** Informational (does not block merge). CI still posts a notice acknowledging the exception.
 
-### Breaking changes
+### Breaking changes and versioning
 
-Breaking changes are **always blocked in place** — full stop. A new major version is a new spec served from a separate URL path (e.g., `/api/v2/`), so it does not register as a breaking change to the current spec.
-
-The only override for an in-place breaking change is the privileged `breaking-change-approved` GitHub label, sanctioned only for a CVE / critical vulnerability with no non-breaking remediation, after escalation to engineering leadership. Who may apply it is enforced by the **Breaking Change Label Guard** workflow (restricted to the `syntara-leads` team). An approved breaking change must still bump `info.version` by a **minor** segment.
-
-**Every meaningful spec change must bump `info.version`.** Comparison is canonical, so serialization-only diffs (whitespace, key order, quotes) do not require a bump. The bump segment is enforced: **minor** for additive changes (new endpoint, field, or enum value), **patch** for spec-only edits (description, example, annotation). A missing or wrong-segment bump is blocked.
+Breaking changes and the `info.version` increment gate are governed by [OpenAPI Spec Management](openapi-spec-management.md#breaking-change-policy) — that is the single source of truth for the gate codes, the version-increment rules, and the `breaking-change-approved` override. In short: breaking changes are blocked in place, and every meaningful spec change must increment `info.version` by the correct segment.
 
 **Severity:** Blocking via the pre-commit hook `backend-check-openapi-breaking` and the `openapi-breaking-changes` CI job.
 
@@ -144,7 +140,7 @@ The scheduled workflow auto-closes drift issues when the drift is resolved.
 | Use typed API clients only | ESLint `syntara/no-raw-http-calls` | `eslint-disable-next-line` with justification |
 | Regenerate contracts when spec changes | CI warning + weekly drift check | `no-contract-regen: <justification>` in PR description |
 | Breaking changes blocked in place | Pre-commit + `openapi-breaking-changes` CI job | `breaking-change-approved` label (privileged), or route to a new major version at a new path |
-| Every spec change bumps `info.version` | Pre-commit + `openapi-breaking-changes` CI job | N/A — a bump is always required |
+| Every spec change updates `info.version` | Pre-commit + `openapi-breaking-changes` CI job | N/A — a version update is always required |
 | WebSocket is read-only streaming | Convention (see [WebSocket Standards](websocket.md)) | N/A — REST is the complete CRUD interface |
 | Backend + frontend changes in one PR | CI warning if contracts stale | `no-contract-regen: <justification>` for spec-only changes |
 

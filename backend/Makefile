@@ -801,27 +801,38 @@ check-openapi-breaking: ## Check OpenAPI spec for breaking changes against devel
 		./scripts/openapi/install-oasdiff.sh; \
 	fi
 	@PR_LABELS_TEXT="$${PR_LABELS:-$${OPENAPI_PR_LABELS:-}}"; \
-	CMD="./scripts/openapi/check-breaking-changes.py \
-		--base $(OPENAPI_BASE_REF) \
-		--head HEAD \
-		--format text \
-		--fallback-spec-path backend/src/syntara/schemas/openapi.yaml"; \
 	if [ -n "$$PR_LABELS_TEXT" ]; then \
-		CMD="$$CMD --pr-labels \"$$PR_LABELS_TEXT\""; \
-	fi; \
-	eval $$CMD
+		./scripts/openapi/check-breaking-changes.py \
+			--base $(OPENAPI_BASE_REF) \
+			--head HEAD \
+			--format text \
+			--fallback-spec-path backend/src/syntara/schemas/openapi.yaml \
+			--pr-labels "$$PR_LABELS_TEXT"; \
+	else \
+		./scripts/openapi/check-breaking-changes.py \
+			--base $(OPENAPI_BASE_REF) \
+			--head HEAD \
+			--format text \
+			--fallback-spec-path backend/src/syntara/schemas/openapi.yaml; \
+	fi
 	@echo "Checking public OpenAPI spec for breaking changes..."
 	@PR_LABELS_TEXT="$${PR_LABELS:-$${OPENAPI_PR_LABELS:-}}"; \
-	CMD="./scripts/openapi/check-breaking-changes.py \
-		--base $(OPENAPI_BASE_REF) \
-		--head HEAD \
-		--format text \
-		--spec-path backend/src/syntara/schemas/openapi-public.yaml \
-		--fallback-spec-path backend/src/syntara/schemas/openapi-public.yaml"; \
 	if [ -n "$$PR_LABELS_TEXT" ]; then \
-		CMD="$$CMD --pr-labels \"$$PR_LABELS_TEXT\""; \
-	fi; \
-	eval $$CMD
+		./scripts/openapi/check-breaking-changes.py \
+			--base $(OPENAPI_BASE_REF) \
+			--head HEAD \
+			--format text \
+			--spec-path backend/src/syntara/schemas/openapi-public.yaml \
+			--fallback-spec-path backend/src/syntara/schemas/openapi-public.yaml \
+			--pr-labels "$$PR_LABELS_TEXT"; \
+	else \
+		./scripts/openapi/check-breaking-changes.py \
+			--base $(OPENAPI_BASE_REF) \
+			--head HEAD \
+			--format text \
+			--spec-path backend/src/syntara/schemas/openapi-public.yaml \
+			--fallback-spec-path backend/src/syntara/schemas/openapi-public.yaml; \
+	fi
 	@echo "OpenAPI breaking changes check complete"
 
 .PHONY: check-openapi-breaking-pre-commit

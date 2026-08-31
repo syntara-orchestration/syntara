@@ -5,13 +5,15 @@ spec-change detection, bump-segment classification, and the full main() gate
 (oasdiff is mocked except in the explicitly-integration tests).
 
 Gate policy under test:
-  * Every *meaningful* OpenAPI spec change must bump info.version. Comparison is
-    canonical, so serialization-only diffs (whitespace, key order, quotes) do
-    not require a bump.
-  * The bump segment must match the change type: minor for additive changes,
-    patch for spec-only edits. A wrong-segment bump is blocked.
+  * Every *meaningful* OpenAPI spec change must update info.version. Comparison
+    is canonical, so serialization-only diffs (whitespace, key order, quotes) do
+    not require a version change.
+  * The version increment must match the change type: minor for additive
+    changes, patch for spec-only edits. An incorrect version increment is
+    blocked (gate_code: incorrect_version_increment).
   * Breaking changes are blocked in place unless the privileged
-    ``breaking-change-approved`` label is present AND the bump is a minor.
+    ``breaking-change-approved`` label is present AND the increment is a minor.
+    The approval label is matched from a JSON-encoded array, exact-case.
 """
 
 from __future__ import annotations
@@ -285,28 +287,44 @@ class TestGetVersionBumpType:
 
 
 class TestCheckApprovalLabel:
-    """Tests for check_approval_label()."""
+    """Tests for check_approval_label().
+
+    The contract is a JSON-encoded array of label names, matched exactly. This
+    guards against two authorization-bypass classes: a label name that contains
+    a comma (which a naive split would forge into the approval label) and a
+    case-variant label (which never triggers the exact-case workflow guards).
+    """
 
     def test_empty_labels(self):
         assert check_breaking.check_approval_label("") is False
 
     def test_no_approval_label(self):
-        assert check_breaking.check_approval_label("bug,enhancement") is False
+        assert check_breaking.check_approval_label('["bug", "enhancement"]') is False
 
     def test_approval_label_present(self):
-        assert check_breaking.check_approval_label("bug,breaking-change-approved,enhancement") is True
+        assert check_breaking.check_approval_label('["bug", "breaking-change-approved", "enhancement"]') is True
 
     def test_approval_label_only(self):
-        assert check_breaking.check_approval_label("breaking-change-approved") is True
+        assert check_breaking.check_approval_label('["breaking-change-approved"]') is True
 
-    def test_case_insensitive(self):
-        assert check_breaking.check_approval_label("BREAKING-CHANGE-APPROVED") is True
+    def test_invalid_json_rejected(self):
+        assert check_breaking.check_approval_label("breaking-change-approved") is False
 
-    def test_whitespace_handling(self):
-        assert check_breaking.check_approval_label("bug, breaking-change-approved , fix") is True
+    def test_non_list_json_rejected(self):
+        assert check_breaking.check_approval_label('{"label": "breaking-change-approved"}') is False
 
     def test_partial_match_rejected(self):
-        assert check_breaking.check_approval_label("not-breaking-change-approved-extra") is False
+        assert check_breaking.check_approval_label('["not-breaking-change-approved-extra"]') is False
+
+    def test_label_name_containing_comma_does_not_grant_approval(self):
+        # A single label literally named "urgent,breaking-change-approved" must
+        # not be split into two labels and accepted.
+        assert check_breaking.check_approval_label('["urgent,breaking-change-approved"]') is False
+
+    def test_case_variant_label_does_not_grant_approval(self):
+        # A case-variant label slips past the exact-case workflow guards, so it
+        # must not be accepted here either.
+        assert check_breaking.check_approval_label('["Breaking-Change-Approved"]') is False
 
 
 class TestCanonicalizeSpec:
@@ -444,7 +462,7 @@ class TestEvaluateGate:
             breaking_approved=True,
         )
         assert decision.allowed is False
-        assert decision.code == "wrong_bump_segment"
+        assert decision.code == "incorrect_version_increment"
 
     def test_breaking_approved_without_bump_blocked(self):
         decision = self._decide(
@@ -465,7 +483,7 @@ class TestEvaluateGate:
     def test_additive_with_patch_blocked(self):
         decision = self._decide(has_changes=True, version_bump_type="patch", expected_bump_type="minor")
         assert decision.allowed is False
-        assert decision.code == "wrong_bump_segment"
+        assert decision.code == "incorrect_version_increment"
 
     def test_spec_only_with_patch_allowed(self):
         decision = self._decide(has_changes=True, version_bump_type="patch", expected_bump_type="patch")
@@ -475,7 +493,7 @@ class TestEvaluateGate:
     def test_spec_only_with_minor_blocked(self):
         decision = self._decide(has_changes=True, version_bump_type="minor", expected_bump_type="patch")
         assert decision.allowed is False
-        assert decision.code == "wrong_bump_segment"
+        assert decision.code == "incorrect_version_increment"
 
     def test_change_without_bump_blocked(self):
         decision = self._decide(has_changes=True, version_bump_type=None, expected_bump_type="minor")
@@ -513,7 +531,7 @@ class TestMainGate:
             has_breaking=True,
             changelog="removed GET /legacy",
             head_description="approved breaking edit",
-            pr_labels="breaking-change-approved",
+            pr_labels='["breaking-change-approved"]',
         )
         assert code == 0
         assert result["breaking_approved"] is True
@@ -530,12 +548,12 @@ class TestMainGate:
             has_breaking=True,
             changelog="removed GET /legacy",
             head_description="approved breaking edit",
-            pr_labels="breaking-change-approved",
+            pr_labels='["breaking-change-approved"]',
         )
         assert code == 1
         assert result["version_bump_type"] == "major"
         assert result["expected_bump_type"] == "minor"
-        assert result["gate_code"] == "wrong_bump_segment"
+        assert result["gate_code"] == "incorrect_version_increment"
 
     def test_breaking_change_approved_but_no_bump_blocked(self, monkeypatch, tmp_path):
         code, result = _run_main(
@@ -545,7 +563,7 @@ class TestMainGate:
             head_version="1.0.0",
             has_breaking=True,
             changelog="removed GET /legacy",
-            pr_labels="breaking-change-approved",
+            pr_labels='["breaking-change-approved"]',
         )
         assert code == 1
         assert result["breaking_approved"] is True
@@ -583,7 +601,7 @@ class TestMainGate:
         assert code == 1
         assert result["version_bump_type"] == "patch"
         assert result["expected_bump_type"] == "minor"
-        assert result["gate_code"] == "wrong_bump_segment"
+        assert result["gate_code"] == "incorrect_version_increment"
 
     def test_spec_only_patch_bump_allowed(self, monkeypatch, tmp_path):
         # Description-only edit: oasdiff reports no structural entries -> expects patch.
@@ -617,7 +635,7 @@ class TestMainGate:
         assert code == 1
         assert result["version_bump_type"] == "minor"
         assert result["expected_bump_type"] == "patch"
-        assert result["gate_code"] == "wrong_bump_segment"
+        assert result["gate_code"] == "incorrect_version_increment"
 
     def test_meaningful_change_no_bump_blocked(self, monkeypatch, tmp_path):
         code, result = _run_main(
@@ -695,6 +713,29 @@ class TestMainGate:
         with pytest.raises(SystemExit) as exc:
             check_breaking.main()
         assert int(exc.value.code or 0) == 0
+        assert not output.exists()
+
+    def test_deleted_spec_on_head_ref_errors_cleanly(self, monkeypatch, tmp_path):
+        # If the spec exists on base but is gone on head, exit 2 with a clear
+        # message instead of crashing on f.write(None).
+        def _fake(ref: str, _spec_path: str) -> str | None:
+            return None if ref == "HEAD" else _spec_yaml("1.0.0")
+
+        monkeypatch.setattr(check_breaking, "get_spec_from_git", _fake)
+        output = tmp_path / "breaking-results.json"
+        argv = [
+            "check-breaking-changes.py",
+            "--base",
+            "origin/devel",
+            "--head",
+            "HEAD",
+            "--output",
+            str(output),
+        ]
+        monkeypatch.setattr(sys, "argv", argv)
+        with pytest.raises(SystemExit) as exc:
+            check_breaking.main()
+        assert int(exc.value.code or 0) == 2
         assert not output.exists()
 
     def test_text_output_includes_spec_and_versions(self, monkeypatch, tmp_path):
@@ -861,7 +902,7 @@ class TestOasdiffIntegration:
         assert result["expected_bump_type"] == "minor"
         # Patch bump for an additive change is the wrong segment.
         assert code == 1
-        assert result["gate_code"] == "wrong_bump_segment"
+        assert result["gate_code"] == "incorrect_version_increment"
 
 
 class TestFormatTextOutput:
@@ -915,7 +956,7 @@ class TestFormatTextOutput:
         assert "breaking-change-approved" in text
         assert "version_bumped: true" in text
 
-    def test_wrong_bump_segment(self):
+    def test_incorrect_version_increment(self):
         decision = check_breaking.evaluate_gate(
             has_breaking=False,
             has_changes=True,
@@ -1036,7 +1077,7 @@ class TestPostBreakingChangesComment:
         assert "minor" in comment
         assert "**version_bumped:** `false`" in comment
 
-    def test_wrong_bump_segment_comment(self):
+    def test_incorrect_version_increment_comment(self):
         comment = post_comment.format_breaking_changes_comment(
             {
                 "has_breaking_changes": False,
@@ -1048,12 +1089,12 @@ class TestPostBreakingChangesComment:
                 "expected_bump_type": "minor",
                 "breaking_approved": False,
                 "spec_path": "backend/src/syntara/schemas/openapi.yaml",
-                "gate_code": "wrong_bump_segment",
+                "gate_code": "incorrect_version_increment",
             },
             "syntara-orchestration",
             "syntara",
         )
-        assert "Wrong Version Bump Segment" in comment
+        assert "Incorrect Version Increment" in comment
         assert "minor" in comment
         assert "patch" in comment
         assert "**version_bumped:** `true`" in comment
@@ -1076,6 +1117,33 @@ class TestAckPathRemoved:
         makefile = (BACKEND_ROOT / "Makefile").read_text()
         assert "--pr-body" not in makefile
 
+    def test_makefile_does_not_eval_untrusted_labels(self):
+        # Untrusted PR label text must not be re-parsed by the shell; the recipe
+        # invokes the checker directly (if/else), never via `eval`.
+        makefile = (BACKEND_ROOT / "Makefile").read_text()
+        assert "eval $$CMD" not in makefile
+        assert "eval $CMD" not in makefile
+
+
+class TestLabelInjectionSafety:
+    """Untrusted PR label text must never reach a shell for re-parsing."""
+
+    def test_workflow_passes_labels_via_env_not_interpolation(self):
+        workflow = (REPO_ROOT / ".github" / "workflows" / "openapi-breaking-changes.yml").read_text()
+        # Labels are forwarded through an env var, not substituted into the run
+        # script (which GitHub Actions would expand before the shell parses it).
+        assert "OPENAPI_PR_LABELS: ${{ steps.labels.outputs.labels }}" in workflow
+        assert '--pr-labels "$OPENAPI_PR_LABELS"' in workflow
+        assert '--pr-labels "${{ steps.labels.outputs.labels }}"' not in workflow
+
+    def test_workflow_emits_labels_as_json_array(self):
+        workflow = (REPO_ROOT / ".github" / "workflows" / "openapi-breaking-changes.yml").read_text()
+        assert "JSON.stringify(labels)" in workflow
+
+    def test_ci_backend_forwards_labels_as_json_array(self):
+        workflow = (REPO_ROOT / ".github" / "workflows" / "ci-backend.yml").read_text()
+        assert "toJSON(github.event.pull_request.labels.*.name)" in workflow
+
 
 class TestBreakingChangeLabelGuard:
     """Contract tests for unauthorized label application being removed.
@@ -1091,7 +1159,9 @@ class TestBreakingChangeLabelGuard:
     def test_triggers_on_label_added(self):
         text = LABEL_GUARD_WORKFLOW.read_text()
         assert "pull_request_target:" in text
-        assert "types: [labeled]" in text
+        # Broadened so the guard reports a (skipped) check on every PR and can be
+        # made a required status check; the labeled event is what actually runs it.
+        assert "labeled" in text
         assert "github.event.label.name == 'breaking-change-approved'" in text
 
     def test_verifies_syntara_leads_membership(self):
@@ -1110,8 +1180,15 @@ class TestBreakingChangeLabelGuard:
     def test_fails_closed_without_org_token(self):
         text = LABEL_GUARD_WORKFLOW.read_text()
         assert "SYNTARA_LEADS_READ_TOKEN" in text
-        assert "secrets.GITHUB_TOKEN" in text
+        # A missing token fails fast in a preflight step rather than silently
+        # falling back to GITHUB_TOKEN (which cannot read team membership).
+        assert "Ensure org-read token is configured" in text
+        assert "secrets.GITHUB_TOKEN" not in text
         assert "isMember = false" in text
+
+    def test_membership_check_uses_only_org_read_token(self):
+        text = LABEL_GUARD_WORKFLOW.read_text()
+        assert "github-token: ${{ secrets.SYNTARA_LEADS_READ_TOKEN }}" in text
 
 
 class TestOpenapiBreakingChangesWorkflow:

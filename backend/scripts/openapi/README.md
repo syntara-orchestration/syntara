@@ -25,9 +25,9 @@ Installs the `oasdiff` tool with checksum verification to prevent supply chain a
 Checks for breaking changes in OpenAPI spec using `oasdiff`. Automatically resolves the spec path relative to the git root, so it works from any subdirectory (e.g., `backend/` in the monorepo).
 
 The gate enforces these rules:
-1. **Every meaningful spec change must bump `info.version`.** Comparison is canonical (semantic), so serialization-only diffs (whitespace, key order, quote style) do not require a bump. A meaningful change with no bump is blocked (`version_bump_required`).
-2. **The bump segment must match the change type**: `minor` for additive changes (new endpoint, field, or enum value), `patch` for spec-only edits (description, example, annotation). A wrong-segment bump is blocked (`wrong_bump_segment`).
-3. **Breaking changes are blocked in place** — full stop (`breaking_blocked`). The only override is the privileged `breaking-change-approved` label (restricted to the `syntara-leads` team via the Breaking Change Label Guard workflow). A new major version is a new spec at a new path and does not register as a breaking change here. An approved breaking change must still bump `info.version` by a `minor` segment.
+1. **Every meaningful spec change must update `info.version`.** Comparison is canonical (semantic), so serialization-only diffs (whitespace, key order, quote style) do not require a version change. A meaningful change that leaves `info.version` unchanged is blocked (`version_bump_required`).
+2. **The version increment must match the change type**: increment the `minor` version for additive changes (new endpoint, field, or enum value), the `patch` version for spec-only edits (description, example, annotation). An incorrect version increment is blocked (`incorrect_version_increment`).
+3. **Breaking changes are blocked in place** — full stop (`breaking_blocked`). The only override is the privileged `breaking-change-approved` label (restricted to the `syntara-leads` team via the Breaking Change Label Guard workflow). A new major version is a new spec at a new path and does not register as a breaking change here. An approved breaking change must still increment `info.version` by a `minor` version.
 
 ```bash
 # Compare current branch against devel
@@ -36,17 +36,17 @@ The gate enforces these rules:
 # Compare specific spec files
 ./check-breaking-changes.py --base-spec old.yaml --head-spec new.yaml
 
-# Include PR labels for the breaking-change approval override
+# Include PR labels (JSON-encoded array) for the breaking-change approval override
 ./check-breaking-changes.py --base devel --head HEAD \
-  --pr-labels "breaking-change-approved,bug"
+  --pr-labels '["breaking-change-approved", "bug"]'
 
 # Output as text instead of JSON
 ./check-breaking-changes.py --base devel --head HEAD --format text
 ```
 
 **Exit Codes:**
-- `0` - Allowed: no meaningful change, non-breaking change with the correct-segment bump, or approved breaking change with a minor bump
-- `1` - Blocked: breaking change without approval, a meaningful change with no version bump, or a wrong-segment bump
+- `0` - Allowed: no meaningful change, non-breaking change with the correct version increment, or approved breaking change with a minor increment
+- `1` - Blocked: breaking change without approval, a meaningful change with no version change, or an incorrect version increment
 - `2` - Error running oasdiff or processing specs
 
 When the gate blocks and `--format json` is used, a human-readable summary (spec path, versions, `version_bumped`, breaking changes) is also written to stderr so CI logs stay actionable.
@@ -65,7 +65,7 @@ When the gate blocks and `--format json` is used, a human-readable summary (spec
   "expected_bump_type": "minor" | "patch" | null,
   "breaking_approved": bool,
   "spec_path": "backend/src/syntara/schemas/openapi.yaml",
-  "gate_code": "ok" | "breaking_approved" | "breaking_blocked" | "version_bump_required" | "wrong_bump_segment"
+  "gate_code": "ok" | "breaking_approved" | "breaking_blocked" | "version_bump_required" | "incorrect_version_increment"
 }
 ```
 
@@ -201,7 +201,7 @@ make check-openapi-contracts
 ### 4. Test Full Workflow Locally
 
 ```bash
-# 1. Check for breaking changes (blocks on breaking changes or a missing version bump)
+# 1. Check for breaking changes (blocks on breaking changes or a missing version update)
 ./scripts/openapi/check-breaking-changes.py \
   --base devel \
   --head HEAD \

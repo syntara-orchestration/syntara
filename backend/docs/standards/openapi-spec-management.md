@@ -67,23 +67,23 @@ These hooks run automatically on commit (and in CI via the `pre-commit` job):
 | `backend-api-spec-drift` | Runs when backend `.py` files change; invokes `make api-spec-drift` to compare the committed spec to the live FastAPI schema; **blocking** |
 | `backend-check-openapi-breaking` | Runs when `openapi.yaml` changes; compares against `devel` and blocks on breaking changes |
 
-### Mandatory version bump
+### OpenAPI info.version updates
 
-**Every meaningful OpenAPI spec change must bump `info.version`.** The bump is how the engineer signals their interpretation of the change to reviewers and how API consumers become aware of spec updates. A meaningful spec change with no `info.version` bump is **blocked** (`gate_code: version_bump_required`).
+**Every meaningful OpenAPI spec change must update `info.version`.** The version change communicates the nature of the API change to API consumers as well as PR reviewers. A meaningful spec change that leaves `info.version` unchanged is **blocked** (`gate_code: version_bump_required`).
 
-Comparison is **canonical** (semantic): the two specs are parsed and compared as data structures. Serialization-only diffs — whitespace, indentation, line endings, key order, quote style — are **not** a meaningful change and do **not** require a bump.
+Comparison is **canonical** (semantic): the two specs are parsed and compared as data structures. Serialization-only diffs — whitespace, indentation, line endings, key order, quote style — are **not** considered meaningful changes and do **not** require a version update.
 
-### Correct bump segment (enforced)
+### Required version increment check (enforced)
 
-CI validates that the bump segment matches the change type, not just that `info.version` changed. A bump of the wrong segment is **blocked** (`gate_code: wrong_bump_segment`) with an error naming the expected segment.
+CI validates that the `info.version` increment is appropriate for the type of specification change. A change using the wrong version increment is **blocked** (`gate_code: incorrect_version_increment`) with an error naming the expected increment.
 
-| Change type | Detected via | Required segment |
+| Change type | Detected via | Required version change |
 |-------------|--------------|------------------|
-| Additive — new endpoint, field, or enum value | oasdiff reports a structural change entry | **minor** |
-| Spec-only — description, example, or annotation edit | canonical diff with no oasdiff structural entry | **patch** |
-| Approved in-place breaking change | oasdiff reports a breaking change + `breaking-change-approved` label | **minor** (never major — a new major version is a new spec at a new URL path) |
+| Additive — new endpoint, field, or enum value | oasdiff reports a structural change entry | Increment the **minor** version |
+| Spec-only — description, example, or annotation edit | canonical diff with no oasdiff structural entry | Increment the **patch** version |
+| Approved in-place breaking change | oasdiff reports a breaking change + `breaking-change-approved` label | Increment the **minor** version (never major — a new major version is a new spec at a new URL path) |
 
-Note: oasdiff does not report pure description/summary/example edits, so those are detected only by the canonical comparison and classified as `patch`.
+Note: oasdiff does not report pure description/summary/example edits, so those are detected only by the canonical comparison and classified as a **patch** change.
 
 ### Dynamic-map / `additionalProperties` content
 
@@ -93,21 +93,28 @@ Changes to dynamic-map fields (`additionalProperties` schemas such as `labels`, 
 
 The gate compares each spec only against its own prior state on the base ref. A new major version introduced as a **new spec at a new URL path** (e.g. `/api/v2/`) has no baseline on the base ref, so the check is skipped for it — it does not register as a breaking change to the current spec.
 
+### Detection scope and limitations
+
+Breaking-change detection is delegated entirely to `oasdiff breaking`; there is no secondary classification layer, so coverage equals oasdiff's own ruleset. Two limits follow from this and a green check must **not** be read as full policy compliance:
+
+- **Coverage equals oasdiff.** Categories in the AO REST API Versioning and Deprecation Policy that oasdiff does not model will not be flagged. Audit oasdiff's ruleset against the policy periodically.
+- **Semantic-only changes are undetectable by any schema differ.** A change where the shape is unchanged but the behavior differs for the same request/response (a "semantic change with no type change") cannot be detected by comparing schemas. Our policy classifies that class as breaking; catching it always requires human review. This gate is not a backstop for it.
+
 ### Breaking Change Policy
 
 Breaking changes are **always blocked in place** — full stop. Per the AO REST API Versioning and Deprecation Policy, breaking changes never apply in place: v1 and v2 are separate specs served from different URL paths.
 
-The only override for an in-place breaking change is the privileged `breaking-change-approved` GitHub label. The label is sanctioned **only** for a CVE / critical security vulnerability with no non-breaking remediation, applied to all supported versions, after escalation to engineering and BU leadership (Senior Director or above). An approved breaking change must still bump `info.version` by a **minor** segment.
+The only override for an in-place breaking change is the privileged `breaking-change-approved` GitHub label. The label is sanctioned **only** for a CVE / critical security vulnerability with no non-breaking remediation, after escalation to engineering and BU leadership (Senior Director or above). An approved breaking change must still increment `info.version` by a **minor** version.
 
 | Change type | Gate |
 |-------------|------|
 | No meaningful spec change (incl. serialization-only) | Allowed (`ok`) |
-| Additive change, minor bump | Allowed (`ok`) |
-| Spec-only change, patch bump | Allowed (`ok`) |
-| Meaningful change, no version bump | Blocked (`version_bump_required`) |
-| Meaningful change, wrong bump segment | Blocked (`wrong_bump_segment`) |
+| Additive change, minor increment | Allowed (`ok`) |
+| Spec-only change, patch increment | Allowed (`ok`) |
+| Meaningful change, no version change | Blocked (`version_bump_required`) |
+| Meaningful change, wrong version increment | Blocked (`incorrect_version_increment`) |
 | Breaking change, no approval label | Blocked (`breaking_blocked`) |
-| Breaking change, `breaking-change-approved` label + minor bump | Allowed (`breaking_approved`) |
+| Breaking change, `breaking-change-approved` label + minor increment | Allowed (`breaking_approved`) |
 
 ### Privileged approval label (enforcement)
 

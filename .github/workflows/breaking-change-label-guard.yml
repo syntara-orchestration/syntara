@@ -11,15 +11,22 @@
 #
 # Team membership requires an `read:org` scoped token. Provision the
 # `SYNTARA_LEADS_READ_TOKEN` secret (a fine-grained PAT or GitHub App token with
-# organization "Members: read"). Without it the guard fails closed: it cannot
-# confirm membership, so it removes the label and asks for a re-apply by a lead.
+# organization "Members: read"). If it is missing, the guard fails fast with a
+# clear configuration error (a preflight step) rather than silently falling back
+# to a token that cannot read team membership.
 name: Breaking Change Label Guard
 
 on:
   # pull_request_target so the token has write access to manage labels/comments,
   # including on fork PRs. No fork code is checked out or executed here.
+  #
+  # opened/synchronize/reopened are included so this workflow reports a check
+  # result on every PR (the job's `if:` skips them, and GitHub treats a skipped
+  # required check as satisfied). That lets it be made a **required** status
+  # check, closing the TOCTOU window where the OpenAPI gate could pass on a
+  # label this guard is concurrently removing.
   pull_request_target:
-    types: [labeled]
+    types: [opened, synchronize, reopened, labeled]
 
 concurrency:
   group: breaking-change-label-guard-${{ github.event.pull_request.number }}
@@ -35,12 +42,22 @@ jobs:
     if: github.event.label.name == 'breaking-change-approved'
     runs-on: ubuntu-latest
     steps:
+      - name: Ensure org-read token is configured
+        env:
+          SYNTARA_LEADS_READ_TOKEN: ${{ secrets.SYNTARA_LEADS_READ_TOKEN }}
+        run: |
+          if [ -z "$SYNTARA_LEADS_READ_TOKEN" ]; then
+            echo "::error::SYNTARA_LEADS_READ_TOKEN secret is not configured. The Breaking Change Label Guard cannot verify syntara-leads membership without a read:org token. Provision the secret (a fine-grained PAT or GitHub App token with organization 'Members: read'), then re-apply the label." >&2
+            exit 1
+          fi
+
       - name: Verify actor is a member of syntara-leads
         uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553 # v9
         with:
-          # Prefer a read:org token; fall back to GITHUB_TOKEN (which cannot read
-          # team membership and will therefore fail closed).
-          github-token: ${{ secrets.SYNTARA_LEADS_READ_TOKEN || secrets.GITHUB_TOKEN }}
+          # Requires a read:org token; the preflight step above fails the job if
+          # it is not configured, so there is no fallback to GITHUB_TOKEN (which
+          # cannot read team membership).
+          github-token: ${{ secrets.SYNTARA_LEADS_READ_TOKEN }}
           script: |
             const org = context.repo.owner;
             const repo = context.repo.repo;
@@ -89,7 +106,7 @@ jobs:
               `privileged \`${label}\` label has been removed.\n\n` +
               `Per the AO REST API Versioning and Deprecation Policy, this label sanctions an ` +
               `**in-place breaking change** only for a CVE / critical security vulnerability with ` +
-              `no non-breaking remediation, applied to all supported versions, after escalation to ` +
+              `no non-breaking remediation, after escalation to ` +
               `engineering and BU leadership (Senior Director or above). Only members of ` +
               `\`${org}/${team}\` may apply it.\n\n` +
               `If this override is warranted, ask a member of **${team}** to review and re-apply the label.`;

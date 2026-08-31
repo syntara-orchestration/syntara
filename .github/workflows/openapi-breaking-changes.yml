@@ -61,8 +61,8 @@ jobs:
         uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553 # v9
         with:
           script: |
-            const labels = context.payload.pull_request.labels.map(l => l.name).join(',');
-            core.setOutput('labels', labels);
+            const labels = context.payload.pull_request.labels.map(l => l.name);
+            core.setOutput('labels', JSON.stringify(labels));
 
       - name: Set up Python
         if: steps.detect.outputs.changed == 'true'
@@ -84,8 +84,10 @@ jobs:
             --head HEAD \
             --output breaking-results.json \
             --fallback-spec-path backend/src/syntara/schemas/openapi.yaml \
-            --pr-labels "${{ steps.labels.outputs.labels }}"
+            --pr-labels "$OPENAPI_PR_LABELS"
         working-directory: backend
+        env:
+          OPENAPI_PR_LABELS: ${{ steps.labels.outputs.labels }}
 
       - name: Show breaking-change results on failure
         if: failure() && steps.detect.outputs.changed == 'true'
@@ -97,7 +99,7 @@ jobs:
         working-directory: backend
 
       - name: Check contract regeneration
-        if: always() && steps.detect.outputs.changed == 'true'
+        if: ${{ !cancelled() && steps.detect.outputs.changed == 'true' }}
         run: |
           PR_BODY=$(cat "$GITHUB_WORKSPACE/pr-body.txt")
           ./scripts/openapi/check-contract-regeneration.py \

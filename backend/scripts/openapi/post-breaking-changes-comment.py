@@ -103,7 +103,7 @@ def _version_bump_required_lines(
     return lines
 
 
-def _wrong_bump_segment_lines(
+def _incorrect_version_increment_lines(
     *,
     spec_path: str,
     base_version: str,
@@ -112,12 +112,12 @@ def _wrong_bump_segment_lines(
     version_bump_type: str | None,
     expected_bump_type: str | None,
 ) -> list[str]:
-    """Format the blocked wrong-bump-segment PR comment section."""
+    """Format the blocked incorrect-version-increment PR comment section."""
     lines = [
-        "### Wrong Version Bump Segment (Blocked)\n",
+        "### Incorrect Version Increment (Blocked)\n",
         (
-            f"This PR bumped `info.version` by a **{escape_markdown(version_bump_type or 'unknown')}** "
-            f"segment, but the change requires a **{escape_markdown(expected_bump_type or 'unknown')}** bump.\n"
+            f"This PR incremented `info.version` by a **{escape_markdown(version_bump_type or 'unknown')}** "
+            f"segment, but the change requires a **{escape_markdown(expected_bump_type or 'unknown')}** increment.\n"
         ),
     ]
     lines.extend(
@@ -232,9 +232,9 @@ def format_breaking_changes_comment(results: dict, repo_owner: str, repo_name: s
                 expected_bump_type=expected_bump_type,
             )
         )
-    elif gate_code == "wrong_bump_segment":
+    elif gate_code == "incorrect_version_increment":
         lines.extend(
-            _wrong_bump_segment_lines(
+            _incorrect_version_increment_lines(
                 spec_path=spec_path,
                 base_version=base_version,
                 head_version=head_version,
