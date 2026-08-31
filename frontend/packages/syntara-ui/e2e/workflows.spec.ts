@@ -1,6 +1,6 @@
 import { test, expect, toAppUrl } from './fixtures'
 import { APP_TITLE } from './helpers/appTitle'
-import { buildUniqueName, createBasicWorkflowViaApi, deleteWorkflow } from './helpers/workflows'
+import { buildUniqueName, createBasicWorkflowViaApi, deleteWorkflow, openWorkflowInBuilder } from './helpers/workflows'
 
 test('workflows page toolbar shows Import workflow before Create workflow', async ({ app }) => {
   await app.goto(toAppUrl('/workflows'))
@@ -77,6 +77,58 @@ test('user searches, views, and deletes a workflow', async ({ app }) => {
   } finally {
     for (const name of [otherWorkflowName, workflowName]) {
       await deleteWorkflow(app, name)
+    }
+  }
+})
+
+test('duplicates workflow from builder toolbar kebab menu', { tag: ['@konflux-skip'] }, async ({ app }) => {
+  const workflowName = buildUniqueName('duplicate-source')
+  let duplicatedWorkflowName: string | undefined
+
+  try {
+    // Create a workflow with a descriptive step
+    const { id } = await createBasicWorkflowViaApi(app, workflowName, 'Original Step')
+
+    // Open in builder
+    await openWorkflowInBuilder(app, workflowName, id)
+
+    // Open kebab menu and click Duplicate
+    await app.getByLabel('Workflow actions').click()
+    await app.getByRole('menuitem', { name: /Duplicate workflow/i }).click()
+
+    // Verify success alert appears
+    const successAlert = app.getByText('Workflow duplicated')
+    await expect(successAlert).toBeVisible({ timeout: 10_000 })
+
+    // Extract duplicated workflow name from the alert (format: "Created \"<name>\"")
+    const alertDescription = app.getByText(/Created ".*"/)
+    await expect(alertDescription).toBeVisible()
+    const alertText = await alertDescription.textContent()
+    const match = alertText?.match(/Created "(.+)"/)
+    expect(match).toBeTruthy()
+    duplicatedWorkflowName = match?.[1]
+    expect(duplicatedWorkflowName).toMatch(new RegExp(`${workflowName} - duplicate-[a-z0-9]+`))
+
+    // Click "Open workflow" link in alert
+    const openWorkflowLink = app.getByRole('button', { name: 'Open workflow' })
+    await expect(openWorkflowLink).toBeVisible()
+    await openWorkflowLink.click()
+
+    // Verify duplicated workflow opens in builder with correct name
+    await expect(app.getByPlaceholder('Workflow name')).toHaveValue(duplicatedWorkflowName!, { timeout: 15_000 })
+
+    // Verify the step was duplicated (ReactFlow canvas node)
+    await expect(app.getByText('Original Step')).toBeVisible()
+
+    // Verify duplicated workflow appears in workflows list
+    await app.goto(toAppUrl('/workflows'))
+    await app.getByPlaceholder('Filter by name').fill(duplicatedWorkflowName!)
+    await app.getByRole('button', { name: 'Apply filter' }).click()
+    await expect(app.getByRole('link', { name: duplicatedWorkflowName, exact: true })).toBeVisible()
+  } finally {
+    await deleteWorkflow(app, workflowName)
+    if (duplicatedWorkflowName) {
+      await deleteWorkflow(app, duplicatedWorkflowName)
     }
   }
 })

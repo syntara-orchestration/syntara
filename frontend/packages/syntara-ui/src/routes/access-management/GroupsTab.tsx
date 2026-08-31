@@ -7,10 +7,10 @@ import { useMemo } from 'react'
 
 import { AppRoute } from '../../app/AppRoute'
 import { usersClient } from '../../client'
-import { NxConfirmationDialog } from '../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { IconLabel } from '../../components/IconLabel'
-import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../components/panels/list/NxListPanel'
+import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../components/panels/list/SynListPanel'
 import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 import { DateCell } from '../../components/table/DateCell'
 import { useCursorPagination, useCursorReset } from '../../hooks/useCursorPagination'
@@ -89,7 +89,7 @@ export function GroupsTab() {
 
   return (
     <>
-      <NxListPanelView
+      <SynListPanelView
         tabKey="groups"
         tabLabel="Groups"
         isPending={query.isPending}
@@ -109,7 +109,7 @@ export function GroupsTab() {
         }
         toolbar={
           groups.length > 0 || hasActiveFilters ? (
-            <NxListPanelToolbar
+            <SynListPanelToolbar
               filters={filters}
               filterDefinitions={filterFieldDefinitions}
               onFilterChange={handleFilterChange}
@@ -135,7 +135,7 @@ export function GroupsTab() {
               Groups organize users into logical collections, making it easy to assign roles to many users at once. When
               a role is assigned to a group, every user in that group inherits its permissions.
             </Content>
-            <NxListPanelTable caption="Groups table" footer={getFooterProps(data)}>
+            <SynListPanelTable caption="Groups table" footer={getFooterProps(data)}>
               <Thead>
                 <Tr>
                   <Th sort={getSortParams(0)}>Name</Th>
@@ -202,7 +202,7 @@ export function GroupsTab() {
                   </Tr>
                 ))}
               </Tbody>
-            </NxListPanelTable>
+            </SynListPanelTable>
           </>
         }
       />
@@ -216,7 +216,7 @@ export function GroupsTab() {
         }}
       />
 
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={deleteDialog.isOpen}
         onClose={deleteDialog.close}
         onConfirm={() => handleDelete(deleteDialog.item)}
@@ -230,7 +230,7 @@ export function GroupsTab() {
         }}
       >
         The group <strong>{deleteDialog.item?.name}</strong> will be deleted. This cannot be undone.
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
     </>
   )
 }

@@ -8,9 +8,20 @@ type SaveBeforeViewDialogProps = Readonly<{
   onSave: () => Promise<boolean>
   onViewWithoutSaving: () => void
   onCancel: () => void
+  title?: string
+  bodyText?: string
+  buttonLabel?: string
 }>
 
-export function SaveBeforeViewDialog({ isOpen, onSave, onViewWithoutSaving, onCancel }: SaveBeforeViewDialogProps) {
+export function SaveBeforeViewDialog({
+  isOpen,
+  onSave,
+  onViewWithoutSaving,
+  onCancel,
+  title = 'Save changes before viewing this version?',
+  bodyText = 'Viewing workflow versions will exit the editor view and will permanently delete all recent unsaved progress on your workflow. Please save your work before leaving.',
+  buttonLabel = 'View version without saving',
+}: SaveBeforeViewDialogProps) {
   useBlurOnOpen(isOpen)
   const [isSaving, setIsSaving] = useState(false)
 
@@ -25,19 +36,16 @@ export function SaveBeforeViewDialog({ isOpen, onSave, onViewWithoutSaving, onCa
 
   return (
     <Modal isOpen={isOpen} onClose={onCancel} variant="small">
-      <ModalHeader title="Save changes before viewing this version?" />
+      <ModalHeader title={title} />
       <ModalBody>
-        <Content>
-          Viewing workflow versions will exit the editor view and will permanently delete all recent unsaved progress on
-          your workflow. Please save your work before leaving.
-        </Content>
+        <Content>{bodyText}</Content>
       </ModalBody>
       <ModalFooter>
         <Button variant="primary" onClick={handleSave} isLoading={isSaving} isDisabled={isSaving}>
           Save workflow
         </Button>
         <Button variant="secondary" onClick={onViewWithoutSaving} isDisabled={isSaving}>
-          View version without saving
+          {buttonLabel}
         </Button>
         <Button variant="link" onClick={onCancel} isDisabled={isSaving}>
           Cancel

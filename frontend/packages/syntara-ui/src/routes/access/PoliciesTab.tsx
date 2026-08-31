@@ -5,7 +5,7 @@ import type { IAction, ThProps } from '@patternfly/react-table'
 import { useCallback, useMemo } from 'react'
 
 import { IconLabel } from '../../components/IconLabel'
-import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../components/panels/list/NxListPanel'
+import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../components/panels/list/SynListPanel'
 import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 import { useCursorReset } from '../../hooks/useCursorPagination'
 import { useDialogState } from '../../hooks/useDialogState'
@@ -173,7 +173,7 @@ export function PoliciesTab() {
 
   return (
     <>
-      <NxListPanelView
+      <SynListPanelView
         tabKey="policies"
         tabLabel="Policies"
         isPending={policiesQuery.isPending}
@@ -186,7 +186,7 @@ export function PoliciesTab() {
         noDataState={<SynEmptyStateNoData title="No policies yet" description="No policies are available." />}
         toolbar={
           showToolbar ? (
-            <NxListPanelToolbar
+            <SynListPanelToolbar
               filters={filters}
               filterDefinitions={filterFieldDefinitions}
               onFilterChange={handleFilterChange}
@@ -201,14 +201,14 @@ export function PoliciesTab() {
               built-in policies to understand available permissions, then group them into roles for project scoped or
               system level assignments to users and groups.
             </Content>
-            <NxListPanelTable caption="Policies" footer={getFooterProps(data)}>
+            <SynListPanelTable caption="Policies" footer={getFooterProps(data)}>
               <PoliciesTableBody
                 policies={policies}
                 projectNameMap={projectNameMap}
                 getSortParams={getSortParams}
                 onViewPolicyJson={policyJsonDialog.open}
               />
-            </NxListPanelTable>
+            </SynListPanelTable>
           </>
         }
       />
