@@ -1,5 +1,5 @@
 import { Button, EmptyState, EmptyStateActions, EmptyStateBody, EmptyStateFooter } from '@patternfly/react-core'
-import { PlusCircleIcon } from '@patternfly/react-icons'
+import { PlusCircleIcon, RhUiAddIcon } from '@patternfly/react-icons'
 
 type CredentialEmptyStateProps = {
   onCreateCredential?: () => void
