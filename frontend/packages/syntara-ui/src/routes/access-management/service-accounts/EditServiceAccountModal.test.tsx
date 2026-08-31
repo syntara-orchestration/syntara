@@ -44,7 +44,7 @@ describe('EditServiceAccountModal', () => {
     status: 'active',
     project_id: '550e8400-e29b-41d4-a716-446655440000',
     last_authenticated_at: '2024-06-15T10:00:00Z',
-    created_by: 'admin',
+    created_by: { id: 'u-004', name: 'admin' },
     updated_by: null,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-02T00:00:00Z',

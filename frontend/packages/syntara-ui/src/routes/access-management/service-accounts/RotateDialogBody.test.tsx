@@ -18,8 +18,8 @@ const mockCredential: ServiceAccountCredentialRead = {
   last_used_at: null,
   created_at: '2026-07-14T12:00:00Z',
   updated_at: '2026-07-14T12:00:00Z',
-  created_by: 'user-1',
-  updated_by: 'user-1',
+  created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1' },
+  updated_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1' },
 }
 
 describe('RotateDialogBody', () => {

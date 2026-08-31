@@ -235,7 +235,7 @@ describe('CredentialWorkflowsTab', () => {
           {
             id: 'wf-1',
             name: 'Production Deployment',
-            created_by: 'admin',
+            created_by: { id: 'u-004', name: 'admin' },
             created_at: '2026-07-01T12:00:00Z',
             node_names: ['Fetch secrets', 'Deploy'],
             last_execution_status: 'completed',

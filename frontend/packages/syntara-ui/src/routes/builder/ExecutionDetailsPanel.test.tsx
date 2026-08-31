@@ -48,7 +48,7 @@ const EXECUTION = {
     status: 'running',
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
-    created_by: 'user-1',
+    created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1' },
     updated_by: null,
     completed_at: null,
     input_data: {},

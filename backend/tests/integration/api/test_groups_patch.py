@@ -53,7 +53,8 @@ class TestGroupsPatchContract:
         data = response.json()
         assert data["name"] == test_group.name
         assert data["id"] == str(test_group.id)
-        assert data["created_by"] == str(test_group.created_by)
+        assert isinstance(data["created_by"], dict)
+        assert data["created_by"]["id"] == str(test_group.created_by)
 
     @pytest.mark.asyncio
     async def test_update_group_empty_patch(self, admin_client: AsyncClient, test_group: Group) -> None:

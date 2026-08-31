@@ -24,6 +24,7 @@ from syntara.core.config.base import get_settings
 from syntara.core.models import User
 from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin, EnrichQueryMixin
+from syntara.core.services.user_reference_resolution import UserReferenceMixin
 from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.emission import emit_completion_metrics
 from syntara.metrics.interface_tag import interface_context_var
@@ -175,7 +176,7 @@ class ExecutionsConvertResourceMixin(ConvertResourceMixin):
         return result
 
 
-class ExecutionService(BaseService):
+class ExecutionService(UserReferenceMixin, BaseService):
     """Service for execution business logic.
 
     This service encapsulates all execution-related business operations,

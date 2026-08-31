@@ -186,9 +186,9 @@ export interface components {
       status: components['schemas']['ExecutionStatus']
       /**
        * Created By
-       * Format: uuid
+       * @description User who started the execution
        */
-      created_by: string
+      readonly created_by?: components['schemas']['UserReference'] | null
       /**
        * Created At
        * Format: date-time
@@ -201,8 +201,11 @@ export interface components {
        * Format: date-time
        */
       updated_at: string
-      /** Updated By */
-      updated_by: string | null
+      /**
+       * Updated By
+       * @description User who last modified the execution
+       */
+      readonly updated_by?: components['schemas']['UserReference'] | null
       /** Input Data */
       input_data: {
         [key: string]: unknown
@@ -567,6 +570,21 @@ export interface components {
       signal_data: {
         [key: string]: unknown
       }
+    }
+    /**
+     * UserReference
+     * @description Minimal user identification for embedding in other resources.
+     *     This model captures user identity at the time of an action, providing
+     *     a snapshot that doesn't change even if the user's details are updated later.
+     */
+    UserReference: {
+      /**
+       * Format: uuid
+       * @description User's unique identifier
+       */
+      id: string
+      /** @description User's display name at time of action */
+      name: string
     }
     /**
      * NodePosition

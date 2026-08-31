@@ -33,7 +33,7 @@ export const integrations: IntegrationRead[] = [
     enabled_model_count: 0,
     created_at: '2024-01-15T10:00:00Z',
     updated_at: '2024-01-15T10:00:00Z',
-    created_by: 'user-1',
+    created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1' },
     labels: {},
   },
   {
@@ -63,7 +63,7 @@ export const integrations: IntegrationRead[] = [
     enabled_model_count: 0,
     created_at: '2024-01-16T11:00:00Z',
     updated_at: '2024-01-16T11:00:00Z',
-    created_by: 'user-1',
+    created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1' },
     labels: {},
   },
   {
@@ -94,7 +94,7 @@ export const integrations: IntegrationRead[] = [
     enabled_model_count: 0,
     created_at: '2024-01-17T12:00:00Z',
     updated_at: '2024-01-17T12:00:00Z',
-    created_by: 'user-1',
+    created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1' },
     labels: {},
   },
   {
@@ -124,7 +124,7 @@ export const integrations: IntegrationRead[] = [
     enabled_model_count: 0,
     created_at: '2024-01-18T13:00:00Z',
     updated_at: '2024-01-18T13:00:00Z',
-    created_by: 'user-1',
+    created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1' },
     labels: {},
   },
   {
@@ -154,7 +154,7 @@ export const integrations: IntegrationRead[] = [
     enabled_model_count: 0,
     created_at: '2024-01-19T14:00:00Z',
     updated_at: '2024-01-19T14:00:00Z',
-    created_by: 'user-1',
+    created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1' },
     labels: {},
   },
   {
@@ -185,7 +185,7 @@ export const integrations: IntegrationRead[] = [
     enabled_model_count: 3,
     created_at: mockDate.daysAgo5,
     updated_at: mockDate.daysAgo1,
-    created_by: 'user-1',
+    created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1' },
     labels: {},
   },
   {
@@ -216,7 +216,7 @@ export const integrations: IntegrationRead[] = [
     enabled_model_count: 4,
     created_at: mockDate.daysAgo4,
     updated_at: mockDate.daysAgo1,
-    created_by: 'user-1',
+    created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1' },
     labels: {},
   },
   {
@@ -246,7 +246,7 @@ export const integrations: IntegrationRead[] = [
     enabled_model_count: 0,
     created_at: mockDate.daysAgo3,
     updated_at: mockDate.daysAgo1,
-    created_by: 'user-1',
+    created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1' },
     labels: {},
   },
 ]

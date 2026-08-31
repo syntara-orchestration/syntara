@@ -885,9 +885,9 @@ export interface components {
       status: components['schemas']['ExecutionStatus']
       /**
        * Created By
-       * Format: uuid
+       * @description User who started the execution
        */
-      created_by: string
+      readonly created_by?: components['schemas']['UserReference'] | null
       /**
        * Created At
        * Format: date-time
@@ -900,8 +900,11 @@ export interface components {
        * Format: date-time
        */
       updated_at: string
-      /** Updated By */
-      updated_by: string | null
+      /**
+       * Updated By
+       * @description User who last modified the execution
+       */
+      readonly updated_by?: components['schemas']['UserReference'] | null
       /** Input Data */
       input_data: {
         [key: string]: unknown

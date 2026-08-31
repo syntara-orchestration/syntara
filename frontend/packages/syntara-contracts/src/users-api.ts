@@ -681,8 +681,11 @@ export interface components {
        * @default false
        */
       is_builtin?: boolean
-      /** Created By */
-      created_by?: string | null
+      /**
+       * Created By
+       * @description User who created the group
+       */
+      readonly created_by?: components['schemas']['UserReference'] | null
       /**
        * Source
        * @default local
@@ -729,8 +732,11 @@ export interface components {
        * @default false
        */
       is_builtin?: boolean
-      /** Created By */
-      created_by?: string | null
+      /**
+       * Created By
+       * @description User who created the group
+       */
+      readonly created_by?: components['schemas']['UserReference'] | null
       /**
        * Source
        * @default local
@@ -1143,6 +1149,21 @@ export interface components {
       labels?: {
         [key: string]: string
       }
+    }
+    /**
+     * UserReference
+     * @description Minimal user identification for embedding in other resources.
+     *     This model captures user identity at the time of an action, providing
+     *     a snapshot that doesn't change even if the user's details are updated later.
+     */
+    UserReference: {
+      /**
+       * Format: uuid
+       * @description User's unique identifier
+       */
+      id: string
+      /** @description User's display name at time of action */
+      name: string
     }
   }
   responses: {

@@ -16,6 +16,7 @@ from syntara.workflows.models.execution import Execution
 from syntara.workflows.workflow_engine.services.temporal_execution_service import (
     TemporalExecutionService,
 )
+from tests.helpers.user_reference import assert_user_reference
 
 
 @pytest.mark.asyncio
@@ -40,7 +41,7 @@ async def test_create_execution_success(
     assert "id" in data
     assert data["workflow_id"] == str(test_workflow.id)
     assert data["status"] == "pending"
-    assert data["created_by"] == str(test_user.id)  # Updated from started_by
+    assert_user_reference(data["created_by"], test_user)
     assert data["input_data"] == {"key": "value"}
     assert "temporal_workflow_id" in data
     assert data["labels"] == {}
@@ -195,7 +196,7 @@ async def test_create_execution_temporal_connection_failure_graceful_degradation
     assert "id" in data
     assert data["workflow_id"] == str(test_workflow.id)
     assert data["status"] == "pending"
-    assert data["created_by"] == str(test_user.id)
+    assert_user_reference(data["created_by"], test_user)
     assert data["input_data"] == {"key": "value"}
 
     # Verify temporal_workflow_id is a stub (starts with "exec-")
