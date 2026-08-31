@@ -119,7 +119,7 @@ describe('CredentialIntegrationsTab', () => {
 
     render(<CredentialIntegrationsTab credentialId="cred-1" />, { wrapper })
 
-    expect(screen.getByText('No integrations using this credential')).toBeInTheDocument()
+    expect(screen.getByText('No integrations yet')).toBeInTheDocument()
     expect(
       screen.getByText(
         'This credential is not currently referenced by any integrations. Integrations will appear here once they are configured to use this credential.'
@@ -233,7 +233,7 @@ describe('CredentialIntegrationsTab', () => {
 
     render(<CredentialIntegrationsTab credentialId="cred-1" />, { wrapper })
 
-    expect(screen.getByText('No integrations using this credential')).toBeInTheDocument()
+    expect(screen.getByText('No integrations yet')).toBeInTheDocument()
   })
 
   it('displays integration type labels correctly', () => {
@@ -290,7 +290,7 @@ describe('CredentialIntegrationsTab', () => {
     expect(screen.getByText('AI coding assistant')).toBeVisible()
   })
 
-  it('renders Created by column with username', () => {
+  it('renders Created by column with username and date', () => {
     vi.mocked(integrationsClient.useQuery).mockReturnValue(
       mockQuery({
         resources: [
@@ -301,6 +301,7 @@ describe('CredentialIntegrationsTab', () => {
             validation_status: 'available',
             scope: 'global',
             created_by: 'admin',
+            created_at: '2026-07-01T12:00:00Z',
           },
         ],
       })
@@ -310,6 +311,7 @@ describe('CredentialIntegrationsTab', () => {
 
     expect(screen.getByText('Created by')).toBeInTheDocument()
     expect(screen.getByText('admin')).toBeInTheDocument()
+    expect(screen.getByText(/Jul.*1.*2026/i)).toBeInTheDocument()
   })
 
   it('links to an empty integration id when the id is missing', () => {
@@ -382,8 +384,8 @@ describe('CredentialIntegrationsTab', () => {
     render(<CredentialIntegrationsTab credentialId="cred-1" />, { wrapper })
 
     expect(screen.getByText('Bare Integration')).toBeInTheDocument()
-    expect(screen.getByText('\u2014')).toBeInTheDocument()
     expect(screen.getByText('Project')).toBeInTheDocument()
+    expect(screen.getByText('-')).toBeInTheDocument()
   })
 
   it('changes per-page count and resets to page 1', async () => {

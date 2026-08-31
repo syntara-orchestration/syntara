@@ -1,12 +1,13 @@
-import { Button, Flex, Label, Tooltip } from '@patternfly/react-core'
+import { Button, Flex, Tooltip } from '@patternfly/react-core'
 import { RhUiCheckCircleIcon, RhUiCloseCircleIcon, RhUiSyncIcon } from '@patternfly/react-icons'
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { ThProps } from '@patternfly/react-table'
 import { useCallback, useMemo, useState } from 'react'
 
-import { NxPanelContentStack } from '../../components/layout/NxPanelContentStack'
-import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../components/panels/list/NxListPanel'
-import { NxEmptyStateNoData } from '../../components/states/NxEmptyStateNoData'
+import { SynLabel } from '../../components/labels/SynLabel'
+import { SynPanelContentStack } from '../../components/layout/SynPanelContentStack'
+import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../components/panels/list/SynListPanel'
+import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 import type { FilterConfig, FilterFieldDefinition } from '../../types/filters'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../types/filters'
 import { detachPromise } from '../../utils/detachPromise'
@@ -103,20 +104,19 @@ function PermissionsTableContent({
               <code>{perm.policy_name}</code>
             </Td>
             <Td dataLabel="Effect">
-              <Label
+              <SynLabel
                 color={perm.effect === 'allow' ? 'green' : 'red'}
                 icon={perm.effect === 'allow' ? <RhUiCheckCircleIcon /> : <RhUiCloseCircleIcon />}
-                isCompact
               >
                 {perm.effect}
-              </Label>
+              </SynLabel>
             </Td>
             <Td dataLabel="Actions">
               <Flex gap={{ default: 'gapXs' }} flexWrap={{ default: 'wrap' }}>
                 {perm.actions.map((a) => (
-                  <Label key={a} color="blue" isCompact>
+                  <SynLabel key={a} color="blue">
                     {a}
-                  </Label>
+                  </SynLabel>
                 ))}
               </Flex>
             </Td>
@@ -209,8 +209,8 @@ export function MyPermissionsView() {
   )
 
   return (
-    <NxPanelContentStack hasGutter>
-      <NxListPanelView
+    <SynPanelContentStack hasGutter>
+      <SynListPanelView
         isPending={isLoading}
         error={error}
         onRetry={() => detachPromise(refetch())}
@@ -218,10 +218,10 @@ export function MyPermissionsView() {
         hasActiveFilters={hasActiveFilters}
         onClearAllFilters={clearAllFilters}
         noDataState={
-          <NxEmptyStateNoData title="No permissions" description="The current user has no permissions assigned." />
+          <SynEmptyStateNoData title="No permissions yet" description="The current user has no permissions assigned." />
         }
         toolbar={
-          <NxListPanelToolbar
+          <SynListPanelToolbar
             filters={filters}
             filterDefinitions={FILTER_FIELD_DEFS}
             onFilterChange={handleFilterChange}
@@ -239,11 +239,11 @@ export function MyPermissionsView() {
           />
         }
         body={
-          <NxListPanelTable caption="User permissions" footer={tableFooter}>
+          <SynListPanelTable caption="User permissions" footer={tableFooter}>
             <PermissionsTableContent permissions={pageData} getSortParams={getSortParams} />
-          </NxListPanelTable>
+          </SynListPanelTable>
         }
       />
-    </NxPanelContentStack>
+    </SynPanelContentStack>
   )
 }

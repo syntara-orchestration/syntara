@@ -13,6 +13,8 @@ from syntara.workflows.models.validation_finding import ValidationCategory, Vali
 
 TEMPLATE_PATTERN = re.compile(r"\$\{([^}]+)\}")
 
+# Keep in sync with KNOWN_NAMESPACES in
+# frontend/packages/syntara-ui/src/routes/builder/utils/validation/rules/validateVariableReferences.ts
 BUILTIN_SCOPES: frozenset[str] = frozenset(
     {
         "trigger",

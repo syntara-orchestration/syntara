@@ -5,11 +5,11 @@ import { useNavigate } from '@tanstack/react-router'
 import { useCallback, useMemo, useState } from 'react'
 
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
-import { NxPage, NxPageBody } from '../../components/layout/NxPage'
-import { NxPageHeader } from '../../components/layout/NxPageHeader'
-import { NxKebabMenu } from '../../components/NxKebabMenu'
-import { NxPageTitle } from '../../components/NxPageTitle'
-import { NxListPanel } from '../../components/panels/list/NxListPanel'
+import { SynPage, SynPageBody } from '../../components/layout/SynPage'
+import { SynPageHeader } from '../../components/layout/SynPageHeader'
+import { SynListPanel } from '../../components/panels/list/SynListPanel'
+import { SynKebabMenu } from '../../components/SynKebabMenu'
+import { SynPageTitle } from '../../components/SynPageTitle'
 import { builtinProjectTooltip } from '../../hooks/permissionUtils'
 import { useCursorPagination, useCursorReset } from '../../hooks/useCursorPagination'
 import { useDialogState } from '../../hooks/useDialogState'
@@ -73,7 +73,7 @@ function WorkflowsPageToolbar({
           </Button>
         </DisabledWithTooltip>
       )}
-      {headerProjectActions.length > 0 && <NxKebabMenu actions={headerProjectActions} aria-label="Project actions" />}
+      {headerProjectActions.length > 0 && <SynKebabMenu actions={headerProjectActions} aria-label="Project actions" />}
     </>
   )
 }
@@ -217,9 +217,9 @@ export default function Workflows() {
   const hasQueryState = workflowsQuery.isPending || !!workflowsQuery.error
   return (
     <>
-      <NxPage>
-        <NxPageTitle segments={['Workflows']} />
-        <NxPageHeader
+      <SynPage>
+        <SynPageTitle segments={['Workflows']} />
+        <SynPageHeader
           title="Workflows"
           docLink={workflowsDocLink}
           projectSelector={hasQueryState ? undefined : ProjectSelector}
@@ -240,8 +240,8 @@ export default function Workflows() {
           }
         />
 
-        <NxPageBody>
-          <NxListPanel>
+        <SynPageBody>
+          <SynListPanel>
             <WorkflowsListView
               isPending={workflowsQuery.isPending}
               error={workflowsQuery.error}
@@ -267,9 +267,9 @@ export default function Workflows() {
               getRowActions={getRowActions}
               projectActionCallbacks={projectActionCallbacks}
             />
-          </NxListPanel>
-        </NxPageBody>
-      </NxPage>
+          </SynListPanel>
+        </SynPageBody>
+      </SynPage>
 
       <WorkflowDialogs
         runDialog={runDialog}

@@ -2,7 +2,7 @@ import { Tooltip } from '@patternfly/react-core'
 import { RhUiCheckCircleIcon, RhUiCloseCircleIcon, RhUiMinusCircleIcon, RhUiSyncIcon } from '@patternfly/react-icons'
 import { IntegrationStatusEnum } from '@syntara/contracts'
 
-import { NxLabel } from '../../../components/labels/NxLabel'
+import { SynLabel } from '../../../components/labels/SynLabel'
 
 type IntegrationStatus = (typeof IntegrationStatusEnum)[keyof typeof IntegrationStatusEnum]
 
@@ -34,9 +34,9 @@ export function StatusLabel({ status, errorMessage }: StatusLabelProps) {
   const hasTooltip = integrationStatus === IntegrationStatusEnum.ERROR && errorMessage
 
   const label = (
-    <NxLabel variant="outline" status={labelStatus} icon={<Icon />} tabIndex={hasTooltip ? 0 : undefined}>
+    <SynLabel variant="outline" status={labelStatus} icon={<Icon />} tabIndex={hasTooltip ? 0 : undefined}>
       {capitalizedStatus}
-    </NxLabel>
+    </SynLabel>
   )
 
   if (hasTooltip) {

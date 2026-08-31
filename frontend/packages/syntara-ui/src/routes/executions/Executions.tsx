@@ -6,15 +6,15 @@ import { useMemo, useState } from 'react'
 
 import { executionsClient } from '../../client'
 import { FilterBar } from '../../components/filters/FilterBar'
-import { NxPage, NxPageBody } from '../../components/layout/NxPage'
-import { NxPageHeader } from '../../components/layout/NxPageHeader'
-import { NxPanel } from '../../components/layout/NxPanel'
-import { NxPanelContentStack } from '../../components/layout/NxPanelContentStack'
-import { NxPageTitle } from '../../components/NxPageTitle'
-import { NxEmptyStateFilter } from '../../components/states/NxEmptyStateFilter'
-import { NxEmptyStateNoData } from '../../components/states/NxEmptyStateNoData'
+import { SynPage, SynPageBody } from '../../components/layout/SynPage'
+import { SynPageHeader } from '../../components/layout/SynPageHeader'
+import { SynPanel } from '../../components/layout/SynPanel'
+import { SynPanelContentStack } from '../../components/layout/SynPanelContentStack'
+import { SynEmptyStateFilter } from '../../components/states/SynEmptyStateFilter'
+import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 import { useQueryState } from '../../components/states/useQueryState'
-import { NxScrollableTableContainer } from '../../components/table/NxScrollableTableContainer'
+import { SynPageTitle } from '../../components/SynPageTitle'
+import { SynScrollableTableContainer } from '../../components/table/SynScrollableTableContainer'
 import { useCursorPagination, useCursorReset } from '../../hooks/useCursorPagination'
 import { useProjectSelector } from '../../hooks/useProjectSelector'
 import { useProjectsForGrouping } from '../../hooks/useProjectsForGrouping'
@@ -118,7 +118,8 @@ export default function Executions() {
           executions: [],
         })
       }
-      groups.get(projectId)!.executions.push(execution)
+      const group = groups.get(projectId)
+      if (group) group.executions.push(execution)
     }
     return groups
   }, [visibleExecutions, projectsForGrouping, isAllProjects, builtinProjectIds])
@@ -141,28 +142,28 @@ export default function Executions() {
   })
   if (queryState) {
     return (
-      <NxPage>
-        <NxPageTitle segments={['Workflow Runs']} />
-        <NxPageHeader title="Workflow Runs" docLink={executionsDocLink} projectSelector={ProjectSelector} />
-        <NxPageBody>
-          <NxPanel isFullHeight>{queryState}</NxPanel>
-        </NxPageBody>
-      </NxPage>
+      <SynPage>
+        <SynPageTitle segments={['Workflow Runs']} />
+        <SynPageHeader title="Workflow Runs" docLink={executionsDocLink} projectSelector={ProjectSelector} />
+        <SynPageBody>
+          <SynPanel isFullHeight>{queryState}</SynPanel>
+        </SynPageBody>
+      </SynPage>
     )
   }
 
   return (
-    <NxPage>
-      <NxPageTitle segments={['Workflow Runs']} />
-      <NxPageHeader title="Workflow Runs" docLink={executionsDocLink} projectSelector={ProjectSelector} />
-      <NxPageBody>
-        <NxPanel isFullHeight>
+    <SynPage>
+      <SynPageTitle segments={['Workflow Runs']} />
+      <SynPageHeader title="Workflow Runs" docLink={executionsDocLink} projectSelector={ProjectSelector} />
+      <SynPageBody>
+        <SynPanel isFullHeight>
           {visibleExecutions.length === 0 && !hasActiveFilters ? (
-            <NxPageBody isCentered>
-              <NxEmptyStateNoData title="No executions found" description="No executions found." />
-            </NxPageBody>
+            <SynPageBody isCentered>
+              <SynEmptyStateNoData title="No executions yet" description="No workflow runs have been recorded yet." />
+            </SynPageBody>
           ) : (
-            <NxPanelContentStack variant="inset">
+            <SynPanelContentStack variant="inset">
               <StackItem>
                 <FilterBar
                   fieldDefinitions={filterFieldDefinitions}
@@ -173,11 +174,11 @@ export default function Executions() {
               </StackItem>
 
               {visibleExecutions.length === 0 ? (
-                <NxPageBody isCentered>
-                  <NxEmptyStateFilter clearAllFilters={handleClearAllFilters} />
-                </NxPageBody>
+                <SynPageBody isCentered>
+                  <SynEmptyStateFilter clearAllFilters={handleClearAllFilters} />
+                </SynPageBody>
               ) : (
-                <NxScrollableTableContainer caption="Executions table" footer={getFooterProps(executionsQuery.data)}>
+                <SynScrollableTableContainer caption="Executions table" footer={getFooterProps(executionsQuery.data)}>
                   <Thead>
                     <Tr>
                       <Th modifier="nowrap">Run ID</Th>
@@ -200,12 +201,12 @@ export default function Executions() {
                   ) : (
                     <FlatExecutionsTableBody executions={visibleExecutions} />
                   )}
-                </NxScrollableTableContainer>
+                </SynScrollableTableContainer>
               )}
-            </NxPanelContentStack>
+            </SynPanelContentStack>
           )}
-        </NxPanel>
-      </NxPageBody>
-    </NxPage>
+        </SynPanel>
+      </SynPageBody>
+    </SynPage>
   )
 }

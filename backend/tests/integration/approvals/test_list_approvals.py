@@ -112,6 +112,7 @@ class TestListApprovalsContract:
             "decided_by",
             "decided_at",
             "decision_notes",
+            "prompt",
         ]
         for field in nullable_fields:
             assert field in approval, f"Nullable field '{field}' missing from approval response"

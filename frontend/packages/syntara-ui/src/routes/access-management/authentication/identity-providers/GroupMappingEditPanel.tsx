@@ -75,23 +75,17 @@ export function GroupMappingEditPanel({
           </Alert>
         </StackItem>
       )}
+      <MappingTable
+        rows={mappingRows}
+        control={control}
+        mappedGroups={mappedGroups}
+        onRemove={onRemove}
+        onAdd={onAdd}
+        onCreateGroup={onCreateGroup}
+        showAddMappingAction={false}
+      />
       <StackItem>
-        <Stack hasGutter>
-          <StackItem>
-            <MappingTable
-              rows={mappingRows}
-              control={control}
-              mappedGroups={mappedGroups}
-              onRemove={onRemove}
-              onAdd={onAdd}
-              onCreateGroup={onCreateGroup}
-              showAddMappingAction={false}
-            />
-          </StackItem>
-          <StackItem>
-            <GroupMappingFormActions onAdd={onAdd} onReDiscover={onReDiscover} isListening={isListening} />
-          </StackItem>
-        </Stack>
+        <GroupMappingFormActions onAdd={onAdd} onReDiscover={onReDiscover} isListening={isListening} />
       </StackItem>
       <StackItem>
         <AdvancedSection

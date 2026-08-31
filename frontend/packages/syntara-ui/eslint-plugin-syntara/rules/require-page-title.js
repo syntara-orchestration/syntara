@@ -8,8 +8,8 @@ export default {
     messages: {
       missingTitle:
         'Page components must render a <title> element for the browser tab. ' +
-        'Use: <NxPageTitle segments={["Page Name"]} />. ' +
-        'Import NxPageTitle from src/components/NxPageTitle.',
+        'Use: <SynPageTitle segments={["Page Name"]} />. ' +
+        'Import SynPageTitle from src/components/SynPageTitle.',
     },
     schema: [],
   },
@@ -18,7 +18,7 @@ export default {
     let hasDefaultExport = false
     return {
       JSXOpeningElement(node) {
-        if (node.name.type === 'JSXIdentifier' && (node.name.name === 'title' || node.name.name === 'NxPageTitle')) {
+        if (node.name.type === 'JSXIdentifier' && (node.name.name === 'title' || node.name.name === 'SynPageTitle')) {
           hasTitleElement = true
         }
       },

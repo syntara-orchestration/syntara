@@ -7,12 +7,12 @@ import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsSettingsCategory, breadcrumbsSettingsPage } from '../../../app/breadcrumbBuilders'
 import { settingsClient } from '../../../client'
 import { EmptyStateAccessDenied } from '../../../components/EmptyStateAccessDenied'
-import { NxPage, NxPageBody } from '../../../components/layout/NxPage'
-import { NxPageHeader } from '../../../components/layout/NxPageHeader'
-import { NxPanel } from '../../../components/layout/NxPanel'
-import { NxPageTitle } from '../../../components/NxPageTitle'
+import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
+import { SynPageHeader } from '../../../components/layout/SynPageHeader'
+import { SynPanel } from '../../../components/layout/SynPanel'
 import { useQueryState } from '../../../components/states/useQueryState'
-import { NxUrlTabs } from '../../../components/tabs/NxUrlTabs'
+import { SynPageTitle } from '../../../components/SynPageTitle'
+import { SynUrlTabs } from '../../../components/tabs/SynUrlTabs'
 import { useDirtyFormGuard } from '../../../hooks/useDirtyFormGuard'
 import {
   FILE_STORAGE_UNAVAILABLE_MESSAGE,
@@ -121,7 +121,8 @@ export default function Settings() {
     for (const setting of allSettings) {
       const cat = setting.category
       if (!grouped.has(cat)) grouped.set(cat, [])
-      grouped.get(cat)!.push(setting)
+      const bucket = grouped.get(cat)
+      if (bucket) bucket.push(setting)
     }
     return grouped
   }, [allSettings])
@@ -194,38 +195,38 @@ export default function Settings() {
 
   if (!canRead || isForbidden) {
     return (
-      <NxPage>
-        <NxPageTitle segments={['Settings']} />
-        <NxPageHeader title="Settings" docLink={settingsDocLink} breadcrumbs={breadcrumbsSettingsPage()} />
+      <SynPage>
+        <SynPageTitle segments={['Settings']} />
+        <SynPageHeader title="Settings" docLink={settingsDocLink} breadcrumbs={breadcrumbsSettingsPage()} />
         <StackItem isFilled>
-          <NxPanel isFullHeight>
+          <SynPanel isFullHeight>
             <EmptyStateAccessDenied description="You don't have permission to view settings. Contact your administrator to request the auditor or admin role." />
-          </NxPanel>
+          </SynPanel>
         </StackItem>
-      </NxPage>
+      </SynPage>
     )
   }
 
   const errorOrLoadingState = categoriesState ?? settingsState
   if (errorOrLoadingState) {
     return (
-      <NxPage>
-        <NxPageTitle segments={['Settings']} />
-        <NxPageHeader title="Settings" docLink={settingsDocLink} breadcrumbs={breadcrumbsSettingsPage()} />
-        <NxPageBody>
-          <NxPanel isFullHeight>{errorOrLoadingState}</NxPanel>
-        </NxPageBody>
-      </NxPage>
+      <SynPage>
+        <SynPageTitle segments={['Settings']} />
+        <SynPageHeader title="Settings" docLink={settingsDocLink} breadcrumbs={breadcrumbsSettingsPage()} />
+        <SynPageBody>
+          <SynPanel isFullHeight>{errorOrLoadingState}</SynPanel>
+        </SynPageBody>
+      </SynPage>
     )
   }
 
   return (
-    <NxPage>
-      <NxPageTitle segments={['Settings']} />
-      <NxPageHeader title="Settings" docLink={settingsDocLink} breadcrumbs={settingsBreadcrumbs} />
-      <NxPageBody>
+    <SynPage>
+      <SynPageTitle segments={['Settings']} />
+      <SynPageHeader title="Settings" docLink={settingsDocLink} breadcrumbs={settingsBreadcrumbs} />
+      <SynPageBody>
         <FileStorageAlert />
-        <NxPanel
+        <SynPanel
           isFullHeight
           panelMainBodyProps={{ style: { flex: 1, minHeight: 0 } }}
           footer={
@@ -245,7 +246,7 @@ export default function Settings() {
         >
           <Stack hasGutter style={{ flex: 1, minHeight: 0, height: '100%' }}>
             <StackItem>
-              <NxUrlTabs
+              <SynUrlTabs
                 basePath={basePath}
                 defaultTab={defaultCategory}
                 validTabs={validTabs}
@@ -254,9 +255,9 @@ export default function Settings() {
                 {categories.map((cat) => (
                   <Tab key={cat.slug} eventKey={cat.slug} title={cat.name} />
                 ))}
-              </NxUrlTabs>
+              </SynUrlTabs>
             </StackItem>
-            <NxPageBody style={{ overflow: 'auto', padding: 'var(--pf-t--global--spacer--md)' }}>
+            <SynPageBody style={{ overflow: 'auto', padding: 'var(--pf-t--global--spacer--md)' }}>
               {categories[activeIndex] && (
                 <SettingsCategoryTab
                   settings={settingsByCategory.get(categories[activeIndex].slug) ?? []}
@@ -267,10 +268,10 @@ export default function Settings() {
                   readOnly={!canWrite}
                 />
               )}
-            </NxPageBody>
+            </SynPageBody>
           </Stack>
-        </NxPanel>
-      </NxPageBody>
-    </NxPage>
+        </SynPanel>
+      </SynPageBody>
+    </SynPage>
   )
 }

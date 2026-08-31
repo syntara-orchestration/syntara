@@ -17,11 +17,11 @@ import {
 import { RhUiCloseCircleIcon } from '@patternfly/react-icons'
 import { useState } from 'react'
 
-import { NxCodeBlock } from '../../components/details/NxCodeBlock'
-import { NxDetail } from '../../components/details/NxDetail'
-import { NxDetailList } from '../../components/details/NxDetailList'
-import { NxLabel } from '../../components/labels/NxLabel'
-import { NxEmptyStateNoData } from '../../components/states/NxEmptyStateNoData'
+import { SynCodeBlock } from '../../components/details/SynCodeBlock'
+import { SynDetail } from '../../components/details/SynDetail'
+import { SynDetailList } from '../../components/details/SynDetailList'
+import { SynLabel } from '../../components/labels/SynLabel'
+import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 
 import {
   formatTraceFieldLabel,
@@ -67,20 +67,20 @@ function StructuredStepBody({ data }: Readonly<{ data: Record<string, unknown> }
   return (
     <Stack hasGutter className={styles.structuredContent}>
       <StackItem>
-        <NxDetailList>
+        <SynDetailList>
           {Object.entries(data).map(([key, value]) => (
-            <NxDetail key={key} label={formatTraceFieldLabel(key)}>
+            <SynDetail key={key} label={formatTraceFieldLabel(key)}>
               <TraceFieldValue value={value} />
-            </NxDetail>
+            </SynDetail>
           ))}
-        </NxDetailList>
+        </SynDetailList>
       </StackItem>
       <StackItem>
         <Content component={ContentVariants.small} className={styles.stepTypeLabel}>
           JSON
         </Content>
-        {/* PatternFly CodeBlock (via NxCodeBlock): read-only display + copy, aligned with schema JSON. */}
-        <NxCodeBlock enableCopy jsonObject={data} />
+        {/* PatternFly CodeBlock (via SynCodeBlock): read-only display + copy, aligned with schema JSON. */}
+        <SynCodeBlock enableCopy jsonObject={data} />
       </StackItem>
     </Stack>
   )
@@ -170,9 +170,9 @@ function ToolCallCard({ group }: Readonly<{ group: ToolCallGroup }>) {
                 <FlexItem>{group.toolName}</FlexItem>
                 {isFailed && (
                   <FlexItem>
-                    <NxLabel variant="outline" status="danger" icon={<RhUiCloseCircleIcon />}>
+                    <SynLabel variant="outline" status="danger" icon={<RhUiCloseCircleIcon />}>
                       Failed
-                    </NxLabel>
+                    </SynLabel>
                   </FlexItem>
                 )}
               </Flex>
@@ -191,14 +191,14 @@ function ToolCallCard({ group }: Readonly<{ group: ToolCallGroup }>) {
           isExpanded={isExpanded}
           onToggle={(_e, expanded) => setIsExpanded(expanded)}
         >
-          <NxCodeBlock enableCopy copyContent={inputJson}>
+          <SynCodeBlock enableCopy copyContent={inputJson}>
             {inputJson}
-          </NxCodeBlock>
+          </SynCodeBlock>
         </ExpandableSection>
-        <NxDetailList>
-          <NxDetail label="Request">{formatTraceText(group.content)}</NxDetail>
-          <NxDetail label="Response">{formatTraceText(group.toolOutput)}</NxDetail>
-        </NxDetailList>
+        <SynDetailList>
+          <SynDetail label="Request">{formatTraceText(group.content)}</SynDetail>
+          <SynDetail label="Response">{formatTraceText(group.toolOutput)}</SynDetail>
+        </SynDetailList>
       </CardBody>
     </Card>
   )
@@ -244,7 +244,7 @@ export function AgentTraceView({ agentTrace, isLoading }: AgentTraceViewProps) {
 
   if (!agentTrace || agentTrace.steps.length === 0) {
     return (
-      <NxEmptyStateNoData
+      <SynEmptyStateNoData
         title="No agent steps yet"
         description="No agent reasoning steps are available for this activity."
       />

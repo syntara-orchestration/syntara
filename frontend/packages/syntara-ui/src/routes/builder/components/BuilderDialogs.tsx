@@ -1,7 +1,7 @@
 import { Checkbox, Content, Stack, StackItem } from '@patternfly/react-core'
 import { useMemo, useEffect, useRef, useState, type Dispatch } from 'react'
 
-import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import type { DialogState } from '../../../hooks/useDialogState'
 import { useAlerts } from '../../../providers/alerts'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
@@ -50,7 +50,10 @@ type BuilderDialogsProps = Readonly<{
   triggerInputSchema?: Record<string, unknown>
   pendingImport: PendingImportData | null
   setPendingImport: (data: PendingImportData | null) => void
-  importDeps: Omit<UseBuilderImportHandlersParams, 'dispatch' | 'markDirty' | 'showSuccess' | 'showError' | 'showInfo'>
+  importDeps: Omit<
+    UseBuilderImportHandlersParams,
+    'dispatch' | 'markDirty' | 'showAlert' | 'showSuccess' | 'showError' | 'showInfo'
+  >
   runStepDialog: DialogState<RunStepDialogData>
   runStepTriggerNodeId?: string
   onRunStepExecutionCreated?: (executionId: string, options: RunStepExecutionCreatedOptions) => void
@@ -154,9 +157,9 @@ export function BuilderDialogs({
 }: BuilderDialogsProps) {
   const isDirty = useWorkflowStore((state) => state.isDirty)
   const markDirty = useWorkflowStore((state) => state.markDirty)
-  const { showSuccess, showError: showImportError, showInfo } = useAlerts()
+  const { showAlert, showSuccess, showError: showImportError, showInfo } = useAlerts()
   const { handleImportCurrent, handleImportNew, clearPendingImport } = useBuilderImportHandlers(
-    { ...importDeps, dispatch, markDirty, showSuccess, showError: showImportError, showInfo },
+    { ...importDeps, dispatch, markDirty, showAlert, showSuccess, showError: showImportError, showInfo },
     pendingImport,
     setPendingImport
   )
@@ -169,7 +172,7 @@ export function BuilderDialogs({
     useRunConfirmState({ confirmDialogOpen, showInputDialog, dispatch, handleRunWorkflow, triggerNodeId })
   return (
     <>
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={showConfirmStep}
         onClose={closeAll}
         onConfirm={handleConfirmRun}
@@ -195,7 +198,7 @@ export function BuilderDialogs({
             />
           </StackItem>
         </Stack>
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
       <RunWorkflowModal
         key={showInputStep ? `open-${triggerNodeId ?? ''}` : 'closed'}
         isOpen={showInputStep}

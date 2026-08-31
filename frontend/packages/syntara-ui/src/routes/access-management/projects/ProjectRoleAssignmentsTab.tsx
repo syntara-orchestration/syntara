@@ -1,16 +1,16 @@
-import { Button, Label, LabelGroup, Truncate } from '@patternfly/react-core'
+import { Button, LabelGroup, Truncate } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { IAction, ThProps } from '@patternfly/react-table'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useMemo, useState } from 'react'
 
-import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
-import { NxLabel } from '../../../components/labels/NxLabel'
-import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../../components/panels/list/NxListPanel'
-import { NxEmptyStateNoData } from '../../../components/states/NxEmptyStateNoData'
+import { SynLabel } from '../../../components/labels/SynLabel'
+import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../../components/panels/list/SynListPanel'
+import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import { invalidateAuthzCaches } from '../../../hooks/invalidateAuthzCaches'
 import { useCursorPagination, useCursorReset } from '../../../hooks/useCursorPagination'
 import { useTableSort } from '../../../hooks/useTableSort'
@@ -103,7 +103,7 @@ function RoleAssignmentsTable({
                 />
               </Td>
               <Td dataLabel="Principal type">
-                <NxLabel color={color}>{text}</NxLabel>
+                <SynLabel color={color}>{text}</SynLabel>
               </Td>
               <Td dataLabel="Role name">
                 <Truncate content={assignment.role_name} />
@@ -112,9 +112,7 @@ function RoleAssignmentsTable({
                 {(assignment.role_policies ?? []).length > 0 ? (
                   <LabelGroup numLabels={3}>
                     {(assignment.role_policies ?? []).map((name) => (
-                      <Label key={name} isCompact>
-                        {name}
-                      </Label>
+                      <SynLabel key={name}>{name}</SynLabel>
                     ))}
                   </LabelGroup>
                 ) : (
@@ -236,7 +234,7 @@ export function ProjectRoleAssignmentsTab({ projectId }: Readonly<{ projectId: s
 
   return (
     <>
-      <NxListPanelView
+      <SynListPanelView
         tabKey="role-assignments"
         tabLabel="Assignments"
         isPending={query.isPending}
@@ -247,8 +245,8 @@ export function ProjectRoleAssignmentsTab({ projectId }: Readonly<{ projectId: s
         hasActiveFilters={hasActiveFilters}
         onClearAllFilters={handleClearAllFilters}
         noDataState={
-          <NxEmptyStateNoData
-            title="No role assignments"
+          <SynEmptyStateNoData
+            title="No role assignments yet"
             description="No roles have been assigned in this project."
             buttonText="Assign role"
             addData={assignmentPermissions.canAssign ? () => setAssignModalOpen(true) : undefined}
@@ -267,7 +265,7 @@ export function ProjectRoleAssignmentsTab({ projectId }: Readonly<{ projectId: s
         }
         toolbar={
           assignments.length > 0 || hasActiveFilters ? (
-            <NxListPanelToolbar
+            <SynListPanelToolbar
               filters={filters}
               filterDefinitions={filterFieldDefinitions}
               onFilterChange={handleFilterChange}
@@ -305,14 +303,14 @@ export function ProjectRoleAssignmentsTab({ projectId }: Readonly<{ projectId: s
           ) : undefined
         }
         body={
-          <NxListPanelTable caption="Project role assignments" footer={getFooterProps(query.data)}>
+          <SynListPanelTable caption="Project role assignments" footer={getFooterProps(query.data)}>
             <RoleAssignmentsTable
               assignments={assignments}
               getSortParams={getSortParams}
               onUnassign={setAssignmentToUnassign}
               permissions={assignmentPermissions}
             />
-          </NxListPanelTable>
+          </SynListPanelTable>
         }
       />
 
@@ -324,7 +322,7 @@ export function ProjectRoleAssignmentsTab({ projectId }: Readonly<{ projectId: s
         onSuccess={refetchAndInvalidateAuthz}
       />
 
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={!!assignmentToUnassign}
         onClose={() => setAssignmentToUnassign(null)}
         onConfirm={handleUnassign}
@@ -335,7 +333,7 @@ export function ProjectRoleAssignmentsTab({ projectId }: Readonly<{ projectId: s
       >
         This unassigns the role <strong>{assignmentToUnassign?.role_name}</strong> from{' '}
         <strong>{assignmentToUnassign?.principal_name}</strong>. Related permissions will be revoked.
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
 
       {createRoleOpen && (
         <AddProjectRoleDialog

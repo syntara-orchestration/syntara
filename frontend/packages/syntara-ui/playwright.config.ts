@@ -42,6 +42,8 @@ export default defineConfig({
     ['json', { outputFile: 'test-results/results.json' }],
     ['html', { outputFolder: 'playwright-report', open: 'never' }],
     ...(process.env.CURRENTS_PROJECT_ID && process.env.CURRENTS_RECORD_KEY ? [currentsReporter()] : []),
+    // Last: prints listed playwright.md tests that passed so they can be removed.
+    ['./e2e/xfailReporter.ts'],
   ],
   use: {
     baseURL,

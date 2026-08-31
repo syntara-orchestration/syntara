@@ -17,9 +17,9 @@ import { useMemo } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 
-import { NxLabel } from '../../components/labels/NxLabel'
-import { NxEmptyStateNoData } from '../../components/states/NxEmptyStateNoData'
-import { NxErrorState } from '../../components/states/NxErrorState'
+import { SynLabel } from '../../components/labels/SynLabel'
+import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
+import { SynErrorState } from '../../components/states/SynErrorState'
 import { getErrorMessage } from '../../utils/apiErrors'
 
 import { accessClient } from './accessClient'
@@ -72,7 +72,7 @@ function AccessResult({
         {result.matched_policy && (
           <StackItem>
             <Content component={ContentVariants.small}>
-              Matched policy: <NxLabel color="grey">{result.matched_policy}</NxLabel>
+              Matched policy: <SynLabel color="grey">{result.matched_policy}</SynLabel>
             </Content>
           </StackItem>
         )}
@@ -101,14 +101,14 @@ function AccessResult({
       {result.denied_by && (
         <StackItem>
           <Content component={ContentVariants.small}>
-            Denied by: <NxLabel color="grey">{result.denied_by}</NxLabel>
+            Denied by: <SynLabel color="grey">{result.denied_by}</SynLabel>
           </Content>
         </StackItem>
       )}
       {result.matched_policy && (
         <StackItem>
           <Content component={ContentVariants.small}>
-            Matched policy: <NxLabel color="grey">{result.matched_policy}</NxLabel>
+            Matched policy: <SynLabel color="grey">{result.matched_policy}</SynLabel>
           </Content>
         </StackItem>
       )}
@@ -244,7 +244,7 @@ export function CheckAccessView({ resourceTypes, actionsByResource }: Readonly<R
         <Stack hasGutter>
           {canIMutation.isIdle && (
             <StackItem>
-              <NxEmptyStateNoData
+              <SynEmptyStateNoData
                 title="Check access permissions"
                 description="Select a resource type and action, then click Check Access to verify your permissions."
               />
@@ -264,7 +264,7 @@ export function CheckAccessView({ resourceTypes, actionsByResource }: Readonly<R
 
           {canIMutation.isError && (
             <StackItem>
-              <NxErrorState
+              <SynErrorState
                 title="Access check failed"
                 message={getErrorMessage(canIMutation.error)}
                 onRetry={onSubmit}

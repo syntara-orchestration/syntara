@@ -74,13 +74,13 @@ export function buildRegistryActivityUpdate(taskData: TaskActivity, data: Regist
       data.executor === ExecutorTypeEnum.SCRIPT
         ? {
             language: data.language ?? 'python',
-            code: data.code!,
+            code: data.code ?? '',
             ...(data.credential_id && { credential_id: data.credential_id }),
             ...(scriptEnv && { environment: scriptEnv }),
           }
         : {
             method: data.method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
-            url: data.url!,
+            url: data.url ?? '',
             ...(apiHeaders && { headers: apiHeaders }),
             ...(data.body && {
               body: parseHttpBodyField(data.body),

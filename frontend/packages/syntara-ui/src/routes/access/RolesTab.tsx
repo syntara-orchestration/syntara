@@ -1,15 +1,16 @@
-import { Button, Content, Label, LabelGroup } from '@patternfly/react-core'
+import { Button, Content, LabelGroup } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiEditFillIcon, RhUiLockIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import { ActionsColumn, ExpandableRowContent, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { IAction, ThProps } from '@patternfly/react-table'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useMemo, useState } from 'react'
 
-import { NxConfirmationDialog } from '../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { IconLabel } from '../../components/IconLabel'
-import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../components/panels/list/NxListPanel'
-import { NxEmptyStateNoData } from '../../components/states/NxEmptyStateNoData'
+import { SynLabel } from '../../components/labels/SynLabel'
+import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../components/panels/list/SynListPanel'
+import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 import { invalidateAuthzCaches } from '../../hooks/invalidateAuthzCaches'
 import { useColumnSortState } from '../../hooks/useColumnSortState'
 import { useCursorPagination, useCursorReset } from '../../hooks/useCursorPagination'
@@ -168,13 +169,11 @@ function RolesTable({
               </Td>
               <Td dataLabel="Type">
                 {role.is_builtin ? (
-                  <Label color="grey" icon={<RhUiLockIcon />} isCompact>
+                  <SynLabel color="grey" icon={<RhUiLockIcon />}>
                     Built-in
-                  </Label>
+                  </SynLabel>
                 ) : (
-                  <Label color="blue" isCompact>
-                    Custom
-                  </Label>
+                  <SynLabel color="blue">Custom</SynLabel>
                 )}
               </Td>
               <Td isActionCell>
@@ -186,9 +185,9 @@ function RolesTable({
                 <ExpandableRowContent>
                   <LabelGroup isCompact numLabels={Infinity}>
                     {(role.policies ?? []).map((policy) => (
-                      <Label key={policy} color="grey" isCompact>
+                      <SynLabel key={policy} color="grey">
                         {policy}
-                      </Label>
+                      </SynLabel>
                     ))}
                   </LabelGroup>
                 </ExpandableRowContent>
@@ -288,7 +287,7 @@ export function RolesTab() {
 
   return (
     <>
-      <NxListPanelView
+      <SynListPanelView
         tabKey="roles"
         tabLabel="Roles"
         isPending={rolesQuery.isPending}
@@ -298,10 +297,10 @@ export function RolesTab() {
         isEmpty={roles.length === 0}
         hasActiveFilters={hasActiveFilters}
         onClearAllFilters={handleClearAllFilters}
-        noDataState={<NxEmptyStateNoData title="No roles found" description="No roles are available." />}
+        noDataState={<SynEmptyStateNoData title="No roles yet" description="No roles are available." />}
         toolbar={
           roles.length > 0 || hasActiveFilters ? (
-            <NxListPanelToolbar
+            <SynListPanelToolbar
               filters={filters}
               filterDefinitions={filterFieldDefinitions}
               onFilterChange={handleFilterChange}
@@ -328,7 +327,7 @@ export function RolesTab() {
               system or project level. Assign roles system-wide for broad access, or scope them to specific projects for
               tighter control.
             </Content>
-            <NxListPanelTable caption="Roles" isExpandable footer={getFooterProps(data)}>
+            <SynListPanelTable caption="Roles" isExpandable footer={getFooterProps(data)}>
               <RolesTable
                 roles={roles}
                 projectNameMap={projectNameMap}
@@ -341,7 +340,7 @@ export function RolesTab() {
                 onDelete={deleteDialog.open}
                 permissions={permissions}
               />
-            </NxListPanelTable>
+            </SynListPanelTable>
           </>
         }
       />
@@ -350,7 +349,7 @@ export function RolesTab() {
 
       {editDialog.item && <EditRoleDialog role={editDialog.item} onClose={editDialog.close} onSuccess={refetch} />}
 
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={deleteDialog.isOpen}
         onClose={deleteDialog.close}
         onConfirm={() => handleDelete(deleteDialog.item)}
@@ -365,7 +364,7 @@ export function RolesTab() {
       >
         The role <strong>{deleteDialog.item?.name}</strong> will be deleted. Assignments that use this role will lose
         access. This cannot be undone.
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
     </>
   )
 }

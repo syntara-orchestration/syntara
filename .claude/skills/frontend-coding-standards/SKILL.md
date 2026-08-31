@@ -32,9 +32,9 @@ Before writing custom utilities, hooks, or helpers, check whether the library or
 - `URLSearchParams` instead of manual query string parsing
 - `AbortController` instead of custom cancellation logic
 - `URL` constructor instead of string concatenation for URLs
-- `crypto.getRandomValues()` + a wrapper instead of Math.random() for IDs
+- `crypto.getRandomValues()` when you need raw bytes; for string IDs use `generateUUID()` from `frontend/packages/syntara-ui/src/utils/generateUUID.ts` (wraps `uuid` v4 — not `crypto.getRandomValues()`)
 
-**Caveat -- verify browser API availability in all deployment contexts.** Some Web APIs are restricted to secure contexts (HTTPS or localhost). For example, `crypto.randomUUID()` is unavailable over plain HTTP and causes a runtime crash. The project uses `generateUUID()` from `frontend/packages/syntara-ui/src/utils/generateUUID.ts` which wraps `crypto.getRandomValues()` (available in all contexts). When using a native API, check [MDN's "Secure context: required" badge](https://developer.mozilla.org/en-US/docs/Web/Security/Secure_Contexts) and verify the app works over both HTTP and HTTPS.
+**Caveat -- verify browser API availability in all deployment contexts.** Some Web APIs are restricted to secure contexts (HTTPS or localhost). For example, `crypto.randomUUID()` is unavailable over plain HTTP and causes a runtime crash. This app uses `generateUUID()` (`uuid` v4) instead of `crypto.randomUUID()`. When using a native API, check [MDN's "Secure context: required" badge](https://developer.mozilla.org/en-US/docs/Web/Security/Secure_Contexts) and verify the app works over both HTTP and HTTPS.
 
 When reviewing code, flag any pattern that duplicates what a dependency or browser API already exposes. If unsure whether a library covers a use case, check [`.claude/skills/frontend-library-references/SKILL.md`](../frontend-library-references/SKILL.md) and fetch the `llms.txt` URL for that library.
 
@@ -98,16 +98,16 @@ function isCredentialArray(value: unknown): value is Credential[] {
 
 ---
 
-## 4. Always Use `NxErrorState` Component — Never Raw Error Markup
+## 4. Always Use `SynErrorState` Component — Never Raw Error Markup
 
-The project has a standard `NxErrorState` component that handles retryable errors, displays consistent UI, and shows a retry button automatically for 5xx errors.
+The project has a standard `SynErrorState` component that handles retryable errors, displays consistent UI, and shows a retry button automatically for 5xx errors.
 
 ```typescript
 // ❌ BAD
 {error && <span>Unable to load profile information.</span>}
 
 // ✅ GOOD
-<NxErrorState
+<SynErrorState
   title="Unable to load profile"
   message={error}
   onRetry={() => detachPromise(refetch())}
@@ -137,19 +137,7 @@ const { register, handleSubmit } = useForm<FormData>({
 
 ### Loading state: Use `isPending` from mutations, not `formState.isSubmitting`
 
-**Enforced by ESLint:** `no-restricted-syntax` (error). See `eslint.config.js`.
-
-`formState.isSubmitting` only covers the synchronous `handleSubmit` wrapper. It does not reflect the actual async mutation state. Use `isPending` from the mutation hook for real loading indicators.
-
-```typescript
-// ❌ BAD — isSubmitting resolves before the mutation completes
-const { formState: { isSubmitting } } = useForm()
-<Button isLoading={isSubmitting}>Save</Button>
-
-// ✅ GOOD — isPending tracks the actual mutation lifecycle
-const { mutate, isPending } = credentialsClient.useMutation('post', '/credentials')
-<Button isLoading={isPending}>Save</Button>
-```
+**Enforced by ESLint:** `no-restricted-syntax` (error). See `eslint.config.js`. Use `isPending` from the mutation hook.
 
 ### Step form (with Zod)
 
@@ -301,7 +289,7 @@ Codebase Search Patterns:
 - `useCursorReset(itemCount, hasActiveFilters, cursor, isFetching, setCursor)` — reset to page 1
 - `useDialogState<T>()` — dialog open/close state with associated item
 - `useDeleteAction(options)` — delete mutation with success/error alerts
-- `NxConfirmationDialog` — reusable confirm/cancel modal (`frontend/packages/syntara-ui/src/components/dialogs/NxConfirmationDialog.tsx`)
+- `SynConfirmationDialog` — reusable confirm/cancel modal (`frontend/packages/syntara-ui/src/components/dialogs/SynConfirmationDialog.tsx`)
 
 ### List Page Standard Pattern
 
@@ -309,7 +297,7 @@ Codebase Search Patterns:
 import { useCursorPagination, useCursorReset } from '../../hooks/useCursorPagination'
 import { useDialogState } from '../../hooks/useDialogState'
 import { useDeleteAction } from '../../hooks/useDeleteAction'
-import { NxConfirmationDialog } from '../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../components/dialogs/SynConfirmationDialog'
 
 export function MyListPage() {
   const {
@@ -338,14 +326,14 @@ export function MyListPage() {
   useCursorReset(items.length, hasActiveFilters, cursor, query.isFetching, setCursor)
 
   return (
-    <NxPage>
+    <SynPage>
       <FilterBar ... />
-      <NxScrollableTableContainer
+      <SynScrollableTableContainer
         footer={getFooterProps(query.data)}
       >
         {/* <Th sort={getSortParams('name')}>Name</Th> */}
-      </NxScrollableTableContainer>
-      <NxConfirmationDialog
+      </SynScrollableTableContainer>
+      <SynConfirmationDialog
         isOpen={deleteDialog.isOpen}
         onClose={deleteDialog.close}
         onConfirm={() => handleDelete(deleteDialog.item)}
@@ -354,8 +342,8 @@ export function MyListPage() {
         confirmVariant="danger"
       >
         Are you sure?
-      </NxConfirmationDialog>
-    </NxPage>
+      </SynConfirmationDialog>
+    </SynPage>
   )
 }
 ```
@@ -385,8 +373,8 @@ Before writing any new UI code, follow this checklist:
    - Place in `frontend/packages/syntara-ui/src/components/` for app-specific components
    - **Use PF6 design tokens instead of hardcoded pixel values** for spacing, sizing, colors, and icons. Use `var(--pf-t--global--spacer--*)` for margins/padding, `var(--pf-t--global--icon--size--*)` for icon dimensions, `var(--pf-t--global--color--*)` for colors, and content-aware units (`ch`, `rem`) for input widths. Hardcoded `px` values are acceptable only for layout constraints (table column widths, fixed panel heights) where no semantic token applies. **CSS modules must also use PF tokens** -- ESLint only catches hardcoded values in JSX, so CSS modules need manual review. Use semantic tokens like `var(--pf-t--global--text--color--subtle)` rather than lower-level tokens like `var(--pf-t--global--color--200)`.
    - **Use `RhUi*` icons** (e.g., `RhUiAddIcon`, `RhUiTrashIcon`, `RhUiEditIcon`) for all action buttons, not legacy PatternFly icons like `PlusCircleIcon`, `CopyIcon`, or `TrashIcon`. The `RhUi*` icon set is the project standard. **Enforced by ESLint:** `no-restricted-imports` (warn) flags any non-`RhUi` import from `@patternfly/react-icons`. Existing legacy icons are being phased out.
-   - **Add `shouldFocusToggleOnSelect` to PF Select components** for accessibility. The select should receive focus when a selection is made. This is not a PF default but is needed for proper keyboard navigation.
-   - **JSDoc on shared/global component props** -- every exported component in `frontend/packages/syntara-ui/src/components/` (especially `Nx*` components) must have JSDoc descriptions on its props interface. TypeScript types convey shape; JSDoc conveys intent. Describe what each prop controls, when to use optional props, and any non-obvious default behavior. This helps both human contributors and AI agents use components correctly without reading the implementation.
+   - **Use `SynSelect` instead of PatternFly `Select`.** `SynSelect` applies scrollable-menu defaults (`isScrollable`, `maxMenuHeight`, popper `preventOverflow`, dismiss-on-outer-scroll). Enforced by ESLint `syntara/prefer-syn-select` (error). Keep importing `MenuToggle`, `SelectList`, `SelectOption`, and `SelectGroup` from PatternFly. Add `shouldFocusToggleOnSelect` for keyboard accessibility after selection (not a PF default). Pass `shouldFocusToggleOnSelect={false}` on typeaheads that must keep focus in a filter input.
+   - **JSDoc on shared/global component props** -- every exported component in `frontend/packages/syntara-ui/src/components/` (especially `Syn*` components) must have JSDoc descriptions on its props interface. TypeScript types convey shape; JSDoc conveys intent. Describe what each prop controls, when to use optional props, and any non-obvious default behavior. This helps both human contributors and AI agents use components correctly without reading the implementation.
 
 4. **Custom Hooks**
    - Extract reusable logic into custom hooks
@@ -768,11 +756,11 @@ mutate(data, {
 
 ### Retry Button in Error States
 
-The `NxErrorState` component automatically shows a retry button for retryable errors when `onRetry` is provided:
+The `SynErrorState` component automatically shows a retry button for retryable errors when `onRetry` is provided:
 
 ```typescript
 // Retry button appears automatically for 5xx errors or errors with retryable=true
-<NxErrorState
+<SynErrorState
   title="Failed to load data"
   message={error}
   onRetry={() => detachPromise(refetch())}
@@ -781,11 +769,11 @@ The `NxErrorState` component automatically shows a retry button for retryable er
 
 ---
 
-## 12. `NxConfirmationDialog` — Never Inline Modal Boilerplate
+## 12. `SynConfirmationDialog` — Never Inline Modal Boilerplate
 
-Use `NxConfirmationDialog` for all confirmation prompts. Never use raw `Modal` + `ModalHeader` + `ModalBody` + `ModalFooter`. ESLint rule `syntara/prefer-confirmation-dialog` (error) catches raw destructive Modal patterns automatically; the guidance below teaches the correct tier selection and content patterns.
+Use `SynConfirmationDialog` for all confirmation prompts. Never use raw `Modal` + `ModalHeader` + `ModalBody` + `ModalFooter`. ESLint rule `syntara/prefer-confirmation-dialog` (error) catches raw destructive Modal patterns automatically; the guidance below teaches the correct tier selection and content patterns.
 
-> **Check Storybook first:** Before implementing any confirmation dialog, call the Storybook MCP `get-documentation` tool with id `"components-dialogs-nxconfirmationdialog"`. The stories are the primary source of truth for tier selection, correct prop usage, title format, body copy, checkbox labels, and button labels — and take precedence over the static examples below.
+> **Check Storybook first:** Before implementing any confirmation dialog, call the Storybook MCP `get-documentation` tool with id `"components-dialogs-synconfirmationdialog"`. The stories are the primary source of truth for tier selection, correct prop usage, title format, body copy, checkbox labels, and button labels — and take precedence over the static examples below.
 
 There are **two tiers** of destructive modals depending on reversibility:
 
@@ -805,7 +793,7 @@ Requires `titleIconVariant="warning"` + `destructiveAcknowledgement` checkbox. T
 </Modal>
 
 // ✅ GOOD — warning icon, acknowledgement checkbox, descriptive body
-<NxConfirmationDialog
+<SynConfirmationDialog
   isOpen={isOpen}
   onClose={onClose}
   onConfirm={handleDelete}
@@ -819,7 +807,7 @@ Requires `titleIconVariant="warning"` + `destructiveAcknowledgement` checkbox. T
   }}
 >
   The workflow <strong>{item?.name}</strong> will be deleted. This cannot be undone.
-</NxConfirmationDialog>
+</SynConfirmationDialog>
 ```
 
 ### Tier 2: Reversible actions (remove, unassign)
@@ -828,7 +816,7 @@ Uses `titleIconVariant="warning"` but **no** `destructiveAcknowledgement` checkb
 
 ```typescript
 // ✅ GOOD — warning icon, descriptive body, no checkbox
-<NxConfirmationDialog
+<SynConfirmationDialog
   isOpen={!!memberToRemove}
   onClose={() => setMemberToRemove(null)}
   onConfirm={handleRemove}
@@ -839,7 +827,7 @@ Uses `titleIconVariant="warning"` but **no** `destructiveAcknowledgement` checkb
 >
   This removes <strong>{memberToRemove?.username}</strong> from the group.
   They will lose any permissions granted through this group membership.
-</NxConfirmationDialog>
+</SynConfirmationDialog>
 ```
 
 ### Body text rules
@@ -1283,22 +1271,9 @@ return groups.map(([id, { credentials }]) => {
 
 ## 27. `aria-label` Only on Interactive Elements
 
-**Enforced by ESLint:** `no-restricted-syntax` (error for `<span>`). See `eslint.config.js`.
+**Enforced by ESLint:** `no-restricted-syntax` (error) for `aria-label` on `<span>`. See `eslint.config.js`. Still flag `aria-label` on a generic `<div>` in review — that selector is span-only. Use `aria-label` on buttons, inputs, widgets, landmarks, images, or iframes.
 
-Do not add `aria-label` to non-interactive elements like `<span>` or `<div>`. Assistive technologies only announce `aria-label` on interactive elements, widgets, landmarks, images, and iframes. On a `<span>`, it is ignored by most screen readers.
-
-```typescript
-// ❌ BAD — aria-label on a non-interactive span
-<span aria-label="Status indicator">{statusText}</span>
-
-// ✅ GOOD — inner text content is sufficient for screen readers
-<span>{statusText}</span>
-
-// ✅ GOOD — aria-label on an interactive element
-<Button aria-label="Close dialog" variant="plain" icon={<TimesIcon />} />
-```
-
-**Reference:** [MDN aria-label](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-label) -- "in practice, it is supported only on interactive elements, widgets, landmarks, images, and iframes."
+**Reference:** [MDN aria-label](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-label).
 
 ---
 
@@ -1403,9 +1378,9 @@ function UserFormFields({ isEdit, control }: Props) {
 | **Client state (global)**    | Zustand stores (workflow builder)                              | React Context with manual reducers           |
 | **Styling**                  | PatternFly components + PF6 design tokens + CSS modules        | Inline style objects, raw HTML, hardcoded px |
 | **API calls**                | Typed clients from `client.tsx`                                | Raw `fetch()`                                |
-| **Error handling**           | `useQueryState`, `useMutationErrorHandler`, `NxErrorState`     | Ad-hoc try/catch with custom JSX             |
+| **Error handling**           | `useQueryState`, `useMutationErrorHandler`, `SynErrorState`     | Ad-hoc try/catch with custom JSX             |
 | **Pagination**               | `useCursorPagination`                                          | Manual cursor/filter/queryParams state       |
-| **Dialogs**                  | `NxConfirmationDialog` + `useDialogState`                      | Raw `Modal` + manual open/close state        |
+| **Dialogs**                  | `SynConfirmationDialog` + `useDialogState`                      | Raw `Modal` + manual open/close state        |
 
 ### Browser-Native APIs First
 
@@ -1603,11 +1578,11 @@ function DefaultStory() { ... }
 
 // ✅ GOOD — if a declaration needs context, attach it as JSDoc
 /**
- * Shared between `NxListPanelTabs` and `NxListPanelContent`. Placed at `NxListPanel`
- * (not `NxListPanelTabs`) so `NxListPanelContent` rendered via a TanStack Router `<Outlet>`
- * can still consume it as a descendant of `NxListPanel` but not of `NxListPanelTabs`.
+ * Shared between `SynListPanelTabs` and `SynListPanelContent`. Placed at `SynListPanel`
+ * (not `SynListPanelTabs`) so `SynListPanelContent` rendered via a TanStack Router `<Outlet>`
+ * can still consume it as a descendant of `SynListPanel` but not of `SynListPanelTabs`.
  */
-type NxListPanelTabContextValue = { ... }
+type SynListPanelTabContextValue = { ... }
 ```
 
 **Why:** Section banners explain _what_ code is, which well-named identifiers already communicate. JSDoc on a declaration travels with the symbol into tooling (IDE hover, generated docs), so the documentation stays attached even after the file is reorganised or the symbol is moved.
@@ -1670,11 +1645,11 @@ import { useDocLink } from '../../utils/docs/useDocLink'
 
 function WorkflowsPage() {
   const docLink = useDocLink('workflows')  // type-safe DocKey
-  return <NxPageHeader title="Workflows" docLink={docLink} />
+  return <SynPageHeader title="Workflows" docLink={docLink} />
 }
 ```
 
-`NxPageHeader` renders the `docLink` as an external link icon next to the page title.
+`SynPageHeader` renders the `docLink` as an external link icon next to the page title.
 
 For the workflow builder's node editor panel, pass `docLink` as a prop to `NodeEditorLayout`, which enables its "Documentation" button (previously disabled with "Coming soon").
 
@@ -1696,10 +1671,10 @@ The sidebar help icon (`AppDockedNav`) uses the `home` key. In community mode th
 const docLink = useDocLink('myNewPage')
 ```
 
-3. Pass it to `NxPageHeader`:
+3. Pass it to `SynPageHeader`:
 
 ```typescript
-<NxPageHeader title="My New Page" docLink={docLink} />
+<SynPageHeader title="My New Page" docLink={docLink} />
 ```
 
 ### Community vs extended
@@ -1714,7 +1689,7 @@ Controlled by **`VITE_EXTENDED`** (`true` / `1` = extended; unset = community). 
 ### Rules
 
 1. **Never hardcode doc URLs** -- always use `useDocLink(key)` so links follow community vs extended resolution
-2. **Every page with `NxPageHeader` should have a `docLink`** -- pass the hook result to the `docLink` prop
+2. **Every page with `SynPageHeader` should have a `docLink`** -- pass the hook result to the `docLink` prop
 3. **`DocKey` is enforced by TypeScript** -- passing a string not in `docsUrls.json` is a compile error
 4. **Keep paths as obvious placeholders until real URLs exist** -- use `__PLACEHOLDER__/...` (not subtle strings that could look real)
 
@@ -1794,9 +1769,9 @@ When interactive elements (checkboxes, buttons, toggles) repeat inside a list or
 
 ---
 
-## 36. Invalid and Not-Found States Must Use `NxEmptyState*` Components
+## 36. Invalid and Not-Found States Must Use `SynEmptyState*` Components
 
-When a detail page receives an invalid ID or the resource is not found (404), render a structured `NxEmptyState*` component (`NxEmptyStateNoData`, `NxEmptyStateFilter`, `NxEmptyStateServiceUnavailable`, or `NxEmptyState` for generic cases) -- never raw text or a bare paragraph. This ensures visual consistency, accessible heading hierarchy, and a clear recovery path.
+When a detail page receives an invalid ID or the resource is not found (404), render a structured `SynEmptyState*` component (`SynEmptyStateNoData`, `SynEmptyStateFilter`, `SynEmptyStateServiceUnavailable`, or `SynEmptyState` for generic cases) -- never raw text or a bare paragraph. This ensures visual consistency, accessible heading hierarchy, and a clear recovery path.
 
 **Reference:** [PatternFly Empty State](https://www.patternfly.org/components/empty-state), [Nielsen Norman: Error Messages](https://www.nngroup.com/articles/error-message-guidelines/)
 
@@ -1819,9 +1794,9 @@ if (isNotFound) {
 if (!isValidId) {
   return (
     <PageShell title={pageTitle} breadcrumbs={breadcrumbs}>
-      <NxEmptyState headingLevel="h2" titleText="Invalid identity provider" icon={RhUiSearchIcon} isFullHeight>
+      <SynEmptyState headingLevel="h2" titleText="Invalid identity provider" icon={RhUiSearchIcon} isFullHeight>
         The identity provider ID in the URL is not valid.
-      </NxEmptyState>
+      </SynEmptyState>
     </PageShell>
   )
 }
@@ -1830,14 +1805,14 @@ if (!isValidId) {
 if (isNotFound) {
   return (
     <PageShell title={pageTitle} breadcrumbs={breadcrumbs}>
-      <NxEmptyStateNoData
+      <SynEmptyStateNoData
         headingLevel="h2"
         titleText="Identity provider not found"
         isFullHeight
       >
         The identity provider may have been deleted.{' '}
         <Link to="/system-administration/authentication">Return to Authentication</Link>.
-      </NxEmptyStateNoData>
+      </SynEmptyStateNoData>
     </PageShell>
   )
 }
@@ -1847,27 +1822,27 @@ if (isNotFound) {
 
 | Scenario                          | Component                              | Icon             |
 | --------------------------------- | -------------------------------------- | ---------------- |
-| Invalid ID format (bad URL param) | `NxEmptyState`                         | `RhUiSearchIcon` |
-| Resource not found (404 from API) | `NxEmptyStateNoData` or `NxEmptyState` | `SearchIcon`     |
-| No permission to view             | `NxEmptyState` with `status="danger"`  | `LockIcon`       |
+| Invalid ID format (bad URL param) | `SynEmptyState`                         | `RhUiSearchIcon` |
+| Resource not found (404 from API) | `SynEmptyStateNoData` or `SynEmptyState` | `SearchIcon`     |
+| No permission to view             | `SynEmptyState` with `status="danger"`  | `LockIcon`       |
 
 ### Consistency Rule
 
-Look at sibling pages in the same route directory. If `IdentityProviderDetail.tsx` uses `<NxEmptyState>` for its not-found state, the new `EditGroupMapping.tsx` in the same directory must match that pattern -- not introduce raw text.
+Look at sibling pages in the same route directory. If `IdentityProviderDetail.tsx` uses `<SynEmptyState>` for its not-found state, the new `EditGroupMapping.tsx` in the same directory must match that pattern -- not introduce raw text.
 
 ## 37. Browser Tab Titles -- `toPageTitle`
 
-Every top-level page component (default export with an `<NxPage>` render) must include `<title>` as the first child of `<NxPage>`. React 19 hoists it to `<head>` automatically — no third-party library needed.
+Every top-level page component (default export with an `<SynPage>` render) must include `<title>` as the first child of `<SynPage>`. React 19 hoists it to `<head>` automatically — no third-party library needed.
 
 ```tsx
 import { toPageTitle } from '../../utils/toPageTitle'
 
 export default function Workflows() {
   return (
-    <NxPage>
+    <SynPage>
       <title>{toPageTitle(['Workflows'])}</title>
-      <NxPageHeader title="Workflows" ... />
-    </NxPage>
+      <SynPageHeader title="Workflows" ... />
+    </SynPage>
   )
 }
 ```
@@ -1885,12 +1860,12 @@ React 19 passes `ref` as a regular prop. Prefer the patterns below for all new a
 
 ```tsx
 // ❌ BAD — React 19 makes forwardRef unnecessary
-export const NxPanel = forwardRef<HTMLDivElement, NxPanelProps>(function NxPanel(props, ref) {
+export const SynPanel = forwardRef<HTMLDivElement, SynPanelProps>(function SynPanel(props, ref) {
   return <Panel ref={ref} {...props} />
 })
 
 // ✅ GOOD — accept ref as a regular prop
-export function NxPanel({ ref, ...props }: NxPanelProps & { ref?: Ref<HTMLDivElement> }) {
+export function SynPanel({ ref, ...props }: SynPanelProps & { ref?: Ref<HTMLDivElement> }) {
   return <Panel ref={ref} {...props} />
 }
 ```
@@ -1974,3 +1949,15 @@ Rules of thumb:
 - Skip `useOptimistic` when the success path is entangled with conflict handling, dirty client stores, or multi-step workflows (e.g. workflow publish).
 
 Reference implementation: `useOptimisticCredentialEnabled` (credentials list enable/disable).
+
+---
+
+## 41. Derive Named Booleans for Repeated Conditions
+
+**When a boolean check is used more than once, extract it into a named constant.** That also names the intent (`isCredentialRequired` vs repeating `CREDENTIAL_REQUIRED_TYPES.has(...)`). Same rule in hooks and utilities, not just components.
+
+---
+
+## 42. Use `ReactNode` Lists for Multi-Item Toast/Alert Content — Not `join('\n')`
+
+**When displaying multiple items in an alert or toast body, render a `ReactNode` list, not `array.join('\n')`.** Browsers collapse `\n` in HTML, so joined warnings appear on one line. `showAlert` / `showWarning` `description` already accepts `ReactNode`. Use a **module-scoped** helper (not nested in the caller) that renders PatternFly `List` / `ListItem` — not a raw `<ul>` or inline `style`.

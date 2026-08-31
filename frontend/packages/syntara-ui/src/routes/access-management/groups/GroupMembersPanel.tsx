@@ -4,17 +4,17 @@ import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table
 import type { IAction } from '@patternfly/react-table'
 import { useMemo, useState } from 'react'
 
-import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { FilterBar } from '../../../components/filters'
 import { IconLabel } from '../../../components/IconLabel'
-import { NxPageBody } from '../../../components/layout/NxPage'
-import { NxPanelContentStack } from '../../../components/layout/NxPanelContentStack'
-import { NxEmptyStateFilter } from '../../../components/states/NxEmptyStateFilter'
-import { NxEmptyStateNoData } from '../../../components/states/NxEmptyStateNoData'
+import { SynPageBody } from '../../../components/layout/SynPage'
+import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
+import { SynEmptyStateFilter } from '../../../components/states/SynEmptyStateFilter'
+import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import { useQueryState } from '../../../components/states/useQueryState'
 import { LinkCell } from '../../../components/table/LinkCell'
-import { NxScrollableTableContainer } from '../../../components/table/NxScrollableTableContainer'
+import { SynScrollableTableContainer } from '../../../components/table/SynScrollableTableContainer'
 import { useFilterState } from '../../../hooks/useFilterState'
 import { useAlerts } from '../../../providers/alerts'
 import type { FilterFieldDefinition } from '../../../types/filters'
@@ -145,8 +145,8 @@ export function GroupMembersPanel({ groupId, onMembershipChange }: Readonly<Grou
   if (members.length === 0) {
     return (
       <>
-        <NxEmptyStateNoData
-          title="No members"
+        <SynEmptyStateNoData
+          title="No members yet"
           description="Add users to this group to manage their access."
           buttonText="Add member"
           addData={permissions.canManageMembers ? () => setAddModalOpen(true) : undefined}
@@ -164,7 +164,7 @@ export function GroupMembersPanel({ groupId, onMembershipChange }: Readonly<Grou
 
   return (
     <>
-      <NxPanelContentStack>
+      <SynPanelContentStack>
         <StackItem>
           <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapMd' }}>
             <FlexItem grow={{ default: 'grow' }}>
@@ -201,16 +201,16 @@ export function GroupMembersPanel({ groupId, onMembershipChange }: Readonly<Grou
         </StackItem>
 
         {filteredMembers.length === 0 ? (
-          <NxPageBody isCentered>
-            <NxEmptyStateFilter
+          <SynPageBody isCentered>
+            <SynEmptyStateFilter
               clearAllFilters={() => {
                 clearAllFilters()
                 setPage(1)
               }}
             />
-          </NxPageBody>
+          </SynPageBody>
         ) : (
-          <NxScrollableTableContainer
+          <SynScrollableTableContainer
             caption="Group members table"
             footer={{
               page,
@@ -266,9 +266,9 @@ export function GroupMembersPanel({ groupId, onMembershipChange }: Readonly<Grou
                 </Tr>
               ))}
             </Tbody>
-          </NxScrollableTableContainer>
+          </SynScrollableTableContainer>
         )}
-      </NxPanelContentStack>
+      </SynPanelContentStack>
 
       <AddMemberModal
         groupId={groupId}
@@ -278,7 +278,7 @@ export function GroupMembersPanel({ groupId, onMembershipChange }: Readonly<Grou
         existingMemberIds={members.map((m) => m.id)}
       />
 
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={!!memberToRemove}
         onClose={() => setMemberToRemove(null)}
         onConfirm={handleRemove}
@@ -289,7 +289,7 @@ export function GroupMembersPanel({ groupId, onMembershipChange }: Readonly<Grou
       >
         This removes <strong>{memberToRemove?.username}</strong> from the group. They will lose any permissions granted
         through this group membership.
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
     </>
   )
 }

@@ -1,8 +1,9 @@
-import { Button, Flex, FlexItem, Label, LabelGroup, Stack, StackItem } from '@patternfly/react-core'
+import { Button, Flex, FlexItem, LabelGroup, Stack, StackItem } from '@patternfly/react-core'
 import { RhUiLockIcon } from '@patternfly/react-icons'
 import { useNavigate } from '@tanstack/react-router'
 
 import { AppRoute } from '../../app/AppRoute'
+import { SynLabel } from '../../components/labels/SynLabel'
 import { detachPromise } from '../../utils/detachPromise'
 
 import type { PolicyStatement } from './types'
@@ -21,11 +22,7 @@ type ScopeLabelProps = {
 export function ScopeLabel({ scope }: Readonly<ScopeLabelProps>) {
   const display = SCOPE_DISPLAY[scope ?? ''] ?? SCOPE_DISPLAY.system
 
-  return (
-    <Label color={display.color} isCompact>
-      {display.label}
-    </Label>
-  )
+  return <SynLabel color={display.color}>{display.label}</SynLabel>
 }
 
 type PolicyTypeLabelProps = {
@@ -35,16 +32,12 @@ type PolicyTypeLabelProps = {
 export function PolicyTypeLabel({ isBuiltin }: Readonly<PolicyTypeLabelProps>) {
   if (isBuiltin) {
     return (
-      <Label color="grey" icon={<RhUiLockIcon />} isCompact>
+      <SynLabel color="grey" icon={<RhUiLockIcon />}>
         Built-in
-      </Label>
+      </SynLabel>
     )
   }
-  return (
-    <Label color="blue" isCompact>
-      Custom
-    </Label>
-  )
+  return <SynLabel color="blue">Custom</SynLabel>
 }
 
 type ProjectLabelProps = {
@@ -89,21 +82,19 @@ export function StatementsCell({ statements }: Readonly<StatementsCellProps>) {
         <StackItem key={`${stmt.effect}-${stmt.scope}-${stmt.actions.join('-')}`}>
           <Flex gap={{ default: 'gapXs' }} alignItems={{ default: 'alignItemsCenter' }} flexWrap={{ default: 'wrap' }}>
             <FlexItem>
-              <Label color={stmt.effect === 'allow' ? 'green' : 'red'} isCompact>
+              <SynLabel color={stmt.effect === 'allow' ? 'green' : 'red'}>
                 {stmt.effect === 'allow' ? 'Allow' : 'Deny'}
-              </Label>
+              </SynLabel>
             </FlexItem>
             <FlexItem>
-              <Label color="grey" isCompact>
-                scope: {stmt.scope}
-              </Label>
+              <SynLabel color="grey">scope: {stmt.scope}</SynLabel>
             </FlexItem>
             <FlexItem>
               <LabelGroup isCompact numLabels={2}>
                 {stmt.actions.map((action) => (
-                  <Label key={action} color="grey" isCompact>
+                  <SynLabel key={action} color="grey">
                     {action}
-                  </Label>
+                  </SynLabel>
                 ))}
               </LabelGroup>
             </FlexItem>

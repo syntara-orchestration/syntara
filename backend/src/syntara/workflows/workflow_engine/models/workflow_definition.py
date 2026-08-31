@@ -89,7 +89,7 @@ def validate_uuid_or_template(value: str, field_label: str) -> str:
 class TemplateAwareBaseModel(BaseModel):
     """Base model that allows template expressions in any field.
 
-    Template expressions like ${input.field} or ${workflow.vars.count} bypass
+    Template expressions like ${trigger.field} or ${step_1.count} bypass
     type validation and constraints, allowing them to be stored as strings and
     evaluated at runtime during workflow execution.
 
@@ -144,6 +144,8 @@ class ActivityName(StrEnum):
     APPROVER_RESOLUTION = "resolve_approvers"
     EXPIRE_APPROVAL = "expire_approval_requests"
     CANCEL_APPROVAL = "cancel_approval_requests"
+    FAIL_DETACHED_APPROVAL = "fail_detached_approval"
+    CANCEL_AGENTIC = "cancel_agentic_invocation"
     ACTIVITY_MONITORING = "register_activity_monitoring"
     COMPLETE_WAIT = "complete_wait"
     FETCH_RUNTIME_SETTINGS = "fetch_workflow_runtime_settings"
@@ -335,7 +337,7 @@ class ScriptExecutorParameters(TemplateAwareBaseModel):
     language: ScriptLanguage
     code: str = Field(min_length=1, description="Script code to execute")
     environment: dict[str, str] = Field(default_factory=dict, description="Environment variables")
-    credential_id: str | None = Field(default=None, description="Syntara credential UUID for credential scrubbing")
+    credential_id: str | None = Field(default=None, description="Orchestrator credential UUID for credential scrubbing")
 
     @field_validator("environment", mode="before")
     @classmethod
@@ -362,7 +364,7 @@ class APIExecutorParameters(TemplateAwareBaseModel):
     query_params: dict[str, Any] = Field(default_factory=dict)
     credential_id: str | None = Field(
         default=None,
-        description="Syntara credential UUID for authentication or Secret URL.",
+        description="Orchestrator credential UUID for authentication or Secret URL.",
     )
 
     @field_validator("url")
@@ -390,7 +392,7 @@ class IntegrationConnectionConfig(BaseModel):
 
     integration_id: str = Field(description="UUID of the integration")
     credential_id: str = Field(
-        description="Syntara credential UUID for execution calls (distinct from management credential)"
+        description="Orchestrator credential UUID for execution calls (distinct from management credential)"
     )
 
     @field_validator("integration_id", "credential_id")
@@ -411,7 +413,7 @@ class AgenticExecutorParameters(TemplateAwareBaseModel, populate_by_name=True):
     )
     credential_id: str | None = Field(
         default=None,
-        description="Syntara credential UUID for LLM provider authentication",
+        description="Orchestrator credential UUID for LLM provider authentication",
     )
     file_ids: list[str] = Field(
         default_factory=list,
@@ -537,7 +539,7 @@ class AAPResourceReferenceMixin(BaseModel):
     credential_id: str | None = Field(
         default=None,
         description=(
-            "Syntara credential UUID for Ansible Automation Platform API authentication. "
+            "Orchestrator credential UUID for Ansible Automation Platform API authentication. "
             "Separate from legacy credentials list."
         ),
     )
@@ -838,7 +840,7 @@ class WaitNodeParameters(BaseModel):
 class ApprovalNodeParameters(BaseModel):
     """Parameters for approval gate nodes."""
 
-    credential_id: str | None = Field(default=None, description="Syntara credential UUID")
+    credential_id: str | None = Field(default=None, description="Orchestrator credential UUID")
     approver_users: list[str] | None = Field(default=None, max_length=100, description="Usernames who can approve")
     approver_groups: list[str] | None = Field(
         default=None, max_length=50, description="Group names whose members can approve"

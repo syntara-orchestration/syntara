@@ -25,11 +25,12 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 
 import { approvalsClient } from '../../client'
-import { NxCodeBlock } from '../../components/details/NxCodeBlock'
-import { NxPanel } from '../../components/layout/NxPanel'
+import { SynCodeBlock } from '../../components/details/SynCodeBlock'
+import { SynPanel } from '../../components/layout/SynPanel'
 import { useFormMutationErrorHandler } from '../../hooks/useFormMutationErrorHandler'
 import { useAlerts } from '../../providers/alerts'
 import { detachPromise } from '../../utils/detachPromise'
+import { lookupMapByApprovalNodeId } from '../approvals/approvalNodeId'
 import { ApprovalSummaryList } from '../approvals/ApprovalSummaryList'
 import { useApprovalPermissions } from '../approvals/useApprovalPermissions'
 import { useCanDecideApproval } from '../approvals/useCanDecideApproval'
@@ -151,9 +152,9 @@ export function ApprovalReviewView({ approval, activityNameMap, onClose }: Appro
     next_step_rejected: nextStepRejected,
   } = approval
 
-  const resolveName = (id: string, fallback: string) => activityNameMap?.get(id) ?? fallback
+  const resolveName = (id: string, fallback: string) => lookupMapByApprovalNodeId(activityNameMap, id) ?? fallback
   const approvalNodeId = approval.approval_node_id
-  const resolvedNodeName = approvalNodeId ? activityNameMap?.get(approvalNodeId) : undefined
+  const resolvedNodeName = lookupMapByApprovalNodeId(activityNameMap, approvalNodeId)
   const approvalDisplayName = resolvedNodeName ? `Approval for ${resolvedNodeName}` : approval.name
 
   // If user is not authorized, show read-only view with approver information
@@ -172,7 +173,7 @@ export function ApprovalReviewView({ approval, activityNameMap, onClose }: Appro
   }
 
   return (
-    <NxPanel isFullHeight style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+    <SynPanel isFullHeight style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <Stack hasGutter style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         <StackItem>
           <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
@@ -223,7 +224,7 @@ export function ApprovalReviewView({ approval, activityNameMap, onClose }: Appro
 
         <StackItem isFilled style={{ minHeight: 0, overflow: 'auto' }}>
           <Title headingLevel="h3">Approval context</Title>
-          <NxCodeBlock jsonObject={approval} enableCopy />
+          <SynCodeBlock jsonObject={approval} enableCopy />
         </StackItem>
 
         <StackItem style={{ flexShrink: 0 }}>
@@ -275,6 +276,6 @@ export function ApprovalReviewView({ approval, activityNameMap, onClose }: Appro
           </Form>
         </StackItem>
       </Stack>
-    </NxPanel>
+    </SynPanel>
   )
 }

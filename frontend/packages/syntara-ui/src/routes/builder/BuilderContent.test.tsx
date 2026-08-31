@@ -75,10 +75,11 @@ vi.mock('../../hooks/useProjectSelector', () => ({
 
 const mockBuilderPermissions = vi.hoisted(() => ({
   canEdit: true,
+  canCreate: true,
   canRun: true,
   canDelete: true,
   isLoading: false,
-  tooltips: { edit: '', save: '', publish: '', unpublish: '', run: '', delete: '' },
+  tooltips: { edit: '', save: '', publish: '', unpublish: '', run: '', delete: '', create: '' },
 }))
 
 vi.mock('./useBuilderPermissions', () => ({
@@ -1149,7 +1150,7 @@ describe('BuilderContent', () => {
       })
 
       const user = userEvent.setup()
-      const row = screen.getByRole('button', { name: /Completed/i })
+      const row = screen.getByRole('link', { name: /Execution from/ })
       expect(row).toBeInTheDocument()
       await user.click(row)
       await waitFor(() => {

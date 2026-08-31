@@ -28,7 +28,7 @@ import { useCallback, useState } from 'react'
 
 import { isUnaryOperator, OPERATOR_LABELS, OPERATOR_GROUPS } from '../../utils/expressions/defaults'
 import type { ExpressionCondition as ExpressionConditionType, ComparisonOperator } from '../../utils/expressions/types'
-import { NxSelect } from '../NxSelect'
+import { SynSelect } from '../SynSelect'
 
 import { HelpPopover } from './HelpPopover'
 
@@ -111,7 +111,7 @@ type ExpressionConditionProps = {
  *
  * Renders inputs for:
  * - NOT checkbox (optional negation) - in separate row
- * - Variable input (e.g., "input.age")
+ * - Variable input (e.g., "trigger.age")
  * - Operator select (unified list)
  * - Value input (e.g., "18") - hidden for unary operators (exists, isEmpty, etc.)
  * - Remove button (if onRemove provided)
@@ -133,7 +133,7 @@ export function ExpressionCondition(props: ExpressionConditionProps) {
     setIsFieldFocused(false)
     const stripped = editingValue.replace(/^\$\{/, '').replace(/\}$/, '')
     if (stripped && !isValidVariableRef(stripped)) {
-      setLocalFieldError('Invalid variable name. Use letters, numbers, dots, and underscores (e.g. input.age).')
+      setLocalFieldError('Invalid variable name. Use letters, numbers, dots, and underscores (e.g. trigger.age).')
       return
     }
     setLocalFieldError(null)
@@ -263,14 +263,12 @@ export function ExpressionCondition(props: ExpressionConditionProps) {
           {/* Operator */}
           <StackItem>
             <FormGroup label="Operator" labelHelp={<OperatorHelp />} isRequired fieldId={`operator-${condition.id}`}>
-              <NxSelect
+              <SynSelect
                 isOpen={isOperatorOpen}
                 onSelect={handleOperatorSelect}
                 onOpenChange={setIsOperatorOpen}
                 toggle={operatorToggle}
                 selected={condition.operator}
-                maxMenuHeight="40vh"
-                isScrollable
               >
                 <SelectList aria-label="Comparison operator">
                   {OPERATOR_GROUPS.map((opGroup) => (
@@ -283,7 +281,7 @@ export function ExpressionCondition(props: ExpressionConditionProps) {
                     </SelectGroup>
                   ))}
                 </SelectList>
-              </NxSelect>
+              </SynSelect>
             </FormGroup>
           </StackItem>
 

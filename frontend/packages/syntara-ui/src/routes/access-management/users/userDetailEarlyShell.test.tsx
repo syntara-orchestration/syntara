@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { NxErrorState } from '../../../components/states/NxErrorState'
+import { SynErrorState } from '../../../components/states/SynErrorState'
 
 import { renderUserDetailEarlyShell } from './userDetailEarlyShell'
 
@@ -93,7 +93,7 @@ describe('renderUserDetailEarlyShell', () => {
         isMyProfile: true,
         isMeQueryPending: false,
         hasUserQueryError: false,
-        queryState: <NxErrorState title="Error loading profile" message="Network error" onRetry={vi.fn()} />,
+        queryState: <SynErrorState title="Error loading profile" message="Network error" onRetry={vi.fn()} />,
         navigateBack: vi.fn(),
         refetchUser: vi.fn(),
       })
@@ -124,7 +124,7 @@ describe('renderUserDetailEarlyShell', () => {
         isMyProfile: false,
         isMeQueryPending: false,
         hasUserQueryError: false,
-        queryState: <NxErrorState title="Error loading user" message="Network error" onRetry={vi.fn()} />,
+        queryState: <SynErrorState title="Error loading user" message="Network error" onRetry={vi.fn()} />,
         navigateBack: vi.fn(),
         refetchUser: vi.fn(),
       })

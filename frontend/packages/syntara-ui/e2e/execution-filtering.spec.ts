@@ -79,12 +79,12 @@ test.describe('Execution Filtering @pr-check', () => {
 
   test('workflow_id filter backwards compatibility: URL parameter pre-populates filter', async ({ app }) => {
     const response = await apiRequest(app, 'get', '/executions?limit=1')
-    test.skip(!response.ok(), 'Executions API unavailable')
+    expect(response.ok(), 'Executions API unavailable').toBeTruthy()
     const data = (await response.json()) as {
       resources?: Array<{ workflow_id?: string }>
     }
     const workflowId = data.resources?.[0]?.workflow_id
-    test.skip(!workflowId, 'No executions with workflow_id available')
+    expect(workflowId, 'No executions with workflow_id available').toBeTruthy()
 
     await app.goto(toAppUrl(`/executions?workflow_id=${workflowId}`))
     await expect(app.getByRole('heading', { level: 1, name: 'Workflow Runs' })).toBeVisible()
@@ -179,7 +179,7 @@ test.describe('Execution Filtering @pr-check', () => {
       await app.getByRole('button', { name: 'Clear all filters' }).last().click()
 
       const fullTable = app.getByRole('grid', { name: 'Executions table' })
-      const noDataState = app.getByText(/No executions found/i)
+      const noDataState = app.getByText(/No workflow runs have been recorded yet/i)
       await expect(fullTable.or(noDataState)).toBeVisible()
       await expect(statusChipGroup).not.toBeVisible()
     }

@@ -1,6 +1,4 @@
-import { type Page } from '@playwright/test'
-
-import { expect, toAppUrl } from '../fixtures'
+import { expect, type Page, toAppUrl } from '../fixtures'
 
 const AUTH_ROOT = '/system-administration/authentication'
 const ADD_IDP_URL = `${AUTH_ROOT}/identity-providers/add`

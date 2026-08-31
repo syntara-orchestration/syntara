@@ -5,12 +5,12 @@ import type { IAction, ThProps } from '@patternfly/react-table'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useMemo, useState } from 'react'
 
-import { NxConfirmationDialog } from '../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { IconLabel } from '../../components/IconLabel'
-import { NxLabel } from '../../components/labels/NxLabel'
-import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../components/panels/list/NxListPanel'
-import { NxEmptyStateNoData } from '../../components/states/NxEmptyStateNoData'
+import { SynLabel } from '../../components/labels/SynLabel'
+import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../components/panels/list/SynListPanel'
+import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 import { useCursorReset } from '../../hooks/useCursorPagination'
 import { useDialogState } from '../../hooks/useDialogState'
 import { useExpandableRowIds } from '../../hooks/useExpandableRowIds'
@@ -184,9 +184,9 @@ function AssignmentsTableBody({
                 />
               </Td>
               <Td dataLabel="Principal type">
-                <NxLabel color={principalTypeDisplay[row.principalType].color}>
+                <SynLabel color={principalTypeDisplay[row.principalType].color}>
                   {principalTypeDisplay[row.principalType].text}
-                </NxLabel>
+                </SynLabel>
               </Td>
               <Td dataLabel="Role name">
                 <Truncate content={row.assignmentName} />
@@ -207,9 +207,9 @@ function AssignmentsTableBody({
                   <ExpandableRowContent>
                     <LabelGroup isCompact numLabels={Infinity}>
                       {row.rolePolicies.map((name) => (
-                        <NxLabel key={name} color="grey">
+                        <SynLabel key={name} color="grey">
                           {name}
-                        </NxLabel>
+                        </SynLabel>
                       ))}
                     </LabelGroup>
                   </ExpandableRowContent>
@@ -294,7 +294,7 @@ export function AssignmentsTab() {
 
   return (
     <>
-      <NxListPanelView
+      <SynListPanelView
         tabKey="assignments"
         tabLabel="Assignments"
         isPending={isPending}
@@ -305,8 +305,8 @@ export function AssignmentsTab() {
         hasActiveFilters={hasActiveFilters}
         onClearAllFilters={handleClearAllFilters}
         noDataState={
-          <NxEmptyStateNoData
-            title="No assignments found"
+          <SynEmptyStateNoData
+            title="No assignments yet"
             description="Assign roles to users or groups to grant access."
             buttonText="Add assignment"
             addData={openAddDialog}
@@ -314,7 +314,7 @@ export function AssignmentsTab() {
         }
         toolbar={
           showToolbar ? (
-            <NxListPanelToolbar
+            <SynListPanelToolbar
               filters={filters}
               filterDefinitions={filterFieldDefinitions}
               onFilterChange={handleFilterChange}
@@ -341,7 +341,7 @@ export function AssignmentsTab() {
               scoped to a specific project or apply system-wide. Use this page to review, create, or revoke access in
               one place.
             </Content>
-            <NxListPanelTable caption="Role assignments" isExpandable footer={getFooterProps(data)}>
+            <SynListPanelTable caption="Role assignments" isExpandable footer={getFooterProps(data)}>
               <AssignmentsTableBody
                 rows={rows}
                 projectNameMap={projectNameMap}
@@ -354,7 +354,7 @@ export function AssignmentsTab() {
                 onDelete={deleteDialog.open}
                 permissions={permissions}
               />
-            </NxListPanelTable>
+            </SynListPanelTable>
           </>
         }
       />
@@ -362,7 +362,7 @@ export function AssignmentsTab() {
       {isAddDialogOpen && <AssignRoleDialog onClose={() => setIsAddDialogOpen(false)} onSuccess={refetch} />}
 
       {deleteItem != null && (
-        <NxConfirmationDialog
+        <SynConfirmationDialog
           isOpen={deleteDialog.isOpen}
           onClose={deleteDialog.close}
           onConfirm={() => handleDelete(deleteItem)}
@@ -380,7 +380,7 @@ export function AssignmentsTab() {
             </>
           )}
           . The associated permissions will be revoked.
-        </NxConfirmationDialog>
+        </SynConfirmationDialog>
       )}
 
       {editItem != null && (

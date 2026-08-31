@@ -43,6 +43,7 @@ are stored at **repo level**.
 | `CURRENTS_RECORD_KEY` | Per-repo Currents.dev recording |
 | `CURRENTS_API_KEY` | Per-repo Currents.dev API access |
 | `RAPIDAST_GCP_KEY` | Only this repo runs DAST scans |
+| `SLACK_CI_MONITORING_WEBHOOK_URL` | Slack webhook for merge queue monitoring alerts |
 
 ### Repo-Level Variables (on `syntara-orchestration/syntara`)
 

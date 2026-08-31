@@ -24,7 +24,7 @@ Your goal is to author comprehensive, production-grade end-to-end tests using Pl
 
 ### Key Conventions (extracted from existing tests)
 
-- **Imports:** `test, expect, toAppUrl` from `'./fixtures'` (NOT `'@playwright/test'`)
+- **Imports:** `test, expect, toAppUrl`, and `type Page` from `'./fixtures'` (NOT `'@playwright/test'`) — the fixtures module re-exports all Playwright primitives; importing directly bypasses project conventions and is caught by ESLint
 - **Fixture:** `{ app }` (NOT `{ page }`) — pre-navigated to base URL with nav visible
 - **Navigation:** `toAppUrl('/path')` helper for all URLs
 - **Unique names:** `buildUniqueName(prefix)` for all test data
@@ -37,6 +37,36 @@ Your goal is to author comprehensive, production-grade end-to-end tests using Pl
 npm run e2e        # Run headless (default: mock API + UI auto-started)
 npm run e2e:ui     # Run with Playwright UI for debugging
 ```
+
+---
+
+## Test Suite Tags
+
+The E2E suite uses Playwright tags to control which tests run in different environments. Tags appear in two forms:
+
+```typescript
+// Describe-level tag — applies to all tests in the block
+test.describe('Integration filtering', { tag: '@pr-check' }, () => { ... })
+
+// Individual test tag — applies to one test
+test('my test', { tag: ['@konflux-skip'] }, async ({ app }) => { ... })
+```
+
+| Tag | What it marks | Runs in | Excluded from | Mechanism |
+|---|---|---|---|---|
+| `@pr-check` | Fast, reliable describe blocks covering the most critical user paths — intended as a quick PR gate subset | All CI environments (full suite always runs; `--grep @pr-check` selects this subset locally) | _(no current CI filter — tag exists for manual use and future CI optimization)_ | `--grep @pr-check` |
+| `@konflux-skip` | Tests confirmed flaky in Konflux's specific execution environment (not flaky in GitHub Actions) | GitHub Actions `test-compose-e2e` job (runs normally) | Konflux `ao-ui-tests` Tekton pipelines | `.tekton/automation-orchestrator-ui-tests-*.yaml` passes `playwright-grep-invert: '@konflux-skip'` → `--grep-invert` |
+| `@local-only` | Visual regression screenshot tests (`e2e/visual-regression/`) | Local development via `npm run e2e:visual-regression` | All CI | `playwright.config.ts` `testIgnore: **/visual-regression/**` + in-test `test.skip(!!process.env.CI)` |
+
+### Tag rules
+
+- **`@pr-check`** — Tag a `test.describe` when the tests inside are fast (under ~30 s total), reliable (no flaky backend dependencies), and cover the most critical user paths. Do NOT tag slow, data-dependent, or flaky describe blocks.
+- **`@konflux-skip`** — Use only for a test confirmed flaky in Konflux's environment specifically. This is a last resort — fix the root cause first. Each tagged test must have a comment explaining the environment-specific cause. Discuss with the team before tagging additional tests.
+- **`@local-only`** — Reserved for visual regression tests. Do not apply to functional tests.
+
+### Never commit `test.fixme` as a long-term state
+
+`test.fixme` marks a test as expected-to-fail, which shows up in CI reports as a "known failure" rather than a clean skip. It is appropriate only as a same-PR placeholder (a test whose fix is in the next commit). For environment-specific skipping use `@konflux-skip`; for data-dependent conditional skipping use `test.skip(!condition, 'reason')`.
 
 ---
 
@@ -423,9 +453,17 @@ await app.getByRole('grid', { name: 'Workflows table' })
 // ⚠️ ACCEPTABLE: When no semantic alternative exists
 await app.getByTestId('workflow-builder-canvas').click()
 
-// ❌ BAD: CSS selectors
+// ❌ BAD: CSS selectors — fragile, breaks on PF version bumps
 await app.locator('.pf-v6-c-button').click()
+
+// ❌ BAD: Internal PF BEM classes in assertions — same risk applies to expect() calls
+await expect(app.locator('.pf-v6-c-alert__description')).toContainText('Error')
+
+// ✅ GOOD: Role/text-based assertion — survives PF prefix changes
+await expect(app.getByRole('alert').getByText('Error')).toBeVisible()
 ```
+
+The CSS-selector ban applies equally to **locators** and **assertions**. Any `.pf-v6-c-*` class can silently stop matching when PatternFly bumps its prefix in a major release.
 
 **Scoping locators to containers:**
 
@@ -436,14 +474,14 @@ await panel.getByRole('button', { name: 'Action', exact: true }).click()
 
 // ✅ Scoped to a row
 const row = app.getByRole('row', { name: new RegExp(workflowName) })
-await row
-  .getByRole('button', { name: /Actions|Kebab toggle/i })
-  .first()
-  .click({ force: true })
+await row.getByRole('button', { name: /Actions|Kebab toggle/i }).click()
 
-// ✅ Scoped to toolbar (PatternFly filter chips)
-const nameChipGroup = app.locator('#filter-toolbar').getByRole('list', { name: 'Name' })
+// ✅ Filter chips via FilterBar (`helpers/patternfly.ts`)
+const nameChipGroup = filterChipGroup(app, 'Name')
 await expect(nameChipGroup.getByText('workflow')).toBeVisible()
+
+// ✅ Table header "select all" — PatternFly `Th select` sets aria-label="Select all rows"
+await table.getByRole('checkbox', { name: /select all/i }).check()
 ```
 
 **Use heading level to avoid strict mode violations in empty states:**
@@ -640,6 +678,28 @@ test('edits a workflow name', async ({ app }) => {
 ```
 
 **Read-only tests** (filtering, viewing, accessibility scans) that don't create resources don't need cleanup.
+
+**Prefer API-based cleanup over UI-based cleanup.** If a test fails mid-flow before the resource is saved or visible in the list, navigating back and interacting with the table to delete is unreliable — the page state is undefined. Use the API client directly in `finally`:
+
+```typescript
+// ✅ GOOD: API-based cleanup — works regardless of UI state
+let workflowId: string | undefined
+try {
+  workflowId = await createWorkflowViaApi({ name: workflowName })
+  // ... test interactions
+} finally {
+  if (workflowId) await deleteWorkflowViaApi(workflowId)
+}
+
+// ❌ AVOID: UI-based cleanup when the test may have failed before saving
+} finally {
+  await app.goto(toAppUrl('/workflows'))
+  await app.getByPlaceholder('Filter by name').fill(workflowName)
+  // If the test failed on step 2, the workflow may not exist in the list
+}
+```
+
+API helpers are in `e2e/utils/api.ts`. Use them for setup and teardown; reserve UI interactions for the assertions under test.
 
 ---
 
@@ -1054,6 +1114,46 @@ await app.routeWebSocket('wss://example.com/ws', ws => {
 })
 ```
 
+### Assertion Anti-Patterns
+
+**Don't hardcode counts or detail strings in assertions.** Fragile strings like `/1 issue found/` break the moment a second validation fires. Assert the meaningful label instead:
+
+```typescript
+// ❌ BAD: Breaks if a second validation error appears
+await expect(app.getByText(/1 issue found/)).toBeVisible()
+
+// ✅ GOOD: Asserts what the user cares about — independent of count
+await expect(app.getByRole('heading', { name: /Verification failed/i })).toBeVisible()
+await expect(app.getByTestId('validation-error-badge')).toBeVisible()
+```
+
+**Don't test sequential WebSocket/async state transitions.** Tests that assert `Pending → Running → Success` in order are inherently flaky — the intermediate states may resolve faster than the assertion can fire. Test the final outcome only, or `test.skip` with a clear explanation:
+
+```typescript
+// ❌ BAD: Racing against WebSocket update timing
+await expect(app.getByText('Pending')).toBeVisible()
+await expect(app.getByText('Running')).toBeVisible()
+await expect(app.getByText('Success')).toBeVisible()
+
+// ✅ GOOD: Assert only the final state
+await expect(app.getByText('Success')).toBeVisible()
+
+// ✅ ACCEPTABLE: Skip when live state depends on non-deterministic timing
+test.skip('live status transitions', 'depends on WebSocket update timing — not reliably testable in E2E')
+```
+
+### No `waitForLoadState('networkidle')`
+
+`networkidle` waits for 500ms of no network activity, which is unreliable in apps with polling, WebSockets, or long-running background requests — the wait can time out or resolve before the UI is actually ready. Use a web-first assertion on the specific element or state you're waiting for instead.
+
+```typescript
+// ❌ BAD — networkidle never resolves cleanly against polling/WebSocket traffic
+await app.waitForLoadState('networkidle')
+
+// ✅ GOOD — wait for the actual UI signal
+await expect(app.getByRole('heading', { name: 'Workflows' })).toBeVisible()
+```
+
 ---
 
 ## Constraints
@@ -1074,15 +1174,18 @@ await app.routeWebSocket('wss://example.com/ws', ws => {
 - ❌ Use `{ timeout: 5000 }` on assertions -- 5000ms is the default Playwright timeout, restating it is redundant
 - ❌ Use `.first()` when only one element should match -- make the locator specific enough to match exactly one element
 - ❌ Use try-catch to silently skip assertions -- when mock data is deterministic, let assertions fail naturally to surface mock setup bugs
-- ❌ Use raw CSS selectors (`.pf-v6-c-button`) -- use `getByRole`, `getByLabel`, or `getByText`
+- ❌ Use raw CSS selectors or PF BEM classes (`.pf-v6-c-button`) in locators **or assertions** -- use `getByRole`, `getByLabel`, or `getByText`
 - ❌ Include `.ts` extension in imports -- follow the codebase convention of extensionless imports
 - ❌ Assert on CSS classes or internal state
 - ❌ Access React internals via `page.evaluate()`
 - ❌ Leave test data in database when testing against real backend
+- ❌ Use `waitForLoadState('networkidle')` -- unreliable with polling/WebSocket traffic; assert on the specific UI signal instead
+- ❌ Assert sequential async/WebSocket state transitions (`Pending → Running → Success`) -- race-prone; assert only the final state
 
 **ALWAYS:**
 
-- ✅ Import `{ test, expect, toAppUrl }` from `'./fixtures'`
+- ✅ Import `{ test, expect, toAppUrl }` and `type Page` from `'./fixtures'`
+- ✅ Prefer API-based cleanup (`e2e/utils/api.ts`) over UI-based cleanup when a test may fail before the resource is visible in the UI
 - ✅ Use `{ app }` fixture
 - ✅ Use `buildUniqueName(prefix)` for all test data
 - ✅ Each test creates ALL resources it needs (fully self-contained)
@@ -1106,7 +1209,7 @@ Before considering tests complete:
 
 ### Test Quality
 
-- [ ] Tests import from `'./fixtures'` (not `'@playwright/test'`)
+- [ ] Tests import `test, expect, toAppUrl`, and `type Page` from `'./fixtures'` (not `'@playwright/test'`)
 - [ ] Tests use `{ app }` fixture (not `{ page }`)
 - [ ] Navigation uses `toAppUrl('/path')`
 - [ ] Semantic locators used (minimal `getByTestId`)

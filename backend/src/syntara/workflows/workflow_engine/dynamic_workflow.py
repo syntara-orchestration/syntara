@@ -12,6 +12,7 @@ from datetime import timedelta
 from typing import Any, ClassVar, cast
 
 from temporalio import workflow
+from temporalio.common import RetryPolicy
 from temporalio.exceptions import ActivityError, ApplicationError
 from temporalio.exceptions import TimeoutError as TemporalTimeoutError
 
@@ -53,6 +54,7 @@ from syntara.workflows.workflow_engine.models.workflow_definition import (
     NodeType,
 )
 from syntara.workflows.workflow_engine.unified_eval import safe_eval_with_namespace
+from syntara.workflows.workflow_engine.utils.loop_iteration_ids import loop_control_activity_id
 
 # Trigger types allowed for dynamic dispatch via Temporal activities.
 # Each entry must have a corresponding @activity.defn with a matching name.
@@ -146,11 +148,15 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             self._cleanup_timeout_tasks()
             self._mark_remaining_unreachable_nodes(graph)
 
+            if self._detached_nodes:
+                await self._expire_remaining_approvals(graph)
+
             return self._build_result(execution_id, include_node_results)
 
         except asyncio.CancelledError:
-            workflow.logger.info("Workflow cancelled, cleaning up pending approvals")
+            workflow.logger.info("Workflow cancelled, cleaning up pending approvals and agentic invocations")
             await self._cancel_approval_requests()
+            await self._cancel_agentic_invocations()
             raise
 
     def _initialize_state(
@@ -290,35 +296,38 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             done, _ = await asyncio.wait(wait_tasks, return_when=asyncio.FIRST_COMPLETED)
 
             for task in done:
-                completed_node_id = self._find_node_for_task(task, pending_tasks)
-                if not completed_node_id:
-                    continue
+                await self._process_completed_task(task, pending_tasks, graph)
 
-                del pending_tasks[completed_node_id]
+    async def _process_completed_task(
+        self,
+        task: asyncio.Task[Any],
+        pending_tasks: dict[str, asyncio.Task[Any]],
+        graph: WorkflowGraph,
+    ) -> None:
+        """Handle a single completed task from the asyncio.wait done set."""
+        completed_node_id = self._find_node_for_task(task, pending_tasks)
+        if not completed_node_id:
+            return
 
-                try:
-                    output = await task
-                except Exception as node_error:  # noqa: BLE001
-                    node = graph.get_node(completed_node_id)
-                    cof = resolve_continue_on_failure(node, self._runtime_settings)
-                    self._handle_node_failure(
-                        completed_node_id, node_error, graph, pending_tasks, continue_on_failure=cof
-                    )
-                    await self._maybe_expire_approval(completed_node_id, node, node_error)
-                    if cof:
-                        self._route_failed_node(completed_node_id, node)
-                        await self._handle_continued_failure(completed_node_id, node, graph, pending_tasks)
-                    continue
+        del pending_tasks[completed_node_id]
 
-                self.resolver.set_namespace(completed_node_id, {**output, "status": "completed"})
-                workflow.logger.info(f"Node {completed_node_id} completed, pending: {list(pending_tasks.keys())}")
+        try:
+            output = await task
+        except Exception as node_error:  # noqa: BLE001
+            node = graph.get_node(completed_node_id)
+            cof = resolve_continue_on_failure(node, self._runtime_settings)
+            self._handle_node_failure(completed_node_id, node_error, graph, pending_tasks, continue_on_failure=cof)
+            await self._maybe_expire_approval(completed_node_id, node, node_error)
+            await self._maybe_cancel_agentic_invocation(node, node_error)
+            if cof:
+                self._route_failed_node(completed_node_id, node)
+                await self._handle_continued_failure(completed_node_id, node, graph, pending_tasks)
+            return
 
-                await self._schedule_successors(
-                    completed_node_id=completed_node_id,
-                    graph=graph,
-                    pending_tasks=pending_tasks,
-                )
-                self._cancel_skipped_pending_tasks(pending_tasks)
+        self.resolver.set_namespace(completed_node_id, {**output, "status": "completed"})
+        workflow.logger.info(f"Node {completed_node_id} completed, pending: {list(pending_tasks.keys())}")
+        await self._schedule_successors(completed_node_id=completed_node_id, graph=graph, pending_tasks=pending_tasks)
+        self._cancel_skipped_pending_tasks(pending_tasks)
 
     @staticmethod
     def _find_node_for_task(
@@ -410,6 +419,44 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             return app_error.message or str(app_error)
         return str(error)
 
+    async def _maybe_cancel_agentic_invocation(
+        self,
+        node: ActivityNode,
+        error: Exception,
+    ) -> None:
+        """Best-effort cancel a running agentic invocation when its node times out."""
+        if node.type != NodeType.AGENTIC:
+            return
+        if not (isinstance(error, ActivityError) and isinstance(error.cause, TemporalTimeoutError)):
+            return
+        await self._cancel_agentic_invocations(node_id=node.id, reason="Node timeout")
+
+    async def _cancel_agentic_invocations(self, node_id: str | None = None, reason: str = "Workflow cancelled") -> None:
+        """Best-effort cancel running agentic invocations for this execution.
+
+        Args:
+            node_id: When set, cancel only the invocation for this node (timeout case).
+                When None, cancel all running agentic invocations (workflow cancellation).
+            reason: Cancellation reason passed to the orchestrator.
+
+        """
+        try:
+            args: list[Any] = [self.execution_id, node_id, reason]
+            await asyncio.shield(
+                workflow.execute_activity(
+                    ActivityName.CANCEL_AGENTIC,
+                    args=args,
+                    activity_id=f"__internal__cancel_agentic_{node_id or 'all'}",
+                    start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
+                    retry_policy=RetryPolicy(maximum_attempts=1),
+                )
+            )
+        except Exception:  # noqa: BLE001
+            workflow.logger.warning(
+                "Failed to cancel agentic invocations (best-effort)",
+                node_id=node_id,
+            )
+
     @staticmethod
     def _build_empty_node_output(node: ActivityNode) -> dict[str, Any]:
         """Build an empty output dict for a node type using its output model."""
@@ -460,13 +507,13 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
     def _remove_detached_tasks(self, pending_tasks: dict[str, asyncio.Task[Any]]) -> None:
         """Remove detached in-flight tasks from the main loop without cancelling them.
 
-        When a converge node fails, in-flight predecessors keep running in
-        Temporal but no longer block the workflow from completing.
+        When a converge node fires (ANY) or fails, in-flight predecessors keep
+        running in Temporal but no longer block the workflow from completing.
         """
         detached = [nid for nid in pending_tasks if nid in self._detached_nodes]
         for nid in detached:
             del pending_tasks[nid]
-            workflow.logger.info(f"Detached in-flight node {nid} from main loop (converge failed)")
+            workflow.logger.info(f"Detached in-flight node {nid} from main loop (converge fired)")
 
     def _cleanup_timeout_tasks(self) -> None:
         """Cancel any remaining converge timeout background tasks."""
@@ -787,7 +834,9 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         # All explored paths lead to skipped/failed nodes → unreachable
         return True
 
-    def _mark_downstream_as_skipped(self, start_node_id: str, graph: WorkflowGraph) -> None:
+    def _mark_downstream_as_skipped(
+        self, start_node_id: str, graph: WorkflowGraph, boundary: set[str] | None = None
+    ) -> None:
         """Eagerly mark downstream nodes as skipped via BFS propagation.
 
         Starting from a skipped node, propagate the skipped status to all
@@ -797,9 +846,15 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         ``_check_converge_successors`` / ``_evaluate_converge_failure``
         based on the node's strategy (ALL/ANY).
 
+        When ``boundary`` is provided, only nodes within that set are eligible
+        for skipping.  This prevents converge cancellation from propagating to
+        nodes that branch off a cancelled predecessor but are not part of the
+        converge's parallel section.
+
         Args:
             start_node_id: Node that was just marked as skipped
             graph: Workflow graph
+            boundary: Optional set of node IDs to restrict propagation to
 
         """
         queue = collections.deque([start_node_id])
@@ -822,6 +877,9 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 # let _check_converge_successors handle them.
                 succ_node = graph.get_node(succ_id)
                 if succ_node.type == NodeType.CONVERGE:
+                    continue
+
+                if boundary is not None and succ_id not in boundary:
                     continue
 
                 # Check if ALL predecessors of this successor are skipped or failed
@@ -947,10 +1005,14 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                         loop_results[namespaced_key] = []
                     loop_results[namespaced_key].append(field_value)
 
-        # Clear from loop_body_map to allow fresh tracking on next iteration
-        # Results stay in resolver for query access
+        # Clear from loop_body_map to allow fresh tracking on next iteration.
+        # Also reset loop_state / iteration_results for body nodes that are
+        # themselves loops so nested loops re-initialize when the outer loop
+        # advances to the next iteration.
         for node_id in loop_body_nodes:
             del self.loop_body_map[node_id]
+            self.loop_state.pop(node_id, None)
+            self.loop_iteration_results.pop(node_id, None)
 
         workflow.logger.info(f"Cleared {len(loop_body_nodes)} loop body nodes from tracking for loop {loop_id}")
 
@@ -1172,7 +1234,9 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             await workflow.execute_activity(
                 ActivityName.LOOP,
                 args=[loop_parameters, node.outputs, self.loop_iteration_results[node_id]],
-                activity_id=f"{node_id}_iter_{state.current_index}",
+                activity_id=loop_control_activity_id(
+                    node_id, state.current_index, self.loop_body_map, self.node_control_data
+                ),
                 start_to_close_timeout=timedelta(seconds=timeout_seconds),
             ),
         )
@@ -1550,6 +1614,19 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
 
         """
         return list(self.skipped_nodes)
+
+    @workflow.query
+    def get_detached_nodes(self) -> list[str]:
+        """Query to get list of detached node IDs.
+
+        Detached nodes were in-flight when a converge ANY strategy fired.
+        ActivitySyncService marks these CANCELLED rather than SKIPPED.
+
+        Returns:
+            List of node IDs that were detached due to converge ANY completion
+
+        """
+        return list(self._detached_nodes)
 
     @workflow.query
     def get_pre_resolved_nodes(self) -> list[str]:

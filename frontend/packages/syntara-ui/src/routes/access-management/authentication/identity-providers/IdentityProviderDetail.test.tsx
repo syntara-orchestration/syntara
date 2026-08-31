@@ -316,7 +316,7 @@ describe('IdentityProviderDetail', () => {
 
     render(<IdentityProviderDetail />, { wrapper: createWrapper() })
 
-    // useQueryState renders a NxLoadingState which includes a spinner
+    // useQueryState renders a SynLoadingState which includes a spinner
     expect(screen.getByRole('progressbar')).toBeInTheDocument()
   })
 

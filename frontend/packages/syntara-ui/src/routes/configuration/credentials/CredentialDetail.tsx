@@ -12,20 +12,20 @@ import { useMemo, useState } from 'react'
 import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsCredentialDetail, breadcrumbsCredentialEarlyShell } from '../../../app/breadcrumbBuilders'
 import { credentialsClient } from '../../../client'
-import { NxDetail } from '../../../components/details/NxDetail'
+import { SynDetail } from '../../../components/details/SynDetail'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
-import { NxLabel } from '../../../components/labels/NxLabel'
-import { NxPage, NxPageBody } from '../../../components/layout/NxPage'
-import { NxPageHeader } from '../../../components/layout/NxPageHeader'
-import { NxPanel } from '../../../components/layout/NxPanel'
-import type { KebabAction } from '../../../components/NxKebabMenu'
-import { NxKebabMenu } from '../../../components/NxKebabMenu'
-import { NxPageTitle } from '../../../components/NxPageTitle'
-import { NxErrorState } from '../../../components/states/NxErrorState'
+import { SynLabel } from '../../../components/labels/SynLabel'
+import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
+import { SynPageHeader } from '../../../components/layout/SynPageHeader'
+import { SynPanel } from '../../../components/layout/SynPanel'
+import { SynErrorState } from '../../../components/states/SynErrorState'
 import { useQueryState } from '../../../components/states/useQueryState'
+import type { KebabAction } from '../../../components/SynKebabMenu'
+import { SynKebabMenu } from '../../../components/SynKebabMenu'
+import { SynPageTitle } from '../../../components/SynPageTitle'
 import { UserTimestamp } from '../../../components/table/UserTimestamp'
-import { NxUrlTabs } from '../../../components/tabs/NxUrlTabs'
+import { SynUrlTabs } from '../../../components/tabs/SynUrlTabs'
 import { useDeleteAction } from '../../../hooks/useDeleteAction'
 import { useUrlTab } from '../../../hooks/useUrlTab'
 import { useAlerts } from '../../../providers/alerts'
@@ -61,13 +61,13 @@ function formatCount(count: number | null | undefined): string | number {
 
 function EnabledStateLabel({ enabled }: Readonly<{ enabled: boolean }>) {
   return enabled ? (
-    <NxLabel variant="outline" status="success" icon={<RhUiCheckCircleIcon />}>
+    <SynLabel variant="outline" status="success" icon={<RhUiCheckCircleIcon />}>
       Enabled
-    </NxLabel>
+    </SynLabel>
   ) : (
-    <NxLabel variant="outline" icon={<RhUiMinusCircleIcon />}>
+    <SynLabel variant="outline" icon={<RhUiMinusCircleIcon />}>
       Disabled
-    </NxLabel>
+    </SynLabel>
   )
 }
 
@@ -78,15 +78,15 @@ function DynamicCredentialFields({ typeFields, credInputs }: Readonly<DynamicFie
     const value = credInputs[field.id]
     const isEncrypted = value === ENCRYPTED_SENTINEL
     return (
-      <NxDetail key={field.id} label={field.label}>
+      <SynDetail key={field.id} label={field.label}>
         {isEncrypted ? (
-          <NxLabel variant="outline" icon={<RhUiLockIcon />}>
+          <SynLabel variant="outline" icon={<RhUiLockIcon />}>
             Encrypted
-          </NxLabel>
+          </SynLabel>
         ) : (
           String((value as string | number | boolean) ?? '—')
         )}
-      </NxDetail>
+      </SynDetail>
     )
   })
 }
@@ -204,9 +204,9 @@ export default function CredentialDetail() {
   }
 
   function handleConfirmDisable() {
-    if (!credentialToDisable) return
+    if (!credentialToDisable?.id) return
     patchCredential(
-      { params: { path: { credential_id: credentialToDisable.id! } }, body: { enabled: false } },
+      { params: { path: { credential_id: credentialToDisable.id } }, body: { enabled: false } },
       {
         onSuccess: () => {
           detachPromise(credQuery.refetch())
@@ -226,6 +226,7 @@ export default function CredentialDetail() {
 
   const handleConfirmDelete = useDeleteAction<Credential, { params: { path: { credential_id: string } } }>({
     deleteFn: (params, callbacks) => deleteCredentialMut(params, callbacks),
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- safe: credentials opened for deletion always have an id (server-assigned); ?? '' would produce an invalid path param
     buildParams: (cred) => ({ params: { path: { credential_id: cred.id! } } }),
     entityLabel: 'credential',
     getItemName: (cred) => cred.name,
@@ -242,7 +243,9 @@ export default function CredentialDetail() {
       isDanger: true,
       isAriaDisabled: !canDelete,
       tooltipProps: canDelete ? undefined : { content: tooltips.delete },
-      onClick: () => openDeleteDialog(credential!),
+      onClick: () => {
+        if (credential) openDeleteDialog(credential)
+      },
     },
   ]
 
@@ -253,27 +256,27 @@ export default function CredentialDetail() {
 
   if (!credentialId) {
     return (
-      <NxPage>
-        <NxPageTitle segments={['Credential', 'Credentials']} />
-        <NxPageHeader title="Error" breadcrumbs={breadcrumbsCredentialEarlyShell('Error')} />
-        <NxPageBody>
-          <NxPanel isFullHeight>
-            <NxErrorState title="Invalid credential" message="No credential ID provided" />
-          </NxPanel>
-        </NxPageBody>
-      </NxPage>
+      <SynPage>
+        <SynPageTitle segments={['Credential', 'Credentials']} />
+        <SynPageHeader title="Error" breadcrumbs={breadcrumbsCredentialEarlyShell('Error')} />
+        <SynPageBody>
+          <SynPanel isFullHeight>
+            <SynErrorState title="Invalid credential" message="No credential ID provided" />
+          </SynPanel>
+        </SynPageBody>
+      </SynPage>
     )
   }
 
   if (queryState) {
     return (
-      <NxPage>
-        <NxPageTitle segments={['Credential', 'Credentials']} />
-        <NxPageHeader title="Credential" breadcrumbs={breadcrumbsCredentialEarlyShell('Credential')} />
-        <NxPageBody>
-          <NxPanel isFullHeight>{queryState}</NxPanel>
-        </NxPageBody>
-      </NxPage>
+      <SynPage>
+        <SynPageTitle segments={['Credential', 'Credentials']} />
+        <SynPageHeader title="Credential" breadcrumbs={breadcrumbsCredentialEarlyShell('Credential')} />
+        <SynPageBody>
+          <SynPanel isFullHeight>{queryState}</SynPanel>
+        </SynPageBody>
+      </SynPage>
     )
   }
 
@@ -286,9 +289,9 @@ export default function CredentialDetail() {
   const credentialCrumbs = breadcrumbsCredentialDetail(credential.id, credential.name, activeTab)
 
   return (
-    <NxPage>
-      <NxPageTitle segments={[credential.name, 'Credentials']} />
-      <NxPageHeader
+    <SynPage>
+      <SynPageTitle segments={[credential.name, 'Credentials']} />
+      <SynPageHeader
         breadcrumbs={credentialCrumbs}
         title={credential.name}
         docLink={credentialsDocLink}
@@ -313,14 +316,14 @@ export default function CredentialDetail() {
                 Edit credential
               </Button>
             </DisabledWithTooltip>
-            <NxKebabMenu actions={kebabActions} aria-label="Credential actions" />
+            <SynKebabMenu actions={kebabActions} aria-label="Credential actions" />
           </>
         }
       />
 
-      <NxPageBody>
-        <NxPanel isFullHeight className={styles.tabsFullHeight}>
-          <NxUrlTabs
+      <SynPageBody>
+        <SynPanel isFullHeight className={styles.tabsFullHeight}>
+          <SynUrlTabs
             basePath={credentialBasePath}
             defaultTab="details"
             validTabs={validTabs}
@@ -330,28 +333,28 @@ export default function CredentialDetail() {
               <Stack hasGutter style={{ padding: 'var(--pf-t--global--spacer--lg)' }}>
                 <StackItem>
                   <DescriptionList isHorizontal>
-                    <NxDetail label="Name">{credential.name}</NxDetail>
-                    {hasDescription ? <NxDetail label="Description">{credential.description}</NxDetail> : null}
-                    <NxDetail label="Type">{credentialTypeDisplayText}</NxDetail>
-                    <NxDetail label="Workflows">{formatCount(credential.workflow_count)}</NxDetail>
-                    <NxDetail label="Integrations">{formatCount(credential.integration_count)}</NxDetail>
-                    <NxDetail label="Last modified">
+                    <SynDetail label="Name">{credential.name}</SynDetail>
+                    {hasDescription ? <SynDetail label="Description">{credential.description}</SynDetail> : null}
+                    <SynDetail label="Type">{credentialTypeDisplayText}</SynDetail>
+                    <SynDetail label="Workflows">{formatCount(credential.workflow_count)}</SynDetail>
+                    <SynDetail label="Integrations">{formatCount(credential.integration_count)}</SynDetail>
+                    <SynDetail label="Last modified">
                       <UserTimestamp
                         user={credential.updated_by}
                         timestamp={credential.updated_at}
                         subtleTimestamp={false}
                       />
-                    </NxDetail>
-                    <NxDetail label="Created">
+                    </SynDetail>
+                    <SynDetail label="Created">
                       <UserTimestamp
                         user={credential.created_by}
                         timestamp={credential.created_at}
                         subtleTimestamp={false}
                       />
-                    </NxDetail>
-                    <NxDetail label="State">
+                    </SynDetail>
+                    <SynDetail label="State">
                       <EnabledStateLabel enabled={credential.enabled ?? false} />
-                    </NxDetail>
+                    </SynDetail>
 
                     <DynamicCredentialFields typeFields={typeFields} credInputs={credInputs} />
                   </DescriptionList>
@@ -384,9 +387,9 @@ export default function CredentialDetail() {
                 <CredentialIntegrationsTab credentialId={credential.id} />
               </Tab>
             )}
-          </NxUrlTabs>
-        </NxPanel>
-      </NxPageBody>
+          </SynUrlTabs>
+        </SynPanel>
+      </SynPageBody>
 
       <DisableCredentialDialog
         credential={credentialToDisable}
@@ -420,6 +423,6 @@ export default function CredentialDetail() {
         credentialToEdit={credential}
         onSuccess={() => detachPromise(credQuery.refetch())}
       />
-    </NxPage>
+    </SynPage>
   )
 }

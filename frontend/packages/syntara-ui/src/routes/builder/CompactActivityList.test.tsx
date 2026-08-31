@@ -29,6 +29,7 @@ describe('CompactActivityList', () => {
 
     expect(screen.getByText('Fetch Data')).toBeInTheDocument()
     expect(screen.getByText('task-2')).toBeInTheDocument()
+    expect(screen.getByRole('grid', { name: 'Activity list' })).toHaveClass('pf-m-compact')
   })
 
   it('renders status for each activity', () => {

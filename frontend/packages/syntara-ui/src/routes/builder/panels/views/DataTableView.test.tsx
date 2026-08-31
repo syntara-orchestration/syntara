@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { DataTableView } from './DataTableView'
+import styles from './DataTableView.module.css'
 
 describe('DataTableView', () => {
   it('renders column headers from data keys', () => {
@@ -11,6 +12,9 @@ describe('DataTableView', () => {
 
     expect(screen.getByRole('columnheader', { name: 'hostname' })).toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: 'port' })).toBeInTheDocument()
+    expect(screen.getByRole('grid', { name: 'Test data' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'hostname' })).toHaveClass(styles.cell)
+    expect(screen.getByRole('cell', { name: 'server1' })).toHaveClass(styles.cell)
   })
 
   it('renders cell values', () => {
@@ -43,6 +47,13 @@ describe('DataTableView', () => {
     render(<DataTableView data={data} ariaLabel="Custom label" />)
 
     expect(screen.getByRole('grid', { name: 'Custom label' })).toBeInTheDocument()
+  })
+
+  it('renders a compact table', () => {
+    const data = { result: 'ok' }
+    render(<DataTableView data={data} ariaLabel="Test data" />)
+
+    expect(screen.getByRole('grid', { name: 'Test data' })).toHaveClass('pf-m-compact')
   })
 
   it('has no accessibility violations', async () => {

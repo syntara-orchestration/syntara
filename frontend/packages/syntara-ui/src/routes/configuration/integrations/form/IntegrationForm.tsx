@@ -18,10 +18,10 @@ import { AppRoute } from '../../../../app/AppRoute'
 import { breadcrumbsIntegrationConfigure } from '../../../../app/breadcrumbBuilders'
 import { tanstackRouter } from '../../../../app/tanstackRouter'
 import { integrationsClient } from '../../../../client'
-import { NxPage, NxPageBody } from '../../../../components/layout/NxPage'
-import { NxPageHeader } from '../../../../components/layout/NxPageHeader'
-import { NxPanel } from '../../../../components/layout/NxPanel'
-import { NxPageTitle } from '../../../../components/NxPageTitle'
+import { SynPage, SynPageBody } from '../../../../components/layout/SynPage'
+import { SynPageHeader } from '../../../../components/layout/SynPageHeader'
+import { SynPanel } from '../../../../components/layout/SynPanel'
+import { SynPageTitle } from '../../../../components/SynPageTitle'
 import { useDirtyFormGuard } from '../../../../hooks/useDirtyFormGuard'
 import { useFormMutationErrorHandler } from '../../../../hooks/useFormMutationErrorHandler'
 import { useAlerts } from '../../../../providers/alerts'
@@ -352,11 +352,11 @@ export function IntegrationForm() {
   )
 
   return (
-    <NxPage>
-      <NxPageTitle segments={['Configure integration', 'Integrations']} />
-      <NxPageHeader title="Configure integration" breadcrumbs={breadcrumbsIntegrationConfigure()} docLink={docLink} />
-      <NxPageBody>
-        <NxPanel isFullHeight panelMainBodyProps={{ className: styles.wizardPanel }}>
+    <SynPage>
+      <SynPageTitle segments={['Configure integration', 'Integrations']} />
+      <SynPageHeader title="Configure integration" breadcrumbs={breadcrumbsIntegrationConfigure()} docLink={docLink} />
+      <SynPageBody>
+        <SynPanel isFullHeight panelMainBodyProps={{ className: styles.wizardPanel }}>
           <Wizard
             isVisitRequired
             footer={
@@ -417,8 +417,8 @@ export function IntegrationForm() {
               />
             </WizardStep>
           </Wizard>
-        </NxPanel>
-      </NxPageBody>
-    </NxPage>
+        </SynPanel>
+      </SynPageBody>
+    </SynPage>
   )
 }

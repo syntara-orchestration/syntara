@@ -1,15 +1,17 @@
-import { Label, LabelGroup, Truncate } from '@patternfly/react-core'
+import { LabelGroup, Truncate } from '@patternfly/react-core'
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { ExecutionsAPI } from '@syntara/contracts'
 import { useCallback, useMemo, useState } from 'react'
 
 import { AppRoute } from '../../../app/AppRoute'
 import { credentialsClient } from '../../../client'
-import { NxPanelContentStack } from '../../../components/layout/NxPanelContentStack'
-import { NxListPanelTable, NxListPanelView } from '../../../components/panels/list/NxListPanel'
-import { NxEmptyStateNoData } from '../../../components/states/NxEmptyStateNoData'
+import { SynLabel } from '../../../components/labels/SynLabel'
+import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
+import { SynListPanelTable, SynListPanelView } from '../../../components/panels/list/SynListPanel'
+import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import { DateCell } from '../../../components/table/DateCell'
 import { LinkCell } from '../../../components/table/LinkCell'
+import { UserTimestamp } from '../../../components/table/UserTimestamp'
 import { useExpandableRowIds } from '../../../hooks/useExpandableRowIds'
 import { detachPromise } from '../../../utils/detachPromise'
 import { StatusLabel } from '../../builder/ExecutionStatus'
@@ -91,15 +93,15 @@ function WorkflowsTable({
                 </LinkCell>
               </Td>
               <Td dataLabel="Created by">
-                <Truncate content={workflow.created_by ?? RELATED_RESOURCE_DASH} />
+                <UserTimestamp user={workflow.created_by} timestamp={workflow.created_at ?? undefined} inline />
               </Td>
               <Td dataLabel="Steps using credential">
                 {workflow.node_names && workflow.node_names.length > 0 ? (
                   <LabelGroup numLabels={5}>
                     {workflow.node_names.map((nodeName) => (
-                      <Label key={nodeName} variant="outline" isCompact>
+                      <SynLabel key={nodeName} variant="outline">
                         {nodeName}
-                      </Label>
+                      </SynLabel>
                     ))}
                   </LabelGroup>
                 ) : (
@@ -149,8 +151,8 @@ export function CredentialWorkflowsTab({ credentialId }: Readonly<CredentialWork
   const { expandedRows, allRowsExpanded, handleToggleRow, handleCollapseAll } = useExpandableRowIds(expandableIds)
 
   return (
-    <NxPanelContentStack>
-      <NxListPanelView
+    <SynPanelContentStack>
+      <SynListPanelView
         isPending={query.isPending}
         error={query.error}
         onRetry={() => detachPromise(query.refetch())}
@@ -159,13 +161,13 @@ export function CredentialWorkflowsTab({ credentialId }: Readonly<CredentialWork
         hasActiveFilters={false}
         onClearAllFilters={noop}
         noDataState={
-          <NxEmptyStateNoData
-            title="No workflows using this credential"
+          <SynEmptyStateNoData
+            title="No workflows yet"
             description="This credential is not currently referenced by any workflows. Workflows will appear here once they are configured to use this credential."
           />
         }
         body={
-          <NxListPanelTable
+          <SynListPanelTable
             caption="Workflows using this credential"
             isExpandable
             footer={{
@@ -185,9 +187,9 @@ export function CredentialWorkflowsTab({ credentialId }: Readonly<CredentialWork
               onToggleRow={handleToggleRow}
               onCollapseAll={handleCollapseAll}
             />
-          </NxListPanelTable>
+          </SynListPanelTable>
         }
       />
-    </NxPanelContentStack>
+    </SynPanelContentStack>
   )
 }

@@ -4,8 +4,9 @@ import type { EdgeConnection } from '../../../types/edge'
 import { getUpstreamNodeIds } from '../../edgeHelpers'
 import type { ValidationContext, ValidationError } from '../types'
 
+// Keep in sync with BUILTIN_SCOPES in backend/src/syntara/workflows/validators/template_expressions.py
 const KNOWN_NAMESPACES = new Set(['trigger', 'workflow_context'])
-const UNSUPPORTED_NAMESPACES = new Set(['input', 'inputs', 'variables', 'workflow'])
+const UNSUPPORTED_NAMESPACES = new Set(['workflow'])
 const VARIABLE_REF_PATTERN = /\$\{([^}]+)\}/g
 
 type VariableReference = {
@@ -115,17 +116,13 @@ type RefContext = {
 
 function checkUnsupportedNamespace(ref: VariableReference, activity: Activity): ValidationError {
   const stepName = activity.name ?? activity.id
-  const suggestion =
-    ref.namespace === 'variables' || ref.namespace === 'workflow'
-      ? `Workflow-level \${${ref.namespace}.*} is not supported`
-      : 'Use ${trigger.field} for trigger payload'
   return {
     id: `var-ref-unsupported-${activity.id}-${ref.namespace}`,
     severity: 'error',
     rule: 'variable-references',
     message: `Step "${stepName}" references \${${ref.fullRef}} but "${ref.namespace}" is not a supported namespace`,
     nodeId: activity.id,
-    suggestion,
+    suggestion: `Workflow-level \${${ref.namespace}.*} is not supported`,
   }
 }
 

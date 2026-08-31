@@ -1,16 +1,17 @@
-import { Label, LabelGroup, ToolbarItem } from '@patternfly/react-core'
+import { LabelGroup, ToolbarItem } from '@patternfly/react-core'
 import type { ReactNode } from 'react'
 
 import type { FilterConfig, FilterFieldDefinition, FilterOperator } from '../../types/filters'
 import { formatDateChipValue } from '../../utils/dateUtils'
+import { SynLabel } from '../labels/SynLabel'
 import { WorkflowName } from '../WorkflowName'
 
 /** User-applied filter values use outlined compact labels. */
 function ActiveFilterValueLabel({ children, onClose }: Readonly<{ children: ReactNode; onClose: () => void }>) {
   return (
-    <Label variant="outline" isCompact onClose={onClose}>
+    <SynLabel variant="outline" onClose={onClose}>
       {children}
-    </Label>
+    </SynLabel>
   )
 }
 

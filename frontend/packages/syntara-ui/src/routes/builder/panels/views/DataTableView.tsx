@@ -1,7 +1,11 @@
-import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table'
+import { Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table'
 import { type ReactNode, useCallback, useMemo } from 'react'
 
+import { SynPanelContentStack } from '../../../../components/layout/SynPanelContentStack'
+import { SynScrollableTableContainer } from '../../../../components/table/SynScrollableTableContainer'
 import { buildRowKey, toSafeString } from '../utils/tableHelpers'
+
+import styles from './DataTableView.module.css'
 
 export type DataTableViewProps = {
   data: Record<string, unknown> | Record<string, unknown>[] | null
@@ -34,28 +38,32 @@ export function DataTableView({ data, ariaLabel, renderCell, renderHeader }: Rea
   )
 
   return (
-    <Table aria-label={ariaLabel} variant="compact">
-      <Thead>
-        <Tr>
-          {columns.map((col) => (
-            <Th key={col}>{renderHeader ? renderHeader(col) : col}</Th>
-          ))}
-        </Tr>
-      </Thead>
-      <Tbody>
-        {rows.map((row, rowIndex) => (
-          <Tr key={getRowKey(row, rowIndex)}>
-            {columns.map((col) => {
-              const text = toSafeString(row[col])
-              return (
-                <Td key={col} dataLabel={col}>
-                  {renderCell ? renderCell(text) : text}
-                </Td>
-              )
-            })}
+    <SynPanelContentStack>
+      <SynScrollableTableContainer caption={ariaLabel} useFixedLayout={false} variant="compact">
+        <Thead>
+          <Tr>
+            {columns.map((col) => (
+              <Th key={col} className={styles.cell}>
+                {renderHeader ? renderHeader(col) : col}
+              </Th>
+            ))}
           </Tr>
-        ))}
-      </Tbody>
-    </Table>
+        </Thead>
+        <Tbody>
+          {rows.map((row, rowIndex) => (
+            <Tr key={getRowKey(row, rowIndex)}>
+              {columns.map((col) => {
+                const text = toSafeString(row[col])
+                return (
+                  <Td key={col} className={styles.cell} dataLabel={col}>
+                    {renderCell ? renderCell(text) : text}
+                  </Td>
+                )
+              })}
+            </Tr>
+          ))}
+        </Tbody>
+      </SynScrollableTableContainer>
+    </SynPanelContentStack>
   )
 }

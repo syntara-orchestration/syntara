@@ -1,6 +1,6 @@
 import type { IntegrationsAPI, Tool } from '@syntara/contracts'
 
-import { NxPanelContentStack } from '../../../components/layout/NxPanelContentStack'
+import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
 
 import styles from './IntegrationDetail.module.css'
 import { IntegrationModelsTab } from './IntegrationModelsTab'
@@ -32,11 +32,12 @@ export function ResourcesTabContent({
   canUpdate: boolean
   updateTooltip?: string
 }>) {
+  const integrationId = integration.id ?? ''
   if (isLLM) {
     return (
-      <NxPanelContentStack className={styles.resourcesTabContent}>
+      <SynPanelContentStack className={styles.resourcesTabContent}>
         <IntegrationModelsTab
-          integrationId={integration.id!}
+          integrationId={integrationId}
           models={modelsState.models}
           isLoading={modelsState.isLoading}
           error={modelsState.error?.message ?? null}
@@ -58,14 +59,14 @@ export function ResourcesTabContent({
           updateTooltip={updateTooltip}
           onRefreshed={onRefreshed}
         />
-      </NxPanelContentStack>
+      </SynPanelContentStack>
     )
   }
 
   return (
-    <NxPanelContentStack className={styles.resourcesTabContent}>
+    <SynPanelContentStack className={styles.resourcesTabContent}>
       <IntegrationResourcesTab
-        integrationId={integration.id!}
+        integrationId={integrationId}
         tools={tools}
         enabledToolIds={enabledToolIds}
         enabledCount={toolEnabledCount}
@@ -75,6 +76,6 @@ export function ResourcesTabContent({
         onRefreshed={onRefreshed}
         refetchTools={refetchTools}
       />
-    </NxPanelContentStack>
+    </SynPanelContentStack>
   )
 }

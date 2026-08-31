@@ -8,18 +8,18 @@ import {
   breadcrumbsServiceAccountDetail,
   breadcrumbsServiceAccountDetailEarlyShell,
 } from '../../../app/breadcrumbBuilders'
-import { NxDetail } from '../../../components/details/NxDetail'
-import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
+import { SynDetail } from '../../../components/details/SynDetail'
+import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
-import { NxLabel } from '../../../components/labels/NxLabel'
-import { NxPage, NxPageBody } from '../../../components/layout/NxPage'
-import { NxPageHeader } from '../../../components/layout/NxPageHeader'
-import { NxKebabMenu } from '../../../components/NxKebabMenu'
-import { NxLink } from '../../../components/NxLink'
-import { NxPageTitle } from '../../../components/NxPageTitle'
-import { NxListPanel, NxListPanelTabs, NxListPanelView } from '../../../components/panels/list/NxListPanel'
+import { SynLabel } from '../../../components/labels/SynLabel'
+import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
+import { SynPageHeader } from '../../../components/layout/SynPageHeader'
+import { SynListPanel, SynListPanelTabs, SynListPanelView } from '../../../components/panels/list/SynListPanel'
 import { useQueryState } from '../../../components/states/useQueryState'
+import { SynKebabMenu } from '../../../components/SynKebabMenu'
+import { SynLink } from '../../../components/SynLink'
+import { SynPageTitle } from '../../../components/SynPageTitle'
 import { DateCell } from '../../../components/table/DateCell'
 import { useDeleteAction } from '../../../hooks/useDeleteAction'
 import { useDialogState } from '../../../hooks/useDialogState'
@@ -42,10 +42,10 @@ import { useServiceAccountPermissions } from './useServiceAccountPermissions'
 function DetailsTab({ serviceAccount }: Readonly<{ serviceAccount: ServiceAccountRead }>) {
   return (
     <DescriptionList isHorizontal>
-      <NxDetail label="Name">{serviceAccount.name}</NxDetail>
-      <NxDetail label="Owning project">
+      <SynDetail label="Name">{serviceAccount.name}</SynDetail>
+      <SynDetail label="Owning project">
         {serviceAccount.project_name && !serviceAccount.is_project_deleted ? (
-          <NxLink to={getProjectDetailPath(serviceAccount.project_id)}>{serviceAccount.project_name}</NxLink>
+          <SynLink to={getProjectDetailPath(serviceAccount.project_id)}>{serviceAccount.project_name}</SynLink>
         ) : (
           <>
             {serviceAccount.project_name ?? serviceAccount.project_id}
@@ -55,36 +55,36 @@ function DetailsTab({ serviceAccount }: Readonly<{ serviceAccount: ServiceAccoun
                 <Tooltip content="The owning project for this service account has been deleted">
                   {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
                   <span tabIndex={0}>
-                    <NxLabel color="grey">Deleted</NxLabel>
+                    <SynLabel color="grey">Deleted</SynLabel>
                   </span>
                 </Tooltip>
               </>
             )}
           </>
         )}
-      </NxDetail>
-      <NxDetail label="Description">{serviceAccount.description}</NxDetail>
-      <NxDetail label="State">
+      </SynDetail>
+      <SynDetail label="Description">{serviceAccount.description}</SynDetail>
+      <SynDetail label="State">
         {serviceAccount.status === 'active' ? (
-          <NxLabel variant="outline" status="success" icon={<RhUiCheckCircleIcon />}>
+          <SynLabel variant="outline" status="success" icon={<RhUiCheckCircleIcon />}>
             Enabled
-          </NxLabel>
+          </SynLabel>
         ) : (
-          <NxLabel variant="outline" icon={<RhUiMinusCircleIcon />}>
+          <SynLabel variant="outline" icon={<RhUiMinusCircleIcon />}>
             Disabled
-          </NxLabel>
+          </SynLabel>
         )}
-      </NxDetail>
-      <NxDetail label="Created">
+      </SynDetail>
+      <SynDetail label="Created">
         <DateCell dateString={serviceAccount.created_at} />
-      </NxDetail>
-      <NxDetail label="Last authenticated">
+      </SynDetail>
+      <SynDetail label="Last authenticated">
         {serviceAccount.last_authenticated_at ? (
           <DateCell dateString={serviceAccount.last_authenticated_at} />
         ) : (
           'Never'
         )}
-      </NxDetail>
+      </SynDetail>
     </DescriptionList>
   )
 }
@@ -126,7 +126,7 @@ function ServiceAccountToolbar({
           Edit service account
         </Button>
       </DisabledWithTooltip>
-      <NxKebabMenu
+      <SynKebabMenu
         actions={[
           {
             key: 'delete',
@@ -259,9 +259,9 @@ export function ServiceAccountDetail() {
   const isEnabled = serviceAccount.status === 'active'
 
   return (
-    <NxPage>
-      <NxPageTitle segments={[serviceAccount.name, 'Service Accounts']} />
-      <NxPageHeader
+    <SynPage>
+      <SynPageTitle segments={[serviceAccount.name, 'Service Accounts']} />
+      <SynPageHeader
         title={serviceAccount.name}
         breadcrumbs={crumbs}
         docLink={docLink}
@@ -275,9 +275,9 @@ export function ServiceAccountDetail() {
           />
         }
       />
-      <NxPageBody>
-        <NxListPanel>
-          <NxListPanelTabs
+      <SynPageBody>
+        <SynListPanel>
+          <SynListPanelTabs
             basePath={basePath}
             defaultTab="details"
             validTabs={VALID_TABS}
@@ -286,9 +286,9 @@ export function ServiceAccountDetail() {
             <Tab eventKey="details" title={<TabTitleText>Details</TabTitleText>} />
             <Tab eventKey="credentials" title={<TabTitleText>Credentials</TabTitleText>} />
             <Tab eventKey="assignments" title={<TabTitleText>Assignments</TabTitleText>} />
-          </NxListPanelTabs>
+          </SynListPanelTabs>
           {activeTab === 'details' && (
-            <NxListPanelView
+            <SynListPanelView
               tabKey="details"
               tabLabel="Details"
               isPending={false}
@@ -314,8 +314,8 @@ export function ServiceAccountDetail() {
               hiddenColumns={['scope']}
             />
           )}
-        </NxListPanel>
-      </NxPageBody>
+        </SynListPanel>
+      </SynPageBody>
 
       <EditServiceAccountModal
         serviceAccount={serviceAccount}
@@ -326,7 +326,7 @@ export function ServiceAccountDetail() {
         }}
       />
 
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={deleteDialog.isOpen}
         onClose={deleteDialog.close}
         onConfirm={() => handleDelete(undefined)}
@@ -340,9 +340,9 @@ export function ServiceAccountDetail() {
         }}
       >
         The service account <strong>{serviceAccount.name}</strong> will be deleted. This cannot be undone.
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
 
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={disableDialog.isOpen}
         onClose={disableDialog.close}
         onConfirm={handleDisable}
@@ -352,7 +352,7 @@ export function ServiceAccountDetail() {
       >
         You are about to disable the service account <strong>{serviceAccount.name}</strong>. You can re-enable the
         service account at any time.
-      </NxConfirmationDialog>
-    </NxPage>
+      </SynConfirmationDialog>
+    </SynPage>
   )
 }

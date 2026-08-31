@@ -1,5 +1,4 @@
-import type { Page } from '@playwright/test'
-
+import { type Page } from './fixtures'
 import { test, expect, toAppUrl } from './fixtures'
 
 async function navigateViaConfigMenu(app: Page, itemName: string) {

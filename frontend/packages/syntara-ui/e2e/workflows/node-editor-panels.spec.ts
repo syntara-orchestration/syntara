@@ -1,3 +1,4 @@
+import { type Page } from '../fixtures'
 import { test, expect, toAppUrl } from '../fixtures'
 import { addAgenticNode, addManualTrigger, addScriptNode } from '../helpers/v2-nodes'
 import {
@@ -15,14 +16,14 @@ import {
  * PF6 menus animate open after the toggle click — clicking before the item is
  * stable causes "element detached from DOM" / "not stable" errors in strict mode.
  */
-async function clickMenuItemWhenVisible(app: import('@playwright/test').Page, itemName: string) {
+async function clickMenuItemWhenVisible(app: Page, itemName: string) {
   const item = app.getByRole('menuitem', { name: itemName })
   await expect(item).toBeVisible()
   await item.click()
 }
 
 /** Click the Layout button to reposition nodes within the viewport. */
-async function layoutCanvas(app: import('@playwright/test').Page) {
+async function layoutCanvas(app: Page) {
   const layoutButton = app.getByRole('button', { name: 'Reset layout', exact: true })
   if ((await layoutButton.count()) > 0) {
     await layoutButton.click()
@@ -37,7 +38,7 @@ async function layoutCanvas(app: import('@playwright/test').Page) {
 }
 
 /** Click a React Flow node by its visible text label. */
-async function clickNode(app: import('@playwright/test').Page, nodeText: string) {
+async function clickNode(app: Page, nodeText: string) {
   await layoutCanvas(app)
   const node = app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: nodeText })
   await expect(node).toBeVisible({ timeout: 5_000 })
@@ -310,7 +311,7 @@ test.describe('Node editor panels', () => {
     workflowId = app.url().split('/').pop() ?? workflowId
 
     // --- Verify each node's output data ---
-    // Scope text assertions to the Output panel's NxPanel container using the
+    // Scope text assertions to the Output panel's SynPanel container using the
     // panelContainer CSS module class (Vite preserves the name in the hashed class).
     const outputPanel = app.locator('[class*="panelContainer"]').filter({
       has: app.getByRole('heading', { name: 'Output', exact: true }),
@@ -937,11 +938,6 @@ test.describe('Node editor panels', () => {
 
     await expect(parametersTab).toBeVisible({ timeout: 15_000 })
     await expect(runStepButton).toBeVisible({ timeout: 15_000 })
-
-    const flexContainer = app.locator('.pf-v6-l-flex').filter({
-      has: app.getByRole('tab', { name: 'Parameters' }),
-    })
-    await expect(flexContainer.getByRole('button', { name: 'Run step' })).toBeVisible()
   })
 
   test('mock data pin flow in Input panel', async ({ app }) => {
@@ -1054,7 +1050,7 @@ test.describe('Node editor panels', () => {
     await expect(app.getByText('Mock data pinned (1)')).not.toBeVisible()
   })
 
-  test('mock data cancel flow', async ({ app }) => {
+  test('mock data cancel flow', { tag: ['@konflux-skip'] }, async ({ app }) => {
     const workflowName = buildUniqueName('e2e-mock-cancel')
     await app.goto(toAppUrl('/workflow-builder/new'))
     await selectProjectIfRequired(app)

@@ -21,8 +21,8 @@ import { useNavigate } from '@tanstack/react-router'
 import { useEffect } from 'react'
 
 import { AppRoute } from '../../app/AppRoute'
-import { NxCodeBlock } from '../../components/details/NxCodeBlock'
-import { NxPanel } from '../../components/layout/NxPanel'
+import { SynCodeBlock } from '../../components/details/SynCodeBlock'
+import { SynPanel } from '../../components/layout/SynPanel'
 import { DateCell } from '../../components/table/DateCell'
 import { detachPromise } from '../../utils/detachPromise'
 
@@ -69,7 +69,7 @@ export function PolicyDetailSidebar({ policy, onClose, projectName }: Readonly<P
   const hasLabels = Object.keys(policy.labels ?? {}).length > 0
 
   return (
-    <NxPanel
+    <SynPanel
       style={{ width: '32rem', borderLeft: '1px solid var(--pf-t--global--border--color--default)' }}
       isFullHeight
       isScrollable
@@ -221,7 +221,7 @@ export function PolicyDetailSidebar({ policy, onClose, projectName }: Readonly<P
                         >
                           Conditions:
                         </Content>
-                        <NxCodeBlock jsonObject={stmt.conditions} noMaxHeight enableCopy={false} />
+                        <SynCodeBlock jsonObject={stmt.conditions} noMaxHeight enableCopy={false} />
                       </FlexItem>
                     )}
                   </Flex>
@@ -240,9 +240,9 @@ export function PolicyDetailSidebar({ policy, onClose, projectName }: Readonly<P
           <Title headingLevel="h3" size={TitleSizes.md} style={{ marginBottom: 'var(--pf-t--global--spacer--sm)' }}>
             Policy definition
           </Title>
-          <NxCodeBlock jsonObject={policyJson} noMaxHeight enableCopy />
+          <SynCodeBlock jsonObject={policyJson} noMaxHeight enableCopy />
         </StackItem>
       </Stack>
-    </NxPanel>
+    </SynPanel>
   )
 }

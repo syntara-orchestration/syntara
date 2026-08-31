@@ -11,11 +11,12 @@ if TYPE_CHECKING:
 from uuid import uuid4
 
 import pytest
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from syntara.authz.exceptions import BuiltinProtectionError
 from syntara.core.lib.encryption import ENCRYPTED_SENTINEL
 from syntara.credentials.exceptions import (
+    CredentialInUseError,
     CredentialNameConflictError,
     CredentialNotFoundError,
     CredentialValidationError,
@@ -122,6 +123,7 @@ def mock_session() -> MagicMock:
     session = MagicMock()
     session.add = MagicMock()
     session.commit = AsyncMock()
+    session.rollback = AsyncMock()
     session.refresh = AsyncMock()
     session.flush = AsyncMock()
     session.delete = AsyncMock()
@@ -626,6 +628,111 @@ class TestDeleteCredential:
         mock_session.delete.assert_awaited_once_with(credential)
 
     @pytest.mark.asyncio
+    async def test_raises_credential_in_use_when_integrations_reference_it(
+        self,
+        mock_session: MagicMock,
+        mock_user: MagicMock,
+        mock_secret_service: MagicMock,
+    ) -> None:
+        """Delete must be blocked (not silently nulled) while integrations reference it."""
+        credential = Credential(
+            id=uuid4(),
+            name="In-Use Cred",
+            credential_type_id=uuid4(),
+            secret_id=uuid4(),
+            enabled=True,
+            project_id=uuid4(),
+            created_by=mock_user.id,
+        )
+
+        mock_result = MagicMock()
+        mock_result.one_or_none.return_value = credential
+        mock_session.exec.return_value = mock_result
+
+        service = CredentialService(mock_session, mock_user, mock_secret_service)
+
+        with (
+            patch.object(service, "get_integration_counts", new_callable=AsyncMock, return_value={credential.id: 2}),
+            patch.object(
+                service,
+                "_get_referencing_integration_names",
+                new_callable=AsyncMock,
+                return_value=["Integration A", "Integration B"],
+            ),
+        ):
+            with pytest.raises(CredentialInUseError) as exc_info:
+                await service.delete_credential(credential.id)
+
+            assert exc_info.value.total_count == 2
+            assert exc_info.value.integration_names == ["Integration A", "Integration B"]
+            assert "Integration A" in exc_info.value.message
+
+        mock_secret_service.delete_secret.assert_not_called()
+        mock_session.delete.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_raises_credential_in_use_on_integrity_error_race(
+        self,
+        mock_session: MagicMock,
+        mock_user: MagicMock,
+        mock_secret_service: MagicMock,
+    ) -> None:
+        """TOCTOU race.
+
+        An integration is attached between the upfront count check and the
+        commit. The FK's ON DELETE RESTRICT makes the commit raise
+        IntegrityError instead of silently nulling the reference; this must
+        surface as the same clean CredentialInUseError, not a generic 400.
+        """
+        credential = Credential(
+            id=uuid4(),
+            name="Raced Cred",
+            credential_type_id=uuid4(),
+            secret_id=uuid4(),
+            enabled=True,
+            project_id=uuid4(),
+            created_by=mock_user.id,
+        )
+
+        mock_result = MagicMock()
+        mock_result.one_or_none.return_value = credential
+        mock_session.exec.return_value = mock_result
+        mock_session.commit.side_effect = IntegrityError(
+            "DELETE",
+            {},
+            Exception(
+                'update or delete on table "credentials" violates foreign key constraint '
+                '"integrations_management_credential_id_fkey" on table "integrations"'
+            ),
+        )
+
+        service = CredentialService(mock_session, mock_user, mock_secret_service)
+
+        with (
+            # First call (upfront check): no references yet. Second call (inside the
+            # except block, after the race): one integration attached.
+            patch.object(
+                service,
+                "get_integration_counts",
+                new_callable=AsyncMock,
+                side_effect=[{}, {credential.id: 1}],
+            ),
+            patch.object(
+                service,
+                "_get_referencing_integration_names",
+                new_callable=AsyncMock,
+                return_value=["Racing Integration"],
+            ),
+        ):
+            with pytest.raises(CredentialInUseError) as exc_info:
+                await service.delete_credential(credential.id)
+
+            assert exc_info.value.integration_names == ["Racing Integration"]
+            assert "Racing Integration" in exc_info.value.message
+
+        mock_session.rollback.assert_awaited_once()
+
+    @pytest.mark.asyncio
     async def test_raises_when_project_is_builtin(
         self,
         mock_session: MagicMock,
@@ -655,6 +762,29 @@ class TestDeleteCredential:
 
         mock_secret_service.delete_secret.assert_not_called()
         mock_session.delete.assert_not_awaited()
+
+
+class TestIsManagementCredentialFkViolation:
+    """Tests for CredentialService._is_management_credential_fk_violation."""
+
+    def test_matches_management_credential_fk(self) -> None:
+        exc = IntegrityError(
+            "DELETE",
+            {},
+            Exception(
+                'update or delete on table "credentials" violates foreign key constraint '
+                '"integrations_management_credential_id_fkey" on table "integrations"'
+            ),
+        )
+        assert CredentialService._is_management_credential_fk_violation(exc) is True
+
+    def test_does_not_match_other_constraint(self) -> None:
+        exc = IntegrityError(
+            "DELETE",
+            {},
+            Exception('duplicate key value violates unique constraint "ix_credentials_name"'),
+        )
+        assert CredentialService._is_management_credential_fk_violation(exc) is False
 
 
 _real_get_integration_counts = CredentialService.get_integration_counts

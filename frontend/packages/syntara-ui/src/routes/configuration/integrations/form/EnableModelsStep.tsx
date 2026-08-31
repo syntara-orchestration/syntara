@@ -16,10 +16,10 @@ import type { IntegrationsAPI } from '@syntara/contracts'
 import { useCallback, useMemo, useState } from 'react'
 
 import { FilterBar } from '../../../../components/filters/FilterBar'
-import { NxPanelContentStack } from '../../../../components/layout/NxPanelContentStack'
-import { NxEmptyStateFilter } from '../../../../components/states/NxEmptyStateFilter'
-import { NxEmptyStateNoData } from '../../../../components/states/NxEmptyStateNoData'
-import { NxScrollableTableContainer } from '../../../../components/table/NxScrollableTableContainer'
+import { SynPanelContentStack } from '../../../../components/layout/SynPanelContentStack'
+import { SynEmptyStateFilter } from '../../../../components/states/SynEmptyStateFilter'
+import { SynEmptyStateNoData } from '../../../../components/states/SynEmptyStateNoData'
+import { SynScrollableTableContainer } from '../../../../components/table/SynScrollableTableContainer'
 import type { FilterConfig, FilterFieldDefinition } from '../../../../types/filters'
 import { getIntegrationNameFilterDefinition } from '../integrationFilters'
 import { ModelRow } from '../ModelRow'
@@ -176,7 +176,7 @@ function EnableModelsStep({
 
   if (models.length === 0) {
     return (
-      <NxEmptyStateNoData
+      <SynEmptyStateNoData
         title="No models found"
         description="The connection was successful, but no models were found on this provider."
       />
@@ -184,7 +184,7 @@ function EnableModelsStep({
   }
 
   return (
-    <NxPanelContentStack className={styles.stepContainerMinWidth}>
+    <SynPanelContentStack className={styles.stepContainerMinWidth}>
       <StackItem>
         <FilterBar
           fieldDefinitions={modelFilterFieldDefinitions}
@@ -195,9 +195,9 @@ function EnableModelsStep({
       </StackItem>
 
       {hasActiveFilters && filteredModels.length === 0 ? (
-        <NxEmptyStateFilter clearAllFilters={handleClearAllFilters} />
+        <SynEmptyStateFilter clearAllFilters={handleClearAllFilters} />
       ) : (
-        <NxScrollableTableContainer caption="Enable models">
+        <SynScrollableTableContainer caption="Enable models">
           <colgroup>
             <col className={styles.checkboxCol} />
             <col />
@@ -236,9 +236,9 @@ function EnableModelsStep({
               )
             })}
           </Tbody>
-        </NxScrollableTableContainer>
+        </SynScrollableTableContainer>
       )}
-    </NxPanelContentStack>
+    </SynPanelContentStack>
   )
 }
 

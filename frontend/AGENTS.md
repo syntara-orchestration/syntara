@@ -21,9 +21,13 @@ This file provides guidance to AI coding assistants when working in the frontend
 | **Before writing or modifying any component, hook, or pattern**                     | `.claude/skills/frontend-coding-standards/SKILL.md`                                       |
 | **Before writing code using React, Zod, Zustand, Vitest, Vite, or TanStack Query**  | `.claude/skills/frontend-library-references/SKILL.md` (fetch the relevant `llms.txt` URL) |
 
-### Storybook MCP (when available)
+### Storybook MCP and PatternFly MCP (when available)
 
-When the Storybook MCP is available in the session, use its tools for all component and story work — it surfaces live documentation, rendered previews, and story conventions without requiring you to read source files.
+When MCP servers are available in the session, use them so you do not invent props.
+
+- **Storybook MCP** (`localhost:5174/mcp`) — this app’s wrappers (`Syn*`). Storybook must be running or the server is dead; start it or ask.
+- **PatternFly MCP** — official PF6 component props. Use this for raw PatternFly, not for `Syn*` wrappers.
+- One browser MCP (Playwright or Chrome DevTools) — screenshots and console in `/frontend-build-ui-feature` Phase 5.
 
 **CRITICAL: Never hallucinate component properties.** Before using any prop on a component — including seemingly obvious ones like `shadow`, `size`, `variant` — you must verify it is actually documented. A story name may not reflect the underlying prop name, so always check the documentation, not just story names.
 
@@ -35,7 +39,7 @@ When the Storybook MCP is available in the session, use its tools for all compon
 4. Before creating or editing any `.stories.*` file, call `get-storybook-story-instructions` for current conventions.
 5. After any component or story change, call `preview-stories` and **always include every returned preview URL in your response**.
 6. If `get-documentation` doesn't show the variant you need, call `get-documentation-for-story` for that specific story.
-7. **Before implementing any confirmation dialog**, call `get-documentation` with id `"components-dialogs-nxconfirmationdialog"` — the `NxConfirmationDialog` stories are the primary source of truth for tier selection, prop usage, title format, body copy, checkbox labels, and button labels.
+7. **Before implementing any confirmation dialog**, call `get-documentation` with id `"components-dialogs-synconfirmationdialog"` — the `SynConfirmationDialog` stories are the primary source of truth for tier selection, prop usage, title format, body copy, checkbox labels, and button labels.
 
 ### Shell Command Rules
 
@@ -70,44 +74,58 @@ Treat accessibility as part of every UI change, not an optional follow-up:
 
 **CRITICAL: Address ALL of these before opening a PR. For detailed examples, see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md).**
 
-Items enforced by ESLint at error level are omitted -- ESLint is the source of truth for those. The items below cover patterns ESLint cannot catch:
+Items enforced by ESLint at **error** level are omitted -- ESLint is the source of truth for those. The following are automatically caught and do not need manual checklist review:
+
+- `formState.isSubmitting` → use `isPending` (`no-restricted-syntax`)
+- `aria-label` on `<span>` → `no-restricted-syntax`
+- Nested React component definitions → `syntara/no-nested-component-definitions` (for PatternFly `toggle` / similar props use a module-scoped child and pass data as props; see coding-standards §18)
+- Hardcoded documentation URLs → `syntara/no-hardcoded-doc-urls`
+- `// TODO` / `// FIXME` comments → `no-warning-comments` (warn, not error -- surfaced as a lint warning, does not block CI)
+- Native `<select>` / `<FormSelect>` → `no-restricted-syntax`
+- Non-null assertions (`!`) on nullable types → `@typescript-eslint/no-non-null-assertion`
+- Internal package source imports (e.g. `@syntara/contracts/src`) → `no-restricted-imports`
+- `new Date()` in mock seed data → `syntara-mock-api`'s `eslint.config.js` (`no-restricted-syntax`)
+- PatternFly CSS class selectors in Playwright `locator()`/assertions → E2E `no-restricted-syntax`
+- Playwright `.nth()` / `.first()` → E2E `no-restricted-properties`
+- `Page` imported directly from `@playwright/test` in E2E files → E2E `no-restricted-imports`
+- `waitForLoadState('networkidle')` in E2E tests → E2E `no-restricted-syntax`
+- Unnecessary `useEffect` patterns → `reactYouMightNotNeedAnEffect/*` (warn)
+
+The items below cover patterns ESLint **cannot** catch:
 
 1. **No unsafe `as` casts on API responses** -- use typed client responses or type guards
 2. **`vitest-axe` test for every new component** -- at least one `toHaveNoViolations()`
-3. **`NxErrorState` component** -- never raw error markup; pass raw error object + `onRetry`
+3. **`SynErrorState` component** -- never raw error markup; pass raw error object + `onRetry`
 4. **Zod + react-hook-form** -- never manual `useState` per field; use `zodResolver`
 5. **Reset `defaultValues` in edit modals** -- `reset()` in `useEffect` keyed on `[isOpen, item]`
-6. **Extract shared patterns** -- use `NxConfirmationDialog`, `useDialogState`, `useDeleteAction`, `useCursorPagination`
+6. **Extract shared patterns** -- use `SynConfirmationDialog`, `useDialogState`, `useDeleteAction`, `useCursorPagination`
 7. **UI PRs must include screenshots** or screen recordings showing key states
 8. **New API endpoints need mock handlers** in `packages/syntara-mock-api/src/handlers.ts`
 9. **Use enum constants** from `@syntara/contracts` -- never string literals for discriminators
 10. **Never compare display strings in logic** -- compare API values or enum constants, not translatable labels
-11. **No nested React components (Sonar S6478)** -- do not declare components inside another component; for PatternFly `toggle` / similar props use a **module-scoped** child component and pass data as props (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §18)
-12. **`NxLabel` for system labels, `NxUserTag` for user-authored tags** -- use `NxLabel` (filled, compact by default) for all system-generated labels: statuses, categories, metadata badges, counts, and filter chips. Use `NxUserTag` (outline, compact by default) only for user-authored content such as workflow tags or user-entered values. Never use PF `Label` directly.
-13. **`useMemo` for derived data in hooks** -- wrap computed maps/arrays/filtered lists from query results in `useMemo` to avoid new references on every render (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §21)
-14. **New hooks need test files** -- every new `use*.ts` hook must have a dedicated `use*.test.ts(x)` with coverage, not just indirect coverage from a component test
-15. **No unnecessary `useEffect`** -- never use `useEffect` to compute derived state, chain state updates, or handle user events; use event handlers, `useMemo`, or inline calculations instead ([React docs](https://react.dev/learn/you-might-not-need-an-effect), [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §23)
-16. **Cascading form field resets belong in `onChange`** -- when one field change should reset another, put the `setValue()` calls in the field's `onChange` handler, not in a `useEffect` watching the field value
-17. **E2E tests must be self-contained** -- every E2E test must create ALL resources it needs and delete ALL created resources in a `try-finally` block; `test.skip()` is only acceptable for data that is impossible to create programmatically (e.g., human-approved records, external integrations) — if the test can create the data via API, it must (see [`.claude/skills/frontend-playwright-e2e/SKILL.md`](../.claude/skills/frontend-playwright-e2e/SKILL.md))
-18. **Use `isPending` from mutation hooks** -- never use `formState.isSubmitting` (it only covers the synchronous `handleSubmit` wrapper, not the async mutation lifecycle); use `isPending` from `useMutation` instead
-19. **Use `RhUi*` icons for action buttons** -- never use PatternFly icons like `PlusCircleIcon` directly; use `RhUiAddIcon`, `RhUiDuplicate`, etc. from `@patternfly/react-icons`
-20. **CSS module classes over inline style objects** -- prefer `.module.css` classes over `style={{ ... }}` props; CSS modules are more DOM-efficient, cacheable, and keep styles co-located
-21. **No mutable counters in `.map()`** -- do not use `let` counters inside `.map()` or `.forEach()`; pre-compute indices immutably or use the callback's index parameter
-22. **`aria-label` only on interactive/widget/landmark elements** -- do not put `aria-label` on generic `<span>` or `<div>`; use it on buttons, inputs, `role="region"`, images, or landmarks
-23. **Never use `eslint-disable`** -- do not add `eslint-disable` or `eslint-disable-next-line` to new or modified code. Every rule catches a real problem; fix the code so the rule passes. Pre-existing suppressions are tech debt being cleaned up. See [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §28
-24. **Conditional hook execution uses wrapper components** -- hooks must be called unconditionally per React rules; if a hook's result is used conditionally, extract to a wrapper component that is conditionally rendered (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §29)
-25. **Leverage existing libraries before custom code** -- all async server state must use TanStack Query (`useQuery`/`useMutation`/`useQueries`), not manual `useEffect` + `useState` + `fetch`; forms must use react-hook-form + Zod; styling must use PatternFly + CSS modules. Do not reimplement what the tech stack already provides (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §30)
-26. **No `// TODO` comments in shipped code** -- deferred work belongs in an issue, not buried in source. If a follow-up is needed, create a ticket and reference it inline (e.g., `// Inline type until #12345`). See [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §32
-27. **New routes must set `requiredPermissions` and/or `routePermission`** -- every route with access requirements needs permission fields in `navigationItems.tsx`; create/edit routes need a `routePermission` for `ProtectedRoute` guard (see [`docs/permissions-rbac.md`](docs/permissions-rbac.md))
-28. **New write actions must use `DisabledWithTooltip` + permission hook** -- never expose ungated create/edit/delete buttons; use a domain `use*Permissions` hook and `permissionTooltip()` for copy (see [`docs/permissions-rbac.md`](docs/permissions-rbac.md))
-29. **New permission-gated features need mock handlers** -- add role-aware responses in `packages/syntara-mock-api/src/handlers.ts` `can_i` block for all 4 roles (admin, viewer, auditor, user) and E2E tests in `permission-gating.spec.ts`
-30. **Use `useDocLink` for documentation URLs** -- never hardcode doc URLs; use `useDocLink('workflows')` from `src/utils/docs/useDocLink.ts`; pass the result to `NxPageHeader`'s `docLink` prop; add new keys to `docsUrls.json` when adding new pages (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) section 33)
-31. **No `new Date()` in mock API seed data** -- seed data in `packages/syntara-mock-api/src/resources/` and `utils/` must use deterministic timestamps from `mockDates.ts`, never `new Date()`. Dynamic timestamps cause visual regression baselines to go stale across CI runs because rendered dates change daily
-32. **New pages must render `<title>{toPageTitle(['...'])}</title>`** -- every top-level page component (default export with `<NxPage>`) must render a `<title>` as its first `<NxPage>` child. Use `toPageTitle` from `src/utils/toPageTitle.ts`
-33. **No new `forwardRef`** -- React 19 passes `ref` as a regular prop; accept `ref` on the props type instead of wrapping with `forwardRef` (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §38)
-34. **Prefer ref callback cleanup functions** -- when attaching DOM listeners or observers, return a cleanup from the ref callback instead of pairing `useRef` + `useEffect` (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §38)
-35. **No new `useContext`** -- React 19 reads context with `use(Context)`; do not add `useContext` (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §39)
-36. **Prefer `useOptimistic` for clear toggle/counter mutations** -- update UI inside a `startTransition` Action with `mutateAsync`; do not hand-roll pending mirror state for simple before/after mutations (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §40)
+11. **`SynLabel` for system labels, `SynUserTag` for user-authored tags** -- use `SynLabel` (filled, compact by default) for all system-generated labels: statuses, categories, metadata badges, counts, and filter chips. Use `SynUserTag` (outline, compact by default) only for user-authored content such as workflow tags or user-entered values. Never use PF `Label` directly.
+12. **`useMemo` for derived data in hooks** -- wrap computed maps/arrays/filtered lists from query results in `useMemo` to avoid new references on every render (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §21)
+13. **New hooks need test files** -- every new `use*.ts` hook must have a dedicated `use*.test.ts(x)` with coverage, not just indirect coverage from a component test
+14. **No unnecessary `useEffect`** -- never use `useEffect` to compute derived state, chain state updates, or handle user events; use event handlers, `useMemo`, or inline calculations instead ([React docs](https://react.dev/learn/you-might-not-need-an-effect), [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §23)
+15. **Cascading form field resets belong in `onChange`** -- when one field change should reset another, put the `setValue()` calls in the field's `onChange` handler, not in a `useEffect` watching the field value
+16. **E2E tests must be self-contained** -- every E2E test must create ALL resources it needs and delete ALL created resources in a `try-finally` block; `test.skip()` is only acceptable for data that is impossible to create programmatically (e.g., human-approved records, external integrations) — if the test can create the data via API, it must (see [`.claude/skills/frontend-playwright-e2e/SKILL.md`](../.claude/skills/frontend-playwright-e2e/SKILL.md))
+17. **Use `RhUi*` icons for action buttons** -- never use PatternFly icons like `PlusCircleIcon` directly; use `RhUiAddIcon`, `RhUiDuplicate`, etc. from `@patternfly/react-icons`
+18. **CSS module classes over inline style objects** -- prefer `.module.css` classes over `style={{ ... }}` props; CSS modules are more DOM-efficient, cacheable, and keep styles co-located
+19. **No mutable counters in `.map()`** -- do not use `let` counters inside `.map()` or `.forEach()`; pre-compute indices immutably or use the callback's index parameter
+20. **Never use `eslint-disable`** -- do not add `eslint-disable` or `eslint-disable-next-line` to new or modified code. Every rule catches a real problem; fix the code so the rule passes. Pre-existing suppressions are tech debt being cleaned up. See [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §28
+21. **Conditional hook execution uses wrapper components** -- hooks must be called unconditionally per React rules; if a hook's result is used conditionally, extract to a wrapper component that is conditionally rendered (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §29)
+22. **Leverage existing libraries before custom code** -- all async server state must use TanStack Query (`useQuery`/`useMutation`/`useQueries`), not manual `useEffect` + `useState` + `fetch`; forms must use react-hook-form + Zod; styling must use PatternFly + CSS modules. Do not reimplement what the tech stack already provides (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §30)
+23. **No `// TODO` comments in shipped code** -- surfaced as a lint warning via `no-warning-comments` (warn, not error; does not block CI but is flagged during review). Deferred work belongs in an issue, not buried in source. If a follow-up is needed, create a ticket and reference it inline (e.g., `// Inline type until #12345`). See [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §32
+24. **New routes must set `requiredPermissions` and/or `routePermission`** -- every route with access requirements needs permission fields in `navigationItems.tsx`; create/edit routes need a `routePermission` for `ProtectedRoute` guard (see [`docs/permissions-rbac.md`](docs/permissions-rbac.md))
+25. **New write actions must use `DisabledWithTooltip` + permission hook** -- never expose ungated create/edit/delete buttons; use a domain `use*Permissions` hook and `permissionTooltip()` for copy (see [`docs/permissions-rbac.md`](docs/permissions-rbac.md))
+26. **New permission-gated features need mock handlers** -- add role-aware responses in `packages/syntara-mock-api/src/handlers.ts` `can_i` block for all 4 roles (admin, viewer, auditor, user) and E2E tests in `permission-gating.spec.ts`
+27. **`SynPageHeader` must get `docLink={useDocLink('key')}`** -- hardcoded docs URLs are ESLint (`syntara/no-hardcoded-doc-urls`); still verify the header receives the hook result and new keys land in `docsUrls.json` (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) section 33)
+28. **No `new Date()` in mock API seed data** -- ESLint enforced in `syntara-mock-api`'s `eslint.config.js` for `src/resources/` and `src/utils/`; seed data must use deterministic timestamps from `mockDates.ts`, never `new Date()`. Dynamic timestamps cause visual regression baselines to go stale across CI runs because rendered dates change daily
+29. **New pages must render `<title>{toPageTitle(['...'])}</title>`** -- every top-level page component (default export with `<SynPage>`) must render a `<title>` as its first `<SynPage>` child. Use `toPageTitle` from `src/utils/toPageTitle.ts`
+30. **No new `forwardRef`** -- React 19 passes `ref` as a regular prop; accept `ref` on the props type instead of wrapping with `forwardRef` (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §38)
+31. **Prefer ref callback cleanup functions** -- when attaching DOM listeners or observers, return a cleanup from the ref callback instead of pairing `useRef` + `useEffect` (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §38)
+32. **No new `useContext`** -- React 19 reads context with `use(Context)`; do not add `useContext` (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §39)
+33. **Prefer `useOptimistic` for clear toggle/counter mutations** -- update UI inside a `startTransition` Action with `mutateAsync`; do not hand-roll pending mirror state for simple before/after mutations (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §40)
 
 ### Feature Preservation Rules
 
@@ -141,6 +159,25 @@ npm run e2e:ui              # Run e2e playwright tests in the playwright UI
 npm run e2e:visual-regression        # Page screenshot visual regression (mock API + UI via Playwright webServer)
 npm run e2e:visual-regression:update # Same, with --update-snapshots (see packages/syntara-ui/VISUAL_REGRESSION.md)
 
+# E2E test suite tags — Playwright tags that control where each test runs:
+#   @pr-check      Fast critical-path tests; select with --grep @pr-check
+#   @konflux-skip  Tests excluded from Konflux pipelines via --grep-invert @konflux-skip (flaky in that env only)
+#   @local-only    Visual regression tests; excluded from all CI automatically
+# Full rules: .claude/skills/frontend-playwright-e2e/SKILL.md → "Test Suite Tags"
+#
+# When to apply @konflux-skip:
+#   - Test creates a real workflow execution and waits for Temporal to complete it
+#     (approval flows, multi-step runs, badge checks) — Temporal under Konflux cluster
+#     load frequently times out or returns unexpected states.
+#   - Test has a wall-clock budget >25s; Konflux runner load regularly pushes it over.
+#   - Test relies on the backend Temporal worker reaching an external URL (httpbin,
+#     webhooks, LLM APIs) — the worker's network is more restricted than the test runner.
+# How to apply:
+#   test('name', { tag: ['@konflux-skip'] }, async ({ app }) => { ... })
+#   After editing, run: npx --prefix .. prettier --write <file>
+#   (Prettier may reformat to multi-line — that is correct and expected.)
+# See also: root CLAUDE.md → "Konflux CI Environment" for backend skip patterns.
+
 # Run a specific test or coverage
 npx vitest run packages/syntara-ui/path/to/specific/test.test.ts
 npm run test:coverage
@@ -156,6 +193,8 @@ npm run format:check       # Check formatting
 npm run lint               # Run ESLint
 npm run tsc                # Type check only
 ```
+
+GitHub `CI Frontend` treats a PR as frontend code when it touches `frontend/`, `backend/`, `.github/workflows/ci-frontend.yml`, or `.github/actions/`. Paths like `.github/CODEOWNERS` do not turn on that suite.
 
 ## Connecting to Real Backend
 
@@ -183,32 +222,32 @@ For how the UI is structured, see these comprehensive guides:
 
 ### Quick Navigation by Task
 
-| Working on...                       | Read this                                                                                                                                                                                                                                                                                               |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **New here / onboarding**           | [`docs/ai-assisted-development.md`](docs/ai-assisted-development.md) -- AI agent prompts, screenshot workflow, full example                                                                                                                                                                             |
-| **API integration**                 | [`docs/data-flow.md`](docs/data-flow.md) -- OpenAPI contracts and type-safe clients                                                                                                                                                                                                                     |
-| **Workflow transformations**        | [`docs/data-flow.md`](docs/data-flow.md) -- Nested to flat conversions                                                                                                                                                                                                                                  |
-| **Step registry (`NodeRegistry`)**  | [`docs/architecture.md`](docs/architecture.md) -- auto-discovery of step types                                                                                                                                                                                                                          |
-| **Builder internals**               | [`docs/architecture.md`](docs/architecture.md) -- "Builder internals (advanced)"                                                                                                                                                                                                                        |
-| **State management**                | [`docs/zustand-architecture.md`](docs/zustand-architecture.md) -- Zustand guide                                                                                                                                                                                                                         |
-| **WebSocket / real-time**           | [`docs/websocket-architecture.md`](docs/websocket-architecture.md) -- multi-channel infrastructure                                                                                                                                                                                                      |
-| **Execution visualization**         | [`docs/execution-visualizer-protocol.md`](docs/execution-visualizer-protocol.md) -- protocol, endpoints, data specs                                                                                                                                                                                     |
-| **List filters / search**           | [`docs/architecture.md`](docs/architecture.md#api-filtering-architecture) -- FilterBar, `useCursorPagination`, types; [`docs/user-guides/filtering.md`](docs/user-guides/filtering.md) -- UX guide                                                                                                      |
-| **PR sizing / stacking**            | [`.github/pull_request_template.md`](../.github/pull_request_template.md) -- PR template and guidelines                                                                                                                                                                                                 |
-| **List page with pagination**       | [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) -- `useCursorPagination` pattern                                                                                                                                                            |
-| **Full list (dropdowns, settings)** | [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) -- section 22: `fetchAllPages` + `useAll*` hooks (not `limit: 100` single queries)                                                                                                          |
-| **Confirmation dialogs**            | [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) -- `NxConfirmationDialog` component; for content patterns (tier copy, checkbox labels, button labels) use Storybook MCP: `get-documentation` -> `"components-dialogs-nxconfirmationdialog"` |
-| **Sonar S6478 / PF `toggle` props** | [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) -- nested components and PatternFly render props                                                                                                                                            |
-| **Dialog state management**         | [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) -- `useDialogState` hook                                                                                                                                                                    |
-| **Error handling patterns**         | [`docs/error-handling.md`](docs/error-handling.md) -- RFC 9457, error utilities, retry support                                                                                                                                                                                                          |
-| **Testing standards**               | [`.claude/skills/frontend-testing-guidelines/SKILL.md`](../.claude/skills/frontend-testing-guidelines/SKILL.md) -- coverage, queries, accessibility                                                                                                                                                     |
-| **Visual regression testing**       | [`packages/syntara-ui/VISUAL_REGRESSION.md`](packages/syntara-ui/VISUAL_REGRESSION.md) -- page registry, baselines, manual-only workflow                                                                                                                                                                |
-| **New workflow step type**          | `packages/syntara-ui/src/routes/builder/registry/nodes/QUICK_START.md`                                                                                                                                                                                                                                  |
-| **UX / PatternFly design system**   | [`.claude/skills/frontend-patternfly-ux/SKILL.md`](../.claude/skills/frontend-patternfly-ux/SKILL.md) -- PF6 patterns                                                                                                                                                                                   |
-| **Library docs / llms.txt links**   | [`.claude/skills/frontend-library-references/SKILL.md`](../.claude/skills/frontend-library-references/SKILL.md) -- fetch before writing React, Zod, Zustand, Vitest, Vite, or TanStack Query code                                                                                                       |
-| **Permission gating / RBAC**        | [`docs/permissions-rbac.md`](docs/permissions-rbac.md) -- `useCanI`, `DisabledWithTooltip`, `ProtectedRoute`, nav filtering, mock API roles, ungated inventory                                                                                                                                          |
-| **Page content frame (`NxPanel`)**  | `packages/syntara-ui/src/components/layout/NxPanel.tsx` -- `Panel` -> `PanelMain` -> `PanelMainBody`; see JSDoc (glass vs `opaqueFloatingFill` vs `variant="raised"`) and [patternfly-react#12372](https://github.com/patternfly/patternfly-react/pull/12372)                                           |
-| **Documentation links**             | [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) -- `useDocLink` hook, `DocKey` type, community vs extended URL resolution                                                                                                                   |
+| Working on...                       | Read this                                                                                                                                                                                                                                                                                                 |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **New here / onboarding**           | [`docs/ai-assisted-development.md`](docs/ai-assisted-development.md) -- AI agent prompts, screenshot workflow, full example                                                                                                                                                                               |
+| **API integration**                 | [`docs/data-flow.md`](docs/data-flow.md) -- OpenAPI contracts and type-safe clients                                                                                                                                                                                                                       |
+| **Workflow transformations**        | [`docs/data-flow.md`](docs/data-flow.md) -- Nested to flat conversions                                                                                                                                                                                                                                    |
+| **Step registry (`NodeRegistry`)**  | [`docs/architecture.md`](docs/architecture.md) -- auto-discovery of step types                                                                                                                                                                                                                            |
+| **Builder internals**               | [`docs/architecture.md`](docs/architecture.md) -- "Builder internals (advanced)"                                                                                                                                                                                                                          |
+| **State management**                | [`docs/zustand-architecture.md`](docs/zustand-architecture.md) -- Zustand guide                                                                                                                                                                                                                           |
+| **WebSocket / real-time**           | [`docs/websocket-architecture.md`](docs/websocket-architecture.md) -- multi-channel infrastructure                                                                                                                                                                                                        |
+| **Execution visualization**         | [`docs/execution-visualizer-protocol.md`](docs/execution-visualizer-protocol.md) -- protocol, endpoints, data specs                                                                                                                                                                                       |
+| **List filters / search**           | [`docs/architecture.md`](docs/architecture.md#api-filtering-architecture) -- FilterBar, `useCursorPagination`, types; [`docs/user-guides/filtering.md`](docs/user-guides/filtering.md) -- UX guide                                                                                                        |
+| **PR sizing / stacking**            | [`.github/pull_request_template.md`](../.github/pull_request_template.md) -- PR template and guidelines                                                                                                                                                                                                   |
+| **List page with pagination**       | [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) -- `useCursorPagination` pattern                                                                                                                                                              |
+| **Full list (dropdowns, settings)** | [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) -- section 22: `fetchAllPages` + `useAll*` hooks (not `limit: 100` single queries)                                                                                                            |
+| **Confirmation dialogs**            | [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) -- `SynConfirmationDialog` component; for content patterns (tier copy, checkbox labels, button labels) use Storybook MCP: `get-documentation` -> `"components-dialogs-synconfirmationdialog"` |
+| **Sonar S6478 / PF `toggle` props** | [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) -- nested components and PatternFly render props                                                                                                                                              |
+| **Dialog state management**         | [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) -- `useDialogState` hook                                                                                                                                                                      |
+| **Error handling patterns**         | [`docs/error-handling.md`](docs/error-handling.md) -- RFC 9457, error utilities, retry support                                                                                                                                                                                                            |
+| **Testing standards**               | [`.claude/skills/frontend-testing-guidelines/SKILL.md`](../.claude/skills/frontend-testing-guidelines/SKILL.md) -- coverage, queries, accessibility                                                                                                                                                       |
+| **Visual regression testing**       | [`packages/syntara-ui/VISUAL_REGRESSION.md`](packages/syntara-ui/VISUAL_REGRESSION.md) -- page registry, baselines, manual-only workflow                                                                                                                                                                  |
+| **New workflow step type**          | `packages/syntara-ui/src/routes/builder/registry/nodes/QUICK_START.md`                                                                                                                                                                                                                                    |
+| **UX / PatternFly design system**   | [`.claude/skills/frontend-patternfly-ux/SKILL.md`](../.claude/skills/frontend-patternfly-ux/SKILL.md) -- PF6 patterns                                                                                                                                                                                     |
+| **Library docs / llms.txt links**   | [`.claude/skills/frontend-library-references/SKILL.md`](../.claude/skills/frontend-library-references/SKILL.md) -- fetch before writing React, Zod, Zustand, Vitest, Vite, or TanStack Query code                                                                                                         |
+| **Permission gating / RBAC**        | [`docs/permissions-rbac.md`](docs/permissions-rbac.md) -- `useCanI`, `DisabledWithTooltip`, `ProtectedRoute`, nav filtering, mock API roles, ungated inventory                                                                                                                                            |
+| **Page content frame (`SynPanel`)** | `packages/syntara-ui/src/components/layout/SynPanel.tsx` -- `Panel` -> `PanelMain` -> `PanelMainBody`; see JSDoc (glass vs `opaqueFloatingFill` vs `variant="raised"`) and [patternfly-react#12372](https://github.com/patternfly/patternfly-react/pull/12372)                                            |
+| **Documentation links**             | [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) -- `useDocLink` hook, `DocKey` type, community vs extended URL resolution                                                                                                                     |
 
 ### Quick Reference: Common Tasks
 
@@ -230,7 +269,7 @@ See: [`docs/data-flow.md`](docs/data-flow.md) — "Type-Safe API Clients"
 1. Add route constant to `packages/syntara-ui/src/app/AppRoute.tsx`
 2. Add navigation item to `packages/syntara-ui/src/app/navigationItems.tsx` with lazy-loaded component
 3. The router auto-discovers it from `navigationItems` — no manual route config needed
-4. In the page component, render `<title>{toPageTitle(['Page Name'])}</title>` as the first child of `<NxPage>`; import `toPageTitle` from `src/utils/toPageTitle`
+4. In the page component, render `<title>{toPageTitle(['Page Name'])}</title>` as the first child of `<SynPage>`; import `toPageTitle` from `src/utils/toPageTitle`
 
 #### How do I add filters to a list page?
 
@@ -238,9 +277,9 @@ Use **`FilterBar` + `useCursorPagination`** (not a hand-rolled cursor/`useFilter
 
 1. **Define fields** in a colocated `*Filters.ts` / `*FilterDefinitions.ts` using `FilterFieldDefinition` + `FilterTypeEnum` / `FilterOperatorEnum` from `src/types/filters.ts`.
 2. **Wire pagination + filters + sort** with `useCursorPagination` — it owns URL-synced filters, sort (`defaultSort` / `columns`), cursor reset, and `queryParams`.
-3. **Render** `FilterBar` (or `NxListPanelToolbar`) with `fieldDefinitions`, `filters`, `onFilterChange={handleFilterChange}`, and `clearAllFilters={handleClearAllFilters}`.
+3. **Render** `FilterBar` (or `SynListPanelToolbar`) with `fieldDefinitions`, `filters`, `onFilterChange={handleFilterChange}`, and `clearAllFilters={handleClearAllFilters}`.
 4. **Query** with the typed client: `client.useQuery('get', '/resource', { params: { query: queryParams } })`.
-5. **Empty filtered results** → `NxEmptyStateFilter` with clear-all; unfiltered empty → `NxEmptyStateNoData`.
+5. **Empty filtered results** → `SynEmptyStateFilter` with clear-all; unfiltered empty → `SynEmptyStateNoData`.
 
 ```typescript
 import { FilterBar } from '../../components/filters/FilterBar'
@@ -363,7 +402,7 @@ import { useDocLink } from '../../utils/docs/useDocLink'
 
 function MyPage() {
   const docLink = useDocLink('workflows') // DocKey is type-safe — only keys from docsUrls.json
-  return <NxPageHeader title="Workflows" docLink={docLink} />
+  return <SynPageHeader title="Workflows" docLink={docLink} />
 }
 ```
 

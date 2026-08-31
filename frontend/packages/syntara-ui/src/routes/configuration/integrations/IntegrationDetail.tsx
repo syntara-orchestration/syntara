@@ -25,20 +25,21 @@ import {
   type IntegrationDetailBreadcrumbTab,
 } from '../../../app/breadcrumbBuilders'
 import { credentialsClient, integrationsClient } from '../../../client'
-import { NxDetail } from '../../../components/details/NxDetail'
+import { SynDetail } from '../../../components/details/SynDetail'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
-import { NxLabel } from '../../../components/labels/NxLabel'
-import { NxPage, NxPageBody } from '../../../components/layout/NxPage'
-import { NxPageHeader } from '../../../components/layout/NxPageHeader'
-import { NxPanel } from '../../../components/layout/NxPanel'
-import type { KebabAction } from '../../../components/NxKebabMenu'
-import { NxKebabMenu } from '../../../components/NxKebabMenu'
-import { NxLink } from '../../../components/NxLink'
-import { NxPageTitle } from '../../../components/NxPageTitle'
-import { NxErrorState } from '../../../components/states/NxErrorState'
+import { SynLabel } from '../../../components/labels/SynLabel'
+import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
+import { SynPageHeader } from '../../../components/layout/SynPageHeader'
+import { SynPanel } from '../../../components/layout/SynPanel'
+import { SynErrorState } from '../../../components/states/SynErrorState'
 import { useQueryState } from '../../../components/states/useQueryState'
-import { NxUrlTabs } from '../../../components/tabs/NxUrlTabs'
+import type { KebabAction } from '../../../components/SynKebabMenu'
+import { SynKebabMenu } from '../../../components/SynKebabMenu'
+import { SynLink } from '../../../components/SynLink'
+import { SynPageTitle } from '../../../components/SynPageTitle'
+import { DateCell } from '../../../components/table/DateCell.tsx'
+import { SynUrlTabs } from '../../../components/tabs/SynUrlTabs'
 import { useUrlTab } from '../../../hooks/useUrlTab'
 import { detachPromise } from '../../../utils/detachPromise'
 import { useDocLink } from '../../../utils/docs/useDocLink'
@@ -79,7 +80,7 @@ function IntegrationProjectsList({ integrationId }: Readonly<{ integrationId: st
   return (
     <LabelGroup numLabels={5}>
       {assignments.map((a) => (
-        <NxLabel key={a.project_id}>{a.project_name}</NxLabel>
+        <SynLabel key={a.project_id}>{a.project_name}</SynLabel>
       ))}
     </LabelGroup>
   )
@@ -103,51 +104,54 @@ function IntegrationDetailsTab({
     <Stack hasGutter className={styles.tabContent}>
       <StackItem>
         <DescriptionList isHorizontal>
-          <NxDetail label={isLLMProvider(integration) ? 'Name' : 'Server name / ID'}>{integration.name}</NxDetail>
-          <NxDetail label="Description">{integration.description}</NxDetail>
-          <NxDetail label="Integration type">
+          <SynDetail label={isLLMProvider(integration) ? 'Name' : 'Server name / ID'}>{integration.name}</SynDetail>
+          <SynDetail label="Description">{integration.description}</SynDetail>
+          <SynDetail label="Integration type">
             {INTEGRATION_TYPE_LABELS[integration.integration_type ?? ''] ?? integration.integration_type ?? ''}
-          </NxDetail>
-          <NxDetail label="Status">
+          </SynDetail>
+          <SynDetail label="Status">
             <StatusLabel
               status={integration.validation_status ?? 'unknown'}
               errorMessage={integration.validation_error}
             />
-          </NxDetail>
-          <NxDetail label="Scope">{integration.scope === 'project' ? 'Project' : 'Global'}</NxDetail>
+          </SynDetail>
+          <SynDetail label="Last checked">
+            <DateCell dateString={integration.last_validated_at} />
+          </SynDetail>
+          <SynDetail label="Scope">{integration.scope === 'project' ? 'Project' : 'Global'}</SynDetail>
           {integration.scope === 'project' && integration.id && (
-            <NxDetail label="Assigned projects">
+            <SynDetail label="Assigned projects">
               <IntegrationProjectsList integrationId={integration.id} />
-            </NxDetail>
+            </SynDetail>
           )}
           {isLLMProvider(integration) && (
-            <NxDetail label="Provider type">
+            <SynDetail label="Provider type">
               {PROVIDER_HINT_LABELS[getProviderHint(integration)] ?? getProviderHint(integration)}
-            </NxDetail>
+            </SynDetail>
           )}
-          <NxDetail label="URL">{getBaseUrl(integration) || '—'}</NxDetail>
-          <NxDetail label="Connection credential">
+          <SynDetail label="URL">{getBaseUrl(integration) || '—'}</SynDetail>
+          <SynDetail label="Connection credential">
             {!credentialId || !credentialName ? (
               <>None</>
             ) : (
               <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapSm' }}>
                 <FlexItem>
-                  <NxLink to={AppRoute.Configuration.Credentials.Detail.replace(':credentialId', credentialId)}>
+                  <SynLink to={AppRoute.Configuration.Credentials.Detail.replace(':credentialId', credentialId)}>
                     {credentialName}
-                  </NxLink>
+                  </SynLink>
                 </FlexItem>
                 {!credentialEnabled && (
                   <FlexItem>
-                    <NxLabel variant="outline" status="warning" icon={<RhUiWarningIcon />}>
+                    <SynLabel variant="outline" status="warning" icon={<RhUiWarningIcon />}>
                       Credential disabled
-                    </NxLabel>
+                    </SynLabel>
                   </FlexItem>
                 )}
               </Flex>
             )}
-          </NxDetail>
+          </SynDetail>
           {(isLLMProvider(integration) || integration.integration_type === IntegrationTypeEnum.MCP_SERVER) && (
-            <NxDetail label={`Enabled ${resourceNoun}`}>{String(enabledResourceCount)}</NxDetail>
+            <SynDetail label={`Enabled ${resourceNoun}`}>{String(enabledResourceCount)}</SynDetail>
           )}
         </DescriptionList>
       </StackItem>
@@ -200,7 +204,7 @@ function IntegrationToolbar({
           Edit integration
         </Button>
       </DisabledWithTooltip>
-      <NxKebabMenu actions={kebabActions} aria-label="Integration actions" />
+      <SynKebabMenu actions={kebabActions} aria-label="Integration actions" />
     </>
   )
 }
@@ -349,27 +353,27 @@ export function IntegrationDetail() {
 
   if (!integrationId) {
     return (
-      <NxPage>
-        <NxPageTitle segments={['Integration', 'Integrations']} />
-        <NxPageHeader title="Error" breadcrumbs={breadcrumbsIntegrationDetailEarlyShell()} />
-        <NxPageBody>
-          <NxPanel isFullHeight>
-            <NxErrorState title="Invalid integration" message="No integration ID provided" />
-          </NxPanel>
-        </NxPageBody>
-      </NxPage>
+      <SynPage>
+        <SynPageTitle segments={['Integration', 'Integrations']} />
+        <SynPageHeader title="Error" breadcrumbs={breadcrumbsIntegrationDetailEarlyShell()} />
+        <SynPageBody>
+          <SynPanel isFullHeight>
+            <SynErrorState title="Invalid integration" message="No integration ID provided" />
+          </SynPanel>
+        </SynPageBody>
+      </SynPage>
     )
   }
 
   if (queryState) {
     return (
-      <NxPage>
-        <NxPageTitle segments={['Integration', 'Integrations']} />
-        <NxPageHeader title="Integration" breadcrumbs={breadcrumbsIntegrationDetailEarlyShell()} />
-        <NxPageBody>
-          <NxPanel isFullHeight>{queryState}</NxPanel>
-        </NxPageBody>
-      </NxPage>
+      <SynPage>
+        <SynPageTitle segments={['Integration', 'Integrations']} />
+        <SynPageHeader title="Integration" breadcrumbs={breadcrumbsIntegrationDetailEarlyShell()} />
+        <SynPageBody>
+          <SynPanel isFullHeight>{queryState}</SynPanel>
+        </SynPageBody>
+      </SynPage>
     )
   }
 
@@ -379,9 +383,9 @@ export function IntegrationDetail() {
   const footer = activeTab === 'resources' ? <ResourcesFooter {...footerState} /> : undefined
 
   return (
-    <NxPage>
-      <NxPageTitle segments={[integration.name, 'Integrations']} />
-      <NxPageHeader
+    <SynPage>
+      <SynPageTitle segments={[integration.name, 'Integrations']} />
+      <SynPageHeader
         breadcrumbs={integrationCrumbs}
         title={integration.name}
         docLink={docLink}
@@ -396,9 +400,9 @@ export function IntegrationDetail() {
         }
       />
 
-      <NxPageBody>
-        <NxPanel isFullHeight isScrollable footer={footer} className={styles.tabsFullHeight}>
-          <NxUrlTabs
+      <SynPageBody>
+        <SynPanel isFullHeight isScrollable footer={footer} className={styles.tabsFullHeight}>
+          <SynUrlTabs
             basePath={integrationBasePath}
             defaultTab="details"
             validTabs={hasResourcesTab(integration) ? ['details', 'resources'] : ['details']}
@@ -442,9 +446,9 @@ export function IntegrationDetail() {
                 />
               </Tab>
             )}
-          </NxUrlTabs>
-        </NxPanel>
-      </NxPageBody>
+          </SynUrlTabs>
+        </SynPanel>
+      </SynPageBody>
 
       <IntegrationDialogs
         validateDialog={validateDialog}
@@ -454,6 +458,6 @@ export function IntegrationDetail() {
         onDelete={handleDelete}
         onDisable={handleDisable}
       />
-    </NxPage>
+    </SynPage>
   )
 }

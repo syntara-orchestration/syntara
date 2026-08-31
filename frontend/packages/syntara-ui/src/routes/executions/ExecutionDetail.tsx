@@ -7,17 +7,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { AppRoute } from '../../app/AppRoute'
 import { executionsClient } from '../../client'
-import { NxPage, NxPageBody } from '../../components/layout/NxPage'
-import { NxPageHeader } from '../../components/layout/NxPageHeader'
-import { NxReactFlowViewportGuard } from '../../components/layout/NxReactFlowViewportGuard'
-import { NxPageTitle } from '../../components/NxPageTitle'
+import { SynPage, SynPageBody } from '../../components/layout/SynPage'
+import { SynPageHeader } from '../../components/layout/SynPageHeader'
+import { SynReactFlowViewportGuard } from '../../components/layout/SynReactFlowViewportGuard'
 import { ResizableDivider } from '../../components/ResizableDivider'
+import { SynPageTitle } from '../../components/SynPageTitle'
 import type { PaginationFooterProps } from '../../components/table/PaginationFooter'
 import { useDialogState } from '../../hooks/useDialogState'
 import { useAlerts } from '../../providers/alerts'
 import type { FilterConfig } from '../../types/filters'
 import { detachPromise } from '../../utils/detachPromise'
 import { useDocLink } from '../../utils/docs/useDocLink'
+import { canvasNodeIdFromApprovalNodeId } from '../approvals/approvalNodeId'
 import { ExecutionDetailsPanel, type WorkflowDefShape } from '../builder/ExecutionDetailsPanel'
 import { ExecutionViewContent } from '../builder/ExecutionViewContent'
 import { useActivityNameMap } from '../builder/useActivityNameMap'
@@ -359,10 +360,10 @@ export default function ExecutionDetail() {
   }
 
   return (
-    <NxPage>
-      <NxPageTitle segments={[executionDetailPageHeading(execution, executionId), 'Workflow Runs']} />
-      <NxReactFlowViewportGuard onReturn={() => detachPromise(navigate({ to: AppRoute.Executions.Root }))}>
-        <NxPageHeader
+    <SynPage>
+      <SynPageTitle segments={[executionDetailPageHeading(execution, executionId), 'Workflow Runs']} />
+      <SynReactFlowViewportGuard onReturn={() => detachPromise(navigate({ to: AppRoute.Executions.Root }))}>
+        <SynPageHeader
           title={executionDetailPageHeading(execution, executionId)}
           docLink={executionsDocLink}
           titleProps={{ size: TitleSizes['2xl'] }}
@@ -393,7 +394,7 @@ export default function ExecutionDetail() {
             />
           }
         />
-        <NxPageBody>
+        <SynPageBody>
           <ExecutionDetailContent
             key={executionId}
             historyCardOpen={historyCardOpen && !approval.panelOpen}
@@ -428,10 +429,12 @@ export default function ExecutionDetail() {
             selectedNodeId={selectedNodeId}
             selectedNodeName={selectedNodeName}
             onNodeSelect={selectNode}
-            currentApprovalNodeId={currentApproval?.approval_node_id}
+            currentApprovalNodeId={
+              currentApproval ? canvasNodeIdFromApprovalNodeId(currentApproval.approval_node_id) : undefined
+            }
           />
-        </NxPageBody>
-      </NxReactFlowViewportGuard>
+        </SynPageBody>
+      </SynReactFlowViewportGuard>
 
       <CopyToEditorDialog
         isOpen={copyToEditorDialog.isOpen}
@@ -461,6 +464,6 @@ export default function ExecutionDetail() {
         }}
         isForkLoading={isForkLoading}
       />
-    </NxPage>
+    </SynPage>
   )
 }

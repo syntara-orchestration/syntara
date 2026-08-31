@@ -22,12 +22,12 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { FilterBar } from '../../components/filters/FilterBar'
 import { IconLabel } from '../../components/IconLabel'
 import { ApprovalPendingBadge } from '../../components/labels/ApprovalPendingBadge'
-import { NxLabel } from '../../components/labels/NxLabel'
-import { NxPanel } from '../../components/layout/NxPanel'
-import type { KebabAction } from '../../components/NxKebabMenu'
-import { NxKebabMenu } from '../../components/NxKebabMenu'
-import { NxLink } from '../../components/NxLink'
-import { NxEmptyStateFilter } from '../../components/states/NxEmptyStateFilter'
+import { SynLabel } from '../../components/labels/SynLabel'
+import { SynPanel } from '../../components/layout/SynPanel'
+import { SynEmptyStateFilter } from '../../components/states/SynEmptyStateFilter'
+import type { KebabAction } from '../../components/SynKebabMenu'
+import { SynKebabMenu } from '../../components/SynKebabMenu'
+import { SynLink } from '../../components/SynLink'
 import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 import type { PaginationFooterProps } from '../../components/table/PaginationFooter'
 import { PaginationFooter } from '../../components/table/PaginationFooter'
@@ -48,8 +48,9 @@ import { useRetryExecution } from '../executions/useRetryExecution'
 import type { ExecutionMetadata } from '../workflows/stores/useExecutionStore'
 
 import { StatusLabel } from './ExecutionStatus'
-import { getDateGroupLabel } from './historyDateUtils'
-import { getClearFiltersHandler } from './hooks/historyRowModel'
+import { formatHistoryDateTime, getDateGroupLabel } from './historyDateUtils'
+import { HistoryListItemLink } from './HistoryListItemLink'
+import { executionDetailHref, getClearFiltersHandler, workflowVersionHref } from './hooks/historyRowModel'
 import styles from './WorkflowHistoryCard.module.css'
 
 type Execution = ExecutionsAPI.components['schemas']['ExecutionRead']
@@ -67,6 +68,7 @@ function groupExecutionsByDate(executions: Execution[]): ExecutionGroup[] {
   for (const exec of executions) {
     const label = exec.created_at ? getDateGroupLabel(exec.created_at) : 'Unknown'
     if (!map.has(label)) map.set(label, [])
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- safe: key was just set via map.set(label, []) above
     map.get(label)!.push(exec)
   }
   return Array.from(map.entries()).map(([label, items]) => ({ label, items }))
@@ -84,7 +86,9 @@ function HistoryRowRetryAction({ execution }: Readonly<{ execution: Execution }>
   const truncatedId = execution.id ? execution.id.slice(0, TRUNCATED_ID_LENGTH) : null
 
   /* v8 ignore start -- v8 emits phantom branches from compiled hook destructuring */
-  const { allowed: canRun, isChecking } = useCanI('run', 'execution')
+  const { allowed: canRun, isChecking } = useCanI('run', 'execution', {
+    resourceProject: execution.project_id,
+  })
   const {
     isCurrentVersion,
     versionLabel,
@@ -109,7 +113,7 @@ function HistoryRowRetryAction({ execution }: Readonly<{ execution: Execution }>
   return (
     <>
       <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} role="presentation">
-        <NxKebabMenu aria-label={`Actions for execution ${truncatedId ?? execution.id}`} actions={kebabActions} />
+        <SynKebabMenu aria-label={`Actions for execution ${truncatedId ?? execution.id}`} actions={kebabActions} />
       </div>
       <RetryExecutionDialog
         isOpen={retryDialogOpen}
@@ -132,62 +136,71 @@ export function ExecutionHistoryRow({ execution, onSelect, isSelected }: Executi
   const truncatedId = execution.id ? execution.id.slice(0, TRUNCATED_ID_LENGTH) : null
   const isTestRun = (execution as { execution_metadata?: ExecutionMetadata }).execution_metadata?.mode === 'test'
   const retryable = isExecutionRetryable(execution.status, execution.mode)
+  const executionHref = executionDetailHref(execution.id)
+  const runIdLabel = truncatedId ? `Run ID: ${truncatedId}` : null
+  const versionHref =
+    execution.workflow_version != null && execution.workflow_id
+      ? workflowVersionHref(execution.workflow_id, execution.workflow_version)
+      : null
+  const dateLabel = execution.created_at
+    ? `Execution from ${formatHistoryDateTime(execution.created_at)}`
+    : `Execution ${truncatedId ?? execution.id}`
+  const rowLabel = runIdLabel ? `${dateLabel}, ${runIdLabel}` : dateLabel
 
   /* v8 ignore start -- phantom branches from compiled JSX props/ternaries in history row layout */
   return (
-    // eslint-disable-next-line syntara/prefer-pf-list-components -- SimpleListItem renders a <button> wrapper, causing invalid nested <button> with the kebab menu (https://github.com/patternfly/patternfly-react/issues/11368)
+    // eslint-disable-next-line syntara/prefer-pf-list-components -- SimpleListItem renders a <button> wrapper, causing invalid nested interactive elements (https://github.com/patternfly/patternfly-react/issues/11368)
     <li className={`pf-v6-c-simple-list__item ${styles.historyRowItem}`}>
-      <button
-        type="button"
-        className={`pf-v6-c-simple-list__item-link ${isSelected ? 'pf-m-current' : ''}`}
-        onClick={onSelect}
+      <HistoryListItemLink
+        to={executionHref}
+        isSelected={isSelected}
+        onSelect={onSelect}
         data-item-id={execution.id}
-      >
-        <Stack className={styles.historyRowStack}>
-          <FlexItem className={styles.historyRowTitle}>
-            {execution.created_at && (
-              <Content component={ContentVariants.p} className={styles.historyRowDatetime}>
-                <ExecutionTimestamp dateString={execution.created_at} />
-              </Content>
-            )}
-          </FlexItem>
-          <Stack className={styles.historyMetaStack}>
-            <Content component={ContentVariants.small} className={styles.historyRowMeta}>
-              {elapsedLabel}
+        aria-label={rowLabel}
+        overlay
+        className={styles.historyRowOverlay}
+      />
+      <Stack className={styles.historyRowStack}>
+        <FlexItem className={styles.historyRowTitle}>
+          {execution.created_at && (
+            <Content component={ContentVariants.p} className={styles.historyRowDatetime}>
+              <ExecutionTimestamp dateString={execution.created_at} />
             </Content>
-            {truncatedId && (
-              <Content component={ContentVariants.small} className={styles.historyRowMeta}>
-                {`Run ID: ${truncatedId}`}
-              </Content>
-            )}
-            {execution.workflow_version != null && execution.workflow_id && (
-              <Content component={ContentVariants.small} className={styles.historyRowMeta}>
-                {'Version: '}
-                <NxLink
-                  to={`/workflow-builder/${execution.workflow_id}?version=${String(execution.workflow_version)}`}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {execution.workflow_version_name ? (
-                    <Truncate content={execution.workflow_version_name} />
-                  ) : (
-                    <ExecutionTimestamp dateString={execution.workflow_version_created_at} />
-                  )}
-                </NxLink>
-              </Content>
-            )}
-            {execution.retried_from_execution_id && (
-              <Content component={ContentVariants.small} className={`${styles.historyRowMeta} ${styles.retriedFrom}`}>
-                {`Retried from: ${execution.retried_from_execution_id.slice(0, TRUNCATED_ID_LENGTH)}`}
-              </Content>
-            )}
-          </Stack>
-          <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapSm' }} flexWrap={{ default: 'wrap' }}>
-            {execution.status && <StatusLabel status={execution.status} />}
-            <ApprovalPendingBadge approvalPending={execution.approval_pending} />
-            {isTestRun && <NxLabel color="purple">Test run</NxLabel>}
-          </Flex>
+          )}
+        </FlexItem>
+        <Stack className={styles.historyMetaStack}>
+          <Content component={ContentVariants.small} className={styles.historyRowMeta}>
+            {elapsedLabel}
+          </Content>
+          {runIdLabel && (
+            <Content component={ContentVariants.small} className={styles.historyRowMeta}>
+              {runIdLabel}
+            </Content>
+          )}
+          {versionHref && (
+            <Content component={ContentVariants.small} className={styles.historyRowMeta}>
+              {'Version: '}
+              <SynLink to={versionHref} className={styles.historyRowRaised}>
+                {execution.workflow_version_name ? (
+                  <Truncate content={execution.workflow_version_name} />
+                ) : (
+                  <ExecutionTimestamp dateString={execution.workflow_version_created_at} />
+                )}
+              </SynLink>
+            </Content>
+          )}
+          {execution.retried_from_execution_id && (
+            <Content component={ContentVariants.small} className={`${styles.historyRowMeta} ${styles.retriedFrom}`}>
+              {`Retried from: ${execution.retried_from_execution_id.slice(0, TRUNCATED_ID_LENGTH)}`}
+            </Content>
+          )}
         </Stack>
-      </button>
+        <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapSm' }} flexWrap={{ default: 'wrap' }}>
+          {execution.status && <StatusLabel status={execution.status} />}
+          <ApprovalPendingBadge approvalPending={execution.approval_pending} />
+          {isTestRun && <SynLabel color="purple">Test run</SynLabel>}
+        </Flex>
+      </Stack>
       {retryable && (
         <div className={styles.historyRowKebab}>
           <HistoryRowRetryAction execution={execution} />
@@ -231,7 +244,7 @@ export function WorkflowHistoryCard(props: WorkflowHistoryCardProps) {
 
   let executionListBody: ReactNode
   if (executions.length === 0 && filters.length > 0) {
-    executionListBody = <NxEmptyStateFilter clearAllFilters={getClearFiltersHandler(onFilterChange)} />
+    executionListBody = <SynEmptyStateFilter clearAllFilters={getClearFiltersHandler(onFilterChange)} />
   } else if (executions.length === 0) {
     executionListBody = (
       <Content component={ContentVariants.p} className={styles.emptyStateText}>
@@ -266,7 +279,7 @@ export function WorkflowHistoryCard(props: WorkflowHistoryCardProps) {
   }
 
   return (
-    <NxPanel
+    <SynPanel
       hasNoPadding
       isFullHeight
       style={{
@@ -365,6 +378,6 @@ export function WorkflowHistoryCard(props: WorkflowHistoryCardProps) {
           </StackItem>
         )}
       </Stack>
-    </NxPanel>
+    </SynPanel>
   )
 }

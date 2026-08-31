@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 
 import { ErrorBoundary } from '../components/ErrorBoundary'
 import { ProtectedRoute } from '../components/ProtectedRoute'
-import { NxLoadingState } from '../components/states/NxLoadingState'
+import { SynLoadingState } from '../components/states/SynLoadingState'
 import type { PermissionRequirement } from '../hooks/permissionUtils'
 
 export function makeRouteComponent(element: React.ReactNode, routePermission?: PermissionRequirement) {
@@ -10,7 +10,7 @@ export function makeRouteComponent(element: React.ReactNode, routePermission?: P
     const guarded = routePermission ? <ProtectedRoute {...routePermission}>{element}</ProtectedRoute> : element
     return (
       <ErrorBoundary>
-        <Suspense fallback={<NxLoadingState />}>{guarded}</Suspense>
+        <Suspense fallback={<SynLoadingState />}>{guarded}</Suspense>
       </ErrorBoundary>
     )
   }

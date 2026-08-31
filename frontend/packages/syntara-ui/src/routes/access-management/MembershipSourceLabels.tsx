@@ -1,4 +1,6 @@
-import { Flex, FlexItem, Label } from '@patternfly/react-core'
+import { Flex, FlexItem } from '@patternfly/react-core'
+
+import { SynLabel } from '../../components/labels/SynLabel'
 
 import type { MembershipSourceInfo } from './membershipSourceUtils'
 
@@ -8,9 +10,9 @@ export function MembershipSourceLabels({ sources }: Readonly<{ sources?: Members
     <Flex gap={{ default: 'gapXs' }} flexWrap={{ default: 'wrap' }}>
       {sources.map((s, idx) => (
         <FlexItem key={`${s.type}-${s.provider_name ?? idx}`}>
-          <Label isCompact color={s.type === 'idp' ? 'blue' : 'grey'}>
+          <SynLabel color={s.type === 'idp' ? 'blue' : 'grey'}>
             {s.type === 'idp' ? (s.provider_name ?? 'IdP') : 'Manual'}
-          </Label>
+          </SynLabel>
         </FlexItem>
       ))}
     </Flex>

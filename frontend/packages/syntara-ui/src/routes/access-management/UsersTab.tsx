@@ -7,13 +7,13 @@ import { useNavigate } from '@tanstack/react-router'
 import { useCallback, useMemo, type ReactNode } from 'react'
 
 import { AppRoute } from '../../app/AppRoute'
-import { NxConfirmationDialog } from '../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { IconLabel } from '../../components/IconLabel'
-import { NxLabel } from '../../components/labels/NxLabel'
-import { NxLink } from '../../components/NxLink'
-import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../components/panels/list/NxListPanel'
-import { NxEmptyStateNoData } from '../../components/states/NxEmptyStateNoData'
+import { SynLabel } from '../../components/labels/SynLabel'
+import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../components/panels/list/SynListPanel'
+import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
+import { SynLink } from '../../components/SynLink'
 import { DateCell } from '../../components/table/DateCell'
 import { useCursorPagination, useCursorReset } from '../../hooks/useCursorPagination'
 import { useDeleteAction } from '../../hooks/useDeleteAction'
@@ -222,9 +222,9 @@ function UserTableRow({
   return (
     <Tr>
       <Td dataLabel="Username">
-        <NxLink to={getUserDetailPath(user.id)}>
+        <SynLink to={getUserDetailPath(user.id)}>
           <Truncate content={user.username} />
-        </NxLink>
+        </SynLink>
       </Td>
       <Td dataLabel="Name">
         <Truncate content={userDisplayName(user)} />
@@ -236,7 +236,7 @@ function UserTableRow({
         <Flex gap={{ default: 'gapXs' }} flexWrap={{ default: 'wrap' }}>
           {(user.auth_sources ?? [AUTH_SOURCE_LOCAL]).map((source) => (
             <FlexItem key={source}>
-              <NxLabel color={source === AUTH_SOURCE_LOCAL ? 'grey' : 'blue'}>{source}</NxLabel>
+              <SynLabel color={source === AUTH_SOURCE_LOCAL ? 'grey' : 'blue'}>{source}</SynLabel>
             </FlexItem>
           ))}
         </Flex>
@@ -321,7 +321,7 @@ export function UsersTab() {
 
   return (
     <>
-      <NxListPanelView
+      <SynListPanelView
         tabKey="users"
         tabLabel="Users"
         isPending={query.isPending}
@@ -332,8 +332,8 @@ export function UsersTab() {
         hasActiveFilters={hasActiveFilters}
         onClearAllFilters={handleClearAllFilters}
         noDataState={
-          <NxEmptyStateNoData
-            title="No users"
+          <SynEmptyStateNoData
+            title="No users yet"
             description="Create a user to manage access to the platform."
             buttonText="Create user"
             addData={handleCreateUser}
@@ -341,7 +341,7 @@ export function UsersTab() {
         }
         toolbar={
           users.length > 0 || hasActiveFilters ? (
-            <NxListPanelToolbar
+            <SynListPanelToolbar
               filters={filters}
               filterDefinitions={filterFieldDefinitions}
               onFilterChange={handleFilterChange}
@@ -377,7 +377,7 @@ export function UsersTab() {
                 />
               </StackItem>
             )}
-            <NxListPanelTable caption="Users" footer={getFooterProps(data)}>
+            <SynListPanelTable caption="Users" footer={getFooterProps(data)}>
               <Thead>
                 <Tr>
                   <Th sort={getSortParams(0)}>Username</Th>
@@ -403,12 +403,12 @@ export function UsersTab() {
                   />
                 ))}
               </Tbody>
-            </NxListPanelTable>
+            </SynListPanelTable>
           </>
         }
       />
 
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={deleteDialog.isOpen}
         onClose={deleteDialog.close}
         onConfirm={() => handleDelete(deleteDialog.item)}
@@ -419,8 +419,8 @@ export function UsersTab() {
         destructiveAcknowledgement={DELETE_USER_ACKNOWLEDGEMENT}
       >
         The user <strong>{deleteDialog.item?.username}</strong> will be deleted. This cannot be undone.
-      </NxConfirmationDialog>
-      <NxConfirmationDialog
+      </SynConfirmationDialog>
+      <SynConfirmationDialog
         isOpen={adminToggle.showConfirm}
         onClose={adminToggle.cancelDisable}
         onConfirm={adminToggle.confirmDisable}
@@ -429,8 +429,8 @@ export function UsersTab() {
       >
         Disabling the built-in administrator account will immediately end your current session. You will need to sign in
         with another admin account to re-enable it.
-      </NxConfirmationDialog>
-      <NxConfirmationDialog
+      </SynConfirmationDialog>
+      <SynConfirmationDialog
         isOpen={disableConfirm.isOpen}
         onClose={disableConfirm.close}
         onConfirm={disableConfirm.confirm}
@@ -438,8 +438,8 @@ export function UsersTab() {
         confirmLabel={disableCopy.confirmLabel}
       >
         {disableCopy.body}
-      </NxConfirmationDialog>
-      <NxConfirmationDialog
+      </SynConfirmationDialog>
+      <SynConfirmationDialog
         isOpen={revokeDialog.isOpen}
         onClose={revokeDialog.close}
         onConfirm={handleRevoke}
@@ -450,7 +450,7 @@ export function UsersTab() {
       >
         All tokens for <strong>{revokeDialog.item?.username}</strong> will be revoked. The user will be signed out and
         must sign in again.
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
     </>
   )
 }

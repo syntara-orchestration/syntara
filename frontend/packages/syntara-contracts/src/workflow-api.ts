@@ -729,6 +729,12 @@ export interface components {
        * @description Project to assign workflow to
        */
       project_id: string
+      /**
+       * Is Import
+       * @description When true, unavailable LLM models are cleared with warnings instead of rejecting the request. Use when importing workflows from other instances.
+       * @default false
+       */
+      is_import?: boolean
     }
     /**
      * WorkflowUpdate
@@ -970,7 +976,7 @@ export interface components {
     }
     /**
      * WorkflowDefinition
-     * @description JSON Schema for graph-based workflow definitions in the Syntara Workflow Engine v2.
+     * @description JSON Schema for graph-based workflow definitions in the Orchestrator Workflow Engine v2.
      *
      *     Attributes:
      *         schema_version: Schema version that this workflow definition conforms to
@@ -1469,7 +1475,7 @@ export interface components {
     AAPJobTemplateExecutorParameters: {
       /**
        * Credential Id
-       * @description Syntara credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
+       * @description Orchestrator credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
        */
       credential_id?: string | null
       /**
@@ -1592,7 +1598,7 @@ export interface components {
     AAPWorkflowJobTemplateExecutorParameters: {
       /**
        * Credential Id
-       * @description Syntara credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
+       * @description Orchestrator credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
        */
       credential_id?: string | null
       /**
@@ -1692,7 +1698,7 @@ export interface components {
       }
       /**
        * Credential Id
-       * @description Syntara credential UUID for authentication or Secret URL.
+       * @description Orchestrator credential UUID for authentication or Secret URL.
        */
       credential_id?: string | null
     }
@@ -1715,7 +1721,7 @@ export interface components {
       llm_model_id?: string | null
       /**
        * Credential Id
-       * @description Syntara credential UUID for LLM provider authentication
+       * @description Orchestrator credential UUID for LLM provider authentication
        */
       credential_id?: string | null
       /**
@@ -1768,7 +1774,7 @@ export interface components {
       integration_id: string
       /**
        * Credential Id
-       * @description Syntara credential UUID for execution calls (distinct from management credential)
+       * @description Orchestrator credential UUID for execution calls (distinct from management credential)
        */
       credential_id: string
     }
@@ -1792,7 +1798,7 @@ export interface components {
       }
       /**
        * Credential Id
-       * @description Syntara credential UUID for credential scrubbing
+       * @description Orchestrator credential UUID for credential scrubbing
        */
       credential_id?: string | null
     }
@@ -1803,7 +1809,7 @@ export interface components {
     ApprovalNodeParameters: {
       /**
        * Credential Id
-       * @description Syntara credential UUID
+       * @description Orchestrator credential UUID
        */
       credential_id?: string | null
       /**

@@ -6,11 +6,11 @@ import { useNavigate } from '@tanstack/react-router'
 import { useCallback, useMemo } from 'react'
 
 import { AppRoute } from '../../app/AppRoute'
-import { NxConfirmationDialog } from '../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { IconLabel } from '../../components/IconLabel'
-import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../components/panels/list/NxListPanel'
-import { NxEmptyStateNoData } from '../../components/states/NxEmptyStateNoData'
+import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../components/panels/list/SynListPanel'
+import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 import { DateCell } from '../../components/table/DateCell'
 import { useCursorPagination, useCursorReset } from '../../hooks/useCursorPagination'
 import { useDialogState } from '../../hooks/useDialogState'
@@ -156,7 +156,7 @@ function DeleteProjectDialog({
   onDelete: () => void
 }>) {
   return (
-    <NxConfirmationDialog
+    <SynConfirmationDialog
       isOpen={isOpen}
       onClose={onClose}
       onConfirm={onDelete}
@@ -177,10 +177,14 @@ function DeleteProjectDialog({
           <List>
             <ListItem>All workflows in this project will be permanently deleted.</ListItem>
             <ListItem>All project role assignments will be removed.</ListItem>
+            <ListItem>
+              Uploaded files are kept after the project is deleted. There is no in-product list or delete flow for them
+              yet.
+            </ListItem>
           </List>
         </StackItem>
       </Stack>
-    </NxConfirmationDialog>
+    </SynConfirmationDialog>
   )
 }
 
@@ -259,7 +263,7 @@ export function ProjectsTab() {
 
   return (
     <>
-      <NxListPanelView
+      <SynListPanelView
         tabKey="projects"
         tabLabel="Projects"
         isPending={query.isPending}
@@ -270,7 +274,7 @@ export function ProjectsTab() {
         hasActiveFilters={hasActiveFilters}
         onClearAllFilters={handleClearAllFilters}
         noDataState={
-          <NxEmptyStateNoData
+          <SynEmptyStateNoData
             title="No projects yet"
             description="Create a project to organize workflows and manage access."
             buttonText="Create project"
@@ -279,7 +283,7 @@ export function ProjectsTab() {
         }
         toolbar={
           projects.length > 0 || hasActiveFilters ? (
-            <NxListPanelToolbar
+            <SynListPanelToolbar
               filters={filters}
               filterDefinitions={filterFieldDefinitions}
               onFilterChange={handleFilterChange}
@@ -306,14 +310,14 @@ export function ProjectsTab() {
               workflow and credential belongs to exactly one project. Use projects to keep related automation work
               together and to control access through role assignments.
             </Content>
-            <NxListPanelTable caption="Projects" footer={getFooterProps(data)}>
+            <SynListPanelTable caption="Projects" footer={getFooterProps(data)}>
               <ProjectsTable
                 projects={projects}
                 getSortParams={getSortParams}
                 onEdit={(p) => formDialog.open(p)}
                 onDelete={(p) => deleteDialog.open(p)}
               />
-            </NxListPanelTable>
+            </SynListPanelTable>
           </>
         }
       />

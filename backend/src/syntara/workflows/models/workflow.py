@@ -190,6 +190,11 @@ class WorkflowCreate(WorkflowBase):
 
     workflow_definition: WorkflowDefinition | dict[str, Any] = Field(..., description="Workflow definition object")
     project_id: UUID = Field(..., description="Project to assign workflow to")
+    is_import: bool = Field(
+        default=False,
+        description="When true, unavailable LLM models are cleared with warnings "
+        "instead of rejecting the request. Use when importing workflows from other instances.",
+    )
 
 
 class WorkflowUpdate(SQLModel):
