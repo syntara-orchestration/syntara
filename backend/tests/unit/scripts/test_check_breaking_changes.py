@@ -21,6 +21,7 @@ from __future__ import annotations
 import importlib
 import json
 import shutil
+import subprocess
 import sys
 import textwrap
 from pathlib import Path
@@ -857,6 +858,16 @@ _INTEGRATION_ADDITIVE = textwrap.dedent("""\
               description: ok
 """)
 
+# Base with the /things endpoint removed, an ERR-level breaking change per
+# oasdiff. The minor bump (1.1.0) satisfies the approved-breaking version rule.
+_INTEGRATION_BREAKING = textwrap.dedent("""\
+    openapi: "3.1.0"
+    info:
+      title: Test API
+      version: 1.1.0
+    paths: {}
+""")
+
 
 @pytest.mark.skipif(shutil.which("oasdiff") is None, reason="oasdiff not installed")
 class TestOasdiffIntegration:
@@ -903,6 +914,81 @@ class TestOasdiffIntegration:
         # Patch bump for an additive change is the wrong segment.
         assert code == 1
         assert result["gate_code"] == "incorrect_version_increment"
+
+    def test_removed_endpoint_is_breaking_and_blocked(self, monkeypatch, tmp_path):
+        # Regression: oasdiff exits 0 even with breaking changes unless --fail-on
+        # is set, so this real-binary case must detect the removed endpoint.
+        code, result = self._run(monkeypatch, tmp_path, _INTEGRATION_BASE, _INTEGRATION_BREAKING)
+        assert result["has_breaking_changes"] is True
+        assert code == 1
+        assert result["gate_code"] == "breaking_blocked"
+
+    def test_removed_endpoint_allowed_with_approval_label(self, monkeypatch, tmp_path):
+        code, result = self._run(
+            monkeypatch,
+            tmp_path,
+            _INTEGRATION_BASE,
+            _INTEGRATION_BREAKING,
+            pr_labels='["breaking-change-approved"]',
+        )
+        assert result["has_breaking_changes"] is True
+        assert code == 0
+        assert result["gate_code"] == "breaking_approved"
+
+
+class TestCheckBreakingChangesExitCodes:
+    """check_breaking_changes maps oasdiff exit codes correctly.
+
+    Regression guard: previously any non-zero exit was treated as a breaking
+    change. That both misreported oasdiff errors (e.g. a spec that fails to
+    load, exit 102) as breaking changes and, because --fail-on was missing,
+    missed real breaking changes (oasdiff exits 0 with breaking changes unless
+    told otherwise).
+    """
+
+    def _patch_oasdiff(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        breaking_returncode: int,
+        *,
+        stdout: str = "",
+        stderr: str = "",
+    ) -> dict[str, list[str]]:
+        captured: dict[str, list[str]] = {}
+
+        def _fake_run(cmd: list[str], *, capture_output: bool = True) -> subprocess.CompletedProcess[str]:
+            if cmd[:2] == ["oasdiff", "--version"]:
+                return subprocess.CompletedProcess(cmd, 0, "oasdiff v1.18.5", "")
+            captured["cmd"] = cmd
+            return subprocess.CompletedProcess(cmd, breaking_returncode, stdout, stderr)
+
+        monkeypatch.setattr(check_breaking, "run_command", _fake_run)
+        return captured
+
+    def test_exit_zero_is_not_breaking(self, monkeypatch):
+        self._patch_oasdiff(monkeypatch, 0, stdout="No changes")
+        has_breaking, _ = check_breaking.check_breaking_changes("a.yaml", "b.yaml")
+        assert has_breaking is False
+
+    def test_exit_one_is_breaking(self, monkeypatch):
+        self._patch_oasdiff(monkeypatch, 1, stdout="1 changes: 1 error")
+        has_breaking, output = check_breaking.check_breaking_changes("a.yaml", "b.yaml")
+        assert has_breaking is True
+        assert "1 error" in output
+
+    def test_tool_error_exit_code_exits_two(self, monkeypatch):
+        # oasdiff returns 102 when a spec fails to load: an error, not a
+        # breaking change. It must not be reported as breaking.
+        self._patch_oasdiff(monkeypatch, 102, stderr="failed to load spec")
+        with pytest.raises(SystemExit) as exc:
+            check_breaking.check_breaking_changes("a.yaml", "missing.yaml")
+        assert exc.value.code == 2
+
+    def test_fail_on_err_flag_is_passed(self, monkeypatch):
+        captured = self._patch_oasdiff(monkeypatch, 0)
+        check_breaking.check_breaking_changes("a.yaml", "b.yaml")
+        assert "--fail-on" in captured["cmd"]
+        assert "ERR" in captured["cmd"]
 
 
 class TestFormatTextOutput:

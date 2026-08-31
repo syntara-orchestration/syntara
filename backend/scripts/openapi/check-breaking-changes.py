@@ -25,7 +25,7 @@ Policy):
      so it would not register as a breaking change here.
 
 Dynamic-map / ``additionalProperties`` content (labels, context_data,
-input_data, output_data, result) is not treated as breaking — oasdiff reports
+input_data, output_data, result) is not treated as breaking; oasdiff reports
 such changes as non-breaking.
 
 Usage:
@@ -181,7 +181,12 @@ def check_breaking_changes(base_spec: str, head_spec: str) -> tuple[bool, str]:
         print("Run: ./scripts/openapi/install-oasdiff.sh", file=sys.stderr)
         sys.exit(2)
 
-    # Run oasdiff breaking changes check
+    # Run oasdiff breaking changes check. Without --fail-on, oasdiff exits 0 even
+    # when it finds breaking changes, so we must request a failing exit code.
+    # With --fail-on ERR the exit code is:
+    #   0   -> no ERR-level breaking changes
+    #   1   -> at least one ERR-level breaking change
+    #   >1  -> oasdiff error (e.g. spec failed to load), not a breaking change
     result = run_command(
         [
             "oasdiff",
@@ -190,14 +195,24 @@ def check_breaking_changes(base_spec: str, head_spec: str) -> tuple[bool, str]:
             head_spec,
             "--format",
             "text",
+            "--fail-on",
+            "ERR",
         ]
     )
+    output = (result.stdout + result.stderr).strip()
 
-    # oasdiff returns non-zero if breaking changes found
-    has_breaking = result.returncode != 0
-    output = result.stdout + result.stderr
+    # Distinguish "breaking changes found" (exit 1) from a tool error (exit >1).
+    # Treating any non-zero code as breaking would both misreport oasdiff errors
+    # as breaking changes and (before --fail-on was added) miss real ones.
+    if result.returncode not in (0, 1):
+        print(
+            f"ERROR: oasdiff failed (exit {result.returncode}) while checking for breaking changes:\n{output}",
+            file=sys.stderr,
+        )
+        sys.exit(2)
 
-    return has_breaking, output.strip()
+    has_breaking = result.returncode == 1
+    return has_breaking, output
 
 
 def get_all_changes(base_spec: str, head_spec: str) -> str:
@@ -229,7 +244,7 @@ def get_changelog_entries(base_spec: str, head_spec: str) -> list[dict[str, Any]
 
     Each entry describes a *structural* change (added endpoint, field, enum
     value, etc.). oasdiff does NOT report spec-only edits (description, summary,
-    example, annotation) here — those are detected via canonical comparison
+    example, annotation) here; those are detected via canonical comparison
     instead. Returns an empty list when there are no structural changes or the
     JSON cannot be parsed.
     """
@@ -253,7 +268,7 @@ def check_approval_label(pr_labels_json: str) -> bool:
     contains a comma cannot be split into two and forge the approval label. The
     match is case-sensitive to stay consistent with the exact-case ``if:``
     conditions in ``breaking-change-label-guard.yml`` and
-    ``openapi-breaking-changes.yml`` — a case-variant label that never triggers
+    ``openapi-breaking-changes.yml``; a case-variant label that never triggers
     those guards must not be accepted here either.
 
     Args:
@@ -400,7 +415,7 @@ def evaluate_gate(
                     "spec-only edits (description, example, annotation) require a patch bump. "
                     if not has_breaking
                     else "An approved in-place breaking change requires a minor bump, not a major "
-                    "one — a new major version is a new spec at a new URL path. "
+                    "one; a new major version is a new spec at a new URL path. "
                 )
                 + f"Set info.version to a '{expected_bump_type}' increment."
             ),
@@ -657,7 +672,7 @@ def _format_text_output(
     """Format results as human-readable text lines."""
     lines = []
 
-    # Version info header — always include spec path, versions, and bump state
+    # Version info header: always include spec path, versions, and bump state
     lines.append(f"Spec: {spec_path}")
     lines.append(f"Version: {base_version or 'unknown'} -> {head_version or 'unknown'}")
     lines.append(f"version_bumped: {str(version_bumped).lower()}")
