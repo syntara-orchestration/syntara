@@ -1,7 +1,6 @@
 import { Content, Tab } from '@patternfly/react-core'
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 
-import { createTestRouter } from '../../test/createTestRouter'
 import { SynPanel } from '../layout/SynPanel'
 
 import { SynUrlTabs } from './SynUrlTabs'
@@ -16,7 +15,6 @@ function TabPane({ label }: { label: string }) {
 }
 
 // Standard three tabs used across all stories.
-// Multi-word labels ("Activity log", "Access roles") demonstrate the sentence-case rule.
 function StandardTabs({ basePath, defaultTab }: { basePath: string; defaultTab?: string }) {
   return (
     <SynUrlTabs basePath={basePath} defaultTab={defaultTab ?? 'details'} aria-label="Resource tabs">
@@ -33,80 +31,17 @@ function StandardTabs({ basePath, defaultTab }: { basePath: string; defaultTab?:
   )
 }
 
-const DefaultStoryRouter = createTestRouter('/resource/details')
-function DefaultStory() {
-  return (
-    <DefaultStoryRouter>
-      <SynPanel>
-        <StandardTabs basePath="/resource" />
-      </SynPanel>
-    </DefaultStoryRouter>
-  )
-}
-
-const SecondTabActiveRouter = createTestRouter('/resource/activity-log')
-function SecondTabActiveStory() {
-  return (
-    <SecondTabActiveRouter>
-      <SynPanel>
-        <StandardTabs basePath="/resource" />
-      </SynPanel>
-    </SecondTabActiveRouter>
-  )
-}
-
-const DefaultTabFallbackRouter = createTestRouter('/resource')
-function DefaultTabFallbackStory() {
-  // URL has no tab segment — `defaultTab` takes over without any redirect.
-  return (
-    <DefaultTabFallbackRouter>
-      <SynPanel>
-        <StandardTabs basePath="/resource" defaultTab="activity-log" />
-      </SynPanel>
-    </DefaultTabFallbackRouter>
-  )
-}
-
-const ValidTabsRouter = createTestRouter('/resource/details')
-function ValidTabsStory() {
-  return (
-    <ValidTabsRouter>
-      <SynPanel>
-        <SynUrlTabs
-          basePath="/resource"
-          defaultTab="details"
-          validTabs={['details', 'activity-log', 'access-roles']}
-          aria-label="Resource tabs"
-        >
-          <Tab eventKey="details" title="Details">
-            <TabPane label="Details" />
-          </Tab>
-          <Tab eventKey="activity-log" title="Activity log">
-            <TabPane label="Activity log" />
-          </Tab>
-          <Tab eventKey="access-roles" title="Access roles">
-            <TabPane label="Access roles" />
-          </Tab>
-        </SynUrlTabs>
-      </SynPanel>
-    </ValidTabsRouter>
-  )
-}
-
-const TabNavigationRouter = createTestRouter('/resource/details')
-function TabNavigationStory() {
-  return (
-    <TabNavigationRouter>
-      <SynPanel>
-        <StandardTabs basePath="/resource" />
-      </SynPanel>
-    </TabNavigationRouter>
-  )
-}
-
 const meta: Meta<typeof SynUrlTabs> = {
   component: SynUrlTabs,
   tags: ['autodocs'],
+  // Wrap all stories in SynPanel automatically
+  decorators: [
+    (Story) => (
+      <SynPanel>
+        <Story />
+      </SynPanel>
+    ),
+  ],
   parameters: {
     docs: {
       description: {
@@ -131,10 +66,15 @@ export default meta
 
 type Story = StoryObj<typeof meta>
 
-/** First tab active — the URL segment matches the first tab key. `SynUrlTabs` lives inside `SynPanel`. */
+/** First tab active — the URL segment matches the first tab key. */
 export const Default: Story = {
-  render: () => <DefaultStory />,
+  render: () => <StandardTabs basePath="/resource" />,
   parameters: {
+    tanstack: {
+      router: {
+        path: '/resource/details',
+      },
+    },
     docs: {
       description: {
         story:
@@ -150,8 +90,13 @@ export const Default: Story = {
  */
 export const NonDefaultTabActive: Story = {
   name: 'Non-default tab active',
-  render: () => <SecondTabActiveStory />,
+  render: () => <StandardTabs basePath="/resource" />,
   parameters: {
+    tanstack: {
+      router: {
+        path: '/resource/activity-log',
+      },
+    },
     docs: {
       description: {
         story:
@@ -167,8 +112,13 @@ export const NonDefaultTabActive: Story = {
  */
 export const DefaultTabFallback: Story = {
   name: 'Default tab fallback',
-  render: () => <DefaultTabFallbackStory />,
+  render: () => <StandardTabs basePath="/resource" defaultTab="activity-log" />,
   parameters: {
+    tanstack: {
+      router: {
+        path: '/resource',
+      },
+    },
     docs: {
       description: {
         story:
@@ -185,8 +135,30 @@ export const DefaultTabFallback: Story = {
  */
 export const WithValidTabs: Story = {
   name: 'Valid tabs guard',
-  render: () => <ValidTabsStory />,
+  render: () => (
+    <SynUrlTabs
+      basePath="/resource"
+      defaultTab="details"
+      validTabs={['details', 'activity-log', 'access-roles']}
+      aria-label="Resource tabs"
+    >
+      <Tab eventKey="details" title="Details">
+        <TabPane label="Details" />
+      </Tab>
+      <Tab eventKey="activity-log" title="Activity log">
+        <TabPane label="Activity log" />
+      </Tab>
+      <Tab eventKey="access-roles" title="Access roles">
+        <TabPane label="Access roles" />
+      </Tab>
+    </SynUrlTabs>
+  ),
   parameters: {
+    tanstack: {
+      router: {
+        path: '/resource/details',
+      },
+    },
     docs: {
       description: {
         story:
@@ -199,8 +171,13 @@ export const WithValidTabs: Story = {
 /** Clicking a tab updates the active selection via URL navigation. */
 export const TabNavigation: Story = {
   name: 'Tab navigation',
-  render: () => <TabNavigationStory />,
+  render: () => <StandardTabs basePath="/resource" />,
   parameters: {
+    tanstack: {
+      router: {
+        path: '/resource/details',
+      },
+    },
     docs: {
       description: {
         story:
