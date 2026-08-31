@@ -45,8 +45,8 @@ class TestSQLModelBaseClasses:
 
     def test_base_resource_updated_at_onupdate(self) -> None:
         """updated_at must auto-update on resource changes via SQLAlchemy onupdate."""
-        updated_at_col = MockBaseResource.__table__.c.updated_at
-        created_at_col = MockBaseResource.__table__.c.created_at
+        updated_at_col = MockBaseResource.__table__.c.updated_at  # type: ignore[attr-defined]
+        created_at_col = MockBaseResource.__table__.c.created_at  # type: ignore[attr-defined]
         assert updated_at_col.onupdate is not None
         assert created_at_col.onupdate is None
 
