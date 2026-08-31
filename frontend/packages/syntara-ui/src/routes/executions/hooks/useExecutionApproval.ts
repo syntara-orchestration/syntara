@@ -46,7 +46,6 @@ export function useExecutionApproval(executionId: string | undefined): UseExecut
   useEffect(() => {
     executionIdRef.current = executionId
     latestNodeIdRef.current = null
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- synchronizing approval state with route param change
     setPendingApproval(null)
     clear()
   }, [executionId, clear])
