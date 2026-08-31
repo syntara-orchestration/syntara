@@ -40,9 +40,21 @@ def _connection() -> AAPConnection:
     )
 
 
+def _mock_user() -> MagicMock:
+    user = MagicMock()
+    user.labels = {}
+    user.authz_metadata = {}
+    return user
+
+
 def _service() -> AAPProxyService:
     mock_session = AsyncMock()
-    return AAPProxyService(settings=get_settings(), session=mock_session)
+    return AAPProxyService(
+        settings=get_settings(),
+        session=mock_session,
+        evaluator=MagicMock(),
+        user=_mock_user(),
+    )
 
 
 class TestListOrganizations:
@@ -558,7 +570,9 @@ class TestGetJobTemplatePublicUrl:
         """detail.url should use aap_public_url instead of aap_base_url."""
         with override_settings(aap_public_url="https://public-aap.example.com"):
             mock_session = AsyncMock()
-            service = AAPProxyService(settings=get_settings(), session=mock_session)
+            service = AAPProxyService(
+                settings=get_settings(), session=mock_session, evaluator=MagicMock(), user=_mock_user()
+            )
             aap_response = {"id": 10, "name": "Deploy App"}
 
             with (
@@ -576,7 +590,9 @@ class TestGetJobTemplatePublicUrl:
         """When aap_public_url is not set, url is None to avoid leaking internal addresses."""
         with override_settings(aap_public_url=None):
             mock_session = AsyncMock()
-            service = AAPProxyService(settings=get_settings(), session=mock_session)
+            service = AAPProxyService(
+                settings=get_settings(), session=mock_session, evaluator=MagicMock(), user=_mock_user()
+            )
             aap_response = {"id": 10, "name": "Deploy App"}
 
             with (
@@ -898,7 +914,9 @@ class TestCredentialAuthorization:
         """Raise when credential_id is omitted and the integration has no management credential."""
         integration = _mock_integration(management_credential_id=None)
         mock_session = _mock_session_with_integration(integration)
-        service = AAPProxyService(settings=get_settings(), session=mock_session)
+        service = AAPProxyService(
+            settings=get_settings(), session=mock_session, evaluator=MagicMock(), user=_mock_user()
+        )
         user_id = uuid4()
 
         with pytest.raises(AAPNotConfiguredError, match="no management credential"):
@@ -1075,7 +1093,9 @@ class TestResolveConnectionFromIntegration:
     async def test_integration_not_found_raises_not_configured(self) -> None:
         """When integration_id does not match any record, AAPNotConfiguredError is raised."""
         mock_session = _mock_session_with_integration(None)
-        service = AAPProxyService(settings=get_settings(), session=mock_session)
+        service = AAPProxyService(
+            settings=get_settings(), session=mock_session, evaluator=MagicMock(), user=_mock_user()
+        )
 
         missing_id = uuid4()
 
@@ -1090,7 +1110,9 @@ class TestResolveConnectionFromIntegration:
         """When integration is disabled, AAPNotConfiguredError is raised."""
         integration = _mock_integration(enabled=False, name="Disabled AAP")
         mock_session = _mock_session_with_integration(integration)
-        service = AAPProxyService(settings=get_settings(), session=mock_session)
+        service = AAPProxyService(
+            settings=get_settings(), session=mock_session, evaluator=MagicMock(), user=_mock_user()
+        )
 
         credential_id = uuid4()
         user_id = uuid4()
@@ -1105,7 +1127,9 @@ class TestResolveConnectionFromIntegration:
         """When integration is not type ansible_automation_platform, AAPNotConfiguredError is raised."""
         integration = _mock_integration(integration_type="mcp_server")
         mock_session = _mock_session_with_integration(integration)
-        service = AAPProxyService(settings=get_settings(), session=mock_session)
+        service = AAPProxyService(
+            settings=get_settings(), session=mock_session, evaluator=MagicMock(), user=_mock_user()
+        )
 
         credential_id = uuid4()
         user_id = uuid4()
@@ -1158,7 +1182,9 @@ class TestResolveConnectionFromIntegration:
     async def test_integration_id_invalid_string_raises_not_configured(self) -> None:
         """Non-UUID string for integration_id should raise AAPNotConfiguredError."""
         mock_session = AsyncMock()
-        service = AAPProxyService(settings=get_settings(), session=mock_session)
+        service = AAPProxyService(
+            settings=get_settings(), session=mock_session, evaluator=MagicMock(), user=_mock_user()
+        )
 
         credential_id = uuid4()
         user_id = uuid4()
@@ -1238,7 +1264,9 @@ class TestRequestTimeSsrfRevalidation:
     async def test_metadata_base_url_rejected_before_outbound_dispatch(self) -> None:
         integration = _mock_integration(base_url="https://169.254.169.254")
         mock_session = _mock_session_with_integration(integration)
-        service = AAPProxyService(settings=get_settings(), session=mock_session)
+        service = AAPProxyService(
+            settings=get_settings(), session=mock_session, evaluator=MagicMock(), user=_mock_user()
+        )
 
         credential_id = uuid4()
         user_id = uuid4()
@@ -1327,7 +1355,13 @@ class TestEnforceIntegrationVisibility:
 
         unrelated_project = uuid4()
         restricted_projects = AllowedProjectsResult(all_projects=False, project_ids=[unrelated_project])
-        service = AAPProxyService(settings=get_settings(), session=mock_session, allowed_projects=restricted_projects)
+        service = AAPProxyService(
+            settings=get_settings(),
+            session=mock_session,
+            evaluator=MagicMock(),
+            user=_mock_user(),
+            allowed_projects=restricted_projects,
+        )
 
         credential_id = uuid4()
         user_id = uuid4()
@@ -1393,7 +1427,9 @@ class TestDefaultAAPIntegrationResolution:
             management_credential_id=management_credential_id,
         )
         mock_session = _mock_session_with_integration(integration)
-        service = AAPProxyService(settings=get_settings(), session=mock_session)
+        service = AAPProxyService(
+            settings=get_settings(), session=mock_session, evaluator=MagicMock(), user=_mock_user()
+        )
         user_id = uuid4()
         cred_connection = AAPConnection(
             base_url="",
@@ -1535,6 +1571,8 @@ class TestDefaultAAPIntegrationResolution:
         service = AAPProxyService(
             settings=get_settings(),
             session=mock_session,
+            evaluator=MagicMock(),
+            user=_mock_user(),
             allowed_projects=AllowedProjectsResult(all_projects=False, project_ids=[uuid4()]),
         )
         cred_connection = AAPConnection(
@@ -1591,7 +1629,9 @@ class TestListVisibleAAPIntegrations:
         mock_result = MagicMock()
         mock_result.all.return_value = [integration]
         mock_session.exec.return_value = mock_result
-        service = AAPProxyService(settings=get_settings(), session=mock_session)
+        service = AAPProxyService(
+            settings=get_settings(), session=mock_session, evaluator=MagicMock(), user=_mock_user()
+        )
 
         result = await service._list_visible_aap_integrations()
 
@@ -1605,6 +1645,8 @@ class TestListVisibleAAPIntegrations:
         service = AAPProxyService(
             settings=get_settings(),
             session=mock_session,
+            evaluator=MagicMock(),
+            user=_mock_user(),
             allowed_projects=AllowedProjectsResult(all_projects=False, project_ids=[uuid4()]),
         )
 
@@ -1631,6 +1673,8 @@ class TestListVisibleAAPIntegrations:
         service = AAPProxyService(
             settings=get_settings(),
             session=mock_session,
+            evaluator=MagicMock(),
+            user=_mock_user(),
             allowed_projects=AllowedProjectsResult(all_projects=False, project_ids=[uuid4()]),
         )
 
@@ -1655,6 +1699,8 @@ class TestListVisibleAAPIntegrations:
         service = AAPProxyService(
             settings=get_settings(),
             session=mock_session,
+            evaluator=MagicMock(),
+            user=_mock_user(),
             allowed_projects=AllowedProjectsResult(all_projects=True, project_ids=[]),
         )
 

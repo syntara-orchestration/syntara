@@ -109,16 +109,16 @@ class AAPProxyService:
         self,
         settings: Settings,
         session: AsyncSession,
+        evaluator: AuthzEvaluator,
+        user: User,
         allowed_projects: AllowedProjectsResult | None = None,
-        evaluator: AuthzEvaluator | None = None,
-        user: User | None = None,
     ) -> None:
         """Initialize with injected dependencies."""
         self._settings = settings
         self._session = session
-        self._allowed_projects = allowed_projects
         self._evaluator = evaluator
         self._user = user
+        self._allowed_projects = allowed_projects
         # Lazily created per-connection client to avoid repeated TCP/TLS setup
         # within the same request (e.g., org resolution + resource list).
         self._client: httpx.AsyncClient | None = None
@@ -517,9 +517,6 @@ class AAPProxyService:
                 integration_id=str(integration.id),
                 credential_id=str(credential_id),
             )
-            if self._evaluator is None or self._user is None:
-                msg = "Authorization evaluator and user context are required for credential access"
-                raise AAPAuthenticationError(msg)
             cred_connection = await resolve_aap_connection_from_credential(
                 session=self._session,
                 credential_id=credential_id,
