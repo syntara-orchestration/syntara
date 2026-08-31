@@ -17,6 +17,7 @@ import structlog
 
 from syntara.api.constants import EXCLUDED_PATH_PREFIXES, EXCLUDED_PATHS
 from syntara.audit.emitter import request_id_context_var
+from syntara.core.request_context import MUTATING_METHODS, is_mutating_request_context_var
 from syntara.metrics.cleanup import release_memory_to_os
 from syntara.metrics.interface_tag import detect_interface, interface_context_var
 from syntara.metrics.types import ComponentLabel, MetricType
@@ -178,6 +179,7 @@ class MetricsMiddleware:
 
         interface = detect_interface(scope)
         interface_context_var.set(interface)
+        is_mutating_request_context_var.set(method in MUTATING_METHODS)
 
         try:
             await self.app(scope, receive, send_wrapper)

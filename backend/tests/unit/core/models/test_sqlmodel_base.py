@@ -6,6 +6,7 @@ These tests will initially fail until the SQLModel classes are implemented.
 """
 
 from datetime import UTC, datetime
+from unittest.mock import MagicMock
 from uuid import UUID, uuid4
 
 import pytest
@@ -18,7 +19,9 @@ from syntara.core.models.base import (
     SoftDeletableResource,
     UserOwnedResource,
 )
+from syntara.core.models.base.base_resource import touch_updated_at_before_flush
 from syntara.core.models.pagination import ResourcesResponse, ResourcesResponseBase
+from syntara.core.request_context import is_mutating_request_context_var
 from tests.unit.core.models.mock_shared_resources import MockBaseResource, MockNamedResource, MockResource
 
 
@@ -49,6 +52,26 @@ class TestSQLModelBaseClasses:
         created_at_col = MockBaseResource.__table__.c.created_at  # type: ignore[attr-defined]
         assert updated_at_col.onupdate is not None
         assert created_at_col.onupdate is None
+
+    def test_touch_updated_at_before_flush_requires_mutating_request(self) -> None:
+        """updated_at is only bumped when the flush happens during a PATCH/PUT request."""
+        old_timestamp = datetime(2020, 1, 1, tzinfo=UTC)
+        resource = MockBaseResource(id=uuid4(), created_at=old_timestamp, updated_at=old_timestamp)
+        session = MagicMock(dirty=[resource])
+
+        token = is_mutating_request_context_var.set(False)
+        try:
+            touch_updated_at_before_flush(session, None, None)
+        finally:
+            is_mutating_request_context_var.reset(token)
+        assert resource.updated_at == old_timestamp
+
+        token = is_mutating_request_context_var.set(True)
+        try:
+            touch_updated_at_before_flush(session, None, None)
+        finally:
+            is_mutating_request_context_var.reset(token)
+        assert resource.updated_at > old_timestamp
 
     def test_base_resource_instance_creation(self) -> None:
         """Test MockBaseResource instance creation with labels."""

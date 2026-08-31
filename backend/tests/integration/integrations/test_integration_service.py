@@ -491,6 +491,19 @@ class TestUpdateValidationStatus:
                 uuid4(), IntegrationSystemUpdate(validation_status=IntegrationStatus.AVAILABLE)
             )
 
+    @pytest.mark.asyncio
+    async def test_update_status_does_not_bump_updated_at(
+        self, test_db_session: AsyncSession, integration_service: IntegrationService
+    ) -> None:
+        """Background validation writes are not API edits and must not change updated_at."""
+        created = await integration_service.create_integration(_mcp_create())
+
+        result = await integration_service.update_validation_status(
+            created.id, IntegrationSystemUpdate(validation_status=IntegrationStatus.AVAILABLE)
+        )
+
+        assert result.updated_at == created.updated_at
+
 
 class TestDeleteIntegration:
     """Tests for IntegrationService.delete_integration."""

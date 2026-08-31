@@ -20,6 +20,7 @@ from sqlmodel import DateTime, Field, SQLModel
 
 from syntara.core.constants import ValidationMessages
 from syntara.core.exceptions import SafeValueError
+from syntara.core.request_context import is_mutating_request_context_var
 
 
 class AuditLevel(str, Enum):
@@ -45,12 +46,18 @@ def _utc_now() -> datetime:
 
 
 def touch_updated_at_before_flush(session: Session, _flush_context: object, _instances: object) -> None:
-    """Bump updated_at on dirty BaseResource rows before flush.
+    """Bump updated_at on dirty BaseResource rows during PATCH/PUT requests.
 
     Column ``onupdate`` alone is insufficient with async sessions when ORM
     objects are validated before refresh (MissingGreenlet). Explicit assignment
     here ensures the timestamp is on the instance and in the UPDATE statement.
+
+    Scoped to mutating API requests (see ``core.request_context``) so
+    background writes -- login timestamps, health-check/validation workers,
+    resource refresh -- don't change user-visible "last updated" semantics.
     """
+    if not is_mutating_request_context_var.get():
+        return
     for obj in session.dirty:
         if isinstance(obj, BaseResource):
             obj.updated_at = _utc_now()
