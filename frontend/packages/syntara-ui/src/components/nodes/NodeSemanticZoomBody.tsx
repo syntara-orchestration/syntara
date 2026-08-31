@@ -1,11 +1,11 @@
 import { Content, ContentVariants, Stack, StackItem, Tooltip } from '@patternfly/react-core'
 import type { CSSProperties, ReactNode } from 'react'
 
-import { SEMANTIC_ZOOM_BAR_HEIGHT_PX } from '../../semanticZoom'
-import type { SemanticZoomBranchSource } from '../../semanticZoomTypes'
+import { SemanticZoomBranchSourceHandles } from '../../routes/workflows/canvas/nodes/common/SemanticZoomBranchSourceHandles'
+import { SEMANTIC_ZOOM_BAR_HEIGHT_PX } from '../../routes/workflows/canvas/semanticZoom'
+import type { SemanticZoomBranchSource } from '../../routes/workflows/canvas/semanticZoomTypes'
 
 import styles from './NodeSemanticZoomBody.module.css'
-import { SemanticZoomBranchSourceHandles } from './SemanticZoomBranchSourceHandles'
 
 export function NodeSemanticZoomBody(props: {
   title: string

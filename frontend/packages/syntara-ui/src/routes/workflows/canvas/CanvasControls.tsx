@@ -12,9 +12,9 @@ import { Panel, useReactFlow } from '@xyflow/react'
 import React, { useCallback, useRef, useState } from 'react'
 
 import { SynPanel } from '../../../components/layout/SynPanel'
+import { NodeExpandedAllContext } from '../../../components/nodes/NodeExpandedAllContext'
 
 import { CanvasLegend } from './CanvasLegend'
-import { NodeExpandedAllContext } from './nodes/common/NodeExpandedAllContext'
 
 const LEGEND_REGION_ID = 'workflow-canvas-legend'
 
