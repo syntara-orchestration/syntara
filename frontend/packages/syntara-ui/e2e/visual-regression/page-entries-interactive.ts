@@ -1128,7 +1128,7 @@ export const userCreateFormPages: PageEntry[] = [
     name: 'user-create-validation-errors',
     path: AppRoute.AccessManagement.CreateUser,
     waitFor: async (page) => {
-      await expect(page.getByRole('heading', { name: 'Create User' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Create user' })).toBeVisible()
     },
     setup: async (page) => {
       await page.getByRole('button', { name: 'Create user' }).click()
