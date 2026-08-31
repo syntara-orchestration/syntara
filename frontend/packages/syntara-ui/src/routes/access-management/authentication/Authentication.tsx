@@ -5,7 +5,7 @@ import { EmptyStateAccessDenied } from '../../../components/EmptyStateAccessDeni
 import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../components/layout/SynPanel'
-import { NxListPanel } from '../../../components/panels/list/NxListPanel'
+import { SynListPanel } from '../../../components/panels/list/SynListPanel'
 import { SynPageTitle } from '../../../components/SynPageTitle'
 import { useCanI } from '../../../hooks/useCanI'
 import { useDocLink } from '../../../utils/docs/useDocLink'
@@ -79,9 +79,9 @@ export default function Authentication() {
         }
       />
       <SynPageBody>
-        <NxListPanel>
+        <SynListPanel>
           <IdentityProvidersTab onHeaderToolbarStateChange={handleHeaderToolbarStateChange} />
-        </NxListPanel>
+        </SynListPanel>
       </SynPageBody>
     </SynPage>
   )

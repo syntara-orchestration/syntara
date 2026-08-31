@@ -2,7 +2,7 @@ import { List, ListItem, Stack, StackItem } from '@patternfly/react-core'
 import type { WorkflowAPI } from '@syntara/contracts'
 import { useCallback, useState } from 'react'
 
-import { NxConfirmationDialog } from '../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../components/dialogs/SynConfirmationDialog'
 import type { DialogState } from '../../hooks/useDialogState'
 import { useAlerts } from '../../providers/alerts'
 import { detachPromise } from '../../utils/detachPromise'
@@ -142,7 +142,7 @@ export function WorkflowDialogs({
 
   return (
     <>
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={runDialog.isOpen}
         onClose={runDialog.close}
         onConfirm={handleConfirmRun}
@@ -152,7 +152,7 @@ export function WorkflowDialogs({
       >
         You are about to manually run this workflow. This action will start the workflow immediately, bypassing its
         normal trigger conditions.
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
 
       <RunWorkflowModal
         key={pendingRunInput ? `open-${pendingRunInput.trigger.triggerNodeId}` : 'closed'}
@@ -196,7 +196,7 @@ export function WorkflowDialogs({
         }}
       />
 
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={unpublishDialog.isOpen}
         onClose={unpublishDialog.close}
         onConfirm={() => {
@@ -212,7 +212,7 @@ export function WorkflowDialogs({
       >
         The workflow <strong>{unpublishDialog.item?.name}</strong> will be unpublished. It will no longer be available
         for execution until published again.
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
 
       <ProjectFormModal
         project={projectEditDialog.item}
@@ -224,7 +224,7 @@ export function WorkflowDialogs({
         }}
       />
 
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={projectDeleteDialog.isOpen}
         onClose={projectDeleteDialog.close}
         onConfirm={() => {
@@ -259,7 +259,7 @@ export function WorkflowDialogs({
             </List>
           </StackItem>
         </Stack>
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
     </>
   )
 }

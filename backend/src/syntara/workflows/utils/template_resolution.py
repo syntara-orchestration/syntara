@@ -44,7 +44,7 @@ def resolve_parameter_templates(
     """Resolve template expressions in node parameters before validation.
 
     This handles fields like timeout, job_template_id, verbosity, etc. that need
-    to be resolved from template strings (e.g., ${input.custom_timeout}) to actual
+    to be resolved from template strings (e.g., ${trigger.custom_timeout}) to actual
     values before Pydantic validation.
 
     Also handles nested dictionaries and lists recursively.

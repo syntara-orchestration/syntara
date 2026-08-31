@@ -8,6 +8,7 @@
  */
 import { type Page } from '../fixtures'
 import { test, expect, toAppUrl } from '../fixtures'
+import { applyApprovalNameFilter } from '../helpers/approvals'
 import { APP_TITLE } from '../helpers/appTitle'
 import { addApprovalNodeWithBranch } from '../helpers/v2-nodes'
 import { runWorkflowFromBuilder, waitForExecutionPaused } from '../helpers/workflow-run'
@@ -47,7 +48,7 @@ async function createPendingApproval(
   // There is a brief async gap between the execution reaching "paused" and the approval
   // appearing in the approvals index — polling here prevents the race in the test setup.
   // In Konflux's environment the indexing lag can exceed 30s; treat as a skip (not a failure).
-  const approvalVisible = await pollApprovalVisible(app, approvalName)
+  const approvalVisible = await pollApprovalVisible(app, approvalName, { timeout: 45_000 })
     .then(() => true)
     .catch(() => false)
   test.skip(!approvalVisible, 'Approval record not visible in listing API — async indexing lag in Konflux')
@@ -138,14 +139,7 @@ test.describe('Approval Workflow Operations', () => {
       const table = app.getByRole('grid', { name: 'Approvals table' })
       await table.waitFor({ state: 'visible', timeout: 15_000 })
 
-      // Filter to show only our test approvals using shared batch ID
-      await app.getByPlaceholder('Filter by name').fill(batchId)
-      await app.getByRole('button', { name: 'Apply filter' }).click()
-
-      // Wait for the filter chip to confirm the filter was applied and the table to refresh
-      await expect(app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Name' })).toBeVisible({
-        timeout: 15_000,
-      })
+      await applyApprovalNameFilter(app, table, batchId)
 
       // Step 1: Select both approvals using row-scoped checkboxes — wait for each row before interacting
       const rows = table.getByRole('row')
@@ -194,7 +188,7 @@ test.describe('Approval Workflow Operations', () => {
     }
   })
 
-  test('user performs batch rejection operations', async ({ app }) => {
+  test('user bulk-rejects filtered approval rows', { tag: ['@konflux-skip'] }, async ({ app }) => {
     // Create 2 pending approvals with a shared prefix for filtering
     const batchId = `batch-${Date.now()}`
     const approval1 = await createPendingApproval(app, batchId)
@@ -208,14 +202,7 @@ test.describe('Approval Workflow Operations', () => {
       const table = app.getByRole('grid', { name: 'Approvals table' })
       await table.waitFor({ state: 'visible', timeout: 15_000 })
 
-      // Filter to show only our test approvals using shared batch ID
-      await app.getByPlaceholder('Filter by name').fill(batchId)
-      await app.getByRole('button', { name: 'Apply filter' }).click()
-
-      // Wait for the filter chip to confirm the filter was applied and the table to refresh
-      await expect(app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Name' })).toBeVisible({
-        timeout: 15_000,
-      })
+      await applyApprovalNameFilter(app, table, batchId)
 
       // Step 1: Select both approvals using row-scoped checkboxes — wait for each row before interacting
       const rows = table.getByRole('row')
@@ -224,11 +211,10 @@ test.describe('Approval Workflow Operations', () => {
       await expect(rows.filter({ hasText: approval2.approvalName })).toBeVisible({ timeout: 15_000 })
       await rows.filter({ hasText: approval2.approvalName }).getByRole('checkbox').check()
 
-      // Step 2: Verify batch toolbar and count
-      await expect(app.getByText('2 selected')).toBeVisible()
+      const pageHeader = app.getByTestId('page-header')
+      await expect(pageHeader.getByText('2 selected')).toBeVisible({ timeout: 15_000 })
 
-      // Step 3: Click "Reject Selected"
-      const rejectButton = app.getByRole('button', { name: 'Reject' })
+      const rejectButton = pageHeader.getByRole('button', { name: 'Reject' })
       await expect(rejectButton).toBeVisible()
       await rejectButton.click()
 
@@ -251,7 +237,7 @@ test.describe('Approval Workflow Operations', () => {
       await expect(app.getByText('Approvals rejected')).toBeVisible({ timeout: 10_000 })
 
       // Step 8: Verify selection cleared
-      await expect(app.getByText('2 selected')).not.toBeVisible()
+      await expect(pageHeader.getByText('2 selected')).not.toBeVisible()
 
       // Step 9: Verify checkboxes are unchecked
       await expect(rows.filter({ hasText: approval1.approvalName }).getByRole('checkbox')).not.toBeChecked()
@@ -270,6 +256,8 @@ test.describe('Approval Workflow Operations', () => {
     const approval = await createPendingApproval(app)
 
     try {
+      await pollApprovalVisible(app, approval.approvalName)
+
       // Navigate to approvals page
       await app.goto(toAppUrl('/approvals'))
       await expect(app.getByRole('heading', { level: 1, name: 'Approvals' })).toBeVisible()
@@ -277,41 +265,33 @@ test.describe('Approval Workflow Operations', () => {
       const table = app.getByRole('grid', { name: 'Approvals table' })
       await table.waitFor({ state: 'visible', timeout: 15_000 })
 
-      // Filter to show only our test approval
-      await app.getByPlaceholder('Filter by name').fill(approval.approvalName)
-      await app.getByRole('button', { name: 'Apply filter' }).click()
-
-      // Wait for the filter chip to confirm the filter was applied and the table to refresh
-      await expect(app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Name' })).toBeVisible({
-        timeout: 15_000,
+      await applyApprovalNameFilter(app, table, approval.approvalName, {
+        waitForRowText: approval.approvalName,
       })
 
       // Step 1: Select the approval using row-scoped checkbox — wait for the row before interacting
       const row = table.getByRole('row').filter({ hasText: approval.approvalName })
       await expect(row).toBeVisible({ timeout: 15_000 })
       await row.getByRole('checkbox').check()
+
       const pageHeader = app.getByTestId('page-header')
-      await expect(pageHeader.getByText('1 selected')).toBeVisible()
+      await expect(pageHeader.getByText('1 selected')).toBeVisible({ timeout: 15_000 })
 
-      await pageHeader.getByRole('button', { name: 'Approve' }).click()
+      const approveButton = pageHeader.getByRole('button', { name: 'Approve' })
+      await expect(approveButton).toBeVisible()
+      await approveButton.click()
 
-      // Step 3: Verify dialog appears
+      // Step 3: Cancel without submitting — dialog should close and selection should remain
       const dialog = app.getByRole('dialog')
-      await expect(dialog).toBeVisible()
+      await expect(dialog.getByRole('heading', { name: /approve.*approval/i })).toBeVisible()
+      await dialog.getByRole('button', { name: 'Cancel' }).click()
 
-      // Step 4: Click "Cancel" button
-      const cancelButton = dialog.getByRole('button', { name: 'Cancel' })
-      await expect(cancelButton).toBeVisible()
-      await cancelButton.click()
+      await expect(app.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 })
+      await expect(pageHeader.getByText('1 selected')).toBeVisible({ timeout: 10_000 })
 
-      // Step 5: Verify dialog closed
-      await expect(dialog).not.toBeVisible()
-
-      await expect(pageHeader.getByText('1 selected')).toBeVisible()
-
-      // Step 7: Deselect to clean up
+      // Step 4: Deselect to clean up
       await row.getByRole('checkbox').uncheck()
-      await expect(app.getByText('1 selected')).not.toBeVisible()
+      await expect(pageHeader.getByText('1 selected')).not.toBeVisible()
     } finally {
       // Cleanup: delete created workflow
       await apiRequest(app, 'delete', `/workflows/${approval.workflowId}`).catch(() => {})

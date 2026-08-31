@@ -21,13 +21,13 @@ import { useMemo, useState } from 'react'
 
 import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsProjectDetail, breadcrumbsProjectDetailEarlyShell } from '../../../app/breadcrumbBuilders'
-import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
 import { SynLabel } from '../../../components/labels/SynLabel'
 import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
-import { NxListPanel, NxListPanelTabs, NxListPanelView } from '../../../components/panels/list/NxListPanel'
+import { SynListPanel, SynListPanelTabs, SynListPanelView } from '../../../components/panels/list/SynListPanel'
 import { useQueryState } from '../../../components/states/useQueryState'
 import { SynKebabMenu } from '../../../components/SynKebabMenu'
 import { SynPageTitle } from '../../../components/SynPageTitle'
@@ -225,16 +225,16 @@ export function ProjectDetail() {
         }
       />
       <SynPageBody>
-        <NxListPanel>
-          <NxListPanelTabs basePath={basePath} defaultTab="details" validTabs={validTabs} aria-label="Project details">
+        <SynListPanel>
+          <SynListPanelTabs basePath={basePath} defaultTab="details" validTabs={validTabs} aria-label="Project details">
             <Tab eventKey="details" title={<TabTitleText>Details</TabTitleText>} />
             {validTabs.includes('role-assignments') && (
               <Tab eventKey="role-assignments" title={<TabTitleText>Assignments</TabTitleText>} />
             )}
-          </NxListPanelTabs>
+          </SynListPanelTabs>
 
           {activeTab === 'details' && (
-            <NxListPanelView
+            <SynListPanelView
               tabKey="details"
               tabLabel="Details"
               isPending={false}
@@ -249,7 +249,7 @@ export function ProjectDetail() {
           {activeTab === 'role-assignments' && validTabs.includes('role-assignments') && (
             <ProjectRoleAssignmentsTab projectId={projectId ?? ''} />
           )}
-        </NxListPanel>
+        </SynListPanel>
       </SynPageBody>
 
       <ProjectFormModal
@@ -261,7 +261,7 @@ export function ProjectDetail() {
         }}
       />
 
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={deleteDialog.isOpen}
         onClose={deleteDialog.close}
         onConfirm={() => handleDelete(deleteDialog.item)}
@@ -290,7 +290,7 @@ export function ProjectDetail() {
             </List>
           </StackItem>
         </Stack>
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
     </SynPage>
   )
 }

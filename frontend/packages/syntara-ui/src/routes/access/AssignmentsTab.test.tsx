@@ -202,7 +202,7 @@ describe('AssignmentsTab', () => {
     it('shows empty state when no rows and no active filters', () => {
       render(<AssignmentsTab />, { wrapper })
 
-      expect(screen.getByText('No assignments found')).toBeInTheDocument()
+      expect(screen.getByText('No assignments yet')).toBeInTheDocument()
       expect(screen.getByText('Assign roles to users or groups to grant access.')).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Add assignment' })).toBeInTheDocument()
     })
@@ -1153,7 +1153,7 @@ describe('AssignmentsTab', () => {
       setupAssignmentsQuery([])
       render(<AssignmentsTab />, { wrapper })
 
-      expect(screen.getByText('No assignments found')).toBeInTheDocument()
+      expect(screen.getByText('No assignments yet')).toBeInTheDocument()
     })
   })
 
@@ -1290,7 +1290,7 @@ describe('AssignmentsTab', () => {
       })
       render(<AssignmentsTab />, { wrapper })
 
-      expect(screen.getByText('No assignments found')).toBeInTheDocument()
+      expect(screen.getByText('No assignments yet')).toBeInTheDocument()
     })
 
     it('handles null data gracefully', () => {
@@ -1316,7 +1316,7 @@ describe('AssignmentsTab', () => {
       })
       render(<AssignmentsTab />, { wrapper })
 
-      expect(screen.getByText('No assignments found')).toBeInTheDocument()
+      expect(screen.getByText('No assignments yet')).toBeInTheDocument()
     })
 
     it('does not show policy labels until a row is expanded', () => {

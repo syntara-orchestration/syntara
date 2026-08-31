@@ -12,7 +12,7 @@ import {
 } from '@patternfly/react-core'
 
 import { adminClient } from '../../../client'
-import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { useQueryState } from '../../../components/states/useQueryState'
 import { DateCell } from '../../../components/table/DateCell'
@@ -112,7 +112,7 @@ export function TokenRevocationTab() {
           </Stack>
         </CardBody>
       </Card>
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={confirmDialog.isOpen}
         onClose={confirmDialog.close}
         onConfirm={handleRevoke}
@@ -131,7 +131,7 @@ export function TokenRevocationTab() {
             <strong>You will be signed out and must sign in again.</strong>
           </StackItem>
         </Stack>
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
     </>
   )
 }

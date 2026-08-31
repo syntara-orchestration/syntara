@@ -54,9 +54,11 @@ import { useRunStepDialog } from './hooks/useRunStepDialog'
 import { useUndoRedoKeyboard } from './hooks/useUndoRedoKeyboard'
 import { useWorkflowMetadata } from './hooks/useWorkflowMetadata'
 import { NodeActionsContext } from './NodeActionsContext'
+import { SaveBeforeViewDialog } from './SaveBeforeViewDialog'
 import type { BuilderContentProps } from './types/builderContent'
 import { useBuilderPermissions } from './useBuilderPermissions'
 import { createAddStepHandler } from './utils/panelActions'
+import { buildWorkflowDefinition, transformNodeParameters } from './utils/workflowDefinitionBuilder'
 import { ValidationBanner } from './ValidationBanner'
 import { VersionInfoCard } from './VersionInfoCard'
 import { VersionViewProvider } from './VersionViewContext'
@@ -76,6 +78,7 @@ export function BuilderContent(props: BuilderContentProps) {
   const [searchParams, setSearchParams] = useSearchParams()
   const { showAlert, showSuccess, showWarning, showError } = useAlerts()
   const [saveAttemptedWithoutProject, setSaveAttemptedWithoutProject] = useState(false)
+  const [pendingDuplicateNavigation, setPendingDuplicateNavigation] = useState<string | null>(null)
   const { selectedProject, stableProjectId, ProjectSelector } = useProjectSelector({
     requireProject: isNew,
     initialProjectId: isNew ? undefined : (workflow?.project_id ?? undefined),
@@ -357,25 +360,34 @@ export function BuilderContent(props: BuilderContentProps) {
   )
 
   const { mutate: duplicateWorkflow, isPending: isDuplicating } = workflowClient.useMutation('post', '/workflows')
-  const handleDuplicateVersion = useCallback(
-    (version: WorkflowVersion) => {
+
+  const executeDuplicateWorkflow = useCallback(
+    (definition: Record<string, unknown>) => {
       if (isDuplicating || !workflow?.name || !workflow.project_id) return
-      const definition = version.workflow_definition
-      if (!definition) {
-        showError({ title: 'Failed to duplicate workflow', description: 'Version has no definition to duplicate' })
-        return
-      }
       const timestamp = Date.now().toString(36)
       const suffix = ` - duplicate-${timestamp}`
       const maxBaseLength = 255 - suffix.length
       const baseName = workflow.name.length > maxBaseLength ? workflow.name.slice(0, maxBaseLength) : workflow.name
       const duplicateName = `${baseName}${suffix}`
+
+      const nodes = Array.isArray(definition.nodes) ? (definition.nodes as Array<Record<string, unknown>>) : undefined
+      const transformedDefinition = {
+        ...definition,
+        nodes: nodes?.map((node) => {
+          const parameters = node.parameters as Record<string, unknown> | undefined
+          if (parameters && typeof node.type === 'string') {
+            return { ...node, parameters: transformNodeParameters(node.type, parameters) }
+          }
+          return node
+        }),
+      }
+
       duplicateWorkflow(
         {
           body: {
             name: duplicateName,
-            description: workflow.description ?? '',
-            workflow_definition: definition,
+            description: workflowDescription,
+            workflow_definition: transformedDefinition,
             labels: workflow.labels ?? {},
             project_id: workflow.project_id,
           },
@@ -388,7 +400,19 @@ export function BuilderContent(props: BuilderContentProps) {
               title: 'Workflow duplicated',
               description: `Created "${duplicateName}"`,
               actionLinks: created?.id ? (
-                <AlertActionLink onClick={() => setLocation(`/workflow-builder/${created.id}`)}>
+                <AlertActionLink
+                  onClick={() => {
+                    // Check isDirty at click time to detect unsaved changes.
+                    // Note: If user makes edits between click and dialog render (~100ms),
+                    // those edits won't trigger the dialog. This is acceptable - the timing
+                    // window is too small to be a practical concern.
+                    if (useWorkflowStore.getState().isDirty) {
+                      setPendingDuplicateNavigation(`/workflow-builder/${created.id}`)
+                    } else {
+                      setLocation(`/workflow-builder/${created.id}`)
+                    }
+                  }}
+                >
                   Open workflow
                 </AlertActionLink>
               ) : undefined,
@@ -408,8 +432,58 @@ export function BuilderContent(props: BuilderContentProps) {
         }
       )
     },
-    [isDuplicating, workflow, duplicateWorkflow, queryClient, showAlert, showError, setLocation]
+    [isDuplicating, workflow, duplicateWorkflow, queryClient, showAlert, showError, setLocation, workflowDescription]
   )
+
+  const handleDuplicateVersion = useCallback(
+    (version: WorkflowVersion) => {
+      const definition = version.workflow_definition
+      if (!definition) {
+        showError({ title: 'Failed to duplicate workflow', description: 'Version has no definition to duplicate' })
+        return
+      }
+      executeDuplicateWorkflow(definition)
+    },
+    [executeDuplicateWorkflow, showError]
+  )
+
+  const handleDuplicateWorkflow = useCallback(() => {
+    if (!currentWorkflow) {
+      showError({ title: 'Cannot duplicate workflow', description: 'Save the workflow before duplicating.' })
+      return
+    }
+    const { edges, nodePositions } = useWorkflowStore.getState()
+    const activities = currentWorkflow.workflow.activities ?? []
+    const triggers = currentWorkflow.triggers ?? []
+    const definition = buildWorkflowDefinition(workflowName, workflowDescription, activities, triggers, {
+      edges,
+      nodePositions,
+    })
+    executeDuplicateWorkflow(definition)
+  }, [currentWorkflow, workflowName, workflowDescription, executeDuplicateWorkflow, showError])
+
+  const handleSaveBeforeDuplicateNavigation = useCallback(async (): Promise<boolean> => {
+    const destinationPath = pendingDuplicateNavigation
+    const saved = await guardedSaveWorkflow()
+    if (saved) {
+      setPendingDuplicateNavigation(null)
+      if (destinationPath) {
+        setLocation(destinationPath)
+      }
+    }
+    return saved
+  }, [pendingDuplicateNavigation, guardedSaveWorkflow, setLocation])
+
+  const handleNavigateWithoutSaving = useCallback(() => {
+    if (pendingDuplicateNavigation) {
+      setLocation(pendingDuplicateNavigation)
+    }
+    setPendingDuplicateNavigation(null)
+  }, [pendingDuplicateNavigation, setLocation])
+
+  const handleCancelDuplicateNavigation = useCallback(() => {
+    setPendingDuplicateNavigation(null)
+  }, [])
 
   const versionPanel = useBuilderVersionPanel({
     workflowId,
@@ -523,6 +597,7 @@ export function BuilderContent(props: BuilderContentProps) {
                   handleSaveWorkflow={guardedSaveWorkflow}
                   onPublish={onPublish}
                   onUnpublish={onUnpublish}
+                  onDuplicate={handleDuplicateWorkflow}
                   onPendingImport={setPendingImport}
                   isLiveRunActive={isLiveRunActive}
                   executionId={mostRecentExecutionId}
@@ -691,6 +766,15 @@ export function BuilderContent(props: BuilderContentProps) {
             <UnsavedStepEditorDialog
               isOpen={unsavedStepEditorDialogOpen}
               onClose={() => dispatch({ type: 'SET_UNSAVED_STEP_EDITOR_DIALOG', payload: false })}
+            />
+            <SaveBeforeViewDialog
+              isOpen={pendingDuplicateNavigation !== null}
+              onSave={handleSaveBeforeDuplicateNavigation}
+              onViewWithoutSaving={handleNavigateWithoutSaving}
+              onCancel={handleCancelDuplicateNavigation}
+              title="Save changes before opening the duplicated workflow?"
+              bodyText="Opening the duplicated workflow will exit the editor view and will permanently delete all recent unsaved progress on your current workflow. Please save your work before leaving."
+              buttonLabel="Open without saving"
             />
           </SynPage>
         </VersionViewProvider>

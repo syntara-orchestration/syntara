@@ -6,7 +6,7 @@
 /* The Truncate component's outer span uses overflow:hidden which clips the text-decoration
    underline drawn below the baseline. A small bottom padding gives the underline room to render. */
 .root :global(.pf-v6-c-truncate) {
-  padding-bottom: 3px;
+  padding-bottom: var(--pf-t--global--spacer--xs);
 }
 
 /* PF Timestamp uses inline-block (which blocks text-decoration propagation) and its own

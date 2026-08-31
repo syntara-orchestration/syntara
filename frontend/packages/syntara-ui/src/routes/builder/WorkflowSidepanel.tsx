@@ -17,7 +17,7 @@ import {
 import { RhUiCodeIcon, RhUiCloseIcon } from '@patternfly/react-icons'
 import type { WorkflowAPI } from '@syntara/contracts'
 
-import { NxCodeBlock } from '../../components/details/NxCodeBlock'
+import { SynCodeBlock } from '../../components/details/SynCodeBlock'
 import { SynPanel } from '../../components/layout/SynPanel'
 
 type WorkflowWithVersion = WorkflowAPI.components['schemas']['WorkflowReadWithVersion']
@@ -85,7 +85,7 @@ export function WorkflowSidepanel(props: WorkflowSidepanelProps) {
               <DescriptionListGroup>
                 <DescriptionListTerm>Workflow definition</DescriptionListTerm>
                 <DescriptionListDescription>
-                  <NxCodeBlock jsonObject={props.workflow.version.workflow_definition} noMaxHeight />
+                  <SynCodeBlock jsonObject={props.workflow.version.workflow_definition} noMaxHeight />
                 </DescriptionListDescription>
               </DescriptionListGroup>
             )}

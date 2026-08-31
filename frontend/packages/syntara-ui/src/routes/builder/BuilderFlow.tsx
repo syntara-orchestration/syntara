@@ -35,6 +35,7 @@ import { UndoRedoControls } from '../workflows/canvas/UndoRedoControls'
 import { useExecutionStore } from '../workflows/stores/useExecutionStore'
 
 import { ActiveExecutionContext } from './ActiveExecutionContext'
+import styles from './BuilderFlow.module.css'
 import { builderEdgeTypes, builderNodeTypes, resolveExecutionStatus } from './builderFlowConfig'
 import { BUTTON_EDGE_DEFAULT_STROKE } from './edges/buttonEdgeStrokeColor'
 import { EdgeMarkers } from './edges/edgeMarkers'
@@ -562,7 +563,7 @@ export function BuilderFlow(props: BuilderFlowProps) {
     <ActiveExecutionContext.Provider value={isActiveExecution}>
       <div
         ref={containerRef}
-        className={readOnlyProp ? 'version-view-readonly' : undefined}
+        className={readOnlyProp ? styles.readonlyCanvas : undefined}
         style={{
           width: '100%',
           height: '100%',
