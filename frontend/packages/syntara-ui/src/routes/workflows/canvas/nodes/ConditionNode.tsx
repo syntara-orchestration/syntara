@@ -2,7 +2,7 @@ import { Flex, FlexItem } from '@patternfly/react-core'
 import type { ConditionActivity } from '@syntara/contracts'
 import { type Node, type NodeProps } from '@xyflow/react'
 
-import { NxDetailList } from '../../../../components/details/NxDetailList'
+import { SynDetailList } from '../../../../components/details/SynDetailList'
 import { RegistryNodeId } from '../../../../constants'
 import type { ActivityStatus } from '../../execution/types'
 import { getNodeTypeColor } from '../nodeTypeColors'
@@ -95,10 +95,10 @@ export function ConditionNodeDetails(props: {
       <Flex justifyContent={{ default: 'justifyContentFlexEnd' }} gap={{ default: 'gapNone' }}>
         <FlexItem grow={{ default: 'grow' }} style={{ minWidth: 0 }}>
           <NodeBody>
-            <NxDetailList>
+            <SynDetailList>
               {renderOutputs(props.conditionActivity.outputs)}
               {renderJson(props.conditionActivity, props.showJson, 'Full Definition')}
-            </NxDetailList>
+            </SynDetailList>
           </NodeBody>
         </FlexItem>
         <div style={{ paddingBottom: 'var(--pf-t--global--spacer--md)' }}>{props.children}</div>

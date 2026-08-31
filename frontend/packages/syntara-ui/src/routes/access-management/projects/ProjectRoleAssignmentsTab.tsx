@@ -5,11 +5,11 @@ import type { IAction, ThProps } from '@patternfly/react-table'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useMemo, useState } from 'react'
 
-import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
 import { SynLabel } from '../../../components/labels/SynLabel'
-import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../../components/panels/list/NxListPanel'
+import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../../components/panels/list/SynListPanel'
 import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import { invalidateAuthzCaches } from '../../../hooks/invalidateAuthzCaches'
 import { useCursorPagination, useCursorReset } from '../../../hooks/useCursorPagination'
@@ -234,7 +234,7 @@ export function ProjectRoleAssignmentsTab({ projectId }: Readonly<{ projectId: s
 
   return (
     <>
-      <NxListPanelView
+      <SynListPanelView
         tabKey="role-assignments"
         tabLabel="Assignments"
         isPending={query.isPending}
@@ -265,7 +265,7 @@ export function ProjectRoleAssignmentsTab({ projectId }: Readonly<{ projectId: s
         }
         toolbar={
           assignments.length > 0 || hasActiveFilters ? (
-            <NxListPanelToolbar
+            <SynListPanelToolbar
               filters={filters}
               filterDefinitions={filterFieldDefinitions}
               onFilterChange={handleFilterChange}
@@ -303,14 +303,14 @@ export function ProjectRoleAssignmentsTab({ projectId }: Readonly<{ projectId: s
           ) : undefined
         }
         body={
-          <NxListPanelTable caption="Project role assignments" footer={getFooterProps(query.data)}>
+          <SynListPanelTable caption="Project role assignments" footer={getFooterProps(query.data)}>
             <RoleAssignmentsTable
               assignments={assignments}
               getSortParams={getSortParams}
               onUnassign={setAssignmentToUnassign}
               permissions={assignmentPermissions}
             />
-          </NxListPanelTable>
+          </SynListPanelTable>
         }
       />
 
@@ -322,7 +322,7 @@ export function ProjectRoleAssignmentsTab({ projectId }: Readonly<{ projectId: s
         onSuccess={refetchAndInvalidateAuthz}
       />
 
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={!!assignmentToUnassign}
         onClose={() => setAssignmentToUnassign(null)}
         onConfirm={handleUnassign}
@@ -333,7 +333,7 @@ export function ProjectRoleAssignmentsTab({ projectId }: Readonly<{ projectId: s
       >
         This unassigns the role <strong>{assignmentToUnassign?.role_name}</strong> from{' '}
         <strong>{assignmentToUnassign?.principal_name}</strong>. Related permissions will be revoked.
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
 
       {createRoleOpen && (
         <AddProjectRoleDialog

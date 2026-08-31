@@ -2,9 +2,9 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 
-import { NxCodeBlock } from './NxCodeBlock'
+import { SynCodeBlock } from './SynCodeBlock'
 
-describe('NxCodeBlock', () => {
+describe('SynCodeBlock', () => {
   // Mock clipboard API - store ref to mock so we can assert on it
   const originalClipboard = navigator.clipboard
   let mockWriteText: ReturnType<typeof vi.fn>
@@ -30,40 +30,40 @@ describe('NxCodeBlock', () => {
   })
 
   it('renders string children', () => {
-    render(<NxCodeBlock>console.log('hello')</NxCodeBlock>)
+    render(<SynCodeBlock>console.log('hello')</SynCodeBlock>)
 
     expect(screen.getByText("console.log('hello')")).toBeInTheDocument()
   })
 
   it('renders JSON object formatted', () => {
     const jsonObject = { name: 'test', value: 123 }
-    render(<NxCodeBlock jsonObject={jsonObject} />)
+    render(<SynCodeBlock jsonObject={jsonObject} />)
 
     expect(screen.getByText(/"name": "test"/)).toBeInTheDocument()
     expect(screen.getByText(/"value": 123/)).toBeInTheDocument()
   })
 
   it('renders as PatternFly CodeBlock', () => {
-    render(<NxCodeBlock>code</NxCodeBlock>)
+    render(<SynCodeBlock>code</SynCodeBlock>)
 
     // PF CodeBlock renders content inside a <code> element
     expect(screen.getByText('code').tagName.toLowerCase()).toBe('code')
   })
 
   it('does not show copy button by default', () => {
-    render(<NxCodeBlock>code</NxCodeBlock>)
+    render(<SynCodeBlock>code</SynCodeBlock>)
 
     expect(screen.queryByRole('button', { name: 'Copy to clipboard' })).not.toBeInTheDocument()
   })
 
   it('shows copy button when enableCopy is true', () => {
-    render(<NxCodeBlock enableCopy>code</NxCodeBlock>)
+    render(<SynCodeBlock enableCopy>code</SynCodeBlock>)
 
     expect(screen.getByRole('button', { name: 'Copy to clipboard' })).toBeInTheDocument()
   })
 
   it('copies text to clipboard when copy button clicked', async () => {
-    render(<NxCodeBlock enableCopy>code to copy</NxCodeBlock>)
+    render(<SynCodeBlock enableCopy>code to copy</SynCodeBlock>)
 
     const copyButton = screen.getByRole('button', { name: 'Copy to clipboard' })
     await userEvent.click(copyButton)
@@ -75,7 +75,7 @@ describe('NxCodeBlock', () => {
   // which fires the setIsCopied(false) reset before waitFor can observe the tooltip text.
   // PF's ClipboardCopyButton tooltip is not reliably surfaced via userEvent in jsdom.
   it('shows "Copied to clipboard" after successful copy', async () => {
-    render(<NxCodeBlock enableCopy>code</NxCodeBlock>)
+    render(<SynCodeBlock enableCopy>code</SynCodeBlock>)
 
     const copyButton = screen.getByRole('button', { name: 'Copy to clipboard' })
     // eslint-disable-next-line testing-library/prefer-user-event -- userEvent does not trigger PF ClipboardCopyButton tooltip in jsdom
@@ -88,7 +88,7 @@ describe('NxCodeBlock', () => {
 
   it('copies JSON object to clipboard', async () => {
     const jsonObject = { test: 'value' }
-    render(<NxCodeBlock enableCopy jsonObject={jsonObject} />)
+    render(<SynCodeBlock enableCopy jsonObject={jsonObject} />)
 
     const copyButton = screen.getByRole('button', { name: 'Copy to clipboard' })
     // eslint-disable-next-line testing-library/prefer-user-event -- userEvent does not trigger PF ClipboardCopyButton tooltip in jsdom
@@ -110,7 +110,7 @@ describe('NxCodeBlock', () => {
       configurable: true,
     })
 
-    render(<NxCodeBlock enableCopy>code</NxCodeBlock>)
+    render(<SynCodeBlock enableCopy>code</SynCodeBlock>)
 
     const copyButton = screen.getByRole('button', { name: 'Copy to clipboard' })
     // Static userEvent.click (no userEvent.setup()) avoids TL replacing navigator.clipboard with its stub.
@@ -125,14 +125,14 @@ describe('NxCodeBlock', () => {
   })
 
   it('renders children over jsonObject when both provided', () => {
-    render(<NxCodeBlock jsonObject={{ ignored: true }}>preferred content</NxCodeBlock>)
+    render(<SynCodeBlock jsonObject={{ ignored: true }}>preferred content</SynCodeBlock>)
 
     expect(screen.getByText('preferred content')).toBeInTheDocument()
     expect(screen.queryByText('ignored')).not.toBeInTheDocument()
   })
 
   it('handles empty content gracefully', () => {
-    expect(() => render(<NxCodeBlock />)).not.toThrow()
+    expect(() => render(<SynCodeBlock />)).not.toThrow()
   })
 
   it('does not copy when clipboard is unavailable', async () => {
@@ -142,7 +142,7 @@ describe('NxCodeBlock', () => {
       configurable: true,
     })
 
-    render(<NxCodeBlock enableCopy>code</NxCodeBlock>)
+    render(<SynCodeBlock enableCopy>code</SynCodeBlock>)
 
     const copyButton = screen.getByRole('button', { name: 'Copy to clipboard' })
     await expect(userEvent.click(copyButton)).resolves.toBeUndefined()
@@ -150,13 +150,13 @@ describe('NxCodeBlock', () => {
 
   describe('expand modal', () => {
     it('does not render expand button by default', () => {
-      render(<NxCodeBlock>code</NxCodeBlock>)
+      render(<SynCodeBlock>code</SynCodeBlock>)
 
       expect(screen.queryByRole('button', { name: 'Expand code' })).not.toBeInTheDocument()
     })
 
     it('renders expand button when enableExpand is true', () => {
-      render(<NxCodeBlock enableExpand>code</NxCodeBlock>)
+      render(<SynCodeBlock enableExpand>code</SynCodeBlock>)
 
       expect(screen.getByRole('button', { name: 'Expand code' })).toBeInTheDocument()
     })
@@ -164,9 +164,9 @@ describe('NxCodeBlock', () => {
     it('opens modal when expand button is clicked', async () => {
       const user = userEvent.setup()
       render(
-        <NxCodeBlock enableExpand expandTitle="Output JSON">
+        <SynCodeBlock enableExpand expandTitle="Output JSON">
           code content
-        </NxCodeBlock>
+        </SynCodeBlock>
       )
 
       await user.click(screen.getByRole('button', { name: 'Expand code' }))
@@ -178,9 +178,9 @@ describe('NxCodeBlock', () => {
     it('closes modal when X button is clicked', async () => {
       const user = userEvent.setup()
       render(
-        <NxCodeBlock enableExpand expandTitle="Output JSON">
+        <SynCodeBlock enableExpand expandTitle="Output JSON">
           code content
-        </NxCodeBlock>
+        </SynCodeBlock>
       )
 
       await user.click(screen.getByRole('button', { name: 'Expand code' }))
@@ -193,9 +193,9 @@ describe('NxCodeBlock', () => {
     it('shows copy button inside modal when enableCopy is true', async () => {
       const user = userEvent.setup()
       render(
-        <NxCodeBlock enableExpand enableCopy expandTitle="Output JSON">
+        <SynCodeBlock enableExpand enableCopy expandTitle="Output JSON">
           code content
-        </NxCodeBlock>
+        </SynCodeBlock>
       )
 
       await user.click(screen.getByRole('button', { name: 'Expand code' }))
@@ -210,9 +210,9 @@ describe('NxCodeBlock', () => {
     it('modal has no footer element', async () => {
       const user = userEvent.setup()
       render(
-        <NxCodeBlock enableExpand expandTitle="Output JSON">
+        <SynCodeBlock enableExpand expandTitle="Output JSON">
           code
-        </NxCodeBlock>
+        </SynCodeBlock>
       )
 
       await user.click(screen.getByRole('button', { name: 'Expand code' }))

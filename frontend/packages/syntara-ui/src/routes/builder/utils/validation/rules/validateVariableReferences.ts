@@ -4,7 +4,8 @@ import type { EdgeConnection } from '../../../types/edge'
 import { getUpstreamNodeIds } from '../../edgeHelpers'
 import type { ValidationContext, ValidationError } from '../types'
 
-const KNOWN_NAMESPACES = new Set(['input', 'trigger', 'workflow', 'workflow_context'])
+// Keep in sync with BUILTIN_SCOPES in backend/src/syntara/workflows/validators/template_expressions.py
+const KNOWN_NAMESPACES = new Set(['trigger', 'workflow', 'workflow_context'])
 const VARIABLE_REF_PATTERN = /\$\{([^}]+)\}/g
 
 type VariableReference = {
@@ -113,8 +114,7 @@ type RefContext = {
 }
 
 function validateRef(ref: VariableReference, activity: Activity, ctx: RefContext): ValidationError | null {
-  // input.* and trigger.* both resolve to the trigger input_schema fields
-  if (ref.namespace === 'input' || ref.namespace === 'trigger')
+  if (ref.namespace === 'trigger')
     return checkSchemaFieldReference(ref, activity, ctx.schemaFields, ref.namespace, ctx.schemaSuggestion)
   if (KNOWN_NAMESPACES.has(ref.namespace)) return null
   return checkNodeReference(ref, activity, ctx.activityIds, ctx.upstreamIds)

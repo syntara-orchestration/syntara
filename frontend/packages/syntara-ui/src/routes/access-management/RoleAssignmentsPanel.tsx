@@ -5,7 +5,7 @@ import type { IAction, ThProps } from '@patternfly/react-table'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useMemo, useState } from 'react'
 
-import { NxConfirmationDialog } from '../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { FilterBar } from '../../components/filters'
 import { IconLabel } from '../../components/IconLabel'
@@ -495,7 +495,7 @@ export function RoleAssignmentsPanel({
         onSuccess={refetchAndInvalidateAuthz}
       />
 
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={!!rowToUnassign}
         onClose={() => setRowToUnassign(null)}
         onConfirm={handleUnassign}
@@ -506,7 +506,7 @@ export function RoleAssignmentsPanel({
       >
         This unassigns the role <strong>{rowToUnassign?.roleName}</strong> from this principal. Related permissions will
         be revoked.
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
     </>
   )
 }

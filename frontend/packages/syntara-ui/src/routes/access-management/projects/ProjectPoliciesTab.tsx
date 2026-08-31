@@ -4,14 +4,14 @@ import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table
 import type { IAction, ThProps } from '@patternfly/react-table'
 import { useState } from 'react'
 
-import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import { IconLabel } from '../../../components/IconLabel'
 import {
-  NxListPanel,
-  NxListPanelTable,
-  NxListPanelToolbar,
-  NxListPanelView,
-} from '../../../components/panels/list/NxListPanel'
+  SynListPanel,
+  SynListPanelTable,
+  SynListPanelToolbar,
+  SynListPanelView,
+} from '../../../components/panels/list/SynListPanel'
 import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import { useDialogState } from '../../../hooks/useDialogState'
 import { useAlerts } from '../../../providers/alerts'
@@ -150,8 +150,8 @@ export function ProjectPoliciesTab({ projectId }: Readonly<{ projectId: string }
 
   return (
     <>
-      <NxListPanel>
-        <NxListPanelView
+      <SynListPanel>
+        <SynListPanelView
           isPending={policiesQuery.isPending}
           isFetching={policiesQuery.isFetching}
           error={policiesQuery.error}
@@ -163,7 +163,7 @@ export function ProjectPoliciesTab({ projectId }: Readonly<{ projectId: string }
             <SynEmptyStateNoData title="No policies yet" description="No policies are available for this project." />
           }
           toolbar={
-            <NxListPanelToolbar
+            <SynListPanelToolbar
               filters={filters}
               filterDefinitions={builtinFilterDefinitions}
               onFilterChange={handleFilterChange}
@@ -171,7 +171,7 @@ export function ProjectPoliciesTab({ projectId }: Readonly<{ projectId: string }
             />
           }
           body={
-            <NxListPanelTable
+            <SynListPanelTable
               caption="Project policies"
               footer={{
                 page,
@@ -189,10 +189,10 @@ export function ProjectPoliciesTab({ projectId }: Readonly<{ projectId: string }
                 onEdit={setPolicyToEdit}
                 onDelete={deleteDialog.open}
               />
-            </NxListPanelTable>
+            </SynListPanelTable>
           }
         />
-      </NxListPanel>
+      </SynListPanel>
 
       {policyToEdit && (
         <EditProjectPolicyDialog
@@ -203,7 +203,7 @@ export function ProjectPoliciesTab({ projectId }: Readonly<{ projectId: string }
         />
       )}
 
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={deleteDialog.isOpen}
         onClose={deleteDialog.close}
         onConfirm={() => handleDelete(deleteDialog.item)}
@@ -218,7 +218,7 @@ export function ProjectPoliciesTab({ projectId }: Readonly<{ projectId: string }
       >
         The policy <strong>{deleteDialog.item?.name}</strong> will be deleted. Any roles using this policy will lose its
         permissions. This cannot be undone.
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
     </>
   )
 }

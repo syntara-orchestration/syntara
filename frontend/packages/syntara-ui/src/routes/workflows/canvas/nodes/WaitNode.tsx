@@ -2,7 +2,7 @@ import type { WaitActivity } from '@syntara/contracts'
 import { type Node, type NodeProps } from '@xyflow/react'
 import { useShallow } from 'zustand/react/shallow'
 
-import { NxDetailList } from '../../../../components/details/NxDetailList'
+import { SynDetailList } from '../../../../components/details/SynDetailList'
 import { RegistryNodeId } from '../../../../constants'
 import { formatDurationLabel } from '../../../builder/utils/timeUtils'
 import type { ActivityStatus } from '../../execution/types'
@@ -72,10 +72,10 @@ export function WaitNodeComponent(props: NodeProps<WaitNode>) {
         menuActions={menuActions}
       />
       <NodeBody>
-        <NxDetailList>
+        <SynDetailList>
           {renderText('Duration', durationLabel)}
           {isActive && renderText('⏱ Countdown', remaining ?? '')}
-        </NxDetailList>
+        </SynDetailList>
       </NodeBody>
     </NodeComponent>
   )

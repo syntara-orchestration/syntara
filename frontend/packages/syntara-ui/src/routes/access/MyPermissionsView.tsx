@@ -6,7 +6,7 @@ import { useCallback, useMemo, useState } from 'react'
 
 import { SynLabel } from '../../components/labels/SynLabel'
 import { SynPanelContentStack } from '../../components/layout/SynPanelContentStack'
-import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../components/panels/list/NxListPanel'
+import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../components/panels/list/SynListPanel'
 import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 import type { FilterConfig, FilterFieldDefinition } from '../../types/filters'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../types/filters'
@@ -210,7 +210,7 @@ export function MyPermissionsView() {
 
   return (
     <SynPanelContentStack hasGutter>
-      <NxListPanelView
+      <SynListPanelView
         isPending={isLoading}
         error={error}
         onRetry={() => detachPromise(refetch())}
@@ -221,7 +221,7 @@ export function MyPermissionsView() {
           <SynEmptyStateNoData title="No permissions yet" description="The current user has no permissions assigned." />
         }
         toolbar={
-          <NxListPanelToolbar
+          <SynListPanelToolbar
             filters={filters}
             filterDefinitions={FILTER_FIELD_DEFS}
             onFilterChange={handleFilterChange}
@@ -239,9 +239,9 @@ export function MyPermissionsView() {
           />
         }
         body={
-          <NxListPanelTable caption="User permissions" footer={tableFooter}>
+          <SynListPanelTable caption="User permissions" footer={tableFooter}>
             <PermissionsTableContent permissions={pageData} getSortParams={getSortParams} />
-          </NxListPanelTable>
+          </SynListPanelTable>
         }
       />
     </SynPanelContentStack>
