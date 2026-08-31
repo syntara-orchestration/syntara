@@ -412,7 +412,7 @@ async def test_workflow_node(
     execution_service: Annotated[ExecutionService, Depends(get_execution_service)],
 ) -> ExecutionRead:
     """Test a single node in a workflow with mocked predecessor outputs."""
-    return await execution_service.create_test_execution(
+    execution = await execution_service.create_test_execution(
         workflow_id=workflow_id,
         target_node_id=request.target_node_id,
         pre_resolved_nodes=request.pre_resolved_nodes,
@@ -420,6 +420,8 @@ async def test_workflow_node(
         execute_target=request.execute_target,
         trigger_node_id=request.trigger_node_id,
     )
+    await execution_service.resolve_user_references([execution])
+    return execution
 
 
 # ============================================================================

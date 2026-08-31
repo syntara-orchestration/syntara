@@ -98,7 +98,9 @@ async def create_credential(
         grace_period_seconds=request.grace_period_seconds,
         expires_at=request.expires_at,
     )
-    return service.to_create_response(credential, plaintext_secret)
+    response = service.to_create_response(credential, plaintext_secret)
+    await service.resolve_user_references([response])
+    return response
 
 
 @router.get(
@@ -115,7 +117,7 @@ async def list_credentials(
     params: Annotated[ServiceAccountCredentialListParams, Query()],
 ) -> ServiceAccountCredentialListResponse:
     """List credentials for a service account with pagination."""
-    return await service.list_credentials(
+    result = await service.list_credentials(
         service_account_id=service_account_id,
         limit=params.limit,
         cursor=params.cursor,
@@ -123,6 +125,8 @@ async def list_credentials(
         query_params_items=list(request.query_params.items()),
         include_total=params.include_total,
     )
+    await service.resolve_user_references(result.resources)
+    return result
 
 
 @router.get(
@@ -139,7 +143,9 @@ async def get_credential(
 ) -> ServiceAccountCredentialRead:
     """Get a credential by ID (secret is never included)."""
     credential = await service.get_credential(credential_id, service_account_id=service_account_id)
-    return service.to_read(credential)
+    read = service.to_read(credential)
+    await service.resolve_user_references([read])
+    return read
 
 
 @router.delete(
@@ -180,7 +186,9 @@ async def rotate_credential(
         service_account_id=service_account_id,
         grace_period_seconds=request.grace_period_seconds,
     )
-    return service.to_rotate_response(credential, plaintext_secret)
+    response = service.to_rotate_response(credential, plaintext_secret)
+    await service.resolve_user_references([response])
+    return response
 
 
 @router.post(
@@ -198,7 +206,9 @@ async def disable_credential(
 ) -> ServiceAccountCredentialRead:
     """Set a credential's status to disabled."""
     credential = await service.disable_credential(credential_id, service_account_id=service_account_id)
-    return service.to_read(credential)
+    read = service.to_read(credential)
+    await service.resolve_user_references([read])
+    return read
 
 
 @router.post(
@@ -216,4 +226,6 @@ async def enable_credential(
 ) -> ServiceAccountCredentialRead:
     """Set a credential's status to active."""
     credential = await service.enable_credential(credential_id, service_account_id=service_account_id)
-    return service.to_read(credential)
+    read = service.to_read(credential)
+    await service.resolve_user_references([read])
+    return read

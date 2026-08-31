@@ -332,11 +332,9 @@ components:
         - project_id
         - temporal_workflow_id
         - status
-        - created_by
         - created_at
         - completed_at
         - updated_at
-        - updated_by
         - input_data
         - error_details
       properties:
@@ -387,8 +385,11 @@ components:
         status:
           $ref: "#/components/schemas/ExecutionStatus"
         created_by:
-          type: string
-          format: uuid
+          anyOf:
+            - $ref: ../../base/shared-resources.openapi.yaml#/components/schemas/UserReference
+            - type: 'null'
+          description: User who started the execution
+          readOnly: true
           title: Created By
         created_at:
           type: string
@@ -406,9 +407,10 @@ components:
           title: Updated At
         updated_by:
           anyOf:
-            - type: string
-              format: uuid
+            - $ref: ../../base/shared-resources.openapi.yaml#/components/schemas/UserReference
             - type: 'null'
+          description: User who last modified the execution
+          readOnly: true
           title: Updated By
         input_data:
           additionalProperties: true

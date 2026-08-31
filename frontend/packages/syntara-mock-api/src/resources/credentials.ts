@@ -172,10 +172,15 @@ export const credentialWorkflows: Record<string, CredentialWorkflowRef[]> = {
     {
       id: 'wf-001',
       name: 'Production Deployment Pipeline',
-      created_by: 'user-001',
+      created_by: { id: '550e8400-e29b-41d4-a716-446655440001', name: 'user-001' },
       created_at: '2025-07-10T14:30:00Z',
     },
-    { id: 'wf-002', name: 'Nightly Health Check', created_by: 'user-001', created_at: '2025-07-12T10:00:00Z' },
+    {
+      id: 'wf-002',
+      name: 'Nightly Health Check',
+      created_by: { id: '550e8400-e29b-41d4-a716-446655440001', name: 'user-001' },
+      created_at: '2025-07-12T10:00:00Z',
+    },
   ],
 }
 

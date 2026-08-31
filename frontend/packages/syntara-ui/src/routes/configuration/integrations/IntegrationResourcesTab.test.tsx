@@ -36,7 +36,7 @@ const mockTools = [
     integration_id: 'int-1',
     namespaced_name: 'int-1/get_repo',
     parameters: [],
-    created_by: 'user-1',
+    created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1' },
   },
   {
     id: 't2',
@@ -46,7 +46,7 @@ const mockTools = [
     integration_id: 'int-1',
     namespaced_name: 'int-1/create_pr',
     parameters: [],
-    created_by: 'user-1',
+    created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1' },
   },
   {
     id: 't3',
@@ -56,7 +56,7 @@ const mockTools = [
     integration_id: 'int-1',
     namespaced_name: 'int-1/list_issues',
     parameters: [],
-    created_by: 'user-1',
+    created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1' },
   },
 ] as Tool[]
 

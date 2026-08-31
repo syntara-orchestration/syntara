@@ -19,8 +19,10 @@ from syntara.auth.session import create_session_store
 from syntara.core.models import User, UserIdentity
 from syntara.core.models.group import Group, user_groups, user_idp_groups
 from syntara.core.services import BaseService
+from syntara.core.services.extensions import ConvertResourceMixin
 from syntara.core.services.secret_consumer_mixin import SecretConsumerMixin
 from syntara.core.services.secret_service import SecretService
+from syntara.core.services.user_reference_resolution import UserReferenceMixin
 from syntara.core.utils.filters import Filter
 from syntara.identity_providers.audit.identity_provider import IdentityProviderLifecycleEvent
 from syntara.identity_providers.exceptions import (
@@ -50,12 +52,20 @@ SelectIdentityProvider = Select[tuple[IdentityProvider]] | SelectOfScalar[tuple[
 logger = structlog.stdlib.get_logger(__name__)
 
 
-class IdentityProviderService(BaseService, SecretConsumerMixin):
+class IdentityProviderConvertMixin(ConvertResourceMixin):
+    """Convert IdentityProvider ORM rows to IdentityProviderRead."""
+
+    def convert_resource(self, resource: IdentityProvider) -> IdentityProviderRead:  # type: ignore[override]
+        """Convert IdentityProvider to read schema."""
+        return IdentityProviderRead.model_validate(resource)
+
+
+class IdentityProviderService(UserReferenceMixin, BaseService, SecretConsumerMixin):
     """Service for Identity Provider CRUD operations and business logic."""
 
     def __init__(self, session: AsyncSession, user: User, secret_service: SecretService) -> None:
         """Initialize service with database session, current user, and secret service."""
-        super().__init__(session, user)
+        super().__init__(session, user, convert_resource_mixin=IdentityProviderConvertMixin())
         self._secret_service = secret_service
 
     def _is_duplicate_name_error(self, e: IntegrityError) -> bool:

@@ -547,79 +547,78 @@ export interface components {
       credential_id?: string | null
     }
     /** @description Schema for integration API responses. */
-    IntegrationRead: components['schemas']['UserOwnedResource'] &
-      components['schemas']['NamedResource'] & {
-        /**
-         * Created By
-         * @description Username or UUID of the creator
-         */
-        created_by?: string | null
-        /**
-         * Updated By
-         * @description Username or UUID of the last modifier
-         */
-        updated_by?: string | null
-        integration_type: components['schemas']['IntegrationType']
-        /**
-         * Enabled
-         * @default true
-         */
-        enabled?: boolean
-        /** @default unknown */
-        validation_status?: components['schemas']['IntegrationStatus']
-        /** @default global */
-        scope?: components['schemas']['IntegrationScope']
-        /**
-         * Configuration
-         * @description Integration-specific configuration
-         */
-        configuration:
-          | components['schemas']['MCPServerConfigurationInput']
-          | components['schemas']['LLMProviderConfiguration']
-          | components['schemas']['AAPConfiguration']
-        /** Last Validated At */
-        last_validated_at?: string | null
-        /** Management Credential Id */
-        management_credential_id?: string | null
-        /** Validation Error */
-        validation_error?: string | null
-        refresh_status?: components['schemas']['IntegrationRefreshStatus'] | null
-        /** Last Refreshed At */
-        last_refreshed_at?: string | null
-        /** Last Successful Refresh At */
-        last_successful_refresh_at?: string | null
-        /** Refresh Error */
-        refresh_error?: string | null
-        /**
-         * Project Ids
-         * @description IDs of projects this integration is assigned to (empty for global scope)
-         */
-        project_ids?: string[]
-        /**
-         * Total Tool Count
-         * @description Total number of tools linked to this integration
-         * @default 0
-         */
-        total_tool_count?: number
-        /**
-         * Enabled Tool Count
-         * @description Number of enabled tools linked to this integration
-         * @default 0
-         */
-        enabled_tool_count?: number
-        /**
-         * Total Model Count
-         * @description Total number of models linked to this integration
-         * @default 0
-         */
-        total_model_count?: number
-        /**
-         * Enabled Model Count
-         * @description Number of enabled models linked to this integration
-         * @default 0
-         */
-        enabled_model_count?: number
-      }
+    IntegrationRead: components['schemas']['NamedResource'] & {
+      /**
+       * Created By
+       * @description User who created the integration
+       */
+      readonly created_by?: components['schemas']['UserReference'] | null
+      /**
+       * Updated By
+       * @description User who last modified the integration
+       */
+      readonly updated_by?: components['schemas']['UserReference'] | null
+      integration_type: components['schemas']['IntegrationType']
+      /**
+       * Enabled
+       * @default true
+       */
+      enabled?: boolean
+      /** @default unknown */
+      validation_status?: components['schemas']['IntegrationStatus']
+      /** @default global */
+      scope?: components['schemas']['IntegrationScope']
+      /**
+       * Configuration
+       * @description Integration-specific configuration
+       */
+      configuration:
+        | components['schemas']['MCPServerConfigurationInput']
+        | components['schemas']['LLMProviderConfiguration']
+        | components['schemas']['AAPConfiguration']
+      /** Last Validated At */
+      last_validated_at?: string | null
+      /** Management Credential Id */
+      management_credential_id?: string | null
+      /** Validation Error */
+      validation_error?: string | null
+      refresh_status?: components['schemas']['IntegrationRefreshStatus'] | null
+      /** Last Refreshed At */
+      last_refreshed_at?: string | null
+      /** Last Successful Refresh At */
+      last_successful_refresh_at?: string | null
+      /** Refresh Error */
+      refresh_error?: string | null
+      /**
+       * Project Ids
+       * @description IDs of projects this integration is assigned to (empty for global scope)
+       */
+      project_ids?: string[]
+      /**
+       * Total Tool Count
+       * @description Total number of tools linked to this integration
+       * @default 0
+       */
+      total_tool_count?: number
+      /**
+       * Enabled Tool Count
+       * @description Number of enabled tools linked to this integration
+       * @default 0
+       */
+      enabled_tool_count?: number
+      /**
+       * Total Model Count
+       * @description Total number of models linked to this integration
+       * @default 0
+       */
+      total_model_count?: number
+      /**
+       * Enabled Model Count
+       * @description Number of enabled models linked to this integration
+       * @default 0
+       */
+      enabled_model_count?: number
+    }
     /**
      * MCPServerConfigurationInput
      * @description Admin-provided fields for MCP server integrations (used by create/patch).
@@ -1041,51 +1040,60 @@ export interface components {
        */
       resources: components['schemas']['ToolWithParameters'][]
     }
-    ToolWithParameters: components['schemas']['UserOwnedResource'] &
-      components['schemas']['NamedResource'] & {
-        /**
-         * Integration Id
-         * Format: uuid
-         * @description UUID of the owning Integration (mcp_server)
-         */
-        integration_id: string
-        /**
-         * Namespaced Name
-         * @description Unique namespaced name for the tool
-         */
-        namespaced_name: string
-        /**
-         * Enabled
-         * @description Whether the tool is enabled
-         * @default true
-         */
-        enabled?: boolean
-        /**
-         * @description Current status of the tool
-         * @default available
-         */
-        status?: components['schemas']['ToolStatus']
-        /**
-         * Last Executed At
-         * @description Timestamp of last execution
-         */
-        last_executed_at?: string | null
-        /**
-         * Last Refreshed At
-         * @description Timestamp of last refresh from provider
-         */
-        last_refreshed_at?: string | null
-        /**
-         * Refresh Error
-         * @description Error message from last refresh attempt
-         */
-        refresh_error?: string | null
-        /**
-         * Parameters
-         * @description Tool parameters
-         */
-        parameters: components['schemas']['ToolParameter'][]
-      }
+    ToolWithParameters: components['schemas']['NamedResource'] & {
+      /**
+       * Created By
+       * @description User who created the tool
+       */
+      readonly created_by?: components['schemas']['UserReference'] | null
+      /**
+       * Updated By
+       * @description User who last modified the tool
+       */
+      readonly updated_by?: components['schemas']['UserReference'] | null
+      /**
+       * Integration Id
+       * Format: uuid
+       * @description UUID of the owning Integration (mcp_server)
+       */
+      integration_id: string
+      /**
+       * Namespaced Name
+       * @description Unique namespaced name for the tool
+       */
+      namespaced_name: string
+      /**
+       * Enabled
+       * @description Whether the tool is enabled
+       * @default true
+       */
+      enabled?: boolean
+      /**
+       * @description Current status of the tool
+       * @default available
+       */
+      status?: components['schemas']['ToolStatus']
+      /**
+       * Last Executed At
+       * @description Timestamp of last execution
+       */
+      last_executed_at?: string | null
+      /**
+       * Last Refreshed At
+       * @description Timestamp of last refresh from provider
+       */
+      last_refreshed_at?: string | null
+      /**
+       * Refresh Error
+       * @description Error message from last refresh attempt
+       */
+      refresh_error?: string | null
+      /**
+       * Parameters
+       * @description Tool parameters
+       */
+      parameters: components['schemas']['ToolParameter'][]
+    }
     /**
      * ToolUpdate
      * @description Model for updating tool configuration.
@@ -1220,21 +1228,6 @@ export interface components {
         [key: string]: string
       }
     }
-    UserOwnedResource: components['schemas']['BaseResource'] & {
-      /**
-       * Created By
-       * Format: uuid
-       * @description User (or automation) that created the resource
-       * @example 770e8400-e29b-41d4-a716-446655440000
-       */
-      readonly created_by: string
-      /**
-       * Updated By
-       * @description User (or automation) that last updated the resource
-       * @example 880e8400-e29b-41d4-a716-446655440000
-       */
-      readonly updated_by?: string | null
-    }
     NamedResource: components['schemas']['BaseResource'] & {
       /**
        * Name
@@ -1248,6 +1241,21 @@ export interface components {
        * @example Handles user authentication and authorization workflows
        */
       description?: string | null
+    }
+    /**
+     * UserReference
+     * @description Minimal user identification for embedding in other resources.
+     *     This model captures user identity at the time of an action, providing
+     *     a snapshot that doesn't change even if the user's details are updated later.
+     */
+    UserReference: {
+      /**
+       * Format: uuid
+       * @description User's unique identifier
+       */
+      id: string
+      /** @description User's display name at time of action */
+      name: string
     }
     /**
      * ErrorData

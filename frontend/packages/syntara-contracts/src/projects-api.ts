@@ -891,9 +891,9 @@ export interface components {
     CredentialWorkflowRef: {
       /**
        * Created By
-       * @description Username or UUID of the workflow creator
+       * @description User who created the workflow
        */
-      created_by?: string | null
+      readonly created_by?: components['schemas']['UserReference'] | null
       /**
        * Created At
        * @description Timestamp when the workflow was created

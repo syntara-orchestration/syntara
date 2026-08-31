@@ -277,7 +277,7 @@ describe('CredentialIntegrationsTab', () => {
             integration_type: 'mcp_server',
             validation_status: 'available',
             scope: 'global',
-            created_by: 'admin',
+            created_by: { id: 'u-004', name: 'admin' },
           },
         ],
       })
@@ -300,7 +300,7 @@ describe('CredentialIntegrationsTab', () => {
             integration_type: 'mcp_server',
             validation_status: 'available',
             scope: 'global',
-            created_by: 'admin',
+            created_by: { id: 'u-004', name: 'admin' },
             created_at: '2026-07-01T12:00:00Z',
           },
         ],
@@ -324,7 +324,7 @@ describe('CredentialIntegrationsTab', () => {
             integration_type: 'mcp_server',
             validation_status: 'available',
             scope: 'global',
-            created_by: 'admin',
+            created_by: { id: 'u-004', name: 'admin' },
           },
         ],
       })
@@ -346,7 +346,7 @@ describe('CredentialIntegrationsTab', () => {
       integration_type: 'mcp_server',
       validation_status: 'available',
       scope: 'global',
-      created_by: 'admin',
+      created_by: { id: 'u-004', name: 'admin' },
     }))
     vi.mocked(integrationsClient.useQuery).mockReturnValue(mockQuery({ resources: manyIntegrations }))
 
@@ -396,7 +396,7 @@ describe('CredentialIntegrationsTab', () => {
       integration_type: 'mcp_server',
       validation_status: 'available',
       scope: 'global',
-      created_by: 'admin',
+      created_by: { id: 'u-004', name: 'admin' },
     }))
     vi.mocked(integrationsClient.useQuery).mockReturnValue(mockQuery({ resources: manyIntegrations }))
 

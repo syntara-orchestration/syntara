@@ -38,6 +38,7 @@ def mock_service() -> MagicMock:
     svc.rotate_credential = AsyncMock()
     svc.disable_credential = AsyncMock()
     svc.enable_credential = AsyncMock()
+    svc.resolve_user_references = AsyncMock()
     return svc
 
 
