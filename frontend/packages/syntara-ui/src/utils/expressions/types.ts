@@ -49,8 +49,8 @@ export type ExpressionNode = ExpressionGroup | ExpressionCondition
 /**
  * A group of expressions combined with a logical operator (AND/OR)
  *
- * Example: (input.age >= 18 AND input.score > 50)
- * Example with negation: !((input.age >= 18 AND input.score > 50))
+ * Example: (trigger.age >= 18 AND trigger.score > 50)
+ * Example with negation: !((trigger.age >= 18 AND trigger.score > 50))
  */
 export type ExpressionGroup = {
   type: 'group'
@@ -67,14 +67,14 @@ export type ExpressionGroup = {
 /**
  * A single condition comparing a variable to a value
  *
- * Example: input.age >= 18
+ * Example: trigger.age >= 18
  * Example with negation: !(user.status == 'inactive')
  */
 export type ExpressionCondition = {
   type: 'condition'
   /** Unique identifier for React keys and path-based updates */
   id: string
-  /** Variable path (e.g., "input.age", "fetch_order.output.riskScore") */
+  /** Variable path (e.g., "trigger.age", "fetch_order.output.riskScore") */
   variable: string
   /** Comparison operator */
   operator: ComparisonOperator

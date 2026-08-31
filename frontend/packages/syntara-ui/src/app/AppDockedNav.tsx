@@ -116,13 +116,14 @@ function NavDropdownItem({
       id={`nav-${item.path.replaceAll('/', '-')}`}
       className={styles.navFlyoutItem}
       flyout={
-        <Menu containsFlyout isNavFlyout onSelect={onMenuSelect}>
+        <Menu containsFlyout isNavFlyout onSelect={onMenuSelect} className={styles.flyoutMenu}>
           <MenuList>
             {enabledChildren.map((child) => (
               <MenuItem
                 key={child.path}
                 icon={child.icon}
                 itemId={child.path}
+                className={styles.flyoutMenuItem}
                 onClick={(e: React.MouseEvent) => e.preventDefault()}
               >
                 {child.label}
@@ -214,6 +215,7 @@ function UserMenuDropdown() {
       variant="plain"
       icon={<RhUiProfileFillIcon />}
       isDocked
+      className={styles.dockedAction}
       aria-label="User menu"
       onClick={() => setIsOpen(!isOpen)}
       onMouseEnter={() => setIsOpen(true)}
@@ -274,7 +276,7 @@ export function AppDockedNav() {
   /* v8 ignore start -- phantom branches from compiled JSX props, ternaries, and map callbacks */
   return (
     <CompassDockMain {...(isMobile && !isDockExpanded && { inert: true })}>
-      <Masthead id="docked-masthead" variant="docked">
+      <Masthead id="docked-masthead" variant="docked" className={styles.dockedMasthead}>
         <MastheadMain>
           <MastheadToggle>
             <Button
@@ -300,7 +302,7 @@ export function AppDockedNav() {
               <MastheadLogo
                 component={(props) => <Link {...props} to="/" />}
                 aria-label="Home"
-                className="pf-m-compact"
+                className={`pf-m-compact ${styles.compactLogo}`}
               >
                 <img
                   src={brand.logoCollapsed}
@@ -323,6 +325,7 @@ export function AppDockedNav() {
                   }
                   variant="docked"
                   aria-label="Main navigation"
+                  className={!isDockTextExpanded ? styles.iconDockNav : undefined}
                 >
                   <NavList>
                     {visibleItems.flatMap((item) => {
@@ -394,6 +397,7 @@ export function AppDockedNav() {
                   <Button
                     variant="plain"
                     isDocked
+                    className={styles.dockedAction}
                     icon={colorScheme === 'dark' ? <RhUiDarkModeIcon /> : <RhUiLightModeIcon />}
                     aria-label={colorSchemeToggleLabel}
                     ref={colorSchemeRef}
@@ -406,6 +410,7 @@ export function AppDockedNav() {
                   <Button
                     variant="plain"
                     isDocked
+                    className={styles.dockedAction}
                     icon={<RhUiQuestionMarkCircleIcon />}
                     aria-label="Documentation (opens in a new tab)"
                     ref={helpRef}

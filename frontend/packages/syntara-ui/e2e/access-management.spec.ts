@@ -16,6 +16,7 @@
  */
 import { test, expect, toAppUrl, createUnavailableGuard } from './fixtures'
 import { APP_TITLE } from './helpers/appTitle'
+import { filterChipGroup } from './helpers/patternfly'
 import { buildUniqueName } from './helpers/workflows'
 import {
   createPolicyViaApi,
@@ -132,7 +133,7 @@ test.describe('Access Management — Roles Tab Filtering', () => {
     await app.getByRole('button', { name: 'Apply filter' }).click()
 
     // Filter chip appears
-    const nameChipGroup = app.locator('.pf-v6-c-label-group').filter({ hasText: 'Name' })
+    const nameChipGroup = filterChipGroup(app, 'Name')
     await expect(nameChipGroup.getByText('admin')).toBeVisible()
 
     // URL contains filter
@@ -143,7 +144,7 @@ test.describe('Access Management — Roles Tab Filtering', () => {
     await app.getByPlaceholder('Filter by name').fill('admin')
     await app.getByRole('button', { name: 'Apply filter' }).click()
 
-    const nameChipGroup = app.locator('.pf-v6-c-label-group').filter({ hasText: 'Name' })
+    const nameChipGroup = filterChipGroup(app, 'Name')
     await expect(nameChipGroup.getByText('admin')).toBeVisible()
 
     // Capture filtered URL, navigate away, then back
@@ -153,7 +154,7 @@ test.describe('Access Management — Roles Tab Filtering', () => {
 
     // Filter restored from URL
     await expect(app.getByRole('tab', { name: /Roles/i })).toHaveAttribute('aria-selected', 'true')
-    const restoredChipGroup = app.locator('.pf-v6-c-label-group').filter({ hasText: 'Name' })
+    const restoredChipGroup = filterChipGroup(app, 'Name')
     await expect(restoredChipGroup.getByText('admin')).toBeVisible()
   })
 
@@ -162,7 +163,7 @@ test.describe('Access Management — Roles Tab Filtering', () => {
     await app.getByPlaceholder('Filter by name').fill('admin')
     await app.getByRole('button', { name: 'Apply filter' }).click()
 
-    const nameChipGroup = app.locator('.pf-v6-c-label-group').filter({ hasText: 'Name' })
+    const nameChipGroup = filterChipGroup(app, 'Name')
     await expect(nameChipGroup.getByText('admin')).toBeVisible()
 
     // Clear all filters
@@ -227,7 +228,7 @@ test.describe('Access Management — Roles Tab Sorting', () => {
     await app.getByRole('button', { name: 'Apply filter' }).click()
 
     // Wait for filter chip to confirm UI has settled
-    const nameChipGroup = app.locator('.pf-v6-c-label-group').filter({ hasText: 'Name' })
+    const nameChipGroup = filterChipGroup(app, 'Name')
     await expect(nameChipGroup.getByText('admin')).toBeVisible()
 
     // Apply sort — click the table header's sort button.
@@ -266,7 +267,7 @@ test.describe('Access Management — Shareable URLs', () => {
     await app.getByRole('button', { name: 'Apply filter' }).click()
 
     // Wait for filter chip to confirm UI has settled
-    const nameChipGroup = app.locator('.pf-v6-c-label-group').filter({ hasText: 'Name' })
+    const nameChipGroup = filterChipGroup(app, 'Name')
     await expect(nameChipGroup.getByText('admin')).toBeVisible()
 
     // Click sort — force: true bypasses PF6 tooltip overlay on truncated header
@@ -283,7 +284,7 @@ test.describe('Access Management — Shareable URLs', () => {
 
     await expect(app.getByRole('tab', { name: /Roles/i })).toHaveAttribute('aria-selected', 'true')
 
-    const restoredChip = app.locator('.pf-v6-c-label-group').filter({ hasText: 'Name' })
+    const restoredChip = filterChipGroup(app, 'Name')
     await expect(restoredChip.getByText('admin')).toBeVisible()
 
     const restoredHeader = app.getByRole('columnheader', { name: 'Name' })
@@ -305,7 +306,7 @@ test.describe('Access Management — User Detail Tabs', () => {
     test.skip(!hasTable, 'No users data available; seed data required')
 
     // Click the first username button in the table to navigate to detail
-    const firstRow = table.getByRole('row').nth(1) // skip header row
+    const firstRow = table.locator('tbody tr:first-child')
     await firstRow.locator('td[data-label="Username"]').getByRole('button').click()
 
     // Should be on user detail page
@@ -363,8 +364,10 @@ test.describe('Access Management — Policies Tab Columns', () => {
 
     test.skip(!hasAllowLabel && !hasDenyLabel, 'No statement effect labels rendered; statements data required')
 
-    // At least one scope label should be visible (e.g. "scope: any")
-    await expect(statementsColumn.getByText(/^scope:/).nth(0)).toBeVisible()
+    // At least one scope label should be visible (e.g. "scope: any").
+    // Use count check rather than toBeVisible so strict mode is not triggered by
+    // having multiple rows each rendering a scope chip.
+    expect(await statementsColumn.getByText(/^scope:/).count()).toBeGreaterThan(0)
   })
 
   test('project-scoped policies show a clickable project link', async ({ app }) => {
@@ -376,6 +379,8 @@ test.describe('Access Management — Policies Tab Columns', () => {
 
     test.skip(!hasProjectLink, 'No project-scoped policies on this page; seed data required')
 
-    await expect(projectButtons.nth(0)).toBeVisible()
+    // toBeVisible() triggers Playwright strict mode when projectButtons matches multiple rows.
+    // Filter to visible elements and assert at least one is present instead.
+    await expect(projectButtons.locator(':visible')).not.toHaveCount(0)
   })
 })

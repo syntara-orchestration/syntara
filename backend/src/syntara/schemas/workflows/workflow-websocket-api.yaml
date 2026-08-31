@@ -39,7 +39,7 @@ info:
     with the REST API. All core entities (Workflow, Execution, Approval, etc.) use the
     same definitions across both REST and WebSocket APIs.
   contact:
-    name: Syntara Team
+    name: Orchestrator Team
   license:
     name: MIT
   x-api-version: v1

@@ -1,7 +1,7 @@
 ---
 openapi: 3.1.0
 info:
-  title: Syntara Integrations API
+  title: Orchestrator Integrations API
   description: |
     REST API for managing Integrations.
 

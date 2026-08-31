@@ -10,17 +10,17 @@
  * - UI-12: Export and open in new window from version history kebab
  */
 
-import { test, expect, toAppUrl } from '../fixtures'
+import { type Page, test, expect, toAppUrl } from '../fixtures'
 import { createWorkflowViaApi, updateWorkflowViaApi, deleteWorkflowViaApi } from '../helpers/workflow-versions'
 import { buildUniqueName } from '../helpers/workflows'
 
-async function openVersionHistory(app: import('@playwright/test').Page) {
+async function openVersionHistory(app: Page) {
   await app.getByRole('button', { name: 'Workflow actions' }).click()
   await app.getByRole('menuitem', { name: 'Version history' }).click()
   await expect(app.getByRole('heading', { name: /Version history/i, level: 2 })).toBeVisible({ timeout: 10_000 })
 }
 
-async function clickVersionRow(app: import('@playwright/test').Page, versionNumber: number) {
+async function clickVersionRow(app: Page, versionNumber: number) {
   await app
     .getByRole('listitem')
     .filter({ has: app.getByRole('button', { name: `Actions for version ${versionNumber}`, exact: true }) })

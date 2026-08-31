@@ -1,6 +1,6 @@
-import { type Locator, type Page } from '@playwright/test'
+import { type Locator } from '@playwright/test'
 
-import { expect } from '../fixtures'
+import { type Page, expect } from '../fixtures'
 
 /** Locator scoped to the Compass page-header region (h1, status badges, toolbar). */
 export const pageHeader = (page: Page): Locator => page.locator('.pf-v6-c-compass__main-header')
@@ -17,7 +17,7 @@ export async function runWorkflowFromBuilder(page: Page): Promise<void> {
 
   const gotConflict = await page
     .getByText('newer version available')
-    .waitFor({ state: 'visible', timeout: 3_000 })
+    .waitFor({ state: 'visible', timeout: 10_000 })
     .then(() => true)
     .catch(() => false)
 

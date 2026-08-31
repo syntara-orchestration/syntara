@@ -1,7 +1,7 @@
 import { ExecutorTypeEnum, type TaskActivity } from '@syntara/contracts'
 import { type Node, type NodeProps } from '@xyflow/react'
 
-import { NxDetailList } from '../../../../components/details/NxDetailList'
+import { SynDetailList } from '../../../../components/details/SynDetailList'
 import { FlowNodeType } from '../../../../constants'
 import type { ActivityStatus } from '../../execution/types'
 import { getNodeTypeColor } from '../nodeTypeColors'
@@ -149,7 +149,7 @@ export function TaskActivityDetails(
         menuActions={props.menuActions}
       />
       <NodeBody>
-        <NxDetailList>
+        <SynDetailList>
           {renderCondition(dataWithMetadata.condition)}
           {taskExecutor === ExecutorTypeEnum.SCRIPT && (
             <>{renderText('Language', (config as { language: string }).language)}</>
@@ -174,7 +174,7 @@ export function TaskActivityDetails(
             <AgenticNodeDetails config={config as AgenticConfig} toolsText={toolsText} />
           )}
           {taskExecutor !== ExecutorTypeEnum.SCRIPT && renderJson(props.data, props.showJson)}
-        </NxDetailList>
+        </SynDetailList>
       </NodeBody>
     </>
   )

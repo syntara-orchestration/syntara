@@ -1,37 +1,37 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
-import { NxDetail } from './NxDetail'
+import { SynDetail } from './SynDetail'
 
 describe('Detail', () => {
   it('renders label and children', () => {
-    render(<NxDetail label="Name">John Doe</NxDetail>)
+    render(<SynDetail label="Name">John Doe</SynDetail>)
 
     expect(screen.getByText('Name')).toBeInTheDocument()
     expect(screen.getByText('John Doe')).toBeInTheDocument()
   })
 
   it('returns null when children is undefined', () => {
-    const { container } = render(<NxDetail label="Empty">{undefined}</NxDetail>)
+    const { container } = render(<SynDetail label="Empty">{undefined}</SynDetail>)
 
     expect(container).toBeEmptyDOMElement()
   })
 
   it('returns null when children is null', () => {
-    const { container } = render(<NxDetail label="Null">{null}</NxDetail>)
+    const { container } = render(<SynDetail label="Null">{null}</SynDetail>)
 
     expect(container).toBeEmptyDOMElement()
   })
 
   it('renders with string children', () => {
-    render(<NxDetail label="Status">Active</NxDetail>)
+    render(<SynDetail label="Status">Active</SynDetail>)
 
     expect(screen.getByText('Status')).toBeInTheDocument()
     expect(screen.getByText('Active')).toBeInTheDocument()
   })
 
   it('renders with number children', () => {
-    render(<NxDetail label="Count">{42}</NxDetail>)
+    render(<SynDetail label="Count">{42}</SynDetail>)
 
     expect(screen.getByText('Count')).toBeInTheDocument()
     expect(screen.getByText('42')).toBeInTheDocument()
@@ -39,9 +39,9 @@ describe('Detail', () => {
 
   it('renders with JSX children', () => {
     render(
-      <NxDetail label="Custom">
+      <SynDetail label="Custom">
         <span data-testid="custom-child">Custom content</span>
-      </NxDetail>
+      </SynDetail>
     )
 
     expect(screen.getByText('Custom')).toBeInTheDocument()
@@ -51,19 +51,19 @@ describe('Detail', () => {
   // Intentionally use getByText rather than data-testid: Detail is rendered multiple times
   // inside a single Details list, so hardcoded data-testid values would be non-unique.
   it('renders label in DescriptionListTerm', () => {
-    render(<NxDetail label="Term Label">Value</NxDetail>)
+    render(<SynDetail label="Term Label">Value</SynDetail>)
 
     expect(screen.getByText('Term Label')).toBeInTheDocument()
   })
 
   it('renders children in DescriptionListDescription', () => {
-    render(<NxDetail label="Label">Description Value</NxDetail>)
+    render(<SynDetail label="Label">Description Value</SynDetail>)
 
     expect(screen.getByText('Description Value')).toBeInTheDocument()
   })
 
   it('renders with empty string children (falsy but valid)', () => {
-    const { container } = render(<NxDetail label="Empty String">{''}</NxDetail>)
+    const { container } = render(<SynDetail label="Empty String">{''}</SynDetail>)
 
     // Empty string is falsy, but it's a valid React child
     // The component checks !props.children which is true for empty string
@@ -73,7 +73,7 @@ describe('Detail', () => {
   it('returns null for zero value (falsy check)', () => {
     // The component uses !props.children which is true for 0
     // This is the actual behavior - zero is treated as falsy
-    const { container } = render(<NxDetail label="Zero">{0}</NxDetail>)
+    const { container } = render(<SynDetail label="Zero">{0}</SynDetail>)
 
     expect(container).toBeEmptyDOMElement()
   })

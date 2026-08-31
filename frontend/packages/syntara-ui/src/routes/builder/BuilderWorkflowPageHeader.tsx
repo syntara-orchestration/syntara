@@ -14,6 +14,7 @@ import { isExecutionCancellable } from '../executions/executionCancellable'
 
 import { BuilderEditorToolbar } from './BuilderEditorToolbar'
 import type { BuilderAction } from './builderReducer'
+import styles from './BuilderWorkflowPageHeader.module.css'
 import { BuilderVersionViewTitleRowAddons } from './BuilderWorkflowPageHeaderParts'
 import { builderVersionViewHasTitleRowExtras } from './builderWorkflowPageHeaderTitle'
 import { EditWorkflowDetailsPopover } from './EditWorkflowDetailsPopover'
@@ -47,6 +48,7 @@ type BuilderToolbarContentProps = Readonly<{
   handleSaveWorkflow: () => Promise<boolean>
   onPublishClick: () => void
   onUnpublish: () => void
+  onDuplicate: () => void
   onPendingImport: (data: PendingImportData) => void
   triggers?: { id: string; name?: string }[]
   isBuiltin: boolean
@@ -96,6 +98,7 @@ function BuilderToolbarContent({
   handleSaveWorkflow,
   onPublishClick,
   onUnpublish,
+  onDuplicate,
   onPendingImport,
   triggers,
   isAddNodePanelOpen,
@@ -194,6 +197,7 @@ function BuilderToolbarContent({
       handleSaveWorkflow={handleSaveWorkflow}
       onPublishClick={onPublishClick}
       onUnpublish={onUnpublish}
+      onDuplicate={onDuplicate}
       onPendingImport={onPendingImport}
       triggers={triggers}
       isAddNodePanelOpen={isAddNodePanelOpen}
@@ -229,12 +233,13 @@ function BuilderEditorTitleSlot({
 }>) {
   return (
     <Flex
+      className={styles.titleSlot}
+      data-testid="builder-title-slot"
       gap={{ default: 'gapMd' }}
       alignItems={{ default: 'alignItemsCenter' }}
-      flexWrap={{ default: 'nowrap' }}
-      style={{ height: '100%' }}
+      flexWrap={{ default: 'wrap' }}
     >
-      <FlexItem style={{ flexShrink: 1, minWidth: 0 }}>
+      <FlexItem className={styles.workflowName} data-testid="builder-workflow-name">
         <Tooltip
           content={builderPermissions.tooltips.edit}
           trigger={builderPermissions.canEdit ? 'manual' : 'mouseenter focus'}
@@ -254,7 +259,7 @@ function BuilderEditorTitleSlot({
         </Tooltip>
       </FlexItem>
       {builderPermissions.canEdit && (
-        <FlexItem style={{ flexShrink: 0 }}>
+        <FlexItem flex={{ default: 'flexNone' }}>
           <EditWorkflowDetailsPopover
             name={workflowName}
             description={workflowDescription}
@@ -269,11 +274,13 @@ function BuilderEditorTitleSlot({
         </FlexItem>
       )}
       {!isNew && (
-        <FlexItem style={{ flexShrink: 0 }}>
+        <FlexItem flex={{ default: 'flexNone' }}>
           <WorkflowPublishStatusBadge publishedVersionId={publishedVersionId} currentVersionId={currentVersionId} />
         </FlexItem>
       )}
-      {(builderPermissions.canEdit || isBuiltin) && <FlexItem style={{ flexShrink: 0 }}>{ProjectSelector}</FlexItem>}
+      {(builderPermissions.canEdit || isBuiltin) && (
+        <FlexItem flex={{ default: 'flexNone' }}>{ProjectSelector}</FlexItem>
+      )}
     </Flex>
   )
 }
@@ -318,6 +325,7 @@ export type BuilderWorkflowPageHeaderProps = Readonly<{
   handleSaveWorkflow: () => Promise<boolean>
   onPublish: (publishName?: string, description?: string, onSettled?: () => void) => void
   onUnpublish: () => void
+  onDuplicate: () => void
   isViewingVersion?: boolean
   versionHistoryOpen?: boolean
   viewedVersionDate?: string | null
@@ -366,6 +374,7 @@ export function BuilderWorkflowPageHeader({
   handleSaveWorkflow,
   onPublish,
   onUnpublish,
+  onDuplicate,
   isViewingVersion,
   versionHistoryOpen,
   viewedVersionDate,
@@ -406,6 +415,7 @@ export function BuilderWorkflowPageHeader({
       handleSaveWorkflow={handleSaveWorkflow}
       onPublishClick={() => publishDialog.open(true)}
       onUnpublish={onUnpublish}
+      onDuplicate={onDuplicate}
       onPendingImport={onPendingImport}
       triggers={triggers}
       isAddNodePanelOpen={isAddNodePanelOpen}

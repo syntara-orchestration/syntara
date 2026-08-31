@@ -28,7 +28,7 @@ T = TypeVar("T", bound="WorkflowDefinition")
 
 @_attrs_define
 class WorkflowDefinition:
-    """JSON Schema for graph-based workflow definitions in the Syntara Workflow Engine v2.
+    """JSON Schema for graph-based workflow definitions in the Orchestrator Workflow Engine v2.
 
     Attributes:
         schema_version: Schema version that this workflow definition conforms to

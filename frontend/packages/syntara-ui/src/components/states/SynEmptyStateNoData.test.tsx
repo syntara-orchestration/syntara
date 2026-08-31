@@ -1,3 +1,4 @@
+import { Button } from '@patternfly/react-core'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
@@ -21,9 +22,9 @@ describe('SynEmptyStateNoData', () => {
   })
 
   it('renders with custom title', () => {
-    render(<SynEmptyStateNoData title="No workflows found" />)
+    render(<SynEmptyStateNoData title="No workflows yet" />)
 
-    expect(screen.getByText('No workflows found')).toBeInTheDocument()
+    expect(screen.getByText('No workflows yet')).toBeInTheDocument()
   })
 
   it('renders with custom description', () => {
@@ -101,5 +102,21 @@ describe('SynEmptyStateNoData', () => {
 
     const button = screen.getByRole('button', { name: 'Add data' })
     expect(button).toHaveClass('pf-m-primary')
+  })
+
+  it('renders addData button without secondary actions when only addData is provided', () => {
+    const addData = vi.fn()
+    render(<SynEmptyStateNoData addData={addData} />)
+
+    expect(screen.getByRole('button', { name: 'Add data' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Learn more' })).not.toBeInTheDocument()
+  })
+
+  it('renders secondary actions when addData and secondaryActions are provided', () => {
+    const addData = vi.fn()
+    render(<SynEmptyStateNoData addData={addData} secondaryActions={<Button variant="link">Learn more</Button>} />)
+
+    expect(screen.getByRole('button', { name: 'Add data' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Learn more' })).toBeInTheDocument()
   })
 })

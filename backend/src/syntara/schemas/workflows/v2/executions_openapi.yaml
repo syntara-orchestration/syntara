@@ -25,7 +25,7 @@ info:
     - Queryable: Filter resources by label selectors in list endpoints
   version: 2.0.0
   contact:
-    name: Syntara Team
+    name: Orchestrator Team
 
 servers:
   - url: /api/v1

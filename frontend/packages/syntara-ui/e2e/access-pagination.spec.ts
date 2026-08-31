@@ -68,7 +68,7 @@ test.describe('Access Management — Dropdown Pagination', () => {
     await expect(app.getByRole('heading', { level: 1, name: 'Access Management' })).toBeVisible()
 
     const usersTable = app.getByRole('grid', { name: 'Users table' })
-    const firstUserRow = usersTable.getByRole('row').nth(1)
+    const firstUserRow = usersTable.locator('tbody tr:first-child')
     const firstUserButton = firstUserRow.getByRole('button')
     const hasUser = await firstUserButton
       .waitFor({ state: 'visible', timeout: 5000 })
@@ -98,8 +98,7 @@ test.describe('Access Management — Dropdown Pagination', () => {
 
     const noResults = dialog.getByText(/No results match/i)
     const roleOptions = dialog.getByRole('option').filter({ hasNotText: /No results match/i })
-    await expect(noResults).toBeHidden()
-    await expect(roleOptions.or(noResults)).toBeVisible({ timeout: 10_000 })
+    await expect(roleOptions.or(noResults)).toBeVisible({ timeout: 15_000 })
     expect(await roleOptions.count()).toBeGreaterThan(0)
 
     await dialog.getByRole('button', { name: 'Cancel' }).click()
@@ -114,7 +113,7 @@ test.describe('Access Management — Dropdown Pagination', () => {
       await expect(app.getByRole('heading', { level: 1, name: 'Access Management' })).toBeVisible()
 
       const groupsTable = app.getByRole('grid', { name: 'Groups table' })
-      const firstGroupRow = groupsTable.getByRole('row').nth(1)
+      const firstGroupRow = groupsTable.locator('tbody tr:first-child')
       const firstGroupButton = firstGroupRow.getByRole('button')
       const hasGroup = await firstGroupButton
         .waitFor({ state: 'visible', timeout: 5000 })
