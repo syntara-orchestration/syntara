@@ -14,6 +14,7 @@ from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.service_account_read_labels import ServiceAccountReadLabels
+    from ..models.user_reference import UserReference
 
 
 T = TypeVar("T", bound="ServiceAccountRead")
@@ -28,14 +29,14 @@ class ServiceAccountRead:
         name (str):
         status (ServiceAccountStatus): Operational status of a service account.
         project_id (UUID):
-        created_by (UUID):
         created_at (datetime.datetime):
         updated_at (datetime.datetime):
         description (None | str | Unset):
         project_name (None | str | Unset):
         is_project_deleted (bool | Unset):  Default: False.
         last_authenticated_at (datetime.datetime | None | Unset):
-        updated_by (None | Unset | UUID):
+        created_by (None | Unset | UserReference): User who created the service account
+        updated_by (None | Unset | UserReference): User who last modified the service account
         labels (ServiceAccountReadLabels | Unset):
     """
 
@@ -43,18 +44,20 @@ class ServiceAccountRead:
     name: str
     status: ServiceAccountStatus
     project_id: UUID
-    created_by: UUID
     created_at: datetime.datetime
     updated_at: datetime.datetime
     description: None | str | Unset = UNSET
     project_name: None | str | Unset = UNSET
     is_project_deleted: bool | Unset = False
     last_authenticated_at: datetime.datetime | None | Unset = UNSET
-    updated_by: None | Unset | UUID = UNSET
+    created_by: None | Unset | UserReference = UNSET
+    updated_by: None | Unset | UserReference = UNSET
     labels: ServiceAccountReadLabels | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
+        from ..models.user_reference import UserReference
+
         id = str(self.id)
 
         name = self.name
@@ -62,8 +65,6 @@ class ServiceAccountRead:
         status = self.status.value
 
         project_id = str(self.project_id)
-
-        created_by = str(self.created_by)
 
         created_at = self.created_at.isoformat()
 
@@ -91,11 +92,19 @@ class ServiceAccountRead:
         else:
             last_authenticated_at = self.last_authenticated_at
 
-        updated_by: None | str | Unset
+        created_by: dict[str, Any] | None | Unset
+        if isinstance(self.created_by, Unset):
+            created_by = UNSET
+        elif isinstance(self.created_by, UserReference):
+            created_by = self.created_by.to_dict()
+        else:
+            created_by = self.created_by
+
+        updated_by: dict[str, Any] | None | Unset
         if isinstance(self.updated_by, Unset):
             updated_by = UNSET
-        elif isinstance(self.updated_by, UUID):
-            updated_by = str(self.updated_by)
+        elif isinstance(self.updated_by, UserReference):
+            updated_by = self.updated_by.to_dict()
         else:
             updated_by = self.updated_by
 
@@ -111,7 +120,6 @@ class ServiceAccountRead:
                 "name": name,
                 "status": status,
                 "project_id": project_id,
-                "created_by": created_by,
                 "created_at": created_at,
                 "updated_at": updated_at,
             }
@@ -124,6 +132,8 @@ class ServiceAccountRead:
             field_dict["is_project_deleted"] = is_project_deleted
         if last_authenticated_at is not UNSET:
             field_dict["last_authenticated_at"] = last_authenticated_at
+        if created_by is not UNSET:
+            field_dict["created_by"] = created_by
         if updated_by is not UNSET:
             field_dict["updated_by"] = updated_by
         if labels is not UNSET:
@@ -134,6 +144,7 @@ class ServiceAccountRead:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.service_account_read_labels import ServiceAccountReadLabels
+        from ..models.user_reference import UserReference
 
         d = dict(src_dict)
         id = UUID(d.pop("id"))
@@ -143,8 +154,6 @@ class ServiceAccountRead:
         status = ServiceAccountStatus(d.pop("status"))
 
         project_id = UUID(d.pop("project_id"))
-
-        created_by = UUID(d.pop("created_by"))
 
         created_at = isoparse(d.pop("created_at"))
 
@@ -187,20 +196,37 @@ class ServiceAccountRead:
 
         last_authenticated_at = _parse_last_authenticated_at(d.pop("last_authenticated_at", UNSET))
 
-        def _parse_updated_by(data: object) -> None | Unset | UUID:
+        def _parse_created_by(data: object) -> None | Unset | UserReference:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
             try:
-                if not isinstance(data, str):
+                if not isinstance(data, dict):
                     raise TypeError()
-                updated_by_type_0 = UUID(data)
+                created_by_type_0 = UserReference.from_dict(data)
+
+                return created_by_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(None | Unset | UserReference, data)
+
+        created_by = _parse_created_by(d.pop("created_by", UNSET))
+
+        def _parse_updated_by(data: object) -> None | Unset | UserReference:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                updated_by_type_0 = UserReference.from_dict(data)
 
                 return updated_by_type_0
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            return cast(None | Unset | UUID, data)
+            return cast(None | Unset | UserReference, data)
 
         updated_by = _parse_updated_by(d.pop("updated_by", UNSET))
 
@@ -216,13 +242,13 @@ class ServiceAccountRead:
             name=name,
             status=status,
             project_id=project_id,
-            created_by=created_by,
             created_at=created_at,
             updated_at=updated_at,
             description=description,
             project_name=project_name,
             is_project_deleted=is_project_deleted,
             last_authenticated_at=last_authenticated_at,
+            created_by=created_by,
             updated_by=updated_by,
             labels=labels,
         )

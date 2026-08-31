@@ -12,6 +12,7 @@ from syntara.auth.passwords import hash_password
 from syntara.core.models import User
 from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin
+from syntara.core.services.user_reference_resolution import UserReferenceMixin
 from syntara.service_accounts.constants import MAX_CREDENTIALS_PER_SA
 from syntara.service_accounts.credential_schemas import (
     ServiceAccountCredentialCreateResponse,
@@ -43,7 +44,7 @@ class ServiceAccountCredentialConvertMixin(ConvertResourceMixin):
         return ServiceAccountCredentialRead.model_validate(resource)
 
 
-class ServiceAccountCredentialService(BaseService):
+class ServiceAccountCredentialService(UserReferenceMixin, BaseService):
     """Service for service account credential business logic."""
 
     def __init__(self, session: AsyncSession, user: User) -> None:

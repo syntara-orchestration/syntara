@@ -1,15 +1,18 @@
 """Service account API request/response schemas."""
 
 from datetime import datetime
-from typing import ClassVar
+from typing import Any, ClassVar
 from uuid import UUID
 
-from pydantic import ConfigDict
+from pydantic import ConfigDict, GetJsonSchemaHandler
+from pydantic.json_schema import JsonSchemaValue
+from pydantic_core import CoreSchema as PydanticCoreSchema
 from sqlmodel import Field, SQLModel
 
 from syntara.core.constants import FieldLimits
 from syntara.core.models.base.query_params import BaseListParams
 from syntara.core.models.pagination import ResourcesResponse
+from syntara.core.models.user_reference import UserReference
 from syntara.service_accounts.models.service_account import ServiceAccountStatus
 
 
@@ -63,11 +66,33 @@ class ServiceAccountRead(SQLModel):
     project_name: str | None = None
     is_project_deleted: bool = False
     last_authenticated_at: datetime | None = None
-    created_by: UUID
-    updated_by: UUID | None = None
+    created_by: UserReference | UUID | str | None = Field(
+        default=None, description="User who created the service account"
+    )
+    updated_by: UserReference | UUID | str | None = Field(
+        default=None, description="User who last modified the service account"
+    )
     created_at: datetime
     updated_at: datetime
     labels: dict[str, str] = Field(default_factory=dict)
+
+    FIELD_SCHEMA_EXTRAS: ClassVar[dict[str, dict[str, Any]]] = {
+        "created_by": UserReference.OPENAPI_NULLABLE_FIELD,
+        "updated_by": UserReference.OPENAPI_NULLABLE_FIELD,
+    }
+
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, core_schema: PydanticCoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        """Inject field-level OpenAPI metadata into the JSON schema."""
+        json_schema = handler(core_schema)
+        json_schema = handler.resolve_ref_schema(json_schema)
+        props = json_schema.get("properties", {})
+        for field, extras in cls.FIELD_SCHEMA_EXTRAS.items():
+            if field in props:
+                props[field].update(extras)
+        return json_schema
 
 
 class ServiceAccountListParams(BaseListParams):

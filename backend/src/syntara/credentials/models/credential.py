@@ -115,13 +115,7 @@ class CredentialRead(NamedResource, UserOwnedResource):
         default=None, description="User who last modified the credential"
     )  # type: ignore[assignment]
 
-    _USER_REF_SCHEMA: ClassVar[dict[str, Any]] = {
-        "readOnly": True,
-        "anyOf": [
-            {"$ref": "#/components/schemas/UserReference"},
-            {"type": "null"},
-        ],
-    }
+    _USER_REF_SCHEMA: ClassVar[dict[str, Any]] = UserReference.OPENAPI_NULLABLE_FIELD
 
     FIELD_SCHEMA_EXTRAS: ClassVar[dict[str, dict[str, Any]]] = {
         **NamedResource.FIELD_SCHEMA_EXTRAS,
@@ -171,7 +165,7 @@ class CredentialWorkflowRef(SQLModel):
     id: UUID
     name: str
     description: str | None = None
-    created_by: str | UUID | None = Field(default=None, description="Username or UUID of the workflow creator")
+    created_by: UserReference | UUID | str | None = Field(default=None, description="User who created the workflow")
     created_at: datetime | None = Field(default=None, description="Timestamp when the workflow was created")
     node_names: list[str] = Field(default_factory=list, description="Names of nodes using this credential")
     last_execution_at: datetime | None = Field(default=None, description="Timestamp of the most recent execution")

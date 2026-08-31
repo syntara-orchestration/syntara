@@ -4,7 +4,7 @@ Provides a structured representation of a user (id + name snapshot) suitable
 for embedding in any resource that tracks "who performed this action".
 """
 
-from typing import ClassVar
+from typing import Any, ClassVar
 from uuid import UUID
 
 from pydantic import ConfigDict, GetJsonSchemaHandler
@@ -24,6 +24,14 @@ class UserReference(SQLModel):
 
     id: UUID = Field(..., description="User's unique identifier")
     name: str = Field(..., description="User's display name at time of action")
+
+    OPENAPI_NULLABLE_FIELD: ClassVar[dict[str, Any]] = {
+        "readOnly": True,
+        "anyOf": [
+            {"$ref": "#/components/schemas/UserReference"},
+            {"type": "null"},
+        ],
+    }
 
     @classmethod
     def __get_pydantic_json_schema__(

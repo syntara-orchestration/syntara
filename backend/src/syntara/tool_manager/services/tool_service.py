@@ -19,6 +19,7 @@ from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.core.models import User
 from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin, EnrichQueryMixin
+from syntara.core.services.user_reference_resolution import UserReferenceMixin
 from syntara.tool_manager.audit.tool_bulk_update import ToolBulkUpdateEvent
 from syntara.tool_manager.audit.tool_update import ToolUpdateEvent
 from syntara.tool_manager.exceptions import (
@@ -56,7 +57,7 @@ class ToolServiceConvertResourceMixin(ConvertResourceMixin):
         return ToolWithParameters.model_validate(resource)
 
 
-class ToolService(BaseService):
+class ToolService(UserReferenceMixin, BaseService):
     """Service for Tool CRUD operations and business logic.
 
     This service handles database persistence, transaction management, and provides
@@ -103,7 +104,7 @@ class ToolService(BaseService):
             )
             id_restriction = list(result.all())
 
-        return await self.list_resources(
+        response = await self.list_resources(
             model=Tool,
             response_type=ToolListResponse,
             limit=limit,
@@ -113,6 +114,8 @@ class ToolService(BaseService):
             include_total=include_total,
             id_restriction=id_restriction,
         )
+        await self.resolve_user_references(response.resources)
+        return response
 
     async def _get_tool_for_integration(self, integration_id: UUID, tool_id: UUID) -> Tool:
         """Fetch a tool and verify it belongs to the specified integration."""
@@ -128,10 +131,16 @@ class ToolService(BaseService):
             raise ToolNotFoundError(str(tool_id))
         return tool
 
+    async def _to_read(self, tool: Tool) -> ToolWithParameters:
+        """Convert a Tool ORM row to ToolWithParameters with resolved user refs."""
+        read = ToolWithParameters.model_validate(tool)
+        await self.resolve_user_references([read])
+        return read
+
     async def get_tool_detail_for_integration(self, integration_id: UUID, tool_id: UUID) -> ToolWithParameters:
         """Get a tool by ID, scoped to an integration (IDOR protection)."""
         tool = await self._get_tool_for_integration(integration_id, tool_id)
-        return ToolWithParameters.model_validate(tool)
+        return await self._to_read(tool)
 
     async def get_tool_detail(self, tool_id: UUID) -> ToolWithParameters:
         """Get a tool by ID with full details including parameters.
@@ -157,7 +166,7 @@ class ToolService(BaseService):
             msg = f"Tool {tool_id} not found"
             raise ToolNotFoundError(msg)
 
-        return ToolWithParameters.model_validate(tool)
+        return await self._to_read(tool)
 
     async def update_tool_for_integration(
         self,

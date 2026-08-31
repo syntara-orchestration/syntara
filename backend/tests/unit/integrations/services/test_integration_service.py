@@ -11,7 +11,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from syntara.authz.engine import AllowedProjectsResult
 from syntara.authz.models import Project
 from syntara.core.exceptions import SafeValueError
-from syntara.core.models import User
+from syntara.core.models import User, UserReference
 from syntara.integrations.exceptions import (
     IntegrationNameConflictError,
     IntegrationNotFoundError,
@@ -75,7 +75,9 @@ class TestCreateIntegration:
         assert result.scope == IntegrationScope.GLOBAL
         assert result.enabled is True
         assert result.management_credential_id is None
-        assert result.created_by == test_user.username
+        assert isinstance(result.created_by, UserReference)
+        assert result.created_by.id == test_user.id
+        assert result.created_by.name == test_user.username
 
     @pytest.mark.asyncio
     async def test_create_llm_provider(

@@ -578,7 +578,7 @@ export const handlers = [
       enabled_model_count: enabledModelCount,
       created_at: now,
       updated_at: now,
-      created_by: 'user-1',
+      created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1' },
       updated_by: null,
       deleted_at: null,
       deleted_by: null,
@@ -1531,7 +1531,7 @@ export const handlers = [
       version: nextVersion,
       schema_version: sourceVersion.schema_version,
       workflow_definition: restoredDef,
-      created_by: 'user-1',
+      created_by: MOCK_VERSION_CREATED_BY,
       created_at: now,
       change_description: `Restored from version ${restoredVersionNum}`,
     }
@@ -2532,8 +2532,8 @@ export const handlers = [
       },
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      created_by: 'admin',
-      updated_by: 'admin',
+      created_by: { id: 'u-004', name: 'admin' },
+      updated_by: { id: 'u-004', name: 'admin' },
     }
 
     identityProviders.push(provider)
@@ -3101,7 +3101,7 @@ export const handlers = [
       name: body.name ?? '',
       description: body.description ?? null,
       is_builtin: false,
-      created_by: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+      created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'demo' },
       created_at: now,
       updated_at: now,
       source: 'local',
@@ -5086,7 +5086,7 @@ export const handlers = [
       project_name,
       is_project_deleted: false,
       last_authenticated_at: null,
-      created_by: 'u-001',
+      created_by: { id: 'u-001', name: 'alice' },
       updated_by: null,
       created_at: mockDate.now,
       updated_at: mockDate.now,
@@ -5108,7 +5108,7 @@ export const handlers = [
     const body = (await request.json()) as { name?: string; description?: string | null } | null
     if (body?.name !== undefined) sa.name = body.name
     if (body?.description !== undefined) sa.description = body.description
-    sa.updated_by = 'u-001'
+    sa.updated_by = { id: 'u-001', name: 'alice' }
     sa.updated_at = mockDate.now
     return HttpResponse.json(sa)
   }),
@@ -5191,7 +5191,7 @@ export const handlers = [
       grace_period_seconds: 3600,
       expires_at: body?.expires_at ?? defaultExpiry,
       last_used_at: null,
-      created_by: 'u-001',
+      created_by: { id: 'u-001', name: 'alice' },
       updated_by: null,
       created_at: mockDate.now,
       updated_at: mockDate.now,
@@ -5229,7 +5229,7 @@ export const handlers = [
       const gracePeriodSeconds = body?.grace_period_seconds ?? 0
 
       cred.updated_at = mockDate.now
-      cred.updated_by = 'u-001'
+      cred.updated_by = { id: 'u-001', name: 'alice' }
       cred.grace_period_seconds = gracePeriodSeconds
       cred.old_secret_valid_until =
         gracePeriodSeconds > 0 ? new Date(Date.now() + gracePeriodSeconds * 1000).toISOString() : null

@@ -7,7 +7,7 @@ Groups are included in JWT tokens as the ``groups`` claim.
 """
 
 from enum import StrEnum
-from typing import ClassVar
+from typing import Any, ClassVar
 from uuid import UUID, uuid4
 
 from sqlalchemy import Column, ForeignKey, String, Table
@@ -18,6 +18,7 @@ from syntara.core.models.base import BaseResource
 from syntara.core.models.base.query_params import BaseListParams
 from syntara.core.models.base.soft_deletable import SoftDeletableResource
 from syntara.core.models.pagination import ResourcesResponse
+from syntara.core.models.user_reference import UserReference
 
 
 class GroupSource(StrEnum):
@@ -178,9 +179,14 @@ class GroupRead(BaseResource):
     name: str
     description: str | None = None
     is_builtin: bool = False
-    created_by: UUID | None = None
+    created_by: UserReference | UUID | str | None = None
     source: str = GroupSource.LOCAL
     member_count: int = 0
+
+    FIELD_SCHEMA_EXTRAS: ClassVar[dict[str, dict[str, Any]]] = {
+        **BaseResource.FIELD_SCHEMA_EXTRAS,
+        "created_by": UserReference.OPENAPI_NULLABLE_FIELD,
+    }
 
 
 class MembershipSource(SQLModel):

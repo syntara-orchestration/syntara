@@ -1656,7 +1656,11 @@ describe('Workflows Component', () => {
         })
       )
       vi.mocked(workflowFetchClient.POST).mockResolvedValue(
-        mockPostResponse({ id: 'new-id', name: 'test', created_by: 'user-1' })
+        mockPostResponse({
+          id: 'new-id',
+          name: 'test',
+          created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1' },
+        })
       )
 
       await openKebabMenuForFirstRow(user)
@@ -1711,7 +1715,11 @@ describe('Workflows Component', () => {
       )
 
       vi.mocked(workflowFetchClient.POST).mockResolvedValue(
-        mockPostResponse({ id: 'new-id', name: 'Important Project Workflow - duplicate-abc', created_by: 'user-1' })
+        mockPostResponse({
+          id: 'new-id',
+          name: 'Important Project Workflow - duplicate-abc',
+          created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1' },
+        })
       )
 
       await openKebabMenuForFirstRow(user)
@@ -1822,7 +1830,11 @@ describe('Workflows Component', () => {
       )
 
       vi.mocked(workflowFetchClient.POST).mockResolvedValue(
-        mockPostResponse({ id: 'new-id', name: 'test', created_by: 'user-1' })
+        mockPostResponse({
+          id: 'new-id',
+          name: 'test',
+          created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1' },
+        })
       )
 
       await openKebabMenuForFirstRow(user)
@@ -1855,7 +1867,11 @@ describe('Workflows Component', () => {
       )
 
       vi.mocked(workflowFetchClient.POST).mockResolvedValue(
-        mockPostResponse({ id: 'new-id', name: 'test', created_by: 'user-1' })
+        mockPostResponse({
+          id: 'new-id',
+          name: 'test',
+          created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1' },
+        })
       )
 
       await openKebabMenuForFirstRow(user)
@@ -1887,7 +1903,9 @@ describe('Workflows Component', () => {
         })
       )
 
-      vi.mocked(workflowFetchClient.POST).mockResolvedValue(mockPostResponse({ name: 'test', created_by: 'user-1' }))
+      vi.mocked(workflowFetchClient.POST).mockResolvedValue(
+        mockPostResponse({ name: 'test', created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1' } })
+      )
 
       await openKebabMenuForFirstRow(user)
 
@@ -2030,7 +2048,11 @@ describe('Workflows Component', () => {
       )
 
       vi.mocked(workflowFetchClient.POST).mockResolvedValue(
-        mockPostResponse({ id: 'new-id', name: 'Workflow with Approval - duplicate-abc', created_by: 'user-1' })
+        mockPostResponse({
+          id: 'new-id',
+          name: 'Workflow with Approval - duplicate-abc',
+          created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1' },
+        })
       )
 
       await openKebabMenuForFirstRow(user)

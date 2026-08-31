@@ -1,13 +1,15 @@
-"""Unit tests for BaseService._resolve_user_fields via IntegrationService."""
+"""Unit tests for IntegrationService.resolve_user_references."""
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
 from sqlalchemy.exc import SQLAlchemyError
 
+from syntara.core.models.user_reference import UserReference
 from syntara.integrations.services.integration_service import IntegrationService
 
 
@@ -30,71 +32,64 @@ def service(mock_session: MagicMock, mock_user: MagicMock) -> IntegrationService
     return IntegrationService(mock_session, mock_user)
 
 
-class TestResolveUserFields:
-    """Tests for BaseService._resolve_user_fields via IntegrationService."""
+class TestResolveUserReferences:
+    """Tests for resolving UUID audit fields to UserReference objects."""
 
     @pytest.mark.asyncio
-    async def test_resolves_uuids_to_usernames(self, service: IntegrationService, mock_session: MagicMock) -> None:
+    async def test_resolves_uuids_to_user_references(
+        self, service: IntegrationService, mock_session: MagicMock
+    ) -> None:
         user_id = uuid4()
-        obj = MagicMock()
-        obj.created_by = user_id
-        obj.updated_by = None
+        obj = SimpleNamespace(created_by=user_id, updated_by=None)
 
-        mock_result = MagicMock()
-        mock_result.__iter__ = MagicMock(return_value=iter([(user_id, "admin")]))
-        mock_session.exec.return_value = mock_result
+        mock_session.exec.return_value = [(user_id, "admin")]
 
-        await service._resolve_user_fields([obj])
+        await service.resolve_user_references([obj])
 
-        assert obj.created_by == "admin"
+        assert isinstance(obj.created_by, UserReference)
+        assert obj.created_by.id == user_id
+        assert obj.created_by.name == "admin"
 
     @pytest.mark.asyncio
     async def test_skips_when_no_user_ids(self, service: IntegrationService, mock_session: MagicMock) -> None:
-        obj = MagicMock()
-        obj.created_by = None
-        obj.updated_by = None
+        obj = SimpleNamespace(created_by=None, updated_by=None)
 
-        await service._resolve_user_fields([obj])
+        await service.resolve_user_references([obj])
 
         mock_session.exec.assert_not_awaited()
 
     @pytest.mark.asyncio
-    async def test_leaves_uuids_on_db_error(self, service: IntegrationService, mock_session: MagicMock) -> None:
+    async def test_clears_fields_on_db_error(self, service: IntegrationService, mock_session: MagicMock) -> None:
         user_id = uuid4()
-        obj = MagicMock()
-        obj.created_by = user_id
-        obj.updated_by = None
+        obj = SimpleNamespace(created_by=user_id, updated_by=None)
 
         mock_session.exec.side_effect = SQLAlchemyError("connection lost")
 
-        await service._resolve_user_fields([obj])
+        await service.resolve_user_references([obj])
 
-        assert obj.created_by == user_id
+        assert obj.created_by is None
 
     @pytest.mark.asyncio
     async def test_resolves_multiple_objects(self, service: IntegrationService, mock_session: MagicMock) -> None:
         user_id_1 = uuid4()
         user_id_2 = uuid4()
 
-        obj1 = MagicMock()
-        obj1.created_by = user_id_1
-        obj1.updated_by = None
-        obj2 = MagicMock()
-        obj2.created_by = user_id_2
-        obj2.updated_by = user_id_1
+        obj1 = SimpleNamespace(created_by=user_id_1, updated_by=None)
+        obj2 = SimpleNamespace(created_by=user_id_2, updated_by=user_id_1)
 
-        mock_result = MagicMock()
-        mock_result.__iter__ = MagicMock(return_value=iter([(user_id_1, "alice"), (user_id_2, "bob")]))
-        mock_session.exec.return_value = mock_result
+        mock_session.exec.return_value = [(user_id_1, "alice"), (user_id_2, "bob")]
 
-        await service._resolve_user_fields([obj1, obj2])
+        await service.resolve_user_references([obj1, obj2])
 
-        assert obj1.created_by == "alice"
-        assert obj2.created_by == "bob"
-        assert obj2.updated_by == "alice"
+        assert isinstance(obj1.created_by, UserReference)
+        assert obj1.created_by.name == "alice"
+        assert isinstance(obj2.created_by, UserReference)
+        assert obj2.created_by.name == "bob"
+        assert isinstance(obj2.updated_by, UserReference)
+        assert obj2.updated_by.name == "alice"
 
     @pytest.mark.asyncio
     async def test_empty_objects_list(self, service: IntegrationService, mock_session: MagicMock) -> None:
-        await service._resolve_user_fields([])
+        await service.resolve_user_references([])
 
         mock_session.exec.assert_not_awaited()

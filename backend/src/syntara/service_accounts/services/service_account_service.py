@@ -17,6 +17,7 @@ from syntara.core.exceptions import assert_project_id_unchanged
 from syntara.core.models import User
 from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin
+from syntara.core.services.user_reference_resolution import UserReferenceMixin
 from syntara.service_accounts.exceptions import ServiceAccountNameConflictError, ServiceAccountNotFoundError
 from syntara.service_accounts.models.service_account import ServiceAccount, ServiceAccountStatus
 from syntara.service_accounts.models.service_account_credential import ServiceAccountCredential
@@ -34,7 +35,7 @@ class ServiceAccountConvertMixin(ConvertResourceMixin):
         return ServiceAccountRead.model_validate(resource)
 
 
-class ServiceAccountService(BaseService):
+class ServiceAccountService(UserReferenceMixin, BaseService):
     """Service for service account business logic."""
 
     def __init__(self, session: AsyncSession, user: User) -> None:

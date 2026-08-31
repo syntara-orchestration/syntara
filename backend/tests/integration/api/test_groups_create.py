@@ -7,6 +7,7 @@ import pytest
 from httpx import AsyncClient
 
 from syntara.core.models import User
+from tests.helpers.user_reference import assert_user_reference
 from tests.integration.helpers.error_data import assert_error_data
 
 GROUPS_URL = "/api/v1/groups"
@@ -74,7 +75,7 @@ class TestGroupsCreateContract:
         assert response.status_code == 201
 
         data = response.json()
-        assert data["created_by"] == str(admin_user.id)
+        assert_user_reference(data["created_by"], admin_user)
 
     @pytest.mark.asyncio
     async def test_create_group_duplicate_name_conflict(self, admin_client: AsyncClient) -> None:
