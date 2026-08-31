@@ -1,9 +1,17 @@
 import { Content, Tab } from '@patternfly/react-core'
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
+import { createRootRoute, createRoute } from '@tanstack/react-router'
 
 import { SynPanel } from '../layout/SynPanel'
 
 import { SynUrlTabs } from './SynUrlTabs'
+
+// Wildcard route allows arbitrary test URLs (/resource/details, /resource/activity-log) to match
+const rootRoute = createRootRoute()
+const mockRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '$',
+})
 
 // Tab content follows the real-world pattern: each Tab panel owns its inner padding.
 function TabPane({ label }: { label: string }) {
@@ -15,6 +23,7 @@ function TabPane({ label }: { label: string }) {
 }
 
 // Standard three tabs used across all stories.
+// Multi-word labels ("Activity log", "Access roles") demonstrate the sentence-case rule.
 function StandardTabs({ basePath, defaultTab }: { basePath: string; defaultTab?: string }) {
   return (
     <SynUrlTabs basePath={basePath} defaultTab={defaultTab ?? 'details'} aria-label="Resource tabs">
@@ -34,7 +43,6 @@ function StandardTabs({ basePath, defaultTab }: { basePath: string; defaultTab?:
 const meta: Meta<typeof SynUrlTabs> = {
   component: SynUrlTabs,
   tags: ['autodocs'],
-  // Wrap all stories in SynPanel automatically
   decorators: [
     (Story) => (
       <SynPanel>
@@ -43,6 +51,11 @@ const meta: Meta<typeof SynUrlTabs> = {
     ),
   ],
   parameters: {
+    tanstack: {
+      router: {
+        route: mockRoute,
+      },
+    },
     docs: {
       description: {
         component:
@@ -66,7 +79,7 @@ export default meta
 
 type Story = StoryObj<typeof meta>
 
-/** First tab active — the URL segment matches the first tab key. */
+/** First tab active — the URL segment matches the first tab key. `SynUrlTabs` lives inside `SynPanel`. */
 export const Default: Story = {
   render: () => <StandardTabs basePath="/resource" />,
   parameters: {
