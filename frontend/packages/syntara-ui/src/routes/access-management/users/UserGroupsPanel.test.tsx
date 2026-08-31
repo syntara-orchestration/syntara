@@ -128,7 +128,7 @@ describe('UserGroupsPanel', () => {
     vi.mocked(accessClient.useMutation).mockReturnValue({
       mutate: vi.fn(),
       isPending: false,
-    } as never)
+    })
   })
 
   describe('Rendering', () => {
@@ -548,7 +548,7 @@ describe('UserGroupsPanel', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         mutate: mockRemoveMutate,
         isPending: false,
-      } as never)
+      })
 
       render(<UserGroupsPanel userId="user-123" />, { wrapper })
 
@@ -620,7 +620,7 @@ describe('UserGroupsPanel', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         mutate: mockRemoveMutate,
         isPending: false,
-      } as never)
+      })
 
       render(<UserGroupsPanel userId="user-123" />, { wrapper })
 
@@ -838,7 +838,7 @@ describe('UserGroupsPanel', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         mutate: mockAddMutate,
         isPending: false,
-      } as never)
+      })
 
       return { mockRefetch }
     }

@@ -293,7 +293,7 @@ describe('IntegrationForm', () => {
       mutateAsync: mockMutateAsync,
       isPending: false,
       isError: false,
-    } as never)
+    })
 
     const user = userEvent.setup()
     render(<IntegrationForm />, { wrapper })

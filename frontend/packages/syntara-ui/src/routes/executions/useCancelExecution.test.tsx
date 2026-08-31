@@ -44,7 +44,7 @@ describe('useCancelExecution', () => {
     vi.mocked(executionsClient.useMutation).mockReturnValue({
       mutate: mockMutate,
       isPending: false,
-    } as never)
+    })
   })
 
   it('calls mutate with the correct execution ID and shows success', () => {
@@ -91,7 +91,7 @@ describe('useCancelExecution', () => {
     vi.mocked(executionsClient.useMutation).mockReturnValue({
       mutate: mockMutate,
       isPending: true,
-    } as never)
+    })
 
     const { Wrapper } = createWrapper()
     const { result } = renderHook(() => useCancelExecution('exec-abc'), { wrapper: Wrapper })

@@ -118,7 +118,7 @@ export function LogicNodeForm({ onSubmit, initialData, onHeaderContentChange }: 
       strategy: initialData?.strategy,
       requiredPathCount: initialData?.requiredPathCount,
       wait_duration: initialData?.wait_duration,
-      settings: initialData?.settings as ConvergeFormData['settings'],
+      settings: initialData?.settings,
     } satisfies Partial<ConvergeFormData>
     const convergeData: Partial<ConvergeFormData> = Object.fromEntries(
       Object.entries(convergeSource).filter(([, v]) => v !== undefined)

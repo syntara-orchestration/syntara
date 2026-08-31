@@ -52,7 +52,7 @@ function makeProject(overrides: Partial<ProjectRead> = {}): ProjectRead {
     id: 'proj-1',
     name: 'Project Alpha',
     ...overrides,
-  } as ProjectRead
+  }
 }
 
 describe('FlatApprovalsTableBody', () => {

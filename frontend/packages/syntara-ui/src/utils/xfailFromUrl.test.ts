@@ -206,7 +206,7 @@ describe('buildTestId', () => {
   // testInfo.titlePath already starts with the testDir-relative spec path
   // (verified against Playwright: e.g. ['sub/foo.spec.ts', 'describe', 'test']).
   const asTestInfo = (titlePath: string[]): Pick<TestInfo, 'titlePath'> =>
-    ({ titlePath }) as Pick<TestInfo, 'titlePath'>
+    ({ titlePath })
 
   it('joins the titlePath without duplicating the spec path', () => {
     // Regression: buildTestId used to prepend testInfo.file, yielding

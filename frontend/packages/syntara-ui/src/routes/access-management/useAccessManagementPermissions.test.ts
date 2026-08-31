@@ -71,7 +71,7 @@ describe('useAccessManagementPermissions', () => {
   })
 
   it('updates to true when API confirms access', async () => {
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
 
     const { result } = renderHook(() => useAccessManagementPermissions(), { wrapper: createWrapper() })
 
@@ -81,7 +81,7 @@ describe('useAccessManagementPermissions', () => {
   })
 
   it('updates to false when API denies all access', async () => {
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: false } } as never)
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: false } })
 
     const { result } = renderHook(() => useAccessManagementPermissions(), { wrapper: createWrapper() })
 
@@ -173,7 +173,7 @@ describe('useAccessManagementPermissions', () => {
   })
 
   it('calls can_i with check_any_project for project-aware resources', async () => {
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
 
     renderHook(() => useAccessManagementPermissions(), { wrapper: createWrapper() })
 
@@ -204,7 +204,7 @@ describe('useAccessManagementPermissions', () => {
   })
 
   it('deduplicates queries across multiple consumers', async () => {
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
 
     const wrapper = createWrapper()
     renderHook(() => useAccessManagementPermissions(), { wrapper })

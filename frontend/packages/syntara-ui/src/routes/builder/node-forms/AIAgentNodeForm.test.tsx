@@ -151,11 +151,11 @@ describe('AIAgentNodeForm', () => {
       isPending: false,
       error: null,
       refetch: vi.fn(),
-    } as never)
+    })
     vi.mocked(credentialsClient.useMutation).mockReturnValue({
       mutate: vi.fn(),
       isPending: false,
-    } as never)
+    })
     vi.mocked(useAllProjects).mockReturnValue({ projects: [], isLoading: false, error: null, refetch: vi.fn() })
     vi.mocked(useSelectableProjects).mockReturnValue({ projects: [], isLoading: false, error: null, refetch: vi.fn() })
     vi.mocked(useFileStorageStatus).mockReturnValue({
@@ -742,7 +742,7 @@ describe('AIAgentNodeForm', () => {
         isLoading: true,
         isError: false,
         refetch: vi.fn().mockResolvedValue({}),
-      } as never)
+      })
 
       renderWithHeader(<AIAgentNodeForm onSubmit={mockOnSubmit} />)
 
@@ -824,14 +824,14 @@ describe('AIAgentNodeForm', () => {
           isLoading: true,
           isError: false,
           refetch: vi.fn().mockResolvedValue({}),
-        } as never)
+        })
 
         vi.mocked(useAllEnabledMcpIntegrations).mockReturnValue({
           integrations: [],
           isLoading: true,
           isError: false,
           refetch: vi.fn().mockResolvedValue({}),
-        } as never)
+        })
 
         renderWithHeader(
           <AIAgentNodeForm

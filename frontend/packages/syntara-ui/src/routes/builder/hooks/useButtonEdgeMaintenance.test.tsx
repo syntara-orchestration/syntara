@@ -191,7 +191,7 @@ describe('useButtonEdgeMaintenance', () => {
       if (typeof updater === 'function') {
         capturedEdges = updater([
           { id: 'edge-1', source: 'node-1', target: 'node-2', sourceHandle: 'source' },
-        ] as unknown as EdgeType[])
+        ])
       }
       return capturedEdges
     })
@@ -834,7 +834,7 @@ describe('useButtonEdgeMaintenance', () => {
             targetHandle: 'target',
             data: { isActive: false },
           },
-        ] as unknown as EdgeType[])
+        ])
         edgesCalls.push(result)
         return result
       }
@@ -888,7 +888,7 @@ describe('useButtonEdgeMaintenance', () => {
             targetHandle: 'target',
             data: { isActive: false },
           },
-        ] as unknown as EdgeType[])
+        ])
         edgesCalls.push(result)
         return result
       }
@@ -1024,7 +1024,7 @@ describe('useButtonEdgeMaintenance', () => {
           edges,
           executionStatus,
         }),
-      { initialProps: { executionStatus: 'running' as string | null } }
+      { initialProps: { executionStatus: 'running' } }
     )
 
     // In execution mode, no button edges should be created

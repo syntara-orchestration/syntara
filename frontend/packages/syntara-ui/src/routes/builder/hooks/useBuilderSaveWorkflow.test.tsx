@@ -3,6 +3,7 @@ import { describe, expect, it, vi, beforeEach, type MockedFunction } from 'vites
 
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
+import { expectStringContaining } from '../../../test/test-helpers'
 import { detachPromise } from '../../../utils/detachPromise'
 
 import type { UseBuilderSaveWorkflowParams } from './useBuilderSaveWorkflow'
@@ -98,7 +99,7 @@ describe('useBuilderSaveWorkflow', () => {
     const { result } = renderHook(() => useBuilderSaveWorkflow(buildParams({ currentWorkflow: null, showError })))
 
     await expect(result.current()).resolves.toBe(false)
-    expect(showError).toHaveBeenCalledWith({ title: 'Failed to save workflow', description: 'No workflow to save' })
+    expect(showError).toHaveBeenCalledWith({ title: 'Save failed', description: 'No workflow to save' })
   })
 
   it('returns false and shows danger toast when create path has no project', async () => {
@@ -209,13 +210,13 @@ describe('useBuilderSaveWorkflow', () => {
 
     await expect(result.current()).resolves.toBe(false)
     expect(showError).toHaveBeenCalledWith({
-      title: 'Failed to create workflow',
-      description: expect.stringContaining('Failed to create workflow') as unknown as string,
+      title: 'Create failed',
+      description: expectStringContaining('Failed to create workflow'),
     })
   })
 
   it('does not call create when update path is used', async () => {
-    const createWorkflow = vi.fn() as MockedFunction<CreateWorkflow>
+    const createWorkflow = vi.fn()
     const updateWorkflow = vi.fn((...args: Parameters<UpdateWorkflow>) => {
       detachPromise(args[1]?.onSuccess?.(updateResponse()))
     }) as MockedFunction<UpdateWorkflow>
@@ -267,7 +268,7 @@ describe('useBuilderSaveWorkflow', () => {
     await expect(result.current()).resolves.toBe(false)
     expect(showError).toHaveBeenCalledWith(
       expect.objectContaining({
-        title: 'Failed to create workflow',
+        title: 'Create failed',
         description: expect.stringContaining('has warnings') as unknown as string,
       })
     )
@@ -287,7 +288,7 @@ describe('useBuilderSaveWorkflow', () => {
     await expect(result.current()).resolves.toBe(false)
     expect(showError).toHaveBeenCalledWith(
       expect.objectContaining({
-        title: 'Failed to update workflow',
+        title: 'Update failed',
         description: expect.stringContaining('has warnings') as unknown as string,
       })
     )
@@ -426,7 +427,7 @@ describe('useBuilderSaveWorkflow', () => {
     await expect(result.current()).resolves.toBe(false)
     expect(showError).toHaveBeenCalledWith(
       expect.objectContaining({
-        title: 'Failed to update workflow',
+        title: 'Update failed',
         description: expect.stringContaining(
           'Step "Orphan Script" is unreachable from any trigger'
         ) as unknown as string,

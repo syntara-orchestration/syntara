@@ -65,7 +65,7 @@ describe('ActionNodeForm', () => {
       isPending: false,
       error: null,
       refetch: vi.fn(),
-    } as never)
+    })
     vi.mocked(useAllCredentials).mockReturnValue({
       credentials: [],
       isLoading: false,
@@ -75,7 +75,7 @@ describe('ActionNodeForm', () => {
     vi.mocked(credentialsClient.useMutation).mockReturnValue({
       mutate: vi.fn(),
       isPending: false,
-    } as never)
+    })
     vi.mocked(useAllProjects).mockReturnValue({ projects: [], isLoading: false, error: null, refetch: vi.fn() })
     vi.mocked(useSelectableProjects).mockReturnValue({ projects: [], isLoading: false, error: null, refetch: vi.fn() })
   })

@@ -94,7 +94,7 @@ describe('useApiErrorAlert', () => {
 
   it('shows alert for different errors', () => {
     const { rerender } = renderHook(({ e }) => useApiErrorAlert(e), {
-      initialProps: { e: { detail: 'Error 1' } as unknown },
+      initialProps: { e: { detail: 'Error 1' } },
     })
 
     expect(mockShowError).toHaveBeenCalledTimes(1)
@@ -105,7 +105,7 @@ describe('useApiErrorAlert', () => {
 
   it('resets deduplication when error becomes null', () => {
     const { rerender } = renderHook(({ e }) => useApiErrorAlert(e), {
-      initialProps: { e: { detail: 'Error' } as unknown },
+      initialProps: { e: { detail: 'Error' } },
     })
 
     expect(mockShowError).toHaveBeenCalledTimes(1)

@@ -1,4 +1,3 @@
-import type { V2WorkflowDefinition } from '@syntara/contracts'
 import { useCallback } from 'react'
 
 import { workflowClient } from '../../../client'
@@ -29,7 +28,7 @@ export function useForkWorkflow({ workflowDefinition, workflowName, projectId }:
         body: {
           name: forkName,
           description: '',
-          workflow_definition: workflowDefinition as unknown as V2WorkflowDefinition,
+          workflow_definition: workflowDefinition,
           project_id: projectId,
         },
       })

@@ -118,7 +118,7 @@ export function useWorkflowImportExport({
         edges,
         nodePositions,
       })
-      downloadWorkflowDefinition(definition as Record<string, unknown>, name)
+      downloadWorkflowDefinition(definition, name)
     } catch (err: unknown) {
       showError({ title: 'Failed to export workflow', description: getErrorMessage(err) })
     }
