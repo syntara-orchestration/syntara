@@ -32,22 +32,21 @@ import { createUnavailableGuard, type Page, expect, test, toAppUrl } from './fix
 import { APP_TITLE } from './helpers/appTitle'
 import { apiRequest } from './utils/api'
 
-/** Navigate to settings and click the Context Manager tab. */
+/** Navigate to the Context Manager settings category. */
 async function goToContextManager(app: Page) {
-  await app.goto(toAppUrl('/system-administration/settings'))
-  const cmTab = app.getByRole('tab', { name: /Context Manager/i })
-  await cmTab.click()
+  await app.goto(toAppUrl('/system-administration/settings/context_manager'))
   // PF6 FormSection renders role="group" with the title as its accessible name.
-  await expect(app.getByRole('group', { name: 'Compression' })).toBeVisible({ timeout: 5000 })
+  await expect(app.getByRole('group', { name: 'Compression' })).toBeVisible({ timeout: 10_000 })
 }
 
-/** Navigate to settings and click the System tab. */
+/** Navigate to the System settings category. */
 async function goToSystem(app: Page) {
-  await app.goto(toAppUrl('/system-administration/settings'))
-  const sysTab = app.getByRole('tab', { name: 'System', exact: true })
-  await sysTab.click()
-  // Wait for the System tab panel to load
-  await expect(app.getByRole('tabpanel', { name: 'System' })).toBeVisible({ timeout: 10_000 })
+  await app.goto(toAppUrl('/system-administration/settings/system'))
+  // SynUrlTabs stubs empty tabpanels with aria-label={slug}; category fields render outside them.
+  await expect(app.getByRole('tab', { name: 'System', exact: true })).toHaveAttribute('aria-selected', 'true', {
+    timeout: 10_000,
+  })
+  await expect(app.getByRole('button', { name: 'System Log Level', exact: true })).toBeVisible({ timeout: 10_000 })
 }
 
 /** Reset a single setting via its kebab menu then save. No-op if already at default. */
