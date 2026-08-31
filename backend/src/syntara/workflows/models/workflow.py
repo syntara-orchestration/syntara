@@ -5,14 +5,14 @@ SQLModel Pattern 1 (separate models with table=False for API operations).
 """
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Annotated, Any, ClassVar
 from uuid import UUID
 
-from pydantic import ConfigDict, field_validator
+from pydantic import ConfigDict
 from sqlmodel import CheckConstraint, Field, Index, Relationship, SQLModel, text
 
 from syntara.core.constants import FieldLimits
-from syntara.core.jsonb_limits import validate_labels_dict, validate_workflow_definition_json
+from syntara.core.jsonb_limits import LabelsField, OptionalLabelsField, WorkflowDefinitionSizeValidator
 from syntara.core.models.base import Resource
 from syntara.core.models.pagination import ResourcesResponse
 from syntara.workflows.models.validation_finding import ValidationResult
@@ -178,13 +178,7 @@ class WorkflowBase(SQLModel):
     description: str | None = Field(
         None, max_length=FieldLimits.DESCRIPTION_MAX_LENGTH, description="Workflow description"
     )
-    labels: dict[str, Any] = Field(default_factory=dict, description="Workflow labels")
-
-    @field_validator("labels", mode="before")
-    @classmethod
-    def validate_labels(cls, v: dict[str, str] | None) -> dict[str, str] | None:
-        """Validate labels structure and serialized size."""
-        return validate_labels_dict(v)
+    labels: LabelsField = Field(default_factory=dict, description="Workflow labels")
 
 
 class WorkflowCreate(WorkflowBase):
@@ -195,21 +189,15 @@ class WorkflowCreate(WorkflowBase):
     on failure, the raw dict falls through to the service-level validator.
     """
 
-    workflow_definition: WorkflowDefinition | dict[str, Any] = Field(..., description="Workflow definition object")
+    workflow_definition: Annotated[WorkflowDefinition | dict[str, Any], WorkflowDefinitionSizeValidator] = Field(
+        ..., description="Workflow definition object"
+    )
     project_id: UUID = Field(..., description="Project to assign workflow to")
     is_import: bool = Field(
         default=False,
         description="When true, unavailable LLM models are cleared with warnings "
         "instead of rejecting the request. Use when importing workflows from other instances.",
     )
-
-    @field_validator("workflow_definition", mode="before")
-    @classmethod
-    def validate_workflow_definition_size(
-        cls, v: WorkflowDefinition | dict[str, Any]
-    ) -> WorkflowDefinition | dict[str, Any]:
-        """Reject oversized workflow_definition payloads."""
-        return validate_workflow_definition_json(v)
 
 
 class WorkflowUpdate(SQLModel):
@@ -228,8 +216,8 @@ class WorkflowUpdate(SQLModel):
     description: str | None = Field(
         None, max_length=FieldLimits.DESCRIPTION_MAX_LENGTH, description="Update workflow description"
     )
-    labels: dict[str, Any] | None = Field(None, description="Update workflow labels")
-    workflow_definition: WorkflowDefinition | dict[str, Any] | None = Field(
+    labels: OptionalLabelsField = Field(None, description="Update workflow labels")
+    workflow_definition: Annotated[WorkflowDefinition | dict[str, Any] | None, WorkflowDefinitionSizeValidator] = Field(
         None, description="New workflow definition (auto-creates version)"
     )
     change_description: str | None = Field(None, description="Description of changes for version history")
@@ -237,14 +225,6 @@ class WorkflowUpdate(SQLModel):
         None,
         description="Version the client was editing. If the server's current_version is higher, returns 409 Conflict.",
     )
-
-    @field_validator("workflow_definition", mode="before")
-    @classmethod
-    def validate_workflow_definition_size(
-        cls, v: WorkflowDefinition | dict[str, Any] | None
-    ) -> WorkflowDefinition | dict[str, Any] | None:
-        """Reject oversized workflow_definition payloads."""
-        return validate_workflow_definition_json(v)
 
 
 class WorkflowRead(WorkflowBase):

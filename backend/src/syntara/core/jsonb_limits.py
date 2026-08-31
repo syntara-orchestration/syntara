@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Annotated, Any
+
+from pydantic import BeforeValidator
 
 from syntara.core.constants import FieldLimits, JsonbLimits, ValidationMessages
 from syntara.core.exceptions import SafeValueError
@@ -83,3 +85,16 @@ def validate_workflow_definition_json[T](value: T) -> T:
         field_name="workflow_definition",
         max_bytes=JsonbLimits.MAX_WORKFLOW_DEFINITION_BYTES,
     )
+
+
+# Reusable annotated field types / validators: apply at the field's type annotation
+# instead of redeclaring a per-class field_validator, so new labels/workflow_definition
+# fields get the size cap automatically rather than by convention (a per-class
+# copy-paste validator pattern previously let WorkflowUpdate.labels slip through
+# uncapped). WorkflowDefinitionSizeValidator is exposed standalone (rather than bundled
+# into a type alias with WorkflowDefinition) to avoid a circular import: WorkflowDefinition
+# lives in syntara.workflows.models, whose package __init__ transitively imports
+# BaseResource from this module's own callers.
+LabelsField = Annotated[dict[str, str], BeforeValidator(validate_labels_dict)]
+OptionalLabelsField = Annotated[dict[str, str] | None, BeforeValidator(validate_labels_dict)]
+WorkflowDefinitionSizeValidator = BeforeValidator(validate_workflow_definition_json)

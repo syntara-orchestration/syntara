@@ -1,11 +1,11 @@
 """Workflow validation request model."""
 
-from typing import Any, ClassVar
+from typing import Annotated, Any, ClassVar
 
-from pydantic import ConfigDict, Field, field_validator
+from pydantic import ConfigDict, Field
 from sqlmodel import SQLModel
 
-from syntara.core.jsonb_limits import validate_workflow_definition_json
+from syntara.core.jsonb_limits import WorkflowDefinitionSizeValidator
 
 
 class WorkflowValidateRequest(SQLModel):
@@ -16,12 +16,8 @@ class WorkflowValidateRequest(SQLModel):
     reporting with node-level attribution.
     """
 
-    workflow_definition: dict[str, Any] = Field(..., description="Workflow definition to validate")
-
-    @field_validator("workflow_definition", mode="before")
-    @classmethod
-    def validate_workflow_definition_size(cls, v: dict[str, Any]) -> dict[str, Any]:
-        """Reject oversized workflow_definition payloads."""
-        return validate_workflow_definition_json(v)
+    workflow_definition: Annotated[dict[str, Any], WorkflowDefinitionSizeValidator] = Field(
+        ..., description="Workflow definition to validate"
+    )
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]

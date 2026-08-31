@@ -49,6 +49,9 @@ class RequestLimits:
     """HTTP request ingress limits."""
 
     DEFAULT_MAX_BODY_MB = 10
+    # Hard ceiling on the multipart body allowance, regardless of file upload settings.
+    # Bounds the damage from a spoofed multipart Content-Type on a non-multipart request.
+    MAX_MULTIPART_BODY_BYTES = 200 * 1024 * 1024  # 200MB
 
 
 class JsonbLimits:

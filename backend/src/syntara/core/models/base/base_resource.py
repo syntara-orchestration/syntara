@@ -105,7 +105,13 @@ class BaseResource(SQLModel, ABC):
     @field_validator("labels", mode="before")
     @classmethod
     def validate_labels(cls, v: dict[str, str] | None) -> dict[str, str] | None:
-        """Validate labels structure, per-entry limits, and serialized size."""
+        """Validate labels structure, per-entry limits, and serialized size.
+
+        Kept as a field_validator (not the Annotated LabelsField type) because this
+        class is inherited by table=True models; SQLModel's column-type inference
+        cannot resolve a JSONB sa_type through an Annotated[..., BeforeValidator(...)]
+        wrapper (raises "no matching SQLAlchemy type").
+        """
         return validate_labels_dict(v)
 
     model_config: ClassVar[ConfigDict] = ConfigDict(

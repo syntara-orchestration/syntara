@@ -5,16 +5,16 @@ SQLModel Pattern 1 (separate models with table=False for API operations).
 """
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, ClassVar, Literal
+from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Literal
 from uuid import UUID
 
-from pydantic import ConfigDict, field_validator
+from pydantic import ConfigDict
 from sqlalchemy import String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, Index, Relationship, SQLModel
 
 from syntara.core.constants import FieldLimits
-from syntara.core.jsonb_limits import validate_workflow_definition_json
+from syntara.core.jsonb_limits import WorkflowDefinitionSizeValidator
 from syntara.core.models.base import SoftDeletableResource, UserOwnedResource
 from syntara.core.models.pagination import ResourcesResponse
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
@@ -88,12 +88,6 @@ class WorkflowVersion(UserOwnedResource, SoftDeletableResource, table=True):
         sa_type=JSONB,
         description="Complete workflow definition as JSONB",
     )
-
-    @field_validator("workflow_definition", mode="before")
-    @classmethod
-    def validate_workflow_definition_size(cls, v: dict[str, Any]) -> dict[str, Any]:
-        """Reject oversized workflow_definition payloads."""
-        return validate_workflow_definition_json(v)
 
     change_description: str | None = Field(
         default=None,
@@ -192,21 +186,13 @@ class PublishVersionRequest(SQLModel):
 
     name: str | None = Field(None, max_length=255, description="Optional name for this version")
     change_description: str | None = Field(None, max_length=1024, description="Description of changes in this version")
-    workflow_definition: WorkflowDefinition | dict[str, Any] | None = Field(
+    workflow_definition: Annotated[WorkflowDefinition | dict[str, Any] | None, WorkflowDefinitionSizeValidator] = Field(
         None, description="Optional workflow definition to publish directly (skips separate save step)"
     )
     expected_version: int | None = Field(
         None,
         description="Version the client was editing. If the server's current_version is higher, returns 409 Conflict.",
     )
-
-    @field_validator("workflow_definition", mode="before")
-    @classmethod
-    def validate_workflow_definition_size(
-        cls, v: WorkflowDefinition | dict[str, Any] | None
-    ) -> WorkflowDefinition | dict[str, Any] | None:
-        """Reject oversized workflow_definition payloads."""
-        return validate_workflow_definition_json(v)
 
 
 # Rebuild models to resolve forward references

@@ -71,11 +71,15 @@ class FileUploadSettings(BaseSettings):
 
     file_upload_max_size_mb: int = Field(
         default=10,
+        ge=1,
+        le=500,
         description="Maximum file size in MB per file",
     )
 
     file_upload_max_files: int = Field(
         default=10,
+        ge=1,
+        le=100,
         description="Maximum number of files per invocation",
     )
 
