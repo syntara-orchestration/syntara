@@ -23,14 +23,7 @@ FROM mirror.gcr.io/library/nginx:1.27.4-alpine@sha256:4ff102c5d78d254a6f0da062b3
 
 COPY --from=builder /licenses /licenses
 
-COPY --from=builder --chown=nginx:nginx /app/packages/syntara-ui/dist /usr/share/nginx/html
+COPY --from=builder /app/packages/syntara-ui/dist /usr/share/nginx/html
 COPY packages/syntara-ui/nginx.conf.template /etc/nginx/templates/default.conf.template
-
-# Allow nginx user to write PID file and use cache directories
-RUN touch /var/run/nginx.pid \
-    && chown -R nginx:nginx /var/run/nginx.pid /var/cache/nginx /var/log/nginx /etc/nginx/conf.d
-
-USER nginx
-
-EXPOSE 8080
+EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]

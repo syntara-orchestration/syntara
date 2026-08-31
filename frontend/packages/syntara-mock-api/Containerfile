@@ -28,7 +28,7 @@ COPY --from=builder /app/package.json /app/package-lock.json ./
 COPY --from=builder /app/packages/syntara-contracts/package.json ./packages/syntara-contracts/
 COPY --from=builder /app/packages/syntara-mock-api/package.json ./packages/syntara-mock-api/
 
-RUN npm ci --omit=dev --no-fund --no-audit --ignore-scripts
+RUN npm ci --omit=dev --no-fund --ignore-scripts
 
 # Copy source code
 COPY --from=builder /app/packages/syntara-contracts ./packages/syntara-contracts
