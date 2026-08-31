@@ -33,11 +33,7 @@ function roundTrip(
     flattenedActivities,
     edges: loadedEdges,
     triggers: loadedTriggers,
-  } = convertV2Definition(
-    v2Def.nodes,
-    v2Def.edges,
-    v2Def.triggers
-  )
+  } = convertV2Definition(v2Def.nodes, v2Def.edges, v2Def.triggers)
 
   const rebuilt = buildWorkflowDefinition(name, description, flattenedActivities, loadedTriggers, {
     edges: loadedEdges,

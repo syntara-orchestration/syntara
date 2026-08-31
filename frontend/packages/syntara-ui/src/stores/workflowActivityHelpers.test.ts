@@ -15,29 +15,26 @@ import type { Activity } from './workflowStoreTypes'
 // v2: all nodes are flat with a config object, no nested structures
 const task = (id: string): Activity => ({ type: ActivityTypeEnum.SCRIPT, id, name: id, parameters: {} })
 
-const condition = (id: string): Activity =>
-  ({
-    type: ActivityTypeEnum.CONDITION,
-    id,
-    name: id,
-    parameters: { condition: 'true' },
-  })
+const condition = (id: string): Activity => ({
+  type: ActivityTypeEnum.CONDITION,
+  id,
+  name: id,
+  parameters: { condition: 'true' },
+})
 
-const loop = (id: string): Activity =>
-  ({
-    type: ActivityTypeEnum.LOOP,
-    id,
-    name: id,
-    parameters: { type: 'for_each', items: 'items' },
-  })
+const loop = (id: string): Activity => ({
+  type: ActivityTypeEnum.LOOP,
+  id,
+  name: id,
+  parameters: { type: 'for_each', items: 'items' },
+})
 
-const converge = (id: string): Activity =>
-  ({
-    type: ActivityTypeEnum.CONVERGE,
-    id,
-    name: id,
-    parameters: { strategy: 'all' },
-  })
+const converge = (id: string): Activity => ({
+  type: ActivityTypeEnum.CONVERGE,
+  id,
+  name: id,
+  parameters: { strategy: 'all' },
+})
 
 describe('findActivityById', () => {
   it('finds top-level activity', () => {

@@ -65,7 +65,7 @@ function cleanMetadata(metadata: ActivityMetadata | undefined): ActivityMetadata
   if (!metadata) return undefined
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { __isGeneric: _isGeneric, ...rest } = metadata
-  return Object.keys(rest).length > 0 ? (rest) : undefined
+  return Object.keys(rest).length > 0 ? rest : undefined
 }
 
 /** Get formId for add mode based on node type and subtype */

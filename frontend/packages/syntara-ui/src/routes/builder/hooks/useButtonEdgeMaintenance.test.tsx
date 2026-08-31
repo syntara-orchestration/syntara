@@ -189,9 +189,7 @@ describe('useButtonEdgeMaintenance', () => {
     let capturedEdges: unknown[] = []
     mockSetEdges.mockImplementation((updater) => {
       if (typeof updater === 'function') {
-        capturedEdges = updater([
-          { id: 'edge-1', source: 'node-1', target: 'node-2', sourceHandle: 'source' },
-        ])
+        capturedEdges = updater([{ id: 'edge-1', source: 'node-1', target: 'node-2', sourceHandle: 'source' }])
       }
       return capturedEdges
     })

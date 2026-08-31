@@ -311,10 +311,7 @@ export default function ExecutionDetail() {
 
   useSyncActivityStore(execution, activities)
 
-  const activityNameMap = useActivityNamesForExecution(
-    execution?.workflow_definition,
-    activities
-  )
+  const activityNameMap = useActivityNamesForExecution(execution?.workflow_definition, activities)
 
   const nodeClick = useExecutionNodeClick(executionId)
   const { approvals, currentIndex, currentApproval, isApprovalLoading, handleNodeClick, navigateToIndex } = nodeClick

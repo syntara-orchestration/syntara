@@ -82,10 +82,9 @@ export function SynKebabMenu({ actions, 'aria-label': ariaLabel, onOpenChange }:
     (ref: React.Ref<MenuToggleElement>) => (
       <KebabToggle
         toggleRef={(node: MenuToggleElement | null) => {
-          ;(toggleRef).current = node
+          toggleRef.current = node
           if (typeof ref === 'function') ref(node)
-          else if (ref && typeof ref === 'object')
-            (ref).current = node
+          else if (ref && typeof ref === 'object') ref.current = node
         }}
         isExpanded={isOpen}
         ariaLabel={ariaLabel}

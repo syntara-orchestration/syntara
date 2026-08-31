@@ -145,7 +145,7 @@ export function useExecutionData(executionId: string, options: UseExecutionDataO
     data: data,
     isLoading,
     isSuccess,
-    error: (error) ?? null,
+    error: error ?? null,
     refetch,
   }
 }

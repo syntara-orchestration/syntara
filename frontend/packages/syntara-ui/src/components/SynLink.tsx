@@ -9,10 +9,7 @@ type RouterLinkProps = React.AnchorHTMLAttributes<HTMLAnchorElement>
 /** Bridge PF Button's `href` convention to TanStack Router's `to` prop. */
 function RouterLink({ href, children, ...rest }: RouterLinkProps) {
   return (
-    <TanStackLink
-      to={(href ?? '/')}
-      {...(rest as Omit<ComponentProps<typeof TanStackLink>, 'to' | 'children'>)}
-    >
+    <TanStackLink to={href ?? '/'} {...(rest as Omit<ComponentProps<typeof TanStackLink>, 'to' | 'children'>)}>
       {children}
     </TanStackLink>
   )
