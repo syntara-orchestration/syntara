@@ -166,3 +166,58 @@ class TestPreResolvedLoopStateInit:
         wf = _make_workflow(pre_resolved_outputs={"script_1": {"output": {"result": "ok"}}})
         await wf._execute_node(node, MagicMock())
         assert "script_1" not in wf.loop_state
+
+    @pytest.mark.asyncio
+    async def test_pre_resolved_foreach_with_none_items_raises_clear_error(self) -> None:
+        """Pre-resolved forEach with None items surfaces the actionable error too."""
+        node = _make_loop_node(extra_config={"items": None})
+        wf = _make_workflow(pre_resolved_outputs={"loop_1": {"output": {"status": "completed"}}})
+        with pytest.raises(ValueError, match="resolved to None"):
+            await wf._execute_node(node, MagicMock())
+
+
+class TestValidateForEachItems:
+    """Tests for _validate_foreach_items guard on forEach loops."""
+
+    def test_list_items_pass(self) -> None:
+        node = _make_loop_node(extra_config={"items": ["a", "b"]})
+        # Should not raise for a valid list.
+        OrchestratorWorkflow._validate_foreach_items(node, ["a", "b"])
+
+    def test_empty_list_items_pass(self) -> None:
+        node = _make_loop_node(extra_config={"items": "${trigger.hosts}"})
+        # An empty list is a valid (zero-iteration) forEach, not an error.
+        OrchestratorWorkflow._validate_foreach_items(node, [])
+
+    def test_none_items_raise_value_error_naming_expression(self) -> None:
+        node = _make_loop_node(extra_config={"items": "${trigger.affected_hosts}"})
+        with pytest.raises(ValueError, match="resolved to None") as exc_info:
+            OrchestratorWorkflow._validate_foreach_items(node, None)
+        # Message names the failing expression and hints at input_data.
+        assert "${trigger.affected_hosts}" in str(exc_info.value)
+        assert "input_data" in str(exc_info.value)
+
+    def test_non_list_items_raise_type_error_naming_expression(self) -> None:
+        node = _make_loop_node(extra_config={"items": "${trigger.data}"})
+        with pytest.raises(TypeError, match="must resolve to a list") as exc_info:
+            OrchestratorWorkflow._validate_foreach_items(node, {"not": "a list"})
+        assert "${trigger.data}" in str(exc_info.value)
+        assert "dict" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_execute_loop_node_raises_on_none_items(self) -> None:
+        """_execute_loop_node fails fast (before running the loop activity) on None items."""
+        wf = _make_workflow()
+        wf._runtime_settings = {}
+        node = _make_loop_node(extra_config={"items": "${trigger.affected_hosts}"})
+        with pytest.raises(ValueError, match="resolved to None"):
+            await wf._execute_loop_node("loop_1", node, {"type": LoopType.FOR_EACH, "items": None})
+
+    @pytest.mark.asyncio
+    async def test_execute_loop_node_raises_on_non_list_items(self) -> None:
+        """_execute_loop_node fails fast on a non-list, non-None items value."""
+        wf = _make_workflow()
+        wf._runtime_settings = {}
+        node = _make_loop_node(extra_config={"items": "${trigger.data}"})
+        with pytest.raises(TypeError, match="must resolve to a list"):
+            await wf._execute_loop_node("loop_1", node, {"type": LoopType.FOR_EACH, "items": 42})

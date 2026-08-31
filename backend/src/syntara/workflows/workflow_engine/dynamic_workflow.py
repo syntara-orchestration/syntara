@@ -1265,11 +1265,49 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
 
         if loop_type == LoopType.FOR_EACH:
             items = _parse_items(loop_parameters.get("items", []))
+            # Fail fast with an actionable message before ForEachLoopState's own
+            # (opaque) list validation, so a forEach whose items expression resolved
+            # to None or a non-list surfaces a clean, self-explanatory failure
+            # instead of a silent zero-iteration loop or a bare Pydantic error.
+            self._validate_foreach_items(node, items)
             return ForEachLoopState(items=items)
 
         condition = loop_parameters.get("condition")
         max_iterations = loop_parameters.get("max_iterations")
         return DoWhileLoopState(condition=condition, max_iterations=max_iterations)
+
+    @staticmethod
+    def _validate_foreach_items(node: ActivityNode, items: Any) -> None:  # noqa: ANN401
+        """Validate a forEach loop's resolved ``items`` before iterating.
+
+        Args:
+            node: The loop node being executed.
+            items: The resolved ``items`` value for the forEach loop.
+
+        Raises:
+            ValueError: If ``items`` resolved to ``None`` (e.g. the referenced
+                input or step output was never populated).
+            TypeError: If ``items`` resolved to a non-list, non-None value.
+
+        """
+        if isinstance(items, list):
+            return
+
+        items_expression = node.parameters.get("items")
+        if items is None:
+            msg = (
+                f"forEach loop items expression {items_expression!r} resolved to None. "
+                "Ensure the referenced input or step output exists and is not empty. "
+                "If referencing a workflow input, verify it was provided in 'input_data' "
+                "when starting the execution."
+            )
+            raise ValueError(msg)
+
+        msg = (
+            f"forEach loop items expression {items_expression!r} must resolve to a list, "
+            f"got {type(items).__name__}: {items!r}"
+        )
+        raise TypeError(msg)
 
     async def _execute_node(
         self,
