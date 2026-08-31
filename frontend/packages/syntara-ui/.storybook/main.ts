@@ -10,7 +10,7 @@ const config: StorybookConfig = {
     getAbsolutePath('@storybook/addon-a11y'),
     getAbsolutePath('@storybook/addon-mcp'),
   ],
-  framework: getAbsolutePath('@storybook/tanstack-react'),
+  framework: '@storybook/tanstack-react',
   core: {
     disableTelemetry: true,
   },
