@@ -9,7 +9,7 @@ import {
 } from '@patternfly/react-core'
 import { RhUiCheckCircleIcon, RhUiCloseCircleIcon, RhUiHourglassIcon, RhUiSyncIcon } from '@patternfly/react-icons'
 import { ActionsColumn, ExpandableRowContent, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
-import type { Decorator, Meta, StoryObj } from '@storybook/react-vite'
+import type { Decorator, Meta, StoryObj } from '@storybook/tanstack-react'
 import type React from 'react'
 import { Fragment, useState } from 'react'
 
