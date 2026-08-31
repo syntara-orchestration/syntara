@@ -680,9 +680,7 @@ export function BuilderContent(props: BuilderContentProps) {
                       {showMostRecentRunPanelInEditor && mostRecentExecutionId && (
                         <ExecutionDetailsPanelWrapper
                           executionId={mostRecentExecutionId}
-                          workflowDefinition={
-                            workflow?.version?.workflow_definition
-                          }
+                          workflowDefinition={workflow?.version?.workflow_definition}
                           selectedNodeId={mostRecentSelectedNodeId}
                           selectedNodeName={mostRecentSelectedNodeName}
                           onNodeSelect={handleMostRecentNodeSelect}

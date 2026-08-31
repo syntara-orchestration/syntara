@@ -280,9 +280,7 @@ describe('registerLogicNodeSubmit', () => {
     })
 
     it('creates activity when cases array is empty', () => {
-      expect(submitSwitchLogic('s1', 'S', { logicType: ActivityTypeEnum.SWITCH, name: 'S', cases: [] })).toBe(
-        true
-      )
+      expect(submitSwitchLogic('s1', 'S', { logicType: ActivityTypeEnum.SWITCH, name: 'S', cases: [] })).toBe(true)
       expect(mockAddActivity).toHaveBeenCalled()
     })
 

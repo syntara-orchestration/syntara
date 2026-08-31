@@ -141,9 +141,7 @@ describe('EdgeFactory', () => {
 
   describe('addEdge', () => {
     it('adds edge to existing edges array', () => {
-      const existingEdges: EdgeType[] = [
-        { id: 'edge-1', source: 'node-1', target: 'node-2', type: 'default' },
-      ]
+      const existingEdges: EdgeType[] = [{ id: 'edge-1', source: 'node-1', target: 'node-2', type: 'default' }]
       const newEdge = EdgeFactory.createEdge({
         source: 'node-2',
         target: 'node-3',
@@ -170,9 +168,7 @@ describe('EdgeFactory', () => {
 
   describe('createAndAdd', () => {
     it('creates and adds edge in one operation', () => {
-      const existingEdges: EdgeType[] = [
-        { id: 'edge-1', source: 'node-1', target: 'node-2', type: 'default' },
-      ]
+      const existingEdges: EdgeType[] = [{ id: 'edge-1', source: 'node-1', target: 'node-2', type: 'default' }]
 
       const result = EdgeFactory.createAndAdd(
         {
@@ -210,9 +206,7 @@ describe('EdgeFactory', () => {
     })
 
     it('handles replacing non-existent edge', () => {
-      const existingEdges: EdgeType[] = [
-        { id: 'edge-1', source: 'node-1', target: 'node-2', type: 'default' },
-      ]
+      const existingEdges: EdgeType[] = [{ id: 'edge-1', source: 'node-1', target: 'node-2', type: 'default' }]
 
       const result = EdgeFactory.replaceEdge(
         'non-existent',
