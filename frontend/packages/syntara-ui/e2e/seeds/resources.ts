@@ -24,37 +24,36 @@ export async function createIntegrationViaApi(
     /** Tools to seed with the MCP integration (enables agent tool selection in E2E). */
     discoveredTools?: Array<{ name: string; enabled?: boolean }>
   }
-): Promise<SeededIntegration | null> {
-  try {
-    const token = options.token ?? (await getAuthToken(page))
-    if (!token) return null
+): Promise<SeededIntegration> {
+  const token = options.token ?? (await getAuthToken(page))
+  if (!token) throw new Error(`createIntegrationViaApi: could not obtain auth token for ${options.name}`)
 
-    const data: Record<string, unknown> = {
-      name: options.name,
+  const data: Record<string, unknown> = {
+    name: options.name,
+    integration_type: 'mcp_server',
+    configuration: {
       integration_type: 'mcp_server',
-      configuration: {
-        integration_type: 'mcp_server',
-        base_url: `https://example.com`,
-      },
-      scope: 'global',
-    }
-    if (options.discoveredTools?.length) {
-      data.discovered_tools = options.discoveredTools.map((tool) => ({
-        name: tool.name,
-        enabled: tool.enabled ?? true,
-      }))
-    }
-
-    const resp = await apiRequest(page, 'post', '/integrations', {
-      token,
-      data,
-    })
-    if (!resp.ok()) return null
-    const integration = (await resp.json()) as { id: string; name: string }
-    return { id: integration.id, name: integration.name }
-  } catch {
-    return null
+      base_url: `https://example.com`,
+    },
+    scope: 'global',
   }
+  if (options.discoveredTools?.length) {
+    data.discovered_tools = options.discoveredTools.map((tool) => ({
+      name: tool.name,
+      enabled: tool.enabled ?? true,
+    }))
+  }
+
+  const resp = await apiRequest(page, 'post', '/integrations', {
+    token,
+    data,
+  })
+  if (!resp.ok()) {
+    const body = await resp.text().catch(() => '')
+    throw new Error(`createIntegrationViaApi failed for ${options.name}: HTTP ${resp.status()} ${body}`)
+  }
+  const integration = (await resp.json()) as { id: string; name: string }
+  return { id: integration.id, name: integration.name }
 }
 
 export async function deleteIntegrationViaApi(page: Page, integrationId: string): Promise<void> {
