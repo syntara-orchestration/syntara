@@ -42,52 +42,54 @@ const seededIdPs: SeededIdentityProvider[] = []
 
 test.beforeAll(async ({ browser }) => {
   const page = await browser.newPage()
-  const token = await getAuthToken(page)
-  const prefix = buildUniqueName('e2e-pag')
+  try {
+    const token = await getAuthToken(page)
+    const prefix = buildUniqueName('e2e-pag')
 
-  if (!token) {
-    await page.close()
-    return
-  }
+    if (!token) throw new Error('pagination beforeAll: could not obtain auth token')
 
-  const project = await ensureProject(page)
-  const projectId = project?.id
+    const project = await ensureProject(page)
+    if (!project) throw new Error('pagination beforeAll: could not ensure project')
+    const projectId = project.id
 
-  const workflowResults = await Promise.allSettled(
-    Array.from({ length: 22 }, (_, i) =>
-      createWorkflowViaApi(page, { name: `${prefix}-workflow-${i + 1}`, projectId, token })
+    const workflowResults = await Promise.allSettled(
+      Array.from({ length: 22 }, (_, i) =>
+        createWorkflowViaApi(page, { name: `${prefix}-workflow-${i + 1}`, projectId, token })
+      )
     )
-  )
-  for (const result of workflowResults) {
-    if (result.status === 'fulfilled' && result.value) seededWorkflows.push(result.value)
-  }
+    const workflowErrors: unknown[] = []
+    for (const result of workflowResults) {
+      if (result.status === 'fulfilled') seededWorkflows.push(result.value)
+      else workflowErrors.push(result.reason)
+    }
+    if (workflowErrors.length) {
+      throw new Error(
+        `pagination beforeAll: failed to seed ${workflowErrors.length} workflows: ${String(workflowErrors[0])}`
+      )
+    }
 
-  for (let i = 1; i <= 2; i++) {
-    const cred = await createCredentialSeed(page, { name: `${prefix}-cred-${i}`, projectId, token })
-    if (cred) seededCredentials.push(cred)
-  }
+    for (let i = 1; i <= 2; i++) {
+      seededCredentials.push(await createCredentialSeed(page, { name: `${prefix}-cred-${i}`, projectId, token }))
+    }
 
-  for (let i = 1; i <= 2; i++) {
-    const integration = await createIntegrationViaApi(page, { name: `${prefix}-integ-${i}`, token })
-    seededIntegrations.push(integration)
-  }
+    for (let i = 1; i <= 2; i++) {
+      seededIntegrations.push(await createIntegrationViaApi(page, { name: `${prefix}-integ-${i}`, token }))
+    }
 
-  for (let i = 1; i <= 16; i++) {
-    const user = await createUserViaApi(page, { username: `${prefix}-user-${i}`, token })
-    if (user) seededUsers.push(user)
-  }
+    for (let i = 1; i <= 16; i++) {
+      seededUsers.push(await createUserViaApi(page, { username: `${prefix}-user-${i}`, token }))
+    }
 
-  for (let i = 1; i <= 15; i++) {
-    const group = await ensureGroupExists(page, `${prefix}-group-${i}`)
-    if (group) seededGroups.push(group)
-  }
+    for (let i = 1; i <= 15; i++) {
+      seededGroups.push(await ensureGroupExists(page, `${prefix}-group-${i}`))
+    }
 
-  for (let i = 1; i <= 21; i++) {
-    const idp = await createIdentityProviderViaApi(page, { name: `${prefix}-idp-${i}`, token })
-    if (idp) seededIdPs.push(idp)
+    for (let i = 1; i <= 21; i++) {
+      seededIdPs.push(await createIdentityProviderViaApi(page, { name: `${prefix}-idp-${i}`, token }))
+    }
+  } finally {
+    await page.close()
   }
-
-  await page.close()
 })
 
 test.afterAll(async ({ browser }) => {
@@ -205,6 +207,7 @@ test.describe('Project Selector — Workflows', () => {
       .catch(() => false)
     if (!selectorVisible) {
       guard.markUnavailable()
+      // Environment constraint: the project selector is absent in some mock/single-project setups.
       test.skip(true, 'Project selector not available in this environment')
       return
     }
@@ -217,6 +220,7 @@ test.describe('Project Selector — Workflows', () => {
       .catch(() => false)
     await app.keyboard.press('Escape')
     if (!optionsInteractive) guard.markUnavailable()
+    // Environment constraint: dropdown options never appear in some mock/single-project setups.
     test.skip(!optionsInteractive, 'Project selector is not interactive in this environment')
   })
 

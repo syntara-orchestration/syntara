@@ -24,10 +24,8 @@ test.beforeAll(async ({ browser }) => {
   credName = buildUniqueName('e2e-userlink')
   const page = await browser.newPage()
   const token = await getAuthToken(page)
-  if (token) {
-    const cred = await createCredentialSeed(page, { name: credName, token })
-    seededCred = cred
-  }
+  if (!token) throw new Error('credential-user-links beforeAll: could not obtain auth token')
+  seededCred = await createCredentialSeed(page, { name: credName, token })
   await page.close()
 })
 

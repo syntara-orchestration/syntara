@@ -64,7 +64,7 @@ test('my test', { tag: ['@local-only'] }, async ({ app }) => { ... })
 
 ### Never commit `test.fixme` as a long-term state
 
-`test.fixme` marks a test as expected-to-fail, which shows up in CI reports as a "known failure" rather than a clean skip. It is appropriate only as a same-PR placeholder (a test whose fix is in the next commit). For data-dependent conditional skipping use `test.skip(!condition, 'reason')`.
+`test.fixme` marks a test as expected-to-fail, which shows up in CI reports as a "known failure" rather than a clean skip. It is appropriate only as a same-PR placeholder (a test whose fix is in the next commit). For data-dependent conditional skipping use `test.skip(!condition, 'reason')`. GitHub-only skips may use `test.skip(!!process.env.CI, ...)`. For missing seed data use `expect(value, msg).toBeTruthy()`, not `test.skip`.
 
 ---
 

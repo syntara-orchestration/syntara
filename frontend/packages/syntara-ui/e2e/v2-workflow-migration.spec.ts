@@ -275,7 +275,7 @@ test.describe('V2 Workflow Schema Migration', () => {
   // 4. Comprehensive round-trip (all 9 node types)
   // -------------------------------------------------------------------------
 
-  test('comprehensive v2 workflow: all node types persist and reload', async ({ app }) => {
+  test('comprehensive v2 workflow: all node types render on canvas after API create', async ({ app }) => {
     test.setTimeout(60_000)
     const workflowName = buildUniqueName('v2-comprehensive')
 

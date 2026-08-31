@@ -35,22 +35,21 @@ const seededPolicies: SeededPolicy[] = []
 
 test.beforeAll(async ({ browser }) => {
   const page = await browser.newPage()
-  const token = await getAuthToken(page)
-  if (token) {
+  try {
+    const token = await getAuthToken(page)
+    if (!token) throw new Error('access-management beforeAll: could not obtain auth token')
     const prefix = buildUniqueName('e2e-am')
 
     for (let i = 1; i <= 2; i++) {
-      const user = await createUserViaApi(page, { username: `${prefix}-user-${i}`, token })
-      if (user) seededUsers.push(user)
+      seededUsers.push(await createUserViaApi(page, { username: `${prefix}-user-${i}`, token }))
     }
 
     const project = await ensureProject(page)
-    if (project) {
-      const policy = await createPolicyViaApi(page, project.id, { name: `${prefix}-policy`, token })
-      if (policy) seededPolicies.push(policy)
-    }
+    if (!project) throw new Error('access-management beforeAll: could not ensure project')
+    seededPolicies.push(await createPolicyViaApi(page, project.id, { name: `${prefix}-policy`, token }))
+  } finally {
+    await page.close()
   }
-  await page.close()
 })
 
 test.afterAll(async ({ browser }) => {
@@ -299,20 +298,18 @@ test.describe('Access Management — Shareable URLs', () => {
 
 test.describe('Access Management — User Detail Tabs', () => {
   test('detail sub-tabs sync to URL', async ({ app }) => {
+    expect(seededUsers.length, 'Failed to seed users via API').toBeGreaterThan(0)
+    const seededName = seededUsers[0].username
+
     await app.goto(toAppUrl(`${ACCESS_URL}/users`))
     await expect(app.getByRole('tab', { name: /Users/i })).toHaveAttribute('aria-selected', 'true')
 
-    // Wait for users table
     const table = app.getByRole('grid', { name: 'Users' })
-    const hasTable = await table
-      .waitFor({ state: 'visible', timeout: 5000 })
-      .then(() => true)
-      .catch(() => false)
-    expect(hasTable, 'No users data available; seed data required').toBeTruthy()
+    await expect(table).toBeVisible()
 
-    // Click the first username link in the table to navigate to detail
-    const firstRow = table.locator('tbody tr:first-child')
-    await firstRow.locator('td[data-label="Username"]').getByRole('link').click()
+    await app.getByPlaceholder('Filter by name').fill(seededName)
+    await app.getByRole('button', { name: 'Apply filter' }).click()
+    await table.getByRole('link', { name: seededName, exact: true }).click()
 
     // Should be on user detail page
     await expect(app).toHaveURL(new RegExp(`${ACCESS_URL}/users/`))
@@ -376,9 +373,8 @@ test.describe('Access Management — Policies Tab Columns', () => {
   })
 
   test('project-scoped policies show a clickable project link', async ({ app }) => {
+    expect(seededPolicies.length, 'Failed to create a project-scoped policy via API').toBeGreaterThan(0)
     const policy = seededPolicies[0]
-    expect(policy, 'Failed to create a project-scoped policy via API').toBeTruthy()
-    if (!policy) return
 
     const table = app.getByRole('grid', { name: 'Policies' })
     await app.getByPlaceholder('Filter by name').fill(policy.name)

@@ -29,22 +29,23 @@ let seededGroup: SeededGroup | null = null
 
 test.beforeAll(async ({ browser }) => {
   const page = await browser.newPage()
-  const token = await getAuthToken(page)
-  if (!token) throw new Error('access-pagination beforeAll: could not obtain auth token')
-  const prefix = buildUniqueName('e2e-accpag')
+  try {
+    const token = await getAuthToken(page)
+    if (!token) throw new Error('access-pagination beforeAll: could not obtain auth token')
+    const prefix = buildUniqueName('e2e-accpag')
 
-  for (let i = 1; i <= 3; i++) {
-    const user = await createUserViaApi(page, { username: `${prefix}-user-${i}`, token })
-    if (user) seededUsers.push(user)
+    for (let i = 1; i <= 3; i++) {
+      seededUsers.push(await createUserViaApi(page, { username: `${prefix}-user-${i}`, token }))
+    }
+
+    for (let i = 1; i <= 3; i++) {
+      seededRoles.push(await createRoleViaApi(page, { name: `${prefix}-role-${i}`, token }))
+    }
+
+    seededGroup = await ensureGroupExists(page, `${prefix}-group`)
+  } finally {
+    await page.close()
   }
-
-  for (let i = 1; i <= 3; i++) {
-    const role = await createRoleViaApi(page, { name: `${prefix}-role-${i}`, token })
-    if (role) seededRoles.push(role)
-  }
-
-  seededGroup = await ensureGroupExists(page, `${prefix}-group`)
-  await page.close()
 })
 
 test.afterAll(async ({ browser }) => {

@@ -76,41 +76,42 @@ export type SeededWorkflow = {
 export async function createWorkflowViaApi(
   page: Page,
   options: { name: string; projectId?: string; token?: string }
-): Promise<SeededWorkflow | null> {
-  try {
-    const token = options.token ?? (await getAuthToken(page))
-    if (!token) return null
+): Promise<SeededWorkflow> {
+  const token = options.token ?? (await getAuthToken(page))
+  if (!token) throw new Error(`createWorkflowViaApi: could not obtain auth token for ${options.name}`)
 
-    const projectId = options.projectId ?? (await ensureProject(page))?.id
-    const data: Record<string, unknown> = {
+  const projectId = options.projectId ?? (await ensureProject(page))?.id
+  if (!projectId) throw new Error(`createWorkflowViaApi: could not ensure project for ${options.name}`)
+
+  const data: Record<string, unknown> = {
+    name: options.name,
+    description: `E2E seed workflow: ${options.name}`,
+    is_enabled: false,
+    project_id: projectId,
+    workflow_definition: {
+      schema_version: '2.0.0',
       name: options.name,
       description: `E2E seed workflow: ${options.name}`,
-      is_enabled: false,
-      workflow_definition: {
-        schema_version: '2.0.0',
-        name: options.name,
-        description: `E2E seed workflow: ${options.name}`,
-        triggers: [
-          {
-            id: 'trigger_1',
-            name: 'Manual trigger',
-            type: 'manual_trigger',
-            parameters: {},
-          },
-        ],
-        nodes: [],
-        edges: [],
-      },
-    }
-    if (projectId) data.project_id = projectId
-
-    const resp = await apiRequest(page, 'post', '/workflows', { token, data })
-    if (!resp.ok()) return null
-    const workflow = (await resp.json()) as { id: string; name: string }
-    return { id: workflow.id, name: workflow.name }
-  } catch {
-    return null
+      triggers: [
+        {
+          id: 'trigger_1',
+          name: 'Manual trigger',
+          type: 'manual_trigger',
+          parameters: {},
+        },
+      ],
+      nodes: [],
+      edges: [],
+    },
   }
+
+  const resp = await apiRequest(page, 'post', '/workflows', { token, data })
+  if (!resp.ok()) {
+    const body = await resp.text().catch(() => '')
+    throw new Error(`createWorkflowViaApi failed for ${options.name}: HTTP ${resp.status()} ${body}`)
+  }
+  const workflow = (await resp.json()) as { id: string; name: string }
+  return { id: workflow.id, name: workflow.name }
 }
 
 export async function deleteWorkflowViaApi(page: Page, workflowId: string): Promise<void> {
@@ -165,31 +166,30 @@ export type SeededIdentityProvider = {
 export async function createIdentityProviderViaApi(
   page: Page,
   options: { name: string; token?: string }
-): Promise<SeededIdentityProvider | null> {
-  try {
-    const token = options.token ?? (await getAuthToken(page))
-    if (!token) return null
+): Promise<SeededIdentityProvider> {
+  const token = options.token ?? (await getAuthToken(page))
+  if (!token) throw new Error(`createIdentityProviderViaApi: could not obtain auth token for ${options.name}`)
 
-    const resp = await apiRequest(page, 'post', '/identity_providers', {
-      token,
-      data: {
-        name: options.name,
-        description: `E2E seed IdP: ${options.name}`,
-        configuration: {
-          provider_type: 'oidc',
-          issuer_url: `https://${options.name}.example.com`,
-          client_id: 'e2e-client-id',
-          client_secret: 'e2e-client-secret',
-          redirect_uri: `https://${options.name}.example.com/callback`,
-        },
+  const resp = await apiRequest(page, 'post', '/identity_providers', {
+    token,
+    data: {
+      name: options.name,
+      description: `E2E seed IdP: ${options.name}`,
+      configuration: {
+        provider_type: 'oidc',
+        issuer_url: `https://${options.name}.example.com`,
+        client_id: 'e2e-client-id',
+        client_secret: 'e2e-client-secret',
+        redirect_uri: `https://${options.name}.example.com/callback`,
       },
-    })
-    if (!resp.ok()) return null
-    const idp = (await resp.json()) as { id: string; name: string }
-    return { id: idp.id, name: idp.name }
-  } catch {
-    return null
+    },
+  })
+  if (!resp.ok()) {
+    const body = await resp.text().catch(() => '')
+    throw new Error(`createIdentityProviderViaApi failed for ${options.name}: HTTP ${resp.status()} ${body}`)
   }
+  const idp = (await resp.json()) as { id: string; name: string }
+  return { id: idp.id, name: idp.name }
 }
 
 export async function deleteIdentityProviderViaApi(page: Page, idpId: string): Promise<void> {
@@ -273,17 +273,13 @@ export type SeededCredential = {
 export async function createCredentialSeed(
   page: Page,
   options: { name: string; projectId?: string; token?: string }
-): Promise<SeededCredential | null> {
-  try {
-    const projectId = options.projectId ?? (await ensureProject(page))?.id
-    if (!projectId) return null
+): Promise<SeededCredential> {
+  const projectId = options.projectId ?? (await ensureProject(page))?.id
+  if (!projectId) throw new Error(`createCredentialSeed: could not ensure project for ${options.name}`)
 
-    const id = await createCredentialViaApi(page, { name: options.name, projectId })
-    if (!id) return null
-    return { id, name: options.name }
-  } catch {
-    return null
-  }
+  const id = await createCredentialViaApi(page, { name: options.name, projectId })
+  if (!id) throw new Error(`createCredentialSeed failed for ${options.name}`)
+  return { id, name: options.name }
 }
 
 export async function patchIntegrationScopeViaApi(

@@ -30,12 +30,10 @@ const seededCredentials: SeededCredential[] = []
 test.beforeAll(async ({ browser }) => {
   const page = await browser.newPage()
   const token = await getAuthToken(page)
-  if (token) {
-    const prefix = buildUniqueName('e2e-credlist')
-    for (let i = 1; i <= 3; i++) {
-      const cred = await createCredentialSeed(page, { name: `${prefix}-cred-${i}`, token })
-      if (cred) seededCredentials.push(cred)
-    }
+  if (!token) throw new Error('credentials-list beforeAll: could not obtain auth token')
+  const prefix = buildUniqueName('e2e-credlist')
+  for (let i = 1; i <= 3; i++) {
+    seededCredentials.push(await createCredentialSeed(page, { name: `${prefix}-cred-${i}`, token }))
   }
   await page.close()
 })

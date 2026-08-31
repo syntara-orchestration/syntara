@@ -9,61 +9,79 @@
  * - Navigate back to groups list
  * - Manage group membership from user detail page
  */
-import { createUnavailableGuard, test, expect, toAppUrl } from './fixtures'
+import { type Page, test, expect, toAppUrl } from './fixtures'
 import { buildUniqueName } from './helpers/workflows'
-import { createUserViaApi, deleteGroupViaApi, deleteUserViaApi, ensureGroupExists } from './seeds/iam'
+import {
+  createUserViaApi,
+  deleteGroupViaApi,
+  deleteUserViaApi,
+  ensureGroupExists,
+  type SeededGroup,
+  type SeededUser,
+} from './seeds/iam'
 import { getAuthToken } from './utils/api'
+
+const seededGroups: SeededGroup[] = []
+let seededUser: SeededUser | undefined
+
+async function openGroupByName(app: Page, name: string) {
+  await app.goto(toAppUrl('/system-administration/access-management/groups'))
+  await expect(app.getByRole('heading', { level: 1, name: /access management/i })).toBeVisible()
+  const table = app.getByRole('grid', { name: 'Groups table' })
+  await app.getByPlaceholder('Filter by name').fill(name)
+  await app.getByRole('button', { name: 'Apply filter' }).click()
+  await table.getByRole('button', { name, exact: true }).click()
+  await expect(app.getByRole('heading', { level: 1, name, exact: true })).toBeVisible()
+}
 
 test.beforeAll(async ({ browser }) => {
   const page = await browser.newPage()
-  const token = await getAuthToken(page)
-  if (token) {
-    await ensureGroupExists(page, 'admins')
+  try {
+    const token = await getAuthToken(page)
+    if (!token) throw new Error('group-membership beforeAll: could not obtain auth token')
+    const prefix = buildUniqueName('e2e-gm')
+    seededGroups.push(await ensureGroupExists(page, `${prefix}-a`))
+    seededGroups.push(await ensureGroupExists(page, `${prefix}-b`))
+    seededUser = await createUserViaApi(page, { username: `${prefix}-user`, token })
+  } finally {
+    await page.close()
   }
-  await page.close()
+})
+
+test.afterAll(async ({ browser }) => {
+  const page = await browser.newPage()
+  try {
+    if (seededUser) await deleteUserViaApi(page, seededUser.id)
+    for (const group of seededGroups) {
+      if (group.createdByUs) await deleteGroupViaApi(page, group.id)
+    }
+  } finally {
+    await page.close()
+  }
 })
 
 test.describe('Group Detail — Navigation & Tabs', () => {
-  const guard = createUnavailableGuard('No "admins" group found; seed data required')
-
   test.beforeEach(async ({ app }) => {
+    expect(seededGroups.length, 'Failed to seed groups via API').toBeGreaterThan(1)
     await app.goto(toAppUrl('/system-administration/access-management/groups'))
     await expect(app.getByRole('heading', { level: 1, name: /access management/i })).toBeVisible()
-    const table = app.getByRole('grid', { name: 'Groups table' })
-    const hasAdmins = await table
-      .getByRole('button', { name: 'admins', exact: true })
-      .waitFor({ state: 'visible', timeout: 3000 })
-      .then(() => true)
-      .catch(() => false)
-    if (!hasAdmins) guard.markUnavailable()
-    expect(hasAdmins, 'No "admins" group found; seed data required').toBeTruthy()
   })
 
   test('clicking a group name navigates to the detail page', async ({ app }) => {
-    const table = app.getByRole('grid', { name: 'Groups table' })
-    await table.getByRole('button', { name: 'admins', exact: true }).click()
+    await openGroupByName(app, seededGroups[0].name)
 
-    // Should navigate to group detail page
     await expect(app).toHaveURL(/system-administration\/access-management\/groups\//)
-    await expect(app.getByRole('heading', { level: 1, name: 'admins', exact: true })).toBeVisible()
-
-    // Should show tabs
     await expect(app.getByRole('tab', { name: /details/i })).toBeVisible()
     await expect(app.getByRole('tab', { name: /assignments/i })).toBeVisible()
   })
 
   test('members tab shows member list or empty state', async ({ app }) => {
-    // Navigate to admins group detail (admins has Members tab, unlike authenticated)
-    const table = app.getByRole('grid', { name: 'Groups table' })
-    await table.getByRole('button', { name: 'admins', exact: true }).click()
-    await expect(app.getByRole('heading', { level: 1, name: 'admins', exact: true })).toBeVisible()
+    await openGroupByName(app, seededGroups[0].name)
 
-    // Switch to members tab
     const membersTab = app.getByRole('tab', { name: /members/i })
     await expect(membersTab).toBeVisible()
     await membersTab.click()
 
-    // Should see members content (table or empty state)
     const hasTable = await app
       .getByRole('columnheader', { name: 'Username' })
       .waitFor({ state: 'visible', timeout: 5000 })
@@ -79,66 +97,43 @@ test.describe('Group Detail — Navigation & Tabs', () => {
   })
 
   test('navigating back returns to groups list', async ({ app }) => {
-    const table = app.getByRole('grid', { name: 'Groups table' })
-    await table.getByRole('button', { name: 'admins', exact: true }).click()
-    await expect(app.getByRole('heading', { level: 1, name: 'admins', exact: true })).toBeVisible()
+    await openGroupByName(app, seededGroups[0].name)
 
-    // Navigate back via URL (GroupDetail has no back button — use sidebar nav)
     await app.goto(toAppUrl('/system-administration/access-management/groups'))
 
     await expect(app.getByRole('heading', { level: 1, name: /access management/i })).toBeVisible()
-    await expect(table.getByRole('button', { name: 'admins', exact: true })).toBeVisible()
+    await app.getByPlaceholder('Filter by name').fill(seededGroups[0].name)
+    await app.getByRole('button', { name: 'Apply filter' }).click()
+    await expect(
+      app.getByRole('grid', { name: 'Groups table' }).getByRole('button', { name: seededGroups[0].name, exact: true })
+    ).toBeVisible()
   })
 
   test('navigating to a different group shows its details', async ({ app }) => {
-    const table = app.getByRole('grid', { name: 'Groups table' })
-
-    // Navigate to admins group detail
-    await table.getByRole('button', { name: 'admins', exact: true }).click()
-    await expect(app.getByRole('heading', { level: 1, name: 'admins', exact: true })).toBeVisible()
-
-    // Go back to groups list
-    await app.goto(toAppUrl('/system-administration/access-management/groups'))
-    await expect(app.getByRole('heading', { level: 1, name: /access management/i })).toBeVisible()
-
-    // Navigate to authenticated group
-    await table.getByRole('button', { name: 'authenticated' }).click()
-    await expect(app.getByRole('heading', { level: 1, name: 'authenticated', exact: true })).toBeVisible()
+    await openGroupByName(app, seededGroups[0].name)
+    await openGroupByName(app, seededGroups[1].name)
   })
 
   test('builtin groups show built-in label and no edit button', async ({ app }) => {
-    const table = app.getByRole('grid', { name: 'Groups table' })
-    await table.getByRole('button', { name: 'admins', exact: true }).click()
-    await expect(app.getByRole('heading', { level: 1, name: 'admins', exact: true })).toBeVisible()
+    await openGroupByName(app, 'admins')
 
-    // Should show Built-in label on the default Details tab
     await expect(app.getByText('Built-in', { exact: true })).toBeVisible()
-
-    // Should not show edit button (builtin groups can't be edited)
     await expect(app.getByRole('button', { name: 'Edit group' })).not.toBeVisible()
   })
 })
 
-// Separate describe so a typeahead failure does not skip the navigation tests above
-// (parent describe is serial via createUnavailableGuard).
-test.describe('Group Detail — Member add/remove (typeahead)', () => {
+// Separate describe so a typeahead failure does not skip the navigation tests above.
+// GitHub CI sets CI=true; Konflux does not — @konflux-skip covers that runner.
+test.describe('Group Detail — Member add/remove (typeahead)', { tag: ['@konflux-skip'] }, () => {
   test.skip(!!process.env.CI, "Typeahead dropdown timing is unreliable in CI — options don't render within timeout")
 
   test('add and remove a member from the group detail', async ({ app }) => {
     const prefix = buildUniqueName('e2e-gm')
     const group = await ensureGroupExists(app, prefix)
     const user = await createUserViaApi(app, { username: `${prefix}-user` })
-    expect(group, 'Failed to create group via API').toBeTruthy()
-    expect(user, 'Failed to create user via API').toBeTruthy()
-    if (!group || !user) return
 
     try {
-      await app.goto(toAppUrl('/system-administration/access-management/groups'))
-      const table = app.getByRole('grid', { name: 'Groups table' })
-      await app.getByPlaceholder('Filter by name').fill(group.name)
-      await app.getByRole('button', { name: 'Apply filter' }).click()
-      await table.getByRole('button', { name: group.name, exact: true }).click()
-      await expect(app.getByRole('heading', { level: 1, name: group.name, exact: true })).toBeVisible()
+      await openGroupByName(app, group.name)
 
       await app.getByRole('tab', { name: /members/i }).click()
       await app.getByRole('button', { name: 'Add member' }).click()
@@ -171,28 +166,24 @@ test.describe('Group Detail — Member add/remove (typeahead)', () => {
 
       await expect(app.getByText(/member removed/i)).toBeVisible()
     } finally {
-      if (user) await deleteUserViaApi(app, user.id)
+      await deleteUserViaApi(app, user.id)
       if (group.createdByUs) await deleteGroupViaApi(app, group.id)
     }
   })
 })
 
 test.describe('User Detail — Group Membership', () => {
-  // This test passes locally against mock API but on CI the User detail page
-  // never finishes loading — the "Edit user" button never appears within 30s.
   test('add to group button is available on user groups tab', async ({ app }) => {
+    expect(seededUser, 'Failed to seed user via API').toBeTruthy()
+    if (!seededUser) throw new Error('Failed to seed user via API')
+    const username = seededUser.username
+
     await app.goto(toAppUrl('/system-administration/access-management/users'))
     await expect(app.getByRole('heading', { level: 1, name: /access management/i })).toBeVisible()
 
-    // Click on a user
-    const userLink = app.getByRole('link', { name: 'admin', exact: true })
-    const hasUser = await userLink
-      .waitFor({ state: 'visible', timeout: 5000 })
-      .then(() => true)
-      .catch(() => false)
-    expect(hasUser, 'No admin user in mock data').toBeTruthy()
-
-    await userLink.click()
+    await app.getByPlaceholder('Filter by name').fill(username)
+    await app.getByRole('button', { name: 'Apply filter' }).click()
+    await app.getByRole('link', { name: username, exact: true }).click()
     await expect(app).toHaveURL(/\/system-administration\/access-management\/users\/[^/]+$/, { timeout: 30_000 })
     // User detail loaded — do not wait on `role="tab"` "Details": PF horizontal overflow can move
     // every sub-tab (including Details) behind overflow/scroll so no tab is a visible `tab`.

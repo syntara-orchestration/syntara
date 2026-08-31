@@ -38,11 +38,10 @@ test.describe('destructive modal UX compliance (AAP-72897)', () => {
     const page = await browser.newPage()
     try {
       const token = await getAuthToken(page)
-      if (!token) return
+      if (!token) throw new Error('destructive-modals beforeAll: could not obtain auth token')
 
       const prefix = buildUniqueName('e2e-dm')
       seededUser = await createUserViaApi(page, { username: `${prefix}-user`, token })
-      if (!seededUser) return
 
       seededAssignment = await createRoleAssignmentViaApi(page, {
         principal_id: seededUser.id,
