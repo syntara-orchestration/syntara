@@ -1,5 +1,6 @@
 import storybook from 'eslint-plugin-storybook'
 import js from '@eslint/js'
+import { fixupPluginRules } from '@eslint/compat'
 import globals from 'globals'
 import react from 'eslint-plugin-react'
 import reactHooks from 'eslint-plugin-react-hooks'
@@ -207,10 +208,13 @@ export default tseslint.config(
       },
     },
     settings: {
-      react: { version: 'detect' },
+      // Pin version instead of "detect" — detect calls context.getFilename(),
+      // removed in ESLint 10; eslint-plugin-react has not updated yet.
+      react: { version: '19.0' },
     },
     plugins: {
-      react,
+      // eslint-plugin-react still uses removed context APIs (getFilename/getSourceCode).
+      react: fixupPluginRules(react),
       'react-hooks': reactHooks,
       'react-refresh': reactRefresh,
       'jsx-a11y': jsxA11y,
