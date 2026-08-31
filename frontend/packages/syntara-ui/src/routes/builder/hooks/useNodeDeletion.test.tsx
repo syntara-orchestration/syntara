@@ -711,7 +711,7 @@ describe('useNodeDeletion', () => {
           type: 'task' as const,
           data: { label: `Task ${i}` },
           position: { x: 0, y: i * 100 },
-        })) as NodeType[]),
+        })) as unknown as NodeType[]),
       ]
 
       const edges: EdgeConnection[] = [

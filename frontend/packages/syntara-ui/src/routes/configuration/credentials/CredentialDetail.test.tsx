@@ -17,7 +17,7 @@ const { mockNavigate } = vi.hoisted(() => ({
   mockNavigate: vi.fn(),
 }))
 
-const wouterMock = vi.hoisted(() => ({
+const wouterMock = vi.hoisted((): { credentialId: string | undefined } => ({
   credentialId: '1',
 }))
 
