@@ -104,8 +104,10 @@ describe('useApiErrorAlert', () => {
   })
 
   it('resets deduplication when error becomes null', () => {
-    const { rerender } = renderHook(({ e }) => useApiErrorAlert(e), {
-      initialProps: { e: { detail: 'Error' } },
+    type ErrorProps = { e: { detail: string } | null }
+    const initialProps: ErrorProps = { e: { detail: 'Error' } }
+    const { rerender } = renderHook(({ e }: ErrorProps) => useApiErrorAlert(e), {
+      initialProps,
     })
 
     expect(mockShowError).toHaveBeenCalledTimes(1)

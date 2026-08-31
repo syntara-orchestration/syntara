@@ -757,7 +757,7 @@ describe('NodeDetailsPanel', () => {
       id,
       type: 'task',
       position: { x: 0, y: 0 },
-      data: { id, type: 'script', name: id, parameters: {} },
+      data: { id, type: 'script', name: id, parameters: { language: 'python', code: '' } },
     })
 
     const { rerender } = render(

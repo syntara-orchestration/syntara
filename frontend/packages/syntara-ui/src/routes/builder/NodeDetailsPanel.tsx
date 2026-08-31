@@ -164,8 +164,8 @@ function resolveMenuNodeType(flowNodeType: string | undefined): MenuNodeTypeUnio
 }
 
 function getNodeDisabledState(node: Node<NodeType['data']> | undefined): boolean {
-  const nodeData = node?.data
-  const nodeSettings = nodeData?.settings as { disabled?: boolean } | undefined
+  if (!node?.data) return false
+  const nodeSettings = Reflect.get(node.data, 'settings') as { disabled?: boolean } | undefined
   return nodeSettings?.disabled ?? false
 }
 

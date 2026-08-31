@@ -1012,17 +1012,19 @@ describe('useButtonEdgeMaintenance', () => {
   it('resets signature when transitioning from execution to edit mode', () => {
     const nodes = [{ id: 'node-1', type: 'task', position: { x: 100, y: 100 } }] as never[]
     const edges = [] as never[]
+    type StatusProps = { executionStatus: string | null }
+    const initialProps: StatusProps = { executionStatus: 'running' }
 
     // Start in execution mode
     const { rerender } = renderHook(
-      ({ executionStatus }: { executionStatus: string | null }) =>
+      ({ executionStatus }: StatusProps) =>
         useButtonEdgeMaintenance({
           ...defaultOptions,
           nodes,
           edges,
           executionStatus,
         }),
-      { initialProps: { executionStatus: 'running' } }
+      { initialProps }
     )
 
     // In execution mode, no button edges should be created

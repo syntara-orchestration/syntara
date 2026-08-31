@@ -49,12 +49,20 @@ vi.mock('../access/useAllProjects', () => ({
 // Mock useProjectSelector — default to a single selected project so that:
 // 1. projectSelectorReady is true (queries are enabled)
 // 2. the flat table body is rendered (most tests expect flat rows)
-const mockUseProjectSelector = vi.fn(() => ({
-  selectedProject: { id: 'proj-default', name: 'Default Project' },
-  isAllProjects: false,
-  projects: [{ id: 'proj-default', name: 'Default Project' }],
-  ProjectSelector: null,
-}))
+type MockProjectSelector = {
+  selectedProject: { id: string; name: string } | null
+  isAllProjects: boolean
+  projects: { id: string; name: string }[]
+  ProjectSelector: null
+}
+const mockUseProjectSelector = vi.fn(
+  (): MockProjectSelector => ({
+    selectedProject: { id: 'proj-default', name: 'Default Project' },
+    isAllProjects: false,
+    projects: [{ id: 'proj-default', name: 'Default Project' }],
+    ProjectSelector: null,
+  })
+)
 vi.mock('../../hooks/useProjectSelector', () => ({
   useProjectSelector: () => mockUseProjectSelector(),
 }))
