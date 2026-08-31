@@ -27,14 +27,14 @@ nodes:
       agent: production://technical-agent
       model: claude-3-5-sonnet-20241022
       prompt: |
-        Research the technical aspects of: ${input.topic}
+        Research the technical aspects of: ${trigger.topic}
 
         Focus on:
         - Technical architecture and implementation
         - Performance characteristics
         - Technical challenges and solutions
     inputs:
-      topic: ${inputs.topic}
+      topic: ${trigger.topic}
     outputs:
       technical_findings: $.result.content
 
@@ -44,14 +44,14 @@ nodes:
       agent: production://market-agent
       model: claude-3-5-sonnet-20241022
       prompt: |
-        Research the market aspects of: ${input.topic}
+        Research the market aspects of: ${trigger.topic}
 
         Focus on:
         - Market size and growth
         - Key competitors and market share
         - Market trends and opportunities
     inputs:
-      topic: ${inputs.topic}
+      topic: ${trigger.topic}
     outputs:
       market_findings: $.result.content
 
@@ -61,14 +61,14 @@ nodes:
       agent: production://compliance-agent
       model: claude-3-5-sonnet-20241022
       prompt: |
-        Research the regulatory and compliance aspects of: ${input.topic}
+        Research the regulatory and compliance aspects of: ${trigger.topic}
 
         Focus on:
         - Relevant regulations and standards
         - Compliance requirements
         - Legal considerations
     inputs:
-      topic: ${inputs.topic}
+      topic: ${trigger.topic}
     outputs:
       regulatory_findings: $.result.content
 

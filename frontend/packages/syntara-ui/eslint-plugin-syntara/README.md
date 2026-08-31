@@ -95,7 +95,7 @@ Disables without a `-- reason` suffix fail lint.
 
 ### `prefer-confirmation-dialog`
 
-Flags raw Modal compositions that appear to be destructive confirmation dialogs. Use `<NxConfirmationDialog>` for consistent UX.
+Flags raw Modal compositions that appear to be destructive confirmation dialogs. Use `<SynConfirmationDialog>` for consistent UX.
 
 ### `prefer-syn-select`
 

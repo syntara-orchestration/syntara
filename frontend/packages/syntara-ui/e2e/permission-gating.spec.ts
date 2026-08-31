@@ -1083,4 +1083,45 @@ test.describe('Permission gating — Builder read-only', () => {
       await deleteTestWorkflow(app, workflowId)
     }
   })
+
+  test('viewer: Duplicate workflow in builder kebab is aria-disabled with tooltip', async ({ app, viewerApp }) => {
+    const { id: workflowId } = await createTestWorkflow(app)
+
+    try {
+      await viewerApp.goto(toAppUrl(`/workflow-builder/${workflowId}`))
+      await viewerApp.getByRole('navigation', { name: 'Main navigation' }).waitFor()
+      await expect(viewerApp.getByRole('heading', { name: /read-only mode/i, level: 4 })).toBeVisible({
+        timeout: 15_000,
+      })
+
+      await viewerApp.getByRole('button', { name: 'Workflow actions' }).click()
+      const duplicateItem = viewerApp.getByRole('menuitem', { name: /Duplicate workflow/i })
+      await expect(duplicateItem).toHaveAttribute('aria-disabled', 'true')
+
+      await duplicateItem.hover()
+      await expect(viewerApp.getByRole('tooltip').filter({ hasText: 'workflow:create' })).toBeVisible()
+    } finally {
+      await deleteTestWorkflow(app, workflowId)
+    }
+  })
+
+  test('auditor: Duplicate workflow in builder kebab is aria-disabled', async ({ app, auditorApp }) => {
+    const { id: workflowId } = await createTestWorkflow(app)
+
+    try {
+      await auditorApp.goto(toAppUrl(`/workflow-builder/${workflowId}`))
+      await auditorApp.getByRole('navigation', { name: 'Main navigation' }).waitFor()
+      await expect(auditorApp.getByRole('heading', { name: /read-only mode/i, level: 4 })).toBeVisible({
+        timeout: 15_000,
+      })
+
+      await auditorApp.getByRole('button', { name: 'Workflow actions' }).click()
+      await expect(auditorApp.getByRole('menuitem', { name: /Duplicate workflow/i })).toHaveAttribute(
+        'aria-disabled',
+        'true'
+      )
+    } finally {
+      await deleteTestWorkflow(app, workflowId)
+    }
+  })
 })

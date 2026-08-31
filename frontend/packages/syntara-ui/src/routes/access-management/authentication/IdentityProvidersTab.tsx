@@ -18,10 +18,10 @@ import { useCallback, useLayoutEffect, useMemo, useState } from 'react'
 
 import { AppRoute } from '../../../app/AppRoute'
 import { adminClient, identityProvidersClient } from '../../../client'
-import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
-import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../../components/panels/list/NxListPanel'
+import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../../components/panels/list/SynListPanel'
 import { ProviderIcon } from '../../../components/ProviderIcon'
 import { SynLink } from '../../../components/SynLink'
 import { useCursorPagination } from '../../../hooks/useCursorPagination'
@@ -310,7 +310,7 @@ export function IdentityProvidersTab({ onHeaderToolbarStateChange }: Readonly<Id
 
   return (
     <>
-      <NxListPanelView
+      <SynListPanelView
         isPending={query.isPending}
         isFetching={query.isFetching}
         error={query.error}
@@ -324,7 +324,7 @@ export function IdentityProvidersTab({ onHeaderToolbarStateChange }: Readonly<Id
         }
         toolbar={
           showHeaderToolbar ? (
-            <NxListPanelToolbar
+            <SynListPanelToolbar
               filters={filters}
               filterDefinitions={filterFieldDefinitions}
               onFilterChange={handleFilterChange}
@@ -332,7 +332,7 @@ export function IdentityProvidersTab({ onHeaderToolbarStateChange }: Readonly<Id
           ) : undefined
         }
         body={
-          <NxListPanelTable caption="Identity providers table" footer={getFooterProps(query.data)}>
+          <SynListPanelTable caption="Identity providers table" footer={getFooterProps(query.data)}>
             <Thead>
               <Tr>
                 <Th sort={getSortParams(0)}>Name</Th>
@@ -354,7 +354,7 @@ export function IdentityProvidersTab({ onHeaderToolbarStateChange }: Readonly<Id
                 />
               ))}
             </Tbody>
-          </NxListPanelTable>
+          </SynListPanelTable>
         }
       />
       <IdentityProviderDeleteDialog
@@ -369,7 +369,7 @@ export function IdentityProvidersTab({ onHeaderToolbarStateChange }: Readonly<Id
         onConfirm={handleConfirmDisable}
         onClose={disableDialog.close}
       />
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={revokeDialog.isOpen}
         onClose={revokeDialog.close}
         onConfirm={handleRevoke}
@@ -380,7 +380,7 @@ export function IdentityProvidersTab({ onHeaderToolbarStateChange }: Readonly<Id
       >
         All tokens for users authenticated via <strong>{revokeDialog.item?.name}</strong> will be revoked. Affected
         users will be signed out and must sign in again.
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
       <AAPSetupModal
         isOpen={aapSetupOpen}
         onClose={() => setAapSetupOpen(false)}
