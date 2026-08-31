@@ -289,7 +289,7 @@ Codebase Search Patterns:
 - `useCursorReset(itemCount, hasActiveFilters, cursor, isFetching, setCursor)` — reset to page 1
 - `useDialogState<T>()` — dialog open/close state with associated item
 - `useDeleteAction(options)` — delete mutation with success/error alerts
-- `NxConfirmationDialog` — reusable confirm/cancel modal (`frontend/packages/syntara-ui/src/components/dialogs/NxConfirmationDialog.tsx`)
+- `SynConfirmationDialog` — reusable confirm/cancel modal (`frontend/packages/syntara-ui/src/components/dialogs/SynConfirmationDialog.tsx`)
 
 ### List Page Standard Pattern
 
@@ -297,7 +297,7 @@ Codebase Search Patterns:
 import { useCursorPagination, useCursorReset } from '../../hooks/useCursorPagination'
 import { useDialogState } from '../../hooks/useDialogState'
 import { useDeleteAction } from '../../hooks/useDeleteAction'
-import { NxConfirmationDialog } from '../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../components/dialogs/SynConfirmationDialog'
 
 export function MyListPage() {
   const {
@@ -333,7 +333,7 @@ export function MyListPage() {
       >
         {/* <Th sort={getSortParams('name')}>Name</Th> */}
       </SynScrollableTableContainer>
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={deleteDialog.isOpen}
         onClose={deleteDialog.close}
         onConfirm={() => handleDelete(deleteDialog.item)}
@@ -342,7 +342,7 @@ export function MyListPage() {
         confirmVariant="danger"
       >
         Are you sure?
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
     </SynPage>
   )
 }
@@ -374,7 +374,7 @@ Before writing any new UI code, follow this checklist:
    - **Use PF6 design tokens instead of hardcoded pixel values** for spacing, sizing, colors, and icons. Use `var(--pf-t--global--spacer--*)` for margins/padding, `var(--pf-t--global--icon--size--*)` for icon dimensions, `var(--pf-t--global--color--*)` for colors, and content-aware units (`ch`, `rem`) for input widths. Hardcoded `px` values are acceptable only for layout constraints (table column widths, fixed panel heights) where no semantic token applies. **CSS modules must also use PF tokens** -- ESLint only catches hardcoded values in JSX, so CSS modules need manual review. Use semantic tokens like `var(--pf-t--global--text--color--subtle)` rather than lower-level tokens like `var(--pf-t--global--color--200)`.
    - **Use `RhUi*` icons** (e.g., `RhUiAddIcon`, `RhUiTrashIcon`, `RhUiEditIcon`) for all action buttons, not legacy PatternFly icons like `PlusCircleIcon`, `CopyIcon`, or `TrashIcon`. The `RhUi*` icon set is the project standard. **Enforced by ESLint:** `no-restricted-imports` (warn) flags any non-`RhUi` import from `@patternfly/react-icons`. Existing legacy icons are being phased out.
    - **Use `SynSelect` instead of PatternFly `Select`.** `SynSelect` applies scrollable-menu defaults (`isScrollable`, `maxMenuHeight`, popper `preventOverflow`, dismiss-on-outer-scroll). Enforced by ESLint `syntara/prefer-syn-select` (error). Keep importing `MenuToggle`, `SelectList`, `SelectOption`, and `SelectGroup` from PatternFly. Add `shouldFocusToggleOnSelect` for keyboard accessibility after selection (not a PF default). Pass `shouldFocusToggleOnSelect={false}` on typeaheads that must keep focus in a filter input.
-   - **JSDoc on shared/global component props** -- every exported component in `frontend/packages/syntara-ui/src/components/` (especially `Nx*` components) must have JSDoc descriptions on its props interface. TypeScript types convey shape; JSDoc conveys intent. Describe what each prop controls, when to use optional props, and any non-obvious default behavior. This helps both human contributors and AI agents use components correctly without reading the implementation.
+   - **JSDoc on shared/global component props** -- every exported component in `frontend/packages/syntara-ui/src/components/` (especially `Syn*` components) must have JSDoc descriptions on its props interface. TypeScript types convey shape; JSDoc conveys intent. Describe what each prop controls, when to use optional props, and any non-obvious default behavior. This helps both human contributors and AI agents use components correctly without reading the implementation.
 
 4. **Custom Hooks**
    - Extract reusable logic into custom hooks
@@ -769,11 +769,11 @@ The `SynErrorState` component automatically shows a retry button for retryable e
 
 ---
 
-## 12. `NxConfirmationDialog` — Never Inline Modal Boilerplate
+## 12. `SynConfirmationDialog` — Never Inline Modal Boilerplate
 
-Use `NxConfirmationDialog` for all confirmation prompts. Never use raw `Modal` + `ModalHeader` + `ModalBody` + `ModalFooter`. ESLint rule `syntara/prefer-confirmation-dialog` (error) catches raw destructive Modal patterns automatically; the guidance below teaches the correct tier selection and content patterns.
+Use `SynConfirmationDialog` for all confirmation prompts. Never use raw `Modal` + `ModalHeader` + `ModalBody` + `ModalFooter`. ESLint rule `syntara/prefer-confirmation-dialog` (error) catches raw destructive Modal patterns automatically; the guidance below teaches the correct tier selection and content patterns.
 
-> **Check Storybook first:** Before implementing any confirmation dialog, call the Storybook MCP `get-documentation` tool with id `"components-dialogs-nxconfirmationdialog"`. The stories are the primary source of truth for tier selection, correct prop usage, title format, body copy, checkbox labels, and button labels — and take precedence over the static examples below.
+> **Check Storybook first:** Before implementing any confirmation dialog, call the Storybook MCP `get-documentation` tool with id `"components-dialogs-synconfirmationdialog"`. The stories are the primary source of truth for tier selection, correct prop usage, title format, body copy, checkbox labels, and button labels — and take precedence over the static examples below.
 
 There are **two tiers** of destructive modals depending on reversibility:
 
@@ -793,7 +793,7 @@ Requires `titleIconVariant="warning"` + `destructiveAcknowledgement` checkbox. T
 </Modal>
 
 // ✅ GOOD — warning icon, acknowledgement checkbox, descriptive body
-<NxConfirmationDialog
+<SynConfirmationDialog
   isOpen={isOpen}
   onClose={onClose}
   onConfirm={handleDelete}
@@ -807,7 +807,7 @@ Requires `titleIconVariant="warning"` + `destructiveAcknowledgement` checkbox. T
   }}
 >
   The workflow <strong>{item?.name}</strong> will be deleted. This cannot be undone.
-</NxConfirmationDialog>
+</SynConfirmationDialog>
 ```
 
 ### Tier 2: Reversible actions (remove, unassign)
@@ -816,7 +816,7 @@ Uses `titleIconVariant="warning"` but **no** `destructiveAcknowledgement` checkb
 
 ```typescript
 // ✅ GOOD — warning icon, descriptive body, no checkbox
-<NxConfirmationDialog
+<SynConfirmationDialog
   isOpen={!!memberToRemove}
   onClose={() => setMemberToRemove(null)}
   onConfirm={handleRemove}
@@ -827,7 +827,7 @@ Uses `titleIconVariant="warning"` but **no** `destructiveAcknowledgement` checkb
 >
   This removes <strong>{memberToRemove?.username}</strong> from the group.
   They will lose any permissions granted through this group membership.
-</NxConfirmationDialog>
+</SynConfirmationDialog>
 ```
 
 ### Body text rules
@@ -1380,7 +1380,7 @@ function UserFormFields({ isEdit, control }: Props) {
 | **API calls**                | Typed clients from `client.tsx`                                | Raw `fetch()`                                |
 | **Error handling**           | `useQueryState`, `useMutationErrorHandler`, `SynErrorState`     | Ad-hoc try/catch with custom JSX             |
 | **Pagination**               | `useCursorPagination`                                          | Manual cursor/filter/queryParams state       |
-| **Dialogs**                  | `NxConfirmationDialog` + `useDialogState`                      | Raw `Modal` + manual open/close state        |
+| **Dialogs**                  | `SynConfirmationDialog` + `useDialogState`                      | Raw `Modal` + manual open/close state        |
 
 ### Browser-Native APIs First
 
@@ -1578,11 +1578,11 @@ function DefaultStory() { ... }
 
 // ✅ GOOD — if a declaration needs context, attach it as JSDoc
 /**
- * Shared between `NxListPanelTabs` and `NxListPanelContent`. Placed at `NxListPanel`
- * (not `NxListPanelTabs`) so `NxListPanelContent` rendered via a TanStack Router `<Outlet>`
- * can still consume it as a descendant of `NxListPanel` but not of `NxListPanelTabs`.
+ * Shared between `SynListPanelTabs` and `SynListPanelContent`. Placed at `SynListPanel`
+ * (not `SynListPanelTabs`) so `SynListPanelContent` rendered via a TanStack Router `<Outlet>`
+ * can still consume it as a descendant of `SynListPanel` but not of `SynListPanelTabs`.
  */
-type NxListPanelTabContextValue = { ... }
+type SynListPanelTabContextValue = { ... }
 ```
 
 **Why:** Section banners explain _what_ code is, which well-named identifiers already communicate. JSDoc on a declaration travels with the symbol into tooling (IDE hover, generated docs), so the documentation stays attached even after the file is reorganised or the symbol is moved.

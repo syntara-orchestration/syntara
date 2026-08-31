@@ -190,7 +190,7 @@ test.describe('Integration Filtering', () => {
     // Assert - Integration type filter applied
     const typeChipGroup = app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Integration type' })
     await expect(typeChipGroup.getByText('MCP Server')).toBeVisible()
-    await expect(app).toHaveURL(/provider_type=mcp/)
+    await expect(app).toHaveURL(/integration_type=mcp_server/)
 
     // Assert - All three filters active
     await expect(nameChipGroup.getByText('integration')).toBeVisible()
@@ -200,7 +200,7 @@ test.describe('Integration Filtering', () => {
     // Verify URL contains all filters
     await expect(app).toHaveURL(/name%5Bcontains%5D=integration/)
     await expect(app).toHaveURL(/status=error/)
-    await expect(app).toHaveURL(/provider_type=mcp/)
+    await expect(app).toHaveURL(/integration_type=mcp_server/)
 
     // Act - Clear all filters
     await app.getByRole('search', { name: 'Filters' }).getByRole('button', { name: 'Clear all filters' }).click()
@@ -209,7 +209,7 @@ test.describe('Integration Filtering', () => {
     await expect(app.getByRole('search', { name: 'Filters' }).getByRole('list')).toHaveCount(0)
     await expect(app).not.toHaveURL(/name%5Bcontains%5D/)
     await expect(app).not.toHaveURL(/status=/)
-    await expect(app).not.toHaveURL(/provider_type=/)
+    await expect(app).not.toHaveURL(/integration_type=/)
   })
 
   test('shareable URLs: filters restored from URL', async ({ app, context }) => {

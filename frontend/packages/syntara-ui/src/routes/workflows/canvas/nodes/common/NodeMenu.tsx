@@ -32,20 +32,7 @@ export function NodeMenu(props: Readonly<NodeMenuProps>) {
   }
 
   return (
-    <div
-      data-testid="node-menu-wrapper"
-      onClick={(e) => e.stopPropagation()}
-      onMouseDown={(e) => e.stopPropagation()}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.stopPropagation()
-        }
-      }}
-      className={`nodrag nopan ${props.className ?? ''}`}
-      role="button"
-      tabIndex={0}
-      style={props.style}
-    >
+    <div data-testid="node-menu-wrapper" className={`nodrag nopan ${props.className ?? ''}`} style={props.style}>
       <Dropdown
         isOpen={isMenuOpen}
         onOpenChange={(isOpen) => setIsMenuOpen(isOpen)}
@@ -54,7 +41,16 @@ export function NodeMenu(props: Readonly<NodeMenuProps>) {
           <MenuToggle
             ref={toggleRef}
             variant="plain"
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            onClick={(event) => {
+              event.stopPropagation()
+              setIsMenuOpen(!isMenuOpen)
+            }}
+            onMouseDown={(event) => event.stopPropagation()}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.stopPropagation()
+              }
+            }}
             isExpanded={isMenuOpen}
             aria-label="Step actions menu"
             className="nodrag nopan"

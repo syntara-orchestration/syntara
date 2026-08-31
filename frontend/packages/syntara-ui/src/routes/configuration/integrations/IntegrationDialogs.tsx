@@ -1,7 +1,7 @@
 import { Badge, Content, ContentVariants } from '@patternfly/react-core'
 import { IntegrationTypeEnum } from '@syntara/contracts'
 
-import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 
 import { getResourceNoun, getTotalResourceCount, isLLMProvider } from './integrationUtils'
 import type { useIntegrationActions } from './useIntegrationActions'
@@ -30,7 +30,7 @@ export function IntegrationDialogs({
 
   return (
     <>
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={validateDialog.isOpen}
         onClose={validateDialog.close}
         onConfirm={onValidate}
@@ -41,9 +41,9 @@ export function IntegrationDialogs({
           This will test the connection to <strong>{validateDialog.item?.name}</strong> and update its validation
           status.
         </Content>
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
 
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={deleteDialog.isOpen}
         onClose={deleteDialog.close}
         onConfirm={onDelete}
@@ -72,9 +72,9 @@ export function IntegrationDialogs({
             </Content>
           </>
         )}
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
 
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={disableDialog.isOpen}
         onClose={disableDialog.close}
         onConfirm={onDisable}
@@ -97,7 +97,7 @@ export function IntegrationDialogs({
             re-enable the integration at any time.
           </Content>
         )}
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
     </>
   )
 }

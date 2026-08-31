@@ -613,7 +613,7 @@ Endpoints under `/api/v1/proxies/aap/` are pure HTTP proxies to AAP Controller A
 |---|---|---|
 | Pagination | Cursor-based keyset (N+1) | Offset-based (`page_size`) |
 | Response type | `ResourcesResponse[T]` (`resources`, `next`, `prev`, `total`) | `AAPListResponse[T]` (`count`, `results`) |
-| Query params | `BaseListParams` (`limit`, `cursor`, `sort`, `include_total`) | `AAPBaseQuery` (`search`, `page_size`, `credential_id`) |
+| Query params | `BaseListParams` (`limit`, `cursor`, `sort`, `include_total`) | `AAPBaseQuery` (`search`, `page_size`, `credential_id`, `integration_id`) |
 | Filtering | Bracket notation with 7 operators + label filters | `search` string only |
 | Sorting | `-field` prefix notation with ID tiebreaker | None (upstream order) |
 | Default page size | 20 (max 100) | 50 (max 200) |

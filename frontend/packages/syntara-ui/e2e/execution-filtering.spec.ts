@@ -179,7 +179,7 @@ test.describe('Execution Filtering @pr-check', () => {
       await app.getByRole('button', { name: 'Clear all filters' }).last().click()
 
       const fullTable = app.getByRole('grid', { name: 'Executions table' })
-      const noDataState = app.getByText(/No executions found/i)
+      const noDataState = app.getByText(/No workflow runs have been recorded yet/i)
       await expect(fullTable.or(noDataState)).toBeVisible()
       await expect(statusChipGroup).not.toBeVisible()
     }

@@ -12,8 +12,9 @@ Test Plan Coverage:
   - Tests ${node_id.stdout_json.field} expressions in config.environment
   - Tests ${trigger_id.field} expressions referencing trigger node outputs
 - API-19 (Expression Resolution - System Variables): PARTIALLY COVERED
-  - ${inputs.*}: NOT a named namespace. Use ${<trigger_node_id>.field} instead —
-    same data, different key. Covered by test_trigger_input_reference_resolution.
+  - ${inputs.*} / ${input.*}: not a reserved namespace. Use ${trigger.*} /
+    ${trigger_id.field} for trigger payload. A node whose id is ``input`` can
+    still be referenced as ${input.*}.
   - ${execution.id}: Implemented but at a different path. The correct expression is
     ${workflow_context.execution.id}. Covered by test_workflow_context_execution_id_resolves.
   - ${workflow.vars.x}: NOT implemented — no namespace creation in the engine.
@@ -325,11 +326,11 @@ class TestExpressionResolution:
 
         Test Plan: API-19 (PARTIALLY COVERED — trigger input path)
 
-        NOTE: API-19 specifies ${inputs.*} syntax, but that named namespace is not
-        implemented. Trigger input data is accessible via ${<trigger_node_id>.field}
-        instead — same data, different key. This test covers that working path.
+        NOTE: API-19 specifies ${inputs.*}. There is no inputs namespace; use
+        ${trigger.*} or ${trigger_id.field}. This test covers the
+        ${trigger_manual.*} path.
 
-        This test uses ${trigger_manual.*} instead, which references the trigger node's output.
+        This test uses ${trigger_manual.*}, which references the trigger node's output.
         Trigger nodes receive input_data from ExecutionCreate and output it, making their outputs
         available to downstream nodes via ${trigger_id.field} expressions.
 

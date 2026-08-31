@@ -14,7 +14,7 @@ import { useId, useState } from 'react'
 
 import { detachPromise } from '../../utils/detachPromise'
 
-import styles from './NxCodeBlock.module.css'
+import styles from './SynCodeBlock.module.css'
 
 function resolveCopyText(
   codeContent: React.ReactNode,
@@ -31,7 +31,7 @@ function resolveCopyText(
  * Displays code or JSON in execution panels, policy sidebars, and builder views.
  * Commonly used with `enableCopy` and `enableExpand` to let users copy or inspect large payloads in a modal.
  */
-export function NxCodeBlock(props: {
+export function SynCodeBlock(props: {
   children?: React.ReactNode
   jsonObject?: object
   noMaxHeight?: boolean
