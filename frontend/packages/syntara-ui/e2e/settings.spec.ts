@@ -100,18 +100,18 @@ test.describe('Settings', () => {
       .catch(() => false)
     if (!hasPage) guard.markUnavailable()
     expect(hasPage, 'Settings page not available; backend may not be running').toBeTruthy()
-    const accessDenied = await app
-      .getByText(/don't have permission to view settings/i)
-      .isVisible()
-      .catch(() => false)
-    expect(accessDenied, 'Admin was denied access to Settings').toBe(false)
-    // Category names come from GET /settings/categories (e.g. Context Manager, Application).
+    // canRead is safe-false until POST /authz/can_i resolves, so the Access denied
+    // empty state flashes while the Settings heading is already visible. Wait for tabs.
     const categoryTabs = app.getByRole('tab', { name: /Context Manager|Application|System|Authentication/i })
     const hasTabs = await expect(categoryTabs)
       .not.toHaveCount(0, { timeout: 30_000 })
       .then(() => true)
       .catch(() => false)
-    if (!hasTabs) guard.markUnavailable()
+    if (!hasTabs) {
+      const denied = await app.getByText(/don't have permission to view settings/i).isVisible()
+      expect(denied, 'Admin was denied access to Settings').toBe(false)
+      guard.markUnavailable()
+    }
     expect(hasTabs, 'Settings page has no tabs; backend may not have settings configured').toBeTruthy()
   })
 
