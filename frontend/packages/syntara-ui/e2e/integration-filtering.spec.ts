@@ -12,22 +12,28 @@ function nameContainsUrl(term: string) {
 
 test.beforeAll(async ({ browser }) => {
   const page = await browser.newPage()
-  const token = await getAuthToken(page)
-  if (!token) throw new Error('integration-filtering beforeAll: could not obtain auth token')
-  seedPrefix = buildUniqueName('e2e-intfilt')
-  for (let i = 1; i <= 22; i++) {
-    const name = `${seedPrefix}-${i}`
-    seededIntegrations.push(await createIntegrationViaApi(page, { name, token }))
+  try {
+    const token = await getAuthToken(page)
+    if (!token) throw new Error('integration-filtering beforeAll: could not obtain auth token')
+    seedPrefix = buildUniqueName('e2e-intfilt')
+    for (let i = 1; i <= 22; i++) {
+      const name = `${seedPrefix}-${i}`
+      seededIntegrations.push(await createIntegrationViaApi(page, { name, token }))
+    }
+  } finally {
+    await page.close()
   }
-  await page.close()
 })
 
 test.afterAll(async ({ browser }) => {
   const page = await browser.newPage()
-  for (const integration of seededIntegrations) {
-    await deleteIntegrationViaApi(page, integration.id)
+  try {
+    for (const integration of seededIntegrations) {
+      await deleteIntegrationViaApi(page, integration.id)
+    }
+  } finally {
+    await page.close()
   }
-  await page.close()
 })
 
 test.describe('Integration Filtering', () => {

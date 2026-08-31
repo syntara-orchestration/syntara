@@ -94,27 +94,28 @@ test.beforeAll(async ({ browser }) => {
 
 test.afterAll(async ({ browser }) => {
   const page = await browser.newPage()
-
-  for (const wf of seededWorkflows) {
-    await deleteWorkflowViaApi(page, wf.id)
+  try {
+    for (const wf of seededWorkflows) {
+      await deleteWorkflowViaApi(page, wf.id)
+    }
+    for (const cred of seededCredentials) {
+      await deleteCredentialViaApi(page, cred.id)
+    }
+    for (const integration of seededIntegrations) {
+      await deleteIntegrationViaApi(page, integration.id)
+    }
+    for (const user of seededUsers) {
+      await deleteUserViaApi(page, user.id)
+    }
+    for (const group of seededGroups) {
+      if (group.createdByUs) await deleteGroupViaApi(page, group.id)
+    }
+    for (const idp of seededIdPs) {
+      await deleteIdentityProviderViaApi(page, idp.id)
+    }
+  } finally {
+    await page.close()
   }
-  for (const cred of seededCredentials) {
-    await deleteCredentialViaApi(page, cred.id)
-  }
-  for (const integration of seededIntegrations) {
-    await deleteIntegrationViaApi(page, integration.id)
-  }
-  for (const user of seededUsers) {
-    await deleteUserViaApi(page, user.id)
-  }
-  for (const group of seededGroups) {
-    if (group.createdByUs) await deleteGroupViaApi(page, group.id)
-  }
-  for (const idp of seededIdPs) {
-    await deleteIdentityProviderViaApi(page, idp.id)
-  }
-
-  await page.close()
 })
 
 /** Workflow rows only — excludes grouped “project” header rows that have no builder link. */

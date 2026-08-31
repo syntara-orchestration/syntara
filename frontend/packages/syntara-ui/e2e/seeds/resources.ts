@@ -11,6 +11,10 @@
 import { type Page } from '../fixtures'
 import { apiRequest, createCredentialViaApi, deleteCredentialViaApi, ensureProject, getAuthToken } from '../utils/api'
 
+function seedError(fn: string, param: string, detail: string): Error {
+  return new Error(`${fn}: ${detail} for ${param}`)
+}
+
 export type SeededIntegration = {
   id: string
   name: string
@@ -26,7 +30,7 @@ export async function createIntegrationViaApi(
   }
 ): Promise<SeededIntegration> {
   const token = options.token ?? (await getAuthToken(page))
-  if (!token) throw new Error(`createIntegrationViaApi: could not obtain auth token for ${options.name}`)
+  if (!token) throw seedError('createIntegrationViaApi', options.name, 'could not obtain auth token')
 
   const data: Record<string, unknown> = {
     name: options.name,
@@ -50,7 +54,7 @@ export async function createIntegrationViaApi(
   })
   if (!resp.ok()) {
     const body = await resp.text().catch(() => '')
-    throw new Error(`createIntegrationViaApi failed for ${options.name}: HTTP ${resp.status()} ${body}`)
+    throw seedError('createIntegrationViaApi', options.name, `HTTP ${resp.status()} ${body}`)
   }
   const integration = (await resp.json()) as { id: string; name: string }
   return { id: integration.id, name: integration.name }
@@ -78,10 +82,10 @@ export async function createWorkflowViaApi(
   options: { name: string; projectId?: string; token?: string }
 ): Promise<SeededWorkflow> {
   const token = options.token ?? (await getAuthToken(page))
-  if (!token) throw new Error(`createWorkflowViaApi: could not obtain auth token for ${options.name}`)
+  if (!token) throw seedError('createWorkflowViaApi', options.name, 'could not obtain auth token')
 
   const projectId = options.projectId ?? (await ensureProject(page))?.id
-  if (!projectId) throw new Error(`createWorkflowViaApi: could not ensure project for ${options.name}`)
+  if (!projectId) throw seedError('createWorkflowViaApi', options.name, 'could not ensure project')
 
   const data: Record<string, unknown> = {
     name: options.name,
@@ -108,7 +112,7 @@ export async function createWorkflowViaApi(
   const resp = await apiRequest(page, 'post', '/workflows', { token, data })
   if (!resp.ok()) {
     const body = await resp.text().catch(() => '')
-    throw new Error(`createWorkflowViaApi failed for ${options.name}: HTTP ${resp.status()} ${body}`)
+    throw seedError('createWorkflowViaApi', options.name, `HTTP ${resp.status()} ${body}`)
   }
   const workflow = (await resp.json()) as { id: string; name: string }
   return { id: workflow.id, name: workflow.name }
@@ -168,7 +172,7 @@ export async function createIdentityProviderViaApi(
   options: { name: string; token?: string }
 ): Promise<SeededIdentityProvider> {
   const token = options.token ?? (await getAuthToken(page))
-  if (!token) throw new Error(`createIdentityProviderViaApi: could not obtain auth token for ${options.name}`)
+  if (!token) throw seedError('createIdentityProviderViaApi', options.name, 'could not obtain auth token')
 
   const resp = await apiRequest(page, 'post', '/identity_providers', {
     token,
@@ -186,7 +190,7 @@ export async function createIdentityProviderViaApi(
   })
   if (!resp.ok()) {
     const body = await resp.text().catch(() => '')
-    throw new Error(`createIdentityProviderViaApi failed for ${options.name}: HTTP ${resp.status()} ${body}`)
+    throw seedError('createIdentityProviderViaApi', options.name, `HTTP ${resp.status()} ${body}`)
   }
   const idp = (await resp.json()) as { id: string; name: string }
   return { id: idp.id, name: idp.name }
@@ -275,10 +279,10 @@ export async function createCredentialSeed(
   options: { name: string; projectId?: string; token?: string }
 ): Promise<SeededCredential> {
   const projectId = options.projectId ?? (await ensureProject(page))?.id
-  if (!projectId) throw new Error(`createCredentialSeed: could not ensure project for ${options.name}`)
+  if (!projectId) throw seedError('createCredentialSeed', options.name, 'could not ensure project')
 
   const id = await createCredentialViaApi(page, { name: options.name, projectId })
-  if (!id) throw new Error(`createCredentialSeed failed for ${options.name}`)
+  if (!id) throw seedError('createCredentialSeed', options.name, 'createCredentialViaApi returned no id')
   return { id, name: options.name }
 }
 
