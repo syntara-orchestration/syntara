@@ -15,6 +15,7 @@ from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import CoreSchema as PydanticCoreSchema
 from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import Session
 from sqlmodel import DateTime, Field, SQLModel
 
 from syntara.core.constants import ValidationMessages
@@ -41,6 +42,18 @@ class AuditLevel(str, Enum):
 def _utc_now() -> datetime:
     """Generate UTC timestamp for field defaults."""
     return datetime.now(UTC)
+
+
+def touch_updated_at_before_flush(session: Session, _flush_context: object, _instances: object) -> None:
+    """Bump updated_at on dirty BaseResource rows before flush.
+
+    Column ``onupdate`` alone is insufficient with async sessions when ORM
+    objects are validated before refresh (MissingGreenlet). Explicit assignment
+    here ensures the timestamp is on the instance and in the UPDATE statement.
+    """
+    for obj in session.dirty:
+        if isinstance(obj, BaseResource):
+            obj.updated_at = _utc_now()
 
 
 class BaseResource(SQLModel, ABC):
@@ -90,7 +103,7 @@ class BaseResource(SQLModel, ABC):
         default_factory=_utc_now,
         description="Timestamp when resource was last updated",
         sa_type=DateTime(timezone=True),  # type: ignore[call-overload]
-        sa_column_kwargs={"server_default": text("now()")},
+        sa_column_kwargs={"server_default": text("now()"), "onupdate": _utc_now},
         index=True,
     )
 

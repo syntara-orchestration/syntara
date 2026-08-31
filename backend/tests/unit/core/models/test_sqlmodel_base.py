@@ -43,6 +43,13 @@ class TestSQLModelBaseClasses:
 
         assert hasattr(MockBaseResource, "__table__")
 
+    def test_base_resource_updated_at_onupdate(self) -> None:
+        """updated_at must auto-update on resource changes via SQLAlchemy onupdate."""
+        updated_at_col = MockBaseResource.__table__.c.updated_at
+        created_at_col = MockBaseResource.__table__.c.created_at
+        assert updated_at_col.onupdate is not None
+        assert created_at_col.onupdate is None
+
     def test_base_resource_instance_creation(self) -> None:
         """Test MockBaseResource instance creation with labels."""
         resource_id = uuid4()

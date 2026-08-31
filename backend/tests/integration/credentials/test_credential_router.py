@@ -272,6 +272,31 @@ class TestUpdateCredential:
         assert "id" in body["updated_by"]
         assert "name" in body["updated_by"]
 
+    @pytest.mark.asyncio
+    async def test_patch_updates_updated_at(
+        self, auth_client: AsyncClient, bearer_type: CredentialType, test_project_id: str
+    ) -> None:
+        create_resp = await auth_client.post(
+            "/api/v1/credentials",
+            json={
+                "name": "Timestamp Test",
+                "credential_type_id": str(bearer_type.id),
+                "project_id": test_project_id,
+                "inputs": {"token": "abc"},
+            },
+        )
+        assert create_resp.status_code == 201
+        created = create_resp.json()
+
+        update_resp = await auth_client.patch(
+            f"/api/v1/credentials/{created['id']}",
+            json={"description": "patched"},
+        )
+        assert update_resp.status_code == 200
+        updated = update_resp.json()
+        assert updated["description"] == "patched"
+        assert updated["updated_at"] > created["updated_at"]
+
 
 class TestUserReferenceFields:
     """Verify created_by/updated_by return UserReference objects."""
