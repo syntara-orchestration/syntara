@@ -11,8 +11,13 @@ info:
     (organizations, job templates, inventories) via cascading dropdowns
     without direct Ansible Automation Platform Controller access.
 
-    Authentication to the Ansible Automation Platform Controller is resolved server-side from
-    environment variables (`APP_AAP_BASE_URL`, `APP_AAP_TOKEN`).
+    Authentication to the Ansible Automation Platform Controller is resolved
+    server-side from the AAP Gateway integration (URL and TLS) and an Orchestrator
+    credential (token or username/password). When integration_id and
+    credential_id are omitted, the unique visible enabled AAP integration
+    and its management credential are used. When more than one AAP integration
+    is visible, pass integration_id to select one. credential_id remains
+    optional and defaults to that integration's management credential.
 
     Note: This API intentionally diverges from standard Orchestrator response conventions.
     As a BFF proxy, it mirrors the upstream Ansible Automation Platform API shape (count/results, page_size)
@@ -1260,7 +1265,7 @@ components:
         title: Credential Id
       description: |
         Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
-        If provided, the credential is decrypted and used instead of environment variables.
+        If omitted, the selected integration's management credential is used.
         Credential must be of type "Ansible Automation Platform".
     integrationId:
       in: query
@@ -1274,7 +1279,8 @@ components:
         title: Integration Id
       description: |
         Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-        When provided, the integration's configured URL is used instead of environment variables.
+        If omitted, the unique visible enabled AAP integration is used.
+        Required when more than one AAP integration is visible.
 
   securitySchemes:
     bearerAuth:

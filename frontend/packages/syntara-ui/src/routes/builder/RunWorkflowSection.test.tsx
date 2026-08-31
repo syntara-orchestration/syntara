@@ -8,10 +8,11 @@ import { RunWorkflowSection } from './RunWorkflowSection'
 describe('RunWorkflowSection', () => {
   const defaultPermissions = {
     canEdit: true,
+    canCreate: true,
     canRun: true,
     canDelete: true,
     isLoading: false,
-    tooltips: { edit: '', save: '', publish: '', unpublish: '', run: 'No run permission', delete: '' },
+    tooltips: { edit: '', save: '', publish: '', unpublish: '', run: 'No run permission', delete: '', create: '' },
   }
 
   const defaultProps = {

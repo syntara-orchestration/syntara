@@ -7,7 +7,7 @@ import { AppRoute } from '../../../app/AppRoute'
 import { credentialsClient } from '../../../client'
 import { SynLabel } from '../../../components/labels/SynLabel'
 import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
-import { NxListPanelTable, NxListPanelView } from '../../../components/panels/list/NxListPanel'
+import { SynListPanelTable, SynListPanelView } from '../../../components/panels/list/SynListPanel'
 import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import { DateCell } from '../../../components/table/DateCell'
 import { LinkCell } from '../../../components/table/LinkCell'
@@ -152,7 +152,7 @@ export function CredentialWorkflowsTab({ credentialId }: Readonly<CredentialWork
 
   return (
     <SynPanelContentStack>
-      <NxListPanelView
+      <SynListPanelView
         isPending={query.isPending}
         error={query.error}
         onRetry={() => detachPromise(query.refetch())}
@@ -167,7 +167,7 @@ export function CredentialWorkflowsTab({ credentialId }: Readonly<CredentialWork
           />
         }
         body={
-          <NxListPanelTable
+          <SynListPanelTable
             caption="Workflows using this credential"
             isExpandable
             footer={{
@@ -187,7 +187,7 @@ export function CredentialWorkflowsTab({ credentialId }: Readonly<CredentialWork
               onToggleRow={handleToggleRow}
               onCollapseAll={handleCollapseAll}
             />
-          </NxListPanelTable>
+          </SynListPanelTable>
         }
       />
     </SynPanelContentStack>

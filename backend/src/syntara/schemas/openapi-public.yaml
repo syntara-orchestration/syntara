@@ -107,7 +107,7 @@ paths:
             title: Credential Id
           description: |
             Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
-            If provided, the credential is decrypted and used instead of environment variables.
+            If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
           name: integration_id
@@ -120,7 +120,8 @@ paths:
             title: Integration Id
           description: |
             Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-            When provided, the integration's configured URL is used instead of environment variables.
+            If omitted, the unique visible enabled AAP integration is used.
+            Required when more than one AAP integration is visible.
       responses:
         '200':
           description: Successful Response
@@ -268,7 +269,7 @@ paths:
             title: Credential Id
           description: |
             Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
-            If provided, the credential is decrypted and used instead of environment variables.
+            If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
           name: integration_id
@@ -281,7 +282,8 @@ paths:
             title: Integration Id
           description: |
             Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-            When provided, the integration's configured URL is used instead of environment variables.
+            If omitted, the unique visible enabled AAP integration is used.
+            Required when more than one AAP integration is visible.
         - in: query
           name: organization
           required: false
@@ -445,7 +447,7 @@ paths:
             title: Credential Id
           description: |
             Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
-            If provided, the credential is decrypted and used instead of environment variables.
+            If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
           name: integration_id
@@ -458,7 +460,8 @@ paths:
             title: Integration Id
           description: |
             Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-            When provided, the integration's configured URL is used instead of environment variables.
+            If omitted, the unique visible enabled AAP integration is used.
+            Required when more than one AAP integration is visible.
       responses:
         '200':
           description: Successful Response
@@ -606,7 +609,7 @@ paths:
             title: Credential Id
           description: |
             Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
-            If provided, the credential is decrypted and used instead of environment variables.
+            If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
           name: integration_id
@@ -619,7 +622,8 @@ paths:
             title: Integration Id
           description: |
             Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-            When provided, the integration's configured URL is used instead of environment variables.
+            If omitted, the unique visible enabled AAP integration is used.
+            Required when more than one AAP integration is visible.
         - in: query
           name: organization
           required: false
@@ -783,7 +787,7 @@ paths:
             title: Credential Id
           description: |
             Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
-            If provided, the credential is decrypted and used instead of environment variables.
+            If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
           name: integration_id
@@ -796,7 +800,8 @@ paths:
             title: Integration Id
           description: |
             Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-            When provided, the integration's configured URL is used instead of environment variables.
+            If omitted, the unique visible enabled AAP integration is used.
+            Required when more than one AAP integration is visible.
       responses:
         '200':
           description: Successful Response
@@ -944,7 +949,7 @@ paths:
             title: Credential Id
           description: |
             Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
-            If provided, the credential is decrypted and used instead of environment variables.
+            If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
           name: integration_id
@@ -957,7 +962,8 @@ paths:
             title: Integration Id
           description: |
             Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-            When provided, the integration's configured URL is used instead of environment variables.
+            If omitted, the unique visible enabled AAP integration is used.
+            Required when more than one AAP integration is visible.
         - in: query
           name: organization
           required: false
@@ -1114,7 +1120,7 @@ paths:
             title: Credential Id
           description: |
             Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
-            If provided, the credential is decrypted and used instead of environment variables.
+            If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
           name: integration_id
@@ -1127,7 +1133,8 @@ paths:
             title: Integration Id
           description: |
             Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-            When provided, the integration's configured URL is used instead of environment variables.
+            If omitted, the unique visible enabled AAP integration is used.
+            Required when more than one AAP integration is visible.
         - in: query
           name: organization
           required: false
@@ -1284,7 +1291,7 @@ paths:
             title: Credential Id
           description: |
             Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
-            If provided, the credential is decrypted and used instead of environment variables.
+            If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
           name: integration_id
@@ -1297,7 +1304,8 @@ paths:
             title: Integration Id
           description: |
             Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-            When provided, the integration's configured URL is used instead of environment variables.
+            If omitted, the unique visible enabled AAP integration is used.
+            Required when more than one AAP integration is visible.
       responses:
         '200':
           description: Successful Response
@@ -1445,7 +1453,7 @@ paths:
             title: Credential Id
           description: |
             Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
-            If provided, the credential is decrypted and used instead of environment variables.
+            If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
           name: integration_id
@@ -1458,7 +1466,8 @@ paths:
             title: Integration Id
           description: |
             Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-            When provided, the integration's configured URL is used instead of environment variables.
+            If omitted, the unique visible enabled AAP integration is used.
+            Required when more than one AAP integration is visible.
       responses:
         '200':
           description: Successful Response
@@ -1605,7 +1614,7 @@ paths:
             title: Credential Id
           description: |
             Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
-            If provided, the credential is decrypted and used instead of environment variables.
+            If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
           name: integration_id
@@ -1618,7 +1627,8 @@ paths:
             title: Integration Id
           description: |
             Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-            When provided, the integration's configured URL is used instead of environment variables.
+            If omitted, the unique visible enabled AAP integration is used.
+            Required when more than one AAP integration is visible.
       responses:
         '200':
           description: Successful Response

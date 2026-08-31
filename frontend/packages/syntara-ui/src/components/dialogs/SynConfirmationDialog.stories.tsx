@@ -2,10 +2,10 @@ import { Content } from '@patternfly/react-core'
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { fn } from 'storybook/test'
 
-import { NxConfirmationDialog } from './NxConfirmationDialog'
+import { SynConfirmationDialog } from './SynConfirmationDialog'
 
-const meta: Meta<typeof NxConfirmationDialog> = {
-  component: NxConfirmationDialog,
+const meta: Meta<typeof SynConfirmationDialog> = {
+  component: SynConfirmationDialog,
   tags: ['autodocs'],
   parameters: {
     docs: {

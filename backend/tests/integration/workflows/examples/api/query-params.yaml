@@ -24,10 +24,10 @@ nodes:
       method: GET
       url: http://test-api.example.com/api/data
       query_params:
-        filter: ${input.filter}
-        limit: ${input.limit}
+        filter: ${trigger.filter}
+        limit: ${trigger.limit}
         sort: name
     inputs:
-      filter: ${inputs.filter}
-      limit: ${inputs.limit}
+      filter: ${trigger.filter}
+      limit: ${trigger.limit}
 edges: []

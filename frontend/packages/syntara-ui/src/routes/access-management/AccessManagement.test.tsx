@@ -181,7 +181,7 @@ describe('AccessManagement', () => {
 
     await user.click(screen.getByRole('tab', { name: 'Groups' }))
 
-    // NxListPanelTabs uses useNavigate (via useUrlTab) for tab navigation
+    // SynListPanelTabs uses useNavigate (via useUrlTab) for tab navigation
     expect(routerTestState.navigate).toHaveBeenCalledWith({ to: AppRoute.AccessManagement.Groups })
   })
 
@@ -338,7 +338,7 @@ describe('AccessManagement', () => {
     await renderAndSettle(<AccessManagement />)
 
     await waitFor(() => {
-      // NxUrlTabs redirects via navigate({ to, replace: true }) when the active tab is hidden
+      // SynUrlTabs redirects via navigate({ to, replace: true }) when the active tab is hidden
       expect(routerTestState.navigate).toHaveBeenCalledWith({ to: AppRoute.AccessManagement.Users, replace: true })
     })
   })

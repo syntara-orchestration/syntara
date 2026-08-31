@@ -74,6 +74,7 @@ const { mockWorkflowPermissions } = vi.hoisted(() => ({
       isLoading: false,
       tooltips: {
         create: 'create tooltip',
+        duplicate: 'duplicate tooltip',
         update: 'update tooltip',
         delete: 'delete tooltip',
         run: 'run tooltip',
@@ -162,7 +163,13 @@ describe('Workflows Component', () => {
       canDelete: true,
       canRun: true,
       isLoading: false,
-      tooltips: { create: 'create tooltip', update: 'update tooltip', delete: 'delete tooltip', run: 'run tooltip' },
+      tooltips: {
+        create: 'create tooltip',
+        duplicate: 'duplicate tooltip',
+        update: 'update tooltip',
+        delete: 'delete tooltip',
+        run: 'run tooltip',
+      },
     }
 
     // Set up accessClient default return values FIRST
