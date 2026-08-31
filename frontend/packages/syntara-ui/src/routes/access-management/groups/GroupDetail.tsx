@@ -18,12 +18,12 @@ import { useMemo, useState } from 'react'
 
 import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsGroupDetail, breadcrumbsGroupDetailEarlyShell } from '../../../app/breadcrumbBuilders'
-import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
 import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
-import { NxListPanel, NxListPanelTabs } from '../../../components/panels/list/NxListPanel'
+import { SynListPanel, SynListPanelTabs } from '../../../components/panels/list/SynListPanel'
 import { useQueryState } from '../../../components/states/useQueryState'
 import { SynKebabMenu } from '../../../components/SynKebabMenu'
 import { SynPageTitle } from '../../../components/SynPageTitle'
@@ -135,7 +135,7 @@ function GroupTabBar({
     return tabs
   }, [showMembers, showAssignments])
   return (
-    <NxListPanelTabs basePath={basePath} defaultTab="details" validTabs={validTabs} aria-label="Group details">
+    <SynListPanelTabs basePath={basePath} defaultTab="details" validTabs={validTabs} aria-label="Group details">
       <Tab eventKey="details" title={<TabTitleText>Details</TabTitleText>} />
       {showMembers && (
         <Tab
@@ -157,7 +157,7 @@ function GroupTabBar({
           }
         />
       )}
-    </NxListPanelTabs>
+    </SynListPanelTabs>
   )
 }
 
@@ -301,7 +301,7 @@ export function GroupDetail() {
         }
       />
       <SynPageBody>
-        <NxListPanel>
+        <SynListPanel>
           <GroupTabBar
             basePath={basePath}
             showMembers={showMembers}
@@ -319,7 +319,7 @@ export function GroupDetail() {
               detachPromise(membersQuery.refetch())
             }}
           />
-        </NxListPanel>
+        </SynListPanel>
       </SynPageBody>
 
       <GroupFormModal
@@ -332,7 +332,7 @@ export function GroupDetail() {
       />
 
       {!groupData.is_builtin && (
-        <NxConfirmationDialog
+        <SynConfirmationDialog
           isOpen={deleteDialog.isOpen}
           onClose={deleteDialog.close}
           onConfirm={() => handleDelete(deleteDialog.item)}
@@ -346,7 +346,7 @@ export function GroupDetail() {
           }}
         >
           The group <strong>{deleteDialog.item?.name}</strong> will be deleted. This cannot be undone.
-        </NxConfirmationDialog>
+        </SynConfirmationDialog>
       )}
     </SynPage>
   )

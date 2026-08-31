@@ -2,7 +2,7 @@ import { Button } from '@patternfly/react-core'
 import { RhUiBanIcon, RhUiEditIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import type { User } from '@syntara/contracts'
 
-import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
 import { SynKebabMenu } from '../../../components/SynKebabMenu'
@@ -31,7 +31,7 @@ export function UserDetailConfirmationDialogs({
 
   return (
     <>
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={revokeDialog.isOpen}
         onClose={revokeDialog.close}
         onConfirm={onRevoke}
@@ -42,8 +42,8 @@ export function UserDetailConfirmationDialogs({
       >
         All tokens for <strong>{revokeDialog.item?.username}</strong> will be revoked. The user will be signed out and
         must sign in again.
-      </NxConfirmationDialog>
-      <NxConfirmationDialog
+      </SynConfirmationDialog>
+      <SynConfirmationDialog
         isOpen={deleteDialog.isOpen}
         onClose={deleteDialog.close}
         onConfirm={onDelete}
@@ -54,7 +54,7 @@ export function UserDetailConfirmationDialogs({
         destructiveAcknowledgement={DELETE_USER_ACKNOWLEDGEMENT}
       >
         The user <strong>{deleteDialog.item?.username}</strong> will be deleted. This cannot be undone.
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
     </>
   )
 }

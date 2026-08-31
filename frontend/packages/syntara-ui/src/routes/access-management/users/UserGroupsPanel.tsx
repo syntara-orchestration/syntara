@@ -23,7 +23,7 @@ import { useMemo, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { z } from 'zod'
 
-import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { FilterBar } from '../../../components/filters'
 import { IconLabel } from '../../../components/IconLabel'
@@ -322,7 +322,7 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
     return (
       <>
         <SynEmptyStateNoData
-          title="No groups"
+          title="No groups yet"
           description="This user is not a member of any groups."
           buttonText="Add to group"
           addData={groupPermissions.canManageMembers ? () => setAddModalOpen(true) : undefined}
@@ -447,7 +447,7 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
         existingGroupIds={groups.flatMap((g) => (g.id ? [g.id] : []))}
       />
 
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={!!groupToRemove}
         onClose={() => setGroupToRemove(null)}
         onConfirm={handleRemove}
@@ -458,7 +458,7 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
       >
         This removes the user from group <strong>{groupToRemove?.name}</strong>. They will lose any permissions granted
         through this group membership.
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
     </>
   )
 }

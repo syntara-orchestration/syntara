@@ -1,5 +1,5 @@
 import { Content, ContentVariants, EmptyState, EmptyStateBody, StackItem, Title } from '@patternfly/react-core'
-import { RhUiCubesFillIcon, RhUiKeyIcon } from '@patternfly/react-icons'
+import { PlusCircleIcon, RhUiKeyIcon } from '@patternfly/react-icons'
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import { useCallback, useState } from 'react'
 
@@ -105,7 +105,7 @@ export function SelectUserStep({
       )}
       {!showSelectionUi && (
         <StackItem isFilled style={flexCenteredBothAxes}>
-          <EmptyState headingLevel="h4" titleText="No users yet" icon={RhUiCubesFillIcon} variant="sm">
+          <EmptyState headingLevel="h4" titleText="No users yet" icon={PlusCircleIcon} variant="sm">
             <EmptyStateBody>
               There must be at least one other user before you can transfer a federated identity.
             </EmptyStateBody>
@@ -228,7 +228,7 @@ export function SelectIdentityStep({
       )}
       {!showSelectionUi && (
         <StackItem isFilled style={flexCenteredBothAxes}>
-          <EmptyState headingLevel="h4" titleText="No identities" icon={RhUiKeyIcon} variant="sm">
+          <EmptyState headingLevel="h4" titleText="No identities yet" icon={RhUiKeyIcon} variant="sm">
             <EmptyStateBody>This user has no federated identities to attach.</EmptyStateBody>
           </EmptyState>
         </StackItem>

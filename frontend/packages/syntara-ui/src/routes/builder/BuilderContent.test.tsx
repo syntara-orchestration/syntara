@@ -75,10 +75,11 @@ vi.mock('../../hooks/useProjectSelector', () => ({
 
 const mockBuilderPermissions = vi.hoisted(() => ({
   canEdit: true,
+  canCreate: true,
   canRun: true,
   canDelete: true,
   isLoading: false,
-  tooltips: { edit: '', save: '', publish: '', unpublish: '', run: '', delete: '' },
+  tooltips: { edit: '', save: '', publish: '', unpublish: '', run: '', delete: '', create: '' },
 }))
 
 vi.mock('./useBuilderPermissions', () => ({

@@ -4,7 +4,7 @@ import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table
 import type { IAction } from '@patternfly/react-table'
 import { useMemo, useState } from 'react'
 
-import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { FilterBar } from '../../../components/filters'
 import { IconLabel } from '../../../components/IconLabel'
@@ -147,7 +147,7 @@ export function GroupMembersPanel({ groupId, onMembershipChange }: Readonly<Grou
     return (
       <>
         <SynEmptyStateNoData
-          title="No members"
+          title="No members yet"
           description="Add users to this group to manage their access."
           buttonText="Add member"
           addData={permissions.canManageMembers ? () => setAddModalOpen(true) : undefined}
@@ -279,7 +279,7 @@ export function GroupMembersPanel({ groupId, onMembershipChange }: Readonly<Grou
         existingMemberIds={members.map((m) => m.id)}
       />
 
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={!!memberToRemove}
         onClose={() => setMemberToRemove(null)}
         onConfirm={handleRemove}
@@ -290,7 +290,7 @@ export function GroupMembersPanel({ groupId, onMembershipChange }: Readonly<Grou
       >
         This removes <strong>{memberToRemove?.username}</strong> from the group. They will lose any permissions granted
         through this group membership.
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
     </>
   )
 }

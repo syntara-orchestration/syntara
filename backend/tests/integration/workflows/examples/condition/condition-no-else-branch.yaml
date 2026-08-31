@@ -17,7 +17,7 @@ nodes:
   - id: feature_check
     name: Check Feature Flag
     type: condition
-    condition: ${input.enable_feature}
+    condition: ${trigger.enable_feature}
 
   - id: enable_feature
     name: Enable Feature

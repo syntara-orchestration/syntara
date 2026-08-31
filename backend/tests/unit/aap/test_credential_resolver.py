@@ -24,6 +24,7 @@ from syntara.aap.credential_resolver import (
     _validate_credential_ownership,
     _validate_credential_type,
     resolve_aap_connection_from_credential,
+    resolve_aap_connection_from_management_credential,
 )
 from syntara.aap.exceptions import AAPAuthenticationError, AAPNotConfiguredError
 from syntara.core.lib.encryption import EncryptionError
@@ -569,3 +570,50 @@ class TestResolveAAPConnectionFromCredential:
 
         with pytest.raises(AAPAuthenticationError, match="is not authorized"):
             await resolve_aap_connection_from_credential(mock_session, credential_id, user_id)
+
+    @pytest.mark.asyncio
+    async def test_management_credential_allows_non_owner(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Management-credential helper decrypts without an owner check."""
+        from typing import cast
+
+        credential_id = uuid4()
+        owner_id = uuid4()
+        credential = _mock_credential(credential_id=credential_id, created_by=owner_id)
+        cast("MagicMock", credential.is_owned_by).return_value = False
+
+        mock_result = MagicMock()
+        mock_result.one_or_none.return_value = credential
+        mock_session = AsyncMock()
+        mock_session.exec.return_value = mock_result
+
+        mock_secret_service = AsyncMock()
+        mock_secret_service.retrieve_secret.return_value = {"oauth_token": "secret-token"}
+        monkeypatch.setattr(
+            "syntara.aap.credential_resolver.create_secret_service",
+            MagicMock(return_value=mock_secret_service),
+        )
+
+        mock_resolved = MagicMock()
+        mock_resolved.extra_vars = {"aap_oauth_token": "secret-token"}
+        mock_injector_resolver = MagicMock()
+        mock_injector_resolver.resolve.return_value = mock_resolved
+        monkeypatch.setattr("syntara.aap.credential_resolver.InjectorResolver", mock_injector_resolver)
+
+        integration = MagicMock()
+        integration.name = "AAP Gateway"
+        integration.management_credential_id = credential_id
+
+        result = await resolve_aap_connection_from_management_credential(mock_session, integration)
+
+        assert result.headers == {"authorization": "Bearer secret-token"}
+        cast("MagicMock", credential.is_owned_by).assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_management_credential_missing_raises(self) -> None:
+        integration = MagicMock()
+        integration.name = "AAP Gateway"
+        integration.management_credential_id = None
+        session = AsyncMock()
+
+        with pytest.raises(AAPNotConfiguredError, match="no management credential"):
+            await resolve_aap_connection_from_management_credential(session, integration)

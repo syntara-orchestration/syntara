@@ -457,7 +457,11 @@ export async function deleteProject(page: Page, projectName: string) {
 /** Navigate directly to the builder for a known workflow ID and wait for the canvas to be ready. */
 export async function openBuilderById(page: Page, workflowId: string): Promise<void> {
   await page.goto(toAppUrl(`/workflow-builder/${workflowId}`))
-  await selectProjectIfRequired(page)
+  // Existing workflows already have a project assigned — the project selector
+  // never shows "Select a project", so skip selectProjectIfRequired (which
+  // would burn 2s waiting for an element that will never appear).
+  // Instead, wait for the builder toolbar to render.
+  await page.getByPlaceholder('Workflow name').waitFor({ state: 'visible', timeout: 15_000 })
   await waitForUIReady(page)
   // Confirm the builder actually loaded this workflow (not a 404 or error state)
   await expect(page).toHaveURL(new RegExp(`/workflow-builder/${workflowId}`))

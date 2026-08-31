@@ -10,13 +10,13 @@ import { SynPageHeader } from '../../layout/SynPageHeader'
 import { SynEmptyStateNoData } from '../../states/SynEmptyStateNoData'
 
 import {
-  NxListPanel,
-  NxListPanelSkeletonTbody,
-  NxListPanelTable,
-  NxListPanelToolbar,
-  NxListPanelView,
-} from './NxListPanel'
-import { KitchenSinkListStory, ResourceActionsOverflowMenu, TabbedListStory } from './NxListPanel.stories.helpers'
+  SynListPanel,
+  SynListPanelSkeletonTbody,
+  SynListPanelTable,
+  SynListPanelToolbar,
+  SynListPanelView,
+} from './SynListPanel'
+import { KitchenSinkListStory, ResourceActionsOverflowMenu, TabbedListStory } from './SynListPanel.stories.helpers'
 
 const FILTER_DEFINITIONS = [
   {
@@ -45,7 +45,7 @@ const ROW_ACTIONS = [
 
 function SampleTable({ rows, isFetching }: Readonly<{ rows: SampleRow[]; isFetching?: boolean }>) {
   return (
-    <NxListPanelTable caption="Sample resources">
+    <SynListPanelTable caption="Sample resources">
       <Thead>
         <Tr>
           <Th>Name</Th>
@@ -54,7 +54,7 @@ function SampleTable({ rows, isFetching }: Readonly<{ rows: SampleRow[]; isFetch
         </Tr>
       </Thead>
       {isFetching ? (
-        <NxListPanelSkeletonTbody columnsCount={3} />
+        <SynListPanelSkeletonTbody columnsCount={3} />
       ) : (
         <Tbody>
           {rows.map((row) => (
@@ -68,12 +68,12 @@ function SampleTable({ rows, isFetching }: Readonly<{ rows: SampleRow[]; isFetch
           ))}
         </Tbody>
       )}
-    </NxListPanelTable>
+    </SynListPanelTable>
   )
 }
 
 const defaultToolbar = (
-  <NxListPanelToolbar filters={[]} filterDefinitions={FILTER_DEFINITIONS} onFilterChange={() => {}} />
+  <SynListPanelToolbar filters={[]} filterDefinitions={FILTER_DEFINITIONS} onFilterChange={() => {}} />
 )
 
 const PANEL_WRAPPER_STYLE = { height: '500px', display: 'flex', flexDirection: 'column' } as const
@@ -89,8 +89,8 @@ const panelDecorator: Decorator = (Story) => (
   </div>
 )
 
-const meta: Meta<typeof NxListPanel> = {
-  component: NxListPanel,
+const meta: Meta<typeof SynListPanel> = {
+  component: SynListPanel,
   decorators: [panelDecorator],
   tags: ['autodocs'],
   parameters: {
@@ -99,12 +99,12 @@ const meta: Meta<typeof NxListPanel> = {
         component:
           'Compound component that composes `SynPanel`, toolbar, and table into a consistent list view.\n\n' +
           '**Sub-components:**\n' +
-          '- `NxListPanel` — pure layout wrapper; always full-height and scrollable\n' +
-          '- `NxListPanelView` — owns the state machine; toolbar is hidden during initial load\n' +
-          '- `NxListPanelToolbar` — wraps `FilterBar` with an actions slot at the trailing end\n' +
-          '- `NxListPanelTable` — scrollable, captioned table with optional pagination footer; swap in `NxListPanelSkeletonTbody` during background refetches\n' +
-          '- `NxListPanelTabs` — URL-driven tabs for use inside `NxListPanel`\n\n' +
-          '**State priority (inside `NxListPanelView`):** initial load → error (503 or standard) → filtered empty → no-data empty → data',
+          '- `SynListPanel` — pure layout wrapper; always full-height and scrollable\n' +
+          '- `SynListPanelView` — owns the state machine; toolbar is hidden during initial load\n' +
+          '- `SynListPanelToolbar` — wraps `FilterBar` with an actions slot at the trailing end\n' +
+          '- `SynListPanelTable` — scrollable, captioned table with optional pagination footer; swap in `SynListPanelSkeletonTbody` during background refetches\n' +
+          '- `SynListPanelTabs` — URL-driven tabs for use inside `SynListPanel`\n\n' +
+          '**State priority (inside `SynListPanelView`):** initial load → error (503 or standard) → filtered empty → no-data empty → data',
       },
     },
   },
@@ -117,8 +117,8 @@ type Story = StoryObj<typeof meta>
 /** Basic table with data — the default happy-path state. */
 export const Default: Story = {
   render: () => (
-    <NxListPanel>
-      <NxListPanelView
+    <SynListPanel>
+      <SynListPanelView
         isPending={false}
         error={null}
         onRetry={() => {}}
@@ -128,15 +128,15 @@ export const Default: Story = {
         toolbar={defaultToolbar}
         body={<SampleTable rows={SAMPLE_ROWS} />}
       />
-    </NxListPanel>
+    </SynListPanel>
   ),
 }
 
 /** `isPending={true}` — full-panel loading spinner; toolbar is hidden. */
 export const Loading: Story = {
   render: () => (
-    <NxListPanel>
-      <NxListPanelView
+    <SynListPanel>
+      <SynListPanelView
         isPending
         error={null}
         onRetry={() => {}}
@@ -146,15 +146,15 @@ export const Loading: Story = {
         toolbar={defaultToolbar}
         body={<SampleTable rows={SAMPLE_ROWS} />}
       />
-    </NxListPanel>
+    </SynListPanel>
   ),
 }
 
 /** `error` set — shows an error state with a Retry button; toolbar is shown. */
 export const Error: Story = {
   render: () => (
-    <NxListPanel>
-      <NxListPanelView
+    <SynListPanel>
+      <SynListPanelView
         isPending={false}
         error={{ status: 500, title: 'Internal Server Error', retryable: true }}
         onRetry={() => {}}
@@ -164,15 +164,15 @@ export const Error: Story = {
         toolbar={defaultToolbar}
         body={<SampleTable rows={SAMPLE_ROWS} />}
       />
-    </NxListPanel>
+    </SynListPanel>
   ),
 }
 
 /** 503 error — auto-detected and shows the Service Unavailable state; toolbar is shown. */
 export const ServiceUnavailable: Story = {
   render: () => (
-    <NxListPanel>
-      <NxListPanelView
+    <SynListPanel>
+      <SynListPanelView
         isPending={false}
         error={{ status: 503, title: 'Service Unavailable', retryable: true }}
         onRetry={() => {}}
@@ -182,15 +182,15 @@ export const ServiceUnavailable: Story = {
         toolbar={defaultToolbar}
         body={<SampleTable rows={SAMPLE_ROWS} />}
       />
-    </NxListPanel>
+    </SynListPanel>
   ),
 }
 
 /** `errorTitle` override — replaces the default "Error" heading with a page-specific label. */
 export const ErrorWithCustomTitle: Story = {
   render: () => (
-    <NxListPanel>
-      <NxListPanelView
+    <SynListPanel>
+      <SynListPanelView
         isPending={false}
         error="Network error"
         errorTitle="Error loading identity providers"
@@ -201,7 +201,7 @@ export const ErrorWithCustomTitle: Story = {
         toolbar={defaultToolbar}
         body={<SampleTable rows={SAMPLE_ROWS} />}
       />
-    </NxListPanel>
+    </SynListPanel>
   ),
 }
 
@@ -212,8 +212,8 @@ export const SkeletonFetching: StoryObj<{ isFetching: boolean }> = {
     isFetching: { control: 'boolean', description: 'Simulates a background refetch — shows skeleton rows.' },
   },
   render: ({ isFetching }) => (
-    <NxListPanel>
-      <NxListPanelView
+    <SynListPanel>
+      <SynListPanelView
         isPending={false}
         isFetching={isFetching}
         error={null}
@@ -221,18 +221,18 @@ export const SkeletonFetching: StoryObj<{ isFetching: boolean }> = {
         isEmpty={false}
         hasActiveFilters={false}
         onClearAllFilters={() => {}}
-        toolbar={<NxListPanelToolbar filters={[]} filterDefinitions={FILTER_DEFINITIONS} onFilterChange={() => {}} />}
+        toolbar={<SynListPanelToolbar filters={[]} filterDefinitions={FILTER_DEFINITIONS} onFilterChange={() => {}} />}
         body={<SampleTable rows={SAMPLE_ROWS} isFetching={isFetching} />}
       />
-    </NxListPanel>
+    </SynListPanel>
   ),
 }
 
 /** `isEmpty && hasActiveFilters` — filter empty state with "Clear all filters" action; toolbar shown. */
 export const FilteredEmpty: Story = {
   render: () => (
-    <NxListPanel>
-      <NxListPanelView
+    <SynListPanel>
+      <SynListPanelView
         isPending={false}
         error={null}
         onRetry={() => {}}
@@ -242,15 +242,15 @@ export const FilteredEmpty: Story = {
         toolbar={defaultToolbar}
         body={<SampleTable rows={[]} />}
       />
-    </NxListPanel>
+    </SynListPanel>
   ),
 }
 
 /** `isEmpty` with no active filters — default no-data empty state; toolbar shown. */
 export const NoData: Story = {
   render: () => (
-    <NxListPanel>
-      <NxListPanelView
+    <SynListPanel>
+      <SynListPanelView
         isPending={false}
         error={null}
         onRetry={() => {}}
@@ -260,7 +260,7 @@ export const NoData: Story = {
         toolbar={defaultToolbar}
         body={<SampleTable rows={[]} />}
       />
-    </NxListPanel>
+    </SynListPanel>
   ),
 }
 
@@ -271,8 +271,8 @@ export const NoData: Story = {
  */
 export const NoDataNoToolbar: Story = {
   render: () => (
-    <NxListPanel>
-      <NxListPanelView
+    <SynListPanel>
+      <SynListPanelView
         isPending={false}
         error={null}
         onRetry={() => {}}
@@ -289,15 +289,15 @@ export const NoDataNoToolbar: Story = {
         }
         body={<SampleTable rows={[]} />}
       />
-    </NxListPanel>
+    </SynListPanel>
   ),
 }
 
 /** Custom `noDataState` — pass your own empty state component. */
 export const NoDataCustom: Story = {
   render: () => (
-    <NxListPanel>
-      <NxListPanelView
+    <SynListPanel>
+      <SynListPanelView
         isPending={false}
         error={null}
         onRetry={() => {}}
@@ -315,15 +315,15 @@ export const NoDataCustom: Story = {
         toolbar={defaultToolbar}
         body={<SampleTable rows={[]} />}
       />
-    </NxListPanel>
+    </SynListPanel>
   ),
 }
 
 /** Toolbar with a single action button in the `actions` slot. */
 export const WithActions: Story = {
   render: () => (
-    <NxListPanel>
-      <NxListPanelView
+    <SynListPanel>
+      <SynListPanelView
         isPending={false}
         error={null}
         onRetry={() => {}}
@@ -331,7 +331,7 @@ export const WithActions: Story = {
         hasActiveFilters={false}
         onClearAllFilters={() => {}}
         toolbar={
-          <NxListPanelToolbar
+          <SynListPanelToolbar
             filters={[]}
             filterDefinitions={FILTER_DEFINITIONS}
             onFilterChange={() => {}}
@@ -344,15 +344,15 @@ export const WithActions: Story = {
         }
         body={<SampleTable rows={SAMPLE_ROWS} />}
       />
-    </NxListPanel>
+    </SynListPanel>
   ),
 }
 
 /** Multiple buttons in the actions slot — primary before secondary per AO design system §8. */
 export const WithMultipleButtons: Story = {
   render: () => (
-    <NxListPanel>
-      <NxListPanelView
+    <SynListPanel>
+      <SynListPanelView
         isPending={false}
         error={null}
         onRetry={() => {}}
@@ -360,7 +360,7 @@ export const WithMultipleButtons: Story = {
         hasActiveFilters={false}
         onClearAllFilters={() => {}}
         toolbar={
-          <NxListPanelToolbar
+          <SynListPanelToolbar
             filters={[]}
             filterDefinitions={FILTER_DEFINITIONS}
             onFilterChange={() => {}}
@@ -378,15 +378,15 @@ export const WithMultipleButtons: Story = {
         }
         body={<SampleTable rows={SAMPLE_ROWS} />}
       />
-    </NxListPanel>
+    </SynListPanel>
   ),
 }
 
 /** Primary button with a kebab overflow menu for secondary actions — use when toolbar has more than two actions. */
 export const WithActionOverflowMenu: Story = {
   render: () => (
-    <NxListPanel>
-      <NxListPanelView
+    <SynListPanel>
+      <SynListPanelView
         isPending={false}
         error={null}
         onRetry={() => {}}
@@ -394,7 +394,7 @@ export const WithActionOverflowMenu: Story = {
         hasActiveFilters={false}
         onClearAllFilters={() => {}}
         toolbar={
-          <NxListPanelToolbar
+          <SynListPanelToolbar
             filters={[]}
             filterDefinitions={FILTER_DEFINITIONS}
             onFilterChange={() => {}}
@@ -410,15 +410,15 @@ export const WithActionOverflowMenu: Story = {
         }
         body={<SampleTable rows={SAMPLE_ROWS} />}
       />
-    </NxListPanel>
+    </SynListPanel>
   ),
 }
 
 /** Arbitrary content between the toolbar and table — e.g. a descriptive paragraph. */
 export const WithContentBetween: Story = {
   render: () => (
-    <NxListPanel>
-      <NxListPanelView
+    <SynListPanel>
+      <SynListPanelView
         isPending={false}
         error={null}
         onRetry={() => {}}
@@ -433,11 +433,11 @@ export const WithContentBetween: Story = {
           </>
         }
       />
-    </NxListPanel>
+    </SynListPanel>
   ),
 }
 
-/** Two tabs each with their own `NxListPanelView`; active tab driven by URL. Click tabs to switch content. */
+/** Two tabs each with their own `SynListPanelView`; active tab driven by URL. Click tabs to switch content. */
 export const TabbedList: Story = {
   render: () => <TabbedListStory />,
 }
@@ -450,8 +450,8 @@ export const ReadOnlyList: Story = {
         <SynPage>
           <SynPageHeader title="Executions" />
           <SynPageBody>
-            <NxListPanel>
-              <NxListPanelView
+            <SynListPanel>
+              <SynListPanelView
                 isPending={false}
                 error={null}
                 onRetry={() => {}}
@@ -461,7 +461,7 @@ export const ReadOnlyList: Story = {
                 toolbar={defaultToolbar}
                 body={<SampleTable rows={SAMPLE_ROWS} />}
               />
-            </NxListPanel>
+            </SynListPanel>
           </SynPageBody>
         </SynPage>
       </div>
@@ -478,8 +478,8 @@ export const WithSorting: Story = {
       return row.name
     })
     return (
-      <NxListPanel>
-        <NxListPanelView
+      <SynListPanel>
+        <SynListPanelView
           isPending={false}
           error={null}
           onRetry={() => {}}
@@ -488,7 +488,7 @@ export const WithSorting: Story = {
           onClearAllFilters={() => {}}
           toolbar={defaultToolbar}
           body={
-            <NxListPanelTable caption="Sample resources">
+            <SynListPanelTable caption="Sample resources">
               <Thead>
                 <Tr>
                   <Th sort={getSortParams(0)}>Name</Th>
@@ -507,10 +507,10 @@ export const WithSorting: Story = {
                   </Tr>
                 ))}
               </Tbody>
-            </NxListPanelTable>
+            </SynListPanelTable>
           }
         />
-      </NxListPanel>
+      </SynListPanel>
     )
   },
 }

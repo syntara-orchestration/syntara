@@ -48,7 +48,7 @@ async function createPendingApproval(
   // There is a brief async gap between the execution reaching "paused" and the approval
   // appearing in the approvals index — polling here prevents the race in the test setup.
   // In Konflux's environment the indexing lag can exceed 30s; treat as a skip (not a failure).
-  const approvalVisible = await pollApprovalVisible(app, approvalName)
+  const approvalVisible = await pollApprovalVisible(app, approvalName, { timeout: 45_000 })
     .then(() => true)
     .catch(() => false)
   test.skip(!approvalVisible, 'Approval record not visible in listing API — async indexing lag in Konflux')

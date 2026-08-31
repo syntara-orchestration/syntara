@@ -201,7 +201,7 @@ test.describe('V2 Workflow Schema Migration', () => {
       await app.getByPlaceholder('Filter by name').fill(workflowName)
       await app.getByRole('button', { name: 'Apply filter' }).click()
       const targetRow = app.getByRole('row', { name: new RegExp(workflowName) })
-      await expect(targetRow).toBeVisible()
+      await expect(targetRow).toBeVisible({ timeout: 15_000 })
     } finally {
       await deleteWorkflow(app, workflowName)
       await deleteLlmIntegration(app, llmIntegration.id)
@@ -341,7 +341,7 @@ test.describe('V2 Workflow Schema Migration', () => {
       await app.getByPlaceholder('Filter by name').fill(workflowName)
       await app.getByRole('button', { name: 'Apply filter' }).click()
       const targetRow = app.getByRole('row', { name: new RegExp(workflowName) })
-      await expect(targetRow).toBeVisible()
+      await expect(targetRow).toBeVisible({ timeout: 15_000 })
 
       // Reopen the saved workflow
       await targetRow.getByRole('link', { name: workflowName, exact: true }).click()
@@ -362,7 +362,7 @@ test.describe('V2 Workflow Schema Migration', () => {
       ]
       for (const nodeName of nodeNames) {
         await expect(
-          app.locator('.react-flow').getByRole('group', { name: new RegExp(`^${nodeName}(,|$)`) }),
+          app.locator('.react-flow').getByRole('button', { name: new RegExp(`^${nodeName}(,|$)`) }),
           `node "${nodeName}" should be present after reload`
         ).toBeAttached({ timeout: 15_000 })
       }

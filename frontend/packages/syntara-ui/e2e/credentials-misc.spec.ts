@@ -71,7 +71,7 @@ test.describe('Credential Workflows Tab', () => {
 
       await retryButton.click()
 
-      const emptyState = app.getByText('No workflows using this credential')
+      const emptyState = app.getByRole('heading', { name: 'No workflows yet' })
       const table = app.getByRole('grid', { name: 'Workflows using this credential' })
       await expect(emptyState.or(table)).toBeVisible({ timeout: 10_000 })
     } finally {

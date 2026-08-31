@@ -186,7 +186,7 @@ describe('UserGroupsPanel', () => {
   })
 
   describe('Empty State', () => {
-    it('shows "No groups" empty state when no groups returned', () => {
+    it('shows "No groups yet" empty state when no groups returned', () => {
       vi.mocked(accessClient.useQuery).mockImplementation((_method, path) => {
         if (path === '/users/{user_id}/groups') {
           return {
@@ -210,7 +210,7 @@ describe('UserGroupsPanel', () => {
 
       render(<UserGroupsPanel userId="user-123" />, { wrapper })
 
-      expect(screen.getByText('No groups')).toBeInTheDocument()
+      expect(screen.getByText('No groups yet')).toBeInTheDocument()
       expect(screen.getByText('This user is not a member of any groups.')).toBeInTheDocument()
     })
   })
@@ -1044,7 +1044,7 @@ describe('UserGroupsPanel', () => {
       render(<UserGroupsPanel userId="user-123" />, { wrapper })
 
       // Should show empty state
-      expect(screen.getByText('No groups')).toBeInTheDocument()
+      expect(screen.getByText('No groups yet')).toBeInTheDocument()
 
       // Click "Add to group" from empty state
       const addButton = screen.getByRole('button', { name: /add to group/i })

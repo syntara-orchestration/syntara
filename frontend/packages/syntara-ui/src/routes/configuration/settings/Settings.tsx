@@ -12,7 +12,7 @@ import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../components/layout/SynPanel'
 import { useQueryState } from '../../../components/states/useQueryState'
 import { SynPageTitle } from '../../../components/SynPageTitle'
-import { NxUrlTabs } from '../../../components/tabs/NxUrlTabs'
+import { SynUrlTabs } from '../../../components/tabs/SynUrlTabs'
 import { useDirtyFormGuard } from '../../../hooks/useDirtyFormGuard'
 import {
   FILE_STORAGE_UNAVAILABLE_MESSAGE,
@@ -246,7 +246,7 @@ export default function Settings() {
         >
           <Stack hasGutter style={{ flex: 1, minHeight: 0, height: '100%' }}>
             <StackItem>
-              <NxUrlTabs
+              <SynUrlTabs
                 basePath={basePath}
                 defaultTab={defaultCategory}
                 validTabs={validTabs}
@@ -255,7 +255,7 @@ export default function Settings() {
                 {categories.map((cat) => (
                   <Tab key={cat.slug} eventKey={cat.slug} title={cat.name} />
                 ))}
-              </NxUrlTabs>
+              </SynUrlTabs>
             </StackItem>
             <SynPageBody style={{ overflow: 'auto', padding: 'var(--pf-t--global--spacer--md)' }}>
               {categories[activeIndex] && (

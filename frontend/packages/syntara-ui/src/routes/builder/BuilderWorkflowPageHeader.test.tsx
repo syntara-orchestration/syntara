@@ -90,13 +90,15 @@ describe('BuilderWorkflowPageHeader', () => {
     handleSaveWorkflow: vi.fn().mockResolvedValue(true),
     onPublish: vi.fn(),
     onUnpublish: vi.fn(),
+    onDuplicate: vi.fn(),
     onPendingImport: vi.fn(),
     builderPermissions: {
       canEdit: true,
+      canCreate: true,
       canRun: true,
       canDelete: true,
       isLoading: false,
-      tooltips: { edit: '', save: '', publish: '', unpublish: '', run: '', delete: '' },
+      tooltips: { edit: '', save: '', publish: '', unpublish: '', run: '', delete: '', create: '' },
     },
   }
 

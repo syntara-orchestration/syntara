@@ -8,7 +8,7 @@ import { EmptyStateAccessDenied } from '../../components/EmptyStateAccessDenied'
 import { SynPage, SynPageBody } from '../../components/layout/SynPage'
 import { SynPageHeader } from '../../components/layout/SynPageHeader'
 import { SynPanel } from '../../components/layout/SynPanel'
-import { NxListPanel, NxListPanelTabs, NxListPanelView } from '../../components/panels/list/NxListPanel'
+import { SynListPanel, SynListPanelTabs, SynListPanelView } from '../../components/panels/list/SynListPanel'
 import { SynPageTitle } from '../../components/SynPageTitle'
 import { useUrlTab } from '../../hooks/useUrlTab'
 import { detachPromise } from '../../utils/detachPromise'
@@ -105,7 +105,7 @@ export function AccessManagement() {
   const defaultTab = validTabDefs[0]?.key ?? 'users'
 
   // Redirect from the bare base path to the first allowed tab so the URL always has a tab segment.
-  // NxUrlTabs handles restricted-path redirects via its own useEffect.
+  // SynUrlTabs handles restricted-path redirects via its own useEffect.
   useLayoutEffect(() => {
     if (isLoading || !canAccessPage) return
     if (location === basePath) {
@@ -135,12 +135,12 @@ export function AccessManagement() {
       <SynPageTitle segments={['Access Management']} />
       <SynPageHeader title="Access Management" docLink={accessDocLink} breadcrumbs={hubBreadcrumbs} />
       <SynPageBody>
-        <NxListPanel>
-          <NxListPanelTabs basePath={basePath} defaultTab={defaultTab} validTabs={validTabKeys}>
+        <SynListPanel>
+          <SynListPanelTabs basePath={basePath} defaultTab={defaultTab} validTabs={validTabKeys}>
             {validTabDefs.map((tab) => (
               <Tab key={tab.key} eventKey={tab.key} title={tab.label} />
             ))}
-          </NxListPanelTabs>
+          </SynListPanelTabs>
 
           {activeTab === 'users' && <UsersTab />}
           {activeTab === 'groups' && <GroupsTab />}
@@ -150,7 +150,7 @@ export function AccessManagement() {
           {activeTab === 'service-accounts' && <ServiceAccountsTab />}
           {activeTab === 'assignments' && <AssignmentsTab />}
           {activeTab === 'check-access' && (
-            <NxListPanelView
+            <SynListPanelView
               tabKey="check-access"
               tabLabel="Check access"
               isPending={false}
@@ -163,7 +163,7 @@ export function AccessManagement() {
             />
           )}
           {activeTab === 'token-revocation' && (
-            <NxListPanelView
+            <SynListPanelView
               tabKey="token-revocation"
               tabLabel="Token revocation"
               isPending={false}
@@ -175,7 +175,7 @@ export function AccessManagement() {
               body={<TokenRevocationTab />}
             />
           )}
-        </NxListPanel>
+        </SynListPanel>
       </SynPageBody>
     </SynPage>
   )

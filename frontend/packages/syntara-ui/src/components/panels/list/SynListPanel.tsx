@@ -13,47 +13,47 @@ import { SynEmptyStateNoData } from '../../states/SynEmptyStateNoData'
 import { SynErrorState } from '../../states/SynErrorState'
 import { SynLoadingState } from '../../states/SynLoadingState'
 import { type TableFooterProps, SynScrollableTableContainer } from '../../table/SynScrollableTableContainer'
-import { NxUrlTabs } from '../../tabs/NxUrlTabs'
+import { SynUrlTabs } from '../../tabs/SynUrlTabs'
 
-import styles from './NxListPanel.module.css'
+import styles from './SynListPanel.module.css'
 
 /**
- * Shared between `NxListPanelTabs` and `NxListPanelView`. Placed at `NxListPanel`
- * (not `NxListPanelTabs`) so `NxListPanelView` rendered via a TanStack Router `<Outlet>`
- * can still consume it as a descendant of `NxListPanel` but not of `NxListPanelTabs`.
+ * Shared between `SynListPanelTabs` and `SynListPanelView`. Placed at `SynListPanel`
+ * (not `SynListPanelTabs`) so `SynListPanelView` rendered via a TanStack Router `<Outlet>`
+ * can still consume it as a descendant of `SynListPanel` but not of `SynListPanelTabs`.
  */
-type NxListPanelTabContextValue = {
+type SynListPanelTabContextValue = {
   /** Returns the stable DOM id to use as a tabpanel id for the given tab eventKey. */
   getPanelId: (eventKey: string) => string
 }
 
-const NxListPanelTabContext = createContext<NxListPanelTabContextValue | null>(null)
+const SynListPanelTabContext = createContext<SynListPanelTabContextValue | null>(null)
 
-function useNxListPanelTabContext() {
-  return use(NxListPanelTabContext)
+function useSynListPanelTabContext() {
+  return use(SynListPanelTabContext)
 }
 
-export type NxListPanelProps = {
+export type SynListPanelProps = {
   children: ReactNode
 }
 
 /** Full-height scrollable list panel wrapper. */
-export function NxListPanel({ children }: NxListPanelProps) {
+export function SynListPanel({ children }: SynListPanelProps) {
   const uid = useId()
-  const tabContextValue = useMemo<NxListPanelTabContextValue>(
+  const tabContextValue = useMemo<SynListPanelTabContextValue>(
     () => ({ getPanelId: (eventKey: string) => `${uid}-tab-panel-${eventKey}` }),
     [uid]
   )
   return (
-    <NxListPanelTabContext.Provider value={tabContextValue}>
+    <SynListPanelTabContext.Provider value={tabContextValue}>
       <SynPanel isFullHeight>
         <SynPanelContentStack hasGutter>{children}</SynPanelContentStack>
       </SynPanel>
-    </NxListPanelTabContext.Provider>
+    </SynListPanelTabContext.Provider>
   )
 }
 
-export type NxListPanelViewProps = {
+export type SynListPanelViewProps = {
   /** Table and arbitrary content — shown only in the data state. */
   body: ReactNode
 
@@ -91,16 +91,16 @@ export type NxListPanelViewProps = {
    * Background refetch in progress — disables toolbar interaction while the body (the table)
    * continues to render. Wire to TanStack Query's `query.isFetching`.
    *
-   * Consumers should swap `<Tbody>` for `<NxListPanelSkeletonTbody>` when this is true so rows
+   * Consumers should swap `<Tbody>` for `<SynListPanelSkeletonTbody>` when this is true so rows
    * animate while the fresh data loads. Do NOT use this for the initial load — use `isPending`.
    */
   isFetching?: boolean
 
   /**
    * The `eventKey` of the tab this view belongs to (e.g. `"members"`).
-   * Required when `NxListPanelView` is used inside a tabbed `NxListPanel`.
+   * Required when `SynListPanelView` is used inside a tabbed `SynListPanel`.
    * Pair with `tabLabel` — together they produce a `role="tabpanel"` wrapper whose
-   * `id` is registered in `NxListPanelTabContext` and targeted by the tab's `aria-controls`.
+   * `id` is registered in `SynListPanelTabContext` and targeted by the tab's `aria-controls`.
    */
   tabKey?: string
   /**
@@ -114,7 +114,7 @@ export type NxListPanelViewProps = {
   tabLabel?: string
 }
 
-/** @internal Renders the appropriate state slot for `NxListPanelView`. Not exported. */
+/** @internal Renders the appropriate state slot for `SynListPanelView`. Not exported. */
 function ListPanelStateContent({
   isPending,
   error,
@@ -124,7 +124,7 @@ function ListPanelStateContent({
   hasActiveFilters,
   onClearAllFilters,
   noDataState,
-}: Omit<NxListPanelViewProps, 'body' | 'toolbar'>) {
+}: Omit<SynListPanelViewProps, 'body' | 'toolbar'>) {
   if (isPending) return <SynLoadingState />
   if (error) return <SynErrorState title={errorTitle} message={error} onRetry={onRetry} />
   if (isEmpty && hasActiveFilters) return <SynEmptyStateFilter clearAllFilters={onClearAllFilters} />
@@ -132,8 +132,8 @@ function ListPanelStateContent({
   return null
 }
 
-/** Drives loading/error/empty/data states for a list panel. Must be a direct child of `NxListPanel`. */
-export function NxListPanelView({
+/** Drives loading/error/empty/data states for a list panel. Must be a direct child of `SynListPanel`. */
+export function SynListPanelView({
   body,
   isPending,
   isFetching,
@@ -147,9 +147,9 @@ export function NxListPanelView({
   toolbar,
   tabKey,
   tabLabel,
-}: NxListPanelViewProps) {
+}: SynListPanelViewProps) {
   const showBody = !isPending && !error && !isEmpty
-  const tabCtx = useNxListPanelTabContext()
+  const tabCtx = useSynListPanelTabContext()
 
   const content = (
     <>
@@ -198,7 +198,7 @@ export function NxListPanelView({
   return content
 }
 
-export type NxListPanelToolbarProps = {
+export type SynListPanelToolbarProps = {
   /** Currently active filters — forwarded to `FilterBar`. */
   filters: FilterConfig[]
   /** Filter field definitions (shape, operators, labels). */
@@ -215,8 +215,8 @@ export type NxListPanelToolbarProps = {
   actions?: ReactNode
 }
 
-/** Filter toolbar for use inside `NxListPanel`. */
-export function NxListPanelToolbar({
+/** Filter toolbar for use inside `SynListPanel`. */
+export function SynListPanelToolbar({
   filters,
   filterDefinitions,
   onFilterChange,
@@ -224,7 +224,7 @@ export function NxListPanelToolbar({
   toolbarItemsAfterFilters,
   isCompact,
   actions,
-}: NxListPanelToolbarProps) {
+}: SynListPanelToolbarProps) {
   return (
     <FilterBar
       className={styles.toolbar}
@@ -239,7 +239,7 @@ export function NxListPanelToolbar({
   )
 }
 
-export type NxListPanelTableProps = {
+export type SynListPanelTableProps = {
   /** Table content (Thead, Tbody, etc.) */
   children: ReactNode
   /** Visually hidden accessible caption. */
@@ -252,8 +252,8 @@ export type NxListPanelTableProps = {
   useFixedLayout?: boolean
 }
 
-/** Paginated scrollable table for use inside `NxListPanel`. */
-export function NxListPanelTable({ children, caption, footer, isExpandable, useFixedLayout }: NxListPanelTableProps) {
+/** Paginated scrollable table for use inside `SynListPanel`. */
+export function SynListPanelTable({ children, caption, footer, isExpandable, useFixedLayout }: SynListPanelTableProps) {
   return (
     <SynScrollableTableContainer
       caption={caption}
@@ -269,15 +269,15 @@ export function NxListPanelTable({ children, caption, footer, isExpandable, useF
 const MAX_SKELETON_ROWS = 20
 const SKELETON_ROW_KEYS = Array.from({ length: MAX_SKELETON_ROWS }, (_, i) => `skeleton-row-${i}`)
 
-export type NxListPanelSkeletonTbodyProps = {
+export type SynListPanelSkeletonTbodyProps = {
   /** Number of columns — one `<Skeleton>` cell per column per row. Must match the visible `<Thead>`. */
   columnsCount: number
   /** Number of skeleton rows. Defaults to 5. */
   rowCount?: number
 }
 
-/** Skeleton tbody for use inside `NxListPanelTable` during a background refetch. Swap for real `<Tbody>` when `isFetching`. */
-export function NxListPanelSkeletonTbody({ columnsCount, rowCount = 5 }: NxListPanelSkeletonTbodyProps) {
+/** Skeleton tbody for use inside `SynListPanelTable` during a background refetch. Swap for real `<Tbody>` when `isFetching`. */
+export function SynListPanelSkeletonTbody({ columnsCount, rowCount = 5 }: SynListPanelSkeletonTbodyProps) {
   return (
     <Tbody>
       {SKELETON_ROW_KEYS.slice(0, rowCount).map((key) => (
@@ -293,7 +293,7 @@ export function NxListPanelSkeletonTbody({ columnsCount, rowCount = 5 }: NxListP
   )
 }
 
-export type NxListPanelTabsProps = Omit<TabsProps, 'activeKey' | 'onSelect' | 'ref'> & {
+export type SynListPanelTabsProps = Omit<TabsProps, 'activeKey' | 'onSelect' | 'ref'> & {
   /** Base URL path for tab routing. */
   basePath: string
   /** Tab key used when the URL has no tab segment. */
@@ -304,12 +304,12 @@ export type NxListPanelTabsProps = Omit<TabsProps, 'activeKey' | 'onSelect' | 'r
   children: ReactNode
 }
 
-/** URL-driven tabs for use inside `NxListPanel`. */
-export function NxListPanelTabs({ basePath, defaultTab, validTabs, children, ...tabsProps }: NxListPanelTabsProps) {
-  const tabCtx = useNxListPanelTabContext()
+/** URL-driven tabs for use inside `SynListPanel`. */
+export function SynListPanelTabs({ basePath, defaultTab, validTabs, children, ...tabsProps }: SynListPanelTabsProps) {
+  const tabCtx = useSynListPanelTabContext()
 
   // Inject tabContentId into each Tab so PF's aria-controls targets the panel rendered by
-  // the corresponding NxListPanelView (which provides the matching id via NxListPanelTabContext).
+  // the corresponding SynListPanelView (which provides the matching id via SynListPanelTabContext).
   // Cast via `unknown` because React.Children.map's inferred type is broader than ReactNode.
   const clonedChildren = (tabCtx
     ? React.Children.map(children, (child) => {
@@ -321,9 +321,9 @@ export function NxListPanelTabs({ basePath, defaultTab, validTabs, children, ...
 
   return (
     <StackItem>
-      <NxUrlTabs basePath={basePath} defaultTab={defaultTab} validTabs={validTabs} {...tabsProps}>
+      <SynUrlTabs basePath={basePath} defaultTab={defaultTab} validTabs={validTabs} {...tabsProps}>
         {clonedChildren}
-      </NxUrlTabs>
+      </SynUrlTabs>
     </StackItem>
   )
 }

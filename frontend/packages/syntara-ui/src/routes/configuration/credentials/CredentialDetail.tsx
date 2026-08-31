@@ -12,7 +12,7 @@ import { useMemo, useState } from 'react'
 import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsCredentialDetail, breadcrumbsCredentialEarlyShell } from '../../../app/breadcrumbBuilders'
 import { credentialsClient } from '../../../client'
-import { NxDetail } from '../../../components/details/NxDetail'
+import { SynDetail } from '../../../components/details/SynDetail'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
 import { SynLabel } from '../../../components/labels/SynLabel'
@@ -25,7 +25,7 @@ import type { KebabAction } from '../../../components/SynKebabMenu'
 import { SynKebabMenu } from '../../../components/SynKebabMenu'
 import { SynPageTitle } from '../../../components/SynPageTitle'
 import { UserTimestamp } from '../../../components/table/UserTimestamp'
-import { NxUrlTabs } from '../../../components/tabs/NxUrlTabs'
+import { SynUrlTabs } from '../../../components/tabs/SynUrlTabs'
 import { useDeleteAction } from '../../../hooks/useDeleteAction'
 import { useUrlTab } from '../../../hooks/useUrlTab'
 import { useAlerts } from '../../../providers/alerts'
@@ -78,7 +78,7 @@ function DynamicCredentialFields({ typeFields, credInputs }: Readonly<DynamicFie
     const value = credInputs[field.id]
     const isEncrypted = value === ENCRYPTED_SENTINEL
     return (
-      <NxDetail key={field.id} label={field.label}>
+      <SynDetail key={field.id} label={field.label}>
         {isEncrypted ? (
           <SynLabel variant="outline" icon={<RhUiLockIcon />}>
             Encrypted
@@ -86,7 +86,7 @@ function DynamicCredentialFields({ typeFields, credInputs }: Readonly<DynamicFie
         ) : (
           String((value as string | number | boolean) ?? '—')
         )}
-      </NxDetail>
+      </SynDetail>
     )
   })
 }
@@ -323,7 +323,7 @@ export default function CredentialDetail() {
 
       <SynPageBody>
         <SynPanel isFullHeight className={styles.tabsFullHeight}>
-          <NxUrlTabs
+          <SynUrlTabs
             basePath={credentialBasePath}
             defaultTab="details"
             validTabs={validTabs}
@@ -333,28 +333,28 @@ export default function CredentialDetail() {
               <Stack hasGutter style={{ padding: 'var(--pf-t--global--spacer--lg)' }}>
                 <StackItem>
                   <DescriptionList isHorizontal>
-                    <NxDetail label="Name">{credential.name}</NxDetail>
-                    {hasDescription ? <NxDetail label="Description">{credential.description}</NxDetail> : null}
-                    <NxDetail label="Type">{credentialTypeDisplayText}</NxDetail>
-                    <NxDetail label="Workflows">{formatCount(credential.workflow_count)}</NxDetail>
-                    <NxDetail label="Integrations">{formatCount(credential.integration_count)}</NxDetail>
-                    <NxDetail label="Last modified">
+                    <SynDetail label="Name">{credential.name}</SynDetail>
+                    {hasDescription ? <SynDetail label="Description">{credential.description}</SynDetail> : null}
+                    <SynDetail label="Type">{credentialTypeDisplayText}</SynDetail>
+                    <SynDetail label="Workflows">{formatCount(credential.workflow_count)}</SynDetail>
+                    <SynDetail label="Integrations">{formatCount(credential.integration_count)}</SynDetail>
+                    <SynDetail label="Last modified">
                       <UserTimestamp
                         user={credential.updated_by}
                         timestamp={credential.updated_at}
                         subtleTimestamp={false}
                       />
-                    </NxDetail>
-                    <NxDetail label="Created">
+                    </SynDetail>
+                    <SynDetail label="Created">
                       <UserTimestamp
                         user={credential.created_by}
                         timestamp={credential.created_at}
                         subtleTimestamp={false}
                       />
-                    </NxDetail>
-                    <NxDetail label="State">
+                    </SynDetail>
+                    <SynDetail label="State">
                       <EnabledStateLabel enabled={credential.enabled ?? false} />
-                    </NxDetail>
+                    </SynDetail>
 
                     <DynamicCredentialFields typeFields={typeFields} credInputs={credInputs} />
                   </DescriptionList>
@@ -387,7 +387,7 @@ export default function CredentialDetail() {
                 <CredentialIntegrationsTab credentialId={credential.id} />
               </Tab>
             )}
-          </NxUrlTabs>
+          </SynUrlTabs>
         </SynPanel>
       </SynPageBody>
 
