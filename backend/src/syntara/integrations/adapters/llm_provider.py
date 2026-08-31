@@ -216,6 +216,55 @@ class LLMProviderAdapter:
         )
         return success, error_msg, error_type
 
+    def _next_page_params(self, response: httpx.Response) -> dict[str, str] | None:
+        """Return query params for the next catalog page, or None if done or unparseable."""
+        try:
+            return self._provider.next_page_params(response.json())
+        except (ValueError, KeyError, TypeError):
+            return None
+
+    async def _paginate_model_pages(
+        self,
+        client: httpx.AsyncClient,
+        url: str,
+        headers: dict[str, str],
+        first_response: httpx.Response,
+        timeout_seconds: int,
+    ) -> tuple[bool, str | None, HealthCheckErrorType | None, list[httpx.Response]]:
+        """Fetch remaining catalog pages after a successful first page."""
+        responses = [first_response]
+        response = first_response
+        for page in range(1, _MAX_PAGINATION_PAGES):
+            params = self._next_page_params(response)
+            if params is None:
+                break
+
+            logger.debug(
+                "Fetching next page of models",
+                provider=self._config.provider_hint,
+                page=page + 1,
+            )
+            success, error_msg, error_type, next_response = await self._do_get(
+                client,
+                url,
+                headers,
+                params,
+                timeout_seconds=timeout_seconds,
+            )
+            if not success or next_response is None:
+                return success, error_msg, error_type, []
+            response = next_response
+            responses.append(response)
+        else:
+            if self._next_page_params(response) is not None:
+                logger.warning(
+                    "Pagination cap reached, results may be incomplete",
+                    provider=self._config.provider_hint,
+                    max_pages=_MAX_PAGINATION_PAGES,
+                )
+
+        return True, None, None, responses
+
     async def _fetch_models(
         self,
         resolved_credential: dict[str, Any],
@@ -232,8 +281,9 @@ class LLMProviderAdapter:
             timeout_seconds: Maximum seconds to wait for the HTTP response.
             paginate: If True, follow pagination until exhausted (up to
                 ``_MAX_PAGINATION_PAGES``). If False, make a single request.
-            confirm_credential: If True, after the first catalog 200 run the
-                provider's auth-gated probe (validate only).
+            confirm_credential: If True, after the catalog 200 run the
+                provider's auth-gated probe once (validate only), before
+                any pagination.
 
         Returns:
             (success, error_msg, error_type, responses) tuple.
@@ -256,7 +306,6 @@ class LLMProviderAdapter:
 
         responses: list[httpx.Response] = []
         params: dict[str, str] | None = None
-        credential_confirmed = not confirm_credential
 
         verify = build_integration_httpx_verify(
             insecure_skip_tls_verify=self._config.insecure_skip_tls_verify,
@@ -264,51 +313,35 @@ class LLMProviderAdapter:
         )
 
         async with httpx.AsyncClient(timeout=timeout_seconds, verify=verify) as client:
-            for page in range(_MAX_PAGINATION_PAGES):
-                success, error_msg, error_type, response = await self._do_get(
+            success, error_msg, error_type, response = await self._do_get(
+                client,
+                url,
+                headers,
+                params,
+                timeout_seconds=timeout_seconds,
+            )
+            if not success or response is None:
+                return success, error_msg, error_type, []
+
+            if confirm_credential:
+                confirmed, confirm_error, confirm_type = await self._confirm_credential(
+                    client,
+                    base_url,
+                    headers,
+                    timeout_seconds=timeout_seconds,
+                )
+                if not confirmed:
+                    return False, confirm_error, confirm_type, []
+
+            if paginate:
+                return await self._paginate_model_pages(
                     client,
                     url,
                     headers,
-                    params,
-                    timeout_seconds=timeout_seconds,
+                    response,
+                    timeout_seconds,
                 )
-                if not success or response is None:
-                    return success, error_msg, error_type, []
-
-                if not credential_confirmed:
-                    confirmed, confirm_error, confirm_type = await self._confirm_credential(
-                        client,
-                        base_url,
-                        headers,
-                        timeout_seconds=timeout_seconds,
-                    )
-                    if not confirmed:
-                        return False, confirm_error, confirm_type, []
-                    credential_confirmed = True
-
-                responses.append(response)
-
-                if not paginate:
-                    break
-
-                try:
-                    params = self._provider.next_page_params(response.json())
-                except (ValueError, KeyError, TypeError):
-                    break
-                if params is None:
-                    break
-
-                logger.debug(
-                    "Fetching next page of models",
-                    provider=self._config.provider_hint,
-                    page=page + 2,
-                )
-            else:
-                logger.warning(
-                    "Pagination cap reached, results may be incomplete",
-                    provider=self._config.provider_hint,
-                    max_pages=_MAX_PAGINATION_PAGES,
-                )
+            responses.append(response)
 
         return True, None, None, responses
 
