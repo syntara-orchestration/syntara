@@ -1557,7 +1557,7 @@ class TestLookupUsers:
         self, mock_session: MagicMock, mock_user: MagicMock, mock_secret_service: MagicMock
     ) -> None:
         uid = uuid4()
-        mock_session.exec = AsyncMock(return_value=[(uid, "alice")])
+        mock_session.exec = AsyncMock(return_value=[(uid, "alice", None)])
         service = CredentialService(mock_session, mock_user, mock_secret_service)
         obj = MagicMock(created_by=uid, updated_by=None)
         result = await service._lookup_users([obj])
@@ -1588,7 +1588,7 @@ class TestResolveUserReferences:
         from syntara.core.models.user_reference import UserReference
 
         uid = uuid4()
-        mock_session.exec = AsyncMock(return_value=[(uid, "alice")])
+        mock_session.exec = AsyncMock(return_value=[(uid, "alice", None)])
         service = CredentialService(mock_session, mock_user, mock_secret_service)
         obj = MagicMock(created_by=uid, updated_by=uid)
         await service._resolve_user_references([obj])
@@ -1629,7 +1629,7 @@ class TestResolveUserReferences:
         from syntara.core.models.user_reference import UserReference
 
         uid1, uid2 = uuid4(), uuid4()
-        mock_session.exec = AsyncMock(return_value=[(uid1, "alice"), (uid2, "bob")])
+        mock_session.exec = AsyncMock(return_value=[(uid1, "alice", None), (uid2, "bob", None)])
         service = CredentialService(mock_session, mock_user, mock_secret_service)
         obj1 = MagicMock(created_by=uid1, updated_by=None)
         obj2 = MagicMock(created_by=uid2, updated_by=uid1)
