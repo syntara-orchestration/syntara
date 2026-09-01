@@ -1195,18 +1195,26 @@ test.describe('Node editor panels', () => {
     const setMockButton = inputPanel.locator('[data-ouia-component-type="PF6/MenuToggle"]').filter({
       hasText: 'Set mock data',
     })
+    await expect(setMockButton).toBeVisible({ timeout: 10_000 })
     await setMockButton.click()
     await clickMenuItemWhenVisible(app, 'Script A')
     await app.getByRole('button', { name: 'Pin data', exact: true }).click()
-    await expect(app.getByText('Mock data pinned (1)')).toBeVisible()
+    await expect(inputPanel.getByText('Mock data pinned (1)')).toBeVisible()
 
     await closeNodeEditorPanel(app)
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).not.toBeVisible()
+    // Nav arrows unmount with the editor; wait so the next canvas click cannot hit them.
+    await expect(app.getByRole('button', { name: /Go to previous step:/ })).toHaveCount(0)
 
     await clickNode(app, 'Script B')
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).toBeVisible({ timeout: 10_000 })
+    // Confirm Script B reopened (its predecessor section is Script A, not the trigger).
+    await expect(app.getByRole('button', { name: 'Script A', exact: true })).toBeVisible({ timeout: 10_000 })
 
-    await expect(app.getByText('Mock data pinned (1)')).toBeVisible()
+    const reopenedInputPanel = app.locator('[class*="panelContainer"]').filter({
+      has: app.getByRole('heading', { name: 'Input', exact: true }),
+    })
+    await expect(reopenedInputPanel.getByText('Mock data pinned (1)')).toBeVisible({ timeout: 10_000 })
   })
 
   test('clicking the copy button on an Input panel field announces the expression was copied', async ({ app }) => {
