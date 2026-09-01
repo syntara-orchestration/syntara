@@ -364,8 +364,6 @@ class TestBuildWorkflowWithVersionResponse:
         workflow.project_id = uuid4()
         workflow.created_at = MagicMock()
         workflow.updated_at = MagicMock()
-        workflow.deleted_at = None
-        workflow.deleted_by = None
         workflow.updated_by = None
 
         version = MagicMock()
@@ -379,8 +377,6 @@ class TestBuildWorkflowWithVersionResponse:
         version.created_by = uuid4()
         version.created_at = MagicMock()
         version.updated_at = MagicMock()
-        version.deleted_at = None
-        version.deleted_by = None
 
         result = await _build_workflow_with_version_response(workflow, version, mock_service)
 
@@ -412,8 +408,6 @@ class TestBuildWorkflowWithVersionResponse:
         workflow.project_id = uuid4()
         workflow.created_at = MagicMock()
         workflow.updated_at = MagicMock()
-        workflow.deleted_at = None
-        workflow.deleted_by = None
         workflow.updated_by = None
 
         version = MagicMock()
@@ -427,8 +421,6 @@ class TestBuildWorkflowWithVersionResponse:
         version.created_by = uuid4()
         version.created_at = MagicMock()
         version.updated_at = MagicMock()
-        version.deleted_at = None
-        version.deleted_by = None
 
         result = await _build_workflow_with_version_response(workflow, version, mock_service)
 
@@ -723,6 +715,7 @@ class TestScheduledTriggerSyncGracefulDegradation:
 
         with (
             patch.object(mock_service, "get_workflow_by_id", new_callable=AsyncMock, return_value=mock_workflow),
+            patch.object(mock_service.session, "scalar", new_callable=AsyncMock, return_value=0),
             patch.object(mock_service.session, "commit", new_callable=AsyncMock),
             patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),
             patch("syntara.workflows.services.workflow_service.WebhookTriggerService") as mock_wh_cls,
@@ -819,6 +812,7 @@ class TestScheduledTriggerSyncGracefulDegradation:
 
         with (
             patch.object(mock_service, "get_workflow_by_id", new_callable=AsyncMock, return_value=mock_workflow),
+            patch.object(mock_service.session, "scalar", new_callable=AsyncMock, return_value=0),
             patch.object(mock_service.session, "commit", new_callable=AsyncMock) as mock_commit,
             patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),
             patch("syntara.workflows.services.workflow_service.WebhookTriggerService") as mock_wh_cls,
@@ -1023,6 +1017,7 @@ class TestScheduledTriggerSyncGracefulDegradation:
 
         with (
             patch.object(mock_service, "get_workflow_by_id", new_callable=AsyncMock, return_value=mock_workflow),
+            patch.object(mock_service.session, "scalar", new_callable=AsyncMock, return_value=0),
             patch.object(mock_service.session, "commit", new_callable=AsyncMock, side_effect=RuntimeError("db down")),
             patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),
             patch("syntara.workflows.services.workflow_service.WebhookTriggerService") as mock_wh_cls,
@@ -1064,17 +1059,6 @@ class TestWorkflowIsPublished:
         workflow = MagicMock()
         workflow.deleted_at = None
         workflow.published_version_id = None
-        with patch(
-            "syntara.workflows.services.workflow_service.AsyncSessionLocal",
-            return_value=_workflow_session_ctx(workflow),
-        ):
-            assert await WorkflowService._workflow_is_published(uuid4()) is False
-
-    @pytest.mark.asyncio
-    async def test_false_when_soft_deleted(self) -> None:
-        workflow = MagicMock()
-        workflow.deleted_at = MagicMock()
-        workflow.published_version_id = uuid4()
         with patch(
             "syntara.workflows.services.workflow_service.AsyncSessionLocal",
             return_value=_workflow_session_ctx(workflow),
