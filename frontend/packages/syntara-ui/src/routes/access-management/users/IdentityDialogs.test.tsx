@@ -261,23 +261,23 @@ describe('IdentityActionsKebab', () => {
   })
 
   describe('disconnected row', () => {
-    it('shows disabled Connect with tooltip when not self', async () => {
+    it('shows disabled Connect identity with tooltip when not self', async () => {
       const user = userEvent.setup()
       renderKebab({ ...defaultDisconnectedProps, isSelf: false })
 
       await user.click(screen.getByRole('button', { name: 'Identity actions' }))
 
-      const connectItem = screen.getByRole('menuitem', { name: 'Connect' })
+      const connectItem = screen.getByRole('menuitem', { name: 'Connect identity' })
       expect(connectItem).toHaveAttribute('aria-disabled', 'true')
     })
 
-    it('calls onConvert when self and local user clicks Connect', async () => {
+    it('calls onConvert when self and local user clicks Connect identity', async () => {
       const user = userEvent.setup()
       const onConvert = vi.fn()
       renderKebab({ ...defaultDisconnectedProps, isSelf: true, isLocalUser: true, onConvert })
 
       await user.click(screen.getByRole('button', { name: 'Identity actions' }))
-      await user.click(screen.getByRole('menuitem', { name: 'Connect' }))
+      await user.click(screen.getByRole('menuitem', { name: 'Connect identity' }))
 
       expect(onConvert).toHaveBeenCalledWith({
         name: 'GitHub',
@@ -285,14 +285,14 @@ describe('IdentityActionsKebab', () => {
       })
     })
 
-    it('does not call onConvert when self and federated user clicks Connect', async () => {
+    it('does not call onConvert when self and federated user clicks Connect identity', async () => {
       const user = userEvent.setup()
       const onConvert = vi.fn()
 
       renderKebab({ ...defaultDisconnectedProps, isSelf: true, isLocalUser: false, onConvert })
 
       await user.click(screen.getByRole('button', { name: 'Identity actions' }))
-      await user.click(screen.getByRole('menuitem', { name: 'Connect' }))
+      await user.click(screen.getByRole('menuitem', { name: 'Connect identity' }))
 
       // Federated users navigate directly; the local-user conversion dialog is not triggered
       expect(onConvert).not.toHaveBeenCalled()

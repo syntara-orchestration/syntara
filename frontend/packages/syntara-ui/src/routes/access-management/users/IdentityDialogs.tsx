@@ -208,7 +208,7 @@ export function IdentityActionsKebab(props: Readonly<IdentityKebabProps>) {
         tooltipProps={!isSelf ? { content: 'Only the user can connect their own identity' } : undefined}
         onClick={isSelf ? handleConnect : undefined}
       >
-        Connect
+        Connect identity
       </DropdownItem>
     )
   }

@@ -54,7 +54,7 @@ test.describe('Connect Flow (UI-20)', () => {
     // Connect action is available in the kebab menu for the unlinked provider
     const kebabButton = unlinkedRow.getByRole('button', { name: 'Identity actions' })
     await kebabButton.click()
-    const connectItem = app.getByRole('menuitem', { name: 'Connect' })
+    const connectItem = app.getByRole('menuitem', { name: 'Connect identity' })
     await expect(connectItem).toBeVisible()
     await expect(connectItem).not.toHaveAttribute('aria-disabled', 'true')
   })
