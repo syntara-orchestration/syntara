@@ -1744,7 +1744,7 @@ class TestActivitySyncTerminalCleanup:
         input_data: dict[str, Any] | None = None,
         output_data: dict[str, Any] | None = None,
     ) -> AsyncMock:
-        """Create a mock workflow handle that returns given data for queries."""
+        """Create a mock workflow handle that returns given data for queries and updates."""
         handle = AsyncMock()
 
         async def mock_query(query_name: str, activity_id: str) -> dict[str, object] | None:
@@ -1755,6 +1755,13 @@ class TestActivitySyncTerminalCleanup:
             return None
 
         handle.query = AsyncMock(side_effect=mock_query)
+
+        async def mock_update(update_name: str, activity_id: str) -> dict[str, object] | None:
+            if update_name == "get_activity_output_when_ready":
+                return output_data
+            return None
+
+        handle.execute_update = AsyncMock(side_effect=mock_update)
         return handle
 
     @pytest.mark.asyncio
@@ -1939,7 +1946,7 @@ class TestLoopIterationSync:
         input_data: dict[str, Any] | None = None,
         output_data: dict[str, Any] | None = None,
     ) -> AsyncMock:
-        """Create a mock workflow handle that returns given data for queries."""
+        """Create a mock workflow handle that returns given data for queries and updates."""
         handle = AsyncMock()
 
         async def mock_query(query_name: str, activity_id: str) -> dict[str, object] | None:
@@ -1950,6 +1957,13 @@ class TestLoopIterationSync:
             return None
 
         handle.query = AsyncMock(side_effect=mock_query)
+
+        async def mock_update(update_name: str, activity_id: str) -> dict[str, object] | None:
+            if update_name == "get_activity_output_when_ready":
+                return output_data
+            return None
+
+        handle.execute_update = AsyncMock(side_effect=mock_update)
         return handle
 
     @pytest.mark.asyncio
@@ -2870,18 +2884,23 @@ class TestSyncNodesToTerminalStatus:
 
 
 class TestInputDataCredentialScrubbing(TestActivitySyncTerminalCleanup):
-    """Verify input_data is scrubbed before writing to ActivityExecution (AAP-74431)."""
+    """Verify pre-scrubbed input_data flows through to ActivityExecution (AAP-74431).
+
+    Credential scrubbing happens in the workflow's query handler (get_activity_input)
+    before data reaches the sync service. These tests verify the already-scrubbed
+    data is persisted correctly.
+    """
 
     @pytest.mark.asyncio
-    async def test_credential_fields_scrubbed_before_persistence(self) -> None:
-        """Input data containing credential fields should be redacted before DB write."""
+    async def test_scrubbed_credential_fields_persisted(self) -> None:
+        """Pre-scrubbed input data from the workflow query should be persisted as-is."""
         from syntara.workflows.workflow_engine.utils.credential_scrubber import REDACTED
 
         activity = self._create_mock_activity_execution(activity_name="approval-node")
         self._mock_session_with_activities([activity])
 
         handle = self._create_mock_handle(
-            input_data={"url": "http://example.com", "bearer_token": "sk-secret-123"},
+            input_data={"url": "http://example.com", "bearer_token": REDACTED},
             output_data={"status": "ok"},
         )
 
@@ -5256,24 +5275,18 @@ class TestQueryActivityIoOutputMerge:
         assert output_data == {"invocation_id": "abc-123"}
 
     @pytest.mark.asyncio
-    async def test_merge_on_retry_path(self) -> None:
+    async def test_completed_uses_execute_update(self) -> None:
         mock_handle = AsyncMock()
-        mock_handle.query.side_effect = [
-            {},
-            None,
-            {"status": "completed", "output": "result"},
-        ]
+        mock_handle.query.return_value = {"param": "value"}
+        mock_handle.execute_update.return_value = {"status": "completed", "output": "result"}
         initial_partial = {"job_id": 42}
         activity_data: dict[str, Any] = {"status": ActivityStatus.COMPLETED}
 
-        with patch(
-            "syntara.workflows.workflow_engine.services.activity_sync_service.asyncio.sleep",
-            new_callable=AsyncMock,
-        ):
-            _, output_data = await self.service._query_activity_io(
-                mock_handle, "my-activity", activity_data, initial_partial
-            )
+        _, output_data = await self.service._query_activity_io(
+            mock_handle, "my-activity", activity_data, initial_partial
+        )
 
+        mock_handle.execute_update.assert_awaited_once_with("get_activity_output_when_ready", "my-activity")
         assert output_data is not None
         assert output_data["job_id"] == 42
         assert output_data["status"] == "completed"

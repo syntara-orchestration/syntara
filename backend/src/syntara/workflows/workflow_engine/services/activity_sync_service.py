@@ -63,12 +63,6 @@ PRE_RESOLVED_ACTIVITY_ID_PREFIX = "pre-resolved-"
 
 logger = structlog.stdlib.get_logger(__name__)
 
-# Retry parameters for querying activity output after Temporal marks an activity as
-# completed but before the workflow loop stores the result in the resolver namespace.
-# Uses exponential backoff: 100ms, 200ms, 400ms, 800ms, 1600ms (total ~3.1s).
-_OUTPUT_QUERY_MAX_RETRIES = 5
-_OUTPUT_QUERY_BASE_DELAY_MS = 100
-
 # Temporal defers ACTIVITY_TASK_STARTED events until the activity completes,
 # so the sync service never sees RUNNING status for in-flight activities.
 # After SCHEDULED, we probe describe() to detect the real state, retrying
@@ -760,7 +754,7 @@ class ActivitySyncService:
                     SyntheticPartialOutput(
                         activity_id=activity_id,
                         scheduled_event_id=scheduled_event_id,
-                        partial_output=partial_output,
+                        partial_output=self._scrub_data(partial_output) or {},
                     )
                 )
             return True
@@ -1809,9 +1803,10 @@ class ActivitySyncService:
     ) -> tuple[dict[str, Any], dict[str, Any] | None]:
         """Query workflow for activity input and output data.
 
-        Queries ``get_activity_input`` and ``get_activity_output`` from the workflow.
-        Handles the retry loop for the race condition where Temporal marks an
-        activity as completed before the workflow loop stores the result.
+        Queries ``get_activity_input`` and, for completed activities, uses the
+        ``get_activity_output_when_ready`` workflow update to wait until the
+        resolver namespace is populated — avoiding the race where Temporal emits
+        ACTIVITY_TASK_COMPLETED before the workflow stores the result.
 
         Args:
             handle: Temporal workflow handle for queries
@@ -1828,44 +1823,14 @@ class ActivitySyncService:
 
         try:
             input_data = await handle.query("get_activity_input", activity_id) or {}
-            queried_output = await handle.query("get_activity_output", activity_id)
+
+            if activity_data["status"] == ActivityStatus.COMPLETED:
+                queried_output = await handle.execute_update("get_activity_output_when_ready", activity_id)
+            else:
+                queried_output = await handle.query("get_activity_output", activity_id)
+
             if queried_output is not None:
                 output_data = self._merge_output(initial_output_data, queried_output)
-
-            # Race condition mitigation: If activity is completed but output is None,
-            # retry the query. This handles the case where Temporal emits the
-            # ACTIVITY_TASK_COMPLETED event before the workflow's async loop
-            # stores the result in the resolver namespace.
-
-            # (e.g., workflow signal after output is stored).
-            if activity_data["status"] == ActivityStatus.COMPLETED and queried_output is None:
-                max_retries = _OUTPUT_QUERY_MAX_RETRIES
-                for retry in range(max_retries):
-                    delay_ms = _OUTPUT_QUERY_BASE_DELAY_MS * (2**retry)
-                    logger.debug(
-                        "Activity completed but output is None, retrying query",
-                        activity_id=activity_id,
-                        retry=retry + 1,
-                        max_retries=max_retries,
-                        delay_ms=delay_ms,
-                    )
-                    await asyncio.sleep(delay_ms / 1000.0)
-                    queried_output = await handle.query("get_activity_output", activity_id)
-                    if queried_output is not None:
-                        output_data = self._merge_output(initial_output_data, queried_output)
-                        logger.debug(
-                            "Successfully retrieved output on retry",
-                            activity_id=activity_id,
-                            retry=retry + 1,
-                        )
-                        break
-                else:
-                    # All retries exhausted, log warning
-                    logger.warning(
-                        "Activity completed but output still None after retries",
-                        activity_id=activity_id,
-                        max_retries=max_retries,
-                    )
 
         except (TemporalError, ValueError) as e:
             logger.debug("Could not query activity data", activity_id=activity_id, error=str(e))
@@ -2146,8 +2111,8 @@ class ActivitySyncService:
         old_values = self._update_activity_record(
             existing,
             activity_data,
-            self._scrub_data(input_data),
-            self._scrub_data(output_data),
+            input_data,
+            output_data,
             is_loop_control=is_loop_control,
         )
         return existing, old_values, is_new
