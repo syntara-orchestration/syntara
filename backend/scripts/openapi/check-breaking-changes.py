@@ -106,9 +106,22 @@ def run_command(cmd: list[str], capture_output: bool = True) -> subprocess.Compl
 def get_spec_from_git(ref: str, spec_path: str) -> str | None:
     """Get OpenAPI spec content from a git reference.
 
-    Returns None if the path does not exist on the given ref (e.g. file was
-    renamed or added in this branch). Exits with code 2 on other git errors.
+    Returns None only when the ref resolves but the path does not exist on it
+    (e.g. the file was renamed or added in this branch). Exits with code 2 if
+    the ref itself cannot be resolved (e.g. a typo, or the branch was not
+    fetched in CI), so a bad ref cannot be silently treated as "new spec,
+    nothing to check". Also exits with code 2 on other git errors.
     """
+    ref_exists = run_command(
+        ["git", "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"]
+    )
+    if ref_exists.returncode != 0:
+        print(
+            f"ERROR: Git ref '{ref}' could not be resolved. "
+            f"Ensure it exists and is fetched (e.g. 'git fetch origin {ref}').",
+            file=sys.stderr,
+        )
+        sys.exit(2)
     exists = run_command(["git", "cat-file", "-e", f"{ref}:{spec_path}"])
     if exists.returncode != 0:
         return None

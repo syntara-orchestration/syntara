@@ -991,6 +991,52 @@ class TestCheckBreakingChangesExitCodes:
         assert "ERR" in captured["cmd"]
 
 
+class TestGetSpecFromGit:
+    """get_spec_from_git distinguishes a missing file from an unresolvable ref.
+
+    Regression guard: previously ``git cat-file -e {ref}:{path}`` returned
+    non-zero for both a missing file and a bad ref, so a typo'd or unfetched
+    base ref collapsed to None and the base-ref path skipped the gate ("new
+    spec, nothing to check"), a silent false negative. A bad ref must now exit
+    2; None means only "ref resolves, file absent".
+    """
+
+    def _patch_git(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        *,
+        ref_ok: bool,
+        file_ok: bool,
+        content: str = "spec: content\n",
+    ) -> None:
+        def _fake_run(cmd: list[str], *, capture_output: bool = True) -> subprocess.CompletedProcess[str]:
+            if cmd[:3] == ["git", "rev-parse", "--verify"]:
+                return subprocess.CompletedProcess(cmd, 0 if ref_ok else 128, "", "")
+            if cmd[:2] == ["git", "cat-file"]:
+                return subprocess.CompletedProcess(cmd, 0 if file_ok else 1, "", "")
+            if cmd[:2] == ["git", "show"]:
+                return subprocess.CompletedProcess(cmd, 0, content, "")
+            pytest.fail(f"unexpected command: {cmd}")
+
+        monkeypatch.setattr(check_breaking, "run_command", _fake_run)
+
+    def test_returns_content_when_ref_and_file_exist(self, monkeypatch):
+        self._patch_git(monkeypatch, ref_ok=True, file_ok=True, content="spec: yes\n")
+        assert check_breaking.get_spec_from_git("origin/devel", "a.yaml") == "spec: yes\n"
+
+    def test_returns_none_when_ref_resolves_but_file_missing(self, monkeypatch):
+        self._patch_git(monkeypatch, ref_ok=True, file_ok=False)
+        assert check_breaking.get_spec_from_git("origin/devel", "a.yaml") is None
+
+    def test_unresolvable_ref_exits_two(self, monkeypatch):
+        # A bad or unfetched ref must fail loudly, not be treated as a missing
+        # file (which the base-ref path would silently skip).
+        self._patch_git(monkeypatch, ref_ok=False, file_ok=False)
+        with pytest.raises(SystemExit) as exc:
+            check_breaking.get_spec_from_git("origin/does-not-exist", "a.yaml")
+        assert exc.value.code == 2
+
+
 class TestFormatTextOutput:
     """Tests for _format_text_output()."""
 
