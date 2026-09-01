@@ -1211,8 +1211,12 @@ class TestConvergeAllFailure:
         assert result is False
         assert "converge_node" not in wf.failed_nodes
 
-    def test_all_converge_skips_not_started_detaches_in_flight(self) -> None:
-        """ALL: not-started preds are skipped, in-flight preds are detached."""
+    def test_all_converge_keeps_in_flight_siblings_on_branch_failure(self) -> None:
+        """ALL: a branch failure must not detach in-flight independent siblings.
+
+        The converge fails immediately and skips downstream, but running
+        siblings stay in pending_tasks so they can complete (AAP-90400).
+        """
         graph = _build_three_branch_converge_graph({"strategy": "all"})
         wf = _make_workflow()
         wf._converge_branch_nodes = {
@@ -1229,7 +1233,8 @@ class TestConvergeAllFailure:
 
         assert "converge_node" in wf.failed_nodes
         assert "node_c" not in wf.skipped_nodes
-        assert "node_c" in wf._detached_nodes
+        assert "node_c" not in wf._detached_nodes
+        assert "node_c" in pending
         assert "node_d" in wf.skipped_nodes
 
     def test_all_converge_does_not_fail_on_cof_predecessor(self) -> None:
