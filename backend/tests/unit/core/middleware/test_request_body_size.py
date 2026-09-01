@@ -5,6 +5,7 @@ from collections.abc import MutableMapping
 from typing import Any
 
 import pytest
+from fastapi import FastAPI
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -12,7 +13,12 @@ from starlette.routing import Route
 from starlette.types import Receive, Scope, Send
 
 from syntara.core.config.base import get_settings
-from syntara.core.middleware.request_body_size import RequestBodySizeMiddleware
+from syntara.core.constants import RequestLimits
+from syntara.core.middleware.request_body_size import (
+    BodyTooLargeError,
+    RequestBodySizeMiddleware,
+    body_too_large_exception_handler,
+)
 
 
 async def _ok_handler(request: Request) -> JSONResponse:
@@ -397,4 +403,92 @@ async def test_rejects_multipart_body_over_computed_limit(monkeypatch: pytest.Mo
     start = messages[0]
     assert start["status"] == 413
     payload = json.loads(messages[1]["body"].decode())
+    assert payload["code"] == "PAYLOAD_TOO_LARGE"
+
+
+@pytest.mark.asyncio
+async def test_multipart_limit_clamped_to_hard_ceiling(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Even with generous file-upload settings, multipart bodies cannot exceed the hard ceiling."""
+    settings = get_settings()
+    monkeypatch.setattr(settings, "file_upload_max_size_mb", 500)
+    monkeypatch.setattr(settings, "file_upload_max_files", 100)
+    middleware = _build_app()
+    payload_size = RequestLimits.MAX_MULTIPART_BODY_BYTES + 1
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/v1/test",
+        "headers": [
+            (b"content-length", str(payload_size).encode()),
+            (b"content-type", b"multipart/form-data; boundary=x"),
+        ],
+        "query_string": b"",
+        "client": ("testclient", 50000),
+        "server": ("testserver", 80),
+        "scheme": "http",
+        "http_version": "1.1",
+    }
+    messages: list[MutableMapping[str, Any]] = []
+
+    async def send(message: MutableMapping[str, Any]) -> None:
+        messages.append(message)
+
+    async def receive() -> dict[str, object]:
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    await middleware(scope, receive, send)
+
+    start = messages[0]
+    assert start["status"] == 413
+    payload = json.loads(messages[1]["body"].decode())
+    assert payload["code"] == "PAYLOAD_TOO_LARGE"
+
+
+@pytest.mark.asyncio
+async def test_fastapi_exception_handler_returns_413_for_oversized_stream() -> None:
+    """BodyTooLargeError raised inside ExceptionMiddleware must surface as 413, not 500."""
+    app = FastAPI()
+    app.add_middleware(RequestBodySizeMiddleware)
+    app.add_exception_handler(BodyTooLargeError, body_too_large_exception_handler)  # type: ignore[arg-type]
+
+    @app.post("/api/v1/test")
+    async def post_test(request: Request) -> dict[str, int]:
+        body = await request.body()
+        return {"bytes": len(body)}
+
+    chunks = [b"x" * 5_000_000, b"x" * 5_000_000, b"x" * 5_000_000]
+    chunk_iter = iter(chunks)
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/v1/test",
+        "headers": [
+            (b"content-type", b"application/json"),
+        ],
+        "query_string": b"",
+        "client": ("testclient", 50000),
+        "server": ("testserver", 80),
+        "scheme": "http",
+        "http_version": "1.1",
+    }
+    messages: list[MutableMapping[str, Any]] = []
+
+    async def send(message: MutableMapping[str, Any]) -> None:
+        messages.append(message)
+
+    async def receive() -> dict[str, object]:
+        try:
+            chunk = next(chunk_iter)
+            return {"type": "http.request", "body": chunk, "more_body": True}
+        except StopIteration:
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+    await app(scope, receive, send)
+
+    start = messages[0]
+    assert start["type"] == "http.response.start"
+    assert start["status"] == 413
+    body = messages[1]["body"]
+    assert isinstance(body, bytes)
+    payload = json.loads(body.decode())
     assert payload["code"] == "PAYLOAD_TOO_LARGE"

@@ -2032,6 +2032,34 @@ class Settings(
             )
         return self
 
+    @model_validator(mode="after")
+    def _warn_multipart_body_limit_clamped(self) -> "Settings":
+        """Warn when file-upload settings exceed the hard multipart body ceiling.
+
+        RequestBodySizeMiddleware clamps multipart allowances to
+        ``RequestLimits.MAX_MULTIPART_BODY_BYTES``. Operators who raise
+        ``file_upload_max_size_mb`` / ``file_upload_max_files`` expecting a
+        proportionally larger ingress limit will otherwise see uploads rejected
+        with no obvious configuration mismatch.
+        """
+        computed_bytes = (self.file_upload_max_size_mb * self.file_upload_max_files + 1) * 1024 * 1024
+        ceiling_bytes = RequestLimits.MAX_MULTIPART_BODY_BYTES
+        if computed_bytes > ceiling_bytes:
+            computed_mb = computed_bytes // (1024 * 1024)
+            ceiling_mb = ceiling_bytes // (1024 * 1024)
+            warnings.warn(
+                "Request body: file upload settings would allow a multipart body of "
+                f"{computed_mb} MB (file_upload_max_size_mb={self.file_upload_max_size_mb} x "
+                f"file_upload_max_files={self.file_upload_max_files} + 1 MB headroom), but "
+                f"RequestBodySizeMiddleware clamps multipart requests to {ceiling_mb} MB "
+                f"(RequestLimits.MAX_MULTIPART_BODY_BYTES). Lower APP_FILE_UPLOAD_MAX_SIZE_MB "
+                "or APP_FILE_UPLOAD_MAX_FILES, or raise MAX_MULTIPART_BODY_BYTES in code if "
+                "larger multipart ingress is required.",
+                UserWarning,
+                stacklevel=1,
+            )
+        return self
+
     @computed_field  # type: ignore[prop-decorator]
     @property
     def jwt_issuer(self) -> str:

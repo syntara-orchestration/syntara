@@ -3,6 +3,7 @@
 from typing import Any
 
 import pytest
+from pydantic import ValidationError
 
 from syntara.core.constants import FieldLimits, JsonbLimits
 from syntara.core.exceptions import SafeValueError
@@ -12,6 +13,7 @@ from syntara.core.jsonb_limits import (
     validate_labels_dict,
     validate_workflow_definition_json,
 )
+from syntara.workflows.models.workflow import WorkflowUpdate
 
 
 class TestSerializedJsonSize:
@@ -78,3 +80,9 @@ class TestValidateWorkflowDefinitionJson:
 
     def test_skips_non_dict_values(self) -> None:
         assert validate_workflow_definition_json(None) is None
+
+
+def test_workflow_update_rejects_oversized_labels() -> None:
+    """WorkflowUpdate.labels must enforce LabelsField validation at the model layer."""
+    with pytest.raises(ValidationError):
+        WorkflowUpdate(labels={f"k{i}": "v" * 100 for i in range(1000)})

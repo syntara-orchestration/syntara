@@ -9,6 +9,7 @@ import pytest
 from pydantic import HttpUrl, ValidationError
 
 from syntara.core.config.base import Settings
+from syntara.core.constants import RequestLimits
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -699,6 +700,55 @@ class TestCorsProductionValidation:
         monkeypatch.setenv("APP_SERVER_SCHEME", "http")
         settings = Settings()
         assert settings.cookie_secure is False
+
+
+# =============================================================================
+# Multipart Body Limit Validation Tests
+# =============================================================================
+
+
+class TestMultipartBodyLimitValidation:
+    """Tests for startup warning when upload settings exceed the multipart ceiling."""
+
+    def test_warns_when_computed_multipart_limit_exceeds_ceiling(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("APP_FILE_UPLOAD_MAX_SIZE_MB", "500")
+        monkeypatch.setenv("APP_FILE_UPLOAD_MAX_FILES", "100")
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            Settings()
+
+        multipart_warnings = [x for x in w if "Request body: file upload settings would allow" in str(x.message)]
+        assert len(multipart_warnings) == 1
+
+    def test_no_warning_when_computed_multipart_limit_within_ceiling(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("APP_FILE_UPLOAD_MAX_SIZE_MB", "10")
+        monkeypatch.setenv("APP_FILE_UPLOAD_MAX_FILES", "10")
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            Settings()
+
+        multipart_warnings = [x for x in w if "Request body: file upload settings would allow" in str(x.message)]
+        assert len(multipart_warnings) == 0
+
+    def test_no_warning_when_computed_multipart_limit_equals_ceiling(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Exactly at the ceiling is allowed; only values above it warn."""
+        ceiling_mb = RequestLimits.MAX_MULTIPART_BODY_BYTES // (1024 * 1024)
+        # (19 * 10 + 1) = 191 MB; (20 * 10 + 1) = 201 MB when ceiling is 200 MB.
+        monkeypatch.setenv("APP_FILE_UPLOAD_MAX_SIZE_MB", "19")
+        monkeypatch.setenv("APP_FILE_UPLOAD_MAX_FILES", "10")
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            settings = Settings()
+
+        assert (
+            settings.file_upload_max_size_mb * settings.file_upload_max_files + 1
+        ) * 1024 * 1024 <= RequestLimits.MAX_MULTIPART_BODY_BYTES
+        assert ceiling_mb == 200
+        multipart_warnings = [x for x in w if "Request body: file upload settings would allow" in str(x.message)]
+        assert len(multipart_warnings) == 0
 
 
 # =============================================================================
