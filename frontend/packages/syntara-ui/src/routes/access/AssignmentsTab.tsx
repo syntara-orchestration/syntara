@@ -276,7 +276,8 @@ export function AssignmentsTab() {
       detachPromise(queryClient.invalidateQueries({ queryKey: ['role-assignments'] }))
       refetch()
     }
-    const onError = (error: unknown) => showError({ title: 'Remove failed', description: getErrorMessage(error) })
+    const onError = (error: unknown) =>
+      showError({ title: 'Failed to remove assignment', description: getErrorMessage(error) })
     const onSettled = deleteDialog.close
     const callbacks = { onSuccess, onError, onSettled }
 

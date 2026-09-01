@@ -296,36 +296,38 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             done, _ = await asyncio.wait(wait_tasks, return_when=asyncio.FIRST_COMPLETED)
 
             for task in done:
-                completed_node_id = self._find_node_for_task(task, pending_tasks)
-                if not completed_node_id:
-                    continue
+                await self._process_completed_task(task, pending_tasks, graph)
 
-                del pending_tasks[completed_node_id]
+    async def _process_completed_task(
+        self,
+        task: asyncio.Task[Any],
+        pending_tasks: dict[str, asyncio.Task[Any]],
+        graph: WorkflowGraph,
+    ) -> None:
+        """Handle a single completed task from the asyncio.wait done set."""
+        completed_node_id = self._find_node_for_task(task, pending_tasks)
+        if not completed_node_id:
+            return
 
-                try:
-                    output = await task
-                except Exception as node_error:  # noqa: BLE001
-                    node = graph.get_node(completed_node_id)
-                    cof = resolve_continue_on_failure(node, self._runtime_settings)
-                    self._handle_node_failure(
-                        completed_node_id, node_error, graph, pending_tasks, continue_on_failure=cof
-                    )
-                    await self._maybe_expire_approval(completed_node_id, node, node_error)
-                    await self._maybe_cancel_agentic_invocation(node, node_error)
-                    if cof:
-                        self._route_failed_node(completed_node_id, node)
-                        await self._handle_continued_failure(completed_node_id, node, graph, pending_tasks)
-                    continue
+        del pending_tasks[completed_node_id]
 
-                self.resolver.set_namespace(completed_node_id, {**output, "status": "completed"})
-                workflow.logger.info(f"Node {completed_node_id} completed, pending: {list(pending_tasks.keys())}")
+        try:
+            output = await task
+        except Exception as node_error:  # noqa: BLE001
+            node = graph.get_node(completed_node_id)
+            cof = resolve_continue_on_failure(node, self._runtime_settings)
+            self._handle_node_failure(completed_node_id, node_error, graph, pending_tasks, continue_on_failure=cof)
+            await self._maybe_expire_approval(completed_node_id, node, node_error)
+            await self._maybe_cancel_agentic_invocation(node, node_error)
+            if cof:
+                self._route_failed_node(completed_node_id, node)
+                await self._handle_continued_failure(completed_node_id, node, graph, pending_tasks)
+            return
 
-                await self._schedule_successors(
-                    completed_node_id=completed_node_id,
-                    graph=graph,
-                    pending_tasks=pending_tasks,
-                )
-                self._cancel_skipped_pending_tasks(pending_tasks)
+        self.resolver.set_namespace(completed_node_id, {**output, "status": "completed"})
+        workflow.logger.info(f"Node {completed_node_id} completed, pending: {list(pending_tasks.keys())}")
+        await self._schedule_successors(completed_node_id=completed_node_id, graph=graph, pending_tasks=pending_tasks)
+        self._cancel_skipped_pending_tasks(pending_tasks)
 
     @staticmethod
     def _find_node_for_task(
@@ -505,13 +507,13 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
     def _remove_detached_tasks(self, pending_tasks: dict[str, asyncio.Task[Any]]) -> None:
         """Remove detached in-flight tasks from the main loop without cancelling them.
 
-        When a converge node fails, in-flight predecessors keep running in
-        Temporal but no longer block the workflow from completing.
+        When a converge node fires (ANY) or fails, in-flight predecessors keep
+        running in Temporal but no longer block the workflow from completing.
         """
         detached = [nid for nid in pending_tasks if nid in self._detached_nodes]
         for nid in detached:
             del pending_tasks[nid]
-            workflow.logger.info(f"Detached in-flight node {nid} from main loop (converge failed)")
+            workflow.logger.info(f"Detached in-flight node {nid} from main loop (converge fired)")
 
     def _cleanup_timeout_tasks(self) -> None:
         """Cancel any remaining converge timeout background tasks."""
@@ -832,7 +834,9 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         # All explored paths lead to skipped/failed nodes → unreachable
         return True
 
-    def _mark_downstream_as_skipped(self, start_node_id: str, graph: WorkflowGraph) -> None:
+    def _mark_downstream_as_skipped(
+        self, start_node_id: str, graph: WorkflowGraph, boundary: set[str] | None = None
+    ) -> None:
         """Eagerly mark downstream nodes as skipped via BFS propagation.
 
         Starting from a skipped node, propagate the skipped status to all
@@ -842,9 +846,15 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         ``_check_converge_successors`` / ``_evaluate_converge_failure``
         based on the node's strategy (ALL/ANY).
 
+        When ``boundary`` is provided, only nodes within that set are eligible
+        for skipping.  This prevents converge cancellation from propagating to
+        nodes that branch off a cancelled predecessor but are not part of the
+        converge's parallel section.
+
         Args:
             start_node_id: Node that was just marked as skipped
             graph: Workflow graph
+            boundary: Optional set of node IDs to restrict propagation to
 
         """
         queue = collections.deque([start_node_id])
@@ -867,6 +877,9 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 # let _check_converge_successors handle them.
                 succ_node = graph.get_node(succ_id)
                 if succ_node.type == NodeType.CONVERGE:
+                    continue
+
+                if boundary is not None and succ_id not in boundary:
                     continue
 
                 # Check if ALL predecessors of this successor are skipped or failed

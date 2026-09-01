@@ -1,4 +1,4 @@
-import { AlertActionLink, Flex, FlexItem, Stack, StackItem } from '@patternfly/react-core'
+import { AlertActionLink, Flex, FlexItem, StackItem } from '@patternfly/react-core'
 import type { WorkflowAPI } from '@syntara/contracts'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
@@ -9,6 +9,7 @@ import { useUnsavedChanges } from '../../app/useUnsavedChanges'
 import { executionsClient, workflowClient } from '../../client'
 import { SynPage } from '../../components/layout/SynPage'
 import { SynPanel } from '../../components/layout/SynPanel'
+import { SynPanelStack, SynPanelStackItem } from '../../components/layout/SynPanelStack'
 import { SynReactFlowViewportGuard } from '../../components/layout/SynReactFlowViewportGuard'
 import { useSearchParams } from '../../hooks/routing/useSearchParams'
 import { useCursorPagination } from '../../hooks/useCursorPagination'
@@ -645,8 +646,8 @@ export function BuilderContent(props: BuilderContentProps) {
                     className={styles.canvasFlexItem}
                     style={{ pointerEvents: isNodeEditorOpen && !versionPanel.isViewingVersion ? 'none' : 'auto' }}
                   >
-                    <Stack className={styles.canvasStack}>
-                      <StackItem isFilled className={styles.filledMinHeight}>
+                    <SynPanelStack>
+                      <SynPanelStackItem isFilled>
                         <SynPanel hasNoPadding isFullHeight className={styles.canvasPanel}>
                           <VersionInfoCard
                             title={versionPanel.viewedVersionName}
@@ -675,7 +676,7 @@ export function BuilderContent(props: BuilderContentProps) {
                             validationErrors={state.validationErrors}
                           />
                         </SynPanel>
-                      </StackItem>
+                      </SynPanelStackItem>
                       {showMostRecentRunPanelInEditor && mostRecentExecutionId && (
                         <ExecutionDetailsPanelWrapper
                           executionId={mostRecentExecutionId}
@@ -693,7 +694,7 @@ export function BuilderContent(props: BuilderContentProps) {
                           onClosePanel={handleCloseMostRecentRunPanel}
                         />
                       )}
-                    </Stack>
+                    </SynPanelStack>
                   </FlexItem>
                   <BuilderSidePanels
                     isAddNodePanelOpen={isAddNodePanelOpen}

@@ -151,12 +151,24 @@ describe('UserForm', () => {
   })
 
   describe('create mode', () => {
-    it('renders with "Create User" heading and "Create user" submit button', () => {
+    it('renders with "Create user" heading and "Create user" submit button', () => {
       setupCreateMocks()
       render(<UserForm mode="create" />, { wrapper })
 
-      expect(screen.getByRole('heading', { name: 'Create User' })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Create user' })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Create user' })).toBeInTheDocument()
+    })
+
+    it('places Create user to the left of Cancel', () => {
+      setupCreateMocks()
+      render(<UserForm mode="create" />, { wrapper })
+
+      const submit = screen.getByRole('button', { name: 'Create user' })
+      const cancel = screen.getByRole('button', { name: 'Cancel' })
+      expect(cancel).toHaveClass('pf-m-link')
+      expect(submit.compareDocumentPosition(cancel) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING
+      )
     })
 
     it('uses createUser documentation key', () => {
@@ -335,12 +347,24 @@ describe('UserForm', () => {
   })
 
   describe('edit mode', () => {
-    it('renders with "Edit User" heading and "Save" submit button', () => {
+    it('renders with the user display name in the heading and "Save" submit button', () => {
       setupEditMocks()
       render(<UserForm mode="edit" />, { wrapper })
 
-      expect(screen.getByRole('heading', { name: 'Edit User' })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Edit John Doe' })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
+    })
+
+    it('places Save to the left of Cancel', () => {
+      setupEditMocks()
+      render(<UserForm mode="edit" />, { wrapper })
+
+      const submit = screen.getByRole('button', { name: 'Save' })
+      const cancel = screen.getByRole('button', { name: 'Cancel' })
+      expect(cancel).toHaveClass('pf-m-link')
+      expect(submit.compareDocumentPosition(cancel) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING
+      )
     })
 
     it('uses users documentation key', () => {
@@ -373,6 +397,7 @@ describe('UserForm', () => {
 
       const nav = screen.getByRole('navigation', { name: 'Breadcrumb' })
       expect(within(nav).getByText('jdoe')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Edit jdoe' })).toBeInTheDocument()
     })
 
     it('calls updateUser mutation with form data on submit', async () => {
@@ -485,6 +510,7 @@ describe('UserForm', () => {
 
       render(<UserForm mode="edit" />, { wrapper })
 
+      expect(screen.getByRole('heading', { name: 'Edit user' })).toBeInTheDocument()
       expect(screen.getByText('User not found')).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /Back to users/ })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /Retry/ })).toBeInTheDocument()
@@ -582,7 +608,7 @@ describe('UserForm', () => {
 
       render(<UserForm mode="edit" />, { wrapper })
 
-      expect(screen.getByRole('heading', { name: 'Edit User' })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Edit user' })).toBeInTheDocument()
       expect(screen.getByRole('progressbar', { name: 'Loading' })).toBeInTheDocument()
       // The form submit button should not be visible in loading state
       expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
