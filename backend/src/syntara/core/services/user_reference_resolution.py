@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
+import structlog
 from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import select
 
@@ -22,21 +22,29 @@ if TYPE_CHECKING:
 
     from sqlmodel.ext.asyncio.session import AsyncSession
 
-logger = logging.getLogger(__name__)
+logger = structlog.stdlib.get_logger(__name__)
 
 # Service principals (mTLS-authenticated internal services) get a ``principals``
 # row but no child-table row, so their display name is derived from the cert CN.
 _SERVICE_CN_BY_PRINCIPAL_ID: dict[UUID, str] = {service_principal_id(cn): cn for cn in KNOWN_SERVICE_CNS}
 
 
-def _user_id_from_value(val: object) -> str | UUID | None:
-    """Extract a user UUID from a raw field value (UUID, string, or UserReference)."""
+def _user_id_from_value(val: object) -> UUID | None:
+    """Extract a principal UUID from a raw field value (UUID, string, or UserReference)."""
     if val is None:
         return None
     if isinstance(val, UserReference):
         return val.id
-    if isinstance(val, UUID | str):
+    if isinstance(val, UUID):
         return val
+    if isinstance(val, str):
+        # The Read models still permit a str id; the lookup map is keyed by
+        # UUID, so an unnormalised str would never match and would be
+        # silently nulled out.
+        try:
+            return UUID(val)
+        except ValueError:
+            return None
     return None
 
 
@@ -87,7 +95,12 @@ async def lookup_users(
         result = await session.exec(stmt)
         return {row[0]: (row[0], _display_name(row[0], row[1], row[2])) for row in result}
     except (SQLAlchemyError, OSError):
-        logger.warning("Failed to resolve usernames", exc_info=True)
+        logger.warning(
+            "Failed to resolve user references",
+            principal_count=len(principal_ids),
+            field_names=list(field_names),
+            exc_info=True,
+        )
         return None
 
 
