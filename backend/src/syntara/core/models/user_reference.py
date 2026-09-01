@@ -1,7 +1,8 @@
 """UserReference model for embedding user identity in API responses.
 
-Provides a structured representation of a user (id + name snapshot) suitable
-for embedding in any resource that tracks "who performed this action".
+Provides a structured representation of a principal (id + current name)
+suitable for embedding in any resource that tracks "who performed this
+action".
 """
 
 from typing import Any, ClassVar
@@ -16,14 +17,16 @@ from sqlmodel import Field, SQLModel
 class UserReference(SQLModel):
     """Minimal user identification for embedding in other resources.
 
-    This model captures user identity at the time of an action, providing
-    a snapshot that doesn't change even if the user's details are updated later.
+    The name is resolved from the database when the response is built, not
+    stored alongside the id, so it always reflects the principal's current
+    name. Renaming a user therefore changes the name shown for their past
+    actions.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)  # type: ignore[assignment]
 
     id: UUID = Field(..., description="User's unique identifier")
-    name: str = Field(..., description="User's display name at time of action")
+    name: str = Field(..., description="Principal's current display name, resolved when the response is built")
 
     OPENAPI_NULLABLE_FIELD: ClassVar[dict[str, Any]] = {
         "readOnly": True,
