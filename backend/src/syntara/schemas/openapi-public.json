@@ -36646,7 +36646,7 @@
       },
       "delete": {
         "summary": "Delete workflow",
-        "description": "Soft delete a workflow.",
+        "description": "Permanently delete a workflow and cascade-delete all its versions and executions.",
         "operationId": "delete_workflow",
         "tags": [
           "Workflows"
@@ -49571,30 +49571,6 @@
             "title": "Current Activities",
             "description": "Currently executing activities"
           },
-          "deleted_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Deleted At"
-          },
-          "deleted_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Deleted By"
-          },
           "workflow_definition": {
             "anyOf": [
               {
@@ -50214,7 +50190,7 @@
       "WorkflowRead": {
         "type": "object",
         "title": "WorkflowRead",
-        "description": "Schema for workflow response (GET /workflows/{id}).\n\nIncludes all fields from the database table model.\nNote: deleted_at and deleted_by are None since soft-deleted workflows are excluded from queries.",
+        "description": "Schema for workflow response (GET /workflows/{id}).\n\nIncludes all fields from the database table model.",
         "required": [
           "name",
           "id",
@@ -50317,30 +50293,6 @@
             "type": "string",
             "format": "date-time",
             "title": "Updated At"
-          },
-          "deleted_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Deleted At"
-          },
-          "deleted_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Deleted By"
           },
           "validation_result": {
             "anyOf": [
@@ -50462,30 +50414,6 @@
             "type": "string",
             "format": "date-time",
             "title": "Updated At"
-          },
-          "deleted_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Deleted At"
-          },
-          "deleted_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Deleted By"
           },
           "validation_result": {
             "anyOf": [
@@ -50612,30 +50540,6 @@
             "format": "date-time",
             "title": "Updated At"
           },
-          "deleted_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Deleted At"
-          },
-          "deleted_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Deleted By"
-          },
           "validation_result": {
             "anyOf": [
               {
@@ -50662,7 +50566,7 @@
       "WorkflowVersionRead": {
         "type": "object",
         "title": "WorkflowVersionRead",
-        "description": "Schema for workflow version response (GET /workflows/{id}/versions/{version}).\nWorkflowVersion entities are read-only and managed automatically by the system.\n\nNote: deleted_at and deleted_by are None since soft-deleted versions are excluded from queries.",
+        "description": "Schema for workflow version response (GET /workflows/{id}/versions/{version}).",
         "required": [
           "id",
           "workflow_id",
@@ -50778,30 +50682,6 @@
             "type": "string",
             "format": "date-time",
             "title": "Updated At"
-          },
-          "deleted_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Deleted At"
-          },
-          "deleted_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Deleted By"
           }
         }
       },
