@@ -397,15 +397,38 @@ export default tseslint.config(
   },
   {
     // Storybook stories use the TanStack Router framework integration configured by this package.
+    // Keep the existing TypeScript import restrictions here because flat config replaces
+    // array-valued rules instead of merging them.
     files: ['**/*.stories.{ts,tsx}'],
     rules: {
-      'no-restricted-imports': [
+      '@typescript-eslint/no-restricted-imports': [
         'error',
         {
           paths: [
             {
               name: '@storybook/react-vite',
               message: 'Use @storybook/tanstack-react for stories in this package.',
+            },
+          ],
+          patterns: [
+            {
+              group: ['wouter', 'wouter/*'],
+              message: 'wouter has been removed. Use @tanstack/react-router directly.',
+            },
+            {
+              regex: '(?:\\.{1,2}/)*(?:hooks/)?routing/(?:useNavigate|useParams|useSearch|useLocation|navigate|Link)$',
+              message: 'Deprecated bridge hook. Use @tanstack/react-router primitives directly.',
+            },
+            {
+              group: ['@tanstack/react-router'],
+              importNames: ['Link'],
+              message:
+                'Use SynLink from components/SynLink instead of TanStack Link directly. SynLink provides consistent PatternFly styling.',
+            },
+            {
+              group: ['@syntara/contracts/src', '@syntara/contracts/src/**'],
+              message:
+                "Import from '@syntara/contracts' (the public entry point), not from internal source paths. Internal paths are not part of the published API and can break silently when the package restructures.",
             },
           ],
         },
