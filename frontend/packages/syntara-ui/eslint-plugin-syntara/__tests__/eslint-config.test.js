@@ -7,6 +7,8 @@ const packageDirectory = process.cwd()
 const eslint = new ESLint({
   cwd: packageDirectory,
   overrideConfigFile: resolve(packageDirectory, 'eslint.config.js'),
+  // The synthetic source has no meaningful function length; keep this unrelated rule out of the test.
+  overrideConfig: { rules: { 'max-lines-per-function': 'off' } },
 })
 
 async function lintStory(code) {
