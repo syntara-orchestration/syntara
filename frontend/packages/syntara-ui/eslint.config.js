@@ -384,6 +384,23 @@ export default tseslint.config(
     },
   },
   {
+    // Storybook stories use the TanStack Router framework integration configured by this package.
+    files: ['**/*.stories.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@storybook/react-vite',
+              message: 'Use @storybook/tanstack-react for stories in this package.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: [...TEST_FILES, 'e2e/visual-regression/**/*.ts'],
     rules: {
       'max-lines': 'off',

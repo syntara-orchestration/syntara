@@ -1,5 +1,5 @@
 import { Label } from '@patternfly/react-core'
-import type { Meta, StoryObj } from '@storybook/react-vite'
+import type { Meta, StoryObj } from '@storybook/tanstack-react'
 
 import { SynDetail } from './SynDetail'
 
