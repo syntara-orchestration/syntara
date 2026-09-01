@@ -56,7 +56,12 @@ def _changed_column_names(obj: "BaseResource") -> set[str]:
         hist = state.attrs[key].history
         if not hist.has_changes():
             continue
-        old = hist.deleted[-1] if hist.deleted else (hist.unchanged[-1] if hist.unchanged else None)
+        if hist.deleted:
+            old = hist.deleted[-1]
+        elif hist.unchanged:
+            old = hist.unchanged[-1]
+        else:
+            old = None
         new = hist.added[-1] if hist.added else None
         if old == new:
             continue
