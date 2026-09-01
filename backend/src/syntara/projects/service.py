@@ -423,7 +423,7 @@ class ProjectService(BaseService):
                             project_id=str(project_id),
                             exc_info=True,
                         )
-        except (OSError, RuntimeError, ImportError):
+        except (OSError, RuntimeError, ImportError, ScheduledTriggerSyncError):
             logger.warning(
                 "Failed to clean Temporal schedules for project",
                 project_id=str(project_id),

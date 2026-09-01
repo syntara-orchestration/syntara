@@ -25,10 +25,11 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
+_SOFT_DELETED = "SELECT id FROM projects WHERE deleted_at IS NOT NULL"
+
+
 def _delete_by_project(table: str) -> sa.TextClause:
-    return sa.text(
-        "DELETE FROM " + table + " WHERE project_id IN (SELECT id FROM projects WHERE deleted_at IS NOT NULL)"
-    )
+    return sa.text("DELETE FROM " + table + f" WHERE project_id IN ({_SOFT_DELETED})")
 
 
 def upgrade() -> None:
@@ -45,42 +46,62 @@ def upgrade() -> None:
     op.execute(
         sa.text(
             "UPDATE workflows SET published_version_id = NULL, is_enabled = false "
-            "WHERE project_id IN (SELECT id FROM projects WHERE deleted_at IS NOT NULL)"
+            f"WHERE project_id IN ({_SOFT_DELETED})"
         )
     )
     op.execute(
         sa.text(
             "DELETE FROM webhook_triggers WHERE workflow_id IN "
-            "(SELECT id FROM workflows WHERE project_id IN "
-            "(SELECT id FROM projects WHERE deleted_at IS NOT NULL))"
+            f"(SELECT id FROM workflows WHERE project_id IN ({_SOFT_DELETED}))"
         )
     )
     op.execute(
         sa.text(
             "DELETE FROM workflow_versions WHERE workflow_id IN "
-            "(SELECT id FROM workflows WHERE project_id IN "
-            "(SELECT id FROM projects WHERE deleted_at IS NOT NULL))"
+            f"(SELECT id FROM workflows WHERE project_id IN ({_SOFT_DELETED}))"
         )
     )
     op.execute(_delete_by_project("workflows"))
 
-    # Credentials: capture secret_ids, delete credentials first (removes FK reference),
-    # then delete their secrets and encrypted_secrets
+    # Credentials + secrets: scoped cleanup.
+    # Skip credentials referenced by a live integration — ON DELETE RESTRICT on
+    # integrations.management_credential_id would fail the migration. Those
+    # credentials (and their secrets) stay; the admin must reassign the
+    # integration's credential and re-run the migration.
+    #
+    # Capture secret_ids BEFORE deleting credentials so the secret deletion
+    # is scoped to this migration's projects, not a global orphan sweep.
+    _integration_refs = "SELECT management_credential_id FROM integrations WHERE management_credential_id IS NOT NULL"
     op.execute(
         sa.text(
-            "DELETE FROM encrypted_secrets WHERE secret_id IN "
-            "(SELECT secret_id FROM credentials WHERE project_id IN "
-            "(SELECT id FROM projects WHERE deleted_at IS NOT NULL) AND secret_id IS NOT NULL)"
+            "CREATE TEMP TABLE _purge_secret_ids AS "
+            "SELECT DISTINCT secret_id FROM credentials "
+            f"WHERE project_id IN ({_SOFT_DELETED}) "
+            "AND secret_id IS NOT NULL "
+            f"AND id NOT IN ({_integration_refs})"
         )
     )
-    op.execute(_delete_by_project("credentials"))
+    op.execute(sa.text("DELETE FROM encrypted_secrets WHERE secret_id IN (SELECT secret_id FROM _purge_secret_ids)"))
     op.execute(
         sa.text(
-            "DELETE FROM secrets WHERE id NOT IN "
-            "(SELECT secret_id FROM credentials WHERE secret_id IS NOT NULL) "
-            "AND id NOT IN (SELECT secret_id FROM identity_providers WHERE secret_id IS NOT NULL)"
+            "UPDATE credentials SET secret_id = NULL "
+            f"WHERE project_id IN ({_SOFT_DELETED}) "
+            f"AND id NOT IN ({_integration_refs})"
         )
     )
+    op.execute(
+        sa.text(f"DELETE FROM credentials WHERE project_id IN ({_SOFT_DELETED}) AND id NOT IN ({_integration_refs})")
+    )
+    # Delete only the captured secrets — scoped, not a global orphan sweep.
+    # Exclude any secret still referenced by an identity provider.
+    op.execute(
+        sa.text(
+            "DELETE FROM secrets WHERE id IN (SELECT secret_id FROM _purge_secret_ids) "
+            "AND id NOT IN "
+            "(SELECT secret_id FROM identity_providers WHERE secret_id IS NOT NULL)"
+        )
+    )
+    op.execute(sa.text("DROP TABLE IF EXISTS _purge_secret_ids"))
 
     op.execute(_delete_by_project("file_metadata"))
     op.execute(_delete_by_project("integration_project_assignments"))
@@ -89,8 +110,7 @@ def upgrade() -> None:
     op.execute(
         sa.text(
             "DELETE FROM service_account_credentials WHERE service_account_id IN "
-            "(SELECT id FROM service_accounts WHERE project_id IN "
-            "(SELECT id FROM projects WHERE deleted_at IS NOT NULL))"
+            f"(SELECT id FROM service_accounts WHERE project_id IN ({_SOFT_DELETED}))"
         )
     )
     op.execute(_delete_by_project("service_accounts"))
