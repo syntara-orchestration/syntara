@@ -12,14 +12,8 @@ vi.mock('../../../components/table/LinkCell', () => ({
   LinkCell: ({ children }: { children: ReactNode }) => <span>{children}</span>,
 }))
 
-const mockUseCredentialPermissions = vi.fn(() => ({
-  canCreate: true,
-  canRead: true,
-  canUpdate: true,
-  canDelete: true,
-  isLoading: false,
-  isReadChecking: false,
-  tooltips: { create: '', read: '', update: '', enable: '', delete: '' },
+const { mockUseCredentialPermissions } = vi.hoisted(() => ({
+  mockUseCredentialPermissions: vi.fn(),
 }))
 
 vi.mock('./useCredentialPermissions', () => ({
