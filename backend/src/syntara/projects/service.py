@@ -294,8 +294,12 @@ class ProjectService(BaseService):
         Uses bulk SQL for efficiency. Ordering respects FK constraints.
         External side-effects (Temporal schedules, file storage) are best-effort.
         """
+        from sqlalchemy import func as sa_func  # noqa: PLC0415
+        from sqlmodel import col  # noqa: PLC0415
+
         from syntara.agent_orchestrator.models.invocation import Invocation  # noqa: PLC0415
         from syntara.approvals.models.approval_request import ApprovalRequest  # noqa: PLC0415
+        from syntara.authz.exceptions import ProjectHasActiveExecutionsError  # noqa: PLC0415
         from syntara.authz.models.policy import Policy  # noqa: PLC0415
         from syntara.authz.models.role import Role  # noqa: PLC0415
         from syntara.core.models.secret import EncryptedSecret, Secret  # noqa: PLC0415
@@ -304,14 +308,34 @@ class ProjectService(BaseService):
         from syntara.integrations.models.integration import IntegrationProjectAssignment  # noqa: PLC0415
         from syntara.service_accounts.models.service_account import ServiceAccount  # noqa: PLC0415
         from syntara.service_accounts.models.service_account_credential import ServiceAccountCredential  # noqa: PLC0415
-        from syntara.workflows.models.execution import Execution  # noqa: PLC0415
+        from syntara.workflows.models.execution import TERMINAL_EXECUTION_STATUSES, Execution  # noqa: PLC0415
         from syntara.workflows.models.webhook_trigger import WebhookTrigger  # noqa: PLC0415
         from syntara.workflows.models.workflow import Workflow  # noqa: PLC0415
         from syntara.workflows.models.workflow_version import WorkflowVersion  # noqa: PLC0415
 
+        # Step 1: Lock workflow rows FOR UPDATE to prevent new executions from being
+        # created while we check and delete.  Any concurrent create_execution() will
+        # block on the workflow SELECT until this transaction commits or rolls back,
+        # closing the TOCTOU race between the active-execution check and the DELETE.
+        result = await self.session.exec(select(Workflow).where(Workflow.project_id == project_id).with_for_update())
+        locked_workflows = list(result.all())
+        locked_wf_ids = [w.id for w in locked_workflows]
+
+        if locked_wf_ids:
+            non_terminal_count = await self.session.scalar(
+                select(sa_func.count())
+                .select_from(Execution)
+                .where(
+                    col(Execution.workflow_id).in_(locked_wf_ids),
+                    col(Execution.status).not_in(TERMINAL_EXECUTION_STATUSES),
+                )
+            )
+            if non_terminal_count:
+                raise ProjectHasActiveExecutionsError(project_id, non_terminal_count)
+
         # --- External cleanup (best-effort, must run BEFORE DB deletes) ---
         # _cleanup_file_storage reads FileMetadata rows to get storage paths,
-        # so it must precede the file_metadata DELETE in step 6 below.
+        # so it must precede the file_metadata DELETE below.
         await self._cleanup_temporal_schedules(project_id)
         await self._cleanup_file_storage(project_id)
 
