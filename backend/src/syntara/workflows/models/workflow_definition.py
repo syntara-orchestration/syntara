@@ -207,9 +207,11 @@ class WorkflowDefinition(SQLModel):
     )
     nodes: list[WorkflowNode] = Field(
         ...,
+        max_length=200,
         description="Execution and control nodes in the workflow graph",
     )
     edges: list[dict[str, Any]] = Field(
         ...,
+        max_length=500,
         description="List of directed edges connecting triggers and nodes in the workflow graph",
     )
