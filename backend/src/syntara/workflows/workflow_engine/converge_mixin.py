@@ -189,7 +189,7 @@ class WorkflowConvergeMixin:
                     f"{', '.join(failed_preds)} failed, "
                     f"ALL strategy requires every branch to succeed"
                 )
-                self._fail_converge_node(converge_id, error_msg, graph, pending_tasks)
+                self._fail_converge_node(converge_id, error_msg, graph, pending_tasks, detach_in_flight=False)
                 return
 
             if upstream_failure_id and upstream_failure_id not in self._cof_failed_nodes:
@@ -198,7 +198,7 @@ class WorkflowConvergeMixin:
                     f"{upstream_failure_id} failed, "
                     f"ALL strategy requires every branch to succeed"
                 )
-                self._fail_converge_node(converge_id, error_msg, graph, pending_tasks)
+                self._fail_converge_node(converge_id, error_msg, graph, pending_tasks, detach_in_flight=False)
                 return
 
         if self._all_predecessors_terminal(predecessor_ids) and not self._are_predecessors_complete(converge_id, graph):
@@ -208,7 +208,7 @@ class WorkflowConvergeMixin:
                 f"Converge node {converge_id}: required {n_req} successful branches, "
                 f"got {successes} (failures excluded)"
             )
-            self._fail_converge_node(converge_id, error_msg, graph, pending_tasks)
+            self._fail_converge_node(converge_id, error_msg, graph, pending_tasks, detach_in_flight=False)
 
     def _all_predecessors_terminal(self, predecessor_ids: list[str]) -> bool:
         """Check if every predecessor has reached a terminal state (completed, failed, or skipped)."""
@@ -232,12 +232,19 @@ class WorkflowConvergeMixin:
         error_msg: str,
         graph: WorkflowGraph,
         pending_tasks: dict[str, asyncio.Task[Any]] | None = None,
+        *,
+        detach_in_flight: bool = True,
     ) -> None:
         """Mark a converge node as failed and clean up.
 
         Checks ``continue_on_failure`` on the converge node: when true the
         failure is recorded but downstream nodes are scheduled instead of
         skipped (via ``_timed_out_converge_nodes``).
+
+        ``detach_in_flight`` controls in-flight sibling branches. Timeout
+        detaches them so the workflow can finish without waiting. A predecessor
+        failure does not: independent branches must run to completion, so the
+        main loop keeps their tasks until they finish.
         """
         node = graph.get_node(node_id)
         cof = resolve_continue_on_failure(node, self._runtime_settings)
@@ -254,13 +261,14 @@ class WorkflowConvergeMixin:
                 self._skip_incomplete_predecessors(node_id, graph, "converge failed", pending_tasks)
             except Exception:  # noqa: BLE001
                 workflow.logger.exception(f"Failed to skip incomplete predecessors for {node_id}")
-            for branch_node_id, converge_ids in self._converge_branch_nodes.items():
-                if (
-                    node_id in converge_ids
-                    and branch_node_id in pending_tasks
-                    and not self.resolver.has_namespace(branch_node_id)
-                ):
-                    self._detached_nodes.add(branch_node_id)
+            if detach_in_flight:
+                for branch_node_id, converge_ids in self._converge_branch_nodes.items():
+                    if (
+                        node_id in converge_ids
+                        and branch_node_id in pending_tasks
+                        and not self.resolver.has_namespace(branch_node_id)
+                    ):
+                        self._detached_nodes.add(branch_node_id)
         if cof:
             self._cof_failed_nodes.add(node_id)
             for branch_node_id, converge_ids in self._converge_branch_nodes.items():
