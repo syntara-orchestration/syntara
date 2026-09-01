@@ -164,7 +164,9 @@ npm run e2e:visual-regression:update # Same, with --update-snapshots (see packag
 #   @konflux-skip  Tests excluded from Konflux pipelines via --grep-invert @konflux-skip (flaky in that env only)
 #   @local-only    Visual regression tests; excluded from all CI automatically
 # Full rules: .claude/skills/frontend-playwright-e2e/SKILL.md → "Test Suite Tags"
-#
+
+For a known flaky test that needs temporary quarantine from CI, follow the
+[test quarantine workflow](../docs/ci/test-quarantine.md).
 # When to apply @konflux-skip:
 #   - Test creates a real workflow execution and waits for Temporal to complete it
 #     (approval flows, multi-step runs, badge checks) — Temporal under Konflux cluster

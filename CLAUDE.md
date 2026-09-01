@@ -125,6 +125,9 @@ uv run podman-compose up -d database redis temporal  # Just infrastructure
 
 Konflux (the Red Hat CI pipeline) runs E2E tests in a restricted environment that differs from local and GitHub CI in several important ways. When E2E tests fail only in Konflux, apply the appropriate skip pattern rather than modifying the test logic.
 
+For a known flaky test that needs temporary quarantine from the pipeline, see
+[the test quarantine workflow](docs/ci/test-quarantine.md).
+
 **Key Konflux constraints:**
 - Does **not** set `CI=true` — guards like `test.skip(!!process.env.CI, ...)` have no effect.
 - The Temporal worker runs in a separate network namespace; it may not reach external URLs (e.g. httpbin.org) even when the test runner can.

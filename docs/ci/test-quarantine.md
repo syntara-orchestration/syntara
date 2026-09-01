@@ -1,8 +1,18 @@
 # Test quarantine workflow
 
-Flaky tests can be temporarily quarantined via the [syntara-ci repository](https://github.com/syntara-orchestration/syntara-ci).
+Flaky tests can be temporarily quarantined via the [syntara-ci repository](https://github.com/syntara-orchestration/syntara-ci). A quarantine keeps the test running while preventing a known failure from blocking the pipeline. Use this only as a temporary measure while the underlying problem is investigated.
 
-To request a quarantine, visit that repository, follow the directions in `README.md` to apply a quarantine, and open a pull request. Quarantines allow a test to run without its failures failing the overall pipeline job. This can be a useful tool for unblocking the team when a known flaky test is preventing progress while a resolution is sought.
+## Requesting a quarantine
+
+1. In the [syntara-ci repository](https://github.com/syntara-orchestration/syntara-ci), choose the file for the affected suite:
+   - [`backend.md`](https://github.com/syntara-orchestration/syntara-ci/blob/main/backend.md) for backend pytest tests.
+   - [`playwright.md`](https://github.com/syntara-orchestration/syntara-ci/blob/main/playwright.md) for frontend Playwright tests.
+2. Add an H1 heading containing the complete test identifier, followed by a short explanation of the failure and why it is believed to be flaky.
+   - Backend identifiers use the full pytest node ID, such as `tests/e2e/workflows/test_wait_node.py::test_wait_node_zero_duration_fails`.
+   - Playwright identifiers use `file.spec.ts > Describe block > test name`.
+3. Open a pull request against `syntara-ci` and include a link to the failing check or other supporting evidence.
+
+The quarantine list is consumed by CI automatically. Quarantined tests continue to run and their results remain available for investigating the failure.
 
 Note that **quarantines should be applied sparingly**! Tests are intended to remain under quarantine temporarily. In the near future, quarantined tests beyond a certain age will be automatically deleted.
 
