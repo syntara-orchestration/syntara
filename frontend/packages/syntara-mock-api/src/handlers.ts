@@ -152,6 +152,15 @@ function getOrCreateVersionStore(workflowId: string, workflow: WorkflowWithVersi
 /** Mock seed data may use camelCase timestamps; API uses snake_case */
 type ApprovalTimestamps = Approval & { createdAt?: string; updatedAt?: string }
 
+/**
+ * created_by/updated_by are UserReference objects ({ id, name }); older
+ * fixtures may still carry a plain string. Return a sortable display name.
+ */
+function userReferenceName(value: { name?: string } | string | null | undefined): string {
+  if (!value) return ''
+  return typeof value === 'string' ? value : (value.name ?? '')
+}
+
 function approvalCreatedAt(a: Approval): string | undefined {
   const row = a as ApprovalTimestamps
   return row.created_at ?? row.createdAt
@@ -3013,8 +3022,8 @@ export const handlers = [
       const searchTerm = createdByContains.toLowerCase()
       resources = resources.filter((g) => {
         if (!g.created_by) return false
-        const creator = users.find((u) => u.id === g.created_by)
-        return creator?.username.toLowerCase().includes(searchTerm) ?? false
+        const creatorName = typeof g.created_by === 'string' ? g.created_by : g.created_by.name
+        return creatorName.toLowerCase().includes(searchTerm)
       })
     }
 
@@ -3042,8 +3051,8 @@ export const handlers = [
             bVal = b.updated_at ?? ''
             break
           case 'created_by':
-            aVal = a.created_by ?? ''
-            bVal = b.created_by ?? ''
+            aVal = userReferenceName(a.created_by)
+            bVal = userReferenceName(b.created_by)
             break
           default:
             aVal = a.name ?? ''

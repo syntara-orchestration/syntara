@@ -1,6 +1,6 @@
-import type * as AuthAPI from '@syntara/contracts/src/auth-api.js'
+import type * as UsersAPI from '@syntara/contracts/src/users-api.js'
 
-export type GroupRead = AuthAPI.components['schemas']['GroupRead']
+export type GroupRead = UsersAPI.components['schemas']['GroupRead']
 
 /** Maps user IDs to the group IDs they belong to */
 export const userGroupMemberships: Record<string, string[]> = {
