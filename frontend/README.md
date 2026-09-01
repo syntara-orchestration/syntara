@@ -219,6 +219,6 @@ We welcome contributions! Please read our [Contributing Guidelines](CONTRIBUTING
 - npm workspaces
 - Vite
 - TypeScript 5.9
-- ESLint 9 + Prettier
+- ESLint + Prettier
 - Vitest + React Testing Library
 - Podman/Docker with Nginx
