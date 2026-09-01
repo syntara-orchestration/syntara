@@ -308,8 +308,12 @@ class TestCheckApprovalLabel:
     def test_approval_label_only(self):
         assert check_breaking.check_approval_label('["breaking-change-approved"]') is True
 
-    def test_invalid_json_rejected(self):
-        assert check_breaking.check_approval_label("breaking-change-approved") is False
+    def test_invalid_json_fails_loudly(self):
+        # A bare (non-JSON) value almost always means a caller reverted to the
+        # old comma-joined format; fail loudly rather than silently "not
+        # approved", so the broken caller is caught immediately in CI.
+        with pytest.raises(SystemExit):
+            check_breaking.check_approval_label("breaking-change-approved")
 
     def test_non_list_json_rejected(self):
         assert check_breaking.check_approval_label('{"label": "breaking-change-approved"}') is False
@@ -989,6 +993,37 @@ class TestCheckBreakingChangesExitCodes:
         check_breaking.check_breaking_changes("a.yaml", "b.yaml")
         assert "--fail-on" in captured["cmd"]
         assert "ERR" in captured["cmd"]
+
+
+class TestGetChangelogEntries:
+    """get_changelog_entries handles empty/invalid/non-list oasdiff JSON.
+
+    The function's three defensive branches (empty stdout, unparseable JSON,
+    valid-but-non-list JSON) are otherwise only reached through the real-binary
+    integration tests, which skip when oasdiff is not installed.
+    """
+
+    def _patch_run(self, monkeypatch: pytest.MonkeyPatch, stdout: str) -> None:
+        def _fake_run(cmd: list[str], *, capture_output: bool = True) -> subprocess.CompletedProcess[str]:
+            return subprocess.CompletedProcess(cmd, 0, stdout, "")
+
+        monkeypatch.setattr(check_breaking, "run_command", _fake_run)
+
+    def test_empty_output_returns_empty_list(self, monkeypatch):
+        self._patch_run(monkeypatch, "")
+        assert check_breaking.get_changelog_entries("a.yaml", "b.yaml") == []
+
+    def test_invalid_json_returns_empty_list(self, monkeypatch):
+        self._patch_run(monkeypatch, "{not valid json")
+        assert check_breaking.get_changelog_entries("a.yaml", "b.yaml") == []
+
+    def test_non_list_json_returns_empty_list(self, monkeypatch):
+        self._patch_run(monkeypatch, '{"changes": []}')
+        assert check_breaking.get_changelog_entries("a.yaml", "b.yaml") == []
+
+    def test_valid_list_json_is_returned(self, monkeypatch):
+        self._patch_run(monkeypatch, '[{"id": "endpoint-added"}]')
+        assert check_breaking.get_changelog_entries("a.yaml", "b.yaml") == [{"id": "endpoint-added"}]
 
 
 class TestGetSpecFromGit:

@@ -294,8 +294,11 @@ def check_approval_label(pr_labels_json: str) -> bool:
         return False
     try:
         labels = json.loads(pr_labels_json)
-    except json.JSONDecodeError:
-        return False
+    except json.JSONDecodeError as exc:
+        # Fail loudly: a malformed value almost always means a caller reverted
+        # to the old comma-joined format. Silently returning False would hide
+        # that as a confusing "not approved" false-negative.
+        raise SystemExit(f"--pr-labels must be JSON-encoded, got: {pr_labels_json!r}") from exc
     return isinstance(labels, list) and BREAKING_CHANGE_APPROVED_LABEL in labels
 
 

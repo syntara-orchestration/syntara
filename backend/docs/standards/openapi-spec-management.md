@@ -122,7 +122,7 @@ CI accepts the override when the PR has the `breaking-change-approved` label, bu
 
 1. Create the label named exactly `breaking-change-approved`.
 2. When the label is added, the guard verifies the actor who added it is an active member of the `syntara-leads` team. If not, it **fails the check, removes the label, and posts a PR comment** explaining why.
-3. Team-membership lookups require an `read:org`-scoped token. Provision the `SYNTARA_LEADS_READ_TOKEN` secret (a fine-grained PAT or GitHub App token with organization **Members: read**). Without it the guard **fails closed** — it cannot confirm membership, so it removes the label and asks a lead to re-apply.
+3. Team-membership lookups require a `read:org`-scoped token. Provision the `SYNTARA_LEADS_READ_TOKEN` secret (a fine-grained PAT or GitHub App token with organization **Members: read**). If it is missing, the guard **fails closed by failing the workflow run itself** (a configuration error); it does not remove the label or post a comment in that case, so making it a required status check (see #5) is what actually blocks the merge.
 4. After a lead applies the label to a failed PR, the OpenAPI Breaking Changes workflow re-runs on `labeled` / `unlabeled`. Re-run **(Backend) Check OpenAPI Breaking Changes** if that required check still shows the pre-label failure.
 5. Make **Breaking Change Label Guard** a required status check so an unauthorized label cannot merge during the window before the OpenAPI job re-runs.
 

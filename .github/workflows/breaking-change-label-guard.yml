@@ -22,9 +22,13 @@ on:
   #
   # opened/synchronize/reopened are included so this workflow reports a check
   # result on every PR (the job's `if:` skips them, and GitHub treats a skipped
-  # required check as satisfied). That lets it be made a **required** status
-  # check, closing the TOCTOU window where the OpenAPI gate could pass on a
-  # label this guard is concurrently removing.
+  # required check as satisfied). This lets it be made a **required** status
+  # check. That required-check configuration is what closes the TOCTOU window
+  # where the OpenAPI gate could pass on a label this guard is concurrently
+  # removing. It is a manual branch-protection setting on `devel` (see the
+  # repo-admin action items on the PR) and cannot be verified from this workflow
+  # file; until it is in place, the guard still removes an unauthorized label,
+  # but asynchronously (best effort) rather than blocking the merge.
   pull_request_target:
     types: [opened, synchronize, reopened, labeled]
 

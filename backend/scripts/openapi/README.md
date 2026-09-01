@@ -211,7 +211,7 @@ make check-openapi-contracts
 ./scripts/openapi/check-breaking-changes.py \
   --base devel \
   --head HEAD \
-  --pr-labels "breaking-change-approved" \
+  --pr-labels '["breaking-change-approved"]' \
   --output /tmp/breaking-results.json
 
 # 3. Check contract regeneration
