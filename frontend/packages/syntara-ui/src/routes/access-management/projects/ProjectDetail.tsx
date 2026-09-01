@@ -207,7 +207,7 @@ export function ProjectDetail() {
 
   if (!projectData) return null
 
-  const projectCrumbs = breadcrumbsProjectDetail(projectData.name, basePath, activeTab)
+  const projectCrumbs = breadcrumbsProjectDetail(projectData.name)
 
   return (
     <SynPage>

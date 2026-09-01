@@ -183,10 +183,6 @@ function TabContent({
 const GROUP_MAPPING_TAB = 'group-mapping' as const
 type TabKey = 'details' | typeof GROUP_MAPPING_TAB
 
-function identityProviderDetailBreadcrumbTrail(provider: ProviderData, idpDetailBasePath: string, activeTab: TabKey) {
-  return breadcrumbsIdentityProviderDetail(provider.name ?? 'Identity provider', idpDetailBasePath, activeTab)
-}
-
 function IdentityProviderDetailEarlyLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <SynPage>
@@ -420,7 +416,7 @@ export function IdentityProviderDetail() {
 
   if (!providerData) return null
 
-  const idpDetailCrumbs = identityProviderDetailBreadcrumbTrail(providerData, idpDetailBasePath, activeTab)
+  const idpDetailCrumbs = breadcrumbsIdentityProviderDetail(providerData.name ?? 'Identity provider')
 
   const config = providerData.configuration
   const idpType = config?.idp_type
