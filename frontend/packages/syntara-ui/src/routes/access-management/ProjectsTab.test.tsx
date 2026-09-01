@@ -129,6 +129,12 @@ function setupMocks(projects = mockProjects) {
   } as never)
 }
 
+const DELETE_PROJECT_LABEL = 'Delete project'
+
+function findDeleteOption() {
+  return screen.findByRole('menuitem', { name: DELETE_PROJECT_LABEL })
+}
+
 describe('ProjectsTab', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -311,7 +317,7 @@ describe('ProjectsTab', () => {
       const actionButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(actionButtons[0])
 
-      const deleteOption = await screen.findByRole('menuitem', { name: /delete/i })
+      const deleteOption = await findDeleteOption()
       await user.click(deleteOption)
 
       await waitFor(() => {
@@ -336,7 +342,7 @@ describe('ProjectsTab', () => {
 
       const actionButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(actionButtons[1])
-      const deleteOption = await screen.findByRole('menuitem', { name: /delete/i })
+      const deleteOption = await findDeleteOption()
       await user.click(deleteOption)
 
       const dialog = await screen.findByRole('dialog')
@@ -359,7 +365,7 @@ describe('ProjectsTab', () => {
 
       const actionButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(actionButtons[0])
-      const deleteOption = await screen.findByRole('menuitem', { name: /delete/i })
+      const deleteOption = await findDeleteOption()
       await user.click(deleteOption)
 
       const deleteButton = await screen.findByRole('button', { name: 'Delete' })
@@ -386,7 +392,7 @@ describe('ProjectsTab', () => {
 
       const actionButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(actionButtons[0])
-      const deleteOption = await screen.findByRole('menuitem', { name: /delete/i })
+      const deleteOption = await findDeleteOption()
       await user.click(deleteOption)
 
       await user.click(screen.getByRole('checkbox'))
@@ -417,7 +423,7 @@ describe('ProjectsTab', () => {
 
       const actionButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(actionButtons[0])
-      const deleteOption = await screen.findByRole('menuitem', { name: /delete/i })
+      const deleteOption = await findDeleteOption()
       await user.click(deleteOption)
 
       await user.click(screen.getByRole('checkbox'))
@@ -444,7 +450,7 @@ describe('ProjectsTab', () => {
 
       const actionButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(actionButtons[0])
-      const deleteOption = await screen.findByRole('menuitem', { name: /delete/i })
+      const deleteOption = await findDeleteOption()
       await user.click(deleteOption)
 
       await waitFor(() => {
