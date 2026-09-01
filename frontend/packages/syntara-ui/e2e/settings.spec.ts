@@ -70,10 +70,7 @@ async function resetSingleSetting(app: Page, settingName: string) {
     return
   }
   await resetItem.click()
-  const saveBtn = app.getByRole('button', { name: 'Save changes' })
-  await expect(saveBtn).toBeEnabled()
-  await saveBtn.click()
-  await expect(saveBtn).toBeDisabled({ timeout: 5000 })
+  await saveSettingsChanges(app)
 }
 
 /** Save dirty settings and wait until the bulk PATCH succeeds. */
@@ -228,10 +225,7 @@ test.describe('Settings', () => {
       await expect(toggle).toBeChecked()
     }
 
-    const saveBtn = app.getByRole('button', { name: 'Save changes' })
-    await expect(saveBtn).toBeEnabled()
-    await saveBtn.click()
-    await expect(saveBtn).toBeDisabled({ timeout: 5000 })
+    await saveSettingsChanges(app)
   })
 
   test('reset single setting via kebab menu', async ({ app }) => {
@@ -399,19 +393,18 @@ test.describe('Settings', () => {
     await expect(toggle).toBeVisible({ timeout: 5000 })
 
     try {
-      // Open dropdown and select DEBUG
       await toggle.click()
-      await app.getByRole('option', { name: 'DEBUG' }).click()
+      const debugOption = app.getByRole('option', { name: 'DEBUG' })
+      await expect(debugOption).toBeVisible()
+      await debugOption.click()
+      await expect(toggle).toContainText('DEBUG')
 
-      // Save
-      const saveButton = app.getByRole('button', { name: 'Save changes' })
-      await expect(saveButton).toBeEnabled()
-      await saveButton.click()
-      await expect(saveButton).toBeDisabled({ timeout: 5000 })
+      await saveSettingsChanges(app)
 
-      // Reload and verify persisted
       await goToSystem(app)
-      await expect(app.getByRole('button', { name: 'System Log Level', exact: true })).toContainText('DEBUG')
+      await expect(app.getByRole('button', { name: 'System Log Level', exact: true })).toContainText('DEBUG', {
+        timeout: 10_000,
+      })
     } finally {
       await goToSystem(app)
       await resetSingleSetting(app, 'System Log Level')
@@ -438,11 +431,7 @@ test.describe('Settings', () => {
       await input.fill('test-item')
       await input.press('Enter')
 
-      // Save
-      const saveButton = app.getByRole('button', { name: 'Save changes' })
-      await expect(saveButton).toBeEnabled()
-      await saveButton.click()
-      await expect(saveButton).toBeDisabled({ timeout: 5000 })
+      await saveSettingsChanges(app)
 
       // Reload and verify persisted
       await goToContextManager(app)
@@ -506,11 +495,7 @@ test.describe('Settings', () => {
     // Verify setting reverted to default
     await expect(input).toHaveValue(originalValue)
 
-    // Save the reset
-    const saveBtn = app.getByRole('button', { name: 'Save changes' })
-    await expect(saveBtn).toBeEnabled()
-    await saveBtn.click()
-    await expect(saveBtn).toBeDisabled({ timeout: 5000 })
+    await saveSettingsChanges(app)
   })
 
   test('version conflict handling', async ({ app }) => {
@@ -565,10 +550,7 @@ test.describe('Settings', () => {
 
       // Increment and save via UI
       await formGroup.getByRole('button', { name: /plus/i }).click()
-      const saveBtn = app.getByRole('button', { name: 'Save changes' })
-      await expect(saveBtn).toBeEnabled()
-      await saveBtn.click()
-      await expect(saveBtn).toBeDisabled({ timeout: 5000 })
+      await saveSettingsChanges(app)
 
       // Query API again — version should be incremented
       const afterResponse = await apiRequest(app, 'get', '/settings/context_manager.compression_loop')
@@ -598,11 +580,7 @@ test.describe('Settings', () => {
         await expect(localLoginToggle).toBeChecked()
       }
 
-      const saveButton = app.getByRole('button', { name: 'Save changes' })
-      await expect(saveButton).toBeEnabled()
-      await saveButton.click()
-      // Save stays disabled after success (no remaining edits); do not wait for it to re-enable.
-      await expect(saveButton).toBeDisabled({ timeout: 10_000 })
+      await saveSettingsChanges(app)
 
       await goToAuthentication(app)
       const reloadedToggle = app.locator('[id="authentication.local_login_enabled"]').locator('..').getByRole('switch')
