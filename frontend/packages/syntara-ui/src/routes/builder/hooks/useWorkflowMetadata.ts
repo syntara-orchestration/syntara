@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 
+import { userReferenceName } from '../../../utils/userReference'
 import type { WorkflowMetadata } from '../types/workflowMetadata'
 
 type WorkflowLike = {
@@ -19,7 +20,7 @@ export function useWorkflowMetadata(workflow: WorkflowLike | undefined): Workflo
       id: workflow.id ?? '',
       version: workflow.current_version ?? workflow.version?.version ?? 0,
       published: workflow.published_version_id != null,
-      author: typeof workflow.created_by === 'string' ? workflow.created_by : 'Unknown',
+      author: userReferenceName(workflow.created_by) ?? 'Unknown',
     }
   }, [workflow])
 }
