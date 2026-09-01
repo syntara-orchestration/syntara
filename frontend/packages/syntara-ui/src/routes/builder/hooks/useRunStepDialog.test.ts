@@ -214,18 +214,18 @@ describe('useRunStepDialog', () => {
       expect(mockDialogOpen).toHaveBeenCalled()
     })
 
-    it('skips form submit when no step editor form is in the DOM', async () => {
-      vi.spyOn(document, 'querySelector').mockReturnValue(null)
+    it('opens dialog after guardedSaveWorkflow succeeds', async () => {
       mockGetNode.mockReturnValue({ id: 'node-1', data: { name: 'Step' } })
+      const handleSaveWorkflow = vi.fn().mockResolvedValue(true)
 
-      const { result } = renderRunStepDialog()
+      const { result } = renderRunStepDialog(handleSaveWorkflow)
 
       await act(async () => {
         await result.current.handleRunStep('node-1')
       })
 
+      expect(handleSaveWorkflow).toHaveBeenCalledTimes(1)
       expect(mockDialogOpen).toHaveBeenCalled()
-      vi.restoreAllMocks()
     })
 
     it('passes edges and nodes to getAncestorNodes', async () => {
