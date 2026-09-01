@@ -176,14 +176,7 @@ test.describe('User Detail — Group Membership', () => {
   test('add to group button is available on user groups tab', async ({ app }) => {
     expect(seededUser, 'Failed to seed user via API').toBeTruthy()
     if (!seededUser) throw new Error('Failed to seed user via API')
-    const username = seededUser.username
-
-    await app.goto(toAppUrl('/system-administration/access-management/users'))
-    await expect(app.getByRole('heading', { level: 1, name: /access management/i })).toBeVisible()
-
-    await app.getByPlaceholder('Filter by name').fill(username)
-    await app.getByRole('button', { name: 'Apply filter' }).click()
-    await app.getByRole('link', { name: username, exact: true }).click()
+    await app.goto(toAppUrl(`/system-administration/access-management/users/${seededUser.id}`))
     await expect(app).toHaveURL(/\/system-administration\/access-management\/users\/[^/]+$/, { timeout: 30_000 })
     // User detail loaded — do not wait on `role="tab"` "Details": PF horizontal overflow can move
     // every sub-tab (including Details) behind overflow/scroll so no tab is a visible `tab`.

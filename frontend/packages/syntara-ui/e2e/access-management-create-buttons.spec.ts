@@ -32,11 +32,14 @@ let seededRole: SeededRole | null = null
 
 test.beforeAll(async ({ browser }) => {
   const page = await browser.newPage()
-  const token = await getAuthToken(page)
-  if (!token) throw new Error('access-management-create-buttons beforeAll: could not obtain auth token')
-  const prefix = buildUniqueName('e2e-amb')
-  seededRole = await createRoleViaApi(page, { name: `${prefix}-role`, token })
-  await page.close()
+  try {
+    const token = await getAuthToken(page)
+    if (!token) throw new Error('access-management-create-buttons beforeAll: could not obtain auth token')
+    const prefix = buildUniqueName('e2e-amb')
+    seededRole = await createRoleViaApi(page, { name: `${prefix}-role`, token })
+  } finally {
+    await page.close()
+  }
 })
 
 test.afterAll(async ({ browser }) => {

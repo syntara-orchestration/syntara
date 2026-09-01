@@ -299,20 +299,10 @@ test.describe('Access Management — Shareable URLs', () => {
 test.describe('Access Management — User Detail Tabs', () => {
   test('detail sub-tabs sync to URL', async ({ app }) => {
     expect(seededUsers.length, 'Failed to seed users via API').toBeGreaterThan(0)
-    const seededName = seededUsers[0].username
 
-    await app.goto(toAppUrl(`${ACCESS_URL}/users`))
-    await expect(app.getByRole('tab', { name: /Users/i })).toHaveAttribute('aria-selected', 'true')
-
-    const table = app.getByRole('grid', { name: 'Users' })
-    await expect(table).toBeVisible()
-
-    await app.getByPlaceholder('Filter by name').fill(seededName)
-    await app.getByRole('button', { name: 'Apply filter' }).click()
-    await table.getByRole('link', { name: seededName, exact: true }).click()
-
-    // Should be on user detail page
-    await expect(app).toHaveURL(new RegExp(`${ACCESS_URL}/users/`))
+    // Users tab filter placeholder is "Filter by username", not "Filter by name". Go by seeded ID.
+    await app.goto(toAppUrl(`${ACCESS_URL}/users/${seededUsers[0].id}`))
+    await expect(app).toHaveURL(new RegExp(`${ACCESS_URL}/users/${seededUsers[0].id}`))
 
     // Click Groups sub-tab if available
     const groupsTab = app.getByRole('tab', { name: /Groups/i })

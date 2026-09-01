@@ -17,7 +17,7 @@ test.beforeAll(async ({ browser }) => {
     if (!token) throw new Error('integration-filtering beforeAll: could not obtain auth token')
     seedPrefix = buildUniqueName('e2e-intfilt')
     for (let i = 1; i <= 22; i++) {
-      const name = `${seedPrefix}-${i}`
+      const name = `${seedPrefix}-${String(i).padStart(2, '0')}`
       seededIntegrations.push(await createIntegrationViaApi(page, { name, token }))
     }
   } finally {
@@ -70,7 +70,7 @@ test.describe('Integration Filtering', () => {
     await expect(nameChipGroup.getByText(seededName)).toBeVisible()
     await expect(app).toHaveURL(nameContainsUrl(seededName))
 
-    await expect(table.getByRole('row', { name: seededName })).toBeVisible({ timeout: 15_000 })
+    await expect(table.getByRole('link', { name: seededName, exact: true })).toBeVisible({ timeout: 15_000 })
   })
 
   test('name filter: apply and clear name filter', async ({ app }) => {

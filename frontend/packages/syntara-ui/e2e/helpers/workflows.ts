@@ -68,8 +68,8 @@ export async function clickAddConnectedStep(page: Page) {
   await expect(addBtn).not.toHaveCount(0, { timeout: 25_000 })
   await expect(async () => {
     if ((await addBtn.count()) === 0) await revealConnectedStepButtons(page)
-    // Approval/condition/loop nodes render one stub per port; prefer the happy-path handle.
-    const port = page.getByTestId(/add-node-button-(approved|true|iterate)/)
+    // Prefer a unique happy-path stub (includes linear `source` so unused `false` is not clicked).
+    const port = page.getByTestId(/add-node-button-(approved|true|iterate|source)/)
     await ((await port.count()) === 1 ? port : addBtn).click({ force: true, timeout: 5_000 })
     await expect(addNodePanel(page)).toHaveCount(1)
   }).toPass({ timeout: 15_000, intervals: [500, 1_000] })
