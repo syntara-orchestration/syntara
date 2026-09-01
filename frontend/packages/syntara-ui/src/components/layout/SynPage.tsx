@@ -29,6 +29,9 @@ export type SynPageBodyProps = Omit<StackItemProps, 'isFilled' | 'children'> & {
  * For the same flex behavior **inside** a nested `Stack` (e.g. builder side panels), prefer
  * `StackItem` + `isFilled` + `className={styles.main}` from `./SynPage.module.css` so the slot
  * is not misread as a page-level `SynPage` child.
+ *
+ * To stack multiple `SynPanel`s in this body (canvas + details), use `SynPanelStack` instead of
+ * wrapping them in `overflow: hidden`.
  */
 export function SynPageBody({ children, className, style, isCentered, ...rest }: SynPageBodyProps) {
   const mergedClass = [styles.main, className].filter(Boolean).join(' ')
