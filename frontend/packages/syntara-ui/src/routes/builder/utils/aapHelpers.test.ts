@@ -9,6 +9,7 @@ import {
   buildExpressionModeActivity,
   buildWorkflowExpressionModeActivity,
   hasExpressionValue,
+  isJobTemplateInputVariablesMode,
   validateJobTemplateId,
   validateWorkflowTemplateId,
 } from './aapHelpers'
@@ -169,6 +170,11 @@ describe('buildAAPConfig', () => {
     expect(result?.tags).toBeUndefined()
   })
 
+  it('includes useInputVariables when the toggle is on', () => {
+    const result = buildAAPConfig(makeFormData({ use_input_variables: true }))
+    expect(result?.useInputVariables).toBe(true)
+  })
+
   it('includes credentialId when set', () => {
     const result = buildAAPConfig(makeFormData({ credential_id: 'cred-123' }))
     expect(result?.credentialId).toBe('cred-123')
@@ -230,6 +236,27 @@ describe('buildExpressionModeActivity', () => {
     expect(activity.parameters.job_template_name).toBe('${trigger.template}')
     expect(activity.parameters.organization_name).toBe('${trigger.org}')
     expect(activity.parameters).not.toHaveProperty('job_template_id')
+  })
+
+  it('persists use_input_variables without a job template id', () => {
+    const activity = buildExpressionModeActivity('node-1', 'AAP Job', makeFormData({ use_input_variables: true }))
+
+    expect(activity.parameters.use_input_variables).toBe(true)
+    expect(activity.parameters).not.toHaveProperty('job_template_id')
+  })
+})
+
+describe('isJobTemplateInputVariablesMode', () => {
+  it('returns true when use_input_variables is set without expressions', () => {
+    expect(isJobTemplateInputVariablesMode(makeFormData({ use_input_variables: true }))).toBe(true)
+  })
+
+  it('returns true when organization or template contains an expression', () => {
+    expect(isJobTemplateInputVariablesMode(makeFormData({ job_template_name: '${inputs.jt}' }))).toBe(true)
+  })
+
+  it('returns false when toggle is off and names have no expressions', () => {
+    expect(isJobTemplateInputVariablesMode(makeFormData({ job_template_name: 'Deploy' }))).toBe(false)
   })
 })
 

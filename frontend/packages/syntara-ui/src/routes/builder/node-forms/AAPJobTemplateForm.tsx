@@ -52,18 +52,7 @@ function AAPFormFields({
   const isVersionView = useIsVersionView()
   const { register, setValue, getValues } = useFormContext<AAPJobTemplateFormData>()
 
-  // Auto-detect expression mode from saved input-variable values, including extra_vars
-  const hasExpressionInInitialData = hasExpressionValue(
-    initialData?.organization_name,
-    initialData?.job_template_name,
-    initialData?.inventory_name,
-    initialData?.limit,
-    initialData?.tags,
-    initialData?.skip_tags,
-    initialData?.extra_vars
-  )
-
-  const [expressionMode, setExpressionMode] = useState(hasExpressionInInitialData)
+  const expressionMode = Boolean(useWatch({ name: 'use_input_variables' }))
 
   const browser = useAAPBrowser(
     selectedCredentialId,
@@ -115,7 +104,9 @@ function AAPFormFields({
             id="aap-expression-mode"
             aria-label="Use input variables"
             isChecked={expressionMode}
-            onChange={(_e, checked) => setExpressionMode(checked)}
+            onChange={(_e, checked) =>
+              setValue('use_input_variables', checked, { shouldDirty: true, shouldValidate: true })
+            }
             isDisabled={isVersionView}
           />
         </FormGroup>
@@ -274,6 +265,17 @@ export function AAPJobTemplateForm(props: Readonly<AAPNodeFormProps>) {
     diff_mode: false,
     settings: {},
     ...sanitizedInitialData,
+    use_input_variables:
+      sanitizedInitialData?.use_input_variables === true ||
+      hasExpressionValue(
+        sanitizedInitialData?.organization_name,
+        sanitizedInitialData?.job_template_name,
+        sanitizedInitialData?.inventory_name,
+        sanitizedInitialData?.limit,
+        sanitizedInitialData?.tags,
+        sanitizedInitialData?.skip_tags,
+        sanitizedInitialData?.extra_vars
+      ),
   }
 
   const methods = useForm<AAPJobTemplateFormData>({

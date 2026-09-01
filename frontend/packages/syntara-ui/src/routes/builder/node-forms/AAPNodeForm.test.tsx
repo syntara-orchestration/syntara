@@ -628,6 +628,27 @@ describe('AAPNodeForm', () => {
       expect(screen.getByPlaceholderText('skip tags or drag expression')).toHaveValue('${inputs.skip_tags}')
     })
 
+    it('persists use_input_variables when the toggle is on without expressions', async () => {
+      const user = userEvent.setup()
+      renderWithHeader(<AAPNodeForm onSubmit={mockOnSubmit} onCancel={vi.fn()} />)
+
+      await user.click(screen.getByRole('switch', { name: 'Use input variables' }))
+      await submitForm()
+
+      await waitFor(() => {
+        expect(mockOnSubmit).toHaveBeenCalledWith(expect.objectContaining({ use_input_variables: true }))
+      })
+    })
+
+    it('enables the toggle from persisted use_input_variables without expressions', () => {
+      renderWithHeader(
+        <AAPNodeForm onSubmit={mockOnSubmit} onCancel={vi.fn()} initialData={{ use_input_variables: true }} />
+      )
+
+      expect(screen.getByRole('switch', { name: 'Use input variables' })).toBeChecked()
+      expect(screen.getByPlaceholderText('{"key": "value"} or drag expression')).toBeVisible()
+    })
+
     it('does not enable the toggle for extra_vars without expressions', () => {
       renderWithHeader(
         <AAPNodeForm
