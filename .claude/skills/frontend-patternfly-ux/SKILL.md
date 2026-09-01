@@ -161,6 +161,7 @@ Every page **must** follow this structural hierarchy:
 | Page Header        | `SynPageHeader`              | Page title and actions                   |
 | Content Frame      | `SynPanel`                   | `Panel` → `PanelMain` → `PanelMainBody`  |
 | Content Stack      | `SynPanelContentStack`       | Full-height flex column inside `SynPanel` |
+| Panel stack        | `SynPanelStack`              | Sibling `SynPanel`s; do not use `overflow: hidden` |
 | Main Content       | Table / Canvas / Form       | Primary page content                     |
 | Footer (on tables) | `PaginationFooter`          | Navigation between table pages           |
 
@@ -179,9 +180,17 @@ Use `SynPanelContentStack` (from `frontend/packages/syntara-ui/src/components/la
 | `default` | Standard full-height panel content                                  |
 | `inset`   | List pages with horizontal inset (workflows, executions, approvals) |
 
+### Stacked Panels
+
+Use `SynPanelStack` + `SynPanelStackItem` when a page body has more than one `SynPanel` stacked vertically (execution detail canvas + run details, builder canvas + most recent run).
+
+- Do not wrap those panels in `overflow: hidden`. That clips PatternFly `box-shadow`.
+- `SynPanelStack` keeps `min-height: 0` and forces `overflow: visible`. Clip inside each panel (scrollable `PanelMain`, React Flow), not on ancestor slots.
+- Use `SynPanelStackItem isFilled` for the flexible pane and a sized `SynPanelStackItem` for a fixed pane.
+
 ### Page Layout Archetypes
 
-The following four compositions are the canonical page structures. Storybook documents each as a composed story under `SynPage`.
+The following compositions are the canonical page structures. Storybook documents each as a composed story under `SynPage`.
 
 | Archetype          | Structure                                                                                                                        |
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
@@ -189,6 +198,7 @@ The following four compositions are the canonical page structures. Storybook doc
 | **Detail page**    | `SynPageBreadcrumbs` → `SynPageHeader` → `SynPanel isFullHeight` → `SynPanelContentStack` (default) → tabs + content                 |
 | **Form page**      | `SynPageBreadcrumbs` → `SynPageHeader` → `SynPanel isFullHeight footer={<ActionGroup>…</ActionGroup>}` → form body (max-width 600px) |
 | **Error in panel** | Same shell as list page → `SynPageBody isCentered` + `SynErrorState` **inside** `SynPanel` (page header and shell remain visible)   |
+| **Stacked panels** | `SynPageHeader` → `SynPageBody` → `SynPanelStack` → filled canvas item + sized details item. Do not use `overflow: hidden` on the stack. |
 
 ### Sticky Form Footer
 
@@ -273,7 +283,7 @@ For live examples and story-driven documentation, use the Storybook MCP:
 
 ```
 list-all-documentation → find "SynUrlTabs" / "SynPage" / "SynPageHeader" / "SynPanel" /
-"SynPageBreadcrumbs" / "SynConfirmationDialog" / "SynDetailList" / "SynCodeBlock" → get-documentation(...)
+"SynPanelStack" / "SynPageBreadcrumbs" / "SynConfirmationDialog" / "SynDetailList" / "SynCodeBlock" → get-documentation(...)
 ```
 
 ---
@@ -496,6 +506,7 @@ When building or reviewing any page, verify every item:
 - [ ] Uses `SynPageHeader` for title and actions
 - [ ] Uses `StackItem isFilled` + `SynPanel isFullHeight` for content
 - [ ] Uses `SynPanelContentStack` for the main content column inside `SynPanel`
+- [ ] Stacks sibling `SynPanel`s with `SynPanelStack` (never `overflow: hidden` on that wrapper)
 - [ ] Loading / empty states use `SynPageBody isCentered`
 - [ ] Inner content has consistent padding
 
@@ -1767,6 +1778,7 @@ The canvas layout engine uses unified spacing constants shared between auto-layo
 
 - The **run details panel** provides an Overview/Details toggle for inspecting execution state
 - Panels use `SynPanel isFullHeight` for proper internal scroll behavior — do not hand-roll `display: flex; flexDirection: column` inline styles when `isFullHeight` exists
+- Stack canvas + run-details with `SynPanelStack` / `SynPanelStackItem`. Never wrap sibling `SynPanel`s in `overflow: hidden` (clips card `box-shadow`)
 - Panels may use a `ResizableDivider` to allow users to resize panel split areas
 - The most recent run details can display inline in the editor after workflow execution
 - **Activity filtering:** The execution details panel includes a `FilterBar` toolbar (role="search", aria-label="Filters") for filtering activities by name. Filter state persists across Overview/Details tab switches. When no activities match, show `SynEmptyStateFilter` with a "Clear all filters" button.
@@ -1965,7 +1977,7 @@ The project ships with Storybook for documenting and reviewing `Syn*` components
 - **Light and dark mode:** Preview components in both themes via the Storybook toolbar (System / Light / Dark) before sign-off
 - **Composed stories over isolated demos:** Stories should reflect real app compositions (e.g., a full list page layout), not isolated prop playgrounds
 - **Autodocs:** Foundational `Syn*` components have `autodocs` enabled — browse auto-generated API docs alongside live examples
-- **Available stories:** `SynPage`, `SynPageHeader`, `SynPageBreadcrumbs`, `SynPanel`, `SynPanelContentStack`, `SynUrlTabs`, `SynConfirmationDialog`, `SynCodeBlock`, `SynDetail`, `SynDetailList`, `SynErrorState`, `SynLoadingState`, `SynEmptyStateNoData`, `SynEmptyStateFilter`, `SynEmptyStateServiceUnavailable`, `SynListPanel`, `SynKebabMenu`, `SynLabel`, `SynUserTag`, `SynScrollableTableContainer`
+- **Available stories:** `SynPage`, `SynPageHeader`, `SynPageBreadcrumbs`, `SynPanel`, `SynPanelContentStack`, `SynPanelStack`, `SynUrlTabs`, `SynConfirmationDialog`, `SynCodeBlock`, `SynDetail`, `SynDetailList`, `SynErrorState`, `SynLoadingState`, `SynEmptyStateNoData`, `SynEmptyStateFilter`, `SynEmptyStateServiceUnavailable`, `SynListPanel`, `SynKebabMenu`, `SynLabel`, `SynUserTag`, `SynScrollableTableContainer`
 
 ---
 

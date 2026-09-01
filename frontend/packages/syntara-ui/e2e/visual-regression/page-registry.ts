@@ -270,7 +270,7 @@ export const pages: PageEntry[] = [
     name: 'user-create',
     path: AppRoute.AccessManagement.CreateUser,
     waitFor: async (page) => {
-      await expect(page.getByRole('heading', { name: 'Create User' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Create user' })).toBeVisible()
     },
   },
   {
@@ -286,7 +286,7 @@ export const pages: PageEntry[] = [
     name: 'user-edit',
     path: AppRoute.AccessManagement.EditUser.replace(':userId', MOCK_USER_ID),
     waitFor: async (page) => {
-      await expect(page.getByRole('heading', { name: 'Edit User' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Edit Demo Admin' })).toBeVisible()
     },
   },
 
