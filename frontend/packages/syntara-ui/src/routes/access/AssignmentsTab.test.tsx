@@ -573,7 +573,7 @@ describe('AssignmentsTab', () => {
       setupAssignmentsQuery(sampleAssignments)
     })
 
-    it('shows the delete modal with Remove and Cancel buttons', async () => {
+    it('shows the delete modal with Delete assignment and Cancel buttons', async () => {
       const user = userEvent.setup()
       render(<AssignmentsTab />, { wrapper })
 
