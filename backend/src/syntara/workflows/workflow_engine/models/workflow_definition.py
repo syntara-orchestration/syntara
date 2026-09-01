@@ -337,7 +337,6 @@ class ScriptExecutorParameters(TemplateAwareBaseModel):
     language: ScriptLanguage
     code: str = Field(min_length=1, description="Script code to execute")
     environment: dict[str, str] = Field(default_factory=dict, description="Environment variables")
-    credential_id: str | None = Field(default=None, description="Orchestrator credential UUID for credential scrubbing")
 
     @field_validator("environment", mode="before")
     @classmethod
