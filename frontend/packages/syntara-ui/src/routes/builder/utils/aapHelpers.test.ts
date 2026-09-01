@@ -240,6 +240,11 @@ describe('hasExpressionValue', () => {
     expect(hasExpressionValue(undefined, '${expr}', 'test')).toBe(true)
   })
 
+  it('returns true for extra_vars JSON that embeds ${ expressions', () => {
+    expect(hasExpressionValue(undefined, undefined, '{"app_version": "${inputs.version}"}')).toBe(true)
+    expect(hasExpressionValue(JSON.stringify({ app_version: '${inputs.version}' }, null, 2))).toBe(true)
+  })
+
   it('returns false when no values contain ${', () => {
     expect(hasExpressionValue('normal', 'text')).toBe(false)
     expect(hasExpressionValue(undefined, undefined)).toBe(false)

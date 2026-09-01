@@ -8,9 +8,10 @@ import { detachPromise } from '../../../utils/detachPromise'
 import { AAPIntegrationSection } from '../components/AAPIntegrationSection'
 import type { ExpandableCodeEditorHandle } from '../components/ExpandableCodeEditor'
 import { NodeEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useNodeEditorAutoSubmit'
+import { hasExpressionValue } from '../utils/aapHelpers'
 import { useIsVersionView } from '../VersionViewContext'
 
-import { applyDefaultValues, isExpression, sanitizeArrayField } from './aapFormHelpers'
+import { applyDefaultValues, sanitizeArrayField } from './aapFormHelpers'
 import { aapJobTemplateSchema, type AAPJobTemplateFormData } from './aapJobTemplateSchema'
 import { PromptOnLaunchFields } from './AAPPromptOnLaunchFields'
 import { AAPResourcePickers } from './AAPResourcePickers'
@@ -51,12 +52,16 @@ function AAPFormFields({
   const isVersionView = useIsVersionView()
   const { register, setValue, getValues } = useFormContext<AAPJobTemplateFormData>()
 
-  // Auto-detect expression mode from initial data
-  const hasExpressionInInitialData =
-    isExpression(initialData?.organization_name) ||
-    isExpression(initialData?.job_template_name) ||
-    isExpression(initialData?.inventory_name) ||
-    isExpression(initialData?.limit)
+  // Auto-detect expression mode from saved input-variable values, including extra_vars
+  const hasExpressionInInitialData = hasExpressionValue(
+    initialData?.organization_name,
+    initialData?.job_template_name,
+    initialData?.inventory_name,
+    initialData?.limit,
+    initialData?.tags,
+    initialData?.skip_tags,
+    initialData?.extra_vars
+  )
 
   const [expressionMode, setExpressionMode] = useState(hasExpressionInInitialData)
 
