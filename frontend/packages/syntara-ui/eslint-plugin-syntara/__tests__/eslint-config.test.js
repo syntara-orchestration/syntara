@@ -3,12 +3,14 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const packageDirectory = process.cwd()
+// Load the package's real ESLint configuration. The test does not copy or recreate its rules.
 const eslint = new ESLint({
   cwd: packageDirectory,
   overrideConfigFile: resolve(packageDirectory, 'eslint.config.js'),
 })
 
 async function lintStory(code) {
+  // lintText uses in-memory source, while filePath applies the real Storybook file-glob config.
   return eslint.lintText(code, {
     filePath: 'src/components/layout/SynPanelStack.stories.tsx',
   })
@@ -22,6 +24,7 @@ describe('ESLint Storybook import restrictions', () => {
       expect.arrayContaining([
         expect.objectContaining({
           ruleId: '@typescript-eslint/no-restricted-imports',
+          severity: 2,
           message: expect.stringContaining('Use @storybook/tanstack-react'),
         }),
       ])
@@ -35,6 +38,7 @@ describe('ESLint Storybook import restrictions', () => {
       expect.arrayContaining([
         expect.objectContaining({
           ruleId: 'no-restricted-imports',
+          severity: 1,
           message: expect.stringContaining('Use RhUi* icons'),
         }),
       ])
