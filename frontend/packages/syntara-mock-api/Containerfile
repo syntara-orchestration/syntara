@@ -12,7 +12,7 @@ COPY packages/syntara-contracts/package*.json ./packages/syntara-contracts/
 COPY packages/syntara-mock-api/package*.json ./packages/syntara-mock-api/
 
 # Install dependencies
-RUN npm ci --no-fund --no-audit --ignore-scripts
+RUN npm ci --no-fund --ignore-scripts
 
 # Copy source files
 COPY packages/syntara-contracts ./packages/syntara-contracts
