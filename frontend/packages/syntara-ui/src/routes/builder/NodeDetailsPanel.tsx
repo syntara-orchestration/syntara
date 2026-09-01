@@ -12,6 +12,7 @@ import type { Node } from '@xyflow/react'
 import type { ReactNode } from 'react'
 import { useState } from 'react'
 
+import { NodeMenu } from '../../components/nodes/NodeMenu'
 import { FlowNodeType, RegistryNodeId } from '../../constants'
 import { useAlerts } from '../../providers/alerts'
 import {
@@ -23,7 +24,6 @@ import {
   type ActivityMetadata,
 } from '../../stores/useWorkflowStore'
 import { parseTriggerIndex } from '../../utils/triggerNodeIds'
-import { NodeMenu } from '../workflows/canvas/nodes/common/NodeMenu'
 import {
   MenuNodeType,
   type MenuNodeTypeUnion,
