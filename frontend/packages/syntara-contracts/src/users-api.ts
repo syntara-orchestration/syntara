@@ -1153,8 +1153,9 @@ export interface components {
     /**
      * UserReference
      * @description Minimal user identification for embedding in other resources.
-     *     This model captures user identity at the time of an action, providing
-     *     a snapshot that doesn't change even if the user's details are updated later.
+     *     The name is resolved from the database when the response is built, not
+     *     stored alongside the id, so it always reflects the principal's current
+     *     name. Renaming a user therefore changes the name shown for their past actions.
      */
     UserReference: {
       /**
@@ -1162,7 +1163,7 @@ export interface components {
        * @description User's unique identifier
        */
       id: string
-      /** @description User's display name at time of action */
+      /** @description Principal's current display name, resolved when the response is built */
       name: string
     }
   }
