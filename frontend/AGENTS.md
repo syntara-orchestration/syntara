@@ -68,6 +68,7 @@ Treat accessibility as part of every UI change, not an optional follow-up:
 - **Leave files no worse than you found them**: If you touch a file, avoid increasing its warning count. When practical, reduce nearby warnings as part of the change.
 - **Refactor instead of suppressing**: Prefer clearer control flow, smaller functions, extracted helpers, and stronger types over disabling rules.
 - **Validate before finishing**: After substantive edits, run the relevant lint/type-check commands for the affected package and fix any issues introduced by the change.
+- **When editing `eslint.config.js`**: Flat config replaces repeated rule settings. Keep each rule in one block, or preserve all existing options.
 - **Use `detachPromise(...)` for fire-and-forget promises**: Import from `packages/syntara-ui/src/utils/detachPromise.ts`. The unary `void` operator is forbidden by ESLint `no-void`.
 
 ### Common PR Mistakes — Quick Checklist
