@@ -59,15 +59,16 @@ function CredentialRow({
   const hasDescription = Boolean(credential.description?.trim())
 
   const actions = useMemo<KebabAction[]>(() => {
-    const updateTooltip = permissions.canUpdate ? undefined : { content: permissions.tooltips.update }
+    const { isLoading, canUpdate, canDelete, tooltips } = permissions
+    const updateTooltip = isLoading || canUpdate ? undefined : { content: tooltips.update }
     const noUpdate = isBuiltinProject ? { content: builtinProjectTooltip('edit this credential') } : updateTooltip
-    const deleteTooltip = permissions.canDelete ? undefined : { content: permissions.tooltips.delete }
+    const deleteTooltip = isLoading || canDelete ? undefined : { content: tooltips.delete }
     const noDelete = isBuiltinProject ? { content: builtinProjectTooltip('delete this credential') } : deleteTooltip
     return [
       {
         key: 'edit',
         title: <IconLabel icon={<RhUiEditIcon />}>Edit credential</IconLabel>,
-        isAriaDisabled: isBuiltinProject || !permissions.canUpdate,
+        isAriaDisabled: isBuiltinProject || isLoading || !canUpdate,
         tooltipProps: noUpdate,
         onClick: () => onEdit(credential),
       },
@@ -76,7 +77,7 @@ function CredentialRow({
         key: 'delete',
         title: <IconLabel icon={<RhUiTrashIcon />}>Delete credential</IconLabel>,
         isDanger: true,
-        isAriaDisabled: isBuiltinProject || !permissions.canDelete,
+        isAriaDisabled: isBuiltinProject || isLoading || !canDelete,
         tooltipProps: noDelete,
         onClick: () => onDelete(credential),
       },
@@ -85,8 +86,9 @@ function CredentialRow({
 
   const toggleDisabledTooltip = useMemo(() => {
     if (isBuiltinProject) return builtinProjectTooltip('enable or disable this credential')
+    if (permissions.isLoading) return undefined
     return permissions.canUpdate ? undefined : permissions.tooltips.enable
-  }, [isBuiltinProject, permissions.canUpdate, permissions.tooltips.enable])
+  }, [isBuiltinProject, permissions.isLoading, permissions.canUpdate, permissions.tooltips.enable])
 
   return (
     <Tbody isExpanded={isExpanded}>

@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createElement } from 'react'
 import type { ReactNode } from 'react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { Credential } from './credentialConstants'
 import { GroupedCredentialsTableBody } from './CredentialsTableBody'
@@ -12,15 +12,18 @@ vi.mock('../../../components/table/LinkCell', () => ({
   LinkCell: ({ children }: { children: ReactNode }) => <span>{children}</span>,
 }))
 
+const mockUseCredentialPermissions = vi.fn(() => ({
+  canCreate: true,
+  canRead: true,
+  canUpdate: true,
+  canDelete: true,
+  isLoading: false,
+  isReadChecking: false,
+  tooltips: { create: '', read: '', update: '', enable: '', delete: '' },
+}))
+
 vi.mock('./useCredentialPermissions', () => ({
-  useCredentialPermissions: () => ({
-    canCreate: true,
-    canRead: true,
-    canUpdate: true,
-    canDelete: true,
-    isLoading: false,
-    tooltips: { create: '', read: '', update: '', enable: '', delete: '' },
-  }),
+  useCredentialPermissions: mockUseCredentialPermissions,
 }))
 
 vi.mock('../../../client', () => ({
@@ -48,6 +51,19 @@ describe('GroupedCredentialsTableBody', () => {
   const onEdit = vi.fn()
   const onDelete = vi.fn()
   const getIsBuiltinProject = () => false
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockUseCredentialPermissions.mockReturnValue({
+      canCreate: true,
+      canRead: true,
+      canUpdate: true,
+      canDelete: true,
+      isLoading: false,
+      isReadChecking: false,
+      tooltips: { create: '', read: '', update: '', enable: '', delete: 'You need credential:delete' },
+    })
+  })
 
   it('renders project group header with credential rows', () => {
     const grouped = new Map([
@@ -131,5 +147,97 @@ describe('GroupedCredentialsTableBody', () => {
 
     await user.click(screen.getByText('Project Alpha'))
     expect(onToggleProject).toHaveBeenCalledWith('proj-1')
+  })
+
+  it('passes each credential project_id to useCredentialPermissions', () => {
+    const credA = { ...sampleCredential, id: 'cred-a', name: 'Cred A', project_id: 'proj-a' } as Credential
+    const credB = { ...sampleCredential, id: 'cred-b', name: 'Cred B', project_id: 'proj-b' } as Credential
+
+    const grouped = new Map([
+      ['proj-a', { project: { id: 'proj-a', name: 'Project A' } as never, credentials: [credA] }],
+      ['proj-b', { project: { id: 'proj-b', name: 'Project B' } as never, credentials: [credB] }],
+    ])
+
+    render(
+      <table>
+        <GroupedCredentialsTableBody
+          groupedCredentials={grouped}
+          collapsedProjects={new Set()}
+          onToggleProject={vi.fn()}
+          typeMap={new Map()}
+          expandedRows={new Set()}
+          onToggleRow={vi.fn()}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onToggleEnabled={onToggleEnabled}
+          getIsBuiltinProject={getIsBuiltinProject}
+        />
+      </table>,
+      { wrapper: createWrapper() }
+    )
+
+    expect(mockUseCredentialPermissions).toHaveBeenCalledWith({ resourceProject: 'proj-a' })
+    expect(mockUseCredentialPermissions).toHaveBeenCalledWith({ resourceProject: 'proj-b' })
+  })
+
+  it('disables delete only for the row whose project is denied', async () => {
+    const credAllowed = {
+      ...sampleCredential,
+      id: 'cred-ok',
+      name: 'Allowed Cred',
+      project_id: 'proj-ok',
+    } as Credential
+    const credDenied = { ...sampleCredential, id: 'cred-no', name: 'Denied Cred', project_id: 'proj-no' } as Credential
+
+    mockUseCredentialPermissions.mockImplementation((opts?: { resourceProject?: string }) => {
+      const denied = opts?.resourceProject === 'proj-no'
+      return {
+        canCreate: true,
+        canRead: true,
+        canUpdate: !denied,
+        canDelete: !denied,
+        isLoading: false,
+        isReadChecking: false,
+        tooltips: { create: '', read: '', update: 'no update', enable: 'no enable', delete: 'no delete' },
+      }
+    })
+
+    const user = userEvent.setup()
+    const grouped = new Map([
+      ['proj-ok', { project: { id: 'proj-ok', name: 'Allowed' } as never, credentials: [credAllowed] }],
+      ['proj-no', { project: { id: 'proj-no', name: 'Denied' } as never, credentials: [credDenied] }],
+    ])
+
+    render(
+      <table>
+        <GroupedCredentialsTableBody
+          groupedCredentials={grouped}
+          collapsedProjects={new Set()}
+          onToggleProject={vi.fn()}
+          typeMap={new Map()}
+          expandedRows={new Set()}
+          onToggleRow={vi.fn()}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onToggleEnabled={onToggleEnabled}
+          getIsBuiltinProject={getIsBuiltinProject}
+        />
+      </table>,
+      { wrapper: createWrapper() }
+    )
+
+    // Open kebab for the allowed row
+    const allowedKebab = screen.getByRole('button', { name: 'Actions for Allowed Cred' })
+    await user.click(allowedKebab)
+    const allowedDelete = await screen.findByRole('menuitem', { name: /Delete credential/ })
+    expect(allowedDelete).not.toHaveAttribute('aria-disabled', 'true')
+    // Close kebab
+    await user.keyboard('{Escape}')
+
+    // Open kebab for the denied row
+    const deniedKebab = screen.getByRole('button', { name: 'Actions for Denied Cred' })
+    await user.click(deniedKebab)
+    const deniedDelete = await screen.findByRole('menuitem', { name: /Delete credential/ })
+    expect(deniedDelete).toHaveAttribute('aria-disabled', 'true')
   })
 })

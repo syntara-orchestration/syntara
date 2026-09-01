@@ -20,6 +20,7 @@ import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../components/layout/SynPanel'
 import { SynErrorState } from '../../../components/states/SynErrorState'
+import { SynLoadingState } from '../../../components/states/SynLoadingState'
 import { useQueryState } from '../../../components/states/useQueryState'
 import type { KebabAction } from '../../../components/SynKebabMenu'
 import { SynKebabMenu } from '../../../components/SynKebabMenu'
@@ -91,43 +92,6 @@ function DynamicCredentialFields({ typeFields, credInputs }: Readonly<DynamicFie
   })
 }
 
-type AccessCheckProps = {
-  isPermissionsLoading: boolean
-  canRead: boolean
-  readTooltip: string
-}
-
-function AccessCheck({ isPermissionsLoading, canRead, readTooltip }: Readonly<AccessCheckProps>) {
-  // Gate credential data display on both load completion AND read authorization
-  if (isPermissionsLoading) {
-    return (
-      <SynPage>
-        <SynPageTitle segments={['Credential', 'Credentials']} />
-        <SynPageHeader title="Credential" breadcrumbs={breadcrumbsCredentialEarlyShell('Credential')} />
-        <SynPageBody>
-          <SynPanel isFullHeight />
-        </SynPageBody>
-      </SynPage>
-    )
-  }
-
-  if (!canRead) {
-    return (
-      <SynPage>
-        <SynPageTitle segments={['Credential', 'Credentials']} />
-        <SynPageHeader title="Credential" breadcrumbs={breadcrumbsCredentialEarlyShell('Credential')} />
-        <SynPageBody>
-          <SynPanel isFullHeight>
-            <SynErrorState title="Access Denied" message={readTooltip} />
-          </SynPanel>
-        </SynPageBody>
-      </SynPage>
-    )
-  }
-
-  return null
-}
-
 type CredentialDetailToolbarProps = {
   credential: Credential
   canUpdate: boolean
@@ -195,7 +159,7 @@ function filterTabsByPermission(
   return ALL_CREDENTIAL_TABS.filter((tab) => tabPermissions[tab] ?? true)
 }
 
-// eslint-disable-next-line max-lines-per-function, complexity -- detail page with multiple tabs, dialogs, toolbar actions, and permission checks
+// eslint-disable-next-line max-lines-per-function, complexity -- detail page: early returns for loading/error/access gate + tabs/dialogs/toolbar push both metrics over threshold
 export default function CredentialDetail() {
   const credentialsDocLink = useDocLink('credentials')
   const { credentialId }: { credentialId: string } = useParams({ strict: false })
@@ -224,6 +188,7 @@ export default function CredentialDetail() {
     canUpdate,
     canDelete,
     isLoading: isPermissionsLoading,
+    isReadChecking,
     tooltips,
   } = useCredentialPermissions({
     resourceProject: credential?.project_id,
@@ -373,8 +338,33 @@ export default function CredentialDetail() {
 
   if (!credential?.id) return null
 
-  const accessCheckResult = AccessCheck({ isPermissionsLoading, canRead, readTooltip: tooltips.read })
-  if (accessCheckResult) return accessCheckResult
+  if (isReadChecking) {
+    return (
+      <SynPage>
+        <SynPageTitle segments={['Credential', 'Credentials']} />
+        <SynPageHeader title="Credential" breadcrumbs={breadcrumbsCredentialEarlyShell('Credential')} />
+        <SynPageBody>
+          <SynPanel isFullHeight>
+            <SynLoadingState />
+          </SynPanel>
+        </SynPageBody>
+      </SynPage>
+    )
+  }
+
+  if (!canRead) {
+    return (
+      <SynPage>
+        <SynPageTitle segments={['Credential', 'Credentials']} />
+        <SynPageHeader title="Credential" breadcrumbs={breadcrumbsCredentialEarlyShell('Credential')} />
+        <SynPageBody>
+          <SynPanel isFullHeight>
+            <SynErrorState title="Access Denied" message={tooltips.read} />
+          </SynPanel>
+        </SynPageBody>
+      </SynPage>
+    )
+  }
 
   const credInputs = credential.inputs ?? {}
   const credentialTypeDisplayText = getTypeDisplayText(credType?.name, typeLoadError)

@@ -8,7 +8,10 @@ type CredentialPermissions = {
   canRead: boolean
   canUpdate: boolean
   canDelete: boolean
+  /** `true` while any permission check (read/create/update/delete) is in flight. */
   isLoading: boolean
+  /** `true` while only the read check is in flight. Use for access gates that should not wait on write checks. */
+  isReadChecking: boolean
   tooltips: {
     create: string
     read: string
@@ -20,11 +23,11 @@ type CredentialPermissions = {
 
 type UseCredentialPermissionsOptions = {
   /**
-   * Concrete project when the credentials list has one selected. Create uses
-   * `check_any_project` when omitted (toolbar on "All projects"); update /
-   * delete fall back to system-scoped `can_i` so system admins keep row
-   * actions. Prefer per-row `resourceProject` when adding stricter All-projects
-   * gating later.
+   * Concrete project to scope the permission check. The list toolbar passes
+   * the selected project; each `CredentialRow` passes `credential.project_id`
+   * for per-row gating in the "All projects" view. When omitted, create uses
+   * `check_any_project` and update/delete fall back to system-scoped `can_i`
+   * so system admins keep row actions.
    */
   resourceProject?: string
   /**
@@ -67,6 +70,7 @@ export function useCredentialPermissions(options?: UseCredentialPermissionsOptio
       canUpdate,
       canDelete,
       isLoading: !enabled || isCheckingRead || isCheckingCreate || isCheckingUpdate || isCheckingDelete,
+      isReadChecking: !enabled || isCheckingRead,
       tooltips: {
         create: permissionTooltip('create a credential', 'credential:create'),
         read: permissionTooltip('view this credential', 'credential:read'),

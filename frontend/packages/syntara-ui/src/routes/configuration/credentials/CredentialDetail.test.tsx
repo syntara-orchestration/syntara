@@ -59,6 +59,7 @@ vi.mock('./useCredentialPermissions', () => ({
     canUpdate: true,
     canDelete: true,
     isLoading: false,
+    isReadChecking: false,
     tooltips: {
       create: 'You need credential:create permission to create a credential.',
       read: 'You need credential:read permission to view this credential.',
@@ -883,6 +884,7 @@ describe('CredentialDetail', () => {
       canUpdate: false,
       canDelete: true,
       isLoading: false,
+      isReadChecking: false,
       tooltips: {
         create: 'create tooltip',
         read: 'read tooltip',
@@ -905,6 +907,7 @@ describe('CredentialDetail', () => {
       canUpdate: false,
       canDelete: true,
       isLoading: false,
+      isReadChecking: false,
       tooltips: {
         create: 'create tooltip',
         read: 'read tooltip',
@@ -927,6 +930,7 @@ describe('CredentialDetail', () => {
       canUpdate: true,
       canDelete: false,
       isLoading: false,
+      isReadChecking: false,
       tooltips: {
         create: 'create tooltip',
         read: 'read tooltip',

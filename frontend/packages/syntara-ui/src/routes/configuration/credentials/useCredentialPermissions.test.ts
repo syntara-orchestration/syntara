@@ -150,9 +150,36 @@ describe('useCredentialPermissions', () => {
     const { result } = renderHook(() => useCredentialPermissions(), { wrapper: createWrapper() })
 
     expect(result.current.isLoading).toBe(true)
+    expect(result.current.isReadChecking).toBe(true)
     expect(result.current.canCreate).toBe(false)
     expect(result.current.canUpdate).toBe(false)
     expect(result.current.canDelete).toBe(false)
+  })
+
+  it('isReadChecking becomes false when read resolves while other checks are in flight', async () => {
+    let resolveRead: (v: unknown) => void
+    const readPromise = new Promise((r) => {
+      resolveRead = r
+    })
+    const neverResolve = new Promise(() => {})
+
+    vi.mocked(accessFetchClient.POST).mockImplementation((_path: string, options?: { body?: { action?: string } }) => {
+      if (options?.body?.action === 'read') return readPromise
+      return neverResolve
+    })
+
+    const { result } = renderHook(() => useCredentialPermissions(), { wrapper: createWrapper() })
+
+    expect(result.current.isReadChecking).toBe(true)
+    expect(result.current.isLoading).toBe(true)
+
+    resolveRead!({ data: { allowed: true } })
+
+    await waitFor(() => {
+      expect(result.current.isReadChecking).toBe(false)
+    })
+    expect(result.current.isLoading).toBe(true)
+    expect(result.current.canRead).toBe(true)
   })
 
   it('skips all checks and reports isLoading when enabled is false', () => {
