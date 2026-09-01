@@ -380,10 +380,15 @@ export async function addConditionNodeWithBranch(page: Page, name: string, expre
 
   // Add a node on the "true" branch to satisfy validation
   // The "false" branch is optional
-  await openAddNodePanel(page)
+  await addScriptOnHandle(page, 'true', `${name} - true action`, 'print("condition is true")')
+}
+
+/** Add a Script node from a specific edge stub (e.g. unused condition `false`). */
+export async function addScriptOnHandle(page: Page, handle: string, name: string, code: string) {
+  await openAddNodePanel(page, handle)
   await selectCategoryAndType(page, 'Action', 'Script')
-  await page.getByRole('textbox', { name: 'Name', exact: true }).fill(`${name} - true action`)
-  await fillCodeEditor(page, { value: 'print("condition is true")' })
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
+  await fillCodeEditor(page, { value: code })
   await page.getByRole('button', { name: 'Create', exact: true }).click()
   await closeNodeEditorPanel(page)
 }

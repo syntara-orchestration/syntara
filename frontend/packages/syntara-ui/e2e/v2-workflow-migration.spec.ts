@@ -31,6 +31,7 @@ import {
   addApprovalNodeWithBranch,
   addConditionNodeWithBranch,
   addLoopNodeWithBody,
+  addScriptOnHandle,
   createLlmIntegration,
   deleteLlmIntegration,
 } from './helpers/v2-nodes'
@@ -217,7 +218,9 @@ test.describe('V2 Workflow Schema Migration', () => {
       await addManualTrigger(app, 'Start')
       await addConditionNodeWithBranch(app, 'Check condition')
       await addLoopNodeWithBody(app, 'Iterate items')
-      await addConvergeNode(app, 'Merge branches')
+      await addConvergeNode(app, 'Merge branches', 'done')
+      // Attach the unused false stub last, when it is the unique remaining branch port.
+      await addScriptOnHandle(app, 'false', 'Check condition - false action', 'print("condition is false")')
 
       // Intercept save
       const saveRequestPromise = app.waitForRequest(

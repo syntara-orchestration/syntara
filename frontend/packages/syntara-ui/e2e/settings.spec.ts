@@ -76,6 +76,18 @@ async function resetSingleSetting(app: Page, settingName: string) {
   await expect(saveBtn).toBeDisabled({ timeout: 5000 })
 }
 
+/** Save dirty settings and wait until the bulk PATCH succeeds. */
+async function saveSettingsChanges(app: Page) {
+  const saveButton = app.getByRole('button', { name: 'Save changes' })
+  await expect(saveButton).toBeEnabled()
+  const saved = app.waitForResponse(
+    (res) => res.request().method() === 'PATCH' && res.url().includes('/settings') && res.ok()
+  )
+  await saveButton.click()
+  await saved
+  await expect(saveButton).toBeDisabled({ timeout: 5000 })
+}
+
 /** Reset all settings in the current tab to defaults via the confirmation modal, then save. */
 async function resetAllToDefaults(app: Page) {
   const resetBtn = app.getByRole('button', { name: 'Reset to defaults' })
@@ -84,11 +96,9 @@ async function resetAllToDefaults(app: Page) {
     const resetAllBtn = app.getByRole('button', { name: 'Reset all' })
     if (await resetAllBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
       await resetAllBtn.click()
-      // Save the reset values
       const saveBtn = app.getByRole('button', { name: 'Save changes' })
       if (await saveBtn.isEnabled({ timeout: 2000 }).catch(() => false)) {
-        await saveBtn.click()
-        await expect(saveBtn).toBeDisabled({ timeout: 5000 })
+        await saveSettingsChanges(app)
       }
     }
   }
@@ -173,19 +183,17 @@ test.describe('Settings', () => {
     try {
       // Click plus to increment
       await formGroup.getByRole('button', { name: /plus/i }).click()
+      const expected = String(Number(originalValue) + 1)
+      await expect(input).toHaveValue(expected)
 
-      // Save
-      const saveButton = app.getByRole('button', { name: 'Save changes' })
-      await expect(saveButton).toBeEnabled()
-      await saveButton.click()
-      await expect(saveButton).toBeDisabled({ timeout: 5000 })
+      await saveSettingsChanges(app)
 
       // Reload via category deep-link so the field is on screen before we assert.
       await goToContextManager(app)
       const reloadedFormGroup = app.locator('[id="context_manager.compression_loop"]').locator('..')
       await expect(reloadedFormGroup).toBeVisible({ timeout: 5000 })
       const reloadedInput = reloadedFormGroup.locator('input')
-      await expect(reloadedInput).toHaveValue(String(Number(originalValue) + 1), { timeout: 5000 })
+      await expect(reloadedInput).toHaveValue(expected, { timeout: 10_000 })
     } finally {
       // Cleanup: reset to defaults
       await goToContextManager(app)
@@ -368,24 +376,15 @@ test.describe('Settings', () => {
     try {
       // Click plus to increment by 0.1
       await formGroup.getByRole('button', { name: /plus/i }).click()
+      const expected = (Number.parseFloat(originalValue) + 0.1).toFixed(1)
+      await expect(input).toHaveValue(expected)
 
-      // Verify the value actually changed before saving
-      const afterClickValue = await input.inputValue()
-      expect(Number(afterClickValue), 'Plus button did not change the float value').not.toBe(Number(originalValue))
+      await saveSettingsChanges(app)
 
-      // Save
-      const saveButton = app.getByRole('button', { name: 'Save changes' })
-      await expect(saveButton).toBeEnabled()
-      await saveButton.click()
-      await expect(saveButton).toBeDisabled({ timeout: 5000 })
-
-      // Reload and verify value persisted
+      // Reload and verify value persisted (toHaveValue retries while the form hydrates)
       await goToContextManager(app)
       const reloadedInput = app.locator('[id="context_manager.compression_temperature"]').locator('..').locator('input')
-      const newValue = await reloadedInput.inputValue()
-      expect(Number(Number.parseFloat(newValue).toFixed(1))).toBe(
-        Number((Number.parseFloat(originalValue) + 0.1).toFixed(1))
-      )
+      await expect(reloadedInput).toHaveValue(expected, { timeout: 10_000 })
     } finally {
       await goToContextManager(app)
       await resetSingleSetting(app, 'Compression temperature')
