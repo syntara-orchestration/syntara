@@ -9,7 +9,7 @@ import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmati
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
 import { SynLabel } from '../../../components/labels/SynLabel'
-import type { KebabAction } from '../../../components/SynKebabMenu'
+import { SynKebabMenu, type KebabAction } from '../../../components/SynKebabMenu'
 import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../../components/panels/list/SynListPanel'
 import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import { invalidateAuthzCaches } from '../../../hooks/invalidateAuthzCaches'
