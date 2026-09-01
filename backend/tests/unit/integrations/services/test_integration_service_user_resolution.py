@@ -42,7 +42,7 @@ class TestResolveUserReferences:
         user_id = uuid4()
         obj = SimpleNamespace(created_by=user_id, updated_by=None)
 
-        mock_session.exec.return_value = [(user_id, "admin")]
+        mock_session.exec.return_value = [(user_id, "admin", None)]
 
         await service.resolve_user_references([obj])
 
@@ -77,7 +77,7 @@ class TestResolveUserReferences:
         obj1 = SimpleNamespace(created_by=user_id_1, updated_by=None)
         obj2 = SimpleNamespace(created_by=user_id_2, updated_by=user_id_1)
 
-        mock_session.exec.return_value = [(user_id_1, "alice"), (user_id_2, "bob")]
+        mock_session.exec.return_value = [(user_id_1, "alice", None), (user_id_2, "bob", None)]
 
         await service.resolve_user_references([obj1, obj2])
 
