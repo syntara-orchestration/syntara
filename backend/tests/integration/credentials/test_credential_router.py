@@ -16,6 +16,7 @@ from syntara.credentials.lib.preseed import GA_CREDENTIAL_TYPES, preseed_credent
 from syntara.credentials.models.credential_type import CredentialType
 from syntara.workflows.models import Workflow, WorkflowVersion
 from syntara.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
+from tests.helpers.user_reference import assert_user_reference
 
 
 @pytest.fixture
@@ -501,6 +502,7 @@ class TestCredentialWorkflows:
         assert workflows[0]["name"] == workflow.name
         assert workflows[0]["node_names"] == ["Fetch Data"]
         assert workflows[0]["created_at"] is not None
+        assert_user_reference(workflows[0]["created_by"], test_user)
 
     @pytest.mark.asyncio
     async def test_workflows_returns_multiple_node_names(

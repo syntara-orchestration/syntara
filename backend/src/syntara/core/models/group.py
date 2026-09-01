@@ -179,7 +179,7 @@ class GroupRead(BaseResource):
     name: str
     description: str | None = None
     is_builtin: bool = False
-    created_by: UserReference | UUID | str | None = None
+    created_by: UserReference | UUID | str | None = Field(default=None, description="User who created the group")
     source: str = GroupSource.LOCAL
     member_count: int = 0
 
