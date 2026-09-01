@@ -13,6 +13,7 @@ from uuid import UUID, uuid4
 from pydantic import ConfigDict, GetJsonSchemaHandler, field_validator
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import CoreSchema as PydanticCoreSchema
+from sqlalchemy import inspect as sa_inspect
 from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Session
@@ -20,7 +21,6 @@ from sqlmodel import DateTime, Field, SQLModel
 
 from syntara.core.constants import ValidationMessages
 from syntara.core.exceptions import SafeValueError
-from syntara.core.request_context import is_mutating_request_context_var
 
 
 class AuditLevel(str, Enum):
@@ -45,21 +45,42 @@ def _utc_now() -> datetime:
     return datetime.now(UTC)
 
 
+def _changed_column_names(obj: "BaseResource") -> set[str]:
+    """Return mapped column names whose pre-flush value differs from the loaded state."""
+    state = sa_inspect(obj)
+    if state is None:
+        return set()
+    changed: set[str] = set()
+    for attr in state.mapper.column_attrs:
+        key = attr.key
+        hist = state.attrs[key].history
+        if not hist.has_changes():
+            continue
+        old = hist.deleted[-1] if hist.deleted else (hist.unchanged[-1] if hist.unchanged else None)
+        new = hist.added[-1] if hist.added else None
+        if old == new:
+            continue
+        changed.add(key)
+    return changed
+
+
 def touch_updated_at_before_flush(session: Session, _flush_context: object, _instances: object) -> None:
-    """Bump updated_at on dirty BaseResource rows during PATCH/PUT requests.
+    """Bump updated_at on dirty BaseResource rows that have a real, user-visible field change.
 
-    Column ``onupdate`` alone is insufficient with async sessions when ORM
-    objects are validated before refresh (MissingGreenlet). Explicit assignment
-    here ensures the timestamp is on the instance and in the UPDATE statement.
+    Explicit assignment here ensures the timestamp is on the instance and in the
+    UPDATE statement (column ``onupdate`` is intentionally not used — it would
+    bump on every row UPDATE, including exempt-only system writes).
 
-    Scoped to mutating API requests (see ``core.request_context``) so
-    background writes -- login timestamps, health-check/validation workers,
-    resource refresh -- don't change user-visible "last updated" semantics.
+    Only bumps when a non-exempt field changed, so system-managed writes --
+    login timestamps, health-check/validation workers, resource refresh --
+    don't change user-visible "last updated" semantics. Models opt fields out
+    via ``__updated_at_exempt_fields__``.
     """
-    if not is_mutating_request_context_var.get():
-        return
     for obj in session.dirty:
-        if isinstance(obj, BaseResource):
+        if not isinstance(obj, BaseResource):
+            continue
+        exempt = type(obj).__updated_at_exempt_fields__
+        if _changed_column_names(obj) - {"updated_at"} - exempt:
             obj.updated_at = _utc_now()
 
 
@@ -110,7 +131,7 @@ class BaseResource(SQLModel, ABC):
         default_factory=_utc_now,
         description="Timestamp when resource was last updated",
         sa_type=DateTime(timezone=True),  # type: ignore[call-overload]
-        sa_column_kwargs={"server_default": text("now()"), "onupdate": _utc_now},
+        sa_column_kwargs={"server_default": text("now()")},
         index=True,
     )
 
@@ -162,6 +183,10 @@ class BaseResource(SQLModel, ABC):
         "created_at",
         "updated_at",
     ]
+
+    # Fields whose mutation alone should not bump updated_at (system-managed
+    # writes, e.g. User.last_login or Integration validation/refresh status).
+    __updated_at_exempt_fields__: ClassVar[frozenset[str]] = frozenset()
 
     # Audit trail configuration
     # Set to AuditLevel.NONE to disable auditing, AuditLevel.META to audit only metadata

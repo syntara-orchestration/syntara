@@ -21,7 +21,6 @@ from syntara.core.models.base import (
 )
 from syntara.core.models.base.base_resource import touch_updated_at_before_flush
 from syntara.core.models.pagination import ResourcesResponse, ResourcesResponseBase
-from syntara.core.request_context import is_mutating_request_context_var
 from tests.unit.core.models.mock_shared_resources import MockBaseResource, MockNamedResource, MockResource
 
 
@@ -46,32 +45,30 @@ class TestSQLModelBaseClasses:
 
         assert hasattr(MockBaseResource, "__table__")
 
-    def test_base_resource_updated_at_onupdate(self) -> None:
-        """updated_at must auto-update on resource changes via SQLAlchemy onupdate."""
+    def test_base_resource_updated_at_has_no_column_onupdate(self) -> None:
+        """updated_at bumps are handled in touch_updated_at_before_flush, not column onupdate."""
         updated_at_col = MockBaseResource.__table__.c.updated_at  # type: ignore[attr-defined]
         created_at_col = MockBaseResource.__table__.c.created_at  # type: ignore[attr-defined]
-        assert updated_at_col.onupdate is not None
+        assert updated_at_col.onupdate is None
         assert created_at_col.onupdate is None
 
-    def test_touch_updated_at_before_flush_requires_mutating_request(self) -> None:
-        """updated_at is only bumped when the flush happens during a PATCH/PUT request."""
-        old_timestamp = datetime(2020, 1, 1, tzinfo=UTC)
-        resource = MockBaseResource(id=uuid4(), created_at=old_timestamp, updated_at=old_timestamp)
+    def test_touch_updated_at_before_flush_skips_exempt_only_changes(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """updated_at is only bumped when a non-exempt field actually changed."""
+        baseline_updated_at = datetime(2020, 1, 1, tzinfo=UTC)
+        resource = MockBaseResource(id=uuid4(), created_at=baseline_updated_at, updated_at=baseline_updated_at)
         session = MagicMock(dirty=[resource])
 
-        token = is_mutating_request_context_var.set(False)
-        try:
-            touch_updated_at_before_flush(session, None, None)
-        finally:
-            is_mutating_request_context_var.reset(token)
-        assert resource.updated_at == old_timestamp
+        monkeypatch.setattr(
+            "syntara.core.models.base.base_resource._changed_column_names",
+            lambda _obj: {"labels"},
+        )
+        monkeypatch.setattr(MockBaseResource, "__updated_at_exempt_fields__", frozenset({"labels"}))
+        touch_updated_at_before_flush(session, None, None)
+        assert resource.updated_at == baseline_updated_at
 
-        token = is_mutating_request_context_var.set(True)
-        try:
-            touch_updated_at_before_flush(session, None, None)
-        finally:
-            is_mutating_request_context_var.reset(token)
-        assert resource.updated_at > old_timestamp
+        monkeypatch.setattr(MockBaseResource, "__updated_at_exempt_fields__", frozenset())
+        touch_updated_at_before_flush(session, None, None)
+        assert resource.updated_at > baseline_updated_at
 
     def test_base_resource_instance_creation(self) -> None:
         """Test MockBaseResource instance creation with labels."""
