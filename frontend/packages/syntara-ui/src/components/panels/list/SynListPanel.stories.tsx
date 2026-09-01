@@ -439,6 +439,13 @@ export const WithContentBetween: Story = {
 /** Two tabs each with their own `SynListPanelView`; active tab driven by URL. Click tabs to switch content. */
 export const TabbedList: Story = {
   render: () => <TabbedListStory />,
+  parameters: {
+    tanstack: {
+      router: {
+        path: '/group/resources/members',
+      },
+    },
+  },
 }
 
 /** Read-only list — filters + table, no create action. Mirrors the Executions page pattern. */
