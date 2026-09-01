@@ -52823,18 +52823,6 @@
             "type": "object",
             "title": "Environment",
             "description": "Environment variables"
-          },
-          "credential_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Credential Id",
-            "description": "Orchestrator credential UUID for credential scrubbing"
           }
         },
         "type": "object",
