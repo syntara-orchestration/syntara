@@ -12,7 +12,7 @@
  * - Kebab menu edit action
  * - Kebab menu delete action
  */
-import { createUnavailableGuard, test, expect } from './fixtures'
+import { test, expect } from './fixtures'
 import { APP_TITLE } from './helpers/appTitle'
 import {
   createTestCredential,
@@ -111,7 +111,7 @@ test.describe('Table Display and Sorting', () => {
         .waitFor({ state: 'visible', timeout: 5000 })
         .then(() => true)
         .catch(() => false)
-      test.skip(!hasTable, 'No credential data available; seed data required')
+      expect(hasTable, 'No credential data available; seed data required').toBeTruthy()
 
       await expect(table.getByRole('columnheader', { name: 'Name' })).toBeVisible()
       await expect(table.getByRole('columnheader', { name: 'Type' })).toBeVisible()
@@ -142,8 +142,6 @@ test.describe('Table Display and Sorting', () => {
 // Test 4: Cursor-Based Pagination
 // ---------------------------------------------------------------------------
 test.describe('Cursor-Based Pagination', () => {
-  const guard = createUnavailableGuard('No credential data available; seed data required')
-
   test.beforeEach(async ({ app }) => {
     await goToCredentialsList(app)
     const table = app.getByRole('grid', { name: 'Credentials table' })
@@ -151,8 +149,7 @@ test.describe('Cursor-Based Pagination', () => {
       .waitFor({ state: 'visible', timeout: 5000 })
       .then(() => true)
       .catch(() => false)
-    if (!hasTable) guard.markUnavailable()
-    test.skip(!hasTable, 'No credential data available; seed data required')
+    expect(hasTable, 'No credential data available; seed data required').toBeTruthy()
   })
 
   test('pagination footer displays credential count', async ({ app }) => {

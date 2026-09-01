@@ -145,21 +145,20 @@ export type CreatedExecution = {
 export async function createExecutionViaApi(
   page: Page,
   options: { workflowId: string; status?: string; token?: string }
-): Promise<CreatedExecution | null> {
-  try {
-    const token = options.token ?? (await getAuthToken(page))
-    if (!token) return null
+): Promise<CreatedExecution> {
+  const token = options.token ?? (await getAuthToken(page))
+  if (!token) throw seedError('createExecutionViaApi', options.workflowId, 'could not obtain auth token')
 
-    const data: Record<string, unknown> = { workflow_id: options.workflowId }
-    if (options.status) data.status = options.status
+  const data: Record<string, unknown> = { workflow_id: options.workflowId }
+  if (options.status) data.status = options.status
 
-    const resp = await apiRequest(page, 'post', '/executions', { token, data })
-    if (!resp.ok()) return null
-    const body = (await resp.json()) as { id: string; status: string }
-    return { id: body.id, status: body.status }
-  } catch {
-    return null
+  const resp = await apiRequest(page, 'post', '/executions', { token, data })
+  if (!resp.ok()) {
+    const body = await resp.text().catch(() => '')
+    throw seedError('createExecutionViaApi', options.workflowId, `HTTP ${resp.status()} ${body}`)
   }
+  const body = (await resp.json()) as { id: string; status: string }
+  return { id: body.id, status: body.status }
 }
 
 export type SeededIdentityProvider = {
@@ -223,49 +222,59 @@ export async function createCredentialForIntegrationType(
     apiKey?: string
     token?: string
   }
-): Promise<SeededCredential | null> {
-  try {
-    const token = options.token ?? (await getAuthToken(page))
-    if (!token) return null
+): Promise<SeededCredential> {
+  const token = options.token ?? (await getAuthToken(page))
+  if (!token) throw seedError('createCredentialForIntegrationType', options.name, 'could not obtain auth token')
 
-    const project = await ensureProject(page)
-    if (!project) return null
+  const project = await ensureProject(page)
+  if (!project) throw seedError('createCredentialForIntegrationType', options.name, 'could not obtain project')
 
-    const typesResp = await apiRequest(page, 'get', '/credential_types', { token })
-    if (!typesResp.ok()) return null
-    const types = (await typesResp.json()) as { resources?: Array<{ id: string; name: string }> }
-    if (!types.resources?.length) return null
-
-    const typeNameMap: Record<string, string> = {
-      mcp_server: 'HTTP Bearer Token',
-      llm_provider: 'LLM Provider',
-      aap_gateway: 'Ansible Automation Platform',
-    }
-    const targetTypeName = typeNameMap[options.integrationType]
-    const credType = types.resources.find((t) => t.name === targetTypeName)
-    if (!credType) return null
-
-    const inputsMap: Record<string, Record<string, string>> = {
-      mcp_server: { token: options.apiKey ?? 'e2e-bearer-token' },
-      llm_provider: { api_key: options.apiKey ?? 'sk-e2e-test-key' },
-      aap_gateway: { oauth_token: options.apiKey ?? 'e2e-aap-oauth-token' },
-    }
-
-    const createResp = await apiRequest(page, 'post', '/credentials', {
-      token,
-      data: {
-        name: options.name,
-        credential_type_id: credType.id,
-        project_id: project.id,
-        inputs: inputsMap[options.integrationType],
-      },
-    })
-    if (!createResp.ok()) return null
-    const cred = (await createResp.json()) as { id: string; name: string }
-    return { id: cred.id, name: cred.name }
-  } catch {
-    return null
+  const typesResp = await apiRequest(page, 'get', '/credential_types', { token })
+  if (!typesResp.ok()) {
+    const typesBody = await typesResp.text().catch(() => '')
+    throw seedError(
+      'createCredentialForIntegrationType',
+      options.name,
+      `credential types HTTP ${typesResp.status()} ${typesBody}`
+    )
   }
+  const types = (await typesResp.json()) as { resources?: Array<{ id: string; name: string }> }
+  if (!types.resources?.length) {
+    throw seedError('createCredentialForIntegrationType', options.name, 'no credential types returned')
+  }
+
+  const typeNameMap: Record<string, string> = {
+    mcp_server: 'HTTP Bearer Token',
+    llm_provider: 'LLM Provider',
+    aap_gateway: 'Ansible Automation Platform',
+  }
+  const targetTypeName = typeNameMap[options.integrationType]
+  const credType = types.resources.find((t) => t.name === targetTypeName)
+  if (!credType) {
+    throw seedError('createCredentialForIntegrationType', options.name, `credential type "${targetTypeName}" not found`)
+  }
+
+  const inputsMap: Record<string, Record<string, string>> = {
+    mcp_server: { token: options.apiKey ?? 'e2e-bearer-token' },
+    llm_provider: { api_key: options.apiKey ?? 'sk-e2e-test-key' },
+    aap_gateway: { oauth_token: options.apiKey ?? 'e2e-aap-oauth-token' },
+  }
+
+  const createResp = await apiRequest(page, 'post', '/credentials', {
+    token,
+    data: {
+      name: options.name,
+      credential_type_id: credType.id,
+      project_id: project.id,
+      inputs: inputsMap[options.integrationType],
+    },
+  })
+  if (!createResp.ok()) {
+    const createBody = await createResp.text().catch(() => '')
+    throw seedError('createCredentialForIntegrationType', options.name, `HTTP ${createResp.status()} ${createBody}`)
+  }
+  const cred = (await createResp.json()) as { id: string; name: string }
+  return { id: cred.id, name: cred.name }
 }
 
 /** Re-export credential helpers from utils/api for convenience. */

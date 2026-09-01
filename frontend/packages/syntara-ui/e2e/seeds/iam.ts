@@ -148,24 +148,23 @@ export async function createRoleAssignmentViaApi(
   page: Page,
   projectId: string,
   options: { userId: string; roleName: string; token?: string }
-): Promise<SeededRoleAssignment | null> {
-  try {
-    const token = options.token ?? (await getAuthToken(page))
-    if (!token) return null
+): Promise<SeededRoleAssignment> {
+  const token = options.token ?? (await getAuthToken(page))
+  if (!token) throw new Error(`createRoleAssignmentViaApi: could not obtain auth token for ${options.roleName}`)
 
-    const resp = await apiRequest(page, 'post', `/projects/${projectId}/role_assignments`, {
-      token,
-      data: {
-        principal_id: options.userId,
-        role_name: options.roleName,
-      },
-    })
-    if (!resp.ok()) return null
-    const assignment = (await resp.json()) as { id: string }
-    return { id: assignment.id, projectId }
-  } catch {
-    return null
+  const resp = await apiRequest(page, 'post', `/projects/${projectId}/role_assignments`, {
+    token,
+    data: {
+      principal_id: options.userId,
+      role_name: options.roleName,
+    },
+  })
+  if (!resp.ok()) {
+    const body = await resp.text().catch(() => '')
+    throw new Error(`createRoleAssignmentViaApi failed for ${options.roleName}: HTTP ${resp.status()} ${body}`)
   }
+  const assignment = (await resp.json()) as { id: string }
+  return { id: assignment.id, projectId }
 }
 
 export async function deleteRoleAssignmentViaApi(page: Page, projectId: string, assignmentId: string): Promise<void> {
