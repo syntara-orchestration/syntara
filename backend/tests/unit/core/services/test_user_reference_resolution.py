@@ -144,3 +144,17 @@ class TestNonUserPrincipals:
         obj = SimpleNamespace(created_by=uuid4(), updated_by=None)
         await resolve_user_references(mock_session, [obj])
         assert obj.created_by is None
+
+
+class TestStringIdNormalisation:
+    """The Read models still permit a str id; it must not be silently dropped."""
+
+    @pytest.mark.asyncio
+    async def test_resolves_uuid_shaped_string(self, mock_session: MagicMock) -> None:
+        uid = uuid4()
+        mock_session.exec = AsyncMock(return_value=[(uid, "frank", None)])
+        obj = SimpleNamespace(created_by=str(uid), updated_by=None)
+        await resolve_user_references(mock_session, [obj])
+        assert isinstance(obj.created_by, UserReference)
+        assert obj.created_by.id == uid
+        assert obj.created_by.name == "frank"
