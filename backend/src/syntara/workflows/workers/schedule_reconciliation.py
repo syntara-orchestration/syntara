@@ -85,7 +85,6 @@ async def _load_expected_schedules(
             .join(WorkflowVersion, WorkflowVersion.id == Workflow.published_version_id)  # type: ignore[arg-type]
             .where(
                 Workflow.published_version_id.is_not(None),  # type: ignore[union-attr]
-                Workflow.deleted_at.is_(None),  # type: ignore[union-attr]
                 func.jsonb_path_exists(
                     WorkflowVersion.workflow_definition,
                     literal_column("'$.triggers[*] ? (@.type == \"scheduled_trigger\")'::jsonpath"),

@@ -25,8 +25,6 @@ def _make_mock_workflow() -> MagicMock:
     wf.published_version_id = None
     wf.created_at = "2026-01-01T00:00:00Z"
     wf.updated_at = "2026-01-01T00:00:00Z"
-    wf.deleted_at = None
-    wf.deleted_by = None
     return wf
 
 
@@ -44,8 +42,6 @@ def _make_mock_version() -> MagicMock:
     v.created_by = uuid4()
     v.created_at = "2026-01-01T00:00:00Z"
     v.updated_at = "2026-01-01T00:00:00Z"
-    v.deleted_at = None
-    v.deleted_by = None
     return v
 
 
