@@ -99,7 +99,7 @@ describe('useBuilderSaveWorkflow', () => {
     const { result } = renderHook(() => useBuilderSaveWorkflow(buildParams({ currentWorkflow: null, showError })))
 
     await expect(result.current()).resolves.toBe(false)
-    expect(showError).toHaveBeenCalledWith({ title: 'Save failed', description: 'No workflow to save' })
+    expect(showError).toHaveBeenCalledWith({ title: 'Failed to save workflow', description: 'No workflow to save' })
   })
 
   it('returns false and shows danger toast when create path has no project', async () => {
@@ -210,7 +210,7 @@ describe('useBuilderSaveWorkflow', () => {
 
     await expect(result.current()).resolves.toBe(false)
     expect(showError).toHaveBeenCalledWith({
-      title: 'Create failed',
+      title: 'Failed to create workflow',
       description: expectStringContaining('Failed to create workflow'),
     })
   })
@@ -268,7 +268,7 @@ describe('useBuilderSaveWorkflow', () => {
     await expect(result.current()).resolves.toBe(false)
     expect(showError).toHaveBeenCalledWith(
       expect.objectContaining({
-        title: 'Create failed',
+        title: 'Failed to create workflow',
         description: expect.stringContaining('has warnings') as unknown as string,
       })
     )
@@ -288,7 +288,7 @@ describe('useBuilderSaveWorkflow', () => {
     await expect(result.current()).resolves.toBe(false)
     expect(showError).toHaveBeenCalledWith(
       expect.objectContaining({
-        title: 'Update failed',
+        title: 'Failed to update workflow',
         description: expect.stringContaining('has warnings') as unknown as string,
       })
     )
@@ -427,7 +427,7 @@ describe('useBuilderSaveWorkflow', () => {
     await expect(result.current()).resolves.toBe(false)
     expect(showError).toHaveBeenCalledWith(
       expect.objectContaining({
-        title: 'Update failed',
+        title: 'Failed to update workflow',
         description: expect.stringContaining(
           'Step "Orphan Script" is unreachable from any trigger'
         ) as unknown as string,
