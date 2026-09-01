@@ -112,7 +112,7 @@ export function useVersionHistory({ workflowId, isNew, onVersionUpdated }: UseVe
         },
         {
           onSuccess: (data) => {
-            showSuccess({ title: 'Version published successfully' })
+            showSuccess({ title: 'Version published' })
             if (data?.current_version != null) {
               onVersionUpdated?.(data.current_version)
             }
