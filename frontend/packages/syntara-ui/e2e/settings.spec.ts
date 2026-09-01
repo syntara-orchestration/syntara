@@ -163,14 +163,7 @@ test.describe('Settings', () => {
   })
 
   test('modify integer setting, save, and verify persistence', async ({ app }) => {
-    const cmTab = app.getByRole('tab', { name: /Context Manager/i })
-    const hasCmTab = await cmTab
-      .waitFor({ state: 'visible', timeout: 5000 })
-      .then(() => true)
-      .catch(() => false)
-    expect(hasCmTab, 'Context Manager tab not available').toBeTruthy()
-
-    await cmTab.click()
+    await goToContextManager(app)
 
     const formGroup = app.locator('[id="context_manager.compression_loop"]').locator('..')
     await expect(formGroup).toBeVisible({ timeout: 5000 })
@@ -187,9 +180,8 @@ test.describe('Settings', () => {
       await saveButton.click()
       await expect(saveButton).toBeDisabled({ timeout: 5000 })
 
-      // Reload and verify value persisted
-      await app.goto(toAppUrl('/system-administration/settings'))
-      await cmTab.click()
+      // Reload via category deep-link so the field is on screen before we assert.
+      await goToContextManager(app)
       const reloadedFormGroup = app.locator('[id="context_manager.compression_loop"]').locator('..')
       await expect(reloadedFormGroup).toBeVisible({ timeout: 5000 })
       const reloadedInput = reloadedFormGroup.locator('input')
@@ -492,6 +484,10 @@ test.describe('Settings', () => {
 
   test('reset all settings via confirmation modal', async ({ app }) => {
     await goToContextManager(app)
+    // Serial suite shares backend settings; start from catalog defaults so
+    // originalValue is what "Reset all" restores (not a leftover increment).
+    await resetAllToDefaults(app)
+    await goToContextManager(app)
 
     // Modify a setting
     const formGroup = app.locator('[id="context_manager.compression_loop"]').locator('..')
@@ -499,6 +495,7 @@ test.describe('Settings', () => {
     const input = formGroup.locator('input')
     const originalValue = await input.inputValue()
     await formGroup.getByRole('button', { name: /plus/i }).click()
+    await expect(input).not.toHaveValue(originalValue)
 
     // Click "Reset to defaults" — modal appears
     await app.getByRole('button', { name: 'Reset to defaults' }).click()

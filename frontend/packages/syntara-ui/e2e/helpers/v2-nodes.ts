@@ -22,7 +22,13 @@ import {
   deleteLlmIntegration,
   selectLlmCredential,
 } from './llm-helpers'
-import { addNodePanel, clickAddConnectedStep, closeNodeEditorPanel, fillCodeEditor } from './workflows'
+import {
+  addNodePanel,
+  clickAddConnectedStep,
+  closeNodeEditorPanel,
+  fillCodeEditor,
+  openNodeForEditing,
+} from './workflows'
 
 export { ensureLlmCredential, createLlmIntegration, deleteLlmIntegration, selectLlmCredential }
 
@@ -52,8 +58,8 @@ async function selectDirectNodeType(page: Page, label: string | RegExp) {
 // ---------------------------------------------------------------------------
 
 /** Click "Add connected step" on an edge and wait for the add-node panel. */
-export async function openAddNodePanel(page: Page) {
-  await clickAddConnectedStep(page)
+export async function openAddNodePanel(page: Page, preferredHandle?: string) {
+  await clickAddConnectedStep(page, preferredHandle)
 }
 
 /** Add a manual trigger. Must be called on a fresh /workflow-builder/new page. */
@@ -459,9 +465,13 @@ export async function addLoopNode(page: Page, name: string, items = '${trigger.i
 export async function addLoopNodeWithBody(page: Page, name: string, items = '${trigger.items}') {
   await addLoopNode(page, name, items)
 
-  // Add a node in the loop body to satisfy validation
-  // Use the "Add connected step" button on the edge
-  await openAddNodePanel(page)
+  // The loop-body stub (`add-node-button-loop`) is often missing from the a11y tree
+  // next to unused condition `false` and loop `done` stubs, which makes a generic
+  // "Add connected step" click fail strict mode. Add via the editor instead.
+  await openNodeForEditing(page, name)
+  await page.getByRole('button', { name: 'Add step…' }).click()
+  await page.getByRole('menuitem', { name: 'In loop' }).click()
+  await expect(addNodePanel(page)).toHaveCount(1)
   await selectCategoryAndType(page, 'Action', 'Script')
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(`${name} - loop body`)
   await fillCodeEditor(page, { value: 'print("processing item")' })

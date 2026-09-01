@@ -9,7 +9,10 @@ import {
   publishWorkflowViaApi,
 } from '../utils/api'
 
+import { clickAddConnectedStep } from './add-connected-step'
+
 export { createBasicWorkflowViaApi, publishWorkflowViaApi }
+export { clickAddConnectedStep }
 
 export const buildUniqueName = (prefix: string) => `${prefix}-${Date.now()}-${randomUUID()}`
 
@@ -45,37 +48,6 @@ export async function triggerLayout(page: Page) {
   await expect(layoutButton).toBeVisible({ timeout: 10000 })
   await layoutButton.click()
   await waitForUIReady(page)
-}
-
-async function revealConnectedStepButtons(page: Page) {
-  await waitForUIReady(page)
-  await expect(page.getByRole('button', { name: 'Create', exact: true }))
-    .not.toBeAttached({ timeout: 10_000 })
-    .catch(() => {})
-  const layoutButton = page.getByRole('button', { name: 'Reset layout', exact: true })
-  await expect(layoutButton).toBeVisible({ timeout: 10_000 })
-  await layoutButton.click()
-  const fitViewButton = page.getByRole('button', { name: 'Fit view' })
-  if ((await fitViewButton.count()) > 0) await fitViewButton.click()
-  await expect(page.locator('[role="group"][aria-roledescription="node"]')).not.toHaveCount(0, { timeout: 10_000 })
-  await waitForUIReady(page)
-}
-
-/** Layout + fit view, then click an edge "Add connected step" button and return the add-node panel. */
-export async function clickAddConnectedStep(page: Page) {
-  await revealConnectedStepButtons(page)
-  const addBtn = page.getByRole('button', { name: 'Add connected step' })
-  await expect(addBtn).not.toHaveCount(0, { timeout: 25_000 })
-  await expect(async () => {
-    if ((await addBtn.count()) === 0) await revealConnectedStepButtons(page)
-    // Prefer a unique happy-path stub (includes linear `source` so unused `false` is not clicked).
-    const port = page.getByTestId(/add-node-button-(approved|true|iterate|source)/)
-    await ((await port.count()) === 1 ? port : addBtn).click({ force: true, timeout: 5_000 })
-    await expect(addNodePanel(page)).toHaveCount(1)
-  }).toPass({ timeout: 15_000, intervals: [500, 1_000] })
-  const panel = addNodePanel(page)
-  await expect(panel.getByRole('button', { name: 'Action', exact: true })).toBeVisible({ timeout: 15_000 })
-  return panel
 }
 
 export async function closeNodeEditorPanel(page: Page) {
