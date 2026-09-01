@@ -45,7 +45,7 @@ class UserTokenConfig(BaseResource, table=True):
     __tablename__ = "user_token_configs"
 
     # Domain-specific fields (BaseResource fields inherited automatically)
-    user_id: UUID = Field(foreign_key="users.id", unique=True, index=True)
+    user_id: UUID = Field(foreign_key="users.id", unique=True, index=True, ondelete="CASCADE")
 
     # Token limit within the rolling window
     token_limit: int = Field(gt=0, description="Maximum tokens allowed within window")
@@ -114,7 +114,7 @@ class TokenUsageRecord(BaseResource, table=True):
     )
 
     # Domain-specific fields (BaseResource fields inherited automatically)
-    user_id: UUID = Field(foreign_key="users.id", index=True)
+    user_id: UUID = Field(foreign_key="users.id", index=True, ondelete="CASCADE")
 
     # Budget-relevant token count: starts as tiktoken estimate, updated to actual total
     token_count: int = Field(ge=0, description="Number of tokens in this request")

@@ -2,7 +2,7 @@
 
 Tests cover:
 - User creation with required fields
-- Soft delete behavior
+- Hard delete behavior
 - Unique constraint violations
 - last_login update functionality
 """
@@ -13,6 +13,7 @@ from typing import Any
 from uuid import uuid4
 
 import pytest
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.core.models import User
@@ -34,8 +35,6 @@ async def test_create_user_with_required_fields(
     assert user.last_name == default_user_data["last_name"]
     assert user.is_enabled is True
     assert user.preferences == {}
-    assert user.deleted_at is None
-    assert user.deleted_by is None
     assert user.created_at is not None
     assert user.updated_at is not None
 
@@ -66,20 +65,11 @@ async def test_create_user_with_all_fields(test_db_session: AsyncSession) -> Non
 
 
 @pytest.mark.asyncio
-async def test_user_soft_delete(
+async def test_user_hard_delete(
     test_db_session: AsyncSession,
     user_factory: Callable[..., Awaitable[User]],
 ) -> None:
-    """Test soft delete sets deleted_at and deleted_by correctly."""
-    # Create admin user who will perform the delete
-    admin = await user_factory(
-        id=uuid4(),
-        username="softdelete-admin",
-        email="softdelete-admin@example.com",
-        first_name="Admin",
-        last_name="User",
-    )
-
+    """Test hard delete removes the user row from the database."""
     # Create user to be deleted
     user = await user_factory(
         id=uuid4(),
@@ -88,15 +78,14 @@ async def test_user_soft_delete(
         first_name="Delete",
         last_name="Me",
     )
+    user_id = user.id
 
-    # Perform soft delete
-    now = datetime.now(UTC)
-    user.deleted_at = now
-    user.deleted_by = admin.id
+    # Perform hard delete
+    await test_db_session.delete(user)
     await test_db_session.commit()
 
-    assert user.deleted_at == now
-    assert user.deleted_by == admin.id
+    result = await test_db_session.exec(select(User).where(User.id == user_id))
+    assert result.one_or_none() is None
 
 
 @pytest.mark.asyncio

@@ -173,7 +173,6 @@ class UsersService(BaseService):
             default_group_result = await self.session.exec(
                 select(Group).where(
                     col(Group.name) == DEFAULT_LOCAL_USERS_GROUP_NAME,
-                    Group.deleted_at.is_(None),  # type: ignore[union-attr]
                 )
             )
             existing_default_group = default_group_result.one_or_none()
@@ -240,7 +239,6 @@ class UsersService(BaseService):
         result = await self.session.exec(
             select(Group).where(
                 col(Group.name).in_(resolved_names),
-                Group.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
         groups = list(result.all())
@@ -462,20 +460,42 @@ class UsersService(BaseService):
         return target_user
 
     async def delete_user(self, user_id: UUID) -> None:
-        """Soft delete a user.
+        """Hard-delete a user and clean up linked resources.
+
+        Deletes non-builtin role assignments, then removes the user row.
+        DB CASCADE handles: user_groups, user_idp_groups, user_identities,
+        refresh_sessions, approval_approver_users, user_token_configs,
+        token_usage_records.
+
+        The principals row is left intact to preserve created_by/updated_by
+        FK integrity on other tables.
 
         Args:
             user_id: UUID of user to delete
 
         Raises:
             UserNotFoundError: If user not found
+            AdminDeleteError: If user is a builtin admin
+            AdminDisableNoOtherAdminsError: If deletion would leave no admins
 
         """
         user = await self.get_user_by_id(user_id)
         if user.is_builtin:
             raise AdminDeleteError
         await self._ensure_other_admins_exist(exclude_user_id=user_id)
-        user.soft_delete(self.user.id)
+
+        from sqlalchemy import delete as sa_delete  # noqa: PLC0415
+
+        from syntara.authz.models.assignments import RoleAssignment  # noqa: PLC0415
+
+        await self.session.exec(
+            sa_delete(RoleAssignment).where(
+                col(RoleAssignment.principal_id) == user_id,
+                col(RoleAssignment.is_builtin) == False,  # noqa: E712
+            )
+        )
+
+        await self.session.delete(user)
         await self.session.commit()
 
     @staticmethod
@@ -561,7 +581,6 @@ class UsersService(BaseService):
             .where(
                 col(Group.name) == "admins",
                 col(Group.is_builtin).is_(True),
-                User.deleted_at.is_(None),  # type: ignore[union-attr]
                 col(User.is_enabled).is_(True),
             )
         )

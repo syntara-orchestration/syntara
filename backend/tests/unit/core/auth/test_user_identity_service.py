@@ -39,7 +39,6 @@ def _make_user(
     """Build a mock User."""
     user = MagicMock()
     user.id = user_id or uuid4()
-    user.deleted_at = None
     user.password_hash = password_hash
     user.auth_type = auth_type
     user.is_builtin = is_builtin

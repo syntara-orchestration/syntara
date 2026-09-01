@@ -33,7 +33,6 @@ async def test_create_group_success(test_db_session: AsyncSession, test_user: Us
     assert group.id is not None
     assert group.created_at is not None
     assert group.updated_at is not None
-    assert group.deleted_at is None
 
 
 @pytest.mark.asyncio

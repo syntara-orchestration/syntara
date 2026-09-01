@@ -53,7 +53,6 @@ def _make_user(**overrides: object) -> User:
         "id": uuid4(),
         "username": "testuser",
         "email": "test@example.com",
-        "deleted_at": None,
     }
     data = {**defaults, **overrides}
     return User(**data)
@@ -228,10 +227,8 @@ class TestInvocationExecutorLifecycleEvents:
 
     @pytest.mark.asyncio
     async def test_execute_orchestration_emits_running_and_completed_events_with_deleted_user(self) -> None:
-        """Successful execution with deleted user emits RUNNING and COMPLETED InvocationLifecycleEvents."""
-        user = _make_user()
-        user.deleted_at = datetime.now(UTC)
-        await self._run_successful_execution_lifecycle_test(user=user)
+        """Successful execution with hard-deleted user (not found in DB) emits lifecycle events."""
+        await self._run_successful_execution_lifecycle_test(user=None)
 
     @pytest.mark.asyncio
     async def test_execute_orchestration_emits_running_and_completed_events_with_unknown_user(self) -> None:

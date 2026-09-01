@@ -38,7 +38,7 @@ from syntara.users.services.user_service import UsersService
 
 async def _get_or_create_admins_group(session: AsyncSession) -> Group:
     """Return the seeded 'admins' group or create one if absent."""
-    result = await session.exec(select(Group).where(Group.name == "admins", Group.deleted_at.is_(None)))  # type: ignore[union-attr]
+    result = await session.exec(select(Group).where(Group.name == "admins"))
     group = result.first()
     if group is not None:
         return group
@@ -50,7 +50,7 @@ async def _get_or_create_admins_group(session: AsyncSession) -> Group:
 
 async def _get_or_create_builtin_admin(session: AsyncSession) -> User:
     """Return the seeded builtin admin user or create one if absent."""
-    result = await session.exec(select(User).where(User.is_builtin == True, User.deleted_at.is_(None)))  # type: ignore[union-attr]  # noqa: E712
+    result = await session.exec(select(User).where(User.is_builtin == True))  # noqa: E712
     user = result.first()
     if user is not None:
         return user
@@ -606,7 +606,7 @@ async def test_to_read_serialization_no_enum_warning(test_db_session: AsyncSessi
 
 @pytest.mark.asyncio
 async def test_delete_user_success(test_db_session: AsyncSession, test_user: User) -> None:
-    """Test successful soft deletion of a user."""
+    """Test successful hard deletion of a user."""
     service = UsersService(test_db_session, test_user)
 
     user = await service.create_user(
@@ -622,18 +622,19 @@ async def test_delete_user_success(test_db_session: AsyncSession, test_user: Use
     await test_db_session.exec(insert(user_groups).values(user_id=test_user.id, group_id=admins_group.id))
     await test_db_session.flush()
 
-    await service.delete_user(user.id)
+    user_id = user.id
+    await service.delete_user(user_id)
 
-    await test_db_session.refresh(user)
-    assert user.deleted_at is not None
+    result = await test_db_session.exec(select(User).where(User.id == user_id))
+    assert result.one_or_none() is None
 
 
 @pytest.mark.asyncio
-async def test_delete_user_anonymizes_email(test_db_session: AsyncSession, test_user: User) -> None:
-    """Test that deleting a user anonymizes their email to prevent reuse attacks.
+async def test_delete_user_allows_email_reuse(test_db_session: AsyncSession, test_user: User) -> None:
+    """Test that deleting a user allows their email to be reused.
 
-    Security: Prevents attacker from engineering account deletion and then
-    registering with victim's email to intercept password resets.
+    Hard delete removes the row entirely, so the unique constraint on
+    email no longer blocks reuse.
     """
     service = UsersService(test_db_session, test_user)
 
@@ -654,14 +655,15 @@ async def test_delete_user_anonymizes_email(test_db_session: AsyncSession, test_
     # Verify email exists before deletion
     assert user.email == original_email
 
-    await service.delete_user(user.id)
+    user_id = user.id
+    await service.delete_user(user_id)
 
-    await test_db_session.refresh(user)
-    assert user.deleted_at is not None
-    assert user.email is None  # Email should be anonymized
+    # Verify user is gone
+    result = await test_db_session.exec(select(User).where(User.id == user_id))
+    assert result.one_or_none() is None
 
     # Verify the email can now be reused by a new user (no unique constraint violation)
-    new_user = await service.create_user(  # type: ignore[unreachable]
+    new_user = await service.create_user(
         username="newuser",
         email=original_email,  # Same email as deleted user
         first_name="New",
@@ -669,7 +671,7 @@ async def test_delete_user_anonymizes_email(test_db_session: AsyncSession, test_
         last_name="User",
     )
     assert new_user.email == original_email
-    assert new_user.id != user.id
+    assert new_user.id != user_id
 
 
 @pytest.mark.asyncio
