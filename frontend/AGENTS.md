@@ -445,7 +445,7 @@ E2E tests use different ports (UI: 4173, mock API: 3300) to avoid conflicts with
 - **Containerization**: Podman (local), Docker Buildx (CI/CD)
 - **Multi-architecture**: Supports linux/amd64 and linux/arm64
 - **Production build**: Nginx-based (UI), Node.js (Mock API)
-- **Authentication**: Basic (demo/coffee)
+- **Authentication**: None — no baked-in credentials
 - **Separate containers**: UI and Mock API
 
 ### Container Commands

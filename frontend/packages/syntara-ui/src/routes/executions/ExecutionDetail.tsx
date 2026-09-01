@@ -301,7 +301,7 @@ export default function ExecutionDetail() {
 
   const historyCardOpen = useMemo(() => {
     const params = new URLSearchParams(searchParams)
-    return params.get('history') !== 'closed'
+    return params.get('history') === 'open'
   }, [searchParams])
 
   const { executionFilters, handleExecutionFilterChange, executionsQuery, executionPaginationFooterProps } =
