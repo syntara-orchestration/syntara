@@ -14,7 +14,7 @@ Managing quarantines in a separate code repository allows a flaky test to be rem
 
 If quarantines are managed in the *same* repository as the target code base, the quarantine becomes a blocker for the entire team, requiring every PR/branch to rebase before merging, creating a bottleneck. In the era of more rapid, agentic development, this represents an unacceptably high tax on velocity.
 
-## Why quarantines and not skips?
+### Why quarantines and not skips?
 
 Quarantines allow a test to continue running, enabling data collection over time. This can allow a test to improve organically, possibly resulting in the quarantine being lifted even without direct intervention.
 
