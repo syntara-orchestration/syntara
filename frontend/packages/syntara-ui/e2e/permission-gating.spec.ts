@@ -282,7 +282,7 @@ test.describe('Permission gating — Route guards', () => {
     await app.goto(toAppUrl(`${AM_URL}/users/create`))
 
     await expect(app.getByRole('heading', { name: 'Access denied' })).not.toBeVisible()
-    await expect(app.getByRole('heading', { name: /Create User/i })).toBeVisible()
+    await expect(app.getByRole('heading', { name: 'Create user' })).toBeVisible()
   })
 })
 

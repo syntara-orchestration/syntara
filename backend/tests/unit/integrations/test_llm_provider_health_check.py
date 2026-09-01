@@ -783,6 +783,169 @@ class TestLLMProviderLogging:
 
 
 # ---------------------------------------------------------------------------
+# Credential confirmation (OpenAI-compatible GET /key after catalog 200)
+# ---------------------------------------------------------------------------
+
+
+class TestLLMProviderCredentialConfirmation:
+    """validate() must not treat a public /models catalog as a valid API key."""
+
+    @pytest.mark.asyncio
+    async def test_custom_models_200_key_401_validate_fails(self) -> None:
+        """OpenRouter-style: public catalog + rejected key → AUTH_FAILURE."""
+        adapter = LLMProviderAdapter(_make_config("custom", base_url="https://openrouter.ai/api/v1"))
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(
+                side_effect=[_mock_response({"data": [{"id": "openai/gpt-4o"}]}), _mock_http_error(401)]
+            )
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_cls.return_value = mock_client
+
+            result = await adapter.validate(_openai_cred("sk-or-v1-INVALID000"), timeout_seconds=10)
+
+        assert result.success is False
+        assert result.error_type == HealthCheckErrorType.AUTH_FAILURE
+        assert mock_client.get.call_count == 2
+        assert mock_client.get.call_args_list[0].args[0].endswith("/models")
+        assert mock_client.get.call_args_list[1].args[0].endswith("/key")
+
+    @pytest.mark.asyncio
+    async def test_custom_models_200_discover_does_not_probe_key(self) -> None:
+        """Discover lists the catalog only; a public /models 200 is enough."""
+        adapter = LLMProviderAdapter(_make_config("custom", base_url="https://openrouter.ai/api/v1"))
+        catalog = _mock_response({"data": [{"id": "openai/gpt-4o"}]})
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(return_value=catalog)
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_cls.return_value = mock_client
+
+            result = await adapter.discover(_openai_cred("sk-or-v1-INVALID000"), timeout_seconds=10)
+
+        assert result.success is True
+        assert result.discovered_models is not None
+        assert len(result.discovered_models) == 1
+        mock_client.get.assert_called_once()
+        assert mock_client.get.call_args.args[0].endswith("/models")
+
+    @pytest.mark.asyncio
+    async def test_custom_models_200_key_200_validate_succeeds(self) -> None:
+        adapter = LLMProviderAdapter(_make_config("custom", base_url="https://openrouter.ai/api/v1"))
+        with _mock_httpx(response=_mock_response({"data": []})) as mock_client:
+            result = await adapter.validate(_openai_cred(), timeout_seconds=10)
+
+        assert result.success is True
+        assert mock_client.get.call_count == 2
+        assert mock_client.get.call_args_list[1].args[0].endswith("/key")
+
+    @pytest.mark.asyncio
+    async def test_openai_models_401_does_not_probe_key(self) -> None:
+        """Auth-gated catalogs fail on the first request; /key is not called."""
+        adapter = LLMProviderAdapter(_make_config("openai"))
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(side_effect=_mock_http_error(401))
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_cls.return_value = mock_client
+
+            result = await adapter.validate(_openai_cred(), timeout_seconds=10)
+
+        assert result.success is False
+        assert result.error_type == HealthCheckErrorType.AUTH_FAILURE
+        mock_client.get.assert_called_once()
+        assert mock_client.get.call_args.args[0].endswith("/models")
+
+    @pytest.mark.asyncio
+    async def test_openai_models_200_key_404_validate_succeeds(self) -> None:
+        """OpenAI has no /key endpoint; 404 is treated as probe-absent."""
+        adapter = LLMProviderAdapter(_make_config("openai"))
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(
+                side_effect=[_mock_response({"data": [{"id": "gpt-4o"}]}), _mock_response({}, status_code=404)]
+            )
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_cls.return_value = mock_client
+
+            result = await adapter.validate(_openai_cred(), timeout_seconds=10)
+
+        assert result.success is True
+        assert mock_client.get.call_count == 2
+        assert mock_client.get.call_args_list[1].args[0].endswith("/key")
+
+    @pytest.mark.asyncio
+    async def test_custom_models_200_key_404_validate_succeeds(self) -> None:
+        """vLLM-style: public catalog and no /key → still success."""
+        adapter = LLMProviderAdapter(_make_config("custom", base_url="http://localhost:8000/v1"))
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(
+                side_effect=[_mock_response({"data": [{"id": "llama"}]}), _mock_http_error(404)]
+            )
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_cls.return_value = mock_client
+
+            result = await adapter.validate(_openai_cred(), timeout_seconds=10)
+
+        assert result.success is True
+
+    @pytest.mark.asyncio
+    async def test_key_probe_timeout_fails_validate(self) -> None:
+        adapter = LLMProviderAdapter(_make_config("custom", base_url="https://openrouter.ai/api/v1"))
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(side_effect=[_mock_response({"data": []}), TimeoutError("timed out")])
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_cls.return_value = mock_client
+
+            result = await adapter.validate(_openai_cred(), timeout_seconds=5)
+
+        assert result.success is False
+        assert result.error_type == HealthCheckErrorType.TIMEOUT
+
+    @pytest.mark.asyncio
+    async def test_anthropic_does_not_probe_key(self) -> None:
+        adapter = LLMProviderAdapter(_make_config("anthropic", base_url=None))
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(return_value=_mock_response({"data": []}))
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_cls.return_value = mock_client
+
+            result = await adapter.validate(_openai_cred(), timeout_seconds=10)
+
+        assert result.success is True
+        mock_client.get.assert_called_once()
+        assert "/key" not in mock_client.get.call_args.args[0]
+
+    @pytest.mark.asyncio
+    async def test_rejected_key_not_logged(self, caplog: pytest.LogCaptureFixture) -> None:
+        import logging
+
+        caplog.set_level(logging.DEBUG)
+        test_api_key = "sk-or-v1-INVALID000"
+        adapter = LLMProviderAdapter(_make_config("custom", base_url="https://openrouter.ai/api/v1"))
+        with patch("syntara.integrations.adapters.llm_provider.httpx.AsyncClient") as mock_cls:
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(side_effect=[_mock_response({"data": []}), _mock_http_error(401)])
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_cls.return_value = mock_client
+
+            await adapter.validate({"llm_api_key": test_api_key}, timeout_seconds=10)
+
+        assert test_api_key not in caplog.text
+
+
+# ---------------------------------------------------------------------------
 # Pagination
 # ---------------------------------------------------------------------------
 
@@ -877,6 +1040,7 @@ class TestLLMProviderDiscoverPagination:
 
         assert result.success is True
         assert mock_client.get.call_count == 1
+        assert mock_client.get.call_args.args[0].endswith("/models")
 
     @pytest.mark.asyncio
     async def test_pagination_stops_at_max_pages(self) -> None:

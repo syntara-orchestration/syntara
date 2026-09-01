@@ -9,6 +9,7 @@ import { AppRoute } from '../../app/AppRoute'
 import { executionsClient } from '../../client'
 import { SynPage, SynPageBody } from '../../components/layout/SynPage'
 import { SynPageHeader } from '../../components/layout/SynPageHeader'
+import { SynPanelStack, SynPanelStackItem } from '../../components/layout/SynPanelStack'
 import { SynReactFlowViewportGuard } from '../../components/layout/SynReactFlowViewportGuard'
 import { ResizableDivider } from '../../components/ResizableDivider'
 import { SynPageTitle } from '../../components/SynPageTitle'
@@ -210,9 +211,8 @@ function ExecutionDetailContent({
             </FlexItem>
           </Flex>
         )}
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-          {/* Workflow Canvas */}
-          <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+        <SynPanelStack>
+          <SynPanelStackItem isFilled>
             <ExecutionViewContent
               workflow={workflow}
               executionStatus={execution?.status ?? null}
@@ -221,12 +221,11 @@ function ExecutionDetailContent({
               onNodeClick={onNodeClick}
               selectedActivityId={currentApprovalNodeId ?? selectedNodeId}
             />
-          </div>
+          </SynPanelStackItem>
 
           <ResizableDivider onResize={handleResize} currentValue={panelHeightPercent} />
 
-          {/* Execution Details Panel */}
-          <div style={{ height: `${String(panelHeight)}px`, flexShrink: 0, overflow: 'hidden' }}>
+          <SynPanelStackItem style={{ height: `${String(panelHeight)}px` }}>
             <ExecutionDetailsPanel
               executionId={executionId}
               workflowDefinition={workflow?.version.workflow_definition}
@@ -234,8 +233,8 @@ function ExecutionDetailContent({
               selectedNodeName={selectedNodeName}
               onNodeSelect={onNodeSelect}
             />
-          </div>
-        </div>
+          </SynPanelStackItem>
+        </SynPanelStack>
       </FlexItem>
 
       {approvalPanel && <FlexItem className={styles.approvalPanelSlot}>{approvalPanel}</FlexItem>}
