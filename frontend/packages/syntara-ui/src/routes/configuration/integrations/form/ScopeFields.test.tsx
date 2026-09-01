@@ -1,5 +1,6 @@
 import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useEffect } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
@@ -146,6 +147,65 @@ describe('ScopeFields', () => {
       await user.click(screen.getByRole('switch', { name: /integration scope/i }))
 
       expect(screen.queryByPlaceholderText('Select projects...')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('project selection', () => {
+    it('updates selected project ids when a project is chosen', async () => {
+      const user = userEvent.setup()
+
+      function ProjectSelectionProbe() {
+        const { control } = useForm<TestFormValues>({
+          defaultValues: { scope: 'project', project_ids: [] },
+        })
+        const projectIds = useWatch({ control, name: 'project_ids' })
+
+        return (
+          <>
+            <ScopeFields<TestFormValues>
+              control={control}
+              scope="project"
+              scopeName="scope"
+              projectIdsName="project_ids"
+              idPrefix="test"
+            />
+            <output data-testid="selected-projects">{projectIds.join(',')}</output>
+          </>
+        )
+      }
+
+      render(<ProjectSelectionProbe />)
+
+      await user.click(screen.getByPlaceholderText('Select projects...'))
+      await user.click(screen.getByText('alice-sandbox'))
+
+      expect(screen.getByTestId('selected-projects')).toHaveTextContent('p-002')
+    })
+
+    it('shows project field validation errors from the form controller', () => {
+      function ErrorProbe() {
+        const { control, setError } = useForm<TestFormValues>({
+          defaultValues: { scope: 'project', project_ids: [] },
+        })
+
+        useEffect(() => {
+          setError('project_ids', { type: 'required', message: 'Select at least one project' })
+        }, [setError])
+
+        return (
+          <ScopeFields<TestFormValues>
+            control={control}
+            scope="project"
+            scopeName="scope"
+            projectIdsName="project_ids"
+            idPrefix="test"
+          />
+        )
+      }
+
+      render(<ErrorProbe />)
+
+      expect(screen.getByText('Select at least one project')).toBeInTheDocument()
     })
   })
 

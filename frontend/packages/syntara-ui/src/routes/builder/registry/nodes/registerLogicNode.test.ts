@@ -303,7 +303,7 @@ describe('registerLogicNode', () => {
     it('calls onError for invalid logicType', () => {
       const onSuccess = vi.fn()
       const onError = vi.fn()
-      getHandler()({ logicType: 'invalid', name: 'Bad' } as unknown as Record<string, unknown>, onSuccess, onError)
+      getHandler()({ logicType: 'invalid', name: 'Bad' }, onSuccess, onError)
 
       expect(onError).toHaveBeenCalledWith('Invalid logic type')
       expect(onSuccess).not.toHaveBeenCalled()

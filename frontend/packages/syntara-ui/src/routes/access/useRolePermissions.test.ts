@@ -46,7 +46,7 @@ describe('useRolePermissions', () => {
   })
 
   it('returns all true when API grants all permissions', async () => {
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
 
     const { result } = renderHook(() => useRolePermissions(), { wrapper: createWrapper() })
 
@@ -59,7 +59,7 @@ describe('useRolePermissions', () => {
   })
 
   it('uses system-scoped can_i when no resourceProject is provided', async () => {
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
 
     renderHook(() => useRolePermissions(), { wrapper: createWrapper() })
 
@@ -78,7 +78,7 @@ describe('useRolePermissions', () => {
   })
 
   it('scopes can_i to resourceProject when provided', async () => {
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
 
     renderHook(() => useRolePermissions({ resourceProject: 'proj-1' }), { wrapper: createWrapper() })
 

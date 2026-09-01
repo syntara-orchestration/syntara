@@ -29,7 +29,7 @@ function getDirtyWorkflowDefinition(
     currentWorkflow.workflow.activities ?? [],
     currentWorkflow.triggers ?? [],
     { edges, nodePositions }
-  ) as unknown as Record<string, unknown>
+  )
 }
 
 type UsePublishWorkflowOptions = {
@@ -73,7 +73,7 @@ export function usePublishWorkflow(
             change_description: description ?? null,
             ...(workflowDefinition ? { workflow_definition: workflowDefinition } : {}),
             ...(expectedVersion != null ? { expected_version: expectedVersion } : {}),
-          } as { name: string | null; change_description: string | null },
+          },
         },
         {
           onSuccess: (data) => {

@@ -143,4 +143,64 @@ describe('DynamicFieldRenderer', () => {
     const input = screen.getByLabelText('Token', { selector: 'input' })
     expect(input).toHaveAttribute('placeholder', '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022')
   })
+
+  it('coerces numeric field values to display strings', () => {
+    render(<DynamicFieldRenderer field={textField} value={443} onChange={onChange} />)
+
+    expect(screen.getByDisplayValue('443')).toBeInTheDocument()
+  })
+
+  it('coerces boolean field values to display strings', () => {
+    render(<DynamicFieldRenderer field={textField} value={false} onChange={onChange} />)
+
+    expect(screen.getByDisplayValue('false')).toBeInTheDocument()
+  })
+
+  it('renders an empty text input when the value is null', () => {
+    render(<DynamicFieldRenderer field={textField} value={null} onChange={onChange} />)
+
+    expect(screen.getByRole('textbox', { name: 'Host' })).toHaveValue('')
+  })
+
+  it('rejects object values instead of stringifying them', () => {
+    render(<DynamicFieldRenderer field={textField} value={{ host: 'example.com' }} onChange={onChange} />)
+
+    expect(screen.getByRole('textbox', { name: 'Host' })).toHaveValue('')
+    expect(screen.queryByDisplayValue('[object Object]')).not.toBeInTheDocument()
+  })
+
+  it('rejects array values instead of stringifying them', () => {
+    render(<DynamicFieldRenderer field={multilineField} value={['line-1', 'line-2']} onChange={onChange} />)
+
+    expect(screen.getByRole('textbox', { name: 'SSH Key' })).toHaveValue('')
+  })
+
+  it('shows field-level validation errors', () => {
+    render(<DynamicFieldRenderer field={textField} value="" onChange={onChange} error="Host is required" />)
+
+    expect(screen.getByText('Host is required')).toBeInTheDocument()
+  })
+
+  it('marks a secret as touched so the encrypted placeholder clears after editing', async () => {
+    const user = userEvent.setup()
+    render(<DynamicFieldRenderer field={secretField} value="$encrypted$" onChange={onChange} isEditMode />)
+
+    const input = screen.getByLabelText('Token', { selector: 'input' })
+    expect(input).toHaveAttribute('placeholder', '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022')
+
+    await user.type(input, 'n')
+
+    expect(onChange).toHaveBeenCalledWith('token', 'n')
+    expect(input).not.toHaveAttribute('placeholder', '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022')
+  })
+
+  it('selects a choices option and notifies onChange', async () => {
+    const user = userEvent.setup()
+    render(<DynamicFieldRenderer field={choicesField} value="" onChange={onChange} />)
+
+    await user.click(screen.getByRole('button', { name: 'Provider' }))
+    await user.click(screen.getByRole('option', { name: 'anthropic' }))
+
+    expect(onChange).toHaveBeenCalledWith('provider', 'anthropic')
+  })
 })

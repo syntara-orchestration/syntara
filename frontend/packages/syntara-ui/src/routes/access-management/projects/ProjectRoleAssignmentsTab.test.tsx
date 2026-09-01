@@ -200,7 +200,7 @@ function setupMutationMock(callbackToInvoke: 'onSuccess' | 'onError', errorValue
     isPending: false,
     isError: false,
     error: null,
-  } as never)
+  })
   return mutate
 }
 
@@ -243,7 +243,7 @@ const mockAllAssignments = [
 describe('ProjectRoleAssignmentsTab', () => {
   const mockRefetch = vi.fn().mockResolvedValue({})
 
-  function setupMocks(assignments: RoleAssignmentRead[] = mockAllAssignments as unknown as RoleAssignmentRead[]) {
+  function setupMocks(assignments: RoleAssignmentRead[] = mockAllAssignments) {
     vi.mocked(accessClient.useQuery).mockReturnValue({
       data: { resources: assignments, total: assignments.length, next: null, prev: null },
       isPending: false,
@@ -251,7 +251,7 @@ describe('ProjectRoleAssignmentsTab', () => {
       isError: false,
       error: null,
       refetch: mockRefetch,
-    } as never)
+    })
 
     vi.mocked(accessClient.useMutation).mockReturnValue(mockMutationReturn)
   }
@@ -321,7 +321,7 @@ describe('ProjectRoleAssignmentsTab', () => {
         created_at: '2024-04-01T00:00:00Z',
         project_id: 'proj-1',
         project_name: 'Test Project',
-      } as RoleAssignmentRead,
+      },
     ])
     render(<ProjectRoleAssignmentsTab projectId="proj-1" />, { wrapper })
 
@@ -363,7 +363,7 @@ describe('ProjectRoleAssignmentsTab', () => {
       isError: true,
       error: new Error('Network error'),
       refetch: vi.fn(),
-    } as never)
+    })
 
     render(<ProjectRoleAssignmentsTab projectId="proj-1" />, { wrapper })
 
@@ -378,7 +378,7 @@ describe('ProjectRoleAssignmentsTab', () => {
       isError: false,
       error: null,
       refetch: vi.fn(),
-    } as never)
+    })
 
     render(<ProjectRoleAssignmentsTab projectId="proj-1" />, { wrapper })
 

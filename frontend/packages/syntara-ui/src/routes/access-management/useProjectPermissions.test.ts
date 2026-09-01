@@ -47,7 +47,7 @@ describe('useProjectPermissions', () => {
   })
 
   it('hub chrome only checks project:create', async () => {
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
 
     const { result } = renderHook(() => useProjectPermissions(), { wrapper: createWrapper() })
 
@@ -64,7 +64,7 @@ describe('useProjectPermissions', () => {
   })
 
   it('scopes update/delete to a concrete resourceProject', async () => {
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
 
     const { result } = renderHook(() => useProjectPermissions({ resourceProject: 'proj-a' }), {
       wrapper: createWrapper(),

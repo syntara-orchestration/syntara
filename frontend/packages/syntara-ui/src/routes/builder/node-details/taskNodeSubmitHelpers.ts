@@ -79,7 +79,7 @@ export function buildRegistryActivityUpdate(taskData: TaskActivity, data: Regist
             ...(scriptEnv && { environment: scriptEnv }),
           }
         : {
-            method: data.method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+            method: data.method,
             url: data.url ?? '',
             ...(apiHeaders && { headers: apiHeaders }),
             ...(data.body && {
@@ -87,7 +87,7 @@ export function buildRegistryActivityUpdate(taskData: TaskActivity, data: Regist
             }),
             ...(data.credential_id && { credential_id: data.credential_id }),
           },
-  } as Activity
+  }
 }
 
 function parseHttpBodyField(body: string): unknown {

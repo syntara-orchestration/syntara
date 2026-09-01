@@ -43,7 +43,7 @@ describe('useAssignmentPermissions', () => {
   })
 
   it('uses check_any_project when no resourceProject is provided', async () => {
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
 
     renderHook(() => useAssignmentPermissions(), { wrapper: createWrapper() })
 
@@ -58,7 +58,7 @@ describe('useAssignmentPermissions', () => {
   })
 
   it('scopes can_i to resourceProject when provided', async () => {
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
 
     const { result } = renderHook(() => useAssignmentPermissions({ resourceProject: 'proj-1' }), {
       wrapper: createWrapper(),

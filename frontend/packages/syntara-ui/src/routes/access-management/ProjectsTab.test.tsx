@@ -107,7 +107,7 @@ function setupMocks(projects = mockProjects) {
     isError: false,
     error: null,
     refetch: mockRefetch,
-  } as never)
+  })
 
   vi.mocked(accessClient.useMutation).mockReturnValue({
     mutate: vi.fn(),
@@ -126,7 +126,7 @@ function setupMocks(projects = mockProjects) {
     variables: undefined,
     status: 'idle',
     isPaused: false,
-  } as never)
+  })
 }
 
 describe('ProjectsTab', () => {
@@ -208,7 +208,7 @@ describe('ProjectsTab', () => {
         isError: false,
         error: null,
         refetch: mockRefetch,
-      } as never)
+      })
 
       render(<ProjectsTab />, { wrapper })
 
@@ -223,7 +223,7 @@ describe('ProjectsTab', () => {
         isError: true,
         error: new Error('Failed to load'),
         refetch: mockRefetch,
-      } as never)
+      })
 
       render(<ProjectsTab />, { wrapper })
 
@@ -353,7 +353,7 @@ describe('ProjectsTab', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         mutate: mockDeleteMutate,
         isPending: false,
-      } as never)
+      })
 
       render(<ProjectsTab />, { wrapper })
 
@@ -380,7 +380,7 @@ describe('ProjectsTab', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         mutate: mockDeleteMutate,
         isPending: false,
-      } as never)
+      })
 
       render(<ProjectsTab />, { wrapper })
 
@@ -411,7 +411,7 @@ describe('ProjectsTab', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         mutate: mockDeleteMutate,
         isPending: false,
-      } as never)
+      })
 
       render(<ProjectsTab />, { wrapper })
 
@@ -499,7 +499,7 @@ describe('ProjectsTab', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         mutate: mockCreateMutate,
         isPending: false,
-      } as never)
+      })
 
       const user = userEvent.setup()
       render(<ProjectsTab />, { wrapper })
@@ -528,7 +528,7 @@ describe('ProjectsTab', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         mutate: mockCreateMutate,
         isPending: false,
-      } as never)
+      })
 
       const user = userEvent.setup()
       render(<ProjectsTab />, { wrapper })

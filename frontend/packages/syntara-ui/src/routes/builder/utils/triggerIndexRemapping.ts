@@ -91,7 +91,7 @@ export function remapTriggerIdsInEdges<T extends EdgeConnection>(
         id: edgeId,
         source: updatedSource,
         target: updatedTarget,
-      } as T
+      }
     }
 
     return edge

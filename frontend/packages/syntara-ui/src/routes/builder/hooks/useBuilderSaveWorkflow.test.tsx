@@ -3,6 +3,7 @@ import { describe, expect, it, vi, beforeEach, type MockedFunction } from 'vites
 
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
+import { expectStringContaining } from '../../../test/test-helpers'
 import { detachPromise } from '../../../utils/detachPromise'
 
 import type { UseBuilderSaveWorkflowParams } from './useBuilderSaveWorkflow'
@@ -210,12 +211,12 @@ describe('useBuilderSaveWorkflow', () => {
     await expect(result.current()).resolves.toBe(false)
     expect(showError).toHaveBeenCalledWith({
       title: 'Failed to create workflow',
-      description: expect.stringContaining('Failed to create workflow') as unknown as string,
+      description: expectStringContaining('Failed to create workflow'),
     })
   })
 
   it('does not call create when update path is used', async () => {
-    const createWorkflow = vi.fn() as MockedFunction<CreateWorkflow>
+    const createWorkflow = vi.fn()
     const updateWorkflow = vi.fn((...args: Parameters<UpdateWorkflow>) => {
       detachPromise(args[1]?.onSuccess?.(updateResponse()))
     }) as MockedFunction<UpdateWorkflow>

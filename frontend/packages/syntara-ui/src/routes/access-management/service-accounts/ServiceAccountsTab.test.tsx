@@ -131,10 +131,10 @@ describe('ServiceAccountsTab', () => {
     })
 
     vi.mocked(accessClient.useQuery).mockReturnValue(
-      buildQueryResult({ resources: mockServiceAccounts, next_cursor: null }) as never
+      buildQueryResult({ resources: mockServiceAccounts, next_cursor: null })
     )
 
-    vi.mocked(accessClient.useMutation).mockReturnValue(buildMutationResult() as never)
+    vi.mocked(accessClient.useMutation).mockReturnValue(buildMutationResult())
   })
 
   it('renders service accounts in a table', () => {
@@ -167,7 +167,7 @@ describe('ServiceAccountsTab', () => {
       buildQueryResult({
         resources: [{ ...mockServiceAccounts[0], project_name: 'old-project', is_project_deleted: true }],
         next_cursor: null,
-      }) as never
+      })
     )
 
     render(<ServiceAccountsTab />, { wrapper })
@@ -182,7 +182,7 @@ describe('ServiceAccountsTab', () => {
       buildQueryResult({
         resources: [{ ...mockServiceAccounts[0], project_name: null }],
         next_cursor: null,
-      }) as never
+      })
     )
 
     render(<ServiceAccountsTab />, { wrapper })
@@ -198,7 +198,7 @@ describe('ServiceAccountsTab', () => {
   })
 
   it('renders empty state when no service accounts exist', () => {
-    vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult({ resources: [], next_cursor: null }) as never)
+    vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult({ resources: [], next_cursor: null }))
 
     render(<ServiceAccountsTab />, { wrapper })
 
@@ -446,7 +446,7 @@ describe('ServiceAccountsTab', () => {
     })
 
     it('has no accessibility violations in empty state', async () => {
-      vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult({ resources: [], next_cursor: null }) as never)
+      vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult({ resources: [], next_cursor: null }))
 
       const { container } = render(<ServiceAccountsTab />, { wrapper })
 

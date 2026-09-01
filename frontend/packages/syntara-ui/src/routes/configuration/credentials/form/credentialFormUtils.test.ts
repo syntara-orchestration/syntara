@@ -23,7 +23,7 @@ import {
 import type { FieldDefinition } from './DynamicFieldRenderer'
 
 function makeCredentialType(overrides: Partial<CredentialType> & { inputs: unknown }): CredentialType {
-  return { id: 'type-1', name: 'Test Type', ...overrides } as CredentialType
+  return { id: 'type-1', name: 'Test Type', ...overrides }
 }
 
 function makeSetError() {

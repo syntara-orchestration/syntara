@@ -374,7 +374,8 @@ describe('LogicNodeForm', () => {
       expect(screen.getByRole('spinbutton', { name: /Seconds/i })).toHaveValue(45)
     })
 
-    it('maps all converge fields from initialData', () => {
+    it('maps all converge fields from initialData', async () => {
+      const user = userEvent.setup()
       renderWithHeader(
         <LogicNodeForm
           onSubmit={mockOnSubmit}
@@ -391,6 +392,12 @@ describe('LogicNodeForm', () => {
       expect(screen.getByPlaceholderText(/Enter activity name/i)).toHaveValue('Converge Node')
       expect(screen.getByRole('button', { name: 'Continue when criteria' })).toHaveTextContent(
         'Any branches reach this step'
+      )
+
+      await user.click(screen.getByRole('tab', { name: 'Settings' }))
+      // Converge settings omit timeout; continue_on_failure:false maps to the stop behavior.
+      expect(screen.getByRole('button', { name: 'On failure behavior' })).toHaveTextContent(
+        'Stop workflow or branch on failure'
       )
     })
   })

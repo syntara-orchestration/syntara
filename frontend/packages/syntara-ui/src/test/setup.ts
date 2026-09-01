@@ -142,7 +142,7 @@ if (typeof globalThis !== 'undefined' && !globalThis.ResizeObserver) {
     disconnect() {
       // No-op in test environment
     }
-  } as typeof ResizeObserver
+  }
 }
 
 beforeEach(() => {

@@ -33,12 +33,10 @@ describe('validateConditionConnections', () => {
 
     const result = validateConditionConnections(activities, edges)
     expect(result).toHaveLength(1)
-    expect(result[0]).toMatchObject({
-      severity: 'error',
-      rule: 'condition-connections',
-      nodeId: 'C1',
-      message: expect.stringContaining('Then') as unknown as string,
-    })
+    expect(result[0]?.severity).toBe('error')
+    expect(result[0]?.rule).toBe('condition-connections')
+    expect(result[0]?.nodeId).toBe('C1')
+    expect(result[0]?.message).toContain('Then')
   })
 
   it('allows missing Else branch connection (else is optional)', () => {
@@ -64,12 +62,10 @@ describe('validateConditionConnections', () => {
 
     const result = validateConditionConnections(activities, edges)
     expect(result).toHaveLength(1)
-    expect(result[0]).toMatchObject({
-      severity: 'error',
-      rule: 'condition-connections',
-      nodeId: 'C1',
-      message: expect.stringContaining('Then') as unknown as string,
-    })
+    expect(result[0]?.severity).toBe('error')
+    expect(result[0]?.rule).toBe('condition-connections')
+    expect(result[0]?.nodeId).toBe('C1')
+    expect(result[0]?.message).toContain('Then')
   })
 
   it('handles multiple condition nodes', () => {

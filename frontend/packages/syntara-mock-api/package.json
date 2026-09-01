@@ -11,8 +11,8 @@
     "podman:run": "podman run --rm -p 3000:3000 syntara-mock-api"
   },
   "dependencies": {
-    "@syntara/contracts": "file:../syntara-contracts",
     "@mswjs/http-middleware": "^0.10.3",
+    "@syntara/contracts": "file:../syntara-contracts",
     "jmespath": "^0.16.0",
     "js-yaml": "^4.1.1",
     "msw": "^2.14.6",

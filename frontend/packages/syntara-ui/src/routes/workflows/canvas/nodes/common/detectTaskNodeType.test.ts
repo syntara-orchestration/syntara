@@ -35,7 +35,7 @@ describe('detectTaskNodeType', () => {
           prompt: 'Do something',
           model: 'claude-3-sonnet',
         },
-      } as Partial<TaskActivity>)
+      })
       const result = detectTaskNodeType(task)
 
       expect(result.detectedExecutorType).toBe('agentic')
@@ -46,7 +46,7 @@ describe('detectTaskNodeType', () => {
       const task = createBaseTask({
         type: 'http_request',
         parameters: { method: 'GET', url: 'https://api.example.com' },
-      } as Partial<TaskActivity>)
+      })
       const result = detectTaskNodeType(task)
 
       expect(result.detectedExecutorType).toBe('http_request')
@@ -57,7 +57,7 @@ describe('detectTaskNodeType', () => {
       const task = createBaseTask({
         type: 'aap_job_template',
         parameters: { job_template_id: 123 },
-      } as Partial<TaskActivity>)
+      })
       const result = detectTaskNodeType(task)
 
       expect(result.detectedExecutorType).toBe('aap_job_template')
@@ -84,7 +84,7 @@ describe('detectTaskNodeType', () => {
       const task = createBaseTask({
         type: 'agentic',
         parameters: { prompt: 'test' },
-      } as Partial<TaskActivity>) as TaskActivityWithMetadata
+      }) as TaskActivityWithMetadata
       task.metadata = { __executorType: 'aap_job_template' }
 
       const result = detectTaskNodeType(task)
@@ -97,7 +97,7 @@ describe('detectTaskNodeType', () => {
       const task = createBaseTask({
         type: 'agentic',
         parameters: { prompt: 'test' },
-      } as Partial<TaskActivity>) as TaskActivityWithMetadata
+      }) as TaskActivityWithMetadata
       task.metadata = { __executorType: 'aap' }
 
       const result = detectTaskNodeType(task)
@@ -137,7 +137,7 @@ describe('detectTaskNodeType', () => {
           prompt: JSON.stringify(promptPayload),
           model: 'claude-3-sonnet',
         },
-      } as Partial<TaskActivity>)
+      })
 
       const result = detectTaskNodeType(task)
 
@@ -154,7 +154,7 @@ describe('detectTaskNodeType', () => {
           prompt: 'Run a job template on AAP',
           model: 'claude-3-sonnet',
         },
-      } as Partial<TaskActivity>)
+      })
 
       const result = detectTaskNodeType(task)
 
@@ -175,7 +175,7 @@ describe('detectTaskNodeType', () => {
           prompt: JSON.stringify(promptPayload),
           model: 'claude-3-sonnet',
         },
-      } as Partial<TaskActivity>)
+      })
 
       const result = detectTaskNodeType(task)
 
@@ -195,7 +195,7 @@ describe('detectTaskNodeType', () => {
           prompt: JSON.stringify(promptPayload),
           model: 'claude-3-sonnet',
         },
-      } as Partial<TaskActivity>)
+      })
 
       const result = detectTaskNodeType(task)
 
@@ -210,7 +210,7 @@ describe('detectTaskNodeType', () => {
           prompt: '{ invalid json',
           model: 'claude-3-sonnet',
         },
-      } as Partial<TaskActivity>)
+      })
 
       const result = detectTaskNodeType(task)
 
@@ -231,7 +231,7 @@ describe('detectTaskNodeType', () => {
           prompt: JSON.stringify(maliciousPayload),
           model: 'claude-3-sonnet',
         },
-      } as Partial<TaskActivity>)
+      })
 
       const result = detectTaskNodeType(task)
 
@@ -254,7 +254,7 @@ describe('detectTaskNodeType', () => {
           prompt: JSON.stringify(maliciousPayload),
           model: 'claude-3-sonnet',
         },
-      } as Partial<TaskActivity>)
+      })
 
       const result = detectTaskNodeType(task)
 
@@ -270,7 +270,7 @@ describe('detectTaskNodeType', () => {
           prompt: '"just a string"',
           model: 'claude-3-sonnet',
         },
-      } as Partial<TaskActivity>)
+      })
 
       const result = detectTaskNodeType(task)
 
@@ -286,7 +286,7 @@ describe('detectTaskNodeType', () => {
           prompt: 'null',
           model: 'claude-3-sonnet',
         },
-      } as Partial<TaskActivity>)
+      })
 
       const result = detectTaskNodeType(task)
 
@@ -308,7 +308,7 @@ describe('detectTaskNodeType', () => {
           prompt: JSON.stringify(promptPayload),
           model: 'claude-3-sonnet',
         },
-      } as Partial<TaskActivity>) as TaskActivityWithMetadata
+      }) as TaskActivityWithMetadata
 
       task.metadata = { __executorType: 'script' }
 
@@ -332,7 +332,7 @@ describe('detectTaskNodeType', () => {
           prompt: JSON.stringify(promptPayload),
           model: 'claude-3-sonnet',
         },
-      } as Partial<TaskActivity>) as TaskActivityWithMetadata
+      }) as TaskActivityWithMetadata
 
       task.metadata = { __executorType: 'invalid-type' }
 

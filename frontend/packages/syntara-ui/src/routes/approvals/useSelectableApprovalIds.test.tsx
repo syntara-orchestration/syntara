@@ -52,7 +52,7 @@ describe('useSelectableApprovalIds', () => {
     vi.mocked(usersClient.useQuery).mockReturnValue({
       data: { resources: [] },
       isLoading: false,
-    } as never)
+    })
 
     const approvals = [mockApproval('1', 'pending')]
     const approvalPermissions = new Map([['1', true]])
@@ -67,12 +67,12 @@ describe('useSelectableApprovalIds', () => {
   it('returns empty set when loading user groups', () => {
     vi.mocked(useAuthStore).mockImplementation((selector) => {
       const state = { username: 'alice', userId: 'user-1' }
-      return selector(state as never) as never
+      return selector(state as never)
     })
     vi.mocked(usersClient.useQuery).mockReturnValue({
       data: undefined,
       isLoading: true,
-    } as never)
+    })
 
     const approvals = [mockApproval('1', 'pending')]
     const approvalPermissions = new Map([['1', true]])
@@ -87,12 +87,12 @@ describe('useSelectableApprovalIds', () => {
   it('includes approval when user has RBAC permission and no approvers configured', () => {
     vi.mocked(useAuthStore).mockImplementation((selector) => {
       const state = { username: 'alice', userId: 'user-1' }
-      return selector(state as never) as never
+      return selector(state as never)
     })
     vi.mocked(usersClient.useQuery).mockReturnValue({
       data: { resources: [] },
       isLoading: false,
-    } as never)
+    })
 
     const approvals = [mockApproval('1', 'pending')]
     const approvalPermissions = new Map([['1', true]])
@@ -107,12 +107,12 @@ describe('useSelectableApprovalIds', () => {
   it('includes approval when user is in approver_users', () => {
     vi.mocked(useAuthStore).mockImplementation((selector) => {
       const state = { username: 'alice', userId: 'user-1' }
-      return selector(state as never) as never
+      return selector(state as never)
     })
     vi.mocked(usersClient.useQuery).mockReturnValue({
       data: { resources: [] },
       isLoading: false,
-    } as never)
+    })
 
     const approvals = [mockApproval('1', 'pending', [{ id: '1', username: 'alice' }])]
     const approvalPermissions = new Map([['1', true]])
@@ -127,12 +127,12 @@ describe('useSelectableApprovalIds', () => {
   it('excludes approval when user is not in approver_users', () => {
     vi.mocked(useAuthStore).mockImplementation((selector) => {
       const state = { username: 'charlie', userId: 'user-3' }
-      return selector(state as never) as never
+      return selector(state as never)
     })
     vi.mocked(usersClient.useQuery).mockReturnValue({
       data: { resources: [] },
       isLoading: false,
-    } as never)
+    })
 
     const approvals = [mockApproval('1', 'pending', [{ id: '1', username: 'alice' }])]
     const approvalPermissions = new Map([['1', true]])
@@ -147,14 +147,14 @@ describe('useSelectableApprovalIds', () => {
   it('includes approval when user is in approver_groups', () => {
     vi.mocked(useAuthStore).mockImplementation((selector) => {
       const state = { username: 'alice', userId: 'user-1' }
-      return selector(state as never) as never
+      return selector(state as never)
     })
     vi.mocked(usersClient.useQuery).mockReturnValue({
       data: {
         resources: [{ id: 'group-1', name: 'Admins' }],
       },
       isLoading: false,
-    } as never)
+    })
 
     const approvals = [mockApproval('1', 'pending', undefined, [{ id: 'group-1', name: 'Admins' }])]
     const approvalPermissions = new Map([['1', true]])
@@ -169,14 +169,14 @@ describe('useSelectableApprovalIds', () => {
   it('excludes approval when user is not in approver_groups', () => {
     vi.mocked(useAuthStore).mockImplementation((selector) => {
       const state = { username: 'alice', userId: 'user-1' }
-      return selector(state as never) as never
+      return selector(state as never)
     })
     vi.mocked(usersClient.useQuery).mockReturnValue({
       data: {
         resources: [{ id: 'group-2', name: 'Other' }],
       },
       isLoading: false,
-    } as never)
+    })
 
     const approvals = [mockApproval('1', 'pending', undefined, [{ id: 'group-1', name: 'Admins' }])]
     const approvalPermissions = new Map([['1', true]])
@@ -191,12 +191,12 @@ describe('useSelectableApprovalIds', () => {
   it('excludes approval when status is not pending', () => {
     vi.mocked(useAuthStore).mockImplementation((selector) => {
       const state = { username: 'alice', userId: 'user-1' }
-      return selector(state as never) as never
+      return selector(state as never)
     })
     vi.mocked(usersClient.useQuery).mockReturnValue({
       data: { resources: [] },
       isLoading: false,
-    } as never)
+    })
 
     const approvals = [mockApproval('1', 'approved')]
     const approvalPermissions = new Map([['1', true]])
@@ -211,12 +211,12 @@ describe('useSelectableApprovalIds', () => {
   it('excludes approval when user lacks RBAC permission', () => {
     vi.mocked(useAuthStore).mockImplementation((selector) => {
       const state = { username: 'alice', userId: 'user-1' }
-      return selector(state as never) as never
+      return selector(state as never)
     })
     vi.mocked(usersClient.useQuery).mockReturnValue({
       data: { resources: [] },
       isLoading: false,
-    } as never)
+    })
 
     const approvals = [mockApproval('1', 'pending')]
     const approvalPermissions = new Map([['1', false]])
@@ -231,7 +231,7 @@ describe('useSelectableApprovalIds', () => {
   it('filters out user groups with missing id or name', () => {
     vi.mocked(useAuthStore).mockImplementation((selector) => {
       const state = { username: 'alice', userId: 'user-1' }
-      return selector(state as never) as never
+      return selector(state as never)
     })
     vi.mocked(usersClient.useQuery).mockReturnValue({
       data: {
@@ -243,7 +243,7 @@ describe('useSelectableApprovalIds', () => {
         ],
       },
       isLoading: false,
-    } as never)
+    })
 
     const approvals = [mockApproval('1', 'pending', undefined, [{ id: 'group-1', name: 'Valid Group' }])]
     const approvalPermissions = new Map([['1', true]])
@@ -258,14 +258,14 @@ describe('useSelectableApprovalIds', () => {
   it('handles multiple approvals with mixed selectability', () => {
     vi.mocked(useAuthStore).mockImplementation((selector) => {
       const state = { username: 'alice', userId: 'user-1' }
-      return selector(state as never) as never
+      return selector(state as never)
     })
     vi.mocked(usersClient.useQuery).mockReturnValue({
       data: {
         resources: [{ id: 'group-1', name: 'Admins' }],
       },
       isLoading: false,
-    } as never)
+    })
 
     const approvals = [
       mockApproval('1', 'pending'), // selectable - no approvers
@@ -293,7 +293,7 @@ describe('useSelectableApprovalIds', () => {
   it('skips query when currentUserId is null', () => {
     vi.mocked(useAuthStore).mockImplementation((selector) => {
       const state = { username: null, userId: null }
-      return selector(state as never) as never
+      return selector(state as never)
     })
 
     const mockUseQuery = vi.fn().mockReturnValue({

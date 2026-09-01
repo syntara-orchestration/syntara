@@ -9,7 +9,7 @@ function makeTask(
   return {
     id: 'a1',
     ...overrides,
-  } as TaskActivity
+  }
 }
 
 describe('getTaskSemanticLabels', () => {

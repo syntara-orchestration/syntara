@@ -194,7 +194,7 @@ function setupMocks(overrides?: {
     isPending: false,
     isError: false,
     error: null,
-  } as never)
+  })
 
   vi.mocked(integrationsClient.useMutation).mockImplementation((_method: string, path: string) => {
     if (path === '/integrations/{integration_id}/tools/bulk_update') {

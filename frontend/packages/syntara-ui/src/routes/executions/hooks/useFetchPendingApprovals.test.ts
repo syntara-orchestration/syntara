@@ -73,7 +73,7 @@ describe('useFetchPendingApprovals', () => {
       isLoading: false,
       isError: false,
       error: null,
-    } as never)
+    })
   })
 
   it('initializes with not loading', () => {

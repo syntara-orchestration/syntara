@@ -16,7 +16,7 @@ function createMockNode(type: string, data?: Partial<NodeType['data']>): Node<No
     id: 'test-node-1',
     type,
     position: { x: 0, y: 0 },
-    data: data ?? ({ name: 'Test Node' } as NodeType['data']),
+    data: data ?? { name: 'Test Node' },
   }
 }
 

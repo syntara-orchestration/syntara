@@ -57,11 +57,11 @@ describe('ActionNodeForm', () => {
       isPending: false,
       error: null,
       refetch: vi.fn(),
-    } as never)
+    })
     vi.mocked(credentialsClient.useMutation).mockReturnValue({
       mutate: vi.fn(),
       isPending: false,
-    } as never)
+    })
     vi.mocked(useAllProjects).mockReturnValue({ projects: [], isLoading: false, error: null, refetch: vi.fn() })
     vi.mocked(useSelectableProjects).mockReturnValue({ projects: [], isLoading: false, error: null, refetch: vi.fn() })
   })
@@ -446,7 +446,7 @@ describe('ActionNodeForm', () => {
         isPending: false,
         error: null,
         refetch: vi.fn(),
-      } as never)
+      })
       renderWithHeader(<ActionNodeForm onSubmit={mockOnSubmit} initialData={{ executor: 'http_request' }} />)
 
       const urlInput = screen.getByRole('textbox', { name: 'URL' })
@@ -546,7 +546,7 @@ describe('ActionNodeForm', () => {
         isError: false,
         error: null,
         refetch: vi.fn(),
-      } as never)
+      })
       renderWithHeader(
         <ActionNodeForm
           onSubmit={mockOnSubmit}

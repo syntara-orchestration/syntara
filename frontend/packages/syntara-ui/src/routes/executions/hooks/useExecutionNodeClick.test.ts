@@ -184,4 +184,51 @@ describe('useExecutionNodeClick', () => {
 
     expect(mockClearApprovals).toHaveBeenCalledOnce()
   })
+
+  it('selectNode sets both selected id and display name', () => {
+    const { result } = renderHook(() => useExecutionNodeClick('exec-1'))
+
+    act(() => {
+      result.current.selectNode('activity-42', 'Deploy service')
+    })
+
+    expect(result.current.selectedNodeId).toBe('activity-42')
+    expect(result.current.selectedNodeName).toBe('Deploy service')
+  })
+
+  it('uses definitionId as the selected activity id when present', () => {
+    const { result } = renderHook(() => useExecutionNodeClick('exec-1'))
+    const node = {
+      id: 'react-flow-node-1',
+      data: {
+        name: 'Run Script',
+        definitionId: 'run_script',
+        __executionState: { status: 'completed' },
+      },
+    }
+
+    act(() => {
+      result.current.handleNodeClick(fakeEvent, node)
+    })
+
+    expect(result.current.selectedNodeId).toBe('run_script')
+    expect(result.current.selectedNodeName).toBe('Run Script')
+  })
+
+  it('ignores clicks when __executionState is not an object', () => {
+    const { result } = renderHook(() => useExecutionNodeClick('exec-1'))
+    const node = {
+      id: 'step-1',
+      data: {
+        name: 'Broken state',
+        __executionState: 'completed',
+      },
+    }
+
+    act(() => {
+      result.current.handleNodeClick(fakeEvent, node)
+    })
+
+    expect(result.current.selectedNodeId).toBeNull()
+  })
 })

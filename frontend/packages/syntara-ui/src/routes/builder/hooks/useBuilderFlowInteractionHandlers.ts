@@ -99,7 +99,7 @@ export function useBuilderFlowInteractionHandlers({
       dispatch({
         type: 'NODE_CLICK',
         // React Flow widens getNode().data; builder state expects Node<NodeType['data']>
-        payload: { node: node as Node<NodeType['data']>, isGeneric },
+        payload: { node: node, isGeneric },
       })
     },
     [dispatch, reactFlowInstance]

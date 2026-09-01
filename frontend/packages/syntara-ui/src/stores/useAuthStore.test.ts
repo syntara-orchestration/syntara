@@ -764,7 +764,7 @@ describe('useAuthStore', () => {
         ...window.location,
         origin: 'http://localhost',
         href: 'http://localhost/',
-      } as Location)
+      })
       Object.defineProperty(window.location, 'href', { set: hrefSetter, configurable: true })
 
       mockFetch.mockResolvedValueOnce({

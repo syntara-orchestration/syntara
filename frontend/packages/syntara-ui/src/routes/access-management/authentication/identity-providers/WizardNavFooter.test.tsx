@@ -13,7 +13,7 @@ const mockContext = {
   goToNextStep: mockGoToNextStep,
   goToPrevStep: mockGoToPrevStep,
   goToStepById: mockGoToStepById,
-  activeStep: { index: 1 } as { index: number },
+  activeStep: { index: 1 },
   steps: [{}, {}],
 }
 

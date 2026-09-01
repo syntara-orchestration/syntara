@@ -86,7 +86,7 @@ describe('IntegrationResourcesTab', () => {
       variables: undefined,
       status: 'idle',
       isPaused: false,
-    } as never)
+    })
   })
 
   function renderTab(overrides?: {

@@ -166,7 +166,7 @@ describe('RolesTab', () => {
       variables: undefined,
       status: 'idle',
       isPaused: false,
-    } as never)
+    })
   })
 
   describe('Accessibility', () => {
@@ -184,7 +184,7 @@ describe('RolesTab', () => {
         error: null,
         isFetching: false,
         refetch: mockRefetch,
-      } as never)
+      })
 
       const { container } = render(<RolesTab />, { wrapper: createWrapper() })
       const results = await axe(container)
@@ -257,7 +257,7 @@ describe('RolesTab', () => {
         error: null,
         isFetching: false,
         refetch: mockRefetch,
-      } as never)
+      })
 
       render(<RolesTab />, { wrapper: createWrapper() })
 

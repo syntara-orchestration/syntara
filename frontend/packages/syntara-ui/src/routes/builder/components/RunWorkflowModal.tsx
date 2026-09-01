@@ -158,7 +158,7 @@ export function RunWorkflowModal({
     const activities = activitiesQuery.data.resources ?? []
     const triggerActivity = activities.find((a) => a.activity_name === triggerNodeId)
     if (triggerActivity?.output_data && typeof triggerActivity.output_data === 'object') {
-      return triggerActivity.output_data as Record<string, unknown>
+      return triggerActivity.output_data
     }
     return null
   }, [activitiesQuery.data, triggerNodeId])

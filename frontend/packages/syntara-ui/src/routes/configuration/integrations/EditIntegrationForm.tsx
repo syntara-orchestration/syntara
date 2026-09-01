@@ -317,7 +317,7 @@ export function EditIntegrationForm() {
       base_url: 'base_url' in config ? String(config.base_url ?? '') : '',
       allow_http: 'allow_http' in config ? Boolean(config.allow_http) : false,
       insecure_skip_tls_verify: 'insecure_skip_tls_verify' in config ? Boolean(config.insecure_skip_tls_verify) : false,
-      ca_certificate: 'ca_certificate' in config ? ((config.ca_certificate as string | null) ?? null) : null,
+      ca_certificate: 'ca_certificate' in config ? (config.ca_certificate ?? null) : null,
       scope: (integration.scope as 'global' | 'project') ?? 'global',
       project_ids: projectIds,
       management_credential_id: integration.management_credential_id ?? null,

@@ -77,7 +77,7 @@ describe('ProjectPolicySelect', () => {
       data: { resources: policies },
       isLoading,
       isFetching,
-    } as never)
+    })
   }
 
   beforeEach(() => {

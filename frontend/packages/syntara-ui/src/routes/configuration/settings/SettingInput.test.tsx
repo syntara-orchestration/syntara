@@ -256,6 +256,28 @@ describe('SettingInput', () => {
     expect(screen.getByDisplayValue('fallback')).toBeInTheDocument()
   })
 
+  it('stringifies non-string values in the default TextInput', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    const unknownSetting = { ...baseSetting, value_type: 'unknown' as RuntimeSetting['value_type'] }
+    render(
+      <SettingInput
+        setting={unknownSetting}
+        value={42}
+        numericBounds={null}
+        numericError={null}
+        onChange={onChange}
+        stringError={null}
+        onStringError={vi.fn()}
+      />
+    )
+
+    expect(screen.getByDisplayValue('42')).toBeInTheDocument()
+
+    await user.type(screen.getByDisplayValue('42'), '0')
+    expect(onChange).toHaveBeenCalledWith('test.setting', '420')
+  })
+
   it('shows error validation state on NumberInput when numericError is set', () => {
     render(
       <SettingInput

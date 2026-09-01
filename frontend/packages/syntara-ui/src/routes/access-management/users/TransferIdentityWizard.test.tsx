@@ -184,7 +184,7 @@ function setupMocks({
   vi.mocked(usersClient.useMutation).mockReturnValue({
     mutate: mockMutate,
     isPending: false,
-  } as never)
+  })
 }
 
 describe('TransferIdentityWizard', () => {

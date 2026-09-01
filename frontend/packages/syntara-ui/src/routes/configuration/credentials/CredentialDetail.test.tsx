@@ -17,8 +17,8 @@ const { mockNavigate } = vi.hoisted(() => ({
   mockNavigate: vi.fn(),
 }))
 
-const wouterMock = vi.hoisted(() => ({
-  credentialId: '1' as string | undefined,
+const wouterMock = vi.hoisted((): { credentialId: string | undefined } => ({
+  credentialId: '1',
 }))
 
 const mockCredential = {
@@ -231,7 +231,7 @@ describe('CredentialDetail', () => {
     queryClient.clear()
     mockMutate = vi.fn()
     vi.mocked(useParams).mockReturnValue({ credentialId: '1' })
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
 
     vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery())
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -798,7 +798,7 @@ describe('CredentialDetail', () => {
 
   it('renders em-dash for workflow count when null', () => {
     const credWithNullCount = { ...mockCredential, workflow_count: null }
-    vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery(credWithNullCount as never))
+    vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery(credWithNullCount))
 
     render(<CredentialDetail />, { wrapper })
 
@@ -810,7 +810,7 @@ describe('CredentialDetail', () => {
 
   it('renders workflow count as badge on Workflows tab when greater than zero', async () => {
     const credWithCount = { ...mockCredential, workflow_count: 5 }
-    vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery(credWithCount as never))
+    vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery(credWithCount))
 
     render(<CredentialDetail />, { wrapper })
 
@@ -832,7 +832,7 @@ describe('CredentialDetail', () => {
 
   it('renders em-dash for integration count when null', () => {
     const credWithNullIntegrationCount = { ...mockCredential, integration_count: null }
-    vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery(credWithNullIntegrationCount as never))
+    vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery(credWithNullIntegrationCount))
 
     render(<CredentialDetail />, { wrapper })
 
@@ -842,7 +842,7 @@ describe('CredentialDetail', () => {
 
   it('renders integration count as badge on Integrations tab when greater than zero', async () => {
     const credWithIntegrationCount = { ...mockCredential, integration_count: 7 }
-    vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery(credWithIntegrationCount as never))
+    vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery(credWithIntegrationCount))
 
     render(<CredentialDetail />, { wrapper })
 
@@ -854,7 +854,7 @@ describe('CredentialDetail', () => {
 
   describe('Permission-based tab gating', () => {
     it('hides Workflows tab when workflow:read is denied', async () => {
-      vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: false } } as never)
+      vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: false } })
       render(<CredentialDetail />, { wrapper })
 
       await act(async () => {
@@ -866,7 +866,7 @@ describe('CredentialDetail', () => {
     })
 
     it('shows Workflows tab when workflow:read is granted', async () => {
-      vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+      vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
       render(<CredentialDetail />, { wrapper })
 
       expect(await screen.findByRole('tab', { name: /Workflows/ })).toBeInTheDocument()

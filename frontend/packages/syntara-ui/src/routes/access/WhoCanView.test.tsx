@@ -71,7 +71,7 @@ function mockMutationState(overrides: Record<string, unknown>) {
     variables: undefined,
     isPaused: false,
     ...overrides,
-  } as never)
+  })
 }
 
 describe('WhoCanView', () => {
@@ -82,7 +82,7 @@ describe('WhoCanView', () => {
       data: { resources: [], next: null },
       isPending: false,
       error: null,
-    } as never)
+    })
     vi.mocked(accessFetchClient.GET).mockResolvedValue({ data: { resources: [] } } as never)
     vi.mocked(dynamicFetchClient.GET).mockResolvedValue({ data: { resources: [] } } as never)
     const projectsMockValue = {
@@ -121,7 +121,7 @@ describe('WhoCanView', () => {
       submittedAt: 0,
       variables: undefined,
       isPaused: false,
-    } as never)
+    })
   })
 
   it('renders empty state initially', () => {

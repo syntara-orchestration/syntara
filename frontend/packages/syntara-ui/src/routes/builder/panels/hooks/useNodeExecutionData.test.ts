@@ -7,7 +7,7 @@ const mockUseQuery = vi.fn<(...args: unknown[]) => { data: unknown; isLoading: b
 
 vi.mock('../../../../client', () => ({
   executionsClient: {
-    useQuery: (...args: unknown[]) => mockUseQuery(...args) as { data: unknown; isLoading: boolean },
+    useQuery: (...args: unknown[]) => mockUseQuery(...args),
   },
 }))
 

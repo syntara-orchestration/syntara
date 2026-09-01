@@ -63,7 +63,7 @@ describe('RetryExecutionButton', () => {
     vi.mocked(executionsClient.useMutation).mockReturnValue({
       mutate: mockMutate,
       isPending: false,
-    } as never)
+    })
     vi.mocked(useCanI).mockReturnValue({ allowed: true, isChecking: false, isError: false })
   })
 

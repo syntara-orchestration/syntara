@@ -76,7 +76,7 @@ export class EdgeFactory {
       type: edgeType,
       markerEnd,
       ...(onAddNode ? { data: { onAddNode } } : {}),
-    } as EdgeType
+    }
   }
 
   /**

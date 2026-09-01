@@ -1,4 +1,3 @@
-import type { WorkflowAPI } from '@syntara/contracts'
 import { useCallback } from 'react'
 
 import type { AlertConfig, AlertMessage } from '../../../providers/alerts'
@@ -8,8 +7,6 @@ import { applyImportToCanvas, type PendingImportData } from '../useWorkflowImpor
 import { buildWorkflowDefinition } from '../utils/workflowDefinitionBuilder'
 
 import type { UseBuilderSaveWorkflowParams } from './useBuilderSaveWorkflow'
-
-type CreateWorkflowBody = WorkflowAPI.paths['/workflows']['post']['requestBody']['content']['application/json']
 
 export type UseBuilderImportHandlersParams = {
   dispatch: (action: BuilderAction) => void
@@ -66,7 +63,7 @@ export function useBuilderImportHandlers(
         body: {
           name: importName,
           description: importDescription,
-          workflow_definition: fullDefinition as unknown as CreateWorkflowBody['workflow_definition'],
+          workflow_definition: fullDefinition,
           project_id: projectId,
           is_import: true,
         },

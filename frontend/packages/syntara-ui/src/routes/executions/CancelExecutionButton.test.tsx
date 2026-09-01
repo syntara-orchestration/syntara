@@ -49,7 +49,7 @@ describe('CancelExecutionButton', () => {
     vi.mocked(executionsClient.useMutation).mockReturnValue({
       mutate: mockMutate,
       isPending: false,
-    } as never)
+    })
   })
 
   it('renders an enabled cancel button', () => {
@@ -81,7 +81,7 @@ describe('CancelExecutionButton', () => {
     vi.mocked(executionsClient.useMutation).mockReturnValue({
       mutate: mockMutate,
       isPending: true,
-    } as never)
+    })
 
     renderButton()
 

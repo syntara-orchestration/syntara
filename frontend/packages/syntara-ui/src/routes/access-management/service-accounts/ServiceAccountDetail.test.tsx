@@ -114,9 +114,9 @@ describe('ServiceAccountDetail', () => {
       tooltips: { create: '', update: '', delete: '', rotateSecret: '' },
     })
 
-    vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult(mockServiceAccount) as never)
+    vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult(mockServiceAccount))
 
-    vi.mocked(accessClient.useMutation).mockReturnValue(buildMutationResult() as never)
+    vi.mocked(accessClient.useMutation).mockReturnValue(buildMutationResult())
   })
 
   it('renders the service account name as heading', () => {
@@ -223,9 +223,7 @@ describe('ServiceAccountDetail', () => {
       return buildMutationResult()
     }) as never)
 
-    vi.mocked(accessClient.useQuery).mockReturnValue(
-      buildQueryResult({ ...mockServiceAccount, status: 'disabled' }) as never
-    )
+    vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult({ ...mockServiceAccount, status: 'disabled' }))
 
     const user = userEvent.setup()
     render(<ServiceAccountDetail />, { wrapper })
@@ -253,7 +251,7 @@ describe('ServiceAccountDetail', () => {
         isError: true,
         error: new Error('Not found'),
         data: undefined,
-      }) as never
+      })
     )
 
     render(<ServiceAccountDetail />, { wrapper })
@@ -269,7 +267,7 @@ describe('ServiceAccountDetail', () => {
         error: new Error('Not found'),
         data: undefined,
         refetch: mockRefetch,
-      }) as never
+      })
     )
 
     const user = userEvent.setup()
@@ -282,9 +280,7 @@ describe('ServiceAccountDetail', () => {
   })
 
   it('shows outline disabled state label on details tab', () => {
-    vi.mocked(accessClient.useQuery).mockReturnValue(
-      buildQueryResult({ ...mockServiceAccount, status: 'disabled' }) as never
-    )
+    vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult({ ...mockServiceAccount, status: 'disabled' }))
 
     render(<ServiceAccountDetail />, { wrapper })
 
@@ -292,9 +288,7 @@ describe('ServiceAccountDetail', () => {
   })
 
   it('shows Disabled state for disabled service accounts', () => {
-    vi.mocked(accessClient.useQuery).mockReturnValue(
-      buildQueryResult({ ...mockServiceAccount, status: 'disabled' }) as never
-    )
+    vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult({ ...mockServiceAccount, status: 'disabled' }))
 
     render(<ServiceAccountDetail />, { wrapper })
 
@@ -304,7 +298,7 @@ describe('ServiceAccountDetail', () => {
 
   it('renders owning project as a link when project_name is present', () => {
     vi.mocked(accessClient.useQuery).mockReturnValue(
-      buildQueryResult({ ...mockServiceAccount, project_name: 'my-project', is_project_deleted: false }) as never
+      buildQueryResult({ ...mockServiceAccount, project_name: 'my-project', is_project_deleted: false })
     )
 
     render(<ServiceAccountDetail />, { wrapper })
@@ -315,9 +309,7 @@ describe('ServiceAccountDetail', () => {
   })
 
   it('renders owning project as plain text when project_name is null', () => {
-    vi.mocked(accessClient.useQuery).mockReturnValue(
-      buildQueryResult({ ...mockServiceAccount, project_name: null }) as never
-    )
+    vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult({ ...mockServiceAccount, project_name: null }))
 
     render(<ServiceAccountDetail />, { wrapper })
 
@@ -327,7 +319,7 @@ describe('ServiceAccountDetail', () => {
 
   it('renders owning project as plain text with Deleted label when project is deleted', () => {
     vi.mocked(accessClient.useQuery).mockReturnValue(
-      buildQueryResult({ ...mockServiceAccount, project_name: 'old-project', is_project_deleted: true }) as never
+      buildQueryResult({ ...mockServiceAccount, project_name: 'old-project', is_project_deleted: true })
     )
 
     render(<ServiceAccountDetail />, { wrapper })
@@ -339,7 +331,7 @@ describe('ServiceAccountDetail', () => {
 
   it('shows Never for last authenticated when never used', () => {
     vi.mocked(accessClient.useQuery).mockReturnValue(
-      buildQueryResult({ ...mockServiceAccount, last_authenticated_at: null }) as never
+      buildQueryResult({ ...mockServiceAccount, last_authenticated_at: null })
     )
 
     render(<ServiceAccountDetail />, { wrapper })
@@ -394,7 +386,7 @@ describe('ServiceAccountDetail', () => {
         isLoading: true,
         isSuccess: false,
         data: undefined,
-      }) as never
+      })
     )
 
     render(<ServiceAccountDetail />, { wrapper })
@@ -403,9 +395,7 @@ describe('ServiceAccountDetail', () => {
   })
 
   it('hides description row when description is null', () => {
-    vi.mocked(accessClient.useQuery).mockReturnValue(
-      buildQueryResult({ ...mockServiceAccount, description: null }) as never
-    )
+    vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult({ ...mockServiceAccount, description: null }))
 
     render(<ServiceAccountDetail />, { wrapper })
 

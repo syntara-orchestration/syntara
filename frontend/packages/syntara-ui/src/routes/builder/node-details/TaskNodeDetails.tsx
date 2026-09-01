@@ -248,7 +248,7 @@ function buildAAPInitialData(taskName: string, config: Record<string, unknown>):
     job_slice_count: c.job_slice_count ?? c.jobSlicing,
     diff_mode: getField(c.diff_mode, c.diffMode, false),
     execution_environment: getField(c.execution_environment, c.executionEnvironment, ''),
-    instance_group: getField(c.instance_group_name, c.instanceGroupName, '') as string | undefined,
+    instance_group: getField(c.instance_group_name, c.instanceGroupName, ''),
     instance_group_id: c.instance_group_id ?? c.instanceGroupId,
     labels: c.labels ?? [],
   }

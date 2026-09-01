@@ -216,7 +216,7 @@ export function useBuilderConflict(params: UseBuilderConflictParams) {
     conflictDialogProps: {
       isOpen: conflictDialog.isOpen,
       onClose: conflictDialog.close,
-      conflictAction: conflictDialog.item?.action ?? ('save' as ConflictAction),
+      conflictAction: conflictDialog.item?.action ?? 'save',
       conflictInfo: conflictDialog.item?.info,
       onSaveAsNewest: handleSaveAsNewest,
       onDuplicate: handleDuplicateWorkflow,

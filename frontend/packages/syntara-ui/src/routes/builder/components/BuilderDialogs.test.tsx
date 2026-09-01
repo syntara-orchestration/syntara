@@ -74,8 +74,8 @@ describe('BuilderDialogs', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(useWorkflowStore).mockImplementation((selector: (s: any) => unknown) => selector({ isDirty: false }))
 
-    vi.mocked(approvalsClient.useQuery).mockReturnValue({ data: undefined, refetch: vi.fn() } as never)
-    vi.mocked(approvalsClient.useMutation).mockReturnValue({ mutate: vi.fn(), isPending: false } as never)
+    vi.mocked(approvalsClient.useQuery).mockReturnValue({ data: undefined, refetch: vi.fn() })
+    vi.mocked(approvalsClient.useMutation).mockReturnValue({ mutate: vi.fn(), isPending: false })
   })
 
   it('renders nothing visible when all dialogs are closed', () => {

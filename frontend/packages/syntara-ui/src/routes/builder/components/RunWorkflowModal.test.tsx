@@ -4,6 +4,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { ColorSchemeProvider } from '../../../providers/theme/ColorSchemeProvider'
+import { expectStringContaining } from '../../../test/test-helpers'
 
 import { RunWorkflowModal } from './RunWorkflowModal'
 
@@ -40,7 +41,7 @@ vi.mock('../../../providers/alerts', () => ({
 const mockUseQuery = vi.fn<(...args: unknown[]) => { data: unknown; isLoading: boolean }>()
 vi.mock('../../../client', () => ({
   executionsClient: {
-    useQuery: (...args: unknown[]) => mockUseQuery(...args) as { data: unknown; isLoading: boolean },
+    useQuery: (...args: unknown[]) => mockUseQuery(...args),
   },
 }))
 
@@ -184,7 +185,7 @@ describe('RunWorkflowModal', () => {
 
       expect(mockShowError).toHaveBeenCalledWith({
         title: 'Validation failed',
-        description: expect.stringContaining('Missing required field: "name"') as unknown as string,
+        description: expectStringContaining('Missing required field: "name"'),
       })
       expect(props.onConfirm).not.toHaveBeenCalled()
     })
@@ -198,7 +199,7 @@ describe('RunWorkflowModal', () => {
 
       expect(mockShowError).toHaveBeenCalledWith({
         title: 'Validation failed',
-        description: expect.stringContaining('Field "name" should be string') as unknown as string,
+        description: expectStringContaining('Field "name" should be string'),
       })
       expect(props.onConfirm).not.toHaveBeenCalled()
     })
@@ -244,7 +245,7 @@ describe('RunWorkflowModal', () => {
 
       expect(mockShowError).toHaveBeenCalledWith({
         title: 'Validation failed',
-        description: expect.stringContaining('Field "qty" should be integer') as unknown as string,
+        description: expectStringContaining('Field "qty" should be integer'),
       })
       expect(props.onConfirm).not.toHaveBeenCalled()
     })
@@ -279,7 +280,7 @@ describe('RunWorkflowModal', () => {
 
       expect(mockShowError).toHaveBeenCalledWith({
         title: 'Validation failed',
-        description: expect.stringContaining('Field "enabled" should be boolean') as unknown as string,
+        description: expectStringContaining('Field "enabled" should be boolean'),
       })
       expect(props.onConfirm).not.toHaveBeenCalled()
     })
@@ -314,7 +315,7 @@ describe('RunWorkflowModal', () => {
 
       expect(mockShowError).toHaveBeenCalledWith({
         title: 'Validation failed',
-        description: expect.stringContaining('Field "tags" should be array') as unknown as string,
+        description: expectStringContaining('Field "tags" should be array'),
       })
       expect(props.onConfirm).not.toHaveBeenCalled()
     })
@@ -349,7 +350,7 @@ describe('RunWorkflowModal', () => {
 
       expect(mockShowError).toHaveBeenCalledWith({
         title: 'Validation failed',
-        description: expect.stringContaining('Field "parameters" should be object') as unknown as string,
+        description: expectStringContaining('Field "parameters" should be object'),
       })
       expect(props.onConfirm).not.toHaveBeenCalled()
     })

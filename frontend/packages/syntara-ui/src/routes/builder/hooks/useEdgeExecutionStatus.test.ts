@@ -58,8 +58,10 @@ describe('useEdgeExecutionStatus', () => {
 
     it('does not clear edge statuses when not initialized even on truthy→null transition', () => {
       const setEdges = vi.fn()
+      type StatusProps = { status: string | null }
+      const initialProps: StatusProps = { status: 'running' }
       const { rerender } = renderHook(
-        ({ status }: { status: string | null }) =>
+        ({ status }: StatusProps) =>
           useEdgeExecutionStatus({
             effectiveExecutionStatus: status,
             isInitialized: false,
@@ -68,7 +70,7 @@ describe('useEdgeExecutionStatus', () => {
             storedEdges: [],
             setEdges,
           }),
-        { initialProps: { status: 'running' as string | null } }
+        { initialProps }
       )
       rerender({ status: null })
       expect(setEdges).not.toHaveBeenCalled()
@@ -79,9 +81,11 @@ describe('useEdgeExecutionStatus', () => {
     it('clears executionStatus from edges when execution ends', () => {
       const setEdges = vi.fn()
       const edgeWithStatus = makeEdge('e1', 'running')
+      type StatusProps = { status: string | null }
+      const initialProps: StatusProps = { status: 'running' }
 
       const { rerender } = renderHook(
-        ({ status }: { status: string | null }) =>
+        ({ status }: StatusProps) =>
           useEdgeExecutionStatus({
             effectiveExecutionStatus: status,
             isInitialized: true,
@@ -90,7 +94,7 @@ describe('useEdgeExecutionStatus', () => {
             storedEdges: [],
             setEdges,
           }),
-        { initialProps: { status: 'running' as string | null } }
+        { initialProps }
       )
 
       setEdges.mockClear()
@@ -105,9 +109,11 @@ describe('useEdgeExecutionStatus', () => {
     it('returns the same edges reference when none have executionStatus (no-op)', () => {
       const setEdges = vi.fn()
       const cleanEdge = makeEdge('e1')
+      type StatusProps = { status: string | null }
+      const initialProps: StatusProps = { status: 'running' }
 
       const { rerender } = renderHook(
-        ({ status }: { status: string | null }) =>
+        ({ status }: StatusProps) =>
           useEdgeExecutionStatus({
             effectiveExecutionStatus: status,
             isInitialized: true,
@@ -116,7 +122,7 @@ describe('useEdgeExecutionStatus', () => {
             storedEdges: [],
             setEdges,
           }),
-        { initialProps: { status: 'running' as string | null } }
+        { initialProps }
       )
 
       setEdges.mockClear()
@@ -244,7 +250,7 @@ describe('useEdgeExecutionStatus', () => {
             storedEdges: [],
             setEdges,
           }),
-        { initialProps: { status: 'running' as string | null } }
+        { initialProps: { status: 'running' } }
       )
 
       setEdges.mockClear()
@@ -270,7 +276,7 @@ describe('useEdgeExecutionStatus', () => {
             storedEdges: [],
             setEdges,
           }),
-        { initialProps: { status: 'running' as string | null } }
+        { initialProps: { status: 'running' } }
       )
 
       setEdges.mockClear()
@@ -296,7 +302,7 @@ describe('useEdgeExecutionStatus', () => {
             storedEdges: [],
             setEdges,
           }),
-        { initialProps: { status: 'running' as string | null } }
+        { initialProps: { status: 'running' } }
       )
 
       setEdges.mockClear()
@@ -323,7 +329,7 @@ describe('useEdgeExecutionStatus', () => {
             storedEdges: [],
             setEdges,
           }),
-        { initialProps: { status: 'running' as string | null } }
+        { initialProps: { status: 'running' } }
       )
 
       setEdges.mockClear()
@@ -351,7 +357,7 @@ describe('useEdgeExecutionStatus', () => {
             storedEdges: [],
             setEdges,
           }),
-        { initialProps: { status: 'completed' as string | null } }
+        { initialProps: { status: 'completed' } }
       )
 
       setEdges.mockClear()

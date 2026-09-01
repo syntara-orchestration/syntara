@@ -75,13 +75,10 @@ export function useVersionHistory({ workflowId, isNew, onVersionUpdated }: UseVe
   const updateMetadataMutation = workflowClient.useMutation('patch', '/workflows/{workflow_id}/versions/{version}')
 
   const allVersions = versionsQuery.data?.resources
-  const publishedVersionName = useMemo(
-    () => resolvePublishedVersionName(allVersions as WorkflowVersion[] | undefined),
-    [allVersions]
-  )
+  const publishedVersionName = useMemo(() => resolvePublishedVersionName(allVersions), [allVersions])
   const filteredVersions = useMemo((): WorkflowVersion[] => {
     if (!allVersions) return []
-    if (statusFilter.length === 0) return allVersions as WorkflowVersion[]
+    if (statusFilter.length === 0) return allVersions
     return (allVersions as WorkflowVersion[]).filter((v) => statusFilter.includes(v.status as VersionStatus))
   }, [allVersions, statusFilter])
 

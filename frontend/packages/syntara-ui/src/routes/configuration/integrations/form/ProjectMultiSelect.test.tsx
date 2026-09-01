@@ -19,7 +19,7 @@ const mockProjects = [
 
 function mockProjectsLoaded(projects = mockProjects) {
   vi.mocked(useSelectableProjects).mockReturnValue({
-    projects: projects as ReturnType<typeof useSelectableProjects>['projects'],
+    projects: projects,
     isLoading: false,
     error: null,
     refetch: vi.fn(),

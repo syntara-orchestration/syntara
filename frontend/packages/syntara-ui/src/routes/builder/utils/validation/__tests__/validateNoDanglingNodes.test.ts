@@ -34,12 +34,10 @@ describe('validateNoDanglingNodes', () => {
 
     const result = validateNoDanglingNodes(activities, edges)
     expect(result).toHaveLength(1)
-    expect(result[0]).toMatchObject({
-      severity: 'error',
-      rule: 'no-dangling-nodes',
-      nodeId: 'C',
-      message: expect.stringContaining('Task C') as unknown as string,
-    })
+    expect(result[0]?.severity).toBe('error')
+    expect(result[0]?.rule).toBe('no-dangling-nodes')
+    expect(result[0]?.nodeId).toBe('C')
+    expect(result[0]?.message).toContain('Task C')
   })
 
   it('detects multiple dangling nodes', () => {

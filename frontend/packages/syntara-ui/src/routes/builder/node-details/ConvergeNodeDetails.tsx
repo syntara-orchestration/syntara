@@ -48,7 +48,7 @@ export function ConvergeNodeDetails({
           ...(data.wait_duration !== undefined && { wait_duration: data.wait_duration }),
         },
         settings: data.settings,
-      } as ConvergeActivity
+      }
 
       updateActivity(nodeId, updatedActivity)
       onClose()

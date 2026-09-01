@@ -289,7 +289,7 @@ describe('Approvals Component', () => {
       error: null,
       isError: false,
       refetch: vi.fn(),
-    } as never)
+    })
 
     mockUseProjectSelector.mockReturnValue({
       selectedProject: null,
@@ -308,7 +308,7 @@ describe('Approvals Component', () => {
       error,
       isError: !!error,
       refetch: vi.fn(),
-    } as never)
+    })
   }
 
   it('renders the approvals table with data', () => {
@@ -369,7 +369,7 @@ describe('Approvals Component', () => {
       isError: true,
       error: { message: 'Failed to load', retryable: true },
       refetch: mockRefetch,
-    } as never)
+    })
 
     const user = userEvent.setup()
     render(<Approvals />)
@@ -697,7 +697,7 @@ describe('Approvals Component', () => {
         error: null,
         isError: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<Approvals />)
 
@@ -748,7 +748,7 @@ describe('Approvals Component', () => {
         },
         isPending: false,
         error: null,
-      } as never)
+      })
 
       render(<Approvals />)
 
@@ -767,7 +767,7 @@ describe('Approvals Component', () => {
         },
         isPending: false,
         error: null,
-      } as never)
+      })
 
       render(<Approvals />)
 
@@ -788,7 +788,7 @@ describe('Approvals Component', () => {
         },
         isPending: false,
         error: null,
-      } as never)
+      })
 
       render(<Approvals />)
 
@@ -816,7 +816,7 @@ describe('Approvals Component', () => {
         isError: false,
         error: null,
         refetch: mockRefetch,
-      } as never)
+      })
 
       const { rerender } = render(<Approvals />)
 
@@ -850,7 +850,7 @@ describe('Approvals Component', () => {
         isError: false,
         error: null,
         refetch: mockRefetch,
-      } as never)
+      })
 
       // Rerender to trigger useEffect with fetching state
       rerender(<Approvals />)
@@ -879,7 +879,7 @@ describe('Approvals Component', () => {
         isError: false,
         error: null,
         refetch: mockRefetch,
-      } as never)
+      })
 
       rerender(<Approvals />)
 
@@ -918,7 +918,7 @@ describe('Approvals Component', () => {
         isError: false,
         error: null,
         refetch: mockRefetch,
-      } as never)
+      })
 
       const { rerender } = render(<Approvals />)
 
@@ -949,7 +949,7 @@ describe('Approvals Component', () => {
         isError: false,
         error: null,
         refetch: mockRefetch,
-      } as never)
+      })
 
       rerender(<Approvals />)
 
@@ -983,7 +983,7 @@ describe('Approvals Component', () => {
           workflow_id: undefined,
         },
       }
-      mockApprovalsQuery([approvalWithoutWorkflow] as unknown as Approval[])
+      mockApprovalsQuery([approvalWithoutWorkflow])
 
       render(<Approvals />)
 
@@ -1052,7 +1052,7 @@ describe('Approvals Component', () => {
         ...a,
         project_id: i === 0 ? 'proj-1' : 'proj-2',
       }))
-      mockApprovalsQuery(approvalsWithProjects as Approval[])
+      mockApprovalsQuery(approvalsWithProjects)
 
       render(<Approvals />)
 
@@ -1074,7 +1074,7 @@ describe('Approvals Component', () => {
       mockAllProjectsSelector([{ id: 'proj-1', name: 'Project Alpha' }])
 
       const approvalsWithProject = [{ ...mockApprovals[0], project_id: 'proj-1' }]
-      mockApprovalsQuery(approvalsWithProject as Approval[])
+      mockApprovalsQuery(approvalsWithProject)
 
       render(<Approvals />)
 
@@ -1129,7 +1129,7 @@ describe('Approvals Component', () => {
         isError: false,
         error: null,
         refetch: vi.fn(),
-      } as never)
+      })
 
       vi.mocked(approvalsClient.useQuery).mockReturnValue({
         data: undefined,
@@ -1137,7 +1137,7 @@ describe('Approvals Component', () => {
         isError: false,
         error: null,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<Approvals />)
 
@@ -1164,7 +1164,7 @@ describe('Approvals Component', () => {
         isPending: false,
         isError: false,
         error: null,
-      } as never)
+      })
     })
 
     async function selectFirstPendingApproval(user: ReturnType<typeof userEvent.setup>) {
@@ -1231,7 +1231,7 @@ describe('Approvals Component', () => {
         isError: false,
         error: null,
         refetch: mockRefetch,
-      } as never)
+      })
 
       const user = userEvent.setup()
       render(<Approvals />)
@@ -1261,7 +1261,7 @@ describe('Approvals Component', () => {
         isError: false,
         error: null,
         refetch: mockRefetch,
-      } as never)
+      })
 
       const user = userEvent.setup()
       render(<Approvals />)

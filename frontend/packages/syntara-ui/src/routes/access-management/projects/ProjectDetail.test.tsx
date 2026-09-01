@@ -113,7 +113,7 @@ describe('ProjectDetail', () => {
       isError: false,
       error: null,
       refetch: mockRefetch,
-    } as never)
+    })
   }
 
   beforeEach(() => {
@@ -122,7 +122,7 @@ describe('ProjectDetail', () => {
     mockRefetch.mockResolvedValue({})
     mockDetailTab.mockReturnValue(['details', mockGoToTab])
     mockUseParams.mockReturnValue({ projectId: 'proj-1' })
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
     vi.mocked(useProjectPermissions).mockReturnValue({
       canCreate: true,
       canUpdate: true,
@@ -133,7 +133,7 @@ describe('ProjectDetail', () => {
     vi.mocked(accessClient.useMutation).mockReturnValue({
       mutate: vi.fn(),
       isPending: false,
-    } as never)
+    })
     setupMocks()
   })
 
@@ -250,7 +250,7 @@ describe('ProjectDetail', () => {
       isError: true,
       error: new Error('Not found'),
       refetch: mockRefetch,
-    } as never)
+    })
 
     render(<ProjectDetail />, { wrapper })
 
@@ -267,7 +267,7 @@ describe('ProjectDetail', () => {
       isError: false,
       error: null,
       refetch: mockRefetch,
-    } as never)
+    })
 
     render(<ProjectDetail />, { wrapper })
 
@@ -283,7 +283,7 @@ describe('ProjectDetail', () => {
       isError: false,
       error: null,
       refetch: mockRefetch,
-    } as never)
+    })
 
     const { container } = render(<ProjectDetail />, { wrapper })
 
@@ -298,7 +298,7 @@ describe('ProjectDetail', () => {
       isError: false,
       error: null,
       refetch: mockRefetch,
-    } as never)
+    })
 
     render(<ProjectDetail />, { wrapper })
 
@@ -313,7 +313,7 @@ describe('ProjectDetail', () => {
       isError: true,
       error: new Error('Not found'),
       refetch: mockRefetch,
-    } as never)
+    })
 
     render(<ProjectDetail />, { wrapper })
 
@@ -330,7 +330,7 @@ describe('ProjectDetail', () => {
       isError: true,
       error: new Error('Not found'),
       refetch: mockRefetch,
-    } as never)
+    })
 
     render(<ProjectDetail />, { wrapper })
 
@@ -347,7 +347,7 @@ describe('ProjectDetail', () => {
       isError: false,
       error: null,
       refetch: mockRefetch,
-    } as never)
+    })
 
     render(<ProjectDetail />, { wrapper })
 
@@ -383,7 +383,7 @@ describe('ProjectDetail', () => {
       isError: true,
       error: { message: 'Not found', retryable: true },
       refetch: rejectingRefetch,
-    } as never)
+    })
 
     render(<ProjectDetail />, { wrapper })
 
@@ -403,7 +403,7 @@ describe('ProjectDetail', () => {
       isError: true,
       error: new Error('Not found'),
       refetch: rejectingRefetch,
-    } as never)
+    })
 
     render(<ProjectDetail />, { wrapper })
 
@@ -420,7 +420,7 @@ describe('ProjectDetail', () => {
       isError: false,
       error: null,
       refetch: mockRefetch,
-    } as never)
+    })
 
     const { container } = render(<ProjectDetail />, { wrapper })
 
@@ -436,7 +436,7 @@ describe('ProjectDetail', () => {
       isError: false,
       error: null,
       refetch: mockRefetch,
-    } as never)
+    })
 
     render(<ProjectDetail />, { wrapper })
 
@@ -453,7 +453,7 @@ describe('ProjectDetail', () => {
       isError: false,
       error: null,
       refetch: mockRefetch,
-    } as never)
+    })
 
     render(<ProjectDetail />, { wrapper })
 
@@ -462,7 +462,7 @@ describe('ProjectDetail', () => {
 
   describe('Permission-based tab gating', () => {
     it('hides Assignments tab when role-assignment:read is denied', async () => {
-      vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: false } } as never)
+      vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: false } })
       render(<ProjectDetail />, { wrapper })
 
       await waitFor(() => {
@@ -472,7 +472,7 @@ describe('ProjectDetail', () => {
     })
 
     it('shows Assignments tab when role-assignment:read is granted', async () => {
-      vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+      vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
       render(<ProjectDetail />, { wrapper })
 
       await waitFor(() => {

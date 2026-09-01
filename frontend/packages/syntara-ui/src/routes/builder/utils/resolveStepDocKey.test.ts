@@ -12,7 +12,7 @@ function makeNode(type: string, data: Record<string, unknown> = {}): Node<NodeTy
     id: 'node-1',
     type,
     position: { x: 0, y: 0 },
-    data: data as NodeType['data'],
+    data: data,
   }
 }
 

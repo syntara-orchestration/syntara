@@ -155,7 +155,7 @@ describe('useCanApprovalAction', () => {
 
     type ActionProps = { action: 'decide' | 'read' }
     const { result, rerender } = renderHook(({ action }: ActionProps) => useCanApprovalAction(action), {
-      initialProps: { action: 'decide' } as ActionProps,
+      initialProps: { action: 'decide' },
     })
 
     await waitFor(() => {
@@ -173,7 +173,7 @@ describe('useCanApprovalAction', () => {
     // Change action
     mockPost.mockClear()
     mockPost.mockResolvedValue({ data: { allowed: false } })
-    rerender({ action: 'read' } as ActionProps)
+    rerender({ action: 'read' })
 
     await waitFor(() => {
       expect(mockPost).toHaveBeenCalledWith('/authz/can_i', {

@@ -77,7 +77,7 @@ function setupSuccessMocks() {
     error: null,
     isFetching: false,
     refetch: vi.fn(),
-  } as never)
+  })
   vi.mocked(accessClient.useQuery).mockReturnValue({
     data: mockUserData,
     isPending: false,
@@ -85,11 +85,11 @@ function setupSuccessMocks() {
     error: null,
     isFetching: false,
     refetch: vi.fn(),
-  } as never)
+  })
   vi.mocked(accessClient.useMutation).mockReturnValue({
     mutate: vi.fn(),
     isPending: false,
-  } as never)
+  })
 }
 
 describe('EditUser', () => {

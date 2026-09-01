@@ -515,7 +515,7 @@ export function BuilderFlow(props: BuilderFlowProps) {
           const triggerRealId = triggers[Number.parseInt(node.id.split('-')[1], 10)]?.id
           const enriched = executionStateEnricher.enrichTriggerNode(
             triggerRealId,
-            node.data as Record<string, unknown>,
+            node.data,
             effectiveExecutionStatus,
             activityStates
           )

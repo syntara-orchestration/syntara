@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { SynLink } from './SynLink'
@@ -24,6 +25,19 @@ describe('SynLink', () => {
     )
     const link = screen.getByRole('link', { name: 'Link' })
     expect(link).toHaveClass('pf-v6-c-button', 'pf-m-link', 'pf-m-inline', 'my-class')
+  })
+
+  it('invokes onClick when the link is activated', async () => {
+    const user = userEvent.setup()
+    const onClick = vi.fn()
+    render(
+      <SynLink to="/path" onClick={onClick}>
+        Click me
+      </SynLink>
+    )
+
+    await user.click(screen.getByRole('link', { name: 'Click me' }))
+    expect(onClick).toHaveBeenCalledOnce()
   })
 
   it('has no accessibility violations', async () => {
