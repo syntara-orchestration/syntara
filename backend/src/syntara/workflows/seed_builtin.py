@@ -257,7 +257,6 @@ async def _seed_one(
         select(Workflow).where(
             col(Workflow.name) == name,
             col(Workflow.is_builtin) == True,  # noqa: E712
-            Workflow.deleted_at.is_(None),  # type: ignore[union-attr]
         )
     )
     existing = result.one_or_none()

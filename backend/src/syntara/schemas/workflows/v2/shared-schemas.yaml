@@ -12,7 +12,6 @@ components:
         Schema for workflow response (GET /workflows/{id}).
 
         Includes all fields from the database table model.
-        Note: deleted_at and deleted_by are None since soft-deleted workflows are excluded from queries.
       required:
         - name
         - id
@@ -86,18 +85,6 @@ components:
           type: string
           format: date-time
           title: Updated At
-        deleted_at:
-          anyOf:
-            - type: string
-              format: date-time
-            - type: 'null'
-          title: Deleted At
-        deleted_by:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
-          title: Deleted By
         validation_result:
           anyOf:
             - $ref: './openapi.yaml#/components/schemas/ValidationResult'
@@ -185,18 +172,6 @@ components:
           type: string
           format: date-time
           title: Updated At
-        deleted_at:
-          anyOf:
-            - type: string
-              format: date-time
-            - type: 'null'
-          title: Deleted At
-        deleted_by:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
-          title: Deleted By
         validation_result:
           anyOf:
             - $ref: './openapi.yaml#/components/schemas/ValidationResult'
@@ -284,18 +259,6 @@ components:
           type: string
           format: date-time
           title: Updated At
-        deleted_at:
-          anyOf:
-            - type: string
-              format: date-time
-            - type: 'null'
-          title: Deleted At
-        deleted_by:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
-          title: Deleted By
         validation_result:
           anyOf:
             - $ref: './openapi.yaml#/components/schemas/ValidationResult'
@@ -502,18 +465,6 @@ components:
             $ref: "#/components/schemas/CurrentActivity"
           title: Current Activities
           description: Currently executing activities
-        deleted_at:
-          anyOf:
-            - type: string
-              format: date-time
-            - type: 'null'
-          title: Deleted At
-        deleted_by:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
-          title: Deleted By
         workflow_definition:
           anyOf:
             - $ref: "#/components/schemas/WorkflowDefinition"

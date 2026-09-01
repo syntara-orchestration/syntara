@@ -251,7 +251,7 @@ describe('useBuilderToolbarHandlers', () => {
     await result.current.handleRunWorkflow()
 
     expect(showError).toHaveBeenCalledWith({
-      title: 'Workflow failed',
+      title: 'Failed to run workflow',
       description: 'Failed to start workflow "My workflow": boom',
     })
   })
@@ -376,7 +376,7 @@ describe('useBuilderToolbarHandlers', () => {
     expect(options?.onError).toEqual(expect.any(Function))
     expect(showSuccess).toHaveBeenCalledWith({
       title: 'Workflow deleted',
-      description: 'Successfully deleted workflow "My workflow"',
+      description: 'Workflow "My workflow" has been deleted.',
     })
     expect(setLocation).toHaveBeenCalledWith('/workflows')
   })
@@ -767,7 +767,7 @@ describe('useBuilderToolbarHandlers', () => {
     result.current.handleDeleteWorkflow()
 
     expect(showError).toHaveBeenCalledWith({
-      title: 'Delete failed',
+      title: 'Failed to delete workflow',
       description: 'Failed to delete workflow "My workflow": delete failed',
     })
     expect(dispatch).toHaveBeenCalledWith({ type: 'SET_DELETE_DIALOG', payload: false })

@@ -34,6 +34,7 @@ if TYPE_CHECKING:
         WebhookTriggerPathConflictError,
         WorkflowConcurrencyLimitError,
         WorkflowDefinitionInvalidError,
+        WorkflowHasActiveExecutionsError,
         WorkflowNameConflictError,
         WorkflowNotFoundError,
         WorkflowNotPublishedError,
@@ -321,6 +322,25 @@ def workflow_concurrency_limit_handler(request: Request, exc: "WorkflowConcurren
         title="Workflow Concurrency Limit Reached",
         detail=str(exc),
         code="WORKFLOW_CONCURRENCY_LIMIT",
+        retryable=True,
+        instance=str(request.url),
+    )
+
+
+def workflow_has_active_executions_handler(request: Request, exc: "WorkflowHasActiveExecutionsError") -> JSONResponse:
+    """Handle WorkflowHasActiveExecutionsError with RFC 9457 format (HTTP 409)."""
+    logger.warning(
+        "Cannot delete resource with active executions",
+        workflow_id=str(exc.workflow_id) if exc.workflow_id else None,
+        project_id=str(exc.project_id) if exc.project_id else None,
+        active_count=exc.active_count,
+    )
+    return create_problem_details_response(
+        status_code=status.HTTP_409_CONFLICT,
+        problem_type=PROBLEM_TYPES["resource_conflict"],
+        title="Active Executions Block Deletion",
+        detail=str(exc),
+        code="ACTIVE_EXECUTIONS_BLOCK_DELETION",
         retryable=True,
         instance=str(request.url),
     )

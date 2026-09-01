@@ -1,5 +1,5 @@
 ---
-schema_version: '2.0.0'
+schema_version: "2.0.0"
 name: simple-python-script
 description: Execute a simple Python script that prints JSON output
 

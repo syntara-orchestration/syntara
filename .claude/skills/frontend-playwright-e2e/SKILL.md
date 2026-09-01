@@ -933,7 +933,7 @@ const results = await new AxeBuilder({ page })
 expect(results.violations).toEqual([])
 ```
 
-**Note on axe-core limitations:** axe-core catches approximately 30% of real WCAG violations automatically. The rest — keyboard navigation flow, screen reader announcement quality, cognitive accessibility, color contrast in jsdom — requires manual testing. Automated scans are a floor, not a ceiling.
+**Note on axe-core limitations:** axe-core catches approximately 30% of real WCAG violations automatically. The rest — keyboard navigation flow, screen reader announcement quality, cognitive accessibility, color contrast in simulated DOM environments — requires manual testing. Automated scans are a floor, not a ceiling.
 
 ---
 
