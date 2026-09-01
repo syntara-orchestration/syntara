@@ -125,7 +125,7 @@ test('user filters approvals by name and status', async ({ app }) => {
 test.describe('Approval Workflow Operations', () => {
   test.skip(!process.env['SYNTARA_E2E_HAS_TEMPORAL_WORKER'], 'Temporal worker unavailable (globalSetup probe)')
 
-  test('user bulk-approves filtered approval rows', { tag: ['@konflux-skip'] }, async ({ app }) => {
+  test('user bulk-approves filtered approval rows', async ({ app }) => {
     // Create 2 pending approvals with a shared prefix for filtering
     const batchId = `batch-${Date.now()}`
     const approval1 = await createPendingApproval(app, batchId)
@@ -188,7 +188,7 @@ test.describe('Approval Workflow Operations', () => {
     }
   })
 
-  test('user bulk-rejects filtered approval rows', { tag: ['@konflux-skip'] }, async ({ app }) => {
+  test('user bulk-rejects filtered approval rows', async ({ app }) => {
     // Create 2 pending approvals with a shared prefix for filtering
     const batchId = `batch-${Date.now()}`
     const approval1 = await createPendingApproval(app, batchId)
@@ -250,8 +250,7 @@ test.describe('Approval Workflow Operations', () => {
   })
 
   // Temporal-backed pending approval + table filter/selection flakes under Konflux load.
-  // Sibling batch-approve tests already use @konflux-skip. Still runs in GitHub compose E2E.
-  test('user cancels batch approval without API call', { tag: ['@konflux-skip'] }, async ({ app }) => {
+  test('user cancels batch approval without API call', async ({ app }) => {
     // Create a pending approval to test cancel behavior
     const approval = await createPendingApproval(app)
 
@@ -298,7 +297,7 @@ test.describe('Approval Workflow Operations', () => {
     }
   })
 
-  test('user changes decision from approve to reject (undo)', { tag: ['@konflux-skip'] }, async ({ app }) => {
+  test('user changes decision from approve to reject (undo)', async ({ app }) => {
     // Create a pending approval to test undo behavior
     const approval = await createPendingApproval(app)
 
@@ -361,7 +360,7 @@ test.describe('Approval Workflow Operations', () => {
     }
   })
 
-  test('user clears decision with explicit undo button', { tag: ['@konflux-skip'] }, async ({ app }) => {
+  test('user clears decision with explicit undo button', async ({ app }) => {
     // Create a pending approval to test undo/clear behavior
     const approval = await createPendingApproval(app)
 
@@ -470,7 +469,7 @@ test.describe('Approval Workflow Operations', () => {
     }
   })
 
-  test('UI-29: self-contained approve flow via approvals queue', { tag: ['@konflux-skip'] }, async ({ app }) => {
+  test('UI-29: self-contained approve flow via approvals queue', async ({ app }) => {
     // Create a workflow with an approval node so we control the approval name
     const workflowName = buildUniqueName('e2e-approve')
     const approvalNodeName = buildUniqueName('gate')

@@ -165,7 +165,7 @@ test.describe('Pagination Footer — Users Tab', () => {
 })
 
 test.describe('Pagination Footer — Groups Tab', () => {
-  test('pagination footer is visible on groups tab', { tag: ['@konflux-skip'] }, async ({ app }) => {
+  test('pagination footer is visible on groups tab', async ({ app }) => {
     await app.goto(toAppUrl('/system-administration/access-management/groups'))
     await expect(app.getByRole('tab', { name: /Groups/i })).toHaveAttribute('aria-selected', 'true')
 
