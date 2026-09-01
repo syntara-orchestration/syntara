@@ -8,7 +8,7 @@
  * conflicts with parallel Playwright workers.
  */
 import { type Page } from '../fixtures'
-import { apiRequest, ensureProject, getAuthToken } from '../utils/api'
+import { apiRequest, getAuthToken } from '../utils/api'
 
 export type SeededUser = {
   id: string
@@ -77,14 +77,8 @@ export async function createRoleViaApi(
   const token = options.token ?? (await getAuthToken(page))
   if (!token) throw new Error(`createRoleViaApi: could not obtain auth token for ${options.name}`)
 
-  // Real backend rejects roles with an empty policies list (HTTP 422). Mock API accepted [].
-  let policies = options.policies
-  if (!policies?.length) {
-    const project = await ensureProject(page)
-    if (!project) throw new Error(`createRoleViaApi: could not ensure project for ${options.name}`)
-    const policy = await createPolicyViaApi(page, project.id, { name: `${options.name}-policy`, token })
-    policies = [policy.name]
-  }
+  // System roles require ≥1 global policy. Project-scoped policies 422; mock accepted [].
+  const policies = options.policies?.length ? options.policies : ['workflow:read:any']
 
   const resp = await apiRequest(page, 'post', '/roles', {
     token,
