@@ -12,8 +12,7 @@
  * - Roles tab: "Create role" button → dialog title and submit both read "Create role"
  * - Assignments tab: "Add assignment" button → dialog title "Add Assignment"; submit "Add assignment"
  *
- * Note: the Users form page heading uses title case ("Create User") while the submit button
- * uses sentence case ("Create user") — both are intentional per PatternFly casing conventions.
+ * Note: the Users form page heading and submit button both use sentence case ("Create user").
  * The Assignments dialog heading uses title case ("Add Assignment") by existing convention;
  * this area was not modified by this PR.
  *
@@ -97,7 +96,7 @@ test.describe('Access Management — Create button labels', () => {
     await createButton.click()
 
     await expect(app).toHaveURL(new RegExp(`${ACCESS_URL}/users/create`))
-    await expect(app.getByRole('heading', { name: 'Create User' })).toBeVisible()
+    await expect(app.getByRole('heading', { name: 'Create user' })).toBeVisible()
     await expect(app.getByRole('button', { name: 'Create user' })).toBeVisible()
 
     await app.getByRole('button', { name: 'Cancel' }).click()
