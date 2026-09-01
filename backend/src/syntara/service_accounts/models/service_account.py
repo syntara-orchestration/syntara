@@ -69,6 +69,9 @@ class ServiceAccount(NamedResource, UserOwnedResource, table=True):
         description="Timestamp of the most recent successful authentication",
     )
 
+    # Client-credentials auth is telemetry, not a user edit; don't bump updated_at for it.
+    __updated_at_exempt_fields__: ClassVar[frozenset[str]] = frozenset({"last_authenticated_at"})
+
     __table_args__ = (
         Index("ix_service_accounts_created_at_id", "created_at", "id"),
         CheckConstraint(

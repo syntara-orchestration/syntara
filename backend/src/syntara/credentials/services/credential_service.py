@@ -6,7 +6,7 @@ and secret masking in API responses.
 
 import json
 from collections.abc import Iterable, Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -564,6 +564,8 @@ class CredentialService(BaseService):
                 decrypted_inputs = await self._merge_inputs(credential, data.inputs)
                 _validate_field_constraints(decrypted_inputs, credential_type.inputs)
                 credential.secret_id = await self._store_inputs(credential, decrypted_inputs)
+                # Secrets live off-row; ORM column history won't reflect an inputs edit.
+                credential.updated_at = datetime.now(UTC)
             else:
                 decrypted_inputs = await self._retrieve_or_empty(credential.secret_id)
         except CredentialDecryptionError:

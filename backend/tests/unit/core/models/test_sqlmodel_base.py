@@ -70,6 +70,24 @@ class TestSQLModelBaseClasses:
         touch_updated_at_before_flush(session, None, None)
         assert resource.updated_at > baseline_updated_at
 
+    def test_touch_updated_at_before_flush_skips_auth_telemetry_fields(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Service-account auth timestamps alone must not bump updated_at."""
+        baseline_updated_at = datetime(2020, 1, 1, tzinfo=UTC)
+        resource = MockBaseResource(id=uuid4(), created_at=baseline_updated_at, updated_at=baseline_updated_at)
+        session = MagicMock(dirty=[resource])
+
+        monkeypatch.setattr(
+            "syntara.core.models.base.base_resource._changed_column_names",
+            lambda _obj: {"last_authenticated_at", "last_used_at"},
+        )
+        monkeypatch.setattr(
+            MockBaseResource,
+            "__updated_at_exempt_fields__",
+            frozenset({"last_authenticated_at", "last_used_at"}),
+        )
+        touch_updated_at_before_flush(session, None, None)
+        assert resource.updated_at == baseline_updated_at
+
     def test_base_resource_instance_creation(self) -> None:
         """Test MockBaseResource instance creation with labels."""
         resource_id = uuid4()

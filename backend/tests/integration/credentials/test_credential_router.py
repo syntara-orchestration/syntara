@@ -297,6 +297,32 @@ class TestUpdateCredential:
         assert updated["description"] == "patched"
         assert updated["updated_at"] > created["updated_at"]
 
+    @pytest.mark.asyncio
+    async def test_patch_inputs_updates_updated_at(
+        self, auth_client: AsyncClient, bearer_type: CredentialType, test_project_id: str, test_user: User
+    ) -> None:
+        """Rotating secret inputs must bump updated_at even when updated_by is unchanged."""
+        create_resp = await auth_client.post(
+            "/api/v1/credentials",
+            json={
+                "name": "Inputs Timestamp Test",
+                "credential_type_id": str(bearer_type.id),
+                "project_id": test_project_id,
+                "inputs": {"token": "original-token"},
+            },
+        )
+        assert create_resp.status_code == 201
+        created = create_resp.json()
+
+        update_resp = await auth_client.patch(
+            f"/api/v1/credentials/{created['id']}",
+            json={"inputs": {"token": "rotated-token"}},
+        )
+        assert update_resp.status_code == 200
+        updated = update_resp.json()
+        assert updated["updated_by"]["id"] == str(test_user.id)
+        assert updated["updated_at"] > created["updated_at"]
+
 
 class TestUserReferenceFields:
     """Verify created_by/updated_by return UserReference objects."""

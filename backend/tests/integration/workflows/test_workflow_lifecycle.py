@@ -296,6 +296,35 @@ async def test_workflow_version_immutability(jwt_client: AsyncClient, test_proje
 
 
 @pytest.mark.asyncio
+async def test_patch_workflow_metadata_bumps_updated_at(jwt_client: AsyncClient, test_project_id: UUID) -> None:
+    """PATCH workflow metadata must bump updated_at via the global before_flush hook."""
+    create_payload = {
+        "name": "updated-at-metadata-test",
+        "description": "Original description",
+        "project_id": str(test_project_id),
+        "workflow_definition": create_minimal_workflow_definition(
+            name="updated-at-metadata-test",
+            description="Original description",
+            activity_id="activity_1",
+        ),
+    }
+
+    create_response = await jwt_client.post("/api/v1/workflows", json=create_payload)
+    assert create_response.status_code == 201
+    created = create_response.json()
+    original_updated_at = created["updated_at"]
+
+    patch_response = await jwt_client.patch(
+        f"/api/v1/workflows/{created['id']}",
+        json={"description": "Patched description"},
+    )
+    assert patch_response.status_code == 200
+    patched = patch_response.json()
+    assert patched["description"] == "Patched description"
+    assert patched["updated_at"] > original_updated_at
+
+
+@pytest.mark.asyncio
 async def test_update_version_metadata_via_patch(jwt_client: AsyncClient, test_project_id: UUID) -> None:
     """Test PATCH /workflows/{id}/versions/{version} updates metadata without affecting the definition."""
     create_payload = {
