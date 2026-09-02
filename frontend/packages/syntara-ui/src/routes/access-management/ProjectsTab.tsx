@@ -1,7 +1,7 @@
 import { Button, Content, List, ListItem, Stack, StackItem, Truncate } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiEditFillIcon, RhUiTrashIcon } from '@patternfly/react-icons'
-import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
-import type { IAction, ThProps } from '@patternfly/react-table'
+import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
+import type { ThProps } from '@patternfly/react-table'
 import { useNavigate } from '@tanstack/react-router'
 import { useCallback, useMemo } from 'react'
 
@@ -11,6 +11,7 @@ import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { IconLabel } from '../../components/IconLabel'
 import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../components/panels/list/SynListPanel'
 import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
+import { SynKebabMenu, type KebabAction } from '../../components/SynKebabMenu'
 import { DateCell } from '../../components/table/DateCell'
 import { useCursorPagination, useCursorReset } from '../../hooks/useCursorPagination'
 import { useDialogState } from '../../hooks/useDialogState'
@@ -50,17 +51,20 @@ function getRowActions(
   onEdit: (p: ProjectRead) => void,
   onDelete: (p: ProjectRead) => void,
   permissions: ReturnType<typeof useProjectPermissions>
-): IAction[] {
+): KebabAction[] {
   return [
     {
-      title: <IconLabel icon={<RhUiEditFillIcon />}>Edit</IconLabel>,
+      key: 'edit',
+      title: <IconLabel icon={<RhUiEditFillIcon />}>Edit project</IconLabel>,
       isAriaDisabled: !permissions.canUpdate,
       tooltipProps: permissions.canUpdate ? undefined : { content: permissions.tooltips.update },
       onClick: permissions.canUpdate ? () => onEdit(project) : undefined,
     },
-    { isSeparator: true },
+    { key: 'sep-delete', isSeparator: true },
     {
-      title: <IconLabel icon={<RhUiTrashIcon />}>Delete</IconLabel>,
+      key: 'delete',
+      title: <IconLabel icon={<RhUiTrashIcon />}>Delete project</IconLabel>,
+      isDanger: true,
       isAriaDisabled: !permissions.canDelete,
       tooltipProps: permissions.canDelete ? undefined : { content: permissions.tooltips.delete },
       onClick: permissions.canDelete ? () => onDelete(project) : undefined,
@@ -107,7 +111,10 @@ function ProjectRow({
         <DateCell dateString={project.updated_at} />
       </Td>
       <Td isActionCell>
-        <ActionsColumn items={getRowActions(project, onEdit, onDelete, permissions)} />
+        <SynKebabMenu
+          actions={getRowActions(project, onEdit, onDelete, permissions)}
+          aria-label={`Actions for ${project.name}`}
+        />
       </Td>
     </Tr>
   )
