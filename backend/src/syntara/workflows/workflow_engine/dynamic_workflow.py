@@ -1286,7 +1286,8 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
 
         Raises:
             ApplicationError: If ``items`` resolved to ``None`` or a non-list value.
-                Always non-retryable — the expression must be fixed in the workflow definition.
+                Always non-retryable — retrying will not change the resolved value; fix the
+                expression or the data it references.
 
         """
         if isinstance(items, list):
@@ -1298,8 +1299,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 f"forEach loop items expression {items_expression!r} resolved to None. "
                 "Ensure the referenced trigger field or step output exists and resolves "
                 "to a list (empty lists are allowed). "
-                "If referencing a workflow input, verify it was provided in 'input_data' "
-                "when starting the execution."
+                "Check the trigger payload or the output of the upstream step the expression references."
             )
         else:
             max_repr = 300
