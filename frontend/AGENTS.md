@@ -161,24 +161,11 @@ npm run e2e:visual-regression:update # Same, with --update-snapshots (see packag
 
 # E2E test suite tags — Playwright tags that control where each test runs:
 #   @pr-check      Fast critical-path tests; select with --grep @pr-check
-#   @konflux-skip  Tests excluded from Konflux pipelines via --grep-invert @konflux-skip (flaky in that env only)
 #   @local-only    Visual regression tests; excluded from all CI automatically
 # Full rules: .claude/skills/frontend-playwright-e2e/SKILL.md → "Test Suite Tags"
 
 For a known flaky test that needs temporary quarantine from CI, follow the
 [test quarantine workflow](../docs/ci/test-quarantine.md).
-# When to apply @konflux-skip:
-#   - Test creates a real workflow execution and waits for Temporal to complete it
-#     (approval flows, multi-step runs, badge checks) — Temporal under Konflux cluster
-#     load frequently times out or returns unexpected states.
-#   - Test has a wall-clock budget >25s; Konflux runner load regularly pushes it over.
-#   - Test relies on the backend Temporal worker reaching an external URL (httpbin,
-#     webhooks, LLM APIs) — the worker's network is more restricted than the test runner.
-# How to apply:
-#   test('name', { tag: ['@konflux-skip'] }, async ({ app }) => { ... })
-#   After editing, run: npx --prefix .. prettier --write <file>
-#   (Prettier may reformat to multi-line — that is correct and expected.)
-# See also: root CLAUDE.md → "Konflux CI Environment" for backend skip patterns.
 
 # Run a specific test or coverage
 npx vitest run packages/syntara-ui/path/to/specific/test.test.ts
@@ -447,7 +434,7 @@ E2E tests use different ports (UI: 4173, mock API: 3300) to avoid conflicts with
 - **Containerization**: Podman (local), Docker Buildx (CI/CD)
 - **Multi-architecture**: Supports linux/amd64 and linux/arm64
 - **Production build**: Nginx-based (UI), Node.js (Mock API)
-- **Authentication**: Basic (demo/coffee)
+- **Authentication**: None — no baked-in credentials
 - **Separate containers**: UI and Mock API
 
 ### Container Commands

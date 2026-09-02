@@ -29,16 +29,13 @@ test.beforeAll(async ({ browser }) => {
       name: buildUniqueName('e2e-ui26'),
       projectId: project?.id,
     })
-    if (workflow) {
-      workflowId = workflow.id
-      const token = await getAuthToken(page)
-      if (token) {
-        await apiRequest(page, 'post', '/executions', {
-          token,
-          data: { workflow_id: workflowId, trigger_node_id: 'trigger_1' },
-        })
-      }
-    }
+    workflowId = workflow.id
+    const token = await getAuthToken(page)
+    if (!token) throw new Error('execution-runs-table beforeAll: could not obtain auth token')
+    await apiRequest(page, 'post', '/executions', {
+      token,
+      data: { workflow_id: workflowId, trigger_node_id: 'trigger_1' },
+    })
   } finally {
     await page.close()
   }

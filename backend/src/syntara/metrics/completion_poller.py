@@ -217,7 +217,6 @@ async def poll_completed_executions(
             select(Execution)
             .where(Execution.status.in_(TERMINAL_EXECUTION_STATUSES))  # type: ignore[attr-defined]
             .where(Execution.completed_at >= cutoff)  # type: ignore[operator]
-            .where(Execution.deleted_at.is_(None))  # type: ignore[union-attr]
             .options(selectinload(Execution.workflow))  # type: ignore[arg-type]
         )
         executions = result.all()
