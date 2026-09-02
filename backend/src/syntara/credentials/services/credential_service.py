@@ -538,6 +538,21 @@ class CredentialService(BaseService):
         await self._resolve_user_references([read])
         return read
 
+    @staticmethod
+    def _apply_credential_scalar_updates(credential: Credential, data: CredentialUpdate) -> bool:
+        """Apply description, enabled, and labels updates. Returns whether any field changed."""
+        has_changes = False
+        if data.description is not None and data.description != credential.description:
+            credential.description = data.description
+            has_changes = True
+        if data.enabled is not None and data.enabled != credential.enabled:
+            credential.enabled = data.enabled
+            has_changes = True
+        if data.labels is not None and data.labels != credential.labels:
+            credential.labels = data.labels
+            has_changes = True
+        return has_changes
+
     async def _apply_credential_inputs_update(
         self,
         credential: Credential,
@@ -588,15 +603,7 @@ class CredentialService(BaseService):
             credential.name = data.name
             has_changes = True
 
-        if data.description is not None and data.description != credential.description:
-            credential.description = data.description
-            has_changes = True
-        if data.enabled is not None and data.enabled != credential.enabled:
-            credential.enabled = data.enabled
-            has_changes = True
-        if data.labels is not None and data.labels != credential.labels:
-            credential.labels = data.labels
-            has_changes = True
+        has_changes = has_changes or self._apply_credential_scalar_updates(credential, data)
 
         decrypted_inputs = await self._apply_credential_inputs_update(credential, data, credential_type)
         has_changes = has_changes or bool(external_field_changes(credential))
