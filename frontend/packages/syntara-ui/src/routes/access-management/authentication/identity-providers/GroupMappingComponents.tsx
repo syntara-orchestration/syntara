@@ -218,12 +218,11 @@ export function MappingTable({
    * (this table does not pass `readOnlyAllowRemove`).
    */
   const showActionsColumn = isReadOnly !== true
-  const showWildcardHelp = isReadOnly !== true
   const showAddButton = !isReadOnly && showAddMappingAction
 
   const table = (
     <SynScrollableTableContainer caption="Group mappings" variant="compact">
-      <GroupMappingTableHead showActionsColumn={showActionsColumn} showWildcardHelp={showWildcardHelp} />
+      <GroupMappingTableHead showActionsColumn={showActionsColumn} />
       <Tbody>
         {rows.map((row) => {
           if (isReadOnly) {
@@ -445,7 +444,7 @@ export function ReadOnlyView({ entries, mappedGroups, onEditMapping }: Readonly<
             onPerPageChange: handlePerPageChange,
           }}
         >
-          <GroupMappingTableHead showActionsColumn={false} showWildcardHelp={false} />
+          <GroupMappingTableHead showActionsColumn={false} />
           <Tbody>
             {paginatedEntries.map((entry, index) => (
               <MappingRow

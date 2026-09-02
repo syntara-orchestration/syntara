@@ -687,7 +687,7 @@ describe('UsersTab Component', () => {
       const user = userEvent.setup()
       render(<UsersTab />, { wrapper })
 
-      const actionButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const actionButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(actionButtons[0])
 
       const editOption = await screen.findByRole('menuitem', { name: /edit/i })
@@ -716,15 +716,15 @@ describe('UsersTab Component', () => {
       const adminRow = rows[1]
       const nonAdminRow = rows[2]
 
-      expect(within(adminRow).queryByRole('button', { name: 'Kebab toggle' })).not.toBeInTheDocument()
-      expect(within(nonAdminRow).getByRole('button', { name: 'Kebab toggle' })).toBeInTheDocument()
+      expect(within(adminRow).queryByRole('button', { name: /^Actions for / })).not.toBeInTheDocument()
+      expect(within(nonAdminRow).getByRole('button', { name: /^Actions for / })).toBeInTheDocument()
     })
 
     it('opens delete dialog when delete action is clicked', async () => {
       const user = userEvent.setup()
       render(<UsersTab />, { wrapper })
 
-      const actionButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const actionButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(actionButtons[0])
 
       const deleteOption = await screen.findByRole('menuitem', { name: /delete/i })
@@ -766,7 +766,7 @@ describe('UsersTab Component', () => {
 
       render(<UsersTab />, { wrapper })
 
-      const actionButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const actionButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(actionButtons[0])
       const deleteOption = await screen.findByRole('menuitem', { name: /delete/i })
       await user.click(deleteOption)
@@ -801,7 +801,7 @@ describe('UsersTab Component', () => {
 
       render(<UsersTab />, { wrapper })
 
-      const actionButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const actionButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(actionButtons[0])
       const deleteOption = await screen.findByRole('menuitem', { name: /delete/i })
       await user.click(deleteOption)
@@ -826,7 +826,7 @@ describe('UsersTab Component', () => {
       const user = userEvent.setup()
       render(<UsersTab />, { wrapper })
 
-      const actionButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const actionButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(actionButtons[0])
       const deleteOption = await screen.findByRole('menuitem', { name: /delete/i })
       await user.click(deleteOption)
@@ -866,7 +866,7 @@ describe('UsersTab Component', () => {
 
       render(<UsersTab />, { wrapper })
 
-      const actionButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const actionButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(actionButtons[0])
       const deleteOption = await screen.findByRole('menuitem', { name: /delete/i })
       await user.click(deleteOption)
