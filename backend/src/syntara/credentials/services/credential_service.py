@@ -565,7 +565,7 @@ class CredentialService(BaseService):
         try:
             if data.inputs is not None:
                 existing_inputs = await self._retrieve_or_empty(credential.secret_id)
-                decrypted_inputs = await self._merge_inputs(credential, data.inputs)
+                decrypted_inputs = self._merge_inputs(existing_inputs, data.inputs)
                 _validate_field_constraints(decrypted_inputs, credential_type.inputs)
                 if decrypted_inputs != existing_inputs:
                     credential.secret_id = await self._store_inputs(credential, decrypted_inputs)
@@ -1010,13 +1010,12 @@ class CredentialService(BaseService):
         result = await self.session.exec(stmt)
         return result.all()  # type: ignore[no-any-return]
 
-    async def _merge_inputs(self, credential: Credential, new_inputs: dict[str, Any]) -> dict[str, Any]:
+    @staticmethod
+    def _merge_inputs(existing_inputs: dict[str, Any], new_inputs: dict[str, Any]) -> dict[str, Any]:
         """Merge new inputs with existing (preserving $encrypted$) without persisting.
 
         Returns the merged plaintext for validation before storage.
         """
-        existing_inputs = await self._retrieve_or_empty(credential.secret_id)
-
         return {
             **existing_inputs,
             **{k: v for k, v in new_inputs.items() if v != ENCRYPTED_SENTINEL},
