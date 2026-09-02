@@ -41,6 +41,7 @@ import { useProjectPermissions } from '../useProjectPermissions'
 import { ProjectDeleteDialog } from './ProjectDeleteDialog'
 import { ProjectNotFoundState } from './ProjectNotFoundState'
 import { ProjectRoleAssignmentsTab } from './ProjectRoleAssignmentsTab'
+import { ProjectWorkflowsTab } from './ProjectWorkflowsTab'
 import { useProjectDetailPermissions } from './useProjectDetailPermissions'
 
 const noop = () => {}
@@ -133,8 +134,8 @@ function ProjectDetailsTab({ project }: Readonly<{ project: ProjectRead }>) {
   )
 }
 
-type ProjectTab = 'details' | 'role-assignments'
-const ALL_PROJECT_TABS: ProjectTab[] = ['details', 'role-assignments']
+type ProjectTab = 'details' | 'workflows' | 'role-assignments'
+const ALL_PROJECT_TABS: ProjectTab[] = ['details', 'workflows', 'role-assignments']
 
 export function ProjectDetail() {
   const navigate = useNavigate()
@@ -203,7 +204,7 @@ export function ProjectDetail() {
 
   if (!projectData) return null
 
-  const projectCrumbs = breadcrumbsProjectDetail(projectData.name)
+  const projectCrumbs = breadcrumbsProjectDetail(projectData.name, basePath, activeTab)
 
   return (
     <SynPage>
@@ -224,6 +225,7 @@ export function ProjectDetail() {
         <SynListPanel>
           <SynListPanelTabs basePath={basePath} defaultTab="details" validTabs={validTabs} aria-label="Project details">
             <Tab eventKey="details" title={<TabTitleText>Details</TabTitleText>} />
+            <Tab eventKey="workflows" title={<TabTitleText>Workflows</TabTitleText>} />
             {validTabs.includes('role-assignments') && (
               <Tab eventKey="role-assignments" title={<TabTitleText>Assignments</TabTitleText>} />
             )}
@@ -241,6 +243,9 @@ export function ProjectDetail() {
               onClearAllFilters={noop}
               body={<ProjectDetailsTab project={projectData} />}
             />
+          )}
+          {activeTab === 'workflows' && (
+            <ProjectWorkflowsTab projectId={projectId ?? ''} isBuiltin={projectData.is_builtin} />
           )}
           {activeTab === 'role-assignments' && validTabs.includes('role-assignments') && (
             <ProjectRoleAssignmentsTab projectId={projectId ?? ''} />

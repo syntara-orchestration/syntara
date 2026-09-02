@@ -56,6 +56,10 @@ vi.mock('./ProjectRoleAssignmentsTab', () => ({
   ProjectRoleAssignmentsTab: () => <div>Mock Role Assignments Tab</div>,
 }))
 
+vi.mock('./ProjectWorkflowsTab', () => ({
+  ProjectWorkflowsTab: () => <div>Mock Workflows Tab</div>,
+}))
+
 vi.mock('./ProjectNotFoundState', () => ({
   ProjectNotFoundState: ({ onBack, onRetry }: { onBack: () => void; onRetry: () => void }) => (
     <div>
@@ -240,6 +244,7 @@ describe('ProjectDetail', () => {
     render(<ProjectDetail />, { wrapper })
 
     expect(screen.getByRole('tab', { name: 'Details' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Workflows' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Assignments' })).toBeInTheDocument()
   })
 
@@ -364,13 +369,29 @@ describe('ProjectDetail', () => {
     expect(screen.getByText('Mock Role Assignments Tab')).toBeInTheDocument()
   })
 
+  it('renders the Workflows tab content', () => {
+    mockDetailTab.mockReturnValue(['workflows', mockGoToTab])
+    render(<ProjectDetail />, { wrapper })
+
+    expect(screen.getByText('Mock Workflows Tab')).toBeInTheDocument()
+  })
+
+  it('defaults to the Details tab and keeps Details selected on first load', () => {
+    render(<ProjectDetail />, { wrapper })
+
+    expect(screen.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: 'Workflows' })).toHaveAttribute('aria-selected', 'false')
+    expect(screen.getByText('Test project')).toBeInTheDocument()
+    expect(screen.queryByText('Mock Workflows Tab')).not.toBeInTheDocument()
+  })
+
   it('calls goToTab when a tab is clicked', async () => {
     const user = userEvent.setup()
     render(<ProjectDetail />, { wrapper })
 
-    await user.click(screen.getByRole('tab', { name: 'Assignments' }))
+    await user.click(screen.getByRole('tab', { name: 'Workflows' }))
 
-    expect(mockGoToTab).toHaveBeenCalledWith('role-assignments')
+    expect(mockGoToTab).toHaveBeenCalledWith('workflows')
   })
 
   it('handles refetch rejection gracefully in onRetry callback', async () => {
@@ -469,6 +490,7 @@ describe('ProjectDetail', () => {
         expect(screen.queryByRole('tab', { name: /Assignments/ })).not.toBeInTheDocument()
       })
       expect(screen.getByRole('tab', { name: /Details/ })).toBeInTheDocument()
+      expect(screen.getByRole('tab', { name: /Workflows/ })).toBeInTheDocument()
     })
 
     it('shows Assignments tab when role-assignment:read is granted', async () => {
