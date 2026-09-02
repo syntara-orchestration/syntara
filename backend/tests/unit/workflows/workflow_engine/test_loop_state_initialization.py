@@ -194,9 +194,9 @@ class TestValidateForEachItems:
         node = _make_loop_node(extra_config={"items": "${trigger.affected_hosts}"})
         with pytest.raises(ApplicationError, match="resolved to None") as exc_info:
             OrchestratorWorkflow._validate_foreach_items(node, None)
-        # Message names the failing expression and hints at input_data.
+        # Message names the failing expression and points to trigger/upstream data.
         assert "${trigger.affected_hosts}" in str(exc_info.value)
-        assert "input_data" in str(exc_info.value)
+        assert "trigger" in str(exc_info.value)
         assert exc_info.value.non_retryable is True
 
     def test_non_list_items_raise_application_error_naming_expression(self) -> None:
