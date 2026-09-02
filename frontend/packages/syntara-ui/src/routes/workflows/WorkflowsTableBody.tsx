@@ -13,6 +13,8 @@ import type { ProjectRead } from '../access/types'
 import { useProjectPermissions } from '../access-management/useProjectPermissions'
 
 import { buildProjectRowActions, type ProjectRowActionCallbacks } from './projectRowActions'
+import { useWorkflowPermissions } from './useWorkflowPermissions'
+import { buildWorkflowRowActions, type WorkflowRowActionCallbacks } from './workflowRowActions'
 
 type Workflow = WorkflowAPI.components['schemas']['WorkflowRead']
 
@@ -20,12 +22,22 @@ export type RowAction = KebabAction
 
 type WorkflowRowProps = {
   workflow: Workflow
-  getRowActions?: (workflow: Workflow) => RowAction[]
+  isBuiltinProject?: boolean
+  rowActionCallbacks?: WorkflowRowActionCallbacks
   showRowActions?: boolean
 }
 
-function WorkflowRow({ workflow, getRowActions, showRowActions = true }: Readonly<WorkflowRowProps>) {
-  const actions = showRowActions && getRowActions ? getRowActions(workflow) : []
+function WorkflowRow({
+  workflow,
+  isBuiltinProject = false,
+  rowActionCallbacks,
+  showRowActions = true,
+}: Readonly<WorkflowRowProps>) {
+  const permissions = useWorkflowPermissions({ resourceProject: workflow.project_id })
+  const actions =
+    showRowActions && rowActionCallbacks
+      ? buildWorkflowRowActions(workflow, permissions, isBuiltinProject, rowActionCallbacks)
+      : []
 
   return (
     <Tr key={workflow.id}>
@@ -68,7 +80,8 @@ type ProjectGroupSectionProps = {
   workflows: Workflow[]
   isCollapsed: boolean
   onToggleProject: (projectId: string) => void
-  getRowActions?: (workflow: Workflow) => RowAction[]
+  isWorkflowProjectBuiltin?: (workflow: Workflow) => boolean
+  rowActionCallbacks?: WorkflowRowActionCallbacks
   showRowActions?: boolean
   projectActionCallbacks?: ProjectRowActionCallbacks
 }
@@ -79,7 +92,8 @@ function ProjectGroupSection({
   workflows,
   isCollapsed,
   onToggleProject,
-  getRowActions,
+  isWorkflowProjectBuiltin,
+  rowActionCallbacks,
   showRowActions = true,
   projectActionCallbacks,
 }: Readonly<ProjectGroupSectionProps>) {
@@ -116,7 +130,8 @@ function ProjectGroupSection({
           <WorkflowRow
             key={workflow.id}
             workflow={workflow}
-            getRowActions={getRowActions}
+            isBuiltinProject={isWorkflowProjectBuiltin?.(workflow) ?? false}
+            rowActionCallbacks={rowActionCallbacks}
             showRowActions={showRowActions}
           />
         ))}
@@ -128,7 +143,8 @@ type GroupedWorkflowsTableBodyProps = {
   groupedWorkflows: Map<string, ProjectGroup>
   collapsedProjects: Set<string>
   onToggleProject: (projectId: string) => void
-  getRowActions?: (workflow: Workflow) => RowAction[]
+  isWorkflowProjectBuiltin?: (workflow: Workflow) => boolean
+  rowActionCallbacks?: WorkflowRowActionCallbacks
   showRowActions?: boolean
   projectActionCallbacks?: ProjectRowActionCallbacks
 }
@@ -137,7 +153,8 @@ export function GroupedWorkflowsTableBody({
   groupedWorkflows,
   collapsedProjects,
   onToggleProject,
-  getRowActions,
+  isWorkflowProjectBuiltin,
+  rowActionCallbacks,
   showRowActions = true,
   projectActionCallbacks,
 }: Readonly<GroupedWorkflowsTableBodyProps>) {
@@ -151,7 +168,8 @@ export function GroupedWorkflowsTableBody({
           workflows={workflows}
           isCollapsed={collapsedProjects.has(projectId)}
           onToggleProject={onToggleProject}
-          getRowActions={getRowActions}
+          isWorkflowProjectBuiltin={isWorkflowProjectBuiltin}
+          rowActionCallbacks={rowActionCallbacks}
           showRowActions={showRowActions}
           projectActionCallbacks={projectActionCallbacks}
         />
@@ -162,13 +180,15 @@ export function GroupedWorkflowsTableBody({
 
 type FlatWorkflowsTableBodyProps = {
   workflows: Workflow[]
-  getRowActions?: (workflow: Workflow) => RowAction[]
+  isWorkflowProjectBuiltin?: (workflow: Workflow) => boolean
+  rowActionCallbacks?: WorkflowRowActionCallbacks
   showRowActions?: boolean
 }
 
 export function FlatWorkflowsTableBody({
   workflows,
-  getRowActions,
+  isWorkflowProjectBuiltin,
+  rowActionCallbacks,
   showRowActions = true,
 }: Readonly<FlatWorkflowsTableBodyProps>) {
   return (
@@ -177,7 +197,8 @@ export function FlatWorkflowsTableBody({
         <WorkflowRow
           key={workflow.id}
           workflow={workflow}
-          getRowActions={getRowActions}
+          isBuiltinProject={isWorkflowProjectBuiltin?.(workflow) ?? false}
+          rowActionCallbacks={rowActionCallbacks}
           showRowActions={showRowActions}
         />
       ))}

@@ -1,12 +1,13 @@
 /**
  * Real-backend role user setup for permission-gating E2E tests.
  *
- * Creates three users (viewer, auditor, user) with role assignments that
+ * Creates users (viewer, auditor, user, projectAdmin) with role assignments that
  * mirror the mock API's can_i permission matrix (handlers.ts).
  *
  * - **auditor**: assigned the built-in "auditor" role directly.
  * - **viewer** / **user**: assigned a custom role built from the backend's
  *   built-in policy names (e.g. "workflow:read:any").
+ * - **projectAdmin**: assigned built-in `project-admin` on a dedicated project.
  *
  * Used by the worker-scoped `roleSetup` fixture in fixtures.ts so each
  * worker creates users once and reuses them across all tests.
@@ -29,6 +30,8 @@ type RoleProfile = {
   builtinRole: string | null
   /** Policy names for custom role creation (ignored when builtinRole is set). */
   policies: string[]
+  /** Assign builtinRole on a new project instead of system scope. */
+  projectScoped?: boolean
 }
 
 /**
@@ -65,6 +68,11 @@ const ROLE_PROFILES: Record<string, RoleProfile> = {
       'authz:query:any',
     ],
   },
+  projectAdmin: {
+    builtinRole: 'project-admin',
+    policies: [],
+    projectScoped: true,
+  },
 }
 
 export type RoleCredentials = {
@@ -74,6 +82,8 @@ export type RoleCredentials = {
 
 export type RoleSetupResult = {
   credentials: Record<string, RoleCredentials>
+  /** Project created for the projectAdmin profile (real backend only). */
+  projectAdminProject?: { id: string; name: string }
   cleanup: () => Promise<void>
 }
 
@@ -94,9 +104,9 @@ async function postJson(
 }
 
 /**
- * Create viewer/auditor/user accounts on the real backend with matching
- * role assignments.  Returns credentials for login and a cleanup function
- * that tears everything down in reverse order.
+ * Create viewer/auditor/user/projectAdmin accounts on the real backend with
+ * matching role assignments.  Returns credentials for login and a cleanup
+ * function that tears everything down in reverse order.
  */
 export async function setupRoleUsers(request: APIRequestContext): Promise<RoleSetupResult> {
   const backendUrl = process.env.VITE_API_URL ?? process.env.SYNTARA_E2E_BASE_URL ?? 'http://localhost:8000'
@@ -114,6 +124,7 @@ export async function setupRoleUsers(request: APIRequestContext): Promise<RoleSe
   const cleanupStack: Array<() => Promise<void>> = []
   const credentials: Record<string, RoleCredentials> = {}
   const password = generatePassword()
+  let projectAdminProject: { id: string; name: string } | undefined
 
   try {
     for (const [role, profile] of Object.entries(ROLE_PROFILES)) {
@@ -133,6 +144,20 @@ export async function setupRoleUsers(request: APIRequestContext): Promise<RoleSe
         assignRoleName = `${prefix}-role`
       }
 
+      let projectId: string | undefined
+      if (profile.projectScoped) {
+        const projectName = `${prefix}-project`
+        const project = await postJson(request, api('/projects'), headers, {
+          name: projectName,
+          description: 'E2E project-admin fixture',
+        })
+        cleanupStack.push(async () => {
+          await request.delete(api(`/projects/${project.id}`), { headers }).catch(() => {})
+        })
+        projectId = project.id
+        projectAdminProject = { id: project.id, name: projectName }
+      }
+
       const user = await postJson(request, api('/users'), headers, {
         username: prefix,
         email: `${prefix}@e2e.example.com`,
@@ -144,13 +169,25 @@ export async function setupRoleUsers(request: APIRequestContext): Promise<RoleSe
         await request.delete(api(`/users/${user.id}`), { headers }).catch(() => {})
       })
 
-      const assignment = await postJson(request, api('/role_assignments'), headers, {
-        principal_id: user.id,
-        role_name: assignRoleName,
-      })
-      cleanupStack.push(async () => {
-        await request.delete(api(`/role_assignments/${assignment.id}`), { headers }).catch(() => {})
-      })
+      if (projectId) {
+        const assignment = await postJson(request, api(`/projects/${projectId}/role_assignments`), headers, {
+          principal_id: user.id,
+          role_name: assignRoleName,
+        })
+        cleanupStack.push(async () => {
+          await request
+            .delete(api(`/projects/${projectId}/role_assignments/${assignment.id}`), { headers })
+            .catch(() => {})
+        })
+      } else {
+        const assignment = await postJson(request, api('/role_assignments'), headers, {
+          principal_id: user.id,
+          role_name: assignRoleName,
+        })
+        cleanupStack.push(async () => {
+          await request.delete(api(`/role_assignments/${assignment.id}`), { headers }).catch(() => {})
+        })
+      }
 
       credentials[role] = { username: prefix, password }
     }
@@ -163,6 +200,7 @@ export async function setupRoleUsers(request: APIRequestContext): Promise<RoleSe
 
   return {
     credentials,
+    projectAdminProject,
     cleanup: async () => {
       for (const fn of cleanupStack.reverse()) {
         await fn()
