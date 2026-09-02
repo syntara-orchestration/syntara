@@ -559,7 +559,7 @@ describe('UserGroupsPanel', () => {
       await user.click(actionsButtons[actionsButtons.length - 1])
 
       // Click "Remove" action
-      const removeItem = await screen.findByText('Remove')
+      const removeItem = await screen.findByText('Remove from group')
       await user.click(removeItem)
 
       // Confirmation dialog should appear
@@ -631,7 +631,7 @@ describe('UserGroupsPanel', () => {
       await user.click(actionsButtons[actionsButtons.length - 1])
 
       // Click Remove
-      const removeItem = await screen.findByText('Remove')
+      const removeItem = await screen.findByText('Remove from group')
       await user.click(removeItem)
 
       // Confirm removal
@@ -676,7 +676,7 @@ describe('UserGroupsPanel', () => {
       const actionsButtons = within(rows[2]).getAllByRole('button')
       await user.click(actionsButtons[actionsButtons.length - 1])
 
-      const removeItem = await screen.findByText('Remove')
+      const removeItem = await screen.findByText('Remove from group')
       await user.click(removeItem)
 
       // Dialog should be open

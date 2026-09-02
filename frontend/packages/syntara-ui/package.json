@@ -91,7 +91,7 @@
     "eslint-plugin-testing-library": "^7.16.2",
     "eslint-plugin-unicorn": "^64.0.0",
     "globals": "^17.6.0",
-    "jsdom": "^29.1.1",
+    "happy-dom": "^20.11.2",
     "knip": "^6.14.2",
     "nyc": "^18.0.0",
     "pngjs": "^7.0.0",

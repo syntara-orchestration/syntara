@@ -106,7 +106,6 @@ class WebhookTriggerService(BaseService):
                 WebhookTrigger.webhook_path == webhook_path,
                 WebhookTrigger.is_enabled == True,  # noqa: E712
                 Workflow.is_enabled == True,  # noqa: E712
-                Workflow.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
         trigger = result.one_or_none()

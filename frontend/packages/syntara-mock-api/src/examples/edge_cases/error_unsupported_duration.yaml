@@ -1,5 +1,5 @@
 ---
-schema_version: '2.0.0'
+schema_version: "2.0.0"
 name: error-invalid-timeout
 description: Test error with invalid timeout value
 

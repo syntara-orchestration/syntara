@@ -13,7 +13,7 @@ from uuid import UUID, uuid4
 
 import structlog
 from sqlalchemy.exc import IntegrityError
-from sqlmodel import func, select
+from sqlmodel import col, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.audit.dispatcher import AuditEventDispatcher
@@ -43,6 +43,7 @@ from syntara.workflows.exceptions import (
     BuiltinWorkflowDeleteError,
     BuiltinWorkflowModifyError,
     ScheduledTriggerSyncError,
+    WorkflowHasActiveExecutionsError,
     WorkflowNameConflictError,
     WorkflowNotFoundError,
     WorkflowNotPublishedError,
@@ -51,6 +52,7 @@ from syntara.workflows.exceptions import (
     WorkflowVersionNotFoundError,
 )
 from syntara.workflows.models import Workflow, WorkflowListResponse, WorkflowRead, WorkflowVersion
+from syntara.workflows.models.execution import TERMINAL_EXECUTION_STATUSES, Execution
 from syntara.workflows.models.validation_finding import (
     ValidationCategory,
     ValidationFinding,
@@ -186,7 +188,6 @@ class WorkflowService(BaseService):
             select(WorkflowVersion).filter(
                 WorkflowVersion.workflow_id == workflow_id,  # type: ignore[arg-type]
                 WorkflowVersion.version == version,  # type: ignore[arg-type]
-                WorkflowVersion.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
         return result.one_or_none()
@@ -323,7 +324,7 @@ class WorkflowService(BaseService):
                 exc_info=True,
             )
             return True
-        return workflow is not None and workflow.deleted_at is None and workflow.published_version_id is not None
+        return workflow is not None and workflow.published_version_id is not None
 
     @staticmethod
     async def _delete_scheduled_triggers(workflow_id: UUID) -> None:
@@ -865,7 +866,6 @@ class WorkflowService(BaseService):
             select(Workflow)
             .filter(
                 Workflow.id == workflow_id,  # type: ignore[arg-type]
-                Workflow.deleted_at.is_(None),  # type: ignore[union-attr]
             )
             .with_for_update()
         )
@@ -894,7 +894,6 @@ class WorkflowService(BaseService):
             .filter(
                 WorkflowVersion.workflow_id == workflow.id,  # type: ignore[arg-type]
                 WorkflowVersion.version.in_([workflow.current_version, expected_version]),  # type: ignore[attr-defined]
-                WorkflowVersion.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
         rows = result.all()
@@ -928,7 +927,6 @@ class WorkflowService(BaseService):
             pub_result = await self.session.exec(
                 select(WorkflowVersion).filter(
                     WorkflowVersion.id == workflow.published_version_id,  # type: ignore[arg-type]
-                    WorkflowVersion.deleted_at.is_(None),  # type: ignore[union-attr]
                 )
             )
             published_ver = pub_result.one_or_none()
@@ -957,7 +955,6 @@ class WorkflowService(BaseService):
         result = await self.session.exec(
             select(Workflow).filter(
                 Workflow.id == workflow_id,  # type: ignore[arg-type]
-                Workflow.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
         workflow = result.one_or_none()
@@ -989,7 +986,6 @@ class WorkflowService(BaseService):
             select(WorkflowVersion).filter(
                 WorkflowVersion.workflow_id == workflow_id,  # type: ignore[arg-type]
                 WorkflowVersion.version == workflow.current_version,  # type: ignore[arg-type]
-                WorkflowVersion.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
         current_version = version_result.one_or_none()
@@ -1629,13 +1625,17 @@ class WorkflowService(BaseService):
         return workflow, new_version
 
     async def delete_workflow(self, workflow_id: UUID) -> None:
-        """Soft delete a workflow.
+        """Hard-delete a workflow and cascade-delete its versions and executions.
+
+        Versions and executions are cascade-deleted via DB FK (ondelete=CASCADE).
 
         Args:
             workflow_id: UUID of workflow to delete
 
         Raises:
             WorkflowNotFoundError: If workflow not found
+            BuiltinWorkflowDeleteError: If workflow is a built-in
+            WorkflowHasActiveExecutionsError: If workflow has non-terminal executions
 
         """
         workflow = await self.get_workflow_by_id(workflow_id)
@@ -1643,12 +1643,39 @@ class WorkflowService(BaseService):
         if workflow.is_builtin:
             raise BuiltinWorkflowDeleteError(workflow.name)
 
-        # Delete associated webhook triggers before soft-deleting the workflow
+        non_terminal_count = await self.session.scalar(
+            select(func.count())
+            .select_from(Execution)
+            .where(
+                Execution.workflow_id == workflow_id,
+                col(Execution.status).not_in(TERMINAL_EXECUTION_STATUSES),
+            )
+        )
+        if non_terminal_count:
+            raise WorkflowHasActiveExecutionsError(non_terminal_count, workflow_id=workflow_id)
+
+        # Explicit cleanup retained so trigger deletion is logged individually
+        # (delete_triggers_for_workflow logs each removal); DB CASCADE would also
+        # remove these rows, but silently.
         webhook_service = WebhookTriggerService(self.session, self.user)
         await webhook_service.delete_triggers_for_workflow(workflow_id)
 
-        # Soft delete
-        workflow.soft_delete(self.user.id)
+        # Clean up ApprovalRequests (soft reference, no FK — CASCADE won't handle these)
+        from sqlalchemy import delete as sa_delete  # noqa: PLC0415
+
+        from syntara.approvals.models.approval_request import ApprovalRequest  # noqa: PLC0415
+
+        exec_ids_subq = select(Execution.id).where(Execution.workflow_id == workflow_id).scalar_subquery()
+        await self.session.exec(sa_delete(ApprovalRequest).where(col(ApprovalRequest.execution_id).in_(exec_ids_subq)))
+
+        # Break self-referential FK before delete
+        # (constraint: is_enabled must be False when published_version_id is NULL)
+        workflow.published_version_id = None
+        workflow.is_enabled = False
+        await self.session.flush()
+
+        # Hard delete — versions and executions cascade via DB FK
+        await self.session.delete(workflow)
         try:
             await self.session.commit()
         except Exception as exc:
