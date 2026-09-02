@@ -12,6 +12,11 @@ user_idp_groups.group_id, idp_group_mapping_entries.mapped_group_id,
 approval_approver_groups.group_id) and behavioral deletes for every
 user-scoped table, including the ones with no other test coverage:
 UserIdentity, RefreshSession, ApprovalApproverUser, user_idp_groups.
+
+Row-existence assertions use plain ``COUNT(*)`` SQL rather than ORM
+``select(Model)`` so they can't be tripped up by lazy-loaded relationships
+on the involved models (e.g. ``ApprovalRequest.approver_group_records``),
+which would raise ``MissingGreenlet`` if touched outside an awaited context.
 """
 
 from datetime import UTC, datetime, timedelta
@@ -19,8 +24,6 @@ from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import insert, text
-from sqlalchemy import select as sa_select
-from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.approvals.models import ApprovalRequest, ApprovalRequestStatus
@@ -34,7 +37,7 @@ from syntara.users.services.group_service import GroupsService
 from syntara.users.services.user_service import UsersService
 from tests.integration.helpers.identity_provider import IdentityProviderCreate
 
-# (table, column, constraint) -> expected ON DELETE action ("c"=CASCADE, "n"=SET NULL, "a"=NO ACTION)
+# (table, constraint, expected confdeltype: "c"=CASCADE, "n"=SET NULL, "a"=NO ACTION)
 _EXPECTED_CONFDELTYPE: list[tuple[str, str, str]] = [
     ("user_groups", "user_groups_user_id_fkey", "c"),
     ("user_groups", "user_groups_group_id_fkey", "c"),
@@ -56,10 +59,38 @@ async def _confdeltype(session: AsyncSession, table: str, constraint: str) -> st
     result = await session.execute(
         text(
             "SELECT confdeltype FROM pg_constraint "
-            "WHERE conrelid = :table_name::regclass AND conname = :constraint_name"
-        ).bindparams(table_name=table, constraint_name=constraint)
+            "WHERE conrelid = CAST(:table_name AS regclass) AND conname = :constraint_name"
+        ),
+        {"table_name": table, "constraint_name": constraint},
     )
     return result.scalar_one_or_none()
+
+
+async def _count(session: AsyncSession, table: str, where_sql: str, **params: object) -> int:
+    """Return a row count for ``table`` using a plain SQL WHERE clause.
+
+    Deliberately bypasses the ORM so assertions can never trip a lazy-load
+    (MissingGreenlet) on models with relationships, such as ApprovalRequest.
+    """
+    result = await session.execute(text(f"SELECT COUNT(*) FROM {table} WHERE {where_sql}"), params)  # noqa: S608
+    return int(result.scalar_one())
+
+
+async def _add_test_user_to_admins(session: AsyncSession, user_id: UUID) -> None:
+    """Ensure the actor stays an enabled admin so delete_user's admin-count guard passes."""
+    admins_group_id = (
+        await session.execute(text("SELECT id FROM groups WHERE name = 'admins' AND is_builtin IS TRUE"))
+    ).scalar_one()
+    already_member = await _count(
+        session,
+        "user_groups",
+        "user_id = :user_id AND group_id = :group_id",
+        user_id=user_id,
+        group_id=admins_group_id,
+    )
+    if not already_member:
+        await session.exec(insert(user_groups).values(user_id=user_id, group_id=admins_group_id))
+        await session.commit()
 
 
 @pytest.mark.asyncio
@@ -83,6 +114,8 @@ async def test_delete_user_cascades_identity_session_and_approver_rows(
     test_db_session: AsyncSession, test_user: User, test_project_id: UUID
 ) -> None:
     """UserIdentity, RefreshSession, ApprovalApproverUser, and user_idp_groups have no other coverage."""
+    await _add_test_user_to_admins(test_db_session, test_user.id)
+
     idp_factory = IdentityProviderCreate(test_db_session, test_user)
     idp = await idp_factory.create()
 
@@ -142,30 +175,33 @@ async def test_delete_user_cascades_identity_session_and_approver_rows(
     idp_group_id = idp_group.id
 
     await service.delete_user(victim_id)
-    test_db_session.expire_all()
 
-    assert (await test_db_session.exec(select(UserIdentity).where(UserIdentity.id == identity_id))).first() is None
-    assert (await test_db_session.exec(select(RefreshSession).where(RefreshSession.jti == session_jti))).first() is None
-    approver_result = await test_db_session.exec(
-        select(ApprovalApproverUser).where(
-            ApprovalApproverUser.approval_id == approval_id, ApprovalApproverUser.user_id == victim_id
+    assert await _count(test_db_session, "user_identities", "id = :id", id=identity_id) == 0
+    assert await _count(test_db_session, "refresh_sessions", "jti = :jti", jti=session_jti) == 0
+    assert (
+        await _count(
+            test_db_session,
+            "approval_approver_users",
+            "approval_id = :approval_id AND user_id = :user_id",
+            approval_id=approval_id,
+            user_id=victim_id,
         )
+        == 0
     )
-    assert approver_result.first() is None
-    idp_group_membership = await test_db_session.execute(
-        sa_select(user_idp_groups).where(
-            user_idp_groups.c.user_id == victim_id,
-            user_idp_groups.c.identity_provider_id == idp_id,
-            user_idp_groups.c.group_id == idp_group_id,
+    assert (
+        await _count(
+            test_db_session,
+            "user_idp_groups",
+            "user_id = :user_id AND identity_provider_id = :idp_id AND group_id = :group_id",
+            user_id=victim_id,
+            idp_id=idp_id,
+            group_id=idp_group_id,
         )
+        == 0
     )
-    assert idp_group_membership.first() is None
 
     # The approval request itself is untouched — only the approver link is user-scoped.
-    surviving_approval = (
-        await test_db_session.exec(select(ApprovalRequest).where(ApprovalRequest.id == approval_id))
-    ).first()
-    assert surviving_approval is not None
+    assert await _count(test_db_session, "approval_requests", "id = :id", id=approval_id) == 1
 
 
 @pytest.mark.asyncio
@@ -207,39 +243,43 @@ async def test_delete_group_cascades_group_scoped_rows_and_preserves_users_and_a
     mapping_id = mapping.id
     approval_id = approval.id
     idp_id = idp.id
+    user_id = test_user.id
 
     await groups_service.delete_group(group_id)
-    test_db_session.expire_all()
-
-    membership = await test_db_session.execute(
-        sa_select(user_groups).where(user_groups.c.user_id == test_user.id, user_groups.c.group_id == group_id)
-    )
-    assert membership.first() is None
-
-    idp_membership = await test_db_session.execute(
-        sa_select(user_idp_groups).where(
-            user_idp_groups.c.user_id == test_user.id,
-            user_idp_groups.c.identity_provider_id == idp_id,
-            user_idp_groups.c.group_id == group_id,
-        )
-    )
-    assert idp_membership.first() is None
 
     assert (
-        await test_db_session.exec(select(IdpGroupMappingEntry).where(IdpGroupMappingEntry.id == mapping_id))
-    ).first() is None
-
-    approver_group_result = await test_db_session.exec(
-        select(ApprovalApproverGroup).where(
-            ApprovalApproverGroup.approval_id == approval_id, ApprovalApproverGroup.group_id == group_id
+        await _count(
+            test_db_session,
+            "user_groups",
+            "user_id = :user_id AND group_id = :group_id",
+            user_id=user_id,
+            group_id=group_id,
         )
+        == 0
     )
-    assert approver_group_result.first() is None
+    assert (
+        await _count(
+            test_db_session,
+            "user_idp_groups",
+            "user_id = :user_id AND identity_provider_id = :idp_id AND group_id = :group_id",
+            user_id=user_id,
+            idp_id=idp_id,
+            group_id=group_id,
+        )
+        == 0
+    )
+    assert await _count(test_db_session, "idp_group_mapping_entries", "id = :id", id=mapping_id) == 0
+    assert (
+        await _count(
+            test_db_session,
+            "approval_approver_groups",
+            "approval_id = :approval_id AND group_id = :group_id",
+            approval_id=approval_id,
+            group_id=group_id,
+        )
+        == 0
+    )
 
     # The user and the approval request itself must survive a group delete.
-    surviving_user = (await test_db_session.exec(select(User).where(User.id == test_user.id))).first()
-    assert surviving_user is not None
-    surviving_approval = (
-        await test_db_session.exec(select(ApprovalRequest).where(ApprovalRequest.id == approval_id))
-    ).first()
-    assert surviving_approval is not None
+    assert await _count(test_db_session, "users", "id = :id", id=user_id) == 1
+    assert await _count(test_db_session, "approval_requests", "id = :id", id=approval_id) == 1
