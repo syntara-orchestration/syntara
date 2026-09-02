@@ -6,9 +6,8 @@
  * - Project selector filters workflows by project_id
  * - Changing per-page resets to first page
  */
-import type { Page } from '@playwright/test'
-
-import { createUnavailableGuard, test, expect, toAppUrl } from './fixtures'
+import { createUnavailableGuard, type Page, test, expect, toAppUrl } from './fixtures'
+import { paginationFooter, paginationFooterForTable } from './helpers/patternfly'
 import { buildUniqueName } from './helpers/workflows'
 import {
   createUserViaApi,
@@ -43,77 +42,80 @@ const seededIdPs: SeededIdentityProvider[] = []
 
 test.beforeAll(async ({ browser }) => {
   const page = await browser.newPage()
-  const token = await getAuthToken(page)
-  const prefix = buildUniqueName('e2e-pag')
+  try {
+    const token = await getAuthToken(page)
+    const prefix = buildUniqueName('e2e-pag')
 
-  if (!token) {
-    await page.close()
-    return
-  }
+    if (!token) throw new Error('pagination beforeAll: could not obtain auth token')
 
-  const project = await ensureProject(page)
-  const projectId = project?.id
+    const project = await ensureProject(page)
+    if (!project) throw new Error('pagination beforeAll: could not ensure project')
+    const projectId = project.id
 
-  const workflowResults = await Promise.allSettled(
-    Array.from({ length: 22 }, (_, i) =>
-      createWorkflowViaApi(page, { name: `${prefix}-workflow-${i + 1}`, projectId, token })
+    const workflowResults = await Promise.allSettled(
+      Array.from({ length: 22 }, (_, i) =>
+        createWorkflowViaApi(page, { name: `${prefix}-workflow-${i + 1}`, projectId, token })
+      )
     )
-  )
-  for (const result of workflowResults) {
-    if (result.status === 'fulfilled' && result.value) seededWorkflows.push(result.value)
-  }
+    const workflowErrors: unknown[] = []
+    for (const result of workflowResults) {
+      if (result.status === 'fulfilled') seededWorkflows.push(result.value)
+      else workflowErrors.push(result.reason)
+    }
+    if (workflowErrors.length) {
+      throw new Error(
+        `pagination beforeAll: failed to seed ${workflowErrors.length} workflows: ${String(workflowErrors[0])}`
+      )
+    }
 
-  for (let i = 1; i <= 2; i++) {
-    const cred = await createCredentialSeed(page, { name: `${prefix}-cred-${i}`, projectId, token })
-    if (cred) seededCredentials.push(cred)
-  }
+    for (let i = 1; i <= 2; i++) {
+      seededCredentials.push(await createCredentialSeed(page, { name: `${prefix}-cred-${i}`, projectId, token }))
+    }
 
-  for (let i = 1; i <= 2; i++) {
-    const integration = await createIntegrationViaApi(page, { name: `${prefix}-integ-${i}`, token })
-    if (integration) seededIntegrations.push(integration)
-  }
+    for (let i = 1; i <= 2; i++) {
+      seededIntegrations.push(await createIntegrationViaApi(page, { name: `${prefix}-integ-${i}`, token }))
+    }
 
-  for (let i = 1; i <= 16; i++) {
-    const user = await createUserViaApi(page, { username: `${prefix}-user-${i}`, token })
-    if (user) seededUsers.push(user)
-  }
+    for (let i = 1; i <= 16; i++) {
+      seededUsers.push(await createUserViaApi(page, { username: `${prefix}-user-${i}`, token }))
+    }
 
-  for (let i = 1; i <= 15; i++) {
-    const group = await ensureGroupExists(page, `${prefix}-group-${i}`)
-    if (group) seededGroups.push(group)
-  }
+    for (let i = 1; i <= 15; i++) {
+      seededGroups.push(await ensureGroupExists(page, `${prefix}-group-${i}`))
+    }
 
-  for (let i = 1; i <= 21; i++) {
-    const idp = await createIdentityProviderViaApi(page, { name: `${prefix}-idp-${i}`, token })
-    if (idp) seededIdPs.push(idp)
+    for (let i = 1; i <= 21; i++) {
+      seededIdPs.push(await createIdentityProviderViaApi(page, { name: `${prefix}-idp-${i}`, token }))
+    }
+  } finally {
+    await page.close()
   }
-
-  await page.close()
 })
 
 test.afterAll(async ({ browser }) => {
   const page = await browser.newPage()
-
-  for (const wf of seededWorkflows) {
-    await deleteWorkflowViaApi(page, wf.id)
+  try {
+    for (const wf of seededWorkflows) {
+      await deleteWorkflowViaApi(page, wf.id)
+    }
+    for (const cred of seededCredentials) {
+      await deleteCredentialViaApi(page, cred.id)
+    }
+    for (const integration of seededIntegrations) {
+      await deleteIntegrationViaApi(page, integration.id)
+    }
+    for (const user of seededUsers) {
+      await deleteUserViaApi(page, user.id)
+    }
+    for (const group of seededGroups) {
+      if (group.createdByUs) await deleteGroupViaApi(page, group.id)
+    }
+    for (const idp of seededIdPs) {
+      await deleteIdentityProviderViaApi(page, idp.id)
+    }
+  } finally {
+    await page.close()
   }
-  for (const cred of seededCredentials) {
-    await deleteCredentialViaApi(page, cred.id)
-  }
-  for (const integration of seededIntegrations) {
-    await deleteIntegrationViaApi(page, integration.id)
-  }
-  for (const user of seededUsers) {
-    await deleteUserViaApi(page, user.id)
-  }
-  for (const group of seededGroups) {
-    if (group.createdByUs) await deleteGroupViaApi(page, group.id)
-  }
-  for (const idp of seededIdPs) {
-    await deleteIdentityProviderViaApi(page, idp.id)
-  }
-
-  await page.close()
 })
 
 /** Workflow rows only — excludes grouped “project” header rows that have no builder link. */
@@ -145,16 +147,16 @@ test.describe('Pagination Footer — Users Tab', () => {
       .then(() => true)
       .catch(() => false)
     if (!hasTable) guard.markUnavailable()
-    test.skip(!hasTable, 'No users data available')
+    expect(hasTable, 'No users data available').toBeTruthy()
   })
 
   test('pagination footer is visible with per-page toggle', async ({ app }) => {
-    const perPageToggle = app.locator('.pf-v6-c-pagination').getByRole('button', { name: /\d+ - \d+/ })
+    const perPageToggle = paginationFooter(app).getByRole('button', { name: /\d+ - \d+/ })
     await expect(perPageToggle).toBeVisible()
   })
 
   test('per-page dropdown shows page size options', async ({ app }) => {
-    const perPageToggle = app.locator('.pf-v6-c-pagination').getByRole('button', { name: /\d+ - \d+/ })
+    const perPageToggle = paginationFooter(app).getByRole('button', { name: /\d+ - \d+/ })
     await expect(perPageToggle).toBeVisible()
     await perPageToggle.click()
 
@@ -166,7 +168,7 @@ test.describe('Pagination Footer — Users Tab', () => {
 })
 
 test.describe('Pagination Footer — Groups Tab', () => {
-  test('pagination footer is visible on groups tab', { tag: ['@konflux-skip'] }, async ({ app }) => {
+  test('pagination footer is visible on groups tab', async ({ app }) => {
     await app.goto(toAppUrl('/system-administration/access-management/groups'))
     await expect(app.getByRole('tab', { name: /Groups/i })).toHaveAttribute('aria-selected', 'true')
 
@@ -175,9 +177,9 @@ test.describe('Pagination Footer — Groups Tab', () => {
       .waitFor({ state: 'visible', timeout: 30_000 })
       .then(() => true)
       .catch(() => false)
-    test.skip(!hasTable, 'No groups data available')
+    expect(hasTable, 'No groups data available').toBeTruthy()
 
-    const perPageToggle = app.locator('.pf-v6-c-pagination').getByRole('button', { name: /\d+ - \d+/ })
+    const perPageToggle = paginationFooter(app).getByRole('button', { name: /\d+ - \d+/ })
     await expect(perPageToggle).toBeVisible()
   })
 })
@@ -196,9 +198,8 @@ test.describe('Project Selector — Workflows', () => {
       .catch(() => false)
     if (!hasTable) {
       guard.markUnavailable()
-      test.skip(true, 'No workflows available — create workflows first')
-      return
     }
+    expect(hasTable, 'No workflows available — create workflows first').toBeTruthy()
 
     const projectInput = app.getByPlaceholder('All projects')
     const selectorVisible = await projectInput
@@ -207,6 +208,7 @@ test.describe('Project Selector — Workflows', () => {
       .catch(() => false)
     if (!selectorVisible) {
       guard.markUnavailable()
+      // Environment constraint: the project selector is absent in some mock/single-project setups.
       test.skip(true, 'Project selector not available in this environment')
       return
     }
@@ -219,6 +221,7 @@ test.describe('Project Selector — Workflows', () => {
       .catch(() => false)
     await app.keyboard.press('Escape')
     if (!optionsInteractive) guard.markUnavailable()
+    // Environment constraint: dropdown options never appear in some mock/single-project setups.
     test.skip(!optionsInteractive, 'Project selector is not interactive in this environment')
   })
 
@@ -236,10 +239,10 @@ test.describe('Project Selector — Workflows', () => {
 
   test('selecting a project sends project_id to the API', async ({ app }) => {
     const workflowCountAllProjects = await workflowNameButtons(app).count()
-    test.skip(
-      workflowCountAllProjects === 0,
+    expect(
+      workflowCountAllProjects > 0,
       'No workflow builder links visible — need at least one workflow to test project filter'
-    )
+    ).toBeTruthy()
 
     const requestPromise = app.waitForRequest((req) => {
       const u = req.url()
@@ -250,18 +253,17 @@ test.describe('Project Selector — Workflows', () => {
     await app.getByRole('option', { name: 'All projects' }).waitFor({ state: 'visible', timeout: 10_000 })
 
     // Find and click first real project (not "All projects" or "Create project")
-    const options = app.getByRole('option')
-    const count = await options.count()
+    const options = await app.getByRole('option').all()
     let clicked = false
-    for (let i = 0; i < count; i++) {
-      const text = await options.nth(i).textContent()
+    for (const option of options) {
+      const text = await option.textContent()
       if (text && !text.includes('All projects') && !text.includes('Create project')) {
-        await options.nth(i).click()
+        await option.click()
         clicked = true
         break
       }
     }
-    test.skip(!clicked, 'No real projects available')
+    expect(clicked, 'No real projects available').toBeTruthy()
 
     const request = await requestPromise
     const rawUrl = request.url()
@@ -279,18 +281,17 @@ test.describe('Project Selector — Workflows', () => {
     await app.getByPlaceholder('All projects').click()
     await app.getByRole('option', { name: 'All projects' }).waitFor({ state: 'visible', timeout: 10_000 })
 
-    const options = app.getByRole('option')
-    const count = await options.count()
+    const options = await app.getByRole('option').all()
     let clicked = false
-    for (let i = 0; i < count; i++) {
-      const text = await options.nth(i).textContent()
+    for (const option of options) {
+      const text = await option.textContent()
       if (text && !text.includes('All projects') && !text.includes('Create project')) {
-        await options.nth(i).click()
+        await option.click()
         clicked = true
         break
       }
     }
-    test.skip(!clicked, 'No real projects available')
+    expect(clicked, 'No real projects available').toBeTruthy()
 
     // Wait for table to update after project selection
     await app.getByRole('grid', { name: 'Workflows table' }).waitFor({ state: 'visible', timeout: 10_000 })
@@ -309,7 +310,7 @@ test.describe('Project Selector — Workflows', () => {
   })
 
   test('pagination footer has per-page toggle', async ({ app }) => {
-    const perPageToggle = app.locator('.pf-v6-c-pagination').getByRole('button', { name: /\d+ - \d+/ })
+    const perPageToggle = paginationFooter(app).getByRole('button', { name: /\d+ - \d+/ })
     await expect(perPageToggle).toBeVisible()
   })
 })
@@ -326,11 +327,11 @@ test.describe('Pagination Navigation — Workflows', () => {
       .catch(() => false)
     if (!hasTable) {
       guard.markUnavailable()
-      test.skip(true, 'No workflows available')
-      return
     }
+    expect(hasTable, 'No workflows available').toBeTruthy()
 
-    const perPageToggle = app.locator('.pf-v6-c-pagination').getByRole('button', { name: /\d+ - \d+/ })
+    // Set per-page to 10 so pagination activates even with fewer items
+    const perPageToggle = paginationFooter(app).getByRole('button', { name: /\d+ - \d+/ })
     await perPageToggle.waitFor({ state: 'visible', timeout: 10_000 })
     await perPageToggle.click()
     await app.getByRole('menuitem', { name: /10 per page/i }).click()
@@ -343,7 +344,7 @@ test.describe('Pagination Navigation — Workflows', () => {
       .catch(() => false)
     const hasNextPage = buttonVisible && (await nextButton.isEnabled().catch(() => false))
     if (!hasNextPage) guard.markUnavailable()
-    test.skip(!hasNextPage, 'Not enough data to paginate — need more than 10 workflows')
+    expect(hasNextPage, 'Not enough data to paginate — need more than 10 workflows').toBeTruthy()
   })
 
   test('next/previous page buttons navigate between pages', async ({ app }) => {
@@ -367,7 +368,7 @@ test.describe('Pagination Navigation — Workflows', () => {
     await expect(prevButton).toBeEnabled()
 
     // Change per-page
-    const perPageToggle = app.locator('.pf-v6-c-pagination').getByRole('button', { name: /\d+ - \d+/ })
+    const perPageToggle = paginationFooter(app).getByRole('button', { name: /\d+ - \d+/ })
     await perPageToggle.click()
     await app.getByRole('menuitem', { name: /50 per page/i }).click()
 
@@ -386,7 +387,7 @@ test.describe('Pagination Footer — Credentials', () => {
       .then(() => true)
       .catch(() => false)
     if (!hasTable) guard.markUnavailable()
-    test.skip(!hasTable, 'No credentials data available')
+    expect(hasTable, 'No credentials data available').toBeTruthy()
   })
 
   test('credentials table renders with footer', async ({ app }) => {
@@ -401,22 +402,22 @@ test.describe('Pagination Footer — Integrations', () => {
   test.beforeEach(async ({ app }) => {
     await app.goto(toAppUrl('/configuration/integrations'))
     await expect(app.getByRole('heading', { level: 1, name: 'Integrations' })).toBeVisible()
-    const table = app.getByRole('grid', { name: 'Integrations table' })
+    const table = app.getByRole('grid', { name: 'Integrations' })
     const hasTable = await table
       .waitFor({ state: 'visible', timeout: 30_000 })
       .then(() => true)
       .catch(() => false)
     if (!hasTable) guard.markUnavailable()
-    test.skip(!hasTable, 'No integrations data available')
+    expect(hasTable, 'No integrations data available').toBeTruthy()
   })
 
   test('pagination footer is visible', async ({ app }) => {
-    const perPageToggle = app.locator('.pf-v6-c-pagination').getByRole('button', { name: /\d+ - \d+/ })
+    const perPageToggle = paginationFooter(app).getByRole('button', { name: /\d+ - \d+/ })
     await expect(perPageToggle).toBeVisible()
   })
 
   test('per-page dropdown shows page size options', async ({ app }) => {
-    const perPageToggle = app.locator('.pf-v6-c-pagination').getByRole('button', { name: /\d+ - \d+/ })
+    const perPageToggle = paginationFooter(app).getByRole('button', { name: /\d+ - \d+/ })
     await expect(perPageToggle).toBeVisible()
     await perPageToggle.click()
 
@@ -436,11 +437,13 @@ test.describe('Pagination Footer — Identity Providers', () => {
       .then(() => true)
       .catch(() => false)
     if (!hasTable) guard.markUnavailable()
-    test.skip(!hasTable, 'No identity provider data available')
+    expect(hasTable, 'No identity provider data available').toBeTruthy()
   })
 
   test('pagination footer is visible on identity providers tab', async ({ app }) => {
-    const perPageToggle = app.locator('.pf-v6-c-pagination').getByRole('button', { name: /\d+ - \d+/ })
-    await expect(perPageToggle).toBeVisible()
+    const perPageToggle = paginationFooterForTable(app, 'Identity providers table').getByRole('button', {
+      name: /\d+\s*[-–]\s*\d+/,
+    })
+    await expect(perPageToggle).toBeVisible({ timeout: 15_000 })
   })
 })

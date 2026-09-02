@@ -13,12 +13,22 @@
  * fills the minimum required form fields, submits, and closes the editor.
  */
 
-import { type Page } from '@playwright/test'
+import { expect, type Page } from '../fixtures'
 
-import { expect } from '../fixtures'
-
-import { ensureLlmCredential, createLlmIntegration, deleteLlmIntegration, selectLlmCredential } from './llm-helpers'
-import { addNodePanel, closeNodeEditorPanel, fillCodeEditor } from './workflows'
+import {
+  ensureLlmCredential,
+  ensureAapIntegration,
+  createLlmIntegration,
+  deleteLlmIntegration,
+  selectLlmCredential,
+} from './llm-helpers'
+import {
+  addNodePanel,
+  clickAddConnectedStep,
+  closeNodeEditorPanel,
+  fillCodeEditor,
+  openNodeForEditing,
+} from './workflows'
 
 export { ensureLlmCredential, createLlmIntegration, deleteLlmIntegration, selectLlmCredential }
 
@@ -47,34 +57,9 @@ async function selectDirectNodeType(page: Page, label: string | RegExp) {
 // Trigger
 // ---------------------------------------------------------------------------
 
-/** Click "Add connected step" button on an edge and wait for the add-node panel to appear. */
-export async function openAddNodePanel(page: Page) {
-  const layoutButton = page.getByRole('button', { name: 'Layout' })
-  if ((await layoutButton.count()) > 0) {
-    await layoutButton.click()
-  }
-
-  // Fit the view so all nodes and edge buttons are visible in the viewport
-  const fitViewButton = page.getByRole('button', { name: 'Fit view' })
-  if ((await fitViewButton.count()) > 0) {
-    await fitViewButton.click()
-  }
-
-  const addBtn = page.getByRole('button', { name: 'Add connected step' })
-  await expect(addBtn.first()).toBeVisible({ timeout: 20_000 })
-
-  // Retry clicking — React Flow edge buttons can be briefly detached during layout animations
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      await addBtn.first().click({ force: true, timeout: 5_000 })
-      await expect(addNodePanel(page)).toHaveCount(1, { timeout: 5_000 })
-      return
-    } catch {
-      if (attempt === 2) throw new Error('Failed to open add-node panel after 3 attempts')
-      await layoutButton.click()
-      await expect(addBtn.first()).toBeVisible({ timeout: 5_000 })
-    }
-  }
+/** Click "Add connected step" on an edge and wait for the add-node panel. */
+export async function openAddNodePanel(page: Page, preferredHandle?: string) {
+  await clickAddConnectedStep(page, preferredHandle)
 }
 
 /** Add a manual trigger. Must be called on a fresh /workflow-builder/new page. */
@@ -164,14 +149,84 @@ export async function addAgenticNode(page: Page, name: string, prompt = 'Analyze
   await closeNodeEditorPanel(page)
 }
 
-/** Add an AAP job template node (v2 type: "aap_job_template"). */
-export async function addAapNode(page: Page, name: string, jobTemplateId = '123') {
+/**
+ * Add an AAP job template node (v2 type: "aap_job_template").
+ *
+ * Creates an AAP integration+credential via the API, then fills the
+ * Integration/Organization/Job template dropdowns in the node form.
+ */
+export async function addAapNode(page: Page, name: string) {
+  const { name: integrationName, credName } = await ensureAapIntegration(page)
+
+  // Intercept AAP browse endpoints so the form works without a real AAP server.
+  // Against a real backend the proxy would fail because ensureAapIntegration
+  // creates an integration with a fake base_url.
+  const orgRoute = '**/aap/organizations*'
+  const jtRoute = '**/aap/job_templates*'
+  await page.route(orgRoute, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ count: 1, results: [{ id: 1, name: 'Default' }] }),
+    })
+  )
+  await page.route(jtRoute, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        count: 1,
+        results: [{ id: 10, name: 'Deploy App', description: 'Deploy the application', organization: 'Default' }],
+      }),
+    })
+  )
+
   await openAddNodePanel(page)
   await selectDirectNodeType(page, /AAP/i)
+  const jobTemplateBtn = addNodePanel(page).getByRole('button', { name: 'Launch AAP job template' })
+  await expect(jobTemplateBtn).toBeVisible({ timeout: 5_000 })
+  await jobTemplateBtn.click()
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
-  await page.getByLabel('Job template ID').fill(jobTemplateId)
+
+  // Select integration
+  const integrationToggle = page.getByRole('button', { name: 'Integration', exact: true })
+  await expect(integrationToggle).toBeEnabled({ timeout: 10_000 })
+  await integrationToggle.click()
+  const integrationOption = page.getByRole('option', { name: new RegExp(integrationName) })
+  await expect(integrationOption).toBeVisible({ timeout: 15_000 })
+  await integrationOption.click()
+
+  // Set up connection with AAP credential
+  const setupBtn = page.getByRole('button', { name: 'Set up connection' })
+  await expect(setupBtn).toBeVisible({ timeout: 5_000 })
+  await setupBtn.click()
+  const credDropdown = page.getByRole('button', { name: 'Select a credential' })
+  await expect(credDropdown).toBeEnabled({ timeout: 30_000 })
+  await credDropdown.click()
+  const credOption = page.getByRole('option', { name: credName })
+  await expect(credOption).toBeVisible({ timeout: 10_000 })
+  await credOption.click()
+
+  // Select organization
+  const orgInput = page.getByPlaceholder('Select an organization')
+  await expect(orgInput).toBeVisible({ timeout: 15_000 })
+  await orgInput.click()
+  await expect(page.getByRole('option', { name: 'Default' })).toBeVisible({ timeout: 10_000 })
+  await page.getByRole('option', { name: 'Default' }).click()
+
+  // Select job template
+  const templateInput = page.getByPlaceholder('Select a job template')
+  await expect(templateInput).toBeVisible({ timeout: 15_000 })
+  await templateInput.click()
+  const deployOption = page.getByRole('option', { name: /Deploy App/i })
+  await expect(deployOption).toBeVisible({ timeout: 10_000 })
+  await deployOption.click()
+
   await page.getByRole('button', { name: 'Create', exact: true }).click()
   await closeNodeEditorPanel(page)
+
+  await page.unroute(orgRoute)
+  await page.unroute(jtRoute)
 }
 
 /** Add an approval node (v2 type: "approval") without completing branches. */
@@ -325,10 +380,15 @@ export async function addConditionNodeWithBranch(page: Page, name: string, expre
 
   // Add a node on the "true" branch to satisfy validation
   // The "false" branch is optional
-  await openAddNodePanel(page)
+  await addScriptOnHandle(page, 'true', `${name} - true action`, 'print("condition is true")')
+}
+
+/** Add a Script node from a specific edge stub (e.g. unused condition `false`). */
+export async function addScriptOnHandle(page: Page, handle: string, name: string, code: string) {
+  await openAddNodePanel(page, handle)
   await selectCategoryAndType(page, 'Action', 'Script')
-  await page.getByRole('textbox', { name: 'Name', exact: true }).fill(`${name} - true action`)
-  await fillCodeEditor(page, { value: 'print("condition is true")' })
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
+  await fillCodeEditor(page, { value: code })
   await page.getByRole('button', { name: 'Create', exact: true }).click()
   await closeNodeEditorPanel(page)
 }
@@ -410,9 +470,13 @@ export async function addLoopNode(page: Page, name: string, items = '${trigger.i
 export async function addLoopNodeWithBody(page: Page, name: string, items = '${trigger.items}') {
   await addLoopNode(page, name, items)
 
-  // Add a node in the loop body to satisfy validation
-  // Use the "Add connected step" button on the edge
-  await openAddNodePanel(page)
+  // The loop-body stub (`add-node-button-loop`) is often missing from the a11y tree
+  // next to unused condition `false` and loop `done` stubs, which makes a generic
+  // "Add connected step" click fail strict mode. Add via the editor instead.
+  await openNodeForEditing(page, name)
+  await page.getByRole('button', { name: 'Add step…' }).click()
+  await page.getByRole('menuitem', { name: 'In loop' }).click()
+  await expect(addNodePanel(page)).toHaveCount(1)
   await selectCategoryAndType(page, 'Action', 'Script')
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(`${name} - loop body`)
   await fillCodeEditor(page, { value: 'print("processing item")' })

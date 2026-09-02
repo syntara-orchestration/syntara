@@ -29,6 +29,10 @@ class PermissionDeniedError extends Error {
  */
 export function useApprovalDecideUsers(projectId?: string | null) {
   async function fetchAllApprovalDecideUsers(): Promise<WhoCanUser[]> {
+    if (!projectId) {
+      return []
+    }
+
     return fetchAllPages<WhoCanUser>(async (cursor: string | undefined) => {
       const result = await accessFetchClient.POST('/authz/who_can', {
         body: {
@@ -37,7 +41,7 @@ export function useApprovalDecideUsers(projectId?: string | null) {
           sort: 'username',
           limit: MAX_PAGE_SIZE,
           cursor,
-          resource_project: projectId!,
+          resource_project: projectId,
         },
       })
 

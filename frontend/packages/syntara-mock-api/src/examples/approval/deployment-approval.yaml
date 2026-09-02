@@ -29,7 +29,7 @@ nodes:
         echo "Tests failed: 0"
         echo "Coverage: 94.5%"
     inputs:
-      version: ${inputs.version}
+      version: ${trigger.version}
     outputs:
       tests_passed: 42
       tests_failed: 0
@@ -41,7 +41,7 @@ nodes:
     parameters:
       approvers:
         - ops-team@example.com
-      prompt: 'Review the staging test results and approve deployment of v${inputs.version} to ${inputs.environment}.'
+      prompt: 'Review the staging test results and approve deployment of v${trigger.version} to ${trigger.environment}.'
       fallback_decision: reject
       decision_window: 86400
 
@@ -54,8 +54,8 @@ nodes:
         echo "Deploying v${INPUT_VERSION} to ${INPUT_ENV}"
         echo "Deployment successful!"
     inputs:
-      version: ${inputs.version}
-      env: ${inputs.environment}
+      version: ${trigger.version}
+      env: ${trigger.environment}
 
   - id: rollback_staging
     name: Rollback Staging

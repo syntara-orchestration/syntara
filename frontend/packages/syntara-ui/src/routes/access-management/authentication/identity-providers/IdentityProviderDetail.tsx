@@ -34,17 +34,17 @@ import {
   breadcrumbsIdentityProviderDetailEarlyShell,
 } from '../../../../app/breadcrumbBuilders'
 import { adminClient, identityProvidersClient } from '../../../../client'
-import { NxConfirmationDialog } from '../../../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../../components/IconLabel'
 import { SynPage, SynPageBody } from '../../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../../components/layout/SynPanel'
-import { NxKebabMenu } from '../../../../components/NxKebabMenu'
-import type { KebabAction } from '../../../../components/NxKebabMenu'
-import { NxListPanel, NxListPanelTabs } from '../../../../components/panels/list/NxListPanel'
+import { SynListPanel, SynListPanelTabs } from '../../../../components/panels/list/SynListPanel'
 import { ProviderIcon } from '../../../../components/ProviderIcon'
 import { useQueryState } from '../../../../components/states/useQueryState'
+import type { KebabAction } from '../../../../components/SynKebabMenu'
+import { SynKebabMenu } from '../../../../components/SynKebabMenu'
 import { SynPageTitle } from '../../../../components/SynPageTitle'
 import { DateCell } from '../../../../components/table/DateCell'
 import { useDeleteAction } from '../../../../hooks/useDeleteAction'
@@ -206,7 +206,7 @@ function IdentityProviderDetailTabStrip({
   mappingCount: number
 }>) {
   return (
-    <NxListPanelTabs
+    <SynListPanelTabs
       basePath={basePath}
       defaultTab="details"
       validTabs={['details', GROUP_MAPPING_TAB]}
@@ -217,7 +217,7 @@ function IdentityProviderDetailTabStrip({
         eventKey={GROUP_MAPPING_TAB}
         title={<TabTitleText>Group mapping {mappingCount > 0 && <Badge isRead>{mappingCount}</Badge>}</TabTitleText>}
       />
-    </NxListPanelTabs>
+    </SynListPanelTabs>
   )
 }
 
@@ -255,7 +255,7 @@ function IdentityProviderDetailToolbar({
           Edit provider
         </Button>
       </DisabledWithTooltip>
-      <NxKebabMenu actions={kebabActions} aria-label="Identity provider actions" />
+      <SynKebabMenu actions={kebabActions} aria-label="Identity provider actions" />
     </>
   )
 }
@@ -284,7 +284,7 @@ function buildKebabActions(
     { key: 'separator', isSeparator: true },
     {
       key: 'delete',
-      title: <IconLabel icon={<RhUiTrashIcon />}>Delete identity provider</IconLabel>,
+      title: <IconLabel icon={<RhUiTrashIcon />}>Delete provider</IconLabel>,
       isDanger: true,
       isAriaDisabled: !idpPermissions.canDelete,
       tooltipProps: idpPermissions.canDelete ? undefined : { content: idpPermissions.tooltips.delete },
@@ -458,7 +458,7 @@ export function IdentityProviderDetail() {
         }
       />
       <SynPageBody>
-        <NxListPanel>
+        <SynListPanel>
           <IdentityProviderDetailTabStrip basePath={idpDetailBasePath} mappingCount={mappingCount} />
           <TabContent
             activeTab={activeTab}
@@ -468,7 +468,7 @@ export function IdentityProviderDetail() {
             groupMappingConfig={groupMappingConfig}
             readOnly={!canUpdate}
           />
-        </NxListPanel>
+        </SynListPanel>
       </SynPageBody>
       <IdentityProviderDeleteDialog
         isOpen={deleteDialogOpen}
@@ -476,7 +476,7 @@ export function IdentityProviderDetail() {
         onClose={() => setDeleteDialogOpen(false)}
         onConfirm={() => handleDelete(providerData)}
       />
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={revokeDialog.isOpen}
         onClose={revokeDialog.close}
         onConfirm={handleRevoke}
@@ -487,7 +487,7 @@ export function IdentityProviderDetail() {
       >
         All tokens for users authenticated via <strong>{revokeDialog.item?.name}</strong> will be revoked. Affected
         users will be signed out and must sign in again.
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
       <DisableIdentityProviderDialog
         provider={disableDialog.item}
         isLoading={isDisabling}

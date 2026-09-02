@@ -1129,7 +1129,7 @@ queryClient.invalidateQueries({ queryKey: ['get', '/workflows'] })
 
 1. Define `FilterFieldDefinition[]` in a colocated `*Filters.ts` / `*FilterDefinitions.ts`
 2. Use `useCursorPagination` for filters + cursor + `queryParams`
-3. Render `FilterBar` (or `NxListPanelToolbar`) with those definitions
+3. Render `FilterBar` (or `SynListPanelToolbar`) with those definitions
 4. Pass `queryParams` into the typed client's `useQuery`
 5. Use `SynEmptyStateFilter` when filters are active and the list is empty
 
@@ -1165,7 +1165,7 @@ flowchart LR
 
 **Location:** `packages/syntara-ui/src/components/filters/FilterBar.tsx`  
 **Barrel:** `packages/syntara-ui/src/components/filters/index.ts`  
-**List layout wrapper:** `NxListPanelToolbar` in `packages/syntara-ui/src/components/panels/list/NxListPanel.tsx`
+**List layout wrapper:** `SynListPanelToolbar` in `packages/syntara-ui/src/components/panels/list/SynListPanel.tsx`
 
 ```typescript
 export type FilterBarProps = {
@@ -1312,7 +1312,7 @@ const query = workflowClient.useQuery('get', '/workflows', {
 // <Th sort={getSortParams('name')}>Name</Th>
 ```
 
-Wire `filters` / `handleFilterChange` / `handleClearAllFilters` into `FilterBar` or `NxListPanelToolbar`. Use `SynEmptyStateFilter` when filters are active but the list is empty.
+Wire `filters` / `handleFilterChange` / `handleClearAllFilters` into `FilterBar` or `SynListPanelToolbar`. Use `SynEmptyStateFilter` when filters are active but the list is empty.
 
 ### Keyword search default behavior
 
@@ -1386,7 +1386,7 @@ Examples:
 2. Prefer `daterange` in the UI; the `date` enum value has no dedicated control in current FilterBar usage.
 3. Confirm the backend supports the operator you choose (`in`, AND date ranges, etc.) — some endpoints do not.
 4. Put scoped params like `project_id` in `useCursorPagination({ extraParams })`, not as fake filters.
-5. Filter chips / system badges use `NxLabel` (not raw PatternFly `Label`).
+5. Filter chips / system badges use `SynLabel` (not raw PatternFly `Label`).
 
 ---
 

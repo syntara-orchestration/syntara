@@ -27,7 +27,7 @@ export type SynPanelContentStackProps = StackProps & {
 /**
  * `Stack` preconfigured with full-height flex sizing for use inside `SynPanel isFullHeight`.
  *
- * Sets `flex: 1`, `minHeight: 0`, and `height: 100%` so that nested `NxScrollableTableContainer`
+ * Sets `flex: 1`, `minHeight: 0`, and `height: 100%` so that nested `SynScrollableTableContainer`
  * regions get a real bounded height — `height: 100%` alone fails inside a flex parent.
  */
 export function SynPanelContentStack({ variant = 'default', style, ...props }: SynPanelContentStackProps) {

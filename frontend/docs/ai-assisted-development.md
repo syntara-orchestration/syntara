@@ -458,7 +458,7 @@ You: [pastes Figma screenshot]
 
 Claude: What is the API endpoint?
 
-You: This is a UI-only change, no new API calls needed. The NxConfirmationDialog
+You: This is a UI-only change, no new API calls needed. The SynConfirmationDialog
      component already exists.
 
 Claude: What should this page or component do?

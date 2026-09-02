@@ -12,7 +12,6 @@ components:
         Schema for workflow response (GET /workflows/{id}).
 
         Includes all fields from the database table model.
-        Note: deleted_at and deleted_by are None since soft-deleted workflows are excluded from queries.
       required:
         - name
         - id
@@ -86,18 +85,6 @@ components:
           type: string
           format: date-time
           title: Updated At
-        deleted_at:
-          anyOf:
-            - type: string
-              format: date-time
-            - type: 'null'
-          title: Deleted At
-        deleted_by:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
-          title: Deleted By
         validation_result:
           anyOf:
             - $ref: './openapi.yaml#/components/schemas/ValidationResult'
@@ -185,18 +172,6 @@ components:
           type: string
           format: date-time
           title: Updated At
-        deleted_at:
-          anyOf:
-            - type: string
-              format: date-time
-            - type: 'null'
-          title: Deleted At
-        deleted_by:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
-          title: Deleted By
         validation_result:
           anyOf:
             - $ref: './openapi.yaml#/components/schemas/ValidationResult'
@@ -284,18 +259,6 @@ components:
           type: string
           format: date-time
           title: Updated At
-        deleted_at:
-          anyOf:
-            - type: string
-              format: date-time
-            - type: 'null'
-          title: Deleted At
-        deleted_by:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
-          title: Deleted By
         validation_result:
           anyOf:
             - $ref: './openapi.yaml#/components/schemas/ValidationResult'
@@ -502,18 +465,6 @@ components:
             $ref: "#/components/schemas/CurrentActivity"
           title: Current Activities
           description: Currently executing activities
-        deleted_at:
-          anyOf:
-            - type: string
-              format: date-time
-            - type: 'null'
-          title: Deleted At
-        deleted_by:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
-          title: Deleted By
         workflow_definition:
           anyOf:
             - $ref: "#/components/schemas/WorkflowDefinition"
@@ -1155,7 +1106,7 @@ components:
         - nodes
         - edges
       title: WorkflowDefinition
-      description: "JSON Schema for graph-based workflow definitions in the Syntara Workflow Engine v2.\n\nAttributes:\n    schema_version: Schema version that this workflow definition conforms to\n    name: Workflow name\n    description: Human-readable description of the workflow's purpose\n    triggers: Trigger nodes that define how the workflow is initiated\n    nodes: Execution and control nodes in the workflow graph\n    edges: Directed edges connecting triggers and nodes in the workflow graph"
+      description: "JSON Schema for graph-based workflow definitions in the Orchestrator Workflow Engine v2.\n\nAttributes:\n    schema_version: Schema version that this workflow definition conforms to\n    name: Workflow name\n    description: Human-readable description of the workflow's purpose\n    triggers: Trigger nodes that define how the workflow is initiated\n    nodes: Execution and control nodes in the workflow graph\n    edges: Directed edges connecting triggers and nodes in the workflow graph"
     AAPJobTemplateNode:
       properties:
         id:
@@ -1743,7 +1694,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Syntara credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
+          description: Orchestrator credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
         integration_id:
           anyOf:
             - type: string
@@ -1894,7 +1845,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Syntara credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
+          description: Orchestrator credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
         integration_id:
           anyOf:
             - type: string
@@ -2011,7 +1962,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Syntara credential UUID for authentication or Secret URL.
+          description: Orchestrator credential UUID for authentication or Secret URL.
       type: object
       required:
         - method
@@ -2039,7 +1990,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Syntara credential UUID for LLM provider authentication
+          description: Orchestrator credential UUID for LLM provider authentication
         file_ids:
           items:
             type: string
@@ -2093,7 +2044,7 @@ components:
         credential_id:
           type: string
           title: Credential Id
-          description: Syntara credential UUID for execution calls (distinct from management credential)
+          description: Orchestrator credential UUID for execution calls (distinct from management credential)
       type: object
       required:
         - integration_id
@@ -2120,7 +2071,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Syntara credential UUID for credential scrubbing
+          description: Orchestrator credential UUID for credential scrubbing
       type: object
       required:
         - language
@@ -2134,7 +2085,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Syntara credential UUID
+          description: Orchestrator credential UUID
         approver_users:
           anyOf:
             - items:

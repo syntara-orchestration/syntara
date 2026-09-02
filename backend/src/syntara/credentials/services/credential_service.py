@@ -6,17 +6,15 @@ and secret masking in API responses.
 
 import json
 from collections.abc import Iterable, Sequence
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    from datetime import datetime
+from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 import structlog
 from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.hazmat.primitives.serialization import load_pem_private_key, load_ssh_private_key
-from sqlalchemy import Select, case, func, literal_column, or_, update
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import Select, case, func, literal_column, or_
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import selectinload
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -36,6 +34,7 @@ from syntara.core.services.secret_service import SecretService
 from syntara.credentials.audit.credential import CredentialEncryptionFailureEvent, CredentialLifecycleEvent
 from syntara.credentials.exceptions import (
     CredentialDecryptionError,
+    CredentialInUseError,
     CredentialNameConflictError,
     CredentialNotFoundError,
     CredentialValidationError,
@@ -634,8 +633,50 @@ class CredentialService(BaseService):
             )
             return {}
 
+    @staticmethod
+    def _is_management_credential_fk_violation(exc: IntegrityError) -> bool:
+        """Check whether *exc* was caused by the management_credential_id RESTRICT FK."""
+        error_str = str(exc)
+        return "integrations_management_credential_id_fkey" in error_str
+
+    async def _get_referencing_integration_names(self, credential_id: UUID, *, limit: int) -> list[str]:
+        """Fetch up to `limit` names of integrations using this credential as their management credential.
+
+        Used to build an actionable message for CredentialInUseError. The
+        total count comes separately from get_integration_counts.
+        """
+        stmt = (
+            select(Integration.name)
+            .where(Integration.management_credential_id == credential_id)
+            .order_by(Integration.name)
+            .limit(limit)
+        )
+        result = await self.session.exec(stmt)
+        return list(result.all())
+
     async def delete_credential(self, credential_id: UUID) -> None:
-        """Delete a credential and its secret data atomically."""
+        """Delete a credential and its secret data atomically.
+
+        Raises:
+            CredentialInUseError: If the credential is still set as the
+                management credential on one or more integrations. Deleting
+                it out from under those integrations would silently break
+                them — management_credential_id would be nulled with no
+                signal that validation_status is now stale.
+                The caller must detach the credential from all referencing
+                integrations first.
+
+                The upfront count-based check below has a TOCTOU race: an
+                integration could be attached between that check and the
+                delete below. The `integrations.management_credential_id`
+                FK is `ON DELETE RESTRICT` (not `SET NULL`) specifically so
+                the database itself rejects the delete in that case rather
+                than silently nulling the reference; the `except
+                IntegrityError` re-raises that as the same clean
+                CredentialInUseError instead of a generic constraint-violation
+                response.
+
+        """
         from syntara.authz.models import Project  # noqa: PLC0415
 
         credential = await self._get_or_raise(credential_id)
@@ -647,6 +688,12 @@ class CredentialService(BaseService):
             msg = f"Cannot delete credentials in built-in project '{project.name}'"
             raise BuiltinProtectionError(msg)
 
+        int_counts = await self.get_integration_counts([credential_id])
+        int_ref_count = int_counts.get(credential_id, 0)
+        if int_ref_count:
+            integration_names = await self._get_referencing_integration_names(credential_id, limit=5)
+            raise CredentialInUseError(credential.name, integration_names, int_ref_count)
+
         wf_counts = await self.get_workflow_counts([credential_id])
         wf_ref_count = wf_counts.get(credential_id, 0)
         if wf_ref_count:
@@ -655,16 +702,6 @@ class CredentialService(BaseService):
                 credential_id=str(credential_id),
                 credential_name=credential.name,
                 affected_workflow_count=wf_ref_count,
-            )
-
-        int_counts = await self.get_integration_counts([credential_id])
-        int_ref_count = int_counts.get(credential_id, 0)
-        if int_ref_count:
-            logger.warning(
-                "Deleting credential still referenced by integrations",
-                credential_id=str(credential_id),
-                credential_name=credential.name,
-                affected_integration_count=int_ref_count,
             )
 
         cred_name = credential.name
@@ -685,14 +722,25 @@ class CredentialService(BaseService):
         if secret_id:
             await self._secret_service.delete_secret(secret_id)
 
-        await self.session.execute(
-            update(Integration)
-            .where(Integration.management_credential_id == credential_id)  # type: ignore[arg-type]
-            .values(management_credential_id=None)
-        )
-
         await self.session.delete(credential)
-        await self.session.commit()
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            if not self._is_management_credential_fk_violation(exc):
+                raise
+            logger.warning(
+                "Credential delete raced with a new integration reference",
+                credential_id=str(credential_id),
+                credential_name=cred_name,
+                exc_info=exc,
+            )
+            int_counts = await self.get_integration_counts([credential_id])
+            int_ref_count = int_counts.get(credential_id, 0)
+            if not int_ref_count:
+                raise
+            integration_names = await self._get_referencing_integration_names(credential_id, limit=5)
+            raise CredentialInUseError(cred_name, integration_names, int_ref_count) from exc
         logger.info("Credential deleted", credential_id=str(credential_id))
         AuditEventDispatcher.dispatch(
             CredentialLifecycleEvent(
@@ -702,9 +750,40 @@ class CredentialService(BaseService):
                 action="deleted",
                 project_id=cred_project_id,
                 affected_workflow_count=wf_ref_count,
-                affected_integration_count=int_ref_count,
+                # Always 0: a non-zero integration ref count raises CredentialInUseError above.
+                affected_integration_count=0,
             ),
         )
+
+    async def _fetch_latest_executions(self, workflow_ids: list[UUID]) -> dict[UUID, tuple[datetime, str]]:
+        """Batch-fetch the latest execution per workflow. Returns empty dict on failure."""
+        from syntara.workflows.models.execution import Execution  # noqa: PLC0415
+
+        if not workflow_ids:
+            return {}
+        try:
+            latest_exec_stmt = (
+                select(Execution.workflow_id, Execution.created_at, Execution.status)
+                .where(
+                    Execution.workflow_id.in_(workflow_ids),  # type: ignore[attr-defined]
+                )
+                .order_by(Execution.workflow_id, Execution.created_at.desc())  # type: ignore[arg-type, attr-defined]
+                .distinct(Execution.workflow_id)  # type: ignore[arg-type]
+            )
+            exec_result = await self.session.exec(latest_exec_stmt)
+            result: dict[UUID, tuple[datetime, str]] = {}
+            for row in exec_result.all():
+                result[row[0]] = (row[1], row[2])
+            return result
+        except (SQLAlchemyError, OSError):
+            # NOTE: credential_id is not available here — workflow_count is the only
+            # correlation context; the caller does not log credential_id on this failure path.
+            logger.warning(
+                "Failed to fetch execution info for credential workflows",
+                workflow_count=len(workflow_ids),
+                exc_info=True,
+            )
+            return {}
 
     async def get_credential_workflows(self, credential_id: UUID) -> list[CredentialWorkflowRef]:
         """Find workflows that reference a given credential in their definitions.
@@ -723,40 +802,11 @@ class CredentialService(BaseService):
             CredentialNotFoundError: If credential does not exist.
 
         """
-        from syntara.workflows.models.execution import Execution  # noqa: PLC0415
-
         await self._get_or_raise(credential_id)
 
         rows = await self._query_workflows_by_credential_ids([credential_id])
         workflow_ids = [row[0] for row in rows]
-
-        # Batch-fetch latest execution per workflow (enrichment — graceful on failure)
-        exec_map: dict[UUID, tuple[datetime, str]] = {}
-        if workflow_ids:
-            try:
-                latest_exec_stmt = (
-                    select(
-                        Execution.workflow_id,
-                        Execution.created_at,
-                        Execution.status,
-                    )
-                    .where(
-                        Execution.workflow_id.in_(workflow_ids),  # type: ignore[attr-defined]
-                        Execution.deleted_at.is_(None),  # type: ignore[union-attr]
-                    )
-                    .order_by(Execution.workflow_id, Execution.created_at.desc())  # type: ignore[arg-type, attr-defined]
-                    .distinct(Execution.workflow_id)  # type: ignore[arg-type]
-                )
-                exec_result = await self.session.exec(latest_exec_stmt)
-                for exec_row in exec_result.all():
-                    exec_map[exec_row[0]] = (exec_row[1], exec_row[2])
-            except (SQLAlchemyError, OSError):
-                logger.warning(
-                    "Failed to fetch execution info for credential workflows",
-                    credential_id=str(credential_id),
-                    workflow_count=len(workflow_ids),
-                    exc_info=True,
-                )
+        exec_map = await self._fetch_latest_executions(workflow_ids)
 
         cred_id_str = str(credential_id)
         refs = []
@@ -797,7 +847,6 @@ class CredentialService(BaseService):
                 WorkflowVersion.workflow_id,
                 func.max(WorkflowVersion.version).label("max_version"),
             )
-            .where(WorkflowVersion.deleted_at.is_(None))  # type: ignore[union-attr]
             .group_by(WorkflowVersion.workflow_id)  # type: ignore[arg-type]
             .subquery()
         )
@@ -852,7 +901,6 @@ class CredentialService(BaseService):
                 (WorkflowVersion.workflow_id == latest_version.c.workflow_id)
                 & (WorkflowVersion.version == latest_version.c.max_version),
             )
-            .where(Workflow.deleted_at.is_(None))  # type: ignore[union-attr]
         )
         if project_id is not None:
             stmt = stmt.where(Workflow.project_id == project_id)
@@ -908,7 +956,6 @@ class CredentialService(BaseService):
                 (WorkflowVersion.workflow_id == latest_version.c.workflow_id)
                 & (WorkflowVersion.version == latest_version.c.max_version),
             )
-            .where(Workflow.deleted_at.is_(None))  # type: ignore[union-attr]
         )
 
         # Use jsonb_path_exists for precise credential_id matching (PostgreSQL 12+)

@@ -75,10 +75,11 @@ vi.mock('../../hooks/useProjectSelector', () => ({
 
 const mockBuilderPermissions = vi.hoisted(() => ({
   canEdit: true,
+  canCreate: true,
   canRun: true,
   canDelete: true,
   isLoading: false,
-  tooltips: { edit: '', save: '', publish: '', unpublish: '', run: '', delete: '' },
+  tooltips: { edit: '', save: '', publish: '', unpublish: '', run: '', delete: '', create: '' },
 }))
 
 vi.mock('./useBuilderPermissions', () => ({
@@ -798,7 +799,7 @@ describe('BuilderContent', () => {
       await user.click(screen.getByRole('button', { name: 'Run' }))
 
       await waitFor(() => {
-        expect(screen.getByText('Workflow failed')).toBeInTheDocument()
+        expect(screen.getByText('Failed to run workflow')).toBeInTheDocument()
       })
     })
 
@@ -2311,7 +2312,7 @@ describe('BuilderContent', () => {
 
       await waitFor(() => {
         expect(screen.getByText('No workflow to save')).toBeInTheDocument()
-        expect(screen.getByText('Save failed')).toBeInTheDocument()
+        expect(screen.getByText('Failed to save workflow')).toBeInTheDocument()
       })
     })
   })

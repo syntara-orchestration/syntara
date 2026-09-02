@@ -42,10 +42,11 @@ vi.mock('../../app/useUnsavedChanges', () => ({
 vi.mock('./useBuilderPermissions', () => ({
   useBuilderPermissions: () => ({
     canEdit: true,
+    canCreate: true,
     canRun: true,
     canDelete: true,
     isLoading: false,
-    tooltips: { edit: '', save: '', publish: '', unpublish: '', run: '', delete: '' },
+    tooltips: { edit: '', save: '', publish: '', unpublish: '', run: '', delete: '', create: '' },
   }),
 }))
 
@@ -299,8 +300,8 @@ describe('BuilderContent - Delete Workflow', () => {
     // Verify error alert
     await waitFor(() => {
       expect(mockDeleteMutate).toHaveBeenCalled()
-      expect(screen.getByText('Delete failed')).toBeInTheDocument()
-      expect(screen.getByText(/Failed to delete workflow/)).toBeInTheDocument()
+      expect(screen.getByText('Failed to delete workflow')).toBeInTheDocument()
+      expect(screen.getByText(/Failed to delete workflow ".+":/)).toBeInTheDocument()
     })
   })
 

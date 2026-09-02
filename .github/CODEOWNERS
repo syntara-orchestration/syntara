@@ -3,9 +3,10 @@
 # Scope policy:
 #   - Areas are owned by the team that maintains them.
 #   - The default rule lists both product teams, so routine repo hygiene
-#     (.gitignore, README, Makefile, .env.example, .claude/, .mcp.json,
-#     PR template) can be approved by any backend or UI engineer rather than
-#     blocking on leads.
+#     (.gitignore, README, Makefile, .env.example, .mcp.json, PR template)
+#     can be approved by any backend or UI engineer rather than blocking on
+#     leads. Agent skills under /.claude/skills/ are owned by the matching
+#     product team (see frontend-* / backend-* below), not this catch-all.
 #   - @syntara-orchestration/syntara-leads is reserved for governance and
 #     architecture: this file, the licences, the standards and decision
 #     records that bind every domain, and the framework layer both stacks
@@ -19,9 +20,14 @@
 
 # ── Backend (Python/FastAPI) ─────────────────────────────────────────────
 /backend/ @syntara-orchestration/syntara-backend
+/.claude/skills/backend-*/ @syntara-orchestration/syntara-backend
 
 # ── Frontend (React/TypeScript) ──────────────────────────────────────────
 /frontend/ @syntara-orchestration/ui-team
+# Skills live at repo root, not under /frontend/. Without this they match `*`
+# and request @syntara-backend on UI-only PRs. Keep frontend-patternfly-ux
+# after this line so uxd-team still wins for that skill.
+/.claude/skills/frontend-*/ @syntara-orchestration/ui-team
 
 # UX design system — requires UX team review.
 # The skill moved to the repo root when the monorepo was consolidated; the old

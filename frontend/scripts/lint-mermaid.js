@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Validates every ```mermaid code block in Markdown files using
- * mermaid's built-in parse() with a jsdom shim for Node.js.
+ * mermaid's built-in parse() with a happy-dom shim for Node.js.
  *
  * Usage:
  *   node scripts/lint-mermaid.js                 # lint all .md files
@@ -17,8 +17,8 @@ import { createRequire } from 'node:module'
 
 const require = createRequire(import.meta.url)
 
-const { JSDOM } = require('jsdom')
-const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>')
+const { Window } = require('happy-dom')
+const window = new Window({ url: 'https://localhost/' })
 
 const defineGlobal = (name, value) => {
   Object.defineProperty(globalThis, name, {
@@ -28,15 +28,15 @@ const defineGlobal = (name, value) => {
   })
 }
 
-defineGlobal('window', dom.window)
-defineGlobal('document', dom.window.document)
-defineGlobal('navigator', dom.window.navigator)
-defineGlobal('DOMParser', dom.window.DOMParser)
-defineGlobal('XMLSerializer', dom.window.XMLSerializer)
-defineGlobal('HTMLElement', dom.window.HTMLElement)
-defineGlobal('Element', dom.window.Element)
-defineGlobal('Node', dom.window.Node)
-defineGlobal('self', dom.window)
+defineGlobal('window', window)
+defineGlobal('document', window.document)
+defineGlobal('navigator', window.navigator)
+defineGlobal('DOMParser', window.DOMParser)
+defineGlobal('XMLSerializer', window.XMLSerializer)
+defineGlobal('HTMLElement', window.HTMLElement)
+defineGlobal('Element', window.Element)
+defineGlobal('Node', window.Node)
+defineGlobal('self', window)
 if (!globalThis.requestAnimationFrame) {
   globalThis.requestAnimationFrame = (cb) => setTimeout(cb, 0)
 }

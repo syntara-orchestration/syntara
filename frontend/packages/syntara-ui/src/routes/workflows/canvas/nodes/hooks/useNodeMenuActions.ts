@@ -1,6 +1,14 @@
+import {
+  RhUiBanIcon,
+  RhUiCheckCircleIcon,
+  RhUiDuplicateIcon,
+  RhUiInformationIcon,
+  RhUiPlayIcon,
+  RhUiSyncIcon,
+  RhUiTrashIcon,
+} from '@patternfly/react-icons'
 import { useReactFlow } from '@xyflow/react'
-import { useCallback } from 'react'
-import type { ReactNode } from 'react'
+import { createElement, useCallback, type ReactNode } from 'react'
 
 import { type MenuNodeTypeUnion, MenuNodeType } from '../../../../../constants'
 import { useAlerts } from '../../../../../providers/alerts'
@@ -27,6 +35,61 @@ type UseNodeMenuActionsOptions = {
   triggerIndex?: number
   disabled?: boolean
   additionalActions?: NodeMenuAction[]
+}
+
+type BuilderActionHandlers = {
+  onViewDetails: () => void
+  onRunStep: () => void
+  onToggleDisabled: () => void
+  onDuplicate: () => void
+  onReplace: () => void
+}
+
+function buildBuilderActions(
+  nodeType: MenuNodeTypeUnion,
+  disabled: boolean,
+  handlers: BuilderActionHandlers
+): NodeMenuAction[] {
+  if (nodeType === MenuNodeType.CONTROL_FLOW) {
+    return [{ id: 'replace', label: 'Replace step', onClick: handlers.onReplace, icon: createElement(RhUiSyncIcon) }]
+  }
+
+  const activityActions: NodeMenuAction[] =
+    nodeType === MenuNodeType.ACTIVITY
+      ? [
+          { id: 'run-step', label: 'Run step', onClick: handlers.onRunStep, icon: createElement(RhUiPlayIcon) },
+          {
+            id: 'toggle-disabled',
+            label: disabled ? 'Enable step' : 'Disable step',
+            onClick: handlers.onToggleDisabled,
+            icon: createElement(disabled ? RhUiCheckCircleIcon : RhUiBanIcon),
+          },
+          {
+            id: 'duplicate',
+            label: 'Duplicate step',
+            onClick: handlers.onDuplicate,
+            icon: createElement(RhUiDuplicateIcon),
+          },
+          { id: 'replace', label: 'Replace step', onClick: handlers.onReplace, icon: createElement(RhUiSyncIcon) },
+        ]
+      : []
+
+  return [
+    {
+      id: 'view-details',
+      label: 'View step details',
+      onClick: handlers.onViewDetails,
+      icon: createElement(RhUiInformationIcon),
+    },
+    ...activityActions,
+  ]
+}
+
+function appendDeleteAction(actions: NodeMenuAction[], deleteAction: NodeMenuAction): NodeMenuAction[] {
+  if (actions.length === 0) {
+    return [deleteAction]
+  }
+  return [...actions, { id: 'sep-delete', label: '', onClick: () => undefined, separator: true }, deleteAction]
 }
 
 /**
@@ -69,9 +132,9 @@ type UseNodeMenuActionsOptions = {
  *   additionalActions: [
  *     {
  *       id: 'duplicate',
- *       label: 'Duplicate',
+ *       label: 'Duplicate step',
  *       onClick: () => handleDuplicate(),
- *       icon: <CopyIcon />,
+ *       icon: createElement(RhUiDuplicateIcon),
  *     },
  *   ],
  * })
@@ -111,43 +174,23 @@ export function useNodeMenuActions(options: UseNodeMenuActionsOptions): NodeMenu
     nodeActions?.onToggleDisabled(nodeId)
   }, [nodeActions, nodeId])
 
-  // Build the menu actions array
   const deleteAction: NodeMenuAction = {
     id: 'delete',
-    label: 'Delete',
+    label: 'Delete step',
     onClick: handleDelete,
     variant: 'danger',
+    icon: createElement(RhUiTrashIcon),
   }
 
-  // Builder-specific actions — only present when NodeActionsContext is provided.
-  // Omitted automatically in execution view and any other non-builder context.
-  function getBuilderActions(): NodeMenuAction[] {
-    if (!nodeActions) return []
+  const builderActions = nodeActions
+    ? buildBuilderActions(nodeType, disabled, {
+        onViewDetails: handleViewDetails,
+        onRunStep: handleRunStep,
+        onToggleDisabled: handleToggleDisabled,
+        onDuplicate: handleDuplicate,
+        onReplace: handleReplace,
+      })
+    : []
 
-    if (nodeType === MenuNodeType.CONTROL_FLOW) {
-      return [{ id: 'replace', label: 'Replace', onClick: handleReplace }]
-    }
-
-    const activityActions: NodeMenuAction[] =
-      nodeType === MenuNodeType.ACTIVITY
-        ? [
-            { id: 'run-step', label: 'Run step', onClick: handleRunStep },
-            { id: 'toggle-disabled', label: disabled ? 'Enable' : 'Disable', onClick: handleToggleDisabled },
-            { id: 'duplicate', label: 'Duplicate', onClick: handleDuplicate },
-            { id: 'replace', label: 'Replace', onClick: handleReplace },
-          ]
-        : []
-
-    return [{ id: 'view-details', label: 'View step details', onClick: handleViewDetails }, ...activityActions]
-  }
-
-  const builderActions = getBuilderActions()
-
-  const allAdditionalActions = [...builderActions, ...additionalActions]
-
-  if (allAdditionalActions.length > 0) {
-    return [...allAdditionalActions, deleteAction]
-  }
-
-  return [deleteAction]
+  return appendDeleteAction([...builderActions, ...additionalActions], deleteAction)
 }

@@ -200,7 +200,6 @@ test.describe('Run history panel filtering', { tag: '@pr-check' }, () => {
         name: buildUniqueName('e2e-rh-filter'),
         token,
       })
-      if (!workflow) throw new Error('Could not create test workflow')
       workflowId = workflow.id
     } finally {
       await page.close()

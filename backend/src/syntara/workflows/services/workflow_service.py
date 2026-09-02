@@ -4,6 +4,7 @@ This service encapsulates workflow-related business logic, separating it from
 HTTP/API concerns in the FastAPI endpoints.
 """
 
+import asyncio
 import threading
 from collections.abc import Iterable
 from datetime import UTC, datetime
@@ -12,7 +13,7 @@ from uuid import UUID, uuid4
 
 import structlog
 from sqlalchemy.exc import IntegrityError
-from sqlmodel import func, select
+from sqlmodel import col, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.audit.dispatcher import AuditEventDispatcher
@@ -20,6 +21,7 @@ from syntara.authz.engine import AllowedProjectsResult, AuthzRequest, authorize
 from syntara.authz.evaluator import AuthzEvaluator
 from syntara.authz.exceptions import AuthorizationDeniedError
 from syntara.authz.models import Project
+from syntara.core.database.session import AsyncSessionLocal
 from syntara.core.exceptions import SafeValueError, assert_project_id_unchanged
 from syntara.core.models import User
 from syntara.core.services import BaseService
@@ -41,6 +43,7 @@ from syntara.workflows.exceptions import (
     BuiltinWorkflowDeleteError,
     BuiltinWorkflowModifyError,
     ScheduledTriggerSyncError,
+    WorkflowHasActiveExecutionsError,
     WorkflowNameConflictError,
     WorkflowNotFoundError,
     WorkflowNotPublishedError,
@@ -49,6 +52,7 @@ from syntara.workflows.exceptions import (
     WorkflowVersionNotFoundError,
 )
 from syntara.workflows.models import Workflow, WorkflowListResponse, WorkflowRead, WorkflowVersion
+from syntara.workflows.models.execution import TERMINAL_EXECUTION_STATUSES, Execution
 from syntara.workflows.models.validation_finding import (
     ValidationCategory,
     ValidationFinding,
@@ -71,6 +75,26 @@ if TYPE_CHECKING:
     from syntara.workflows.utils.serialization import VersionPublishTimestamps
 
 logger = structlog.stdlib.get_logger(__name__)
+
+# Strong refs so the event loop does not GC detached schedule-delete tasks.
+_pending_schedule_delete_tasks: set[asyncio.Task[None]] = set()
+_SCHEDULE_DELETE_TASK_PREFIX = "delete-scheduled-triggers-"
+
+
+def _on_schedule_delete_done(task: asyncio.Task[None]) -> None:
+    """Drop the strong ref and log failures the coroutine did not swallow."""
+    _pending_schedule_delete_tasks.discard(task)
+    if task.cancelled():
+        return
+    exc = task.exception()
+    if exc is None:
+        return
+    logger.warning(
+        "Best-effort scheduled trigger deletion failed — reconciliation worker will clean up orphans",
+        error=str(exc),
+        exc_info=(type(exc), exc, exc.__traceback__),
+    )
+
 
 # Running counters for workflow creation success rate (FR-010).
 _workflow_creation_counts: list[int] = [0, 0]  # [successes, total]
@@ -164,7 +188,6 @@ class WorkflowService(BaseService):
             select(WorkflowVersion).filter(
                 WorkflowVersion.workflow_id == workflow_id,  # type: ignore[arg-type]
                 WorkflowVersion.version == version,  # type: ignore[arg-type]
-                WorkflowVersion.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
         return result.one_or_none()
@@ -242,7 +265,7 @@ class WorkflowService(BaseService):
         """Create/update Temporal Schedules for scheduled trigger nodes.
 
         Only called on publish.  Unpublish and delete use
-        ``_delete_scheduled_triggers`` for best-effort cleanup; the
+        ``_schedule_trigger_deletion`` for best-effort cleanup; the
         schedule reconciliation worker handles any orphans that remain
         when Temporal is unreachable.
         """
@@ -253,19 +276,94 @@ class WorkflowService(BaseService):
         )
 
     @staticmethod
+    def _schedule_trigger_deletion(workflow_id: UUID) -> asyncio.Task[None] | None:
+        """Start Temporal schedule deletion without holding the HTTP request.
+
+        Must not use ``asyncio.timeout`` on this work: cancelling an
+        in-flight ``Client.connect`` can still interrupt cleanup.
+        Connect no longer holds ``_client_lock``, but the HTTP handler
+        must not wait on or cancel the task. Must not use Starlette
+        ``BackgroundTasks`` either: those keep the ASGI connection open
+        until they finish, which is the nginx 504 (AAP-87692).
+
+        The task is allowed to outlive the request. The schedule
+        reconciliation worker is the backstop if the process dies first.
+        """
+        try:
+            task = asyncio.create_task(
+                WorkflowService._delete_scheduled_triggers(workflow_id),
+                name=f"{_SCHEDULE_DELETE_TASK_PREFIX}{workflow_id}",
+            )
+        except RuntimeError:
+            logger.warning(
+                "Could not start scheduled trigger deletion — reconciliation worker will clean up orphans",
+                workflow_id=str(workflow_id),
+                exc_info=True,
+            )
+            return None
+        _pending_schedule_delete_tasks.add(task)
+        task.add_done_callback(_on_schedule_delete_done)
+        return task
+
+    @staticmethod
+    async def _workflow_is_published(workflow_id: UUID) -> bool:
+        """Return True when detached cleanup must not delete Temporal schedules.
+
+        Opens a new session so this can run after the request session is
+        closed. If the workflow was republished before cleanup ran, schedules
+        must be kept. DB errors fail closed (skip delete) so a transient read
+        failure cannot wipe a republish; the reconciler removes orphans.
+        """
+        try:
+            async with AsyncSessionLocal() as session:
+                workflow = await session.get(Workflow, workflow_id)
+        except Exception:  # noqa: BLE001
+            logger.warning(
+                "Could not read workflow state before schedule deletion — skipping cleanup",
+                workflow_id=str(workflow_id),
+                exc_info=True,
+            )
+            return True
+        return workflow is not None and workflow.published_version_id is not None
+
+    @staticmethod
     async def _delete_scheduled_triggers(workflow_id: UUID) -> None:
         """Best-effort deletion of Temporal Schedules for a workflow.
 
-        Swallows errors so the caller (unpublish / delete) always succeeds.
-        The schedule reconciliation worker will clean up any orphans that
-        remain when Temporal is unreachable.
+        Swallows errors so a detached unpublish/delete task cannot fail
+        the already-committed database change. Skips deletion when a later
+        publish won the race. Re-checks after connect; list/delete re-check
+        via ``should_abort`` so a republish during those calls keeps the
+        new schedules. The schedule reconciliation worker will clean up
+        any orphans that remain when Temporal is unreachable or the
+        process dies before this task finishes.
         """
         try:
+            if await WorkflowService._workflow_is_published(workflow_id):
+                logger.info(
+                    "Skipping scheduled trigger deletion because the workflow is published",
+                    workflow_id=str(workflow_id),
+                )
+                return
             scheduled_service = ScheduledTriggerService()
+            # Wait for connect first. A slow Temporal handshake is the
+            # republish window; re-check before listing/deleting schedules.
+            await scheduled_service.get_client()
+            if await WorkflowService._workflow_is_published(workflow_id):
+                logger.info(
+                    "Skipping scheduled trigger deletion because the workflow is published",
+                    workflow_id=str(workflow_id),
+                )
+                return
+
+            async def _abort_if_republished() -> bool:
+                return await WorkflowService._workflow_is_published(workflow_id)
+
             await scheduled_service.delete_triggers_for_workflow(
                 workflow_id=str(workflow_id),
+                should_abort=_abort_if_republished,
             )
-        except ScheduledTriggerSyncError:
+        except Exception:  # noqa: BLE001
             logger.warning(
                 "Best-effort scheduled trigger deletion failed — reconciliation worker will clean up orphans",
                 workflow_id=str(workflow_id),
@@ -768,7 +866,6 @@ class WorkflowService(BaseService):
             select(Workflow)
             .filter(
                 Workflow.id == workflow_id,  # type: ignore[arg-type]
-                Workflow.deleted_at.is_(None),  # type: ignore[union-attr]
             )
             .with_for_update()
         )
@@ -797,7 +894,6 @@ class WorkflowService(BaseService):
             .filter(
                 WorkflowVersion.workflow_id == workflow.id,  # type: ignore[arg-type]
                 WorkflowVersion.version.in_([workflow.current_version, expected_version]),  # type: ignore[attr-defined]
-                WorkflowVersion.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
         rows = result.all()
@@ -831,7 +927,6 @@ class WorkflowService(BaseService):
             pub_result = await self.session.exec(
                 select(WorkflowVersion).filter(
                     WorkflowVersion.id == workflow.published_version_id,  # type: ignore[arg-type]
-                    WorkflowVersion.deleted_at.is_(None),  # type: ignore[union-attr]
                 )
             )
             published_ver = pub_result.one_or_none()
@@ -860,7 +955,6 @@ class WorkflowService(BaseService):
         result = await self.session.exec(
             select(Workflow).filter(
                 Workflow.id == workflow_id,  # type: ignore[arg-type]
-                Workflow.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
         workflow = result.one_or_none()
@@ -892,7 +986,6 @@ class WorkflowService(BaseService):
             select(WorkflowVersion).filter(
                 WorkflowVersion.workflow_id == workflow_id,  # type: ignore[arg-type]
                 WorkflowVersion.version == workflow.current_version,  # type: ignore[arg-type]
-                WorkflowVersion.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
         current_version = version_result.one_or_none()
@@ -1421,7 +1514,7 @@ class WorkflowService(BaseService):
             )
         )
 
-        await self._delete_scheduled_triggers(workflow.id)
+        self._schedule_trigger_deletion(workflow.id)
 
         return workflow
 
@@ -1532,13 +1625,17 @@ class WorkflowService(BaseService):
         return workflow, new_version
 
     async def delete_workflow(self, workflow_id: UUID) -> None:
-        """Soft delete a workflow.
+        """Hard-delete a workflow and cascade-delete its versions and executions.
+
+        Versions and executions are cascade-deleted via DB FK (ondelete=CASCADE).
 
         Args:
             workflow_id: UUID of workflow to delete
 
         Raises:
             WorkflowNotFoundError: If workflow not found
+            BuiltinWorkflowDeleteError: If workflow is a built-in
+            WorkflowHasActiveExecutionsError: If workflow has non-terminal executions
 
         """
         workflow = await self.get_workflow_by_id(workflow_id)
@@ -1546,12 +1643,39 @@ class WorkflowService(BaseService):
         if workflow.is_builtin:
             raise BuiltinWorkflowDeleteError(workflow.name)
 
-        # Delete associated webhook triggers before soft-deleting the workflow
+        non_terminal_count = await self.session.scalar(
+            select(func.count())
+            .select_from(Execution)
+            .where(
+                Execution.workflow_id == workflow_id,
+                col(Execution.status).not_in(TERMINAL_EXECUTION_STATUSES),
+            )
+        )
+        if non_terminal_count:
+            raise WorkflowHasActiveExecutionsError(non_terminal_count, workflow_id=workflow_id)
+
+        # Explicit cleanup retained so trigger deletion is logged individually
+        # (delete_triggers_for_workflow logs each removal); DB CASCADE would also
+        # remove these rows, but silently.
         webhook_service = WebhookTriggerService(self.session, self.user)
         await webhook_service.delete_triggers_for_workflow(workflow_id)
 
-        # Soft delete
-        workflow.soft_delete(self.user.id)
+        # Clean up ApprovalRequests (soft reference, no FK — CASCADE won't handle these)
+        from sqlalchemy import delete as sa_delete  # noqa: PLC0415
+
+        from syntara.approvals.models.approval_request import ApprovalRequest  # noqa: PLC0415
+
+        exec_ids_subq = select(Execution.id).where(Execution.workflow_id == workflow_id).scalar_subquery()
+        await self.session.exec(sa_delete(ApprovalRequest).where(col(ApprovalRequest.execution_id).in_(exec_ids_subq)))
+
+        # Break self-referential FK before delete
+        # (constraint: is_enabled must be False when published_version_id is NULL)
+        workflow.published_version_id = None
+        workflow.is_enabled = False
+        await self.session.flush()
+
+        # Hard delete — versions and executions cascade via DB FK
+        await self.session.delete(workflow)
         try:
             await self.session.commit()
         except Exception as exc:
@@ -1571,4 +1695,4 @@ class WorkflowService(BaseService):
             project_id=workflow.project_id,
         )
 
-        await self._delete_scheduled_triggers(workflow_id)
+        self._schedule_trigger_deletion(workflow_id)

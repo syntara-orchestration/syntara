@@ -1,7 +1,7 @@
 import { List, ListItem, Stack, StackItem } from '@patternfly/react-core'
 import { useId } from 'react'
 
-import { NxConfirmationDialog } from '../../../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../../../components/dialogs/SynConfirmationDialog'
 
 const DESTRUCTIVE_ACK_LABEL =
   'I understand this identity provider and its linked identities will be permanently deleted.'
@@ -25,7 +25,7 @@ export function IdentityProviderDeleteDialog({
   const ackCheckboxId = useId()
 
   return (
-    <NxConfirmationDialog
+    <SynConfirmationDialog
       isOpen={isOpen}
       onClose={onClose}
       onConfirm={onConfirm}
@@ -51,6 +51,6 @@ export function IdentityProviderDeleteDialog({
           </List>
         </StackItem>
       </Stack>
-    </NxConfirmationDialog>
+    </SynConfirmationDialog>
   )
 }

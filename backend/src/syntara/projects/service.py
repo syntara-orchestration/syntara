@@ -1,7 +1,6 @@
 """Project service for business logic."""
 
 from collections.abc import Iterable
-from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -219,63 +218,111 @@ class ProjectService(BaseService):
 
             msg = "Default project cannot be deleted"
             raise DefaultProjectProtectionError(msg)
+        await self._check_credentials_not_referenced_by_integrations(project.id, project.name)
         await self._cascade_cleanup_project_resources(project_id)
         project.soft_delete(self.user.id)
         self.session.add(project)
         await self.session.commit()
 
+    async def _check_credentials_not_referenced_by_integrations(self, project_id: UUID, project_name: str) -> None:
+        """Raise 409 if any credential in this project is still referenced by an integration.
+
+        Integrations are not project-scoped — a global integration can reference
+        a project credential as its management credential. The ON DELETE RESTRICT
+        FK on integrations.management_credential_id makes the database reject the
+        bulk credential DELETE in the cascade, so we fail early with an actionable
+        message instead of letting PostgreSQL surface a generic constraint error.
+
+        Accepts plain values instead of the Project ORM object to avoid any risk
+        of lazy-loading ORM attributes outside a greenlet context after the async
+        queries inside this method.
+        """
+        from sqlalchemy import func  # noqa: PLC0415
+
+        from syntara.credentials.exceptions import ProjectCredentialInUseError  # noqa: PLC0415
+        from syntara.credentials.models.credential import Credential  # noqa: PLC0415
+        from syntara.integrations.models.integration import Integration  # noqa: PLC0415
+
+        cred_ids_subq = select(Credential.id).where(Credential.project_id == project_id).scalar_subquery()
+
+        count_result = await self.session.exec(
+            select(func.count()).where(
+                Integration.management_credential_id.in_(cred_ids_subq)  # type: ignore[union-attr]
+            )
+        )
+        total_count = count_result.one()
+        if not total_count:
+            return
+
+        names_result = await self.session.exec(
+            select(Integration.name, Credential.name)
+            .join(Credential, Integration.management_credential_id == Credential.id)  # type: ignore[arg-type]
+            .where(Integration.management_credential_id.in_(cred_ids_subq))  # type: ignore[union-attr]
+            .order_by(Integration.name)
+            .limit(5)
+        )
+        rows = list(names_result.all())
+        integration_names = [r[0] for r in rows]
+        credential_names = list(dict.fromkeys(r[1] for r in rows))
+
+        raise ProjectCredentialInUseError(project_name, credential_names, integration_names, total_count)
+
     async def _cascade_cleanup_project_resources(self, project_id: UUID) -> None:
         """Remove all project-scoped resources before soft-deleting the project.
 
         Uses bulk SQL for efficiency. Ordering respects FK constraints.
-        Soft-deletable resources are soft-deleted; others are hard-deleted.
+
+        Files and service accounts are intentionally retained after project
+        deletion (not cascaded here). Callers observe the orphaned state via
+        ``is_project_deleted`` on their read models. After soft-delete,
+        project-scoped ``files:delete`` cannot authorize orphan cleanup;
+        only system-scope ``files:delete`` with a known UUID can.
         """
+        from sqlalchemy import func as sa_func  # noqa: PLC0415
+        from sqlmodel import col  # noqa: PLC0415
+
         from syntara.approvals.models.approval_request import ApprovalRequest  # noqa: PLC0415
         from syntara.authz.models.policy import Policy  # noqa: PLC0415
         from syntara.authz.models.role import Role  # noqa: PLC0415
         from syntara.core.models.secret import EncryptedSecret, Secret  # noqa: PLC0415
         from syntara.credentials.models.credential import Credential  # noqa: PLC0415
-        from syntara.workflows.models.execution import Execution  # noqa: PLC0415
+        from syntara.workflows.exceptions import WorkflowHasActiveExecutionsError  # noqa: PLC0415
+        from syntara.workflows.models.execution import TERMINAL_EXECUTION_STATUSES, Execution  # noqa: PLC0415
+        from syntara.workflows.models.webhook_trigger import WebhookTrigger  # noqa: PLC0415
         from syntara.workflows.models.workflow import Workflow  # noqa: PLC0415
-        from syntara.workflows.models.workflow_version import WorkflowVersion  # noqa: PLC0415
 
-        now = datetime.now(UTC)
-        user_id = self.user.id
+        # Step 1: Fail fast — guard against deleting a project with in-flight executions.
+        workflow_ids_subq = select(Workflow.id).where(Workflow.project_id == project_id).scalar_subquery()
+        non_terminal_count = await self.session.scalar(
+            select(sa_func.count())
+            .select_from(Execution)
+            .where(
+                Execution.workflow_id.in_(workflow_ids_subq),  # type: ignore[attr-defined]
+                col(Execution.status).not_in(TERMINAL_EXECUTION_STATUSES),
+            )
+        )
+        if non_terminal_count:
+            raise WorkflowHasActiveExecutionsError(non_terminal_count, project_id=project_id)
 
-        # Step 1: Hard-delete approval requests
+        # Step 2: Hard-delete approval requests
         await self.session.exec(
             delete(ApprovalRequest).where(ApprovalRequest.project_id == project_id)  # type: ignore[arg-type]
         )
 
-        # Step 2: Soft-delete executions
+        # Step 3: Delete webhook triggers for workflows in this project.
         await self.session.exec(
-            update(Execution)
-            .where(
-                Execution.project_id == project_id,  # type: ignore[arg-type]
-                Execution.deleted_at.is_(None),  # type: ignore[union-attr]
-            )
-            .values(deleted_at=now, deleted_by=user_id)
+            delete(WebhookTrigger).where(WebhookTrigger.workflow_id.in_(workflow_ids_subq))  # type: ignore[attr-defined]
         )
 
-        # Step 3: Soft-delete workflow versions (no direct project_id, found via workflow)
-        workflow_ids_subq = select(Workflow.id).where(Workflow.project_id == project_id).scalar_subquery()
-        await self.session.exec(
-            update(WorkflowVersion)
-            .where(
-                WorkflowVersion.workflow_id.in_(workflow_ids_subq),  # type: ignore[attr-defined]
-                WorkflowVersion.deleted_at.is_(None),  # type: ignore[union-attr]
-            )
-            .values(deleted_at=now, deleted_by=user_id)
-        )
-
-        # Step 4: Soft-delete workflows
+        # Step 4: Null out published_version_id to avoid self-referential FK issues,
+        # then hard-delete workflows (executions and versions cascade via DB FK).
         await self.session.exec(
             update(Workflow)
-            .where(
-                Workflow.project_id == project_id,  # type: ignore[arg-type]
-                Workflow.deleted_at.is_(None),  # type: ignore[union-attr]
-            )
-            .values(deleted_at=now, deleted_by=user_id)
+            .where(Workflow.project_id == project_id)  # type: ignore[arg-type]
+            .values(published_version_id=None, is_enabled=False)
+        )
+        await self.session.exec(
+            delete(Workflow).where(Workflow.project_id == project_id)  # type: ignore[arg-type]
         )
 
         # Step 5: Collect secret IDs, null FK, delete secrets, then hard-delete credentials

@@ -21,7 +21,7 @@ import { useMemo, useState } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 
 import { FormFieldWarning } from '../../components/FormFieldError'
-import { NxSelect } from '../../components/NxSelect'
+import { SynSelect } from '../../components/SynSelect'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { useFormMutationErrorHandler } from '../../hooks/useFormMutationErrorHandler'
 import { useAlerts } from '../../providers/alerts'
@@ -39,6 +39,30 @@ import { useSelectableProjects } from './useAllProjects'
 import { PRINCIPAL_ID_FIELD, roleAssignmentsQueryKey, useAlreadyAssignedRoles } from './useAlreadyAssignedRoles'
 
 const PAGE_SIZE = 20
+
+type NamedOption = { value: string; label: string }
+
+function assignmentAddedDescription(
+  data: AssignRoleFormData,
+  userOptions: NamedOption[],
+  groupOptions: NamedOption[],
+  serviceAccountOptions: NamedOption[]
+): string {
+  const optionsByType = {
+    [RolePrincipalType.USER]: userOptions,
+    [RolePrincipalType.GROUP]: groupOptions,
+    [RolePrincipalType.SERVICE_ACCOUNT]: serviceAccountOptions,
+  }
+  const idByType = {
+    [RolePrincipalType.USER]: data.userId,
+    [RolePrincipalType.GROUP]: data.groupId,
+    [RolePrincipalType.SERVICE_ACCOUNT]: data.serviceAccountId,
+  }
+  const principalId = idByType[data.principalType]
+  const principalName =
+    optionsByType[data.principalType].find((option) => option.value === principalId)?.label ?? principalId
+  return `Assignment for ${principalName} has been added.`
+}
 
 // ── Form body (extracted to stay within max-lines-per-function) ───────────
 
@@ -72,7 +96,7 @@ type AssignRoleFormBodyProps = {
 function ScopeSelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const [isOpen, setIsOpen] = useState(false)
   return (
-    <NxSelect
+    <SynSelect
       id="scope"
       isOpen={isOpen}
       selected={value}
@@ -97,7 +121,7 @@ function ScopeSelect({ value, onChange }: { value: string; onChange: (value: str
         <SelectOption value="system">System</SelectOption>
         <SelectOption value="project">Project</SelectOption>
       </SelectList>
-    </NxSelect>
+    </SynSelect>
   )
 }
 
@@ -434,7 +458,10 @@ export function AssignRoleDialog({ onClose, onSuccess }: Readonly<AssignRoleDial
           queryKey: roleAssignmentsQueryKey(data.principalType, principalId),
         })
       )
-      showSuccess({ title: 'Assignment added', description: 'Assignment created successfully' })
+      showSuccess({
+        title: 'Assignment added',
+        description: assignmentAddedDescription(data, userOptions, groupOptions, serviceAccountOptions),
+      })
       onSuccess()
       onClose()
     }
