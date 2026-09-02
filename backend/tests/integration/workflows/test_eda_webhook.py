@@ -69,6 +69,16 @@ def _skip_sa_authorization() -> Generator[None]:
         yield
 
 
+@pytest.fixture(autouse=True)
+def _skip_sa_binding_sync() -> Generator[None]:
+    """Skip SA binding sync during publish — test SA IDs don't exist in the DB."""
+    with patch(
+        "syntara.workflows.services.webhook_trigger_service.WebhookTriggerService._sync_trigger_sa_bindings",
+        new_callable=AsyncMock,
+    ):
+        yield
+
+
 @pytest.fixture
 def _no_temporal(session_app: FastAPI) -> Generator[None]:
     """Override Temporal dependency to return None (simulate unavailability)."""
@@ -93,6 +103,7 @@ async def eda_workflow(
                 "type": "eda_trigger",
                 "parameters": {
                     "webhook_path": "github-deployments",
+                    "authorized_service_account_ids": [str(uuid4())],
                 },
             }
         ],
@@ -141,6 +152,7 @@ async def eda_workflow_with_schema(
                 "parameters": {
                     "webhook_path": "validated-events",
                     "input_schema": input_schema,
+                    "authorized_service_account_ids": [str(uuid4())],
                 },
             }
         ],
@@ -431,7 +443,11 @@ class TestCrossTypePathIsolation:
                 "schema_version": "2.0.0",
                 "name": "Generic Webhook Workflow",
                 "triggers": [
-                    {"id": "wh_1", "type": "webhook_trigger", "parameters": {"webhook_path": shared_path}},
+                    {
+                        "id": "wh_1",
+                        "type": "webhook_trigger",
+                        "parameters": {"webhook_path": shared_path, "authorized_service_account_ids": [str(uuid4())]},
+                    },
                 ],
                 "nodes": [
                     {"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}},
@@ -450,7 +466,11 @@ class TestCrossTypePathIsolation:
                 "schema_version": "2.0.0",
                 "name": "EDA Webhook Workflow",
                 "triggers": [
-                    {"id": "eda_1", "type": "eda_trigger", "parameters": {"webhook_path": shared_path}},
+                    {
+                        "id": "eda_1",
+                        "type": "eda_trigger",
+                        "parameters": {"webhook_path": shared_path, "authorized_service_account_ids": [str(uuid4())]},
+                    },
                 ],
                 "nodes": [
                     {"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}},

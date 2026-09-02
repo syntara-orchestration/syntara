@@ -2,12 +2,12 @@ import { Spinner, StackItem } from '@patternfly/react-core'
 import type { Approval } from '@syntara/contracts'
 import { useMemo, useReducer, useState } from 'react'
 
-import { EmptyStateAccessDenied } from '../../components/EmptyStateAccessDenied'
 import { FilterBar } from '../../components/filters/FilterBar'
 import { SynPage, SynPageBody } from '../../components/layout/SynPage'
 import { SynPageHeader } from '../../components/layout/SynPageHeader'
 import { SynPanel } from '../../components/layout/SynPanel'
 import { SynPanelContentStack } from '../../components/layout/SynPanelContentStack'
+import { SynEmptyStateAccessDenied } from '../../components/states/SynEmptyStateAccessDenied'
 import { useQueryState } from '../../components/states/useQueryState'
 import { SynPageTitle } from '../../components/SynPageTitle'
 import { permissionTooltip } from '../../hooks/permissionUtils'
@@ -63,7 +63,7 @@ export default function Approvals() {
         <SynPageTitle segments={['Approvals']} />
         <SynPageHeader title="Approvals" docLink={approvalsDocLink ?? undefined} />
         <SynPageBody isCentered>
-          <EmptyStateAccessDenied description="You do not have permission to view approvals. Contact your administrator to request access." />
+          <SynEmptyStateAccessDenied description="You do not have permission to view approvals. Contact your administrator to request access." />
         </SynPageBody>
       </SynPage>
     )

@@ -59,7 +59,7 @@ describe('useNodeMenuActions', () => {
       const { result } = renderHook(() => useNodeMenuActions({ nodeId: 'task-1', nodeType: MenuNodeType.ACTIVITY }))
 
       expect(result.current).toHaveLength(1)
-      expect(result.current[0].label).toBe('Delete step')
+      expect(result.current[0].label).toBe('Delete')
       expect(result.current[0].variant).toBe('danger')
     })
 
@@ -69,7 +69,7 @@ describe('useNodeMenuActions', () => {
       )
 
       expect(result.current).toHaveLength(1)
-      expect(result.current[0].label).toBe('Delete step')
+      expect(result.current[0].label).toBe('Delete')
     })
 
     it('calls deleteElements with correct node id for activity node', () => {
@@ -258,24 +258,24 @@ describe('useNodeMenuActions', () => {
   })
 
   describe('disable toggle', () => {
-    it('shows "Disable step" label when node is not disabled', () => {
+    it('shows "Disable" label when node is not disabled', () => {
       const { result } = renderHook(
         () => useNodeMenuActions({ nodeId: 'task-1', nodeType: MenuNodeType.ACTIVITY, disabled: false }),
         { wrapper: withNodeActions(defaultNodeActions) }
       )
 
       const toggle = result.current.find((a) => a.id === 'toggle-disabled')
-      expect(toggle?.label).toBe('Disable step')
+      expect(toggle?.label).toBe('Disable')
     })
 
-    it('shows "Enable step" label when node is disabled', () => {
+    it('shows "Enable" label when node is disabled', () => {
       const { result } = renderHook(
         () => useNodeMenuActions({ nodeId: 'task-1', nodeType: MenuNodeType.ACTIVITY, disabled: true }),
         { wrapper: withNodeActions(defaultNodeActions) }
       )
 
       const toggle = result.current.find((a) => a.id === 'toggle-disabled')
-      expect(toggle?.label).toBe('Enable step')
+      expect(toggle?.label).toBe('Enable')
     })
 
     it('calls onToggleDisabled with node id when clicked', () => {
@@ -354,7 +354,7 @@ describe('useNodeMenuActions', () => {
       )
 
       expect(result.current).toHaveLength(1)
-      expect(result.current[0].label).toBe('Delete step')
+      expect(result.current[0].label).toBe('Delete')
     })
 
     it('handles multiple additional actions', () => {

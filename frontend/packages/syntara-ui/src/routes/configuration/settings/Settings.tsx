@@ -6,10 +6,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsSettingsCategory, breadcrumbsSettingsPage } from '../../../app/breadcrumbBuilders'
 import { settingsClient } from '../../../client'
-import { EmptyStateAccessDenied } from '../../../components/EmptyStateAccessDenied'
 import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../components/layout/SynPanel'
+import { SynEmptyStateAccessDenied } from '../../../components/states/SynEmptyStateAccessDenied'
 import { useQueryState } from '../../../components/states/useQueryState'
 import { SynPageTitle } from '../../../components/SynPageTitle'
 import { SynUrlTabs } from '../../../components/tabs/SynUrlTabs'
@@ -200,7 +200,7 @@ export default function Settings() {
         <SynPageHeader title="Settings" docLink={settingsDocLink} breadcrumbs={breadcrumbsSettingsPage()} />
         <StackItem isFilled>
           <SynPanel isFullHeight>
-            <EmptyStateAccessDenied description="You don't have permission to view settings. Contact your administrator to request the auditor or admin role." />
+            <SynEmptyStateAccessDenied description="You don't have permission to view settings. Contact your administrator to request the auditor or admin role." />
           </SynPanel>
         </StackItem>
       </SynPage>

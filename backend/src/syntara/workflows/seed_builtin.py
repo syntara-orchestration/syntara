@@ -190,7 +190,6 @@ async def seed_builtin_workflows(session: AsyncSession) -> None:
         select(Project).where(
             Project.name == BUILTIN_PROJECT_NAME,
             Project.is_builtin == True,  # noqa: E712
-            Project.deleted_at.is_(None),  # type: ignore[union-attr]
         )
     )
     system_project = project_result.first()

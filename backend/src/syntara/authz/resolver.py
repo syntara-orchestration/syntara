@@ -290,7 +290,6 @@ async def resolve_effective_policies(
         projects_result = await db.exec(
             select(Project).where(
                 Project.id.in_(list(project_role_names.keys())),  # type: ignore[attr-defined]
-                Project.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
         project_map = {p.id: p.name for p in projects_result.all()}

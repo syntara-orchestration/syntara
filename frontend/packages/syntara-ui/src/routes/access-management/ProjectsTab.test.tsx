@@ -326,10 +326,10 @@ describe('ProjectsTab', () => {
 
       const dialog = screen.getByRole('dialog')
       expect(within(dialog).getByText('Alpha')).toBeInTheDocument()
-      expect(within(dialog).getByText(/will be deleted/)).toBeInTheDocument()
+      expect(within(dialog).getByText(/will be deleted\. This cannot be undone\./)).toBeInTheDocument()
       expect(
         within(dialog).getByRole('checkbox', {
-          name: 'I understand this project, its workflows, and role assignments will be permanently deleted or removed.',
+          name: 'I understand this project and the resources listed above will be permanently deleted.',
         })
       ).toBeInTheDocument()
     })
@@ -347,7 +347,7 @@ describe('ProjectsTab', () => {
 
       const dialog = await screen.findByRole('dialog')
       expect(within(dialog).getByText('Beta')).toBeInTheDocument()
-      expect(within(dialog).getByText(/will be deleted/)).toBeInTheDocument()
+      expect(within(dialog).getByText(/will be deleted\. This cannot be undone\./)).toBeInTheDocument()
     })
   })
 
