@@ -46924,11 +46924,6 @@
             ],
             "title": "Project Name"
           },
-          "is_project_deleted": {
-            "type": "boolean",
-            "title": "Is Project Deleted",
-            "default": false
-          },
           "last_authenticated_at": {
             "anyOf": [
               {

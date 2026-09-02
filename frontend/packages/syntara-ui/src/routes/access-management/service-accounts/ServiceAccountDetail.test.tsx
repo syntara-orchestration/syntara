@@ -304,7 +304,7 @@ describe('ServiceAccountDetail', () => {
 
   it('renders owning project as a link when project_name is present', () => {
     vi.mocked(accessClient.useQuery).mockReturnValue(
-      buildQueryResult({ ...mockServiceAccount, project_name: 'my-project', is_project_deleted: false }) as never
+      buildQueryResult({ ...mockServiceAccount, project_name: 'my-project' }) as never
     )
 
     render(<ServiceAccountDetail />, { wrapper })
@@ -323,18 +323,6 @@ describe('ServiceAccountDetail', () => {
 
     expect(screen.getByText('proj-1')).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'proj-1' })).not.toBeInTheDocument()
-  })
-
-  it('renders owning project as plain text with Deleted label when project is deleted', () => {
-    vi.mocked(accessClient.useQuery).mockReturnValue(
-      buildQueryResult({ ...mockServiceAccount, project_name: 'old-project', is_project_deleted: true }) as never
-    )
-
-    render(<ServiceAccountDetail />, { wrapper })
-
-    expect(screen.getByText('old-project')).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'old-project' })).not.toBeInTheDocument()
-    expect(screen.getByText('Deleted')).toBeInTheDocument()
   })
 
   it('shows Never for last authenticated when never used', () => {

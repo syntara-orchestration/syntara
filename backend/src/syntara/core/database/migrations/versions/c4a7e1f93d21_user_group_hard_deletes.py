@@ -11,7 +11,7 @@ Strategy:
 - Convert partial unique indexes to standard unique constraints.
 
 Revision ID: c4a7e1f93d21
-Revises: 7367ba3d8ccb
+Revises: f1b3c7d9e2a4
 Create Date: 2026-09-01 15:00:00.000000
 
 """
@@ -23,7 +23,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "c4a7e1f93d21"
-down_revision: str | Sequence[str] | None = "7367ba3d8ccb"
+down_revision: str | Sequence[str] | None = "f1b3c7d9e2a4"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

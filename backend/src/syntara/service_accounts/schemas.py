@@ -61,7 +61,6 @@ class ServiceAccountRead(SQLModel):
     status: ServiceAccountStatus
     project_id: UUID
     project_name: str | None = None
-    is_project_deleted: bool = False
     last_authenticated_at: datetime | None = None
     created_by: UUID
     updated_by: UUID | None = None

@@ -5084,7 +5084,6 @@ export const handlers = [
       status: 'active' as const,
       project_id: body.project_id,
       project_name,
-      is_project_deleted: false,
       last_authenticated_at: null,
       created_by: 'u-001',
       updated_by: null,

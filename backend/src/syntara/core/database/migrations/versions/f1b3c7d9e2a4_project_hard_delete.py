@@ -29,7 +29,8 @@ _SOFT_DELETED = "SELECT id FROM projects WHERE deleted_at IS NOT NULL"
 
 
 def _delete_by_project(table: str) -> sa.TextClause:
-    return sa.text("DELETE FROM " + table + f" WHERE project_id IN ({_SOFT_DELETED})")
+    # S608: table is a static literal from this migration, not user input.
+    return sa.text("DELETE FROM " + table + f" WHERE project_id IN ({_SOFT_DELETED})")  # noqa: S608
 
 
 def upgrade() -> None:
