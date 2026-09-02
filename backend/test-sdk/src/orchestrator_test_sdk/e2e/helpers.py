@@ -332,6 +332,11 @@ def poll_execution_until_complete(
     Returns:
         ExecutionRead with final terminal state (completed, failed, cancelled, or completed_with_errors)
 
+    Once the execution is terminal, waits up to ``ACTIVITY_SETTLE_TIMEOUT`` additional
+    seconds for every present activity row to also reach a terminal status, so callers
+    don't observe an activity still marked "running" after the execution has completed
+    (mirrors ``poll_execution``).
+
     Raises:
         AssertionError: If execution does not reach terminal state within timeout
 
@@ -351,6 +356,20 @@ def poll_execution_until_complete(
 
         status = str(execution.status)
         if status in TERMINAL_EXECUTION_STATUSES:
+            settle_elapsed = 0
+            while not _activities_settled(execution) and settle_elapsed < ACTIVITY_SETTLE_TIMEOUT:
+                time.sleep(poll_interval)
+                settle_elapsed += poll_interval
+                try:
+                    execution = syntara_api.executions.get(
+                        execution_id=execution_id,
+                        include="activities",
+                    ).assert_and_get()
+                except UnexpectedResponseException as exc:
+                    # Transient gateway/server errors — treat as "not settled yet" and keep polling
+                    if exc.status_code in (502, 503, 504):
+                        continue
+                    raise
             return execution
 
         time.sleep(poll_interval)
