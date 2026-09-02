@@ -367,6 +367,7 @@ class TestListApprovalsContract:
         - Invalid status values return 422 Unprocessable Entity
         - Invalid UUIDs return 422 Unprocessable Entity
         - Invalid limit values return 422 Unprocessable Entity
+        - Unknown query parameters return 422 Unprocessable Entity
         - Error responses match RFC 9457 format
         """
         # Act & Assert - Invalid status value
@@ -419,5 +420,19 @@ class TestListApprovalsContract:
             title="Request Validation Error",
             detail="Validation failed: query -> limit: Input should be less than or equal to 100",
             code="REQUEST_VALIDATION_ERROR",
+            retryable=False,
+        )
+
+        # Act & Assert - Unknown query parameter is rejected instead of silently ignored.
+        # This is raised as a SafeValueError inside the service, so the RFC 9457 title/code
+        # differ from the FastAPI request-validation cases above.
+        response = await auth_client.get("/api/v1/approvals?bogus_param=value")
+        assert response.status_code == 422
+        assert_error_data(
+            response,
+            error_type="https://api.example.com/errors/validation-error",
+            title="Validation Error",
+            detail="Unknown query parameter(s): bogus_param",
+            code="VALIDATION_ERROR",
             retryable=False,
         )
