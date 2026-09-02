@@ -129,6 +129,12 @@ function setupMocks(projects = mockProjects) {
   } as never)
 }
 
+const DELETE_PROJECT_LABEL = 'Delete project'
+
+function findDeleteOption() {
+  return screen.findByRole('menuitem', { name: DELETE_PROJECT_LABEL })
+}
+
 describe('ProjectsTab', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -293,7 +299,7 @@ describe('ProjectsTab', () => {
       const user = userEvent.setup()
       render(<ProjectsTab />, { wrapper })
 
-      const actionButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const actionButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(actionButtons[0])
 
       const editOption = await screen.findByRole('menuitem', { name: /edit/i })
@@ -308,10 +314,10 @@ describe('ProjectsTab', () => {
       const user = userEvent.setup()
       render(<ProjectsTab />, { wrapper })
 
-      const actionButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const actionButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(actionButtons[0])
 
-      const deleteOption = await screen.findByRole('menuitem', { name: /delete/i })
+      const deleteOption = await findDeleteOption()
       await user.click(deleteOption)
 
       await waitFor(() => {
@@ -334,9 +340,9 @@ describe('ProjectsTab', () => {
       const user = userEvent.setup()
       render(<ProjectsTab />, { wrapper })
 
-      const actionButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const actionButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(actionButtons[1])
-      const deleteOption = await screen.findByRole('menuitem', { name: /delete/i })
+      const deleteOption = await findDeleteOption()
       await user.click(deleteOption)
 
       const dialog = await screen.findByRole('dialog')
@@ -357,9 +363,9 @@ describe('ProjectsTab', () => {
 
       render(<ProjectsTab />, { wrapper })
 
-      const actionButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const actionButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(actionButtons[0])
-      const deleteOption = await screen.findByRole('menuitem', { name: /delete/i })
+      const deleteOption = await findDeleteOption()
       await user.click(deleteOption)
 
       const deleteButton = await screen.findByRole('button', { name: 'Delete' })
@@ -384,9 +390,9 @@ describe('ProjectsTab', () => {
 
       render(<ProjectsTab />, { wrapper })
 
-      const actionButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const actionButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(actionButtons[0])
-      const deleteOption = await screen.findByRole('menuitem', { name: /delete/i })
+      const deleteOption = await findDeleteOption()
       await user.click(deleteOption)
 
       await user.click(screen.getByRole('checkbox'))
@@ -415,9 +421,9 @@ describe('ProjectsTab', () => {
 
       render(<ProjectsTab />, { wrapper })
 
-      const actionButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const actionButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(actionButtons[0])
-      const deleteOption = await screen.findByRole('menuitem', { name: /delete/i })
+      const deleteOption = await findDeleteOption()
       await user.click(deleteOption)
 
       await user.click(screen.getByRole('checkbox'))
@@ -442,9 +448,9 @@ describe('ProjectsTab', () => {
       const user = userEvent.setup()
       render(<ProjectsTab />, { wrapper })
 
-      const actionButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const actionButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(actionButtons[0])
-      const deleteOption = await screen.findByRole('menuitem', { name: /delete/i })
+      const deleteOption = await findDeleteOption()
       await user.click(deleteOption)
 
       await waitFor(() => {
@@ -476,7 +482,7 @@ describe('ProjectsTab', () => {
       const user = userEvent.setup()
       render(<ProjectsTab />, { wrapper })
 
-      const actionButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const actionButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(actionButtons[0])
       const editOption = await screen.findByRole('menuitem', { name: /edit/i })
       await user.click(editOption)

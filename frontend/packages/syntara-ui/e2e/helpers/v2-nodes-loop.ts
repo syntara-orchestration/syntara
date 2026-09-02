@@ -169,7 +169,7 @@ export async function addForEachLoopNode(
  * Assumes the add-node panel is already open or will be opened.
  */
 export async function addChildScriptToLoop(page: Page, scriptName: string, code: string) {
-  await openAddNodePanel(page)
+  await openAddNodePanel(page, 'loop')
   await selectCategoryAndType(page, 'Action', 'Script')
 
   const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })

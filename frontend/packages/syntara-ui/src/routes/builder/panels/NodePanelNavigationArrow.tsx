@@ -3,6 +3,9 @@ import type { MenuToggleElement } from '@patternfly/react-core'
 import { RhUiCaretLeftIcon, RhUiCaretRightIcon } from '@patternfly/react-icons'
 import { useCallback, useMemo, useState, type Ref } from 'react'
 
+import { IconLabel } from '../../../components/IconLabel'
+import { renderNodeIcon } from '../../workflows/canvas/nodes/renderNodeIcon'
+
 import type { UpstreamNodeInfo } from './hooks/useUpstreamNodes'
 import styles from './NodePanelNavigationArrow.module.css'
 import { getUpstreamNodeDisplayName } from './utils/getUpstreamNodeDisplayName'
@@ -34,6 +37,13 @@ function getArrowClassName(direction: NavigationDirection): string {
 
 function getNavigateAriaLabel(direction: NavigationDirection, nodeName: string): string {
   return direction === 'previous' ? `Go to previous step: ${nodeName}` : `Go to next step: ${nodeName}`
+}
+
+function NavTargetLabel({ node }: Readonly<{ node: UpstreamNodeInfo }>) {
+  const name = getUpstreamNodeDisplayName(node)
+  const icon = renderNodeIcon(node.icon, node.iconId, 'legend')
+
+  return <IconLabel icon={icon ? <span aria-hidden="true">{icon}</span> : undefined}>{name}</IconLabel>
 }
 
 type SingleTargetArrowProps = {
@@ -140,7 +150,7 @@ function MultiTargetArrow({ direction, nodes, onNavigate }: Readonly<MultiTarget
         <DropdownList>
           {nodes.map((node) => (
             <DropdownItem key={node.id} onClick={() => handleSelect(node.id)}>
-              {getUpstreamNodeDisplayName(node)}
+              <NavTargetLabel node={node} />
             </DropdownItem>
           ))}
         </DropdownList>

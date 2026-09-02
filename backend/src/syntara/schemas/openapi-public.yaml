@@ -25226,7 +25226,7 @@ paths:
                 retryable: true
     delete:
       summary: Delete workflow
-      description: Soft delete a workflow.
+      description: Permanently delete a workflow and cascade-delete all its versions and executions.
       operationId: delete_workflow
       tags:
         - Workflows
@@ -33814,18 +33814,6 @@ components:
             $ref: '#/components/schemas/CurrentActivity'
           title: Current Activities
           description: Currently executing activities
-        deleted_at:
-          anyOf:
-            - type: string
-              format: date-time
-            - type: 'null'
-          title: Deleted At
-        deleted_by:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
-          title: Deleted By
         workflow_definition:
           anyOf:
             - $ref: '#/components/schemas/WorkflowDefinition'
@@ -34260,7 +34248,6 @@ components:
         Schema for workflow response (GET /workflows/{id}).
 
         Includes all fields from the database table model.
-        Note: deleted_at and deleted_by are None since soft-deleted workflows are excluded from queries.
       required:
         - name
         - id
@@ -34334,18 +34321,6 @@ components:
           type: string
           format: date-time
           title: Updated At
-        deleted_at:
-          anyOf:
-            - type: string
-              format: date-time
-            - type: 'null'
-          title: Deleted At
-        deleted_by:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
-          title: Deleted By
         validation_result:
           anyOf:
             - $ref: '#/components/schemas/ValidationResult'
@@ -34432,18 +34407,6 @@ components:
           type: string
           format: date-time
           title: Updated At
-        deleted_at:
-          anyOf:
-            - type: string
-              format: date-time
-            - type: 'null'
-          title: Deleted At
-        deleted_by:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
-          title: Deleted By
         validation_result:
           anyOf:
             - $ref: '#/components/schemas/ValidationResult'
@@ -34530,18 +34493,6 @@ components:
           type: string
           format: date-time
           title: Updated At
-        deleted_at:
-          anyOf:
-            - type: string
-              format: date-time
-            - type: 'null'
-          title: Deleted At
-        deleted_by:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
-          title: Deleted By
         validation_result:
           anyOf:
             - $ref: '#/components/schemas/ValidationResult'
@@ -34558,11 +34509,7 @@ components:
     WorkflowVersionRead:
       type: object
       title: WorkflowVersionRead
-      description: |-
-        Schema for workflow version response (GET /workflows/{id}/versions/{version}).
-        WorkflowVersion entities are read-only and managed automatically by the system.
-
-        Note: deleted_at and deleted_by are None since soft-deleted versions are excluded from queries.
+      description: Schema for workflow version response (GET /workflows/{id}/versions/{version}).
       required:
         - id
         - workflow_id
@@ -34638,18 +34585,6 @@ components:
           type: string
           format: date-time
           title: Updated At
-        deleted_at:
-          anyOf:
-            - type: string
-              format: date-time
-            - type: 'null'
-          title: Deleted At
-        deleted_by:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
-          title: Deleted By
     PublishVersionRequest:
       type: object
       title: PublishVersionRequest

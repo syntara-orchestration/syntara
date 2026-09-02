@@ -7,25 +7,25 @@ const seededWorkflows: SeededWorkflow[] = []
 
 test.beforeAll(async ({ browser }) => {
   const page = await browser.newPage()
-  const token = await getAuthToken(page)
-  if (token) {
+  try {
+    const token = await getAuthToken(page)
+    if (!token) throw new Error('workflow-filtering beforeAll: could not obtain auth token')
     const prefix = buildUniqueName('e2e-wffilt')
     const project = await ensureProject(page)
     const projectId = project?.id
 
     for (let i = 1; i <= 22; i++) {
-      let wf: SeededWorkflow | null = null
-      for (let attempt = 0; attempt < 3 && !wf; attempt++) {
-        wf = await createWorkflowViaApi(page, {
+      seededWorkflows.push(
+        await createWorkflowViaApi(page, {
           name: `${prefix}-workflow-${i}`,
           projectId,
           token,
         })
-      }
-      if (wf) seededWorkflows.push(wf)
+      )
     }
+  } finally {
+    await page.close()
   }
-  await page.close()
 })
 
 test.afterAll(async ({ browser }) => {
@@ -161,14 +161,12 @@ test.describe('Workflow Filtering', () => {
     const paginationWorkflows: SeededWorkflow[] = []
 
     for (let i = 1; i <= 22; i++) {
-      let wf: SeededWorkflow | null = null
-      for (let attempt = 0; attempt < 3 && !wf; attempt++) {
-        wf = await createWorkflowViaApi(app, {
+      paginationWorkflows.push(
+        await createWorkflowViaApi(app, {
           name: `${prefix}-workflow-${i}`,
           projectId,
         })
-      }
-      if (wf) paginationWorkflows.push(wf)
+      )
     }
     expect(paginationWorkflows).toHaveLength(22)
 
@@ -230,8 +228,7 @@ test.describe('Workflow Filtering', () => {
     await expect(nameChipGroup.getByText('test')).toBeVisible()
 
     // Act - Remove name filter chip
-    const nameLabel = nameChipGroup.getByRole('listitem').filter({ hasText: 'test' })
-    await nameLabel.getByRole('button', { name: /close/i }).click()
+    await nameChipGroup.getByRole('button', { name: 'Close test' }).click()
 
     // Assert - Filter removed
     await expect(nameChipGroup).not.toBeVisible()
