@@ -9,8 +9,8 @@
  * - Permission gating for project actions
  */
 import { test, expect, toAppUrl } from './fixtures'
-import { buildUniqueName } from './helpers/workflows'
-import { createProjectViaApi, createWorkflowViaApi, deleteProjectViaApi, deleteWorkflowViaApi } from './utils/api'
+import { buildUniqueName, createBasicWorkflowViaApi } from './helpers/workflows'
+import { createProjectViaApi, deleteProjectViaApi, deleteWorkflowViaApi } from './utils/api'
 
 test.describe('Workflows Page - Project Actions in All Projects View', () => {
   test('project group header shows kebab menu with edit and delete actions', async ({ app }) => {
@@ -22,21 +22,16 @@ test.describe('Workflows Page - Project Actions in All Projects View', () => {
     try {
       const project = await createProjectViaApi(app, projectName)
       projectId = project.id
-      const workflow = await createWorkflowViaApi(
-        app,
-        workflowName,
-        [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
-        [],
-        [],
-        { projectId }
-      )
+      const workflow = await createBasicWorkflowViaApi(app, workflowName, undefined, { projectId })
       workflowId = workflow.id
 
-      // Navigate to All projects view
+      // Navigate to All projects view and filter to isolate our workflow
       await app.goto(toAppUrl('/workflows'))
       const projectSelector = app.getByRole('textbox', { name: 'Project' })
       await projectSelector.click()
       await app.getByRole('option', { name: 'All projects' }).click()
+      await app.getByPlaceholder('Filter by name').fill(workflowName)
+      await app.getByRole('button', { name: 'Apply filter' }).click()
 
       // Find the project group header row
       const projectRow = app.getByRole('row').filter({ hasText: projectName })
@@ -66,21 +61,16 @@ test.describe('Workflows Page - Project Actions in All Projects View', () => {
     try {
       const project = await createProjectViaApi(app, originalName)
       projectId = project.id
-      const workflow = await createWorkflowViaApi(
-        app,
-        workflowName,
-        [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
-        [],
-        [],
-        { projectId }
-      )
+      const workflow = await createBasicWorkflowViaApi(app, workflowName, undefined, { projectId })
       workflowId = workflow.id
 
-      // Navigate to All projects view
+      // Navigate to All projects view and filter to isolate our workflow
       await app.goto(toAppUrl('/workflows'))
       const projectSelector = app.getByRole('textbox', { name: 'Project' })
       await projectSelector.click()
       await app.getByRole('option', { name: 'All projects' }).click()
+      await app.getByPlaceholder('Filter by name').fill(workflowName)
+      await app.getByRole('button', { name: 'Apply filter' }).click()
 
       // Open project kebab menu
       const projectRow = app.getByRole('row').filter({ hasText: originalName })
@@ -116,21 +106,16 @@ test.describe('Workflows Page - Project Actions in All Projects View', () => {
     try {
       const project = await createProjectViaApi(app, projectName)
       projectId = project.id
-      const workflow = await createWorkflowViaApi(
-        app,
-        workflowName,
-        [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
-        [],
-        [],
-        { projectId }
-      )
+      const workflow = await createBasicWorkflowViaApi(app, workflowName, undefined, { projectId })
       workflowId = workflow.id
 
-      // Navigate to All projects view
+      // Navigate to All projects view and filter to isolate our workflow
       await app.goto(toAppUrl('/workflows'))
       const projectSelector = app.getByRole('textbox', { name: 'Project' })
       await projectSelector.click()
       await app.getByRole('option', { name: 'All projects' }).click()
+      await app.getByPlaceholder('Filter by name').fill(workflowName)
+      await app.getByRole('button', { name: 'Apply filter' }).click()
 
       // Open delete from project kebab
       const projectRow = app.getByRole('row').filter({ hasText: projectName })
@@ -176,7 +161,8 @@ test.describe('Workflows Page - Project Actions in Selected Project View', () =>
       await app.goto(toAppUrl('/workflows'))
       const projectSelector = app.getByRole('textbox', { name: 'Project' })
       await projectSelector.click()
-      await app.getByRole('option', { name: projectName }).click()
+      await projectSelector.fill(projectName)
+      await app.getByRole('option', { name: projectName, exact: true }).click()
 
       // Project is now selected — kebab should be visible in header
       const headerKebab = app.getByRole('button', { name: 'Project actions' })
@@ -202,7 +188,8 @@ test.describe('Workflows Page - Project Actions in Selected Project View', () =>
       await app.goto(toAppUrl('/workflows'))
       const projectSelector = app.getByRole('textbox', { name: 'Project' })
       await projectSelector.click()
-      await app.getByRole('option', { name: originalName }).click()
+      await projectSelector.fill(originalName)
+      await app.getByRole('option', { name: originalName, exact: true }).click()
 
       // Edit via header kebab
       const headerKebab = app.getByRole('button', { name: 'Project actions' })
