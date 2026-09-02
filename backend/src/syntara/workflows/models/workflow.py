@@ -14,7 +14,6 @@ from sqlmodel import CheckConstraint, Field, Index, Relationship, SQLModel, text
 
 from syntara.core.constants import FieldLimits
 from syntara.core.jsonb_limits import LabelsField, OptionalLabelsField, WorkflowDefinitionSizeValidator
-from syntara.core.models.base import Resource
 from syntara.core.models.base.named import NamedResource
 from syntara.core.models.base.user_owned import UserOwnedResource
 from syntara.core.models.pagination import ResourcesResponse

@@ -15,6 +15,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import CheckConstraint, Column, DateTime, Field, Index, Relationship, SQLModel
 
 from syntara.core.constants import FieldLimits
+from syntara.core.jsonb_limits import validate_jsonb_size
 from syntara.core.models.base import UserOwnedResource
 from syntara.core.models.pagination import ResourcesResponse
 from syntara.core.utils.sqlmodel import postgres_enum_column

@@ -15,7 +15,7 @@ from sqlmodel import Field, Index, Relationship, SQLModel
 
 from syntara.core.constants import FieldLimits
 from syntara.core.jsonb_limits import WorkflowDefinitionSizeValidator
-from syntara.core.models.base import SoftDeletableResource, UserOwnedResource
+from syntara.core.models.base import UserOwnedResource
 from syntara.core.models.pagination import ResourcesResponse
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 
