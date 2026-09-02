@@ -1803,10 +1803,13 @@ class ActivitySyncService:
     ) -> tuple[dict[str, Any], dict[str, Any] | None]:
         """Query workflow for activity input and output data.
 
-        Queries ``get_activity_input`` and, for completed activities, uses the
-        ``get_activity_output_when_ready`` workflow update to wait until the
-        resolver namespace is populated — avoiding the race where Temporal emits
-        ACTIVITY_TASK_COMPLETED before the workflow stores the result.
+        Queries ``get_activity_input`` and ``get_activity_output`` from the
+        workflow.  For completed activities whose output is not yet available
+        (race where Temporal emits ACTIVITY_TASK_COMPLETED before the workflow
+        stores the result), falls back to the ``get_activity_output_when_ready``
+        workflow update which blocks until the resolver namespace is populated.
+        The query-first approach ensures this works even after the workflow has
+        completed (updates cannot target completed workflows).
 
         Args:
             handle: Temporal workflow handle for queries
@@ -1823,11 +1826,14 @@ class ActivitySyncService:
 
         try:
             input_data = await handle.query("get_activity_input", activity_id) or {}
+            queried_output = await handle.query("get_activity_output", activity_id)
 
-            if activity_data["status"] == ActivityStatus.COMPLETED:
-                queried_output = await handle.execute_update("get_activity_output_when_ready", activity_id)
-            else:
-                queried_output = await handle.query("get_activity_output", activity_id)
+            if queried_output is None and activity_data["status"] == ActivityStatus.COMPLETED:
+                try:
+                    queried_output = await handle.execute_update("get_activity_output_when_ready", activity_id)
+                except TemporalError:
+                    await asyncio.sleep(0.7)
+                    queried_output = await handle.query("get_activity_output", activity_id)
 
             if queried_output is not None:
                 output_data = self._merge_output(initial_output_data, queried_output)

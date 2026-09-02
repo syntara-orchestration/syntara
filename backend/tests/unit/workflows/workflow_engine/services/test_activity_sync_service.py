@@ -5275,9 +5275,34 @@ class TestQueryActivityIoOutputMerge:
         assert output_data == {"invocation_id": "abc-123"}
 
     @pytest.mark.asyncio
-    async def test_completed_uses_execute_update(self) -> None:
+    async def test_completed_query_returns_output_skips_update(self) -> None:
+        """When query returns output for a completed activity, no update is needed."""
         mock_handle = AsyncMock()
-        mock_handle.query.return_value = {"param": "value"}
+        mock_handle.query.side_effect = [
+            {"param": "value"},
+            {"status": "completed", "output": "result"},
+        ]
+        initial_partial = {"job_id": 42}
+        activity_data: dict[str, Any] = {"status": ActivityStatus.COMPLETED}
+
+        _, output_data = await self.service._query_activity_io(
+            mock_handle, "my-activity", activity_data, initial_partial
+        )
+
+        mock_handle.execute_update.assert_not_awaited()
+        assert output_data is not None
+        assert output_data["job_id"] == 42
+        assert output_data["status"] == "completed"
+        assert output_data["output"] == "result"
+
+    @pytest.mark.asyncio
+    async def test_completed_query_none_falls_back_to_update(self) -> None:
+        """When query returns None for a completed activity, fall back to update."""
+        mock_handle = AsyncMock()
+        mock_handle.query.side_effect = [
+            {},
+            None,
+        ]
         mock_handle.execute_update.return_value = {"status": "completed", "output": "result"}
         initial_partial = {"job_id": 42}
         activity_data: dict[str, Any] = {"status": ActivityStatus.COMPLETED}
@@ -5291,3 +5316,33 @@ class TestQueryActivityIoOutputMerge:
         assert output_data["job_id"] == 42
         assert output_data["status"] == "completed"
         assert output_data["output"] == "result"
+
+    @pytest.mark.asyncio
+    async def test_completed_update_fails_retries_query(self) -> None:
+        """When update fails (workflow already completed), retry query to get output."""
+        from temporalio.exceptions import ApplicationError
+
+        mock_handle = AsyncMock()
+        mock_handle.query.side_effect = [
+            {},
+            None,
+            {"status": "completed", "output": "result"},
+        ]
+        mock_handle.execute_update.side_effect = ApplicationError("workflow completed")
+        initial_partial = {"job_id": 42}
+        activity_data: dict[str, Any] = {"status": ActivityStatus.COMPLETED}
+
+        with patch(
+            "syntara.workflows.workflow_engine.services.activity_sync_service.asyncio.sleep",
+            new_callable=AsyncMock,
+        ) as mock_sleep:
+            _, output_data = await self.service._query_activity_io(
+                mock_handle, "my-activity", activity_data, initial_partial
+            )
+            mock_sleep.assert_awaited_once_with(0.7)
+
+        assert output_data is not None
+        assert output_data["job_id"] == 42
+        assert output_data["status"] == "completed"
+        assert output_data["output"] == "result"
+        assert mock_handle.query.await_count == 3
