@@ -1,3 +1,4 @@
+# ruff: noqa: S608  # interpolations are module-level SQL literals, not user input
 """project hard delete
 
 Convert projects from soft delete to hard delete per the cascade-everything
@@ -29,8 +30,7 @@ _SOFT_DELETED = "SELECT id FROM projects WHERE deleted_at IS NOT NULL"
 
 
 def _delete_by_project(table: str) -> sa.TextClause:
-    # S608: table is a static literal from this migration, not user input.
-    return sa.text("DELETE FROM " + table + f" WHERE project_id IN ({_SOFT_DELETED})")  # noqa: S608
+    return sa.text("DELETE FROM " + table + f" WHERE project_id IN ({_SOFT_DELETED})")
 
 
 def upgrade() -> None:

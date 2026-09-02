@@ -115,7 +115,7 @@ class ServiceAccountService(BaseService):
                 Project.id.in_(project_ids),  # type: ignore[attr-defined]
             )
         )
-        return {row_id: name for row_id, name in result.all()}
+        return dict(result.all())
 
     async def get_service_account(self, service_account_id: UUID) -> ServiceAccount:
         """Get a service account by ID.
