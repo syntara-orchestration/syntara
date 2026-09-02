@@ -14,6 +14,7 @@ from uuid import uuid4
 
 import pytest
 from sqlalchemy import insert
+from sqlalchemy import select as sa_select
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -676,10 +677,10 @@ async def test_delete_user_cascades_scoped_rows_and_retains_spend(
     assert (await test_db_session.exec(select(User).where(User.id == user_id))).one_or_none() is None
     missing_config = await test_db_session.exec(select(UserTokenConfig).where(UserTokenConfig.id == config_id))
     assert missing_config.one_or_none() is None
-    membership = await test_db_session.exec(
-        select(user_groups).where(user_groups.c.user_id == user_id, user_groups.c.group_id == admins_group_id)
+    membership = await test_db_session.execute(
+        sa_select(user_groups).where(user_groups.c.user_id == user_id, user_groups.c.group_id == admins_group_id)
     )
-    assert membership.one_or_none() is None
+    assert membership.first() is None
 
     retained = (await test_db_session.exec(select(TokenUsageRecord).where(TokenUsageRecord.id == usage_id))).one()
     assert retained.user_id is None
