@@ -12,10 +12,11 @@ from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.sql.schema import Table
 
 from syntara.agent_orchestrator.token_manager.models import TokenUsageRecord, UserTokenConfig
-from syntara.approvals.models.approval_approvers import ApprovalApproverUser
+from syntara.approvals.models.approval_approvers import ApprovalApproverGroup, ApprovalApproverUser
 from syntara.auth.session.models import RefreshSession
 from syntara.core.models.group import Group, user_groups, user_idp_groups
 from syntara.core.models.user_identity import UserIdentity
+from syntara.identity_providers.models.idp_group_mapping import IdpGroupMappingEntry
 from syntara.workflows.models.workflow import Workflow
 
 
@@ -52,6 +53,19 @@ def test_token_usage_set_null_and_nullable() -> None:
     column = _table(TokenUsageRecord).c.user_id
     assert column.nullable is True
     assert _ondelete(column) == "SET NULL"
+
+
+def test_group_scoped_fks_cascade() -> None:
+    """Membership, IdP sync, group->IdP mapping, and group-approver rows go with the group.
+
+    Metadata-only companion to the pg_constraint assertions in
+    tests/integration/core/database/test_user_group_delete_fk_constraints.py, which check
+    the same FKs against the live, migrated schema (not just model declarations).
+    """
+    assert _ondelete(user_groups.c.group_id) == "CASCADE"
+    assert _ondelete(user_idp_groups.c.group_id) == "CASCADE"
+    assert _ondelete(_table(IdpGroupMappingEntry).c.mapped_group_id) == "CASCADE"
+    assert _ondelete(_table(ApprovalApproverGroup).c.group_id) == "CASCADE"
 
 
 def test_group_created_by_set_null() -> None:
