@@ -12,7 +12,7 @@ from syntara.auth.passwords import hash_password
 from syntara.core.models import User
 from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin
-from syntara.core.services.user_reference_resolution import UserReferenceMixin
+from syntara.core.services.user_reference_resolution import UserReferenceResolverMixin
 from syntara.service_accounts.constants import MAX_CREDENTIALS_PER_SA
 from syntara.service_accounts.credential_schemas import (
     ServiceAccountCredentialCreateResponse,
@@ -44,7 +44,7 @@ class ServiceAccountCredentialConvertMixin(ConvertResourceMixin):
         return ServiceAccountCredentialRead.model_validate(resource)
 
 
-class ServiceAccountCredentialService(UserReferenceMixin, BaseService):
+class ServiceAccountCredentialService(UserReferenceResolverMixin, BaseService):
     """Service for service account credential business logic."""
 
     def __init__(self, session: AsyncSession, user: User) -> None:
@@ -283,26 +283,29 @@ class ServiceAccountCredentialService(UserReferenceMixin, BaseService):
         response.max_lifetime_days = await get_runtime_settings().get_int(
             "service_accounts.credential_max_lifetime_days"
         )
+        await self.resolve_user_references(response.resources)
         return response
 
-    def to_read(self, credential: ServiceAccountCredential) -> ServiceAccountCredentialRead:
+    async def to_read(self, credential: ServiceAccountCredential) -> ServiceAccountCredentialRead:
         """Convert a credential to a read response."""
-        return ServiceAccountCredentialRead.model_validate(credential)
+        read = ServiceAccountCredentialRead.model_validate(credential)
+        await self.resolve_user_references([read])
+        return read
 
-    def to_create_response(
+    async def to_create_response(
         self,
         credential: ServiceAccountCredential,
         plaintext_secret: str,
     ) -> ServiceAccountCredentialCreateResponse:
         """Convert a credential to a create response with one-time secret."""
-        read_data = ServiceAccountCredentialRead.model_validate(credential).model_dump()
+        read_data = (await self.to_read(credential)).model_dump()
         return ServiceAccountCredentialCreateResponse(**read_data, client_secret=plaintext_secret)
 
-    def to_rotate_response(
+    async def to_rotate_response(
         self,
         credential: ServiceAccountCredential,
         plaintext_secret: str,
     ) -> ServiceAccountCredentialRotateResponse:
         """Convert a credential to a rotate response with new secret."""
-        read_data = ServiceAccountCredentialRead.model_validate(credential).model_dump()
+        read_data = (await self.to_read(credential)).model_dump()
         return ServiceAccountCredentialRotateResponse(**read_data, client_secret=plaintext_secret)

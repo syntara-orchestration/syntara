@@ -170,7 +170,7 @@ async def _build_workflow_with_version_response(
     warning: str | None = None,
     validation_result: "ValidationResult | None" = None,
 ) -> WorkflowReadWithVersion | PublishWorkflowVersionResponse:
-    workflow_read = WorkflowRead.model_validate(workflow, from_attributes=True)
+    workflow_read = await service.to_read(workflow)
     await _populate_published_version_number(workflow_read, workflow, version, service.session)
     ever_published, pub_ts = await service.get_publish_context([version.id])
     base = workflow_read.model_dump()
@@ -290,7 +290,7 @@ async def create_workflow(
         project_id=request.project_id,
         is_import=request.is_import,
     )
-    read = WorkflowRead.model_validate(workflow, from_attributes=True)
+    read = await service.to_read(workflow)
     if _has_validation_issues(result):
         read.validation_result = result
     return read
@@ -412,7 +412,7 @@ async def test_workflow_node(
     execution_service: Annotated[ExecutionService, Depends(get_execution_service)],
 ) -> ExecutionRead:
     """Test a single node in a workflow with mocked predecessor outputs."""
-    execution = await execution_service.create_test_execution(
+    return await execution_service.create_test_execution(
         workflow_id=workflow_id,
         target_node_id=request.target_node_id,
         pre_resolved_nodes=request.pre_resolved_nodes,
@@ -420,8 +420,6 @@ async def test_workflow_node(
         execute_target=request.execute_target,
         trigger_node_id=request.trigger_node_id,
     )
-    await execution_service.resolve_user_references([execution])
-    return execution
 
 
 # ============================================================================
@@ -544,7 +542,7 @@ async def unpublish_workflow(
 ) -> WorkflowRead:
     """Unpublish the currently published workflow version."""
     workflow = await service.unpublish_workflow(workflow_id=workflow_id)
-    return WorkflowRead.model_validate(workflow)
+    return await service.to_read(workflow)
 
 
 @router.post(

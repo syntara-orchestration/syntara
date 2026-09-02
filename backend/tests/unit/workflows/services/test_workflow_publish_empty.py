@@ -339,6 +339,13 @@ class TestUnpublishWorkflow:
         assert version.change_description == "Original Desc"
 
 
+async def _stub_to_read(workflow: object) -> object:
+    """Stand in for WorkflowService.to_read without a database."""
+    from syntara.workflows.models.workflow import WorkflowRead
+
+    return WorkflowRead.model_validate(workflow, from_attributes=True)
+
+
 class TestBuildWorkflowWithVersionResponse:
     """Tests for _build_workflow_with_version_response router helper."""
 
@@ -349,6 +356,7 @@ class TestBuildWorkflowWithVersionResponse:
 
         version_id = uuid4()
         mock_service = AsyncMock()
+        mock_service.to_read = AsyncMock(side_effect=_stub_to_read)
         mock_service.get_publish_context.return_value = ({version_id}, {})
         workflow = MagicMock()
         workflow.id = uuid4()
@@ -389,6 +397,7 @@ class TestBuildWorkflowWithVersionResponse:
         from syntara.workflows.router import _build_workflow_with_version_response
 
         mock_service = AsyncMock()
+        mock_service.to_read = AsyncMock(side_effect=_stub_to_read)
         mock_result = MagicMock()
         mock_result.one_or_none.return_value = None
         mock_service.session.exec = AsyncMock(return_value=mock_result)

@@ -28123,6 +28123,7 @@ components:
             - $ref: '#/components/schemas/UserReference'
             - type: 'null'
           description: User who made the decision
+          readOnly: true
         decided_at:
           anyOf:
             - format: date-time
@@ -28478,6 +28479,7 @@ components:
             - $ref: '#/components/schemas/UserReference'
             - type: 'null'
           description: User who made the decision (if successful)
+          readOnly: true
         decision_notes:
           anyOf:
             - type: string
@@ -35173,7 +35175,6 @@ components:
         - id
         - current_version
         - is_enabled
-        - created_by
         - project_id
         - created_at
         - updated_at
@@ -35215,9 +35216,19 @@ components:
           default: false
           title: Has Validation Issues
         created_by:
-          type: string
-          format: uuid
+          anyOf:
+            - $ref: '#/components/schemas/UserReference'
+            - type: 'null'
+          description: User who created the workflow
+          readOnly: true
           title: Created By
+        updated_by:
+          anyOf:
+            - $ref: '#/components/schemas/UserReference'
+            - type: 'null'
+          description: User who last modified the workflow
+          readOnly: true
+          title: Updated By
         project_id:
           type: string
           format: uuid
@@ -35258,7 +35269,6 @@ components:
         - id
         - current_version
         - is_enabled
-        - created_by
         - project_id
         - created_at
         - updated_at
@@ -35301,9 +35311,19 @@ components:
           default: false
           title: Has Validation Issues
         created_by:
-          type: string
-          format: uuid
+          anyOf:
+            - $ref: '#/components/schemas/UserReference'
+            - type: 'null'
+          description: User who created the workflow
+          readOnly: true
           title: Created By
+        updated_by:
+          anyOf:
+            - $ref: '#/components/schemas/UserReference'
+            - type: 'null'
+          description: User who last modified the workflow
+          readOnly: true
+          title: Updated By
         project_id:
           type: string
           format: uuid
@@ -35344,7 +35364,6 @@ components:
         - id
         - current_version
         - is_enabled
-        - created_by
         - project_id
         - created_at
         - updated_at
@@ -35387,9 +35406,19 @@ components:
           default: false
           title: Has Validation Issues
         created_by:
-          type: string
-          format: uuid
+          anyOf:
+            - $ref: '#/components/schemas/UserReference'
+            - type: 'null'
+          description: User who created the workflow
+          readOnly: true
           title: Created By
+        updated_by:
+          anyOf:
+            - $ref: '#/components/schemas/UserReference'
+            - type: 'null'
+          description: User who last modified the workflow
+          readOnly: true
+          title: Updated By
         project_id:
           type: string
           format: uuid

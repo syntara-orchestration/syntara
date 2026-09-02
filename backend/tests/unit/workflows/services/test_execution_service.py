@@ -14,6 +14,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from syntara.core.exceptions import SafeValueError
 from syntara.core.models import User
 from syntara.core.models.pagination import ResourcesResponseBase
+from syntara.core.models.user_reference import UserReference
 from syntara.metrics.interface_tag import interface_context_var
 from syntara.workflows.exceptions import (
     ExecutionNotFoundError,
@@ -26,6 +27,26 @@ from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_version import WorkflowVersion
 from syntara.workflows.services.execution_service import ExecutionService, count_active_executions
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
+
+
+def _exec_results(*results: object, users: object = ()) -> object:
+    """Build a ``session.exec`` side effect for ExecutionService tests.
+
+    ExecutionService now resolves created_by/updated_by after building each
+    response, which issues an extra query. That query is the only one selecting
+    from ``principals``, so it is answered with *users* (rows of
+    ``(principal_id, username, first_name, last_name, service_account_name)``)
+    rather than by counting how many other queries ran first. Every other call
+    consumes *results* in order, then yields empty row sets.
+    """
+    queue = list(results)
+
+    def _next(statement: object = None, *_args: object, **_kwargs: object) -> object:
+        if statement is not None and "principals" in str(statement).lower():
+            return list(users)  # type: ignore[call-overload]
+        return queue.pop(0) if queue else []
+
+    return _next
 
 
 class TestExecutionServiceBase:
@@ -176,7 +197,9 @@ class TestCreateExecution:
         # Mock database query
         mock_result = Mock()
         mock_result.first = Mock(return_value=(workflow, workflow_version))
-        mock_session.exec = AsyncMock(return_value=mock_result)
+        mock_session.exec = AsyncMock(
+            side_effect=_exec_results(mock_result, users=[(user_id, "creator", None, None, None)])
+        )
         mock_session.scalar = AsyncMock(return_value=0)
         mock_session.add = Mock()
         mock_session.commit = AsyncMock()
@@ -209,8 +232,8 @@ class TestCreateExecution:
         assert result.temporal_workflow_id == "exec-abc123"
         assert result.status == ExecutionStatus.PENDING
         assert result.input_data == {"key": "value"}
-        assert result.created_by == user_id
-        assert result.updated_by == user_id
+        assert result.created_by == UserReference(id=user_id, name="creator")
+        assert result.updated_by == UserReference(id=user_id, name="creator")
 
         # Verify Temporal was called
         mock_temporal.start_workflow.assert_awaited_once()
@@ -254,7 +277,7 @@ class TestCreateExecution:
 
         mock_result = Mock()
         mock_result.first = Mock(return_value=(workflow, workflow_version))
-        mock_session.exec = AsyncMock(return_value=mock_result)
+        mock_session.exec = AsyncMock(side_effect=_exec_results(mock_result))
         mock_session.scalar = AsyncMock(return_value=0)
         mock_session.add = Mock()
         mock_session.commit = AsyncMock()
@@ -300,7 +323,7 @@ class TestCreateExecution:
 
         mock_result = Mock()
         mock_result.first = Mock(return_value=(workflow, workflow_version))
-        mock_session.exec = AsyncMock(return_value=mock_result)
+        mock_session.exec = AsyncMock(side_effect=_exec_results(mock_result))
         mock_session.scalar = AsyncMock(return_value=0)
         mock_session.add = Mock()
         mock_session.commit = AsyncMock()
@@ -351,7 +374,7 @@ class TestCreateExecution:
         # Mock database query
         mock_result = Mock()
         mock_result.first = Mock(return_value=(workflow, workflow_version))
-        mock_session.exec = AsyncMock(return_value=mock_result)
+        mock_session.exec = AsyncMock(side_effect=_exec_results(mock_result))
         mock_session.scalar = AsyncMock(return_value=0)
         mock_session.add = Mock()
         mock_session.commit = AsyncMock()
@@ -422,7 +445,7 @@ class TestCreateExecution:
 
         mock_result = Mock()
         mock_result.first = Mock(return_value=(workflow, workflow_version))
-        mock_session.exec = AsyncMock(return_value=mock_result)
+        mock_session.exec = AsyncMock(side_effect=_exec_results(mock_result))
         mock_session.scalar = AsyncMock(return_value=0)
         mock_session.add = Mock()
         mock_session.commit = AsyncMock()
@@ -556,7 +579,7 @@ class TestCreateExecution:
 
         mock_result = Mock()
         mock_result.first = Mock(return_value=(workflow, workflow_version))
-        mock_session.exec = AsyncMock(return_value=mock_result)
+        mock_session.exec = AsyncMock(side_effect=_exec_results(mock_result))
         mock_session.scalar = AsyncMock(return_value=0)
         mock_session.add = Mock()
         mock_session.commit = AsyncMock()
@@ -604,7 +627,7 @@ class TestCreateExecution:
 
         mock_result = Mock()
         mock_result.first = Mock(return_value=(workflow, workflow_version))
-        mock_session.exec = AsyncMock(return_value=mock_result)
+        mock_session.exec = AsyncMock(side_effect=_exec_results(mock_result))
         mock_session.scalar = AsyncMock(return_value=0)
         mock_session.add = Mock()
         mock_session.commit = AsyncMock()
@@ -652,7 +675,7 @@ class TestCreateExecution:
 
         mock_result = Mock()
         mock_result.first = Mock(return_value=(workflow, workflow_version))
-        mock_session.exec = AsyncMock(return_value=mock_result)
+        mock_session.exec = AsyncMock(side_effect=_exec_results(mock_result))
         mock_session.scalar = AsyncMock(return_value=0)
         mock_session.add = Mock()
         mock_session.commit = AsyncMock()
@@ -705,7 +728,7 @@ class TestCreateExecution:
 
         mock_result = Mock()
         mock_result.first = Mock(return_value=(workflow, workflow_version))
-        mock_session.exec = AsyncMock(return_value=mock_result)
+        mock_session.exec = AsyncMock(side_effect=_exec_results(mock_result))
         mock_session.scalar = AsyncMock(return_value=0)
         mock_session.add = Mock()
         mock_session.commit = AsyncMock()
@@ -1023,7 +1046,7 @@ class TestGetExecution(TestExecutionServiceBase):
 
         mock_result = Mock()
         mock_result.one_or_none = Mock(return_value=execution)
-        mock_session.exec = AsyncMock(return_value=mock_result)
+        mock_session.exec = AsyncMock(side_effect=_exec_results(mock_result))
         mock_session.scalar = AsyncMock(return_value=0)
 
         mock_user = Mock(spec=User)
@@ -1051,7 +1074,7 @@ class TestGetExecution(TestExecutionServiceBase):
 
         mock_result = Mock()
         mock_result.one_or_none = Mock(return_value=execution)
-        mock_session.exec = AsyncMock(return_value=mock_result)
+        mock_session.exec = AsyncMock(side_effect=_exec_results(mock_result))
         mock_session.scalar = AsyncMock(return_value=0)
 
         # Mock Temporal service
@@ -1116,7 +1139,7 @@ class TestListExecutions(TestExecutionServiceBase):
         # Mock database result for main query (exec)
         mock_main_result = Mock()
         mock_main_result.all.return_value = [exec1, exec2]
-        mock_session.exec = AsyncMock(return_value=mock_main_result)
+        mock_session.exec = AsyncMock(side_effect=_exec_results(mock_main_result))
         mock_session.scalar = AsyncMock(return_value=0)
 
         service = ExecutionService(session=mock_session, user=mock_user)
@@ -1147,7 +1170,7 @@ class TestListExecutions(TestExecutionServiceBase):
         # Mock database result for main query (exec)
         mock_main_result = Mock()
         mock_main_result.all.return_value = [exec1]
-        mock_session.exec = AsyncMock(return_value=mock_main_result)
+        mock_session.exec = AsyncMock(side_effect=_exec_results(mock_main_result))
         mock_session.scalar = AsyncMock(return_value=0)
 
         service = ExecutionService(session=mock_session, user=mock_user)
@@ -1170,7 +1193,7 @@ class TestListExecutions(TestExecutionServiceBase):
         # Mock database result for main query (exec)
         mock_main_result = Mock()
         mock_main_result.all.return_value = [exec1]
-        mock_session.exec = AsyncMock(return_value=mock_main_result)
+        mock_session.exec = AsyncMock(side_effect=_exec_results(mock_main_result))
         mock_session.scalar = AsyncMock(return_value=0)
 
         service = ExecutionService(session=mock_session, user=mock_user)
@@ -1191,10 +1214,11 @@ class TestListExecutions(TestExecutionServiceBase):
         exec1_id = uuid4()
         exec1 = self._create_test_execution(execution_id=exec1_id, created_by=user_id)
 
-        # Mock database result for main query (exec)
         mock_main_result = Mock()
         mock_main_result.all.return_value = [exec1]
-        mock_session.exec = AsyncMock(return_value=mock_main_result)
+        mock_session.exec = AsyncMock(
+            side_effect=_exec_results(mock_main_result, users=[(user_id, "creator", None, None, None)])
+        )
         mock_session.scalar = AsyncMock(return_value=0)
 
         service = ExecutionService(session=mock_session, user=mock_user)
@@ -1203,7 +1227,7 @@ class TestListExecutions(TestExecutionServiceBase):
         assert isinstance(result, ResourcesResponseBase)
         assert len(result.resources) == 1
         assert isinstance(result.resources[0], ExecutionRead)
-        assert result.resources[0].created_by == user_id
+        assert result.resources[0].created_by == UserReference(id=user_id, name="creator")
 
     @pytest.mark.asyncio
     async def test_list_executions_with_labels_filter(self) -> None:
@@ -1217,7 +1241,7 @@ class TestListExecutions(TestExecutionServiceBase):
         # Mock database result for main query (exec)
         mock_main_result = Mock()
         mock_main_result.all.return_value = [exec1]
-        mock_session.exec = AsyncMock(return_value=mock_main_result)
+        mock_session.exec = AsyncMock(side_effect=_exec_results(mock_main_result))
         mock_session.scalar = AsyncMock(return_value=0)
 
         service = ExecutionService(session=mock_session, user=mock_user)
@@ -1242,7 +1266,7 @@ class TestListExecutions(TestExecutionServiceBase):
         # Mock database result for main query (exec)
         mock_main_result = Mock()
         mock_main_result.all.return_value = [exec1]
-        mock_session.exec = AsyncMock(return_value=mock_main_result)
+        mock_session.exec = AsyncMock(side_effect=_exec_results(mock_main_result))
         mock_session.scalar = AsyncMock(return_value=0)
 
         service = ExecutionService(session=mock_session, user=mock_user)
@@ -1271,7 +1295,7 @@ class TestListExecutions(TestExecutionServiceBase):
         # Mock database result for main query (exec)
         mock_main_result = Mock()
         mock_main_result.all.return_value = [exec1]
-        mock_session.exec = AsyncMock(return_value=mock_main_result)
+        mock_session.exec = AsyncMock(side_effect=_exec_results(mock_main_result))
         mock_session.scalar = AsyncMock(return_value=0)
 
         service = ExecutionService(session=mock_session, user=mock_user)
@@ -1300,7 +1324,7 @@ class TestListExecutions(TestExecutionServiceBase):
         mock_count_result.one.return_value = 42
 
         # Setup exec to return different results based on call order
-        mock_session.exec = AsyncMock(side_effect=[mock_main_result, mock_count_result])
+        mock_session.exec = AsyncMock(side_effect=_exec_results(mock_main_result, mock_count_result))
         mock_session.scalar = AsyncMock(return_value=0)
 
         service = ExecutionService(session=mock_session, user=mock_user)
@@ -1323,7 +1347,7 @@ class TestListExecutions(TestExecutionServiceBase):
         # Mock database result for main query (exec)
         mock_main_result = Mock()
         mock_main_result.all.return_value = [exec1]
-        mock_session.exec = AsyncMock(return_value=mock_main_result)
+        mock_session.exec = AsyncMock(side_effect=_exec_results(mock_main_result))
         mock_session.scalar = AsyncMock(return_value=0)
 
         service = ExecutionService(session=mock_session, user=mock_user)
@@ -1343,7 +1367,7 @@ class TestListExecutions(TestExecutionServiceBase):
         # Mock database result for main query (exec) - empty
         mock_main_result = Mock()
         mock_main_result.all.return_value = []
-        mock_session.exec = AsyncMock(return_value=mock_main_result)
+        mock_session.exec = AsyncMock(side_effect=_exec_results(mock_main_result))
         mock_session.scalar = AsyncMock(return_value=0)
 
         service = ExecutionService(session=mock_session, user=mock_user)
@@ -1365,7 +1389,7 @@ class TestListExecutions(TestExecutionServiceBase):
         # Mock database result for main query (exec)
         mock_main_result = Mock()
         mock_main_result.all.return_value = [exec1]
-        mock_session.exec = AsyncMock(return_value=mock_main_result)
+        mock_session.exec = AsyncMock(side_effect=_exec_results(mock_main_result))
         mock_session.scalar = AsyncMock(return_value=0)
 
         service = ExecutionService(session=mock_session, user=mock_user)
@@ -1388,7 +1412,7 @@ class TestListExecutions(TestExecutionServiceBase):
         # Mock database result for main query (exec)
         mock_main_result = Mock()
         mock_main_result.all.return_value = [exec1]
-        mock_session.exec = AsyncMock(return_value=mock_main_result)
+        mock_session.exec = AsyncMock(side_effect=_exec_results(mock_main_result))
         mock_session.scalar = AsyncMock(return_value=0)
 
         service = ExecutionService(session=mock_session, user=mock_user)
@@ -1424,7 +1448,7 @@ class TestListExecutionsWithTemporalSync(TestExecutionServiceBase):
         # Mock database result for main query (exec)
         mock_main_result = Mock()
         mock_main_result.all = Mock(return_value=[exec1, exec2])
-        mock_session.exec = AsyncMock(return_value=mock_main_result)
+        mock_session.exec = AsyncMock(side_effect=_exec_results(mock_main_result))
         mock_session.scalar = AsyncMock(return_value=0)
 
         # Mock Temporal service
@@ -1454,7 +1478,7 @@ class TestListExecutionsWithTemporalSync(TestExecutionServiceBase):
         # Mock database result for main query (exec)
         mock_main_result = Mock()
         mock_main_result.all = Mock(return_value=[exec1])
-        mock_session.exec = AsyncMock(return_value=mock_main_result)
+        mock_session.exec = AsyncMock(side_effect=_exec_results(mock_main_result))
         mock_session.scalar = AsyncMock(return_value=0)
 
         mock_temporal = Mock()

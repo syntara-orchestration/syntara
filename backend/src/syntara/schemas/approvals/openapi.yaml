@@ -438,6 +438,7 @@ components:
                 - $ref: "#/components/schemas/UserReference"
                 - type: "null"
               description: User who made the decision
+              readOnly: true
             decided_at:
               anyOf:
                 - format: date-time
@@ -789,6 +790,7 @@ components:
             - $ref: "#/components/schemas/UserReference"
             - type: "null"
           description: User who made the decision (if successful)
+          readOnly: true
         decision_notes:
           anyOf:
             - type: string
