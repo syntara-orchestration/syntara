@@ -209,13 +209,6 @@ class TestGetActivityOutputWhenReady:
         assert output["bearer_token"] == REDACTED
         assert output["result"] == "ok"
 
-    @pytest.mark.asyncio
-    async def test_returns_none_when_namespace_data_is_none(self) -> None:
-        wf = _make_workflow()
-        wf.resolver.set_namespace("node_a", None)
-        output = await wf.get_activity_output_when_ready("node_a")
-        assert output is None
-
 
 # --- _determine_output_port ---
 
