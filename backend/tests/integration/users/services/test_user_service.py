@@ -9,6 +9,7 @@ Tests cover:
 """
 
 import warnings
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
@@ -16,6 +17,7 @@ from sqlalchemy import insert
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from syntara.agent_orchestrator.token_manager.models import TokenUsageRecord, UserTokenConfig
 from syntara.auth.exceptions import (
     AdminDeleteError,
     AdminDisableNoOtherAdminsError,
@@ -28,11 +30,13 @@ from syntara.auth.exceptions import (
 from syntara.auth.passwords import hash_password, verify_password
 from syntara.core.models import User
 from syntara.core.models.group import Group, user_groups
+from syntara.core.models.principal import Principal
 from syntara.core.models.user import AuthType
 from syntara.core.models.user_identity import UserIdentity
 from syntara.core.models.user_schemas import UserRead
 from syntara.identity_providers.models.identity_provider import IdentityProvider
 from syntara.identity_providers.models.identity_provider_configuration import OIDCConfiguration
+from syntara.users.services.group_service import GroupsService
 from syntara.users.services.user_service import UsersService
 
 
@@ -627,6 +631,65 @@ async def test_delete_user_success(test_db_session: AsyncSession, test_user: Use
 
     result = await test_db_session.exec(select(User).where(User.id == user_id))
     assert result.one_or_none() is None
+
+
+@pytest.mark.asyncio
+async def test_delete_user_cascades_scoped_rows_and_retains_spend(
+    test_db_session: AsyncSession, test_user: User
+) -> None:
+    """User-scoped rows cascade; token usage and created groups do not."""
+    service = UsersService(test_db_session, test_user)
+    groups_service = GroupsService(test_db_session, test_user)
+
+    user = await service.create_user(
+        username="cascade-victim",
+        email="cascade-victim@example.com",
+        first_name="Cascade",
+        last_name="Victim",
+        password=TEST_PASSWORD,
+    )
+
+    admins_group = await _get_or_create_admins_group(test_db_session)
+    await test_db_session.exec(insert(user_groups).values(user_id=test_user.id, group_id=admins_group.id))
+    await test_db_session.exec(insert(user_groups).values(user_id=user.id, group_id=admins_group.id))
+    await test_db_session.flush()
+
+    created_group = await groups_service.create_group(name="created-by-victim", description=None)
+    created_group.created_by = user.id
+    test_db_session.add(created_group)
+
+    config = UserTokenConfig(user_id=user.id, token_limit=1000, window_duration_seconds=3600)
+    usage = TokenUsageRecord(user_id=user.id, token_count=42, request_timestamp=datetime.now(UTC))
+    test_db_session.add(config)
+    test_db_session.add(usage)
+    await test_db_session.commit()
+
+    usage_id = usage.id
+    config_id = config.id
+    group_id = created_group.id
+    user_id = user.id
+    admins_group_id = admins_group.id
+
+    await service.delete_user(user_id)
+    test_db_session.expire_all()
+
+    assert (await test_db_session.exec(select(User).where(User.id == user_id))).one_or_none() is None
+    missing_config = await test_db_session.exec(select(UserTokenConfig).where(UserTokenConfig.id == config_id))
+    assert missing_config.one_or_none() is None
+    membership = await test_db_session.exec(
+        select(user_groups).where(user_groups.c.user_id == user_id, user_groups.c.group_id == admins_group_id)
+    )
+    assert membership.one_or_none() is None
+
+    retained = (await test_db_session.exec(select(TokenUsageRecord).where(TokenUsageRecord.id == usage_id))).one()
+    assert retained.user_id is None
+    assert retained.token_count == 42
+
+    surviving_group = (await test_db_session.exec(select(Group).where(Group.id == group_id))).one()
+    assert surviving_group.created_by is None
+
+    principal = (await test_db_session.exec(select(Principal).where(Principal.id == user_id))).one()
+    assert principal is not None
 
 
 @pytest.mark.asyncio

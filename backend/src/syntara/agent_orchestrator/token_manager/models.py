@@ -89,7 +89,7 @@ class TokenUsageRecord(BaseResource, table=True):
         to the database.
 
     Attributes:
-        user_id: Foreign key to User table
+        user_id: User who incurred the usage (NULL after that user is deleted)
         token_count: Budget-relevant token count (starts as estimate, updated to actual)
         request_timestamp: When the request was made (used for rolling window calculation)
         request_text_hash: Optional SHA-256 hash of request text (for debugging/deduplication)
@@ -114,7 +114,13 @@ class TokenUsageRecord(BaseResource, table=True):
     )
 
     # Domain-specific fields (BaseResource fields inherited automatically)
-    user_id: UUID = Field(foreign_key="users.id", index=True, ondelete="CASCADE")
+    user_id: UUID | None = Field(
+        default=None,
+        foreign_key="users.id",
+        index=True,
+        ondelete="SET NULL",
+        description="User who incurred the usage; NULL after the user is deleted",
+    )
 
     # Budget-relevant token count: starts as tiktoken estimate, updated to actual total
     token_count: int = Field(ge=0, description="Number of tokens in this request")

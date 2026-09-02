@@ -5,7 +5,8 @@ Convert users and groups from soft delete to hard delete per the
 
 Strategy:
 - Purge soft-deleted rows (role assignments cleaned first to avoid FK violations).
-- Change FK ondelete rules: user_token_configs/token_usage_records → CASCADE,
+- Change FK ondelete rules: user_token_configs → CASCADE,
+  token_usage_records.user_id → SET NULL (retain spend history),
   groups.created_by → SET NULL.
 - Drop deleted_at / deleted_by columns from both tables.
 - Convert partial unique indexes to standard unique constraints.
@@ -26,6 +27,31 @@ revision: str = "c4a7e1f93d21"
 down_revision: str | Sequence[str] | None = "f1b3c7d9e2a4"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
+
+
+def _assert_fk_not_cascade(table: str, constraint: str) -> None:
+    """Abort if a FK pointing at users/groups would CASCADE on delete.
+
+    Phase 1 deletes user/group rows while some FKs are still NO ACTION.
+    If those FKs were CASCADE, the deletes would wipe live referencing rows.
+    """
+    bind = op.get_bind()
+    confdeltype = bind.execute(
+        sa.text(
+            "SELECT c.confdeltype FROM pg_constraint c "
+            "JOIN pg_class rel ON rel.oid = c.conrelid "
+            "JOIN pg_namespace nsp ON nsp.oid = rel.relnamespace "
+            "WHERE nsp.nspname = current_schema() "
+            "AND rel.relname = :table_name AND c.conname = :constraint_name"
+        ),
+        {"table_name": table, "constraint_name": constraint},
+    ).scalar()
+    if confdeltype == "c":
+        msg = (
+            f"Refusing to purge: {constraint} on {table} is ON DELETE CASCADE. "
+            "Deleting users/groups would remove live referencing rows."
+        )
+        raise RuntimeError(msg)
 
 
 def upgrade() -> None:
@@ -51,11 +77,6 @@ def upgrade() -> None:
         sa.text("DELETE FROM user_token_configs WHERE user_id IN (SELECT id FROM users WHERE deleted_at IS NOT NULL)")
     )
 
-    # CUSTOM: Clean token_usage_records for soft-deleted users.
-    op.execute(
-        sa.text("DELETE FROM token_usage_records WHERE user_id IN (SELECT id FROM users WHERE deleted_at IS NOT NULL)")
-    )
-
     # CUSTOM: Null out groups.created_by referencing soft-deleted users.
     op.execute(
         sa.text(
@@ -63,6 +84,16 @@ def upgrade() -> None:
             "WHERE created_by IN (SELECT id FROM users WHERE deleted_at IS NOT NULL)"
         )
     )
+
+    # Guard: these FKs must not CASCADE. Deleting users/groups would otherwise
+    # remove live groups (deleted_by / created_by) or other users (deleted_by).
+    _assert_fk_not_cascade("groups", "groups_deleted_by_fkey")
+    _assert_fk_not_cascade("groups", "groups_created_by_fkey")
+    _assert_fk_not_cascade("users", "users_deleted_by_fkey")
+    _assert_fk_not_cascade("token_usage_records", "token_usage_records_user_id_fkey")
+
+    # CUSTOM: Null deleted_by on groups we are about to purge, then delete them.
+    op.execute(sa.text("UPDATE groups SET deleted_by = NULL WHERE deleted_at IS NOT NULL"))
 
     # CUSTOM: Purge soft-deleted groups.
     # user_groups, user_idp_groups, idp_group_mapping_entries,
@@ -72,33 +103,41 @@ def upgrade() -> None:
     # CUSTOM: Null out self-referential deleted_by FK before purging users.
     op.execute(sa.text("UPDATE users SET deleted_by = NULL WHERE deleted_at IS NOT NULL"))
 
-    # CUSTOM: Null out groups.deleted_by before dropping column (all values, not just soft-deleted).
-    op.execute(sa.text("UPDATE groups SET deleted_by = NULL WHERE deleted_by IS NOT NULL"))
+    # CUSTOM: Null deleted_by on remaining (live) groups that point at users
+    # we are about to purge. NO ACTION would otherwise block the user delete.
+    op.execute(
+        sa.text(
+            "UPDATE groups SET deleted_by = NULL "
+            "WHERE deleted_by IN (SELECT id FROM users WHERE deleted_at IS NOT NULL)"
+        )
+    )
+
+    # Retain token usage for install-wide spend: nullable + SET NULL before purge.
+    op.alter_column("token_usage_records", "user_id", existing_type=sa.UUID(), nullable=True)
+    op.drop_constraint("token_usage_records_user_id_fkey", "token_usage_records", type_="foreignkey")
+    op.create_foreign_key(
+        "token_usage_records_user_id_fkey",
+        "token_usage_records",
+        "users",
+        ["user_id"],
+        ["id"],
+        ondelete="SET NULL",
+    )
 
     # CUSTOM: Purge soft-deleted users.
     # user_groups, user_idp_groups, user_identities, refresh_sessions,
     # approval_approver_users all CASCADE automatically.
+    # token_usage_records.user_id is SET NULL (rows kept).
     op.execute(sa.text("DELETE FROM users WHERE deleted_at IS NOT NULL"))
     # END CUSTOM
 
-    # ── Phase 2: Change FK ondelete rules ─────────────────────────────────
+    # ── Phase 2: Change remaining FK ondelete rules ───────────────────────
 
     # -- user_token_configs.user_id: NO ACTION → CASCADE --
     op.drop_constraint("user_token_configs_user_id_fkey", "user_token_configs", type_="foreignkey")
     op.create_foreign_key(
         "user_token_configs_user_id_fkey",
         "user_token_configs",
-        "users",
-        ["user_id"],
-        ["id"],
-        ondelete="CASCADE",
-    )
-
-    # -- token_usage_records.user_id: NO ACTION → CASCADE --
-    op.drop_constraint("token_usage_records_user_id_fkey", "token_usage_records", type_="foreignkey")
-    op.create_foreign_key(
-        "token_usage_records_user_id_fkey",
-        "token_usage_records",
         "users",
         ["user_id"],
         ["id"],
@@ -207,8 +246,11 @@ def downgrade() -> None:
     op.drop_constraint("groups_created_by_fkey", "groups", type_="foreignkey")
     op.create_foreign_key("groups_created_by_fkey", "groups", "users", ["created_by"], ["id"])
 
-    # Restore token_usage_records.user_id FK (NO ACTION)
+    # Restore token_usage_records.user_id FK (NOT NULL, NO ACTION).
+    # Rows with user_id NULL cannot be restored to NOT NULL.
+    op.execute(sa.text("DELETE FROM token_usage_records WHERE user_id IS NULL"))
     op.drop_constraint("token_usage_records_user_id_fkey", "token_usage_records", type_="foreignkey")
+    op.alter_column("token_usage_records", "user_id", existing_type=sa.UUID(), nullable=False)
     op.create_foreign_key("token_usage_records_user_id_fkey", "token_usage_records", "users", ["user_id"], ["id"])
 
     # Restore user_token_configs.user_id FK (NO ACTION)

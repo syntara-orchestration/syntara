@@ -464,8 +464,12 @@ class UsersService(BaseService):
 
         Deletes non-builtin role assignments, then removes the user row.
         DB CASCADE handles: user_groups, user_idp_groups, user_identities,
-        refresh_sessions, approval_approver_users, user_token_configs,
-        token_usage_records.
+        refresh_sessions, approval_approver_users, user_token_configs.
+        token_usage_records.user_id is SET NULL so install-wide spend is kept.
+        groups.created_by is SET NULL so groups outlive their creator.
+
+        Ownership FKs (created_by / updated_by) point at principals.id, not
+        users.id, so workflows, projects, credentials, and executions survive.
 
         The principals row is left intact to preserve created_by/updated_by
         FK integrity on other tables.

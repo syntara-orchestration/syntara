@@ -3,20 +3,21 @@
 Tests cover:
 - CRUD operations (create, read, update, delete)
 - Duplicate name handling
-- Soft delete behavior
+- Hard delete behavior
 - Error conditions and edge cases
 """
 
 from uuid import uuid4
 
 import pytest
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.auth.exceptions import GroupNameConflictError, GroupNotFoundError
 from syntara.auth.passwords import hash_password
 from syntara.core.exceptions import SafeValueError
 from syntara.core.models import User
-from syntara.core.models.group import GroupRead, GroupSource
+from syntara.core.models.group import Group, GroupRead, GroupSource
 from syntara.users.services.group_service import GroupsService
 
 
@@ -175,15 +176,29 @@ async def test_update_group_no_changes_preserves_timestamp(test_db_session: Asyn
 
 @pytest.mark.asyncio
 async def test_delete_group_success(test_db_session: AsyncSession, test_user: User) -> None:
-    """Test successful soft delete sets deleted_at."""
+    """Test successful hard deletion of a group."""
     service = GroupsService(test_db_session, test_user)
 
     group = await service.create_group(name="delete-me", description=None)
     await service.delete_group(group.id)
 
-    # Verify the group is no longer findable via service
     with pytest.raises(GroupNotFoundError):
         await service.get_group_by_id(group.id)
+
+    assert (await test_db_session.exec(select(Group).where(Group.id == group.id))).one_or_none() is None
+
+
+@pytest.mark.asyncio
+async def test_delete_group_does_not_delete_member_users(test_db_session: AsyncSession, test_user: User) -> None:
+    """Deleting a group must not cascade into user rows."""
+    service = GroupsService(test_db_session, test_user)
+    group = await service.create_group(name="ephemeral-team", description=None)
+    await service.add_member(group.id, test_user.id)
+
+    await service.delete_group(group.id)
+
+    remaining = (await test_db_session.exec(select(User).where(User.id == test_user.id))).one()
+    assert remaining.username == test_user.username
 
 
 @pytest.mark.asyncio
