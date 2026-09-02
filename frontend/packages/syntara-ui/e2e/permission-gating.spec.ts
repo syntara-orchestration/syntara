@@ -85,8 +85,15 @@ async function createPublishedWorkflowForProjectAdmin(
         schema_version: '2.0.0',
         name,
         triggers: [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
-        nodes: [],
-        edges: [],
+        nodes: [
+          {
+            id: 'node_1',
+            type: 'script',
+            name: 'E2E admin step',
+            parameters: { language: 'python', code: 'print("e2e")' },
+          },
+        ],
+        edges: [{ from: 'trigger_1', to: 'node_1' }],
       },
     },
   })
