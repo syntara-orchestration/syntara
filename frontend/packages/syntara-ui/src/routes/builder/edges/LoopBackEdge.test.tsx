@@ -7,18 +7,25 @@ import { LoopBackEdge } from './LoopBackEdge'
 
 const mockNodesConnectable = vi.hoisted(() => ({ value: true }))
 const mockIsHovered = vi.hoisted(() => ({ value: false }))
+const mockNodes = vi.hoisted(() => ({
+  value: [
+    { id: 'loop-node', position: { x: 50, y: 25 }, measured: { height: 50 } },
+    { id: 'body-node', position: { x: 250, y: 125 }, measured: { height: 50 } },
+  ] as Array<{ id: string; position: { x: number; y: number }; measured?: { height: number } }>,
+}))
 
 // Mock @xyflow/react
-const mockGetNodes = vi.fn()
 vi.mock('@xyflow/react', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@xyflow/react')>()
   return {
     ...actual,
     useReactFlow: () => ({
-      getNodes: mockGetNodes,
+      getNodes: () => mockNodes.value,
     }),
-    useStore: (selector: (s: { nodesConnectable: boolean }) => boolean) =>
-      selector({ nodesConnectable: mockNodesConnectable.value }),
+    useStore: <T,>(
+      selector: (s: { nodes: typeof mockNodes.value; nodesConnectable: boolean }) => T,
+      _equalityFn?: (a: T, b: T) => boolean
+    ) => selector({ nodes: mockNodes.value, nodesConnectable: mockNodesConnectable.value }),
   }
 })
 
@@ -67,10 +74,10 @@ describe('LoopBackEdge', () => {
   }
 
   beforeEach(() => {
-    mockGetNodes.mockReturnValue([
+    mockNodes.value = [
       { id: 'loop-node', position: { x: 50, y: 25 }, measured: { height: 50 } },
       { id: 'body-node', position: { x: 250, y: 125 }, measured: { height: 50 } },
-    ])
+    ]
   })
 
   it('renders EdgePath', () => {
@@ -94,22 +101,36 @@ describe('LoopBackEdge', () => {
   })
 
   it('calculates path around loop body nodes', () => {
-    // Add an intermediate node
-    mockGetNodes.mockReturnValue([
+    mockNodes.value = [
       { id: 'loop-node', position: { x: 50, y: 25 }, measured: { height: 50 } },
       { id: 'body-node', position: { x: 250, y: 125 }, measured: { height: 50 } },
       { id: 'middle-node', position: { x: 150, y: 25 }, measured: { height: 100 } },
-    ])
+    ]
 
     render(<LoopBackEdge {...defaultProps} />)
     expect(screen.getByTestId('edge-path')).toBeInTheDocument()
   })
 
+  it('updates path when node measured height changes', () => {
+    const { rerender } = render(<LoopBackEdge {...defaultProps} />)
+    const initialPath = screen.getByTestId('edge-path').getAttribute('d')
+
+    mockNodes.value = [
+      { id: 'loop-node', position: { x: 50, y: 25 }, measured: { height: 50 } },
+      { id: 'body-node', position: { x: 250, y: 125 }, measured: { height: 120 } },
+    ]
+    rerender(<LoopBackEdge {...defaultProps} />)
+
+    const updatedPath = screen.getByTestId('edge-path').getAttribute('d')
+    expect(updatedPath).toBeTruthy()
+    expect(updatedPath).not.toBe(initialPath)
+  })
+
   it('handles nodes without measured dimensions', () => {
-    mockGetNodes.mockReturnValue([
+    mockNodes.value = [
       { id: 'loop-node', position: { x: 50, y: 25 } },
       { id: 'body-node', position: { x: 250, y: 125 } },
-    ])
+    ]
 
     render(<LoopBackEdge {...defaultProps} />)
     expect(screen.getByTestId('edge-path')).toBeInTheDocument()

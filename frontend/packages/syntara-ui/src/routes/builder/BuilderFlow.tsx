@@ -48,6 +48,7 @@ import { useEdgeExecutionStatus } from './hooks/useEdgeExecutionStatus'
 import { useEdgeSynchronization } from './hooks/useEdgeSynchronization'
 import { useExternalNodeSelection } from './hooks/useExternalNodeSelection'
 import { useLoopBackNodeTypes } from './hooks/useLoopBackNodeTypes'
+import { useLoopGroupPositionSync } from './hooks/useLoopGroupPositionSync'
 import { useNodeDeletion } from './hooks/useNodeDeletion'
 import { useNodePositioning } from './hooks/useNodePositioning'
 import { useNodeUpdates } from './hooks/useNodeUpdates'
@@ -289,7 +290,12 @@ export function BuilderFlow(props: BuilderFlowProps) {
 
   useExternalNodeSelection(selectedActivityId, setNodes)
 
-  const { onNodeDragStop, onLayout } = usePositionEventHandlers(nodes, edges, setNodes, setEdges)
+  const { onNodeDragStart, onNodeDrag, onNodeDragStop, onLayout } = usePositionEventHandlers(
+    nodes,
+    edges,
+    setNodes,
+    setEdges
+  )
 
   const onEdgesChange = useCallback(
     (changes: EdgeChange<EdgeType>[]) => {
@@ -344,6 +350,15 @@ export function BuilderFlow(props: BuilderFlowProps) {
   })
 
   useLoopBackNodeTypes({ edges, isInitialized, setNodes })
+
+  useLoopGroupPositionSync({
+    nodes,
+    edges,
+    isInitialized,
+    workflowVersion,
+    triggers: currentWorkflow?.triggers ?? [],
+    updateNodePositions,
+  })
 
   // Use custom hook for node deletion handling
   const { onNodesDelete } = useNodeDeletion({
@@ -597,6 +612,8 @@ export function BuilderFlow(props: BuilderFlowProps) {
           nodeTypes={builderNodeTypes}
           edgeTypes={builderEdgeTypes}
           onNodesChange={onNodesChange}
+          onNodeDragStart={isReadOnly ? undefined : onNodeDragStart}
+          onNodeDrag={isReadOnly ? undefined : onNodeDrag}
           onNodeDragStop={isReadOnly ? undefined : onNodeDragStop}
           onEdgesChange={onEdgesChange}
           onNodesDelete={isReadOnly ? undefined : onNodesDelete}
