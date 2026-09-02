@@ -28,8 +28,34 @@ const require = createRequire(import.meta.url)
 // Read the installed React version instead of hardcoding.
 const reactVersion = require('react/package.json').version
 
+/** Glob patterns for unit and integration test files. */
 const TEST_FILES = ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}']
+/** Glob pattern for end-to-end test files. */
 const E2E_FILES = ['e2e/**']
+/** Import restrictions shared by TypeScript source files. */
+const SHARED_RESTRICTED_IMPORT_OPTIONS = {
+  patterns: [
+    {
+      group: ['wouter', 'wouter/*'],
+      message: 'wouter has been removed. Use @tanstack/react-router directly.',
+    },
+    {
+      regex: '(?:\\.{1,2}/)*(?:hooks/)?routing/(?:useNavigate|useParams|useSearch|useLocation|navigate|Link)$',
+      message: 'Deprecated bridge hook. Use @tanstack/react-router primitives directly.',
+    },
+    {
+      group: ['@tanstack/react-router'],
+      importNames: ['Link'],
+      message:
+        'Use SynLink from components/SynLink instead of TanStack Link directly. SynLink provides consistent PatternFly styling.',
+    },
+    {
+      group: ['@syntara/contracts/src', '@syntara/contracts/src/**'],
+      message:
+        "Import from '@syntara/contracts' (the public entry point), not from internal source paths. Internal paths are not part of the published API and can break silently when the package restructures.",
+    },
+  ],
+}
 
 export default tseslint.config(
   {
@@ -164,27 +190,7 @@ export default tseslint.config(
       '@typescript-eslint/no-restricted-imports': [
         'warn',
         {
-          patterns: [
-            {
-              group: ['wouter', 'wouter/*'],
-              message: 'wouter has been removed. Use @tanstack/react-router directly.',
-            },
-            {
-              regex: '(?:\\.{1,2}/)*(?:hooks/)?routing/(?:useNavigate|useParams|useSearch|useLocation|navigate|Link)$',
-              message: 'Deprecated bridge hook. Use @tanstack/react-router primitives directly.',
-            },
-            {
-              group: ['@tanstack/react-router'],
-              importNames: ['Link'],
-              message:
-                'Use SynLink from components/SynLink instead of TanStack Link directly. SynLink provides consistent PatternFly styling.',
-            },
-            {
-              group: ['@syntara/contracts/src', '@syntara/contracts/src/**'],
-              message:
-                "Import from '@syntara/contracts' (the public entry point), not from internal source paths. Internal paths are not part of the published API and can break silently when the package restructures.",
-            },
-          ],
+          ...SHARED_RESTRICTED_IMPORT_OPTIONS,
         },
       ],
     },
@@ -404,31 +410,11 @@ export default tseslint.config(
       '@typescript-eslint/no-restricted-imports': [
         'error',
         {
+          ...SHARED_RESTRICTED_IMPORT_OPTIONS,
           paths: [
             {
               name: '@storybook/react-vite',
               message: 'Use @storybook/tanstack-react for stories in this package.',
-            },
-          ],
-          patterns: [
-            {
-              group: ['wouter', 'wouter/*'],
-              message: 'wouter has been removed. Use @tanstack/react-router directly.',
-            },
-            {
-              regex: '(?:\\.{1,2}/)*(?:hooks/)?routing/(?:useNavigate|useParams|useSearch|useLocation|navigate|Link)$',
-              message: 'Deprecated bridge hook. Use @tanstack/react-router primitives directly.',
-            },
-            {
-              group: ['@tanstack/react-router'],
-              importNames: ['Link'],
-              message:
-                'Use SynLink from components/SynLink instead of TanStack Link directly. SynLink provides consistent PatternFly styling.',
-            },
-            {
-              group: ['@syntara/contracts/src', '@syntara/contracts/src/**'],
-              message:
-                "Import from '@syntara/contracts' (the public entry point), not from internal source paths. Internal paths are not part of the published API and can break silently when the package restructures.",
             },
           ],
         },
