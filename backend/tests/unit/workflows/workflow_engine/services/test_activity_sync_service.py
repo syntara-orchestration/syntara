@@ -3288,6 +3288,38 @@ class TestScheduleDescribeProbe:
         assert queue.empty()
         mock_handle.describe.assert_not_called()
 
+    @pytest.mark.asyncio
+    async def test_partial_output_is_scrubbed_at_source(self) -> None:
+        """Partial output containing credential fields should be scrubbed before entering the queue."""
+        from syntara.workflows.workflow_engine.utils.credential_scrubber import REDACTED
+
+        pa = self._make_started_pa_with_heartbeat(
+            partial_output={"job_id": 42, "bearer_token": "sk-secret-123"},
+        )
+        mock_desc = Mock()
+        mock_desc.raw_description.pending_activities = [pa]
+        mock_handle = AsyncMock()
+        mock_handle.describe.return_value = mock_desc
+
+        queue: asyncio.Queue[Any] = asyncio.Queue()
+
+        with patch(
+            "syntara.workflows.workflow_engine.services.activity_sync_service.asyncio.sleep",
+            new_callable=AsyncMock,
+        ):
+            await self.service._schedule_describe_probe(
+                handle=mock_handle,
+                queue=queue,
+                activity_id="my-activity",
+                scheduled_event_id=5,
+            )
+
+        _ = await queue.get()  # SyntheticActivityStarted
+        item2 = await queue.get()
+        assert isinstance(item2, SyntheticPartialOutput)
+        assert item2.partial_output["job_id"] == 42
+        assert item2.partial_output["bearer_token"] == REDACTED
+
 
 class TestExtractHeartbeatData:
     """Test _extract_heartbeat_data static method."""
