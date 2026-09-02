@@ -1609,13 +1609,17 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         inside the workflow until the resolver namespace is populated — eliminating
         the race where Temporal emits ACTIVITY_TASK_COMPLETED before the workflow
         loop stores the result.
+
+        If the namespace is not populated within 30 seconds (e.g. the workflow
+        errored without storing a result), ``wait_condition`` raises a Temporal
+        exception. The caller in ``_query_activity_io`` catches this via
+        ``except TemporalError`` and falls back to a sleep + query retry.
         """
         await workflow.wait_condition(
             lambda: self.resolver.has_namespace(activity_id),
             timeout=timedelta(seconds=30),
         )
-        data = self.resolver.get_namespace(activity_id)
-        return self._scrub_data(data) if data is not None else None
+        return self._scrub_data(self.resolver.get_namespace(activity_id))
 
     @workflow.query
     def get_skipped_nodes(self) -> list[str]:
