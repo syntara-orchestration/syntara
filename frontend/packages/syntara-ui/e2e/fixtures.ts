@@ -169,14 +169,12 @@ export const test = xfailBase.extend<
     await context.close()
   },
 
+  // Mock: intercept as project-admin. Real backend: this test creates a user
+  // and logs in on the page after setup (worker roleSetup has no project-admin).
   projectAdminApp: async ({ browser, roleSetup }, use) => {
     const context = await browser.newContext()
     const page = await context.newPage()
-    if (roleSetup) {
-      const creds = roleSetup.credentials.projectAdmin
-      if (!creds) throw new Error('projectAdmin credentials missing from roleSetup')
-      await loginAs(page, creds.username, creds.password)
-    } else {
+    if (!roleSetup) {
       await loginAsRole(page, 'project-admin')
     }
     await use(page)
