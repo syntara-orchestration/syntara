@@ -2,13 +2,12 @@
 
 ## Goal
 
-Migrate the UI from code-based TanStack Router definitions to file-based route
-definitions without unintentionally changing the browser-visible URL contract.
+Move the UI from code-based TanStack Router definitions to file-based route
+definitions without changing its browser URLs by accident.
 
-The migration must begin with a complete route validation and end by running
-the same validation against the migrated application. Any difference must be
-classified as intentional, preserved through a redirect/alias, or treated as a
-regression.
+Start with a complete route validation. Run the same validation after the
+migration. Every difference must be intentional, covered by a redirect/alias,
+or fixed as a regression.
 
 ## Current state
 
@@ -24,13 +23,13 @@ The UI currently has:
 - A visual-regression page registry containing a subset of concrete URLs.
 - Lazy-loaded page components that should mostly remain unchanged.
 
-The current route definitions already use TanStack parameter syntax (`$id`),
-while `AppRoute` uses Wouter-style placeholders (`:id`) for several helpers.
-The validation must normalize both forms without changing the actual URL.
+The route definitions use TanStack parameter syntax (`$id`). Some `AppRoute`
+helpers use Wouter-style placeholders (`:id`). The validator must treat both
+forms as the same parameter without changing the real URL.
 
 ## Phase 0: establish the pre-migration route baseline
 
-This phase is a release-blocking prerequisite for the refactor.
+This phase must finish before the refactor starts.
 
 ### 0.1 Identify every route source
 
@@ -45,8 +44,8 @@ Inventory routes from all relevant sources, including:
 - Literal URLs passed to links, navigation calls, redirects, or test fixtures.
 - Any documented or externally supported URLs found in UI documentation.
 
-The inventory should record the source file and line for every entry so missing
-or duplicated definitions are actionable.
+Record the source file and line for each entry. This makes missing and duplicate
+routes easy to fix.
 
 ### 0.2 Normalize the route contract
 
@@ -61,7 +60,7 @@ Create a deterministic route representation containing at least:
 }
 ```
 
-Normalization rules should include:
+Use these normalization rules:
 
 - Convert `:userId` and `$userId` to one canonical parameter syntax.
 - Preserve parameter names and ordering.
@@ -71,9 +70,9 @@ Normalization rules should include:
   unsupported.
 - Sort entries deterministically.
 
-Do not compare the generated route-tree file byte-for-byte. Component imports,
-formatting, or unrelated generated output can change without changing the URL
-contract. Compare a normalized route projection instead.
+Do not compare the generated route-tree file byte for byte. Imports and
+formatting can change without changing the URL contract. Compare a normalized
+route projection instead.
 
 ### 0.3 Validate route completeness and consistency
 
@@ -87,14 +86,14 @@ The baseline check should fail or produce a reviewed exception for:
 - Page-registry URLs that no longer resolve.
 - Registered routes with no appropriate page-registry or smoke-test coverage.
 
-This is a discovery check, not an assumption that every source must contain
-every route. The expected relationship between each source should be
-documented so intentional omissions are distinguishable from drift.
+Not every source needs to contain every route. Document the expected
+relationship between sources so intentional omissions are not mistaken for
+drift.
 
 ### 0.4 Probe concrete browser URLs
 
-Route templates alone do not prove that pages render. Build a concrete URL
-probe set containing:
+Route templates do not prove that pages render. Build a concrete URL probe set
+containing:
 
 - Every static route.
 - Representative values for every parameterized route.
@@ -112,9 +111,9 @@ Playwright/mock-API setup. Record:
 - Console/page errors.
 - Access-denied behavior where permission gating is intentional.
 
-Do not require every arbitrary parameter value to exist in the database. The
-probe contract should use deterministic fixtures and clearly distinguish
-route matching failures from expected missing-resource responses.
+Do not require every parameter value to exist in the database. Use deterministic
+fixtures and distinguish route-matching failures from expected missing-resource
+responses.
 
 ### 0.5 Commit the baseline artifact
 
@@ -126,16 +125,16 @@ Store a reviewable baseline containing:
 - Known intentional aliases or exceptions.
 - The command used to regenerate and validate it.
 
-The baseline should be reproducible in CI from the pre-migration revision. It
-must not depend on the current date or unstable API seed data.
+CI must be able to reproduce the baseline from the pre-migration revision. Do
+not depend on the current date or unstable API seed data.
 
 ## Phase 1: prepare file-based routing
 
-1. Confirm the TanStack Router and router-plugin versions are compatible.
+1. Confirm that the TanStack Router and router-plugin versions are compatible.
 2. Configure the router plugin and a dedicated route directory. The existing
    `src/routes/` contains feature components, so avoid creating ambiguity
    between feature folders and route-definition files.
-3. Decide whether to use flat file-based routes initially or introduce nested
+3. Start with flat file-based routes or decide to introduce nested
    layout routes. Flat files are the safer first step because they minimize
    URL and `<Outlet />` changes.
 4. Define the generated route-tree output location and commit policy.
@@ -145,9 +144,9 @@ must not depend on the current date or unstable API seed data.
 ## Phase 2: migrate route definitions incrementally
 
 Convert one route group at a time. Each file should use
-`createFileRoute('/canonical/path')` and retain the existing page component,
-lazy-loading behavior, search validation, permission guard, loading state, and
-error boundary.
+`createFileRoute('/canonical/path')`. Keep the current page component,
+lazy-loading, search validation, permission guard, loading state, and error
+boundary.
 
 For each migrated group:
 
@@ -159,12 +158,12 @@ For each migrated group:
 6. Run the route completeness check and the affected concrete URL probes.
 7. Run the affected unit, E2E, and visual-regression tests.
 
-Keep the migration changes separate from unrelated page or UX changes so route
-differences remain easy to review.
+Keep migration changes separate from unrelated page or UX changes. This makes
+route differences easier to review.
 
 ## Phase 3: reconcile route consumers
 
-After route definitions are migrated:
+After migrating the route definitions:
 
 - Make generated TanStack route paths the authoritative route source.
 - Decide whether `AppRoute` remains as a compatibility/helper layer or is
@@ -190,7 +189,7 @@ Run the exact Phase 0 process against the migrated revision:
    permission behavior.
 6. Rerun completeness, unit, E2E, and visual-regression checks.
 
-The migration is complete only when:
+The migration is complete when:
 
 - Every pre-migration supported URL still resolves to the same page or to an
   explicitly approved replacement/redirect.
@@ -202,7 +201,7 @@ The migration is complete only when:
 
 ## Phase 5: make route compatibility a permanent CI check
 
-Once the migration is stable, add a CI workflow that:
+After the migration is stable, add a CI workflow that:
 
 1. Generates the route tree.
 2. Generates the normalized route projection.
@@ -215,13 +214,12 @@ Once the migration is stable, add a CI workflow that:
 7. Runs the route probe suite for all affected routes, with a scheduled full
    suite as additional protection.
 
-The generated `routeTree.gen.ts` is the router's structural manifest once
-file-based routing is in place. The normalized projection is still useful as a
-stable CI contract because it avoids diffing component imports and can include
-repository-specific compatibility metadata that TanStack Router does not
-define.
+With file-based routing, `routeTree.gen.ts` is the router's structural
+manifest. A normalized projection is still useful for CI because it avoids
+diffing component imports and can include compatibility data that TanStack
+Router does not define.
 
-## Decisions required before implementation
+## Decisions to make before implementation
 
 - Which URLs are public compatibility commitments versus internal-only routes?
 - Are hidden/detail routes included? Recommended: yes if bookmarkable or
