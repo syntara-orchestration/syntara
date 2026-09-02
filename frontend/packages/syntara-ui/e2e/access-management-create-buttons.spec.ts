@@ -32,12 +32,14 @@ let seededRole: SeededRole | null = null
 
 test.beforeAll(async ({ browser }) => {
   const page = await browser.newPage()
-  const token = await getAuthToken(page)
-  if (token) {
+  try {
+    const token = await getAuthToken(page)
+    if (!token) throw new Error('access-management-create-buttons beforeAll: could not obtain auth token')
     const prefix = buildUniqueName('e2e-amb')
     seededRole = await createRoleViaApi(page, { name: `${prefix}-role`, token })
+  } finally {
+    await page.close()
   }
-  await page.close()
 })
 
 test.afterAll(async ({ browser }) => {
@@ -116,7 +118,7 @@ test.describe('Access Management — Create button labels', () => {
           .waitFor({ state: 'visible', timeout: 5000 })
           .then(() => true)
           .catch(() => false)
-        test.skip(!hasButton, `No seed data available; "${label}" button not visible in empty state`)
+        expect(hasButton, `No seed data available; "${label}" button not visible in empty state`).toBeTruthy()
       }
 
       await expect(actionButton).toBeVisible()

@@ -1,4 +1,3 @@
-import { List, ListItem, Stack, StackItem } from '@patternfly/react-core'
 import type { WorkflowAPI } from '@syntara/contracts'
 import { useCallback, useState } from 'react'
 
@@ -8,6 +7,7 @@ import { useAlerts } from '../../providers/alerts'
 import { detachPromise } from '../../utils/detachPromise'
 import type { ProjectRead } from '../access/types'
 import { ProjectFormModal } from '../access-management/ProjectFormModal'
+import { ProjectDeleteDialog } from '../access-management/projects/ProjectDeleteDialog'
 import { RunWorkflowModal } from '../builder/components/RunWorkflowModal'
 import { PublishWorkflowDialog } from '../builder/PublishWorkflowDialog'
 import { hasNonEmptyInputSchema } from '../builder/utils/triggerReferenceCheck'
@@ -224,42 +224,17 @@ export function WorkflowDialogs({
         }}
       />
 
-      <SynConfirmationDialog
+      <ProjectDeleteDialog
+        projectName={projectDeleteDialog.item?.name}
         isOpen={projectDeleteDialog.isOpen}
         onClose={projectDeleteDialog.close}
         onConfirm={() => {
           if (projectDeleteDialog.item) {
             onDeleteProject(projectDeleteDialog.item)
           }
-          // Dialog closes in onSettled callback passed to useProjectActions
         }}
-        title="Delete project?"
-        confirmLabel="Delete"
-        confirmVariant="danger"
-        titleIconVariant="warning"
         confirmLoading={isDeletingProject}
-        destructiveAcknowledgement={{
-          checkboxId: 'delete-project-ack',
-          label:
-            'I understand this project, its workflows, and role assignments will be permanently deleted or removed.',
-        }}
-      >
-        <Stack hasGutter>
-          <StackItem>
-            The project <strong>{projectDeleteDialog.item?.name}</strong> will be deleted. This cannot be undone.
-          </StackItem>
-          <StackItem>
-            <List>
-              <ListItem>All workflows in this project will be permanently deleted.</ListItem>
-              <ListItem>All project role assignments will be removed.</ListItem>
-              <ListItem>
-                Uploaded files are kept after the project is deleted. There is no in-product list or delete flow for
-                them yet.
-              </ListItem>
-            </List>
-          </StackItem>
-        </Stack>
-      </SynConfirmationDialog>
+      />
     </>
   )
 }

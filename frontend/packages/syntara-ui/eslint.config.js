@@ -1,5 +1,6 @@
 import storybook from 'eslint-plugin-storybook'
 import js from '@eslint/js'
+import { fixupPluginRules } from '@eslint/compat'
 import globals from 'globals'
 import react from 'eslint-plugin-react'
 import reactHooks from 'eslint-plugin-react-hooks'
@@ -16,11 +17,16 @@ import reactUseEffect from 'eslint-plugin-react-you-might-not-need-an-effect'
 import tseslint from 'typescript-eslint'
 import eslintConfigPrettier from 'eslint-config-prettier'
 import syntaraPlugin from './eslint-plugin-syntara/index.js'
+import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import { dirname } from 'node:path'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
+const require = createRequire(import.meta.url)
+// eslint-plugin-react's "detect" calls context.getFilename(), removed in ESLint 10.
+// Read the installed React version instead of hardcoding.
+const reactVersion = require('react/package.json').version
 
 const TEST_FILES = ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}']
 const E2E_FILES = ['e2e/**']
@@ -207,13 +213,15 @@ export default tseslint.config(
       },
     },
     settings: {
-      react: { version: 'detect' },
+      react: { version: reactVersion },
     },
     plugins: {
-      react,
+      // eslint-plugin-react / jsx-a11y still declare ESLint ^9 peers and use removed
+      // context APIs in places; bridge until upstream supports ESLint 10.
+      react: fixupPluginRules(react),
       'react-hooks': reactHooks,
       'react-refresh': reactRefresh,
-      'jsx-a11y': jsxA11y,
+      'jsx-a11y': fixupPluginRules(jsxA11y),
       'import-x': importPlugin,
       'no-only-tests': noOnlyTests,
       sonarjs,
@@ -224,6 +232,10 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
       'react-hooks/exhaustive-deps': 'error',
+      // React Compiler–aligned rules from eslint-plugin-react-hooks ≥7.1.
+      // Existing call sites are eslint-disable'd; new instances fail lint.
+      'react-hooks/refs': 'error',
+      'react-hooks/set-state-in-effect': 'error',
       // Strict accessibility linting for JSX (labels, roles, alt text, etc.)
       ...jsxA11y.configs.strict.rules,
       // Allow tabIndex={0} on role="region" elements (e.g. SynScrollableTableContainer scroll region).

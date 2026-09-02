@@ -284,7 +284,7 @@ function buildKebabActions(
     { key: 'separator', isSeparator: true },
     {
       key: 'delete',
-      title: <IconLabel icon={<RhUiTrashIcon />}>Delete identity provider</IconLabel>,
+      title: <IconLabel icon={<RhUiTrashIcon />}>Delete provider</IconLabel>,
       isDanger: true,
       isAriaDisabled: !idpPermissions.canDelete,
       tooltipProps: idpPermissions.canDelete ? undefined : { content: idpPermissions.tooltips.delete },

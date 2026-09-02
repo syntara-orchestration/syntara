@@ -1,7 +1,6 @@
 import { Button, Content, Flex, FlexItem, StackItem, Switch, Tooltip, Truncate } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiBanIcon, RhUiEditFillIcon, RhUiTrashIcon } from '@patternfly/react-icons'
-import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
-import type { IAction } from '@patternfly/react-table'
+import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { User } from '@syntara/contracts'
 import { useNavigate } from '@tanstack/react-router'
 import { useCallback, useMemo, type ReactNode } from 'react'
@@ -13,6 +12,7 @@ import { IconLabel } from '../../components/IconLabel'
 import { SynLabel } from '../../components/labels/SynLabel'
 import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../components/panels/list/SynListPanel'
 import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
+import { SynKebabMenu, type KebabAction } from '../../components/SynKebabMenu'
 import { SynLink } from '../../components/SynLink'
 import { DateCell } from '../../components/table/DateCell'
 import { useCursorPagination, useCursorReset } from '../../hooks/useCursorPagination'
@@ -99,10 +99,11 @@ function getRowActions(
   onRevoke: (user: User) => void,
   permissions: ReturnType<typeof useUserPermissions>,
   onNavigate: (path: string) => void
-): IAction[] {
+): KebabAction[] {
   return [
     {
-      title: <IconLabel icon={<RhUiEditFillIcon />}>Edit</IconLabel>,
+      key: 'edit',
+      title: <IconLabel icon={<RhUiEditFillIcon />}>Edit user</IconLabel>,
       isAriaDisabled: !permissions.canUpdate,
       tooltipProps: permissions.canUpdate ? undefined : { content: permissions.tooltips.update },
       onClick: permissions.canUpdate
@@ -110,14 +111,17 @@ function getRowActions(
         : undefined,
     },
     {
+      key: 'revoke',
       title: <IconLabel icon={<RhUiBanIcon />}>Revoke tokens</IconLabel>,
       isAriaDisabled: !permissions.canRevoke,
       tooltipProps: permissions.canRevoke ? undefined : { content: permissions.tooltips.revoke },
       onClick: permissions.canRevoke ? () => onRevoke(user) : undefined,
     },
-    { isSeparator: true },
+    { key: 'sep-delete', isSeparator: true },
     {
-      title: <IconLabel icon={<RhUiTrashIcon />}>Delete</IconLabel>,
+      key: 'delete',
+      title: <IconLabel icon={<RhUiTrashIcon />}>Delete user</IconLabel>,
+      isDanger: true,
       isAriaDisabled: !permissions.canDelete,
       tooltipProps: permissions.canDelete ? undefined : { content: permissions.tooltips.delete },
       onClick: permissions.canDelete ? () => onDelete(user) : undefined,
@@ -248,7 +252,12 @@ function UserTableRow({
         <UserStateSwitch user={user} disabledReason={toggleDisabledReason} onToggle={onToggleEnabled} />
       </Td>
       <Td isActionCell>
-        {!user.is_builtin && <ActionsColumn items={getRowActions(user, onDelete, onRevoke, permissions, onNavigate)} />}
+        {!user.is_builtin && (
+          <SynKebabMenu
+            actions={getRowActions(user, onDelete, onRevoke, permissions, onNavigate)}
+            aria-label={`Actions for ${user.username}`}
+          />
+        )}
       </Td>
     </Tr>
   )

@@ -882,7 +882,7 @@ class WebhookTriggerParameters(TemplateAwareBaseModel):
         description="Optional JSON Schema (Draft-07) for validating incoming webhook payloads",
     )
     authorized_service_account_ids: list[uuid.UUID] = Field(
-        default_factory=list,
+        min_length=1,
         description="UUIDs of service accounts authorized to invoke this trigger endpoint",
     )
 

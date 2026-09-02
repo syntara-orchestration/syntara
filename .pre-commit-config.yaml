@@ -80,12 +80,10 @@ repos:
 
       - id: frontend-eslint
         name: 'frontend: eslint'
-        # --flag v10_config_lookup_from_file makes ESLint resolve eslint.config.js
-        # from each file's own directory rather than the cwd. Without it, running
-        # ESLint from the repo root (as pre-commit does) would fail to find any
-        # config because there is no root-level eslint.config.js — each package
-        # owns its own config.
-        entry: npx --prefix frontend eslint --flag v10_config_lookup_from_file --
+        # ESLint 10 resolves eslint.config.js from each linted file's directory
+        # (config lookup from file is the default). That lets pre-commit run from
+        # the repo root while each frontend package still uses its own config.
+        entry: npx --prefix frontend eslint --
         language: system
         pass_filenames: true
         # Type-aware linting (parserOptions.project) loads full TypeScript

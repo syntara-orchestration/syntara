@@ -102,6 +102,9 @@ describe('useScrollOverflow', () => {
   it('reads --syn-scroll-fade-distance from the scroll element computed style', () => {
     // scrollableRemaining = 500 - 140 - 300 = 60; fadeDistance = 80; t = 0.75; smoothstep(0.75) = 0.84375
     const scrollEl = createMockScrollElement({ scrollHeight: 500, clientHeight: 300, scrollTop: 140 })
+    // getComputedStyle only reflects inline custom properties on elements connected to the
+    // document (true in production; the mock element here otherwise stays detached).
+    document.body.appendChild(scrollEl)
     scrollEl.style.setProperty('--syn-scroll-fade-distance', '80')
     const wrapperEl = document.createElement('div')
     const { result } = renderHook(() => useScrollOverflow())
@@ -109,6 +112,7 @@ describe('useScrollOverflow', () => {
     attachScrollOverflow(result.current.scrollRef, result.current.wrapperRef, scrollEl, wrapperEl)
 
     expect(Number.parseFloat(wrapperEl.style.getPropertyValue('--syn-scroll-fade-opacity'))).toBeCloseTo(0.84375)
+    scrollEl.remove()
   })
 
   it('clamps opacity to 1 when scrollable remaining exceeds the fade distance', () => {

@@ -414,13 +414,13 @@ export async function deleteRoleViaApi(app: Page, roleId: string): Promise<void>
   }
 }
 
-/** Create a role assignment via the API. Returns the assignment or null. */
+/** Create a role assignment via the API. Throws on missing token or HTTP failure. */
 export async function createRoleAssignmentViaApi(
   app: Page,
   options: { principal_id?: string; group_id?: string; role_name: string }
-): Promise<{ id: string } | null> {
+): Promise<{ id: string }> {
   const token = await getAuthToken(app)
-  if (!token) return null
+  if (!token) throw new Error(`createRoleAssignmentViaApi: could not obtain auth token for ${options.role_name}`)
   const resp = await apiRequest(app, 'post', '/role_assignments', {
     token,
     data: options,

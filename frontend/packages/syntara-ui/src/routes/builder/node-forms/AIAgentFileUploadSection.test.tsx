@@ -269,7 +269,7 @@ describe('AIAgentFileUploadSection', () => {
   it('does not toast on AbortError even when the signal is not marked aborted', async () => {
     const user = userEvent.setup()
     // Use a plain Error so we exercise the `error.name === 'AbortError'` branch
-    // (DOMException may not be `instanceof Error` in jsdom).
+    // (DOMException may not be `instanceof Error` in happy-dom).
     const abortError = new Error('The operation was aborted.')
     abortError.name = 'AbortError'
     vi.mocked(downloadFileById).mockRejectedValue(abortError)
