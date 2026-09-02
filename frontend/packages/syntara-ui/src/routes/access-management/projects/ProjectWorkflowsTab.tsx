@@ -13,9 +13,7 @@ import { workflowDefaultSort, workflowTableColumns } from '../../workflows/workf
 
 const EMPTY_ROW_ACTIONS: RowAction[] = []
 const EMPTY_COLLAPSED_PROJECTS = new Set<string>()
-function noopToggleProject() {
-  return
-}
+const noopToggleProject = () => undefined
 
 function noRowActions(): RowAction[] {
   return EMPTY_ROW_ACTIONS
