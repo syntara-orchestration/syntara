@@ -1065,6 +1065,22 @@ export interface components {
       instance?: string | null
     }
     /**
+     * UserReference
+     * @description Minimal user identification for embedding in other resources.
+     *     The name is resolved from the database when the response is built, not
+     *     stored alongside the id, so it always reflects the principal's current
+     *     name. Renaming a user therefore changes the name shown for their past actions.
+     */
+    UserReference: {
+      /**
+       * Format: uuid
+       * @description User's unique identifier
+       */
+      id: string
+      /** @description Principal's current display name, resolved when the response is built */
+      name: string
+    }
+    /**
      * ValidationSeverity
      * @description Severity level for a validation finding.
      * @enum {string}
@@ -1170,9 +1186,14 @@ export interface components {
       has_validation_issues?: boolean
       /**
        * Created By
-       * Format: uuid
+       * @description User who created the workflow
        */
-      created_by: string
+      readonly created_by?: components['schemas']['UserReference'] | null
+      /**
+       * Updated By
+       * @description User who last modified the workflow
+       */
+      readonly updated_by?: components['schemas']['UserReference'] | null
       /**
        * Project Id
        * Format: uuid
@@ -1327,22 +1348,6 @@ export interface components {
        */
       name: string
     }
-    /**
-     * UserReference
-     * @description Minimal user identification for embedding in other resources.
-     *     The name is resolved from the database when the response is built, not
-     *     stored alongside the id, so it always reflects the principal's current
-     *     name. Renaming a user therefore changes the name shown for their past actions.
-     */
-    UserReference: {
-      /**
-       * Format: uuid
-       * @description User's unique identifier
-       */
-      id: string
-      /** @description Principal's current display name, resolved when the response is built */
-      name: string
-    }
     ApprovalRequestRead: components['schemas']['BaseResource'] & {
       /**
        * Project Id
@@ -1403,7 +1408,7 @@ export interface components {
        */
       approver_groups?: components['schemas']['ApproverGroupSummary'][]
       /** @description User who made the decision */
-      decided_by?: components['schemas']['UserReference'] | null
+      readonly decided_by?: components['schemas']['UserReference'] | null
       /**
        * Decided At
        * @description When decision was made
