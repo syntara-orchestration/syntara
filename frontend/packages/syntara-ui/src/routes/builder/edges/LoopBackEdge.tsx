@@ -1,15 +1,13 @@
-import { useReactFlow, Position, useStore } from '@xyflow/react'
+import { Position, useStore } from '@xyflow/react'
+import { useCallback } from 'react'
 
 import { EdgeActions } from './EdgeActions'
 import { EdgeLabel } from './EdgeLabel'
 import { EdgePath } from './EdgePath'
 import { adjustSourceCoordinates } from './edgeUtils'
+import { loopBackEdgeGeometryEqual, selectLoopBackEdgeGeometry } from './loopBackEdgeGeometry'
 import type { BaseEdgeProps } from './types'
 import { useEdgeHandlers } from './useEdgeHandlers'
-
-function getNodeBottom(node: { position: { y: number }; measured?: { height?: number } }): number {
-  return node.position.y + (node.measured?.height ?? 0)
-}
 
 /**
  * Loop-back edge component with custom path routing
@@ -18,8 +16,12 @@ function getNodeBottom(node: { position: { y: number }; measured?: { height?: nu
  */
 export function LoopBackEdge(props: BaseEdgeProps) {
   const { sourceX, sourceY, targetX, targetY, label, style, id, source, target, data, markerEnd, selected } = props
-  const reactFlowInstance = useReactFlow()
-  const { getNodes } = reactFlowInstance
+  const geometrySelector = useCallback(
+    (state: { nodes: Parameters<typeof selectLoopBackEdgeGeometry>[0] }) =>
+      selectLoopBackEdgeGeometry(state.nodes, { source, target, sourceX, sourceY, targetX, targetY }),
+    [source, target, sourceX, sourceY, targetX, targetY]
+  )
+  const geometry = useStore(geometrySelector, loopBackEdgeGeometryEqual)
   const nodesConnectable = useStore((s) => s.nodesConnectable)
 
   const {
@@ -41,41 +43,7 @@ export function LoopBackEdge(props: BaseEdgeProps) {
     data,
   })
 
-  // Calculate vertical offset dynamically based on nodes in the loop body
-  // Find the loop node (target of this edge)
-  const targetNode = getNodes().find((n) => n.id === target)
-  const sourceNode = getNodes().find((n) => n.id === source)
-
-  // Calculate the maximum bottom position so the edge's horizontal segment goes below the loop node and all loop body nodes
-  let maxBottomY = sourceY
-
-  if (targetNode && sourceNode) {
-    // Include the loop node (target) so the edge passes below it and isn't hidden underneath
-    maxBottomY = Math.max(maxBottomY, getNodeBottom(targetNode))
-
-    // Include the source node (last node in the loop body)
-    maxBottomY = Math.max(maxBottomY, getNodeBottom(sourceNode))
-
-    // Also include any other nodes between target and source
-    const allNodes = getNodes()
-    const loopBodyNodes = allNodes.filter((node) => {
-      if (!node.position || node.measured?.height == null) return false // Skip nodes without position or height (include height === 0)
-      if (node.id === source || node.id === target) return false // Already handled by target/source nodes
-      const nodeY = node.position.y + node.measured.height / 2
-      const nodeX = node.position.x
-      // Nodes at similar Y level to target/source and between them horizontally
-      return (
-        Math.abs(nodeY - targetY) < 100 && // Similar Y level (within 100px)
-        nodeX > targetX && // To the right of target (loop node)
-        nodeX < sourceX // To the left of source (last node in loop)
-      )
-    })
-
-    // Find the maximum bottom edge of these nodes
-    loopBodyNodes.forEach((node) => {
-      maxBottomY = Math.max(maxBottomY, getNodeBottom(node))
-    })
-  }
+  const maxBottomY = geometry.loopBodyMaxBottom
 
   const { x: adjustedSourceX, y: adjustedSourceY } = adjustSourceCoordinates(sourceX, sourceY, Position.Right)
 
