@@ -27,7 +27,17 @@ const defaultProps: WorkflowsListViewProps = {
   groupedWorkflows: null,
   collapsedProjects: new Set(),
   onToggleProject: vi.fn(),
-  getRowActions: vi.fn().mockReturnValue([]),
+  isWorkflowProjectBuiltin: vi.fn(() => false),
+  rowActionCallbacks: {
+    navigate: vi.fn() as never,
+    onRun: vi.fn(),
+    onDuplicate: vi.fn(),
+    onExport: vi.fn(),
+    onPublish: vi.fn(),
+    onUnpublish: vi.fn(),
+    onDelete: vi.fn(),
+    isDuplicating: false,
+  },
 }
 
 describe('WorkflowsListView', () => {
