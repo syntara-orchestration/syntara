@@ -169,11 +169,16 @@ export const test = xfailBase.extend<
     await context.close()
   },
 
-  // Mock-only — no roleSetup support; real-backend tests skip via isRealBackend guard in spec files
-  projectAdminApp: async ({ browser }, use) => {
+  projectAdminApp: async ({ browser, roleSetup }, use) => {
     const context = await browser.newContext()
     const page = await context.newPage()
-    await loginAsRole(page, 'project-admin')
+    if (roleSetup) {
+      const creds = roleSetup.credentials.projectAdmin
+      if (!creds) throw new Error('projectAdmin credentials missing from roleSetup')
+      await loginAs(page, creds.username, creds.password)
+    } else {
+      await loginAsRole(page, 'project-admin')
+    }
     await use(page)
     await context.close()
   },
