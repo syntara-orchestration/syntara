@@ -388,17 +388,17 @@ class TestEDAWebhookEdgeCases:
 
         assert response.status_code == 404
 
-    async def test_webhook_does_not_trigger_soft_deleted_workflow(
+    async def test_webhook_does_not_trigger_deleted_workflow(
         self,
         base_client: AsyncClient,
         eda_workflow: Workflow,
         test_db_session: AsyncSession,
     ) -> None:
-        """Returns 404 when the owning workflow is soft-deleted."""
-        from datetime import UTC, datetime
-
-        eda_workflow.deleted_at = datetime.now(tz=UTC)
-        test_db_session.add(eda_workflow)
+        """Returns 404 when the owning workflow has been hard-deleted (trigger cascades)."""
+        eda_workflow.published_version_id = None
+        eda_workflow.is_enabled = False
+        await test_db_session.flush()
+        await test_db_session.delete(eda_workflow)
         await test_db_session.commit()
 
         response = await base_client.post(

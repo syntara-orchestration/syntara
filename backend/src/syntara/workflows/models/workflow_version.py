@@ -14,7 +14,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, Index, Relationship, SQLModel
 
 from syntara.core.constants import FieldLimits
-from syntara.core.models.base import SoftDeletableResource, UserOwnedResource
+from syntara.core.models.base import UserOwnedResource
 from syntara.core.models.pagination import ResourcesResponse
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 
@@ -23,11 +23,10 @@ if TYPE_CHECKING:
     from syntara.workflows.models.workflow import Workflow
 
 
-class WorkflowVersion(UserOwnedResource, SoftDeletableResource, table=True):
+class WorkflowVersion(UserOwnedResource, table=True):
     """WorkflowVersion model for maintaining version history.
 
-    Combines UserOwnedResource and SoftDeletableResource (both extend BaseResource)
-    with version-specific fields for tracking workflow definition evolution.
+    Uses hard deletes — versions cascade with their parent workflow.
 
     Attributes:
         id: Primary key UUID (from BaseResource)
@@ -36,8 +35,6 @@ class WorkflowVersion(UserOwnedResource, SoftDeletableResource, table=True):
         labels: Optional key-value metadata (from BaseResource)
         created_by: UUID of user who created this version (from UserOwnedResource)
         updated_by: UUID of user who last updated this version (from UserOwnedResource)
-        deleted_at: Soft delete timestamp (from SoftDeletableResource)
-        deleted_by: UUID of user who performed soft delete (from SoftDeletableResource)
         workflow_id: Foreign key to parent Workflow
         version: Version number (auto-incremented per workflow)
         schema_version: Workflow schema version (e.g., "2.0.0")
@@ -62,9 +59,9 @@ class WorkflowVersion(UserOwnedResource, SoftDeletableResource, table=True):
         *UserOwnedResource.__sortable_fields__,
     ]
 
-    # Foreign key to Workflow
     workflow_id: UUID = Field(
         foreign_key="workflows.id",
+        ondelete="CASCADE",  # Versions are cascade-deleted when their parent workflow is deleted
         description="Parent workflow ID",
         index=True,
     )
@@ -110,7 +107,8 @@ class WorkflowVersion(UserOwnedResource, SoftDeletableResource, table=True):
 
     executions: list["Execution"] = Relationship(
         back_populates="workflow_version",
-        cascade_delete=False,
+        cascade_delete=True,
+        sa_relationship_kwargs={"passive_deletes": True},
     )
 
     # Table arguments for indexes and constraints
@@ -143,11 +141,7 @@ class WorkflowVersion(UserOwnedResource, SoftDeletableResource, table=True):
 
 
 class WorkflowVersionRead(SQLModel):
-    """Schema for workflow version response (GET /workflows/{id}/versions/{version}).
-
-    WorkflowVersion entities are read-only and managed automatically by the system.
-    Note: deleted_at and deleted_by are None since soft-deleted versions are excluded from queries.
-    """
+    """Schema for workflow version response (GET /workflows/{id}/versions/{version})."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)  # type: ignore[assignment]
 
@@ -165,8 +159,6 @@ class WorkflowVersionRead(SQLModel):
     created_by_username: str | None = None
     created_at: datetime
     updated_at: datetime
-    deleted_at: datetime | None = None
-    deleted_by: UUID | None = None
 
 
 class WorkflowVersionListResponse(ResourcesResponse[WorkflowVersionRead]):

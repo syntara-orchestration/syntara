@@ -121,7 +121,12 @@ describe('ExpressionFormField', () => {
       dataTransfer: { types: ['application/json'] },
     })
 
-    expect(input).toHaveStyle(DROP_TARGET_OUTLINE as Record<string, unknown>)
+    // Assert on the literal inline style rather than toHaveStyle(): getComputedStyle can't
+    // resolve var() (happy-dom does not perform real CSS cascade), so it isn't a
+    // meaningful check for DROP_TARGET_OUTLINE's outlineColor token.
+    expect(input.style.outlineWidth).toBe(DROP_TARGET_OUTLINE.outlineWidth)
+    expect(input.style.outlineStyle).toBe(DROP_TARGET_OUTLINE.outlineStyle)
+    expect(input.style.outlineColor).toBe(DROP_TARGET_OUTLINE.outlineColor)
   })
 
   it('removes highlight state on dragLeave', () => {
@@ -135,7 +140,7 @@ describe('ExpressionFormField', () => {
 
     fireEvent.dragLeave(input)
 
-    expect(input).not.toHaveStyle(DROP_TARGET_OUTLINE as Record<string, unknown>)
+    expect(input.style.outlineWidth).toBe('')
   })
 
   it('has no accessibility violations', async () => {

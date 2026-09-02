@@ -30,7 +30,7 @@ export type HttpUrlFieldProps = Readonly<{
   isDisabled: boolean
 }>
 
-// Exported for isolated accessibility testing (avoids PatternFly tab JSDOM issue in full-form tests)
+// Exported for isolated accessibility testing (avoids PatternFly tab happy-dom issue in full-form tests)
 export function HttpUrlField({
   register,
   getValues,

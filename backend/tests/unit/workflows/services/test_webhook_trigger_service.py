@@ -182,11 +182,11 @@ class TestGetByWebhookPath:
 
     @pytest.mark.asyncio
     async def test_raises_not_found_when_workflow_deleted(self) -> None:
-        """Trigger for a soft-deleted workflow should return not-found.
+        """Trigger for a deleted workflow should return not-found.
 
-        The query joins on the Workflow table and filters on
-        Workflow.deleted_at IS NULL, so a trigger whose parent workflow
-        is soft-deleted will not be returned.
+        Since workflows use hard delete, the webhook trigger's CASCADE FK
+        will have already removed this row — but the service should still
+        handle the not-found case gracefully.
         """
         mock_session = AsyncMock(spec=AsyncSession)
 

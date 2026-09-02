@@ -25,6 +25,7 @@ from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
 from syntara.projects.service import ProjectService
 from syntara.workflows.models.execution import Execution
+from syntara.workflows.models.webhook_trigger import WebhookTrigger
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_version import WorkflowVersion
 from tests.helpers.workflow import create_minimal_workflow_definition
@@ -353,8 +354,8 @@ async def test_delete_project_cascades_custom_policies(seeded_db: AsyncSession, 
 
 
 @pytest.mark.asyncio
-async def test_delete_project_soft_deletes_workflows(seeded_db: AsyncSession, test_user: User) -> None:
-    """Deleting a project soft-deletes all workflows within it."""
+async def test_delete_project_hard_deletes_workflows(seeded_db: AsyncSession, test_user: User) -> None:
+    """Deleting a project hard-deletes all workflows within it."""
     svc = ProjectService(seeded_db, test_user)
     user_id = test_user.id
     project = await svc.create_project(name="cascade-workflows")
@@ -373,14 +374,12 @@ async def test_delete_project_soft_deletes_workflows(seeded_db: AsyncSession, te
 
     seeded_db.expire_all()
     wf = (await seeded_db.exec(select(Workflow).where(Workflow.id == wf_id))).first()
-    assert wf is not None
-    assert wf.deleted_at is not None
-    assert wf.deleted_by == user_id
+    assert wf is None
 
 
 @pytest.mark.asyncio
-async def test_delete_project_soft_deletes_executions(seeded_db: AsyncSession, test_user: User) -> None:
-    """Deleting a project soft-deletes all executions within it."""
+async def test_delete_project_cascades_executions(seeded_db: AsyncSession, test_user: User) -> None:
+    """Deleting a project cascade-deletes all executions with their workflows."""
     svc = ProjectService(seeded_db, test_user)
     user_id = test_user.id
     project = await svc.create_project(name="cascade-executions")
@@ -410,21 +409,103 @@ async def test_delete_project_soft_deletes_executions(seeded_db: AsyncSession, t
         workflow_version_id=wf_version.id,
         project_id=project.id,
         temporal_workflow_id=f"temporal-{uuid4().hex[:8]}",
-        status="pending",
+        status="completed",
         created_by=user_id,
         labels={},
     )
     seeded_db.add(execution)
     await seeded_db.commit()
     exec_id = execution.id
+    version_id = wf_version.id
 
     await svc.delete_project(project.id)
 
     seeded_db.expire_all()
     ex = (await seeded_db.exec(select(Execution).where(Execution.id == exec_id))).first()
-    assert ex is not None
-    assert ex.deleted_at is not None
-    assert ex.deleted_by == user_id
+    assert ex is None, "Execution should cascade-delete with its workflow when project is deleted"
+    ver = (await seeded_db.exec(select(WorkflowVersion).where(WorkflowVersion.id == version_id))).first()
+    assert ver is None, "WorkflowVersion should cascade-delete with its workflow when project is deleted"
+
+
+@pytest.mark.asyncio
+async def test_delete_project_blocked_by_active_execution(seeded_db: AsyncSession, test_user: User) -> None:
+    """Deleting a project is blocked when one of its workflows has a non-terminal execution."""
+    from syntara.workflows.exceptions import WorkflowHasActiveExecutionsError
+
+    svc = ProjectService(seeded_db, test_user)
+    user_id = test_user.id
+    project = await svc.create_project(name="cascade-blocked-active-exec")
+
+    workflow = Workflow(name="active-exec-workflow", project_id=project.id, created_by=user_id, labels={})
+    seeded_db.add(workflow)
+    await seeded_db.flush()
+
+    version = WorkflowVersion(
+        workflow_id=workflow.id,
+        version=1,
+        schema_version="2.0.0",
+        workflow_definition=create_minimal_workflow_definition(name="active-exec"),
+        created_by=user_id,
+        labels={},
+    )
+    seeded_db.add(version)
+    await seeded_db.flush()
+
+    execution = Execution(
+        workflow_id=workflow.id,
+        workflow_version_id=version.id,
+        project_id=project.id,
+        created_by=user_id,
+        status="running",
+        temporal_workflow_id=f"temporal-{uuid4().hex[:8]}",
+        labels={},
+    )
+    seeded_db.add(execution)
+    await seeded_db.commit()
+    workflow_id, execution_id = workflow.id, execution.id
+
+    with pytest.raises(WorkflowHasActiveExecutionsError):
+        await svc.delete_project(project.id)
+
+    seeded_db.expire_all()
+    wf = (await seeded_db.exec(select(Workflow).where(Workflow.id == workflow_id))).first()
+    assert wf is not None, "Workflow should still exist after blocked delete"
+    ex = (await seeded_db.exec(select(Execution).where(Execution.id == execution_id))).first()
+    assert ex is not None, "Execution should still exist after blocked delete"
+
+
+@pytest.mark.asyncio
+async def test_delete_project_removes_webhook_triggers(seeded_db: AsyncSession, test_user: User) -> None:
+    """Deleting a project removes webhook triggers for its workflows."""
+    svc = ProjectService(seeded_db, test_user)
+    user_id = test_user.id
+    project = await svc.create_project(name="trigger-cleanup")
+
+    workflow = Workflow(
+        name="trigger-workflow",
+        project_id=project.id,
+        created_by=user_id,
+        labels={},
+    )
+    seeded_db.add(workflow)
+    await seeded_db.flush()
+
+    trigger = WebhookTrigger(
+        id=uuid4(),
+        workflow_id=workflow.id,
+        webhook_path=f"test-trigger-{uuid4().hex[:8]}",
+        trigger_node_id="webhook-node-1",
+        trigger_type="webhook_trigger",
+    )
+    seeded_db.add(trigger)
+    await seeded_db.commit()
+    trigger_id = trigger.id
+
+    await svc.delete_project(project.id)
+
+    seeded_db.expire_all()
+    t = (await seeded_db.exec(select(WebhookTrigger).where(WebhookTrigger.id == trigger_id))).first()
+    assert t is None, "WebhookTrigger should be removed when project is deleted"
 
 
 @pytest.mark.asyncio
@@ -583,7 +664,7 @@ async def test_delete_project_hard_deletes_approval_requests(seeded_db: AsyncSes
         workflow_version_id=wf_version.id,
         project_id=project.id,
         temporal_workflow_id=f"temporal-{uuid4().hex[:8]}",
-        status="pending",
+        status="completed",
         created_by=user_id,
         labels={},
     )
@@ -630,18 +711,16 @@ async def test_delete_project_does_not_affect_other_projects(seeded_db: AsyncSes
     await svc.delete_project(p1_id)
 
     seeded_db.expire_all()
-    # p1 resources should be gone/soft-deleted
+    # p1 resources should be gone (hard-deleted)
     assert (await seeded_db.exec(select(Role).where(Role.project_id == p1_id))).all() == []
     wf1_row = (await seeded_db.exec(select(Workflow).where(Workflow.project_id == p1_id))).first()
-    assert wf1_row is not None
-    assert wf1_row.deleted_at is not None
+    assert wf1_row is None
 
     # p2 resources should be untouched
     r2 = (await seeded_db.exec(select(Role).where(Role.id == role2_id))).first()
     assert r2 is not None
     wf2_row = (await seeded_db.exec(select(Workflow).where(Workflow.id == wf2_id))).first()
     assert wf2_row is not None
-    assert wf2_row.deleted_at is None
 
 
 @pytest.mark.asyncio
