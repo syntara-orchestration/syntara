@@ -4,11 +4,11 @@ import { useLayoutEffect, useMemo } from 'react'
 
 import { AppRoute } from '../../app/AppRoute'
 import { breadcrumbsAccessManagementHub } from '../../app/breadcrumbBuilders'
-import { EmptyStateAccessDenied } from '../../components/EmptyStateAccessDenied'
 import { SynPage, SynPageBody } from '../../components/layout/SynPage'
 import { SynPageHeader } from '../../components/layout/SynPageHeader'
 import { SynPanel } from '../../components/layout/SynPanel'
 import { SynListPanel, SynListPanelTabs, SynListPanelView } from '../../components/panels/list/SynListPanel'
+import { SynEmptyStateAccessDenied } from '../../components/states/SynEmptyStateAccessDenied'
 import { SynPageTitle } from '../../components/SynPageTitle'
 import { useUrlTab } from '../../hooks/useUrlTab'
 import { detachPromise } from '../../utils/detachPromise'
@@ -120,7 +120,7 @@ export function AccessManagement() {
         <SynPageHeader title="Access Management" breadcrumbs={[{ label: 'Access Management' }]} />
         <SynPageBody>
           <SynPanel isFullHeight>
-            <EmptyStateAccessDenied description="You don't have permission to view access management. Contact your administrator to request access." />
+            <SynEmptyStateAccessDenied description="You don't have permission to view access management. Contact your administrator to request access." />
           </SynPanel>
         </SynPageBody>
       </SynPage>
