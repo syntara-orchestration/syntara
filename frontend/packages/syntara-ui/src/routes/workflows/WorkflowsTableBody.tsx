@@ -2,6 +2,7 @@ import { Flex, FlexItem, Truncate } from '@patternfly/react-core'
 import { RhUiCaretDownIcon, RhUiCaretRightIcon } from '@patternfly/react-icons'
 import { Tbody, Td, Tr } from '@patternfly/react-table'
 import type { WorkflowAPI } from '@syntara/contracts'
+import { useState } from 'react'
 
 import groupedTableStyles from '../../components/groupedTable.module.css'
 import type { KebabAction } from '../../components/SynKebabMenu'
@@ -28,7 +29,11 @@ type WorkflowRowProps = {
 }
 
 function WorkflowRow({ workflow, isBuiltinProject, rowActionCallbacks }: Readonly<WorkflowRowProps>) {
-  const permissions = useWorkflowPermissions({ resourceProject: workflow.project_id })
+  const [rowChecksEnabled, setRowChecksEnabled] = useState(false)
+  const permissions = useWorkflowPermissions({
+    resourceProject: workflow.project_id,
+    enabled: rowChecksEnabled,
+  })
   const actions = buildWorkflowRowActions(workflow, permissions, isBuiltinProject, rowActionCallbacks)
 
   return (
@@ -53,7 +58,15 @@ function WorkflowRow({ workflow, isBuiltinProject, rowActionCallbacks }: Readonl
         />
       </Td>
       <Td isActionCell>
-        {actions.length > 0 && <SynKebabMenu actions={actions} aria-label={`Actions for ${workflow.name}`} />}
+        {actions.length > 0 && (
+          <SynKebabMenu
+            actions={actions}
+            aria-label={`Actions for ${workflow.name}`}
+            onOpenChange={(isOpen) => {
+              if (isOpen) setRowChecksEnabled(true)
+            }}
+          />
+        )}
       </Td>
     </Tr>
   )
