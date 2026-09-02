@@ -117,6 +117,20 @@ describe('useWorkflowPermissions', () => {
     })
   })
 
+  it('enabled false skips all can_i calls', () => {
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+
+    const { result } = renderHook(() => useWorkflowPermissions({ resourceProject: 'proj-1', enabled: false }), {
+      wrapper: createWrapper(),
+    })
+
+    expect(result.current.canCreate).toBe(false)
+    expect(result.current.canUpdate).toBe(false)
+    expect(result.current.canDelete).toBe(false)
+    expect(result.current.canRun).toBe(false)
+    expect(accessFetchClient.POST).not.toHaveBeenCalled()
+  })
+
   it('scopes create/update/delete/run to resourceProject when provided', async () => {
     mockCanI({ create: true, update: true, delete: true, run: true })
 

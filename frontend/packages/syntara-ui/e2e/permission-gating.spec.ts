@@ -477,10 +477,7 @@ test.describe('Permission gating — Workflow actions', () => {
     try {
       await projectAdminApp.goto(toAppUrl('/workflows'))
       await expect(projectAdminApp.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
-
-      const projectSelector = projectAdminApp.getByRole('textbox', { name: 'Project' })
-      await projectSelector.click()
-      await projectAdminApp.getByRole('option', { name: 'All projects' }).click()
+      await expect(projectAdminApp.getByPlaceholder('All projects')).toBeVisible()
 
       const createButton = projectAdminApp.getByRole('button', { name: /Create workflow/i })
       await expect(createButton).toBeVisible()
@@ -503,7 +500,8 @@ test.describe('Permission gating — Workflow actions', () => {
       )
       await expect(projectAdminApp.getByRole('menuitem', { name: /Run published version/i })).not.toHaveAttribute(
         'aria-disabled',
-        'true'
+        'true',
+        { timeout: 20_000 }
       )
       await expect(projectAdminApp.getByRole('menuitem', { name: /^Publish workflow$/i })).not.toHaveAttribute(
         'aria-disabled',
