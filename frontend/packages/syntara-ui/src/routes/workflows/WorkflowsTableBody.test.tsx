@@ -188,7 +188,8 @@ describe('WorkflowsTableBody', () => {
       }
     })
 
-    it('scopes row can_i checks to workflow.project_id', async () => {
+    it('scopes row can_i checks to workflow.project_id when the kebab opens', async () => {
+      const user = userEvent.setup()
       renderInTable(
         <FlatWorkflowsTableBody
           workflows={[baseWorkflow]}
@@ -196,6 +197,10 @@ describe('WorkflowsTableBody', () => {
           rowActionCallbacks={rowActionCallbacks}
         />
       )
+
+      expect(accessFetchClient.POST).not.toHaveBeenCalled()
+
+      await user.click(screen.getByRole('button', { name: 'Actions for Deploy Pipeline' }))
 
       await waitFor(() => {
         expect(accessFetchClient.POST).toHaveBeenCalledWith('/authz/can_i', {

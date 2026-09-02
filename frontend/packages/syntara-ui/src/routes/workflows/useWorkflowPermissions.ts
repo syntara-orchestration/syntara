@@ -30,6 +30,11 @@ type UseWorkflowPermissionsOptions = {
    * fetches Create; row kebabs call this hook with `resourceProject` instead.
    */
   createOnly?: boolean
+  /**
+   * When false, skip all `can_i` calls (safe-false). Row kebabs pass false until
+   * the menu opens so All projects does not fire one request per visible row.
+   */
+  enabled?: boolean
 }
 
 /**
@@ -42,12 +47,18 @@ export function useWorkflowPermissions(options?: UseWorkflowPermissionsOptions):
   const resourceType = 'workflow' as const
   const resourceProject = options?.resourceProject
   const hasProject = Boolean(resourceProject)
-  const rowChecksEnabled = options?.createOnly !== true
+  const checksEnabled = options?.enabled !== false
+  const createEnabled = options?.createOnly === true || checksEnabled
+  const rowChecksEnabled = options?.createOnly !== true && checksEnabled
 
   // Create: any-project when the list has no selected project (project-admin can
   // still open the builder). Update/delete/run: always pass a concrete project
-  // for row kebabs; skip those queries when this hook is create-only (toolbar).
-  const createOptions = hasProject ? { resourceProject } : { checkAnyProject: true as const }
+  // for row kebabs; skip those queries when this hook is create-only (toolbar)
+  // or until the row kebab opens (`enabled: false`).
+  const createOptions = {
+    ...(hasProject ? { resourceProject } : { checkAnyProject: true as const }),
+    enabled: createEnabled,
+  }
   const scopedOptions = {
     ...(hasProject ? { resourceProject } : {}),
     enabled: rowChecksEnabled,
