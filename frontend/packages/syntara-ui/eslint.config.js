@@ -61,6 +61,7 @@ export default tseslint.config(
   {
     ignores: [
       'dist',
+      'storybook-static/**',
       'coverage/**',
       'playwright.config.ts',
       'test-results/**',
