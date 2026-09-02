@@ -162,6 +162,7 @@ test.describe('Workflows Page - Project Actions in Selected Project View', () =>
       const projectSelector = app.getByRole('textbox', { name: 'Project' })
       await projectSelector.click()
       await projectSelector.fill(projectName)
+      await app.getByRole('option', { name: projectName, exact: true }).waitFor({ state: 'visible', timeout: 10_000 })
       await app.getByRole('option', { name: projectName, exact: true }).click()
 
       // Project is now selected — kebab should be visible in header
@@ -189,6 +190,7 @@ test.describe('Workflows Page - Project Actions in Selected Project View', () =>
       const projectSelector = app.getByRole('textbox', { name: 'Project' })
       await projectSelector.click()
       await projectSelector.fill(originalName)
+      await app.getByRole('option', { name: originalName, exact: true }).waitFor({ state: 'visible', timeout: 10_000 })
       await app.getByRole('option', { name: originalName, exact: true }).click()
 
       // Edit via header kebab
