@@ -9,7 +9,10 @@ import {
   publishWorkflowViaApi,
 } from '../utils/api'
 
+import { clickAddConnectedStep } from './add-connected-step'
+
 export { createBasicWorkflowViaApi, publishWorkflowViaApi }
+export { clickAddConnectedStep }
 
 export const buildUniqueName = (prefix: string) => `${prefix}-${Date.now()}-${randomUUID()}`
 
@@ -45,44 +48,6 @@ export async function triggerLayout(page: Page) {
   await expect(layoutButton).toBeVisible({ timeout: 10000 })
   await layoutButton.click()
   await waitForUIReady(page)
-}
-
-/**
- * Click "Layout" to position nodes and reveal edge buttons,
- * then click "Add connected step" and return the add-node panel.
- */
-export async function clickAddConnectedStep(page: Page) {
-  // Wait for any toast notifications or loading states to clear
-  await waitForUIReady(page)
-
-  const layoutButton = page.getByRole('button', { name: 'Reset layout', exact: true })
-  await expect(layoutButton).toBeVisible({ timeout: 10000 })
-  await layoutButton.click()
-
-  // Wait again after layout completes
-  await waitForUIReady(page)
-
-  // Wait for canvas to finish re-rendering after layout and "Add connected step" buttons to appear.
-  // Konflux CI can be slow to re-render after layout — use a generous timeout.
-  await expect(async () => {
-    const addBtn = page.getByRole('button', { name: 'Add connected step' })
-    await expect(addBtn.first()).toBeVisible()
-  }).toPass({ timeout: 25000, intervals: [500] })
-
-  const addBtn = page.getByRole('button', { name: 'Add connected step' })
-  await addBtn.first().click()
-
-  const panel = addNodePanel(page)
-  await expect(panel).toHaveCount(1)
-
-  // Wait for panel to be fully loaded and stable
-  await expect(async () => {
-    const firstCategoryBtn = panel.getByRole('button', { name: 'Action', exact: true })
-    await expect(firstCategoryBtn).toBeVisible()
-    await expect(firstCategoryBtn).toBeEnabled()
-  }).toPass({ timeout: 15000, intervals: [500, 1000] })
-
-  return panel
 }
 
 export async function closeNodeEditorPanel(page: Page) {

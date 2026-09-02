@@ -665,7 +665,7 @@ describe('RoleAssignmentsPanel', () => {
       const user = userEvent.setup()
       render(<RoleAssignmentsPanel principalType="user" principalId="u1" />, { wrapper })
 
-      const kebabButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const kebabButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(kebabButtons[0])
 
       const unassignItem = await screen.findByRole('menuitem', { name: /Unassign/i })
@@ -683,7 +683,7 @@ describe('RoleAssignmentsPanel', () => {
       const user = userEvent.setup()
       render(<RoleAssignmentsPanel principalType="user" principalId="u1" />, { wrapper })
 
-      const kebabButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const kebabButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(kebabButtons[0])
 
       const unassignItem = await screen.findByRole('menuitem', { name: /Unassign/i })
@@ -704,7 +704,7 @@ describe('RoleAssignmentsPanel', () => {
       const user = userEvent.setup()
       render(<RoleAssignmentsPanel principalType="user" principalId="u1" />, { wrapper })
 
-      const kebabButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const kebabButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(kebabButtons[0])
 
       const unassignItem = await screen.findByRole('menuitem', { name: /Unassign/i })
@@ -749,7 +749,7 @@ describe('RoleAssignmentsPanel', () => {
       const user = userEvent.setup()
       render(<RoleAssignmentsPanel principalType="user" principalId="u1" />, { wrapper })
 
-      const kebabButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const kebabButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(kebabButtons[0])
 
       const unassignItem = await screen.findByRole('menuitem', { name: /Unassign/i })
@@ -777,7 +777,7 @@ describe('RoleAssignmentsPanel', () => {
       const user = userEvent.setup()
       render(<RoleAssignmentsPanel principalType="user" principalId="u1" />, { wrapper })
 
-      const kebabButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const kebabButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(kebabButtons[0])
 
       const unassignItem = await screen.findByRole('menuitem', { name: /Unassign/i })
@@ -812,7 +812,7 @@ describe('RoleAssignmentsPanel', () => {
       const user = userEvent.setup()
       render(<RoleAssignmentsPanel principalType="user" principalId="u1" />, { wrapper })
 
-      const kebabButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const kebabButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(kebabButtons[0])
 
       const unassignItem = await screen.findByRole('menuitem', { name: /Unassign/i })
@@ -850,7 +850,7 @@ describe('RoleAssignmentsPanel', () => {
       const user = userEvent.setup()
       render(<RoleAssignmentsPanel principalType="user" principalId="u1" />, { wrapper })
 
-      const kebabButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const kebabButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(kebabButtons[0])
 
       const unassignItem = await screen.findByRole('menuitem', { name: /Unassign/i })
@@ -934,7 +934,7 @@ describe('RoleAssignmentsPanel', () => {
       const user = userEvent.setup()
       render(<RoleAssignmentsPanel principalType="service_account" principalId="sa-1" />, { wrapper })
 
-      const kebabButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const kebabButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(kebabButtons[0])
 
       const unassignItem = await screen.findByRole('menuitem', { name: /Unassign/i })

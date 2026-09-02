@@ -1,7 +1,7 @@
 import { Button, LabelGroup, Truncate } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiTrashIcon } from '@patternfly/react-icons'
-import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
-import type { IAction, ThProps } from '@patternfly/react-table'
+import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
+import type { ThProps } from '@patternfly/react-table'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useMemo, useState } from 'react'
 
@@ -11,6 +11,7 @@ import { IconLabel } from '../../../components/IconLabel'
 import { SynLabel } from '../../../components/labels/SynLabel'
 import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../../components/panels/list/SynListPanel'
 import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
+import { SynKebabMenu, type KebabAction } from '../../../components/SynKebabMenu'
 import { invalidateAuthzCaches } from '../../../hooks/invalidateAuthzCaches'
 import { useCursorPagination, useCursorReset } from '../../../hooks/useCursorPagination'
 import { useTableSort } from '../../../hooks/useTableSort'
@@ -55,9 +56,10 @@ function getAssignmentActions(
   assignment: RoleAssignmentRead,
   onUnassign: (assignment: RoleAssignmentRead) => void,
   permissions: ReturnType<typeof useAssignmentPermissions>
-): IAction[] {
+): KebabAction[] {
   return [
     {
+      key: 'unassign',
       title: <IconLabel icon={<RhUiTrashIcon />}>Unassign role</IconLabel>,
       isDanger: true,
       isAriaDisabled: !permissions.canRevoke,
@@ -121,7 +123,10 @@ function RoleAssignmentsTable({
                 )}
               </Td>
               <Td isActionCell>
-                <ActionsColumn items={getAssignmentActions(assignment, onUnassign, permissions)} />
+                <SynKebabMenu
+                  actions={getAssignmentActions(assignment, onUnassign, permissions)}
+                  aria-label={`Actions for ${assignment.principal_name} ${assignment.role_name}`}
+                />
               </Td>
             </Tr>
           )

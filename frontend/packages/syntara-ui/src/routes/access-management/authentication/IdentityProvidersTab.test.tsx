@@ -362,7 +362,7 @@ describe('IdentityProvidersTab', () => {
       render(<IdentityProvidersTab />, { wrapper })
 
       // Open the actions kebab menu
-      const actionsButton = screen.getByRole('button', { name: /Kebab toggle/ })
+      const actionsButton = screen.getByRole('button', { name: /^Actions for / })
       await user.click(actionsButton)
 
       // Click delete
@@ -378,7 +378,7 @@ describe('IdentityProvidersTab', () => {
       setupProviders()
       render(<IdentityProvidersTab />, { wrapper })
 
-      const actionsButton = screen.getByRole('button', { name: /Kebab toggle/ })
+      const actionsButton = screen.getByRole('button', { name: /^Actions for / })
       await user.click(actionsButton)
       await user.click(screen.getByText('Delete identity provider'))
 
@@ -394,7 +394,7 @@ describe('IdentityProvidersTab', () => {
       render(<IdentityProvidersTab />, { wrapper })
 
       // Open delete dialog
-      const actionsButton = screen.getByRole('button', { name: /Kebab toggle/ })
+      const actionsButton = screen.getByRole('button', { name: /^Actions for / })
       await user.click(actionsButton)
       await user.click(screen.getByText('Delete identity provider'))
 
@@ -426,7 +426,7 @@ describe('IdentityProvidersTab', () => {
       render(<IdentityProvidersTab />, { wrapper })
 
       // Open delete dialog
-      const actionsButton = screen.getByRole('button', { name: /Kebab toggle/ })
+      const actionsButton = screen.getByRole('button', { name: /^Actions for / })
       await user.click(actionsButton)
       await user.click(screen.getByText('Delete identity provider'))
 
@@ -472,7 +472,7 @@ describe('IdentityProvidersTab', () => {
       render(<IdentityProvidersTab />, { wrapper })
 
       // Open delete dialog and confirm
-      const actionsButton = screen.getByRole('button', { name: /Kebab toggle/ })
+      const actionsButton = screen.getByRole('button', { name: /^Actions for / })
       await user.click(actionsButton)
       await user.click(screen.getByText('Delete identity provider'))
       const dialog = screen.getByRole('dialog')
@@ -494,7 +494,7 @@ describe('IdentityProvidersTab', () => {
       setupProviders()
       render(<IdentityProvidersTab />, { wrapper })
 
-      const actionsButton = screen.getByRole('button', { name: /Kebab toggle/ })
+      const actionsButton = screen.getByRole('button', { name: /^Actions for / })
       await user.click(actionsButton)
       await user.click(screen.getByText('Edit provider'))
 
@@ -508,7 +508,7 @@ describe('IdentityProvidersTab', () => {
       setupProviders()
       render(<IdentityProvidersTab />, { wrapper })
 
-      const actionsButton = screen.getByRole('button', { name: /Kebab toggle/ })
+      const actionsButton = screen.getByRole('button', { name: /^Actions for / })
       await user.click(actionsButton)
       await user.click(screen.getByRole('menuitem', { name: /edit group mapping/i }))
 
@@ -522,7 +522,7 @@ describe('IdentityProvidersTab', () => {
       setupProviders()
       render(<IdentityProvidersTab />, { wrapper })
 
-      const actionsButton = screen.getByRole('button', { name: /Kebab toggle/ })
+      const actionsButton = screen.getByRole('button', { name: /^Actions for / })
       await user.click(actionsButton)
       await user.click(screen.getByText('Revoke tokens'))
 
@@ -537,7 +537,7 @@ describe('IdentityProvidersTab', () => {
       setupProviders()
       render(<IdentityProvidersTab />, { wrapper })
 
-      const actionsButton = screen.getByRole('button', { name: /Kebab toggle/ })
+      const actionsButton = screen.getByRole('button', { name: /^Actions for / })
       await user.click(actionsButton)
       await user.click(screen.getByText('Revoke tokens'))
 
@@ -568,7 +568,7 @@ describe('IdentityProvidersTab', () => {
 
       render(<IdentityProvidersTab />, { wrapper })
 
-      const actionsButton = screen.getByRole('button', { name: /Kebab toggle/ })
+      const actionsButton = screen.getByRole('button', { name: /^Actions for / })
       await user.click(actionsButton)
       await user.click(screen.getByText('Revoke tokens'))
 
