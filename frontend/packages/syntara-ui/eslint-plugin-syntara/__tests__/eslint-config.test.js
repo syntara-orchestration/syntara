@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const packageDirectory = process.cwd()
+
 // Load the package's real ESLint configuration. The test does not copy or recreate its rules.
 const eslint = new ESLint({
   cwd: packageDirectory,
