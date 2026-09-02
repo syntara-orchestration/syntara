@@ -570,7 +570,7 @@ describe('ActionNodeForm', () => {
 
     it('has no accessibility violations in the locked URL state (HttpUrlField in isolation)', async () => {
       // Render HttpUrlField directly — avoids the PatternFly tab aria-controls/id
-      // mismatch that occurs in JSDOM when testing the full ActionNodeForm.
+      // mismatch that occurs in happy-dom when testing the full ActionNodeForm.
       function Wrapper() {
         const { register, getValues, setValue } = useForm<ActionFormValues>({
           defaultValues: { executor: 'http_request', url: '' },

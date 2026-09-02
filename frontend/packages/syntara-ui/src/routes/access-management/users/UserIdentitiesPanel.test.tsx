@@ -877,10 +877,10 @@ describe('UserIdentitiesPanel', () => {
     it('reads and removes link_error from URL search params', () => {
       // Spy on history.replaceState before the component reads the URL
       const replaceStateSpy = vi.spyOn(window.history, 'replaceState').mockImplementation(() => {
-        // no-op to avoid SecurityError in jsdom
+        // no-op to avoid SecurityError in happy-dom
       })
 
-      // Inject a link_error param via the real location (jsdom supports this)
+      // Inject a link_error param via the real location (happy-dom supports this)
       const originalSearch = window.location.search
       // Use pushState to set the URL without navigation
       window.history.pushState({}, '', '/?link_error=Something+went+wrong')

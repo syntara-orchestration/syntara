@@ -103,6 +103,7 @@ function getAssignmentRowActions(
     { isSeparator: true },
     {
       title: <IconLabel icon={<RhUiTrashIcon />}>Delete assignment</IconLabel>,
+      isDanger: true,
       isAriaDisabled: !permissions.canRevoke,
       tooltipProps: permissions.canRevoke ? undefined : { content: permissions.tooltips.revoke },
       onClick: permissions.canRevoke ? () => onDelete(row) : undefined,
