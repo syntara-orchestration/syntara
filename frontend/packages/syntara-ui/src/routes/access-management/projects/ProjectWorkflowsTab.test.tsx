@@ -274,4 +274,41 @@ describe('ProjectWorkflowsTab', () => {
       expect.anything()
     )
   })
+
+  it('shows a loading state while workflows are pending', () => {
+    mockQueries({ isPending: true })
+    render(<ProjectWorkflowsTab projectId="proj-1" />, { wrapper })
+
+    expect(screen.getByTestId('loading-state')).toBeInTheDocument()
+  })
+
+  it('shows an error state and retries the workflows query', async () => {
+    const refetch = mockQueries({
+      error: { status: 500, title: 'Internal Server Error', retryable: true },
+    })
+    const user = userEvent.setup()
+    render(<ProjectWorkflowsTab projectId="proj-1" />, { wrapper })
+
+    expect(screen.getByTestId('error-state')).toBeInTheDocument()
+    expect(screen.getByText('Error loading workflows')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(refetch).toHaveBeenCalled()
+  })
+
+  it('does not mark an empty project id as ready for the workflows query', () => {
+    render(<ProjectWorkflowsTab projectId="" />, { wrapper })
+
+    expect(useWorkflowPermissions).toHaveBeenCalledWith({ resourceProject: '' })
+    expect(accessClient.useQuery).toHaveBeenCalledWith(
+      'get',
+      '/projects/{project_id}/workflows',
+      expect.objectContaining({
+        params: expect.objectContaining({
+          path: { project_id: '' },
+        }) as unknown,
+      }) as unknown,
+      expect.objectContaining({ enabled: false })
+    )
+  })
 })
