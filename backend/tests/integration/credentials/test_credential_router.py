@@ -295,9 +295,9 @@ class TestUserReferenceFields:
         body = resp.json()
 
         assert body["created_by"]["id"] == str(test_user.id)
-        assert body["created_by"]["name"] == test_user.username
+        assert body["created_by"]["name"] == test_user.display_name
         assert body["updated_by"]["id"] == str(test_user.id)
-        assert body["updated_by"]["name"] == test_user.username
+        assert body["updated_by"]["name"] == test_user.display_name
 
     @pytest.mark.asyncio
     async def test_get_returns_user_reference(
@@ -320,7 +320,7 @@ class TestUserReferenceFields:
         body = get_resp.json()
 
         assert body["created_by"]["id"] == str(test_user.id)
-        assert body["created_by"]["name"] == test_user.username
+        assert body["created_by"]["name"] == test_user.display_name
 
     @pytest.mark.asyncio
     async def test_list_returns_user_references(
@@ -342,7 +342,7 @@ class TestUserReferenceFields:
         for resource in resp.json()["resources"]:
             assert isinstance(resource["created_by"], dict)
             assert resource["created_by"]["id"] == str(test_user.id)
-            assert resource["created_by"]["name"] == test_user.username
+            assert resource["created_by"]["name"] == test_user.display_name
 
     @pytest.mark.asyncio
     async def test_update_returns_user_reference(
@@ -368,7 +368,7 @@ class TestUserReferenceFields:
         body = update_resp.json()
 
         assert body["updated_by"]["id"] == str(test_user.id)
-        assert body["updated_by"]["name"] == test_user.username
+        assert body["updated_by"]["name"] == test_user.display_name
 
 
 class TestDeleteCredential:

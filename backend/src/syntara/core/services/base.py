@@ -5,7 +5,7 @@ consistent filtering, sorting, pagination, and label handling across the entire 
 """
 
 import time
-from collections.abc import Awaitable, Callable, Iterable, Sequence
+from collections.abc import Awaitable, Callable, Iterable
 from datetime import datetime
 from typing import Any
 from uuid import UUID
@@ -13,7 +13,6 @@ from uuid import UUID
 import structlog
 from pydantic import TypeAdapter, ValidationError
 from sqlalchemy import Integer, Select, cast, func
-from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel.sql._expression_select_cls import SelectOfScalar
@@ -130,50 +129,6 @@ class BaseService:
         self.post_processing_mixin = (
             post_processing_mixin if post_processing_mixin is not None else DefaultPostProcessingMixin()
         )
-
-    @staticmethod
-    def _collect_user_ids(objects: Sequence[Any], field_names: Sequence[str]) -> set[str | UUID]:
-        ids: set[str | UUID] = set()
-        for obj in objects:
-            for field in field_names:
-                val = getattr(obj, field, None)
-                if val:
-                    ids.add(val)
-        return ids
-
-    @staticmethod
-    def _apply_user_map(objects: Sequence[Any], field_names: Sequence[str], user_map: dict[str | UUID, str]) -> None:
-        for obj in objects:
-            for field in field_names:
-                val = getattr(obj, field, None)
-                if val and val in user_map:
-                    setattr(obj, field, user_map[val])
-
-    async def _resolve_user_fields(
-        self,
-        objects: Sequence[Any],
-        field_names: Sequence[str] = ("created_by", "updated_by"),
-    ) -> None:
-        """Resolve user UUID fields to usernames in-place.
-
-        Cosmetic enrichment — if the query fails, UUIDs are left in place.
-        """
-        user_ids = self._collect_user_ids(objects, field_names)
-        if not user_ids:
-            return
-        try:
-            stmt = select(User.id, User.username).where(User.id.in_(user_ids))  # type: ignore[attr-defined]
-            result = await self.session.exec(stmt)
-            user_map: dict[str | UUID, str] = {row[0]: row[1] for row in result}
-        except (SQLAlchemyError, OSError):
-            logger.warning("Failed to resolve usernames; returning UUIDs", exc_info=True)
-            return
-        unresolved = user_ids - set(user_map.keys())
-        if unresolved:
-            logger.debug(
-                "Some user UUIDs could not be resolved to usernames", unresolved_ids=[str(uid) for uid in unresolved]
-            )
-        self._apply_user_map(objects, field_names, user_map)
 
     def _apply_standard_filters(
         self,

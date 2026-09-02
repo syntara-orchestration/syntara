@@ -26,6 +26,7 @@ from syntara.core.exceptions import SafeValueError, assert_project_id_unchanged
 from syntara.core.models import User
 from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin
+from syntara.core.services.user_reference_resolution import UserReferenceResolverMixin
 from syntara.credentials.lib.auth_types import AUTH_TYPE_URL
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
@@ -122,7 +123,7 @@ class WorkflowConvertResourceMixin(ConvertResourceMixin):
         return WorkflowRead.model_validate(resource)
 
 
-class WorkflowService(BaseService):
+class WorkflowService(UserReferenceResolverMixin, BaseService):
     """Service for workflow business logic.
 
     This service encapsulates all workflow-related business operations,
@@ -741,7 +742,7 @@ class WorkflowService(BaseService):
 
         """
         # Use unified list_resources method with overridden methods
-        return await self.list_resources(
+        response = await self.list_resources(
             model=Workflow,
             response_type=WorkflowListResponse,
             limit=limit,
@@ -751,6 +752,8 @@ class WorkflowService(BaseService):
             include_total=include_total,
             allowed_projects=allowed_projects,
         )
+        await self.resolve_user_references(response.resources)
+        return response
 
     async def get_publish_context(
         self, version_ids: list[UUID]
@@ -842,6 +845,16 @@ class WorkflowService(BaseService):
             query_params_items=merged_params,
             include_total=include_total,
         )
+
+    async def to_read(self, workflow: Workflow) -> WorkflowRead:
+        """Convert a Workflow to its response model, with user references resolved.
+
+        Every single-workflow response is built here so no endpoint can return a
+        WorkflowRead whose created_by/updated_by are still raw principal ids.
+        """
+        read = WorkflowRead.model_validate(workflow, from_attributes=True)
+        await self.resolve_user_references([read])
+        return read
 
     async def populate_published_version_numbers(self, workflows: list[WorkflowRead]) -> None:
         """Batch-populate published_version_number on WorkflowRead objects."""

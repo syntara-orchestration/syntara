@@ -47,7 +47,7 @@ from syntara.core.models.user_schemas import GroupMemberListResponse, GroupMembe
 from syntara.core.queries.user_queries import get_user_by_id
 from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin
-from syntara.core.services.user_reference_resolution import UserReferenceMixin
+from syntara.core.services.user_reference_resolution import UserReferenceResolverMixin
 from syntara.core.utils.filters import Filter
 from syntara.identity_providers.models.identity_provider import IdentityProvider
 
@@ -63,7 +63,7 @@ class GroupConvertResourceMixin(ConvertResourceMixin):
 logger = structlog.stdlib.get_logger(__name__)
 
 
-class GroupsService(UserReferenceMixin, BaseService):
+class GroupsService(UserReferenceResolverMixin, BaseService):
     """Service for group business logic.
 
     This service encapsulates all group-related business operations,
@@ -138,7 +138,7 @@ class GroupsService(UserReferenceMixin, BaseService):
     async def to_group_read(self, group: Group, member_count: int = 0) -> GroupRead:
         """Convert Group to GroupRead and resolve created_by to UserReference."""
         group_read = self.enrich_group_read(group, member_count)
-        await self.resolve_user_references([group_read], field_names=("created_by",))
+        await self.resolve_user_references([group_read])
         return group_read
 
     async def create_group(
@@ -233,7 +233,7 @@ class GroupsService(UserReferenceMixin, BaseService):
             for resource in response.resources:
                 resource.member_count = counts.get(resource.id, 0)
 
-        await self.resolve_user_references(response.resources, field_names=("created_by",))
+        await self.resolve_user_references(response.resources)
 
         return response
 
@@ -579,7 +579,7 @@ class GroupsService(UserReferenceMixin, BaseService):
             read.membership_sources = sources.get(g.id, [MembershipSource(type="manual")])
             resources.append(read)
 
-        await self.resolve_user_references(resources, field_names=("created_by",))
+        await self.resolve_user_references(resources)
 
         return UserGroupListResponse(resources=resources, next=next_cursor)
 

@@ -31,7 +31,7 @@ from syntara.core.models import User
 from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin, EnrichQueryMixin
 from syntara.core.services.secret_service import SecretService
-from syntara.core.services.user_reference_resolution import UserReferenceMixin
+from syntara.core.services.user_reference_resolution import UserReferenceResolverMixin
 from syntara.credentials.audit.credential import CredentialEncryptionFailureEvent, CredentialLifecycleEvent
 from syntara.credentials.exceptions import (
     CredentialDecryptionError,
@@ -282,7 +282,7 @@ def _get_node_credential_id(node: dict[str, Any]) -> str | None:
     return result
 
 
-class CredentialService(UserReferenceMixin, BaseService):
+class CredentialService(UserReferenceResolverMixin, BaseService):
     """Service for Credential CRUD operations with encryption via SecretService."""
 
     def __init__(self, session: AsyncSession, user: User, secret_service: SecretService) -> None:
@@ -761,7 +761,7 @@ class CredentialService(UserReferenceMixin, BaseService):
             )
 
         # Resolve created_by UUIDs to UserReference objects
-        await self.resolve_user_references(refs, field_names=("created_by",))
+        await self.resolve_user_references(refs)
 
         return refs
 

@@ -16,7 +16,7 @@ from syntara.core.models.base.base_resource import AuditLevel
 from syntara.core.models.base.named import NamedResource
 from syntara.core.models.base.user_owned import UserOwnedResource
 from syntara.core.models.pagination import ResourcesResponse
-from syntara.core.models.user_reference import UserReference
+from syntara.core.models.user_reference import UserReference, UserReferenceFieldsMixin
 from syntara.credentials.models.credential_type import CredentialType
 
 
@@ -107,7 +107,7 @@ class CredentialCreate(SQLModel):
     project_id: UUID = Field(description="Project to assign credential to")
 
 
-class CredentialRead(NamedResource, UserOwnedResource):
+class CredentialRead(UserReferenceFieldsMixin, NamedResource, UserOwnedResource):
     """Schema for credential API responses. Secret fields masked as $encrypted$."""
 
     created_by: UserReference | UUID | str | None = Field(default=None, description="User who created the credential")  # type: ignore[assignment]
@@ -115,13 +115,9 @@ class CredentialRead(NamedResource, UserOwnedResource):
         default=None, description="User who last modified the credential"
     )  # type: ignore[assignment]
 
-    _USER_REF_SCHEMA: ClassVar[dict[str, Any]] = UserReference.OPENAPI_NULLABLE_FIELD
-
     FIELD_SCHEMA_EXTRAS: ClassVar[dict[str, dict[str, Any]]] = {
         **NamedResource.FIELD_SCHEMA_EXTRAS,
         **UserOwnedResource.FIELD_SCHEMA_EXTRAS,
-        "created_by": _USER_REF_SCHEMA,
-        "updated_by": _USER_REF_SCHEMA,
     }
 
     credential_type_id: UUID
@@ -159,8 +155,10 @@ class CredentialListResponse(ResourcesResponse[CredentialRead]):
     """Paginated list response for credentials."""
 
 
-class CredentialWorkflowRef(SQLModel):
+class CredentialWorkflowRef(UserReferenceFieldsMixin, SQLModel):
     """Reference to a workflow that uses a credential."""
+
+    USER_REFERENCE_FIELDS: ClassVar[tuple[str, ...]] = ("created_by",)
 
     id: UUID
     name: str

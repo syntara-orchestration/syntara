@@ -77,7 +77,7 @@ class TestCreateIntegration:
         assert result.management_credential_id is None
         assert isinstance(result.created_by, UserReference)
         assert result.created_by.id == test_user.id
-        assert result.created_by.name == test_user.username
+        assert result.created_by.name == test_user.display_name
 
     @pytest.mark.asyncio
     async def test_create_llm_provider(

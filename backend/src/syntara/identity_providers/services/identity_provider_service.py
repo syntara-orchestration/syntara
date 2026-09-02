@@ -22,7 +22,7 @@ from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin
 from syntara.core.services.secret_consumer_mixin import SecretConsumerMixin
 from syntara.core.services.secret_service import SecretService
-from syntara.core.services.user_reference_resolution import UserReferenceMixin
+from syntara.core.services.user_reference_resolution import UserReferenceResolverMixin
 from syntara.core.utils.filters import Filter
 from syntara.identity_providers.audit.identity_provider import IdentityProviderLifecycleEvent
 from syntara.identity_providers.exceptions import (
@@ -60,7 +60,7 @@ class IdentityProviderConvertMixin(ConvertResourceMixin):
         return IdentityProviderRead.model_validate(resource)
 
 
-class IdentityProviderService(UserReferenceMixin, BaseService, SecretConsumerMixin):
+class IdentityProviderService(UserReferenceResolverMixin, BaseService, SecretConsumerMixin):
     """Service for Identity Provider CRUD operations and business logic."""
 
     def __init__(self, session: AsyncSession, user: User, secret_service: SecretService) -> None:
@@ -110,7 +110,7 @@ class IdentityProviderService(UserReferenceMixin, BaseService, SecretConsumerMix
         """List identity providers with filtering, sorting, and pagination."""
         special_field_handlers = self._get_special_field_handlers()
 
-        return await self.list_resources(
+        response = await self.list_resources(
             model=IdentityProvider,
             response_type=IdentityProviderListResponse,
             limit=limit,
@@ -120,6 +120,8 @@ class IdentityProviderService(UserReferenceMixin, BaseService, SecretConsumerMix
             query_params_items=query_params_items,
             include_total=include_total,
         )
+        await self.resolve_user_references(response.resources)
+        return response
 
     async def get_provider(self, provider_id: UUID) -> IdentityProviderRead:
         """Get an identity provider by ID."""
@@ -135,7 +137,7 @@ class IdentityProviderService(UserReferenceMixin, BaseService, SecretConsumerMix
             raise IdentityProviderNotFoundError(msg)
 
         response = IdentityProviderRead.model_validate(provider)
-        return await self._populate_response_entries(response)
+        return await self._finalize_read(response)
 
     @staticmethod
     def _extract_group_mapping_entries(
@@ -203,14 +205,19 @@ class IdentityProviderService(UserReferenceMixin, BaseService, SecretConsumerMix
             for row in result.all()
         ]
 
-    async def _populate_response_entries(
+    async def _finalize_read(
         self,
         response: IdentityProviderRead,
     ) -> IdentityProviderRead:
-        """Populate group_mapping_entries on a response from the DB table."""
+        """Finish a read model: group_mapping_entries from the DB table, plus user references.
+
+        Every single-provider response goes through here, so a new endpoint cannot
+        forget the enrichment.
+        """
         config = response.configuration
         if isinstance(config, (OIDCConfiguration, OIDCConfigurationResponse)):
             config.group_mapping_entries = await self._load_group_mapping_entries(response.id)
+        await self.resolve_user_references([response])
         return response
 
     async def create_provider(self, provider_create: IdentityProviderCreate) -> IdentityProviderRead:
@@ -250,7 +257,7 @@ class IdentityProviderService(UserReferenceMixin, BaseService, SecretConsumerMix
                 ),
             )
             response = IdentityProviderRead.model_validate(provider)
-            return await self._populate_response_entries(response)
+            return await self._finalize_read(response)
 
         except IntegrityError as e:
             await self._handle_integrity_error(e, provider_create.name)

@@ -18,7 +18,7 @@ from syntara.core.models.base import BaseResource
 from syntara.core.models.base.query_params import BaseListParams
 from syntara.core.models.base.soft_deletable import SoftDeletableResource
 from syntara.core.models.pagination import ResourcesResponse
-from syntara.core.models.user_reference import UserReference
+from syntara.core.models.user_reference import UserReference, UserReferenceFieldsMixin
 
 
 class GroupSource(StrEnum):
@@ -170,7 +170,7 @@ class GroupUpdate(SQLModel):
     )
 
 
-class GroupRead(BaseResource):
+class GroupRead(UserReferenceFieldsMixin, BaseResource):
     """Schema for group response (GET /groups/{id}).
 
     Includes all fields from the database table model.
@@ -183,9 +183,10 @@ class GroupRead(BaseResource):
     source: str = GroupSource.LOCAL
     member_count: int = 0
 
+    USER_REFERENCE_FIELDS: ClassVar[tuple[str, ...]] = ("created_by",)
+
     FIELD_SCHEMA_EXTRAS: ClassVar[dict[str, dict[str, Any]]] = {
         **BaseResource.FIELD_SCHEMA_EXTRAS,
-        "created_by": UserReference.OPENAPI_NULLABLE_FIELD,
     }
 
 

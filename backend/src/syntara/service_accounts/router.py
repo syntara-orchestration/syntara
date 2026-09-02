@@ -97,9 +97,7 @@ async def create_service_account(
         project_id=request.project_id,
         description=request.description,
     )
-    read = await service.to_read(service_account)
-    await service.resolve_user_references([read])
-    return read
+    return await service.to_read(service_account)
 
 
 @router.get(
@@ -115,7 +113,7 @@ async def list_service_accounts(
     visibility: Annotated[VisibilityResult, Depends(VisibilityFilter("service_account", "read"))],
 ) -> ServiceAccountListResponse:
     """List service accounts with project-scoped visibility and pagination."""
-    result = await service.list_service_accounts(
+    return await service.list_service_accounts(
         limit=params.limit,
         cursor=params.cursor,
         sort=params.sort,
@@ -123,8 +121,6 @@ async def list_service_accounts(
         include_total=params.include_total,
         allowed_projects=visibility.to_allowed_projects(),
     )
-    await service.resolve_user_references(result.resources)
-    return result
 
 
 @router.get(
@@ -140,9 +136,7 @@ async def get_service_account(
 ) -> ServiceAccountRead:
     """Get a service account by ID (secret is never included)."""
     service_account = await service.get_service_account(service_account_id)
-    read = await service.to_read(service_account)
-    await service.resolve_user_references([read])
-    return read
+    return await service.to_read(service_account)
 
 
 @router.patch(
@@ -165,9 +159,7 @@ async def update_service_account(
         name=request.name,
         description=request.description,
     )
-    read = await service.to_read(service_account)
-    await service.resolve_user_references([read])
-    return read
+    return await service.to_read(service_account)
 
 
 @router.delete(
@@ -201,9 +193,7 @@ async def disable_service_account(
 ) -> ServiceAccountRead:
     """Set a service account's status to disabled."""
     service_account = await service.disable_service_account(service_account_id)
-    read = await service.to_read(service_account)
-    await service.resolve_user_references([read])
-    return read
+    return await service.to_read(service_account)
 
 
 @router.post(
@@ -220,6 +210,4 @@ async def enable_service_account(
 ) -> ServiceAccountRead:
     """Set a service account's status to active."""
     service_account = await service.enable_service_account(service_account_id)
-    read = await service.to_read(service_account)
-    await service.resolve_user_references([read])
-    return read
+    return await service.to_read(service_account)

@@ -19,7 +19,7 @@ from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.core.models import User
 from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin, EnrichQueryMixin
-from syntara.core.services.user_reference_resolution import UserReferenceMixin
+from syntara.core.services.user_reference_resolution import UserReferenceResolverMixin
 from syntara.tool_manager.audit.tool_bulk_update import ToolBulkUpdateEvent
 from syntara.tool_manager.audit.tool_update import ToolUpdateEvent
 from syntara.tool_manager.exceptions import (
@@ -57,7 +57,7 @@ class ToolServiceConvertResourceMixin(ConvertResourceMixin):
         return ToolWithParameters.model_validate(resource)
 
 
-class ToolService(UserReferenceMixin, BaseService):
+class ToolService(UserReferenceResolverMixin, BaseService):
     """Service for Tool CRUD operations and business logic.
 
     This service handles database persistence, transaction management, and provides

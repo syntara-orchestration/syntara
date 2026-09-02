@@ -21,7 +21,7 @@ from syntara.core.models.base import BaseResource
 from syntara.core.models.base.named import NamedResource
 from syntara.core.models.base.user_owned import UserOwnedResource
 from syntara.core.models.pagination import ResourcesResponse
-from syntara.core.models.user_reference import UserReference
+from syntara.core.models.user_reference import UserReference, UserReferenceFieldsMixin
 from syntara.core.utils.sqlmodel import postgres_enum_column
 
 
@@ -235,7 +235,7 @@ class Tool(ToolBase, table=True):
 # ============================================================================
 
 
-class ToolWithParameters(ToolBase):
+class ToolWithParameters(UserReferenceFieldsMixin, ToolBase):
     """Schema for Tool response with ToolParameter details."""
 
     created_by: UserReference | UUID | str | None = Field(default=None, description="User who created the tool")  # type: ignore[assignment]
@@ -243,8 +243,6 @@ class ToolWithParameters(ToolBase):
 
     FIELD_SCHEMA_EXTRAS: ClassVar[dict[str, Any]] = {
         **ToolBase.FIELD_SCHEMA_EXTRAS,
-        "created_by": UserReference.OPENAPI_NULLABLE_FIELD,
-        "updated_by": UserReference.OPENAPI_NULLABLE_FIELD,
     }
 
     parameters: list[ToolParameter] = Field(..., description="Tool parameters")

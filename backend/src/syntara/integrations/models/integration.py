@@ -19,7 +19,7 @@ from syntara.core.models.base.named import NamedResource
 from syntara.core.models.base.query_params import BaseListParams
 from syntara.core.models.base.user_owned import UserOwnedResource
 from syntara.core.models.pagination import ResourcesResponse
-from syntara.core.models.user_reference import UserReference
+from syntara.core.models.user_reference import UserReference, UserReferenceFieldsMixin
 from syntara.core.utils.sqlmodel import DiscriminatedJSONB, postgres_enum_column
 from syntara.integrations.models.integration_configuration import (
     IntegrationConfiguration,
@@ -372,7 +372,7 @@ class IntegrationCreate(SQLModel):
         return self
 
 
-class IntegrationRead(NamedResource, UserOwnedResource):
+class IntegrationRead(UserReferenceFieldsMixin, NamedResource, UserOwnedResource):
     """Schema for integration API responses."""
 
     created_by: UserReference | UUID | str | None = Field(default=None, description="User who created the integration")  # type: ignore[assignment]
@@ -383,8 +383,6 @@ class IntegrationRead(NamedResource, UserOwnedResource):
     FIELD_SCHEMA_EXTRAS: ClassVar[dict[str, Any]] = {
         **NamedResource.FIELD_SCHEMA_EXTRAS,
         **UserOwnedResource.FIELD_SCHEMA_EXTRAS,
-        "created_by": UserReference.OPENAPI_NULLABLE_FIELD,
-        "updated_by": UserReference.OPENAPI_NULLABLE_FIELD,
     }
 
     integration_type: IntegrationType

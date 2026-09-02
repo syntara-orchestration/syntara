@@ -131,7 +131,7 @@ async def list_executions(
 
     """
     # Use unified list method with query parameters
-    result = await service.list_executions(
+    return await service.list_executions(
         limit=params.limit,
         cursor=params.cursor,
         sort=params.sort,
@@ -139,8 +139,6 @@ async def list_executions(
         include_total=params.include_total,
         allowed_projects=visibility.to_allowed_projects(),
     )
-    await service.resolve_user_references(result.resources)
-    return result
 
 
 @router.post(
@@ -230,7 +228,6 @@ async def create_execution(
         trigger_node_id=request.trigger_node_id,
         use_published=request.use_published,
     )
-    await service.resolve_user_references([execution])
     return execution
 
 
@@ -261,9 +258,7 @@ async def get_execution(
 
     """
     include_set = include_params.get_include_set()
-    execution = await service.get_execution(execution_id, include=include_set)
-    await service.resolve_user_references([execution])
-    return execution
+    return await service.get_execution(execution_id, include=include_set)
 
 
 @router.post(
@@ -303,9 +298,7 @@ async def retry_execution(
 ) -> ExecutionRead:
     """Retry a completed workflow execution."""
     logger.info("Retrying execution", execution_id=execution_id)
-    execution = await service.retry_execution(execution_id)
-    await service.resolve_user_references([execution])
-    return execution
+    return await service.retry_execution(execution_id)
 
 
 @router.get(
