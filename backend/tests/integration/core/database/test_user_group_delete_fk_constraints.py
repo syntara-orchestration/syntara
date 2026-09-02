@@ -30,7 +30,7 @@ from syntara.approvals.models import ApprovalRequest, ApprovalRequestStatus
 from syntara.approvals.models.approval_approvers import ApprovalApproverGroup, ApprovalApproverUser
 from syntara.auth.session.models import RefreshSession
 from syntara.core.models import User
-from syntara.core.models.group import user_groups, user_idp_groups
+from syntara.core.models.group import Group, user_groups, user_idp_groups
 from syntara.core.models.user_identity import UserIdentity
 from syntara.identity_providers.models.idp_group_mapping import IdpGroupMappingEntry
 from syntara.users.services.group_service import GroupsService
@@ -49,7 +49,10 @@ _EXPECTED_CONFDELTYPE: list[tuple[str, str, str]] = [
     ("user_token_configs", "user_token_configs_user_id_fkey", "c"),
     ("approval_approver_users", "approval_approver_users_user_id_fkey", "c"),
     ("approval_approver_groups", "approval_approver_groups_group_id_fkey", "c"),
-    ("idp_group_mapping_entries", "idp_group_mapping_entries_mapped_group_id_fkey", "c"),
+    # Column was renamed nexus_group_id -> mapped_group_id in 4ca3cbf8652a, but Postgres
+    # doesn't rename constraints on RENAME COLUMN and no migration issued RENAME CONSTRAINT,
+    # so the FK is still named after the old column.
+    ("idp_group_mapping_entries", "idp_group_mapping_entries_nexus_group_id_fkey", "c"),
     ("token_usage_records", "token_usage_records_user_id_fkey", "n"),
     ("groups", "groups_created_by_fkey", "n"),
 ]
@@ -77,10 +80,18 @@ async def _count(session: AsyncSession, table: str, where_sql: str, **params: ob
 
 
 async def _add_test_user_to_admins(session: AsyncSession, user_id: UUID) -> None:
-    """Ensure the actor stays an enabled admin so delete_user's admin-count guard passes."""
-    admins_group_id = (
-        await session.execute(text("SELECT id FROM groups WHERE name = 'admins' AND is_builtin IS TRUE"))
-    ).scalar_one()
+    """Ensure the actor is an enabled admin so delete_user's admin-count guard passes.
+
+    The "admins" group is not guaranteed to be seeded in the integration test
+    template (only "authenticated" is auto-created), so this gets-or-creates it,
+    mirroring the pattern in tests/integration/users/services/test_user_service.py.
+    """
+    admins_group_id = (await session.execute(text("SELECT id FROM groups WHERE name = 'admins'"))).scalar_one_or_none()
+    if admins_group_id is None:
+        admins_group_id = uuid4()
+        session.add(Group(id=admins_group_id, name="admins", is_builtin=True, labels={}))
+        await session.flush()
+
     already_member = await _count(
         session,
         "user_groups",
@@ -90,7 +101,7 @@ async def _add_test_user_to_admins(session: AsyncSession, user_id: UUID) -> None
     )
     if not already_member:
         await session.exec(insert(user_groups).values(user_id=user_id, group_id=admins_group_id))
-        await session.commit()
+    await session.commit()
 
 
 @pytest.mark.asyncio
