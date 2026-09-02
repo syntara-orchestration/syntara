@@ -61,7 +61,7 @@ _EXPECTED_CONFDELTYPE: list[tuple[str, str, str]] = [
 async def _confdeltype(session: AsyncSession, table: str, constraint: str) -> str | None:
     result = await session.execute(
         text(
-            "SELECT confdeltype FROM pg_constraint "
+            "SELECT confdeltype::text FROM pg_constraint "
             "WHERE conrelid = CAST(:table_name AS regclass) AND conname = :constraint_name"
         ),
         {"table_name": table, "constraint_name": constraint},
