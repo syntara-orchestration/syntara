@@ -24,5 +24,5 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": [".storybook/**/*.ts", ".storybook/**/*.tsx"]
+  "include": [".storybook/**/*.ts", ".storybook/**/*.tsx", "eslint-plugin-syntara/__tests__/fixtures/**/*.tsx"]
 }

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 const packageDirectory = import.meta.dirname ? resolve(import.meta.dirname, '../..') : process.cwd()
 
 // Load the package's real ESLint configuration. The test does not copy or recreate its rules.
-const restrictedStoryFixture = 'src/test/fixtures/eslint/restricted-story-imports.stories.tsx'
+const restrictedStoryFixture = 'eslint-plugin-syntara/__tests__/fixtures/restricted-story-imports.stories.tsx'
 const eslint = new ESLint({
   cwd: packageDirectory,
   ignore: false,

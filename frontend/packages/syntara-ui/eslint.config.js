@@ -68,7 +68,6 @@ export default tseslint.config(
       'playwright-report/**',
       'scripts/**',
       'eslint-plugin-syntara/**',
-      'src/test/fixtures/eslint/**',
     ],
   },
   js.configs.recommended,
