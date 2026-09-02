@@ -1268,7 +1268,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             # Fail fast with an actionable message before ForEachLoopState's own
             # (opaque) list validation, so a forEach whose items expression resolved
             # to None or a non-list surfaces a clean, self-explanatory failure
-            # instead of a silent zero-iteration loop or a bare Pydantic error.
+            # instead of a bare Pydantic ValidationError.
             self._validate_foreach_items(node, items)
             return ForEachLoopState(items=items)
 
@@ -1285,29 +1285,31 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             items: The resolved ``items`` value for the forEach loop.
 
         Raises:
-            ValueError: If ``items`` resolved to ``None`` (e.g. the referenced
-                input or step output was never populated).
-            TypeError: If ``items`` resolved to a non-list, non-None value.
+            ApplicationError: If ``items`` resolved to ``None`` or a non-list value.
+                Always non-retryable — the expression must be fixed in the workflow definition.
 
         """
         if isinstance(items, list):
             return
 
-        items_expression = node.parameters.get("items")
+        items_expression = node.parameters.get("items") or ""
         if items is None:
             msg = (
                 f"forEach loop items expression {items_expression!r} resolved to None. "
-                "Ensure the referenced input or step output exists and is not empty. "
+                "Ensure the referenced trigger field or step output exists and resolves "
+                "to a list (empty lists are allowed). "
                 "If referencing a workflow input, verify it was provided in 'input_data' "
                 "when starting the execution."
             )
-            raise ValueError(msg)
-
-        msg = (
-            f"forEach loop items expression {items_expression!r} must resolve to a list, "
-            f"got {type(items).__name__}: {items!r}"
-        )
-        raise TypeError(msg)
+        else:
+            max_repr = 300
+            raw = repr(items)
+            truncated = raw[:max_repr] + "…" if len(raw) > max_repr else raw
+            msg = (
+                f"forEach loop items expression {items_expression!r} must resolve to a list, "
+                f"got {type(items).__name__}: {truncated}"
+            )
+        raise ApplicationError(msg, type="ForEachItemsError", non_retryable=True)
 
     async def _execute_node(
         self,
