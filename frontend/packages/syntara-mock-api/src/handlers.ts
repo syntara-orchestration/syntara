@@ -89,6 +89,12 @@ type MockVersionRecord = {
 const MOCK_VERSION_CREATED_BY = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
 const MOCK_VERSION_CREATED_BY_USERNAME = 'demo'
 
+/**
+ * A workflow's created_by/updated_by are UserReference objects; a *version*'s
+ * created_by is still a bare principal id (MOCK_VERSION_CREATED_BY).
+ */
+const MOCK_WORKFLOW_USER_REF = { id: MOCK_VERSION_CREATED_BY, name: 'user-1' }
+
 /** Creates a 409 WORKFLOW_VERSION_CONFLICT response for save/publish mock handlers. */
 function workflowVersionConflictResponse(
   workflowId: string,
@@ -984,7 +990,7 @@ export const handlers = [
       current_version: 1,
       created_at: now,
       updated_at: now,
-      created_by: 'user-1',
+      created_by: MOCK_WORKFLOW_USER_REF,
       updated_by: null,
       project_id: projectId,
       version: {
@@ -992,7 +998,7 @@ export const handlers = [
         version: 1,
         schema_version: body.workflow_definition?.schema_version ?? '2.0.0',
         workflow_definition: body.workflow_definition,
-        created_by: 'user-1',
+        created_by: MOCK_VERSION_CREATED_BY,
         created_at: now,
         change_description: 'Initial version',
         status: WorkflowVersionStatusEnum.DRAFT,
@@ -1156,7 +1162,7 @@ export const handlers = [
       version: nextVersion,
       schema_version: nextDefinition?.schema_version ?? workflow.version?.schema_version ?? '2.0.0',
       workflow_definition: nextDefinition,
-      created_by: mutableWorkflow.updated_by ?? workflow.version?.created_by ?? 'user-1',
+      created_by: workflow.version?.created_by ?? MOCK_VERSION_CREATED_BY,
       created_at: now,
       change_description: body.change_description ?? 'Updated via mock API',
     }

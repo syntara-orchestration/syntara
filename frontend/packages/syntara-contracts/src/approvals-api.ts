@@ -178,7 +178,7 @@ export interface components {
        */
       approver_groups?: components['schemas']['ApproverGroupSummary'][]
       /** @description User who made the decision */
-      decided_by?: components['schemas']['UserReference'] | null
+      readonly decided_by?: components['schemas']['UserReference'] | null
       /**
        * Decided At
        * @description When decision was made
@@ -448,7 +448,7 @@ export interface components {
        */
       decided_at?: string | null
       /** @description User who made the decision (if successful) */
-      decided_by?: components['schemas']['UserReference'] | null
+      readonly decided_by?: components['schemas']['UserReference'] | null
       /**
        * Decision Notes
        * @description Notes provided with the decision (echoed back from request)

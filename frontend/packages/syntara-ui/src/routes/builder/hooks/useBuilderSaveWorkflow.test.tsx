@@ -18,7 +18,7 @@ const baseCreateResponse: CreateResponse = {
   name: 'test-wf',
   current_version: 1,
   is_enabled: true,
-  created_by: 'user-1',
+  created_by: { id: 'u-1', name: 'user-1' },
   project_id: 'proj-1',
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
