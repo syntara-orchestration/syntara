@@ -9,9 +9,7 @@ from enum import Enum, StrEnum
 from typing import TYPE_CHECKING, Any, ClassVar
 from uuid import UUID
 
-from pydantic import ConfigDict, GetJsonSchemaHandler, field_validator, model_validator
-from pydantic.json_schema import JsonSchemaValue
-from pydantic_core import CoreSchema as PydanticCoreSchema
+from pydantic import ConfigDict, field_validator, model_validator
 from sqlalchemy import BigInteger, String, Text, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import CheckConstraint, Column, DateTime, Field, Index, Relationship, SQLModel
@@ -19,7 +17,7 @@ from sqlmodel import CheckConstraint, Column, DateTime, Field, Index, Relationsh
 from syntara.core.constants import FieldLimits
 from syntara.core.models.base import UserOwnedResource
 from syntara.core.models.pagination import ResourcesResponse
-from syntara.core.models.user_reference import UserReference
+from syntara.core.models.user_reference import UserReference, UserReferenceFieldsMixin
 from syntara.core.utils.sqlmodel import postgres_enum_column
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 
@@ -414,7 +412,7 @@ class ActivityData(SQLModel):
     iteration: int | None = None
 
 
-class ExecutionRead(SQLModel):
+class ExecutionRead(UserReferenceFieldsMixin, SQLModel):
     """Schema for execution response (GET /executions/{id}).
 
     Includes database table fields plus computed fields (workflow_version,
@@ -478,24 +476,6 @@ class ExecutionRead(SQLModel):
         description="List of activities with their current status. "
         "Only included when requested via ?include=activities query parameter.",
     )
-
-    FIELD_SCHEMA_EXTRAS: ClassVar[dict[str, dict[str, Any]]] = {
-        "created_by": UserReference.OPENAPI_NULLABLE_FIELD,
-        "updated_by": UserReference.OPENAPI_NULLABLE_FIELD,
-    }
-
-    @classmethod
-    def __get_pydantic_json_schema__(
-        cls, core_schema: PydanticCoreSchema, handler: GetJsonSchemaHandler
-    ) -> JsonSchemaValue:
-        """Inject field-level OpenAPI metadata into the JSON schema."""
-        json_schema = handler(core_schema)
-        json_schema = handler.resolve_ref_schema(json_schema)
-        props = json_schema.get("properties", {})
-        for field, extras in cls.FIELD_SCHEMA_EXTRAS.items():
-            if field in props:
-                props[field].update(extras)
-        return json_schema
 
 
 # ============================================================================

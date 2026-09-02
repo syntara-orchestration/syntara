@@ -12,4 +12,4 @@ def assert_user_reference(value: object, user: User) -> None:
     """Assert *value* is a UserReference JSON object for *user*."""
     assert isinstance(value, dict), f"expected UserReference object, got {type(value).__name__}: {value!r}"
     assert value["id"] == str(user.id)
-    assert value["name"] == user.username
+    assert value["name"] == user.display_name

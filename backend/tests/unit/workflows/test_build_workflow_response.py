@@ -5,7 +5,11 @@ from uuid import uuid4
 
 import pytest
 
-from syntara.workflows.models.workflow import PublishWorkflowVersionResponse, WorkflowReadWithVersion
+from syntara.workflows.models.workflow import (
+    PublishWorkflowVersionResponse,
+    WorkflowRead,
+    WorkflowReadWithVersion,
+)
 from syntara.workflows.models.workflow_version import PublishVersionRequest
 from syntara.workflows.router import _build_workflow_with_version_response, publish_workflow_version
 
@@ -21,6 +25,7 @@ def _make_mock_workflow() -> MagicMock:
     wf.is_enabled = True
     wf.has_validation_issues = False
     wf.created_by = uuid4()
+    wf.updated_by = None
     wf.project_id = uuid4()
     wf.published_version_id = None
     wf.created_at = "2026-01-01T00:00:00Z"
@@ -45,10 +50,16 @@ def _make_mock_version() -> MagicMock:
     return v
 
 
+async def _to_read(workflow: MagicMock) -> WorkflowRead:
+    """Stand in for WorkflowService.to_read without a database."""
+    return WorkflowRead.model_validate(workflow, from_attributes=True)
+
+
 def _make_mock_service() -> AsyncMock:
     service = AsyncMock()
     service.session = AsyncMock()
     service.get_publish_context = AsyncMock(return_value=({}, {}))
+    service.to_read = AsyncMock(side_effect=_to_read)
     return service
 
 

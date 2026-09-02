@@ -60,6 +60,7 @@ from syntara.approvals.models import (
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.core.services import BaseService, GroupMembershipService
 from syntara.core.services.extensions import ConvertResourceMixin, EnrichQueryMixin
+from syntara.core.services.user_reference_resolution import UserReferenceResolverMixin
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -84,11 +85,6 @@ class ApprovalEnrichQuery(EnrichQueryMixin):
 
 class ApprovalServiceConvertResourceMixin(ConvertResourceMixin):
     """Mixin for converting ApprovalRequest resources to ApprovalRequestRead format."""
-
-    def __init__(self, user: User) -> None:
-        """Initialize ApprovalServiceConvertResourceMixin with current user."""
-        super().__init__()
-        self.user = user
 
     def convert_resource(self, resource: ApprovalRequest) -> ApprovalRequestRead:  # type: ignore[override]
         """Convert ApprovalRequest to ApprovalRequestRead format."""
@@ -117,26 +113,17 @@ class ApprovalServiceConvertResourceMixin(ConvertResourceMixin):
             ApproverGroupSummary(id=group.id, name=group.name) for group in approver_group_records
         ]
 
-        # Set the decided_by field with UserReference if there's a decider.
-        # Check the FK column first to avoid triggering a lazy load (which
-        # fails in async context with MissingGreenlet).  The decider
-        # relationship may still be None after selectinload if the session
-        # state was reset (e.g. after commit in decide()), so fall back to
-        # the current user when the decider matches.
+        # decided_by carries only the id here; ApprovalService resolves the name
+        # through the shared UserReferenceResolver, which handles every principal
+        # type. ApprovalRequestRead types the field strictly, so a placeholder
+        # name keeps the model valid until resolution overwrites it.
         if resource.decided_by is not None:
-            decider = getattr(resource, "decider", None)
-            if decider is not None:
-                decider_name = decider.display_name
-            elif resource.decided_by == self.user.id:
-                decider_name = self.user.display_name
-            else:
-                decider_name = ""
-            result.decided_by = UserReference(id=resource.decided_by, name=decider_name)
+            result.decided_by = UserReference(id=resource.decided_by, name="")
 
         return result
 
 
-class ApprovalService(BaseService):
+class ApprovalService(UserReferenceResolverMixin, BaseService):
     """Service for approval business logic.
 
     This service encapsulates all approval-related business operations,
@@ -148,7 +135,7 @@ class ApprovalService(BaseService):
         super().__init__(
             session,
             user,
-            convert_resource_mixin=ApprovalServiceConvertResourceMixin(user),
+            convert_resource_mixin=ApprovalServiceConvertResourceMixin(),
             enrich_query_mixin=ApprovalEnrichQuery(),
         )
         self.group_membership_service = GroupMembershipService(session)
@@ -181,7 +168,7 @@ class ApprovalService(BaseService):
             Eager-loads approver relationships via ApprovalEnrichQuery mixin to avoid N+1 queries.
 
         """
-        return await self.list_resources(
+        response = await self.list_resources(
             model=ApprovalRequest,
             response_type=ApprovalListResponse,
             limit=limit,
@@ -191,6 +178,8 @@ class ApprovalService(BaseService):
             include_total=include_total,
             allowed_projects=allowed_projects,
         )
+        await self.resolve_user_references(response.resources)
+        return response
 
     @staticmethod
     def _approval_eager_loads(*, include_decider: bool = True) -> Sequence[Any]:
@@ -279,7 +268,9 @@ class ApprovalService(BaseService):
         if not approval:
             raise ApprovalNotFoundError(approval_id)
 
-        return cast("ApprovalRequestRead", self.convert_resource_mixin.convert_resource(approval))
+        read = cast("ApprovalRequestRead", self.convert_resource_mixin.convert_resource(approval))
+        await self.resolve_user_references([read])
+        return read
 
     @staticmethod
     def _check_eager_loads(approval: ApprovalRequest) -> None:
@@ -555,7 +546,9 @@ class ApprovalService(BaseService):
         # Refresh the approval with eager-loaded relationships for convert_resource
         await self._refresh_approval_relationships(approval, include_decider=False)
 
-        return cast("ApprovalRequestRead", self.convert_resource_mixin.convert_resource(approval))
+        read = cast("ApprovalRequestRead", self.convert_resource_mixin.convert_resource(approval))
+        await self.resolve_user_references([read])
+        return read
 
     async def delete(
         self,
@@ -731,6 +724,7 @@ class ApprovalService(BaseService):
         await self._refresh_approval_relationships(approval)
 
         response = cast("ApprovalRequestRead", self.convert_resource_mixin.convert_resource(approval))
+        await self.resolve_user_references([response])
         response.signal_delivery_error = signal_error
         return response
 

@@ -20,7 +20,7 @@ from syntara.core.queries.project_queries import assert_project_alive
 from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin
 from syntara.core.services.secret_service import SecretService
-from syntara.core.services.user_reference_resolution import UserReferenceMixin
+from syntara.core.services.user_reference_resolution import UserReferenceResolverMixin
 from syntara.credentials.exceptions import CredentialDisabledError
 from syntara.credentials.lib.injector_resolver import InjectorResolver
 from syntara.integrations.adapters.factory import create_health_check_adapter
@@ -103,7 +103,7 @@ class IntegrationConvertResourceMixin(ConvertResourceMixin):
         return IntegrationRead.model_validate(resource)
 
 
-class IntegrationService(UserReferenceMixin, BaseService):
+class IntegrationService(UserReferenceResolverMixin, BaseService):
     """Service for Integration CRUD operations."""
 
     def __init__(

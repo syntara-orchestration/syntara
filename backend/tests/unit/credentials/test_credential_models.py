@@ -107,20 +107,24 @@ class TestCredentialRead:
         assert read.created_by is None
         assert read.updated_by is None
 
-    def test_schema_extras_set_readonly(self) -> None:
-        extras = CredentialRead.FIELD_SCHEMA_EXTRAS
-        assert extras["created_by"]["readOnly"] is True
-        assert extras["updated_by"]["readOnly"] is True
+    def test_declares_its_user_reference_fields(self) -> None:
+        """The shared resolver reads this declaration to know what to populate."""
+        assert CredentialRead.USER_REFERENCE_FIELDS == ("created_by", "updated_by")
 
-    def test_schema_extras_restrict_anyof_to_user_reference_or_null(self) -> None:
-        """FIELD_SCHEMA_EXTRAS should restrict anyOf to UserReference | null only."""
-        any_of = CredentialRead.FIELD_SCHEMA_EXTRAS["created_by"]["anyOf"]
-        refs = [item.get("$ref") for item in any_of if "$ref" in item]
-        types = [item.get("type") for item in any_of if "type" in item]
+    def test_user_reference_fields_are_advertised_as_reference_or_null(self) -> None:
+        """UserReferenceFieldsMixin narrows the field to UserReference | null, readOnly.
+
+        Without it the ``UserReference | UUID | str | None`` annotation would leak a
+        four-way union into the OpenAPI spec.
+        """
+        spec = UserReference.OPENAPI_NULLABLE_FIELD
+        assert spec["readOnly"] is True
+        refs = [item.get("$ref") for item in spec["anyOf"] if "$ref" in item]
+        types = [item.get("type") for item in spec["anyOf"] if "type" in item]
         assert "#/components/schemas/UserReference" in refs
         assert "null" in types
         assert "string" not in types
-        assert len(any_of) == 2
+        assert len(spec["anyOf"]) == 2
 
 
 class TestCredentialCreate:

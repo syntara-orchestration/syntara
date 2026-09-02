@@ -105,9 +105,7 @@ async def setup_aap_oidc_provider(
     """Set up an AAP OIDC identity provider."""
     settings = get_settings()
     setup_service = AAPOIDCSetupService(idp_service=service, settings=settings)
-    read = await setup_service.setup(setup_request)
-    await service.resolve_user_references([read])
-    return read
+    return await setup_service.setup(setup_request)
 
 
 # ============================================================================
@@ -128,15 +126,13 @@ async def list_identity_providers(
     params: Annotated[IdentityProviderListParams, Query()],
 ) -> IdentityProviderListResponse:
     """List identity providers with filtering, sorting, and pagination."""
-    result = await service.list_providers(
+    return await service.list_providers(
         limit=params.limit,
         cursor=params.cursor,
         sort=params.sort,
         query_params_items=request.query_params.items(),
         include_total=params.include_total,
     )
-    await service.resolve_user_references(result.resources)
-    return result
 
 
 @router.post(
@@ -153,9 +149,7 @@ async def create_identity_provider(
     service: Annotated[IdentityProviderService, Depends(get_identity_provider_service)],
 ) -> IdentityProviderRead:
     """Create a new identity provider."""
-    read = await service.create_provider(provider_create)
-    await service.resolve_user_references([read])
-    return read
+    return await service.create_provider(provider_create)
 
 
 @router.get(
@@ -170,9 +164,7 @@ async def get_identity_provider(
     service: Annotated[IdentityProviderService, Depends(get_identity_provider_service)],
 ) -> IdentityProviderRead:
     """Get identity provider details by ID."""
-    read = await service.get_provider(provider_id)
-    await service.resolve_user_references([read])
-    return read
+    return await service.get_provider(provider_id)
 
 
 @router.patch(
@@ -188,9 +180,7 @@ async def update_identity_provider(
     service: Annotated[IdentityProviderService, Depends(get_identity_provider_service)],
 ) -> IdentityProviderRead:
     """Update an identity provider."""
-    read = await service.update_provider(provider_id, provider_update)
-    await service.resolve_user_references([read])
-    return read
+    return await service.update_provider(provider_id, provider_update)
 
 
 @router.delete(

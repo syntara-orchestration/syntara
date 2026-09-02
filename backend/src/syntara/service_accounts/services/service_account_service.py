@@ -17,7 +17,7 @@ from syntara.core.exceptions import assert_project_id_unchanged
 from syntara.core.models import User
 from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin
-from syntara.core.services.user_reference_resolution import UserReferenceMixin
+from syntara.core.services.user_reference_resolution import UserReferenceResolverMixin
 from syntara.service_accounts.exceptions import ServiceAccountNameConflictError, ServiceAccountNotFoundError
 from syntara.service_accounts.models.service_account import ServiceAccount, ServiceAccountStatus
 from syntara.service_accounts.models.service_account_credential import ServiceAccountCredential
@@ -35,7 +35,7 @@ class ServiceAccountConvertMixin(ConvertResourceMixin):
         return ServiceAccountRead.model_validate(resource)
 
 
-class ServiceAccountService(UserReferenceMixin, BaseService):
+class ServiceAccountService(UserReferenceResolverMixin, BaseService):
     """Service for service account business logic."""
 
     def __init__(self, session: AsyncSession, user: User) -> None:
@@ -98,6 +98,7 @@ class ServiceAccountService(UserReferenceMixin, BaseService):
         project_name = await self._resolve_project_info(service_account.project_id)
         if project_name:
             read.project_name = project_name
+        await self.resolve_user_references([read])
         return read
 
     async def _resolve_project_info(self, project_id: UUID) -> str | None:
@@ -167,6 +168,7 @@ class ServiceAccountService(UserReferenceMixin, BaseService):
         response.max_lifetime_days = await get_runtime_settings().get_int(
             "service_accounts.credential_max_lifetime_days"
         )
+        await self.resolve_user_references(response.resources)
         return response
 
     async def update_service_account(

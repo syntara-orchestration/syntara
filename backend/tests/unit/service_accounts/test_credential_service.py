@@ -277,7 +277,7 @@ class TestRotateCredential:
 class TestConversionMethods:
     """Tests for to_read, to_create_response, to_rotate_response."""
 
-    def test_to_read(self, service: ServiceAccountCredentialService) -> None:
+    async def test_to_read(self, service: ServiceAccountCredentialService) -> None:
         cred = ServiceAccountCredential(
             service_account_id=uuid4(),
             credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS,
@@ -285,11 +285,11 @@ class TestConversionMethods:
             hashed_secret="$argon2id$placeholder",  # noqa: S106
             created_by=uuid4(),
         )
-        read = service.to_read(cred)
+        read = await service.to_read(cred)
         assert isinstance(read, ServiceAccountCredentialRead)
         assert read.identifier == "nx_sa_abcdef1234567890"
 
-    def test_to_create_response_client_credentials(self, service: ServiceAccountCredentialService) -> None:
+    async def test_to_create_response_client_credentials(self, service: ServiceAccountCredentialService) -> None:
         cred = ServiceAccountCredential(
             service_account_id=uuid4(),
             credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS,
@@ -297,11 +297,11 @@ class TestConversionMethods:
             hashed_secret="$argon2id$placeholder",  # noqa: S106
             created_by=uuid4(),
         )
-        resp = service.to_create_response(cred, "the-secret")
+        resp = await service.to_create_response(cred, "the-secret")
         assert isinstance(resp, ServiceAccountCredentialCreateResponse)
         assert resp.client_secret == "the-secret"  # noqa: S105
 
-    def test_to_rotate_response(self, service: ServiceAccountCredentialService) -> None:
+    async def test_to_rotate_response(self, service: ServiceAccountCredentialService) -> None:
         cred = ServiceAccountCredential(
             service_account_id=uuid4(),
             credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS,
@@ -309,7 +309,7 @@ class TestConversionMethods:
             hashed_secret="$argon2id$placeholder",  # noqa: S106
             created_by=uuid4(),
         )
-        resp = service.to_rotate_response(cred, "new-secret")
+        resp = await service.to_rotate_response(cred, "new-secret")
         assert isinstance(resp, ServiceAccountCredentialRotateResponse)
         assert resp.client_secret == "new-secret"  # noqa: S105
 
