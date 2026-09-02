@@ -388,6 +388,21 @@ class TestPatchIntegration:
         assert result.description == created.description
 
     @pytest.mark.asyncio
+    async def test_patch_same_values_does_not_bump_updated_at(
+        self, test_db_session: AsyncSession, integration_service: IntegrationService
+    ) -> None:
+        """Resubmitting unchanged values must not bump updated_at."""
+        created = await integration_service.create_integration(_mcp_create(name="Noop Patch"))
+        original_updated_at = created.updated_at
+
+        result = await integration_service.update_integration(
+            created.id,
+            IntegrationUpdate(name="Noop Patch", enabled=True),
+        )
+
+        assert result.updated_at == original_updated_at
+
+    @pytest.mark.asyncio
     async def test_patch_name_conflict_raises(
         self, test_db_session: AsyncSession, integration_service: IntegrationService
     ) -> None:

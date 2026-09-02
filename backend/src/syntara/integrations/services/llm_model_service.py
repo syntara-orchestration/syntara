@@ -118,7 +118,8 @@ class LLMModelService(BaseService):
             value = getattr(data, field)
             if value is not None:
                 setattr(model, field, value)
-        model.updated_at = datetime.now(UTC)
+        if not self.has_pending_user_changes(model):
+            return LLMModelRead.model_validate(model)
         await self.session.commit()
         logger.info(
             "Updated LLM model",

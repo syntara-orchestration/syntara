@@ -54,7 +54,7 @@ def register_sqlalchemy_events() -> None:
     - Audit context propagation (Postgres session variables)
     - Auto-creation of Principal rows for principal subtypes
     """
-    from syntara.core.models.base.base_resource import touch_updated_at_before_flush  # noqa: PLC0415
+    from syntara.core.models.base.base_resource import touch_audit_metadata_before_flush  # noqa: PLC0415
     from syntara.core.models.principal import _before_flush  # noqa: PLC0415
 
     target = AsyncSession.sync_session_class
@@ -62,8 +62,8 @@ def register_sqlalchemy_events() -> None:
     # Register each handler only if not already registered (idempotency)
     if not event.contains(target, "before_flush", set_audit_context):
         event.listen(target, "before_flush", set_audit_context)
-    if not event.contains(target, "before_flush", touch_updated_at_before_flush):
-        event.listen(target, "before_flush", touch_updated_at_before_flush)
+    if not event.contains(target, "before_flush", touch_audit_metadata_before_flush):
+        event.listen(target, "before_flush", touch_audit_metadata_before_flush)
     if not event.contains(target, "before_flush", _before_flush):
         event.listen(target, "before_flush", _before_flush)
 

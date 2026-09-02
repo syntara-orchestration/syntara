@@ -323,6 +323,59 @@ class TestUpdateCredential:
         assert updated["updated_by"]["id"] == str(test_user.id)
         assert updated["updated_at"] > created["updated_at"]
 
+    @pytest.mark.asyncio
+    async def test_patch_same_inputs_does_not_update_audit_metadata(
+        self, auth_client: AsyncClient, bearer_type: CredentialType, test_project_id: str, test_user: User
+    ) -> None:
+        """Resubmitting unchanged secret inputs must not bump updated_at or updated_by."""
+        create_resp = await auth_client.post(
+            "/api/v1/credentials",
+            json={
+                "name": "Noop Inputs Test",
+                "credential_type_id": str(bearer_type.id),
+                "project_id": test_project_id,
+                "inputs": {"token": "same-token"},
+            },
+        )
+        assert create_resp.status_code == 201
+        created = create_resp.json()
+
+        update_resp = await auth_client.patch(
+            f"/api/v1/credentials/{created['id']}",
+            json={"inputs": {"token": "same-token"}},
+        )
+        assert update_resp.status_code == 200
+        updated = update_resp.json()
+        assert updated["updated_at"] == created["updated_at"]
+        assert updated["updated_by"]["id"] == str(test_user.id)
+
+    @pytest.mark.asyncio
+    async def test_patch_same_description_does_not_update_audit_metadata(
+        self, auth_client: AsyncClient, bearer_type: CredentialType, test_project_id: str, test_user: User
+    ) -> None:
+        """Resubmitting an unchanged description must not bump updated_at."""
+        create_resp = await auth_client.post(
+            "/api/v1/credentials",
+            json={
+                "name": "Noop Description Test",
+                "credential_type_id": str(bearer_type.id),
+                "project_id": test_project_id,
+                "inputs": {"token": "abc"},
+                "description": "unchanged",
+            },
+        )
+        assert create_resp.status_code == 201
+        created = create_resp.json()
+
+        update_resp = await auth_client.patch(
+            f"/api/v1/credentials/{created['id']}",
+            json={"description": "unchanged"},
+        )
+        assert update_resp.status_code == 200
+        updated = update_resp.json()
+        assert updated["updated_at"] == created["updated_at"]
+        assert updated["updated_by"]["id"] == str(test_user.id)
+
 
 class TestUserReferenceFields:
     """Verify created_by/updated_by return UserReference objects."""

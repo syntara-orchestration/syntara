@@ -45,6 +45,49 @@ def _utc_now() -> datetime:
     return datetime.now(UTC)
 
 
+_EXTERNAL_CHANGES_ATTR = "_syntara_external_field_changes"
+
+
+def note_external_field_change(obj: "BaseResource", field_name: str) -> None:
+    """Mark that a non-ORM / off-row field changed on this resource.
+
+    Services compare domain-specific payloads (e.g. Credential inputs in
+    SecretService) and call this when the stored value actually differs.
+    The before_flush hook treats external markers like user-visible ORM edits.
+    """
+    changes: set[str] = obj.__dict__.setdefault(_EXTERNAL_CHANGES_ATTR, set())
+    changes.add(field_name)
+
+
+def external_field_changes(obj: "BaseResource") -> frozenset[str]:
+    """Return off-row field names marked via :func:`note_external_field_change`."""
+    changes = obj.__dict__.get(_EXTERNAL_CHANGES_ATTR)
+    if not changes:
+        return frozenset()
+    return frozenset(changes)
+
+
+def clear_external_field_changes(obj: "BaseResource") -> None:
+    """Clear transient off-row change markers after audit metadata is applied."""
+    obj.__dict__.pop(_EXTERNAL_CHANGES_ATTR, None)
+
+
+def user_visible_column_changes(obj: "BaseResource") -> set[str]:
+    """Return user-visible ORM and external field names that actually changed."""
+    exempt = type(obj).__updated_at_exempt_fields__
+    external = set(external_field_changes(obj))
+    state = sa_inspect(obj)
+    orm_changed: set[str] = set()
+    if state is not None and state.persistent:
+        orm_changed = _changed_column_names(obj) - {"updated_at", "updated_by"} - exempt
+    return orm_changed | external
+
+
+def has_user_visible_changes(obj: "BaseResource") -> bool:
+    """Return whether the resource has a real user-visible change pending flush."""
+    return bool(user_visible_column_changes(obj))
+
+
 def _changed_column_names(obj: "BaseResource") -> set[str]:
     """Return mapped column names whose pre-flush value differs from the loaded state."""
     state = sa_inspect(obj)
@@ -69,24 +112,33 @@ def _changed_column_names(obj: "BaseResource") -> set[str]:
     return changed
 
 
-def touch_updated_at_before_flush(session: Session, _flush_context: object, _instances: object) -> None:
-    """Bump updated_at on dirty BaseResource rows that have a real, user-visible field change.
+def touch_audit_metadata_before_flush(session: Session, _flush_context: object, _instances: object) -> None:
+    """Bump updated_at on resources with real user-visible changes.
 
     Explicit assignment here ensures the timestamp is on the instance and in the
     UPDATE statement (column ``onupdate`` is intentionally not used — it would
     bump on every row UPDATE, including exempt-only system writes).
 
-    Only bumps when a non-exempt field changed, so system-managed writes --
-    login timestamps, health-check/validation workers, resource refresh --
-    don't change user-visible "last updated" semantics. Models opt fields out
-    via ``__updated_at_exempt_fields__``.
+    Only bumps when a non-exempt ORM field or off-row marker changed, so
+    system-managed writes -- login timestamps, health-check/validation workers,
+    resource refresh -- don't change user-visible "last updated" semantics.
+    Models opt ORM fields out via ``__updated_at_exempt_fields__`` and
+    off-row fields in via :func:`note_external_field_change`.
+
+    ``updated_by`` is set by services when committing user edits (they hold the
+    acting user); this hook only manages ``updated_at``.
     """
-    for obj in session.dirty:
+    for obj in session:
         if not isinstance(obj, BaseResource):
             continue
-        exempt = type(obj).__updated_at_exempt_fields__
-        if _changed_column_names(obj) - {"updated_at"} - exempt:
-            obj.updated_at = _utc_now()
+        if not has_user_visible_changes(obj):
+            continue
+        obj.updated_at = _utc_now()
+        clear_external_field_changes(obj)
+
+
+# Backward-compatible alias for existing imports and tests.
+touch_updated_at_before_flush = touch_audit_metadata_before_flush
 
 
 class BaseResource(SQLModel, ABC):
@@ -192,6 +244,9 @@ class BaseResource(SQLModel, ABC):
     # Fields whose mutation alone should not bump updated_at (system-managed
     # writes, e.g. User.last_login or Integration validation/refresh status).
     __updated_at_exempt_fields__: ClassVar[frozenset[str]] = frozenset()
+
+    # Off-row fields documented for services that call note_external_field_change.
+    __external_change_fields__: ClassVar[frozenset[str]] = frozenset()
 
     # Audit trail configuration
     # Set to AuditLevel.NONE to disable auditing, AuditLevel.META to audit only metadata
