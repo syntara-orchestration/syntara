@@ -463,8 +463,8 @@ export const handlers = [
       const isDesc = sort.startsWith('-')
       const field = isDesc ? sort.slice(1) : sort
       filtered.sort((a, b) => {
-        let aVal = ''
-        let bVal = ''
+        let aVal: string
+        let bVal: string
         switch (field) {
           case 'name':
             aVal = a.name ?? ''
@@ -1642,8 +1642,8 @@ export const handlers = [
       const field = isDesc ? sort.slice(1) : sort
       // Allowlist matches Execution.__sortable_fields__; unknown fields are ignored.
       enriched.sort((a, b) => {
-        let aVal = ''
-        let bVal = ''
+        let aVal: string
+        let bVal: string
         switch (field) {
           case 'id':
             aVal = a.id ?? ''
@@ -2282,8 +2282,8 @@ export const handlers = [
       const isDesc = sort.startsWith('-')
       const field = isDesc ? sort.slice(1) : sort
       resources.sort((a, b) => {
-        let aVal = ''
-        let bVal = ''
+        let aVal: string
+        let bVal: string
         switch (field) {
           case 'name':
             aVal = a.name ?? ''
@@ -2623,8 +2623,8 @@ export const handlers = [
       const isDesc = sort.startsWith('-')
       const field = isDesc ? sort.slice(1) : sort
       resources.sort((a, b) => {
-        let aVal = ''
-        let bVal = ''
+        let aVal: string
+        let bVal: string
         switch (field) {
           case 'username':
             aVal = a.username
@@ -3037,8 +3037,8 @@ export const handlers = [
       const isDesc = sort.startsWith('-')
       const field = isDesc ? sort.slice(1) : sort
       resources.sort((a, b) => {
-        let aVal = ''
-        let bVal = ''
+        let aVal: string
+        let bVal: string
         switch (field) {
           case 'name':
             aVal = a.name ?? ''
@@ -4387,7 +4387,7 @@ export const handlers = [
       const isDesc = sort.startsWith('-')
       const field = isDesc ? sort.slice(1) : sort
       filtered.sort((a, b) => {
-        let cmp = 0
+        let cmp: number
         switch (field) {
           case 'name':
             cmp = a.name.localeCompare(b.name)
@@ -4449,7 +4449,7 @@ export const handlers = [
       const isDesc = sort.startsWith('-')
       const field = isDesc ? sort.slice(1) : sort
       filtered.sort((a, b) => {
-        let cmp = 0
+        let cmp: number
         switch (field) {
           case 'name':
             cmp = a.name.localeCompare(b.name)
