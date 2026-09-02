@@ -55,7 +55,6 @@ async def test_create_project(seeded_db: AsyncSession, test_user: User) -> None:
     assert project.name == "test-project"
     assert project.description == "A test project"
     assert project.labels == {"env": "dev"}
-    assert project.deleted_at is None
 
     # Creator should be assigned project-admin
     assignments = (await seeded_db.exec(select(RoleAssignment).where(RoleAssignment.project_id == project.id))).all()
@@ -94,7 +93,7 @@ async def test_get_project_not_found(seeded_db: AsyncSession, test_user: User) -
 
 @pytest.mark.asyncio
 async def test_get_deleted_project_not_found(seeded_db: AsyncSession, test_user: User) -> None:
-    """Getting a soft-deleted project raises SafeValueError."""
+    """Getting a hard-deleted project raises ProjectNotFoundError."""
     svc = ProjectService(seeded_db, test_user)
     project = await svc.create_project(name="deleted-project")
     await svc.delete_project(project.id)
@@ -253,7 +252,7 @@ async def test_update_project_partial(seeded_db: AsyncSession, test_user: User) 
 
 @pytest.mark.asyncio
 async def test_delete_project(seeded_db: AsyncSession, test_user: User) -> None:
-    """Soft-delete a project."""
+    """Hard-delete a project."""
     svc = ProjectService(seeded_db, test_user)
     project = await svc.create_project(name="delete-me")
     await svc.delete_project(project.id)
@@ -378,8 +377,8 @@ async def test_delete_project_hard_deletes_workflows(seeded_db: AsyncSession, te
 
 
 @pytest.mark.asyncio
-async def test_delete_project_cascades_executions(seeded_db: AsyncSession, test_user: User) -> None:
-    """Deleting a project cascade-deletes all executions with their workflows."""
+async def test_delete_project_hard_deletes_executions(seeded_db: AsyncSession, test_user: User) -> None:
+    """Deleting a project hard-deletes all executions within it."""
     svc = ProjectService(seeded_db, test_user)
     user_id = test_user.id
     project = await svc.create_project(name="cascade-executions")
@@ -416,62 +415,58 @@ async def test_delete_project_cascades_executions(seeded_db: AsyncSession, test_
     seeded_db.add(execution)
     await seeded_db.commit()
     exec_id = execution.id
-    version_id = wf_version.id
 
     await svc.delete_project(project.id)
 
     seeded_db.expire_all()
     ex = (await seeded_db.exec(select(Execution).where(Execution.id == exec_id))).first()
-    assert ex is None, "Execution should cascade-delete with its workflow when project is deleted"
-    ver = (await seeded_db.exec(select(WorkflowVersion).where(WorkflowVersion.id == version_id))).first()
-    assert ver is None, "WorkflowVersion should cascade-delete with its workflow when project is deleted"
+    assert ex is None
 
 
 @pytest.mark.asyncio
-async def test_delete_project_blocked_by_active_execution(seeded_db: AsyncSession, test_user: User) -> None:
-    """Deleting a project is blocked when one of its workflows has a non-terminal execution."""
-    from syntara.workflows.exceptions import WorkflowHasActiveExecutionsError
+async def test_delete_project_blocked_by_active_executions(seeded_db: AsyncSession, test_user: User) -> None:
+    """Deleting a project with non-terminal executions raises ProjectHasActiveExecutionsError."""
+    from syntara.authz.exceptions import ProjectHasActiveExecutionsError
 
     svc = ProjectService(seeded_db, test_user)
     user_id = test_user.id
-    project = await svc.create_project(name="cascade-blocked-active-exec")
+    project = await svc.create_project(name="active-execs-project")
 
-    workflow = Workflow(name="active-exec-workflow", project_id=project.id, created_by=user_id, labels={})
-    seeded_db.add(workflow)
-    await seeded_db.flush()
-
-    version = WorkflowVersion(
-        workflow_id=workflow.id,
-        version=1,
-        schema_version="2.0.0",
-        workflow_definition=create_minimal_workflow_definition(name="active-exec"),
+    workflow = Workflow(
+        name="active-workflow",
+        project_id=project.id,
         created_by=user_id,
         labels={},
     )
-    seeded_db.add(version)
+    seeded_db.add(workflow)
+    await seeded_db.flush()
+
+    wf_version = WorkflowVersion(
+        workflow_id=workflow.id,
+        version=1,
+        schema_version="2.0.0",
+        workflow_definition=create_minimal_workflow_definition(name="test-guard"),
+        created_by=user_id,
+        labels={},
+    )
+    seeded_db.add(wf_version)
     await seeded_db.flush()
 
     execution = Execution(
         workflow_id=workflow.id,
-        workflow_version_id=version.id,
+        workflow_version_id=wf_version.id,
         project_id=project.id,
-        created_by=user_id,
-        status="running",
         temporal_workflow_id=f"temporal-{uuid4().hex[:8]}",
+        status="running",
+        created_by=user_id,
         labels={},
     )
     seeded_db.add(execution)
     await seeded_db.commit()
-    workflow_id, execution_id = workflow.id, execution.id
 
-    with pytest.raises(WorkflowHasActiveExecutionsError):
+    with pytest.raises(ProjectHasActiveExecutionsError) as exc_info:
         await svc.delete_project(project.id)
-
-    seeded_db.expire_all()
-    wf = (await seeded_db.exec(select(Workflow).where(Workflow.id == workflow_id))).first()
-    assert wf is not None, "Workflow should still exist after blocked delete"
-    ex = (await seeded_db.exec(select(Execution).where(Execution.id == execution_id))).first()
-    assert ex is not None, "Execution should still exist after blocked delete"
+    assert exc_info.value.active_count == 1
 
 
 @pytest.mark.asyncio
@@ -711,7 +706,7 @@ async def test_delete_project_does_not_affect_other_projects(seeded_db: AsyncSes
     await svc.delete_project(p1_id)
 
     seeded_db.expire_all()
-    # p1 resources should be gone (hard-deleted)
+    # p1 resources should be fully deleted
     assert (await seeded_db.exec(select(Role).where(Role.project_id == p1_id))).all() == []
     wf1_row = (await seeded_db.exec(select(Workflow).where(Workflow.project_id == p1_id))).first()
     assert wf1_row is None
@@ -785,7 +780,6 @@ async def test_delete_default_project_raises(seeded_db: AsyncSession, test_user:
 
     # Still present and still the default after rejected delete
     await seeded_db.refresh(default_project)
-    assert default_project.deleted_at is None
     assert default_project.is_default is True
 
 

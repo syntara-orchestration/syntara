@@ -173,22 +173,8 @@ class TestFileManagerIsProjectDeleted:
     """Tests for FileManager.is_project_deleted orphan detection."""
 
     @pytest.mark.asyncio
-    async def test_is_project_deleted_true_when_deleted_at_set(self, file_manager_with_retriever: FileManager) -> None:
-        from datetime import UTC, datetime
-
+    async def test_is_project_deleted_false_when_project_exists(self, file_manager_with_retriever: FileManager) -> None:
         project = Mock()
-        project.deleted_at = datetime.now(UTC)
-        session = AsyncMock()
-        result = Mock()
-        result.one_or_none = Mock(return_value=project)
-        session.exec = AsyncMock(return_value=result)
-
-        assert await file_manager_with_retriever.is_project_deleted(uuid4(), session) is True
-
-    @pytest.mark.asyncio
-    async def test_is_project_deleted_false_when_active(self, file_manager_with_retriever: FileManager) -> None:
-        project = Mock()
-        project.deleted_at = None
         session = AsyncMock()
         result = Mock()
         result.one_or_none = Mock(return_value=project)
@@ -224,19 +210,11 @@ class TestFileManagerBatchIsProjectDeleted:
         file_manager_with_retriever: FileManager,
         scenario: str,
     ) -> None:
-        from datetime import UTC, datetime
-
-        active_id = uuid4()
-        soft_id = uuid4()
+        existing_id = uuid4()
         missing_id = uuid4()
 
-        active = Mock()
-        active.id = active_id
-        active.deleted_at = None
-
-        soft = Mock()
-        soft.id = soft_id
-        soft.deleted_at = datetime.now(UTC)
+        existing = Mock()
+        existing.id = existing_id
 
         session = AsyncMock()
         query_result = Mock()
@@ -248,15 +226,15 @@ class TestFileManagerBatchIsProjectDeleted:
             return
 
         if scenario == "mapped":
-            query_result.all = Mock(return_value=[active, soft])
+            query_result.all = Mock(return_value=[existing])
             session.exec = AsyncMock(return_value=query_result)
-            result = await file_manager_with_retriever.batch_is_project_deleted({active_id, soft_id}, session)
-            assert result == {active_id: False, soft_id: True}
+            result = await file_manager_with_retriever.batch_is_project_deleted({existing_id}, session)
+            assert result == {existing_id: False}
             session.exec.assert_awaited_once()
             return
 
-        query_result.all = Mock(return_value=[active])
+        query_result.all = Mock(return_value=[existing])
         session.exec = AsyncMock(return_value=query_result)
-        result = await file_manager_with_retriever.batch_is_project_deleted({active_id, missing_id}, session)
-        assert result == {active_id: False, missing_id: True}
+        result = await file_manager_with_retriever.batch_is_project_deleted({existing_id, missing_id}, session)
+        assert result == {existing_id: False, missing_id: True}
         session.exec.assert_awaited_once()

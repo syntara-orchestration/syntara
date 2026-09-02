@@ -4,8 +4,9 @@ Tests verify the business logic for webhook trigger management:
 path lookup, sync from workflow definitions, and cascade delete.
 """
 
+from collections.abc import Generator
 from typing import Any
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, patch
 from uuid import UUID, uuid4
 
 import pytest
@@ -268,6 +269,16 @@ class TestVerifyServiceAccountAuthorization:
 class TestSyncWebhookTriggers:
     """Test suite for sync_webhook_triggers."""
 
+    @pytest.fixture(autouse=True)
+    def _skip_sa_binding_sync(self) -> Generator[None]:
+        """Patch SA binding sync — these tests focus on trigger create/update/delete, not SA bindings."""
+        with patch.object(
+            WebhookTriggerService,
+            "_sync_trigger_sa_bindings",
+            new_callable=AsyncMock,
+        ):
+            yield
+
     @pytest.mark.asyncio
     async def test_creates_new_trigger(self) -> None:
         """Test that a new trigger is created for a webhook node not in the DB."""
@@ -285,7 +296,7 @@ class TestSyncWebhookTriggers:
                 {
                     "id": "trigger-1",
                     "type": "webhook_trigger",
-                    "parameters": {"webhook_path": "new-hook"},
+                    "parameters": {"webhook_path": "new-hook", "authorized_service_account_ids": [str(uuid4())]},
                 }
             ]
         )
@@ -306,12 +317,9 @@ class TestSyncWebhookTriggers:
         )
 
         mock_session = AsyncMock(spec=AsyncSession)
-        # First exec: existing triggers lookup; second exec: SA binding lookup
         existing_result = Mock()
         existing_result.all.return_value = [existing]
-        sa_result = Mock()
-        sa_result.all.return_value = []
-        mock_session.exec = AsyncMock(side_effect=[existing_result, sa_result])
+        mock_session.exec = AsyncMock(return_value=existing_result)
         mock_session.flush = AsyncMock()
 
         service = _make_service(session=mock_session)
@@ -321,7 +329,7 @@ class TestSyncWebhookTriggers:
                 {
                     "id": "trigger-1",
                     "type": "webhook_trigger",
-                    "parameters": {"webhook_path": "new-path"},
+                    "parameters": {"webhook_path": "new-path", "authorized_service_account_ids": [str(uuid4())]},
                 }
             ]
         )
@@ -379,12 +387,12 @@ class TestSyncWebhookTriggers:
                 {
                     "id": "trigger-1",
                     "type": "webhook_trigger",
-                    "parameters": {"webhook_path": "duplicate-path"},
+                    "parameters": {"webhook_path": "duplicate-path", "authorized_service_account_ids": [str(uuid4())]},
                 },
                 {
                     "id": "trigger-2",
                     "type": "webhook_trigger",
-                    "parameters": {"webhook_path": "innocent-path"},
+                    "parameters": {"webhook_path": "innocent-path", "authorized_service_account_ids": [str(uuid4())]},
                 },
             ]
         )
@@ -420,7 +428,7 @@ class TestSyncWebhookTriggers:
                 {
                     "id": "trigger-1",
                     "type": "webhook_trigger",
-                    "parameters": {"webhook_path": "some-path"},
+                    "parameters": {"webhook_path": "some-path", "authorized_service_account_ids": [str(uuid4())]},
                 }
             ]
         )
@@ -503,7 +511,7 @@ class TestSyncWebhookTriggers:
                 {
                     "id": "trigger-1",
                     "type": "webhook_trigger",
-                    "parameters": {"webhook_path": "test"},
+                    "parameters": {"webhook_path": "test", "authorized_service_account_ids": [str(uuid4())]},
                 }
             ]
         )
@@ -521,14 +529,9 @@ class TestSyncWebhookTriggers:
         )
 
         mock_session = AsyncMock(spec=AsyncSession)
-        # First exec: existing triggers; then two SA binding lookups (one per trigger)
         existing_result = Mock()
         existing_result.all.return_value = [existing]
-        sa_result1 = Mock()
-        sa_result1.all.return_value = []
-        sa_result2 = Mock()
-        sa_result2.all.return_value = []
-        mock_session.exec = AsyncMock(side_effect=[existing_result, sa_result1, sa_result2])
+        mock_session.exec = AsyncMock(return_value=existing_result)
         mock_session.flush = AsyncMock()
 
         service = _make_service(session=mock_session)
@@ -538,12 +541,12 @@ class TestSyncWebhookTriggers:
                 {
                     "id": "trigger-1",
                     "type": "webhook_trigger",
-                    "parameters": {"webhook_path": "updated-path"},
+                    "parameters": {"webhook_path": "updated-path", "authorized_service_account_ids": [str(uuid4())]},
                 },
                 {
                     "id": "trigger-2",
                     "type": "webhook_trigger",
-                    "parameters": {"webhook_path": "brand-new"},
+                    "parameters": {"webhook_path": "brand-new", "authorized_service_account_ids": [str(uuid4())]},
                 },
             ]
         )
@@ -569,7 +572,11 @@ class TestSyncWebhookTriggers:
                 {
                     "id": "trigger-1",
                     "type": "webhook_trigger",
-                    "parameters": {"webhook_path": "with-schema", "input_schema": schema},
+                    "parameters": {
+                        "webhook_path": "with-schema",
+                        "input_schema": schema,
+                        "authorized_service_account_ids": [str(uuid4())],
+                    },
                 }
             ]
         )
@@ -620,7 +627,7 @@ class TestSyncWebhookTriggers:
                 {
                     "id": "trigger-1",
                     "type": "webhook_trigger",
-                    "parameters": {"webhook_path": ""},
+                    "parameters": {"webhook_path": "", "authorized_service_account_ids": [str(uuid4())]},
                 }
             ]
         )
@@ -646,7 +653,7 @@ class TestSyncWebhookTriggers:
                 {
                     "id": "trigger-1",
                     "type": "webhook_trigger",
-                    "parameters": {"webhook_path": "-invalid-path-"},
+                    "parameters": {"webhook_path": "-invalid-path-", "authorized_service_account_ids": [str(uuid4())]},
                 }
             ]
         )
@@ -680,6 +687,7 @@ class TestSyncWebhookTriggers:
                                 "data": {"$ref": "http://internal/schema"},
                             },
                         },
+                        "authorized_service_account_ids": [str(uuid4())],
                     },
                 }
             ]
@@ -707,7 +715,7 @@ class TestSyncWebhookTriggers:
                 {
                     "id": "eda-1",
                     "type": "eda_trigger",
-                    "parameters": {"webhook_path": "jira-updates"},
+                    "parameters": {"webhook_path": "jira-updates", "authorized_service_account_ids": [str(uuid4())]},
                 }
             ]
         )
@@ -739,7 +747,11 @@ class TestSyncWebhookTriggers:
                 {
                     "id": "eda-1",
                     "type": "eda_trigger",
-                    "parameters": {"webhook_path": "with-schema", "input_schema": schema},
+                    "parameters": {
+                        "webhook_path": "with-schema",
+                        "input_schema": schema,
+                        "authorized_service_account_ids": [str(uuid4())],
+                    },
                 }
             ]
         )
@@ -776,6 +788,7 @@ class TestSyncWebhookTriggers:
                                 "data": {"type": "string", "pattern": "(a+)+$"},
                             },
                         },
+                        "authorized_service_account_ids": [str(uuid4())],
                     },
                 }
             ]
@@ -803,12 +816,12 @@ class TestSyncWebhookTriggers:
                 {
                     "id": "wh-1",
                     "type": "webhook_trigger",
-                    "parameters": {"webhook_path": "generic-hook"},
+                    "parameters": {"webhook_path": "generic-hook", "authorized_service_account_ids": [str(uuid4())]},
                 },
                 {
                     "id": "eda-1",
                     "type": "eda_trigger",
-                    "parameters": {"webhook_path": "eda-hook"},
+                    "parameters": {"webhook_path": "eda-hook", "authorized_service_account_ids": [str(uuid4())]},
                 },
             ]
         )

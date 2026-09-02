@@ -1753,6 +1753,41 @@ export const handlers = [
       project_id: workflow?.project_id ?? null,
     }
     executions.push(execution)
+
+    // Self-contained E2E: a paused approval execution must also appear in GET /approvals.
+    // The real backend creates that row when Temporal pauses; the mock has no worker.
+    if (isPaused) {
+      for (const node of nodes) {
+        if (node.type !== 'approval' || typeof node.id !== 'string') continue
+        approvals.push({
+          id: uuidv4(),
+          created_at: timestamp,
+          updated_at: timestamp,
+          labels: {},
+          project_id: workflow?.project_id ?? 'p-001',
+          execution_id: executionId,
+          approval_node_id: node.id,
+          name: typeof node.name === 'string' && node.name.length > 0 ? node.name : 'Approval',
+          status: 'pending',
+          prompt: null,
+          timeout_at: null,
+          approver_users: [],
+          approver_groups: [],
+          next_step_approved: { id: 'script_1', name: 'Approved action', type: 'script' },
+          next_step_rejected: null,
+          workflow_context: {
+            workflow_id: body.workflow_id,
+            workflow_version: versionNum,
+            workflow_name: workflow?.name ?? 'workflow',
+            inputs: {},
+          },
+          decided_by: null,
+          decided_at: null,
+          decision_notes: null,
+        } as Approval)
+      }
+    }
+
     return HttpResponse.json(execution, { status: 201 })
   }),
 

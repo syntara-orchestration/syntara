@@ -13206,7 +13206,7 @@ paths:
         - bearerAuth: []
     delete:
       summary: Delete project
-      description: 'Delete a project (soft-delete). Requires: project:delete permission scoped to this project.'
+      description: 'Delete a project (hard-delete). Requires: project:delete permission scoped to this project.'
       operationId: delete_project
       x-app-permission:
         resource: project

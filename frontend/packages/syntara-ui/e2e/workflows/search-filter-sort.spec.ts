@@ -32,11 +32,12 @@ test.describe('Workflows Table - Search, Filter, and Sort', () => {
 
     const names = ['alpha', 'beta', 'gamma', 'delta']
     for (let i = 0; i < count; i++) {
-      const wf = await createWorkflowViaApi(page, {
-        name: `${prefix}-${names[i]}-workflow`,
-        projectId,
-      })
-      if (wf) workflows.push(wf)
+      workflows.push(
+        await createWorkflowViaApi(page, {
+          name: `${prefix}-${names[i]}-workflow`,
+          projectId,
+        })
+      )
     }
 
     return workflows
