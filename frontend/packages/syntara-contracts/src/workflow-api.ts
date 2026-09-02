@@ -325,9 +325,14 @@ export interface components {
       has_validation_issues?: boolean
       /**
        * Created By
-       * Format: uuid
+       * @description User who created the workflow
        */
-      created_by: string
+      readonly created_by?: components['schemas']['UserReference'] | null
+      /**
+       * Updated By
+       * @description User who last modified the workflow
+       */
+      readonly updated_by?: components['schemas']['UserReference'] | null
       /**
        * Project Id
        * Format: uuid
@@ -395,9 +400,14 @@ export interface components {
       has_validation_issues?: boolean
       /**
        * Created By
-       * Format: uuid
+       * @description User who created the workflow
        */
-      created_by: string
+      readonly created_by?: components['schemas']['UserReference'] | null
+      /**
+       * Updated By
+       * @description User who last modified the workflow
+       */
+      readonly updated_by?: components['schemas']['UserReference'] | null
       /**
        * Project Id
        * Format: uuid
@@ -465,9 +475,14 @@ export interface components {
       has_validation_issues?: boolean
       /**
        * Created By
-       * Format: uuid
+       * @description User who created the workflow
        */
-      created_by: string
+      readonly created_by?: components['schemas']['UserReference'] | null
+      /**
+       * Updated By
+       * @description User who last modified the workflow
+       */
+      readonly updated_by?: components['schemas']['UserReference'] | null
       /**
        * Project Id
        * Format: uuid
