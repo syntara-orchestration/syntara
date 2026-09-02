@@ -127,7 +127,11 @@ function checkUnsupportedNamespace(ref: VariableReference, activity: Activity): 
 }
 
 function validateRef(ref: VariableReference, activity: Activity, ctx: RefContext): ValidationError | null {
-  if (UNSUPPORTED_NAMESPACES.has(ref.namespace)) return checkUnsupportedNamespace(ref, activity)
+  // Only reject as an unsupported namespace when it is not also a real node id.
+  // A node literally named "workflow" is a valid reference target on the backend
+  // (template_expressions.py has no unsupported blocklist), so treat it as a node ref.
+  if (UNSUPPORTED_NAMESPACES.has(ref.namespace) && !ctx.activityIds.has(ref.namespace))
+    return checkUnsupportedNamespace(ref, activity)
   if (ref.namespace === 'trigger')
     return checkSchemaFieldReference(ref, activity, ctx.schemaFields, ref.namespace, ctx.schemaSuggestion)
   if (KNOWN_NAMESPACES.has(ref.namespace)) return null
@@ -152,7 +156,9 @@ export function validateVariableReferences(
     if (refs.length === 0) continue
 
     const needsUpstream = refs.some(
-      (r) => !KNOWN_NAMESPACES.has(r.namespace) && !UNSUPPORTED_NAMESPACES.has(r.namespace)
+      (r) =>
+        !KNOWN_NAMESPACES.has(r.namespace) &&
+        (!UNSUPPORTED_NAMESPACES.has(r.namespace) || activityIds.has(r.namespace))
     )
     const upstreamIds = needsUpstream ? getUpstreamNodeIds(activity.id, edges) : new Set<string>()
     const ctx: RefContext = { schemaFields, schemaSuggestion, activityIds, upstreamIds }

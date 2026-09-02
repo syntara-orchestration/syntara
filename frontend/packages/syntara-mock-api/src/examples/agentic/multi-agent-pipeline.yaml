@@ -41,7 +41,7 @@ nodes:
       prompt: |
         Analyze the following research data and identify key insights:
 
-        ${research_phase.output.data}
+        ${research_phase.output.result.data}
 
         Provide:
         - Trend analysis

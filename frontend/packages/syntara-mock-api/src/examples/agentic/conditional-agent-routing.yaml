@@ -40,7 +40,7 @@ nodes:
   - id: route_to_specialist
     name: Route to Specialist
     type: condition
-    condition: ${classify_request.output} == 'technical'
+    condition: ${classify_request.output.result.content} == 'technical'
 
   - id: technical_specialist
     name: Technical Specialist
@@ -54,7 +54,7 @@ nodes:
   - id: check_business
     name: Check if Business Domain
     type: condition
-    condition: ${classify_request.output} == 'business'
+    condition: ${classify_request.output.result.content} == 'business'
 
   - id: business_specialist
     name: Business Specialist

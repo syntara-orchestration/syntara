@@ -83,6 +83,16 @@ describe('validateVariableReferences', () => {
       expect(errors[0].message).toContain('"workflow" is not a supported namespace')
       expect(errors[0].suggestion).toContain('workflow')
     })
+
+    it('accepts ${workflow.output} when a node is actually named workflow (parity with backend node refs)', () => {
+      const activities: Activity[] = [
+        makeActivity({ id: 'workflow', type: 'script', parameters: { code: 'echo hello' } }),
+        makeActivity({ id: 'task-1', type: 'script', parameters: { code: '${workflow.output}' } }),
+      ]
+      const edges: EdgeConnection[] = [{ id: 'e1', source: 'workflow', target: 'task-1' }]
+
+      expect(validateVariableReferences(activities, edges)).toEqual([])
+    })
   })
 
   describe('node references (AC2)', () => {
