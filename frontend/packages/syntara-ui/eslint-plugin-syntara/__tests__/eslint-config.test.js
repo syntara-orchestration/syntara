@@ -2,7 +2,7 @@ import { ESLint } from 'eslint'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const packageDirectory = process.cwd()
+const packageDirectory = import.meta.dirname ? resolve(import.meta.dirname, '../..') : process.cwd()
 
 // Load the package's real ESLint configuration. The test does not copy or recreate its rules.
 const eslint = new ESLint({
