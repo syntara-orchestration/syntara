@@ -14,7 +14,7 @@ import asyncio
 import copy
 from collections.abc import Generator
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -179,6 +179,35 @@ class TestGetActivityOutputQuery:
         wf = _make_workflow()
         wf.resolver.set_namespace("trigger", {"url": "http://example.com"})
         assert wf.get_activity_output("trigger") == {"url": "http://example.com"}
+
+
+# ---------------------------------------------------------------------------
+# Tests: get_activity_output_when_ready update handler
+# ---------------------------------------------------------------------------
+
+
+class TestGetActivityOutputWhenReady:
+    """Test the get_activity_output_when_ready update handler."""
+
+    @pytest.fixture(autouse=True)
+    def _patch_wait_condition(self, _mock_temporal_workflow: MagicMock) -> None:
+        _mock_temporal_workflow.wait_condition = AsyncMock()
+
+    @pytest.mark.asyncio
+    async def test_returns_output_when_namespace_exists(self) -> None:
+        wf = _make_workflow()
+        wf.resolver.set_namespace("node_a", {"status": "ok", "result": 42})
+        output = await wf.get_activity_output_when_ready("node_a")
+        assert output == {"status": "ok", "result": 42}
+
+    @pytest.mark.asyncio
+    async def test_scrubs_credentials_in_output(self) -> None:
+        wf = _make_workflow()
+        wf.resolver.set_namespace("node_a", {"result": "ok", "bearer_token": "secret"})
+        output = await wf.get_activity_output_when_ready("node_a")
+        assert output is not None
+        assert output["bearer_token"] == REDACTED
+        assert output["result"] == "ok"
 
 
 # --- _determine_output_port ---

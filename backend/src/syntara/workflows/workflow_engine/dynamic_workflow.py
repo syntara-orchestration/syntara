@@ -1601,6 +1601,26 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             return None
         return self._scrub_data(data)
 
+    @workflow.update
+    async def get_activity_output_when_ready(self, activity_id: str) -> dict[str, Any]:
+        """Wait until activity output is stored in the resolver, then return it.
+
+        Unlike the ``get_activity_output`` query, this update handler blocks
+        inside the workflow until the resolver namespace is populated — eliminating
+        the race where Temporal emits ACTIVITY_TASK_COMPLETED before the workflow
+        loop stores the result.
+
+        If the namespace is not populated within 30 seconds (e.g. the workflow
+        errored without storing a result), ``wait_condition`` raises a Temporal
+        exception. The caller in ``_query_activity_io`` catches this via
+        ``except TemporalError`` and falls back to a sleep + query retry.
+        """
+        await workflow.wait_condition(
+            lambda: self.resolver.has_namespace(activity_id),
+            timeout=timedelta(seconds=30),
+        )
+        return self._scrub_data(self.resolver.get_namespace(activity_id))
+
     @workflow.query
     def get_skipped_nodes(self) -> list[str]:
         """Query to get list of skipped node IDs.
