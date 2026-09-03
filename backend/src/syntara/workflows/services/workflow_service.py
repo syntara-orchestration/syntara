@@ -72,7 +72,7 @@ from syntara.workflows.validators import (
 )
 
 if TYPE_CHECKING:
-    from syntara.workflows.models import WorkflowVersionListResponse
+    from syntara.workflows.models import WorkflowVersionListResponse, WorkflowVersionRead
     from syntara.workflows.utils.serialization import VersionPublishTimestamps
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -802,7 +802,6 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         workflow = await self.get_workflow_by_id(workflow_id)
         published_version_id = workflow.published_version_id
 
-        username_map: dict[UUID, str] = {}
         ever_published_ids: set[UUID] = set()
         publish_ts: dict[UUID, VersionPublishTimestamps] = {}
 
@@ -810,23 +809,16 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             nonlocal ever_published_ids
             if not versions:
                 return
-            user_ids = {v.created_by for v in versions if v.created_by is not None}
-            if user_ids:
-                rows = await self.session.exec(
-                    select(User.id, User.username).where(User.id.in_(user_ids))  # type: ignore[attr-defined]
-                )
-                username_map.update({row[0]: row[1] for row in rows})
-
             version_ids = [v.id for v in versions]
             batch_published, batch_ts = await self.get_publish_context(version_ids)
             ever_published_ids.update(batch_published)
             publish_ts.update(batch_ts)
 
         def convert_version(version: WorkflowVersion) -> WorkflowVersionRead:
+            # created_by is left as a raw id here; BaseService resolves every
+            # declared user-reference field after conversion.
             version_dict = deserialize_workflow_version(version, published_version_id, ever_published_ids, publish_ts)
-            version_read = WorkflowVersionRead.model_validate(version_dict)
-            version_read.created_by_username = username_map.get(version.created_by)
-            return version_read
+            return WorkflowVersionRead.model_validate(version_dict)
 
         merged_params = [("workflow_id", str(workflow_id))]
         if query_params_items:
@@ -843,6 +835,27 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             query_params_items=merged_params,
             include_total=include_total,
         )
+
+    async def to_version_read(
+        self,
+        version: "WorkflowVersion",
+        published_version_id: UUID | None,
+        ever_published: set[UUID],
+        publish_ts: dict[UUID, "VersionPublishTimestamps"],
+    ) -> "WorkflowVersionRead":
+        """Convert a WorkflowVersion to its response model, with user references resolved.
+
+        Single-version responses are built here rather than in the router so no
+        endpoint can hand back a version whose created_by is still a raw id.
+        """
+        from syntara.workflows.models import WorkflowVersionRead  # noqa: PLC0415
+        from syntara.workflows.utils.serialization import deserialize_workflow_version  # noqa: PLC0415
+
+        read = WorkflowVersionRead.model_validate(
+            deserialize_workflow_version(version, published_version_id, ever_published, publish_ts)
+        )
+        await self.resolve_user_references([read])
+        return read
 
     async def to_read(self, workflow: Workflow) -> WorkflowRead:
         """Convert a Workflow to its response model, with user references resolved.

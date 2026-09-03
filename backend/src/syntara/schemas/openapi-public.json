@@ -50664,7 +50664,6 @@
           "version",
           "schema_version",
           "workflow_definition",
-          "created_by",
           "created_at",
           "updated_at"
         ],
@@ -50749,20 +50748,17 @@
             "title": "Name"
           },
           "created_by": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Created By"
-          },
-          "created_by_username": {
             "anyOf": [
               {
-                "type": "string"
+                "$ref": "#/components/schemas/UserReference"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Created By Username"
+            "description": "User who created the version",
+            "readOnly": true,
+            "title": "Created By"
           },
           "created_at": {
             "type": "string",
