@@ -146,7 +146,7 @@ describe('usePositionEventHandlers', () => {
 
       result.current.onNodeDragStart({} as never, loopNode, [loopNode])
       const movedLoopNode = makeNode('loop-1', { x: 40, y: 20 }, 'loop')
-      result.current.onNodeDrag({} as never, movedLoopNode, [movedLoopNode])
+      result.current.onNodeDrag({} as never, movedLoopNode)
 
       expect(mockSetNodes).toHaveBeenCalled()
       const updater = mockSetNodes.mock.calls[0][0] as (prev: NodeType[]) => NodeType[]
@@ -162,7 +162,7 @@ describe('usePositionEventHandlers', () => {
       const { result } = renderSyncHook([taskNode])
 
       result.current.onNodeDragStart({} as never, taskNode, [taskNode])
-      result.current.onNodeDrag({} as never, makeNode('task-1', { x: 50, y: 30 }, 'task'), [taskNode])
+      result.current.onNodeDrag({} as never, makeNode('task-1', { x: 50, y: 30 }, 'task'))
 
       expect(mockSetNodes).not.toHaveBeenCalled()
     })
@@ -172,7 +172,7 @@ describe('usePositionEventHandlers', () => {
       const { result } = renderSyncHook([loopNode], []) // no edges connecting body
 
       result.current.onNodeDragStart({} as never, loopNode, [loopNode])
-      result.current.onNodeDrag({} as never, makeNode('loop-1', { x: 50, y: 30 }, 'loop'), [loopNode])
+      result.current.onNodeDrag({} as never, makeNode('loop-1', { x: 50, y: 30 }, 'loop'))
 
       expect(mockSetNodes).not.toHaveBeenCalled()
     })
@@ -229,7 +229,7 @@ describe('usePositionEventHandlers', () => {
 
       // Both loop and body node are in draggedNodes (multi-select)
       result.current.onNodeDragStart({} as never, loopNode, [loopNode, bodyNode])
-      result.current.onNodeDrag({} as never, makeNode('loop-1', { x: 40, y: 20 }, 'loop'), [loopNode, bodyNode])
+      result.current.onNodeDrag({} as never, makeNode('loop-1', { x: 40, y: 20 }, 'loop'))
 
       // setNodes should NOT be called since body is already being dragged by React Flow
       expect(mockSetNodes).not.toHaveBeenCalled()
@@ -247,7 +247,7 @@ describe('usePositionEventHandlers', () => {
 
       result.current.onNodeDragStart({} as never, loopNode, [loopNode])
       const movedLoopNode = makeNode('loop-1', { x: 40, y: 20 }, 'loop')
-      result.current.onNodeDrag({} as never, movedLoopNode, [movedLoopNode])
+      result.current.onNodeDrag({} as never, movedLoopNode)
 
       expect(mockSetNodes).toHaveBeenCalled()
       const updater = mockSetNodes.mock.calls[0][0] as (prev: NodeType[]) => NodeType[]

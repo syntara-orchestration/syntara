@@ -41,6 +41,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
       getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
       getNode: vi.fn(),
     }),
+    useUpdateNodeInternals: () => vi.fn(),
   }
 })
 
