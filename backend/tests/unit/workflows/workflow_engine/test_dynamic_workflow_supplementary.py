@@ -23,13 +23,12 @@ from temporalio.exceptions import ApplicationError
 
 from syntara.core.exceptions import SafeValueError
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
+from syntara.workflows.workflow_engine.constants import INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS
 from syntara.workflows.workflow_engine.dynamic_workflow import (
     ALLOWED_TRIGGER_TYPES,
     OrchestratorWorkflow,
 )
-from syntara.workflows.workflow_engine.constants import INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS
 from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
-from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
 from syntara.workflows.workflow_engine.models.workflow_definition import (
     ActivityName,
@@ -233,15 +232,14 @@ class TestExecuteExecutorNodeHeartbeatTimeout:
                 outputs=None,
                 timeout_seconds=3600,
             )
+        assert mock_exec.await_args is not None, "the activity should have been scheduled"
         return dict(mock_exec.await_args.kwargs)
 
     @pytest.mark.asyncio
     async def test_internal_activity_gets_a_heartbeat_timeout(self) -> None:
         """Without this the heartbeat loop is inert and a cancel never reaches the agent."""
         kwargs = await self._schedule(NodeType.INTERNAL_ACTIVITY)
-        assert kwargs["heartbeat_timeout"] == timedelta(
-            seconds=INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS
-        )
+        assert kwargs["heartbeat_timeout"] == timedelta(seconds=INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS)
 
     @pytest.mark.asyncio
     async def test_non_heartbeating_executors_get_no_heartbeat_timeout(self) -> None:

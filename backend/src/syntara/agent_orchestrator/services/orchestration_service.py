@@ -678,9 +678,7 @@ class OrchestrationService:
                     # Wait one poll interval at a time so a quiet stream still gets
                     # checked; anything already pending is left running meanwhile.
                     while True:
-                        done, _ = await asyncio.wait(
-                            {next_event}, timeout=_CANCELLATION_POLL_INTERVAL_SECONDS
-                        )
+                        done, _ = await asyncio.wait({next_event}, timeout=_CANCELLATION_POLL_INTERVAL_SECONDS)
                         if done:
                             break
                         last_cancellation_check = await self._poll_cancellation_if_due(
@@ -704,9 +702,7 @@ class OrchestrationService:
                     break
 
                 # A stream that never goes quiet would otherwise never be polled.
-                last_cancellation_check = await self._poll_cancellation_if_due(
-                    invocation_id, last_cancellation_check
-                )
+                last_cancellation_check = await self._poll_cancellation_if_due(invocation_id, last_cancellation_check)
 
                 # Process streaming events (event is StandardStreamEvent | CustomStreamEvent)
                 event_dict = cast("dict[str, Any]", event)
