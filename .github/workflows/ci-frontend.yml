@@ -483,11 +483,10 @@ jobs:
     needs: [changes, frontend-checks-gate]
     # Only auto-trigger on same-repo PRs with frontend changes, or manual dispatch, or merge queue, or schedule.
     # Fork PRs are explicitly excluded from auto-triggering to prevent security risks.
-    # always() + gate != failure|cancelled lets workflow_dispatch still run when the
-    # checks gate is skipped (e.g. docs-only PR), while preserving fast-fail when
-    # lint/unit actually failed.
+    # !cancelled() lets workflow_dispatch run when the checks gate is skipped
+    # (e.g. docs-only PR), while allowing stale workflow runs to be cancelled.
     if: |
-      always() &&
+      !cancelled() &&
       (
         github.event_name == 'schedule' ||
         (
@@ -785,6 +784,7 @@ jobs:
       - coverage-report
       - storybook-build
       - test-build
+      - scripts-checks
       - frontend-checks-gate
       - konflux-frontend-gate
       - konflux-ui-tests-gate
@@ -799,7 +799,7 @@ jobs:
           fi
 
           ok="success|skipped"
-          for job in gen-contracts checks unit-tests coverage-report storybook-build test-build frontend-checks-gate test-compose-e2e konflux-frontend-gate konflux-ui-tests-gate shared-checks-gate; do
+          for job in gen-contracts checks unit-tests coverage-report storybook-build test-build scripts-checks frontend-checks-gate test-compose-e2e konflux-frontend-gate konflux-ui-tests-gate shared-checks-gate; do
             case "$job" in
               gen-contracts)           result="${{ needs.gen-contracts.result }}" ;;
               checks)                  result="${{ needs.checks.result }}" ;;
@@ -807,6 +807,7 @@ jobs:
               coverage-report)         result="${{ needs.coverage-report.result }}" ;;
               storybook-build)         result="${{ needs.storybook-build.result }}" ;;
               test-build)              result="${{ needs.test-build.result }}" ;;
+              scripts-checks)          result="${{ needs.scripts-checks.result }}" ;;
               frontend-checks-gate)    result="${{ needs.frontend-checks-gate.result }}" ;;
               test-compose-e2e)        result="${{ needs.test-compose-e2e.result }}" ;;
               konflux-frontend-gate)   result="${{ needs.konflux-frontend-gate.result }}" ;;
