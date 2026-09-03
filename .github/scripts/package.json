@@ -7,6 +7,8 @@
     "build": "tsc",
     "check-dequeue-burst": "tsx src/dequeue-burst-alert.ts",
     "check-queue-health": "tsx src/queue-health-poll.ts",
+    "format": "prettier --config ../../frontend/.prettierrc --write .",
+    "format:check": "prettier --config ../../frontend/.prettierrc --check .",
     "test": "vitest run",
     "test:watch": "vitest",
     "tsc": "tsc --noEmit"

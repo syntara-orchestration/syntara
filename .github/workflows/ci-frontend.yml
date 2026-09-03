@@ -96,7 +96,7 @@ jobs:
           else
             echo "contracts=false" >> "$GITHUB_OUTPUT"
           fi
-          if grep -qE '^\\.github/scripts/' <<< "$FILES"; then
+          if grep -qE '^(\\.github/scripts/|frontend/\\.prettierrc$|\\.github/workflows/ci-frontend\\.yml$)' <<< "$FILES"; then
             echo "scripts=true" >> "$GITHUB_OUTPUT"
           else
             echo "scripts=false" >> "$GITHUB_OUTPUT"
@@ -251,8 +251,8 @@ jobs:
           path: pr_number.txt
           retention-days: 7
 
-  scripts-tests:
-    name: (Scripts) Tests
+  scripts-checks:
+    name: (Scripts) Checks
     needs: changes
     if: needs.changes.outputs.scripts == 'true'
     runs-on: ubuntu-latest
@@ -269,6 +269,10 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+        working-directory: .github/scripts
+
+      - name: Check formatting
+        run: npm run format:check
         working-directory: .github/scripts
 
       - name: Type check

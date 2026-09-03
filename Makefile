@@ -38,7 +38,7 @@ _ensure-env:
 format: ## Format both codebases
 	$(MAKE) -C backend format
 	cd frontend && npm run format
-	npx --no-install --prefix .github/scripts prettier --config frontend/.prettierrc --write .github/scripts
+	npm --prefix .github/scripts run format
 
 lint: ## Lint both codebases
 	$(MAKE) -C backend lint
