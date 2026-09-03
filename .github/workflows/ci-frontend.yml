@@ -96,7 +96,7 @@ jobs:
           else
             echo "contracts=false" >> "$GITHUB_OUTPUT"
           fi
-          if grep -qE '^(\\.github/scripts/|frontend/\\.prettierrc$|\\.github/workflows/ci-frontend\\.yml$)' <<< "$FILES"; then
+          if grep -qE '^(\\.github/scripts/|\\.github/workflows/ci-frontend\\.yml$)' <<< "$FILES"; then
             echo "scripts=true" >> "$GITHUB_OUTPUT"
           else
             echo "scripts=false" >> "$GITHUB_OUTPUT"
