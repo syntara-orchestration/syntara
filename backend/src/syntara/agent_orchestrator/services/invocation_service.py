@@ -16,11 +16,12 @@ Key design decisions:
 
 from collections.abc import AsyncGenerator, Callable, Iterable
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID, uuid4
 
 import structlog
 from fastapi import UploadFile
+from sqlmodel import col, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 if TYPE_CHECKING:
@@ -34,9 +35,11 @@ from syntara.agent_orchestrator.models import (
     InvocationStatus,
 )
 from syntara.agent_orchestrator.models.request import CancellationResult
+from syntara.agent_orchestrator.utils.cancellation import get_invocation_cancel_key
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.audit.emitter import request_id_context_var
 from syntara.authz.engine import AllowedProjectsResult
+from syntara.core.cache.stream import StreamClient
 from syntara.core.constants import CONTEXT_KEY_FILE_IDS
 from syntara.core.database.session import get_db
 from syntara.core.exceptions import SafeValueError
@@ -372,34 +375,81 @@ class InvocationService(BaseService):
             )
             return CancellationResult.NOT_CANCELLABLE
 
-        # Update invocation with cancellation details using existing fields
-        invocation.status = InvocationStatus.CANCELLED
-        invocation.error_message = f"User cancelled: {reason}"
-        invocation.completed_at = datetime.now(UTC)
-
-        # Store cancellation metadata in checkpoint_data for debugging
+        now = datetime.now(UTC)
+        error_message = f"User cancelled: {reason}"
         cancellation_data: dict[str, object] = {
-            "cancelled_at": invocation.completed_at.isoformat(),
+            "cancelled_at": now.isoformat(),
             "cancelled_by": str(self.user.id),
             "reason": reason,
         }
+        checkpoint_data: dict[str, object] = dict(invocation.checkpoint_data) if invocation.checkpoint_data else {}
+        checkpoint_data.update(cancellation_data)
 
-        # Merge with existing checkpoint_data if it exists
-        if invocation.checkpoint_data:
-            invocation.checkpoint_data.update(cancellation_data)
-        else:
-            invocation.checkpoint_data = cancellation_data
+        # Conditional UPDATE so a concurrent COMPLETED/FAILED write cannot be
+        # overwritten by a stale in-memory CANCELLED assignment.
+        stmt = (
+            update(Invocation)
+            .where(Invocation.id == invocation_id)  # type: ignore[arg-type]
+            .where(col(Invocation.status).in_((InvocationStatus.CREATED, InvocationStatus.RUNNING)))
+            .values(
+                status=InvocationStatus.CANCELLED,
+                error_message=error_message,
+                completed_at=now,
+                checkpoint_data=checkpoint_data,
+            )
+        )
+        result = await self.session.exec(stmt)
+        if not bool(cast("Any", result).rowcount > 0):
+            await self.session.refresh(invocation)
+            logger.warning(
+                "Cancellation failed: Invocation not in cancellable state",
+                invocation_id=invocation_id,
+                status=invocation.status.value,
+            )
+            AuditEventDispatcher.dispatch(
+                InvocationCancelledEvent(
+                    invocation_id=invocation_id,
+                    result=InvocationCancellationResult.NOT_CANCELLABLE,
+                    reason=reason,
+                    current_status=invocation.status,
+                    activity_id=activity_id,
+                    activity_name=activity_name,
+                )
+            )
+            return CancellationResult.NOT_CANCELLABLE
 
-        # Clean up uploaded and converted files associated with this invocation
-        cleaned_file_ids = await self._cleanup_invocation_files(invocation)
+        invocation.status = InvocationStatus.CANCELLED
+        invocation.error_message = error_message
+        invocation.completed_at = now
+        invocation.checkpoint_data = checkpoint_data
 
         # Note: Document conversion workflows will complete harmlessly even for
         # cancelled invocations. Execution workflow cancellation is handled by Temporal.
 
+        cleaned_file_ids: list[UUID] = []
         try:
             await self.session.commit()
 
             logger.info("Invocation cancelled successfully", invocation_id=invocation_id, reason=reason)
+
+            # Signal the running agent loop via Redis so it stops.  The
+            # terminal cancelled stream event is published by
+            # orchestration_service when the agent actually stops.
+            await self._signal_cancellation(invocation_id)
+
+            # Clean up files AFTER the signal is sent.  The agent may still be
+            # executing a tool at this point (see _cancellation_watcher known
+            # limitation) so in-flight tools could see missing files — this is
+            # accepted since the invocation is already cancelled in the DB.
+            # Best-effort: cleanup failures must not 500 a cancel that already
+            # committed — a client retry would get NOT_CANCELLABLE.
+            try:
+                cleaned_file_ids = await self._cleanup_invocation_files(invocation)
+            except Exception:
+                logger.exception(
+                    "File cleanup failed after cancellation, continuing",
+                    invocation_id=invocation_id,
+                )
 
             # Dispatch success audit event
             AuditEventDispatcher.dispatch(
@@ -428,7 +478,44 @@ class InvocationService(BaseService):
                     activity_name=activity_name,
                 )
             )
+            try:
+                await self.session.rollback()
+            except Exception:
+                logger.exception(
+                    "Failed to rollback after invocation cancel commit error",
+                    invocation_id=invocation_id,
+                )
             raise
+
+    async def _signal_cancellation(self, invocation_id: UUID) -> None:
+        """Set Redis cancellation key so the agent loop detects cancellation.
+
+        Only sets the cancel key — does NOT publish a terminal ``cancelled``
+        event to the stream.  The orchestration service publishes the terminal
+        event when the agent actually stops, ensuring no stream traffic appears
+        after the terminal marker.
+
+        Best-effort: Redis failures are logged but do not prevent cancellation.
+        """
+        from syntara.workflows.workflow_engine.constants import AGENT_EXECUTION_TIMEOUT_SECONDS  # noqa: PLC0415
+
+        cancel_key_ttl_seconds = AGENT_EXECUTION_TIMEOUT_SECONDS
+        try:
+            async with StreamClient() as client:
+                cancel_key = get_invocation_cancel_key(invocation_id)
+                await client.set_key(cancel_key, "1", cancel_key_ttl_seconds)
+
+                logger.info(
+                    "Cancellation signal sent via Redis",
+                    invocation_id=invocation_id,
+                )
+        except Exception:
+            logger.exception(
+                "Failed to signal cancellation via Redis,"
+                " agent may continue to completion if Redis stays healthy"
+                " (DB fallback only runs when Redis itself errors)",
+                invocation_id=invocation_id,
+            )
 
     async def _cleanup_files_from_paths(
         self, files_to_cleanup: list[str], invocation_id: UUID, *, context: str = ""

@@ -195,6 +195,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         self._cof_failed_nodes: set[str] = set()
         self._secret_values: set[str] = set()
         self._has_unhandled_failure: bool = False
+        self._cancelled_node: str | None = None
         self._runtime_settings = {}  # populated by run() after settings fetch
         self.pre_resolved_outputs: dict[str, dict[str, Any]] = pre_resolved_outputs or {}
         self.stop_after_nodes: set[str] = set(stop_after_nodes) if stop_after_nodes else set()
@@ -357,8 +358,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         """Record a node failure; skip downstream unless continue_on_failure is set."""
         app_error = self._extract_application_error(error)
         error_message = self._resolve_failure_message(node_id, error, app_error, graph)
-
-        self.failed_nodes[node_id] = error_message
+        is_cancellation = app_error is not None and app_error.type == "InvocationCancelledError"
 
         # Extract output from ApplicationError.details if executor attached it
         namespace_entry: dict[str, Any] = {}
@@ -374,19 +374,38 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             workflow.logger.debug(f"No output in ApplicationError.details for node {node_id}, using empty model")
             namespace_entry = self._build_empty_node_output(node)
 
-        namespace_entry["status"] = "failed"
+        if is_cancellation:
+            namespace_entry["status"] = "cancelled"
+            self._cancelled_node = node_id
+            # TODO(https://redhat.atlassian.net/browse/AAP-86855): cancelled nodes are not in failed_nodes
+            # or skipped_nodes, so _mark_downstream_as_skipped is a no-op (it
+            # requires predecessors in one of those sets), converge ALL-strategy
+            # treats the cancelled branch as successful, and
+            # _count_successful_predecessors includes it.  Thread cancelled node
+            # IDs through those predicates or add a _cancelled_nodes set checked
+            # alongside failed_nodes.  Additionally, continue_on_failure is not
+            # handled for cancellation: _process_pending_tasks still calls
+            # _handle_continued_failure after _handle_node_failure returns,
+            # scheduling successors while _build_result stamps the run cancelled.
+            workflow.logger.info(f"Node {node_id} cancelled: {error_message}")
+        else:
+            self.failed_nodes[node_id] = error_message
+            namespace_entry["status"] = "failed"
+            workflow.logger.error(f"Node {node_id} failed: {error_message}")
         namespace_entry["error"] = error_message
 
         self.resolver.set_namespace(node_id, namespace_entry)
-        workflow.logger.error(f"Node {node_id} failed: {error_message}")
-        if not continue_on_failure:
+        if not is_cancellation and not continue_on_failure:
             if node_id not in self._converge_branch_nodes:
                 self._has_unhandled_failure = True
             self._mark_downstream_as_skipped(node_id, graph)
-        else:
+        elif not is_cancellation and continue_on_failure:
             self._cof_failed_nodes.add(node_id)
 
-        self._check_converge_successors(node_id, graph, pending_tasks)
+        if is_cancellation:
+            self._mark_downstream_as_skipped(node_id, graph)
+        else:
+            self._check_converge_successors(node_id, graph, pending_tasks)
 
     @staticmethod
     def _extract_application_error(error: Exception) -> ApplicationError | None:
@@ -529,7 +548,9 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         # to the converge node: CoF absorbs it, no-CoF sets the flag directly, and
         # a successful converge reconciles any unabsorbed branch failures.  Nodes
         # outside any parallel branch set the flag eagerly on failure.
-        if self._has_unhandled_failure:
+        if self._cancelled_node is not None:
+            workflow_status = "cancelled"
+        elif self._has_unhandled_failure:
             workflow_status = "failed"
         elif self.failed_nodes:
             workflow_status = "completed_with_errors"

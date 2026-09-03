@@ -7,6 +7,8 @@
     "build": "tsc",
     "check-dequeue-burst": "tsx src/dequeue-burst-alert.ts",
     "check-queue-health": "tsx src/queue-health-poll.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
     "tsc": "tsc --noEmit"
@@ -19,6 +21,7 @@
   "devDependencies": {
     "@types/node": "22.13.0",
     "msw": "2.8.5",
+    "prettier": "3.8.4",
     "tsx": "4.19.2",
     "typescript": "5.7.3",
     "vitest": "3.1.2"
