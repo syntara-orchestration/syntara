@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import { extractParameters, normalizeTemplate } from './normalize-route'
-import type { NormalizedRoute, RouteKind } from './types'
+import type { NormalizedRoute, RouteKind } from './route-manifest-schema'
 
 const PATH_LITERAL = /['"](\/[^'"]*)['"]/g
 

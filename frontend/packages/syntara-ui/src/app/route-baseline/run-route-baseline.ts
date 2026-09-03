@@ -8,7 +8,7 @@ import {
   readCommittedManifest,
   writeManifest,
 } from './manifest-io'
-import type { RouteManifest } from './types'
+import type { RouteManifest } from './route-manifest-schema'
 
 /**
  * Result of comparing the committed baseline to a fresh generate.

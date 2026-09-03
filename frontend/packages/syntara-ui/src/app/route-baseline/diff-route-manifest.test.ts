@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
 import { diffRouteManifest } from './diff-route-manifest'
-import { ROUTE_MANIFEST_COMMENT_KEY, ROUTE_MANIFEST_NOTICE, type RouteManifest } from './types'
+import {
+  ROUTE_MANIFEST_COMMENT_KEY,
+  ROUTE_MANIFEST_NOTICE,
+  type RouteManifest,
+} from './route-manifest-schema'
 
 const base: RouteManifest = {
   [ROUTE_MANIFEST_COMMENT_KEY]: ROUTE_MANIFEST_NOTICE,

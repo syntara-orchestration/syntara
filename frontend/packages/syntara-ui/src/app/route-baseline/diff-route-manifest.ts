@@ -1,4 +1,4 @@
-import type { NormalizedRoute, RouteManifest } from './types'
+import type { NormalizedRoute, RouteManifest } from './route-manifest-schema'
 
 /**
  * Structured difference between two route manifests.

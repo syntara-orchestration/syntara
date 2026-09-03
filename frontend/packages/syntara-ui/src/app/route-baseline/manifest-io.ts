@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { stableStringify } from './normalize-route'
-import type { RouteManifest } from './types'
+import { parseRouteManifest, type RouteManifest } from './route-manifest-schema'
 
 const thisDir = dirname(fileURLToPath(import.meta.url))
 
@@ -44,19 +44,22 @@ export function getManifestPath(pkgRoot = getPackageRoot()): string {
  */
 export function readCommittedManifest(pkgRoot = getPackageRoot()): RouteManifest {
   const raw = readFileSync(getManifestPath(pkgRoot), 'utf-8')
-  return JSON.parse(raw) as RouteManifest
+  return parseRouteManifest(JSON.parse(raw) as unknown)
 }
 
 /**
  * Write a route manifest to `route-baseline/manifest.json` under `pkgRoot`.
+ *
+ * Validates with Zod before writing so only schema-shaped data is committed.
  *
  * @param manifest - Manifest to serialize
  * @param pkgRoot - UI package root (or a temp directory in tests)
  * @returns Absolute path written
  */
 export function writeManifest(manifest: RouteManifest, pkgRoot = getPackageRoot()): string {
+  const validated = parseRouteManifest(manifest)
   const path = getManifestPath(pkgRoot)
   mkdirSync(dirname(path), { recursive: true })
-  writeFileSync(path, stableStringify(manifest), 'utf-8')
+  writeFileSync(path, stableStringify(validated), 'utf-8')
   return path
 }

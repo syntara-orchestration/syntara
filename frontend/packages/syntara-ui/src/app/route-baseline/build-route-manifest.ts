@@ -13,9 +13,10 @@ import {
 import {
   ROUTE_MANIFEST_COMMENT_KEY,
   ROUTE_MANIFEST_NOTICE,
+  parseRouteManifest,
   type NormalizedRoute,
   type RouteManifest,
-} from './types'
+} from './route-manifest-schema'
 
 /**
  * Result of building a manifest plus source-parity findings.
@@ -103,11 +104,11 @@ export function buildRouteManifest(options: BuildRouteManifestOptions): Manifest
   }
 
   return {
-    manifest: {
+    manifest: parseRouteManifest({
       [ROUTE_MANIFEST_COMMENT_KEY]: ROUTE_MANIFEST_NOTICE,
       version: 1,
       routes,
-    },
+    }),
     appRouteOnly,
     navigationOnly,
   }

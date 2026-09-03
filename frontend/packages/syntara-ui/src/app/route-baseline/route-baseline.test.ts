@@ -19,8 +19,12 @@ import {
   readCommittedManifest,
   writeManifest,
 } from './manifest-io'
+import {
+  ROUTE_MANIFEST_COMMENT_KEY,
+  ROUTE_MANIFEST_NOTICE,
+  type RouteManifest,
+} from './route-manifest-schema'
 import { checkRouteBaseline, updateRouteBaseline } from './run-route-baseline'
-import { ROUTE_MANIFEST_COMMENT_KEY, ROUTE_MANIFEST_NOTICE, type RouteManifest } from './types'
 
 describe('route baseline', () => {
   const pkgRoot = getPackageRoot()
