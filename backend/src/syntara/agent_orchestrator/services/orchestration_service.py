@@ -28,6 +28,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from syntara.agent_orchestrator.agents.generic_agent import GenericAgent
 from syntara.agent_orchestrator.agents.orchestrator_agent import OrchestratorAgent
+from syntara.agent_orchestrator.cancellation import cancel_was_requested
 from syntara.agent_orchestrator.constants import AgentRoutes
 from syntara.agent_orchestrator.context_manager.planner import ContextManagerPlanner
 from syntara.agent_orchestrator.exceptions import InvocationCancelledError, ToolSelectionUnavailableError
@@ -588,6 +589,31 @@ class OrchestrationService:
                 )
                 cb_url = ctx.callback_url.get_secret_value() if ctx and ctx.callback_url else None
                 await WorkflowSignalClient.send_failure_signal(cb_url, invocation_id, cancelled)
+                raise
+
+            except asyncio.CancelledError:
+                # The Temporal activity was cancelled. asyncio.CancelledError is a
+                # BaseException, so it bypasses both handlers around it and stream
+                # subscribers -- which stop only on a terminal event -- would wait
+                # out the Redis stream's expiry instead. Ref: AAP-88614.
+                if not cancel_was_requested():
+                    # Transient (worker shutdown, timeout, pause, reset): the attempt
+                    # runs again, so the run is not over and the stream must stay open.
+                    raise
+                logger.info("Orchestration abandoned — activity cancelled", invocation_id=invocation_id)
+                # Shielded: a bare await is silently dropped if a second cancellation
+                # lands while the publish is in flight, losing the terminal event.
+                await asyncio.shield(
+                    self._publish_stream_event(
+                        client,
+                        stream_id,
+                        "cancelled",
+                        invocation_id,
+                        # Not "user_cancelled": the workflow was cancelled, which is
+                        # not necessarily the same as somebody clicking Cancel.
+                        CancelledEventData(reason="workflow_cancelled").model_dump(),
+                    )
+                )
                 raise
 
             except Exception as e:

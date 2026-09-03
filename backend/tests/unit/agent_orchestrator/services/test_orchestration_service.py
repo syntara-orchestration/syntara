@@ -1095,6 +1095,84 @@ class TestOrchestrationServiceHonoursCancellation:
         assert slept, "the test must actually exercise a quiet stretch"
 
     @pytest.mark.asyncio
+    async def test_activity_cancellation_publishes_a_terminal_stream_event(self) -> None:
+        """A Temporal activity cancel must still tell stream subscribers the run is over.
+
+        asyncio.CancelledError is a BaseException, so it bypasses both the
+        InvocationCancelledError and the Exception handlers. Subscribers stop only
+        on a terminal event, so without one the UI spins until the Redis stream
+        expires. Ref: AAP-88614.
+        """
+        mock_llm = AsyncMock()
+        mock_llm.model_name = "test-model"
+        mock_context_manager = MagicMock()
+        mock_context_manager.get_async_session_context = _session_cm_returning(InvocationStatus.RUNNING)
+
+        service = OrchestrationService(mock_llm, mock_context_manager)
+
+        with (
+            patch.object(service, "_setup_graph", return_value=AsyncMock()),
+            patch.object(service, "_execute_graph_streaming", side_effect=asyncio.CancelledError()),
+            patch("syntara.agent_orchestrator.services.orchestration_service.StreamClient") as mock_stream_client,
+            patch.object(service, "_publish_stream_event", new=AsyncMock()) as mock_publish,
+            patch(
+                "syntara.agent_orchestrator.services.orchestration_service.cancel_was_requested",
+                return_value=True,
+            ),
+        ):
+            mock_stream_client.return_value.__aenter__.return_value = AsyncMock()
+
+            with pytest.raises(asyncio.CancelledError):
+                await service.execute(
+                    prompt="Test prompt",
+                    session_id="test-session",
+                    invocation_id=uuid4(),
+                    actor_context=AuditActorContext(),
+                    ctx=InvocationContextData(),
+                )
+
+        published_types = [call.args[2] for call in mock_publish.await_args_list]
+        assert "cancelled" in published_types, "activity cancellation must publish a terminal event"
+
+    @pytest.mark.asyncio
+    async def test_worker_shutdown_publishes_no_terminal_event(self) -> None:
+        """Worker shutdown is transient: the retry resumes the run, so it is not over.
+
+        The invocation row is left RUNNING for the retry (see InvocationExecutor), so
+        telling subscribers the run was cancelled would be wrong.
+        """
+        mock_llm = AsyncMock()
+        mock_llm.model_name = "test-model"
+        mock_context_manager = MagicMock()
+        mock_context_manager.get_async_session_context = _session_cm_returning(InvocationStatus.RUNNING)
+
+        service = OrchestrationService(mock_llm, mock_context_manager)
+
+        with (
+            patch.object(service, "_setup_graph", return_value=AsyncMock()),
+            patch.object(service, "_execute_graph_streaming", side_effect=asyncio.CancelledError()),
+            patch("syntara.agent_orchestrator.services.orchestration_service.StreamClient") as mock_stream_client,
+            patch.object(service, "_publish_stream_event", new=AsyncMock()) as mock_publish,
+            patch(
+                "syntara.agent_orchestrator.services.orchestration_service.cancel_was_requested",
+                return_value=False,
+            ),
+        ):
+            mock_stream_client.return_value.__aenter__.return_value = AsyncMock()
+
+            with pytest.raises(asyncio.CancelledError):
+                await service.execute(
+                    prompt="Test prompt",
+                    session_id="test-session",
+                    invocation_id=uuid4(),
+                    actor_context=AuditActorContext(),
+                    ctx=InvocationContextData(),
+                )
+
+        published_types = [call.args[2] for call in mock_publish.await_args_list]
+        assert "cancelled" not in published_types, "a transient cancellation must not end the stream"
+
+    @pytest.mark.asyncio
     async def test_running_invocation_completes_normally(self) -> None:
         """A RUNNING invocation is unaffected by the cancellation poll."""
         mock_llm = AsyncMock()
