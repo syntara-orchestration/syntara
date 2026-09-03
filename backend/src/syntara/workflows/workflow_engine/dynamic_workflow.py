@@ -1602,7 +1602,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         return self._scrub_data(data)
 
     @workflow.update
-    async def get_activity_output_when_ready(self, activity_id: str) -> dict[str, Any] | None:
+    async def get_activity_output_when_ready(self, activity_id: str) -> dict[str, Any]:
         """Wait until activity output is stored in the resolver, then return it.
 
         Unlike the ``get_activity_output`` query, this update handler blocks
