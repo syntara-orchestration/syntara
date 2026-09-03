@@ -3,12 +3,13 @@
 import asyncio
 import time
 from collections.abc import AsyncGenerator, Generator
-from typing import NoReturn
+from typing import Any, NoReturn
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID, uuid4
 
 import pytest
 
+from syntara.core.models.user_reference import UserReference
 from syntara.workflows.exceptions import (
     ScheduledTriggerSyncError,
     TriggerValidationError,
@@ -339,11 +340,40 @@ class TestUnpublishWorkflow:
         assert version.change_description == "Original Desc"
 
 
-async def _stub_to_read(workflow: object) -> object:
-    """Stand in for WorkflowService.to_read without a database."""
+async def _stub_to_read(workflow: Any) -> object:  # noqa: ANN401
+    """Stand in for WorkflowService.to_read without a database.
+
+    The real method resolves created_by/updated_by before returning; a response
+    still holding a raw id is rejected at serialization, so mirror that here.
+    """
     from syntara.workflows.models.workflow import WorkflowRead
 
-    return WorkflowRead.model_validate(workflow, from_attributes=True)
+    read = WorkflowRead.model_validate(workflow, from_attributes=True)
+    read.created_by = UserReference(id=workflow.created_by, name="tester")
+    read.updated_by = None
+    return read
+
+
+async def _stub_to_version_read(version: Any, *_args: object, **_kwargs: object) -> object:  # noqa: ANN401
+    """Stand in for WorkflowService.to_version_read without a database.
+
+    Like to_read, the real method resolves created_by before returning.
+    """
+    from syntara.workflows.models.workflow_version import WorkflowVersionRead
+
+    return WorkflowVersionRead(
+        id=version.id,
+        workflow_id=version.workflow_id,
+        version=version.version,
+        schema_version=version.schema_version,
+        workflow_definition=version.workflow_definition,
+        change_description=version.change_description,
+        name=version.name,
+        status="draft",
+        created_by=UserReference(id=version.created_by, name="tester"),
+        created_at=version.created_at,
+        updated_at=version.updated_at,
+    )
 
 
 class TestBuildWorkflowWithVersionResponse:
@@ -357,6 +387,7 @@ class TestBuildWorkflowWithVersionResponse:
         version_id = uuid4()
         mock_service = AsyncMock()
         mock_service.to_read = AsyncMock(side_effect=_stub_to_read)
+        mock_service.to_version_read = AsyncMock(side_effect=_stub_to_version_read)
         mock_service.get_publish_context.return_value = ({version_id}, {})
         workflow = MagicMock()
         workflow.id = uuid4()
@@ -398,6 +429,7 @@ class TestBuildWorkflowWithVersionResponse:
 
         mock_service = AsyncMock()
         mock_service.to_read = AsyncMock(side_effect=_stub_to_read)
+        mock_service.to_version_read = AsyncMock(side_effect=_stub_to_version_read)
         mock_result = MagicMock()
         mock_result.one_or_none.return_value = None
         mock_service.session.exec = AsyncMock(return_value=mock_result)

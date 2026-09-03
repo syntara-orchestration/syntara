@@ -47,13 +47,25 @@ def mock_service() -> MagicMock:
     return svc
 
 
+def _read_for(cred: ServiceAccountCredential) -> ServiceAccountCredentialRead:
+    """Build the response the way the service does, with created_by resolved.
+
+    The router's to_read() is mocked in these tests, so the resolution it would
+    normally perform has to be mirrored here -- a response carrying a raw id is
+    rejected at serialization.
+    """
+    read = ServiceAccountCredentialRead.model_validate(cred)
+    read.created_by = UserReference(id=cred.created_by, name="tester")
+    return read
+
+
 def _make_credential(**kwargs: object) -> ServiceAccountCredential:
     defaults = {
         "service_account_id": uuid4(),
         "credential_type": ServiceAccountCredentialType.CLIENT_CREDENTIALS,
         "identifier": "nx_sa_abcdef1234567890",
         "hashed_secret": "$argon2id$placeholder",
-        "created_by": UserReference(id=uuid4(), name="tester"),
+        "created_by": uuid4(),
     }
     defaults.update(kwargs)
     return ServiceAccountCredential(**defaults)
@@ -82,7 +94,7 @@ class TestCreateCredential:
 
         mock_service.create_credential.return_value = (cred, secret)
         mock_service.to_create_response.return_value = ServiceAccountCredentialCreateResponse(
-            **ServiceAccountCredentialRead.model_validate(cred).model_dump(),
+            **_read_for(cred).model_dump(),
             client_secret=secret,
         )
 
@@ -102,7 +114,7 @@ class TestGetCredentialEndpoint:
         sa_id = uuid4()
         cred = _make_credential()
         mock_service.get_credential.return_value = cred
-        mock_service.to_read.return_value = ServiceAccountCredentialRead.model_validate(cred)
+        mock_service.to_read.return_value = _read_for(cred)
 
         result = await get_credential(sa_id, cred.id, mock_service)
         assert isinstance(result, ServiceAccountCredentialRead)
@@ -131,7 +143,7 @@ class TestRotateCredentialEndpoint:
 
         mock_service.rotate_credential.return_value = (cred, secret)
         mock_service.to_rotate_response.return_value = ServiceAccountCredentialRotateResponse(
-            **ServiceAccountCredentialRead.model_validate(cred).model_dump(),
+            **_read_for(cred).model_dump(),
             client_secret=secret,
         )
 
@@ -155,7 +167,7 @@ class TestDisableCredentialEndpoint:
         cred = _make_credential()
         cred.status = ServiceAccountCredentialStatus.DISABLED
         mock_service.disable_credential.return_value = cred
-        mock_service.to_read.return_value = ServiceAccountCredentialRead.model_validate(cred)
+        mock_service.to_read.return_value = _read_for(cred)
 
         result = await disable_credential(sa_id, cred.id, mock_service)
         assert isinstance(result, ServiceAccountCredentialRead)
@@ -170,7 +182,7 @@ class TestEnableCredentialEndpoint:
         sa_id = uuid4()
         cred = _make_credential()
         mock_service.enable_credential.return_value = cred
-        mock_service.to_read.return_value = ServiceAccountCredentialRead.model_validate(cred)
+        mock_service.to_read.return_value = _read_for(cred)
 
         result = await enable_credential(sa_id, cred.id, mock_service)
         assert isinstance(result, ServiceAccountCredentialRead)

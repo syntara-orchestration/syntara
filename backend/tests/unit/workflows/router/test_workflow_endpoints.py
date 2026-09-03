@@ -9,7 +9,7 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException
 
-from syntara.workflows.models.workflow_version import PublishVersionRequest, WorkflowVersionRead
+from syntara.workflows.models.workflow_version import PublishVersionRequest
 from syntara.workflows.router import (
     get_workflow,
     get_workflow_version,
@@ -169,29 +169,21 @@ class TestWorkflowEndpoints:
         mock_version_result = MagicMock()
         mock_version_result.one_or_none.return_value = mock_version
         mock_service.session.exec.side_effect = [mock_workflow_result, mock_version_result]
-        mock_deserialized = MagicMock()
         ever_published = {version_id}
         pub_ts = MagicMock()
         mock_service.get_publish_context.return_value = (ever_published, pub_ts)
-        mock_validated = MagicMock()
+        expected_read = MagicMock()
+        mock_service.to_version_read.return_value = expected_read
 
-        with (
-            patch(
-                "syntara.workflows.router.deserialize_workflow_version",
-                return_value=mock_deserialized,
-            ) as mock_deser,
-            patch.object(
-                WorkflowVersionRead,
-                "model_validate",
-                return_value=mock_validated,
-            ) as mock_validate,
-        ):
-            result = await get_workflow_version(workflow_id=workflow_id, version=version_number, service=mock_service)
+        result = await get_workflow_version(workflow_id=workflow_id, version=version_number, service=mock_service)
 
+        # The router hands construction to the service, which resolves created_by;
+        # it no longer builds the read model itself.
         mock_service.get_publish_context.assert_awaited_once_with([version_id])
-        mock_deser.assert_called_once_with(mock_version, published_version_id, ever_published, pub_ts)
-        mock_validate.assert_called_once_with(mock_deserialized)
-        assert result is mock_validated
+        mock_service.to_version_read.assert_awaited_once_with(
+            mock_version, published_version_id, ever_published, pub_ts
+        )
+        assert result is expected_read
 
     @pytest.mark.asyncio
     async def test_get_workflow_version_raises_404_when_workflow_not_found(self) -> None:
