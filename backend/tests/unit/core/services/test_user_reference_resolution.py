@@ -32,7 +32,9 @@ class _OwnerSchema:
         self.created_by = created_by
 
 
-def _row(principal_id: object, username: str | None = None, sa_name: str | None = None) -> tuple:
+def _row(
+    principal_id: object, username: str | None = None, sa_name: str | None = None
+) -> tuple[object, str | None, None, None, str | None]:
     """Build a lookup row: (principal_id, username, first_name, last_name, service_account_name)."""
     return (principal_id, username, None, None, sa_name)
 
