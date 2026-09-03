@@ -157,8 +157,7 @@ export function validateVariableReferences(
 
     const needsUpstream = refs.some(
       (r) =>
-        !KNOWN_NAMESPACES.has(r.namespace) &&
-        (!UNSUPPORTED_NAMESPACES.has(r.namespace) || activityIds.has(r.namespace))
+        !KNOWN_NAMESPACES.has(r.namespace) && (!UNSUPPORTED_NAMESPACES.has(r.namespace) || activityIds.has(r.namespace))
     )
     const upstreamIds = needsUpstream ? getUpstreamNodeIds(activity.id, edges) : new Set<string>()
     const ctx: RefContext = { schemaFields, schemaSuggestion, activityIds, upstreamIds }
