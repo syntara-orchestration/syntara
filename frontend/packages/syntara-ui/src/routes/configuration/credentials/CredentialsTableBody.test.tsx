@@ -174,6 +174,47 @@ describe('GroupedCredentialsTableBody', () => {
     expect(mockUseCredentialPermissions).toHaveBeenCalledWith({ resourceProject: 'proj-b' })
   })
 
+  it('disables enable toggle while per-row permissions are loading', async () => {
+    mockUseCredentialPermissions.mockReturnValue({
+      canCreate: false,
+      canRead: false,
+      canUpdate: false,
+      canDelete: false,
+      isLoading: true,
+      isReadChecking: true,
+      tooltips: { create: '', read: '', update: '', enable: '', delete: '' },
+    })
+
+    const user = userEvent.setup()
+    const grouped = new Map([
+      ['proj-1', { project: { id: 'proj-1', name: 'Project Alpha' } as never, credentials: [sampleCredential] }],
+    ])
+
+    render(
+      <table>
+        <GroupedCredentialsTableBody
+          groupedCredentials={grouped}
+          collapsedProjects={new Set()}
+          onToggleProject={vi.fn()}
+          typeMap={new Map()}
+          expandedRows={new Set()}
+          onToggleRow={vi.fn()}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onToggleEnabled={onToggleEnabled}
+          getIsBuiltinProject={getIsBuiltinProject}
+        />
+      </table>,
+      { wrapper: createWrapper() }
+    )
+
+    const toggle = screen.getByRole('switch', { name: 'Enabled' })
+    expect(toggle).toBeDisabled()
+
+    await user.click(toggle)
+    expect(onToggleEnabled).not.toHaveBeenCalled()
+  })
+
   it('disables delete only for the row whose project is denied', async () => {
     const credAllowed = {
       ...sampleCredential,

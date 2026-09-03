@@ -84,11 +84,23 @@ function CredentialRow({
     ]
   }, [permissions, isBuiltinProject, credential, onEdit, onDelete])
 
+  const toggleDisabled = isBuiltinProject || permissions.isLoading || !permissions.canUpdate
+
   const toggleDisabledTooltip = useMemo(() => {
     if (isBuiltinProject) return builtinProjectTooltip('enable or disable this credential')
     if (permissions.isLoading) return undefined
     return permissions.canUpdate ? undefined : permissions.tooltips.enable
   }, [isBuiltinProject, permissions.isLoading, permissions.canUpdate, permissions.tooltips.enable])
+
+  const toggleSwitch = (
+    <Switch
+      id={`credential-toggle-${credential.id}`}
+      label="Enabled"
+      isChecked={credential.enabled}
+      isDisabled={toggleDisabled}
+      onChange={toggleDisabled ? undefined : () => onToggleEnabled(credential)}
+    />
+  )
 
   return (
     <Tbody isExpanded={isExpanded}>
@@ -126,23 +138,7 @@ function CredentialRow({
           <UserTimestamp user={credential.updated_by} timestamp={credential.updated_at} inline />
         </Td>
         <Td dataLabel="State" onClick={(e) => e.stopPropagation()}>
-          {toggleDisabledTooltip ? (
-            <Tooltip content={toggleDisabledTooltip}>
-              <Switch
-                id={`credential-toggle-${credential.id}`}
-                label="Enabled"
-                isChecked={credential.enabled}
-                isDisabled
-              />
-            </Tooltip>
-          ) : (
-            <Switch
-              id={`credential-toggle-${credential.id}`}
-              label="Enabled"
-              isChecked={credential.enabled}
-              onChange={() => onToggleEnabled(credential)}
-            />
-          )}
+          {toggleDisabledTooltip ? <Tooltip content={toggleDisabledTooltip}>{toggleSwitch}</Tooltip> : toggleSwitch}
         </Td>
         <Td isActionCell onClick={(e) => e.stopPropagation()}>
           <SynKebabMenu actions={actions} aria-label={`Actions for ${credential.name}`} />
