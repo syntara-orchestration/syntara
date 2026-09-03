@@ -17,8 +17,7 @@ from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import DateTime, Field, SQLModel
 
-from syntara.core.constants import ValidationMessages
-from syntara.core.exceptions import SafeValueError
+from syntara.core.jsonb_limits import validate_labels_dict
 
 
 class AuditLevel(str, Enum):
@@ -106,22 +105,14 @@ class BaseResource(SQLModel, ABC):
     @field_validator("labels", mode="before")
     @classmethod
     def validate_labels(cls, v: dict[str, str] | None) -> dict[str, str] | None:
-        """Validate that labels dictionary contains only string values."""
-        if v is None:
-            return v
+        """Validate labels structure, per-entry limits, and serialized size.
 
-        if not isinstance(v, dict):
-            raise SafeValueError(ValidationMessages.LABELS_MUST_BE_DICT)
-
-        for key, value in v.items():
-            if not isinstance(key, str):
-                msg = ValidationMessages.LABELS_KEY_MUST_BE_STRING.format(key=key, type_name=type(key).__name__)  # type: ignore[unreachable]
-                raise SafeValueError(msg)
-            if not isinstance(value, str):
-                msg = ValidationMessages.LABELS_VALUE_MUST_BE_STRING.format(key=key, type_name=type(value).__name__)  # type: ignore[unreachable]
-                raise SafeValueError(msg)
-
-        return v
+        Kept as a field_validator (not the Annotated LabelsField type) because this
+        class is inherited by table=True models; SQLModel's column-type inference
+        cannot resolve a JSONB sa_type through an Annotated[..., BeforeValidator(...)]
+        wrapper (raises "no matching SQLAlchemy type").
+        """
+        return validate_labels_dict(v)
 
     model_config: ClassVar[ConfigDict] = ConfigDict(
         from_attributes=True,

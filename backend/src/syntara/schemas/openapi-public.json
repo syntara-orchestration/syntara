@@ -50223,7 +50223,9 @@
             "description": "Workflow description"
           },
           "labels": {
-            "additionalProperties": true,
+            "additionalProperties": {
+              "type": "string"
+            },
             "type": "object",
             "title": "Labels",
             "description": "Workflow labels"
@@ -50344,7 +50346,9 @@
             "description": "Workflow description"
           },
           "labels": {
-            "additionalProperties": true,
+            "additionalProperties": {
+              "type": "string"
+            },
             "type": "object",
             "title": "Labels",
             "description": "Workflow labels"
@@ -50469,7 +50473,9 @@
             "description": "Workflow description"
           },
           "labels": {
-            "additionalProperties": true,
+            "additionalProperties": {
+              "type": "string"
+            },
             "type": "object",
             "title": "Labels",
             "description": "Workflow labels"
@@ -50876,7 +50882,9 @@
             "description": "Workflow description"
           },
           "labels": {
-            "additionalProperties": true,
+            "additionalProperties": {
+              "type": "string"
+            },
             "type": "object",
             "title": "Labels",
             "description": "Workflow labels"
@@ -50943,7 +50951,9 @@
           "labels": {
             "anyOf": [
               {
-                "additionalProperties": true,
+                "additionalProperties": {
+                  "type": "string"
+                },
                 "type": "object"
               },
               {

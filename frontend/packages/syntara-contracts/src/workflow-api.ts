@@ -302,7 +302,7 @@ export interface components {
        * @description Workflow labels
        */
       labels?: {
-        [key: string]: unknown
+        [key: string]: string
       }
       /**
        * Id
@@ -372,7 +372,7 @@ export interface components {
        * @description Workflow labels
        */
       labels?: {
-        [key: string]: unknown
+        [key: string]: string
       }
       /**
        * Id
@@ -442,7 +442,7 @@ export interface components {
        * @description Workflow labels
        */
       labels?: {
-        [key: string]: unknown
+        [key: string]: string
       }
       /**
        * Id
@@ -692,7 +692,7 @@ export interface components {
        * @description Workflow labels
        */
       labels?: {
-        [key: string]: unknown
+        [key: string]: string
       }
       /**
        * Workflow Definition
@@ -741,7 +741,7 @@ export interface components {
        * @description Update workflow labels
        */
       labels?: {
-        [key: string]: unknown
+        [key: string]: string
       } | null
       /**
        * Workflow Definition

@@ -1147,7 +1147,7 @@ export interface components {
        * @description Workflow labels
        */
       labels?: {
-        [key: string]: unknown
+        [key: string]: string
       }
       /**
        * Id

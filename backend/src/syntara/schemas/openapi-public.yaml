@@ -34272,7 +34272,8 @@ components:
           title: Description
           description: Workflow description
         labels:
-          additionalProperties: true
+          additionalProperties:
+            type: string
           type: object
           title: Labels
           description: Workflow labels
@@ -34358,7 +34359,8 @@ components:
           title: Description
           description: Workflow description
         labels:
-          additionalProperties: true
+          additionalProperties:
+            type: string
           type: object
           title: Labels
           description: Workflow labels
@@ -34444,7 +34446,8 @@ components:
           title: Description
           description: Workflow description
         labels:
-          additionalProperties: true
+          additionalProperties:
+            type: string
           type: object
           title: Labels
           description: Workflow labels
@@ -34703,7 +34706,8 @@ components:
           title: Description
           description: Workflow description
         labels:
-          additionalProperties: true
+          additionalProperties:
+            type: string
           type: object
           title: Labels
           description: Workflow labels
@@ -34752,7 +34756,8 @@ components:
           description: Update workflow description
         labels:
           anyOf:
-            - additionalProperties: true
+            - additionalProperties:
+                type: string
               type: object
             - type: 'null'
           title: Labels
