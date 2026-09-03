@@ -24,12 +24,8 @@ import structlog
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
+from syntara.workflows.workflow_engine.constants import INTERNAL_ACTIVITY_HEARTBEAT_INTERVAL_SECONDS
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
-
-# Temporal only delivers cancellation to activities that heartbeat. The agent
-# execution runs for minutes inside a single activity, so it must heartbeat or a
-# cancelled workflow cannot interrupt it. Ref: AAP-88614.
-_HEARTBEAT_INTERVAL_SECONDS = 10.0
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -76,17 +72,7 @@ async def _run_invocation_execution(operation_input: InvocationExecutionInput) -
         )
 
     executor = InvocationExecutor()
-    heartbeat_task = asyncio.create_task(_heartbeat_until_cancelled())
-    try:
-        await executor.execute_invocation(UUID(invocation_id), actor_context=actor_context)
-    finally:
-        heartbeat_task.cancel()
-        # gather(return_exceptions=True) reports the heartbeat task's own
-        # CancelledError/exception as a result instead of raising it here, while a
-        # cancellation aimed at *this* task during the await still propagates. A
-        # bare `suppress(CancelledError)` would swallow the activity's own cancel
-        # and report a cancelled agent run as completed.
-        await asyncio.gather(heartbeat_task, return_exceptions=True)
+    await executor.execute_invocation(UUID(invocation_id), actor_context=actor_context)
     return {"output": {"status": "completed"}}
 
 
@@ -98,9 +84,12 @@ async def _heartbeat_until_cancelled() -> None:
     an activity context (unit tests, direct calls) ``activity.heartbeat`` raises
     ``RuntimeError``; any other failure (e.g. the SDK's heartbeat queue being
     full) must not fail the agent run either, so the loop stops on any error.
+
+    Beat before the first sleep: the cancellation request is only picked up on a
+    heartbeat, so sleeping first leaves a dead zone one interval long at the start
+    of every activity in which a cancel cannot be delivered.
     """
     while True:
-        await asyncio.sleep(_HEARTBEAT_INTERVAL_SECONDS)
         try:
             activity.heartbeat()
         except RuntimeError:  # not inside an activity context
@@ -108,6 +97,7 @@ async def _heartbeat_until_cancelled() -> None:
         except Exception:
             logger.exception("Activity heartbeat failed; cancellation may no longer be deliverable")
             return
+        await asyncio.sleep(INTERNAL_ACTIVITY_HEARTBEAT_INTERVAL_SECONDS)
 
 
 async def _run_integration_health_check(operation_input: dict[str, Any]) -> dict[str, Any]:  # noqa: ARG001
@@ -161,5 +151,18 @@ async def execute_internal_activity(
     operation_input = input_config.get("input", {})
     logger.info("Executing internal activity", operation=operation_name, input_keys=list(operation_input.keys()))
 
-    result: dict[str, Any] = await handler(operation_input)
+    # Every internal operation heartbeats, not just the agent run: the schedule
+    # sets a heartbeat_timeout for this activity type (see _execute_executor_node),
+    # so an operation that never beats would fail the attempt spuriously.
+    heartbeat_task = asyncio.create_task(_heartbeat_until_cancelled())
+    try:
+        result: dict[str, Any] = await handler(operation_input)
+    finally:
+        heartbeat_task.cancel()
+        # gather(return_exceptions=True) reports the heartbeat task's own
+        # CancelledError/exception as a result instead of raising it here, while a
+        # cancellation aimed at *this* task during the await still propagates. A
+        # bare `suppress(CancelledError)` would swallow the activity's own cancel
+        # and report a cancelled agent run as completed.
+        await asyncio.gather(heartbeat_task, return_exceptions=True)
     return result

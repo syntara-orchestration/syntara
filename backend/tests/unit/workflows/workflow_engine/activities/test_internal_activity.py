@@ -389,7 +389,7 @@ class TestInvocationExecutionHeartbeat:
                 return_value=mock_executor,
             ),
             patch(
-                "syntara.workflows.workflow_engine.activities.internal_activity._HEARTBEAT_INTERVAL_SECONDS",
+                "syntara.workflows.workflow_engine.activities.internal_activity.INTERNAL_ACTIVITY_HEARTBEAT_INTERVAL_SECONDS",
                 0.02,
             ),
             patch(
@@ -421,7 +421,7 @@ class TestInvocationExecutionHeartbeat:
                 return_value=mock_executor,
             ),
             patch(
-                "syntara.workflows.workflow_engine.activities.internal_activity._HEARTBEAT_INTERVAL_SECONDS",
+                "syntara.workflows.workflow_engine.activities.internal_activity.INTERNAL_ACTIVITY_HEARTBEAT_INTERVAL_SECONDS",
                 0.02,
             ),
             patch("syntara.workflows.workflow_engine.activities.internal_activity.activity.heartbeat"),
@@ -451,7 +451,7 @@ class TestInvocationExecutionHeartbeat:
                 return_value=mock_executor,
             ),
             patch(
-                "syntara.workflows.workflow_engine.activities.internal_activity._HEARTBEAT_INTERVAL_SECONDS",
+                "syntara.workflows.workflow_engine.activities.internal_activity.INTERNAL_ACTIVITY_HEARTBEAT_INTERVAL_SECONDS",
                 0.02,
             ),
             patch(
@@ -465,3 +465,72 @@ class TestInvocationExecutionHeartbeat:
             )
 
         assert result["output"]["status"] == "completed"
+
+    @pytest.mark.anyio
+    async def test_first_heartbeat_precedes_the_first_sleep(self) -> None:
+        """The loop must beat before sleeping, or cancel is undeliverable for one interval.
+
+        Temporal picks up a cancellation request on a heartbeat. Sleeping first
+        leaves a dead zone one interval long at the start of every activity in
+        which a cancel cannot arrive. Ref: AAP-88614.
+        """
+        import asyncio
+
+        from syntara.workflows.workflow_engine.activities.internal_activity import _heartbeat_until_cancelled
+
+        with (
+            # A long interval: any beat observed can only be the pre-sleep one.
+            patch(
+                "syntara.workflows.workflow_engine.activities.internal_activity.INTERNAL_ACTIVITY_HEARTBEAT_INTERVAL_SECONDS",
+                600.0,
+            ),
+            patch(
+                "syntara.workflows.workflow_engine.activities.internal_activity.activity.heartbeat"
+            ) as mock_heartbeat,
+        ):
+            task = asyncio.create_task(_heartbeat_until_cancelled())
+            await asyncio.sleep(0)  # let the loop reach its first statement
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+
+        assert mock_heartbeat.call_count == 1, (
+            f"the first heartbeat must not wait for a full interval, got {mock_heartbeat.call_count}"
+        )
+
+    @pytest.mark.anyio
+    async def test_non_agent_internal_operations_also_heartbeat(self) -> None:
+        """Every internal operation must beat, since the schedule sets a heartbeat_timeout.
+
+        _execute_executor_node gives internal_activity nodes a heartbeat_timeout, so
+        an operation that never heartbeats would fail its attempt spuriously.
+        """
+        import asyncio
+
+        async def slow_convert(*_args: object, **_kwargs: object) -> object:
+            await asyncio.sleep(0.25)
+            return MagicMock(name="COMPLETED")
+
+        mock_task = MagicMock()
+        mock_task.convert = AsyncMock(side_effect=slow_convert)
+
+        with (
+            patch(
+                "syntara.files.document_conversion.tasks.DocumentConversionTask",
+                return_value=mock_task,
+            ),
+            patch(
+                "syntara.workflows.workflow_engine.activities.internal_activity.INTERNAL_ACTIVITY_HEARTBEAT_INTERVAL_SECONDS",
+                0.02,
+            ),
+            patch(
+                "syntara.workflows.workflow_engine.activities.internal_activity.activity.heartbeat"
+            ) as mock_heartbeat,
+        ):
+            await execute_internal_activity(
+                {"activity": "document_conversion", "input": {"file_id": str(uuid4())}},
+                None,
+            )
+
+        assert mock_heartbeat.call_count >= 2, (
+            f"document_conversion must heartbeat too, got {mock_heartbeat.call_count}"
+        )
