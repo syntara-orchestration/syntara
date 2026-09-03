@@ -1,38 +1,41 @@
 type SlackBlock = {
-  type: string;
-  [key: string]: unknown;
-};
+  type: string
+  [key: string]: unknown
+}
 
 type SlackAttachment = {
-  color: string;
-  blocks: SlackBlock[];
-};
+  color: string
+  blocks: SlackBlock[]
+}
 
 type SlackMessage = {
-  attachments: SlackAttachment[];
-};
+  attachments: SlackAttachment[]
+}
 
 /**
  * Slack notification client using Block Kit formatted messages.
  * Sends color-coded alerts for merge queue health events.
  */
 export class SlackNotifier {
-  private readonly webhookUrl: string;
+  private readonly webhookUrl: string
 
   constructor(webhookUrl: string) {
-    this.webhookUrl = webhookUrl;
+    this.webhookUrl = webhookUrl
   }
 
   /**
    * Sends a red alert when multiple PRs are dequeued in rapid succession.
-   * Indicates a systemic issue causing repeated check failures.
+   * Indicates a possible systemic issue with the merge queue.
    */
-  async sendDequeueBurstAlert(
-    dequeueCount: number,
-    prNumber: string,
-    prUrl: string,
+  async sendDequeueBurstAlert(params: {
+    dequeues: Array<{ number: number; url: string; title: string }>
+    timeWindowMinutes: number
     queueUrl: string
-  ): Promise<void> {
+  }): Promise<void> {
+    const { dequeues, timeWindowMinutes, queueUrl } = params
+
+    const prLinks = dequeues.map((pr) => `<${pr.url}|#${pr.number}>`).join(', ')
+
     const message: SlackMessage = {
       attachments: [
         {
@@ -50,11 +53,11 @@ export class SlackNotifier {
               fields: [
                 {
                   type: 'mrkdwn',
-                  text: `*Dequeues in last 30 min:* ${dequeueCount}`,
+                  text: `*Dequeues in last ${timeWindowMinutes} min:* ${dequeues.length}`,
                 },
                 {
                   type: 'mrkdwn',
-                  text: `*Latest PR:* <${prUrl}|#${prNumber}>`,
+                  text: `*PRs:* ${prLinks}`,
                 },
               ],
             },
@@ -62,7 +65,7 @@ export class SlackNotifier {
               type: 'section',
               text: {
                 type: 'mrkdwn',
-                text: 'Multiple PRs failed checks in rapid succession. This may indicate a systemic issue.',
+                text: 'Multiple PRs were removed from the merge queue. This may indicate a systemic issue.',
               },
             },
             {
@@ -81,20 +84,22 @@ export class SlackNotifier {
           ],
         },
       ],
-    };
+    }
 
-    await this.send(message);
+    await this.send(message)
   }
 
   /**
    * Sends a red alert when the merge queue has stalled.
-   * Fires when PRs are waiting but nothing has merged in 60+ minutes.
+   * Fires when PRs are waiting but nothing has merged beyond the timeout threshold.
    */
-  async sendQueueBackupAlert(
-    queueDepth: number,
-    minutesSinceMerge: number,
+  async sendQueueBackupAlert(params: {
+    queueDepth: number
+    minutesSinceMerge: number
+    timeoutMinutes: number
     queueUrl: string
-  ): Promise<void> {
+  }): Promise<void> {
+    const { queueDepth, minutesSinceMerge, timeoutMinutes, queueUrl } = params
     const message: SlackMessage = {
       attachments: [
         {
@@ -124,7 +129,7 @@ export class SlackNotifier {
               type: 'section',
               text: {
                 type: 'mrkdwn',
-                text: 'The merge queue has entries but nothing has merged in over 60 minutes. The queue may be stalled.',
+                text: `The merge queue has entries but nothing has merged in over ${timeoutMinutes} minutes. The queue may be stalled.`,
               },
             },
             {
@@ -143,9 +148,9 @@ export class SlackNotifier {
           ],
         },
       ],
-    };
+    }
 
-    await this.send(message);
+    await this.send(message)
   }
 
   /**
@@ -201,9 +206,9 @@ export class SlackNotifier {
           ],
         },
       ],
-    };
+    }
 
-    await this.send(message);
+    await this.send(message)
   }
 
   /**
@@ -215,12 +220,10 @@ export class SlackNotifier {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(message),
-    });
+    })
 
     if (!response.ok) {
-      throw new Error(
-        `Slack notification failed: ${response.status} ${response.statusText}`
-      );
+      throw new Error(`Slack notification failed: ${response.status} ${response.statusText}`)
     }
   }
 }

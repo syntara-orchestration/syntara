@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod'
 
 /**
  * Validates GitHub Actions workflow run data from the REST API.
@@ -9,9 +9,10 @@ export const WorkflowRunSchema = z.object({
   name: z.string(),
   head_branch: z.string(),
   status: z.string(),
+  event: z.string(),
   conclusion: z.string().nullable(),
   created_at: z.string(),
-});
+})
 
 /**
  * Validates a single entry in the GitHub merge queue from GraphQL API.
@@ -25,7 +26,7 @@ export const MergeQueueEntrySchema = z.object({
     number: z.number(),
     title: z.string(),
   }),
-});
+})
 
 /**
  * Validates the GraphQL response for merge queue queries.
@@ -33,13 +34,15 @@ export const MergeQueueEntrySchema = z.object({
  */
 export const MergeQueueResponseSchema = z.object({
   repository: z.object({
-    mergeQueue: z.object({
-      entries: z.object({
-        nodes: z.array(MergeQueueEntrySchema),
-      }),
-    }).nullable(),
+    mergeQueue: z
+      .object({
+        entries: z.object({
+          nodes: z.array(MergeQueueEntrySchema),
+        }),
+      })
+      .nullable(),
   }),
-});
+})
 
 /**
  * Validates GitHub commit data from the REST API.
@@ -55,7 +58,7 @@ export const CommitSchema = z.object({
     }),
   }),
   html_url: z.string(),
-});
+})
 
 /**
  * Validates required GitHub Actions environment variables.
@@ -67,22 +70,40 @@ export const EnvironmentSchema = z.object({
   repository: z.string().min(1, 'GITHUB_REPOSITORY is required'),
   runId: z.number().int().positive('GITHUB_RUN_ID must be a positive integer'),
   headRef: z.string().optional(),
-});
+  eventName: z.string().optional(),
+})
 
-export type WorkflowRun = z.infer<typeof WorkflowRunSchema>;
-export type MergeQueueEntry = z.infer<typeof MergeQueueEntrySchema>;
-export type Commit = z.infer<typeof CommitSchema>;
+const requiredFiniteNumber = (name: string) =>
+  z
+    .string({ required_error: `${name} is required` })
+    .trim()
+    .min(1, `${name} is required`)
+    .transform(Number)
+    .refine(Number.isFinite, `${name} must be a finite number`)
+
+/** Validates values passed from the queue-health workflow to the unhealthy alert. */
+export const UnhealthyAlertEnvironmentSchema = z.object({
+  queueDepth: requiredFiniteNumber('QUEUE_DEPTH'),
+  minutesSinceMerge: requiredFiniteNumber('MINUTES_SINCE_MERGE'),
+  timeoutMinutes: requiredFiniteNumber('TIMEOUT_MINUTES'),
+  queueUrl: z.string({ required_error: 'QUEUE_URL is required' }).url('QUEUE_URL must be a valid URL'),
+})
+
+export type WorkflowRun = z.infer<typeof WorkflowRunSchema>
+export type MergeQueueEntry = z.infer<typeof MergeQueueEntrySchema>
+export type Commit = z.infer<typeof CommitSchema>
 
 /**
  * Represents the current health state of the merge queue.
  * Includes health status, reason, and optional diagnostic data.
  */
 export type HealthState = {
-  health: 'healthy' | 'unhealthy';
-  reason: 'queue_empty' | 'merging' | 'stalled';
-  queueDepth?: number;
-  minutesSinceMerge?: number;
-  oldestPr?: number;
-};
+  health: 'healthy' | 'unhealthy'
+  reason: 'queue_empty' | 'merging' | 'stalled'
+  queueDepth?: number
+  minutesSinceMerge?: number
+  oldestPr?: number
+}
 
-export type Environment = z.infer<typeof EnvironmentSchema>;
+export type Environment = z.infer<typeof EnvironmentSchema>
+export type UnhealthyAlertEnvironment = z.infer<typeof UnhealthyAlertEnvironmentSchema>

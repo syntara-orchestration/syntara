@@ -34,6 +34,7 @@ jobs:
         working-directory: .github/scripts
 
       - name: Check queue health and notify
+        id: health
         if: env.SLACK_CI_MONITORING_WEBHOOK_URL != ''
         run: npm run check-queue-health
         working-directory: .github/scripts
@@ -41,3 +42,37 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_RUN_ID: ${{ github.run_id }}
+
+      # Marker steps so the next run can infer steady-state health when no alert fired
+      - name: Health is unhealthy
+        if: steps.health.outputs.health == 'unhealthy'
+        run: echo "Recorded unhealthy state for next run"
+
+      - name: Health is healthy
+        if: steps.health.outputs.health == 'healthy'
+        run: echo "Recorded healthy state for next run"
+
+      - name: Send unhealthy alert
+        if: steps.health.outputs.should_alert_unhealthy == 'true'
+        run: npm run send-unhealthy-alert
+        working-directory: .github/scripts
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SLACK_CI_MONITORING_WEBHOOK_URL: ${{ secrets.SLACK_CI_MONITORING_WEBHOOK_URL }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          QUEUE_DEPTH: ${{ steps.health.outputs.queue_depth }}
+          MINUTES_SINCE_MERGE: ${{ steps.health.outputs.minutes_since_merge }}
+          TIMEOUT_MINUTES: ${{ steps.health.outputs.timeout_minutes }}
+          QUEUE_URL: ${{ steps.health.outputs.queue_url }}
+
+      - name: Send recovery alert
+        if: steps.health.outputs.should_alert_recovery == 'true'
+        run: npm run send-recovery-alert
+        working-directory: .github/scripts
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SLACK_CI_MONITORING_WEBHOOK_URL: ${{ secrets.SLACK_CI_MONITORING_WEBHOOK_URL }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          QUEUE_URL: ${{ steps.health.outputs.queue_url }}

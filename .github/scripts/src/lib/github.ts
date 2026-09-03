@@ -1,6 +1,6 @@
-import { Octokit } from '@octokit/rest';
-import { graphql } from '@octokit/graphql';
-import { z } from 'zod';
+import { Octokit } from '@octokit/rest'
+import { graphql } from '@octokit/graphql'
+import { z } from 'zod'
 import {
   WorkflowRunSchema,
   MergeQueueResponseSchema,
@@ -8,27 +8,27 @@ import {
   type WorkflowRun,
   type MergeQueueEntry,
   type Commit,
-} from './types.js';
+} from './types.js'
 
 /**
  * GitHub API client with type-safe wrappers for merge queue monitoring.
  * Combines REST and GraphQL APIs to query workflow runs, queue state, and commits.
  */
 export class GitHubClient {
-  private readonly octokit: Octokit;
-  private readonly graphqlClient: typeof graphql;
-  private readonly owner: string;
-  private readonly repo: string;
+  private readonly octokit: Octokit
+  private readonly graphqlClient: typeof graphql
+  private readonly owner: string
+  private readonly repo: string
 
   constructor(token: string, repository: string) {
-    this.octokit = new Octokit({ auth: token });
+    this.octokit = new Octokit({ auth: token })
     this.graphqlClient = graphql.defaults({
       headers: { authorization: `token ${token}` },
-    });
+    })
 
-    const [owner, repo] = repository.split('/');
-    this.owner = owner;
-    this.repo = repo;
+    const [owner, repo] = repository.split('/')
+    this.owner = owner
+    this.repo = repo
   }
 
   /**
@@ -38,7 +38,8 @@ export class GitHubClient {
   async getWorkflowRuns(
     workflowFileName: string,
     since: Date,
-    excludeRunId?: number
+    excludeRunId?: number,
+    event?: string
   ): Promise<WorkflowRun[]> {
     const response = await this.octokit.actions.listWorkflowRuns({
       owner: this.owner,
@@ -46,13 +47,12 @@ export class GitHubClient {
       workflow_id: workflowFileName,
       per_page: 20,
       created: `>=${since.toISOString()}`,
-    });
+      ...(event ? { event } : {}),
+    })
 
-    const runs = z.array(WorkflowRunSchema).parse(response.data.workflow_runs);
+    const runs = z.array(WorkflowRunSchema).parse(response.data.workflow_runs)
 
-    return runs.filter(
-      (run) => run.status === 'completed' && run.id !== excludeRunId
-    );
+    return runs.filter((run) => run.status === 'completed' && run.id !== excludeRunId)
   }
 
   /**
@@ -78,24 +78,27 @@ export class GitHubClient {
           }
         }
       }
-    `;
+    `
 
     const response = await this.graphqlClient<unknown>(query, {
       owner: this.owner,
       repo: this.repo,
       branch,
-    });
+    })
 
-    const parsed = MergeQueueResponseSchema.parse(response);
+    const parsed = MergeQueueResponseSchema.parse(response)
 
-    return parsed.repository.mergeQueue?.entries.nodes ?? [];
+    return parsed.repository.mergeQueue?.entries.nodes ?? []
   }
 
   /**
    * Fetches recently merged PRs to a branch.
    * Uses PR merge time, not commit timestamps, for accurate merge activity detection.
    */
-  async getRecentMerges(branch: string, since: Date): Promise<Array<{ number: number; mergedAt: string; title: string }>> {
+  async getRecentMerges(
+    branch: string,
+    since: Date
+  ): Promise<Array<{ number: number; mergedAt: string; title: string }>> {
     const response = await this.octokit.pulls.list({
       owner: this.owner,
       repo: this.repo,
@@ -104,7 +107,7 @@ export class GitHubClient {
       sort: 'updated',
       direction: 'desc',
       per_page: 30,
-    });
+    })
 
     return response.data
       .filter((pr) => pr.merged_at !== null)
@@ -113,7 +116,7 @@ export class GitHubClient {
         number: pr.number,
         mergedAt: pr.merged_at!,
         title: pr.title,
-      }));
+      }))
   }
 
   /**
@@ -125,14 +128,14 @@ export class GitHubClient {
       repo: this.repo,
       sha: branch,
       per_page: 30,
-    });
+    })
 
-    const allCommits = z.array(CommitSchema).parse(response.data);
+    const allCommits = z.array(CommitSchema).parse(response.data)
 
     return allCommits.filter((commit) => {
-      const committerDate = new Date(commit.commit.committer.date);
-      return committerDate >= since;
-    });
+      const committerDate = new Date(commit.commit.committer.date)
+      return committerDate >= since
+    })
   }
 
   /**
@@ -144,9 +147,9 @@ export class GitHubClient {
       owner: this.owner,
       repo: this.repo,
       run_id: runId,
-    });
+    })
 
-    return response.data.jobs;
+    return response.data.jobs
   }
 
   /**
@@ -157,22 +160,114 @@ export class GitHubClient {
     const response = await this.octokit.repos.get({
       owner: this.owner,
       repo: this.repo,
-    });
+    })
 
-    return response.data.default_branch;
+    return response.data.default_branch
   }
 
   /**
    * Builds a URL to the GitHub merge queue page for a branch.
    */
   getQueueUrl(branch: string): string {
-    return `https://github.com/${this.owner}/${this.repo}/queue/${branch}`;
+    return `https://github.com/${this.owner}/${this.repo}/queue/${branch}`
   }
 
   /**
    * Builds a URL to a specific pull request.
    */
   getPrUrl(prNumber: number): string {
-    return `https://github.com/${this.owner}/${this.repo}/pull/${prNumber}`;
+    return `https://github.com/${this.owner}/${this.repo}/pull/${prNumber}`
+  }
+
+  /**
+   * Fetches PRs that were removed from the merge queue (dequeued).
+   * Uses the Timeline API to detect removed_from_merge_queue events.
+   * Does not include successfully merged PRs.
+   */
+  async getRecentDequeues(
+    branch: string,
+    since: Date
+  ): Promise<Array<{ number: number; title: string; dequeuedAt: string }>> {
+    // Get recently updated PRs (both open and closed)
+    const [openPrs, closedPrs] = await Promise.all([
+      this.octokit.pulls.list({
+        owner: this.owner,
+        repo: this.repo,
+        state: 'open',
+        base: branch,
+        sort: 'updated',
+        direction: 'desc',
+        per_page: 50,
+      }),
+      this.octokit.pulls.list({
+        owner: this.owner,
+        repo: this.repo,
+        state: 'closed',
+        base: branch,
+        sort: 'updated',
+        direction: 'desc',
+        per_page: 30,
+      }),
+    ])
+
+    const allPrs = [...openPrs.data, ...closedPrs.data]
+    const dequeues: Array<{
+      number: number
+      title: string
+      dequeuedAt: string
+    }> = []
+
+    // Check timeline events for each recently updated PR
+    for (const pr of allPrs.filter((pr) => new Date(pr.updated_at) >= since)) {
+      // Skip PRs that were successfully merged - those aren't dequeues
+      if (pr.merged_at) {
+        continue
+      }
+
+      try {
+        const timeline = await this.octokit.paginate(this.octokit.issues.listEventsForTimeline, {
+          owner: this.owner,
+          repo: this.repo,
+          issue_number: pr.number,
+          per_page: 100,
+        })
+
+        // Find removed_from_merge_queue events within our time window
+        // Timeline API returns various event types; we only care about ones with created_at
+        const dequeueEvents: Array<{ created_at: string }> = timeline.flatMap((event) => {
+          if (
+            !('event' in event) ||
+            event.event !== 'removed_from_merge_queue' ||
+            !('created_at' in event) ||
+            typeof event.created_at !== 'string'
+          ) {
+            return []
+          }
+
+          if (new Date(event.created_at) < since) {
+            return []
+          }
+
+          return [{ created_at: event.created_at }]
+        })
+
+        if (dequeueEvents.length > 0) {
+          const latestEvent = dequeueEvents.reduce((latest, event) =>
+            new Date(event.created_at) > new Date(latest.created_at) ? event : latest
+          )
+          dequeues.push({
+            number: pr.number,
+            title: pr.title,
+            dequeuedAt: latestEvent.created_at,
+          })
+        }
+      } catch (error) {
+        throw new Error(`Could not fetch timeline for PR #${pr.number}`, {
+          cause: error,
+        })
+      }
+    }
+
+    return dequeues.sort((a, b) => new Date(b.dequeuedAt).getTime() - new Date(a.dequeuedAt).getTime())
   }
 }
