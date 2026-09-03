@@ -67,7 +67,9 @@ async def _confdeltype(session: AsyncSession, table: str, constraint: str) -> st
         {"table_name": table, "constraint_name": constraint},
     )
     raw_result = result.scalar_one_or_none()
-    return raw_result.decode() if raw_result is not None else None
+    if raw_result is None:
+        return None
+    return raw_result if isinstance(raw_result, str) else raw_result.decode()
 
 
 async def _count(session: AsyncSession, table: str, where_sql: str, **params: object) -> int:
