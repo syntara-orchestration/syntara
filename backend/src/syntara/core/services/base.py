@@ -5,7 +5,7 @@ consistent filtering, sorting, pagination, and label handling across the entire 
 """
 
 import time
-from collections.abc import Awaitable, Callable, Iterable
+from collections.abc import Awaitable, Callable, Iterable, Sequence
 from datetime import datetime
 from typing import Any
 from uuid import UUID
@@ -23,8 +23,10 @@ from syntara.core.constants import FieldLimits
 from syntara.core.exceptions import SafeValueError
 from syntara.core.models import User
 from syntara.core.models.base.base_resource import BaseResource, has_user_visible_changes
+from syntara.core.models.user_reference import UserReferenceFieldsMixin
 from syntara.core.services.extensions import ConvertResourceMixin, EnrichQueryMixin, PostProcessingMixin
 from syntara.core.services.types import TModel, TResponse
+from syntara.core.services.user_reference_resolution import UserReferenceResolver
 from syntara.core.utils.cursor import (
     PaginationDirection,
     SortDirection,
@@ -134,6 +136,19 @@ class BaseService:
     def has_pending_user_changes(self, resource: BaseResource) -> bool:
         """Return whether a resource has real user-visible changes pending flush."""
         return has_user_visible_changes(resource)
+
+    async def resolve_declared_user_references(self, objects: Sequence[Any]) -> None:
+        """Resolve user-reference fields on every response object that declares them.
+
+        Keyed on the explicit :class:`UserReferenceFieldsMixin` declaration rather
+        than on the resolver's permissive fallback, so a Read model that carries a
+        raw ``created_by`` UUID by design is never silently turned into an object.
+
+        Called by the base for every response it builds; services do not wire it.
+        """
+        declared = [obj for obj in objects if isinstance(obj, UserReferenceFieldsMixin)]
+        if declared:
+            await UserReferenceResolver(self.session).resolve(declared)
 
     def _apply_standard_filters(
         self,
@@ -828,6 +843,11 @@ class BaseService:
             converted = [response_type_converter(r) for r in trimmed]
         else:
             converted = [self.convert_resource_mixin.convert_resource(r) for r in trimmed]
+
+        # Placed after conversion (not in post_process, which runs on ORM rows and is
+        # skipped whenever post_query_callback is supplied) so every list endpoint is
+        # enriched without the service wiring a call.
+        await self.resolve_declared_user_references(converted)
 
         return response_type(
             resources=converted,

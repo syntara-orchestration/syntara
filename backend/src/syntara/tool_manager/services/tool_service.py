@@ -104,7 +104,7 @@ class ToolService(UserReferenceResolverMixin, BaseService):
             )
             id_restriction = list(result.all())
 
-        response = await self.list_resources(
+        return await self.list_resources(
             model=Tool,
             response_type=ToolListResponse,
             limit=limit,
@@ -114,8 +114,6 @@ class ToolService(UserReferenceResolverMixin, BaseService):
             include_total=include_total,
             id_restriction=id_restriction,
         )
-        await self.resolve_user_references(response.resources)
-        return response
 
     async def _get_tool_for_integration(self, integration_id: UUID, tool_id: UUID) -> Tool:
         """Fetch a tool and verify it belongs to the specified integration."""

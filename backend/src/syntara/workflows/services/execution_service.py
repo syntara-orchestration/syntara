@@ -922,7 +922,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
 
         """
         # Use unified list_resources method with overridden methods
-        response = await self.list_resources(
+        return await self.list_resources(
             model=Execution,
             response_type=ExecutionListResponse,
             limit=limit,
@@ -932,8 +932,6 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             include_total=include_total,
             allowed_projects=allowed_projects,
         )
-        await self.resolve_user_references(response.resources)
-        return response
 
     async def list_execution_activities(
         self,
