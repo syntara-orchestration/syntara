@@ -40,6 +40,30 @@ import { PRINCIPAL_ID_FIELD, roleAssignmentsQueryKey, useAlreadyAssignedRoles } 
 
 const PAGE_SIZE = 20
 
+type NamedOption = { value: string; label: string }
+
+function assignmentAddedDescription(
+  data: AssignRoleFormData,
+  userOptions: NamedOption[],
+  groupOptions: NamedOption[],
+  serviceAccountOptions: NamedOption[]
+): string {
+  const optionsByType = {
+    [RolePrincipalType.USER]: userOptions,
+    [RolePrincipalType.GROUP]: groupOptions,
+    [RolePrincipalType.SERVICE_ACCOUNT]: serviceAccountOptions,
+  }
+  const idByType = {
+    [RolePrincipalType.USER]: data.userId,
+    [RolePrincipalType.GROUP]: data.groupId,
+    [RolePrincipalType.SERVICE_ACCOUNT]: data.serviceAccountId,
+  }
+  const principalId = idByType[data.principalType]
+  const principalName =
+    optionsByType[data.principalType].find((option) => option.value === principalId)?.label ?? principalId
+  return `Assignment for ${principalName} has been added.`
+}
+
 // ── Form body (extracted to stay within max-lines-per-function) ───────────
 
 type AssignRoleFormBodyProps = {
@@ -434,7 +458,10 @@ export function AssignRoleDialog({ onClose, onSuccess }: Readonly<AssignRoleDial
           queryKey: roleAssignmentsQueryKey(data.principalType, principalId),
         })
       )
-      showSuccess({ title: 'Assignment added', description: 'Assignment created successfully' })
+      showSuccess({
+        title: 'Assignment added',
+        description: assignmentAddedDescription(data, userOptions, groupOptions, serviceAccountOptions),
+      })
       onSuccess()
       onClose()
     }

@@ -8,6 +8,7 @@ import { SynPage, SynPageBody } from './SynPage'
 import { SynPageHeader } from './SynPageHeader'
 import { SynPanel } from './SynPanel'
 import { SynPanelContentStack } from './SynPanelContentStack'
+import { SynPanelStack, SynPanelStackItem } from './SynPanelStack'
 
 const meta: Meta<typeof SynPage> = {
   component: SynPage,
@@ -152,6 +153,37 @@ export const ErrorPageLayout: Story = {
         <SynPanel isFullHeight>
           <SynErrorState message={{ detail: 'Connection timed out.', retryable: true }} onRetry={fn()} />
         </SynPanel>
+      </SynPageBody>
+    </SynPage>
+  ),
+}
+
+export const StackedPanelsLayout: Story = {
+  name: 'Stacked panels (canvas + details)',
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Two sibling `SynPanel`s in `SynPanelStack`. Do not wrap them in `overflow: hidden` — that clips panel box-shadow.',
+      },
+    },
+  },
+  render: () => (
+    <SynPage>
+      <SynPageHeader title="Workflow run" />
+      <SynPageBody>
+        <SynPanelStack>
+          <SynPanelStackItem isFilled>
+            <SynPanel isFullHeight>
+              <Content component="p">Canvas</Content>
+            </SynPanel>
+          </SynPanelStackItem>
+          <SynPanelStackItem style={{ height: '120px' }}>
+            <SynPanel isFullHeight>
+              <Content component="p">Current run details</Content>
+            </SynPanel>
+          </SynPanelStackItem>
+        </SynPanelStack>
       </SynPageBody>
     </SynPage>
   ),

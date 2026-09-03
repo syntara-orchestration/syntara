@@ -22,7 +22,13 @@ import {
   deleteLlmIntegration,
   selectLlmCredential,
 } from './llm-helpers'
-import { addNodePanel, closeNodeEditorPanel, fillCodeEditor } from './workflows'
+import {
+  addNodePanel,
+  clickAddConnectedStep,
+  closeNodeEditorPanel,
+  fillCodeEditor,
+  openNodeForEditing,
+} from './workflows'
 
 export { ensureLlmCredential, createLlmIntegration, deleteLlmIntegration, selectLlmCredential }
 
@@ -51,34 +57,9 @@ async function selectDirectNodeType(page: Page, label: string | RegExp) {
 // Trigger
 // ---------------------------------------------------------------------------
 
-/** Click "Add connected step" button on an edge and wait for the add-node panel to appear. */
-export async function openAddNodePanel(page: Page) {
-  const layoutButton = page.getByRole('button', { name: 'Layout' })
-  if ((await layoutButton.count()) > 0) {
-    await layoutButton.click()
-  }
-
-  // Fit the view so all nodes and edge buttons are visible in the viewport
-  const fitViewButton = page.getByRole('button', { name: 'Fit view' })
-  if ((await fitViewButton.count()) > 0) {
-    await fitViewButton.click()
-  }
-
-  const addBtn = page.getByRole('button', { name: 'Add connected step' })
-  await expect(addBtn.first()).toBeVisible({ timeout: 20_000 })
-
-  // Retry clicking — React Flow edge buttons can be briefly detached during layout animations
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      await addBtn.first().click({ force: true, timeout: 5_000 })
-      await expect(addNodePanel(page)).toHaveCount(1, { timeout: 5_000 })
-      return
-    } catch {
-      if (attempt === 2) throw new Error('Failed to open add-node panel after 3 attempts')
-      await layoutButton.click()
-      await expect(addBtn.first()).toBeVisible({ timeout: 5_000 })
-    }
-  }
+/** Click "Add connected step" on an edge and wait for the add-node panel. */
+export async function openAddNodePanel(page: Page, preferredHandle?: string) {
+  await clickAddConnectedStep(page, preferredHandle)
 }
 
 /** Add a manual trigger. Must be called on a fresh /workflow-builder/new page. */
@@ -95,8 +76,24 @@ export async function addManualTrigger(page: Page, name = 'Manual trigger') {
   // Panel auto-closes after adding trigger - no manual close needed
 }
 
+/** Select a service account in the trigger form's "Authorized service accounts" dropdown. */
+async function selectServiceAccount(page: Page, serviceAccountName: string) {
+  // Two buttons match /authorized service accounts/i: the toggle (has text "Select service
+  // accounts") and the FormLabelWithHelp icon (aria-label "Authorized service accounts help",
+  // no text content). Filter by text content to target only the toggle and to wait for the
+  // loading spinner to clear.
+  const toggle = page
+    .getByRole('button', { name: /authorized service accounts/i })
+    .filter({ hasText: /select service accounts/i })
+  await toggle.click()
+  // PF v6 SelectOption with hasCheckbox renders <li role="menuitem">, NOT role="option".
+  // getByRole('option') would find zero elements here. Scope to the listbox and match by text.
+  await page.getByRole('listbox').getByRole('menuitem').filter({ hasText: serviceAccountName }).click()
+  await page.keyboard.press('Escape')
+}
+
 /** Add a webhook (API) trigger. Must be called on a fresh /workflow-builder/new page. */
-export async function addWebhookTrigger(page: Page, name: string, webhookPath: string) {
+export async function addWebhookTrigger(page: Page, name: string, webhookPath: string, serviceAccountName: string) {
   // Wait for page to finish loading
   await expect(page.getByRole('progressbar', { name: 'Loading' })).not.toBeVisible({ timeout: 15000 })
 
@@ -105,13 +102,14 @@ export async function addWebhookTrigger(page: Page, name: string, webhookPath: s
   await page.getByRole('button', { name: 'Webhook trigger', exact: true }).click()
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
   await page.getByRole('textbox', { name: 'Webhook path' }).fill(webhookPath)
+  await selectServiceAccount(page, serviceAccountName)
   await page.getByRole('button', { name: 'Create', exact: true }).click()
 
   // Panel auto-closes after adding trigger - no manual close needed
 }
 
 /** Add an EDA (Event-Driven Ansible) trigger. Must be called on a fresh /workflow-builder/new page. */
-export async function addEdaTrigger(page: Page, name: string, webhookPath: string) {
+export async function addEdaTrigger(page: Page, name: string, webhookPath: string, serviceAccountName: string) {
   // Wait for page to finish loading
   await expect(page.getByRole('progressbar', { name: 'Loading' })).not.toBeVisible({ timeout: 15000 })
 
@@ -120,6 +118,7 @@ export async function addEdaTrigger(page: Page, name: string, webhookPath: strin
   await page.getByRole('button', { name: 'Event-Driven Ansible trigger', exact: true }).click()
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
   await page.getByRole('textbox', { name: 'Webhook path' }).fill(webhookPath)
+  await selectServiceAccount(page, serviceAccountName)
   await page.getByRole('button', { name: 'Create', exact: true }).click()
 
   // Panel auto-closes after adding trigger - no manual close needed
@@ -399,10 +398,15 @@ export async function addConditionNodeWithBranch(page: Page, name: string, expre
 
   // Add a node on the "true" branch to satisfy validation
   // The "false" branch is optional
-  await openAddNodePanel(page)
+  await addScriptOnHandle(page, 'true', `${name} - true action`, 'print("condition is true")')
+}
+
+/** Add a Script node from a specific edge stub (e.g. unused condition `false`). */
+export async function addScriptOnHandle(page: Page, handle: string, name: string, code: string) {
+  await openAddNodePanel(page, handle)
   await selectCategoryAndType(page, 'Action', 'Script')
-  await page.getByRole('textbox', { name: 'Name', exact: true }).fill(`${name} - true action`)
-  await fillCodeEditor(page, { value: 'print("condition is true")' })
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
+  await fillCodeEditor(page, { value: code })
   await page.getByRole('button', { name: 'Create', exact: true }).click()
   await closeNodeEditorPanel(page)
 }
@@ -484,9 +488,13 @@ export async function addLoopNode(page: Page, name: string, items = '${trigger.i
 export async function addLoopNodeWithBody(page: Page, name: string, items = '${trigger.items}') {
   await addLoopNode(page, name, items)
 
-  // Add a node in the loop body to satisfy validation
-  // Use the "Add connected step" button on the edge
-  await openAddNodePanel(page)
+  // The loop-body stub (`add-node-button-loop`) is often missing from the a11y tree
+  // next to unused condition `false` and loop `done` stubs, which makes a generic
+  // "Add connected step" click fail strict mode. Add via the editor instead.
+  await openNodeForEditing(page, name)
+  await page.getByRole('button', { name: 'Add step…' }).click()
+  await page.getByRole('menuitem', { name: 'In loop' }).click()
+  await expect(addNodePanel(page)).toHaveCount(1)
   await selectCategoryAndType(page, 'Action', 'Script')
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(`${name} - loop body`)
   await fillCodeEditor(page, { value: 'print("processing item")' })

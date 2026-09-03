@@ -26,8 +26,6 @@ test.describe('Workflows Table - Display and Navigation', () => {
       projectId: project?.id,
     })
 
-    if (!workflow) throw new Error('Failed to create test workflow')
-
     try {
       // Navigate to workflows page
       await app.goto(toAppUrl('/workflows'))
@@ -59,8 +57,6 @@ test.describe('Workflows Table - Display and Navigation', () => {
       projectId: project?.id,
     })
 
-    if (!workflow) throw new Error('Failed to create test workflow')
-
     try {
       // Navigate to workflows page and filter for our specific workflow
       await app.goto(toAppUrl('/workflows'))
@@ -90,8 +86,6 @@ test.describe('Workflows Table - Display and Navigation', () => {
       name: workflowName,
       projectId: project?.id,
     })
-
-    if (!workflow) throw new Error('Failed to create test workflow')
 
     try {
       await app.goto(toAppUrl('/workflows'))
@@ -130,8 +124,6 @@ test.describe('Workflows Table - Display and Navigation', () => {
       name: workflowName,
       projectId: project?.id,
     })
-
-    if (!workflow) throw new Error('Failed to create test workflow')
 
     try {
       // Navigate to workflows page

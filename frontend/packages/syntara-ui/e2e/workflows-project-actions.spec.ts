@@ -145,8 +145,8 @@ test.describe('Workflows Page - Project Actions in All Projects View', () => {
       const deleteDialog = app.getByRole('dialog', { name: /Delete project/i })
       await expect(deleteDialog).toBeVisible()
       await expect(deleteDialog.getByText(projectName)).toBeVisible()
-      await expect(deleteDialog.getByText(/workflows.*permanently deleted/i)).toBeVisible()
-      await expect(deleteDialog.getByText(/role assignments.*removed/i)).toBeVisible()
+      await expect(deleteDialog.getByText(/Workflows, executions, and approval requests/i)).toBeVisible()
+      await expect(deleteDialog.getByText(/Role assignments, project roles, and policies/i)).toBeVisible()
 
       // Verify destructive acknowledgement checkbox is required
       const confirmButton = deleteDialog.getByRole('button', { name: 'Delete' })

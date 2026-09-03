@@ -70,11 +70,13 @@ ENV DESCRIPTION="Syntara UI" \
     container=oci
 
 LABEL com.redhat.component="ansible-automation-orchestrator-ui-container" \
-      name="ansible-automation-platform/ansible-automation-orchestrator-ui-rhel9" \
+      name="ansible-automation-platform/automation-orchestrator-ui-rhel9" \
+      cpe="cpe:/a:redhat:ansible_automation_orchestrator:2026.8::el9" \
       summary="${DESCRIPTION}" \
       io.openshift.expose-services="" \
       io.openshift.tags="automation,ansible,orchestrator" \
-      io.k8s.display-name="ansible-automation-orchestrator-ui-rhel9" \
+      io.k8s.display-name="automation-orchestrator-ui-rhel9" \
       io.k8s.description="${DESCRIPTION}" \
       maintainer="Ansible Automation Platform Productization Team" \
-      description="${DESCRIPTION}"
+      description="${DESCRIPTION}" \
+      vendor="Red Hat, Inc."

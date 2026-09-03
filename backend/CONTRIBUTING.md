@@ -177,13 +177,24 @@ CI posts an informational warning if the spec changed but contracts were not reg
 
 The pre-commit hook (enforced in CI) compares your spec against `devel` to detect breaking changes (removed fields, type changes, deleted endpoints).
 
-**If breaking changes are detected**, you must acknowledge them in the PR description:
+**Every meaningful OpenAPI spec change must update `info.version`.** Comparison is canonical, so serialization-only diffs (whitespace, key order, quotes) do not require a version change. The version increment is enforced: increment the **minor** version for additive changes (new endpoint, field, or enum value) and the **patch** version for spec-only edits (description, example, annotation). A missing version change or an incorrect version increment is blocked.
 
-- Add to PR description: `breaking-change-ack: <detailed justification>`
-- Minimum 20 characters explaining why necessary, migration path, and how the frontend is updated
-- Example: `breaking-change-ack: Removing deprecated created_by_id field in favor of created_by object. Regenerated contracts and updated UI references in this PR. Migration guide added to API docs.`
+**If breaking changes are detected**, they are blocked in place — full stop. A new major version is a new spec served from a separate URL path (e.g., `/api/v2/`), so it does not register as a breaking change to the current spec. A PR-body annotation is not enough.
 
-**This check blocks merge** until breaking changes are acknowledged. See [OpenAPI Breaking Changes](docs/openapi-breaking-changes.md) for details.
+See [OpenAPI Spec Management](docs/standards/openapi-spec-management.md) for gate codes and repo configuration.
+
+#### Breaking-change override process
+
+This is the handbook for the AO REST API Versioning and Deprecation Policy as enforced in Syntara.
+
+1. **Do not break the current version in place.** Ship a non-breaking change, or if strictly necessary or otherwise deemed appropriate, introduce a new major version as a new spec at a new URL path (for example `/api/v2/`). Each spec is compared only against its own prior state.
+2. **Update `info.version` on every meaningful spec change.** Canonical (semantic) comparison means serialization-only diffs do not require a version change. Increment the **minor** version for additive changes (new endpoint, field, or enum value) and the **patch** version for spec-only edits (description, example, annotation).
+3. **CVE / critical security escape hatch.** An in-place breaking change is allowed only when all of the following are true:
+   - there is no non-breaking remediation
+   - engineering and BU leadership (Senior Director or above) have approved
+   - a member of `syntara-leads` applies the `breaking-change-approved` label
+   - `info.version` is incremented by a **minor** version (never major — a new major version is a new spec at a new path)
+4. **Label restriction.** GitHub has no native per-label permission. The Breaking Change Label Guard workflow (`.github/workflows/breaking-change-label-guard.yml`) verifies the actor who added the label is in `syntara-leads`. If not, it fails the check, removes the label, and comments on the PR. Provision `SYNTARA_LEADS_READ_TOKEN` (org Members: read); without it the guard fails closed.
 
 ### Submitting a Pull Request
 

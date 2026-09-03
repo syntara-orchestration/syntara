@@ -61,6 +61,8 @@
 
 # Repository governance
 /.github/CODEOWNERS @syntara-orchestration/syntara-leads
+# Privileged in-place breaking-change override — who may apply the label.
+/.github/workflows/breaking-change-label-guard.yml @syntara-orchestration/syntara-leads @syntara-orchestration/syntara-ci-stability
 /.github/AI_AGENT_POLICY.md @syntara-orchestration/syntara-leads
 /GOVERNANCE.md @syntara-orchestration/syntara-leads
 /LICENSE @syntara-orchestration/syntara-leads

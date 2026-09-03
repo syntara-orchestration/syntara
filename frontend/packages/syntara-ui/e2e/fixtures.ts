@@ -180,8 +180,8 @@ export const test = xfailBase.extend<
 })
 
 /**
- * Creates a describe-scoped guard that skips all remaining tests without
- * setting up fixtures once a data-availability check fails.
+ * Creates a describe-scoped guard that skips remaining tests in a serial
+ * describe after the first data-availability `expect()` fails.
  *
  * Configures the enclosing describe as `mode: 'serial'` so the unavailable
  * flag reliably propagates across tests (with `fullyParallel: true`, parallel
@@ -192,7 +192,7 @@ export const test = xfailBase.extend<
  *   test.beforeEach(async ({ app }) => {
  *     const hasData = await checkData(app)
  *     if (!hasData) guard.markUnavailable()
- *     test.skip(!hasData, 'No data available')
+ *     expect(hasData, 'No data available').toBeTruthy()
  *   })
  */
 export function createUnavailableGuard(reason: string) {

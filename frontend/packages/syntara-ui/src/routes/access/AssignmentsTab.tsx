@@ -103,6 +103,7 @@ function getAssignmentRowActions(
     { isSeparator: true },
     {
       title: <IconLabel icon={<RhUiTrashIcon />}>Delete assignment</IconLabel>,
+      isDanger: true,
       isAriaDisabled: !permissions.canRevoke,
       tooltipProps: permissions.canRevoke ? undefined : { content: permissions.tooltips.revoke },
       onClick: permissions.canRevoke ? () => onDelete(row) : undefined,
@@ -276,7 +277,8 @@ export function AssignmentsTab() {
       detachPromise(queryClient.invalidateQueries({ queryKey: ['role-assignments'] }))
       refetch()
     }
-    const onError = (error: unknown) => showError({ title: 'Remove failed', description: getErrorMessage(error) })
+    const onError = (error: unknown) =>
+      showError({ title: 'Failed to remove assignment', description: getErrorMessage(error) })
     const onSettled = deleteDialog.close
     const callbacks = { onSuccess, onError, onSettled }
 

@@ -14,7 +14,7 @@ test('user configures an integration and verifies it appears', async ({ app }) =
   try {
     const token = await getAuthToken(app)
     seededIntegration = await createIntegrationViaApi(app, { name: integrationName, token: token ?? undefined })
-    expect(seededIntegration).not.toBeNull()
+    expect(seededIntegration, 'Failed to create integration via API').toBeTruthy()
 
     await app.goto(toAppUrl('/configuration/integrations'))
     await expect(app.getByRole('heading', { level: 1, name: 'Integrations' })).toBeVisible()

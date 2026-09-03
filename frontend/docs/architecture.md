@@ -380,7 +380,7 @@ flowchart LR
 Each `TNavigationItem` in `navigationItems.tsx` supports two permission fields:
 
 - `requiredPermissions` (array of `{ action, resourceType }`, OR logic): controls navigation visibility. The item is hidden if the user lacks ALL listed permissions. Consumed by `useFilteredNavigationItems`.
-- `routePermission` (single `{ action, resourceType }`): wraps the route component in `ProtectedRoute`, which shows `EmptyStateAccessDenied` when the permission check fails. Used for create/edit routes.
+- `routePermission` (single `{ action, resourceType }`): wraps the route component in `ProtectedRoute`, which shows `SynEmptyStateAccessDenied` when the permission check fails. Used for create/edit routes.
 
 See [`docs/permissions-rbac.md`](permissions-rbac.md) for the full permission gating architecture.
 

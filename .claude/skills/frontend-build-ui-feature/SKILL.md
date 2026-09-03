@@ -43,7 +43,7 @@ Follow the project skills for implementation. **Always match existing codebase p
 - Use typed API clients from `frontend/packages/syntara-ui/src/client.tsx`. No raw `fetch()`.
 - Use Zod + react-hook-form for any forms. Use manual `useState`/controlled form controls as a last resort.
 - Handle all states: data loaded, no data yet, no filter results, API error with retry.
-- Write unit tests alongside the code: happy path, empty states, error state, and at least one `toHaveNoViolations()` accessibility test. Follow `.claude/skills/frontend-testing-guidelines/SKILL.md` (query order, `userEvent.setup()`, jsdom not happy-dom, dedicated `use*.test.ts(x)` for new hooks).
+- Write unit tests alongside the code: happy path, empty states, error state, and at least one `toHaveNoViolations()` accessibility test. Follow `.claude/skills/frontend-testing-guidelines/SKILL.md` (query order, `userEvent.setup()`, happy-dom Vitest environment, dedicated `use*.test.ts(x)` for new hooks).
 
 After the code is written, check it against the UX design system:
 
