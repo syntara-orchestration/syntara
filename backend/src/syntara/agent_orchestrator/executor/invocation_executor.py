@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 from sqlalchemy.orm import selectinload
 from sqlmodel import col, select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
+from temporalio import activity as temporal_activity
 
 from syntara.agent_orchestrator.audit.invocation_lifecycle import InvocationLifecycleEvent
 from syntara.agent_orchestrator.clients.openrouter_config import get_openrouter_llm
@@ -503,11 +504,18 @@ class InvocationExecutor:
             # heartbeats this is reachable, and nothing else records a terminal
             # state — without this the row stays RUNNING forever. The conditional
             # UPDATE is a no-op when a cancel already wrote CANCELLED.
+            if not self._cancel_was_requested():
+                # Transient cancellation (worker shutdown, timeout, pause, reset) --
+                # not a cancel. Leave the row RUNNING so the activity retry resumes it.
+                logger.info(
+                    "Agent execution activity cancelled without a cancel request; leaving status for retry",
+                    invocation_id=invocation.id,
+                )
+                raise
             logger.info("Agent execution activity cancelled", invocation_id=invocation.id)
             # Shielded: a bare await here is silently dropped if a second
-            # cancellation lands while the write is in flight — which is exactly
-            # the worker-shutdown case above — leaving the row RUNNING forever,
-            # the very state this handler exists to prevent.
+            # cancellation lands while the write is in flight, leaving the row
+            # RUNNING forever — the very state this handler exists to prevent.
             await asyncio.shield(
                 self._update_invocation_status(
                     invocation.id,
@@ -523,6 +531,29 @@ class InvocationExecutor:
             await self._handle_execution_failure(
                 e, invocation, ctx, recorder, invocation_start, execution_id, request_id
             )
+
+    @staticmethod
+    def _cancel_was_requested() -> bool:
+        """Whether this cancellation came from a real cancel rather than worker shutdown.
+
+        Only a requested cancel is a cancel. Every other reason Temporal cancels an
+        activity -- worker shutdown on a rolling deploy, a timeout, a pause, a reset
+        -- is transient, and the attempt is expected to run again. Recording
+        CANCELLED for those is wrong: the retried attempt returns early on the
+        ``status == CANCELLED`` guard in execute_invocation, abandoning an agent
+        nobody cancelled. Leaving the row RUNNING lets the retry resume it.
+
+        Outside an activity context (unit tests, direct calls) the details are
+        unavailable, so fall back to treating the cancellation as requested and
+        keep recording a terminal state.
+        """
+        try:
+            details = temporal_activity.cancellation_details()
+        except RuntimeError:
+            return True
+        if details is None:
+            return True
+        return bool(getattr(details, "cancel_requested", False))
 
     @staticmethod
     def _wrap_timeout_error(e: Exception, invocation_id: UUID) -> Exception:
