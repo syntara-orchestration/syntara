@@ -210,7 +210,7 @@ test.describe('destructive modal UX compliance (AAP-72897)', () => {
     await expect(modal.getByRole('checkbox')).toHaveCount(0)
 
     // Confirm button should be enabled immediately (no checkbox gate)
-    const confirmButton = modal.getByRole('button', { name: 'Unassign' })
+    const confirmButton = modal.getByRole('button', { name: 'Unassign role' })
     await expect(confirmButton).toBeEnabled()
 
     // Cancel to avoid side effects
