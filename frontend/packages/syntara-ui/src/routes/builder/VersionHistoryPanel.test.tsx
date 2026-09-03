@@ -21,8 +21,7 @@ function createMockVersion(overrides: Record<string, unknown> = {}): WorkflowVer
     version: 1,
     schema_version: '2.0.0',
     workflow_definition: { schema_version: '2.0.0' as const, name: 'test', triggers: [], nodes: [], edges: [] },
-    created_by: 'user-1',
-    created_by_username: 'testuser',
+    created_by: { id: 'user-1', name: 'testuser' },
     created_at: '2026-05-19T21:59:00.000Z',
     updated_at: '2026-05-19T21:59:00.000Z',
     change_description: 'Initial version',
@@ -39,21 +38,21 @@ const defaultProps = {
       status: 'draft',
       created_at: '2026-05-19T21:59:00.000Z',
       change_description: 'Latest changes',
-      created_by_username: 'sarah.chen',
+      created_by: { id: 'user-1', name: 'sarah.chen' },
     }),
     createMockVersion({
       version: 2,
       status: 'previously_published',
       created_at: '2026-05-16T21:59:00.000Z',
       change_description: 'Published release',
-      created_by_username: 'marcus.williams',
+      created_by: { id: 'user-1', name: 'marcus.williams' },
     }),
     createMockVersion({
       version: 1,
       status: 'published',
       created_at: '2026-05-12T21:59:00.000Z',
       change_description: 'Initial version',
-      created_by_username: 'priya.patel',
+      created_by: { id: 'user-1', name: 'priya.patel' },
     }),
   ],
   onClose: vi.fn(),
@@ -257,7 +256,7 @@ describe('VersionHistoryPanel', () => {
       name: 'Release 1.0',
       status: 'published',
       created_at: '2026-05-19T21:59:00.000Z',
-      created_by_username: 'sarah.chen',
+      created_by: { id: 'user-1', name: 'sarah.chen' },
     })
     render(<VersionHistoryPanel {...defaultProps} versions={[version]} />)
 
@@ -284,7 +283,7 @@ describe('VersionHistoryPanel', () => {
     const version = createMockVersion({
       version: 2,
       status: 'previously_published',
-      created_by_username: 'marcus.williams',
+      created_by: { id: 'user-1', name: 'marcus.williams' },
     })
     const { container } = render(<VersionHistoryPanel {...defaultProps} versions={[version]} />)
 
@@ -326,7 +325,7 @@ describe('VersionHistoryPanel', () => {
   })
 
   it('renders version row without change_description', () => {
-    const version = createMockVersion({ version: 5, change_description: null, created_by_username: null })
+    const version = createMockVersion({ version: 5, change_description: null, created_by: null })
     render(<VersionHistoryPanel {...defaultProps} versions={[version]} />)
 
     expect(screen.queryByText('testuser')).not.toBeInTheDocument()
@@ -347,7 +346,7 @@ describe('VersionHistoryPanel', () => {
       created_at: null,
       change_description: null,
       status: null,
-      created_by_username: 'testuser',
+      created_by: { id: 'user-1', name: 'testuser' },
     })
     render(<VersionHistoryPanel {...defaultProps} versions={[version]} />)
 
@@ -408,10 +407,18 @@ describe('VersionHistoryPanel', () => {
         version: 3,
         created_at: '2026-05-19T10:00:00.000Z',
         change_description: 'v3',
-        created_by_username: 'user-v3',
+        created_by: { id: 'user-1', name: 'user-v3' },
       }),
-      createMockVersion({ version: 2, created_at: '2026-05-19T08:00:00.000Z', created_by_username: 'user-v2' }),
-      createMockVersion({ version: 1, created_at: '2026-01-15T10:00:00.000Z', created_by_username: 'user-v1' }),
+      createMockVersion({
+        version: 2,
+        created_at: '2026-05-19T08:00:00.000Z',
+        created_by: { id: 'user-1', name: 'user-v2' },
+      }),
+      createMockVersion({
+        version: 1,
+        created_at: '2026-01-15T10:00:00.000Z',
+        created_by: { id: 'user-1', name: 'user-v1' },
+      }),
     ]
     render(<VersionHistoryPanel {...defaultProps} versions={versions} />)
 
@@ -432,7 +439,7 @@ describe('VersionHistoryPanel', () => {
       version: 6,
       change_description: null,
       status: null,
-      created_by_username: 'testuser',
+      created_by: { id: 'user-1', name: 'testuser' },
     })
     render(<VersionHistoryPanel {...defaultProps} versions={[version]} />)
 
@@ -452,7 +459,7 @@ describe('VersionHistoryPanel', () => {
       created_at: null,
       change_description: null,
       status: 'published',
-      created_by_username: 'testuser',
+      created_by: { id: 'user-1', name: 'testuser' },
     })
     render(<VersionHistoryPanel {...defaultProps} versions={[version]} />)
 
@@ -461,8 +468,16 @@ describe('VersionHistoryPanel', () => {
 
   it('renders multiple versions in different date groups', () => {
     const versions = [
-      createMockVersion({ version: 3, created_at: '2026-05-19T10:00:00.000Z', created_by_username: 'recent-user' }),
-      createMockVersion({ version: 2, created_at: '2026-01-10T10:00:00.000Z', created_by_username: 'old-user' }),
+      createMockVersion({
+        version: 3,
+        created_at: '2026-05-19T10:00:00.000Z',
+        created_by: { id: 'user-1', name: 'recent-user' },
+      }),
+      createMockVersion({
+        version: 2,
+        created_at: '2026-01-10T10:00:00.000Z',
+        created_by: { id: 'user-1', name: 'old-user' },
+      }),
     ]
     render(<VersionHistoryPanel {...defaultProps} versions={versions} />)
 
@@ -553,7 +568,7 @@ describe('VersionHistoryPanel', () => {
       version: 1,
       name: 'Release 1.0',
       created_at: '2026-05-19T10:00:00.000Z',
-      created_by_username: 'testuser',
+      created_by: { id: 'user-1', name: 'testuser' },
     })
     render(<VersionHistoryPanel {...defaultProps} versions={[version]} />)
 
@@ -565,7 +580,7 @@ describe('VersionHistoryPanel', () => {
     render(
       <VersionHistoryPanel
         {...defaultProps}
-        versions={[createMockVersion({ version: 1, status: 'draft', created_by_username: 'user1' })]}
+        versions={[createMockVersion({ version: 1, status: 'draft', created_by: { id: 'user-1', name: 'user1' } })]}
         canEdit={false}
         editTooltip="You do not have permission"
       />
@@ -585,7 +600,7 @@ describe('VersionHistoryPanel', () => {
     render(
       <VersionHistoryPanel
         {...defaultProps}
-        versions={[createMockVersion({ version: 1, status: 'draft', created_by_username: 'user1' })]}
+        versions={[createMockVersion({ version: 1, status: 'draft', created_by: { id: 'user-1', name: 'user1' } })]}
         canEdit={false}
       />
     )

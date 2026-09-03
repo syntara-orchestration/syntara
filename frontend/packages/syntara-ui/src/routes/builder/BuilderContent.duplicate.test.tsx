@@ -115,7 +115,7 @@ const mockWorkflow: WorkflowWithVersion = {
       ],
       edges: [],
     },
-    created_by: 'user-1',
+    created_by: { id: 'user-1', name: 'user-1' },
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
   },

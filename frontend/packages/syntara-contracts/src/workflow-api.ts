@@ -430,7 +430,7 @@ export interface components {
       /** @description Validation findings from the last save operation. Only included in create/update responses; use has_validation_issues for the durable indicator. */
       validation_result?: components['schemas']['ValidationResult'] | null
       /** @description Current active version details */
-      version: components['schemas']['WorkflowVersionRead']
+      version: components['schemas']['schemas-WorkflowVersionRead']
     }
     /**
      * PublishWorkflowVersionResponse
@@ -552,11 +552,9 @@ export interface components {
       name?: string | null
       /**
        * Created By
-       * Format: uuid
+       * @description User who created the version
        */
-      created_by: string
-      /** Created By Username */
-      created_by_username?: string | null
+      readonly created_by?: components['schemas']['UserReference'] | null
       /**
        * Created At
        * Format: date-time
@@ -2268,6 +2266,59 @@ export interface components {
        * @example /invocations/550e8400-e29b-41d4-a716-446655440000
        */
       instance?: string | null
+    }
+    /**
+     * WorkflowVersionRead
+     * @description Schema for workflow version response (GET /workflows/{id}/versions/{version}).
+     */
+    'schemas-WorkflowVersionRead': {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /**
+       * Workflow Id
+       * Format: uuid
+       */
+      workflow_id: string
+      /** Version */
+      version: number
+      /** Schema Version */
+      schema_version: string
+      /** Workflow Definition */
+      workflow_definition: {
+        [key: string]: unknown
+      }
+      /** Change Description */
+      change_description?: string | null
+      /**
+       * Status
+       * @default draft
+       * @enum {string}
+       */
+      status?: 'draft' | 'published' | 'previously_published'
+      /** Last Published At */
+      last_published_at?: string | null
+      /** Last Unpublished At */
+      last_unpublished_at?: string | null
+      /** Name */
+      name?: string | null
+      /**
+       * Created By
+       * @description User who created the version
+       */
+      readonly created_by?: components['schemas']['UserReference'] | null
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string
     }
     /**
      * ExecutionStatus
