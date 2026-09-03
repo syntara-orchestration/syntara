@@ -546,4 +546,131 @@ describe('AAPNodeForm', () => {
       })
     })
   })
+
+  describe('Use input variables', () => {
+    it('toggles use input variables switch', async () => {
+      const user = userEvent.setup()
+      renderWithHeader(<AAPNodeForm onSubmit={mockOnSubmit} onCancel={vi.fn()} />)
+
+      const inputVarsSwitch = screen.getByRole('switch', { name: 'Use input variables' })
+      expect(inputVarsSwitch).not.toBeChecked()
+
+      await user.click(inputVarsSwitch)
+
+      expect(inputVarsSwitch).toBeChecked()
+    })
+
+    it('shows extra_vars expression field when use input variables is enabled', async () => {
+      const user = userEvent.setup()
+      renderWithHeader(<AAPNodeForm onSubmit={mockOnSubmit} onCancel={vi.fn()} />)
+
+      await user.click(screen.getByRole('switch', { name: 'Use input variables' }))
+
+      expect(screen.getByPlaceholderText('{"key": "value"} or drag expression')).toBeInTheDocument()
+    })
+
+    it('enables the toggle and shows extra_vars when loading saved extra_vars expressions', () => {
+      const savedExtraVars = '{"app_version": "${inputs.version}"}'
+      renderWithHeader(
+        <AAPNodeForm
+          onSubmit={mockOnSubmit}
+          onCancel={vi.fn()}
+          initialData={{
+            name: 'Deploy with vars',
+            organization_name: 'Default',
+            job_template_name: 'Deploy App',
+            extra_vars: savedExtraVars,
+          }}
+        />
+      )
+
+      expect(screen.getByRole('switch', { name: 'Use input variables' })).toBeChecked()
+      expect(screen.getByPlaceholderText('{"key": "value"} or drag expression')).toHaveValue(savedExtraVars)
+    })
+
+    it('enables the toggle when loading saved extra_vars with pretty-printed expressions', () => {
+      const savedExtraVars = JSON.stringify({ app_version: '${inputs.version}' }, null, 2)
+      renderWithHeader(
+        <AAPNodeForm
+          onSubmit={mockOnSubmit}
+          onCancel={vi.fn()}
+          initialData={{
+            extra_vars: savedExtraVars,
+          }}
+        />
+      )
+
+      expect(screen.getByRole('switch', { name: 'Use input variables' })).toBeChecked()
+      expect(screen.getByPlaceholderText('{"key": "value"} or drag expression')).toBeVisible()
+    })
+
+    it('enables the toggle from tags expressions', () => {
+      renderWithHeader(
+        <AAPNodeForm
+          onSubmit={mockOnSubmit}
+          onCancel={vi.fn()}
+          initialData={{
+            tags: '${inputs.tags}',
+          }}
+        />
+      )
+
+      expect(screen.getByRole('switch', { name: 'Use input variables' })).toBeChecked()
+      expect(screen.getByPlaceholderText('tags or drag expression')).toHaveValue('${inputs.tags}')
+    })
+
+    it('enables the toggle from skip_tags expressions', () => {
+      renderWithHeader(
+        <AAPNodeForm
+          onSubmit={mockOnSubmit}
+          onCancel={vi.fn()}
+          initialData={{
+            skip_tags: '${inputs.skip_tags}',
+          }}
+        />
+      )
+
+      expect(screen.getByRole('switch', { name: 'Use input variables' })).toBeChecked()
+      expect(screen.getByPlaceholderText('skip tags or drag expression')).toHaveValue('${inputs.skip_tags}')
+    })
+
+    it('persists use_input_variables when the toggle is on without expressions', async () => {
+      const user = userEvent.setup()
+      renderWithHeader(<AAPNodeForm onSubmit={mockOnSubmit} onCancel={vi.fn()} />)
+
+      await user.click(screen.getByRole('switch', { name: 'Use input variables' }))
+      await submitForm()
+
+      await waitFor(() => {
+        expect(mockOnSubmit).toHaveBeenCalledWith(expect.objectContaining({ use_input_variables: true }))
+      })
+    })
+
+    it('enables the toggle from persisted use_input_variables without expressions', () => {
+      renderWithHeader(
+        <AAPNodeForm onSubmit={mockOnSubmit} onCancel={vi.fn()} initialData={{ use_input_variables: true }} />
+      )
+
+      expect(screen.getByRole('switch', { name: 'Use input variables' })).toBeChecked()
+      expect(screen.getByPlaceholderText('{"key": "value"} or drag expression')).toBeVisible()
+    })
+
+    it('does not enable the toggle for extra_vars without expressions', () => {
+      renderWithHeader(
+        <AAPNodeForm
+          onSubmit={mockOnSubmit}
+          onCancel={vi.fn()}
+          initialData={{
+            organization_name: 'Default',
+            job_template_name: 'Deploy App',
+            job_template_id: 10,
+            extra_vars: '{"key": "value"}',
+          }}
+        />
+      )
+
+      expect(screen.getByRole('switch', { name: 'Use input variables' })).not.toBeChecked()
+      expect(screen.queryByPlaceholderText('{"key": "value"} or drag expression')).not.toBeInTheDocument()
+    })
+  })
 })

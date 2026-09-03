@@ -132,6 +132,19 @@ vi.mock('../node-forms/AAPJobTemplateForm', () => ({
       >
         {submitButtonText ?? 'Add step'}
       </button>
+      <button
+        onClick={() =>
+          onSubmit({
+            name: 'Updated AAP Task',
+            use_input_variables: true,
+            organization_name: '',
+            job_template_name: '',
+          })
+        }
+        data-testid="aap-submit-input-vars-button"
+      >
+        Update with input variables
+      </button>
       <button onClick={onCancel} data-testid="aap-cancel-button">
         Cancel
       </button>
@@ -386,6 +399,25 @@ describe('TaskNodeDetails Component', () => {
     await user.click(screen.getByTestId('submit-button'))
 
     expect(mockUpdateActivity).toHaveBeenCalledWith('task-1', expect.objectContaining({ name: 'Updated Task' }))
+  })
+
+  it('updates an AAP job template with use_input_variables and no job template id', async () => {
+    const user = userEvent.setup()
+    const taskData = {
+      type: 'aap_job_template' as const,
+      id: 'task-aap',
+      name: 'AAP Task',
+      parameters: {
+        use_input_variables: true,
+      },
+    }
+
+    renderTaskNodeDetails(taskData, 'task-aap')
+
+    await user.click(screen.getByTestId('aap-submit-input-vars-button'))
+
+    expect(mockShowError).not.toHaveBeenCalled()
+    expect(mockUpdateActivity).toHaveBeenCalledWith('task-aap', expect.objectContaining({ name: 'Updated AAP Task' }))
   })
 
   it('calls updateActivity on successful AAP form submission', async () => {
