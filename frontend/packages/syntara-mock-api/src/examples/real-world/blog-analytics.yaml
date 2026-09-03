@@ -13,14 +13,16 @@ metadata:
 triggers:
   - id: trigger_manual
     type: manual_trigger
-
-inputs:
-  user_id:
-    type: integer
-    description: User ID to analyze
-    default: 1
-    minimum: 1
-    maximum: 10
+    parameters:
+      input_schema:
+        type: object
+        properties:
+          user_id:
+            type: integer
+            description: User ID to analyze
+            default: 1
+            minimum: 1
+            maximum: 10
 
 nodes:
   - id: fetch_user
@@ -31,12 +33,6 @@ nodes:
       url: https://jsonplaceholder.typicode.com/users/${trigger.user_id}
       headers:
         Accept: application/json
-    outputs:
-      user: $.body
-      name: $.body.name
-      username: $.body.username
-      email: $.body.email
-      company: $.body.company.name
     timeout: 30
 
   - id: fetch_posts
@@ -49,8 +45,6 @@ nodes:
         Accept: application/json
       query_params:
         userId: ${trigger.user_id}
-    outputs:
-      posts: $.body
     timeout: 30
 
   - id: fetch_todos
@@ -63,8 +57,6 @@ nodes:
         Accept: application/json
       query_params:
         userId: ${trigger.user_id}
-    outputs:
-      todos: $.body
     timeout: 30
 
   - id: analyze_posts
@@ -72,6 +64,8 @@ nodes:
     type: script
     parameters:
       language: python
+      environment:
+        INPUT_POSTS: ${fetch_posts.body}
       code: |
         import json
         import os
@@ -107,11 +101,6 @@ nodes:
         }
 
         print(json.dumps(analysis))
-    inputs:
-      posts: ${fetch_posts.output.posts}
-    outputs:
-      post_analysis: $.output
-      total_posts: $.output.total_posts
     timeout: 60
 
   - id: analyze_todos
@@ -119,6 +108,8 @@ nodes:
     type: script
     parameters:
       language: python
+      environment:
+        INPUT_TODOS: ${fetch_todos.body}
       code: |
         import json
         import os
@@ -139,11 +130,6 @@ nodes:
         }
 
         print(json.dumps(analysis))
-    inputs:
-      todos: ${fetch_todos.output.todos}
-    outputs:
-      todo_analysis: $.output
-      completion_rate: $.output.completion_rate
     timeout: 60
 
   - id: generate_report
@@ -151,6 +137,13 @@ nodes:
     type: script
     parameters:
       language: python
+      environment:
+        INPUT_NAME: ${fetch_user.body.name}
+        INPUT_USERNAME: ${fetch_user.body.username}
+        INPUT_EMAIL: ${fetch_user.body.email}
+        INPUT_COMPANY: ${fetch_user.body.company.name}
+        INPUT_POST_ANALYSIS: ${analyze_posts.stdout_json}
+        INPUT_TODO_ANALYSIS: ${analyze_todos.stdout_json}
       code: |
         import json
         import os
@@ -193,26 +186,15 @@ nodes:
         }
 
         print(json.dumps(report, indent=2))
-    inputs:
-      name: ${fetch_user.output.name}
-      username: ${fetch_user.output.username}
-      email: ${fetch_user.output.email}
-      company: ${fetch_user.output.company}
-      post_analysis: ${analyze_posts.output.post_analysis}
-      todo_analysis: ${analyze_todos.output.todo_analysis}
-    outputs:
-      report: $.output
-      summary: $.output.summary
-      activity_level: $.output.activity_level
     timeout: 60
 edges:
-  - source: fetch_user
-    target: fetch_posts
-  - source: fetch_posts
-    target: fetch_todos
-  - source: fetch_todos
-    target: analyze_posts
-  - source: analyze_posts
-    target: analyze_todos
-  - source: analyze_todos
-    target: generate_report
+  - from: fetch_user
+    to: fetch_posts
+  - from: fetch_posts
+    to: fetch_todos
+  - from: fetch_todos
+    to: analyze_posts
+  - from: analyze_posts
+    to: analyze_todos
+  - from: analyze_todos
+    to: generate_report

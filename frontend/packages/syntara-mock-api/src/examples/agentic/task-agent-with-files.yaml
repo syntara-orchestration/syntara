@@ -29,23 +29,23 @@ nodes:
         - 'a1b2c3d4-0001-0001-0001-000000000001'
         - 'a1b2c3d4-0001-0001-0001-000000000002'
         - 'a1b2c3d4-0001-0001-0001-000000000003'
-    outputs:
-      analysis: $.result.content
 
   - id: generate_report
     type: script
     name: Generate Report
     parameters:
       language: python
+      environment:
+        INPUT_ANALYSIS: ${analyze_docs.output}
       code: |
         import json
-        analysis = json.loads('${analyze_docs.analysis}')
+        import os
+
+        analysis = json.loads(os.getenv("INPUT_ANALYSIS", "[]"))
         print(f"Report generated from {len(analysis)} documents")
-    inputs:
-      analysis: ${analyze_docs.analysis}
 
 edges:
-  - source: trigger_manual
-    target: analyze_docs
-  - source: analyze_docs
-    target: generate_report
+  - from: trigger_manual
+    to: analyze_docs
+  - from: analyze_docs
+    to: generate_report

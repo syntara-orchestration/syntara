@@ -3,15 +3,17 @@ schema_version: "2.0.0"
 name: authenticated-request
 description: API request with Authorization header from inputs
 
-inputs:
-  apiToken:
-    type: string
-    description: API authentication token
-    default: Bearer test-token-123
-
 triggers:
   - id: trigger_manual
     type: manual_trigger
+    parameters:
+      input_schema:
+        type: object
+        properties:
+          apiToken:
+            type: string
+            description: API authentication token
+            default: Bearer test-token-123
 
 nodes:
   - id: authenticated_fetch
@@ -21,6 +23,4 @@ nodes:
       url: http://test-api.example.com/api/auth
       headers:
         Authorization: ${trigger.apiToken}
-    inputs:
-      apiToken: ${trigger.apiToken}
 edges: []

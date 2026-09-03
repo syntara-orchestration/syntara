@@ -65,6 +65,36 @@ describe('validateVariableReferences', () => {
     })
   })
 
+  describe('unsupported leftover namespaces', () => {
+    it('errors on ${workflow.*} even when the field exists on the trigger schema', () => {
+      const activities: Activity[] = [
+        makeActivity({
+          id: 'task-1',
+          type: 'script',
+          parameters: { code: 'echo ${workflow.username}' },
+        }),
+      ]
+      const context: ValidationContext = { triggers: [makeTriggerWithInputs(['username'])] }
+
+      const errors = validateVariableReferences(activities, [], context)
+      expect(errors).toHaveLength(1)
+      expect(errors[0].severity).toBe('error')
+      expect(errors[0].nodeId).toBe('task-1')
+      expect(errors[0].message).toContain('"workflow" is not a supported namespace')
+      expect(errors[0].suggestion).toContain('workflow')
+    })
+
+    it('accepts ${workflow.output} when a node is actually named workflow (parity with backend node refs)', () => {
+      const activities: Activity[] = [
+        makeActivity({ id: 'workflow', type: 'script', parameters: { code: 'echo hello' } }),
+        makeActivity({ id: 'task-1', type: 'script', parameters: { code: '${workflow.output}' } }),
+      ]
+      const edges: EdgeConnection[] = [{ id: 'e1', source: 'workflow', target: 'task-1' }]
+
+      expect(validateVariableReferences(activities, edges)).toEqual([])
+    })
+  })
+
   describe('node references (AC2)', () => {
     it('returns no warnings when referencing an existing upstream node', () => {
       const activities: Activity[] = [
@@ -182,12 +212,12 @@ describe('validateVariableReferences', () => {
   })
 
   describe('skipped namespaces', () => {
-    it.each(['workflow', 'workflow_context'])('does not error for ${%s.*} references', (namespace) => {
+    it('does not error for ${workflow_context.*} references', () => {
       const activities: Activity[] = [
         makeActivity({
           id: 'task-1',
           type: 'script',
-          parameters: { code: `\${${namespace}.some_field}` },
+          parameters: { code: '${workflow_context.some_field}' },
         }),
       ]
 

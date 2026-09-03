@@ -5,7 +5,8 @@ import { getUpstreamNodeIds } from '../../edgeHelpers'
 import type { ValidationContext, ValidationError } from '../types'
 
 // Keep in sync with BUILTIN_SCOPES in backend/src/syntara/workflows/validators/template_expressions.py
-const KNOWN_NAMESPACES = new Set(['trigger', 'workflow', 'workflow_context'])
+const KNOWN_NAMESPACES = new Set(['trigger', 'workflow_context'])
+const UNSUPPORTED_NAMESPACES = new Set(['workflow'])
 const VARIABLE_REF_PATTERN = /\$\{([^}]+)\}/g
 
 type VariableReference = {
@@ -113,7 +114,24 @@ type RefContext = {
   upstreamIds: Set<string>
 }
 
+function checkUnsupportedNamespace(ref: VariableReference, activity: Activity): ValidationError {
+  const stepName = activity.name ?? activity.id
+  return {
+    id: `var-ref-unsupported-${activity.id}-${ref.namespace}`,
+    severity: 'error',
+    rule: 'variable-references',
+    message: `Step "${stepName}" references \${${ref.fullRef}} but "${ref.namespace}" is not a supported namespace`,
+    nodeId: activity.id,
+    suggestion: `Workflow-level \${${ref.namespace}.*} is not supported`,
+  }
+}
+
 function validateRef(ref: VariableReference, activity: Activity, ctx: RefContext): ValidationError | null {
+  // Only reject as an unsupported namespace when it is not also a real node id.
+  // A node literally named "workflow" is a valid reference target on the backend
+  // (template_expressions.py has no unsupported blocklist), so treat it as a node ref.
+  if (UNSUPPORTED_NAMESPACES.has(ref.namespace) && !ctx.activityIds.has(ref.namespace))
+    return checkUnsupportedNamespace(ref, activity)
   if (ref.namespace === 'trigger')
     return checkSchemaFieldReference(ref, activity, ctx.schemaFields, ref.namespace, ctx.schemaSuggestion)
   if (KNOWN_NAMESPACES.has(ref.namespace)) return null
@@ -137,7 +155,10 @@ export function validateVariableReferences(
     const refs = paramStrings.flatMap(extractVariableReferences)
     if (refs.length === 0) continue
 
-    const needsUpstream = refs.some((r) => !KNOWN_NAMESPACES.has(r.namespace))
+    const needsUpstream = refs.some(
+      (r) =>
+        !KNOWN_NAMESPACES.has(r.namespace) && (!UNSUPPORTED_NAMESPACES.has(r.namespace) || activityIds.has(r.namespace))
+    )
     const upstreamIds = needsUpstream ? getUpstreamNodeIds(activity.id, edges) : new Set<string>()
     const ctx: RefContext = { schemaFields, schemaSuggestion, activityIds, upstreamIds }
 

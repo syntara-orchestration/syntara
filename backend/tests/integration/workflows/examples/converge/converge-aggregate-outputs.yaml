@@ -40,17 +40,17 @@ nodes:
       strategy: all
       aggregateOutputs: true
 edges:
-  - source: parallel_aggregate_fork
-    target: data_task1
-  - source: parallel_aggregate_fork
-    target: data_task2
-  - source: parallel_aggregate_fork
-    target: data_task3
-  - source: data_task1
-    target: parallel_aggregate_join
-  - source: data_task2
-    target: parallel_aggregate_join
-  - source: data_task3
-    target: parallel_aggregate_join
-  - source: parallel_aggregate_join
-    target: converge_aggregate
+  - from: parallel_aggregate_fork
+    to: data_task1
+  - from: parallel_aggregate_fork
+    to: data_task2
+  - from: parallel_aggregate_fork
+    to: data_task3
+  - from: data_task1
+    to: parallel_aggregate_join
+  - from: data_task2
+    to: parallel_aggregate_join
+  - from: data_task3
+    to: parallel_aggregate_join
+  - from: parallel_aggregate_join
+    to: converge_aggregate

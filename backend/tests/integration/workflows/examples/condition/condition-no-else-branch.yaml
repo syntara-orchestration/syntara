@@ -3,15 +3,17 @@ schema_version: "2.0.0"
 name: condition-no-else-test
 description: Test condition with only then branch (no else)
 
-inputs:
-  enable_feature:
-    type: boolean
-    description: Whether to enable the feature
-    default: true
-
 triggers:
   - id: trigger_manual
     type: manual_trigger
+    parameters:
+      input_schema:
+        type: object
+        properties:
+          enable_feature:
+            type: boolean
+            description: Whether to enable the feature
+            default: true
 
 nodes:
   - id: feature_check
@@ -27,9 +29,7 @@ nodes:
       code: |
         echo "Feature enabled"
         echo "Initializing feature..."
-    outputs:
-      status: $.stdout
 edges:
-  - source: feature_check
-    target: enable_feature
+  - from: feature_check
+    to: enable_feature
     port: then

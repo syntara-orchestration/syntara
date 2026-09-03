@@ -6,24 +6,25 @@ description: Demonstrates retry policies with exponential backoff
 triggers:
   - id: trigger_manual
     type: manual_trigger
-
-inputs:
-  failure_rate:
-    type: integer
-    description: Percentage chance of failure (0-100)
-    default: 70
-    minimum: 0
-    maximum: 100
-  seed:
-    type: integer
-    description: |
-      Random seed for deterministic testing (optional).
-      When provided, ensures reproducible behavior in tests.
-      Seed advances by attempt number (attempt 1=seed, attempt 2=seed+1, etc):
-        - Seed 10: Produces [28, 39] = FAIL, SUCCESS (tests retry mechanism)
-        - Seed 1707: Produces [20, 22, 29, 0, 3] = all failures (tests exhaustion)
-      In production, omit this parameter to use true randomness.
-    required: false
+    parameters:
+      input_schema:
+        type: object
+        properties:
+          failure_rate:
+            type: integer
+            description: Percentage chance of failure (0-100)
+            default: 70
+            minimum: 0
+            maximum: 100
+          seed:
+            type: integer
+            description: |
+              Random seed for deterministic testing (optional).
+              When provided, ensures reproducible behavior in tests.
+              Seed advances by attempt number (attempt 1=seed, attempt 2=seed+1, etc):
+                - Seed 10: Produces [28, 39] = FAIL, SUCCESS (tests retry mechanism)
+                - Seed 1707: Produces [20, 22, 29, 0, 3] = all failures (tests exhaustion)
+              In production, omit this parameter to use true randomness.
 
 nodes:
   - id: unreliable_service
@@ -31,6 +32,10 @@ nodes:
     type: script
     parameters:
       language: bash
+      environment:
+        INPUT_FAILURE_RATE: ${trigger.failure_rate}
+        INPUT_ATTEMPT: "1"
+        INPUT_SEED: ${trigger.seed}
       code: |
         ATTEMPT_NUMBER=${INPUT_ATTEMPT:-1}
 
@@ -56,12 +61,6 @@ nodes:
           echo "{\"status\": \"failed\", \"attempt\": $ATTEMPT_NUMBER, \"random\": $RANDOM_NUM}" >&2
           exit 1
         fi
-    inputs:
-      failure_rate: ${trigger.failure_rate}
-      attempt: '1'
-      seed: ${trigger.seed}
-    outputs:
-      result: $.stdout
     timeout: 10
     retry_policy:
       maxAttempts: 5
@@ -75,6 +74,9 @@ nodes:
     type: script
     parameters:
       language: bash
+      environment:
+        INPUT_STATUS: ${unreliable_service.stdout_json.status}
+        INPUT_ATTEMPT: ${unreliable_service.stdout_json.attempt}
       code: |
         echo ""
         echo "=== Service Call Completed ==="
@@ -86,9 +88,6 @@ nodes:
         echo "  ✓ Retry policies help handle transient failures"
         echo "  ✓ Exponential backoff prevents overwhelming failing services"
         echo "  ✓ Timeouts prevent indefinite waiting"
-    inputs:
-      status: ${unreliable_service.output.result.status}
-      attempt: ${unreliable_service.output.result.attempt}
 
   - id: fixed_backoff_example
     name: Fixed Backoff Example
@@ -134,9 +133,9 @@ nodes:
         echo "  --inputs '{\"failure_rate\": 30}'  (easier to succeed)"
         echo "  --inputs '{\"failure_rate\": 90}'  (harder to succeed)"
 edges:
-  - source: unreliable_service
-    target: process_result
-  - source: process_result
-    target: fixed_backoff_example
-  - source: fixed_backoff_example
-    target: summary
+  - from: unreliable_service
+    to: process_result
+  - from: process_result
+    to: fixed_backoff_example
+  - from: fixed_backoff_example
+    to: summary
