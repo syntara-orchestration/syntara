@@ -34,7 +34,15 @@ class UserReference(SQLModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)  # type: ignore[assignment]
 
     id: UUID = Field(..., description="User's unique identifier")
-    name: str = Field(..., description="Principal's current display name, resolved when the response is built")
+    name: str = Field(
+        ...,
+        description=(
+            "Principal's current display name, resolved when the response is built. "
+            "Not a username: for a user this is their first and last name, falling back to "
+            "the username when both are blank; for a service account it is the account name; "
+            "for an internal service it is derived from the certificate CN."
+        ),
+    )
 
     OPENAPI_NULLABLE_FIELD: ClassVar[dict[str, Any]] = {
         "readOnly": True,
