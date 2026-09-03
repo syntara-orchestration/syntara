@@ -4,8 +4,8 @@ type UserReference = WorkflowAPI.components['schemas']['UserReference']
 
 /**
  * Audit fields (created_by / updated_by) return a UserReference ({ id, name }),
- * but some payloads still carry a plain id string — WorkflowVersionRead.created_by
- * is still a UUID, and older mock fixtures use strings.
+ * but some payloads may still carry a plain id string, and older mock fixtures
+ * use strings.
  *
  * These helpers take `unknown` deliberately: they sit on an API boundary, so the
  * runtime shape is not guaranteed by the contract types alone.

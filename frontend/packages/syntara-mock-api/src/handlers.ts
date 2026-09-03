@@ -78,8 +78,7 @@ type MockVersionRecord = {
   change_description: string
   status: string
   name: string | null
-  created_by: string
-  created_by_username: string
+  created_by: { id: string; name: string }
   created_at: string
   updated_at: string
   deleted_at: null
@@ -89,11 +88,9 @@ type MockVersionRecord = {
 const MOCK_VERSION_CREATED_BY = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
 const MOCK_VERSION_CREATED_BY_USERNAME = 'demo'
 
-/**
- * A workflow's created_by/updated_by are UserReference objects; a *version*'s
- * created_by is still a bare principal id (MOCK_VERSION_CREATED_BY).
- */
+/** Workflow and version created_by/updated_by are both UserReference objects. */
 const MOCK_WORKFLOW_USER_REF = { id: MOCK_VERSION_CREATED_BY, name: 'user-1' }
+const MOCK_VERSION_USER_REF = { id: MOCK_VERSION_CREATED_BY, name: MOCK_VERSION_CREATED_BY_USERNAME }
 
 /** Creates a 409 WORKFLOW_VERSION_CONFLICT response for save/publish mock handlers. */
 function workflowVersionConflictResponse(
@@ -143,8 +140,7 @@ function getOrCreateVersionStore(workflowId: string, workflow: WorkflowWithVersi
         change_description: 'Initial version',
         status: 'draft',
         name: null,
-        created_by: MOCK_VERSION_CREATED_BY,
-        created_by_username: MOCK_VERSION_CREATED_BY_USERNAME,
+        created_by: MOCK_VERSION_USER_REF,
         created_at: now,
         updated_at: now,
         deleted_at: null,
@@ -998,7 +994,7 @@ export const handlers = [
         version: 1,
         schema_version: body.workflow_definition?.schema_version ?? '2.0.0',
         workflow_definition: body.workflow_definition,
-        created_by: MOCK_VERSION_CREATED_BY,
+        created_by: MOCK_VERSION_USER_REF,
         created_at: now,
         change_description: 'Initial version',
         status: WorkflowVersionStatusEnum.DRAFT,
@@ -1137,8 +1133,7 @@ export const handlers = [
         change_description: workflow.version?.change_description ?? `Version ${currentVersionNum}`,
         status: 'draft',
         name: null,
-        created_by: workflow.version?.created_by ?? MOCK_VERSION_CREATED_BY,
-        created_by_username: MOCK_VERSION_CREATED_BY_USERNAME,
+        created_by: workflow.version?.created_by ?? MOCK_VERSION_USER_REF,
         created_at: workflow.version?.created_at ?? now,
         updated_at: workflow.version?.created_at ?? now,
         deleted_at: null,
@@ -1162,7 +1157,7 @@ export const handlers = [
       version: nextVersion,
       schema_version: nextDefinition?.schema_version ?? workflow.version?.schema_version ?? '2.0.0',
       workflow_definition: nextDefinition,
-      created_by: workflow.version?.created_by ?? MOCK_VERSION_CREATED_BY,
+      created_by: workflow.version?.created_by ?? MOCK_VERSION_USER_REF,
       created_at: now,
       change_description: body.change_description ?? 'Updated via mock API',
     }
@@ -1176,8 +1171,7 @@ export const handlers = [
       change_description: mutableWorkflow.version.change_description ?? '',
       status: 'draft',
       name: null,
-      created_by: mutableWorkflow.version.created_by ?? MOCK_VERSION_CREATED_BY,
-      created_by_username: MOCK_VERSION_CREATED_BY_USERNAME,
+      created_by: mutableWorkflow.version.created_by ?? MOCK_VERSION_USER_REF,
       created_at: now,
       updated_at: now,
       deleted_at: null,
@@ -1459,12 +1453,7 @@ export const handlers = [
     const includeTotal = url.searchParams.get('include_total') === 'true'
 
     const versions = getOrCreateVersionStore(workflowId, workflow)
-    const sorted = [...versions]
-      .sort((a, b) => b.version - a.version)
-      .map((version) => ({
-        ...version,
-        created_by_username: version.created_by_username ?? MOCK_VERSION_CREATED_BY_USERNAME,
-      }))
+    const sorted = [...versions].sort((a, b) => b.version - a.version)
 
     return HttpResponse.json(paginate(sorted, cursor, limit, includeTotal))
   }),
@@ -1530,8 +1519,7 @@ export const handlers = [
       change_description: `Restored from version ${restoredVersionNum}`,
       status: 'draft',
       name: null,
-      created_by: MOCK_VERSION_CREATED_BY,
-      created_by_username: MOCK_VERSION_CREATED_BY_USERNAME,
+      created_by: MOCK_VERSION_USER_REF,
       created_at: now,
       updated_at: now,
       deleted_at: null,
@@ -1546,7 +1534,7 @@ export const handlers = [
       version: nextVersion,
       schema_version: sourceVersion.schema_version,
       workflow_definition: restoredDef,
-      created_by: MOCK_VERSION_CREATED_BY,
+      created_by: MOCK_VERSION_USER_REF,
       created_at: now,
       change_description: `Restored from version ${restoredVersionNum}`,
     }
