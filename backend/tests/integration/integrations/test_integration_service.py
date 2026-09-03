@@ -388,6 +388,21 @@ class TestPatchIntegration:
         assert result.description == created.description
 
     @pytest.mark.asyncio
+    async def test_patch_same_values_does_not_bump_updated_at(
+        self, test_db_session: AsyncSession, integration_service: IntegrationService
+    ) -> None:
+        """Resubmitting unchanged values must not bump updated_at."""
+        created = await integration_service.create_integration(_mcp_create(name="Noop Patch"))
+        original_updated_at = created.updated_at
+
+        result = await integration_service.update_integration(
+            created.id,
+            IntegrationUpdate(name="Noop Patch", enabled=True),
+        )
+
+        assert result.updated_at == original_updated_at
+
+    @pytest.mark.asyncio
     async def test_patch_name_conflict_raises(
         self, test_db_session: AsyncSession, integration_service: IntegrationService
     ) -> None:
@@ -490,6 +505,19 @@ class TestUpdateValidationStatus:
             await integration_service.update_validation_status(
                 uuid4(), IntegrationSystemUpdate(validation_status=IntegrationStatus.AVAILABLE)
             )
+
+    @pytest.mark.asyncio
+    async def test_update_status_does_not_bump_updated_at(
+        self, test_db_session: AsyncSession, integration_service: IntegrationService
+    ) -> None:
+        """Background validation writes are not API edits and must not change updated_at."""
+        created = await integration_service.create_integration(_mcp_create())
+
+        result = await integration_service.update_validation_status(
+            created.id, IntegrationSystemUpdate(validation_status=IntegrationStatus.AVAILABLE)
+        )
+
+        assert result.updated_at == created.updated_at
 
 
 class TestDeleteIntegration:

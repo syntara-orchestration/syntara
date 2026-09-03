@@ -160,6 +160,19 @@ class Integration(NamedResource, UserOwnedResource, table=True):
         sa_type=DateTime(timezone=True),  # type: ignore[call-overload]
     )
 
+    # Validation/refresh are background-worker writes, not user edits; don't bump updated_at for them.
+    __updated_at_exempt_fields__: ClassVar[frozenset[str]] = frozenset(
+        {
+            "validation_status",
+            "validation_error",
+            "last_validated_at",
+            "refresh_status",
+            "refresh_error",
+            "last_refreshed_at",
+            "last_successful_refresh_at",
+        }
+    )
+
     __filterable_fields__: ClassVar[list[str]] = [
         *NamedResource.__filterable_fields__,
         *UserOwnedResource.__filterable_fields__,

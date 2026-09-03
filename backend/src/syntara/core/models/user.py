@@ -61,6 +61,9 @@ class User(SoftDeletableResource, table=True):
         index=True,
     )
 
+    # Login is a system-managed telemetry write, not a user edit; don't bump updated_at for it.
+    __updated_at_exempt_fields__: ClassVar[frozenset[str]] = frozenset({"last_login"})
+
     # Filterable fields for API list endpoints
     __filterable_fields__: ClassVar[list[str]] = [
         "id",
