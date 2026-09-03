@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { stableStringify } from './normalize-route'
-import { parseRouteManifest, type RouteManifest } from './route-manifest-schema'
+import { routeManifestSchema, type RouteManifest } from './route-manifest-schema'
 
 const thisDir = dirname(fileURLToPath(import.meta.url))
 
@@ -44,7 +44,7 @@ export function getManifestPath(pkgRoot = getPackageRoot()): string {
  */
 export function readCommittedManifest(pkgRoot = getPackageRoot()): RouteManifest {
   const raw = readFileSync(getManifestPath(pkgRoot), 'utf-8')
-  return parseRouteManifest(JSON.parse(raw) as unknown)
+  return routeManifestSchema.parse(JSON.parse(raw) as unknown)
 }
 
 /**
@@ -57,7 +57,7 @@ export function readCommittedManifest(pkgRoot = getPackageRoot()): RouteManifest
  * @returns Absolute path written
  */
 export function writeManifest(manifest: RouteManifest, pkgRoot = getPackageRoot()): string {
-  const validated = parseRouteManifest(manifest)
+  const validated = routeManifestSchema.parse(manifest)
   const path = getManifestPath(pkgRoot)
   mkdirSync(dirname(path), { recursive: true })
   writeFileSync(path, stableStringify(validated), 'utf-8')

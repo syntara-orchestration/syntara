@@ -61,14 +61,3 @@ export type RouteKind = z.infer<typeof routeKindSchema>
 export type RouteSource = z.infer<typeof routeSourceSchema>
 export type NormalizedRoute = z.infer<typeof normalizedRouteSchema>
 export type RouteManifest = z.infer<typeof routeManifestSchema>
-
-/**
- * Parse unknown JSON into a typed {@link RouteManifest}.
- *
- * @param value - Parsed JSON value (not a raw string)
- * @returns Validated manifest
- * @throws ZodError when the value does not match the schema
- */
-export function parseRouteManifest(value: unknown): RouteManifest {
-  return routeManifestSchema.parse(value)
-}

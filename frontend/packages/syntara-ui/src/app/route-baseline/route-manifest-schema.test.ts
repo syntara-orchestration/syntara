@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest'
 import {
   ROUTE_MANIFEST_COMMENT_KEY,
   ROUTE_MANIFEST_NOTICE,
-  parseRouteManifest,
   routeManifestSchema,
 } from './route-manifest-schema'
 
@@ -22,7 +21,7 @@ const validManifest = {
 
 describe('routeManifestSchema', () => {
   it('accepts a valid manifest and infers the typed shape', () => {
-    const parsed = parseRouteManifest(validManifest)
+    const parsed = routeManifestSchema.parse(validManifest)
 
     expect(parsed.version).toBe(1)
     expect(parsed[ROUTE_MANIFEST_COMMENT_KEY]).toBe(ROUTE_MANIFEST_NOTICE)
