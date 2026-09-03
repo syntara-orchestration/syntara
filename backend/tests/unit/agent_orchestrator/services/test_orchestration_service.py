@@ -1,5 +1,6 @@
 """Unit tests for OrchestrationService LangGraph streaming integration."""
 
+import asyncio
 import logging
 import time
 from collections.abc import AsyncGenerator
@@ -1033,6 +1034,65 @@ class TestOrchestrationServiceHonoursCancellation:
             assert "cancelled" in published_types
             assert "completion" not in published_types
             assert "error" not in published_types
+
+    @pytest.mark.asyncio
+    async def test_cancel_observed_while_the_stream_is_quiet(self) -> None:
+        """A cancel must land during a long tool call, when no events are emitted.
+
+        astream_events goes silent between on_tool_start and on_tool_end, so a
+        cancellation poll driven from the loop body cannot fire while a tool (or a
+        long generation) is in flight. cancel_invocation only writes the DB row --
+        it does not cancel the Temporal workflow -- so for an invocation-only
+        cancel this poll is the sole interrupt. Ref: AAP-88614.
+        """
+        from syntara.agent_orchestrator.exceptions import InvocationCancelledError
+
+        quiet_seconds = 30.0
+        slept: list[float] = []
+
+        mock_llm = AsyncMock()
+        mock_llm.model_name = "test-model"
+        mock_context_manager = MagicMock()
+        mock_context_manager.get_async_session_context = _session_cm_returning(InvocationStatus.CANCELLED)
+
+        service = OrchestrationService(mock_llm, mock_context_manager)
+
+        async def stalling_stream(*_args: object, **_kwargs: object) -> AsyncGenerator[dict[str, Any], None]:
+            yield {"event": "on_tool_start", "data": {}}
+            # The tool runs; the stream emits nothing at all for this stretch.
+            slept.append(quiet_seconds)
+            await asyncio.sleep(quiet_seconds)
+            yield {"event": "on_tool_end", "data": {}}
+            yield {"event": "on_chain_end", "data": {}}
+
+        mock_graph = AsyncMock()
+        mock_graph.astream_events = stalling_stream
+
+        with (
+            patch.object(service, "_setup_graph", return_value=mock_graph),
+            patch("syntara.agent_orchestrator.services.orchestration_service.StreamClient") as mock_stream_client,
+            patch(
+                "syntara.agent_orchestrator.services.orchestration_service._CANCELLATION_POLL_INTERVAL_SECONDS",
+                0.05,
+            ),
+        ):
+            mock_stream_client.return_value.__aenter__.return_value = AsyncMock()
+
+            with pytest.raises(InvocationCancelledError):
+                await asyncio.wait_for(
+                    service.execute(
+                        prompt="Test prompt",
+                        session_id="test-session",
+                        invocation_id=uuid4(),
+                        actor_context=AuditActorContext(),
+                        ctx=InvocationContextData(),
+                    ),
+                    # Far below the quiet stretch: the poll must not wait for the
+                    # tool to finish before observing the cancel.
+                    timeout=quiet_seconds / 3,
+                )
+
+        assert slept, "the test must actually exercise a quiet stretch"
 
     @pytest.mark.asyncio
     async def test_running_invocation_completes_normally(self) -> None:

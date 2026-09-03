@@ -638,28 +638,78 @@ class OrchestrationService:
 
         last_cancellation_check = time.monotonic()
 
-        # Stream events from LangGraph
-        async for event in graph.astream_events(initial_state, config, version="v2"):
-            # Abandon the run promptly once the invocation is cancelled — otherwise
-            # the loop keeps calling the LLM after the user cancelled. Throttled so a
-            # token-by-token stream does not hammer the database.
-            now = time.monotonic()
-            if now - last_cancellation_check >= _CANCELLATION_POLL_INTERVAL_SECONDS:
-                last_cancellation_check = now
-                await self._raise_if_invocation_cancelled(invocation_id, phase="orchestration")
+        # The poll is driven from a timer, not from the arrival of events:
+        # astream_events emits nothing while a tool call or a long generation is in
+        # flight, so a check placed only in the loop body cannot fire during exactly
+        # the stretches that burn the most tokens. cancel_invocation writes the
+        # invocation row without cancelling the Temporal workflow, so on an
+        # invocation-only cancel this poll is the sole interrupt. Ref: AAP-88614.
+        stream = graph.astream_events(initial_state, config, version="v2").__aiter__()
+        try:
+            while True:
+                next_event = asyncio.ensure_future(anext(stream))
+                try:
+                    # Wait one poll interval at a time so a quiet stream still gets
+                    # checked; anything already pending is left running meanwhile.
+                    while True:
+                        done, _ = await asyncio.wait(
+                            {next_event}, timeout=_CANCELLATION_POLL_INTERVAL_SECONDS
+                        )
+                        if done:
+                            break
+                        last_cancellation_check = await self._poll_cancellation_if_due(
+                            invocation_id, last_cancellation_check
+                        )
+                except BaseException:
+                    # A raised cancellation (or anything else) leaves the pending
+                    # anext orphaned. Cancel it and let it unwind before the
+                    # generator is closed below — aclose() on a generator still
+                    # mid-await raises "asynchronous generator is already running".
+                    # gather(return_exceptions=True) reports that task's own
+                    # CancelledError as a result while a cancellation aimed at
+                    # *this* coroutine still propagates.
+                    next_event.cancel()
+                    await asyncio.gather(next_event, return_exceptions=True)
+                    raise
 
-            # Process streaming events (event is StandardStreamEvent | CustomStreamEvent)
-            event_dict = cast("dict[str, Any]", event)
-            ttft_tracker.process_event(event_dict)
-            await self._process_streaming_event(event_dict, invocation_id, stream_id, client)
+                try:
+                    event = next_event.result()
+                except StopAsyncIteration:
+                    break
 
-            # Accumulate for trace persistence
-            trace_accumulator.accumulate(event_dict)
+                # A stream that never goes quiet would otherwise never be polled.
+                last_cancellation_check = await self._poll_cancellation_if_due(
+                    invocation_id, last_cancellation_check
+                )
 
-            # Capture final state from graph end events
-            final_state = self._extract_final_state(event_dict, final_state)
+                # Process streaming events (event is StandardStreamEvent | CustomStreamEvent)
+                event_dict = cast("dict[str, Any]", event)
+                ttft_tracker.process_event(event_dict)
+                await self._process_streaming_event(event_dict, invocation_id, stream_id, client)
+
+                # Accumulate for trace persistence
+                trace_accumulator.accumulate(event_dict)
+
+                # Capture final state from graph end events
+                final_state = self._extract_final_state(event_dict, final_state)
+        finally:
+            aclose = getattr(stream, "aclose", None)
+            if aclose is not None:
+                await aclose()
 
         return final_state
+
+    async def _poll_cancellation_if_due(self, invocation_id: UUID, last_check: float) -> float:
+        """Check for cancellation at most once per poll interval.
+
+        Throttled so a token-by-token stream does not hammer the database.
+        Returns the timestamp of the last check, whether or not one was made.
+        """
+        now = time.monotonic()
+        if now - last_check < _CANCELLATION_POLL_INTERVAL_SECONDS:
+            return last_check
+        await self._raise_if_invocation_cancelled(invocation_id, phase="orchestration")
+        return now
 
     async def _raise_if_invocation_cancelled(self, invocation_id: UUID, *, phase: str) -> None:
         """Raise ``InvocationCancelledError`` if the invocation has been cancelled.
