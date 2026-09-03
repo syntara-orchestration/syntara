@@ -802,14 +802,14 @@ check-openapi-breaking: ## Check OpenAPI spec for breaking changes against devel
 	fi
 	@PR_LABELS_TEXT="$${PR_LABELS:-$${OPENAPI_PR_LABELS:-}}"; \
 	if [ -n "$$PR_LABELS_TEXT" ]; then \
-		./scripts/openapi/check-breaking-changes.py \
+		uv run ./scripts/openapi/check-breaking-changes.py \
 			--base $(OPENAPI_BASE_REF) \
 			--head HEAD \
 			--format text \
 			--fallback-spec-path backend/src/syntara/schemas/openapi.yaml \
 			--pr-labels "$$PR_LABELS_TEXT"; \
 	else \
-		./scripts/openapi/check-breaking-changes.py \
+		uv run ./scripts/openapi/check-breaking-changes.py \
 			--base $(OPENAPI_BASE_REF) \
 			--head HEAD \
 			--format text \
@@ -818,7 +818,7 @@ check-openapi-breaking: ## Check OpenAPI spec for breaking changes against devel
 	@echo "Checking public OpenAPI spec for breaking changes..."
 	@PR_LABELS_TEXT="$${PR_LABELS:-$${OPENAPI_PR_LABELS:-}}"; \
 	if [ -n "$$PR_LABELS_TEXT" ]; then \
-		./scripts/openapi/check-breaking-changes.py \
+		uv run ./scripts/openapi/check-breaking-changes.py \
 			--base $(OPENAPI_BASE_REF) \
 			--head HEAD \
 			--format text \
@@ -826,7 +826,7 @@ check-openapi-breaking: ## Check OpenAPI spec for breaking changes against devel
 			--fallback-spec-path backend/src/syntara/schemas/openapi-public.yaml \
 			--pr-labels "$$PR_LABELS_TEXT"; \
 	else \
-		./scripts/openapi/check-breaking-changes.py \
+		uv run ./scripts/openapi/check-breaking-changes.py \
 			--base $(OPENAPI_BASE_REF) \
 			--head HEAD \
 			--format text \
