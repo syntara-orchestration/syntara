@@ -45,7 +45,6 @@ class UserIdentityService:
         user_result = await self.session.exec(
             select(User).where(
                 User.id == user_id,
-                User.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
         if not user_result.one_or_none():
@@ -197,7 +196,6 @@ class UserIdentityService:
         target_result = await self.session.exec(
             select(User).where(
                 User.id == target_user_id,
-                User.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
         target_user = target_result.one_or_none()

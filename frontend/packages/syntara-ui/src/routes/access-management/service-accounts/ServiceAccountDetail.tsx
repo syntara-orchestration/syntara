@@ -1,4 +1,4 @@
-import { Button, DescriptionList, Switch, Tab, TabTitleText, Tooltip } from '@patternfly/react-core'
+import { Button, DescriptionList, Switch, Tab, TabTitleText } from '@patternfly/react-core'
 import { RhUiCheckCircleIcon, RhUiEditIcon, RhUiMinusCircleIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import { useNavigate, useParams } from '@tanstack/react-router'
 import { useCallback } from 'react'
@@ -44,23 +44,10 @@ function DetailsTab({ serviceAccount }: Readonly<{ serviceAccount: ServiceAccoun
     <DescriptionList isHorizontal>
       <SynDetail label="Name">{serviceAccount.name}</SynDetail>
       <SynDetail label="Owning project">
-        {serviceAccount.project_name && !serviceAccount.is_project_deleted ? (
+        {serviceAccount.project_name ? (
           <SynLink to={getProjectDetailPath(serviceAccount.project_id)}>{serviceAccount.project_name}</SynLink>
         ) : (
-          <>
-            {serviceAccount.project_name ?? serviceAccount.project_id}
-            {serviceAccount.is_project_deleted && (
-              <>
-                {' '}
-                <Tooltip content="The owning project for this service account has been deleted">
-                  {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
-                  <span tabIndex={0}>
-                    <SynLabel color="grey">Deleted</SynLabel>
-                  </span>
-                </Tooltip>
-              </>
-            )}
-          </>
+          serviceAccount.project_id
         )}
       </SynDetail>
       <SynDetail label="Description">{serviceAccount.description}</SynDetail>

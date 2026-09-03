@@ -139,7 +139,6 @@ async def _resolve_aap_role_groups(
         select(Group).filter(
             col(Group.name) == target_name,
             col(Group.is_builtin) == True,  # noqa: E712
-            Group.deleted_at.is_(None),  # type: ignore[union-attr]
         )
     )
     group = result.first()
@@ -197,7 +196,6 @@ async def _resolve_users_group(db: AsyncSession, user_id: UUID) -> UUID | None:
         select(Group).filter(
             col(Group.name) == "users",
             col(Group.is_builtin) == True,  # noqa: E712
-            Group.deleted_at.is_(None),  # type: ignore[union-attr]
         )
     )
     group: Group | None = result.first()

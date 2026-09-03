@@ -637,7 +637,6 @@ async def assign_authenticated_group_project_user(
     group_result = await db.exec(
         select(Group).where(
             Group.name == AUTHENTICATED_GROUP_NAME,
-            Group.deleted_at.is_(None),  # type: ignore[union-attr]
         )
     )
     group = group_result.first()

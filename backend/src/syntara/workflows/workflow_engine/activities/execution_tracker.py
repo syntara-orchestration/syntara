@@ -30,7 +30,7 @@ class Execution(Base):
     input_data = Column(JSONB)
     output_data = Column(JSONB)
     error_details = Column(Text)
-    triggered_by = Column(UUID, ForeignKey("users.id"))
+    triggered_by = Column(UUID)  # principal id; not an FK to users.id
 
 class ActivityExecution(Base):
     __tablename__ = "activity_executions"

@@ -1,3 +1,4 @@
+# ruff: noqa: S608  # interpolations are module-level SQL literals, not user input
 """project hard delete
 
 Convert projects from soft delete to hard delete per the cascade-everything

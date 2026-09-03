@@ -153,7 +153,6 @@ class IdentityProviderService(BaseService, SecretConsumerMixin):
             result = await self.session.exec(
                 select(Group.id).where(
                     col(Group.id).in_(requested_ids),
-                    Group.deleted_at.is_(None),  # type: ignore[union-attr]
                 )
             )
             found_ids = set(result.all())

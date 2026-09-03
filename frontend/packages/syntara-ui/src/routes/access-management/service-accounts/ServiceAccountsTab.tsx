@@ -1,4 +1,4 @@
-import { Button, Content, Switch, Tooltip, Truncate } from '@patternfly/react-core'
+import { Button, Content, Switch, Truncate } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiEditFillIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import { useCallback, useMemo } from 'react'
@@ -6,7 +6,6 @@ import { useCallback, useMemo } from 'react'
 import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
-import { SynLabel } from '../../../components/labels/SynLabel'
 import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../../components/panels/list/SynListPanel'
 import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import type { KebabAction } from '../../../components/SynKebabMenu'
@@ -102,23 +101,10 @@ function ServiceAccountRow({
         </SynLink>
       </Td>
       <Td dataLabel="Owning project">
-        {sa.project_name && !sa.is_project_deleted ? (
+        {sa.project_name ? (
           <SynLink to={getProjectDetailPath(sa.project_id)}>{sa.project_name}</SynLink>
         ) : (
-          <>
-            {sa.project_name ?? sa.project_id}
-            {sa.is_project_deleted && (
-              <>
-                {' '}
-                <Tooltip content="The owning project for this service account has been deleted">
-                  {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
-                  <span tabIndex={0}>
-                    <SynLabel color="grey">Deleted</SynLabel>
-                  </span>
-                </Tooltip>
-              </>
-            )}
-          </>
+          sa.project_id
         )}
       </Td>
       <Td dataLabel="Created">
