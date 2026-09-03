@@ -1,5 +1,5 @@
 {
-  "notice": "GENERATED FILE. Do not edit by hand. Regenerate with: npm run route-baseline:update --prefix packages/syntara-ui",
+  "//": "GENERATED FILE. Do not edit by hand. Regenerate with: npm run route-baseline:update --prefix packages/syntara-ui",
   "routes": [
     {
       "kind": "fallback",

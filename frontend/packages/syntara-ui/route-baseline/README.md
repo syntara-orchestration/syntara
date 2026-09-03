@@ -4,8 +4,9 @@
 
 ## Do not edit `manifest.json` by hand
 
-This file is generated. Hand edits are overwritten and will fail CI/tests when
-they drift from the live route sources.
+This file is generated. The top-level `"//"` field is a do-not-edit banner
+(JSON has no real comments). Hand edits are overwritten and will fail tests
+when they drift from the live route sources.
 
 To update after an intentional route change:
 

@@ -10,7 +10,12 @@ import {
   collectNavigationPathsFromSource,
   collectRouterRoutes,
 } from './collect-routes'
-import { ROUTE_MANIFEST_NOTICE, type NormalizedRoute, type RouteManifest } from './types'
+import {
+  ROUTE_MANIFEST_COMMENT_KEY,
+  ROUTE_MANIFEST_NOTICE,
+  type NormalizedRoute,
+  type RouteManifest,
+} from './types'
 
 /**
  * Result of building a manifest plus source-parity findings.
@@ -99,7 +104,7 @@ export function buildRouteManifest(options: BuildRouteManifestOptions): Manifest
 
   return {
     manifest: {
-      notice: ROUTE_MANIFEST_NOTICE,
+      [ROUTE_MANIFEST_COMMENT_KEY]: ROUTE_MANIFEST_NOTICE,
       version: 1,
       routes,
     },

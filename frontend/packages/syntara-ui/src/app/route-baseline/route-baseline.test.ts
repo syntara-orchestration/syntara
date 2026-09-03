@@ -20,7 +20,7 @@ import {
   writeManifest,
 } from './manifest-io'
 import { checkRouteBaseline, updateRouteBaseline } from './run-route-baseline'
-import { ROUTE_MANIFEST_NOTICE, type RouteManifest } from './types'
+import { ROUTE_MANIFEST_COMMENT_KEY, ROUTE_MANIFEST_NOTICE, type RouteManifest } from './types'
 
 describe('route baseline', () => {
   const pkgRoot = getPackageRoot()
@@ -69,7 +69,7 @@ describe('route baseline', () => {
   })
 
   it('builds a stable sorted manifest from the real package sources', () => {
-    expect(manifest.notice).toBe(ROUTE_MANIFEST_NOTICE)
+    expect(manifest[ROUTE_MANIFEST_COMMENT_KEY]).toBe(ROUTE_MANIFEST_NOTICE)
     expect(manifest.version).toBe(1)
     expect(manifest.routes.length).toBeGreaterThanOrEqual(47)
 
@@ -155,7 +155,7 @@ describe('route baseline', () => {
 
     const built = buildRouteManifest({ pkgRoot: tempRoot })
     const stale: RouteManifest = {
-      notice: ROUTE_MANIFEST_NOTICE,
+      [ROUTE_MANIFEST_COMMENT_KEY]: ROUTE_MANIFEST_NOTICE,
       version: 1,
       routes: built.manifest.routes.filter((route) => route.template !== '/workflows'),
     }

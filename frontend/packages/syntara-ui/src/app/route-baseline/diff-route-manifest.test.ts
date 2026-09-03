@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
 import { diffRouteManifest } from './diff-route-manifest'
-import { ROUTE_MANIFEST_NOTICE, type RouteManifest } from './types'
+import { ROUTE_MANIFEST_COMMENT_KEY, ROUTE_MANIFEST_NOTICE, type RouteManifest } from './types'
 
 const base: RouteManifest = {
-  notice: ROUTE_MANIFEST_NOTICE,
+  [ROUTE_MANIFEST_COMMENT_KEY]: ROUTE_MANIFEST_NOTICE,
   version: 1,
   routes: [
     {
@@ -25,7 +25,7 @@ const base: RouteManifest = {
 describe('diffRouteManifest', () => {
   it('reports additions, removals, and parameter renames as changes', () => {
     const next: RouteManifest = {
-      notice: ROUTE_MANIFEST_NOTICE,
+      [ROUTE_MANIFEST_COMMENT_KEY]: ROUTE_MANIFEST_NOTICE,
       version: 1,
       routes: [
         {
@@ -52,7 +52,7 @@ describe('diffRouteManifest', () => {
 
   it('reports in-place kind or parameter list changes', () => {
     const next: RouteManifest = {
-      notice: ROUTE_MANIFEST_NOTICE,
+      [ROUTE_MANIFEST_COMMENT_KEY]: ROUTE_MANIFEST_NOTICE,
       version: 1,
       routes: [
         {

@@ -31,6 +31,9 @@ export type NormalizedRoute = {
   sources: Array<'router' | 'appRoute' | 'navigation' | 'app'>
 }
 
+/** Key used for the generated-file banner. Looks like a comment in JSON. */
+export const ROUTE_MANIFEST_COMMENT_KEY = '//' as const
+
 /** Standard banner written into every generated manifest. */
 export const ROUTE_MANIFEST_NOTICE =
   'GENERATED FILE. Do not edit by hand. Regenerate with: npm run route-baseline:update --prefix packages/syntara-ui'
@@ -41,9 +44,9 @@ export const ROUTE_MANIFEST_NOTICE =
 export type RouteManifest = {
   /**
    * Human-readable warning that this file is generated.
-   * JSON has no comments; keep this field so the notice is visible in the file.
+   * JSON has no comments; the `//` key makes the banner read like one.
    */
-  notice: typeof ROUTE_MANIFEST_NOTICE
+  [ROUTE_MANIFEST_COMMENT_KEY]: typeof ROUTE_MANIFEST_NOTICE
   /** Manifest schema version. Bump only when the JSON shape changes. */
   version: 1
   /** Deterministically sorted route entries. */
