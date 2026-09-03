@@ -562,7 +562,6 @@ class ExecutionService(BaseService):
                 == select(Project.id)
                 .where(
                     Project.name == project_name,
-                    Project.deleted_at.is_(None),  # type: ignore[union-attr]
                 )
                 .scalar_subquery(),
             )

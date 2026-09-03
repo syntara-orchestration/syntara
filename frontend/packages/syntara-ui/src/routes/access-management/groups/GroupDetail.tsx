@@ -281,7 +281,7 @@ export function GroupDetail() {
 
   if (!groupData) return null
 
-  const groupCrumbs = breadcrumbsGroupDetail(groupData.name, basePath, activeTab)
+  const groupCrumbs = breadcrumbsGroupDetail(groupData.name)
 
   return (
     <SynPage>

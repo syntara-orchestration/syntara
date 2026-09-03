@@ -215,6 +215,15 @@ class WebhookTriggerService(BaseService):
         sa_bindings: list[tuple[UUID, set[UUID]]] = []
 
         for node_id, parameters in webhook_nodes.items():
+            if not is_enabled and node_id in existing_triggers:
+                # Disabling (unpublish): skip parameter validation for historical definitions
+                trigger = existing_triggers.pop(node_id)
+                trigger.is_enabled = False
+                self.session.add(trigger)
+                results.append(WebhookTriggerRead.model_validate(trigger))
+                sa_bindings.append((trigger.id, set()))
+                continue
+
             try:
                 validated = WebhookTriggerParameters.model_validate(parameters)
             except ValidationError as e:

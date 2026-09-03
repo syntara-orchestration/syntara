@@ -6,12 +6,14 @@ import { axe } from 'vitest-axe'
 
 import { credentialsClient } from '../../../client'
 import { useAllProjects, useSelectableProjects } from '../../access/useAllProjects'
+import { useAllCredentials } from '../components/useAllCredentials'
 
 import type { ActionFormValues } from './actionFormSchema'
 import { ActionNodeForm, HttpUrlField } from './ActionNodeForm'
 import { renderWithHeader } from './test-utils/renderWithHeader'
 
-// Mock credentialsClient used by CredentialSelector
+// Mock credentialsClient used by CredentialSelector (now only for /credential_types
+// and the single-credential read-only lookup — the credentials list comes from useAllCredentials)
 vi.mock('../../../client', () => ({
   credentialsClient: {
     useQuery: vi.fn(),
@@ -19,6 +21,12 @@ vi.mock('../../../client', () => ({
   },
   authMiddleware: { onRequest: vi.fn(({ request }: { request: unknown }) => request) },
   interfaceTagMiddleware: { onRequest: vi.fn() },
+}))
+
+// CredentialSelector fetches its credential list via this hook (see useAllCredentials.test.tsx
+// for its own pagination coverage) — mocking it keeps these form tests synchronous.
+vi.mock('../components/useAllCredentials', () => ({
+  useAllCredentials: vi.fn(),
 }))
 
 vi.mock('../../access/useAllProjects', () => ({
@@ -58,6 +66,12 @@ describe('ActionNodeForm', () => {
       error: null,
       refetch: vi.fn(),
     } as never)
+    vi.mocked(useAllCredentials).mockReturnValue({
+      credentials: [],
+      isLoading: false,
+      error: null,
+      refetch: vi.fn() as unknown as ReturnType<typeof useAllCredentials>['refetch'],
+    })
     vi.mocked(credentialsClient.useMutation).mockReturnValue({
       mutate: vi.fn(),
       isPending: false,
@@ -146,18 +160,14 @@ describe('ActionNodeForm', () => {
   })
 
   it('passes projectId to CredentialSelector for HTTP request executor', () => {
-    const useQueryMock = vi.mocked(credentialsClient.useQuery)
-    useQueryMock.mockClear()
+    const useAllCredentialsMock = vi.mocked(useAllCredentials)
+    useAllCredentialsMock.mockClear()
 
     renderWithHeader(
       <ActionNodeForm onSubmit={mockOnSubmit} initialData={{ executor: 'http_request' }} projectId="project-123" />
     )
 
-    const hasProjectIdCall = useQueryMock.mock.calls.some((call) => {
-      const params = (call[2] as unknown as { params?: { query?: Record<string, unknown> } })?.params?.query
-      return params?.project_id === 'project-123'
-    })
-    expect(hasProjectIdCall).toBe(true)
+    expect(useAllCredentialsMock).toHaveBeenCalledWith({ projectId: 'project-123' })
   })
 
   it('validates URL field for API executor', () => {
@@ -329,9 +339,9 @@ describe('ActionNodeForm', () => {
       credential_type_id: 'type-secret-url',
       enabled: true,
       inputs: {},
+      project_id: 'proj-1',
       created_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-01-01T00:00:00Z',
-      created_by: 'user-1',
     }
     const mockBearerType = {
       id: 'type-bearer',
@@ -350,11 +360,17 @@ describe('ActionNodeForm', () => {
       credential_type_id: 'type-bearer',
       enabled: true,
       inputs: {},
+      project_id: 'proj-1',
       created_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-01-01T00:00:00Z',
-      created_by: 'user-1',
     }
 
+    // `credentialsClient.useQuery` is still mocked with path-based branching here because
+    // HttpCredentialSection (the parent of CredentialSelector for the HTTP executor) makes
+    // its own direct '/credentials' + '/credential_types' calls to compute isUrlManagedByCredential —
+    // that duplicate fetch is a pre-existing, separate call site untouched by this fix.
+    // `useAllCredentials` additionally needs to be mocked so CredentialSelector's own dropdown
+    // (rendered inside HttpCredentialSection) shows the same credentials.
     function setupSecretUrlMocks() {
       vi.mocked(credentialsClient.useQuery).mockImplementation(
         (_method: string, path: string): ReturnType<(typeof credentialsClient)['useQuery']> => {
@@ -376,6 +392,12 @@ describe('ActionNodeForm', () => {
           } as never
         }
       )
+      vi.mocked(useAllCredentials).mockReturnValue({
+        credentials: [mockSecretUrlCredential],
+        isLoading: false,
+        error: null,
+        refetch: vi.fn() as unknown as ReturnType<typeof useAllCredentials>['refetch'],
+      })
     }
 
     function setupMixedCredentialMocks() {
@@ -399,6 +421,12 @@ describe('ActionNodeForm', () => {
           } as never
         }
       )
+      vi.mocked(useAllCredentials).mockReturnValue({
+        credentials: [mockSecretUrlCredential, mockBearerCredential],
+        isLoading: false,
+        error: null,
+        refetch: vi.fn() as unknown as ReturnType<typeof useAllCredentials>['refetch'],
+      })
     }
 
     it('disables URL field and shows locked placeholder when Secret URL credential is selected', async () => {
@@ -441,12 +469,7 @@ describe('ActionNodeForm', () => {
     })
 
     it('URL field is enabled and shows normal placeholder with no credential selected', () => {
-      vi.mocked(credentialsClient.useQuery).mockReturnValue({
-        data: { resources: [] },
-        isPending: false,
-        error: null,
-        refetch: vi.fn(),
-      } as never)
+      // Uses the default beforeEach mocks (empty credential list)
       renderWithHeader(<ActionNodeForm onSubmit={mockOnSubmit} initialData={{ executor: 'http_request' }} />)
 
       const urlInput = screen.getByRole('textbox', { name: 'URL' })
@@ -509,6 +532,12 @@ describe('ActionNodeForm', () => {
           } as never
         }
       )
+      vi.mocked(useAllCredentials).mockReturnValue({
+        credentials: [mockBearerCredential],
+        isLoading: false,
+        error: null,
+        refetch: vi.fn() as unknown as ReturnType<typeof useAllCredentials>['refetch'],
+      })
       renderWithHeader(<ActionNodeForm onSubmit={mockOnSubmit} initialData={{ executor: 'http_request' }} />)
 
       await user.click(screen.getByRole('button', { name: 'Authentication credential' }))
@@ -540,6 +569,10 @@ describe('ActionNodeForm', () => {
     })
 
     it('URL field is locked immediately when loading and credential_id is pre-set', () => {
+      // HttpCredentialSection derives isUrlManagedByCredential from its own direct
+      // credentialsClient.useQuery('/credentials') + ('/credential_types') calls (a pre-existing,
+      // separate call site — see the comment above setupSecretUrlMocks), so it's this mock,
+      // not useAllCredentials, that must report the loading state here.
       vi.mocked(credentialsClient.useQuery).mockReturnValue({
         data: undefined,
         isPending: true,

@@ -492,7 +492,7 @@ Each empty state scenario maps to a specific icon, optional `status` prop, and s
   1. Query error/loading → `useQueryState(query, { title, onRetry })` returns a loading or error component
   2. Truly empty (no data AND no active filters) → `SynEmptyStateNoData` with create CTA; **hide FilterBar entirely**
   3. Has data OR has active filters → show `FilterBar`; if data is empty with filters, show `SynEmptyStateFilter` inside the scroll area
-- **Access denied empty state:** Use `EmptyStateAccessDenied` (with `RhUiLockIcon`) when a user navigates directly to a page they cannot read. Message format: "You don't have permission to view {resource}. Contact your administrator to request access."
+- **Access denied empty state:** Use `SynEmptyStateAccessDenied` (with `RhUiLockIcon`) when a user navigates directly to a page they cannot read. Message format: "You don't have permission to view {resource}. Contact your administrator to request access."
 
 ---
 
@@ -656,7 +656,7 @@ Use when the edit experience is too complex for inline editing on a detail tab:
 - Detail tab stays **read-only** with an "Edit [resource]" button navigating to the edit route
 - Edit page at a dedicated route (e.g., `.../group-mapping/edit`)
 - Page shell: `SynPage` → `SynPageHeader` with breadcrumbs + toolbar (Save primary + Cancel link)
-- Permission check: `useCanI('update', 'resource')` → `EmptyStateAccessDenied` if denied
+- Permission check: `useCanI('update', 'resource')` → `SynEmptyStateAccessDenied` if denied
 - Query params for entry mode variants: `?discover=1`, `?new=1`
 
 ### Update/Edit: Inline
@@ -1222,11 +1222,11 @@ Pages that support role-based access must adapt their UI based on the authentica
 
 ### Permission Tiers
 
-| Permission Level         | Navigation             | Controls                               | Actions                               |
-| ------------------------ | ---------------------- | -------------------------------------- | ------------------------------------- |
-| **No read permission**   | Hidden from navigation | `EmptyStateAccessDenied` on direct URL | None                                  |
-| **Read only** (auditor)  | Visible in navigation  | All controls rendered as **read-only** | Action buttons disabled with tooltips |
-| **Read + write** (admin) | Visible in navigation  | All controls editable                  | Full CRUD actions available           |
+| Permission Level         | Navigation             | Controls                                  | Actions                               |
+| ------------------------ | ---------------------- | ----------------------------------------- | ------------------------------------- |
+| **No read permission**   | Hidden from navigation | `SynEmptyStateAccessDenied` on direct URL | None                                  |
+| **Read only** (auditor)  | Visible in navigation  | All controls rendered as **read-only**    | Action buttons disabled with tooltips |
+| **Read + write** (admin) | Visible in navigation  | All controls editable                     | Full CRUD actions available           |
 
 ### Permission Hook Pattern
 
@@ -1267,13 +1267,13 @@ type WorkflowPermissions = {
 
 ```text
 Can user read this section?
-├─ No → Hide nav item / tab OR show EmptyStateAccessDenied (if direct URL)
+├─ No → Hide nav item / tab OR show SynEmptyStateAccessDenied (if direct URL)
 └─ Yes → Can user perform action?
     ├─ No, action is primary CTA in empty state → Hide button (pass undefined callback)
     ├─ No, action is toolbar/button → Disable with isAriaDisabled + DisabledWithTooltip
     ├─ No, action is row/kebab item → isAriaDisabled + tooltipProps, onClick undefined
     ├─ No, action is form field → readOnly prop / hide save toolbar
-    └─ No, action is create/edit route → ProtectedRoute → EmptyStateAccessDenied
+    └─ No, action is create/edit route → ProtectedRoute → SynEmptyStateAccessDenied
 ```
 
 ### Navigation Gating
@@ -1347,7 +1347,7 @@ For create/edit forms accessible via direct URL:
 
 1. `isChecking` → `SynLoadingState`
 2. `isError` → `SynErrorState title="Unable to verify permissions"`
-3. `!allowed` → `EmptyStateAccessDenied`
+3. `!allowed` → `SynEmptyStateAccessDenied`
 4. `allowed` → render children
 
 **Note:** List/detail pages use in-page empty states or tab filtering -- not route guards. Route guards target mutation form routes only.
@@ -2045,7 +2045,7 @@ What are you building?
 │   └── Handle 2 empty states (no events yet / no filter results)
 │
 ├── Role-based access page
-│   ├── No read → hide from nav/tab; EmptyStateAccessDenied on direct URL
+│   ├── No read → hide from nav/tab; SynEmptyStateAccessDenied on direct URL
 │   ├── Read only → controls disabled via isAriaDisabled + DisabledWithTooltip
 │   ├── Read + write → full edit capability
 │   └── Use permission hooks (use{Domain}Permissions) for all gating
@@ -2059,7 +2059,7 @@ What are you building?
 ├── Dedicated edit page (complex inline editing)
 │   ├── Parent tab stays read-only with "Edit" button
 │   ├── Edit page at sub-route with Save/Cancel toolbar
-│   └── Permission-gated with EmptyStateAccessDenied fallback
+│   └── Permission-gated with SynEmptyStateAccessDenied fallback
 │
 ├── Canvas/builder view
 │   ├── Use React Flow + PatternFly wrapper

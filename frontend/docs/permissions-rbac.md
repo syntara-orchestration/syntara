@@ -88,14 +88,14 @@ Wraps an action button/control. When `isDisabled` is true, renders a PF `Tooltip
 
 ### `ProtectedRoute` — `components/ProtectedRoute.tsx`
 
-Route guard that checks a single permission via `useCanI`. Shows a spinner while checking, `EmptyStateAccessDenied` when denied, and renders children when allowed. Used for create/edit routes.
+Route guard that checks a single permission via `useCanI`. Shows a spinner while checking, `SynEmptyStateAccessDenied` when denied, and renders children when allowed. Used for create/edit routes.
 
-### `EmptyStateAccessDenied` — `components/EmptyStateAccessDenied.tsx`
+### `SynEmptyStateAccessDenied` — `components/states/SynEmptyStateAccessDenied.tsx`
 
 Page-level access denied state. Two usage patterns:
 
 1. **Via `ProtectedRoute`** — for create/edit routes, set `routePermission` in `navigationItems.tsx` and `ProtectedRoute` handles the rest.
-2. **Inline in page components** — for pages that need custom loading/layout around the access-denied state (e.g. `AccessManagement.tsx`, `Authentication.tsx`, `Settings.tsx`, `EditGroupMapping.tsx`). Check permissions with `useCanI` and render `EmptyStateAccessDenied` directly when denied.
+2. **Inline in page components** — for pages that need custom loading/layout around the access-denied state (e.g. `AccessManagement.tsx`, `Authentication.tsx`, `Settings.tsx`, `EditGroupMapping.tsx`). Check permissions with `useCanI` and render `SynEmptyStateAccessDenied` directly when denied.
 
 Prefer `ProtectedRoute` (pattern 1) for simple route guards. Use inline rendering (pattern 2) when the page has surrounding chrome (breadcrumbs, tabs, layout) that should still render around the access-denied state.
 
@@ -121,7 +121,7 @@ Set on `TNavigationItem` in `navigationItems.tsx`. The nav item is visible if th
 
 ### `routePermission` (single, route guard)
 
-Set on `TNavigationItem` for create/edit routes. Wraps the route component in `ProtectedRoute`, blocking access with `EmptyStateAccessDenied` if the permission check fails.
+Set on `TNavigationItem` for create/edit routes. Wraps the route component in `ProtectedRoute`, blocking access with `SynEmptyStateAccessDenied` if the permission check fails.
 
 ```tsx
 {
@@ -133,11 +133,11 @@ Set on `TNavigationItem` for create/edit routes. Wraps the route component in `P
 
 ## Three-Tier UX Model
 
-| Permission level       | Navigation                       | Page content                           | Actions                                                       |
-| ---------------------- | -------------------------------- | -------------------------------------- | ------------------------------------------------------------- |
-| **No read permission** | Hidden via `requiredPermissions` | `EmptyStateAccessDenied` on direct URL | None                                                          |
-| **Read only**          | Visible                          | Controls rendered read-only            | Action buttons disabled with tooltips (`DisabledWithTooltip`) |
-| **Read + write**       | Visible                          | All controls editable                  | Full CRUD                                                     |
+| Permission level       | Navigation                       | Page content                              | Actions                                                       |
+| ---------------------- | -------------------------------- | ----------------------------------------- | ------------------------------------------------------------- |
+| **No read permission** | Hidden via `requiredPermissions` | `SynEmptyStateAccessDenied` on direct URL | None                                                          |
+| **Read only**          | Visible                          | Controls rendered read-only               | Action buttons disabled with tooltips (`DisabledWithTooltip`) |
+| **Read + write**       | Visible                          | All controls editable                     | Full CRUD                                                     |
 
 **When to hide vs disable**: Disable action buttons with tooltips in list/detail views so users know the action exists but is restricted. Hide Save/Reset buttons entirely in settings-style forms where read-only mode is the norm.
 
@@ -245,7 +245,7 @@ Backend defines `policy:create`, `policy:update`, `policy:delete`. The UI curren
 | Gap                          | Permission       | Pattern to follow                     |
 | ---------------------------- | ---------------- | ------------------------------------- |
 | Executions list page guard   | `execution:read` | Add `requiredPermissions` to nav item |
-| Execution detail route guard | `execution:read` | `EmptyStateAccessDenied` on 403       |
+| Execution detail route guard | `execution:read` | `SynEmptyStateAccessDenied` on 403    |
 | Future rerun action          | `execution:run`  | `DisabledWithTooltip`                 |
 
 **Note**: Approval permission gating is complete for UI components (list page, nav item, decision actions) with comprehensive unit tests. E2E test coverage in `e2e/permission-gating.spec.ts` for the viewer/auditor/user roles is recommended as a follow-up to verify end-to-end permission flows.

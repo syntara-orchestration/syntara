@@ -290,6 +290,7 @@ export function SelectFilterInput({
   // Load initial async options on mount
   React.useEffect(() => {
     if (isAsync && isOpen && asyncOptions.length === 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- load options when the menu opens; setState happens inside loadAsyncOptions
       detachPromise(loadAsyncOptions(''))
     }
   }, [isAsync, isOpen, asyncOptions.length, loadAsyncOptions])

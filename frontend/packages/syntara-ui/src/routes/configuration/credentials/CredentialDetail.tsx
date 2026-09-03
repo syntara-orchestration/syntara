@@ -28,7 +28,6 @@ import { SynPageTitle } from '../../../components/SynPageTitle'
 import { UserTimestamp } from '../../../components/table/UserTimestamp'
 import { SynUrlTabs } from '../../../components/tabs/SynUrlTabs'
 import { useDeleteAction } from '../../../hooks/useDeleteAction'
-import { useUrlTab } from '../../../hooks/useUrlTab'
 import { useAlerts } from '../../../providers/alerts'
 import { getErrorMessage } from '../../../utils/apiErrors'
 import { detachPromise } from '../../../utils/detachPromise'
@@ -165,7 +164,6 @@ export default function CredentialDetail() {
   const { credentialId }: { credentialId: string } = useParams({ strict: false })
   const navigate = useNavigate()
   const credentialBasePath = AppRoute.Configuration.Credentials.Detail.replace(':credentialId', credentialId ?? '')
-  const [activeTab] = useUrlTab<CredentialTab>(credentialBasePath)
   const { canReadWorkflows, canReadIntegrations, isLoading: permissionsLoading } = useCredentialDetailPermissions()
 
   const validTabs = useMemo(
@@ -370,7 +368,7 @@ export default function CredentialDetail() {
   const credentialTypeDisplayText = getTypeDisplayText(credType?.name, typeLoadError)
   const hasDescription = Boolean(credential.description?.trim())
 
-  const credentialCrumbs = breadcrumbsCredentialDetail(credential.id, credential.name, activeTab)
+  const credentialCrumbs = breadcrumbsCredentialDetail(credential.name)
 
   return (
     <SynPage>
