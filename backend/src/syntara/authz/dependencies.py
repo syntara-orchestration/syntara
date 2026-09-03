@@ -127,7 +127,6 @@ class PermissionChecker:
         result = await db.exec(
             select(Project.name).where(
                 Project.id == (project_id if isinstance(project_id, UUID) else UUID(str(project_id))),
-                Project.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
         return result.first() or ""
