@@ -24,7 +24,7 @@ The top-level component performs permission checks via `useApprovalPermissions()
 
 1. `useApprovalPermissions()` checks `approval:read` permission (via `useCanI`)
 2. While checking: show loading spinner
-3. If denied: show `EmptyStateAccessDenied`
+3. If denied: show `SynEmptyStateAccessDenied`
 4. If allowed: render `ApprovalsPage`
 
 ### Main Page: `ApprovalsPage` Component

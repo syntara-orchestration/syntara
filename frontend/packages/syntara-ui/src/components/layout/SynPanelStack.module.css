@@ -1,0 +1,28 @@
+/**
+ * Stack sibling `SynPanel`s without clipping PatternFly `box-shadow`.
+ * Flex shrink uses min-height: 0; overflow stays visible. Put clipping inside
+ * each panel (scrollable PanelMain, React Flow), not on these slots.
+ */
+.stack {
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  overflow: visible;
+}
+
+.item {
+  min-width: 0;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+}
+
+.filled {
+  composes: item;
+  min-height: 0;
+}
+
+.fixed {
+  composes: item;
+  flex-shrink: 0;
+}

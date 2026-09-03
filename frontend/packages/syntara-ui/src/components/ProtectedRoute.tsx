@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import type { PermissionRequirement } from '../hooks/permissionUtils'
 import { useCanI } from '../hooks/useCanI'
 
-import { EmptyStateAccessDenied } from './EmptyStateAccessDenied'
+import { SynEmptyStateAccessDenied } from './states/SynEmptyStateAccessDenied'
 import { SynErrorState } from './states/SynErrorState'
 import { SynLoadingState } from './states/SynLoadingState'
 
@@ -30,7 +30,7 @@ export function ProtectedRoute({ action, resourceType, children }: Readonly<Prot
   }
   if (!allowed) {
     return (
-      <EmptyStateAccessDenied
+      <SynEmptyStateAccessDenied
         description={`You do not have permission to access this page (requires ${resourceType}:${action}).`}
       />
     )

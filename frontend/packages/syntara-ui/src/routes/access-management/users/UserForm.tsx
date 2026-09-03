@@ -39,6 +39,22 @@ const DEFAULT_VALUES: UserFormData = {
   group_names: ['users'],
 }
 
+const CREATE_USER_PAGE_TITLE = 'Create user'
+const EDIT_USER_PAGE_TITLE = 'Edit user'
+
+function userFormPageTitle(
+  isEdit: boolean,
+  user: { first_name?: string | null; last_name?: string | null; username: string } | undefined
+): string {
+  if (!isEdit) {
+    return CREATE_USER_PAGE_TITLE
+  }
+  if (user) {
+    return `Edit ${userDisplayName(user)}`
+  }
+  return EDIT_USER_PAGE_TITLE
+}
+
 function PasswordWarningAlert({ isSelf }: Readonly<{ isSelf: boolean }>) {
   const title = isSelf ? 'You will be signed out' : 'User will be signed out'
   const description = isSelf
@@ -57,7 +73,7 @@ function userFormBreadcrumbTrail(
   isEdit: boolean,
   pageTitle: string,
   userId: string | undefined,
-  user: { first_name: string; last_name?: string | null; username: string } | undefined
+  user: { first_name?: string | null; last_name?: string | null; username: string } | undefined
 ): AppBreadcrumbItem[] {
   if (!isEdit) {
     return breadcrumbsCreateUser()
@@ -119,7 +135,7 @@ function UserFormMainPanel({
 function UserFormEditNotFoundPage({ onBack, onRetry }: Readonly<{ onBack: () => void; onRetry: () => void }>) {
   return (
     <SynPage>
-      <SynPageHeader title="Edit User" breadcrumbs={breadcrumbsUserFormLoading('Edit user')} />
+      <SynPageHeader title="Edit user" breadcrumbs={breadcrumbsUserFormLoading('Edit user')} />
       <SynPageBody>
         <SynPanel isFullHeight>
           <UserNotFoundState onBack={onBack} onRetry={onRetry} />
@@ -144,10 +160,10 @@ export function UserForm({ mode }: Readonly<UserFormProps>) {
   const navigate = useNavigate()
   const isEdit = mode === 'edit'
   const usersDocLink = useDocLink(isEdit ? 'users' : 'createUser')
-  const pageTitle = isEdit ? 'Edit User' : 'Create User'
   const submitLabel = isEdit ? 'Save' : 'Create user'
 
   const { userId, isValidId, userQuery, isBuiltinUser, isFederatedUser, isSelf, formValues } = useUserFormData(isEdit)
+  const pageTitle = userFormPageTitle(isEdit, userQuery.data)
 
   const schema = isEdit ? userFormSchema : userCreateSchema
   const {
