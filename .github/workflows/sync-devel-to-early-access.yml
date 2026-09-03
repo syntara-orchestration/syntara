@@ -12,7 +12,9 @@ concurrency:
 
 jobs:
   sync:
+    name: Sync devel into early-access
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: write
 
@@ -43,6 +45,7 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_EARLY_ACCESS_SYNC_WEBHOOK_URL }}
         run: |
+          set -euo pipefail
           jq -n \
             --arg repo "${{ github.repository }}" \
             --arg url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
