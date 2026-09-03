@@ -102,25 +102,24 @@ class ServiceAccountService(BaseService):
 
     async def _resolve_project_info(self, project_id: UUID) -> tuple[str, bool] | None:
         result = await self.session.exec(
-            select(Project.name, Project.deleted_at).where(
+            select(Project.name).where(
                 Project.id == project_id,
             )
         )
-        row = result.first()
-        if row is None:
+        name = result.first()
+        if name is None:
             return None
-        name, deleted_at = row
-        return name, deleted_at is not None
+        return name, False
 
     async def _resolve_project_infos(self, project_ids: set[UUID]) -> dict[UUID, tuple[str, bool]]:
         if not project_ids:
             return {}
         result = await self.session.exec(
-            select(Project.id, Project.name, Project.deleted_at).where(
+            select(Project.id, Project.name).where(
                 Project.id.in_(project_ids),  # type: ignore[attr-defined]
             )
         )
-        return {row_id: (name, deleted_at is not None) for row_id, name, deleted_at in result.all()}
+        return {row_id: (name, False) for row_id, name in result.all()}
 
     async def get_service_account(self, service_account_id: UUID) -> ServiceAccount:
         """Get a service account by ID.

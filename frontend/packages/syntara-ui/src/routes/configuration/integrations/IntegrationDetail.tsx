@@ -19,11 +19,7 @@ import { IntegrationTypeEnum } from '@syntara/contracts'
 import { useNavigate, useParams } from '@tanstack/react-router'
 
 import { AppRoute } from '../../../app/AppRoute'
-import {
-  breadcrumbsIntegrationDetail,
-  breadcrumbsIntegrationDetailEarlyShell,
-  type IntegrationDetailBreadcrumbTab,
-} from '../../../app/breadcrumbBuilders'
+import { breadcrumbsIntegrationDetail, breadcrumbsIntegrationDetailEarlyShell } from '../../../app/breadcrumbBuilders'
 import { credentialsClient, integrationsClient } from '../../../client'
 import { SynDetail } from '../../../components/details/SynDetail'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
@@ -280,12 +276,14 @@ function hasResourcesTab(integration: IntegrationsAPI.components['schemas']['Int
   return isLLMProvider(integration) || integration.integration_type === IntegrationTypeEnum.MCP_SERVER
 }
 
+type IntegrationDetailTab = 'details' | 'resources' | 'edit'
+
 export function IntegrationDetail() {
   const { integrationId }: { integrationId: string } = useParams({ strict: false })
   const navigate = useNavigate()
   const integrationBasePath = AppRoute.Configuration.Integrations.Detail.replace(':integrationId', integrationId)
   const editPath = AppRoute.Configuration.Integrations.Edit.replace(':integrationId', integrationId)
-  const [activeTab] = useUrlTab<IntegrationDetailBreadcrumbTab | 'edit'>(integrationBasePath)
+  const [activeTab] = useUrlTab<IntegrationDetailTab>(integrationBasePath)
   const docLink = useDocLink('integrations')
   const permissions = useIntegrationPermissions()
 
@@ -379,7 +377,7 @@ export function IntegrationDetail() {
 
   if (!integration?.id) return null
 
-  const integrationCrumbs = breadcrumbsIntegrationDetail(integration.id, integration.name, activeTab)
+  const integrationCrumbs = breadcrumbsIntegrationDetail(integration.name)
   const footer = activeTab === 'resources' ? <ResourcesFooter {...footerState} /> : undefined
 
   return (

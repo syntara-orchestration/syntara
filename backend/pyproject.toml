@@ -202,7 +202,7 @@ ignore = [
 ]
 "tests/performance/conftest.py" = ["E402"]  # pytest_plugins must precede imports
 "src/syntara/api/repositories/*.py" = ["ANN401"]  # Allow Any for database row types
-"src/syntara/core/database/migrations/**/*.py" = ["INP001", "D400", "D415", "PLR0915"]  # Alembic files (auto-generated)
+"src/syntara/core/database/migrations/**/*.py" = ["INP001", "D400", "D415", "PLR0915", "S608"]  # Alembic files (auto-generated, trusted SQL)
 "src/cli/**/*.py" = ["ANN401", "SLF001", "PLC0415"]  # CLI: dynamic types, private access to bundler, deferred imports
 "src/syntara/api/main.py" = ["S104"]  # Binding to all interfaces for development
 "tools/ci/check_migrations.py" = [

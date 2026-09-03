@@ -14,20 +14,12 @@ vi.mock('../../../hooks/useAAPBrowser', () => ({
     mockUseAAPBrowser(...args) as ReturnType<typeof import('../../../hooks/useAAPBrowser').useAAPBrowser>,
 }))
 
-// Mock credentials client for CredentialSelector
+// Mock credentials client for CredentialSelector (only /credential_types now — the
+// credentials list comes from useAllCredentials, mocked separately below)
 vi.mock('../../../client', () => ({
   credentialsClient: {
     useQuery: vi.fn(() => ({
-      data: {
-        resources: [
-          {
-            id: 'test-credential-id',
-            name: 'Test AAP Credential',
-            credential_type: 'ansible-automation-platform',
-            description: 'Test credential for AAP',
-          },
-        ],
-      },
+      data: { resources: [] },
       isPending: false,
       isError: false,
       refetch: vi.fn(),
@@ -49,6 +41,25 @@ vi.mock('../../../client', () => ({
   },
   authMiddleware: { onRequest: vi.fn() },
   interfaceTagMiddleware: { onRequest: vi.fn() },
+}))
+
+// CredentialSelector fetches its credential list via this hook (see useAllCredentials.test.tsx
+// for its own pagination coverage) — mocking it keeps these form tests synchronous.
+vi.mock('../components/useAllCredentials', () => ({
+  useAllCredentials: vi.fn(() => ({
+    credentials: [
+      {
+        id: 'test-credential-id',
+        name: 'Test AAP Credential',
+        credential_type_id: 'type-aap',
+        description: 'Test credential for AAP',
+        project_id: 'proj-1',
+      },
+    ],
+    isLoading: false,
+    error: null,
+    refetch: vi.fn(),
+  })),
 }))
 
 // Mock useIntegrationPermissions to avoid async act() warnings from permission queries
@@ -92,9 +103,9 @@ vi.mock('../components/ExpandableCodeEditor', () => ({
   ),
 }))
 
-import { credentialsClient } from '../../../client'
 import type { AAPJobTemplateDetail } from '../../../hooks/useAAPBrowser'
 import { submitForm } from '../../../test/submit-form'
+import { useAllCredentials } from '../components/useAllCredentials'
 
 import { AAPJobTemplateForm as AAPNodeForm } from './AAPJobTemplateForm'
 import { renderWithHeader } from './test-utils/renderWithHeader'
@@ -194,21 +205,20 @@ describe('AAPNodeForm', () => {
     // Set default mock implementation (can be overridden in nested describe blocks)
     mockUseAAPBrowser.mockReturnValue(createMockAAPBrowser(defaultTemplateDetail))
 
-    // Reset credentials client to default mock
-    vi.mocked(credentialsClient.useQuery).mockReturnValue({
-      data: {
-        resources: [
-          {
-            id: 'test-credential-id',
-            name: 'Test AAP Credential',
-            credential_type: 'ansible-automation-platform',
-            description: 'Test credential for AAP',
-          },
-        ],
-      },
-      isPending: false,
-      isError: false,
-      refetch: vi.fn(),
+    // Reset the credentials list to the default mock (a single AAP-compatible credential)
+    vi.mocked(useAllCredentials).mockReturnValue({
+      credentials: [
+        {
+          id: 'test-credential-id',
+          name: 'Test AAP Credential',
+          credential_type_id: 'type-aap',
+          description: 'Test credential for AAP',
+          project_id: 'proj-1',
+        },
+      ],
+      isLoading: false,
+      error: null,
+      refetch: vi.fn() as unknown as ReturnType<typeof useAllCredentials>['refetch'],
     })
   })
 
@@ -280,8 +290,8 @@ describe('AAPNodeForm', () => {
 
   it('passes projectId to CredentialSelector', async () => {
     const user = userEvent.setup()
-    const useQueryMock = vi.mocked(credentialsClient.useQuery)
-    useQueryMock.mockClear()
+    const useAllCredentialsMock = vi.mocked(useAllCredentials)
+    useAllCredentialsMock.mockClear()
 
     renderWithHeader(
       <AAPNodeForm
@@ -296,11 +306,7 @@ describe('AAPNodeForm', () => {
     // Open credential picker via "Set up connection" button
     await user.click(screen.getByText(/Set up connection/i))
 
-    const hasProjectIdCall = useQueryMock.mock.calls.some((call) => {
-      const params = (call[2] as unknown as { params?: { query?: Record<string, unknown> } })?.params?.query
-      return params?.project_id === 'project-456'
-    })
-    expect(hasProjectIdCall).toBe(true)
+    expect(useAllCredentialsMock).toHaveBeenCalledWith({ projectId: 'project-456' })
   })
 
   it('renders prompt on launch fields based on template detail flags', () => {

@@ -19,93 +19,65 @@ import {
   breadcrumbsCredentialDetail,
   breadcrumbsGroupDetail,
   breadcrumbsProjectDetail,
-  breadcrumbsSettingsCategory,
   breadcrumbsSettingsPage,
   breadcrumbsUserDetail,
   breadcrumbsUserDetailEarlyShell,
   breadcrumbsUserFormLoading,
-  type CredentialDetailBreadcrumbTab,
+  breadcrumbsIntegrationDetail,
+  breadcrumbsServiceAccountDetail,
 } from './breadcrumbBuilders'
 
 describe('breadcrumbBuilders', () => {
-  it('omits the default details tab segment for project detail', () => {
-    const items = breadcrumbsProjectDetail(
-      'My project',
-      '/system-administration/access-management/projects/uuid-1',
-      'details'
-    )
-    expect(items).toHaveLength(3)
-    expect(items[2]).toEqual({ label: 'My project' })
-    expect(items[2]).not.toHaveProperty('href')
+  it('uses page hierarchy only for project detail, without a tab segment', () => {
+    const items = breadcrumbsProjectDetail('My project')
+    expect(items).toEqual([
+      { label: 'Access management', href: AppRoute.AccessManagement.Root },
+      { label: 'Projects', href: AppRoute.AccessManagement.Projects },
+      { label: 'My project' },
+    ])
   })
 
-  it('includes a tab segment when not on the default details tab', () => {
-    const base = '/system-administration/access-management/projects/uuid-1'
-    const items = breadcrumbsProjectDetail('My project', base, 'role-assignments')
-    expect(items).toHaveLength(4)
-    expect(items[2]).toEqual({ label: 'My project', href: base })
-    expect(items[3]).toEqual({ label: 'Assignments' })
-  })
-
-  it('omits default details tab for user, group, and identity provider detail', () => {
-    expect(breadcrumbsUserDetail('alice', '/system-administration/access-management/users/u1', 'details')).toEqual([
+  it('uses page hierarchy only for user, group, and identity provider detail', () => {
+    expect(breadcrumbsUserDetail('alice')).toEqual([
       { label: 'Access management', href: AppRoute.AccessManagement.Root },
       { label: 'Users', href: AppRoute.AccessManagement.Users },
       { label: 'alice' },
     ])
-    expect(breadcrumbsGroupDetail('g1', '/system-administration/access-management/groups/g1', 'details')).toEqual([
+    expect(breadcrumbsGroupDetail('g1')).toEqual([
       { label: 'Access management', href: AppRoute.AccessManagement.Root },
       { label: 'Groups', href: AppRoute.AccessManagement.Groups },
       { label: 'g1' },
     ])
-    expect(
-      breadcrumbsIdentityProviderDetail(
-        'Okta',
-        '/system-administration/authentication/identity-providers/p1',
-        'details'
-      )
-    ).toEqual([
+    expect(breadcrumbsIdentityProviderDetail('Okta')).toEqual([
       { label: 'Identity providers', href: AppRoute.SystemAdministration.Authentication.Root },
       { label: 'Okta' },
     ])
   })
 
-  it('omits Details segment for credential detail on the default tab', () => {
-    const items = breadcrumbsCredentialDetail('cred-1', 'Prod key', 'details')
-    expect(items).toHaveLength(3)
-    expect(items[2]).toEqual({ label: 'Prod key' })
+  it('uses page hierarchy only for credential and integration detail', () => {
+    expect(breadcrumbsCredentialDetail('Prod key')).toEqual([
+      { label: 'Configuration', href: AppRoute.Configuration.Overview },
+      { label: 'Credentials', href: AppRoute.Configuration.Credentials.Root },
+      { label: 'Prod key' },
+    ])
+    expect(breadcrumbsIntegrationDetail('GitHub')).toEqual([
+      { label: 'Configuration', href: AppRoute.Configuration.Overview },
+      { label: 'Integrations', href: AppRoute.Configuration.Integrations.Root },
+      { label: 'GitHub' },
+    ])
   })
 
-  it('adds Workflows segment when on the workflows tab', () => {
-    const items = breadcrumbsCredentialDetail('cred-1', 'Prod key', 'workflows')
-    expect(items).toHaveLength(4)
-    expect(items[2]).toMatchObject({
-      label: 'Prod key',
-      href: AppRoute.Configuration.Credentials.Detail.replace(':credentialId', 'cred-1'),
-    })
-    expect(items[3]).toEqual({ label: 'Workflows' })
-  })
-
-  it('adds Integrations segment when on the integrations tab', () => {
-    const items = breadcrumbsCredentialDetail('cred-1', 'Prod key', 'integrations')
-    expect(items).toHaveLength(4)
-    expect(items[2]).toMatchObject({
-      label: 'Prod key',
-      href: AppRoute.Configuration.Credentials.Detail.replace(':credentialId', 'cred-1'),
-    })
-    expect(items[3]).toEqual({ label: 'Integrations' })
-  })
-
-  it('uses raw tab name as fallback for unknown tab', () => {
-    const items = breadcrumbsCredentialDetail('cred-1', 'Prod key', 'unknown-tab' as CredentialDetailBreadcrumbTab)
-    expect(items).toHaveLength(4)
-    expect(items[3]).toEqual({ label: 'unknown-tab' })
+  it('uses page hierarchy only for service account detail', () => {
+    expect(breadcrumbsServiceAccountDetail('ci-bot')).toEqual([
+      { label: 'Access management', href: AppRoute.AccessManagement.Root },
+      { label: 'Service Accounts', href: AppRoute.AccessManagement.ServiceAccounts },
+      { label: 'ci-bot' },
+    ])
   })
 
   it('covers hub, forms, settings, integrations, approvals, and loading shells', () => {
-    expect(breadcrumbsAccessManagementHub('Policies')).toEqual([
+    expect(breadcrumbsAccessManagementHub()).toEqual([
       { label: 'Access management', href: AppRoute.AccessManagement.Root },
-      { label: 'Policies' },
     ])
     expect(breadcrumbsIdentityProvidersPage()).toEqual([{ label: 'Identity providers' }])
     expect(breadcrumbsCreateUser()).toHaveLength(3)
@@ -114,8 +86,7 @@ describe('breadcrumbBuilders', () => {
     expect(breadcrumbsIdentityProviderAdd()).toHaveLength(2)
     expect(breadcrumbsIdentityProviderEdit('Auth0', '/path')).toHaveLength(3)
 
-    expect(breadcrumbsSettingsPage()).toEqual([{ label: 'Settings' }])
-    expect(breadcrumbsSettingsCategory('AI / LLM')).toHaveLength(2)
+    expect(breadcrumbsSettingsPage()).toEqual([{ label: 'Settings', href: AppRoute.SystemAdministration.Settings }])
 
     expect(breadcrumbsApprovalsPage('Loading')).toHaveLength(2)
 
@@ -129,26 +100,5 @@ describe('breadcrumbBuilders', () => {
     expect(breadcrumbsProjectDetailEarlyShell()).toHaveLength(3)
     expect(breadcrumbsIdentityProviderFormLoading('…')).toHaveLength(2)
     expect(breadcrumbsIdentityProviderDetailEarlyShell()).toHaveLength(2)
-  })
-
-  it('includes non-default tab segments for entity detail builders', () => {
-    expect(breadcrumbsUserDetail('u', '/system-administration/access-management/users/u1', 'groups').at(-1)).toEqual({
-      label: 'Groups',
-    })
-    expect(breadcrumbsGroupDetail('g', '/system-administration/access-management/groups/g1', 'members').at(-1)).toEqual(
-      { label: 'Members' }
-    )
-    expect(
-      breadcrumbsProjectDetail('p', '/system-administration/access-management/projects/p1', 'role-assignments').at(-1)
-    ).toEqual({
-      label: 'Assignments',
-    })
-    expect(
-      breadcrumbsIdentityProviderDetail(
-        'Idp',
-        '/system-administration/authentication/identity-providers/p1',
-        'group-mapping'
-      ).at(-1)
-    ).toEqual({ label: 'Group mapping' })
   })
 })

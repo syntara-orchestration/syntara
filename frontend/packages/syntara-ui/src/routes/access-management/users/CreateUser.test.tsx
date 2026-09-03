@@ -64,6 +64,6 @@ describe('CreateUser', () => {
 
     render(<CreateUser />, { wrapper })
 
-    expect(screen.getByRole('heading', { name: 'Create User' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Create user' })).toBeInTheDocument()
   })
 })

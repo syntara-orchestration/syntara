@@ -32,7 +32,7 @@ from syntara.core.utils.cursor import (
     deserialize_column_sort_value,
     extract_keyset_from_cursor,
 )
-from syntara.core.utils.filters import Filter, apply_filters, parse_filters
+from syntara.core.utils.filters import BRACKET_PATTERN, LABEL_PARAM_PATTERN, Filter, apply_filters, parse_filters
 from syntara.core.utils.labels import apply_label_filters, parse_label_filter, parse_labels_query
 from syntara.core.utils.pagination import PaginationResult, generate_response
 from syntara.core.utils.sorting import apply_sorting, parse_sort
@@ -620,31 +620,46 @@ class BaseService:
     ) -> None:
         """Validate query parameters against model field types using Pydantic.
 
+        Rejects unknown query parameters and validates values for known fields.
+
         Args:
             query_params: Raw query parameters from request
             model: BaseResource class to validate against (reads __filterable_fields__)
 
         Raises:
-            ValueError: If validation fails for any parameter
+            SafeValueError: If unknown parameters are found or validation fails
 
         """
-        for field_name, string_value in query_params.items():
-            # Skip validation for fields not in allowed list
-            if field_name not in model.__filterable_fields__:
+        filterable = model.__filterable_fields__
+        unknown_params: list[str] = []
+
+        for param_name, string_value in query_params.items():
+            if LABEL_PARAM_PATTERN.match(param_name):
                 continue
 
-            # Get field info from model
-            field_info = model.model_fields.get(field_name)
-            if field_info:
-                try:
-                    # Just validate, don't store the converted value
-                    adapter: TypeAdapter[Any] = TypeAdapter(field_info.annotation)
-                    adapter.validate_python(string_value)
-                except ValidationError as e:
-                    # Extract the first error message for cleaner output
-                    error_detail = str(e.errors()[0]["msg"]) if e.errors() else str(e)
-                    error_message = f"Invalid value for field '{field_name}': {error_detail}"
-                    raise SafeValueError(error_message) from e
+            bracket_match = BRACKET_PATTERN.match(param_name)
+            field_name = bracket_match.group(1) if bracket_match else param_name
+
+            if field_name not in filterable:
+                unknown_params.append(param_name)
+                continue
+
+            # Validate value type for plain (non-bracket) params with model field info
+            if not bracket_match:
+                field_info = model.model_fields.get(field_name)
+                if field_info:
+                    try:
+                        adapter: TypeAdapter[Any] = TypeAdapter(field_info.annotation)
+                        adapter.validate_python(string_value)
+                    except ValidationError as e:
+                        error_detail = str(e.errors()[0]["msg"]) if e.errors() else str(e)
+                        error_message = f"Invalid value for field '{field_name}': {error_detail}"
+                        raise SafeValueError(error_message) from e
+
+        if unknown_params:
+            params_str = ", ".join(sorted(unknown_params))
+            msg = f"Unknown query parameter(s): {params_str}"
+            raise SafeValueError(msg)
 
     async def list_resources(
         self,

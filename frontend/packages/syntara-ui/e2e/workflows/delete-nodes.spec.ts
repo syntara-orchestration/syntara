@@ -61,7 +61,7 @@ test('delete a middle node removes the node and its connected edges', async ({ a
     await kebabButton.click()
 
     // Click Delete in the dropdown menu
-    const deleteMenuItem = app.getByRole('menuitem', { name: 'Delete' })
+    const deleteMenuItem = app.getByRole('menuitem', { name: 'Delete step' })
     await expect(deleteMenuItem).toBeVisible()
     await deleteMenuItem.click()
 
@@ -129,7 +129,7 @@ for (const { position, nodes, deleteNode, remainingNodes } of deletePositionCase
       await expect(kebabButton).toBeVisible()
       await kebabButton.click()
 
-      await app.getByRole('menuitem', { name: 'Delete' }).click()
+      await app.getByRole('menuitem', { name: 'Delete step' }).click()
 
       // Verify deleted node is removed from the DOM
       await expect(targetNode).not.toBeAttached({ timeout: 10000 })

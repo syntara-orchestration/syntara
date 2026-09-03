@@ -7,11 +7,14 @@ import { isValidWebhookPath, normalizeWebhookPath, triggerFormSchema } from './t
 // Helpers
 // ---------------------------------------------------------------------------
 
+const STUB_SA_IDS = ['a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d']
+
 function parseWebhook(webhookPath: string, inputSchema?: string) {
   return triggerFormSchema.safeParse({
     triggerType: TriggerTypeEnum.WEBHOOK_TRIGGER,
     webhookPath,
     inputSchema,
+    authorizedServiceAccountIds: STUB_SA_IDS,
   })
 }
 
@@ -20,6 +23,7 @@ function parseEda(webhookPath: string, inputSchema?: string) {
     triggerType: TriggerTypeEnum.EDA_TRIGGER,
     webhookPath,
     inputSchema,
+    authorizedServiceAccountIds: STUB_SA_IDS,
   })
 }
 
@@ -381,6 +385,67 @@ describe('triggerFormSchema — missed schedule policy (overlap)', () => {
   })
 
   it('accepts omitted policy (optional field)', () => {
+    const result = triggerFormSchema.safeParse({
+      triggerType: TriggerTypeEnum.SCHEDULED,
+      scheduleType: 'cron',
+      cron: '0 9 * * *',
+    })
+    expect(result.success).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Authorized service account validation (webhook & EDA)
+// ---------------------------------------------------------------------------
+
+describe('triggerFormSchema — authorized service account validation', () => {
+  it('rejects webhook trigger without service accounts', () => {
+    const result = triggerFormSchema.safeParse({
+      triggerType: TriggerTypeEnum.WEBHOOK_TRIGGER,
+      webhookPath: 'test-hook',
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues.find((i) => i.path.includes('authorizedServiceAccountIds'))?.message).toBe(
+        'At least one authorized service account is required'
+      )
+    }
+  })
+
+  it('rejects webhook trigger with empty service accounts', () => {
+    const result = triggerFormSchema.safeParse({
+      triggerType: TriggerTypeEnum.WEBHOOK_TRIGGER,
+      webhookPath: 'test-hook',
+      authorizedServiceAccountIds: [],
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects EDA trigger without service accounts', () => {
+    const result = triggerFormSchema.safeParse({
+      triggerType: TriggerTypeEnum.EDA_TRIGGER,
+      webhookPath: 'eda-events',
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts webhook trigger with service accounts', () => {
+    const result = triggerFormSchema.safeParse({
+      triggerType: TriggerTypeEnum.WEBHOOK_TRIGGER,
+      webhookPath: 'test-hook',
+      authorizedServiceAccountIds: STUB_SA_IDS,
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('does not require service accounts for manual trigger', () => {
+    const result = triggerFormSchema.safeParse({
+      triggerType: TriggerTypeEnum.MANUAL_TRIGGER,
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('does not require service accounts for scheduled trigger', () => {
     const result = triggerFormSchema.safeParse({
       triggerType: TriggerTypeEnum.SCHEDULED,
       scheduleType: 'cron',

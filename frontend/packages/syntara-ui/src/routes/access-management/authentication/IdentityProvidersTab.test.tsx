@@ -362,11 +362,11 @@ describe('IdentityProvidersTab', () => {
       render(<IdentityProvidersTab />, { wrapper })
 
       // Open the actions kebab menu
-      const actionsButton = screen.getByRole('button', { name: /Kebab toggle/ })
+      const actionsButton = screen.getByRole('button', { name: /^Actions for / })
       await user.click(actionsButton)
 
       // Click delete
-      await user.click(screen.getByText('Delete'))
+      await user.click(screen.getByText('Delete provider'))
 
       // Delete dialog should appear
       expect(screen.getByText('Delete identity provider?')).toBeInTheDocument()
@@ -378,9 +378,9 @@ describe('IdentityProvidersTab', () => {
       setupProviders()
       render(<IdentityProvidersTab />, { wrapper })
 
-      const actionsButton = screen.getByRole('button', { name: /Kebab toggle/ })
+      const actionsButton = screen.getByRole('button', { name: /^Actions for / })
       await user.click(actionsButton)
-      await user.click(screen.getByText('Delete'))
+      await user.click(screen.getByText('Delete provider'))
 
       expect(screen.getByText(/Remove all user identities linked to this provider/)).toBeInTheDocument()
       expect(screen.getByText(/Revoke active sessions authenticated via this provider/)).toBeInTheDocument()
@@ -394,9 +394,9 @@ describe('IdentityProvidersTab', () => {
       render(<IdentityProvidersTab />, { wrapper })
 
       // Open delete dialog
-      const actionsButton = screen.getByRole('button', { name: /Kebab toggle/ })
+      const actionsButton = screen.getByRole('button', { name: /^Actions for / })
       await user.click(actionsButton)
-      await user.click(screen.getByText('Delete'))
+      await user.click(screen.getByText('Delete provider'))
 
       // Cancel
       await user.click(screen.getByText('Cancel'))
@@ -426,9 +426,9 @@ describe('IdentityProvidersTab', () => {
       render(<IdentityProvidersTab />, { wrapper })
 
       // Open delete dialog
-      const actionsButton = screen.getByRole('button', { name: /Kebab toggle/ })
+      const actionsButton = screen.getByRole('button', { name: /^Actions for / })
       await user.click(actionsButton)
-      await user.click(screen.getByText('Delete'))
+      await user.click(screen.getByText('Delete provider'))
 
       // Check the acknowledgement checkbox before clicking Delete
       const dialog = screen.getByRole('dialog')
@@ -472,9 +472,9 @@ describe('IdentityProvidersTab', () => {
       render(<IdentityProvidersTab />, { wrapper })
 
       // Open delete dialog and confirm
-      const actionsButton = screen.getByRole('button', { name: /Kebab toggle/ })
+      const actionsButton = screen.getByRole('button', { name: /^Actions for / })
       await user.click(actionsButton)
-      await user.click(screen.getByText('Delete'))
+      await user.click(screen.getByText('Delete provider'))
       const dialog = screen.getByRole('dialog')
       // Check the acknowledgement checkbox before clicking Delete
       await user.click(within(dialog).getByRole('checkbox'))
@@ -494,7 +494,7 @@ describe('IdentityProvidersTab', () => {
       setupProviders()
       render(<IdentityProvidersTab />, { wrapper })
 
-      const actionsButton = screen.getByRole('button', { name: /Kebab toggle/ })
+      const actionsButton = screen.getByRole('button', { name: /^Actions for / })
       await user.click(actionsButton)
       await user.click(screen.getByText('Edit provider'))
 
@@ -508,7 +508,7 @@ describe('IdentityProvidersTab', () => {
       setupProviders()
       render(<IdentityProvidersTab />, { wrapper })
 
-      const actionsButton = screen.getByRole('button', { name: /Kebab toggle/ })
+      const actionsButton = screen.getByRole('button', { name: /^Actions for / })
       await user.click(actionsButton)
       await user.click(screen.getByRole('menuitem', { name: /edit group mapping/i }))
 
@@ -522,7 +522,7 @@ describe('IdentityProvidersTab', () => {
       setupProviders()
       render(<IdentityProvidersTab />, { wrapper })
 
-      const actionsButton = screen.getByRole('button', { name: /Kebab toggle/ })
+      const actionsButton = screen.getByRole('button', { name: /^Actions for / })
       await user.click(actionsButton)
       await user.click(screen.getByText('Revoke tokens'))
 
@@ -537,7 +537,7 @@ describe('IdentityProvidersTab', () => {
       setupProviders()
       render(<IdentityProvidersTab />, { wrapper })
 
-      const actionsButton = screen.getByRole('button', { name: /Kebab toggle/ })
+      const actionsButton = screen.getByRole('button', { name: /^Actions for / })
       await user.click(actionsButton)
       await user.click(screen.getByText('Revoke tokens'))
 
@@ -568,7 +568,7 @@ describe('IdentityProvidersTab', () => {
 
       render(<IdentityProvidersTab />, { wrapper })
 
-      const actionsButton = screen.getByRole('button', { name: /Kebab toggle/ })
+      const actionsButton = screen.getByRole('button', { name: /^Actions for / })
       await user.click(actionsButton)
       await user.click(screen.getByText('Revoke tokens'))
 
