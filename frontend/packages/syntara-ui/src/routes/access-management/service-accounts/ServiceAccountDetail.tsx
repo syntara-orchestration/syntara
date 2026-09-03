@@ -255,7 +255,7 @@ export function ServiceAccountDetail() {
 
   if (!serviceAccount) return null
 
-  const crumbs = breadcrumbsServiceAccountDetail(serviceAccount.name, basePath, activeTab)
+  const crumbs = breadcrumbsServiceAccountDetail(serviceAccount.name)
   const isEnabled = serviceAccount.status === 'active'
 
   return (

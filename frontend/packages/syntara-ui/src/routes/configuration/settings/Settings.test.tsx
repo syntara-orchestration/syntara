@@ -220,6 +220,14 @@ describe('Settings', () => {
     expect(screen.queryByRole('link', { name: 'Configuration' })).not.toBeInTheDocument()
   })
 
+  it('does not render breadcrumbs when a category tab is selected', () => {
+    mockLocation.value = '/system-administration/settings/application'
+    mockQueries()
+    render(<Settings />)
+
+    expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument()
+  })
+
   it('navigates to the correct URL when a tab is clicked', async () => {
     const user = userEvent.setup()
     mockQueries()

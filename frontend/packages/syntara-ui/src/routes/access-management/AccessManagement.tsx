@@ -127,8 +127,7 @@ export function AccessManagement() {
     )
   }
 
-  const activeTabDef = validTabDefs.find((t) => t.key === activeTab) ?? validTabDefs[0]
-  const hubBreadcrumbs = breadcrumbsAccessManagementHub(activeTabDef?.label ?? 'Access Management')
+  const hubBreadcrumbs = breadcrumbsAccessManagementHub()
 
   return (
     <SynPage>
