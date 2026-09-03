@@ -26,7 +26,7 @@ from temporalio.api.enums.v1 import EventType, PendingActivityState
 from temporalio.api.history.v1 import HistoryEvent
 from temporalio.client import Client, WorkflowHandle, WorkflowHistoryEventFilterType
 from temporalio.exceptions import TemporalError
-from temporalio.service import RPCError
+from temporalio.service import RPCError, RPCStatusCode
 
 from syntara.audit.context_managers import actor_context
 from syntara.audit.dispatcher import AuditEventDispatcher
@@ -1833,7 +1833,7 @@ class ActivitySyncService:
                 try:
                     queried_output = await handle.execute_update("get_activity_output_when_ready", activity_id)
                 except RPCError as e:
-                    if "not found" not in str(e).lower():
+                    if e.status != RPCStatusCode.NOT_FOUND:
                         raise
                     # Workflow already completed — the update was rejected because
                     # the server has already recorded the final state.  This means
