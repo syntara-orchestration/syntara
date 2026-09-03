@@ -63,19 +63,27 @@ Create a deterministic route representation containing at least:
   "template": "/system-administration/access-management/users/$userId",
   "parameters": ["userId"],
   "kind": "page",
-  "source": "packages/syntara-ui/src/app/routes/access-management.tsx"
+  "sources": ["appRoute", "navigation", "router"]
 }
 ```
+
+Phase 0 ships this shape in `route-baseline/manifest.gen.json` (Zod-validated).
 
 Use these normalization rules:
 
 - Convert `:userId` and `$userId` to one canonical parameter syntax.
-- Preserve parameter names and ordering.
-- Distinguish static, parameterized, catch-all, redirect, and fallback routes.
-- Record query/search parameters separately from pathname templates.
-- Record whether a route is hidden from navigation; hidden does not mean
-  unsupported.
+- Preserve path-parameter names and ordering (`parameters` is path-only).
+- Distinguish page, redirect, fallback, and app-level (`App.tsx` pre-router)
+  routes via `kind`.
+- Tag discovery sources (`router`, `appRoute`, `navigation`, `app`) rather than
+  embedding a single source file path.
 - Sort entries deterministically.
+
+Deferred beyond the initial Phase 0 artifact (track in later phases / follow-ups):
+
+- Search/query parameter inventory (`validateSearch` keys).
+- Hidden-from-navigation flags.
+- Per-route source file/line provenance.
 
 Do not compare the generated route-tree file byte for byte. Imports and
 formatting can change without changing the URL contract. Compare a normalized

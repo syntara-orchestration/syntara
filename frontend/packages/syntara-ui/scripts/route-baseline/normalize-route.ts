@@ -41,12 +41,12 @@ export function stableStringify(value: unknown): string {
 }
 
 /**
- * Narrow unknown values to plain objects for key sorting.
+ * Narrow unknown values to plain objects for key sorting and safe property access.
  *
- * @param value - JSON.stringify replacer value
+ * @param value - Candidate value
  * @returns Whether `value` is a non-null, non-array object
  */
-function isPlainObject(value: unknown): value is Record<string, unknown> {
+export function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 

@@ -24,6 +24,8 @@ export type CheckRouteBaselineResult = {
   appRouteOnly: string[]
   /** Navigation templates missing from the generated manifest. */
   navigationOnly: string[]
+  /** Route modules with `createRoute` that are not mounted in the tree. */
+  unmountedRouteFiles: string[]
   /** Human-readable lines describing failures (empty when `ok`). */
   messages: string[]
 }
@@ -36,30 +38,29 @@ export type UpdateRouteBaselineResult = {
   path: string
   /** Number of routes in the written manifest. */
   routeCount: number
-  /** AppRoute parity gaps (warnings; update still writes). */
-  appRouteOnly: string[]
-  /** Navigation parity gaps (warnings; update still writes). */
-  navigationOnly: string[]
 }
 
 /**
  * Compare the committed manifest to a fresh build without exiting the process.
  *
- * Used by the CLI script and by Vitest.
+ * Used by Vitest via `route-baseline:check`.
  *
  * @param pkgRoot - Package root containing sources and `route-baseline/`
  * @returns Check result with diff and message lines
  */
 export function checkRouteBaseline(pkgRoot = getPackageRoot()): CheckRouteBaselineResult {
   const committed = readCommittedManifest(pkgRoot)
-  const { manifest, appRouteOnly, navigationOnly } = buildRouteManifest({ pkgRoot })
+  const { manifest, appRouteOnly, navigationOnly, unmountedRouteFiles } = buildRouteManifest({
+    pkgRoot,
+  })
   const diff = diffRouteManifest(committed, manifest)
   const ok =
     diff.added.length === 0 &&
     diff.removed.length === 0 &&
     diff.changed.length === 0 &&
     appRouteOnly.length === 0 &&
-    navigationOnly.length === 0
+    navigationOnly.length === 0 &&
+    unmountedRouteFiles.length === 0
 
   return {
     ok,
@@ -67,7 +68,14 @@ export function checkRouteBaseline(pkgRoot = getPackageRoot()): CheckRouteBaseli
     diff,
     appRouteOnly,
     navigationOnly,
-    messages: formatCheckMessages({ ok, diff, appRouteOnly, navigationOnly }),
+    unmountedRouteFiles,
+    messages: formatCheckMessages({
+      ok,
+      diff,
+      appRouteOnly,
+      navigationOnly,
+      unmountedRouteFiles,
+    }),
   }
 }
 
@@ -82,6 +90,7 @@ function formatCheckMessages(input: {
   diff: RouteManifestDiff
   appRouteOnly: string[]
   navigationOnly: string[]
+  unmountedRouteFiles: string[]
 }): string[] {
   if (input.ok) return []
 
@@ -100,6 +109,7 @@ function formatCheckMessages(input: {
 
   appendTemplateList(messages, 'AppRoute templates missing from manifest:', input.appRouteOnly)
   appendTemplateList(messages, 'Navigation templates missing from manifest:', input.navigationOnly)
+  appendTemplateList(messages, 'Unmounted route modules with createRoute:', input.unmountedRouteFiles)
 
   messages.push('')
   messages.push('If this change is intentional, run:')
@@ -124,17 +134,40 @@ function appendTemplateList(messages: string[], title: string, templates: string
 /**
  * Regenerate the route baseline and write `route-baseline/manifest.gen.json`.
  *
+ * Refuses to write when AppRoute/navigation parity gaps or unmounted route
+ * modules are present — fix those first or extend `SOURCE_PARITY_EXCEPTIONS`
+ * with a documented reason.
+ *
  * @param pkgRoot - Package root to read sources from and write the manifest into
  * @returns Write result including path and route count
+ * @throws When parity gaps or unmounted route modules would be committed
  */
 export function updateRouteBaseline(pkgRoot = getPackageRoot()): UpdateRouteBaselineResult {
-  const { manifest, appRouteOnly, navigationOnly } = buildRouteManifest({ pkgRoot })
+  const { manifest, appRouteOnly, navigationOnly, unmountedRouteFiles } = buildRouteManifest({
+    pkgRoot,
+  })
+
+  if (appRouteOnly.length > 0 || navigationOnly.length > 0 || unmountedRouteFiles.length > 0) {
+    const lines = [
+      'Refusing to update route baseline while source parity gaps remain:',
+      ...formatCheckMessages({
+        ok: false,
+        diff: { added: [], removed: [], changed: [] },
+        appRouteOnly,
+        navigationOnly,
+        unmountedRouteFiles,
+      }).filter((line) => !line.startsWith('If this change') && !line.startsWith('  npm run') && line !== 'and commit route-baseline/manifest.gen.json' && line !== ''),
+      '',
+      'Add a documented SOURCE_PARITY_EXCEPTIONS entry only for intentional gaps,',
+      'or mount/remove the orphan route modules, then retry.',
+    ]
+    throw new Error(lines.join('\n'))
+  }
+
   mkdirSync(getRouteBaselineDir(pkgRoot), { recursive: true })
   const path = writeManifest(manifest, pkgRoot)
   return {
     path,
     routeCount: manifest.routes.length,
-    appRouteOnly,
-    navigationOnly,
   }
 }

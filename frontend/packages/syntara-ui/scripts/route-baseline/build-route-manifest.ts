@@ -4,11 +4,11 @@ import { join } from 'node:path'
 import { AppRoute } from '../../src/app/AppRoute'
 
 import {
-  collectAppLevelRoutes,
+  collectAppLevelRoutesFromSource,
   collectAppRoutePaths,
-  collectFallbackRoute,
+  collectFallbackRouteFromSource,
+  collectMountedRouterRoutes,
   collectNavigationPathsFromSource,
-  collectRouterRoutes,
 } from './collect-routes'
 import {
   ROUTE_MANIFEST_COMMENT_KEY,
@@ -22,24 +22,25 @@ import {
  * Result of building a manifest plus source-parity findings.
  */
 export type ManifestBuildResult = {
-  /** Normalized route contract built from router and fixed app/fallback entries. */
+  /** Normalized route contract built from mounted router, app, and fallback entries. */
   manifest: RouteManifest
   /** AppRoute templates missing from the manifest after known exceptions. */
   appRouteOnly: string[]
   /** Navigation templates missing from the manifest after known exceptions. */
   navigationOnly: string[]
+  /** Route modules that define `createRoute` but are not mounted in the tree. */
+  unmountedRouteFiles: string[]
 }
 
 /**
  * AppRoute / navigation templates intentionally absent from the router tree.
  *
- * Keep aligned with unimplemented or structural entries (see page-registry exclusions).
+ * Keep each entry documented. Growing this set without review hides parity drift.
+ * Paths already present in the manifest (including `kind: "app"`) do not belong here.
  */
 export const SOURCE_PARITY_EXCEPTIONS = new Set([
   // Declared in AppRoute but unused; not a live browser route.
   '/dashboard',
-  // Handled in App.tsx before RouterProvider (kind `app`); not a TanStack route.
-  '/auth/test-signin-callback',
   // Placeholder support links — no createRoute yet.
   '/support/documentation',
   '/support/faq',
@@ -58,8 +59,8 @@ export type BuildRouteManifestOptions = {
 /**
  * Build the normalized route manifest from live package sources.
  *
- * Reads router modules, AppRoute, and navigation source files under `pkgRoot`,
- * then reports AppRoute/nav templates that are missing from the router contract.
+ * Reads the mounted TanStack tree, App.tsx escape hatches, `__root` fallback,
+ * AppRoute, and navigation sources under `pkgRoot`.
  *
  * @param options - Package root used to locate source files
  * @returns Manifest plus any source-parity gaps
@@ -69,10 +70,13 @@ export function buildRouteManifest(options: BuildRouteManifestOptions): Manifest
   const routesDir = join(pkgRoot, 'src/app/routes')
   const appRouteSource = readFileSync(join(pkgRoot, 'src/app/AppRoute.tsx'), 'utf-8')
   const navigationSource = readFileSync(join(pkgRoot, 'src/app/navigationItems.tsx'), 'utf-8')
+  const appSource = readFileSync(join(pkgRoot, 'src/app/App.tsx'), 'utf-8')
+  const rootSource = readFileSync(join(pkgRoot, 'src/app/routes/__root.ts'), 'utf-8')
+  const treeSource = readFileSync(join(pkgRoot, 'src/app/tanstackRouteTree.tsx'), 'utf-8')
 
-  const routerRoutes = collectRouterRoutes(routesDir)
-  const appLevel = collectAppLevelRoutes()
-  const fallback = collectFallbackRoute()
+  const { routes: routerRoutes, unmountedRouteFiles } = collectMountedRouterRoutes(routesDir, treeSource)
+  const appLevel = collectAppLevelRoutesFromSource(appSource, AppRoute)
+  const fallback = collectFallbackRouteFromSource(rootSource)
 
   const byTemplate = new Map<string, NormalizedRoute>()
   for (const route of [...routerRoutes, ...appLevel, fallback]) {
@@ -111,6 +115,7 @@ export function buildRouteManifest(options: BuildRouteManifestOptions): Manifest
     }),
     appRouteOnly,
     navigationOnly,
+    unmountedRouteFiles,
   }
 }
 

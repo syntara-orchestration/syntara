@@ -1,7 +1,7 @@
-import { readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { basename, join } from 'node:path'
 
-import { extractParameters, normalizeTemplate } from './normalize-route'
+import { extractParameters, isPlainObject, normalizeTemplate } from './normalize-route'
 import type { NormalizedRoute, RouteKind } from './route-manifest-schema'
 
 const PATH_LITERAL = /['"](\/[^'"]*)['"]/g
@@ -26,8 +26,8 @@ export function collectPathsFromObject(value: unknown, out: Set<string> = new Se
     out.add(value)
     return out
   }
-  if (value && typeof value === 'object') {
-    for (const child of Object.values(value as Record<string, unknown>)) {
+  if (isPlainObject(value)) {
+    for (const child of Object.values(value)) {
       collectPathsFromObject(child, out)
     }
   }
@@ -35,20 +35,73 @@ export function collectPathsFromObject(value: unknown, out: Set<string> = new Se
 }
 
 /**
+ * Extract the interior of a `{ ... }` object starting at `openBraceIndex`,
+ * respecting nested braces and string literals.
+ *
+ * @param source - Full source text
+ * @param openBraceIndex - Index of the opening `{`
+ * @returns Object body without the outer braces, or `null` if unbalanced
+ */
+export function extractBalancedObjectBody(source: string, openBraceIndex: number): string | null {
+  if (source[openBraceIndex] !== '{') return null
+
+  let depth = 0
+  let inString: '"' | "'" | '`' | null = null
+  let escaped = false
+
+  for (let i = openBraceIndex; i < source.length; i++) {
+    const ch = source[i]
+    if (!ch) continue
+
+    if (inString) {
+      if (escaped) {
+        escaped = false
+        continue
+      }
+      if (ch === '\\') {
+        escaped = true
+        continue
+      }
+      if (ch === inString) inString = null
+      continue
+    }
+
+    if (ch === '"' || ch === "'" || ch === '`') {
+      inString = ch
+      continue
+    }
+
+    if (ch === '{') {
+      depth += 1
+      continue
+    }
+
+    if (ch === '}') {
+      depth -= 1
+      if (depth === 0) return source.slice(openBraceIndex + 1, i)
+    }
+  }
+
+  return null
+}
+
+/**
  * Parse `createRoute({ ... })` blocks from a route module source string.
  *
- * Uses text parsing so collectors never import page components or CSS.
+ * Uses brace-depth scanning so nested option objects cannot truncate the block.
+ * Text parsing avoids importing page components or CSS.
  *
  * @param source - TypeScript/TSX file contents
  * @returns Raw path entries with kind and optional redirect target
  */
 export function parseCreateRouteBlocks(source: string): ParsedCreateRoute[] {
   const results: ParsedCreateRoute[] = []
-  const blockRegex = /createRoute\(\{([\s\S]*?)\n\s*\}\)/g
+  const startRegex = /createRoute\s*\(\s*\{/g
 
-  for (const match of source.matchAll(blockRegex)) {
-    const body = match[1]
-    if (!body) continue
+  for (const match of source.matchAll(startRegex)) {
+    const openBraceIndex = (match.index ?? 0) + match[0].lastIndexOf('{')
+    const body = extractBalancedObjectBody(source, openBraceIndex)
+    if (body === null) continue
 
     const pathMatch = body.match(/\bpath:\s*['"]([^'"]+)['"]/)
     const path = pathMatch?.[1]
@@ -68,40 +121,86 @@ export function parseCreateRouteBlocks(source: string): ParsedCreateRoute[] {
 }
 
 /**
- * Collect normalized routes from every non-test `*.tsx` file in a routes directory.
+ * Parse `tanstackRouteTree.tsx` for route modules that are imported and mounted.
+ *
+ * A module counts as mounted only when its export is both imported from
+ * `./routes/...` and spread into `addChildren([...])`.
+ *
+ * @param treeSource - File contents of `tanstackRouteTree.tsx`
+ * @returns Sorted unique route module basenames (for example `workflows`)
+ */
+export function parseMountedRouteModules(treeSource: string): string[] {
+  const importByBinding = new Map<string, string>()
+
+  for (const match of treeSource.matchAll(
+    /import\s*\{\s*(\w+)\s*\}\s*from\s*['"]\.\/routes\/([^'"]+)['"]/g
+  )) {
+    const binding = match[1]
+    const modulePath = match[2]
+    if (!binding || !modulePath) continue
+    importByBinding.set(binding, basename(modulePath))
+  }
+
+  const mounted = new Set<string>()
+  const childrenMatch = treeSource.match(/addChildren\(\[([\s\S]*?)\]\)/)
+  const childrenBody = childrenMatch?.[1] ?? ''
+
+  for (const match of childrenBody.matchAll(/\.\.\.(\w+)/g)) {
+    const binding = match[1]
+    if (!binding) continue
+    const moduleName = importByBinding.get(binding)
+    if (moduleName) mounted.add(moduleName)
+  }
+
+  return [...mounted].sort()
+}
+
+/**
+ * Collect normalized routes from route modules mounted in the TanStack tree.
+ *
+ * Only files referenced by `tanstackRouteTree.tsx` are scraped, so orphan
+ * `createRoute` modules cannot pollute the baseline.
  *
  * @param routesDir - Absolute path to `src/app/routes`
- * @returns Deduplicated router routes (not yet sorted)
+ * @param treeSource - Contents of `tanstackRouteTree.tsx`
+ * @returns Deduplicated router routes plus any unmounted route file basenames
  */
-export function collectRouterRoutes(routesDir: string): NormalizedRoute[] {
-  const files = readdirSync(routesDir).filter((name) => name.endsWith('.tsx') && !name.includes('.test.'))
+export function collectMountedRouterRoutes(
+  routesDir: string,
+  treeSource: string
+): { routes: NormalizedRoute[]; unmountedRouteFiles: string[] } {
+  const mountedModules = new Set(parseMountedRouteModules(treeSource))
+  const routeFiles = readdirSync(routesDir).filter(
+    (name) => (name.endsWith('.tsx') || name.endsWith('.ts')) && !name.includes('.test.') && name !== '__root.ts'
+  )
+
+  const unmountedRouteFiles = routeFiles
+    .filter((name) => {
+      const base = basename(name, name.endsWith('.tsx') ? '.tsx' : '.ts')
+      if (base === '__root') return false
+      const source = readFileSync(join(routesDir, name), 'utf-8')
+      return parseCreateRouteBlocks(source).length > 0 && !mountedModules.has(base)
+    })
+    .sort()
+
   const byTemplate = new Map<string, NormalizedRoute>()
 
-  for (const file of files) {
-    const source = readFileSync(join(routesDir, file), 'utf-8')
+  for (const moduleName of mountedModules) {
+    const fileName = resolveRouteModuleFile(routesDir, moduleName)
+    if (!fileName) continue
+    const source = readFileSync(join(routesDir, fileName), 'utf-8')
     for (const route of parseCreateRouteBlocks(source)) {
-      const template = normalizeTemplate(route.path)
-      const entry: NormalizedRoute = {
-        template,
-        parameters: extractParameters(template),
+      mergeRoute(byTemplate, {
+        template: normalizeTemplate(route.path),
+        parameters: extractParameters(normalizeTemplate(route.path)),
         kind: route.kind,
         sources: ['router'],
         ...(route.redirectTo ? { redirectTo: normalizeTemplate(route.redirectTo) } : {}),
-      }
-      const existing = byTemplate.get(template)
-      if (existing) {
-        existing.sources = uniqueSources([...existing.sources, ...entry.sources])
-        if (entry.kind === 'redirect') {
-          existing.kind = 'redirect'
-          existing.redirectTo = entry.redirectTo
-        }
-      } else {
-        byTemplate.set(template, entry)
-      }
+      })
     }
   }
 
-  return [...byTemplate.values()]
+  return { routes: [...byTemplate.values()], unmountedRouteFiles }
 }
 
 /**
@@ -184,45 +283,112 @@ export function resolveAppRouteReference(appRouteCatalog: unknown, expression: s
   if (parts[0] !== 'AppRoute') return undefined
   let current: unknown = appRouteCatalog
   for (const part of parts.slice(1)) {
-    if (!current || typeof current !== 'object') return undefined
-    current = (current as Record<string, unknown>)[part]
+    if (!isPlainObject(current)) return undefined
+    current = current[part]
   }
   return current
 }
 
 /**
- * Return bookmarkable paths handled in `App.tsx` before `RouterProvider`.
+ * Collect bookmarkable paths handled in `App.tsx` before `RouterProvider`.
  *
- * These are intentional exceptions to the TanStack route tree. Today that is
- * only the identity-provider test sign-in callback, which must render without
- * mounting the authenticated shell.
+ * Parses `location.pathname === AppRoute...` and literal pathname comparisons
+ * so changing the escape hatch updates the baseline.
  *
+ * @param appSource - File contents of `App.tsx`
+ * @param appRouteCatalog - Live `AppRoute` object for resolving references
  * @returns Normalized app-level route entries
  */
-export function collectAppLevelRoutes(): NormalizedRoute[] {
-  return [
-    {
-      template: '/auth/test-signin-callback',
-      parameters: [],
+export function collectAppLevelRoutesFromSource(
+  appSource: string,
+  appRouteCatalog: unknown
+): NormalizedRoute[] {
+  const byTemplate = new Map<string, NormalizedRoute>()
+
+  for (const match of appSource.matchAll(/location\.pathname\s*===\s*(AppRoute(?:\.\w+)+)/g)) {
+    const expression = match[1]
+    if (!expression) continue
+    const resolved = resolveAppRouteReference(appRouteCatalog, expression)
+    if (typeof resolved !== 'string') continue
+    const template = normalizeTemplate(resolved)
+    byTemplate.set(template, {
+      template,
+      parameters: extractParameters(template),
       kind: 'app',
       sources: ['app', 'appRoute'],
-    },
-  ]
+    })
+  }
+
+  for (const match of appSource.matchAll(/location\.pathname\s*===\s*['"](\/[^'"]+)['"]/g)) {
+    const path = match[1]
+    if (!path) continue
+    const template = normalizeTemplate(path)
+    byTemplate.set(template, {
+      template,
+      parameters: extractParameters(template),
+      kind: 'app',
+      sources: ['app'],
+    })
+  }
+
+  return [...byTemplate.values()]
 }
 
 /**
- * Return the catch-all fallback recorded from the root route not-found behavior.
+ * Collect the catch-all fallback from `__root.ts` not-found navigation.
  *
+ * @param rootSource - File contents of `src/app/routes/__root.ts`
  * @returns Normalized fallback route entry
+ * @throws If no `navigate({ to: '...' })` target is found
  */
-export function collectFallbackRoute(): NormalizedRoute {
+export function collectFallbackRouteFromSource(rootSource: string): NormalizedRoute {
+  const match = rootSource.match(/\bnavigate\(\{\s*to:\s*['"]([^'"]+)['"]/)
+  const redirectTo = match?.[1]
+  if (!redirectTo) {
+    throw new Error('Could not find not-found navigate({ to }) target in __root.ts')
+  }
+
   return {
     template: '*',
     parameters: [],
     kind: 'fallback',
-    redirectTo: '/workflows',
+    redirectTo: normalizeTemplate(redirectTo),
     sources: ['router'],
   }
+}
+
+/**
+ * Resolve a mounted module basename to a file under `routesDir`.
+ *
+ * @param routesDir - Absolute path to `src/app/routes`
+ * @param moduleName - Basename without extension (for example `workflows`)
+ * @returns Matching filename, or `undefined` when missing
+ */
+function resolveRouteModuleFile(routesDir: string, moduleName: string): string | undefined {
+  const candidates = [`${moduleName}.tsx`, `${moduleName}.ts`]
+  for (const candidate of candidates) {
+    if (existsSync(join(routesDir, candidate))) return candidate
+  }
+  return undefined
+}
+
+/**
+ * Merge a route into a template map, combining sources and preferring redirects.
+ *
+ * @param byTemplate - Mutable map keyed by canonical template
+ * @param entry - Route entry to merge
+ */
+function mergeRoute(byTemplate: Map<string, NormalizedRoute>, entry: NormalizedRoute): void {
+  const existing = byTemplate.get(entry.template)
+  if (existing) {
+    existing.sources = uniqueSources([...existing.sources, ...entry.sources])
+    if (entry.kind === 'redirect') {
+      existing.kind = 'redirect'
+      existing.redirectTo = entry.redirectTo
+    }
+    return
+  }
+  byTemplate.set(entry.template, entry)
 }
 
 /**

@@ -5,20 +5,16 @@
  *   npm run route-baseline:update
  *
  * Commit the updated manifest in the same PR as the intentional route change.
+ * Exits non-zero when AppRoute/navigation parity gaps or unmounted modules remain.
  */
 
 import { updateRouteBaseline } from './run-route-baseline'
 
-const result = updateRouteBaseline()
-
-if (result.appRouteOnly.length > 0) {
-  console.warn('AppRoute templates missing from manifest (except known exceptions):')
-  for (const template of result.appRouteOnly) console.warn(`  - ${template}`)
+try {
+  const result = updateRouteBaseline()
+  console.log(`Wrote ${result.routeCount} routes to ${result.path}`)
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error)
+  console.error(message)
+  process.exit(1)
 }
-
-if (result.navigationOnly.length > 0) {
-  console.warn('Navigation templates missing from manifest:')
-  for (const template of result.navigationOnly) console.warn(`  - ${template}`)
-}
-
-console.log(`Wrote ${result.routeCount} routes to ${result.path}`)

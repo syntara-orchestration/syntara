@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  collectPathsFromObject,
+  collectAppLevelRoutesFromSource,
+  collectFallbackRouteFromSource,
   collectNavigationPathsFromSource,
+  collectPathsFromObject,
+  extractBalancedObjectBody,
   parseCreateRouteBlocks,
+  parseMountedRouteModules,
   resolveAppRouteReference,
 } from './collect-routes'
 
@@ -38,6 +42,112 @@ export const routes = [
         redirectTo: '/configuration/integrations',
       },
     ])
+  })
+
+  it('keeps scanning when a nested object appears before path', () => {
+    const source = `
+createRoute({
+  getParentRoute: () => rootRoute,
+  staticData: {
+    nested: { deeper: true },
+  },
+  path: '/nested-before-path',
+  component: Page,
+})
+`
+    expect(parseCreateRouteBlocks(source)).toStrictEqual([
+      { path: '/nested-before-path', kind: 'page' },
+    ])
+  })
+
+  it('ignores braces inside string literals', () => {
+    const source = `
+createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/literal-braces',
+  meta: { label: 'has { brace' },
+})
+`
+    expect(parseCreateRouteBlocks(source)).toStrictEqual([{ path: '/literal-braces', kind: 'page' }])
+  })
+})
+
+describe('extractBalancedObjectBody', () => {
+  it('returns null for unbalanced input', () => {
+    expect(extractBalancedObjectBody('{ left open', 0)).toBeNull()
+  })
+})
+
+describe('parseMountedRouteModules', () => {
+  it('requires both import and addChildren spread', () => {
+    const treeSource = `
+import { rootRoute } from './routes/__root'
+import { workflowsRoutes } from './routes/workflows'
+import { orphanRoutes } from './routes/orphan'
+
+export const buildTanStackRouteTree = () =>
+  rootRoute.addChildren([
+    ...workflowsRoutes,
+  ])
+`
+    expect(parseMountedRouteModules(treeSource)).toStrictEqual(['workflows'])
+  })
+})
+
+describe('collectAppLevelRoutesFromSource', () => {
+  it('resolves AppRoute pathname escape hatches', () => {
+    const catalog = { Auth: { TestSignInCallback: '/auth/test-signin-callback' } }
+    const source = `
+      if (globalThis.location.pathname === AppRoute.Auth.TestSignInCallback) {
+        return <TestSignInCallback />
+      }
+    `
+    expect(collectAppLevelRoutesFromSource(source, catalog)).toStrictEqual([
+      {
+        template: '/auth/test-signin-callback',
+        parameters: [],
+        kind: 'app',
+        sources: ['app', 'appRoute'],
+      },
+    ])
+  })
+
+  it('accepts literal pathname comparisons', () => {
+    const source = `if (location.pathname === '/custom-app-path') return null`
+    expect(collectAppLevelRoutesFromSource(source, {})).toStrictEqual([
+      {
+        template: '/custom-app-path',
+        parameters: [],
+        kind: 'app',
+        sources: ['app'],
+      },
+    ])
+  })
+})
+
+describe('collectFallbackRouteFromSource', () => {
+  it('reads the not-found navigate target', () => {
+    const source = `
+function NotFoundRedirect() {
+  useEffect(() => {
+    detachPromise(navigate({ to: '/workflows', replace: true }))
+  }, [navigate])
+  return null
+}
+`
+    expect(collectFallbackRouteFromSource(source)).toStrictEqual({
+      template: '*',
+      parameters: [],
+      kind: 'fallback',
+      redirectTo: '/workflows',
+      sources: ['router'],
+    })
+  })
+
+  it('throws when the navigate target is missing', () => {
+    expect(() => collectFallbackRouteFromSource('export const rootRoute = {}')).toThrow(
+      /not-found navigate/
+    )
   })
 })
 

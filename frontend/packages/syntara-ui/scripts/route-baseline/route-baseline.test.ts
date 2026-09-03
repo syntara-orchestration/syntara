@@ -6,11 +6,11 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { AppRoute } from '../../src/app/AppRoute'
 
-import { buildRouteManifest } from './build-route-manifest'
+import { SOURCE_PARITY_EXCEPTIONS, buildRouteManifest } from './build-route-manifest'
 import {
   collectAppRoutePaths,
+  collectMountedRouterRoutes,
   collectNavigationPathsFromSource,
-  collectRouterRoutes,
 } from './collect-routes'
 import { diffRouteManifest } from './diff-route-manifest'
 import {
@@ -28,7 +28,9 @@ import { checkRouteBaseline, updateRouteBaseline } from './run-route-baseline'
 
 describe('route baseline', () => {
   const pkgRoot = getPackageRoot()
-  const { manifest, appRouteOnly, navigationOnly } = buildRouteManifest({ pkgRoot })
+  const { manifest, appRouteOnly, navigationOnly, unmountedRouteFiles } = buildRouteManifest({
+    pkgRoot,
+  })
   const tempRoots: string[] = []
 
   afterEach(() => {
@@ -72,6 +74,18 @@ describe('route baseline', () => {
     expect(navigationOnly).toStrictEqual([])
   })
 
+  it('has no unmounted route modules with createRoute', () => {
+    expect(unmountedRouteFiles).toStrictEqual([])
+  })
+
+  it('keeps SOURCE_PARITY_EXCEPTIONS limited to documented non-manifest gaps', () => {
+    expect(SOURCE_PARITY_EXCEPTIONS.has('/auth/test-signin-callback')).toBe(false)
+    expect(SOURCE_PARITY_EXCEPTIONS.has('/dashboard')).toBe(true)
+    for (const template of SOURCE_PARITY_EXCEPTIONS) {
+      expect(manifest.routes.some((route) => route.template === template)).toBe(false)
+    }
+  })
+
   it('builds a stable sorted manifest from the real package sources', () => {
     expect(manifest[ROUTE_MANIFEST_COMMENT_KEY]).toBe(ROUTE_MANIFEST_NOTICE)
     expect(manifest.version).toBe(1)
@@ -97,7 +111,7 @@ describe('route baseline', () => {
     expect(route?.sources).toContain('router')
   })
 
-  it('records the not-found fallback', () => {
+  it('records the not-found fallback from __root.ts', () => {
     const route = manifest.routes.find((entry) => entry.template === '*')
     expect(route).toStrictEqual({
       template: '*',
@@ -108,10 +122,22 @@ describe('route baseline', () => {
     })
   })
 
-  it('collects router, AppRoute, and navigation paths from real files', () => {
-    const routerRoutes = collectRouterRoutes(join(pkgRoot, 'src/app/routes'))
-    const appRouteSource = readFileSync(join(pkgRoot, 'src/app/AppRoute.tsx'), 'utf-8')
-    const navigationSource = readFileSync(join(pkgRoot, 'src/app/navigationItems.tsx'), 'utf-8')
+  it('records the App.tsx auth escape hatch from live source', () => {
+    const route = manifest.routes.find((entry) => entry.template === '/auth/test-signin-callback')
+    expect(route).toMatchObject({
+      kind: 'app',
+      parameters: [],
+    })
+    expect(route?.sources).toEqual(expect.arrayContaining(['app', 'appRoute']))
+  })
+
+  it('collects only mounted router modules from the live tree', () => {
+    const treeSource = readFileSync(join(pkgRoot, 'src/app/tanstackRouteTree.tsx'), 'utf-8')
+    const { routes: routerRoutes, unmountedRouteFiles: unmounted } = collectMountedRouterRoutes(
+      join(pkgRoot, 'src/app/routes'),
+      treeSource
+    )
+    expect(unmounted).toStrictEqual([])
 
     const routerTemplates = new Set(routerRoutes.map((route) => route.template))
     expect(routerTemplates.has('/workflows')).toBe(true)
@@ -120,6 +146,9 @@ describe('route baseline', () => {
       kind: 'redirect',
       redirectTo: '/configuration/integrations',
     })
+
+    const appRouteSource = readFileSync(join(pkgRoot, 'src/app/AppRoute.tsx'), 'utf-8')
+    const navigationSource = readFileSync(join(pkgRoot, 'src/app/navigationItems.tsx'), 'utf-8')
 
     const appRoutePaths = collectAppRoutePaths(appRouteSource)
     expect(appRoutePaths).toContain('/workflows')
@@ -150,6 +179,7 @@ describe('route baseline', () => {
     expect(result.ok).toBe(true)
     expect(result.messages).toStrictEqual([])
     expect(result.diff).toStrictEqual({ added: [], removed: [], changed: [] })
+    expect(result.unmountedRouteFiles).toStrictEqual([])
     expect(result.manifest).toStrictEqual(readCommittedManifest(pkgRoot))
   })
 
@@ -171,6 +201,76 @@ describe('route baseline', () => {
     expect(result.messages.some((line) => line.includes('Added routes:'))).toBe(true)
   })
 
+  it('checkRouteBaseline fails when App.tsx escape hatch path changes', () => {
+    const tempRoot = makeTempPackageRoot()
+    copyRouteSources(pkgRoot, tempRoot)
+    updateRouteBaseline(tempRoot)
+
+    const appPath = join(tempRoot, 'src/app/App.tsx')
+    const appSource = readFileSync(appPath, 'utf-8').replace(
+      'AppRoute.Auth.TestSignInCallback',
+      "'/auth/moved-callback'"
+    )
+    writeFileSync(appPath, appSource)
+
+    const result = checkRouteBaseline(tempRoot)
+    expect(result.ok).toBe(false)
+    expect(result.diff.added).toContain('/auth/moved-callback')
+    expect(result.diff.removed).toContain('/auth/test-signin-callback')
+  })
+
+  it('checkRouteBaseline fails when __root not-found target changes', () => {
+    const tempRoot = makeTempPackageRoot()
+    copyRouteSources(pkgRoot, tempRoot)
+    updateRouteBaseline(tempRoot)
+
+    const rootPath = join(tempRoot, 'src/app/routes/__root.ts')
+    writeFileSync(
+      rootPath,
+      readFileSync(rootPath, 'utf-8').replace("to: '/workflows'", "to: '/approvals'")
+    )
+
+    const result = checkRouteBaseline(tempRoot)
+    expect(result.ok).toBe(false)
+    expect(result.diff.changed.some((change) => change.template === '*')).toBe(true)
+  })
+
+  it('checkRouteBaseline fails for unmounted createRoute modules', () => {
+    const tempRoot = makeTempPackageRoot()
+    copyRouteSources(pkgRoot, tempRoot)
+    updateRouteBaseline(tempRoot)
+
+    writeFileSync(
+      join(tempRoot, 'src/app/routes/orphan.tsx'),
+      `import { createRoute } from '@tanstack/react-router'
+import { rootRoute } from './__root'
+export const orphanRoutes = [
+  createRoute({ getParentRoute: () => rootRoute, path: '/orphan-page' }),
+]
+`
+    )
+
+    const result = checkRouteBaseline(tempRoot)
+    expect(result.ok).toBe(false)
+    expect(result.unmountedRouteFiles).toContain('orphan.tsx')
+    expect(result.messages.some((line) => line.includes('Unmounted route modules'))).toBe(true)
+  })
+
+  it('updateRouteBaseline refuses to write when parity gaps remain', () => {
+    const tempRoot = makeTempPackageRoot()
+    copyRouteSources(pkgRoot, tempRoot)
+
+    const appRoutePath = join(tempRoot, 'src/app/AppRoute.tsx')
+    writeFileSync(
+      appRoutePath,
+      `${readFileSync(appRoutePath, 'utf-8')}\nexport const ExtraOnlyInAppRoute = '/parity-gap-only'\n`
+    )
+
+    // Rebuild AppRoute import won't pick up the string unless it's a path literal
+    // inside the file — collectAppRoutePaths scrapes all '/...' literals.
+    expect(() => updateRouteBaseline(tempRoot)).toThrow(/Refusing to update route baseline/)
+  })
+
   it('updateRouteBaseline writes a manifest that checkRouteBaseline accepts', () => {
     const tempRoot = makeTempPackageRoot()
     copyRouteSources(pkgRoot, tempRoot)
@@ -190,8 +290,11 @@ describe('route baseline', () => {
  */
 function copyRouteSources(fromPkgRoot: string, toPkgRoot: string) {
   const relativeFiles = [
+    'src/app/App.tsx',
     'src/app/AppRoute.tsx',
     'src/app/navigationItems.tsx',
+    'src/app/tanstackRouteTree.tsx',
+    'src/app/routes/__root.ts',
     ...listRouteModules(fromPkgRoot),
   ]
 
@@ -209,6 +312,6 @@ function copyRouteSources(fromPkgRoot: string, toPkgRoot: string) {
 function listRouteModules(pkgRoot: string): string[] {
   const routesDir = join(pkgRoot, 'src/app/routes')
   return readdirSync(routesDir)
-    .filter((name) => name.endsWith('.tsx') && !name.includes('.test.'))
+    .filter((name) => (name.endsWith('.tsx') || name.endsWith('.ts')) && !name.includes('.test.'))
     .map((name) => `src/app/routes/${name}`)
 }
