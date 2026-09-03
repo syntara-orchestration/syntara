@@ -68,6 +68,7 @@ async def test_update_tool_status_disable_success(
     assert not updated_tool.enabled
     assert isinstance(updated_tool.updated_by, UserReference)
     assert updated_tool.updated_by.id == test_user.id
+    assert updated_tool.updated_by.name == test_user.display_name
     assert updated_tool.updated_at >= test_tool.updated_at
 
 
@@ -87,6 +88,7 @@ async def test_update_tool_status_enable_success(
     assert updated_tool.enabled
     assert isinstance(updated_tool.updated_by, UserReference)
     assert updated_tool.updated_by.id == test_user.id
+    assert updated_tool.updated_by.name == test_user.display_name
     assert updated_tool.updated_at >= test_tool.updated_at
 
 
@@ -114,6 +116,7 @@ async def test_update_tool_status_success(test_db_session: AsyncSession, test_to
     assert updated_tool.status == ToolStatus.ERROR
     assert isinstance(updated_tool.updated_by, UserReference)
     assert updated_tool.updated_by.id == test_user.id
+    assert updated_tool.updated_by.name == test_user.display_name
     assert updated_tool.updated_at >= test_tool.updated_at
 
 
@@ -134,6 +137,7 @@ async def test_update_tool_refresh_error_success(
     assert updated_tool.refresh_error == error_message
     assert isinstance(updated_tool.updated_by, UserReference)
     assert updated_tool.updated_by.id == test_user.id
+    assert updated_tool.updated_by.name == test_user.display_name
     assert updated_tool.updated_at >= test_tool.updated_at
 
 
@@ -158,6 +162,7 @@ async def test_update_tool_all_fields_success(test_db_session: AsyncSession, tes
     assert updated_tool.refresh_error == error_message
     assert isinstance(updated_tool.updated_by, UserReference)
     assert updated_tool.updated_by.id == test_user.id
+    assert updated_tool.updated_by.name == test_user.display_name
     assert updated_tool.updated_at >= test_tool.updated_at
 
 
@@ -622,6 +627,7 @@ async def test_update_tool_status_audit_tracking(
 
     assert isinstance(updated_tool.updated_by, UserReference)
     assert updated_tool.updated_by.id == test_user.id
+    assert updated_tool.updated_by.name == test_user.display_name
     assert updated_tool.updated_at > original_updated_at
     assert isinstance(updated_tool.created_by, UserReference)
     assert updated_tool.created_by.id == test_tool.created_by
