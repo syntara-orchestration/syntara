@@ -21,6 +21,8 @@
     "e2e:visual-regression:container": "bash scripts/visual-regression-container.sh",
     "e2e:visual-regression:container:update": "bash scripts/visual-regression-container.sh --update",
     "check:visual-baselines": "npm exec --prefix packages/syntara-ui tsx -- scripts/check-visual-baselines.ts",
+    "route-baseline:check": "npm run route-baseline:check --prefix packages/syntara-ui",
+    "route-baseline:update": "npm run route-baseline:update --prefix packages/syntara-ui",
     "knip": "npm run knip --workspaces --if-present",
     "clean": "npm run clean --workspaces --if-present",
     "format": "prettier --write .",
