@@ -19,7 +19,9 @@ class UserReference:
 
         Attributes:
             id (UUID): User's unique identifier
-            name (str): Principal's current display name, resolved when the response is built
+            name (str): Principal's current display name, resolved when the response is built. Not a username: for a user
+                this is their first and last name, falling back to the username when both are blank; for a service account it is
+                the account name; for an internal service it is derived from the certificate CN.
     """
 
     id: UUID
