@@ -34,6 +34,8 @@ export type WorkflowsListViewProps = Readonly<{
   onToggleProject: (projectId: string) => void
   getRowActions: (workflow: Workflow) => RowAction[]
   projectActionCallbacks?: ProjectRowActionCallbacks
+  tabKey?: string
+  tabLabel?: string
 }>
 
 export function WorkflowsListView({
@@ -56,11 +58,15 @@ export function WorkflowsListView({
   onToggleProject,
   getRowActions,
   projectActionCallbacks,
+  tabKey,
+  tabLabel,
 }: WorkflowsListViewProps) {
   const isEmpty = sortedWorkflows.length === 0
 
   return (
     <SynListPanelView
+      tabKey={tabKey}
+      tabLabel={tabLabel}
       isPending={isPending}
       isFetching={isFetching}
       error={error}

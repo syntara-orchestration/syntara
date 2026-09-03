@@ -56,6 +56,10 @@ vi.mock('./ProjectRoleAssignmentsTab', () => ({
   ProjectRoleAssignmentsTab: () => <div>Mock Role Assignments Tab</div>,
 }))
 
+vi.mock('./ProjectWorkflowsTab', () => ({
+  ProjectWorkflowsTab: () => <div>Mock Workflows Tab</div>,
+}))
+
 vi.mock('./ProjectNotFoundState', () => ({
   ProjectNotFoundState: ({ onBack, onRetry }: { onBack: () => void; onRetry: () => void }) => (
     <div>
@@ -240,6 +244,7 @@ describe('ProjectDetail', () => {
     render(<ProjectDetail />, { wrapper })
 
     expect(screen.getByRole('tab', { name: 'Details' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Workflows' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Assignments' })).toBeInTheDocument()
   })
 
@@ -364,13 +369,29 @@ describe('ProjectDetail', () => {
     expect(screen.getByText('Mock Role Assignments Tab')).toBeInTheDocument()
   })
 
+  it('renders the Workflows tab content', () => {
+    mockDetailTab.mockReturnValue(['workflows', mockGoToTab])
+    render(<ProjectDetail />, { wrapper })
+
+    expect(screen.getByText('Mock Workflows Tab')).toBeInTheDocument()
+  })
+
+  it('defaults to the Details tab and keeps Details selected on first load', () => {
+    render(<ProjectDetail />, { wrapper })
+
+    expect(screen.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: 'Workflows' })).toHaveAttribute('aria-selected', 'false')
+    expect(screen.getByText('Test project')).toBeInTheDocument()
+    expect(screen.queryByText('Mock Workflows Tab')).not.toBeInTheDocument()
+  })
+
   it('calls goToTab when a tab is clicked', async () => {
     const user = userEvent.setup()
     render(<ProjectDetail />, { wrapper })
 
-    await user.click(screen.getByRole('tab', { name: 'Assignments' }))
+    await user.click(screen.getByRole('tab', { name: 'Workflows' }))
 
-    expect(mockGoToTab).toHaveBeenCalledWith('role-assignments')
+    expect(mockGoToTab).toHaveBeenCalledWith('workflows')
   })
 
   it('handles refetch rejection gracefully in onRetry callback', async () => {
@@ -461,18 +482,48 @@ describe('ProjectDetail', () => {
   })
 
   describe('Permission-based tab gating', () => {
+    function mockCanI(permissions: Record<string, boolean>) {
+      vi.mocked(accessFetchClient.POST).mockImplementation((_path: string, opts: never) => {
+        const body = (opts as { body?: { resource_type?: string } })?.body
+        const resourceType = body?.resource_type ?? ''
+        const allowed = permissions[resourceType] ?? true
+        return Promise.resolve({ data: { allowed } } as never)
+      })
+    }
+
+    it('hides Workflows tab when workflow:read is denied', async () => {
+      mockCanI({ workflow: false })
+      render(<ProjectDetail />, { wrapper })
+
+      await waitFor(() => {
+        expect(screen.queryByRole('tab', { name: /Workflows/ })).not.toBeInTheDocument()
+      })
+      expect(screen.getByRole('tab', { name: /Details/ })).toBeInTheDocument()
+      expect(screen.getByRole('tab', { name: /Assignments/ })).toBeInTheDocument()
+    })
+
+    it('shows Workflows tab when workflow:read is granted', async () => {
+      mockCanI({ workflow: true })
+      render(<ProjectDetail />, { wrapper })
+
+      await waitFor(() => {
+        expect(screen.getByRole('tab', { name: /Workflows/ })).toBeInTheDocument()
+      })
+    })
+
     it('hides Assignments tab when role-assignment:read is denied', async () => {
-      vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: false } } as never)
+      mockCanI({ 'role-assignment': false })
       render(<ProjectDetail />, { wrapper })
 
       await waitFor(() => {
         expect(screen.queryByRole('tab', { name: /Assignments/ })).not.toBeInTheDocument()
       })
       expect(screen.getByRole('tab', { name: /Details/ })).toBeInTheDocument()
+      expect(screen.getByRole('tab', { name: /Workflows/ })).toBeInTheDocument()
     })
 
     it('shows Assignments tab when role-assignment:read is granted', async () => {
-      vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+      mockCanI({ 'role-assignment': true })
       render(<ProjectDetail />, { wrapper })
 
       await waitFor(() => {
