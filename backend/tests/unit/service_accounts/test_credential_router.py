@@ -5,6 +5,7 @@ from uuid import uuid4
 
 import pytest
 
+from syntara.core.models.user_reference import UserReference
 from syntara.service_accounts.credential_router import (
     create_credential,
     delete_credential,
@@ -52,7 +53,7 @@ def _make_credential(**kwargs: object) -> ServiceAccountCredential:
         "credential_type": ServiceAccountCredentialType.CLIENT_CREDENTIALS,
         "identifier": "nx_sa_abcdef1234567890",
         "hashed_secret": "$argon2id$placeholder",
-        "created_by": uuid4(),
+        "created_by": UserReference(id=uuid4(), name="tester"),
     }
     defaults.update(kwargs)
     return ServiceAccountCredential(**defaults)
