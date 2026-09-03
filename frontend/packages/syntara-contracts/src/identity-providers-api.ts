@@ -525,19 +525,28 @@ export interface components {
      * IdentityProviderRead
      * @description Schema for IdentityProvider response with configuration details (excludes secrets).
      */
-    IdentityProviderRead: components['schemas']['UserOwnedResource'] &
-      components['schemas']['NamedResource'] & {
-        /** @description Human-readable provider name */
-        name?: unknown
-        /**
-         * Enabled
-         * @description Enable/disable the identity provider
-         * @default true
-         */
-        enabled?: boolean
-        /** @description Identity provider configuration */
-        configuration: components['schemas']['OIDCConfigurationResponse']
-      }
+    IdentityProviderRead: components['schemas']['NamedResource'] & {
+      /**
+       * Created By
+       * @description User who created the identity provider
+       */
+      readonly created_by?: components['schemas']['UserReference'] | null
+      /**
+       * Updated By
+       * @description User who last modified the identity provider
+       */
+      readonly updated_by?: components['schemas']['UserReference'] | null
+      /** @description Human-readable provider name */
+      name?: unknown
+      /**
+       * Enabled
+       * @description Enable/disable the identity provider
+       * @default true
+       */
+      enabled?: boolean
+      /** @description Identity provider configuration */
+      configuration: components['schemas']['OIDCConfigurationResponse']
+    }
     /**
      * IdentityProviderListResponse
      * @description Paginated list response for identity providers.
@@ -705,21 +714,6 @@ export interface components {
         [key: string]: string
       }
     }
-    UserOwnedResource: components['schemas']['BaseResource'] & {
-      /**
-       * Created By
-       * Format: uuid
-       * @description User (or automation) that created the resource
-       * @example 770e8400-e29b-41d4-a716-446655440000
-       */
-      readonly created_by: string
-      /**
-       * Updated By
-       * @description User (or automation) that last updated the resource
-       * @example 880e8400-e29b-41d4-a716-446655440000
-       */
-      readonly updated_by?: string | null
-    }
     NamedResource: components['schemas']['BaseResource'] & {
       /**
        * Name
@@ -733,6 +727,22 @@ export interface components {
        * @example Handles user authentication and authorization workflows
        */
       description?: string | null
+    }
+    /**
+     * UserReference
+     * @description Minimal user identification for embedding in other resources.
+     *     The name is resolved from the database when the response is built, not
+     *     stored alongside the id, so it always reflects the principal's current
+     *     name. Renaming a user therefore changes the name shown for their past actions.
+     */
+    UserReference: {
+      /**
+       * Format: uuid
+       * @description User's unique identifier
+       */
+      id: string
+      /** @description Principal's current display name, resolved when the response is built. Not a username: for a user this is their first and last name, falling back to the username when both are blank; for a service account it is the account name; for an internal service it is derived from the certificate CN. */
+      name: string
     }
     /**
      * ErrorData

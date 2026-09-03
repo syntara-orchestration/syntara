@@ -301,11 +301,14 @@ export interface components {
       last_authenticated_at?: string | null
       /**
        * Created By
-       * Format: uuid
+       * @description User who created the service account
        */
-      created_by: string
-      /** Updated By */
-      updated_by?: string | null
+      readonly created_by?: components['schemas']['UserReference'] | null
+      /**
+       * Updated By
+       * @description User who last modified the service account
+       */
+      readonly updated_by?: components['schemas']['UserReference'] | null
       /**
        * Created At
        * Format: date-time
@@ -408,11 +411,14 @@ export interface components {
       old_secret_valid_until?: string | null
       /**
        * Created By
-       * Format: uuid
+       * @description User who created the credential
        */
-      created_by: string
-      /** Updated By */
-      updated_by?: string | null
+      readonly created_by?: components['schemas']['UserReference'] | null
+      /**
+       * Updated By
+       * @description User who last modified the credential
+       */
+      readonly updated_by?: components['schemas']['UserReference'] | null
       /**
        * Created At
        * Format: date-time
@@ -453,11 +459,14 @@ export interface components {
       old_secret_valid_until?: string | null
       /**
        * Created By
-       * Format: uuid
+       * @description User who created the credential
        */
-      created_by: string
-      /** Updated By */
-      updated_by?: string | null
+      readonly created_by?: components['schemas']['UserReference'] | null
+      /**
+       * Updated By
+       * @description User who last modified the credential
+       */
+      readonly updated_by?: components['schemas']['UserReference'] | null
       /**
        * Created At
        * Format: date-time
@@ -514,11 +523,14 @@ export interface components {
       old_secret_valid_until?: string | null
       /**
        * Created By
-       * Format: uuid
+       * @description User who created the credential
        */
-      created_by: string
-      /** Updated By */
-      updated_by?: string | null
+      readonly created_by?: components['schemas']['UserReference'] | null
+      /**
+       * Updated By
+       * @description User who last modified the credential
+       */
+      readonly updated_by?: components['schemas']['UserReference'] | null
       /**
        * Created At
        * Format: date-time
@@ -586,6 +598,22 @@ export interface components {
        * @default 180
        */
       max_lifetime_days?: number
+    }
+    /**
+     * UserReference
+     * @description Minimal user identification for embedding in other resources.
+     *     The name is resolved from the database when the response is built, not
+     *     stored alongside the id, so it always reflects the principal's current
+     *     name. Renaming a user therefore changes the name shown for their past actions.
+     */
+    UserReference: {
+      /**
+       * Format: uuid
+       * @description User's unique identifier
+       */
+      id: string
+      /** @description Principal's current display name, resolved when the response is built. Not a username: for a user this is their first and last name, falling back to the username when both are blank; for a service account it is the account name; for an internal service it is derived from the certificate CN. */
+      name: string
     }
     /**
      * ErrorData

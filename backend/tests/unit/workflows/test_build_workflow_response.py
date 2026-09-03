@@ -5,8 +5,13 @@ from uuid import uuid4
 
 import pytest
 
-from syntara.workflows.models.workflow import PublishWorkflowVersionResponse, WorkflowReadWithVersion
-from syntara.workflows.models.workflow_version import PublishVersionRequest
+from syntara.core.models.user_reference import UserReference
+from syntara.workflows.models.workflow import (
+    PublishWorkflowVersionResponse,
+    WorkflowRead,
+    WorkflowReadWithVersion,
+)
+from syntara.workflows.models.workflow_version import PublishVersionRequest, WorkflowVersionRead
 from syntara.workflows.router import _build_workflow_with_version_response, publish_workflow_version
 
 
@@ -21,6 +26,7 @@ def _make_mock_workflow() -> MagicMock:
     wf.is_enabled = True
     wf.has_validation_issues = False
     wf.created_by = uuid4()
+    wf.updated_by = None
     wf.project_id = uuid4()
     wf.published_version_id = None
     wf.created_at = "2026-01-01T00:00:00Z"
@@ -45,10 +51,44 @@ def _make_mock_version() -> MagicMock:
     return v
 
 
+async def _to_read(workflow: MagicMock) -> WorkflowRead:
+    """Stand in for WorkflowService.to_read without a database.
+
+    The real method resolves created_by/updated_by before returning; a response
+    still holding a raw id is rejected at serialization, so mirror that here.
+    """
+    read = WorkflowRead.model_validate(workflow, from_attributes=True)
+    read.created_by = UserReference(id=workflow.created_by, name="tester")
+    read.updated_by = None
+    return read
+
+
+async def _to_version_read(version: MagicMock, *_args: object, **_kwargs: object) -> WorkflowVersionRead:
+    """Stand in for WorkflowService.to_version_read without a database.
+
+    Like to_read, the real method resolves created_by before returning.
+    """
+    return WorkflowVersionRead(
+        id=version.id,
+        workflow_id=version.workflow_id,
+        version=version.version,
+        schema_version=version.schema_version,
+        workflow_definition=version.workflow_definition,
+        change_description=version.change_description,
+        name=version.name,
+        status="draft",
+        created_by=UserReference(id=version.created_by, name="tester"),
+        created_at=version.created_at,
+        updated_at=version.updated_at,
+    )
+
+
 def _make_mock_service() -> AsyncMock:
     service = AsyncMock()
     service.session = AsyncMock()
     service.get_publish_context = AsyncMock(return_value=({}, {}))
+    service.to_read = AsyncMock(side_effect=_to_read)
+    service.to_version_read = AsyncMock(side_effect=_to_version_read)
     return service
 
 

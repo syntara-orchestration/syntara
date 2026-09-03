@@ -78,8 +78,7 @@ type MockVersionRecord = {
   change_description: string
   status: string
   name: string | null
-  created_by: string
-  created_by_username: string
+  created_by: { id: string; name: string }
   created_at: string
   updated_at: string
   deleted_at: null
@@ -88,6 +87,10 @@ type MockVersionRecord = {
 
 const MOCK_VERSION_CREATED_BY = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
 const MOCK_VERSION_CREATED_BY_USERNAME = 'demo'
+
+/** Workflow and version created_by/updated_by are both UserReference objects. */
+const MOCK_WORKFLOW_USER_REF = { id: MOCK_VERSION_CREATED_BY, name: 'user-1' }
+const MOCK_VERSION_USER_REF = { id: MOCK_VERSION_CREATED_BY, name: MOCK_VERSION_CREATED_BY_USERNAME }
 
 /** Creates a 409 WORKFLOW_VERSION_CONFLICT response for save/publish mock handlers. */
 function workflowVersionConflictResponse(
@@ -137,8 +140,7 @@ function getOrCreateVersionStore(workflowId: string, workflow: WorkflowWithVersi
         change_description: 'Initial version',
         status: 'draft',
         name: null,
-        created_by: MOCK_VERSION_CREATED_BY,
-        created_by_username: MOCK_VERSION_CREATED_BY_USERNAME,
+        created_by: MOCK_VERSION_USER_REF,
         created_at: now,
         updated_at: now,
         deleted_at: null,
@@ -151,6 +153,15 @@ function getOrCreateVersionStore(workflowId: string, workflow: WorkflowWithVersi
 
 /** Mock seed data may use camelCase timestamps; API uses snake_case */
 type ApprovalTimestamps = Approval & { createdAt?: string; updatedAt?: string }
+
+/**
+ * created_by/updated_by are UserReference objects ({ id, name }); older
+ * fixtures may still carry a plain string. Return a sortable display name.
+ */
+function userReferenceName(value: { name?: string } | string | null | undefined): string {
+  if (!value) return ''
+  return typeof value === 'string' ? value : (value.name ?? '')
+}
 
 function approvalCreatedAt(a: Approval): string | undefined {
   const row = a as ApprovalTimestamps
@@ -448,8 +459,8 @@ export const handlers = [
       const isDesc = sort.startsWith('-')
       const field = isDesc ? sort.slice(1) : sort
       filtered.sort((a, b) => {
-        let aVal = ''
-        let bVal = ''
+        let aVal: string
+        let bVal: string
         switch (field) {
           case 'name':
             aVal = a.name ?? ''
@@ -578,7 +589,7 @@ export const handlers = [
       enabled_model_count: enabledModelCount,
       created_at: now,
       updated_at: now,
-      created_by: 'user-1',
+      created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1' },
       updated_by: null,
       deleted_at: null,
       deleted_by: null,
@@ -975,7 +986,7 @@ export const handlers = [
       current_version: 1,
       created_at: now,
       updated_at: now,
-      created_by: 'user-1',
+      created_by: MOCK_WORKFLOW_USER_REF,
       updated_by: null,
       project_id: projectId,
       version: {
@@ -983,7 +994,7 @@ export const handlers = [
         version: 1,
         schema_version: body.workflow_definition?.schema_version ?? '2.0.0',
         workflow_definition: body.workflow_definition,
-        created_by: 'user-1',
+        created_by: MOCK_VERSION_USER_REF,
         created_at: now,
         change_description: 'Initial version',
         status: WorkflowVersionStatusEnum.DRAFT,
@@ -1122,8 +1133,7 @@ export const handlers = [
         change_description: workflow.version?.change_description ?? `Version ${currentVersionNum}`,
         status: 'draft',
         name: null,
-        created_by: workflow.version?.created_by ?? MOCK_VERSION_CREATED_BY,
-        created_by_username: MOCK_VERSION_CREATED_BY_USERNAME,
+        created_by: workflow.version?.created_by ?? MOCK_VERSION_USER_REF,
         created_at: workflow.version?.created_at ?? now,
         updated_at: workflow.version?.created_at ?? now,
         deleted_at: null,
@@ -1147,7 +1157,7 @@ export const handlers = [
       version: nextVersion,
       schema_version: nextDefinition?.schema_version ?? workflow.version?.schema_version ?? '2.0.0',
       workflow_definition: nextDefinition,
-      created_by: mutableWorkflow.updated_by ?? workflow.version?.created_by ?? 'user-1',
+      created_by: workflow.version?.created_by ?? MOCK_VERSION_USER_REF,
       created_at: now,
       change_description: body.change_description ?? 'Updated via mock API',
     }
@@ -1161,8 +1171,7 @@ export const handlers = [
       change_description: mutableWorkflow.version.change_description ?? '',
       status: 'draft',
       name: null,
-      created_by: mutableWorkflow.version.created_by ?? MOCK_VERSION_CREATED_BY,
-      created_by_username: MOCK_VERSION_CREATED_BY_USERNAME,
+      created_by: mutableWorkflow.version.created_by ?? MOCK_VERSION_USER_REF,
       created_at: now,
       updated_at: now,
       deleted_at: null,
@@ -1444,12 +1453,7 @@ export const handlers = [
     const includeTotal = url.searchParams.get('include_total') === 'true'
 
     const versions = getOrCreateVersionStore(workflowId, workflow)
-    const sorted = [...versions]
-      .sort((a, b) => b.version - a.version)
-      .map((version) => ({
-        ...version,
-        created_by_username: version.created_by_username ?? MOCK_VERSION_CREATED_BY_USERNAME,
-      }))
+    const sorted = [...versions].sort((a, b) => b.version - a.version)
 
     return HttpResponse.json(paginate(sorted, cursor, limit, includeTotal))
   }),
@@ -1515,8 +1519,7 @@ export const handlers = [
       change_description: `Restored from version ${restoredVersionNum}`,
       status: 'draft',
       name: null,
-      created_by: MOCK_VERSION_CREATED_BY,
-      created_by_username: MOCK_VERSION_CREATED_BY_USERNAME,
+      created_by: MOCK_VERSION_USER_REF,
       created_at: now,
       updated_at: now,
       deleted_at: null,
@@ -1531,7 +1534,7 @@ export const handlers = [
       version: nextVersion,
       schema_version: sourceVersion.schema_version,
       workflow_definition: restoredDef,
-      created_by: 'user-1',
+      created_by: MOCK_VERSION_USER_REF,
       created_at: now,
       change_description: `Restored from version ${restoredVersionNum}`,
     }
@@ -1627,8 +1630,8 @@ export const handlers = [
       const field = isDesc ? sort.slice(1) : sort
       // Allowlist matches Execution.__sortable_fields__; unknown fields are ignored.
       enriched.sort((a, b) => {
-        let aVal = ''
-        let bVal = ''
+        let aVal: string
+        let bVal: string
         switch (field) {
           case 'id':
             aVal = a.id ?? ''
@@ -2267,8 +2270,8 @@ export const handlers = [
       const isDesc = sort.startsWith('-')
       const field = isDesc ? sort.slice(1) : sort
       resources.sort((a, b) => {
-        let aVal = ''
-        let bVal = ''
+        let aVal: string
+        let bVal: string
         switch (field) {
           case 'name':
             aVal = a.name ?? ''
@@ -2532,8 +2535,8 @@ export const handlers = [
       },
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      created_by: 'admin',
-      updated_by: 'admin',
+      created_by: { id: 'u-004', name: 'admin' },
+      updated_by: { id: 'u-004', name: 'admin' },
     }
 
     identityProviders.push(provider)
@@ -2608,8 +2611,8 @@ export const handlers = [
       const isDesc = sort.startsWith('-')
       const field = isDesc ? sort.slice(1) : sort
       resources.sort((a, b) => {
-        let aVal = ''
-        let bVal = ''
+        let aVal: string
+        let bVal: string
         switch (field) {
           case 'username':
             aVal = a.username
@@ -3013,8 +3016,8 @@ export const handlers = [
       const searchTerm = createdByContains.toLowerCase()
       resources = resources.filter((g) => {
         if (!g.created_by) return false
-        const creator = users.find((u) => u.id === g.created_by)
-        return creator?.username.toLowerCase().includes(searchTerm) ?? false
+        const creatorName = typeof g.created_by === 'string' ? g.created_by : g.created_by.name
+        return creatorName.toLowerCase().includes(searchTerm)
       })
     }
 
@@ -3022,8 +3025,8 @@ export const handlers = [
       const isDesc = sort.startsWith('-')
       const field = isDesc ? sort.slice(1) : sort
       resources.sort((a, b) => {
-        let aVal = ''
-        let bVal = ''
+        let aVal: string
+        let bVal: string
         switch (field) {
           case 'name':
             aVal = a.name ?? ''
@@ -3042,8 +3045,8 @@ export const handlers = [
             bVal = b.updated_at ?? ''
             break
           case 'created_by':
-            aVal = a.created_by ?? ''
-            bVal = b.created_by ?? ''
+            aVal = userReferenceName(a.created_by)
+            bVal = userReferenceName(b.created_by)
             break
           default:
             aVal = a.name ?? ''
@@ -3101,7 +3104,7 @@ export const handlers = [
       name: body.name ?? '',
       description: body.description ?? null,
       is_builtin: false,
-      created_by: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+      created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'demo' },
       created_at: now,
       updated_at: now,
       source: 'local',
@@ -4372,7 +4375,7 @@ export const handlers = [
       const isDesc = sort.startsWith('-')
       const field = isDesc ? sort.slice(1) : sort
       filtered.sort((a, b) => {
-        let cmp = 0
+        let cmp: number
         switch (field) {
           case 'name':
             cmp = a.name.localeCompare(b.name)
@@ -4434,7 +4437,7 @@ export const handlers = [
       const isDesc = sort.startsWith('-')
       const field = isDesc ? sort.slice(1) : sort
       filtered.sort((a, b) => {
-        let cmp = 0
+        let cmp: number
         switch (field) {
           case 'name':
             cmp = a.name.localeCompare(b.name)
@@ -5086,7 +5089,7 @@ export const handlers = [
       project_name,
       is_project_deleted: false,
       last_authenticated_at: null,
-      created_by: 'u-001',
+      created_by: { id: 'u-001', name: 'alice' },
       updated_by: null,
       created_at: mockDate.now,
       updated_at: mockDate.now,
@@ -5108,7 +5111,7 @@ export const handlers = [
     const body = (await request.json()) as { name?: string; description?: string | null } | null
     if (body?.name !== undefined) sa.name = body.name
     if (body?.description !== undefined) sa.description = body.description
-    sa.updated_by = 'u-001'
+    sa.updated_by = { id: 'u-001', name: 'alice' }
     sa.updated_at = mockDate.now
     return HttpResponse.json(sa)
   }),
@@ -5191,7 +5194,7 @@ export const handlers = [
       grace_period_seconds: 3600,
       expires_at: body?.expires_at ?? defaultExpiry,
       last_used_at: null,
-      created_by: 'u-001',
+      created_by: { id: 'u-001', name: 'alice' },
       updated_by: null,
       created_at: mockDate.now,
       updated_at: mockDate.now,
@@ -5229,7 +5232,7 @@ export const handlers = [
       const gracePeriodSeconds = body?.grace_period_seconds ?? 0
 
       cred.updated_at = mockDate.now
-      cred.updated_by = 'u-001'
+      cred.updated_by = { id: 'u-001', name: 'alice' }
       cred.grace_period_seconds = gracePeriodSeconds
       cred.old_secret_valid_until =
         gracePeriodSeconds > 0 ? new Date(Date.now() + gracePeriodSeconds * 1000).toISOString() : null

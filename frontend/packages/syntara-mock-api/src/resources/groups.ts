@@ -1,6 +1,6 @@
-import type * as AuthAPI from '@syntara/contracts/src/auth-api.js'
+import type * as UsersAPI from '@syntara/contracts/src/users-api.js'
 
-export type GroupRead = AuthAPI.components['schemas']['GroupRead']
+export type GroupRead = UsersAPI.components['schemas']['GroupRead']
 
 /** Maps user IDs to the group IDs they belong to */
 export const userGroupMemberships: Record<string, string[]> = {
@@ -69,7 +69,7 @@ export const groups: GroupRead[] = [
     name: 'platform-admins',
     description: 'Full platform administrators',
     is_builtin: false,
-    created_by: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+    created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'demo' },
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
     source: 'local',
@@ -80,7 +80,7 @@ export const groups: GroupRead[] = [
     name: 'developers',
     description: 'Workflow developers and creators',
     is_builtin: false,
-    created_by: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+    created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'demo' },
     created_at: '2026-01-15T00:00:00Z',
     updated_at: '2026-01-15T00:00:00Z',
     source: 'local',
@@ -91,7 +91,7 @@ export const groups: GroupRead[] = [
     name: 'viewers',
     description: 'Read-only access group',
     is_builtin: false,
-    created_by: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+    created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'demo' },
     created_at: '2026-02-01T00:00:00Z',
     updated_at: '2026-02-01T00:00:00Z',
     source: 'local',

@@ -325,9 +325,14 @@ export interface components {
       has_validation_issues?: boolean
       /**
        * Created By
-       * Format: uuid
+       * @description User who created the workflow
        */
-      created_by: string
+      readonly created_by?: components['schemas']['UserReference'] | null
+      /**
+       * Updated By
+       * @description User who last modified the workflow
+       */
+      readonly updated_by?: components['schemas']['UserReference'] | null
       /**
        * Project Id
        * Format: uuid
@@ -395,9 +400,14 @@ export interface components {
       has_validation_issues?: boolean
       /**
        * Created By
-       * Format: uuid
+       * @description User who created the workflow
        */
-      created_by: string
+      readonly created_by?: components['schemas']['UserReference'] | null
+      /**
+       * Updated By
+       * @description User who last modified the workflow
+       */
+      readonly updated_by?: components['schemas']['UserReference'] | null
       /**
        * Project Id
        * Format: uuid
@@ -420,7 +430,7 @@ export interface components {
       /** @description Validation findings from the last save operation. Only included in create/update responses; use has_validation_issues for the durable indicator. */
       validation_result?: components['schemas']['ValidationResult'] | null
       /** @description Current active version details */
-      version: components['schemas']['WorkflowVersionRead']
+      version: components['schemas']['schemas-WorkflowVersionRead']
     }
     /**
      * PublishWorkflowVersionResponse
@@ -465,9 +475,14 @@ export interface components {
       has_validation_issues?: boolean
       /**
        * Created By
-       * Format: uuid
+       * @description User who created the workflow
        */
-      created_by: string
+      readonly created_by?: components['schemas']['UserReference'] | null
+      /**
+       * Updated By
+       * @description User who last modified the workflow
+       */
+      readonly updated_by?: components['schemas']['UserReference'] | null
       /**
        * Project Id
        * Format: uuid
@@ -537,11 +552,9 @@ export interface components {
       name?: string | null
       /**
        * Created By
-       * Format: uuid
+       * @description User who created the version
        */
-      created_by: string
-      /** Created By Username */
-      created_by_username?: string | null
+      readonly created_by?: components['schemas']['UserReference'] | null
       /**
        * Created At
        * Format: date-time
@@ -885,9 +898,9 @@ export interface components {
       status: components['schemas']['ExecutionStatus']
       /**
        * Created By
-       * Format: uuid
+       * @description User who started the execution
        */
-      created_by: string
+      readonly created_by?: components['schemas']['UserReference'] | null
       /**
        * Created At
        * Format: date-time
@@ -900,8 +913,11 @@ export interface components {
        * Format: date-time
        */
       updated_at: string
-      /** Updated By */
-      updated_by: string | null
+      /**
+       * Updated By
+       * @description User who last modified the execution
+       */
+      readonly updated_by?: components['schemas']['UserReference'] | null
       /** Input Data */
       input_data: {
         [key: string]: unknown
@@ -2170,6 +2186,22 @@ export interface components {
       validation_result: components['schemas']['ValidationResult']
     }
     /**
+     * UserReference
+     * @description Minimal user identification for embedding in other resources.
+     *     The name is resolved from the database when the response is built, not
+     *     stored alongside the id, so it always reflects the principal's current
+     *     name. Renaming a user therefore changes the name shown for their past actions.
+     */
+    UserReference: {
+      /**
+       * Format: uuid
+       * @description User's unique identifier
+       */
+      id: string
+      /** @description Principal's current display name, resolved when the response is built. Not a username: for a user this is their first and last name, falling back to the username when both are blank; for a service account it is the account name; for an internal service it is derived from the certificate CN. */
+      name: string
+    }
+    /**
      * ErrorData
      * @description RFC 9457 Problem Details format for error event data.
      *     This model is used for streaming error events and follows the RFC 9457 Problem Details specification. It provides machine-readable and human-readable error information with consistent structure.
@@ -2234,6 +2266,59 @@ export interface components {
        * @example /invocations/550e8400-e29b-41d4-a716-446655440000
        */
       instance?: string | null
+    }
+    /**
+     * WorkflowVersionRead
+     * @description Schema for workflow version response (GET /workflows/{id}/versions/{version}).
+     */
+    'schemas-WorkflowVersionRead': {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /**
+       * Workflow Id
+       * Format: uuid
+       */
+      workflow_id: string
+      /** Version */
+      version: number
+      /** Schema Version */
+      schema_version: string
+      /** Workflow Definition */
+      workflow_definition: {
+        [key: string]: unknown
+      }
+      /** Change Description */
+      change_description?: string | null
+      /**
+       * Status
+       * @default draft
+       * @enum {string}
+       */
+      status?: 'draft' | 'published' | 'previously_published'
+      /** Last Published At */
+      last_published_at?: string | null
+      /** Last Unpublished At */
+      last_unpublished_at?: string | null
+      /** Name */
+      name?: string | null
+      /**
+       * Created By
+       * @description User who created the version
+       */
+      readonly created_by?: components['schemas']['UserReference'] | null
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string
     }
     /**
      * ExecutionStatus

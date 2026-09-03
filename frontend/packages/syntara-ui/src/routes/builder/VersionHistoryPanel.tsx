@@ -45,6 +45,7 @@ import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 import type { PaginationFooterProps } from '../../components/table/PaginationFooter'
 import { PaginationFooter } from '../../components/table/PaginationFooter'
 import type { FilterConfig } from '../../types/filters'
+import { userReferenceId, userReferenceName } from '../../utils/userReference'
 
 import { formatHistoryDateTime, getDateGroupLabel } from './historyDateUtils'
 import { resolveVersionStatusForBadge, shouldShowSecondaryVersionDatetime } from './hooks/historyRowModel'
@@ -228,6 +229,23 @@ type VersionRowProps = Readonly<{
   scrollRef?: Ref<HTMLSpanElement>
 }>
 
+/** Renders a version's creator, linked to their user page when the id is known. */
+function VersionCreatedBy({ createdBy }: { createdBy: unknown }) {
+  const name = userReferenceName(createdBy)
+  const id = userReferenceId(createdBy)
+  if (!name) return null
+  if (!id) return <>{name}</>
+  return (
+    <SynLink
+      to={AppRoute.AccessManagement.UserDetail.replace(':userId', id)}
+      className={styles.usernameLink}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {name}
+    </SynLink>
+  )
+}
+
 function VersionRow({
   version,
   onSelect,
@@ -248,6 +266,7 @@ function VersionRow({
   scrollRef,
 }: VersionRowProps) {
   const badgeStatus = resolveVersionStatusForBadge(version.status)
+  const creatorName = userReferenceName(version.created_by)
   const showSecondaryDatetime = shouldShowSecondaryVersionDatetime(version.name, version.created_at)
 
   return (
@@ -268,21 +287,15 @@ function VersionRow({
               </Content>
             </Tooltip>
           </FlexItem>
-          {(showSecondaryDatetime && version.created_at) || version.created_by_username ? (
+          {(showSecondaryDatetime && version.created_at) || creatorName ? (
             <Content component={ContentVariants.small} className={styles.secondaryDatetime}>
               {showSecondaryDatetime && version.created_at ? (
                 <ExecutionTimestamp dateString={version.created_at} />
               ) : null}
-              {version.created_by_username ? (
+              {creatorName ? (
                 <>
                   {showSecondaryDatetime && version.created_at ? ' by ' : null}
-                  <SynLink
-                    to={AppRoute.AccessManagement.UserDetail.replace(':userId', version.created_by)}
-                    className={styles.usernameLink}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {version.created_by_username}
-                  </SynLink>
+                  <VersionCreatedBy createdBy={version.created_by} />
                 </>
               ) : null}
             </Content>

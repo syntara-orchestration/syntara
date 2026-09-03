@@ -9,6 +9,7 @@ from sqlmodel import Field, SQLModel
 
 from syntara.core.models.base.query_params import BaseListParams
 from syntara.core.models.pagination import ResourcesResponse
+from syntara.core.models.user_reference import UserReference, UserReferenceFieldsMixin
 from syntara.service_accounts.constants import MAX_CREDENTIALS_PER_SA
 from syntara.service_accounts.models.service_account_credential import (
     ServiceAccountCredentialStatus,
@@ -37,7 +38,7 @@ class ServiceAccountCredentialCreate(SQLModel):
     )
 
 
-class ServiceAccountCredentialRead(SQLModel):
+class ServiceAccountCredentialRead(UserReferenceFieldsMixin, SQLModel):
     """Schema for credential responses (excludes secrets)."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)  # type: ignore[assignment]
@@ -51,8 +52,10 @@ class ServiceAccountCredentialRead(SQLModel):
     expires_at: datetime | None = None
     old_secret_valid_until: datetime | None = None
     last_used_at: datetime | None = None
-    created_by: UUID
-    updated_by: UUID | None = None
+    created_by: UserReference | UUID | str | None = Field(default=None, description="User who created the credential")
+    updated_by: UserReference | UUID | str | None = Field(
+        default=None, description="User who last modified the credential"
+    )
     created_at: datetime
     updated_at: datetime
 

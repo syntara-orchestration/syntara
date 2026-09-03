@@ -15,6 +15,7 @@ import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.core.models import User
+from syntara.core.models.user_reference import UserReference
 from syntara.integrations.models.integration import Integration
 from syntara.tool_manager.exceptions import (
     ToolBulkUpdateValidationError,
@@ -65,7 +66,9 @@ async def test_update_tool_status_disable_success(
     updated_tool = await service.update_tool(test_tool.id, ToolUpdate(enabled=False))
 
     assert not updated_tool.enabled
-    assert updated_tool.updated_by == test_user.id
+    assert isinstance(updated_tool.updated_by, UserReference)
+    assert updated_tool.updated_by.id == test_user.id
+    assert updated_tool.updated_by.name == test_user.display_name
     assert updated_tool.updated_at >= test_tool.updated_at
 
 
@@ -83,7 +86,9 @@ async def test_update_tool_status_enable_success(
     updated_tool = await service.update_tool(test_tool.id, ToolUpdate(enabled=True))
 
     assert updated_tool.enabled
-    assert updated_tool.updated_by == test_user.id
+    assert isinstance(updated_tool.updated_by, UserReference)
+    assert updated_tool.updated_by.id == test_user.id
+    assert updated_tool.updated_by.name == test_user.display_name
     assert updated_tool.updated_at >= test_tool.updated_at
 
 
@@ -109,7 +114,9 @@ async def test_update_tool_status_success(test_db_session: AsyncSession, test_to
     updated_tool = await service.update_tool(test_tool.id, ToolUpdate(status=ToolStatus.ERROR))
 
     assert updated_tool.status == ToolStatus.ERROR
-    assert updated_tool.updated_by == test_user.id
+    assert isinstance(updated_tool.updated_by, UserReference)
+    assert updated_tool.updated_by.id == test_user.id
+    assert updated_tool.updated_by.name == test_user.display_name
     assert updated_tool.updated_at >= test_tool.updated_at
 
 
@@ -128,7 +135,9 @@ async def test_update_tool_refresh_error_success(
     updated_tool = await service.update_tool(test_tool.id, ToolUpdate(refresh_error=error_message))
 
     assert updated_tool.refresh_error == error_message
-    assert updated_tool.updated_by == test_user.id
+    assert isinstance(updated_tool.updated_by, UserReference)
+    assert updated_tool.updated_by.id == test_user.id
+    assert updated_tool.updated_by.name == test_user.display_name
     assert updated_tool.updated_at >= test_tool.updated_at
 
 
@@ -151,7 +160,9 @@ async def test_update_tool_all_fields_success(test_db_session: AsyncSession, tes
     assert not updated_tool.enabled
     assert updated_tool.status == ToolStatus.ERROR
     assert updated_tool.refresh_error == error_message
-    assert updated_tool.updated_by == test_user.id
+    assert isinstance(updated_tool.updated_by, UserReference)
+    assert updated_tool.updated_by.id == test_user.id
+    assert updated_tool.updated_by.name == test_user.display_name
     assert updated_tool.updated_at >= test_tool.updated_at
 
 
@@ -614,9 +625,12 @@ async def test_update_tool_status_audit_tracking(
     original_updated_at = test_tool.updated_at
     updated_tool = await service.update_tool(test_tool.id, ToolUpdate(enabled=False))
 
-    assert updated_tool.updated_by == test_user.id
+    assert isinstance(updated_tool.updated_by, UserReference)
+    assert updated_tool.updated_by.id == test_user.id
+    assert updated_tool.updated_by.name == test_user.display_name
     assert updated_tool.updated_at > original_updated_at
-    assert updated_tool.created_by == test_tool.created_by  # Should not change
+    assert isinstance(updated_tool.created_by, UserReference)
+    assert updated_tool.created_by.id == test_tool.created_by
 
 
 @pytest.mark.asyncio

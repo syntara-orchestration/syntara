@@ -19,6 +19,17 @@ from syntara.core.models.base import SoftDeletableResource
 from syntara.core.models.principal import PrincipalType
 
 
+def user_display_name(username: str, first_name: str | None, last_name: str | None) -> str:
+    """First and last name, or *username* when both are blank or whitespace.
+
+    Single source of the display-name rule: :attr:`User.display_name` and the
+    shared user-reference resolver must agree, or the same principal shows a
+    different name depending on which endpoint you ask.
+    """
+    name = " ".join(part.strip() for part in (first_name, last_name) if part and part.strip())
+    return name or username
+
+
 class AuthType(StrEnum):
     """Authentication type for users."""
 
@@ -119,8 +130,7 @@ class User(SoftDeletableResource, table=True):
     @property
     def display_name(self) -> str:
         """First and last name, or username when both are blank or whitespace."""
-        name = " ".join(part.strip() for part in (self.first_name, self.last_name) if part and part.strip())
-        return name or self.username
+        return user_display_name(self.username, self.first_name, self.last_name)
 
     password_hash: str | None = Field(
         default=None,

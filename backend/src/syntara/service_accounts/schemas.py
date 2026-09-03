@@ -10,6 +10,7 @@ from sqlmodel import Field, SQLModel
 from syntara.core.constants import FieldLimits
 from syntara.core.models.base.query_params import BaseListParams
 from syntara.core.models.pagination import ResourcesResponse
+from syntara.core.models.user_reference import UserReference, UserReferenceFieldsMixin
 from syntara.service_accounts.models.service_account import ServiceAccountStatus
 
 
@@ -50,7 +51,7 @@ class ServiceAccountUpdate(SQLModel):
     )
 
 
-class ServiceAccountRead(SQLModel):
+class ServiceAccountRead(UserReferenceFieldsMixin, SQLModel):
     """Schema for service account responses."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)  # type: ignore[assignment]
@@ -63,8 +64,12 @@ class ServiceAccountRead(SQLModel):
     project_name: str | None = None
     is_project_deleted: bool = False
     last_authenticated_at: datetime | None = None
-    created_by: UUID
-    updated_by: UUID | None = None
+    created_by: UserReference | UUID | str | None = Field(
+        default=None, description="User who created the service account"
+    )
+    updated_by: UserReference | UUID | str | None = Field(
+        default=None, description="User who last modified the service account"
+    )
     created_at: datetime
     updated_at: datetime
     labels: dict[str, str] = Field(default_factory=dict)

@@ -49,7 +49,6 @@ from syntara.workflows.models import (
 from syntara.workflows.models.execution import ExecutionRead, TestExecutionCreate
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 from syntara.workflows.services import ExecutionService, WorkflowService
-from syntara.workflows.utils.serialization import deserialize_workflow_version
 from syntara.workflows.validators import get_system_continue_on_failure, workflow_validator
 from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
@@ -170,11 +169,12 @@ async def _build_workflow_with_version_response(
     warning: str | None = None,
     validation_result: "ValidationResult | None" = None,
 ) -> WorkflowReadWithVersion | PublishWorkflowVersionResponse:
-    workflow_read = WorkflowRead.model_validate(workflow, from_attributes=True)
+    workflow_read = await service.to_read(workflow)
     await _populate_published_version_number(workflow_read, workflow, version, service.session)
     ever_published, pub_ts = await service.get_publish_context([version.id])
     base = workflow_read.model_dump()
-    base["version"] = deserialize_workflow_version(version, workflow.published_version_id, ever_published, pub_ts)
+    version_read = await service.to_version_read(version, workflow.published_version_id, ever_published, pub_ts)
+    base["version"] = version_read.model_dump()
     if validation_result is not None and _has_validation_issues(validation_result):
         base["validation_result"] = validation_result.model_dump(mode="json")
     if warning is not None:
@@ -290,7 +290,7 @@ async def create_workflow(
         project_id=request.project_id,
         is_import=request.is_import,
     )
-    read = WorkflowRead.model_validate(workflow, from_attributes=True)
+    read = await service.to_read(workflow)
     if _has_validation_issues(result):
         read.validation_result = result
     return read
@@ -496,9 +496,7 @@ async def get_workflow_version(
 
     ever_published, pub_ts = await service.get_publish_context([workflow_version.id])
 
-    return WorkflowVersionRead.model_validate(
-        deserialize_workflow_version(workflow_version, workflow.published_version_id, ever_published, pub_ts)
-    )
+    return await service.to_version_read(workflow_version, workflow.published_version_id, ever_published, pub_ts)
 
 
 @router.post(
@@ -542,7 +540,7 @@ async def unpublish_workflow(
 ) -> WorkflowRead:
     """Unpublish the currently published workflow version."""
     workflow = await service.unpublish_workflow(workflow_id=workflow_id)
-    return WorkflowRead.model_validate(workflow)
+    return await service.to_read(workflow)
 
 
 @router.post(
@@ -630,6 +628,4 @@ async def update_workflow_version_metadata(
         fields_set=request.model_fields_set,
     )
     ever_published, pub_ts = await service.get_publish_context([updated.id])
-    return WorkflowVersionRead.model_validate(
-        deserialize_workflow_version(updated, workflow.published_version_id, ever_published, pub_ts)
-    )
+    return await service.to_version_read(updated, workflow.published_version_id, ever_published, pub_ts)

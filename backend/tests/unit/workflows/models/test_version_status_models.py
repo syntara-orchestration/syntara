@@ -182,7 +182,6 @@ class TestWorkflowVersionReadFields:
         )
         assert read.status == "draft"
         assert read.name is None
-        assert read.created_by_username is None
 
 
 class TestWorkflowVersionUpdate:

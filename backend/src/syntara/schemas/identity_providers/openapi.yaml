@@ -847,13 +847,26 @@ components:
       description: Schema for IdentityProvider response with configuration details (excludes secrets).
       additionalProperties: false
       allOf:
-        - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/UserOwnedResource"
         - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/NamedResource"
         - type: object
           title: IdentityProviderRead
           required:
             - configuration
           properties:
+            created_by:
+              anyOf:
+                - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/UserReference"
+                - type: "null"
+              description: User who created the identity provider
+              readOnly: true
+              title: Created By
+            updated_by:
+              anyOf:
+                - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/UserReference"
+                - type: "null"
+              description: User who last modified the identity provider
+              readOnly: true
+              title: Updated By
             name:
               description: Human-readable provider name
             enabled:

@@ -16,7 +16,7 @@ from syntara.core.models.base.base_resource import AuditLevel
 from syntara.core.models.base.named import NamedResource
 from syntara.core.models.base.user_owned import UserOwnedResource
 from syntara.core.models.pagination import ResourcesResponse
-from syntara.core.models.user_reference import UserReference
+from syntara.core.models.user_reference import UserReference, UserReferenceFieldsMixin
 from syntara.credentials.models.credential_type import CredentialType
 
 
@@ -107,7 +107,7 @@ class CredentialCreate(SQLModel):
     project_id: UUID = Field(description="Project to assign credential to")
 
 
-class CredentialRead(NamedResource, UserOwnedResource):
+class CredentialRead(UserReferenceFieldsMixin, NamedResource, UserOwnedResource):
     """Schema for credential API responses. Secret fields masked as $encrypted$."""
 
     created_by: UserReference | UUID | str | None = Field(default=None, description="User who created the credential")  # type: ignore[assignment]
@@ -115,19 +115,9 @@ class CredentialRead(NamedResource, UserOwnedResource):
         default=None, description="User who last modified the credential"
     )  # type: ignore[assignment]
 
-    _USER_REF_SCHEMA: ClassVar[dict[str, Any]] = {
-        "readOnly": True,
-        "anyOf": [
-            {"$ref": "#/components/schemas/UserReference"},
-            {"type": "null"},
-        ],
-    }
-
     FIELD_SCHEMA_EXTRAS: ClassVar[dict[str, dict[str, Any]]] = {
         **NamedResource.FIELD_SCHEMA_EXTRAS,
         **UserOwnedResource.FIELD_SCHEMA_EXTRAS,
-        "created_by": _USER_REF_SCHEMA,
-        "updated_by": _USER_REF_SCHEMA,
     }
 
     credential_type_id: UUID
@@ -165,13 +155,15 @@ class CredentialListResponse(ResourcesResponse[CredentialRead]):
     """Paginated list response for credentials."""
 
 
-class CredentialWorkflowRef(SQLModel):
+class CredentialWorkflowRef(UserReferenceFieldsMixin, SQLModel):
     """Reference to a workflow that uses a credential."""
+
+    USER_REFERENCE_FIELDS: ClassVar[tuple[str, ...]] = ("created_by",)
 
     id: UUID
     name: str
     description: str | None = None
-    created_by: str | UUID | None = Field(default=None, description="Username or UUID of the workflow creator")
+    created_by: UserReference | UUID | str | None = Field(default=None, description="User who created the workflow")
     created_at: datetime | None = Field(default=None, description="Timestamp when the workflow was created")
     node_names: list[str] = Field(default_factory=list, description="Names of nodes using this credential")
     last_execution_at: datetime | None = Field(default=None, description="Timestamp of the most recent execution")

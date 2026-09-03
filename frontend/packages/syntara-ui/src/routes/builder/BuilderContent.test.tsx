@@ -135,7 +135,7 @@ describe('BuilderContent', () => {
     labels: {},
     created_at: '2023-01-01T00:00:00Z',
     updated_at: '2023-01-02T00:00:00Z',
-    created_by: 'user-1',
+    created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1' },
     current_version: 1,
     version: {
       workflow_definition: {
@@ -2912,8 +2912,7 @@ describe('BuilderContent', () => {
         change_description: 'Second version',
         status: 'draft',
         name: null,
-        created_by: 'user-1',
-        created_by_username: 'sarah.chen',
+        created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'sarah.chen' },
       },
       {
         id: 'ver-1',
@@ -2925,8 +2924,7 @@ describe('BuilderContent', () => {
         change_description: 'First version',
         status: 'published',
         name: null,
-        created_by: 'user-1',
-        created_by_username: 'marcus.williams',
+        created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'marcus.williams' },
       },
     ]
 
@@ -3386,8 +3384,7 @@ describe('BuilderContent', () => {
         change_description: 'Second version',
         status: 'draft',
         name: null,
-        created_by: 'user-1',
-        created_by_username: 'sarah.chen',
+        created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'sarah.chen' },
       },
       {
         id: 'ver-1',
@@ -3399,8 +3396,7 @@ describe('BuilderContent', () => {
         change_description: 'First version',
         status: 'published',
         name: null,
-        created_by: 'user-1',
-        created_by_username: 'marcus.williams',
+        created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'marcus.williams' },
       },
     ]
 
@@ -3481,8 +3477,7 @@ describe('BuilderContent', () => {
         change_description: 'Second version',
         status: 'draft',
         name: null,
-        created_by: 'user-1',
-        created_by_username: 'sarah.chen',
+        created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'sarah.chen' },
       },
     ]
 

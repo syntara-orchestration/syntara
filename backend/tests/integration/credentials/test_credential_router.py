@@ -16,6 +16,7 @@ from syntara.credentials.lib.preseed import GA_CREDENTIAL_TYPES, preseed_credent
 from syntara.credentials.models.credential_type import CredentialType
 from syntara.workflows.models import Workflow, WorkflowVersion
 from syntara.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
+from tests.helpers.user_reference import assert_user_reference
 
 
 @pytest.fixture
@@ -294,9 +295,9 @@ class TestUserReferenceFields:
         body = resp.json()
 
         assert body["created_by"]["id"] == str(test_user.id)
-        assert body["created_by"]["name"] == test_user.username
+        assert body["created_by"]["name"] == test_user.display_name
         assert body["updated_by"]["id"] == str(test_user.id)
-        assert body["updated_by"]["name"] == test_user.username
+        assert body["updated_by"]["name"] == test_user.display_name
 
     @pytest.mark.asyncio
     async def test_get_returns_user_reference(
@@ -319,7 +320,7 @@ class TestUserReferenceFields:
         body = get_resp.json()
 
         assert body["created_by"]["id"] == str(test_user.id)
-        assert body["created_by"]["name"] == test_user.username
+        assert body["created_by"]["name"] == test_user.display_name
 
     @pytest.mark.asyncio
     async def test_list_returns_user_references(
@@ -341,7 +342,7 @@ class TestUserReferenceFields:
         for resource in resp.json()["resources"]:
             assert isinstance(resource["created_by"], dict)
             assert resource["created_by"]["id"] == str(test_user.id)
-            assert resource["created_by"]["name"] == test_user.username
+            assert resource["created_by"]["name"] == test_user.display_name
 
     @pytest.mark.asyncio
     async def test_update_returns_user_reference(
@@ -367,7 +368,7 @@ class TestUserReferenceFields:
         body = update_resp.json()
 
         assert body["updated_by"]["id"] == str(test_user.id)
-        assert body["updated_by"]["name"] == test_user.username
+        assert body["updated_by"]["name"] == test_user.display_name
 
 
 class TestDeleteCredential:
@@ -501,6 +502,7 @@ class TestCredentialWorkflows:
         assert workflows[0]["name"] == workflow.name
         assert workflows[0]["node_names"] == ["Fetch Data"]
         assert workflows[0]["created_at"] is not None
+        assert_user_reference(workflows[0]["created_by"], test_user)
 
     @pytest.mark.asyncio
     async def test_workflows_returns_multiple_node_names(

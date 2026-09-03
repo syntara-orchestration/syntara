@@ -1764,9 +1764,10 @@ components:
               title: Is Builtin
             created_by:
               anyOf:
-                - type: string
-                  format: uuid
+                - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/UserReference"
                 - type: 'null'
+              description: User who created the group
+              readOnly: true
               title: Created By
             source:
               type: string
@@ -1827,9 +1828,10 @@ components:
               title: Is Builtin
             created_by:
               anyOf:
-                - type: string
-                  format: uuid
+                - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/UserReference"
                 - type: 'null'
+              description: User who created the group
+              readOnly: true
               title: Created By
             source:
               type: string

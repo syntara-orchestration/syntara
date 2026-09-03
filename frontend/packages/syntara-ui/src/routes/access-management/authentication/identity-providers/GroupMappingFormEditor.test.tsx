@@ -63,7 +63,7 @@ const mockProvider = {
   id: VALID_PROVIDER_ID,
   name: 'Test Provider',
   enabled: true,
-  created_by: 'admin',
+  created_by: { id: 'u-004', name: 'admin' },
   configuration: {
     issuer_url: 'https://example.com',
     provider_type: 'oidc' as const,

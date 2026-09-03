@@ -891,9 +891,9 @@ export interface components {
     CredentialWorkflowRef: {
       /**
        * Created By
-       * @description Username or UUID of the workflow creator
+       * @description User who created the workflow
        */
-      created_by?: string | null
+      readonly created_by?: components['schemas']['UserReference'] | null
       /**
        * Created At
        * @description Timestamp when the workflow was created
@@ -1065,6 +1065,22 @@ export interface components {
       instance?: string | null
     }
     /**
+     * UserReference
+     * @description Minimal user identification for embedding in other resources.
+     *     The name is resolved from the database when the response is built, not
+     *     stored alongside the id, so it always reflects the principal's current
+     *     name. Renaming a user therefore changes the name shown for their past actions.
+     */
+    UserReference: {
+      /**
+       * Format: uuid
+       * @description User's unique identifier
+       */
+      id: string
+      /** @description Principal's current display name, resolved when the response is built. Not a username: for a user this is their first and last name, falling back to the username when both are blank; for a service account it is the account name; for an internal service it is derived from the certificate CN. */
+      name: string
+    }
+    /**
      * ValidationSeverity
      * @description Severity level for a validation finding.
      * @enum {string}
@@ -1170,9 +1186,14 @@ export interface components {
       has_validation_issues?: boolean
       /**
        * Created By
-       * Format: uuid
+       * @description User who created the workflow
        */
-      created_by: string
+      readonly created_by?: components['schemas']['UserReference'] | null
+      /**
+       * Updated By
+       * @description User who last modified the workflow
+       */
+      readonly updated_by?: components['schemas']['UserReference'] | null
       /**
        * Project Id
        * Format: uuid
@@ -1327,21 +1348,6 @@ export interface components {
        */
       name: string
     }
-    /**
-     * UserReference
-     * @description Minimal user identification for embedding in other resources.
-     *     This model captures user identity at the time of an action, providing
-     *     a snapshot that doesn't change even if the user's details are updated later.
-     */
-    UserReference: {
-      /**
-       * Format: uuid
-       * @description User's unique identifier
-       */
-      id: string
-      /** @description User's display name at time of action */
-      name: string
-    }
     ApprovalRequestRead: components['schemas']['BaseResource'] & {
       /**
        * Project Id
@@ -1402,7 +1408,7 @@ export interface components {
        */
       approver_groups?: components['schemas']['ApproverGroupSummary'][]
       /** @description User who made the decision */
-      decided_by?: components['schemas']['UserReference'] | null
+      readonly decided_by?: components['schemas']['UserReference'] | null
       /**
        * Decided At
        * @description When decision was made

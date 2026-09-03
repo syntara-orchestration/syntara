@@ -168,6 +168,9 @@ function assertPathWithinBase(filePath: string, baseDir: string): string {
   return resolvedPath
 }
 
+/** Principal id used for every YAML-seeded workflow and version. */
+const MOCK_SEED_USER_ID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+
 /**
  * Convert a YAML workflow definition file to a WorkflowWithVersion object
  *
@@ -182,6 +185,8 @@ export function convertYamlToWorkflow(
   createdBy = 'system',
   allowedBaseDir: string
 ): WorkflowWithVersion {
+  // A workflow's created_by is a UserReference ({ id, name }); a *version*'s
+  // created_by is still a bare principal id string.
   const resolvedPath = assertPathWithinBase(yamlFilePath, allowedBaseDir)
   const yamlContent = readFileSync(resolvedPath, 'utf-8')
   // js-yaml 4 rejects unsafe tags (e.g. !!js/function) by default; safeLoad was removed.
@@ -199,7 +204,7 @@ export function convertYamlToWorkflow(
     description,
     created_at: mockDate.daysAgo3,
     updated_at: mockDate.daysAgo1,
-    created_by: createdBy,
+    created_by: { id: MOCK_SEED_USER_ID, name: createdBy },
     labels: {},
     current_version: 1,
     published_version_id: null,
@@ -214,7 +219,7 @@ export function convertYamlToWorkflow(
       version: 1,
       schema_version: '2.0.0',
       status: WorkflowVersionStatusEnum.DRAFT,
-      created_by: createdBy,
+      created_by: MOCK_SEED_USER_ID,
       created_at: mockDate.daysAgo3,
       updated_at: mockDate.daysAgo3,
     },

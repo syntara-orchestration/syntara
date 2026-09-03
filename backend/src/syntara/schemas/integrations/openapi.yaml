@@ -1345,7 +1345,6 @@ components:
       description: Schema for integration API responses.
       additionalProperties: false
       allOf:
-        - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/UserOwnedResource"
         - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/NamedResource"
         - type: object
           title: IntegrationRead
@@ -1355,19 +1354,17 @@ components:
           properties:
             created_by:
               anyOf:
-                - type: string
-                - type: string
-                  format: uuid
+                - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/UserReference"
                 - type: "null"
-              description: Username or UUID of the creator
+              description: User who created the integration
+              readOnly: true
               title: Created By
             updated_by:
               anyOf:
-                - type: string
-                - type: string
-                  format: uuid
+                - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/UserReference"
                 - type: "null"
-              description: Username or UUID of the last modifier
+              description: User who last modified the integration
+              readOnly: true
               title: Updated By
             integration_type:
               $ref: '#/components/schemas/IntegrationType'

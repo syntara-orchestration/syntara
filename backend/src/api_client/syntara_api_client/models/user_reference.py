@@ -13,12 +13,15 @@ T = TypeVar("T", bound="UserReference")
 @_attrs_define
 class UserReference:
     """Minimal user identification for embedding in other resources.
-    This model captures user identity at the time of an action, providing
-    a snapshot that doesn't change even if the user's details are updated later.
+    The name is resolved from the database when the response is built, not
+    stored alongside the id, so it always reflects the principal's current
+    name. Renaming a user therefore changes the name shown for their past actions.
 
         Attributes:
             id (UUID): User's unique identifier
-            name (str): User's display name at time of action
+            name (str): Principal's current display name, resolved when the response is built. Not a username: for a user
+                this is their first and last name, falling back to the username when both are blank; for a service account it is
+                the account name; for an internal service it is derived from the certificate CN.
     """
 
     id: UUID

@@ -29,8 +29,7 @@ def _make_serialized_version(wf_id: str, **overrides: object) -> dict[str, objec
         "change_description": None,
         "created_at": now,
         "updated_at": now,
-        "created_by": str(uuid4()),
-        "created_by_username": None,
+        "created_by": None,
     }
     base.update(overrides)
     return base
@@ -46,10 +45,6 @@ class TestUpdateWorkflowVersionMetadata:
         request = WorkflowVersionUpdate(name="New Name", change_description="New Desc")
 
         with (
-            patch(
-                "syntara.workflows.router.deserialize_workflow_version",
-                return_value=_make_serialized_version(str(wf_id), name="New Name", change_description="New Desc"),
-            ),
             patch.object(mock_service, "get_publish_context", new_callable=AsyncMock, return_value=(set(), {})),
         ):
             await update_workflow_version_metadata(workflow_id=wf_id, version=1, request=request, service=mock_service)
@@ -69,10 +64,6 @@ class TestUpdateWorkflowVersionMetadata:
         request = WorkflowVersionUpdate.model_validate({"name": "Only Name"})
 
         with (
-            patch(
-                "syntara.workflows.router.deserialize_workflow_version",
-                return_value=_make_serialized_version(str(wf_id), name="Only Name"),
-            ),
             patch.object(mock_service, "get_publish_context", new_callable=AsyncMock, return_value=(set(), {})),
         ):
             await update_workflow_version_metadata(workflow_id=wf_id, version=1, request=request, service=mock_service)
@@ -87,10 +78,6 @@ class TestUpdateWorkflowVersionMetadata:
         request = WorkflowVersionUpdate()
 
         with (
-            patch(
-                "syntara.workflows.router.deserialize_workflow_version",
-                return_value=_make_serialized_version(str(wf_id)),
-            ),
             patch.object(mock_service, "get_publish_context", new_callable=AsyncMock, return_value=(set(), {})),
         ):
             await update_workflow_version_metadata(workflow_id=wf_id, version=1, request=request, service=mock_service)
