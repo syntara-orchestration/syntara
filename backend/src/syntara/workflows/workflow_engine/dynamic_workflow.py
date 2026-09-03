@@ -452,9 +452,14 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 )
             )
         except Exception:  # noqa: BLE001
+            # workflow.logger is a stdlib Logger, so structured fields must go
+            # through extra={}. A bare kwarg raises TypeError here, and because
+            # this runs inside the workflow, that failure fails the workflow task
+            # itself — Temporal then retries the activation forever and the
+            # execution never leaves RUNNING. Ref: AAP-88614.
             workflow.logger.warning(
                 "Failed to cancel agentic invocations (best-effort)",
-                node_id=node_id,
+                extra={"node_id": node_id},
             )
 
     @staticmethod
