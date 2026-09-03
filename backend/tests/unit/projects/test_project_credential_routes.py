@@ -10,6 +10,7 @@ import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
+from syntara.core.models.user_reference import UserReference
 from syntara.credentials.models.credential import (
     Credential,
     CredentialListResponse,
@@ -45,7 +46,7 @@ def _make_cred_read(project_id=PROJECT_ID, credential_id=CREDENTIAL_ID) -> Crede
         enabled=True,
         project_id=project_id,
         workflow_count=0,
-        created_by="admin",
+        created_by=UserReference(id=uuid4(), name="admin"),
         created_at=datetime.now(tz=UTC),
         updated_at=datetime.now(tz=UTC),
         labels={},
