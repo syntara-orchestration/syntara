@@ -1132,15 +1132,29 @@ class ExecutionService(BaseService):
         write that status or the agent runs to completion. Ref: AAP-88614.
 
         Best-effort: a failure here must not turn a successful workflow
-        cancellation into an error for the caller.
+        cancellation into an error for the caller. Temporal has already
+        accepted the cancel by the time this runs, so the whole body is
+        guarded — not just the per-invocation call.
         """
+        try:
+            await self._cancel_linked_invocations_unguarded(execution)
+        except Exception:
+            logger.exception(
+                "Failed to propagate cancellation to linked invocations",
+                execution_id=execution.id,
+            )
+
+    async def _cancel_linked_invocations_unguarded(self, execution: Execution) -> None:
         # Imported lazily: agent_orchestrator imports this module for execution
         # creation, so a module-level import would be circular.
-        from syntara.agent_orchestrator.models import Invocation, InvocationStatus  # noqa: PLC0415
-        from syntara.agent_orchestrator.services import InvocationService  # noqa: PLC0415
+        from syntara.agent_orchestrator.models.invocation import Invocation, InvocationStatus  # noqa: PLC0415
+        from syntara.agent_orchestrator.services.invocation_service import InvocationService  # noqa: PLC0415
 
         invocation_ids = await self._linked_invocation_ids(execution.id)
         if not invocation_ids:
+            # Not necessarily wrong (no agentic node, or it never started), but
+            # it is the one silent way this propagation can miss — leave a trace.
+            logger.info("No linked invocations to cancel for execution", execution_id=execution.id)
             return
 
         result = await self.session.exec(
@@ -1163,6 +1177,11 @@ class ExecutionService(BaseService):
                     execution_id=execution.id,
                     invocation_id=invocation.id,
                 )
+                # cancel_invocation mutates the row before it commits. Drop the
+                # half-applied CANCELLED state so a later commit on this shared
+                # session does not persist a cancellation that failed.
+                if invocation in self.session:
+                    self.session.expunge(invocation)
                 continue
 
             await self._cancel_agent_execution_for_invocation(invocation.id)
@@ -1205,9 +1224,10 @@ class ExecutionService(BaseService):
         running execution. Best-effort — the DB status is the effective stop.
 
         ``input_data`` is caller-supplied, so the lookup is restricted to the
-        builtin "Agent Execution" workflow in the builtin project. Without that
-        restriction any execution could claim an ``invocation_id`` and be
-        cancelled alongside it.
+        builtin "Agent Execution" workflow in the builtin project — matched on
+        the ``is_builtin`` flags as well as the names, the same way
+        ``seed_builtin`` resolves them. Without that restriction any execution
+        could claim an ``invocation_id`` and be cancelled alongside it.
         """
         if self.temporal_service is None:
             return
@@ -1222,6 +1242,7 @@ class ExecutionService(BaseService):
             select(Project.id)
             .where(
                 Project.name == BUILTIN_PROJECT_NAME,
+                col(Project.is_builtin).is_(True),
                 Project.deleted_at.is_(None),  # type: ignore[union-attr]
             )
             .scalar_subquery()
@@ -1232,9 +1253,9 @@ class ExecutionService(BaseService):
             .join(Workflow, Workflow.id == Execution.workflow_id)  # type: ignore[arg-type]
             .where(col(Execution.input_data)["invocation_id"].astext == str(invocation_id))
             .where(col(Workflow.name) == BUILTIN_WORKFLOW_AGENT_EXECUTION)
+            .where(col(Workflow.is_builtin).is_(True))
             .where(Workflow.project_id == builtin_project_id)
             .where(col(Execution.status).not_in(TERMINAL_EXECUTION_STATUSES))
-            .where(col(Execution.deleted_at).is_(None))
         )
         for agent_execution in result.all():
             try:

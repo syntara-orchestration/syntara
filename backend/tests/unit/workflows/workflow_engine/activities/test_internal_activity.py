@@ -431,3 +431,37 @@ class TestInvocationExecutionHeartbeat:
                 {"activity": "invocation_execution", "input": {"invocation_id": str(inv_id)}},
                 None,
             )
+
+    @pytest.mark.anyio
+    async def test_heartbeat_failure_does_not_fail_the_activity(self) -> None:
+        """A heartbeat error must not mask the agent run's own outcome."""
+        import asyncio
+
+        inv_id = uuid4()
+
+        async def slow_execute(*_args: object, **_kwargs: object) -> None:
+            await asyncio.sleep(0.1)
+
+        mock_executor = MagicMock()
+        mock_executor.execute_invocation = AsyncMock(side_effect=slow_execute)
+
+        with (
+            patch(
+                "syntara.agent_orchestrator.executor.invocation_executor.InvocationExecutor",
+                return_value=mock_executor,
+            ),
+            patch(
+                "syntara.workflows.workflow_engine.activities.internal_activity._HEARTBEAT_INTERVAL_SECONDS",
+                0.02,
+            ),
+            patch(
+                "syntara.workflows.workflow_engine.activities.internal_activity.activity.heartbeat",
+                side_effect=asyncio.QueueFull(),
+            ),
+        ):
+            result = await execute_internal_activity(
+                {"activity": "invocation_execution", "input": {"invocation_id": str(inv_id)}},
+                None,
+            )
+
+        assert result["output"]["status"] == "completed"

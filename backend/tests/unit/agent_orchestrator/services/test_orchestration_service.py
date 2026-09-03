@@ -951,6 +951,8 @@ class TestOrchestrationServiceHonoursCancellation:
 
         service = OrchestrationService(mock_llm, mock_context_manager)
         invocation_id = uuid4()
+        actor_context = AuditActorContext()
+        ctx = InvocationContextData()
 
         consumed = 0
 
@@ -979,8 +981,8 @@ class TestOrchestrationServiceHonoursCancellation:
                     prompt="Test prompt",
                     session_id="test-session",
                     invocation_id=invocation_id,
-                    actor_context=AuditActorContext(),
-                    ctx=InvocationContextData(),
+                    actor_context=actor_context,
+                    ctx=ctx,
                 )
 
         assert consumed < 50, f"stream should have been abandoned early, consumed {consumed}/50 events"
@@ -996,6 +998,9 @@ class TestOrchestrationServiceHonoursCancellation:
         mock_context_manager.get_async_session_context = _session_cm_returning(InvocationStatus.CANCELLED)
 
         service = OrchestrationService(mock_llm, mock_context_manager)
+        invocation_id = uuid4()
+        actor_context = AuditActorContext()
+        ctx = InvocationContextData()
 
         mock_graph = AsyncMock()
         mock_graph.astream_events = lambda *_a, **_k: mock_astream_events_generator("a", "b")
@@ -1008,6 +1013,7 @@ class TestOrchestrationServiceHonoursCancellation:
                 0.0,
             ),
             patch.object(service, "_handle_completion_callback", new=AsyncMock()) as mock_callback,
+            patch.object(service, "_publish_stream_event", new=AsyncMock()) as mock_publish,
         ):
             mock_stream_client.return_value.__aenter__.return_value = AsyncMock()
 
@@ -1015,12 +1021,18 @@ class TestOrchestrationServiceHonoursCancellation:
                 await service.execute(
                     prompt="Test prompt",
                     session_id="test-session",
-                    invocation_id=uuid4(),
-                    actor_context=AuditActorContext(),
-                    ctx=InvocationContextData(),
+                    invocation_id=invocation_id,
+                    actor_context=actor_context,
+                    ctx=ctx,
                 )
 
             mock_callback.assert_not_awaited()
+            # Stream subscribers stop only on a terminal event; cancellation must
+            # publish one or the UI spins until the stream expires.
+            published_types = [call.args[2] for call in mock_publish.await_args_list]
+            assert "cancelled" in published_types
+            assert "completion" not in published_types
+            assert "error" not in published_types
 
     @pytest.mark.asyncio
     async def test_running_invocation_completes_normally(self) -> None:

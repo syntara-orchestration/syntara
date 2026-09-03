@@ -91,6 +91,9 @@ class TestAgenticActivityPartialOutput:
                     project_id=project_id,
                 )
 
+            # Exactly one STOP_MONITOR heartbeat, carrying the invocation_id. An
+            # earlier bare STOP_MONITOR would end the describe probe before the
+            # partial output exists, so the link would never be persisted.
             assert mock_heartbeat.call_count == 1
             mock_heartbeat.assert_called_once_with(
                 {

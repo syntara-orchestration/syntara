@@ -13,7 +13,6 @@ sandbox warnings that can interfere with other activities.
 from __future__ import annotations
 
 import asyncio
-import contextlib
 from dataclasses import asdict
 from typing import TYPE_CHECKING, Any, TypedDict
 from uuid import UUID
@@ -82,8 +81,12 @@ async def _run_invocation_execution(operation_input: InvocationExecutionInput) -
         await executor.execute_invocation(UUID(invocation_id), actor_context=actor_context)
     finally:
         heartbeat_task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await heartbeat_task
+        # gather(return_exceptions=True) reports the heartbeat task's own
+        # CancelledError/exception as a result instead of raising it here, while a
+        # cancellation aimed at *this* task during the await still propagates. A
+        # bare `suppress(CancelledError)` would swallow the activity's own cancel
+        # and report a cancelled agent run as completed.
+        await asyncio.gather(heartbeat_task, return_exceptions=True)
     return {"output": {"status": "completed"}}
 
 
@@ -92,14 +95,18 @@ async def _heartbeat_until_cancelled() -> None:
 
     Temporal delivers a cancellation request to an activity through its
     heartbeats; an activity that never heartbeats cannot be interrupted. Outside
-    an activity context (unit tests, direct calls) ``activity.heartbeat`` raises,
-    so the loop exits quietly rather than failing the operation.
+    an activity context (unit tests, direct calls) ``activity.heartbeat`` raises
+    ``RuntimeError``; any other failure (e.g. the SDK's heartbeat queue being
+    full) must not fail the agent run either, so the loop stops on any error.
     """
     while True:
         await asyncio.sleep(_HEARTBEAT_INTERVAL_SECONDS)
         try:
             activity.heartbeat()
         except RuntimeError:  # not inside an activity context
+            return
+        except Exception:
+            logger.exception("Activity heartbeat failed; cancellation may no longer be deliverable")
             return
 
 

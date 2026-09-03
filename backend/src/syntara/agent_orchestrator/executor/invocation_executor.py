@@ -497,6 +497,21 @@ class InvocationExecutor:
         except InvocationCancelledError:
             logger.info("Invocation cancelled during execution", invocation_id=invocation.id)
             self._record_invocation_metrics(recorder, invocation_start, invocation.id, status="cancelled")
+        except asyncio.CancelledError:
+            # The Temporal activity running us was cancelled (its workflow was
+            # cancelled, or the worker is shutting down). Now that the activity
+            # heartbeats this is reachable, and nothing else records a terminal
+            # state — without this the row stays RUNNING forever. The conditional
+            # UPDATE is a no-op when a cancel already wrote CANCELLED.
+            logger.info("Agent execution activity cancelled", invocation_id=invocation.id)
+            await self._update_invocation_status(
+                invocation.id,
+                InvocationStatus.CANCELLED,
+                completed_at=datetime.now(UTC),
+                error_message="Cancelled: agent execution workflow cancelled",
+            )
+            self._record_invocation_metrics(recorder, invocation_start, invocation.id, status="cancelled")
+            raise
         except Exception as e:  # noqa: BLE001
             e = self._wrap_timeout_error(e, invocation.id)
             await self._handle_execution_failure(

@@ -10,7 +10,12 @@ from uuid import uuid4
 
 import pytest
 
-from syntara.agent_orchestrator.exceptions import AgentTimeoutError, ToolDiscoveryError, ToolSelectionUnavailableError
+from syntara.agent_orchestrator.exceptions import (
+    AgentTimeoutError,
+    InvocationCancelledError,
+    ToolDiscoveryError,
+    ToolSelectionUnavailableError,
+)
 from syntara.agent_orchestrator.services.error_handler import (
     ERROR_TYPE_BASE_URI,
     classify_streaming_error,
@@ -242,3 +247,21 @@ def test_multiple_invocations_independent() -> None:
     assert error1.instance == f"/invocations/{invocation_id1}"
     assert error2.instance == f"/invocations/{invocation_id2}"
     assert error1.instance != error2.instance
+
+
+def test_invocation_cancelled_not_default_llm_streaming_error() -> None:
+    """A cancellation must reach the parent workflow as a cancellation, not an LLM error.
+
+    The cancel branch in OrchestrationService sends this exception via
+    send_failure_signal; the parent's agentic activity shows the classified
+    detail as its failure reason. Ref: AAP-88614.
+    """
+    invocation_id = uuid4()
+    result = classify_streaming_error(InvocationCancelledError(str(invocation_id), "orchestration"), invocation_id)
+
+    assert result.code == "INVOCATION_CANCELLED"
+    assert result.type == f"{ERROR_TYPE_BASE_URI}/invocation-cancelled"
+    assert result.retryable is False
+    assert "LLM" not in result.title
+    assert result.instance is not None
+    assert str(invocation_id) in result.instance

@@ -35,6 +35,7 @@ from syntara.agent_orchestrator.models.agent_response import GenericAgentRespons
 from syntara.agent_orchestrator.models.agent_state import AgentState, AgentStateFactory
 from syntara.agent_orchestrator.models.context_data import InvocationContextData
 from syntara.agent_orchestrator.models.streaming_events import (
+    CancelledEventData,
     CompletionEventData,
     DeltaEventData,
     ToolCallEventData,
@@ -567,10 +568,26 @@ class OrchestrationService:
 
                 return result
 
-            except InvocationCancelledError:
-                # Expected control flow, not a failure: no error event, no failure
-                # signal. InvocationExecutor records the cancelled outcome.
+            except InvocationCancelledError as cancelled:
+                # Expected control flow, not a failure — InvocationExecutor records
+                # the cancelled outcome. Two consumers still need a terminal signal:
+                #  - stream subscribers stop only on completion/error/cancelled, so
+                #    publish "cancelled" or the UI spins until the stream expires;
+                #  - the parent workflow's agentic activity is parked in
+                #    raise_complete_async and only a callback releases it. On an
+                #    invocation-only cancel the parent is still running, so fail it
+                #    now instead of letting it hit start_to_close_timeout. When the
+                #    parent was itself cancelled the callback is a no-op.
                 logger.info("Orchestration abandoned — invocation cancelled", invocation_id=invocation_id)
+                await self._publish_stream_event(
+                    client,
+                    stream_id,
+                    "cancelled",
+                    invocation_id,
+                    CancelledEventData(reason="user_cancelled").model_dump(),
+                )
+                cb_url = ctx.callback_url.get_secret_value() if ctx and ctx.callback_url else None
+                await WorkflowSignalClient.send_failure_signal(cb_url, invocation_id, cancelled)
                 raise
 
             except Exception as e:
@@ -652,7 +669,7 @@ class OrchestrationService:
         the same choice ``ContextManagerPlanner._check_cancellation`` makes — since
         failing to reach the database is not evidence of a cancellation.
         """
-        from syntara.agent_orchestrator.models import Invocation, InvocationStatus  # noqa: PLC0415
+        from syntara.agent_orchestrator.models.invocation import Invocation, InvocationStatus  # noqa: PLC0415
 
         try:
             async with self.context_manager.get_async_session_context() as session:
