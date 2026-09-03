@@ -483,10 +483,11 @@ jobs:
     needs: [changes, frontend-checks-gate]
     # Only auto-trigger on same-repo PRs with frontend changes, or manual dispatch, or merge queue, or schedule.
     # Fork PRs are explicitly excluded from auto-triggering to prevent security risks.
-    # !cancelled() lets workflow_dispatch run when the checks gate is skipped
-    # (e.g. docs-only PR), while allowing stale workflow runs to be cancelled.
+    # always() + gate != failure|cancelled lets workflow_dispatch still run when the
+    # checks gate is skipped (e.g. docs-only PR), while preserving fast-fail when
+    # lint/unit actually failed.
     if: |
-      !cancelled() &&
+      always() &&
       (
         github.event_name == 'schedule' ||
         (
