@@ -5350,9 +5350,9 @@ class TestQueryActivityIoOutputMerge:
         assert output_data["output"] == "result"
 
     @pytest.mark.asyncio
-    async def test_completed_update_fails_retries_query(self) -> None:
-        """When update fails (workflow already completed), retry query to get output."""
-        from temporalio.exceptions import ApplicationError
+    async def test_completed_update_fails_workflow_done_retries_query(self) -> None:
+        """When update fails with NOT_FOUND (workflow completed), retry query immediately."""
+        from temporalio.service import RPCError, RPCStatusCode
 
         mock_handle = AsyncMock()
         mock_handle.query.side_effect = [
@@ -5360,21 +5360,86 @@ class TestQueryActivityIoOutputMerge:
             None,
             {"status": "completed", "output": "result"},
         ]
-        mock_handle.execute_update.side_effect = ApplicationError("workflow completed")
+        mock_handle.execute_update.side_effect = RPCError(
+            "workflow execution not found",
+            RPCStatusCode.NOT_FOUND,
+            b"",
+        )
         initial_partial = {"job_id": 42}
         activity_data: dict[str, Any] = {"status": ActivityStatus.COMPLETED}
 
-        with patch(
-            "syntara.workflows.workflow_engine.services.activity_sync_service.asyncio.sleep",
-            new_callable=AsyncMock,
-        ) as mock_sleep:
-            _, output_data = await self.service._query_activity_io(
-                mock_handle, "my-activity", activity_data, initial_partial
-            )
-            mock_sleep.assert_awaited_once_with(0.7)
+        _, output_data = await self.service._query_activity_io(
+            mock_handle, "my-activity", activity_data, initial_partial
+        )
 
         assert output_data is not None
         assert output_data["job_id"] == 42
         assert output_data["status"] == "completed"
         assert output_data["output"] == "result"
         assert mock_handle.query.await_count == 3
+
+    @pytest.mark.asyncio
+    async def test_completed_update_fails_non_not_found_propagates(self) -> None:
+        """When update fails with a non-NOT_FOUND RPCError, it propagates to the outer handler."""
+        from temporalio.service import RPCError, RPCStatusCode
+
+        mock_handle = AsyncMock()
+        mock_handle.query.side_effect = [
+            {},
+            None,
+        ]
+        mock_handle.execute_update.side_effect = RPCError(
+            "internal server error",
+            RPCStatusCode.INTERNAL,
+            b"",
+        )
+        activity_data: dict[str, Any] = {"status": ActivityStatus.COMPLETED}
+
+        _, output_data = await self.service._query_activity_io(mock_handle, "my-activity", activity_data, None)
+
+        assert output_data is None
+
+    @pytest.mark.asyncio
+    async def test_completed_update_timeout_returns_partial(self) -> None:
+        """When wait_condition times out (30s), output falls back to initial_output_data."""
+        from temporalio.exceptions import ApplicationError
+
+        mock_handle = AsyncMock()
+        mock_handle.query.side_effect = [
+            {},
+            None,
+        ]
+        mock_handle.execute_update.side_effect = ApplicationError("timed out")
+        initial_partial = {"job_id": 42}
+        activity_data: dict[str, Any] = {"status": ActivityStatus.COMPLETED}
+
+        _, output_data = await self.service._query_activity_io(
+            mock_handle, "my-activity", activity_data, initial_partial
+        )
+
+        assert output_data == {"job_id": 42}
+
+    @pytest.mark.asyncio
+    async def test_completed_retry_query_returns_none(self) -> None:
+        """When workflow completed but retry query still returns None, falls back to partial."""
+        from temporalio.service import RPCError, RPCStatusCode
+
+        mock_handle = AsyncMock()
+        mock_handle.query.side_effect = [
+            {},
+            None,
+            None,
+        ]
+        mock_handle.execute_update.side_effect = RPCError(
+            "workflow execution not found",
+            RPCStatusCode.NOT_FOUND,
+            b"",
+        )
+        initial_partial = {"job_id": 42}
+        activity_data: dict[str, Any] = {"status": ActivityStatus.COMPLETED}
+
+        _, output_data = await self.service._query_activity_io(
+            mock_handle, "my-activity", activity_data, initial_partial
+        )
+
+        assert output_data == {"job_id": 42}

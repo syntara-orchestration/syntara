@@ -26,6 +26,7 @@ from temporalio.api.enums.v1 import EventType, PendingActivityState
 from temporalio.api.history.v1 import HistoryEvent
 from temporalio.client import Client, WorkflowHandle, WorkflowHistoryEventFilterType
 from temporalio.exceptions import TemporalError
+from temporalio.service import RPCError
 
 from syntara.audit.context_managers import actor_context
 from syntara.audit.dispatcher import AuditEventDispatcher
@@ -1831,8 +1832,14 @@ class ActivitySyncService:
             if queried_output is None and activity_data["status"] == ActivityStatus.COMPLETED:
                 try:
                     queried_output = await handle.execute_update("get_activity_output_when_ready", activity_id)
-                except TemporalError:
-                    await asyncio.sleep(0.7)
+                except RPCError as e:
+                    if "not found" not in str(e).lower():
+                        raise
+                    # Workflow already completed — the update was rejected because
+                    # the server has already recorded the final state.  This means
+                    # set_namespace() has run (completion requires it), so a query
+                    # against the completed workflow's final state is guaranteed to
+                    # return the output.
                     queried_output = await handle.query("get_activity_output", activity_id)
 
             if queried_output is not None:
