@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   ROUTE_MANIFEST_COMMENT_KEY,
   ROUTE_MANIFEST_NOTICE,
+  plainObjectSchema,
   routeManifestSchema,
 } from './route-manifest-schema'
 
@@ -53,5 +54,14 @@ describe('routeManifestSchema', () => {
     })
 
     expect(result.success).toBe(false)
+  })
+})
+
+describe('plainObjectSchema', () => {
+  it('accepts plain objects and rejects null, arrays, and primitives', () => {
+    expect(plainObjectSchema.safeParse({ a: 1 }).success).toBe(true)
+    expect(plainObjectSchema.safeParse(null).success).toBe(false)
+    expect(plainObjectSchema.safeParse([]).success).toBe(false)
+    expect(plainObjectSchema.safeParse('x').success).toBe(false)
   })
 })

@@ -1,5 +1,8 @@
 import { z } from 'zod'
 
+/** Non-null, non-array object — used when walking unknown nested catalogs. */
+export const plainObjectSchema = z.record(z.string(), z.unknown())
+
 /** Key used for the generated-file banner. Looks like a comment in JSON. */
 export const ROUTE_MANIFEST_COMMENT_KEY = '//' as const
 
@@ -66,6 +69,7 @@ export const routeManifestSchema = z.object({
   routes: z.array(normalizedRouteSchema),
 })
 
+export type PlainObject = z.infer<typeof plainObjectSchema>
 export type RouteKind = z.infer<typeof routeKindSchema>
 export type RouteSource = z.infer<typeof routeSourceSchema>
 export type NormalizedRoute = z.infer<typeof normalizedRouteSchema>

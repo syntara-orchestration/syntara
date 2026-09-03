@@ -1,5 +1,7 @@
 import { convertWouterPathToTanStack } from '../../src/app/convertParamSyntax'
 
+import { plainObjectSchema } from './route-manifest-schema'
+
 /**
  * Convert a path template to TanStack `$param` syntax.
  *
@@ -41,16 +43,6 @@ export function stableStringify(value: unknown): string {
 }
 
 /**
- * Narrow unknown values to plain objects for key sorting and safe property access.
- *
- * @param value - Candidate value
- * @returns Whether `value` is a non-null, non-array object
- */
-export function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-/**
  * JSON.stringify replacer that sorts plain-object keys.
  *
  * @param _key - Property name (unused)
@@ -58,11 +50,12 @@ export function isPlainObject(value: unknown): value is Record<string, unknown> 
  * @returns Value with object keys sorted when applicable
  */
 function replacer(_key: string, value: unknown): unknown {
-  if (!isPlainObject(value)) return value
+  const parsed = plainObjectSchema.safeParse(value)
+  if (!parsed.success) return value
 
   const sorted: Record<string, unknown> = {}
-  for (const key of Object.keys(value).sort()) {
-    sorted[key] = value[key]
+  for (const key of Object.keys(parsed.data).sort()) {
+    sorted[key] = parsed.data[key]
   }
   return sorted
 }

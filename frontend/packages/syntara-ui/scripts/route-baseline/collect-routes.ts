@@ -1,8 +1,8 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 
-import { extractParameters, isPlainObject, normalizeTemplate } from './normalize-route'
-import type { NormalizedRoute, RouteKind } from './route-manifest-schema'
+import { extractParameters, normalizeTemplate } from './normalize-route'
+import { plainObjectSchema, type NormalizedRoute, type RouteKind } from './route-manifest-schema'
 
 const PATH_LITERAL = /['"](\/[^'"]*)['"]/g
 
@@ -26,8 +26,9 @@ export function collectPathsFromObject(value: unknown, out: Set<string> = new Se
     out.add(value)
     return out
   }
-  if (isPlainObject(value)) {
-    for (const child of Object.values(value)) {
+  const object = plainObjectSchema.safeParse(value)
+  if (object.success) {
+    for (const child of Object.values(object.data)) {
       collectPathsFromObject(child, out)
     }
   }
@@ -283,8 +284,9 @@ export function resolveAppRouteReference(appRouteCatalog: unknown, expression: s
   if (parts[0] !== 'AppRoute') return undefined
   let current: unknown = appRouteCatalog
   for (const part of parts.slice(1)) {
-    if (!isPlainObject(current)) return undefined
-    current = current[part]
+    const object = plainObjectSchema.safeParse(current)
+    if (!object.success) return undefined
+    current = object.data[part]
   }
   return current
 }
