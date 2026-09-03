@@ -1,6 +1,6 @@
 [project]
 name = "syntara-api-client"
-version = "1.0.0"
+version = "1.1.0"
 description = "A client library for accessing Orchestrator API"
 license = "Apache-2.0"
 authors = []
