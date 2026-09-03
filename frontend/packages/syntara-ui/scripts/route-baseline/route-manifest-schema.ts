@@ -5,7 +5,7 @@ export const ROUTE_MANIFEST_COMMENT_KEY = '//' as const
 
 /** Standard banner written into every generated manifest. */
 export const ROUTE_MANIFEST_NOTICE =
-  'GENERATED FILE. Do not edit by hand. Regenerate with: npm run route-baseline:update --prefix packages/syntara-ui'
+  'GENERATED FILE. Do not edit by hand. Regenerate with: npm run route-baseline:update'
 
 /**
  * Route role recorded in the baseline manifest.
@@ -13,22 +13,31 @@ export const ROUTE_MANIFEST_NOTICE =
  * - `page` — normal UI route with a component
  * - `redirect` — route that only redirects to another path
  * - `fallback` — catch-all for unmatched URLs
- * - `app` — handled outside the TanStack route tree (for example in `App.tsx`)
+ * - `app` — bookmarkable path handled in `App.tsx` before `RouterProvider`
+ *   (today only `/auth/test-signin-callback`; not part of the TanStack tree)
  */
 export const routeKindSchema = z.enum(['page', 'redirect', 'fallback', 'app'])
 
-/** Where a template was discovered when building the manifest. */
+/**
+ * Where a path template was discovered when building the manifest.
+ *
+ * - `router` — `createRoute` in `src/app/routes`
+ * - `appRoute` — declared in the `AppRoute` catalog
+ * - `navigation` — linked from `navigationItems`
+ * - `app` — handled in `App.tsx` before the router mounts
+ */
 export const routeSourceSchema = z.enum(['router', 'appRoute', 'navigation', 'app'])
 
 /**
  * One normalized route in the compatibility contract.
  *
  * Path templates always use TanStack `$param` syntax.
+ * `parameters` lists path params only (search params are out of scope for Phase 0).
  */
 export const normalizedRouteSchema = z.object({
   /** Canonical pathname template, for example `/users/$userId`. */
   template: z.string().min(1),
-  /** Ordered parameter names extracted from `template`. */
+  /** Ordered path-parameter names extracted from `template`. */
   parameters: z.array(z.string()),
   /** How this route behaves at runtime. */
   kind: routeKindSchema,
@@ -43,7 +52,7 @@ export const normalizedRouteSchema = z.object({
 })
 
 /**
- * Committed route baseline artifact written to `route-baseline/manifest.json`.
+ * Committed route baseline artifact written to `route-baseline/manifest.gen.json`.
  */
 export const routeManifestSchema = z.object({
   /**

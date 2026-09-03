@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { AppRoute } from '../AppRoute'
+import { AppRoute } from '../../src/app/AppRoute'
 
 import {
   collectAppLevelRoutes,
@@ -38,7 +38,7 @@ export type ManifestBuildResult = {
 export const SOURCE_PARITY_EXCEPTIONS = new Set([
   // Declared in AppRoute but unused; not a live browser route.
   '/dashboard',
-  // Handled in App.tsx before RouterProvider; included in the manifest as kind `app`.
+  // Handled in App.tsx before RouterProvider (kind `app`); not a TanStack route.
   '/auth/test-signin-callback',
   // Placeholder support links — no createRoute yet.
   '/support/documentation',

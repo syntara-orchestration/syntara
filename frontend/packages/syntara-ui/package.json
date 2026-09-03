@@ -25,8 +25,8 @@
     "lint:fix": "eslint . --fix",
     "knip": "knip",
     "knip:exports": "knip --include files,exports,duplicates,enumMembers,namespaceMembers",
-    "route-baseline:check": "tsx scripts/check-route-baseline.ts",
-    "route-baseline:update": "tsx scripts/update-route-baseline.ts",
+    "route-baseline:check": "vitest run scripts/route-baseline",
+    "route-baseline:update": "tsx scripts/route-baseline/update-route-baseline.ts",
     "storybook": "storybook dev -p 5174 --exact-port --ci --disable-telemetry",
     "storybook:build": "storybook build --disable-telemetry"
   },

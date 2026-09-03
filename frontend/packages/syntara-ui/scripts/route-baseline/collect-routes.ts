@@ -191,7 +191,11 @@ export function resolveAppRouteReference(appRouteCatalog: unknown, expression: s
 }
 
 /**
- * Return fixed app-level routes that are bookmarkable but outside TanStack Router.
+ * Return bookmarkable paths handled in `App.tsx` before `RouterProvider`.
+ *
+ * These are intentional exceptions to the TanStack route tree. Today that is
+ * only the identity-provider test sign-in callback, which must render without
+ * mounting the authenticated shell.
  *
  * @returns Normalized app-level route entries
  */

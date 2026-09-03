@@ -103,8 +103,8 @@ function formatCheckMessages(input: {
 
   messages.push('')
   messages.push('If this change is intentional, run:')
-  messages.push('  npm run route-baseline:update --prefix packages/syntara-ui')
-  messages.push('and commit route-baseline/manifest.json')
+  messages.push('  npm run route-baseline:update')
+  messages.push('and commit route-baseline/manifest.gen.json')
   return messages
 }
 
@@ -122,7 +122,7 @@ function appendTemplateList(messages: string[], title: string, templates: string
 }
 
 /**
- * Regenerate the route baseline and write `route-baseline/manifest.json`.
+ * Regenerate the route baseline and write `route-baseline/manifest.gen.json`.
  *
  * @param pkgRoot - Package root to read sources from and write the manifest into
  * @returns Write result including path and route count

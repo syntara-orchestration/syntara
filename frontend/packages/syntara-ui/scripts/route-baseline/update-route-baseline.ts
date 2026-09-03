@@ -1,5 +1,5 @@
 /**
- * Regenerate `route-baseline/manifest.json` from the current route sources.
+ * Regenerate `route-baseline/manifest.gen.json` from the current route sources.
  *
  * Usage:
  *   npm run route-baseline:update
@@ -7,7 +7,7 @@
  * Commit the updated manifest in the same PR as the intentional route change.
  */
 
-import { updateRouteBaseline } from '../src/app/route-baseline/run-route-baseline'
+import { updateRouteBaseline } from './run-route-baseline'
 
 const result = updateRouteBaseline()
 

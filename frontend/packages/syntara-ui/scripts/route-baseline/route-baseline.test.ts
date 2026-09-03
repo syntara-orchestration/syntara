@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { AppRoute } from '../AppRoute'
+import { AppRoute } from '../../src/app/AppRoute'
 
 import { buildRouteManifest } from './build-route-manifest'
 import {
@@ -43,14 +43,14 @@ describe('route baseline', () => {
     return root
   }
 
-  it('matches the committed route-baseline/manifest.json with deep equality', () => {
+  it('matches the committed route-baseline/manifest.gen.json with deep equality', () => {
     const committed = readCommittedManifest(pkgRoot)
     const diff = diffRouteManifest(committed, manifest)
 
     if (diff.added.length || diff.removed.length || diff.changed.length) {
       const lines = [
         'Route baseline drift detected. If this change is intentional, run:',
-        '  npm run route-baseline:update --prefix packages/syntara-ui',
+        '  npm run route-baseline:update',
         '',
         diff.removed.length ? `Removed:\n  - ${diff.removed.join('\n  - ')}` : '',
         diff.added.length ? `Added:\n  - ${diff.added.join('\n  - ')}` : '',

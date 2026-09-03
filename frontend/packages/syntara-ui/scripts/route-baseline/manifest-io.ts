@@ -13,7 +13,7 @@ const thisDir = dirname(fileURLToPath(import.meta.url))
  * @returns Absolute path to the UI package root
  */
 export function getPackageRoot(): string {
-  return join(thisDir, '../../..')
+  return join(thisDir, '../..')
 }
 
 /**
@@ -30,16 +30,16 @@ export function getRouteBaselineDir(pkgRoot = getPackageRoot()): string {
  * Resolve the committed manifest file path.
  *
  * @param pkgRoot - UI package root (defaults to this package)
- * @returns Absolute path to `route-baseline/manifest.json`
+ * @returns Absolute path to `route-baseline/manifest.gen.json`
  */
 export function getManifestPath(pkgRoot = getPackageRoot()): string {
-  return join(getRouteBaselineDir(pkgRoot), 'manifest.json')
+  return join(getRouteBaselineDir(pkgRoot), 'manifest.gen.json')
 }
 
 /**
  * Read and parse the committed route baseline manifest.
  *
- * @param pkgRoot - UI package root that contains `route-baseline/manifest.json`
+ * @param pkgRoot - UI package root that contains `route-baseline/manifest.gen.json`
  * @returns Parsed manifest object
  */
 export function readCommittedManifest(pkgRoot = getPackageRoot()): RouteManifest {
@@ -48,7 +48,7 @@ export function readCommittedManifest(pkgRoot = getPackageRoot()): RouteManifest
 }
 
 /**
- * Write a route manifest to `route-baseline/manifest.json` under `pkgRoot`.
+ * Write a route manifest to `route-baseline/manifest.gen.json` under `pkgRoot`.
  *
  * Validates with Zod before writing so only schema-shaped data is committed.
  *

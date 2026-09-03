@@ -1,4 +1,4 @@
-import { convertWouterPathToTanStack } from '../convertParamSyntax'
+import { convertWouterPathToTanStack } from '../../src/app/convertParamSyntax'
 
 /**
  * Convert a path template to TanStack `$param` syntax.
@@ -41,6 +41,16 @@ export function stableStringify(value: unknown): string {
 }
 
 /**
+ * Narrow unknown values to plain objects for key sorting.
+ *
+ * @param value - JSON.stringify replacer value
+ * @returns Whether `value` is a non-null, non-array object
+ */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/**
  * JSON.stringify replacer that sorts plain-object keys.
  *
  * @param _key - Property name (unused)
@@ -48,12 +58,11 @@ export function stableStringify(value: unknown): string {
  * @returns Value with object keys sorted when applicable
  */
 function replacer(_key: string, value: unknown): unknown {
-  if (value && typeof value === 'object' && !Array.isArray(value)) {
-    const sorted: Record<string, unknown> = {}
-    for (const key of Object.keys(value as Record<string, unknown>).sort()) {
-      sorted[key] = (value as Record<string, unknown>)[key]
-    }
-    return sorted
+  if (!isPlainObject(value)) return value
+
+  const sorted: Record<string, unknown> = {}
+  for (const key of Object.keys(value).sort()) {
+    sorted[key] = value[key]
   }
-  return value
+  return sorted
 }
