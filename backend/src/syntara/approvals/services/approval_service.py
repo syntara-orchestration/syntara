@@ -168,7 +168,7 @@ class ApprovalService(UserReferenceResolverMixin, BaseService):
             Eager-loads approver relationships via ApprovalEnrichQuery mixin to avoid N+1 queries.
 
         """
-        response = await self.list_resources(
+        return await self.list_resources(
             model=ApprovalRequest,
             response_type=ApprovalListResponse,
             limit=limit,
@@ -178,8 +178,6 @@ class ApprovalService(UserReferenceResolverMixin, BaseService):
             include_total=include_total,
             allowed_projects=allowed_projects,
         )
-        await self.resolve_user_references(response.resources)
-        return response
 
     @staticmethod
     def _approval_eager_loads(*, include_decider: bool = True) -> Sequence[Any]:

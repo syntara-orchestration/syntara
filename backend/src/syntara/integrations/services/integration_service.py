@@ -555,8 +555,6 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
             resource.enabled_model_count = m_enabled
             resource.project_ids = self._filter_project_ids(project_ids_map.get(resource.id, []), allowed_projects)
 
-        await self.resolve_user_references(response.resources)
-
         return response
 
     @staticmethod
