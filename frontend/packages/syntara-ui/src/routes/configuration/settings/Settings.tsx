@@ -4,7 +4,7 @@ import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { AppRoute } from '../../../app/AppRoute'
-import { breadcrumbsSettingsCategory, breadcrumbsSettingsPage } from '../../../app/breadcrumbBuilders'
+import { breadcrumbsSettingsPage } from '../../../app/breadcrumbBuilders'
 import { settingsClient } from '../../../client'
 import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
@@ -107,14 +107,6 @@ export default function Settings() {
     const idx = categories.findIndex((c) => c.slug === activeSlug)
     return Math.max(idx, 0)
   }, [activeSlug, categories])
-
-  const settingsBreadcrumbs = useMemo(() => {
-    const category = categories[activeIndex]
-    if (category && activeIndex > 0) {
-      return breadcrumbsSettingsCategory(category.name)
-    }
-    return breadcrumbsSettingsPage()
-  }, [categories, activeIndex])
 
   const settingsByCategory = useMemo(() => {
     const grouped = new Map<string, (typeof allSettings)[number][]>()
@@ -223,7 +215,7 @@ export default function Settings() {
   return (
     <SynPage>
       <SynPageTitle segments={['Settings']} />
-      <SynPageHeader title="Settings" docLink={settingsDocLink} breadcrumbs={settingsBreadcrumbs} />
+      <SynPageHeader title="Settings" docLink={settingsDocLink} breadcrumbs={breadcrumbsSettingsPage()} />
       <SynPageBody>
         <FileStorageAlert />
         <SynPanel
