@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
+import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import type { NodeType } from '../../workflows/canvas/nodes/NodeType'
 
 type UseWorkflowInitializationOptions = {
@@ -7,8 +8,6 @@ type UseWorkflowInitializationOptions = {
   workflowVersion: number
   onLayout: (options?: { markDirty?: boolean }) => void
   onVersionChange?: () => void
-  /** When true, skip the automatic layout after initialization (e.g. undo/redo with stored positions). */
-  hasStoredPositions?: boolean
   /** Called after the first automatic layout completes (useful for clearing undo history). */
   onAfterInitialLayout?: () => void
 }
@@ -27,7 +26,6 @@ export function useWorkflowInitialization({
   workflowVersion,
   onLayout,
   onVersionChange,
-  hasStoredPositions = false,
   onAfterInitialLayout,
 }: UseWorkflowInitializationOptions) {
   const [isInitialized, setIsInitialized] = useState(false)
@@ -75,6 +73,7 @@ export function useWorkflowInitialization({
   useEffect(() => {
     if (isInitialized && !hasRunInitialLayoutRef.current) {
       hasRunInitialLayoutRef.current = true
+      const hasStoredPositions = Object.keys(useWorkflowStore.getState().nodePositions).length > 0
       if (hasStoredPositions) {
         onAfterInitialLayoutRef.current?.()
         return
@@ -85,7 +84,7 @@ export function useWorkflowInitialization({
       }, 50)
       return () => clearTimeout(timer)
     }
-  }, [isInitialized, hasStoredPositions])
+  }, [isInitialized])
 
   return {
     isInitialized,
