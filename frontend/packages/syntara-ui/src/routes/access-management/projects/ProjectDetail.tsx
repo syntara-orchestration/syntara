@@ -135,7 +135,17 @@ function ProjectDetailsTab({ project }: Readonly<{ project: ProjectRead }>) {
 }
 
 type ProjectTab = 'details' | 'workflows' | 'role-assignments'
-const ALL_PROJECT_TABS: ProjectTab[] = ['details', 'workflows', 'role-assignments']
+
+function computeVisibleTabs(
+  canReadWorkflows: boolean,
+  canReadAssignments: boolean,
+  permissionsLoading: boolean
+): ProjectTab[] {
+  const tabs: ProjectTab[] = ['details']
+  if (permissionsLoading || canReadWorkflows) tabs.push('workflows')
+  if (permissionsLoading || canReadAssignments) tabs.push('role-assignments')
+  return tabs
+}
 
 export function ProjectDetail() {
   const navigate = useNavigate()
@@ -146,13 +156,17 @@ export function ProjectDetail() {
   const [editModalOpen, setEditModalOpen] = useState(false)
   const deleteDialog = useDialogState<ProjectRead>()
   const projectPermissions = useProjectPermissions({ resourceProject: projectId })
-  const { canReadAssignments, isLoading: permissionsLoading } = useProjectDetailPermissions(projectId ?? '')
+  const {
+    canReadWorkflows,
+    canReadAssignments,
+    isLoading: permissionsLoading,
+  } = useProjectDetailPermissions(projectId ?? '')
   const { mutate: deleteProject } = accessClient.useMutation('delete', '/projects/{project_id}')
 
-  const validTabs = useMemo(() => {
-    if (permissionsLoading || canReadAssignments) return ALL_PROJECT_TABS
-    return ALL_PROJECT_TABS.filter((tab) => tab !== 'role-assignments')
-  }, [canReadAssignments, permissionsLoading])
+  const validTabs = useMemo(
+    () => computeVisibleTabs(canReadWorkflows, canReadAssignments, permissionsLoading),
+    [canReadWorkflows, canReadAssignments, permissionsLoading]
+  )
 
   const projectQuery = accessClient.useQuery(
     'get',
@@ -225,7 +239,9 @@ export function ProjectDetail() {
         <SynListPanel>
           <SynListPanelTabs basePath={basePath} defaultTab="details" validTabs={validTabs} aria-label="Project details">
             <Tab eventKey="details" title={<TabTitleText>Details</TabTitleText>} />
-            <Tab eventKey="workflows" title={<TabTitleText>Workflows</TabTitleText>} />
+            {validTabs.includes('workflows') && (
+              <Tab eventKey="workflows" title={<TabTitleText>Workflows</TabTitleText>} />
+            )}
             {validTabs.includes('role-assignments') && (
               <Tab eventKey="role-assignments" title={<TabTitleText>Assignments</TabTitleText>} />
             )}
@@ -244,7 +260,7 @@ export function ProjectDetail() {
               body={<ProjectDetailsTab project={projectData} />}
             />
           )}
-          {activeTab === 'workflows' && (
+          {activeTab === 'workflows' && validTabs.includes('workflows') && (
             <ProjectWorkflowsTab projectId={projectId ?? ''} isBuiltin={projectData.is_builtin} />
           )}
           {activeTab === 'role-assignments' && validTabs.includes('role-assignments') && (
