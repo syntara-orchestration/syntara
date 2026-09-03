@@ -173,7 +173,6 @@ class ServiceAccountService(UserReferenceResolverMixin, BaseService):
         response.max_lifetime_days = await get_runtime_settings().get_int(
             "service_accounts.credential_max_lifetime_days"
         )
-        await self.resolve_user_references(response.resources)
         return response
 
     async def update_service_account(

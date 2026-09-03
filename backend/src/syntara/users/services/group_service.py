@@ -233,8 +233,6 @@ class GroupsService(UserReferenceResolverMixin, BaseService):
             for resource in response.resources:
                 resource.member_count = counts.get(resource.id, 0)
 
-        await self.resolve_user_references(response.resources)
-
         return response
 
     async def get_group_by_id(self, group_id: UUID) -> Group:

@@ -110,7 +110,7 @@ class IdentityProviderService(UserReferenceResolverMixin, BaseService, SecretCon
         """List identity providers with filtering, sorting, and pagination."""
         special_field_handlers = self._get_special_field_handlers()
 
-        response = await self.list_resources(
+        return await self.list_resources(
             model=IdentityProvider,
             response_type=IdentityProviderListResponse,
             limit=limit,
@@ -120,8 +120,6 @@ class IdentityProviderService(UserReferenceResolverMixin, BaseService, SecretCon
             query_params_items=query_params_items,
             include_total=include_total,
         )
-        await self.resolve_user_references(response.resources)
-        return response
 
     async def get_provider(self, provider_id: UUID) -> IdentityProviderRead:
         """Get an identity provider by ID."""

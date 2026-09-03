@@ -445,8 +445,6 @@ class CredentialService(UserReferenceResolverMixin, BaseService):
                 resource.workflow_count = workflow_counts.get(resource.id, 0)
                 resource.integration_count = integration_counts.get(resource.id, 0)
 
-        await self.resolve_user_references(response.resources)
-
         return response
 
     async def update_credential(self, credential_id: UUID, data: CredentialUpdate) -> CredentialRead:
