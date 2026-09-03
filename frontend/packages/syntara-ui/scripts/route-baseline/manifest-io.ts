@@ -3,7 +3,11 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { stableStringify } from './normalize-route'
-import { routeManifestSchema, type RouteManifest } from './route-manifest-schema'
+import {
+  routeManifestJsonSchema,
+  routeManifestSchema,
+  type RouteManifest,
+} from './route-manifest-schema'
 
 const thisDir = dirname(fileURLToPath(import.meta.url))
 
@@ -43,8 +47,7 @@ export function getManifestPath(pkgRoot = getPackageRoot()): string {
  * @returns Parsed manifest object
  */
 export function readCommittedManifest(pkgRoot = getPackageRoot()): RouteManifest {
-  const raw = readFileSync(getManifestPath(pkgRoot), 'utf-8')
-  return routeManifestSchema.parse(JSON.parse(raw) as unknown)
+  return routeManifestJsonSchema.parse(readFileSync(getManifestPath(pkgRoot), 'utf-8'))
 }
 
 /**

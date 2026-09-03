@@ -3,7 +3,10 @@ import { describe, expect, it } from 'vitest'
 import {
   ROUTE_MANIFEST_COMMENT_KEY,
   ROUTE_MANIFEST_NOTICE,
+  absolutePathSchema,
+  parsedCreateRouteSchema,
   plainObjectSchema,
+  routeManifestJsonSchema,
   routeManifestSchema,
 } from './route-manifest-schema'
 
@@ -63,5 +66,40 @@ describe('plainObjectSchema', () => {
     expect(plainObjectSchema.safeParse(null).success).toBe(false)
     expect(plainObjectSchema.safeParse([]).success).toBe(false)
     expect(plainObjectSchema.safeParse('x').success).toBe(false)
+  })
+})
+
+describe('absolutePathSchema', () => {
+  it('requires a leading slash', () => {
+    expect(absolutePathSchema.safeParse('/workflows').success).toBe(true)
+    expect(absolutePathSchema.safeParse('workflows').success).toBe(false)
+    expect(absolutePathSchema.safeParse('').success).toBe(false)
+  })
+})
+
+describe('parsedCreateRouteSchema', () => {
+  it('accepts page and redirect shapes', () => {
+    expect(parsedCreateRouteSchema.parse({ path: '/workflows', kind: 'page' })).toStrictEqual({
+      path: '/workflows',
+      kind: 'page',
+    })
+    expect(
+      parsedCreateRouteSchema.parse({
+        path: '/configuration',
+        kind: 'redirect',
+        redirectTo: '/configuration/integrations',
+      })
+    ).toMatchObject({ kind: 'redirect', redirectTo: '/configuration/integrations' })
+  })
+})
+
+describe('routeManifestJsonSchema', () => {
+  it('parses JSON text into a typed manifest', () => {
+    const parsed = routeManifestJsonSchema.parse(JSON.stringify(validManifest))
+    expect(parsed).toStrictEqual(validManifest)
+  })
+
+  it('rejects invalid JSON text', () => {
+    expect(routeManifestJsonSchema.safeParse('{not-json').success).toBe(false)
   })
 })

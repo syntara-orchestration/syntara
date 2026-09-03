@@ -2,15 +2,15 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 
 import { extractParameters, normalizeTemplate } from './normalize-route'
-import { plainObjectSchema, type NormalizedRoute, type RouteKind } from './route-manifest-schema'
+import {
+  absolutePathSchema,
+  parsedCreateRouteSchema,
+  plainObjectSchema,
+  type NormalizedRoute,
+  type ParsedCreateRoute,
+} from './route-manifest-schema'
 
 const PATH_LITERAL = /['"](\/[^'"]*)['"]/g
-
-type ParsedCreateRoute = {
-  path: string
-  kind: RouteKind
-  redirectTo?: string
-}
 
 type NavItemLike = { path: string; children?: NavItemLike[] }
 
@@ -22,8 +22,9 @@ type NavItemLike = { path: string; children?: NavItemLike[] }
  * @returns The same set for chaining
  */
 export function collectPathsFromObject(value: unknown, out: Set<string> = new Set()): Set<string> {
-  if (typeof value === 'string' && value.startsWith('/')) {
-    out.add(value)
+  const path = absolutePathSchema.safeParse(value)
+  if (path.success) {
+    out.add(path.data)
     return out
   }
   const object = plainObjectSchema.safeParse(value)
@@ -110,12 +111,10 @@ export function parseCreateRouteBlocks(source: string): ParsedCreateRoute[] {
 
     const redirectMatch = body.match(/\bredirect\(\{\s*to:\s*['"]([^'"]+)['"]/)
     const redirectTo = redirectMatch?.[1]
-    if (redirectTo) {
-      results.push({ path, kind: 'redirect', redirectTo })
-      continue
-    }
-
-    results.push({ path, kind: 'page' })
+    const parsed = parsedCreateRouteSchema.safeParse(
+      redirectTo ? { path, kind: 'redirect', redirectTo } : { path, kind: 'page' }
+    )
+    if (parsed.success) results.push(parsed.data)
   }
 
   return results
@@ -213,8 +212,8 @@ export function collectMountedRouterRoutes(
 export function collectAppRoutePaths(appRouteSource: string): string[] {
   const paths = new Set<string>()
   for (const match of appRouteSource.matchAll(PATH_LITERAL)) {
-    const path = match[1]
-    if (path) paths.add(normalizeTemplate(path))
+    const path = absolutePathSchema.safeParse(match[1])
+    if (path.success) paths.add(normalizeTemplate(path.data))
   }
   return [...paths].sort()
 }
@@ -258,15 +257,13 @@ export function collectNavigationPathsFromSource(
   for (const match of navigationSource.matchAll(/\bpath:\s*(AppRoute(?:\.\w+)+)/g)) {
     const expression = match[1]
     if (!expression) continue
-    const resolved = resolveAppRouteReference(appRouteCatalog, expression)
-    if (typeof resolved === 'string') {
-      paths.add(normalizeTemplate(resolved))
-    }
+    const resolved = absolutePathSchema.safeParse(resolveAppRouteReference(appRouteCatalog, expression))
+    if (resolved.success) paths.add(normalizeTemplate(resolved.data))
   }
 
   for (const match of navigationSource.matchAll(/\bpath:\s*['"](\/[^'"]+)['"]/g)) {
-    const path = match[1]
-    if (path) paths.add(normalizeTemplate(path))
+    const path = absolutePathSchema.safeParse(match[1])
+    if (path.success) paths.add(normalizeTemplate(path.data))
   }
 
   return [...paths].sort()
@@ -310,9 +307,9 @@ export function collectAppLevelRoutesFromSource(
   for (const match of appSource.matchAll(/location\.pathname\s*===\s*(AppRoute(?:\.\w+)+)/g)) {
     const expression = match[1]
     if (!expression) continue
-    const resolved = resolveAppRouteReference(appRouteCatalog, expression)
-    if (typeof resolved !== 'string') continue
-    const template = normalizeTemplate(resolved)
+    const resolved = absolutePathSchema.safeParse(resolveAppRouteReference(appRouteCatalog, expression))
+    if (!resolved.success) continue
+    const template = normalizeTemplate(resolved.data)
     byTemplate.set(template, {
       template,
       parameters: extractParameters(template),
@@ -322,9 +319,9 @@ export function collectAppLevelRoutesFromSource(
   }
 
   for (const match of appSource.matchAll(/location\.pathname\s*===\s*['"](\/[^'"]+)['"]/g)) {
-    const path = match[1]
-    if (!path) continue
-    const template = normalizeTemplate(path)
+    const path = absolutePathSchema.safeParse(match[1])
+    if (!path.success) continue
+    const template = normalizeTemplate(path.data)
     byTemplate.set(template, {
       template,
       parameters: extractParameters(template),
@@ -345,8 +342,8 @@ export function collectAppLevelRoutesFromSource(
  */
 export function collectFallbackRouteFromSource(rootSource: string): NormalizedRoute {
   const match = rootSource.match(/\bnavigate\(\{\s*to:\s*['"]([^'"]+)['"]/)
-  const redirectTo = match?.[1]
-  if (!redirectTo) {
+  const redirectTo = absolutePathSchema.safeParse(match?.[1])
+  if (!redirectTo.success) {
     throw new Error('Could not find not-found navigate({ to }) target in __root.ts')
   }
 
@@ -354,7 +351,7 @@ export function collectFallbackRouteFromSource(rootSource: string): NormalizedRo
     template: '*',
     parameters: [],
     kind: 'fallback',
-    redirectTo: normalizeTemplate(redirectTo),
+    redirectTo: normalizeTemplate(redirectTo.data),
     sources: ['router'],
   }
 }

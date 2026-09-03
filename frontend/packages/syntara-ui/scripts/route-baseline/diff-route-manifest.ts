@@ -1,4 +1,5 @@
-import type { NormalizedRoute, RouteManifest } from './route-manifest-schema'
+import { stableStringify } from './normalize-route'
+import { normalizedRouteSchema, type NormalizedRoute, type RouteManifest } from './route-manifest-schema'
 
 /**
  * Structured difference between two route manifests.
@@ -55,20 +56,16 @@ export function diffRouteManifest(before: RouteManifest, after: RouteManifest): 
 }
 
 /**
- * Deep-compare two normalized route entries field by field.
+ * Compare two normalized routes via the Zod schema + stable JSON.
+ *
+ * Field-by-field hand checks drift when the schema grows; this stays aligned.
  *
  * @param a - Left route
  * @param b - Right route
- * @returns `true` when every compared field matches
+ * @returns `true` when the schema-shaped payloads match
  */
 function routesEqual(a: NormalizedRoute, b: NormalizedRoute): boolean {
   return (
-    a.template === b.template &&
-    a.kind === b.kind &&
-    a.redirectTo === b.redirectTo &&
-    a.parameters.length === b.parameters.length &&
-    a.parameters.every((param, index) => param === b.parameters[index]) &&
-    a.sources.length === b.sources.length &&
-    a.sources.every((source, index) => source === b.sources[index])
+    stableStringify(normalizedRouteSchema.parse(a)) === stableStringify(normalizedRouteSchema.parse(b))
   )
 }
