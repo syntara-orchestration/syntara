@@ -196,6 +196,7 @@ export type AAPJobTemplateConfig = {
   instanceGroupId?: number
   instanceGroupName?: string
   labels?: string[] // AAP Controller label names (prompt-on-launch override, supports creating new labels)
+  useInputVariables?: boolean
 }
 
 /** Mapping from AAPJobTemplateConfig key → API config key, with a predicate type. */
@@ -222,6 +223,7 @@ const aapConfigMapping: [keyof AAPJobTemplateConfig, string, 'truthy' | 'defined
   ['instanceGroupId', 'instance_group_id', 'defined'],
   ['instanceGroupName', 'instance_group_name', 'truthy'],
   ['labels', 'labels', 'truthy'],
+  ['useInputVariables', 'use_input_variables', 'truthy'],
 ]
 
 /**
