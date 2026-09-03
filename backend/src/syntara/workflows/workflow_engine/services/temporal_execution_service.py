@@ -10,7 +10,7 @@ from uuid import UUID, uuid4
 
 import structlog
 from temporalio.client import Client
-from temporalio.service import RPCError
+from temporalio.service import RPCError, RPCStatusCode
 
 from syntara.core.config.base import TEMPORAL_DEFAULT_BACKGROUND_TASK_QUEUE, get_settings
 from syntara.core.exceptions import SafeValueError
@@ -25,6 +25,21 @@ from syntara.workflows.workflow_engine.models.responses import (
 from syntara.workflows.workflow_engine.models.workflow_definition import resolve_trigger_node
 
 logger = structlog.stdlib.get_logger(__name__)
+
+
+def _is_not_found(error: RPCError) -> bool:
+    """Whether a Temporal RPC failure means "the thing is already gone".
+
+    Matching on the message text is not enough: Temporal reports a cancelled or
+    completed parent as NOT_FOUND with the message "workflow execution already
+    completed", which contains no "not found" substring. A message-only guard
+    re-raises it, and the activity-signal endpoint then answers 500 with an
+    unhandled RPCError traceback — seen in AAP-88614, where cancelling an
+    execution mid-agent-run made the orchestrator signal an activity Temporal
+    had already cancelled. The gRPC status is the reliable signal; the substring
+    check stays as a fallback for servers that report this differently.
+    """
+    return error.status == RPCStatusCode.NOT_FOUND or "not found" in str(error).lower()
 
 
 class TemporalExecutionService:
@@ -215,7 +230,7 @@ class TemporalExecutionService:
             logger.info("Workflow cancelled successfully", temporal_workflow_id=temporal_workflow_id)
 
         except RPCError as e:
-            if "not found" in str(e).lower():
+            if _is_not_found(e):
                 logger.info(
                     "Workflow already completed, cancel is a no-op",
                     temporal_workflow_id=temporal_workflow_id,
@@ -253,7 +268,7 @@ class TemporalExecutionService:
             )
 
         except RPCError as e:
-            if "not found" in str(e).lower():
+            if _is_not_found(e):
                 logger.warning(
                     "Async activity already completed or timed out (idempotent no-op)",
                     activity_id=activity_id,
@@ -296,7 +311,7 @@ class TemporalExecutionService:
             )
 
         except RPCError as e:
-            if "not found" in str(e).lower():
+            if _is_not_found(e):
                 logger.warning(
                     "Async activity already completed or timed out (idempotent no-op)",
                     activity_id=activity_id,

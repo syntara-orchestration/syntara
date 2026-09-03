@@ -63,6 +63,24 @@ class TestCompleteAsyncActivity:
         with pytest.raises(RPCError, match="connection refused"):
             await service.complete_async_activity("wf-123", "node-1", {"output": {}})
 
+    @pytest.mark.asyncio
+    async def test_idempotent_on_workflow_already_completed(self) -> None:
+        """A NOT_FOUND whose message lacks the words 'not found' is still a no-op.
+
+        Cancelling an execution that is running an agentic node makes the agent
+        orchestrator send a failure signal for an activity whose workflow Temporal
+        has already cancelled. Temporal answers NOT_FOUND with the message
+        "workflow execution already completed" — no "not found" substring — so a
+        message-based guard re-raises and the signal endpoint returns 500 with an
+        unhandled RPCError traceback. Match on the gRPC status instead.
+        """
+        service, mock_client = _make_service()
+        mock_handle = AsyncMock()
+        mock_handle.complete.side_effect = _make_rpc_error("workflow execution already completed")
+        mock_client.get_async_activity_handle.return_value = mock_handle
+
+        await service.complete_async_activity("wf-123", "node-1", {"output": {}})
+
 
 class TestFailAsyncActivity:
     """Tests for TemporalExecutionService.fail_async_activity."""
@@ -108,3 +126,21 @@ class TestFailAsyncActivity:
 
         with pytest.raises(RPCError, match="connection refused"):
             await service.fail_async_activity("wf-123", "node-1", RuntimeError("err"))
+
+    @pytest.mark.asyncio
+    async def test_idempotent_on_workflow_already_completed(self) -> None:
+        """A NOT_FOUND whose message lacks the words 'not found' is still a no-op.
+
+        Cancelling an execution that is running an agentic node makes the agent
+        orchestrator send a failure signal for an activity whose workflow Temporal
+        has already cancelled. Temporal answers NOT_FOUND with the message
+        "workflow execution already completed" — no "not found" substring — so a
+        message-based guard re-raises and the signal endpoint returns 500 with an
+        unhandled RPCError traceback. Match on the gRPC status instead.
+        """
+        service, mock_client = _make_service()
+        mock_handle = AsyncMock()
+        mock_handle.fail.side_effect = _make_rpc_error("workflow execution already completed")
+        mock_client.get_async_activity_handle.return_value = mock_handle
+
+        await service.fail_async_activity("wf-123", "node-1", RuntimeError("err"))

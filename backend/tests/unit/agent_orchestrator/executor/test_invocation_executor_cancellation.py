@@ -1,5 +1,6 @@
 """Unit tests for InvocationExecutor cancellation race condition fixes."""
 
+import asyncio
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -428,3 +429,208 @@ class TestInvocationExecutorCancellationRaceCondition:
         assert values[started_at_col].effective_value == explicit_started_at, "Explicit started_at should be preserved"
 
         mock_session.commit.assert_called_once()
+
+
+class TestInvocationExecutorActivityCancellation:
+    """The activity running the agent can be cancelled by Temporal.
+
+    Nothing else records a terminal state in that case, so the executor must write
+    CANCELLED itself. The write is shielded: a bare ``await`` inside an
+    ``except asyncio.CancelledError`` block is silently dropped when a second
+    cancellation arrives while it is in flight (worker shutdown), leaving the row
+    RUNNING forever — the exact state the handler exists to prevent. Ref: AAP-88614.
+    """
+
+    @staticmethod
+    def _executor() -> tuple[InvocationExecutor, AsyncMock]:
+        mock_session = AsyncMock()
+
+        async def mock_session_factory() -> AsyncGenerator[AsyncSession, None]:
+            yield mock_session
+
+        return InvocationExecutor(session_factory=mock_session_factory), mock_session
+
+    @pytest.mark.asyncio
+    async def test_activity_cancellation_records_cancelled_and_reraises(self) -> None:
+        """A cancelled activity writes CANCELLED and lets the cancellation propagate."""
+        executor, mock_session = self._executor()
+        invocation_id = uuid4()
+
+        mock_invocation = MagicMock()
+        mock_invocation.id = invocation_id
+        mock_invocation.status = InvocationStatus.RUNNING
+        mock_invocation.prompt = "test prompt"
+        mock_invocation.session_id = "test-session"
+        mock_invocation.context_data = {}
+        mock_session.get.return_value = mock_invocation
+
+        mock_exec_result = MagicMock()
+        mock_exec_result.rowcount = 1
+        mock_session.exec.return_value = mock_exec_result
+
+        with (
+            patch(
+                "syntara.agent_orchestrator.executor.invocation_executor.get_openrouter_llm",
+                return_value=(MagicMock(model_name="test-model", openai_api_base="https://test.example.com"), None),
+            ),
+            patch("syntara.agent_orchestrator.executor.invocation_executor.ContextManagerPlanner"),
+            patch("syntara.agent_orchestrator.executor.invocation_executor.OrchestrationService") as mock_orchestration,
+            patch.object(executor, "_update_invocation_status", new=AsyncMock()) as mock_update,
+        ):
+            mock_orchestration.return_value.execute.side_effect = asyncio.CancelledError()
+
+            with pytest.raises(asyncio.CancelledError):
+                await executor.execute_invocation(invocation_id)
+
+        statuses = [c.args[1] for c in mock_update.await_args_list if len(c.args) > 1]
+        assert InvocationStatus.CANCELLED in statuses, f"activity cancellation must record CANCELLED, got {statuses}"
+
+    @pytest.mark.asyncio
+    async def test_terminal_write_survives_cancellation_during_cleanup(self) -> None:
+        """A second cancellation mid-write must not drop the CANCELLED update.
+
+        Without ``asyncio.shield`` the update coroutine is cancelled at its first
+        await point and the row silently stays RUNNING.
+        """
+        executor, mock_session = self._executor()
+        invocation_id = uuid4()
+
+        mock_invocation = MagicMock()
+        mock_invocation.id = invocation_id
+        mock_invocation.status = InvocationStatus.RUNNING
+        mock_invocation.prompt = "test prompt"
+        mock_invocation.session_id = "test-session"
+        mock_invocation.context_data = {}
+        mock_session.get.return_value = mock_invocation
+
+        mock_exec_result = MagicMock()
+        mock_exec_result.rowcount = 1
+        mock_session.exec.return_value = mock_exec_result
+
+        wrote: list[InvocationStatus] = []
+        entered = asyncio.Event()
+
+        async def slow_update(_inv_id: object, status: InvocationStatus, **_kwargs: object) -> None:
+            # Only the terminal write is of interest; the executor also calls this
+            # earlier to mark the invocation RUNNING, and cancelling during that
+            # call would not exercise the cleanup path at all.
+            if status is not InvocationStatus.CANCELLED:
+                wrote.append(status)
+                return
+            entered.set()
+            await asyncio.sleep(0.02)  # a real await point, like a DB round-trip
+            wrote.append(status)
+
+        with (
+            patch(
+                "syntara.agent_orchestrator.executor.invocation_executor.get_openrouter_llm",
+                return_value=(MagicMock(model_name="test-model", openai_api_base="https://test.example.com"), None),
+            ),
+            patch("syntara.agent_orchestrator.executor.invocation_executor.ContextManagerPlanner"),
+            patch("syntara.agent_orchestrator.executor.invocation_executor.OrchestrationService") as mock_orchestration,
+            patch.object(executor, "_update_invocation_status", new=slow_update),
+        ):
+            mock_orchestration.return_value.execute.side_effect = asyncio.CancelledError()
+
+            task = asyncio.create_task(executor.execute_invocation(invocation_id))
+            await entered.wait()
+            task.cancel()  # lands while the terminal write is in flight
+            with pytest.raises(asyncio.CancelledError):
+                await task
+            await asyncio.sleep(0.05)  # let the shielded write finish
+
+        assert InvocationStatus.CANCELLED in wrote, (
+            "terminal CANCELLED write was dropped when a cancellation arrived mid-write"
+        )
+
+    @staticmethod
+    def _cancellation_details(*, worker_shutdown: bool, cancel_requested: bool) -> MagicMock:
+        details = MagicMock()
+        details.worker_shutdown = worker_shutdown
+        details.cancel_requested = cancel_requested
+        return details
+
+    async def _run_cancelled_invocation(self, details: MagicMock | None) -> list[InvocationStatus]:
+        """Cancel an in-flight invocation and return the statuses that were persisted."""
+        executor, mock_session = self._executor()
+        invocation_id = uuid4()
+
+        mock_invocation = MagicMock()
+        mock_invocation.id = invocation_id
+        mock_invocation.status = InvocationStatus.RUNNING
+        mock_invocation.prompt = "test prompt"
+        mock_invocation.session_id = "test-session"
+        mock_invocation.context_data = {}
+        mock_session.get.return_value = mock_invocation
+
+        mock_exec_result = MagicMock()
+        mock_exec_result.rowcount = 1
+        mock_session.exec.return_value = mock_exec_result
+
+        details_patch = (
+            patch("temporalio.activity.cancellation_details", return_value=details)
+            if details is not None
+            else patch("temporalio.activity.cancellation_details", side_effect=RuntimeError("Not in activity context"))
+        )
+
+        with (
+            patch(
+                "syntara.agent_orchestrator.executor.invocation_executor.get_openrouter_llm",
+                return_value=(MagicMock(model_name="test-model", openai_api_base="https://test.example.com"), None),
+            ),
+            patch("syntara.agent_orchestrator.executor.invocation_executor.ContextManagerPlanner"),
+            patch("syntara.agent_orchestrator.executor.invocation_executor.OrchestrationService") as mock_orchestration,
+            patch.object(executor, "_update_invocation_status", new=AsyncMock()) as mock_update,
+            details_patch,
+        ):
+            mock_orchestration.return_value.execute.side_effect = asyncio.CancelledError()
+
+            with pytest.raises(asyncio.CancelledError):
+                await executor.execute_invocation(invocation_id)
+
+        return [c.args[1] for c in mock_update.await_args_list if len(c.args) > 1]
+
+    @pytest.mark.asyncio
+    async def test_worker_shutdown_does_not_persist_cancelled(self) -> None:
+        """A worker-shutdown cancellation must leave the row RUNNING so the retry resumes.
+
+        On a rolling deploy Temporal cancels the activity locally, with
+        worker_shutdown set and cancel_requested clear. Writing CANCELLED here makes
+        the retried attempt no-op on the ``status == CANCELLED`` guard in
+        execute_invocation, abandoning an agent nobody cancelled. Ref: AAP-88614.
+        """
+        statuses = await self._run_cancelled_invocation(
+            self._cancellation_details(worker_shutdown=True, cancel_requested=False)
+        )
+        assert InvocationStatus.CANCELLED not in statuses, "worker shutdown must not persist CANCELLED"
+
+    @pytest.mark.asyncio
+    async def test_requested_cancel_still_persists_cancelled(self) -> None:
+        """A real cancel must still record CANCELLED -- the fix must not over-correct."""
+        statuses = await self._run_cancelled_invocation(
+            self._cancellation_details(worker_shutdown=False, cancel_requested=True)
+        )
+        assert InvocationStatus.CANCELLED in statuses, "a requested cancel must persist CANCELLED"
+
+    @pytest.mark.asyncio
+    async def test_cancel_outside_activity_context_still_persists_cancelled(self) -> None:
+        """cancellation_details() raises outside an activity; keep the old behaviour there."""
+        statuses = await self._run_cancelled_invocation(None)
+        assert InvocationStatus.CANCELLED in statuses, (
+            "without activity context the handler must fall back to recording CANCELLED"
+        )
+
+    @pytest.mark.asyncio
+    async def test_non_requested_cancellation_does_not_persist_cancelled(self) -> None:
+        """Any cancellation that is not a requested cancel must leave the row RUNNING.
+
+        A timeout, pause or reset arrives with cancel_requested clear. Persisting
+        CANCELLED there abandons the invocation on the retry guard just as worker
+        shutdown does, so only a requested cancel may write a terminal status.
+        """
+        details = MagicMock()
+        details.worker_shutdown = False
+        details.cancel_requested = False
+        details.timed_out = True
+        statuses = await self._run_cancelled_invocation(details)
+        assert InvocationStatus.CANCELLED not in statuses, "non-requested cancellation must not persist CANCELLED"

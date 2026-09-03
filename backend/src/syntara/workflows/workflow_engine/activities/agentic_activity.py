@@ -144,6 +144,10 @@ async def execute_agentic_activity(
 
     """
     logger.info("Starting agentic activity (v2)")
+    # Do not add an early STOP_MONITOR heartbeat here: the sync-service describe
+    # probe exits on the first STOP_MONITOR it sees, and a bare one at start would
+    # end the probe before the invocation_id partial output below exists. That link
+    # is what lets cancelling the execution cancel the invocation (AAP-88614).
 
     try:
         try:

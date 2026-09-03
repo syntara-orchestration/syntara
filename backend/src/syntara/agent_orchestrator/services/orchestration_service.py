@@ -24,16 +24,19 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import ToolNode
+from sqlalchemy.exc import SQLAlchemyError
 
 from syntara.agent_orchestrator.agents.generic_agent import GenericAgent
 from syntara.agent_orchestrator.agents.orchestrator_agent import OrchestratorAgent
+from syntara.agent_orchestrator.cancellation import cancel_was_requested
 from syntara.agent_orchestrator.constants import AgentRoutes
 from syntara.agent_orchestrator.context_manager.planner import ContextManagerPlanner
-from syntara.agent_orchestrator.exceptions import ToolSelectionUnavailableError
+from syntara.agent_orchestrator.exceptions import InvocationCancelledError, ToolSelectionUnavailableError
 from syntara.agent_orchestrator.models.agent_response import GenericAgentResponse
 from syntara.agent_orchestrator.models.agent_state import AgentState, AgentStateFactory
 from syntara.agent_orchestrator.models.context_data import InvocationContextData
 from syntara.agent_orchestrator.models.streaming_events import (
+    CancelledEventData,
     CompletionEventData,
     DeltaEventData,
     ToolCallEventData,
@@ -59,6 +62,11 @@ from syntara.metrics.instrumentation import LLMStreamTracker
 
 logger = structlog.stdlib.get_logger(__name__)
 
+
+# How often the streaming loop re-reads Invocation.status to notice a cancellation.
+# The planner only checks during context planning; without this the agent runs to
+# completion after a cancel. Ref: AAP-88614.
+_CANCELLATION_POLL_INTERVAL_SECONDS = 3.0
 
 _MAX_TOOL_OUTPUT_LENGTH = 10_000
 _MAX_TOOL_CONTENT_LENGTH = 200
@@ -547,6 +555,10 @@ class OrchestrationService:
                 # over stream-derived reasoning-step estimates for Agent Steps header.
                 self._apply_provider_token_totals(result)
 
+                # A cancel can land between the last poll and here; signalling a
+                # cancelled workflow would target an execution that no longer exists.
+                await self._raise_if_invocation_cancelled(invocation_id, phase="completion")
+
                 # Publish completion event
                 await self._publish_completion_event(invocation_id, stream_id, client)
 
@@ -556,6 +568,53 @@ class OrchestrationService:
                 logger.info("Streaming orchestration completed", invocation_id=invocation_id)
 
                 return result
+
+            except InvocationCancelledError as cancelled:
+                # Expected control flow, not a failure — InvocationExecutor records
+                # the cancelled outcome. Two consumers still need a terminal signal:
+                #  - stream subscribers stop only on completion/error/cancelled, so
+                #    publish "cancelled" or the UI spins until the stream expires;
+                #  - the parent workflow's agentic activity is parked in
+                #    raise_complete_async and only a callback releases it. On an
+                #    invocation-only cancel the parent is still running, so fail it
+                #    now instead of letting it hit start_to_close_timeout. When the
+                #    parent was itself cancelled the callback is a no-op.
+                logger.info("Orchestration abandoned — invocation cancelled", invocation_id=invocation_id)
+                await self._publish_stream_event(
+                    client,
+                    stream_id,
+                    "cancelled",
+                    invocation_id,
+                    CancelledEventData(reason="user_cancelled").model_dump(),
+                )
+                cb_url = ctx.callback_url.get_secret_value() if ctx and ctx.callback_url else None
+                await WorkflowSignalClient.send_failure_signal(cb_url, invocation_id, cancelled)
+                raise
+
+            except asyncio.CancelledError:
+                # The Temporal activity was cancelled. asyncio.CancelledError is a
+                # BaseException, so it bypasses both handlers around it and stream
+                # subscribers -- which stop only on a terminal event -- would wait
+                # out the Redis stream's expiry instead. Ref: AAP-88614.
+                if not cancel_was_requested():
+                    # Transient (worker shutdown, timeout, pause, reset): the attempt
+                    # runs again, so the run is not over and the stream must stay open.
+                    raise
+                logger.info("Orchestration abandoned — activity cancelled", invocation_id=invocation_id)
+                # Shielded: a bare await is silently dropped if a second cancellation
+                # lands while the publish is in flight, losing the terminal event.
+                await asyncio.shield(
+                    self._publish_stream_event(
+                        client,
+                        stream_id,
+                        "cancelled",
+                        invocation_id,
+                        # Not "user_cancelled": the workflow was cancelled, which is
+                        # not necessarily the same as somebody clicking Cancel.
+                        CancelledEventData(reason="workflow_cancelled").model_dump(),
+                    )
+                )
+                raise
 
             except Exception as e:
                 # Handle streaming errors
@@ -603,20 +662,102 @@ class OrchestrationService:
             model=self._get_model_name(),
         )
 
-        # Stream events from LangGraph
-        async for event in graph.astream_events(initial_state, config, version="v2"):
-            # Process streaming events (event is StandardStreamEvent | CustomStreamEvent)
-            event_dict = cast("dict[str, Any]", event)
-            ttft_tracker.process_event(event_dict)
-            await self._process_streaming_event(event_dict, invocation_id, stream_id, client)
+        last_cancellation_check = time.monotonic()
 
-            # Accumulate for trace persistence
-            trace_accumulator.accumulate(event_dict)
+        # The poll is driven from a timer, not from the arrival of events:
+        # astream_events emits nothing while a tool call or a long generation is in
+        # flight, so a check placed only in the loop body cannot fire during exactly
+        # the stretches that burn the most tokens. cancel_invocation writes the
+        # invocation row without cancelling the Temporal workflow, so on an
+        # invocation-only cancel this poll is the sole interrupt. Ref: AAP-88614.
+        stream = graph.astream_events(initial_state, config, version="v2").__aiter__()
+        try:
+            while True:
+                next_event = asyncio.ensure_future(anext(stream))
+                try:
+                    # Wait one poll interval at a time so a quiet stream still gets
+                    # checked; anything already pending is left running meanwhile.
+                    while True:
+                        done, _ = await asyncio.wait({next_event}, timeout=_CANCELLATION_POLL_INTERVAL_SECONDS)
+                        if done:
+                            break
+                        last_cancellation_check = await self._poll_cancellation_if_due(
+                            invocation_id, last_cancellation_check
+                        )
+                except BaseException:
+                    # A raised cancellation (or anything else) leaves the pending
+                    # anext orphaned. Cancel it and let it unwind before the
+                    # generator is closed below — aclose() on a generator still
+                    # mid-await raises "asynchronous generator is already running".
+                    # gather(return_exceptions=True) reports that task's own
+                    # CancelledError as a result while a cancellation aimed at
+                    # *this* coroutine still propagates.
+                    next_event.cancel()
+                    await asyncio.gather(next_event, return_exceptions=True)
+                    raise
 
-            # Capture final state from graph end events
-            final_state = self._extract_final_state(event_dict, final_state)
+                try:
+                    event = next_event.result()
+                except StopAsyncIteration:
+                    break
+
+                # A stream that never goes quiet would otherwise never be polled.
+                last_cancellation_check = await self._poll_cancellation_if_due(invocation_id, last_cancellation_check)
+
+                # Process streaming events (event is StandardStreamEvent | CustomStreamEvent)
+                event_dict = cast("dict[str, Any]", event)
+                ttft_tracker.process_event(event_dict)
+                await self._process_streaming_event(event_dict, invocation_id, stream_id, client)
+
+                # Accumulate for trace persistence
+                trace_accumulator.accumulate(event_dict)
+
+                # Capture final state from graph end events
+                final_state = self._extract_final_state(event_dict, final_state)
+        finally:
+            aclose = getattr(stream, "aclose", None)
+            if aclose is not None:
+                await aclose()
 
         return final_state
+
+    async def _poll_cancellation_if_due(self, invocation_id: UUID, last_check: float) -> float:
+        """Check for cancellation at most once per poll interval.
+
+        Throttled so a token-by-token stream does not hammer the database.
+        Returns the timestamp of the last check, whether or not one was made.
+        """
+        now = time.monotonic()
+        if now - last_check < _CANCELLATION_POLL_INTERVAL_SECONDS:
+            return last_check
+        await self._raise_if_invocation_cancelled(invocation_id, phase="orchestration")
+        return now
+
+    async def _raise_if_invocation_cancelled(self, invocation_id: UUID, *, phase: str) -> None:
+        """Raise ``InvocationCancelledError`` if the invocation has been cancelled.
+
+        Reads through the context manager's session factory rather than holding a
+        session open for the life of the run. Database errors degrade gracefully —
+        the same choice ``ContextManagerPlanner._check_cancellation`` makes — since
+        failing to reach the database is not evidence of a cancellation.
+        """
+        from syntara.agent_orchestrator.models.invocation import Invocation, InvocationStatus  # noqa: PLC0415
+
+        try:
+            async with self.context_manager.get_async_session_context() as session:
+                invocation = await session.get(Invocation, invocation_id)
+                cancelled = bool(invocation and invocation.status == InvocationStatus.CANCELLED)
+        except (SQLAlchemyError, OSError) as exc:
+            logger.warning(
+                "Failed to check cancellation status, continuing execution",
+                invocation_id=invocation_id,
+                phase=phase,
+                error=str(exc),
+            )
+            return
+
+        if cancelled:
+            raise InvocationCancelledError(str(invocation_id), phase)
 
     def _extract_final_state(
         self, event_dict: dict[str, Any], current_final_state: AgentState | None

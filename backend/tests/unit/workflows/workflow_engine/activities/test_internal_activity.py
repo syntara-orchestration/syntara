@@ -360,3 +360,177 @@ class TestRunIntegrationResourceDiscovery:
         assert result["output"]["processed"] == 2
         assert result["output"]["refreshed"] == 1
         assert result["output"]["error"] == 1
+
+
+class TestInvocationExecutionHeartbeat:
+    """The agent-execution activity must heartbeat while the agent runs.
+
+    Temporal only delivers cancellation to activities that heartbeat. Without
+    it, cancelling the builtin AGENT_EXECUTION workflow cannot interrupt an
+    in-flight agent, so a cancelled run keeps calling the LLM. Ref: AAP-88614.
+    """
+
+    @pytest.mark.anyio
+    async def test_heartbeats_while_executor_runs(self) -> None:
+        """A slow invocation emits heartbeats rather than running silently."""
+        import asyncio
+
+        inv_id = uuid4()
+
+        async def slow_execute(*_args: object, **_kwargs: object) -> None:
+            await asyncio.sleep(0.25)
+
+        mock_executor = MagicMock()
+        mock_executor.execute_invocation = AsyncMock(side_effect=slow_execute)
+
+        with (
+            patch(
+                "syntara.agent_orchestrator.executor.invocation_executor.InvocationExecutor",
+                return_value=mock_executor,
+            ),
+            patch(
+                "syntara.workflows.workflow_engine.activities.internal_activity.INTERNAL_ACTIVITY_HEARTBEAT_INTERVAL_SECONDS",
+                0.02,
+            ),
+            patch(
+                "syntara.workflows.workflow_engine.activities.internal_activity.activity.heartbeat"
+            ) as mock_heartbeat,
+        ):
+            await execute_internal_activity(
+                {"activity": "invocation_execution", "input": {"invocation_id": str(inv_id)}},
+                None,
+            )
+
+        assert mock_heartbeat.call_count >= 2, (
+            f"expected periodic heartbeats during execution, got {mock_heartbeat.call_count}"
+        )
+
+    @pytest.mark.anyio
+    async def test_cancellation_propagates_and_stops_heartbeat(self) -> None:
+        """Temporal cancellation surfaces as CancelledError, not a wrapped failure."""
+        import asyncio
+
+        inv_id = uuid4()
+
+        mock_executor = MagicMock()
+        mock_executor.execute_invocation = AsyncMock(side_effect=asyncio.CancelledError())
+
+        with (
+            patch(
+                "syntara.agent_orchestrator.executor.invocation_executor.InvocationExecutor",
+                return_value=mock_executor,
+            ),
+            patch(
+                "syntara.workflows.workflow_engine.activities.internal_activity.INTERNAL_ACTIVITY_HEARTBEAT_INTERVAL_SECONDS",
+                0.02,
+            ),
+            patch("syntara.workflows.workflow_engine.activities.internal_activity.activity.heartbeat"),
+            pytest.raises(asyncio.CancelledError),
+        ):
+            await execute_internal_activity(
+                {"activity": "invocation_execution", "input": {"invocation_id": str(inv_id)}},
+                None,
+            )
+
+    @pytest.mark.anyio
+    async def test_heartbeat_failure_does_not_fail_the_activity(self) -> None:
+        """A heartbeat error must not mask the agent run's own outcome."""
+        import asyncio
+
+        inv_id = uuid4()
+
+        async def slow_execute(*_args: object, **_kwargs: object) -> None:
+            await asyncio.sleep(0.1)
+
+        mock_executor = MagicMock()
+        mock_executor.execute_invocation = AsyncMock(side_effect=slow_execute)
+
+        with (
+            patch(
+                "syntara.agent_orchestrator.executor.invocation_executor.InvocationExecutor",
+                return_value=mock_executor,
+            ),
+            patch(
+                "syntara.workflows.workflow_engine.activities.internal_activity.INTERNAL_ACTIVITY_HEARTBEAT_INTERVAL_SECONDS",
+                0.02,
+            ),
+            patch(
+                "syntara.workflows.workflow_engine.activities.internal_activity.activity.heartbeat",
+                side_effect=asyncio.QueueFull(),
+            ),
+        ):
+            result = await execute_internal_activity(
+                {"activity": "invocation_execution", "input": {"invocation_id": str(inv_id)}},
+                None,
+            )
+
+        assert result["output"]["status"] == "completed"
+
+    @pytest.mark.anyio
+    async def test_first_heartbeat_precedes_the_first_sleep(self) -> None:
+        """The loop must beat before sleeping, or cancel is undeliverable for one interval.
+
+        Temporal picks up a cancellation request on a heartbeat. Sleeping first
+        leaves a dead zone one interval long at the start of every activity in
+        which a cancel cannot arrive. Ref: AAP-88614.
+        """
+        import asyncio
+
+        from syntara.workflows.workflow_engine.activities.internal_activity import _heartbeat_until_cancelled
+
+        with (
+            # A long interval: any beat observed can only be the pre-sleep one.
+            patch(
+                "syntara.workflows.workflow_engine.activities.internal_activity.INTERNAL_ACTIVITY_HEARTBEAT_INTERVAL_SECONDS",
+                600.0,
+            ),
+            patch(
+                "syntara.workflows.workflow_engine.activities.internal_activity.activity.heartbeat"
+            ) as mock_heartbeat,
+        ):
+            task = asyncio.create_task(_heartbeat_until_cancelled())
+            await asyncio.sleep(0)  # let the loop reach its first statement
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+
+        assert mock_heartbeat.call_count == 1, (
+            f"the first heartbeat must not wait for a full interval, got {mock_heartbeat.call_count}"
+        )
+
+    @pytest.mark.anyio
+    async def test_non_agent_internal_operations_also_heartbeat(self) -> None:
+        """Every internal operation must beat, since the schedule sets a heartbeat_timeout.
+
+        _execute_executor_node gives internal_activity nodes a heartbeat_timeout, so
+        an operation that never heartbeats would fail its attempt spuriously.
+        """
+        import asyncio
+
+        async def slow_convert(*_args: object, **_kwargs: object) -> object:
+            await asyncio.sleep(0.25)
+            return MagicMock(name="COMPLETED")
+
+        mock_task = MagicMock()
+        mock_task.convert = AsyncMock(side_effect=slow_convert)
+
+        with (
+            patch(
+                "syntara.files.document_conversion.tasks.DocumentConversionTask",
+                return_value=mock_task,
+            ),
+            patch(
+                "syntara.workflows.workflow_engine.activities.internal_activity.INTERNAL_ACTIVITY_HEARTBEAT_INTERVAL_SECONDS",
+                0.02,
+            ),
+            patch(
+                "syntara.workflows.workflow_engine.activities.internal_activity.activity.heartbeat"
+            ) as mock_heartbeat,
+        ):
+            await execute_internal_activity(
+                {"activity": "document_conversion", "input": {"file_id": str(uuid4())}},
+                None,
+            )
+
+        assert mock_heartbeat.call_count >= 2, (
+            f"document_conversion must heartbeat too, got {mock_heartbeat.call_count}"
+        )

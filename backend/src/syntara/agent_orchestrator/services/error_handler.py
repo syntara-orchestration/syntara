@@ -6,7 +6,12 @@ RFC 9457 Problem Details format for WebSocket error events.
 
 from uuid import UUID
 
-from syntara.agent_orchestrator.exceptions import AgentTimeoutError, ToolDiscoveryError, ToolSelectionUnavailableError
+from syntara.agent_orchestrator.exceptions import (
+    AgentTimeoutError,
+    InvocationCancelledError,
+    ToolDiscoveryError,
+    ToolSelectionUnavailableError,
+)
 from syntara.core.models.error import ErrorData
 
 # Base URI for error types
@@ -79,6 +84,18 @@ def _classify_by_exception_type(exception: Exception, instance: str | None) -> E
             title="Agent Timeout",
             detail=str(exception),
             code="AGENT_TIMEOUT",
+            retryable=False,
+            instance=instance,
+        )
+
+    if isinstance(exception, InvocationCancelledError):
+        # Sent to the parent workflow as the agentic activity's failure reason;
+        # without this it reads as an "LLM Streaming Error".
+        return ErrorData(
+            type=f"{ERROR_TYPE_BASE_URI}/invocation-cancelled",
+            title="Invocation Cancelled",
+            detail="The agent invocation was cancelled before it completed.",
+            code="INVOCATION_CANCELLED",
             retryable=False,
             instance=instance,
         )

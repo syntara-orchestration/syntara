@@ -28,6 +28,7 @@ with workflow.unsafe.imports_passed_through():
         DEFAULT_ACTIVITY_TIMEOUT_SECONDS,
         ENGINE_MAX_OUTPUT_BYTES_KEY,
         ENGINE_TIMEOUT_SECONDS_KEY,
+        INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS,
     )
     from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
     from syntara.workflows.workflow_engine.node_settings_resolver import (
@@ -452,9 +453,14 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 )
             )
         except Exception:  # noqa: BLE001
+            # workflow.logger is a stdlib Logger, so structured fields must go
+            # through extra={}. A bare kwarg raises TypeError here, and because
+            # this runs inside the workflow, that failure fails the workflow task
+            # itself — Temporal then retries the activation forever and the
+            # execution never leaves RUNNING. Ref: AAP-88614.
             workflow.logger.warning(
                 "Failed to cancel agentic invocations (best-effort)",
-                node_id=node_id,
+                extra={"node_id": node_id},
             )
 
     @staticmethod
@@ -1064,6 +1070,17 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             args.extend(extra_args)
 
         retry_policy = resolve_retry_policy(node, self._runtime_settings)
+        # Temporal delivers cancellation to an activity only through its heartbeats,
+        # and only when the schedule carries a heartbeat_timeout -- otherwise the
+        # beats are dropped and cancelling the workflow leaves a long-running
+        # activity (the agent run) executing until start_to_close_timeout. Only
+        # internal activities heartbeat; giving the others a heartbeat timeout would
+        # fail them spuriously. Ref: AAP-88614.
+        heartbeat_timeout = (
+            timedelta(seconds=INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS)
+            if node_type == NodeType.INTERNAL_ACTIVITY
+            else None
+        )
         return cast(
             "dict[str, Any]",
             await workflow.execute_activity(
@@ -1071,6 +1088,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 args=args,
                 activity_id=node.id,
                 start_to_close_timeout=timedelta(seconds=timeout_seconds),
+                heartbeat_timeout=heartbeat_timeout,
                 retry_policy=retry_policy,
             ),
         )

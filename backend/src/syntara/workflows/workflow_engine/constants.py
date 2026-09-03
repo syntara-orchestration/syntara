@@ -28,6 +28,14 @@ MAX_ENV_VAR_LENGTH = _settings.max_env_var_length
 # executor nodes use _get_default_timeout() for type-appropriate defaults.
 DEFAULT_ACTIVITY_TIMEOUT_SECONDS = 30
 
+# Temporal only delivers activity cancellation through heartbeats, and only to an
+# activity that was scheduled with a heartbeat_timeout -- without one the server
+# drops the beats and a cancelled workflow cannot interrupt a long-running
+# activity. Internal activities beat on this interval; the schedule allows 3x
+# that before Temporal declares the attempt dead. Ref: AAP-88614.
+INTERNAL_ACTIVITY_HEARTBEAT_INTERVAL_SECONDS = 10.0
+INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS = 30.0
+
 # Key injected by the engine into each activity's input config so the activity
 # can use the already-resolved timeout without re-querying the catalog.
 # Must be popped by agentic_activity before forwarding config to the orchestrator.
