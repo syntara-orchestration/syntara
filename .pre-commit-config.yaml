@@ -80,7 +80,7 @@ repos:
 
       - id: github-scripts-prettier
         name: 'github-scripts: prettier format'
-        entry: npx --prefix frontend prettier --config frontend/.prettierrc --write --
+        entry: npx --no-install --prefix .github/scripts prettier --config frontend/.prettierrc --write --
         language: system
         pass_filenames: true
         files: ^\.github/scripts/.*\.(ts|js|json|md)$

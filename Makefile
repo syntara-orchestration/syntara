@@ -10,6 +10,7 @@ help: ## Show available targets
 install: ## Install backend and frontend dependencies
 	$(MAKE) -C backend install
 	cd frontend && npm ci
+	cd .github/scripts && npm ci
 	$(MAKE) pre-commit-install
 
 pre-commit-install: ## Install pre-commit hooks
@@ -37,7 +38,7 @@ _ensure-env:
 format: ## Format both codebases
 	$(MAKE) -C backend format
 	cd frontend && npm run format
-	npx --prefix frontend prettier --config frontend/.prettierrc --write .github/scripts
+	npx --no-install --prefix .github/scripts prettier --config frontend/.prettierrc --write .github/scripts
 
 lint: ## Lint both codebases
 	$(MAKE) -C backend lint
