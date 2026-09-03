@@ -8,12 +8,18 @@ action".
 from typing import Any, ClassVar
 from uuid import UUID
 
-from pydantic import ConfigDict, GetJsonSchemaHandler
+from pydantic import ConfigDict, GetJsonSchemaHandler, field_serializer
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import CoreSchema as PydanticCoreSchema
 from sqlmodel import Field, SQLModel
 
 DEFAULT_USER_REFERENCE_FIELDS: tuple[str, ...] = ("created_by", "updated_by")
+
+# Every field name any schema declares in USER_REFERENCE_FIELDS. The guard below is
+# a decorator, so it needs literal names at class-creation time and cannot read each
+# subclass's declaration; check_fields=False lets it name fields a given schema lacks.
+# Adding a new user-reference field means adding it here too.
+GUARDED_USER_REFERENCE_FIELDS: tuple[str, ...] = ("created_by", "updated_by", "decided_by")
 
 
 class UserReference(SQLModel):
@@ -64,6 +70,25 @@ class UserReferenceFieldsMixin:
     """
 
     USER_REFERENCE_FIELDS: ClassVar[tuple[str, ...]] = DEFAULT_USER_REFERENCE_FIELDS
+
+    @field_serializer(*GUARDED_USER_REFERENCE_FIELDS, mode="plain", check_fields=False)
+    def _guard_resolved_user_reference(self, value: object) -> "UserReference | None":
+        """Fail loudly when a response is serialized with an unresolved reference.
+
+        A raw id still sitting in one of these fields means the service never called
+        the resolver, and an empty name means it stopped at the placeholder some
+        services set before resolving. Both are bugs that would otherwise ship as a
+        wrong-looking name, so this turns them into a red test rather than silent data.
+        """
+        if value is None:
+            return None
+        if not isinstance(value, UserReference):
+            msg = f"{type(self).__name__}: user reference was never resolved (got {value!r})"
+            raise TypeError(msg)
+        if not value.name:
+            msg = f"{type(self).__name__}: user reference {value.id} resolved to an empty name"
+            raise ValueError(msg)
+        return value
 
     @classmethod
     def __get_pydantic_json_schema__(
