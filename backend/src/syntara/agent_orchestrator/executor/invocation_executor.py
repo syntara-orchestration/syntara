@@ -504,11 +504,17 @@ class InvocationExecutor:
             # state — without this the row stays RUNNING forever. The conditional
             # UPDATE is a no-op when a cancel already wrote CANCELLED.
             logger.info("Agent execution activity cancelled", invocation_id=invocation.id)
-            await self._update_invocation_status(
-                invocation.id,
-                InvocationStatus.CANCELLED,
-                completed_at=datetime.now(UTC),
-                error_message="Cancelled: agent execution workflow cancelled",
+            # Shielded: a bare await here is silently dropped if a second
+            # cancellation lands while the write is in flight — which is exactly
+            # the worker-shutdown case above — leaving the row RUNNING forever,
+            # the very state this handler exists to prevent.
+            await asyncio.shield(
+                self._update_invocation_status(
+                    invocation.id,
+                    InvocationStatus.CANCELLED,
+                    completed_at=datetime.now(UTC),
+                    error_message="Cancelled: agent execution workflow cancelled",
+                )
             )
             self._record_invocation_metrics(recorder, invocation_start, invocation.id, status="cancelled")
             raise

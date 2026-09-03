@@ -1,5 +1,6 @@
 """Unit tests for InvocationExecutor cancellation race condition fixes."""
 
+import asyncio
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -428,3 +429,116 @@ class TestInvocationExecutorCancellationRaceCondition:
         assert values[started_at_col].effective_value == explicit_started_at, "Explicit started_at should be preserved"
 
         mock_session.commit.assert_called_once()
+
+
+class TestInvocationExecutorActivityCancellation:
+    """The activity running the agent can be cancelled by Temporal.
+
+    Nothing else records a terminal state in that case, so the executor must write
+    CANCELLED itself. The write is shielded: a bare ``await`` inside an
+    ``except asyncio.CancelledError`` block is silently dropped when a second
+    cancellation arrives while it is in flight (worker shutdown), leaving the row
+    RUNNING forever — the exact state the handler exists to prevent. Ref: AAP-88614.
+    """
+
+    @staticmethod
+    def _executor() -> tuple[InvocationExecutor, AsyncMock]:
+        mock_session = AsyncMock()
+
+        async def mock_session_factory() -> AsyncGenerator[AsyncSession, None]:
+            yield mock_session
+
+        return InvocationExecutor(session_factory=mock_session_factory), mock_session
+
+    @pytest.mark.asyncio
+    async def test_activity_cancellation_records_cancelled_and_reraises(self) -> None:
+        """A cancelled activity writes CANCELLED and lets the cancellation propagate."""
+        executor, mock_session = self._executor()
+        invocation_id = uuid4()
+
+        mock_invocation = MagicMock()
+        mock_invocation.id = invocation_id
+        mock_invocation.status = InvocationStatus.RUNNING
+        mock_invocation.prompt = "test prompt"
+        mock_invocation.session_id = "test-session"
+        mock_invocation.context_data = {}
+        mock_session.get.return_value = mock_invocation
+
+        mock_exec_result = MagicMock()
+        mock_exec_result.rowcount = 1
+        mock_session.exec.return_value = mock_exec_result
+
+        with (
+            patch(
+                "syntara.agent_orchestrator.executor.invocation_executor.get_openrouter_llm",
+                return_value=(MagicMock(model_name="test-model", openai_api_base="https://test.example.com"), None),
+            ),
+            patch("syntara.agent_orchestrator.executor.invocation_executor.ContextManagerPlanner"),
+            patch("syntara.agent_orchestrator.executor.invocation_executor.OrchestrationService") as mock_orchestration,
+            patch.object(executor, "_update_invocation_status", new=AsyncMock()) as mock_update,
+        ):
+            mock_orchestration.return_value.execute.side_effect = asyncio.CancelledError()
+
+            with pytest.raises(asyncio.CancelledError):
+                await executor.execute_invocation(invocation_id)
+
+        statuses = [c.args[1] for c in mock_update.await_args_list if len(c.args) > 1]
+        assert InvocationStatus.CANCELLED in statuses, f"activity cancellation must record CANCELLED, got {statuses}"
+
+    @pytest.mark.asyncio
+    async def test_terminal_write_survives_cancellation_during_cleanup(self) -> None:
+        """A second cancellation mid-write must not drop the CANCELLED update.
+
+        Without ``asyncio.shield`` the update coroutine is cancelled at its first
+        await point and the row silently stays RUNNING.
+        """
+        executor, mock_session = self._executor()
+        invocation_id = uuid4()
+
+        mock_invocation = MagicMock()
+        mock_invocation.id = invocation_id
+        mock_invocation.status = InvocationStatus.RUNNING
+        mock_invocation.prompt = "test prompt"
+        mock_invocation.session_id = "test-session"
+        mock_invocation.context_data = {}
+        mock_session.get.return_value = mock_invocation
+
+        mock_exec_result = MagicMock()
+        mock_exec_result.rowcount = 1
+        mock_session.exec.return_value = mock_exec_result
+
+        wrote: list[InvocationStatus] = []
+        entered = asyncio.Event()
+
+        async def slow_update(_inv_id: object, status: InvocationStatus, **_kwargs: object) -> None:
+            # Only the terminal write is of interest; the executor also calls this
+            # earlier to mark the invocation RUNNING, and cancelling during that
+            # call would not exercise the cleanup path at all.
+            if status is not InvocationStatus.CANCELLED:
+                wrote.append(status)
+                return
+            entered.set()
+            await asyncio.sleep(0.02)  # a real await point, like a DB round-trip
+            wrote.append(status)
+
+        with (
+            patch(
+                "syntara.agent_orchestrator.executor.invocation_executor.get_openrouter_llm",
+                return_value=(MagicMock(model_name="test-model", openai_api_base="https://test.example.com"), None),
+            ),
+            patch("syntara.agent_orchestrator.executor.invocation_executor.ContextManagerPlanner"),
+            patch("syntara.agent_orchestrator.executor.invocation_executor.OrchestrationService") as mock_orchestration,
+            patch.object(executor, "_update_invocation_status", new=slow_update),
+        ):
+            mock_orchestration.return_value.execute.side_effect = asyncio.CancelledError()
+
+            task = asyncio.create_task(executor.execute_invocation(invocation_id))
+            await entered.wait()
+            task.cancel()  # lands while the terminal write is in flight
+            with pytest.raises(asyncio.CancelledError):
+                await task
+            await asyncio.sleep(0.05)  # let the shielded write finish
+
+        assert InvocationStatus.CANCELLED in wrote, (
+            "terminal CANCELLED write was dropped when a cancellation arrived mid-write"
+        )
