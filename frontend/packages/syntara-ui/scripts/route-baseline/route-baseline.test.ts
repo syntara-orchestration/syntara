@@ -39,7 +39,7 @@ describe('route baseline tooling', () => {
   it('round-trips a generated manifest through writeManifest and readCommittedManifest', () => {
     const { manifest } = buildRouteManifest({ pkgRoot })
     const tempRoot = makeTempPackageRoot()
-    mkdirSync(join(tempRoot, 'route-baseline'), { recursive: true })
+    mkdirSync(join(tempRoot, 'scripts/route-baseline'), { recursive: true })
 
     const writtenPath = writeManifest(manifest, tempRoot)
 

@@ -1,5 +1,5 @@
 /**
- * Compare live route sources to the committed `route-baseline/manifest.gen.json`.
+ * Compare live route sources to the committed `scripts/route-baseline/manifest.gen.json`.
  *
  * Usage:
  *   npm run route-baseline:check

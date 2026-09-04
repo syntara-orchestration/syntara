@@ -19,18 +19,20 @@ export function getPackageRoot(): string {
 /**
  * Resolve the committed baseline directory under a package root.
  *
+ * Tooling and the generated artifact both live under `scripts/route-baseline/`.
+ *
  * @param pkgRoot - UI package root (defaults to this package)
- * @returns Absolute path to `route-baseline/`
+ * @returns Absolute path to `scripts/route-baseline/`
  */
 export function getRouteBaselineDir(pkgRoot = getPackageRoot()): string {
-  return join(pkgRoot, 'route-baseline')
+  return join(pkgRoot, 'scripts/route-baseline')
 }
 
 /**
  * Resolve the committed manifest file path.
  *
  * @param pkgRoot - UI package root (defaults to this package)
- * @returns Absolute path to `route-baseline/manifest.gen.json`
+ * @returns Absolute path to `scripts/route-baseline/manifest.gen.json`
  */
 export function getManifestPath(pkgRoot = getPackageRoot()): string {
   return join(getRouteBaselineDir(pkgRoot), 'manifest.gen.json')
@@ -39,7 +41,7 @@ export function getManifestPath(pkgRoot = getPackageRoot()): string {
 /**
  * Read and parse the committed route baseline manifest.
  *
- * @param pkgRoot - UI package root that contains `route-baseline/manifest.gen.json`
+ * @param pkgRoot - UI package root that contains `scripts/route-baseline/manifest.gen.json`
  * @returns Parsed manifest object
  */
 export function readCommittedManifest(pkgRoot = getPackageRoot()): RouteManifest {
@@ -47,7 +49,7 @@ export function readCommittedManifest(pkgRoot = getPackageRoot()): RouteManifest
 }
 
 /**
- * Write a route manifest to `route-baseline/manifest.gen.json` under `pkgRoot`.
+ * Write a route manifest to `scripts/route-baseline/manifest.gen.json` under `pkgRoot`.
  *
  * Validates with Zod before writing so only schema-shaped data is committed.
  *

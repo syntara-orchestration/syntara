@@ -42,7 +42,7 @@ export type UpdateRouteBaselineResult = {
  *
  * Used by Vitest via `route-baseline:check`.
  *
- * @param pkgRoot - Package root containing sources and `route-baseline/`
+ * @param pkgRoot - Package root containing sources and `scripts/route-baseline/`
  * @returns Check result with diff and message lines
  */
 export function checkRouteBaseline(pkgRoot = getPackageRoot()): CheckRouteBaselineResult {
@@ -114,7 +114,7 @@ function formatCheckMessages(input: {
   messages.push('If this change is intentional:')
   messages.push('  1. cd frontend')
   messages.push('  2. npm run route-baseline:update')
-  messages.push('  3. Review packages/syntara-ui/route-baseline/manifest.gen.json')
+  messages.push('  3. Review packages/syntara-ui/scripts/route-baseline/manifest.gen.json')
   messages.push('  4. Commit the updated manifest in the same PR')
   messages.push('')
   messages.push('If this change is unintentional:')
@@ -138,7 +138,7 @@ function appendTemplateList(messages: string[], title: string, templates: string
 }
 
 /**
- * Regenerate the route baseline and write `route-baseline/manifest.gen.json`.
+ * Regenerate the route baseline and write `scripts/route-baseline/manifest.gen.json`.
  *
  * Refuses to write when AppRoute/navigation parity gaps or unmounted route
  * modules are present — fix those first or extend `SOURCE_PARITY_EXCEPTIONS`

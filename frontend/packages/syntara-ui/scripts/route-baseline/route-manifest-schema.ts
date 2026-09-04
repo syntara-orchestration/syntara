@@ -67,7 +67,7 @@ export const normalizedRouteSchema = z.object({
 })
 
 /**
- * Committed route baseline artifact written to `route-baseline/manifest.gen.json`.
+ * Committed route baseline artifact written to `scripts/route-baseline/manifest.gen.json`.
  */
 export const routeManifestSchema = z.object({
   /**

@@ -1,5 +1,5 @@
 /**
- * Regenerate `route-baseline/manifest.gen.json` from the current route sources.
+ * Regenerate `scripts/route-baseline/manifest.gen.json` from the current route sources.
  *
  * Usage:
  *   npm run route-baseline:update

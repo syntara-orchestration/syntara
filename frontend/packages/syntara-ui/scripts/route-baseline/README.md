@@ -15,9 +15,12 @@ npm run route-baseline:update
 **CI:** `(Frontend) Route Baseline` in `ci-frontend.yml` runs `route-baseline:check`.
 That job is the single contract gate.
 
-**Vitest:** collector / update helpers under `scripts/route-baseline/` run with the
-normal package suite (`npm run vitest` / `npm test`). Those tests use fixtures;
-they do **not** re-assert the live committed manifest.
+**Layout:** tooling, docs, and `manifest.gen.json` all live in this directory
+(`scripts/route-baseline/`).
+
+**Vitest:** collector / update helpers in this directory run with the normal
+package suite (`npm run vitest` / `npm test`). Those tests use fixtures; they do
+**not** re-assert the live committed manifest.
 
 Commit an updated `manifest.gen.json` in the same PR as the route change.
 
@@ -42,7 +45,7 @@ not need AppRoute. Incomplete AppRoute-only adds still refuse update.
 
 1. `cd frontend`
 2. `npm run route-baseline:update`
-3. Review `packages/syntara-ui/route-baseline/manifest.gen.json`
+3. Review `packages/syntara-ui/scripts/route-baseline/manifest.gen.json`
 4. Commit the updated manifest in the same PR
 
 **Unintentional drift**
