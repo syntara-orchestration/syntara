@@ -109,9 +109,18 @@ function formatCheckMessages(input: {
   appendTemplateList(messages, 'Unmounted route modules with createRoute:', input.unmountedRouteFiles)
 
   messages.push('')
-  messages.push('If this change is intentional, run:')
-  messages.push('  npm run route-baseline:update')
-  messages.push('and commit route-baseline/manifest.gen.json')
+  messages.push('Next steps:')
+  messages.push('')
+  messages.push('If this change is intentional:')
+  messages.push('  1. cd frontend')
+  messages.push('  2. npm run route-baseline:update')
+  messages.push('  3. Review packages/syntara-ui/route-baseline/manifest.gen.json')
+  messages.push('  4. Commit the updated manifest in the same PR')
+  messages.push('')
+  messages.push('If this change is unintentional:')
+  messages.push('  Fix the route sources (src/app/routes/*, AppRoute.tsx,')
+  messages.push('  navigationItems.tsx, tanstackRouteTree.tsx, App.tsx, or routes/__root.ts),')
+  messages.push('  then re-run: npm run route-baseline:check')
   return messages
 }
 
@@ -145,21 +154,22 @@ export function updateRouteBaseline(pkgRoot = getPackageRoot()): UpdateRouteBase
   })
 
   if (appRouteOnly.length > 0 || navigationOnly.length > 0 || unmountedRouteFiles.length > 0) {
+    const parityLines = formatCheckMessages({
+      ok: false,
+      diff: { added: [], removed: [], changed: [] },
+      appRouteOnly,
+      navigationOnly,
+      unmountedRouteFiles,
+    })
+    // Drop the shared "Next steps" remediation — update has its own guidance.
+    const nextStepsIndex = parityLines.indexOf('Next steps:')
+    const gapLines = (nextStepsIndex === -1 ? parityLines : parityLines.slice(0, nextStepsIndex)).filter(
+      (line) => line !== ''
+    )
+
     const lines = [
       'Refusing to update route baseline while source parity gaps remain:',
-      ...formatCheckMessages({
-        ok: false,
-        diff: { added: [], removed: [], changed: [] },
-        appRouteOnly,
-        navigationOnly,
-        unmountedRouteFiles,
-      }).filter(
-        (line) =>
-          !line.startsWith('If this change') &&
-          !line.startsWith('  npm run') &&
-          line !== 'and commit route-baseline/manifest.gen.json' &&
-          line !== ''
-      ),
+      ...gapLines,
       '',
       'Add a documented SOURCE_PARITY_EXCEPTIONS entry only for intentional gaps,',
       'or mount/remove the orphan route modules, then retry.',

@@ -12,8 +12,12 @@ npm run route-baseline:check
 npm run route-baseline:update
 ```
 
-Collector unit tests live under `scripts/route-baseline/` and run with the
-normal package suite (`npm run vitest` / `npm test`).
+**CI:** `(Frontend) Route Baseline` in `ci-frontend.yml` runs `route-baseline:check`.
+That job is the single contract gate.
+
+**Vitest:** collector / update helpers under `scripts/route-baseline/` run with the
+normal package suite (`npm run vitest` / `npm test`). Those tests use fixtures;
+they do **not** re-assert the live committed manifest.
 
 Commit an updated `manifest.gen.json` in the same PR as the route change.
 
@@ -31,6 +35,21 @@ The baseline is a **committed contract**, not “routes look fine.”
 **Router-only routes are allowed.** A new `createRoute` without an `AppRoute` /
 nav entry fails check with “Added”, then update succeeds. Hidden/detail URLs do
 not need AppRoute. Incomplete AppRoute-only adds still refuse update.
+
+## When check fails
+
+**Intentional change**
+
+1. `cd frontend`
+2. `npm run route-baseline:update`
+3. Review `packages/syntara-ui/route-baseline/manifest.gen.json`
+4. Commit the updated manifest in the same PR
+
+**Unintentional drift**
+
+Fix the route sources (`src/app/routes/*`, `AppRoute.tsx`, `navigationItems.tsx`,
+`tanstackRouteTree.tsx`, `App.tsx`, or `routes/__root.ts`), then re-run
+`npm run route-baseline:check`.
 
 ## Collector notes
 
