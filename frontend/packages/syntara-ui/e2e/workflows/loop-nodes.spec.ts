@@ -24,8 +24,10 @@ import {
   closeNodeEditorPanel,
   deleteWorkflow,
   openNodeForEditing,
+  openWorkflowInBuilder,
   saveWorkflow,
   startWorkflowWithTrigger,
+  triggerLayout,
   verifyNodeVisible,
   waitForUIReady,
 } from '../helpers/workflows'
@@ -250,6 +252,45 @@ test.describe('Loop Node Configuration [UI-16]', () => {
       }
     })
   }
+
+  test('loop-back edge renders after save and reopen', async ({ app }) => {
+    const workflowName = buildUniqueName('e2e-loop-back-reopen')
+
+    try {
+      await startWorkflowWithTrigger(app)
+
+      await addWhileLoopNode(app, {
+        name: 'Loop header',
+        condition: 'true',
+      })
+      await addChildScriptToLoop(app, 'Loop body', 'print("body")')
+      await waitForUIReady(app)
+      await triggerLayout(app)
+
+      const edgePathCountBeforeSave = await app.locator('svg g.react-flow__edge path').count()
+      expect(edgePathCountBeforeSave).toBeGreaterThanOrEqual(2)
+
+      await saveWorkflow(app, workflowName)
+      const workflowId = app.url().match(/workflow-builder\/([^/?]+)/)?.[1]
+      expect(workflowId).toBeTruthy()
+
+      await openWorkflowInBuilder(app, workflowName, workflowId)
+      await verifyNodeVisible(app, 'Loop header')
+      await verifyNodeVisible(app, 'Loop body')
+      await triggerLayout(app)
+
+      const edgePaths = await app.evaluate(() =>
+        [...document.querySelectorAll('svg g.react-flow__edge path')]
+          .map((path) => path.getAttribute('d'))
+          .filter((path): path is string => Boolean(path))
+      )
+
+      expect(edgePaths.length).toBeGreaterThanOrEqual(2)
+      edgePaths.forEach((path) => expect(path).toMatch(/^M/))
+    } finally {
+      await deleteWorkflow(app, workflowName)
+    }
+  })
 
   test('verifies configuration persists after multiple edits', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-loop-multi-edit')
