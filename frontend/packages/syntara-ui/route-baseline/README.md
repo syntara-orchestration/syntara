@@ -22,5 +22,4 @@ npm run route-baseline:check
 `/auth/test-signin-callback` is `kind: "app"` — handled in `App.tsx` before the
 router so the identity-provider test-signin popup skips `AppShell`. Planned
 follow-up after the file-based routing migration: move it to a public /
-layout-less TanStack route, or revisit and keep the escape hatch. See
-`frontend/docs/file-based-routing-migration-plan.md` (Follow-ups).
+layout-less TanStack route, or revisit and keep the escape hatch.
