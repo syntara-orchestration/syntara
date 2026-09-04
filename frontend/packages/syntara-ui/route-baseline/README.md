@@ -2,20 +2,42 @@
 
 `manifest.gen.json` is the UI route compatibility contract.
 
-To update after an intentional route change:
+## Commands
 
 ```bash
+# Compare live sources to the committed manifest (contract only — fast)
+npm run route-baseline:check
+
+# Regenerate manifest.gen.json after an intentional route change (+ Prettier)
 npm run route-baseline:update
 ```
 
-That regenerates `manifest.gen.json` and runs Prettier on it. Commit the
-result in the same PR.
+Collector unit tests live under `scripts/route-baseline/` and run with the
+normal package suite (`npm run vitest` / `npm test`).
 
-To verify locally:
+Commit an updated `manifest.gen.json` in the same PR as the route change.
 
-```bash
-npm run route-baseline:check
-```
+## Expectation model
+
+The baseline is a **committed contract**, not “routes look fine.”
+
+| Situation | `route-baseline:check` | `route-baseline:update` |
+|---|---|---|
+| Accidental break vs committed manifest | **Fail** | N/A — fix the source |
+| Intentional route change, sources consistent | **Fail** until regen | **Succeed**, then check passes |
+| AppRoute/nav out of sync with router | **Fail** (parity) | **Refuse** until fixed |
+| Non-contract change (page copy, search params) | **Pass** | No-op |
+
+**Router-only routes are allowed.** A new `createRoute` without an `AppRoute` /
+nav entry fails check with “Added”, then update succeeds. Hidden/detail URLs do
+not need AppRoute. Incomplete AppRoute-only adds still refuse update.
+
+## Collector notes
+
+- Redirect targets may be string literals **or** `AppRoute.Foo.Bar` references.
+- Mounted modules may be reached through static `export { ... } from './other'`
+  re-exports under `src/app/routes/` (text follow, not runtime import).
+- Search params, page JSX, and non-redirect `beforeLoad` logic are out of scope.
 
 ## Known exception
 

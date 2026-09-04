@@ -74,7 +74,11 @@ export function buildRouteManifest(options: BuildRouteManifestOptions): Manifest
   const treeSource = readFileSync(join(pkgRoot, 'src/app/tanstackRouteTree.tsx'), 'utf-8')
 
   const appRouteCatalog = parseAppRouteCatalog(appRouteSource)
-  const { routes: routerRoutes, unmountedRouteFiles } = collectMountedRouterRoutes(routesDir, treeSource)
+  const { routes: routerRoutes, unmountedRouteFiles } = collectMountedRouterRoutes(
+    routesDir,
+    treeSource,
+    appRouteCatalog
+  )
   const appLevel = collectAppLevelRoutesFromSource(appSource, appRouteCatalog)
   const fallback = collectFallbackRouteFromSource(rootSource)
 

@@ -88,15 +88,33 @@ export function extractBalancedObjectBody(source: string, openBraceIndex: number
 }
 
 /**
+ * Options for {@link parseCreateRouteBlocks}.
+ */
+export type ParseCreateRouteBlocksOptions = {
+  /**
+   * Nested `AppRoute` catalog used to resolve `redirect({ to: AppRoute... })`.
+   * Required when a createRoute block uses an AppRoute redirect target.
+   */
+  appRouteCatalog?: unknown
+}
+
+/**
  * Parse `createRoute({ ... })` blocks from a route module source string.
  *
  * Uses brace-depth scanning so nested option objects cannot truncate the block.
  * Text parsing avoids importing page components or CSS.
  *
+ * Redirect targets may be string literals or `AppRoute.Foo.Bar` references
+ * (resolved via {@link resolveAppRouteReference}).
+ *
  * @param source - TypeScript/TSX file contents
+ * @param options - Optional AppRoute catalog for non-literal redirects
  * @returns Raw path entries with kind and optional redirect target
  */
-export function parseCreateRouteBlocks(source: string): ParsedCreateRoute[] {
+export function parseCreateRouteBlocks(
+  source: string,
+  options: ParseCreateRouteBlocksOptions = {}
+): ParsedCreateRoute[] {
   const results: ParsedCreateRoute[] = []
   const startRegex = /createRoute\s*\(\s*\{/g
 
@@ -109,8 +127,7 @@ export function parseCreateRouteBlocks(source: string): ParsedCreateRoute[] {
     const path = pathMatch?.[1]
     if (!path) continue
 
-    const redirectMatch = body.match(/\bredirect\(\{\s*to:\s*['"]([^'"]+)['"]/)
-    const redirectTo = redirectMatch?.[1]
+    const redirectTo = extractRedirectTarget(body, options.appRouteCatalog)
     const parsed = parsedCreateRouteSchema.safeParse(
       redirectTo ? { path, kind: 'redirect', redirectTo } : { path, kind: 'page' }
     )
@@ -121,10 +138,53 @@ export function parseCreateRouteBlocks(source: string): ParsedCreateRoute[] {
 }
 
 /**
+ * Read `redirect({ to: ... })` from a createRoute options body.
+ *
+ * Supports string literals and `AppRoute...` references. Other expression
+ * shapes throw so redirect metadata is never silently dropped.
+ *
+ * @param body - Interior of a createRoute options object
+ * @param appRouteCatalog - Catalog for resolving AppRoute references
+ * @returns Absolute redirect path, or `undefined` when no redirect is present
+ */
+function extractRedirectTarget(body: string, appRouteCatalog: unknown): string | undefined {
+  const literalMatch = body.match(/\bredirect\(\{\s*to:\s*['"]([^'"]+)['"]/)
+  if (literalMatch?.[1]) return literalMatch[1]
+
+  const appRouteMatch = body.match(/\bredirect\(\{\s*to:\s*(AppRoute(?:\.\w+)+)/)
+  if (appRouteMatch?.[1]) {
+    if (appRouteCatalog === undefined) {
+      throw new Error(
+        `redirect({ to: ${appRouteMatch[1]} }) requires an AppRoute catalog to resolve`
+      )
+    }
+    const resolved = absolutePathSchema.safeParse(
+      resolveAppRouteReference(appRouteCatalog, appRouteMatch[1])
+    )
+    if (!resolved.success) {
+      throw new Error(`Could not resolve redirect target ${appRouteMatch[1]} against AppRoute`)
+    }
+    return resolved.data
+  }
+
+  const otherMatch = body.match(/\bredirect\(\{\s*to:\s*([^,\s}'"]+)/)
+  if (otherMatch?.[1]) {
+    throw new Error(
+      `Unsupported redirect({ to: ${otherMatch[1]} }) — use a string literal or AppRoute.Foo.Bar`
+    )
+  }
+
+  return undefined
+}
+
+/**
  * Parse `tanstackRouteTree.tsx` for route modules that are imported and mounted.
  *
  * A module counts as mounted only when its export is both imported from
  * `./routes/...` and spread into `addChildren([...])`.
+ *
+ * Returns the **imported** basenames (before re-export following). Prefer
+ * {@link resolveMountedCreateRouteModules} when scraping `createRoute` files.
  *
  * @param treeSource - File contents of `tanstackRouteTree.tsx`
  * @returns Sorted unique route module basenames (for example `workflows`)
@@ -154,20 +214,42 @@ export function parseMountedRouteModules(treeSource: string): string[] {
 }
 
 /**
- * Collect normalized routes from route modules mounted in the TanStack tree.
+ * Resolve mounted tree imports to modules that actually contain `createRoute`.
  *
- * Only files referenced by `tanstackRouteTree.tsx` are scraped, so orphan
- * `createRoute` modules cannot pollute the baseline.
+ * Follows static `export { ... } from './other'` / `export * from './other'`
+ * re-exports under `routesDir` without executing route modules.
  *
  * @param routesDir - Absolute path to `src/app/routes`
  * @param treeSource - Contents of `tanstackRouteTree.tsx`
+ * @returns Sorted basenames of modules that define `createRoute`
+ */
+export function resolveMountedCreateRouteModules(routesDir: string, treeSource: string): string[] {
+  const mounted = new Set<string>()
+  for (const imported of parseMountedRouteModules(treeSource)) {
+    const resolved = followToCreateRouteModule(routesDir, imported)
+    mounted.add(resolved ?? imported)
+  }
+  return [...mounted].sort()
+}
+
+/**
+ * Collect normalized routes from route modules mounted in the TanStack tree.
+ *
+ * Only files referenced by `tanstackRouteTree.tsx` (including one-hop+ static
+ * re-exports) are scraped, so orphan `createRoute` modules cannot pollute the
+ * baseline.
+ *
+ * @param routesDir - Absolute path to `src/app/routes`
+ * @param treeSource - Contents of `tanstackRouteTree.tsx`
+ * @param appRouteCatalog - Catalog for resolving `redirect({ to: AppRoute... })`
  * @returns Deduplicated router routes plus any unmounted route file basenames
  */
 export function collectMountedRouterRoutes(
   routesDir: string,
-  treeSource: string
+  treeSource: string,
+  appRouteCatalog?: unknown
 ): { routes: NormalizedRoute[]; unmountedRouteFiles: string[] } {
-  const mountedModules = new Set(parseMountedRouteModules(treeSource))
+  const mountedModules = new Set(resolveMountedCreateRouteModules(routesDir, treeSource))
   const routeFiles = readdirSync(routesDir).filter(
     (name) => (name.endsWith('.tsx') || name.endsWith('.ts')) && !name.includes('.test.') && name !== '__root.ts'
   )
@@ -177,7 +259,7 @@ export function collectMountedRouterRoutes(
       const base = basename(name, name.endsWith('.tsx') ? '.tsx' : '.ts')
       if (base === '__root') return false
       const source = readFileSync(join(routesDir, name), 'utf-8')
-      return parseCreateRouteBlocks(source).length > 0 && !mountedModules.has(base)
+      return parseCreateRouteBlocks(source, { appRouteCatalog }).length > 0 && !mountedModules.has(base)
     })
     .sort()
 
@@ -187,7 +269,7 @@ export function collectMountedRouterRoutes(
     const fileName = resolveRouteModuleFile(routesDir, moduleName)
     if (!fileName) continue
     const source = readFileSync(join(routesDir, fileName), 'utf-8')
-    for (const route of parseCreateRouteBlocks(source)) {
+    for (const route of parseCreateRouteBlocks(source, { appRouteCatalog })) {
       mergeRoute(byTemplate, {
         template: normalizeTemplate(route.path),
         parameters: extractParameters(normalizeTemplate(route.path)),
@@ -426,6 +508,58 @@ function resolveRouteModuleFile(routesDir: string, moduleName: string): string |
     if (existsSync(join(routesDir, candidate))) return candidate
   }
   return undefined
+}
+
+/**
+ * Follow static re-exports until a module that defines `createRoute` is found.
+ *
+ * @param routesDir - Absolute path to `src/app/routes`
+ * @param moduleName - Starting basename (imported from the route tree)
+ * @param seen - Cycle guard
+ * @returns Basename that contains `createRoute`, or `undefined` if none
+ */
+function followToCreateRouteModule(
+  routesDir: string,
+  moduleName: string,
+  seen: Set<string> = new Set()
+): string | undefined {
+  if (seen.has(moduleName)) return undefined
+  seen.add(moduleName)
+
+  const fileName = resolveRouteModuleFile(routesDir, moduleName)
+  if (!fileName) return undefined
+
+  const source = readFileSync(join(routesDir, fileName), 'utf-8')
+  // Presence only — do not resolve redirects (AppRoute catalog may be absent here).
+  if (/createRoute\s*\(\s*\{/.test(source)) return moduleName
+
+  for (const target of parseRelativeReexportTargets(source)) {
+    const resolved = followToCreateRouteModule(routesDir, basename(target), seen)
+    if (resolved) return resolved
+  }
+
+  return undefined
+}
+
+/**
+ * Collect relative module specifiers from `export ... from './x'` statements.
+ *
+ * @param source - TypeScript module source
+ * @returns Relative paths as written (for example `./workflows`)
+ */
+function parseRelativeReexportTargets(source: string): string[] {
+  const targets: string[] = []
+  const patterns = [
+    /export\s*\*\s*from\s*['"](\.\/[^'"]+)['"]/g,
+    /export\s*\{[^}]*\}\s*from\s*['"](\.\/[^'"]+)['"]/g,
+  ]
+  for (const pattern of patterns) {
+    for (const match of source.matchAll(pattern)) {
+      const target = match[1]
+      if (target && !targets.includes(target)) targets.push(target)
+    }
+  }
+  return targets
 }
 
 /**

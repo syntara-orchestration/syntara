@@ -1,3 +1,7 @@
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -10,6 +14,7 @@ import {
   parseCreateRouteBlocks,
   parseMountedRouteModules,
   resolveAppRouteReference,
+  resolveMountedCreateRouteModules,
 } from './collect-routes'
 
 describe('parseCreateRouteBlocks', () => {
@@ -43,6 +48,50 @@ export const routes = [
         redirectTo: '/configuration/integrations',
       },
     ])
+  })
+
+  it('resolves redirect({ to: AppRoute... }) against the catalog', () => {
+    const catalog = {
+      Configuration: {
+        Credentials: { Root: '/configuration/credentials' },
+      },
+    }
+    const source = `
+createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/configuration',
+  beforeLoad: () => redirect({ to: AppRoute.Configuration.Credentials.Root, replace: true }),
+})
+`
+    expect(parseCreateRouteBlocks(source, { appRouteCatalog: catalog })).toStrictEqual([
+      {
+        path: '/configuration',
+        kind: 'redirect',
+        redirectTo: '/configuration/credentials',
+      },
+    ])
+  })
+
+  it('throws when AppRoute redirect cannot be resolved', () => {
+    const source = `
+createRoute({
+  path: '/configuration',
+  beforeLoad: () => redirect({ to: AppRoute.Missing.Path, replace: true }),
+})
+`
+    expect(() => parseCreateRouteBlocks(source, { appRouteCatalog: {} })).toThrow(
+      /Could not resolve redirect target AppRoute\.Missing\.Path/
+    )
+  })
+
+  it('throws for unsupported non-literal redirect targets', () => {
+    const source = `
+createRoute({
+  path: '/configuration',
+  beforeLoad: () => redirect({ to: someVariable, replace: true }),
+})
+`
+    expect(() => parseCreateRouteBlocks(source)).toThrow(/Unsupported redirect/)
   })
 
   it('keeps scanning when a nested object appears before path', () => {
@@ -90,6 +139,28 @@ export const buildTanStackRouteTree = () =>
   ])
 `
     expect(parseMountedRouteModules(treeSource)).toStrictEqual(['workflows'])
+  })
+})
+
+describe('resolveMountedCreateRouteModules', () => {
+  it('follows static re-export barrels to the createRoute module', () => {
+    const routesDir = mkdtempSync(join(tmpdir(), 'route-baseline-reexport-'))
+    writeFileSync(
+      join(routesDir, 'workflows.tsx'),
+      `
+import { createRoute } from '@tanstack/react-router'
+export const workflowsRoutes = [
+  createRoute({ getParentRoute: () => rootRoute, path: '/workflows' }),
+]
+`
+    )
+    writeFileSync(join(routesDir, 'workflows-reexport.ts'), `export { workflowsRoutes } from './workflows'\n`)
+
+    const treeSource = `
+import { workflowsRoutes } from './routes/workflows-reexport'
+export const buildTanStackRouteTree = () => rootRoute.addChildren([...workflowsRoutes])
+`
+    expect(resolveMountedCreateRouteModules(routesDir, treeSource)).toStrictEqual(['workflows'])
   })
 })
 
