@@ -23,7 +23,7 @@
     "msw": "2.8.5",
     "prettier": "3.8.4",
     "tsx": "4.19.2",
-    "typescript": "5.7.3",
+    "typescript": "5.9.3",
     "vitest": "3.1.2"
   }
 }
