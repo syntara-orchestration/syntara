@@ -1,0 +1,55 @@
+---
+name: Sync devel → early-access
+
+on:
+  schedule:
+    - cron: '0 6 * * 0' # Every Sunday at 06:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: sync-devel-to-early-access
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Sync devel into early-access
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout early-access
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          ref: early-access
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch devel
+        run: git fetch origin devel
+
+      - name: Merge devel into early-access
+        run: |
+          git merge origin/devel --no-ff -m "chore: merge devel into early-access [automated]"
+
+      - name: Push to early-access
+        run: git push origin early-access
+
+      - name: Notify Slack on sync failure
+        if: failure() && env.SLACK_WEBHOOK_URL != ''
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_EARLY_ACCESS_SYNC_WEBHOOK_URL }}
+        run: |
+          set -euo pipefail
+          jq -n \
+            --arg repo "${{ github.repository }}" \
+            --arg url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            '{text: (":warning: *Sync failed*: `devel` → `early-access` in *" + $repo + "*.\nManual intervention required: <" + $url + "|View failed run>")}' \
+          | curl --fail -sS -X POST "$SLACK_WEBHOOK_URL" \
+              -H "Content-Type: application/json" \
+              --data @-
