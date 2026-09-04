@@ -5,6 +5,10 @@ import type { FlowPosition } from '../types'
 
 import { useNodePositioning } from './useNodePositioning'
 
+vi.mock('./useLoopGroupPositionSync', () => ({
+  useLoopGroupPositionSync: vi.fn(),
+}))
+
 describe('useNodePositioning', () => {
   const mockSetNodes = vi.fn()
   const mockGetViewport = vi.fn(() => ({ x: 0, y: 0, zoom: 1 }))
