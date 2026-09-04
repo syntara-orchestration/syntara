@@ -1,18 +1,18 @@
-import { convertWouterPathToTanStack } from '../../src/app/convertParamSyntax'
+import { toTanStackPathTemplate } from '../../src/app/convertParamSyntax'
 
 import { plainObjectSchema } from './route-manifest-schema'
 
 /**
  * Convert a path template to TanStack `$param` syntax.
  *
- * Accepts both Wouter-style `:param` and TanStack `$param` forms so AppRoute
+ * Accepts AppRoute-style `:param` and TanStack `$param` forms so AppRoute
  * helpers and router definitions compare as the same URL contract.
  *
  * @param path - Raw path template from any route source
  * @returns Canonical template using `$param` placeholders
  */
 export function normalizeTemplate(path: string): string {
-  return convertWouterPathToTanStack(path)
+  return toTanStackPathTemplate(path)
 }
 
 /**

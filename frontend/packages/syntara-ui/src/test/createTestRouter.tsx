@@ -8,7 +8,7 @@ import {
 } from '@tanstack/react-router'
 import React from 'react'
 
-import { convertWouterPathToTanStack } from '../app/convertParamSyntax'
+import { toTanStackPathTemplate } from '../app/convertParamSyntax'
 
 /**
  * Module-scoped context used to pass test children into the matched route's component.
@@ -48,7 +48,7 @@ export function createTestRouter(initialPath = '/', routePattern?: string) {
       ? rootRoute.addChildren([
           createRoute({
             getParentRoute: () => rootRoute,
-            path: convertWouterPathToTanStack(routePattern),
+            path: toTanStackPathTemplate(routePattern),
             component: TestRouteComponent,
           }),
         ])
