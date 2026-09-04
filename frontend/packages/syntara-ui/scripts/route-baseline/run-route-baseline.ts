@@ -121,6 +121,8 @@ function formatCheckMessages(input: {
   messages.push('  Fix the route sources (src/app/routes/*, AppRoute.tsx,')
   messages.push('  navigationItems.tsx, tanstackRouteTree.tsx, App.tsx, or routes/__root.ts),')
   messages.push('  then re-run: npm run route-baseline:check')
+  messages.push('')
+  messages.push('Docs: frontend/packages/syntara-ui/scripts/route-baseline/README.md')
   return messages
 }
 

@@ -209,7 +209,7 @@ jobs:
             echo "\`tanstackRouteTree.tsx\`, \`App.tsx\`, or \`routes/__root.ts\`), then re-run"
             echo "\`npm run route-baseline:check\`."
             echo ""
-            echo "Docs: \`frontend/packages/syntara-ui/scripts/route-baseline/README.md\`"
+            echo "Full guide: \`frontend/packages/syntara-ui/scripts/route-baseline/README.md\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
   unit-tests:
