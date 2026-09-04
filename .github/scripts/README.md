@@ -34,21 +34,25 @@ npm run check-queue-health
 ## Testing in CI
 
 **Dequeue burst alert:**
+
 - Runs when PRs are dequeued from the merge queue
 - To test: lower the threshold to 1 in `dequeue-burst-alert.ts`, then wait for a dequeue event
 
 **Queue health poll:**
+
 - Runs on a scheduled interval
 - To test manually: Go to Actions → "Merge Queue Health Poll" → Run workflow
 
 ## How It Works
 
 **Dequeue Burst Alert:**
+
 1. Counts how many PRs were dequeued within a recent time window
 2. Sends Slack alert when the threshold is exceeded
 3. Stops alerting after the window expires
 
 **Queue Health Poll:**
+
 1. Fetches the repository's default branch
 2. Checks the merge queue for waiting PRs
 3. If empty, the queue is healthy

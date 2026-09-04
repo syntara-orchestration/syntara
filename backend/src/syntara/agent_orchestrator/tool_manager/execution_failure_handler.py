@@ -18,8 +18,10 @@ from langgraph.prebuilt.tool_node import ToolCallRequest
 from langgraph.types import Command
 
 from syntara.agent_orchestrator.audit.tool_management import ToolInvocationEvent, ToolInvocationStatus
+from syntara.agent_orchestrator.exceptions import InvocationCancelledError
 from syntara.agent_orchestrator.tool_manager.tool_services import _get_tool_manager_client
 from syntara.agent_orchestrator.utils import retry_with_backoff
+from syntara.agent_orchestrator.utils.cancellation import raise_if_invocation_cancelled
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.core.config.base import get_settings
 from syntara.core.database.session import AsyncSessionLocal
@@ -367,7 +369,6 @@ def create_tool_awrapper(
     async def _execute(
         request: ToolCallRequest, execute: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command[Any]]]
     ) -> ToolMessage | Command[Any]:
-        # Execute async function
         return await execute(request)
 
     async def tool_awrapper(
@@ -392,9 +393,15 @@ def create_tool_awrapper(
         _emit_start_audit(ctx, tool_name, tool_input)
 
         try:
+            # Outside retry_with_backoff's wait_for so a hung Redis EXISTS
+            # cannot be classified as a retryable tool TimeoutError.
+            await raise_if_invocation_cancelled(ctx.invocation_id, "tool_execution")
             result = await _execute(request, execute)
             _emit_success_audit(ctx, tool_name, result)
             return result
+        except InvocationCancelledError as error:
+            caught_error = error
+            raise
         except Exception as error:  # noqa: BLE001 - logged inside _handle_tool_execution_error
             caught_error = error
             tool_id, error_msg = _handle_tool_execution_error(ctx, request, error)
@@ -402,13 +409,19 @@ def create_tool_awrapper(
                 await _report_tool_failure(tool_id, error)
             return error_msg
         finally:
-            duration_ms, status = _finalize_tool_execution(request, start_time, caught_error, execution_id)
-            await _persist_tool_execution_to_db(
-                request.tool,
-                duration_ms,
-                status,
-                error_message=str(caught_error) if caught_error else None,
-            )
+            if isinstance(caught_error, InvocationCancelledError):
+                logger.debug(
+                    "Skipping tool execution metrics for cancelled invocation",
+                    invocation_id=ctx.invocation_id,
+                )
+            else:
+                duration_ms, status = _finalize_tool_execution(request, start_time, caught_error, execution_id)
+                await _persist_tool_execution_to_db(
+                    request.tool,
+                    duration_ms,
+                    status,
+                    error_message=str(caught_error) if caught_error else None,
+                )
 
     return tool_awrapper
 
@@ -508,17 +521,23 @@ def create_tool_wrapper(
                 _run_coroutine_from_sync(_report_tool_failure(tool_id, error), loop, "tool failure report")
             return error_msg
         finally:
-            duration_ms, status = _finalize_tool_execution(request, start_time, caught_error, execution_id)
-            _run_coroutine_from_sync(
-                _persist_tool_execution_to_db(
-                    request.tool,
-                    duration_ms,
-                    status,
-                    error_message=str(caught_error) if caught_error else None,
-                ),
-                loop,
-                "tool execution DB persistence",
-            )
+            if isinstance(caught_error, InvocationCancelledError):
+                logger.debug(
+                    "Skipping tool execution metrics for cancelled invocation",
+                    invocation_id=ctx.invocation_id,
+                )
+            else:
+                duration_ms, status = _finalize_tool_execution(request, start_time, caught_error, execution_id)
+                _run_coroutine_from_sync(
+                    _persist_tool_execution_to_db(
+                        request.tool,
+                        duration_ms,
+                        status,
+                        error_message=str(caught_error) if caught_error else None,
+                    ),
+                    loop,
+                    "tool execution DB persistence",
+                )
 
     return tool_wrapper
 

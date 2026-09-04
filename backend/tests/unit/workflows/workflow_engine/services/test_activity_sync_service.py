@@ -1239,6 +1239,28 @@ class TestWorkflowEventExtraction:
         assert status == ExecutionStatus.FAILED
         assert error_details is not None
 
+    def test_extract_execution_status_cancelled_from_result_payload(self) -> None:
+        """COMPLETED event with inner status 'cancelled' maps to CANCELLED."""
+        import json
+
+        from syntara.workflows.models.execution import ExecutionStatus
+
+        event = self._create_workflow_event(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED)
+        payload = Mock()
+        payload.data = json.dumps(
+            {
+                "status": "cancelled",
+                "execution_id": "exec-1",
+                "failed_activities": {},
+            }
+        ).encode()
+        event.workflow_execution_completed_event_attributes.result.payloads = [payload]
+
+        status, _completed_at, error_details = self.service._extract_execution_status_from_event(event)
+
+        assert status == ExecutionStatus.CANCELLED
+        assert error_details is None
+
 
 class TestExecutionStatusUpdates:
     """Test execution status updates during monitoring."""

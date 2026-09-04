@@ -11,9 +11,23 @@ import pytest
 from langchain_core.tools import BaseTool
 
 from syntara.agent_orchestrator.context_manager.models import ContextPackage
+from syntara.agent_orchestrator.exceptions import InvocationCancelledError
 from syntara.agent_orchestrator.models import InvocationContextData
 from syntara.agent_orchestrator.services.orchestration_service import OrchestrationService
 from syntara.audit.emitter import AuditActorContext
+
+
+@pytest.fixture(autouse=True)
+def _skip_cancel_poll(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Orchestration unit tests do not hit the database for cancel checks."""
+
+    async def _noop(*_args: object, **_kwargs: object) -> None:
+        return None
+
+    monkeypatch.setattr(
+        "syntara.agent_orchestrator.services.orchestration_service.raise_if_invocation_cancelled",
+        _noop,
+    )
 
 
 def create_mock_streaming_event(event_type: str, content: str | None = None) -> dict[str, Any]:
@@ -266,6 +280,54 @@ class TestOrchestrationServiceErrorHandling:
             # Verify error event was published
             error_calls = [c for c in mock_client_instance.publish.call_args_list if "error" in str(c)]
             assert len(error_calls) == 1
+
+    @pytest.mark.asyncio
+    async def test_cancelled_invocation_skips_temporal_callbacks(self) -> None:
+        """Cancellation during execute must not send success or failure signals."""
+        mock_llm = AsyncMock()
+        mock_llm.model_name = "test-model"
+        mock_context_manager = MagicMock()
+        mock_context_manager.plan_request.return_value = ContextPackage(payload={}, grounding_score=0.0)
+
+        service = OrchestrationService(mock_llm, mock_context_manager)
+        invocation_id = uuid4()
+
+        mock_graph = AsyncMock()
+        mock_graph.astream_events = lambda *_args, **_kwargs: mock_astream_events_generator("Hello")
+
+        async def _raise_cancelled(_invocation_id: object, _phase: str) -> None:
+            raise InvocationCancelledError(str(invocation_id), "orchestration")
+
+        with (
+            patch.object(service, "_setup_graph", return_value=mock_graph),
+            patch("syntara.agent_orchestrator.services.orchestration_service.StreamClient") as mock_stream_client,
+            patch(
+                "syntara.agent_orchestrator.services.orchestration_service.raise_if_invocation_cancelled",
+                side_effect=_raise_cancelled,
+            ),
+            patch(
+                "syntara.agent_orchestrator.services.orchestration_service.WorkflowSignalClient.send_failure_signal",
+                new_callable=AsyncMock,
+            ) as mock_fail,
+            patch(
+                "syntara.agent_orchestrator.services.orchestration_service.WorkflowSignalClient.send_success_signal",
+                new_callable=AsyncMock,
+            ) as mock_success,
+        ):
+            mock_client_instance = AsyncMock()
+            mock_stream_client.return_value.__aenter__.return_value = mock_client_instance
+
+            with pytest.raises(InvocationCancelledError):
+                await service.execute(
+                    prompt="Test",
+                    session_id="test-session",
+                    invocation_id=invocation_id,
+                    actor_context=AuditActorContext(),
+                    ctx=InvocationContextData(),
+                )
+
+            mock_fail.assert_not_awaited()
+            mock_success.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_orchestration_service_publishes_error_event_on_failure(self) -> None:
@@ -916,3 +978,598 @@ class TestGetToolsStrategy:
             tool_selection_strategy="SELECTED",
             tool_selections={"uuid-a", "uuid-b"},
         )
+
+
+class TestPreGraphCancelCheck:
+    """execute() checks the cancel key before _setup_graph."""
+
+    @pytest.mark.asyncio
+    async def test_execute_raises_before_setup_graph_when_cancelled(self) -> None:
+        from syntara.agent_orchestrator.exceptions import InvocationCancelledError
+
+        mock_llm = AsyncMock()
+        mock_llm.model_name = "test-model"
+        service = OrchestrationService(mock_llm, MagicMock())
+        invocation_id = uuid4()
+
+        mock_client = AsyncMock()
+        mock_client.key_exists.return_value = True
+
+        with (
+            patch("syntara.agent_orchestrator.services.orchestration_service.StreamClient") as mock_sc,
+            patch.object(service, "_setup_graph") as mock_setup,
+        ):
+            mock_sc.return_value.__aenter__.return_value = mock_client
+            mock_sc.return_value.__aexit__.return_value = None
+
+            with pytest.raises(InvocationCancelledError):
+                await service.execute(
+                    prompt="Test",
+                    session_id="s",
+                    invocation_id=invocation_id,
+                    actor_context=AuditActorContext(),
+                    ctx=InvocationContextData(),
+                )
+
+            mock_setup.assert_not_called()
+
+
+class TestOrchestrationServiceCancellation:
+    """Test cancellation signal detection in the streaming loop."""
+
+    @pytest.mark.asyncio
+    async def test_execute_publishes_cancelled_event_on_cancellation(self) -> None:
+        """Test that InvocationCancelledError in execute publishes a cancelled event."""
+        from syntara.agent_orchestrator.exceptions import InvocationCancelledError
+
+        mock_llm = AsyncMock()
+        mock_llm.model_name = "test-model"
+        mock_context_manager = MagicMock()
+        test_context = ContextPackage(payload={}, grounding_score=0.0)
+        mock_context_manager.plan_request.return_value = test_context
+
+        service = OrchestrationService(mock_llm, mock_context_manager)
+        invocation_id = uuid4()
+
+        with (
+            patch.object(
+                service,
+                "_execute_graph_streaming",
+                side_effect=InvocationCancelledError(str(invocation_id), "streaming"),
+            ),
+            patch.object(service, "_setup_graph", return_value=AsyncMock()),
+            patch("syntara.agent_orchestrator.services.orchestration_service.StreamClient") as mock_stream_client,
+        ):
+            mock_client_instance = AsyncMock()
+            mock_stream_client.return_value.__aenter__.return_value = mock_client_instance
+
+            with pytest.raises(InvocationCancelledError):
+                await service.execute(
+                    prompt="Test",
+                    session_id="test-session",
+                    invocation_id=invocation_id,
+                    actor_context=AuditActorContext(),
+                    ctx=InvocationContextData(),
+                )
+
+            cancelled_calls = [c for c in mock_client_instance.publish.call_args_list if "cancelled" in str(c)]
+            assert len(cancelled_calls) == 1
+            _stream_id, event = cancelled_calls[0][0]
+            assert event["event_type"] == "cancelled"
+            assert event["data"]["reason"] == "user_cancelled"
+
+    @pytest.mark.asyncio
+    async def test_execute_reraises_cancelled_even_when_publish_fails(self) -> None:
+        """A failed cancelled-event publish must not turn a cancel into a generic error."""
+        from syntara.agent_orchestrator.exceptions import InvocationCancelledError
+
+        mock_llm = AsyncMock()
+        mock_llm.model_name = "test-model"
+        mock_context_manager = MagicMock()
+        test_context = ContextPackage(payload={}, grounding_score=0.0)
+        mock_context_manager.plan_request.return_value = test_context
+
+        service = OrchestrationService(mock_llm, mock_context_manager)
+        invocation_id = uuid4()
+
+        with (
+            patch.object(
+                service,
+                "_execute_graph_streaming",
+                side_effect=InvocationCancelledError(str(invocation_id), "streaming"),
+            ),
+            patch.object(
+                service,
+                "_publish_stream_event",
+                side_effect=ConnectionError("Redis down"),
+            ),
+            patch.object(service, "_setup_graph", return_value=AsyncMock()),
+            patch("syntara.agent_orchestrator.services.orchestration_service.StreamClient") as mock_stream_client,
+        ):
+            mock_client_instance = AsyncMock()
+            mock_stream_client.return_value.__aenter__.return_value = mock_client_instance
+
+            with pytest.raises(InvocationCancelledError):
+                await service.execute(
+                    prompt="Test",
+                    session_id="test-session",
+                    invocation_id=invocation_id,
+                    actor_context=AuditActorContext(),
+                    ctx=InvocationContextData(),
+                )
+
+    @pytest.mark.asyncio
+    async def test_check_cancellation_signal_raises_on_cancelled(self) -> None:
+        """Test _check_cancellation_signal raises InvocationCancelledError when key exists."""
+        from syntara.agent_orchestrator.exceptions import InvocationCancelledError
+
+        mock_llm = AsyncMock()
+        mock_context_manager = MagicMock()
+        service = OrchestrationService(mock_llm, mock_context_manager)
+
+        mock_client = AsyncMock()
+        mock_client.key_exists.return_value = True
+        invocation_id = uuid4()
+
+        with pytest.raises(InvocationCancelledError):
+            await service._check_cancellation_signal(
+                mock_client, f"invocation:{invocation_id}:cancelled", invocation_id
+            )
+
+    @pytest.mark.asyncio
+    async def test_check_cancellation_signal_falls_back_to_db_on_redis_failure(self) -> None:
+        """Test _check_cancellation_signal falls back to DB when Redis is unavailable."""
+        from redis.exceptions import ConnectionError as RedisConnectionError
+
+        from syntara.agent_orchestrator.exceptions import InvocationCancelledError
+        from syntara.agent_orchestrator.models import Invocation, InvocationStatus
+
+        mock_llm = AsyncMock()
+        mock_context_manager = MagicMock()
+
+        mock_invocation = MagicMock(spec=Invocation)
+        mock_invocation.status = InvocationStatus.CANCELLED
+
+        mock_session = AsyncMock()
+        mock_session.get.return_value = mock_invocation
+
+        async def mock_session_factory() -> AsyncGenerator[AsyncMock, None]:
+            yield mock_session
+
+        service = OrchestrationService(mock_llm, mock_context_manager, session_factory=mock_session_factory)
+
+        mock_client = AsyncMock()
+        mock_client.key_exists.side_effect = RedisConnectionError("Redis down")
+        invocation_id = uuid4()
+
+        with pytest.raises(InvocationCancelledError):
+            await service._check_cancellation_signal(
+                mock_client, f"invocation:{invocation_id}:cancelled", invocation_id
+            )
+
+        mock_session.get.assert_called_once_with(Invocation, invocation_id)
+
+    @pytest.mark.asyncio
+    async def test_check_cancellation_signal_continues_when_both_fail(self) -> None:
+        """Test _check_cancellation_signal continues when both Redis and DB fail."""
+        from redis.exceptions import ConnectionError as RedisConnectionError
+        from sqlalchemy.exc import SQLAlchemyError
+
+        mock_llm = AsyncMock()
+        mock_context_manager = MagicMock()
+
+        mock_session = AsyncMock()
+        mock_session.get.side_effect = SQLAlchemyError("DB down")
+
+        async def mock_session_factory() -> AsyncGenerator[AsyncMock, None]:
+            yield mock_session
+
+        service = OrchestrationService(mock_llm, mock_context_manager, session_factory=mock_session_factory)
+
+        mock_client = AsyncMock()
+        mock_client.key_exists.side_effect = RedisConnectionError("Redis down")
+        invocation_id = uuid4()
+
+        await service._check_cancellation_signal(mock_client, f"invocation:{invocation_id}:cancelled", invocation_id)
+
+    @pytest.mark.asyncio
+    async def test_check_cancellation_signal_skips_db_when_redis_says_not_cancelled(self) -> None:
+        """Test _check_cancellation_signal skips DB check when Redis is up and says not cancelled."""
+        mock_llm = AsyncMock()
+        mock_context_manager = MagicMock()
+
+        mock_session = AsyncMock()
+
+        async def mock_session_factory() -> AsyncGenerator[AsyncMock, None]:
+            yield mock_session
+
+        service = OrchestrationService(mock_llm, mock_context_manager, session_factory=mock_session_factory)
+
+        mock_client = AsyncMock()
+        mock_client.key_exists.return_value = False
+        invocation_id = uuid4()
+
+        await service._check_cancellation_signal(mock_client, f"invocation:{invocation_id}:cancelled", invocation_id)
+
+        mock_session.get.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_cancellation_watcher_sets_event_on_cancel(self) -> None:
+        """Test that _cancellation_watcher sets the event when cancellation is detected."""
+        import asyncio
+
+        mock_llm = AsyncMock()
+        mock_context_manager = MagicMock()
+        service = OrchestrationService(mock_llm, mock_context_manager)
+
+        mock_client = AsyncMock()
+        mock_client.key_exists.return_value = True
+        invocation_id = uuid4()
+        cancel_event = asyncio.Event()
+
+        with patch("syntara.agent_orchestrator.services.orchestration_service.StreamClient") as mock_sc:
+            mock_sc.return_value.__aenter__.return_value = mock_client
+            mock_sc.return_value.__aexit__.return_value = None
+            await service._cancellation_watcher(
+                f"invocation:{invocation_id}:cancelled",
+                invocation_id,
+                cancel_event,
+                interval=0.0,
+            )
+
+        assert cancel_event.is_set()
+
+    @pytest.mark.asyncio
+    async def test_cancellation_watcher_keeps_polling_until_cancelled(self) -> None:
+        """Test that _cancellation_watcher polls repeatedly until cancellation is found."""
+        import asyncio
+
+        mock_llm = AsyncMock()
+        mock_context_manager = MagicMock()
+        service = OrchestrationService(mock_llm, mock_context_manager)
+
+        mock_client = AsyncMock()
+        # Not cancelled on first two checks, then cancelled
+        mock_client.key_exists.side_effect = [False, False, True]
+        invocation_id = uuid4()
+        cancel_event = asyncio.Event()
+
+        with patch("syntara.agent_orchestrator.services.orchestration_service.StreamClient") as mock_sc:
+            mock_sc.return_value.__aenter__.return_value = mock_client
+            mock_sc.return_value.__aexit__.return_value = None
+            await service._cancellation_watcher(
+                f"invocation:{invocation_id}:cancelled",
+                invocation_id,
+                cancel_event,
+                interval=0.0,
+            )
+
+        assert cancel_event.is_set()
+        assert mock_client.key_exists.call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_execute_graph_streaming_raises_on_mid_stream_cancellation(
+        self,
+    ) -> None:
+        """Test that _execute_graph_streaming raises InvocationCancelledError when the watcher detects cancellation."""
+        import asyncio
+
+        from syntara.agent_orchestrator.exceptions import InvocationCancelledError
+        from syntara.agent_orchestrator.services.orchestration_service import _TraceAccumulator
+
+        mock_llm = AsyncMock()
+        mock_llm.model_name = "test-model"
+        mock_context_manager = MagicMock()
+        service = OrchestrationService(mock_llm, mock_context_manager)
+
+        invocation_id = uuid4()
+        mock_client = AsyncMock()
+
+        cancel_trigger = asyncio.Event()
+
+        async def fake_watcher(
+            _key: str,
+            _inv_id: object,
+            cancel_event: asyncio.Event,
+            **_kw: object,
+        ) -> None:
+            await cancel_trigger.wait()
+            cancel_event.set()
+
+        async def stream_with_yields() -> AsyncGenerator[dict[str, Any], None]:
+            yield create_mock_streaming_event("on_chat_model_stream", "Hello")
+            cancel_trigger.set()
+            await asyncio.sleep(0)
+            yield create_mock_streaming_event("on_chat_model_stream", "World")
+
+        mock_graph = AsyncMock()
+        mock_graph.astream_events = lambda *_a, **_kw: stream_with_yields()
+
+        with patch.object(service, "_cancellation_watcher", side_effect=fake_watcher):
+            with pytest.raises(InvocationCancelledError):
+                await service._execute_graph_streaming(
+                    graph=mock_graph,
+                    initial_state={},  # type: ignore[typeddict-item]
+                    config={"configurable": {"thread_id": "test"}},
+                    invocation_id=invocation_id,
+                    stream_id="stream-1",
+                    client=mock_client,
+                    trace_accumulator=_TraceAccumulator(),
+                )
+
+    @pytest.mark.asyncio
+    async def test_execute_graph_streaming_returns_final_state_when_not_cancelled(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test that _execute_graph_streaming returns final_state when no cancellation occurs.
+
+        Patches StreamClient so the watcher's own connection uses a mock,
+        and yields control mid-stream so the watcher can poll at least once.
+        """
+        import asyncio
+
+        import syntara.agent_orchestrator.services.orchestration_service as orch_mod
+        from syntara.agent_orchestrator.services.orchestration_service import _TraceAccumulator
+
+        monkeypatch.setattr(orch_mod, "_CANCELLATION_POLL_INTERVAL", 0.0)
+
+        mock_llm = AsyncMock()
+        mock_llm.model_name = "test-model"
+        mock_context_manager = MagicMock()
+        service = OrchestrationService(mock_llm, mock_context_manager)
+
+        invocation_id = uuid4()
+        mock_client = AsyncMock()
+
+        watcher_client = AsyncMock()
+        watcher_client.key_exists.return_value = False
+
+        async def stream_with_yield() -> AsyncGenerator[dict[str, Any], None]:
+            yield create_mock_streaming_event("on_chat_model_stream", "Done")
+            await asyncio.sleep(0)
+            yield {"event": "on_chain_end", "data": {}}
+
+        mock_graph = AsyncMock()
+        mock_graph.astream_events = lambda *_a, **_kw: stream_with_yield()
+
+        with patch("syntara.agent_orchestrator.services.orchestration_service.StreamClient") as mock_sc:
+            mock_sc.return_value.__aenter__.return_value = watcher_client
+            mock_sc.return_value.__aexit__.return_value = None
+
+            result = await service._execute_graph_streaming(
+                graph=mock_graph,
+                initial_state={},  # type: ignore[typeddict-item]
+                config={"configurable": {"thread_id": "test"}},
+                invocation_id=invocation_id,
+                stream_id="stream-1",
+                client=mock_client,
+                trace_accumulator=_TraceAccumulator(),
+            )
+
+        assert result is None
+        watcher_client.key_exists.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_execute_graph_streaming_cleans_up_watcher_on_cancellation(
+        self,
+    ) -> None:
+        """Test that the watcher task is cancelled and awaited even when cancellation is raised."""
+        import asyncio
+
+        from syntara.agent_orchestrator.exceptions import InvocationCancelledError
+        from syntara.agent_orchestrator.services.orchestration_service import _TraceAccumulator
+
+        mock_llm = AsyncMock()
+        mock_llm.model_name = "test-model"
+        mock_context_manager = MagicMock()
+        service = OrchestrationService(mock_llm, mock_context_manager)
+
+        invocation_id = uuid4()
+        mock_client = AsyncMock()
+
+        cancel_trigger = asyncio.Event()
+
+        async def fake_watcher(
+            _key: str,
+            _inv_id: object,
+            cancel_event: asyncio.Event,
+            **_kw: object,
+        ) -> None:
+            await cancel_trigger.wait()
+            cancel_event.set()
+
+        async def stream_with_yields() -> AsyncGenerator[dict[str, Any], None]:
+            yield create_mock_streaming_event("on_chat_model_stream", "Hello")
+            cancel_trigger.set()
+            await asyncio.sleep(0)
+            yield create_mock_streaming_event("on_chat_model_stream", "World")
+
+        mock_graph = AsyncMock()
+        mock_graph.astream_events = lambda *_a, **_kw: stream_with_yields()
+
+        with patch.object(service, "_cancellation_watcher", side_effect=fake_watcher):
+            with pytest.raises(InvocationCancelledError):
+                await service._execute_graph_streaming(
+                    graph=mock_graph,
+                    initial_state={},  # type: ignore[typeddict-item]
+                    config={"configurable": {"thread_id": "test"}},
+                    invocation_id=invocation_id,
+                    stream_id="stream-1",
+                    client=mock_client,
+                    trace_accumulator=_TraceAccumulator(),
+                )
+
+        # Give the event loop a tick to clean up
+        await asyncio.sleep(0)
+
+        # Watcher should have been cancelled and awaited in finally block
+        pending = [t for t in asyncio.all_tasks() if "cancellation_watcher" in t.get_name()]
+        assert pending == []
+
+    @pytest.mark.asyncio
+    async def test_publish_failure_with_cancelled_db_row_raises_cancelled(
+        self,
+    ) -> None:
+        """When publish raises and cancel_event is unset, DB fallback still surfaces cancellation."""
+        import asyncio
+
+        from redis.exceptions import ConnectionError as RedisConnectionError
+
+        from syntara.agent_orchestrator.exceptions import InvocationCancelledError
+        from syntara.agent_orchestrator.models import InvocationStatus
+        from syntara.agent_orchestrator.services.orchestration_service import _TraceAccumulator
+
+        mock_llm = AsyncMock()
+        mock_llm.model_name = "test-model"
+        mock_context_manager = MagicMock()
+        service = OrchestrationService(mock_llm, mock_context_manager)
+
+        invocation_id = uuid4()
+        mock_client = AsyncMock()
+        mock_client.publish.side_effect = RedisConnectionError("Redis down")
+        mock_client.key_exists.side_effect = RedisConnectionError("Redis down")
+
+        mock_invocation = MagicMock()
+        mock_invocation.status = InvocationStatus.CANCELLED
+
+        async def stream_one_event() -> AsyncGenerator[dict[str, Any], None]:
+            yield create_mock_streaming_event("on_chat_model_stream", "Hello")
+
+        mock_graph = AsyncMock()
+        mock_graph.astream_events = lambda *_a, **_kw: stream_one_event()
+
+        async def noop_watcher(
+            _key: str,
+            _inv_id: object,
+            _cancel_event: asyncio.Event,
+            **_kw: object,
+        ) -> None:
+            await asyncio.sleep(3600)
+
+        with (
+            patch.object(service, "_cancellation_watcher", side_effect=noop_watcher),
+            patch.object(service, "_get_async_session_context") as mock_session_ctx,
+        ):
+            mock_session = AsyncMock()
+            mock_session.get.return_value = mock_invocation
+            mock_session_ctx.return_value.__aenter__.return_value = mock_session
+
+            with pytest.raises(InvocationCancelledError):
+                await service._execute_graph_streaming(
+                    graph=mock_graph,
+                    initial_state={},  # type: ignore[typeddict-item]
+                    config={"configurable": {"thread_id": "test"}},
+                    invocation_id=invocation_id,
+                    stream_id="stream-1",
+                    client=mock_client,
+                    trace_accumulator=_TraceAccumulator(),
+                )
+
+    @pytest.mark.asyncio
+    async def test_watcher_teardown_failure_does_not_replace_real_exception(self) -> None:
+        """A failed watcher must not mask InvocationCancelledError from the stream loop."""
+        import asyncio
+
+        from syntara.agent_orchestrator.exceptions import InvocationCancelledError
+        from syntara.agent_orchestrator.services.orchestration_service import _TraceAccumulator
+
+        mock_llm = AsyncMock()
+        mock_llm.model_name = "test-model"
+        mock_context_manager = MagicMock()
+        service = OrchestrationService(mock_llm, mock_context_manager)
+
+        invocation_id = uuid4()
+        mock_client = AsyncMock()
+
+        async def failing_watcher(
+            _key: str,
+            _inv_id: object,
+            cancel_event: asyncio.Event,
+            **_kw: object,
+        ) -> None:
+            cancel_event.set()
+            msg = "StreamClient connect failed"
+            raise ConnectionError(msg)
+
+        async def stream_with_yields() -> AsyncGenerator[dict[str, Any], None]:
+            await asyncio.sleep(0)
+            yield create_mock_streaming_event("on_chat_model_stream", "Hello")
+
+        mock_graph = AsyncMock()
+        mock_graph.astream_events = lambda *_a, **_kw: stream_with_yields()
+
+        with patch.object(service, "_cancellation_watcher", side_effect=failing_watcher):
+            with pytest.raises(InvocationCancelledError):
+                await service._execute_graph_streaming(
+                    graph=mock_graph,
+                    initial_state={},  # type: ignore[typeddict-item]
+                    config={"configurable": {"thread_id": "test"}},
+                    invocation_id=invocation_id,
+                    stream_id="stream-1",
+                    client=mock_client,
+                    trace_accumulator=_TraceAccumulator(),
+                )
+
+    @pytest.mark.asyncio
+    async def test_parent_cancellation_during_watcher_teardown_propagates(self) -> None:
+        """CancelledError injected into the parent at ``await watcher`` must propagate.
+
+        The watcher blocks until cancelled (simulating the real 2s poll).
+        The stream finishes normally.  In the ``finally`` block,
+        ``watcher.cancel()`` cancels the watcher; the watcher's teardown
+        also cancels the parent, so ``task.cancelling() > 0`` when the
+        ``except CancelledError`` handler runs.  Without the guard the
+        CancelledError would be suppressed and the function would return.
+        """
+        import asyncio
+
+        from syntara.agent_orchestrator.services.orchestration_service import _TraceAccumulator
+
+        mock_llm = AsyncMock()
+        mock_llm.model_name = "test-model"
+        mock_context_manager = MagicMock()
+        service = OrchestrationService(mock_llm, mock_context_manager)
+
+        invocation_id = uuid4()
+        mock_client = AsyncMock()
+
+        parent_task: asyncio.Task[Any] | None = None
+
+        async def watcher_that_cancels_parent_on_teardown(
+            _key: str,
+            _inv_id: object,
+            _cancel_event: asyncio.Event,
+            **_kw: object,
+        ) -> None:
+            try:
+                await asyncio.sleep(3600)
+            except asyncio.CancelledError:
+                if parent_task is not None:
+                    parent_task.cancel()
+                raise
+
+        async def stream_with_yield() -> AsyncGenerator[dict[str, Any], None]:
+            yield create_mock_streaming_event("on_chat_model_stream", "Done")
+            await asyncio.sleep(0)
+            yield {"event": "on_chain_end", "data": {}}
+
+        mock_graph = AsyncMock()
+        mock_graph.astream_events = lambda *_a, **_kw: stream_with_yield()
+
+        async def run_streaming() -> object:
+            with patch.object(service, "_cancellation_watcher", side_effect=watcher_that_cancels_parent_on_teardown):
+                return await service._execute_graph_streaming(
+                    graph=mock_graph,
+                    initial_state={},  # type: ignore[typeddict-item]
+                    config={"configurable": {"thread_id": "test"}},
+                    invocation_id=invocation_id,
+                    stream_id="stream-1",
+                    client=mock_client,
+                    trace_accumulator=_TraceAccumulator(),
+                )
+
+        parent_task = asyncio.create_task(run_streaming())
+        await asyncio.sleep(0)
+
+        with pytest.raises(asyncio.CancelledError):
+            await parent_task

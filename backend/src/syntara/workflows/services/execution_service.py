@@ -1038,10 +1038,23 @@ class ExecutionService(BaseService):
                 activity_id=activity_id,
                 error=error,
             )
+        elif status == "cancelled":
+            reason = signal_data.get("reason", "Invocation cancelled")
+            msg = f"InvocationCancelledError: {reason}"[:MAX_CALLBACK_ERROR_MSG_LENGTH]
+            error = ApplicationError(
+                msg,
+                type="InvocationCancelledError",
+                non_retryable=True,
+            )
+            await self.temporal_service.fail_async_activity(
+                temporal_workflow_id=execution.temporal_workflow_id,
+                activity_id=activity_id,
+                error=error,
+            )
         else:
-            # Fail-open: any non-"failed" status (including "approved", "rejected",
-            # "completed") completes the activity. The workflow routes based on the
-            # output data (e.g., approval decision), not the Temporal activity state.
+            # Fail-open: any non-"failed"/non-"cancelled" status (including "approved",
+            # "rejected", "completed") completes the activity. The workflow routes based
+            # on the output data (e.g., approval decision), not the Temporal activity state.
             await self.temporal_service.complete_async_activity(
                 temporal_workflow_id=execution.temporal_workflow_id,
                 activity_id=activity_id,
@@ -1109,6 +1122,21 @@ class ExecutionService(BaseService):
                 error_type=type(exc).__name__,
             )
             raise
+
+        # Best-effort: cancel any in-flight agentic invocations linked to
+        # this execution.  Agentic activities use async-completion so the
+        # Temporal cancel above does not reach the running agent process.
+        try:
+            from syntara.workflows.services.invocation_cancellation import (  # noqa: PLC0415
+                cancel_invocations_for_execution,
+            )
+
+            await cancel_invocations_for_execution(self.session, self.user, execution_id)
+        except Exception:
+            logger.exception(
+                "Best-effort invocation cancellation failed",
+                execution_id=execution_id,
+            )
 
         self._emit_lifecycle_event(
             execution_id=execution.id,

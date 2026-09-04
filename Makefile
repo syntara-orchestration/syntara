@@ -10,6 +10,7 @@ help: ## Show available targets
 install: ## Install backend and frontend dependencies
 	$(MAKE) -C backend install
 	cd frontend && npm ci
+	cd .github/scripts && npm ci
 	$(MAKE) pre-commit-install
 
 pre-commit-install: ## Install pre-commit hooks
@@ -37,6 +38,7 @@ _ensure-env:
 format: ## Format both codebases
 	$(MAKE) -C backend format
 	cd frontend && npm run format
+	npm --prefix .github/scripts run format
 
 lint: ## Lint both codebases
 	$(MAKE) -C backend lint
