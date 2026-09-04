@@ -6,6 +6,7 @@ import {
   collectNavigationPathsFromSource,
   collectPathsFromObject,
   extractBalancedObjectBody,
+  parseAppRouteCatalog,
   parseCreateRouteBlocks,
   parseMountedRouteModules,
   resolveAppRouteReference,
@@ -55,9 +56,7 @@ createRoute({
   component: Page,
 })
 `
-    expect(parseCreateRouteBlocks(source)).toStrictEqual([
-      { path: '/nested-before-path', kind: 'page' },
-    ])
+    expect(parseCreateRouteBlocks(source)).toStrictEqual([{ path: '/nested-before-path', kind: 'page' }])
   })
 
   it('ignores braces inside string literals', () => {
@@ -145,9 +144,7 @@ function NotFoundRedirect() {
   })
 
   it('throws when the navigate target is missing', () => {
-    expect(() => collectFallbackRouteFromSource('export const rootRoute = {}')).toThrow(
-      /not-found navigate/
-    )
+    expect(() => collectFallbackRouteFromSource('export const rootRoute = {}')).toThrow(/not-found navigate/)
   })
 })
 
@@ -172,11 +169,7 @@ describe('collectNavigationPathsFromSource', () => {
       { path: AppRoute.Approvals.Root },
       { path: '/custom' },
     `
-    expect(collectNavigationPathsFromSource(source, catalog)).toStrictEqual([
-      '/approvals',
-      '/custom',
-      '/workflows',
-    ])
+    expect(collectNavigationPathsFromSource(source, catalog)).toStrictEqual(['/approvals', '/custom', '/workflows'])
   })
 })
 
@@ -186,5 +179,23 @@ describe('resolveAppRouteReference', () => {
     expect(resolveAppRouteReference(catalog, 'AppRoute.AccessManagement.Users')).toBe(
       '/system-administration/access-management/users'
     )
+  })
+})
+
+describe('parseAppRouteCatalog', () => {
+  it('parses nested AppRoute object literals from source', () => {
+    const source = `
+export const AppRoute = {
+  Workflows: {
+    Root: '/workflows',
+  },
+  Auth: {
+    TestSignInCallback: '/auth/test-signin-callback',
+  },
+}
+`
+    const catalog = parseAppRouteCatalog(source)
+    expect(resolveAppRouteReference(catalog, 'AppRoute.Workflows.Root')).toBe('/workflows')
+    expect(resolveAppRouteReference(catalog, 'AppRoute.Auth.TestSignInCallback')).toBe('/auth/test-signin-callback')
   })
 })

@@ -132,9 +132,7 @@ export function parseCreateRouteBlocks(source: string): ParsedCreateRoute[] {
 export function parseMountedRouteModules(treeSource: string): string[] {
   const importByBinding = new Map<string, string>()
 
-  for (const match of treeSource.matchAll(
-    /import\s*\{\s*(\w+)\s*\}\s*from\s*['"]\.\/routes\/([^'"]+)['"]/g
-  )) {
+  for (const match of treeSource.matchAll(/import\s*\{\s*(\w+)\s*\}\s*from\s*['"]\.\/routes\/([^'"]+)['"]/g)) {
     const binding = match[1]
     const modulePath = match[2]
     if (!binding || !modulePath) continue
@@ -248,10 +246,7 @@ export function collectNavigationPaths(items: NavItemLike[]): string[] {
  * @param appRouteCatalog - The `AppRoute` object used to resolve references
  * @returns Sorted unique templates
  */
-export function collectNavigationPathsFromSource(
-  navigationSource: string,
-  appRouteCatalog: unknown
-): string[] {
+export function collectNavigationPathsFromSource(navigationSource: string, appRouteCatalog: unknown): string[] {
   const paths = new Set<string>()
 
   for (const match of navigationSource.matchAll(/\bpath:\s*(AppRoute(?:\.\w+)+)/g)) {
@@ -267,6 +262,29 @@ export function collectNavigationPathsFromSource(
   }
 
   return [...paths].sort()
+}
+
+/**
+ * Parse `export const AppRoute = { ... }` from source into a nested catalog.
+ *
+ * Avoids importing `AppRoute.tsx` from Node/tsconfig.node (no JSX).
+ *
+ * @param source - File contents of `AppRoute.tsx`
+ * @returns Nested catalog of path strings
+ */
+export function parseAppRouteCatalog(source: string): Record<string, unknown> {
+  const match = /export\s+const\s+AppRoute\s*=\s*\{/.exec(source)
+  if (!match || match.index === undefined) {
+    throw new Error('Could not find export const AppRoute = { in AppRoute source')
+  }
+
+  const openBraceIndex = match.index + match[0].lastIndexOf('{')
+  const body = extractBalancedObjectBody(source, openBraceIndex)
+  if (body === null) {
+    throw new Error('Unbalanced AppRoute object literal')
+  }
+
+  return parseObjectLiteral(body)
 }
 
 /**
@@ -289,6 +307,48 @@ export function resolveAppRouteReference(appRouteCatalog: unknown, expression: s
 }
 
 /**
+ * Parse a nested object-literal body of string and object properties.
+ *
+ * @param body - Object interior without outer braces
+ * @returns Nested record of string path values
+ */
+function parseObjectLiteral(body: string): Record<string, unknown> {
+  const result: Record<string, unknown> = {}
+  let i = 0
+
+  while (i < body.length) {
+    while (i < body.length && /[\s,]/.test(body[i] ?? '')) i += 1
+    if (i >= body.length) break
+
+    const keyMatch = /^([A-Za-z_]\w*)\s*:/.exec(body.slice(i))
+    if (!keyMatch?.[1]) break
+    const key = keyMatch[1]
+    i += keyMatch[0].length
+
+    while (i < body.length && /\s/.test(body[i] ?? '')) i += 1
+
+    if (body[i] === '{') {
+      const nestedBody = extractBalancedObjectBody(body, i)
+      if (nestedBody === null) {
+        throw new Error(`Unbalanced nested object at key ${key}`)
+      }
+      result[key] = parseObjectLiteral(nestedBody)
+      i += nestedBody.length + 2
+      continue
+    }
+
+    const stringMatch = /^(['"])((?:\\.|(?!\1).)*)\1/.exec(body.slice(i))
+    if (!stringMatch?.[2]) {
+      throw new Error(`Expected string or object value at key ${key}`)
+    }
+    result[key] = stringMatch[2].replace(/\\(['"\\])/g, '$1')
+    i += stringMatch[0].length
+  }
+
+  return result
+}
+
+/**
  * Collect bookmarkable paths handled in `App.tsx` before `RouterProvider`.
  *
  * Parses `location.pathname === AppRoute...` and literal pathname comparisons
@@ -298,10 +358,7 @@ export function resolveAppRouteReference(appRouteCatalog: unknown, expression: s
  * @param appRouteCatalog - Live `AppRoute` object for resolving references
  * @returns Normalized app-level route entries
  */
-export function collectAppLevelRoutesFromSource(
-  appSource: string,
-  appRouteCatalog: unknown
-): NormalizedRoute[] {
+export function collectAppLevelRoutesFromSource(appSource: string, appRouteCatalog: unknown): NormalizedRoute[] {
   const byTemplate = new Map<string, NormalizedRoute>()
 
   for (const match of appSource.matchAll(/location\.pathname\s*===\s*(AppRoute(?:\.\w+)+)/g)) {

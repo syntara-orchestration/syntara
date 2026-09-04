@@ -3,11 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { stableStringify } from './normalize-route'
-import {
-  routeManifestJsonSchema,
-  routeManifestSchema,
-  type RouteManifest,
-} from './route-manifest-schema'
+import { routeManifestJsonSchema, routeManifestSchema, type RouteManifest } from './route-manifest-schema'
 
 const thisDir = dirname(fileURLToPath(import.meta.url))
 

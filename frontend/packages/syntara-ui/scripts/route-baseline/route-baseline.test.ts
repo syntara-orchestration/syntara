@@ -4,26 +4,16 @@ import { join } from 'node:path'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { AppRoute } from '../../src/app/AppRoute'
-
 import { SOURCE_PARITY_EXCEPTIONS, buildRouteManifest } from './build-route-manifest'
 import {
   collectAppRoutePaths,
   collectMountedRouterRoutes,
   collectNavigationPathsFromSource,
+  parseAppRouteCatalog,
 } from './collect-routes'
 import { diffRouteManifest } from './diff-route-manifest'
-import {
-  getManifestPath,
-  getPackageRoot,
-  readCommittedManifest,
-  writeManifest,
-} from './manifest-io'
-import {
-  ROUTE_MANIFEST_COMMENT_KEY,
-  ROUTE_MANIFEST_NOTICE,
-  type RouteManifest,
-} from './route-manifest-schema'
+import { getManifestPath, getPackageRoot, readCommittedManifest, writeManifest } from './manifest-io'
+import { ROUTE_MANIFEST_COMMENT_KEY, ROUTE_MANIFEST_NOTICE, type RouteManifest } from './route-manifest-schema'
 import { checkRouteBaseline, updateRouteBaseline } from './run-route-baseline'
 
 describe('route baseline', () => {
@@ -56,9 +46,7 @@ describe('route baseline', () => {
         '',
         diff.removed.length ? `Removed:\n  - ${diff.removed.join('\n  - ')}` : '',
         diff.added.length ? `Added:\n  - ${diff.added.join('\n  - ')}` : '',
-        diff.changed.length
-          ? `Changed:\n  - ${diff.changed.map((change) => change.template).join('\n  - ')}`
-          : '',
+        diff.changed.length ? `Changed:\n  - ${diff.changed.map((change) => change.template).join('\n  - ')}` : '',
       ].filter(Boolean)
       throw new Error(lines.join('\n'))
     }
@@ -149,12 +137,13 @@ describe('route baseline', () => {
 
     const appRouteSource = readFileSync(join(pkgRoot, 'src/app/AppRoute.tsx'), 'utf-8')
     const navigationSource = readFileSync(join(pkgRoot, 'src/app/navigationItems.tsx'), 'utf-8')
+    const appRouteCatalog = parseAppRouteCatalog(appRouteSource)
 
     const appRoutePaths = collectAppRoutePaths(appRouteSource)
     expect(appRoutePaths).toContain('/workflows')
     expect(appRoutePaths).toContain('/system-administration/access-management/users/$userId')
 
-    const navigationPaths = collectNavigationPathsFromSource(navigationSource, AppRoute)
+    const navigationPaths = collectNavigationPathsFromSource(navigationSource, appRouteCatalog)
     expect(navigationPaths).toContain('/workflows')
     expect(navigationPaths).toContain('/approvals')
   })
@@ -225,10 +214,7 @@ describe('route baseline', () => {
     updateRouteBaseline(tempRoot)
 
     const rootPath = join(tempRoot, 'src/app/routes/__root.ts')
-    writeFileSync(
-      rootPath,
-      readFileSync(rootPath, 'utf-8').replace("to: '/workflows'", "to: '/approvals'")
-    )
+    writeFileSync(rootPath, readFileSync(rootPath, 'utf-8').replace("to: '/workflows'", "to: '/approvals'"))
 
     const result = checkRouteBaseline(tempRoot)
     expect(result.ok).toBe(false)

@@ -2,12 +2,7 @@ import { mkdirSync } from 'node:fs'
 
 import { buildRouteManifest } from './build-route-manifest'
 import { diffRouteManifest, type RouteManifestDiff } from './diff-route-manifest'
-import {
-  getPackageRoot,
-  getRouteBaselineDir,
-  readCommittedManifest,
-  writeManifest,
-} from './manifest-io'
+import { getPackageRoot, getRouteBaselineDir, readCommittedManifest, writeManifest } from './manifest-io'
 import type { RouteManifest } from './route-manifest-schema'
 
 /**
@@ -156,7 +151,13 @@ export function updateRouteBaseline(pkgRoot = getPackageRoot()): UpdateRouteBase
         appRouteOnly,
         navigationOnly,
         unmountedRouteFiles,
-      }).filter((line) => !line.startsWith('If this change') && !line.startsWith('  npm run') && line !== 'and commit route-baseline/manifest.gen.json' && line !== ''),
+      }).filter(
+        (line) =>
+          !line.startsWith('If this change') &&
+          !line.startsWith('  npm run') &&
+          line !== 'and commit route-baseline/manifest.gen.json' &&
+          line !== ''
+      ),
       '',
       'Add a documented SOURCE_PARITY_EXCEPTIONS entry only for intentional gaps,',
       'or mount/remove the orphan route modules, then retry.',

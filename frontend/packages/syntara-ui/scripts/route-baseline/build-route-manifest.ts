@@ -1,14 +1,13 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { AppRoute } from '../../src/app/AppRoute'
-
 import {
   collectAppLevelRoutesFromSource,
   collectAppRoutePaths,
   collectFallbackRouteFromSource,
   collectMountedRouterRoutes,
   collectNavigationPathsFromSource,
+  parseAppRouteCatalog,
 } from './collect-routes'
 import {
   ROUTE_MANIFEST_COMMENT_KEY,
@@ -74,8 +73,9 @@ export function buildRouteManifest(options: BuildRouteManifestOptions): Manifest
   const rootSource = readFileSync(join(pkgRoot, 'src/app/routes/__root.ts'), 'utf-8')
   const treeSource = readFileSync(join(pkgRoot, 'src/app/tanstackRouteTree.tsx'), 'utf-8')
 
+  const appRouteCatalog = parseAppRouteCatalog(appRouteSource)
   const { routes: routerRoutes, unmountedRouteFiles } = collectMountedRouterRoutes(routesDir, treeSource)
-  const appLevel = collectAppLevelRoutesFromSource(appSource, AppRoute)
+  const appLevel = collectAppLevelRoutesFromSource(appSource, appRouteCatalog)
   const fallback = collectFallbackRouteFromSource(rootSource)
 
   const byTemplate = new Map<string, NormalizedRoute>()
@@ -87,7 +87,7 @@ export function buildRouteManifest(options: BuildRouteManifestOptions): Manifest
   const manifestTemplates = new Set(routes.map((r) => r.template))
 
   const appRoutePaths = collectAppRoutePaths(appRouteSource)
-  const navigationPaths = collectNavigationPathsFromSource(navigationSource, AppRoute)
+  const navigationPaths = collectNavigationPathsFromSource(navigationSource, appRouteCatalog)
 
   const appRouteOnly = appRoutePaths.filter(
     (template) => !manifestTemplates.has(template) && !SOURCE_PARITY_EXCEPTIONS.has(template)

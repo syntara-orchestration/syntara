@@ -65,7 +65,5 @@ export function diffRouteManifest(before: RouteManifest, after: RouteManifest): 
  * @returns `true` when the schema-shaped payloads match
  */
 function routesEqual(a: NormalizedRoute, b: NormalizedRoute): boolean {
-  return (
-    stableStringify(normalizedRouteSchema.parse(a)) === stableStringify(normalizedRouteSchema.parse(b))
-  )
+  return stableStringify(normalizedRouteSchema.parse(a)) === stableStringify(normalizedRouteSchema.parse(b))
 }
