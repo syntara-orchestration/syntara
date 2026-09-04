@@ -26,6 +26,3 @@ out
 .git
 
 *.yaml
-
-# Generated route compatibility contract (owned by route-baseline:update)
-packages/syntara-ui/route-baseline/manifest.gen.json

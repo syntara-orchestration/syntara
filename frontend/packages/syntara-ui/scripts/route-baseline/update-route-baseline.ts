@@ -4,8 +4,9 @@
  * Usage:
  *   npm run route-baseline:update
  *
- * Commit the updated manifest in the same PR as the intentional route change.
- * Exits non-zero when AppRoute/navigation parity gaps or unmounted modules remain.
+ * Writes the manifest and formats it with Prettier. Commit the result in the
+ * same PR as the intentional route change. Exits non-zero when AppRoute /
+ * navigation parity gaps or unmounted modules remain.
  */
 
 import { updateRouteBaseline } from './run-route-baseline'

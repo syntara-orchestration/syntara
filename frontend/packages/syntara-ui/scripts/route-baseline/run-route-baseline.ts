@@ -1,4 +1,6 @@
-import { mkdirSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { existsSync, mkdirSync } from 'node:fs'
+import { join } from 'node:path'
 
 import { buildRouteManifest } from './build-route-manifest'
 import { diffRouteManifest, type RouteManifestDiff } from './diff-route-manifest'
@@ -167,8 +169,30 @@ export function updateRouteBaseline(pkgRoot = getPackageRoot()): UpdateRouteBase
 
   mkdirSync(getRouteBaselineDir(pkgRoot), { recursive: true })
   const path = writeManifest(manifest, pkgRoot)
+  formatGeneratedManifest(path, pkgRoot)
   return {
     path,
     routeCount: manifest.routes.length,
+  }
+}
+
+/**
+ * Run Prettier on the generated manifest so update output matches `format:check`.
+ *
+ * @param manifestPath - Absolute path to `manifest.gen.json`
+ * @param pkgRoot - UI package root (used to locate the frontend Prettier cwd)
+ */
+function formatGeneratedManifest(manifestPath: string, pkgRoot: string): void {
+  const frontendRoot = join(pkgRoot, '..')
+  const cwd = existsSync(join(frontendRoot, 'package.json')) ? frontendRoot : pkgRoot
+
+  try {
+    execFileSync('npx', ['prettier', '--write', manifestPath], {
+      cwd,
+      stdio: 'pipe',
+    })
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    throw new Error(`Failed to format ${manifestPath} with Prettier: ${detail}`)
   }
 }

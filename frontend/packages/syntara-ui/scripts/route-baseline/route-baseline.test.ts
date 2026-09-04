@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -268,6 +269,24 @@ export const orphanRoutes = [
     const check = checkRouteBaseline(tempRoot)
     expect(check.ok).toBe(true)
     expect(check.manifest.routes).toHaveLength(update.routeCount)
+  })
+
+  it('updateRouteBaseline formats the manifest with Prettier', () => {
+    const tempRoot = makeTempPackageRoot()
+    copyRouteSources(pkgRoot, tempRoot)
+
+    // Point Prettier at the real frontend config by nesting under a fake packages/ path.
+    const nestedRoot = join(tempRoot, 'packages', 'syntara-ui')
+    copyRouteSources(pkgRoot, nestedRoot)
+    writeFileSync(join(tempRoot, 'package.json'), '{ "name": "frontend-fixture" }\n')
+
+    const update = updateRouteBaseline(nestedRoot)
+    expect(() =>
+      execFileSync('npx', ['prettier', '--check', update.path], {
+        cwd: tempRoot,
+        stdio: 'pipe',
+      })
+    ).not.toThrow()
   })
 })
 

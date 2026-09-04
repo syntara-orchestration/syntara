@@ -8,7 +8,8 @@ To update after an intentional route change:
 npm run route-baseline:update
 ```
 
-Then commit the regenerated `manifest.gen.json` in the same PR.
+That regenerates `manifest.gen.json` and runs Prettier on it. Commit the
+result in the same PR.
 
 To verify locally:
 
