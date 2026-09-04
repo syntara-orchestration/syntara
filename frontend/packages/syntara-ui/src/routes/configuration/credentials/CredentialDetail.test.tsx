@@ -29,6 +29,7 @@ const mockCredential = {
   inputs: { token: '$encrypted$', username: 'octocat' },
   enabled: true,
   labels: {},
+  project_id: 'proj-1',
   created_at: '2026-03-01T00:00:00Z',
   updated_at: '2026-03-18T00:00:00Z',
 }
@@ -54,11 +55,14 @@ type MockCredentialRecord = Omit<typeof mockCredential, 'description'> & { descr
 vi.mock('./useCredentialPermissions', () => ({
   useCredentialPermissions: vi.fn(() => ({
     canCreate: true,
+    canRead: true,
     canUpdate: true,
     canDelete: true,
     isLoading: false,
+    isReadChecking: false,
     tooltips: {
       create: 'You need credential:create permission to create a credential.',
+      read: 'You need credential:read permission to view this credential.',
       update: 'You need credential:update permission to edit this credential.',
       enable: 'You need credential:update permission to enable or disable this credential.',
       delete: 'You need credential:delete permission to delete this credential.',
@@ -876,11 +880,14 @@ describe('CredentialDetail', () => {
   it('disables Edit button when user lacks credential:update permission', () => {
     vi.mocked(useCredentialPermissions).mockReturnValue({
       canCreate: true,
+      canRead: true,
       canUpdate: false,
       canDelete: true,
       isLoading: false,
+      isReadChecking: false,
       tooltips: {
         create: 'create tooltip',
+        read: 'read tooltip',
         update: 'You need credential:update permission to edit this credential.',
         enable: 'enable tooltip',
         delete: 'delete tooltip',
@@ -896,11 +903,14 @@ describe('CredentialDetail', () => {
   it('disables Enable/Disable toggle when user lacks credential:update permission', () => {
     vi.mocked(useCredentialPermissions).mockReturnValue({
       canCreate: true,
+      canRead: true,
       canUpdate: false,
       canDelete: true,
       isLoading: false,
+      isReadChecking: false,
       tooltips: {
         create: 'create tooltip',
+        read: 'read tooltip',
         update: 'You need credential:update permission to edit this credential.',
         enable: 'enable tooltip',
         delete: 'delete tooltip',
@@ -916,11 +926,14 @@ describe('CredentialDetail', () => {
   it('disables Delete kebab action when user lacks credential:delete permission', async () => {
     vi.mocked(useCredentialPermissions).mockReturnValue({
       canCreate: true,
+      canRead: true,
       canUpdate: true,
       canDelete: false,
       isLoading: false,
+      isReadChecking: false,
       tooltips: {
         create: 'create tooltip',
+        read: 'read tooltip',
         update: 'update tooltip',
         enable: 'enable tooltip',
         delete: 'You need credential:delete permission to delete this credential.',
@@ -935,5 +948,29 @@ describe('CredentialDetail', () => {
 
     const deleteItem = await screen.findByRole('menuitem', { name: /Delete credential/ })
     expect(deleteItem).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('passes resourceProject and enabled to useCredentialPermissions after credential loads', () => {
+    vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery())
+
+    render(<CredentialDetail />, { wrapper })
+
+    expect(useCredentialPermissions).toHaveBeenCalledWith(
+      expect.objectContaining({ resourceProject: 'proj-1', enabled: true })
+    )
+  })
+
+  it('passes enabled: false to useCredentialPermissions while credential is loading', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(credentialsClient.useQuery).mockImplementation((_method: string, path: string): any => {
+      if (path === '/credentials/{credential_id}') {
+        return { data: undefined, isPending: true, error: null, refetch: vi.fn() }
+      }
+      return { data: null, isPending: false, error: null, refetch: vi.fn() }
+    })
+
+    render(<CredentialDetail />, { wrapper })
+
+    expect(useCredentialPermissions).toHaveBeenCalledWith(expect.objectContaining({ enabled: false }))
   })
 })
