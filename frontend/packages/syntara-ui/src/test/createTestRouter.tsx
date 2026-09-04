@@ -33,7 +33,7 @@ function TestRouteComponent() {
  * (which are inherently async in TanStack Router).
  *
  * @param initialPath - The initial URL path (may include query string, e.g. "/users?tab=groups")
- * @param routePattern - Optional wouter-style route pattern (e.g. "/users/:userId") for
+ * @param routePattern - Optional AppRoute-style path pattern (e.g. "/users/:userId") for
  *   `useParams` tests. Converted to TanStack syntax (`$userId`) automatically.
  *   When omitted, a catch-all route is used so location/navigate/search tests work.
  */

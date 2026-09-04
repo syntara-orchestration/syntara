@@ -7,7 +7,7 @@ describe('normalizeTemplate', () => {
     expect(normalizeTemplate('/users/$userId')).toBe('/users/$userId')
   })
 
-  it('converts Wouter :param syntax to $param', () => {
+  it('converts AppRoute :param syntax to $param', () => {
     expect(normalizeTemplate('/users/:userId/:tab')).toBe('/users/$userId/$tab')
   })
 })

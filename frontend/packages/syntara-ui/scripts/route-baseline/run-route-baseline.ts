@@ -40,7 +40,7 @@ export type UpdateRouteBaselineResult = {
 /**
  * Compare the committed manifest to a fresh build without exiting the process.
  *
- * Used by Vitest via `route-baseline:check`.
+ * Used by `npm run route-baseline:check` and by fixture-based Vitest cases.
  *
  * @param pkgRoot - Package root containing sources and `scripts/route-baseline/`
  * @returns Check result with diff and message lines
