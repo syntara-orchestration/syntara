@@ -1,5 +1,5 @@
 import { RhUiDuplicateIcon, RhUiEditIcon, RhUiTrashIcon } from '@patternfly/react-icons'
-import type { Meta, StoryObj } from '@storybook/react-vite'
+import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import { fn } from 'storybook/test'
 
 import { IconLabel } from './IconLabel'
