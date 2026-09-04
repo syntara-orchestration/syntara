@@ -43,10 +43,9 @@ not need AppRoute. Incomplete AppRoute-only adds still refuse update.
 
 **Intentional change**
 
-1. `cd frontend`
-2. `npm run route-baseline:update`
-3. Review `packages/syntara-ui/scripts/route-baseline/manifest.gen.json`
-4. Commit the updated manifest in the same PR
+1. From the frontend workspace (or `@syntara/ui` package): `npm run route-baseline:update`
+2. Review `scripts/route-baseline/manifest.gen.json`
+3. Commit the updated manifest in the same PR
 
 **Unintentional drift**
 

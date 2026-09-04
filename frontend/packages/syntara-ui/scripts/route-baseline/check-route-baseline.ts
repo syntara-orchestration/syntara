@@ -29,18 +29,7 @@ if (process.env.GITHUB_ACTIONS === 'true') {
   console.error(
     `::error title=Route baseline drift::${escapeGitHubAnnotation(result.messages[0] ?? 'Route baseline check failed')}`
   )
-  writeGitHubSummary(
-    [
-      '## Route baseline failed',
-      '',
-      '```',
-      report,
-      '```',
-      '',
-      'Full guide: `frontend/packages/syntara-ui/scripts/route-baseline/README.md`',
-      '',
-    ].join('\n')
-  )
+  writeGitHubSummary(['## Route baseline failed', '', '```', report, '```', ''].join('\n'))
 }
 
 process.exit(1)

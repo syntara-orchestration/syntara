@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, relative } from 'node:path'
 
 import { buildRouteManifest } from './build-route-manifest'
 import { diffRouteManifest, type RouteManifestDiff } from './diff-route-manifest'
@@ -112,18 +112,34 @@ function formatCheckMessages(input: {
   messages.push('Next steps:')
   messages.push('')
   messages.push('If this change is intentional:')
-  messages.push('  1. cd frontend')
-  messages.push('  2. npm run route-baseline:update')
-  messages.push('  3. Review packages/syntara-ui/scripts/route-baseline/manifest.gen.json')
-  messages.push('  4. Commit the updated manifest in the same PR')
+  messages.push('  1. From the frontend workspace (or @syntara/ui package):')
+  messages.push('       npm run route-baseline:update')
+  messages.push('  2. Review scripts/route-baseline/manifest.gen.json')
+  messages.push('  3. Commit the updated manifest in the same PR')
   messages.push('')
   messages.push('If this change is unintentional:')
   messages.push('  Fix the route sources (src/app/routes/*, AppRoute.tsx,')
   messages.push('  navigationItems.tsx, tanstackRouteTree.tsx, App.tsx, or routes/__root.ts),')
   messages.push('  then re-run: npm run route-baseline:check')
   messages.push('')
-  messages.push('Docs: frontend/packages/syntara-ui/scripts/route-baseline/README.md')
+  messages.push(`Docs: ${routeBaselineReadmeHint()}`)
   return messages
+}
+
+/**
+ * Point at the route-baseline README without hard-coding a monorepo path.
+ *
+ * Prefers a path relative to the current working directory when possible.
+ *
+ * @returns Human-readable docs location
+ */
+function routeBaselineReadmeHint(): string {
+  const readmePath = join(getRouteBaselineDir(), 'README.md')
+  const fromCwd = relative(process.cwd(), readmePath)
+  if (fromCwd && !fromCwd.startsWith('..')) {
+    return fromCwd
+  }
+  return 'scripts/route-baseline/README.md (in the @syntara/ui package)'
 }
 
 /**
