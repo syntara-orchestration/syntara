@@ -901,13 +901,12 @@ class TestCredentialAuthorization:
     async def test_missing_integration_id_raises_not_configured(self) -> None:
         """Calling _resolve_connection without integration_id must raise when none are configured."""
         service = _service()
-        user_id = uuid4()
 
         with (
             patch.object(service, "_list_visible_aap_integrations", new_callable=AsyncMock, return_value=[]),
             pytest.raises(AAPNotConfiguredError, match="No enabled AAP Controller integration"),
         ):
-            await service._resolve_connection(credential_id="550e8400-e29b-41d4-a716-446655440000", user_id=user_id)
+            await service._resolve_connection(credential_id="550e8400-e29b-41d4-a716-446655440000")
 
     @pytest.mark.asyncio
     async def test_missing_credential_id_raises_not_configured(self) -> None:
@@ -917,35 +916,9 @@ class TestCredentialAuthorization:
         service = AAPProxyService(
             settings=get_settings(), session=mock_session, evaluator=MagicMock(), user=_mock_user()
         )
-        user_id = uuid4()
 
         with pytest.raises(AAPNotConfiguredError, match="no management credential"):
-            await service._resolve_connection(integration_id=integration.id, user_id=user_id)
-
-    @pytest.mark.asyncio
-    async def test_credential_id_without_user_id_raises_value_error(self) -> None:
-        """Passing credential_id without user_id must raise ValueError (security violation)."""
-        service = _service()
-        integration_id = uuid4()
-
-        with pytest.raises(ValueError, match="user_id is required when credential_id is provided"):
-            await service._resolve_connection(
-                credential_id="550e8400-e29b-41d4-a716-446655440000",
-                integration_id=integration_id,
-                user_id=None,
-            )
-
-    @pytest.mark.asyncio
-    async def test_omitted_credential_id_without_user_id_raises_value_error(self) -> None:
-        """Auto-resolved management credential still requires a caller user_id."""
-        integration = _mock_integration(management_credential_id=uuid4())
-        service = _service()
-
-        with (
-            patch.object(service, "_list_visible_aap_integrations", new_callable=AsyncMock, return_value=[integration]),
-            pytest.raises(ValueError, match="user_id is required for AAP proxy connection resolution"),
-        ):
-            await service._resolve_connection(credential_id=None, user_id=None)
+            await service._resolve_connection(integration_id=integration.id)
 
     @pytest.mark.asyncio
     async def test_invalid_credential_id_format_raises_authentication_error(self) -> None:
@@ -1060,7 +1033,6 @@ class TestResolveConnectionFromIntegration:
         )
 
         credential_id = uuid4()
-        user_id = uuid4()
 
         with patch(
             "syntara.aap.services.aap_proxy_service.resolve_aap_connection_from_credential",
@@ -1070,7 +1042,6 @@ class TestResolveConnectionFromIntegration:
             result = await service._resolve_connection(
                 integration_id=integration.id,
                 credential_id=credential_id,
-                user_id=user_id,
             )
 
         # URL comes from integration (trailing slash stripped)
@@ -1079,11 +1050,11 @@ class TestResolveConnectionFromIntegration:
         assert result.headers == {"Authorization": "Bearer cred-token"}
         # verify_ssl from integration config (insecure_skip_tls_verify=False -> verify_ssl=True)
         assert result.verify_ssl is True
-        # Credential resolver was called with evaluator and user context
+        # Credential resolver was called with evaluator and user context from constructor-injected user
         mock_cred_resolver.assert_called_once_with(
             session=mock_session,
             credential_id=credential_id,
-            user_id=user_id,
+            user_id=mock_user.id,
             evaluator=mock_evaluator,
             user_labels=mock_user.labels,
             user_metadata=mock_user.authz_metadata,
@@ -1100,10 +1071,9 @@ class TestResolveConnectionFromIntegration:
         missing_id = uuid4()
 
         credential_id = uuid4()
-        user_id = uuid4()
 
         with pytest.raises(AAPNotConfiguredError, match=f"Integration {missing_id} not found"):
-            await service._resolve_connection(integration_id=missing_id, credential_id=credential_id, user_id=user_id)
+            await service._resolve_connection(integration_id=missing_id, credential_id=credential_id)
 
     @pytest.mark.asyncio
     async def test_integration_disabled_raises_not_configured(self) -> None:
@@ -1115,12 +1085,9 @@ class TestResolveConnectionFromIntegration:
         )
 
         credential_id = uuid4()
-        user_id = uuid4()
 
         with pytest.raises(AAPNotConfiguredError, match="disabled"):
-            await service._resolve_connection(
-                integration_id=integration.id, credential_id=credential_id, user_id=user_id
-            )
+            await service._resolve_connection(integration_id=integration.id, credential_id=credential_id)
 
     @pytest.mark.asyncio
     async def test_integration_wrong_type_raises_not_configured(self) -> None:
@@ -1132,12 +1099,9 @@ class TestResolveConnectionFromIntegration:
         )
 
         credential_id = uuid4()
-        user_id = uuid4()
 
         with pytest.raises(AAPNotConfiguredError, match="expected 'ansible_automation_platform'"):
-            await service._resolve_connection(
-                integration_id=integration.id, credential_id=credential_id, user_id=user_id
-            )
+            await service._resolve_connection(integration_id=integration.id, credential_id=credential_id)
 
     @pytest.mark.asyncio
     async def test_integration_id_as_string_uuid_is_accepted(self) -> None:
@@ -1163,7 +1127,6 @@ class TestResolveConnectionFromIntegration:
         )
 
         credential_id = uuid4()
-        user_id = uuid4()
 
         with patch(
             "syntara.aap.services.aap_proxy_service.resolve_aap_connection_from_credential",
@@ -1173,7 +1136,6 @@ class TestResolveConnectionFromIntegration:
             result = await service._resolve_connection(
                 integration_id=str(integration_id),
                 credential_id=credential_id,
-                user_id=user_id,
             )
 
         assert result.base_url == "https://aap-str.example.com"
@@ -1187,10 +1149,9 @@ class TestResolveConnectionFromIntegration:
         )
 
         credential_id = uuid4()
-        user_id = uuid4()
 
         with pytest.raises(AAPNotConfiguredError, match="Invalid integration_id format"):
-            await service._resolve_connection(integration_id="not-a-uuid", credential_id=credential_id, user_id=user_id)
+            await service._resolve_connection(integration_id="not-a-uuid", credential_id=credential_id)
 
     @pytest.mark.asyncio
     async def test_integration_with_insecure_tls_sets_verify_ssl_false(self) -> None:
@@ -1218,7 +1179,6 @@ class TestResolveConnectionFromIntegration:
         )
 
         credential_id = uuid4()
-        user_id = uuid4()
 
         with patch(
             "syntara.aap.services.aap_proxy_service.resolve_aap_connection_from_credential",
@@ -1228,24 +1188,9 @@ class TestResolveConnectionFromIntegration:
             result = await service._resolve_connection(
                 integration_id=integration.id,
                 credential_id=credential_id,
-                user_id=user_id,
             )
 
         assert result.verify_ssl is False
-
-    @pytest.mark.asyncio
-    async def test_integration_with_credential_but_no_user_id_raises_value_error(self) -> None:
-        """Passing credential_id without user_id must raise ValueError."""
-        service = _service()
-        integration_id = uuid4()
-        credential_id = uuid4()
-
-        with pytest.raises(ValueError, match="user_id is required when credential_id is provided"):
-            await service._resolve_connection(
-                integration_id=integration_id,
-                credential_id=credential_id,
-                user_id=None,
-            )
 
 
 @pytest.mark.ssrf_enforced
@@ -1269,7 +1214,6 @@ class TestRequestTimeSsrfRevalidation:
         )
 
         credential_id = uuid4()
-        user_id = uuid4()
 
         with (
             patch(
@@ -1282,7 +1226,6 @@ class TestRequestTimeSsrfRevalidation:
                 await service._resolve_connection(
                     integration_id=integration.id,
                     credential_id=credential_id,
-                    user_id=user_id,
                 )
 
             # Short-circuit must happen before credential resolution and any outbound dispatch.
@@ -1337,7 +1280,6 @@ class TestEnforceIntegrationVisibility:
             result = await service._resolve_connection(
                 integration_id=integration.id,
                 credential_id=uuid4(),
-                user_id=uuid4(),
             )
 
         assert result.base_url == "https://aap-global.example.com"
@@ -1364,7 +1306,6 @@ class TestEnforceIntegrationVisibility:
         )
 
         credential_id = uuid4()
-        user_id = uuid4()
 
         with (
             patch(
@@ -1377,7 +1318,6 @@ class TestEnforceIntegrationVisibility:
             await service._resolve_connection(
                 integration_id=integration.id,
                 credential_id=credential_id,
-                user_id=user_id,
             )
 
 
@@ -1393,7 +1333,6 @@ class TestDefaultAAPIntegrationResolution:
             management_credential_id=management_credential_id,
         )
         service = _service()
-        user_id = uuid4()
         cred_connection = AAPConnection(
             base_url="",
             headers={"Authorization": "Bearer mgmt-token"},
@@ -1409,7 +1348,7 @@ class TestDefaultAAPIntegrationResolution:
                 return_value=cred_connection,
             ) as mock_mgmt_resolver,
         ):
-            result = await service._resolve_connection(user_id=user_id)
+            result = await service._resolve_connection()
 
         assert result.base_url == "https://aap-gw.example.com"
         assert result.headers == {"Authorization": "Bearer mgmt-token"}
@@ -1430,7 +1369,6 @@ class TestDefaultAAPIntegrationResolution:
         service = AAPProxyService(
             settings=get_settings(), session=mock_session, evaluator=MagicMock(), user=_mock_user()
         )
-        user_id = uuid4()
         cred_connection = AAPConnection(
             base_url="",
             headers={"Authorization": "Bearer mgmt-token"},
@@ -1443,7 +1381,7 @@ class TestDefaultAAPIntegrationResolution:
             new_callable=AsyncMock,
             return_value=cred_connection,
         ) as mock_mgmt_resolver:
-            result = await service._resolve_connection(integration_id=integration.id, user_id=user_id)
+            result = await service._resolve_connection(integration_id=integration.id)
 
         assert result.base_url == "https://aap-gw.example.com"
         mock_mgmt_resolver.assert_called_once_with(
@@ -1470,7 +1408,6 @@ class TestDefaultAAPIntegrationResolution:
             user=mock_user,
         )
         credential_id = uuid4()
-        user_id = uuid4()
         cred_connection = AAPConnection(
             base_url="",
             headers={"Authorization": "Bearer user-token"},
@@ -1486,13 +1423,12 @@ class TestDefaultAAPIntegrationResolution:
             await service._resolve_connection(
                 integration_id=integration.id,
                 credential_id=credential_id,
-                user_id=user_id,
             )
 
         mock_cred_resolver.assert_called_once_with(
             session=mock_session,
             credential_id=credential_id,
-            user_id=user_id,
+            user_id=mock_user.id,
             evaluator=mock_evaluator,
             user_labels=mock_user.labels,
             user_metadata=mock_user.authz_metadata,
@@ -1511,7 +1447,7 @@ class TestDefaultAAPIntegrationResolution:
             patch.object(service, "_list_visible_aap_integrations", new_callable=AsyncMock, return_value=integrations),
             pytest.raises(AAPNotConfiguredError, match="pass integration_id"),
         ):
-            await service._resolve_connection(user_id=uuid4())
+            await service._resolve_connection()
 
     @pytest.mark.asyncio
     async def test_multiple_enabled_integrations_require_explicit_id_even_if_one_is_available(self) -> None:
@@ -1534,7 +1470,7 @@ class TestDefaultAAPIntegrationResolution:
             ),
             pytest.raises(AAPNotConfiguredError, match="pass integration_id"),
         ):
-            await service._resolve_connection(user_id=uuid4())
+            await service._resolve_connection()
 
     @pytest.mark.asyncio
     async def test_omitted_ids_use_only_the_visible_enabled_integration(self) -> None:
@@ -1594,7 +1530,7 @@ class TestDefaultAAPIntegrationResolution:
                 return_value=cred_connection,
             ) as mock_mgmt_resolver,
         ):
-            result = await service._resolve_connection(user_id=uuid4())
+            result = await service._resolve_connection()
 
         assert result.base_url == "https://visible-aap.example.com"
         assert result.headers == {"Authorization": "Bearer visible-mgmt-token"}

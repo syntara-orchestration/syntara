@@ -140,14 +140,13 @@ class AAPProxyService:
         resource_path: str,
         mapper: Callable[[dict[str, Any]], T],
         query: AAPResourceQuery,
-        user_id: UUID | None = None,
     ) -> AAPListResponse[T]:
         """List templates generically for job_templates and workflow_job_templates.
 
         Reduces code duplication between list_job_templates and list_workflow_job_templates.
         """
         connection = await self._resolve_connection(
-            credential_id=query.credential_id, user_id=user_id, integration_id=query.integration_id
+            credential_id=query.credential_id, integration_id=query.integration_id
         )
         params = self._build_params(search=query.search, page_size=query.page_size)
 
@@ -170,16 +169,13 @@ class AAPProxyService:
         model_class: type[T],
         url_path: str,
         credential_id: str | None = None,
-        user_id: UUID | None = None,
         integration_id: UUID | str | None = None,
     ) -> T:
         """Get template detail generically for job_templates and workflow_job_templates.
 
         Reduces code duplication between get_job_template and get_workflow_job_template.
         """
-        connection = await self._resolve_connection(
-            credential_id=credential_id, user_id=user_id, integration_id=integration_id
-        )
+        connection = await self._resolve_connection(credential_id=credential_id, integration_id=integration_id)
         data = await self._proxy_get(connection, f"{_AAP_API_PREFIX}/{resource_path}/{template_id}/", {})
         detail = model_class.model_validate(data)
         # Only set detail.url if aap_public_url is explicitly configured (avoid leaking internal addresses)
@@ -196,34 +192,28 @@ class AAPProxyService:
     # Public service methods
     # ------------------------------------------------------------------
 
-    async def list_organizations(
-        self, query: AAPBaseQuery, user_id: UUID | None = None
-    ) -> AAPListResponse[AAPOrganization]:
+    async def list_organizations(self, query: AAPBaseQuery) -> AAPListResponse[AAPOrganization]:
         """List AAP organizations."""
         connection = await self._resolve_connection(
-            credential_id=query.credential_id, user_id=user_id, integration_id=query.integration_id
+            credential_id=query.credential_id, integration_id=query.integration_id
         )
         params = self._build_params(search=query.search, page_size=query.page_size)
         data = await self._proxy_get(connection, f"{_AAP_API_PREFIX}/organizations/", params)
         results = _safe_map(data, lambda r: AAPOrganization(id=r["id"], name=r["name"]))
         return AAPListResponse(count=data.get("count", len(results)), results=results)
 
-    async def list_job_templates(
-        self, query: AAPResourceQuery, user_id: UUID | None = None
-    ) -> AAPListResponse[AAPJobTemplate]:
+    async def list_job_templates(self, query: AAPResourceQuery) -> AAPListResponse[AAPJobTemplate]:
         """List AAP job templates, optionally filtered by organization."""
         return await self._list_templates(
             "job_templates",
             lambda r: AAPJobTemplate(id=r["id"], name=r["name"], description=r.get("description")),
             query,
-            user_id,
         )
 
     async def get_job_template(
         self,
         job_template_id: int,
         credential_id: str | None = None,
-        user_id: UUID | None = None,
         integration_id: UUID | str | None = None,
     ) -> AAPJobTemplateDetail:
         """Get AAP job template details including prompt-on-launch flags."""
@@ -233,26 +223,21 @@ class AAPProxyService:
             AAPJobTemplateDetail,
             "job-template",
             credential_id,
-            user_id,
             integration_id,
         )
 
-    async def list_workflow_job_templates(
-        self, query: AAPResourceQuery, user_id: UUID | None = None
-    ) -> AAPListResponse[AAPWorkflowJobTemplate]:
+    async def list_workflow_job_templates(self, query: AAPResourceQuery) -> AAPListResponse[AAPWorkflowJobTemplate]:
         """List AAP workflow job templates, optionally filtered by organization."""
         return await self._list_templates(
             "workflow_job_templates",
             lambda r: AAPWorkflowJobTemplate(id=r["id"], name=r["name"], description=r.get("description")),
             query,
-            user_id,
         )
 
     async def get_workflow_job_template(
         self,
         workflow_job_template_id: int,
         credential_id: str | None = None,
-        user_id: UUID | None = None,
         integration_id: UUID | str | None = None,
     ) -> AAPWorkflowJobTemplateDetail:
         """Get AAP workflow job template details including prompt-on-launch flags."""
@@ -262,16 +247,13 @@ class AAPProxyService:
             AAPWorkflowJobTemplateDetail,
             "workflow-job-template",
             credential_id,
-            user_id,
             integration_id,
         )
 
-    async def list_inventories(
-        self, query: AAPResourceQuery, user_id: UUID | None = None
-    ) -> AAPListResponse[AAPInventory]:
+    async def list_inventories(self, query: AAPResourceQuery) -> AAPListResponse[AAPInventory]:
         """List AAP inventories, optionally filtered by organization."""
         connection = await self._resolve_connection(
-            credential_id=query.credential_id, user_id=user_id, integration_id=query.integration_id
+            credential_id=query.credential_id, integration_id=query.integration_id
         )
         params = self._build_params(search=query.search, page_size=query.page_size)
 
@@ -287,12 +269,10 @@ class AAPProxyService:
         results = _safe_map(data, lambda r: AAPInventory(id=r["id"], name=r["name"], description=r.get("description")))
         return AAPListResponse(count=data.get("count", len(results)), results=results)
 
-    async def list_execution_environments(
-        self, query: AAPResourceQuery, user_id: UUID | None = None
-    ) -> AAPListResponse[AAPExecutionEnvironment]:
+    async def list_execution_environments(self, query: AAPResourceQuery) -> AAPListResponse[AAPExecutionEnvironment]:
         """List AAP execution environments belonging to the selected org or having no org."""
         connection = await self._resolve_connection(
-            credential_id=query.credential_id, user_id=user_id, integration_id=query.integration_id
+            credential_id=query.credential_id, integration_id=query.integration_id
         )
         params = self._build_params(search=query.search, page_size=query.page_size)
 
@@ -311,34 +291,30 @@ class AAPProxyService:
         )
         return AAPListResponse(count=data.get("count", len(results)), results=results)
 
-    async def list_credentials(
-        self, query: AAPBaseQuery, user_id: UUID | None = None
-    ) -> AAPListResponse[AAPCredential]:
+    async def list_credentials(self, query: AAPBaseQuery) -> AAPListResponse[AAPCredential]:
         """List AAP credentials (not organization-scoped)."""
         connection = await self._resolve_connection(
-            credential_id=query.credential_id, user_id=user_id, integration_id=query.integration_id
+            credential_id=query.credential_id, integration_id=query.integration_id
         )
         params = self._build_params(search=query.search, page_size=query.page_size)
         data = await self._proxy_get(connection, f"{_AAP_API_PREFIX}/credentials/", params)
         results = _safe_map(data, lambda r: AAPCredential(id=r["id"], name=r["name"]))
         return AAPListResponse(count=data.get("count", len(results)), results=results)
 
-    async def list_instance_groups(
-        self, query: AAPBaseQuery, user_id: UUID | None = None
-    ) -> AAPListResponse[AAPInstanceGroup]:
+    async def list_instance_groups(self, query: AAPBaseQuery) -> AAPListResponse[AAPInstanceGroup]:
         """List AAP instance groups (not organization-scoped)."""
         connection = await self._resolve_connection(
-            credential_id=query.credential_id, user_id=user_id, integration_id=query.integration_id
+            credential_id=query.credential_id, integration_id=query.integration_id
         )
         params = self._build_params(search=query.search, page_size=query.page_size)
         data = await self._proxy_get(connection, f"{_AAP_API_PREFIX}/instance_groups/", params)
         results = _safe_map(data, lambda r: AAPInstanceGroup(id=r["id"], name=r["name"]))
         return AAPListResponse(count=data.get("count", len(results)), results=results)
 
-    async def list_labels(self, query: AAPBaseQuery, user_id: UUID | None = None) -> AAPListResponse[AAPLabel]:
+    async def list_labels(self, query: AAPBaseQuery) -> AAPListResponse[AAPLabel]:
         """List AAP labels."""
         connection = await self._resolve_connection(
-            credential_id=query.credential_id, user_id=user_id, integration_id=query.integration_id
+            credential_id=query.credential_id, integration_id=query.integration_id
         )
         params = self._build_params(search=query.search, page_size=query.page_size)
         data = await self._proxy_get(connection, f"{_AAP_API_PREFIX}/labels/", params)
@@ -355,7 +331,6 @@ class AAPProxyService:
     async def _resolve_connection(
         self,
         credential_id: UUID | str | None = None,
-        user_id: UUID | None = None,
         integration_id: UUID | str | None = None,
     ) -> AAPConnection:
         """Resolve AAP connection from an integration and credential.
@@ -364,13 +339,12 @@ class AAPProxyService:
         proxy uses the unique visible enabled AAP integration and its
         management credential. ``validation_status`` is not considered.
 
-        When the caller supplies ``credential_id``, that credential's owner
-        must match ``user_id``. Omitted ``credential_id`` uses the integration's
-        management credential after visibility has been enforced.
+        When the caller supplies ``credential_id``, ``credential:use`` RBAC is
+        enforced against ``self._user``. Omitted ``credential_id`` uses the
+        integration's management credential after visibility has been enforced.
 
         Args:
             credential_id: Syntara credential ID for AAP authentication.
-            user_id: User ID for authorization check.
             integration_id: AAP Gateway integration ID for connection URL resolution.
 
         Returns:
@@ -379,20 +353,12 @@ class AAPProxyService:
         Raises:
             AAPNotConfiguredError: Integration/credential not found, disabled, or IDs missing.
             AAPAuthenticationError: Credential decryption failed or user not authorized.
-            ValueError: user_id not provided for connection resolution.
 
         """
-        if credential_id is not None and user_id is None:
-            msg = "user_id is required when credential_id is provided (authorization check cannot be bypassed)"
-            raise ValueError(msg)
         integration = await self._resolve_aap_integration(integration_id)
-        if user_id is None:
-            msg = "user_id is required for AAP proxy connection resolution"
-            raise ValueError(msg)
         return await self._resolve_connection_from_integration(
             integration=integration,
             credential_id=credential_id,
-            user_id=user_id,
         )
 
     async def _enforce_integration_visibility(self, integration: Integration) -> None:
@@ -492,7 +458,6 @@ class AAPProxyService:
         self,
         integration: Integration,
         credential_id: UUID | str | None,
-        user_id: UUID,
     ) -> AAPConnection:
         """Resolve AAP connection URL from an integration, with auth from a credential."""
         config = integration.configuration
@@ -520,7 +485,7 @@ class AAPProxyService:
             cred_connection = await resolve_aap_connection_from_credential(
                 session=self._session,
                 credential_id=credential_id,
-                user_id=user_id,
+                user_id=self._user.id,
                 evaluator=self._evaluator,
                 user_labels=self._user.labels,
                 user_metadata=self._user.authz_metadata,

@@ -107,7 +107,7 @@ async def list_organizations(
     error_type = None
     result_count = None
     try:
-        result = await service.list_organizations(query, user_id=current_user.id)
+        result = await service.list_organizations(query)
         result_count = result.count
     except Exception as exc:
         error_type = type(exc).__name__
@@ -139,7 +139,7 @@ async def list_job_templates(
     error_type = None
     result_count = None
     try:
-        result = await service.list_job_templates(query, user_id=current_user.id)
+        result = await service.list_job_templates(query)
         result_count = result.count
     except Exception as exc:
         error_type = type(exc).__name__
@@ -178,7 +178,6 @@ async def get_job_template(
         result = await service.get_job_template(
             job_template_id,
             credential_id=credential_id_str,
-            user_id=current_user.id,
             integration_id=integration_id_str,
         )
         resource_name = result.name
@@ -214,7 +213,7 @@ async def list_workflow_job_templates(
     error_type = None
     result_count = None
     try:
-        result = await service.list_workflow_job_templates(query, user_id=current_user.id)
+        result = await service.list_workflow_job_templates(query)
         result_count = result.count
     except Exception as exc:
         error_type = type(exc).__name__
@@ -257,7 +256,6 @@ async def get_workflow_job_template(
         result = await service.get_workflow_job_template(
             workflow_job_template_id,
             credential_id=credential_id_str,
-            user_id=current_user.id,
             integration_id=integration_id_str,
         )
         resource_name = result.name
@@ -291,7 +289,7 @@ async def list_inventories(
     error_type = None
     result_count = None
     try:
-        result = await service.list_inventories(query, user_id=current_user.id)
+        result = await service.list_inventories(query)
         result_count = result.count
     except Exception as exc:
         error_type = type(exc).__name__
@@ -326,7 +324,7 @@ async def list_execution_environments(
     error_type = None
     result_count = None
     try:
-        result = await service.list_execution_environments(query, user_id=current_user.id)
+        result = await service.list_execution_environments(query)
         result_count = result.count
     except Exception as exc:
         error_type = type(exc).__name__
@@ -359,7 +357,7 @@ async def list_credentials(
     error_type = None
     result_count = None
     try:
-        result = await service.list_credentials(query, user_id=current_user.id)
+        result = await service.list_credentials(query)
         result_count = result.count
     except Exception as exc:
         error_type = type(exc).__name__
@@ -391,7 +389,7 @@ async def list_instance_groups(
     error_type = None
     result_count = None
     try:
-        result = await service.list_instance_groups(query, user_id=current_user.id)
+        result = await service.list_instance_groups(query)
         result_count = result.count
     except Exception as exc:
         error_type = type(exc).__name__
@@ -423,7 +421,7 @@ async def list_labels(
     error_type = None
     result_count = None
     try:
-        result = await service.list_labels(query, user_id=current_user.id)
+        result = await service.list_labels(query)
         result_count = result.count
     except Exception as exc:
         error_type = type(exc).__name__
