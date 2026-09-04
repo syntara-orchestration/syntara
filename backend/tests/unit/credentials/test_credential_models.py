@@ -1,6 +1,5 @@
 """Unit tests for credential model schemas — CredentialRead with UserReference."""
 
-from pathlib import Path
 from uuid import uuid4
 
 from syntara.core.models.user_reference import UserReference
@@ -10,44 +9,6 @@ from syntara.credentials.models.credential import (
     CredentialUpdate,
     CredentialWorkflowRef,
 )
-
-
-def _exec_for_coverage() -> None:
-    """Re-execute module source in a throwaway namespace for coverage tracking.
-
-    ``pytest-cov`` starts *after* conftest imports, so class-level
-    declarations never appear as covered.  Running the source through
-    ``exec`` with the correct filename records those lines without
-    modifying real module objects.
-
-    For modules containing ``table=True`` SQLModel classes we redirect
-    table registration to a throwaway MetaData so the real registry is
-    never touched.
-    """
-    import warnings
-    from unittest.mock import patch
-
-    import sqlalchemy as sa
-
-    import syntara.credentials.models.credential as _mod
-    import syntara.credentials.models.credential_type as _ct_mod
-
-    scratch_meta = sa.MetaData()
-
-    for mod in (_ct_mod, _mod):
-        if not mod.__file__:
-            continue
-        with Path(mod.__file__).open() as _f:
-            _code = compile(_f.read(), mod.__file__, "exec")
-        try:
-            with warnings.catch_warnings(), patch("sqlmodel.main.SQLModel.metadata", scratch_meta):
-                warnings.simplefilter("ignore")
-                exec(_code, {"__name__": "_coverage_throwaway"})  # noqa: S102
-        except Exception:
-            pass
-
-
-_exec_for_coverage()
 
 
 class TestCredentialRead:
