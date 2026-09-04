@@ -25,12 +25,12 @@ Commit an updated `manifest.gen.json` in the same PR as the route change.
 
 The baseline is a **committed contract**, not “routes look fine.”
 
-| Situation | `route-baseline:check` | `route-baseline:update` |
-|---|---|---|
-| Accidental break vs committed manifest | **Fail** | N/A — fix the source |
-| Intentional route change, sources consistent | **Fail** until regen | **Succeed**, then check passes |
-| AppRoute/nav out of sync with router | **Fail** (parity) | **Refuse** until fixed |
-| Non-contract change (page copy, search params) | **Pass** | No-op |
+| Situation                                      | `route-baseline:check` | `route-baseline:update`        |
+| ---------------------------------------------- | ---------------------- | ------------------------------ |
+| Accidental break vs committed manifest         | **Fail**               | N/A — fix the source           |
+| Intentional route change, sources consistent   | **Fail** until regen   | **Succeed**, then check passes |
+| AppRoute/nav out of sync with router           | **Fail** (parity)      | **Refuse** until fixed         |
+| Non-contract change (page copy, search params) | **Pass**               | No-op                          |
 
 **Router-only routes are allowed.** A new `createRoute` without an `AppRoute` /
 nav entry fails check with “Added”, then update succeeds. Hidden/detail URLs do

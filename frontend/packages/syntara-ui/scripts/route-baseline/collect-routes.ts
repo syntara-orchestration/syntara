@@ -154,13 +154,9 @@ function extractRedirectTarget(body: string, appRouteCatalog: unknown): string |
   const appRouteMatch = body.match(/\bredirect\(\{\s*to:\s*(AppRoute(?:\.\w+)+)/)
   if (appRouteMatch?.[1]) {
     if (appRouteCatalog === undefined) {
-      throw new Error(
-        `redirect({ to: ${appRouteMatch[1]} }) requires an AppRoute catalog to resolve`
-      )
+      throw new Error(`redirect({ to: ${appRouteMatch[1]} }) requires an AppRoute catalog to resolve`)
     }
-    const resolved = absolutePathSchema.safeParse(
-      resolveAppRouteReference(appRouteCatalog, appRouteMatch[1])
-    )
+    const resolved = absolutePathSchema.safeParse(resolveAppRouteReference(appRouteCatalog, appRouteMatch[1]))
     if (!resolved.success) {
       throw new Error(`Could not resolve redirect target ${appRouteMatch[1]} against AppRoute`)
     }
@@ -169,9 +165,7 @@ function extractRedirectTarget(body: string, appRouteCatalog: unknown): string |
 
   const otherMatch = body.match(/\bredirect\(\{\s*to:\s*([^,\s}'"]+)/)
   if (otherMatch?.[1]) {
-    throw new Error(
-      `Unsupported redirect({ to: ${otherMatch[1]} }) — use a string literal or AppRoute.Foo.Bar`
-    )
+    throw new Error(`Unsupported redirect({ to: ${otherMatch[1]} }) — use a string literal or AppRoute.Foo.Bar`)
   }
 
   return undefined
@@ -549,10 +543,7 @@ function followToCreateRouteModule(
  */
 function parseRelativeReexportTargets(source: string): string[] {
   const targets: string[] = []
-  const patterns = [
-    /export\s*\*\s*from\s*['"](\.\/[^'"]+)['"]/g,
-    /export\s*\{[^}]*\}\s*from\s*['"](\.\/[^'"]+)['"]/g,
-  ]
+  const patterns = [/export\s*\*\s*from\s*['"](\.\/[^'"]+)['"]/g, /export\s*\{[^}]*\}\s*from\s*['"](\.\/[^'"]+)['"]/g]
   for (const pattern of patterns) {
     for (const match of source.matchAll(pattern)) {
       const target = match[1]

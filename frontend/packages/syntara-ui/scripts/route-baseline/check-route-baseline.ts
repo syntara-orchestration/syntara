@@ -26,7 +26,9 @@ console.error(report)
 
 if (process.env.GITHUB_ACTIONS === 'true') {
   // Single annotation so the Actions UI points at the contract failure.
-  console.error(`::error title=Route baseline drift::${escapeGitHubAnnotation(result.messages[0] ?? 'Route baseline check failed')}`)
+  console.error(
+    `::error title=Route baseline drift::${escapeGitHubAnnotation(result.messages[0] ?? 'Route baseline check failed')}`
+  )
   writeGitHubSummary(['## Route baseline failed', '', '```', report, '```', ''].join('\n'))
 }
 
