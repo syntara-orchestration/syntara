@@ -2,6 +2,7 @@ import { Flex, FlexItem, Truncate } from '@patternfly/react-core'
 import { RhUiCaretDownIcon, RhUiCaretRightIcon } from '@patternfly/react-icons'
 import { Tbody, Td, Tr } from '@patternfly/react-table'
 import type { WorkflowAPI } from '@syntara/contracts'
+import { useState } from 'react'
 
 import groupedTableStyles from '../../components/groupedTable.module.css'
 import type { KebabAction } from '../../components/SynKebabMenu'
@@ -14,6 +15,8 @@ import type { ProjectRead } from '../access/types'
 import { useProjectPermissions } from '../access-management/useProjectPermissions'
 
 import { buildProjectRowActions, type ProjectRowActionCallbacks } from './projectRowActions'
+import { useWorkflowPermissions } from './useWorkflowPermissions'
+import { buildWorkflowRowActions, type WorkflowRowActionCallbacks } from './workflowRowActions'
 
 type Workflow = WorkflowAPI.components['schemas']['WorkflowRead']
 
@@ -21,11 +24,17 @@ export type RowAction = KebabAction
 
 type WorkflowRowProps = {
   workflow: Workflow
-  getRowActions: (workflow: Workflow) => RowAction[]
+  isBuiltinProject: boolean
+  rowActionCallbacks: WorkflowRowActionCallbacks
 }
 
-function WorkflowRow({ workflow, getRowActions }: Readonly<WorkflowRowProps>) {
-  const actions = getRowActions(workflow)
+function WorkflowRow({ workflow, isBuiltinProject, rowActionCallbacks }: Readonly<WorkflowRowProps>) {
+  const [rowChecksEnabled, setRowChecksEnabled] = useState(false)
+  const permissions = useWorkflowPermissions({
+    resourceProject: workflow.project_id,
+    enabled: rowChecksEnabled,
+  })
+  const actions = buildWorkflowRowActions(workflow, permissions, isBuiltinProject, rowActionCallbacks)
 
   return (
     <Tr key={workflow.id}>
@@ -49,7 +58,15 @@ function WorkflowRow({ workflow, getRowActions }: Readonly<WorkflowRowProps>) {
         />
       </Td>
       <Td isActionCell>
-        {actions.length > 0 && <SynKebabMenu actions={actions} aria-label={`Actions for ${workflow.name}`} />}
+        {actions.length > 0 && (
+          <SynKebabMenu
+            actions={actions}
+            aria-label={`Actions for ${workflow.name}`}
+            onOpenChange={(isOpen) => {
+              if (isOpen) setRowChecksEnabled(true)
+            }}
+          />
+        )}
       </Td>
     </Tr>
   )
@@ -66,7 +83,8 @@ type ProjectGroupSectionProps = {
   workflows: Workflow[]
   isCollapsed: boolean
   onToggleProject: (projectId: string) => void
-  getRowActions: (workflow: Workflow) => RowAction[]
+  isWorkflowProjectBuiltin: (workflow: Workflow) => boolean
+  rowActionCallbacks: WorkflowRowActionCallbacks
   projectActionCallbacks?: ProjectRowActionCallbacks
 }
 
@@ -76,7 +94,8 @@ function ProjectGroupSection({
   workflows,
   isCollapsed,
   onToggleProject,
-  getRowActions,
+  isWorkflowProjectBuiltin,
+  rowActionCallbacks,
   projectActionCallbacks,
 }: Readonly<ProjectGroupSectionProps>) {
   const permissions = useProjectPermissions({
@@ -107,7 +126,12 @@ function ProjectGroupSection({
       </Tr>
       {!isCollapsed &&
         workflows.map((workflow) => (
-          <WorkflowRow key={workflow.id} workflow={workflow} getRowActions={getRowActions} />
+          <WorkflowRow
+            key={workflow.id}
+            workflow={workflow}
+            isBuiltinProject={isWorkflowProjectBuiltin(workflow)}
+            rowActionCallbacks={rowActionCallbacks}
+          />
         ))}
     </Tbody>
   )
@@ -117,7 +141,8 @@ type GroupedWorkflowsTableBodyProps = {
   groupedWorkflows: Map<string, ProjectGroup>
   collapsedProjects: Set<string>
   onToggleProject: (projectId: string) => void
-  getRowActions: (workflow: Workflow) => RowAction[]
+  isWorkflowProjectBuiltin: (workflow: Workflow) => boolean
+  rowActionCallbacks: WorkflowRowActionCallbacks
   projectActionCallbacks?: ProjectRowActionCallbacks
 }
 
@@ -125,7 +150,8 @@ export function GroupedWorkflowsTableBody({
   groupedWorkflows,
   collapsedProjects,
   onToggleProject,
-  getRowActions,
+  isWorkflowProjectBuiltin,
+  rowActionCallbacks,
   projectActionCallbacks,
 }: Readonly<GroupedWorkflowsTableBodyProps>) {
   return (
@@ -138,7 +164,8 @@ export function GroupedWorkflowsTableBody({
           workflows={workflows}
           isCollapsed={collapsedProjects.has(projectId)}
           onToggleProject={onToggleProject}
-          getRowActions={getRowActions}
+          isWorkflowProjectBuiltin={isWorkflowProjectBuiltin}
+          rowActionCallbacks={rowActionCallbacks}
           projectActionCallbacks={projectActionCallbacks}
         />
       ))}
@@ -148,14 +175,24 @@ export function GroupedWorkflowsTableBody({
 
 type FlatWorkflowsTableBodyProps = {
   workflows: Workflow[]
-  getRowActions: (workflow: Workflow) => RowAction[]
+  isWorkflowProjectBuiltin: (workflow: Workflow) => boolean
+  rowActionCallbacks: WorkflowRowActionCallbacks
 }
 
-export function FlatWorkflowsTableBody({ workflows, getRowActions }: Readonly<FlatWorkflowsTableBodyProps>) {
+export function FlatWorkflowsTableBody({
+  workflows,
+  isWorkflowProjectBuiltin,
+  rowActionCallbacks,
+}: Readonly<FlatWorkflowsTableBodyProps>) {
   return (
     <Tbody>
       {workflows.map((workflow) => (
-        <WorkflowRow key={workflow.id} workflow={workflow} getRowActions={getRowActions} />
+        <WorkflowRow
+          key={workflow.id}
+          workflow={workflow}
+          isBuiltinProject={isWorkflowProjectBuiltin(workflow)}
+          rowActionCallbacks={rowActionCallbacks}
+        />
       ))}
     </Tbody>
   )

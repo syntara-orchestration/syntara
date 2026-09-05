@@ -1,12 +1,15 @@
 /**
  * Real-backend role user setup for permission-gating E2E tests.
  *
- * Creates three users (viewer, auditor, user) with role assignments that
+ * Creates users (viewer, auditor, user) with role assignments that
  * mirror the mock API's can_i permission matrix (handlers.ts).
  *
  * - **auditor**: assigned the built-in "auditor" role directly.
  * - **viewer** / **user**: assigned a custom role built from the backend's
  *   built-in policy names (e.g. "workflow:read:any").
+ *
+ * Project-admin is not created here. The test that needs that persona
+ * creates the user, project, and assignment, then deletes all three.
  *
  * Used by the worker-scoped `roleSetup` fixture in fixtures.ts so each
  * worker creates users once and reuses them across all tests.
@@ -20,7 +23,7 @@ import type { APIRequestContext } from '@playwright/test'
 
 import { buildUniqueName } from '../helpers/workflows'
 
-function generatePassword(): string {
+export function generatePassword(): string {
   return `E2e-${randomBytes(16).toString('hex')}!A1`
 }
 
@@ -95,7 +98,7 @@ async function postJson(
 
 /**
  * Create viewer/auditor/user accounts on the real backend with matching
- * role assignments.  Returns credentials for login and a cleanup function
+ * role assignments. Returns credentials for login and a cleanup function
  * that tears everything down in reverse order.
  */
 export async function setupRoleUsers(request: APIRequestContext): Promise<RoleSetupResult> {
