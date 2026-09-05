@@ -1,0 +1,35 @@
+---
+name: CI Docs
+
+on:
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'backend/docs/**'
+      - 'frontend/docs/**'
+      - 'mkdocs.yml'
+      - '.readthedocs.yaml'
+      - 'docs/requirements.txt'
+      - '.github/workflows/ci-docs.yml'
+      - 'Makefile'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - run: uv pip install --system -r docs/requirements.txt
+      - run: mkdocs build --strict

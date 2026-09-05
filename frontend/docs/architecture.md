@@ -21,8 +21,8 @@ This document explains **how the Syntara UI is organized**, **how it fetches dat
 9. [App Startup](#app-startup-where-everything-begins)
 10. [Routing](#routing-wouter)
 11. [State Management](#state-management)
-12. [Backend Requests + Data Flow](#backend-requests--data-flow-tanstack-query--openapi-clients)
-13. [Workflow Builder](#workflow-builder-backend-workflow--ui-graph-react-flow)
+12. [Backend Requests + Data Flow](#backend-requests-data-flow-tanstack-query-openapi-clients)
+13. [Workflow Builder](#workflow-builder-backend-workflow-ui-graph-react-flow)
 14. [React Flow Integration](#react-flow-integration-nodes-edges-and-layout)
 15. [Where to Look for Common Changes](#where-to-look-for-common-changes)
 16. [API Filtering Architecture](#api-filtering-architecture)
@@ -404,13 +404,13 @@ const { workflowId } = useParams()
 
 **Page breadcrumbs (location hierarchy):**
 
-- [`SynPageHeader`](packages/syntara-ui/src/components/layout/SynPageHeader.tsx) accepts a required string `title` (default `h1`), optional `breadcrumbs` (PatternFly `Breadcrumb` above the title when there are at least two items), optional `toolbar` for actions (laid out right-aligned via an internal spacer—callers should not add their own `FlexItem grow`), optional `projectSelector` and other title-row slots (`titleLeading`, `titleAddons`), and `titleSlot` for rare full-width custom title rows (e.g. the workflow builder).
-- Trails are built with helpers in [`breadcrumbBuilders.ts`](packages/syntara-ui/src/app/breadcrumbBuilders.ts); links use `href` values from [`AppRoute.tsx`](packages/syntara-ui/src/app/AppRoute.tsx).
+- [`SynPageHeader`](https://github.com/syntara-orchestration/syntara/blob/devel/frontend/packages/syntara-ui/src/components/layout/SynPageHeader.tsx) accepts a required string `title` (default `h1`), optional `breadcrumbs` (PatternFly `Breadcrumb` above the title when there are at least two items), optional `toolbar` for actions (laid out right-aligned via an internal spacer—callers should not add their own `FlexItem grow`), optional `projectSelector` and other title-row slots (`titleLeading`, `titleAddons`), and `titleSlot` for rare full-width custom title rows (e.g. the workflow builder).
+- Trails are built with helpers in [`breadcrumbBuilders.ts`](https://github.com/syntara-orchestration/syntara/blob/devel/frontend/packages/syntara-ui/src/app/breadcrumbBuilders.ts); links use `href` values from [`AppRoute.tsx`](https://github.com/syntara-orchestration/syntara/blob/devel/frontend/packages/syntara-ui/src/app/AppRoute.tsx).
 - **Visibility**: nothing is rendered unless there are **at least two** items. The **last** item omits `href` and represents the current page (including tab-specific labels on detail views).
 - **Default tab**: On entity detail routes where the URL without a trailing segment is the same as the default tab (e.g. `…/projects/:id` and `…/projects/:id/details` both mean “Details”), the trail ends at the **entity name** so the parent link is not redundant with the current page.
 - **Access management hub**: Visiting `/system-administration/access-management` triggers a client-side `replace` navigation to `/system-administration/access-management/users` (the default tab). Breadcrumbs are omitted on that Users hub view because the page title and tab bar already convey the location; other hub tabs still show `Access management > …`.
 - **Settings (`/system-administration/settings`)**: The first category tab is the default view. Breadcrumbs are omitted (single-item trail). Selecting another tab shows `Settings > [category]` with **Settings** as a link so you can return to the default tab from the trail.
-- **Link style**: [`index.css`](packages/syntara-ui/src/index.css) sets breadcrumb link **color**, **`TextDecorationColor`** (underline), and **hover** variants from `--pf-t--global--text--color--link--*` — PF’s default maps underline color to neutral decoration tokens; **`TextDecorationStyle`** is **solid** where globals use dotted — so links match [PatternFly breadcrumb](https://www.patternfly.org/components/breadcrumb/) styling.
+- **Link style**: [`index.css`](https://github.com/syntara-orchestration/syntara/blob/devel/frontend/packages/syntara-ui/src/index.css) sets breadcrumb link **color**, **`TextDecorationColor`** (underline), and **hover** variants from `--pf-t--global--text--color--link--*` — PF’s default maps underline color to neutral decoration tokens; **`TextDecorationStyle`** is **solid** where globals use dotted — so links match [PatternFly breadcrumb](https://www.patternfly.org/components/breadcrumb/) styling.
 - On **narrow viewports** (`max-width: 768px`), when there are two or more _middle_ segments, those segments collapse behind a dropdown toggle (badge count) per PatternFly’s breadcrumb dropdown pattern.
 
 ---
@@ -625,7 +625,7 @@ The builder edits nodes + edges directly in the Zustand store. On save, `buildWo
 | `utils/buildNestedStructure.ts`                   | Legacy wrapper (identity function in v2 — returns activities as-is)                                                      |
 | `utils/validation/`                               | Validation rules                                                                                                         |
 
-Floating canvas surfaces (controls, step legend, steps on the canvas, undo/redo) use [`SynPanel`](../packages/syntara-ui/src/components/layout/SynPanel.tsx) so they stay readable under the glass theme: compact overlays use `variant="raised"`; large flat panels (for example the step editor shell) use `opaqueFloatingFill` instead of raised chrome.
+Floating canvas surfaces (controls, step legend, steps on the canvas, undo/redo) use [`SynPanel`](https://github.com/syntara-orchestration/syntara/blob/devel/frontend/packages/syntara-ui/src/components/layout/SynPanel.tsx) so they stay readable under the glass theme: compact overlays use `variant="raised"`; large flat panels (for example the step editor shell) use `opaqueFloatingFill` instead of raised chrome.
 
 ### Builder internals (advanced): registry, edges, and graph semantics
 
@@ -1446,4 +1446,4 @@ Detail pages use the entity name from API data as the first segment, falling bac
 | [`docs/websocket-architecture.md`](./websocket-architecture.md)           | WebSocket infrastructure, hooks, and real-time patterns      |
 | [`docs/user-guides/filtering.md`](./user-guides/filtering.md)             | How to use search and filters in the UI; shareable URLs      |
 | [`docs/TEST_HELPERS_FILTER_TESTING.md`](./TEST_HELPERS_FILTER_TESTING.md) | Unit-test helpers for filter URL assertions                  |
-| [`AGENTS.md`](../AGENTS.md)                                               | Quick reference for AI assistants and developers             |
+| [`AGENTS.md`](https://github.com/syntara-orchestration/syntara/blob/devel/frontend/AGENTS.md)                                               | Quick reference for AI assistants and developers             |

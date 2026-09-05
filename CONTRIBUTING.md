@@ -186,6 +186,29 @@ make gen-contracts
 
 This reads OpenAPI specs from `backend/src/syntara/schemas/` and generates types in `frontend/packages/syntara-contracts/src/`. Include the regenerated types in the same PR as the schema changes.
 
+## Documentation Site
+
+The published docs site uses [MkDocs Material](https://squidfunk.github.io/mkdocs-material/) and is built by Read the Docs.
+
+### Dependency management
+
+Direct dependencies are declared with range constraints in `docs/requirements.in`. A compiled lockfile (`docs/requirements.txt`) pins every transitive dependency so builds are reproducible. Dependabot opens weekly PRs for transitive dependency updates (configured in `.github/dependabot.yml`).
+
+When adding or removing an MkDocs plugin, edit `docs/requirements.in` then recompile the lockfile:
+
+```bash
+uv pip compile --universal --output-file docs/requirements.txt docs/requirements.in
+```
+
+Include both files in the same PR.
+
+### Local preview
+
+```bash
+make docs-serve   # Live-reload server on port 8080
+make docs-build   # Validate with mkdocs build --strict (same check CI runs)
+```
+
 ## Commit Conventions
 
 Use [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`.

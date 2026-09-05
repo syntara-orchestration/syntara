@@ -75,6 +75,12 @@ frontend/.eslintcache
 # Shared
 # ==============================================================================
 
+# Python bytecode (anywhere in tree)
+__pycache__/
+
+# Documentation build output
+site/
+
 # File upload storage (container bind mount)
 data/uploads/
 

@@ -12,13 +12,13 @@
    - [Instrumentation Tools](#instrumentation-tools)
    - [Data Protection](#data-protection)
 2. [Domain Integration Guide](#2-domain-integration-guide)
-   - [Integration Pattern](#integration-pattern)
-   - [Step-by-Step Integration](#step-by-step-integration)
-   - [Domain Event Flow](#domain-event-flow)
+   - [Choosing Your Instrumentation Strategy](#choosing-your-instrumentation-strategy)
+   - [Decision Tree](#decision-tree)
+   - [Layering Example: Login Request](#layering-example-login-request)
 3. [Example: Auth Domain Implementation](#3-example-auth-domain-implementation)
    - [Domain Events](#domain-events)
+   - [Login Flow Example](#login-flow-example)
    - [Event Handlers](#event-handlers)
-   - [Usage in Code](#usage-in-code)
 
 ---
 
