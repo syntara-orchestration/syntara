@@ -1,30 +1,17 @@
-import { zodResolver } from '@hookform/resolvers/zod'
-import {
-  Button,
-  Form,
-  FormGroup,
-  FormHelperText,
-  HelperText,
-  HelperTextItem,
-  Modal,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
-  TextArea,
-  TextInput,
-} from '@patternfly/react-core'
-import { RhUiAddIcon, RhUiErrorIcon } from '@patternfly/react-icons'
+import { Button, Form, Modal, ModalBody, ModalFooter, ModalHeader } from '@patternfly/react-core'
+import { RhUiAddIcon } from '@patternfly/react-icons'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
-import { Controller, useForm } from 'react-hook-form'
 
-import { useFormMutationErrorHandler } from '../../hooks/useFormMutationErrorHandler'
+import { SynForm } from '../../components/forms/SynForm'
+import { SynTextAreaField } from '../../components/forms/SynTextAreaField'
+import { SynTextField } from '../../components/forms/SynTextField'
+import { useSynForm } from '../../hooks/useSynForm'
 import { useAlerts } from '../../providers/alerts'
 import { detachPromise } from '../../utils/detachPromise'
 import { accessClient } from '../access/accessClient'
 import type { ProjectRead } from '../access/types'
 
-import { HintOrError } from './authentication/identity-providers/formFieldHelpers'
 import { projectHelp } from './projectFieldHelp'
 import {
   PROJECT_NAME_HINT,
@@ -57,13 +44,12 @@ export function ProjectFormModal({ project, isOpen, onClose, onSuccess, onCreate
     detachPromise(queryClient.invalidateQueries({ queryKey: ['all-projects'] }))
   }
 
-  const { control, handleSubmit, setError, reset } = useForm<ProjectFormData>({
-    resolver: zodResolver(projectFormSchema, undefined, { mode: 'sync' }),
-    defaultValues: {
-      name: project?.name ?? '',
-      description: project?.description ?? '',
-    },
+  const form = useSynForm({
+    schema: projectFormSchema,
+    defaultValues: { name: '', description: '' },
+    onClose,
   })
+  const { handleSubmit, handleError, handleClose, reset } = form
 
   useEffect(() => {
     if (isOpen) {
@@ -74,18 +60,9 @@ export function ProjectFormModal({ project, isOpen, onClose, onSuccess, onCreate
     }
   }, [isOpen, project, reset])
 
-  const handleError = useFormMutationErrorHandler<ProjectFormData>(setError)
-
   const { mutate: createProject, isPending: isCreating } = accessClient.useMutation('post', '/projects')
-
   const { mutate: updateProject, isPending: isUpdating } = accessClient.useMutation('patch', '/projects/{project_id}')
-
   const isPending = isCreating || isUpdating
-
-  const handleClose = () => {
-    reset()
-    onClose()
-  }
 
   const onSubmit = (formData: ProjectFormData) => {
     const alertContext = formData.name ? `Project "${formData.name}"` : undefined
@@ -146,53 +123,24 @@ export function ProjectFormModal({ project, isOpen, onClose, onSuccess, onCreate
       <ModalHeader title={title} />
       <ModalBody>
         <Form id="project-form" onSubmit={handleSubmit(onSubmit)}>
-          <Controller
-            name="name"
-            control={control}
-            render={({ field, fieldState }) => (
-              <FormGroup label="Project name" fieldId="project-name" isRequired labelHelp={projectHelp.name}>
-                <TextInput
-                  id="project-name"
-                  aria-label="Project name"
-                  placeholder={PROJECT_NAME_PLACEHOLDER}
-                  validated={fieldState.error ? 'error' : 'default'}
-                  value={field.value ?? ''}
-                  onChange={field.onChange}
-                  onBlur={field.onBlur}
-                  name={field.name}
-                />
-                <HintOrError error={fieldState.error} hint={PROJECT_NAME_HINT} />
-              </FormGroup>
-            )}
-          />
-          <Controller
-            name="description"
-            control={control}
-            render={({ field, fieldState }) => (
-              <FormGroup label="Description" fieldId="project-description">
-                <TextArea
-                  id="project-description"
-                  aria-label="Description"
-                  placeholder="Enter description"
-                  validated={fieldState.error ? 'error' : 'default'}
-                  value={field.value ?? ''}
-                  onChange={field.onChange}
-                  onBlur={field.onBlur}
-                  name={field.name}
-                  rows={3}
-                />
-                {fieldState.error && (
-                  <FormHelperText>
-                    <HelperText>
-                      <HelperTextItem icon={<RhUiErrorIcon />} variant="error">
-                        {fieldState.error.message}
-                      </HelperTextItem>
-                    </HelperText>
-                  </FormHelperText>
-                )}
-              </FormGroup>
-            )}
-          />
+          <SynForm form={form}>
+            <SynTextField
+              name="name"
+              label="Project name"
+              fieldId="project-name"
+              isRequired
+              placeholder={PROJECT_NAME_PLACEHOLDER}
+              hint={PROJECT_NAME_HINT}
+              labelHelp={projectHelp.name}
+            />
+            <SynTextAreaField
+              name="description"
+              label="Description"
+              fieldId="project-description"
+              placeholder="Enter description"
+              rows={3}
+            />
+          </SynForm>
         </Form>
       </ModalBody>
       <ModalFooter>

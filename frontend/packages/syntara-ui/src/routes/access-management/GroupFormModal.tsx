@@ -1,24 +1,12 @@
-import { zodResolver } from '@hookform/resolvers/zod'
-import {
-  Button,
-  Form,
-  FormGroup,
-  FormHelperText,
-  HelperText,
-  HelperTextItem,
-  Modal,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
-  TextArea,
-  TextInput,
-} from '@patternfly/react-core'
-import { RhUiAddIcon, RhUiErrorIcon } from '@patternfly/react-icons'
+import { Button, Form, Modal, ModalBody, ModalFooter, ModalHeader } from '@patternfly/react-core'
+import { RhUiAddIcon } from '@patternfly/react-icons'
 import type { Group } from '@syntara/contracts'
 import { useEffect } from 'react'
-import { Controller, useForm } from 'react-hook-form'
 
-import { useFormMutationErrorHandler } from '../../hooks/useFormMutationErrorHandler'
+import { SynForm } from '../../components/forms/SynForm'
+import { SynTextAreaField } from '../../components/forms/SynTextAreaField'
+import { SynTextField } from '../../components/forms/SynTextField'
+import { useSynForm } from '../../hooks/useSynForm'
 import { useAlerts } from '../../providers/alerts'
 import { accessClient } from '../access/accessClient'
 
@@ -44,13 +32,12 @@ export function GroupFormModal({ group, initialName, isOpen, onClose, onSuccess 
 
   const { showAlert } = useAlerts()
 
-  const { control, handleSubmit, setError, reset } = useForm<GroupFormData>({
-    resolver: zodResolver(groupFormSchema, undefined, { mode: 'sync' }),
-    defaultValues: {
-      name: group?.name ?? '',
-      description: group?.description ?? '',
-    },
+  const form = useSynForm({
+    schema: groupFormSchema,
+    defaultValues: { name: '', description: '' },
+    onClose,
   })
+  const { handleSubmit, handleError, handleClose, reset } = form
 
   useEffect(() => {
     if (isOpen) {
@@ -61,18 +48,9 @@ export function GroupFormModal({ group, initialName, isOpen, onClose, onSuccess 
     }
   }, [isOpen, group, initialName, reset])
 
-  const handleError = useFormMutationErrorHandler<GroupFormData>(setError)
-
   const { mutate: createGroup, isPending: isCreating } = accessClient.useMutation('post', '/groups')
-
   const { mutate: updateGroup, isPending: isUpdating } = accessClient.useMutation('patch', '/groups/{group_id}')
-
   const isPending = isCreating || isUpdating
-
-  const handleClose = () => {
-    reset()
-    onClose()
-  }
 
   const onSubmit = (formData: GroupFormData) => {
     const alertContext = formData.name ? `Group "${formData.name}"` : undefined
@@ -81,10 +59,7 @@ export function GroupFormModal({ group, initialName, isOpen, onClose, onSuccess 
       updateGroup(
         {
           params: { path: { group_id: group.id } },
-          body: {
-            name: formData.name,
-            description: formData.description,
-          },
+          body: { name: formData.name, description: formData.description },
         },
         {
           onSuccess: () => {
@@ -102,12 +77,7 @@ export function GroupFormModal({ group, initialName, isOpen, onClose, onSuccess 
       )
     } else {
       createGroup(
-        {
-          body: {
-            name: formData.name,
-            description: formData.description,
-          },
-        },
+        { body: { name: formData.name, description: formData.description } },
         {
           onSuccess: () => {
             showAlert({
@@ -130,61 +100,23 @@ export function GroupFormModal({ group, initialName, isOpen, onClose, onSuccess 
       <ModalHeader title={title} />
       <ModalBody>
         <Form id="group-form" onSubmit={handleSubmit(onSubmit)}>
-          <Controller
-            name="name"
-            control={control}
-            render={({ field, fieldState }) => (
-              <FormGroup label="Group name" fieldId="group-name" isRequired labelHelp={groupHelp.name}>
-                <TextInput
-                  id="group-name"
-                  aria-label="Group name"
-                  placeholder="Enter group name"
-                  validated={fieldState.error ? 'error' : 'default'}
-                  value={field.value ?? ''}
-                  onChange={field.onChange}
-                  onBlur={field.onBlur}
-                  name={field.name}
-                />
-                {fieldState.error && (
-                  <FormHelperText>
-                    <HelperText>
-                      <HelperTextItem icon={<RhUiErrorIcon />} variant="error">
-                        {fieldState.error.message}
-                      </HelperTextItem>
-                    </HelperText>
-                  </FormHelperText>
-                )}
-              </FormGroup>
-            )}
-          />
-          <Controller
-            name="description"
-            control={control}
-            render={({ field, fieldState }) => (
-              <FormGroup label="Description" fieldId="group-description">
-                <TextArea
-                  id="group-description"
-                  aria-label="Description"
-                  placeholder="Enter description"
-                  validated={fieldState.error ? 'error' : 'default'}
-                  value={field.value ?? ''}
-                  onChange={field.onChange}
-                  onBlur={field.onBlur}
-                  name={field.name}
-                  rows={3}
-                />
-                {fieldState.error && (
-                  <FormHelperText>
-                    <HelperText>
-                      <HelperTextItem icon={<RhUiErrorIcon />} variant="error">
-                        {fieldState.error.message}
-                      </HelperTextItem>
-                    </HelperText>
-                  </FormHelperText>
-                )}
-              </FormGroup>
-            )}
-          />
+          <SynForm form={form}>
+            <SynTextField
+              name="name"
+              label="Group name"
+              fieldId="group-name"
+              isRequired
+              placeholder="Enter group name"
+              labelHelp={groupHelp.name}
+            />
+            <SynTextAreaField
+              name="description"
+              label="Description"
+              fieldId="group-description"
+              placeholder="Enter description"
+              rows={3}
+            />
+          </SynForm>
         </Form>
       </ModalBody>
       <ModalFooter>
