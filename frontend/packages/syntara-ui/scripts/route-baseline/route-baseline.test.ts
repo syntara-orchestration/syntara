@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -6,12 +6,11 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { SOURCE_PARITY_EXCEPTIONS, buildRouteManifest } from './build-route-manifest'
 import { collectAppRoutePaths } from './collect-routes'
-import { getManifestPath, getPackageRoot, readCommittedManifest, writeManifest } from './manifest-io'
+import { getManifestPath, readCommittedManifest, writeManifest } from './manifest-io'
 import { ROUTE_MANIFEST_COMMENT_KEY, ROUTE_MANIFEST_NOTICE, type RouteManifest } from './route-manifest-schema'
 import { checkRouteBaseline, updateRouteBaseline } from './run-route-baseline'
 
 describe('route baseline tooling', () => {
-  const pkgRoot = getPackageRoot()
   const tempRoots: string[] = []
 
   afterEach(() => {
@@ -26,7 +25,18 @@ describe('route baseline tooling', () => {
     return root
   }
 
+  function makeFixturePackageRoot(): string {
+    const toPkgRoot = makeTempPackageRoot()
+    for (const [relative, source] of Object.entries(FIXTURE_ROUTE_SOURCES)) {
+      const to = join(toPkgRoot, relative)
+      mkdirSync(join(to, '..'), { recursive: true })
+      writeFileSync(to, source)
+    }
+    return toPkgRoot
+  }
+
   it('keeps SOURCE_PARITY_EXCEPTIONS limited to documented non-manifest gaps', () => {
+    const pkgRoot = makeFixturePackageRoot()
     const { manifest } = buildRouteManifest({ pkgRoot })
 
     expect(SOURCE_PARITY_EXCEPTIONS.has('/auth/test-signin-callback')).toBe(false)
@@ -37,6 +47,7 @@ describe('route baseline tooling', () => {
   })
 
   it('round-trips a generated manifest through writeManifest and readCommittedManifest', () => {
+    const pkgRoot = makeFixturePackageRoot()
     const { manifest } = buildRouteManifest({ pkgRoot })
     const tempRoot = makeTempPackageRoot()
     mkdirSync(join(tempRoot, 'scripts/route-baseline'), { recursive: true })
@@ -52,8 +63,7 @@ describe('route baseline tooling', () => {
   })
 
   it('checkRouteBaseline fails when the committed manifest is stale', () => {
-    const tempRoot = makeTempPackageRoot()
-    copyRouteSources(pkgRoot, tempRoot)
+    const tempRoot = makeFixturePackageRoot()
 
     const built = buildRouteManifest({ pkgRoot: tempRoot })
     const stale: RouteManifest = {
@@ -71,8 +81,7 @@ describe('route baseline tooling', () => {
   })
 
   it('checkRouteBaseline fails when App.tsx escape hatch path changes', () => {
-    const tempRoot = makeTempPackageRoot()
-    copyRouteSources(pkgRoot, tempRoot)
+    const tempRoot = makeFixturePackageRoot()
     updateRouteBaseline(tempRoot)
 
     const appPath = join(tempRoot, 'src/app/App.tsx')
@@ -89,8 +98,7 @@ describe('route baseline tooling', () => {
   })
 
   it('checkRouteBaseline fails when __root not-found target changes', () => {
-    const tempRoot = makeTempPackageRoot()
-    copyRouteSources(pkgRoot, tempRoot)
+    const tempRoot = makeFixturePackageRoot()
     updateRouteBaseline(tempRoot)
 
     const rootPath = join(tempRoot, 'src/app/routes/__root.ts')
@@ -102,8 +110,7 @@ describe('route baseline tooling', () => {
   })
 
   it('checkRouteBaseline fails for unmounted createRoute modules', () => {
-    const tempRoot = makeTempPackageRoot()
-    copyRouteSources(pkgRoot, tempRoot)
+    const tempRoot = makeFixturePackageRoot()
     updateRouteBaseline(tempRoot)
 
     writeFileSync(
@@ -123,8 +130,7 @@ export const orphanRoutes = [
   })
 
   it('updateRouteBaseline refuses to write when parity gaps remain', () => {
-    const tempRoot = makeTempPackageRoot()
-    copyRouteSources(pkgRoot, tempRoot)
+    const tempRoot = makeFixturePackageRoot()
 
     const appRoutePath = join(tempRoot, 'src/app/AppRoute.tsx')
     writeFileSync(
@@ -137,11 +143,10 @@ export const orphanRoutes = [
   })
 
   it('updateRouteBaseline writes a manifest that checkRouteBaseline accepts', () => {
-    const tempRoot = makeTempPackageRoot()
-    copyRouteSources(pkgRoot, tempRoot)
+    const tempRoot = makeFixturePackageRoot()
 
     const update = updateRouteBaseline(tempRoot)
-    expect(update.routeCount).toBeGreaterThanOrEqual(47)
+    expect(update.routeCount).toBe(3)
     expect(readFileSync(update.path, 'utf-8').length).toBeGreaterThan(0)
 
     const check = checkRouteBaseline(tempRoot)
@@ -150,13 +155,12 @@ export const orphanRoutes = [
   })
 
   it('buildRouteManifest output is sorted, unique, and versioned', () => {
-    const tempRoot = makeTempPackageRoot()
-    copyRouteSources(pkgRoot, tempRoot)
+    const tempRoot = makeFixturePackageRoot()
     const { manifest } = buildRouteManifest({ pkgRoot: tempRoot })
 
     expect(manifest[ROUTE_MANIFEST_COMMENT_KEY]).toBe(ROUTE_MANIFEST_NOTICE)
     expect(manifest.version).toBe(1)
-    expect(manifest.routes.length).toBeGreaterThanOrEqual(47)
+    expect(manifest.routes).toHaveLength(3)
 
     const templates = manifest.routes.map((route) => route.template)
     expect(templates).toStrictEqual([...templates].sort((a, b) => a.localeCompare(b)))
@@ -164,40 +168,24 @@ export const orphanRoutes = [
   })
 
   it('collectAppRoutePaths scrapes absolute path literals from AppRoute source', () => {
-    const appRouteSource = readFileSync(join(pkgRoot, 'src/app/AppRoute.tsx'), 'utf-8')
+    const appRouteSource = FIXTURE_ROUTE_SOURCES['src/app/AppRoute.tsx']
+    expect(appRouteSource).toBeDefined()
     const paths = collectAppRoutePaths(appRouteSource)
-    expect(paths.length).toBeGreaterThan(0)
-    expect(paths.every((path) => path.startsWith('/'))).toBe(true)
+    expect(paths).toStrictEqual(['/auth/test-signin-callback', '/workflows'])
   })
 })
 
 /**
- * Copy only the source files the baseline builder reads into a temp package root.
+ * Static route package fixture consumed by the baseline builder tests.
+ *
+ * Keep this independent of the live application route topology: the contract
+ * CLI, rather than Vitest, verifies the committed manifest against live sources.
  */
-function copyRouteSources(fromPkgRoot: string, toPkgRoot: string) {
-  const relativeFiles = [
-    'src/app/App.tsx',
-    'src/app/AppRoute.tsx',
-    'src/app/navigationItems.tsx',
-    'src/app/tanstackRouteTree.tsx',
-    'src/app/routes/__root.ts',
-    ...listRouteModules(fromPkgRoot),
-  ]
-
-  for (const relative of relativeFiles) {
-    const from = join(fromPkgRoot, relative)
-    const to = join(toPkgRoot, relative)
-    mkdirSync(join(to, '..'), { recursive: true })
-    writeFileSync(to, readFileSync(from))
-  }
-}
-
-/**
- * List relative paths of router module files under `src/app/routes`.
- */
-function listRouteModules(pkgRoot: string): string[] {
-  const routesDir = join(pkgRoot, 'src/app/routes')
-  return readdirSync(routesDir)
-    .filter((name) => (name.endsWith('.tsx') || name.endsWith('.ts')) && !name.includes('.test.'))
-    .map((name) => `src/app/routes/${name}`)
-}
+const FIXTURE_ROUTE_SOURCES = {
+  'src/app/App.tsx': `if (globalThis.location.pathname === AppRoute.Auth.TestSignInCallback) return null\n`,
+  'src/app/AppRoute.tsx': `export const AppRoute = {\n  Workflows: { Root: '/workflows' },\n  Auth: { TestSignInCallback: '/auth/test-signin-callback' },\n}\n`,
+  'src/app/navigationItems.tsx': `const items = [{ path: AppRoute.Workflows.Root }]\n`,
+  'src/app/tanstackRouteTree.tsx': `import { workflowsRoutes } from './routes/workflows'\nexport const tree = rootRoute.addChildren([...workflowsRoutes])\n`,
+  'src/app/routes/__root.ts': `navigate({ to: '/workflows', replace: true })\n`,
+  'src/app/routes/workflows.tsx': `export const workflowsRoutes = [\n  createRoute({ getParentRoute: () => rootRoute, path: '/workflows' }),\n]\n`,
+} as const
