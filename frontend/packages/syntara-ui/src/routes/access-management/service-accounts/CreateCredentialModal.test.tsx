@@ -46,7 +46,7 @@ describe('CreateCredentialModal', () => {
     const user = userEvent.setup()
     render(<CreateCredentialModal {...defaultProps} />)
 
-    await user.click(screen.getByRole('button', { name: 'Create' }))
+    await user.click(screen.getByRole('button', { name: 'Create credential' }))
 
     expect(defaultProps.onSubmit).toHaveBeenCalledTimes(1)
     const arg = defaultProps.onSubmit.mock.calls[0][0] as string
@@ -82,7 +82,7 @@ describe('CreateCredentialModal', () => {
     await user.clear(dateInput)
     await user.type(dateInput, 'not-a-date')
 
-    await user.click(screen.getByRole('button', { name: 'Create' }))
+    await user.click(screen.getByRole('button', { name: 'Create credential' }))
 
     expect(defaultProps.onSubmit).not.toHaveBeenCalled()
   })

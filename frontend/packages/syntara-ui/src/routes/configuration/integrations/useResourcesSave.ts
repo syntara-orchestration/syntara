@@ -75,7 +75,7 @@ export function useResourcesSave(opts: {
     onDiscard: resetToServer,
     title: 'Save resource changes?',
     body: 'You have unsaved changes to enabled resources. Would you like to save before leaving?',
-    saveLabel: 'Save changes',
+    saveLabel: 'Save resources',
     isActive,
   })
 

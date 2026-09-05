@@ -527,7 +527,7 @@ describe('IdentityProviderDetail', () => {
 
     const toggle = screen.getByRole('switch', { name: /enabled/i })
     await user.click(toggle)
-    await user.click(screen.getByRole('button', { name: 'Disable' }))
+    await user.click(screen.getByRole('button', { name: 'Disable identity provider' }))
 
     expect(mockPatch).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -557,7 +557,7 @@ describe('IdentityProviderDetail', () => {
 
     const toggle = screen.getByRole('switch', { name: /enabled/i })
     await user.click(toggle)
-    await user.click(screen.getByRole('button', { name: 'Disable' }))
+    await user.click(screen.getByRole('button', { name: 'Disable identity provider' }))
 
     expect(mockRefetch).toHaveBeenCalled()
   })
@@ -577,7 +577,7 @@ describe('IdentityProviderDetail', () => {
 
     const toggle = screen.getByRole('switch', { name: /enabled/i })
     await user.click(toggle)
-    await user.click(screen.getByRole('button', { name: 'Disable' }))
+    await user.click(screen.getByRole('button', { name: 'Disable identity provider' }))
 
     await waitFor(() => {
       expect(screen.getByText(/failed to disable identity provider/i)).toBeInTheDocument()
@@ -699,7 +699,7 @@ describe('IdentityProviderDetail', () => {
     await user.click(screen.getByRole('checkbox'))
 
     // Confirm deletion
-    const confirmButton = screen.getByRole('button', { name: /^delete$/i })
+    const confirmButton = screen.getByRole('button', { name: /^delete identity provider$/i })
     await user.click(confirmButton)
 
     expect(mockDelete).toHaveBeenCalled()

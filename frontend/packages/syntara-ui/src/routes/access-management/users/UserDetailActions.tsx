@@ -48,7 +48,7 @@ export function UserDetailConfirmationDialogs({
         onClose={deleteDialog.close}
         onConfirm={onDelete}
         title="Delete user?"
-        confirmLabel="Delete"
+        confirmLabel="Delete user"
         confirmVariant="danger"
         titleIconVariant="warning"
         destructiveAcknowledgement={DELETE_USER_ACKNOWLEDGEMENT}

@@ -17,7 +17,7 @@ import {
   ToolbarContent,
   ToolbarItem,
 } from '@patternfly/react-core'
-import { WrenchIcon } from '@patternfly/react-icons'
+import { RhUiConnectedIcon, WrenchIcon } from '@patternfly/react-icons'
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { IntegrationsAPI } from '@syntara/contracts'
 import { useMemo, useState } from 'react'
@@ -91,6 +91,7 @@ function EnableToolsStep({
             <EmptyStateActions>
               <Button
                 variant="primary"
+                icon={<RhUiConnectedIcon />}
                 onClick={isTestDisabled ? undefined : onTestConnection}
                 isAriaDisabled={isTestDisabled}
               >

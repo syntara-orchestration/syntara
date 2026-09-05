@@ -1,5 +1,5 @@
 import { Button, StackItem } from '@patternfly/react-core'
-import { RhUiEditIcon, RhUiTrashIcon } from '@patternfly/react-icons'
+import { RhUiAddIcon, RhUiEditIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import { Th, Thead, Tr } from '@patternfly/react-table'
 import { useCallback, useMemo, useState } from 'react'
 
@@ -93,7 +93,7 @@ function CredentialPageToolbar({ permissions, isBuiltinProject, onCreateClick }:
   const tooltip = isBuiltinProject ? builtinProjectTooltip('create a credential') : permissions.tooltips.create
   return (
     <DisabledWithTooltip isDisabled={!canCreate} content={tooltip}>
-      <Button variant="primary" isAriaDisabled={!canCreate} onClick={onCreateClick}>
+      <Button variant="primary" icon={<RhUiAddIcon />} isAriaDisabled={!canCreate} onClick={onCreateClick}>
         Create credential
       </Button>
     </DisabledWithTooltip>

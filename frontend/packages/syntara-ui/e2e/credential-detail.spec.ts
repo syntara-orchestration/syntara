@@ -84,7 +84,7 @@ test.describe('Credential Detail Page & Workflows Tab', () => {
       await expect(dialog).toBeVisible()
       await expect(dialog.getByText('Disable credential?')).toBeVisible()
       await expect(dialog.getByText(new RegExp(name))).toBeVisible()
-      await expect(dialog.getByRole('button', { name: 'Disable' })).toBeVisible()
+      await expect(dialog.getByRole('button', { name: 'Disable credential' })).toBeVisible()
       await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeVisible()
     } finally {
       await deleteCredentialByName(app, name)

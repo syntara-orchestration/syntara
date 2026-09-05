@@ -50,7 +50,7 @@ test.describe('EDA Trigger', () => {
       // Save workflow (select project right before save)
       await selectProjectIfRequired(app)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
-      await app.getByRole('button', { name: 'Save' }).click()
+      await app.getByRole('button', { name: 'Save workflow' }).click()
       await expect(app).toHaveURL(/workflow-builder\/.+/)
 
       // Verify workflow appears in list

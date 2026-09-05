@@ -245,7 +245,7 @@ describe('CredentialsTab', () => {
 
       const ackCheckbox = screen.getByRole('checkbox', { name: /i understand/i })
       await user.click(ackCheckbox)
-      await user.click(screen.getByRole('button', { name: 'Delete' }))
+      await user.click(screen.getByRole('button', { name: 'Delete credential' }))
       expect(mockMutations.delete).toHaveBeenCalled()
     })
   })
@@ -402,7 +402,7 @@ describe('CredentialsTab', () => {
         expect(screen.getByText('Disable credential?')).toBeInTheDocument()
       })
 
-      await user.click(screen.getByRole('button', { name: 'Disable' }))
+      await user.click(screen.getByRole('button', { name: 'Disable credential' }))
       expect(mockMutations.disable).toHaveBeenCalled()
     })
 
@@ -456,7 +456,7 @@ describe('CredentialsTab', () => {
         expect(screen.getByRole('heading', { name: 'Create credential' })).toBeInTheDocument()
       })
 
-      const createButton = screen.getByRole('button', { name: 'Create' })
+      const createButton = screen.getByRole('button', { name: 'Create credential' })
       await user.click(createButton)
 
       expect(mockMutations.create).toHaveBeenCalled()

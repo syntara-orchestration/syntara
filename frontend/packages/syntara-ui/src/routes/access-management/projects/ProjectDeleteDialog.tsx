@@ -31,7 +31,7 @@ export function ProjectDeleteDialog({
       onClose={onClose}
       onConfirm={onConfirm}
       title="Delete project?"
-      confirmLabel="Delete"
+      confirmLabel="Delete project"
       confirmVariant="danger"
       titleIconVariant="warning"
       confirmLoading={confirmLoading}

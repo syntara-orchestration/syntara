@@ -54,7 +54,7 @@ export function useIntegrationModelsState(integrationId: string, isActive: boole
     },
     title: 'Save model changes?',
     body: 'You have unsaved changes to enabled models. Would you like to save before leaving?',
-    saveLabel: 'Save model changes',
+    saveLabel: 'Save models',
     isActive,
   })
 

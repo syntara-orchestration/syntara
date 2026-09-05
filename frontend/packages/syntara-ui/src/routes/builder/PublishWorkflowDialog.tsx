@@ -127,7 +127,7 @@ export function PublishWorkflowDialog({ isOpen, isPublishing, onClose, onPublish
           isLoading={isPublishing}
           isDisabled={isPublishing}
         >
-          Publish
+          Publish workflow
         </Button>
         <Button variant="link" onClick={onClose} isDisabled={isPublishing}>
           Cancel

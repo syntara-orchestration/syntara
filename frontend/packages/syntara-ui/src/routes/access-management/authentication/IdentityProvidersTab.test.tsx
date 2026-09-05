@@ -366,7 +366,7 @@ describe('IdentityProvidersTab', () => {
       await user.click(actionsButton)
 
       // Click delete
-      await user.click(screen.getByText('Delete provider'))
+      await user.click(screen.getByText('Delete identity provider'))
 
       // Delete dialog should appear
       expect(screen.getByText('Delete identity provider?')).toBeInTheDocument()
@@ -380,7 +380,7 @@ describe('IdentityProvidersTab', () => {
 
       const actionsButton = screen.getByRole('button', { name: /^Actions for / })
       await user.click(actionsButton)
-      await user.click(screen.getByText('Delete provider'))
+      await user.click(screen.getByText('Delete identity provider'))
 
       expect(screen.getByText(/Remove all user identities linked to this provider/)).toBeInTheDocument()
       expect(screen.getByText(/Revoke active sessions authenticated via this provider/)).toBeInTheDocument()
@@ -396,7 +396,7 @@ describe('IdentityProvidersTab', () => {
       // Open delete dialog
       const actionsButton = screen.getByRole('button', { name: /^Actions for / })
       await user.click(actionsButton)
-      await user.click(screen.getByText('Delete provider'))
+      await user.click(screen.getByText('Delete identity provider'))
 
       // Cancel
       await user.click(screen.getByText('Cancel'))
@@ -428,14 +428,14 @@ describe('IdentityProvidersTab', () => {
       // Open delete dialog
       const actionsButton = screen.getByRole('button', { name: /^Actions for / })
       await user.click(actionsButton)
-      await user.click(screen.getByText('Delete provider'))
+      await user.click(screen.getByText('Delete identity provider'))
 
       // Check the acknowledgement checkbox before clicking Delete
       const dialog = screen.getByRole('dialog')
       await user.click(within(dialog).getByRole('checkbox'))
 
       // Confirm delete — target the button inside the modal dialog
-      await user.click(within(dialog).getByRole('button', { name: 'Delete' }))
+      await user.click(within(dialog).getByRole('button', { name: 'Delete identity provider' }))
 
       expect(mockDeleteMutate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -474,11 +474,11 @@ describe('IdentityProvidersTab', () => {
       // Open delete dialog and confirm
       const actionsButton = screen.getByRole('button', { name: /^Actions for / })
       await user.click(actionsButton)
-      await user.click(screen.getByText('Delete provider'))
+      await user.click(screen.getByText('Delete identity provider'))
       const dialog = screen.getByRole('dialog')
       // Check the acknowledgement checkbox before clicking Delete
       await user.click(within(dialog).getByRole('checkbox'))
-      await user.click(within(dialog).getByRole('button', { name: 'Delete' }))
+      await user.click(within(dialog).getByRole('button', { name: 'Delete identity provider' }))
 
       // Simulate onSuccess and onSettled callbacks from useDeleteAction
       act(() => {
@@ -630,7 +630,7 @@ describe('IdentityProvidersTab', () => {
       const toggle = screen.getByRole('switch', { name: /Toggle Azure AD/i })
       await user.click(toggle)
 
-      await user.click(screen.getByRole('button', { name: 'Disable' }))
+      await user.click(screen.getByRole('button', { name: 'Disable identity provider' }))
 
       expect(mockPatchMutate).toHaveBeenCalledWith(
         { params: { path: { provider_id: 'provider-1' } }, body: { enabled: false } },
@@ -733,7 +733,7 @@ describe('IdentityProvidersTab', () => {
 
       const toggle = screen.getByRole('switch', { name: /Toggle Azure AD/i })
       await user.click(toggle)
-      await user.click(screen.getByRole('button', { name: 'Disable' }))
+      await user.click(screen.getByRole('button', { name: 'Disable identity provider' }))
 
       act(() => {
         getMutationCallbacks(mockPatchMutate).onSuccess?.()
@@ -765,7 +765,7 @@ describe('IdentityProvidersTab', () => {
 
       const toggle = screen.getByRole('switch', { name: /Toggle Azure AD/i })
       await user.click(toggle)
-      await user.click(screen.getByRole('button', { name: 'Disable' }))
+      await user.click(screen.getByRole('button', { name: 'Disable identity provider' }))
 
       act(() => {
         getMutationCallbacks(mockPatchMutate).onError?.(new Error('Server error'))

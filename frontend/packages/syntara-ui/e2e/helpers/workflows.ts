@@ -357,7 +357,7 @@ export async function deleteWorkflow(page: Page, workflowName: string) {
         .click({ force: true })
       await page.getByRole('menuitem', { name: 'Delete workflow' }).click()
       await page.getByRole('checkbox', { name: /I understand this workflow/i }).check()
-      await page.getByRole('button', { name: 'Delete' }).click()
+      await page.getByRole('button', { name: 'Delete workflow' }).click()
 
       // Wait for deletion to complete - delete dialog should close
       const deleteDialog = page.getByRole('dialog', { name: /Delete workflow/i })
@@ -406,7 +406,7 @@ export async function deleteProject(page: Page, projectName: string) {
     const deleteDialog = page.getByRole('dialog', { name: /Delete project/i })
     await expect(deleteDialog).toBeVisible()
     await deleteDialog.getByRole('checkbox', { name: /I understand/i }).check()
-    await deleteDialog.getByRole('button', { name: 'Delete' }).click()
+    await deleteDialog.getByRole('button', { name: 'Delete project' }).click()
 
     // Wait for dialog to close
     await expect(deleteDialog)
@@ -475,7 +475,7 @@ export async function createBasicWorkflow(page: Page, workflowName: string, acti
   await selectProjectIfRequired(page)
 
   await page.getByPlaceholder('Workflow name').fill(workflowName)
-  await page.getByRole('button', { name: 'Save' }).click()
+  await page.getByRole('button', { name: 'Save workflow' }).click()
 
   // Must navigate away from /new — .+ alone would match "new" and give a false pass
   await expect(page).toHaveURL(/workflow-builder\/(?!new)/, { timeout: 15_000 })
@@ -505,7 +505,7 @@ export async function startWorkflowWithTrigger(page: Page) {
 export async function saveWorkflow(page: Page, workflowName: string, { timeout = 15_000 } = {}) {
   await selectProjectIfRequired(page)
   await page.getByPlaceholder('Workflow name').fill(workflowName)
-  await page.getByRole('button', { name: 'Save' }).click()
+  await page.getByRole('button', { name: 'Save workflow' }).click()
   await expect(page).toHaveURL(/workflow-builder\/(?!new)/, { timeout })
 }
 
@@ -529,7 +529,7 @@ export async function createWorkflowWithTrigger(page: Page, workflowName: string
   const nameInput = page.getByPlaceholder('Workflow name')
   await nameInput.clear()
   await nameInput.fill(workflowName)
-  await page.getByRole('button', { name: 'Save' }).click()
+  await page.getByRole('button', { name: 'Save workflow' }).click()
   await expect(page).toHaveURL(/workflow-builder\/(?!new)/, { timeout: 15_000 })
 
   await expect(page.getByText('Manual trigger')).toBeVisible()

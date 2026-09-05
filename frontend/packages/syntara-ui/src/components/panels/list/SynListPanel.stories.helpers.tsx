@@ -210,6 +210,7 @@ const KITCHEN_FILTER_DEFINITIONS: FilterFieldDefinition[] = [
 
 const KITCHEN_ROW_ACTIONS = [
   { title: 'Edit resource', onClick: () => {} },
+  { isSeparator: true },
   { title: 'Delete resource', onClick: () => {}, isDanger: true },
 ]
 

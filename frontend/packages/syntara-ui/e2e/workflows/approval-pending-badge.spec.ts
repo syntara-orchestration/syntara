@@ -33,7 +33,7 @@ async function createPendingApproval(
 
   // Add approval node and save
   await addApprovalNodeWithBranch(app, approvalName)
-  await app.getByRole('button', { name: 'Save', exact: true }).click()
+  await app.getByRole('button', { name: 'Save workflow' }).click()
   await runWorkflowFromBuilder(app)
 
   // Extract execution ID from URL

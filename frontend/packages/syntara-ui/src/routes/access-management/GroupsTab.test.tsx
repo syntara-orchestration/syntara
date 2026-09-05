@@ -586,7 +586,7 @@ describe('GroupsTab Component', () => {
       await user.click(screen.getByRole('checkbox'))
 
       // Click Delete button in dialog
-      const deleteButton = await screen.findByRole('button', { name: 'Delete' })
+      const deleteButton = await screen.findByRole('button', { name: 'Delete group' })
       await user.click(deleteButton)
 
       expect(mockDeleteMutate).toHaveBeenCalled()
@@ -626,7 +626,7 @@ describe('GroupsTab Component', () => {
       await user.click(screen.getByRole('checkbox'))
 
       // Click Delete
-      const deleteButton = await screen.findByRole('button', { name: 'Delete' })
+      const deleteButton = await screen.findByRole('button', { name: 'Delete group' })
       await user.click(deleteButton)
 
       // Simulate successful mutation
@@ -664,7 +664,7 @@ describe('GroupsTab Component', () => {
       await user.click(screen.getByRole('checkbox'))
 
       // Click Delete
-      const deleteButton = await screen.findByRole('button', { name: 'Delete' })
+      const deleteButton = await screen.findByRole('button', { name: 'Delete group' })
       await user.click(deleteButton)
 
       // Simulate failed mutation

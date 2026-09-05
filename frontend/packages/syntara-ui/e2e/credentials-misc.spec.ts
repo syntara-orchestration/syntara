@@ -189,7 +189,7 @@ test.describe('Alert Notifications', () => {
       await app.getByRole('menuitem', { name: /Delete/ }).click()
       const deleteDialog = app.getByRole('dialog')
       await deleteDialog.getByRole('checkbox').click()
-      await deleteDialog.getByRole('button', { name: 'Delete' }).click()
+      await deleteDialog.getByRole('button', { name: 'Delete credential' }).click()
       await expect(app.getByText('Credential deleted')).toBeVisible()
 
       await expect(app.getByText('Credential deleted')).not.toBeVisible({ timeout: 12_000 })

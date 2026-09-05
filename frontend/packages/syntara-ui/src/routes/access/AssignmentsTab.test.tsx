@@ -563,7 +563,7 @@ describe('AssignmentsTab', () => {
       await user.click(deleteOption)
 
       await waitFor(() => {
-        expect(screen.getByText('Remove assignment?')).toBeInTheDocument()
+        expect(screen.getByText('Delete assignment?')).toBeInTheDocument()
       })
     })
   })
@@ -573,7 +573,7 @@ describe('AssignmentsTab', () => {
       setupAssignmentsQuery(sampleAssignments)
     })
 
-    it('shows the delete modal with Remove and Cancel buttons', async () => {
+    it('shows the delete modal with Delete assignment and Cancel buttons', async () => {
       const user = userEvent.setup()
       render(<AssignmentsTab />, { wrapper })
 
@@ -584,8 +584,8 @@ describe('AssignmentsTab', () => {
       await user.click(deleteOption)
 
       await waitFor(() => {
-        expect(screen.getByText('Remove assignment?')).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: 'Remove' })).toBeInTheDocument()
+        expect(screen.getByText('Delete assignment?')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Delete assignment' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
       })
     })
@@ -605,7 +605,7 @@ describe('AssignmentsTab', () => {
       })
     })
 
-    it('calls delete mutation when Remove button is clicked', async () => {
+    it('calls delete mutation when Delete assignment button is clicked', async () => {
       const user = userEvent.setup()
       render(<AssignmentsTab />, { wrapper })
 
@@ -615,8 +615,8 @@ describe('AssignmentsTab', () => {
       const deleteOption = await screen.findByRole('menuitem', { name: /Delete assignment/i })
       await user.click(deleteOption)
 
-      const removeButton = await screen.findByRole('button', { name: 'Remove' })
-      await user.click(removeButton)
+      const deleteButton = await screen.findByRole('button', { name: 'Delete assignment' })
+      await user.click(deleteButton)
 
       expect(mockDeleteMutate).toHaveBeenCalled()
     })
@@ -631,12 +631,12 @@ describe('AssignmentsTab', () => {
       const deleteOption = await screen.findByRole('menuitem', { name: /Delete assignment/i })
       await user.click(deleteOption)
 
-      const dialog = await screen.findByRole('dialog', { name: /Remove assignment/i })
+      const dialog = await screen.findByRole('dialog', { name: /Delete assignment/i })
 
       await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
 
       await waitFor(() => {
-        expect(screen.queryByRole('dialog', { name: /Remove assignment/i })).not.toBeInTheDocument()
+        expect(screen.queryByRole('dialog', { name: /Delete assignment/i })).not.toBeInTheDocument()
       })
     })
   })
@@ -818,7 +818,7 @@ describe('AssignmentsTab', () => {
       await user.click(deleteOption)
 
       await waitFor(() => {
-        expect(screen.getByText('Remove assignment?')).toBeInTheDocument()
+        expect(screen.getByText('Delete assignment?')).toBeInTheDocument()
       })
       return user
     }
@@ -826,7 +826,7 @@ describe('AssignmentsTab', () => {
     it('calls delete mutation for project-scoped assignment', async () => {
       const user = await openDeleteDialog()
 
-      await user.click(screen.getByRole('button', { name: 'Remove' }))
+      await user.click(screen.getByRole('button', { name: 'Delete assignment' }))
 
       expect(mockDeleteMutate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -839,7 +839,7 @@ describe('AssignmentsTab', () => {
     it('refetches assignments on successful delete', async () => {
       const user = await openDeleteDialog()
 
-      await user.click(screen.getByRole('button', { name: 'Remove' }))
+      await user.click(screen.getByRole('button', { name: 'Delete assignment' }))
 
       const callbacks = mockDeleteMutate.mock.calls[0][1] as {
         onSuccess: () => void
@@ -852,14 +852,14 @@ describe('AssignmentsTab', () => {
 
       expect(mockRefetch).toHaveBeenCalled()
       await waitFor(() => {
-        expect(screen.queryByText('Remove assignment?')).not.toBeInTheDocument()
+        expect(screen.queryByText('Delete assignment?')).not.toBeInTheDocument()
       })
     })
 
     it('closes dialog on failed delete', async () => {
       const user = await openDeleteDialog()
 
-      await user.click(screen.getByRole('button', { name: 'Remove' }))
+      await user.click(screen.getByRole('button', { name: 'Delete assignment' }))
 
       const callbacks = mockDeleteMutate.mock.calls[0][1] as {
         onError: (error: unknown) => void
@@ -871,7 +871,7 @@ describe('AssignmentsTab', () => {
       })
 
       await waitFor(() => {
-        expect(screen.queryByText('Remove assignment?')).not.toBeInTheDocument()
+        expect(screen.queryByText('Delete assignment?')).not.toBeInTheDocument()
         expect(screen.getByText('Failed to remove assignment')).toBeInTheDocument()
       })
     })
@@ -890,10 +890,10 @@ describe('AssignmentsTab', () => {
       await user.click(deleteOption)
 
       await waitFor(() => {
-        expect(screen.getByText('Remove assignment?')).toBeInTheDocument()
+        expect(screen.getByText('Delete assignment?')).toBeInTheDocument()
       })
 
-      await user.click(screen.getByRole('button', { name: 'Remove' }))
+      await user.click(screen.getByRole('button', { name: 'Delete assignment' }))
 
       expect(mockDeleteMutate).toHaveBeenCalledWith(
         expect.objectContaining({ params: { path: { assignment_id: 'sur1' } } }),
@@ -1185,7 +1185,7 @@ describe('AssignmentsTab', () => {
       await user.click(deleteOption)
 
       await waitFor(() => {
-        expect(screen.getByText('Remove assignment?')).toBeInTheDocument()
+        expect(screen.getByText('Delete assignment?')).toBeInTheDocument()
         expect(screen.queryByText(/in project/)).not.toBeInTheDocument()
       })
     })

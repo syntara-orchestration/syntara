@@ -32,7 +32,7 @@ describe('ImportConfirmationDialog', () => {
 
     expect(screen.getByRole('radio', { name: /Import as new workflow/ })).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: /Import into current workflow/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Import' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Import workflow' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
   })
 
@@ -47,7 +47,7 @@ describe('ImportConfirmationDialog', () => {
     const user = userEvent.setup()
     const { props } = renderDialog()
 
-    await user.click(screen.getByRole('button', { name: 'Import' }))
+    await user.click(screen.getByRole('button', { name: 'Import workflow' }))
 
     expect(props.onImportNew).toHaveBeenCalledOnce()
     expect(props.onImportCurrent).not.toHaveBeenCalled()
@@ -58,7 +58,7 @@ describe('ImportConfirmationDialog', () => {
     const { props } = renderDialog()
 
     await user.click(screen.getByRole('radio', { name: /Import into current workflow/ }))
-    await user.click(screen.getByRole('button', { name: 'Import' }))
+    await user.click(screen.getByRole('button', { name: 'Import workflow' }))
 
     expect(props.onImportCurrent).toHaveBeenCalledOnce()
     expect(props.onImportNew).not.toHaveBeenCalled()

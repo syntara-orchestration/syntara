@@ -137,13 +137,13 @@ describe('WhoCanView', () => {
     expect(screen.getByText('Resource type')).toBeInTheDocument()
     expect(screen.getByText('Action')).toBeInTheDocument()
     expect(screen.getByText('Resource ID')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Find Users' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Find users' })).toBeInTheDocument()
   })
 
-  it('disables Find Users button when form is incomplete', () => {
+  it('disables Find users button when form is incomplete', () => {
     render(<WhoCanView {...sampleResourceActions} />, { wrapper })
 
-    expect(screen.getByRole('button', { name: 'Find Users' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Find users' })).toBeDisabled()
   })
 
   it('populates action options after resource type is chosen', async () => {
@@ -255,7 +255,7 @@ describe('WhoCanView', () => {
     await user.click(screen.getByPlaceholderText('Select an action'))
     await user.click(screen.getByRole('option', { name: /^read$/i }))
 
-    await user.click(screen.getByRole('button', { name: 'Find Users' }))
+    await user.click(screen.getByRole('button', { name: 'Find users' }))
 
     await waitFor(() => {
       expect(mockMutate).toHaveBeenCalledWith(
@@ -385,7 +385,7 @@ describe('WhoCanView', () => {
       await user.click(screen.getByRole('option', { name: /workflow/i }))
       await user.click(screen.getByPlaceholderText('Select an action'))
       await user.click(screen.getByRole('option', { name: /^read$/i }))
-      await user.click(screen.getByRole('button', { name: 'Find Users' }))
+      await user.click(screen.getByRole('button', { name: 'Find users' }))
 
       await waitFor(() => {
         expect(mockMutate).toHaveBeenCalled()

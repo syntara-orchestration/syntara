@@ -243,7 +243,7 @@ function ResourcesFooter({
   isDirty,
   isSaving,
   onSave,
-  saveLabel = 'Save changes',
+  saveLabel = 'Save tools',
 }: Readonly<{ isDirty: boolean; isSaving: boolean; onSave: () => void; saveLabel?: string }>) {
   return (
     <ActionGroup>
@@ -266,10 +266,10 @@ function getFooterState(
       isDirty: modelsState.isDirty,
       isSaving: modelsState.isSaving,
       onSave: modelsState.handleSave,
-      saveLabel: 'Save model changes',
+      saveLabel: 'Save models',
     }
   }
-  return { isDirty: toolsDirty, isSaving: isToolsSaving, onSave: handleToolsSave, saveLabel: 'Save changes' }
+  return { isDirty: toolsDirty, isSaving: isToolsSaving, onSave: handleToolsSave, saveLabel: 'Save tools' }
 }
 
 function hasResourcesTab(integration: IntegrationsAPI.components['schemas']['IntegrationRead']): boolean {

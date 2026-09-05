@@ -61,7 +61,7 @@ async function createTwoNodeWorkflow(app: Page, workflowName: string) {
   // Save
   await selectProjectIfRequired(app)
   await app.getByPlaceholder('Workflow name').fill(workflowName)
-  await app.getByRole('button', { name: 'Save' }).click()
+  await app.getByRole('button', { name: 'Save workflow' }).click()
   await expect(app).toHaveURL(/workflow-builder\/.+/)
   await triggerLayout(app)
   await expect(

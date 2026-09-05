@@ -182,7 +182,7 @@ export function EditAssignmentDialog({ row, displayName, onClose, onSuccess }: R
       </ModalBody>
       <ModalFooter>
         <Button variant="primary" form="edit-assignment-form" type="submit" isLoading={isPending}>
-          Save
+          Save assignment
         </Button>
         <Button variant="link" onClick={onClose}>
           Cancel

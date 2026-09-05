@@ -423,7 +423,7 @@ describe('ProjectRoleAssignmentsTab', () => {
     await openUnassignDialog(user, 'alice', 'admin')
 
     expect(screen.getByText('Unassign role?')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Unassign' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Unassign role' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
   })
 
@@ -446,7 +446,7 @@ describe('ProjectRoleAssignmentsTab', () => {
     render(<ProjectRoleAssignmentsTab projectId="proj-1" />, { wrapper })
 
     await openUnassignDialog(user, 'alice', 'admin')
-    await user.click(screen.getByRole('button', { name: 'Unassign' }))
+    await user.click(screen.getByRole('button', { name: 'Unassign role' }))
 
     expect(mutate).toHaveBeenCalledWith(
       { params: { path: { project_id: 'proj-1', assignment_id: 'a1' } } },
@@ -462,7 +462,7 @@ describe('ProjectRoleAssignmentsTab', () => {
     render(<ProjectRoleAssignmentsTab projectId="proj-1" />, { wrapper })
 
     await openUnassignDialog(user, 'devs', 'editor')
-    await user.click(screen.getByRole('button', { name: 'Unassign' }))
+    await user.click(screen.getByRole('button', { name: 'Unassign role' }))
 
     expect(mutate).toHaveBeenCalledWith(
       { params: { path: { project_id: 'proj-1', assignment_id: 'a2' } } },
@@ -477,7 +477,7 @@ describe('ProjectRoleAssignmentsTab', () => {
     render(<ProjectRoleAssignmentsTab projectId="proj-1" />, { wrapper })
 
     await openUnassignDialog(user, 'alice', 'admin')
-    await user.click(screen.getByRole('button', { name: 'Unassign' }))
+    await user.click(screen.getByRole('button', { name: 'Unassign role' }))
 
     expect(screen.getByText('Failed to unassign role')).toBeInTheDocument()
   })

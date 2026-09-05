@@ -556,7 +556,7 @@ describe('IntegrationDetail', () => {
 
       await waitFor(() => {
         const dialog = screen.getByRole('dialog')
-        expect(within(dialog).getByText(/delete integration/i)).toBeInTheDocument()
+        expect(within(dialog).getByRole('heading', { name: /delete integration/i })).toBeInTheDocument()
         expect(within(dialog).getByRole('checkbox')).toBeInTheDocument()
         expect(within(dialog).getByText(/permanently deleted/i)).toBeInTheDocument()
       })
@@ -653,14 +653,14 @@ describe('IntegrationDetail', () => {
       expect(typeof opts!.exitWithoutSaving).toBe('function')
       expect(opts!.title).toBe('Save resource changes?')
       expect(opts!.body).toBe('You have unsaved changes to enabled resources. Would you like to save before leaving?')
-      expect(opts!.saveLabel).toBe('Save changes')
+      expect(opts!.saveLabel).toBe('Save resources')
     })
 
     it('shows save button disabled on resources tab when no changes are made', () => {
       mockActiveTab = 'resources'
       render(<IntegrationDetail />, { wrapper })
 
-      const saveButton = screen.getByRole('button', { name: 'Save changes' })
+      const saveButton = screen.getByRole('button', { name: 'Save tools' })
       expect(saveButton).toHaveAttribute('aria-disabled', 'true')
     })
 
@@ -677,7 +677,7 @@ describe('IntegrationDetail', () => {
       })
       render(<IntegrationDetail />, { wrapper })
 
-      const saveButton = screen.getByRole('button', { name: 'Save changes' })
+      const saveButton = screen.getByRole('button', { name: 'Save tools' })
       expect(saveButton).not.toHaveAttribute('aria-disabled', 'true')
     })
 
@@ -685,7 +685,7 @@ describe('IntegrationDetail', () => {
       mockActiveTab = 'details'
       render(<IntegrationDetail />, { wrapper })
 
-      expect(screen.queryByRole('button', { name: 'Save changes' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Save tools' })).not.toBeInTheDocument()
     })
   })
 
@@ -748,7 +748,7 @@ describe('IntegrationDetail', () => {
       const user = userEvent.setup()
       render(<IntegrationDetail />, { wrapper })
 
-      await user.click(screen.getByRole('button', { name: 'Save changes' }))
+      await user.click(screen.getByRole('button', { name: 'Save tools' }))
 
       await waitFor(() => {
         expect(mockMutateAsync).toHaveBeenCalledWith({
@@ -766,7 +766,7 @@ describe('IntegrationDetail', () => {
       const user = userEvent.setup()
       render(<IntegrationDetail />, { wrapper })
 
-      await user.click(screen.getByRole('button', { name: 'Save changes' }))
+      await user.click(screen.getByRole('button', { name: 'Save tools' }))
 
       await waitFor(() => {
         expect(screen.getByText('Changes saved')).toBeInTheDocument()
@@ -778,7 +778,7 @@ describe('IntegrationDetail', () => {
       const user = userEvent.setup()
       render(<IntegrationDetail />, { wrapper })
 
-      await user.click(screen.getByRole('button', { name: 'Save changes' }))
+      await user.click(screen.getByRole('button', { name: 'Save tools' }))
 
       await waitFor(() => {
         expect(screen.getByText('Save failed')).toBeInTheDocument()
@@ -1304,14 +1304,14 @@ describe('IntegrationDetail', () => {
       mockActiveTab = 'resources'
       render(<IntegrationDetail />, { wrapper })
 
-      expect(screen.getByRole('button', { name: 'Save model changes' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Save models' })).toBeInTheDocument()
     })
 
-    it('shows Save changes button on MCP server resources tab', () => {
+    it('shows Save tools button on MCP server resources tab', () => {
       mockActiveTab = 'resources'
       render(<IntegrationDetail />, { wrapper })
 
-      expect(screen.getByRole('button', { name: 'Save changes' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Save tools' })).toBeInTheDocument()
     })
   })
 })

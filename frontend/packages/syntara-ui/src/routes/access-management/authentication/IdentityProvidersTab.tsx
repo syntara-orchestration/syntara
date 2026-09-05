@@ -91,7 +91,7 @@ function getRowActions(
     { key: 'sep-delete', isSeparator: true },
     {
       key: 'delete',
-      title: <IconLabel icon={<RhUiTrashIcon />}>Delete provider</IconLabel>,
+      title: <IconLabel icon={<RhUiTrashIcon />}>Delete identity provider</IconLabel>,
       isDanger: true,
       isDisabled: !id,
       isAriaDisabled: !permissions.canDelete,

@@ -55,7 +55,7 @@ test.describe('Run Button Visibility', () => {
 
       // Save the workflow
       await app.getByPlaceholder('Workflow name').fill(workflowName)
-      await app.getByRole('button', { name: 'Save' }).click()
+      await app.getByRole('button', { name: 'Save workflow' }).click()
       await expect(app).toHaveURL(/workflow-builder\/(?!new)/, { timeout: 15_000 })
 
       // Run button should now be enabled (saved + has trigger)

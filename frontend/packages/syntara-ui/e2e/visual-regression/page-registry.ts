@@ -259,7 +259,7 @@ export const pages: PageEntry[] = [
     setup: async (page) => {
       const kebab = page.getByRole('button', { name: /Actions|Kebab toggle/i }).first()
       await kebab.click()
-      await page.getByRole('menuitem', { name: 'Delete' }).click()
+      await page.getByRole('menuitem', { name: 'Delete user' }).click()
       const dialog = page.getByRole('dialog')
       await expect(dialog).toBeVisible()
       await expect(dialog.getByRole('button', { name: /Delete/i })).toBeVisible()
@@ -349,7 +349,7 @@ export const pages: PageEntry[] = [
         .filter({ hasText: 'platform-admins' })
         .getByRole('button', { name: /Actions|Kebab toggle/i })
         .click()
-      await page.getByRole('menuitem', { name: 'Delete' }).click()
+      await page.getByRole('menuitem', { name: 'Delete group' }).click()
       const dialog = page.getByRole('dialog')
       await expect(dialog).toBeVisible()
       await expect(dialog.getByRole('button', { name: /Delete/i })).toBeVisible()
@@ -621,7 +621,7 @@ export const pages: PageEntry[] = [
     setup: async (page) => {
       const kebab = page.getByRole('button', { name: /Actions|Kebab toggle/i }).first()
       await kebab.click()
-      await page.getByRole('menuitem', { name: 'Delete' }).click()
+      await page.getByRole('menuitem', { name: 'Delete identity provider' }).click()
       const dialog = page.getByRole('dialog')
       await expect(dialog).toBeVisible()
       await expect(dialog.getByRole('button', { name: /Delete/i })).toBeVisible()

@@ -154,7 +154,7 @@ export function EditProjectPolicyDialog({
       </ModalBody>
       <ModalFooter>
         <Button variant="primary" form="edit-project-policy-form" type="submit" isLoading={isPending}>
-          Save
+          Save policy
         </Button>
         <Button variant="link" onClick={onClose}>
           Cancel
