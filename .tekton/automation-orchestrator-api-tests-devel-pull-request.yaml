@@ -38,15 +38,21 @@ spec:
       value: '{{pull_request_number}}'
   pipelineRef:
     params:
-      - name: name
-        value: ao-api-tests
-      - name: bundle
-        value: quay.io/aap-ci/tekton-catalog/pipeline/test/ao-api-tests:0.1@sha256:c5e04d21740314af736b6b39a66680d0c7dbfff68a1e88a76f18932a54638376
-      - name: kind
-        value: pipeline
-      - name: secret
-        value: quay-aap-ci-viewer
-    resolver: bundles
+      - name: org
+        value: ansible-automation-platform
+      - name: repo
+        value: aap-konflux-pipelines
+      - name: revision
+        value: anstrat-2240-multi-org-commit-status
+      - name: pathInRepo
+        value: pipelines/test/ao-api-tests/0.1/pipeline.yaml
+      - name: token
+        value: github-aap-org-secret
+      - name: tokenKey
+        value: password
+      - name: scmType
+        value: github
+    resolver: git
 
   taskRunTemplate:
     serviceAccountName: konflux-integration-runner
