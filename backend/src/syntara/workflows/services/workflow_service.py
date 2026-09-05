@@ -26,6 +26,7 @@ from syntara.core.exceptions import SafeValueError, assert_project_id_unchanged
 from syntara.core.models import User
 from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin
+from syntara.core.services.user_reference_resolution import UserReferenceMixin
 from syntara.credentials.lib.auth_types import AUTH_TYPE_URL
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
@@ -122,7 +123,7 @@ class WorkflowConvertResourceMixin(ConvertResourceMixin):
         return WorkflowRead.model_validate(resource)
 
 
-class WorkflowService(BaseService):
+class WorkflowService(UserReferenceMixin, BaseService):
     """Service for workflow business logic.
 
     This service encapsulates all workflow-related business operations,
@@ -638,6 +639,7 @@ class WorkflowService(BaseService):
             labels=labels,
             current_version=1,
             created_by=self.user.id,
+            updated_by=self.user.id,
             is_enabled=False,
             has_validation_issues=has_validation_issues,
             project_id=project_id,

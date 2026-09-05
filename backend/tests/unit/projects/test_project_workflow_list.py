@@ -49,4 +49,5 @@ class TestListProjectWorkflows:
             allowed_projects=expected_allowed,
         )
         mock_service.populate_published_version_numbers.assert_awaited_once_with(mock_result.resources)
+        mock_service.resolve_user_references.assert_awaited_once_with(mock_result.resources)
         assert result is mock_result

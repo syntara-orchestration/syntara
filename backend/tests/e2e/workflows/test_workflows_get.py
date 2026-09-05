@@ -11,6 +11,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from orchestrator_test_sdk.e2e import unique_name
+from syntara_api_client.models.user_reference import UserReference
 from syntara_api_client.models.workflow_create import WorkflowCreate
 from syntara_api_client.models.workflow_definition import WorkflowDefinition
 
@@ -130,9 +131,11 @@ class TestWorkflowListing:
             )
         )
 
-        creator_id = workflow1.created_by
+        # created_by is a UserReference {id, name} on API responses
+        assert isinstance(workflow1.created_by, UserReference)
+        creator_id = workflow1.created_by.id
 
-        # Filter by creator using additional_params
+        # Filter by creator using additional_params (filter still accepts UUID)
         result = syntara_api.workflows.list(
             include_total=True, additional_params={"created_by": str(creator_id)}
         ).assert_and_get()

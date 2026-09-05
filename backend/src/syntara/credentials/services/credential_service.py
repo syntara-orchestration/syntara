@@ -31,6 +31,7 @@ from syntara.core.models import User
 from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin, EnrichQueryMixin
 from syntara.core.services.secret_service import SecretService
+from syntara.core.services.user_reference_resolution import UserReferenceMixin
 from syntara.credentials.audit.credential import CredentialEncryptionFailureEvent, CredentialLifecycleEvent
 from syntara.credentials.exceptions import (
     CredentialDecryptionError,
@@ -281,7 +282,7 @@ def _get_node_credential_id(node: dict[str, Any]) -> str | None:
     return result
 
 
-class CredentialService(BaseService):
+class CredentialService(UserReferenceMixin, BaseService):
     """Service for Credential CRUD operations with encryption via SecretService."""
 
     def __init__(self, session: AsyncSession, user: User, secret_service: SecretService) -> None:
@@ -320,59 +321,6 @@ class CredentialService(BaseService):
             for field_id, value in decrypted_inputs.items()
         }
         return read
-
-    async def _lookup_users(
-        self,
-        objects: Sequence[Any],
-        field_names: Sequence[str] = ("created_by", "updated_by"),
-    ) -> dict[str | UUID, tuple[UUID, str]] | None:
-        """Collect user UUIDs from *objects* and batch-resolve them.
-
-        Returns a mapping {uuid: (uuid, username)} on success, or
-        None when the lookup query fails (caller decides fallback).
-        """
-        user_ids: set[str | UUID] = set()
-        for obj in objects:
-            for field in field_names:
-                val = getattr(obj, field, None)
-                if val:
-                    user_ids.add(val)
-        if not user_ids:
-            return {}
-        try:
-            stmt = select(User.id, User.username).where(User.id.in_(user_ids))  # type: ignore[attr-defined]
-            result = await self.session.exec(stmt)
-            return {row[0]: (row[0], row[1]) for row in result}
-        except (SQLAlchemyError, OSError):
-            logger.warning("Failed to resolve usernames", exc_info=True)
-            return None
-
-    async def _resolve_user_references(
-        self,
-        objects: Sequence[Any],
-        field_names: Sequence[str] = ("created_by", "updated_by"),
-    ) -> None:
-        """Resolve user UUID fields to UserReference objects in-place.
-
-        Unresolvable UUIDs (e.g. deleted users) produce None rather than
-        an empty object, per AC-4 of AAP-79148.
-        """
-        from syntara.core.models.user_reference import UserReference  # noqa: PLC0415
-
-        user_map = await self._lookup_users(objects, field_names)
-        if user_map is None:
-            for obj in objects:
-                for field in field_names:
-                    setattr(obj, field, None)
-            return
-        for obj in objects:
-            for field in field_names:
-                val = getattr(obj, field, None)
-                if val is not None and val in user_map:
-                    uid, username = user_map[val]
-                    setattr(obj, field, UserReference(id=uid, name=username))
-                elif val is not None:
-                    setattr(obj, field, None)
 
     async def _resolve_user_fields(
         self,
@@ -449,7 +397,7 @@ class CredentialService(BaseService):
 
         decrypted_inputs = data.inputs or {}
         read = self._build_masked_response(credential, credential_type, decrypted_inputs)
-        await self._resolve_user_references([read])
+        await self.resolve_user_references([read])
         return read
 
     @staticmethod
@@ -483,7 +431,7 @@ class CredentialService(BaseService):
         read.workflow_count = wf_counts.get(credential_id, 0)
         int_counts = await self.get_integration_counts([credential_id])
         read.integration_count = int_counts.get(credential_id, 0)
-        await self._resolve_user_references([read])
+        await self.resolve_user_references([read])
 
         return read
 
@@ -517,7 +465,7 @@ class CredentialService(BaseService):
                 resource.workflow_count = workflow_counts.get(resource.id, 0)
                 resource.integration_count = integration_counts.get(resource.id, 0)
 
-        await self._resolve_user_references(response.resources)
+        await self.resolve_user_references(response.resources)
 
         return response
 
@@ -593,7 +541,7 @@ class CredentialService(BaseService):
         integration_counts = await self.get_integration_counts([credential_id])
         read.integration_count = integration_counts.get(credential_id, 0)
 
-        await self._resolve_user_references([read])
+        await self.resolve_user_references([read])
 
         return read
 

@@ -173,13 +173,13 @@ function assertPathWithinBase(filePath: string, baseDir: string): string {
  *
  * @param yamlFilePath - Path to the YAML workflow file
  * @param id - Unique workflow ID
- * @param createdBy - Creator of the workflow (default: 'system')
+ * @param createdBy - Creator of the workflow as UserReference (default: demo user)
  * @param allowedBaseDir - Base directory to restrict file access (required for security)
  */
 export function convertYamlToWorkflow(
   yamlFilePath: string,
   id: string,
-  createdBy = 'system',
+  createdBy: { id: string; name: string } = { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'demo' },
   allowedBaseDir: string
 ): WorkflowWithVersion {
   const resolvedPath = assertPathWithinBase(yamlFilePath, allowedBaseDir)
@@ -200,8 +200,10 @@ export function convertYamlToWorkflow(
     created_at: mockDate.daysAgo3,
     updated_at: mockDate.daysAgo1,
     created_by: createdBy,
+    updated_by: createdBy,
     labels: {},
     current_version: 1,
+    is_enabled: false,
     published_version_id: null,
     version: {
       // Deterministic, stable version id/workflow_id — derived from the workflow's own
@@ -214,7 +216,8 @@ export function convertYamlToWorkflow(
       version: 1,
       schema_version: '2.0.0',
       status: WorkflowVersionStatusEnum.DRAFT,
-      created_by: createdBy,
+      created_by: createdBy.id,
+      created_by_username: createdBy.name,
       created_at: mockDate.daysAgo3,
       updated_at: mockDate.daysAgo3,
     },
