@@ -424,6 +424,12 @@ components:
             - type: string
             - type: 'null'
           title: Error Details
+        error:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Error
+          description: Human-readable failure summary. Populated whenever status is 'failed' or 'completed_with_errors'; null otherwise.
         mode:
           $ref: "#/components/schemas/ExecutionMode"
           default: standard

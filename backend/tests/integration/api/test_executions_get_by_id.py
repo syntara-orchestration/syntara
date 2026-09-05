@@ -28,6 +28,7 @@ async def test_get_execution_by_id_success(
     assert data["workflow_id"] == str(test_execution.workflow_id)
     assert data["workflow_name"] == test_workflow.name
     assert data["status"] == ExecutionStatus.PENDING.value
+    assert data["error"] is None
     assert "created_at" in data
     assert "updated_at" in data
 
@@ -63,6 +64,52 @@ async def test_get_execution_with_error_details(
     data = response.json()
     assert data["status"] == ExecutionStatus.FAILED.value
     assert data["error_details"] == "Connection timeout to external service"
+    # `error` mirrors error_details for FAILED executions — the field a monitoring
+    # client actually checks (see AAP execution-error-visibility bugfix).
+    assert data["error"] == "Connection timeout to external service"
+
+
+@pytest.mark.asyncio
+async def test_get_execution_error_null_for_non_failure_status(
+    auth_client: AsyncClient,
+    test_db_session: AsyncSession,
+    test_execution: Execution,
+) -> None:
+    """`error` stays null for statuses that aren't FAILED/COMPLETED_WITH_ERRORS.
+
+    Defensive: error_details should only be set on failure, but `error`
+    must not leak it otherwise, even if error_details happens to be set.
+    """
+    test_execution.status = ExecutionStatus.COMPLETED
+    test_execution.error_details = "stale error_details from a prior state"
+    await test_db_session.commit()
+
+    response = await auth_client.get(f"/api/v1/executions/{test_execution.id}")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == ExecutionStatus.COMPLETED.value
+    assert data["error_details"] == "stale error_details from a prior state"
+    assert data["error"] is None
+
+
+@pytest.mark.asyncio
+async def test_get_execution_with_completed_with_errors_includes_error(
+    auth_client: AsyncClient,
+    test_db_session: AsyncSession,
+    test_execution: Execution,
+) -> None:
+    """`error` is populated for COMPLETED_WITH_ERRORS, not just FAILED."""
+    test_execution.status = ExecutionStatus.COMPLETED_WITH_ERRORS
+    test_execution.error_details = "node_bad: KeyError: nonexistent_field"
+    await test_db_session.commit()
+
+    response = await auth_client.get(f"/api/v1/executions/{test_execution.id}")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == ExecutionStatus.COMPLETED_WITH_ERRORS.value
+    assert data["error"] == "node_bad: KeyError: nonexistent_field"
 
 
 @pytest.mark.asyncio
