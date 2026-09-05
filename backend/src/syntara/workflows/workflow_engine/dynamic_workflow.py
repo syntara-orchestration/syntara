@@ -278,8 +278,9 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             self._cancel_skipped_pending_tasks(pending_tasks)
             self._remove_detached_tasks(pending_tasks)
 
-            # Schedule successors of converge nodes that failed with continue_on_failure
-            for node_id in list(self._timed_out_converge_nodes):
+            # Schedule successors of converge nodes that failed with continue_on_failure.
+            # Sort by node ID for deterministic replay ordering
+            for node_id in sorted(self._timed_out_converge_nodes):
                 self._timed_out_converge_nodes.discard(node_id)
                 workflow.logger.info(f"Scheduling successors of CoF-failed converge node {node_id}")
                 await self._schedule_successors(node_id, graph, pending_tasks)
@@ -287,14 +288,12 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             if not pending_tasks:
                 break
 
-            # Include timeout tasks so asyncio.wait wakes up when a timeout fires,
+            # Include timeout tasks so workflow.wait wakes up when a timeout fires,
             # rather than blocking until a pending node completes.
-            wait_tasks = set(pending_tasks.values())
-            for timeout_task in self._timeout_tasks.values():
-                if not timeout_task.done():
-                    wait_tasks.add(timeout_task)
+            wait_tasks = [t for _, t in sorted(pending_tasks.items())]
+            wait_tasks.extend(t for _, t in sorted(self._timeout_tasks.items()) if not t.done())
 
-            done, _ = await asyncio.wait(wait_tasks, return_when=asyncio.FIRST_COMPLETED)
+            done, _ = await workflow.wait(wait_tasks, return_when=asyncio.FIRST_COMPLETED)
 
             for task in done:
                 await self._process_completed_task(task, pending_tasks, graph)
