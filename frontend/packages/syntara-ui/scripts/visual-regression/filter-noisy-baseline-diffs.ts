@@ -17,10 +17,10 @@
  * The hybrid rule was validated on exact equality, not YIQ / anti-alias ignore.
  *
  * Usage:
- *   npm exec tsx -- scripts/filter-noisy-baseline-diffs.ts
- *   npm exec tsx -- scripts/filter-noisy-baseline-diffs.ts --dry-run
- *   npm exec tsx -- scripts/filter-noisy-baseline-diffs.ts --base-ref HEAD
- *   npm exec tsx -- scripts/filter-noisy-baseline-diffs.ts \
+ *   npm exec tsx -- scripts/visual-regression/filter-noisy-baseline-diffs.ts
+ *   npm exec tsx -- scripts/visual-regression/filter-noisy-baseline-diffs.ts --dry-run
+ *   npm exec tsx -- scripts/visual-regression/filter-noisy-baseline-diffs.ts --base-ref HEAD
+ *   npm exec tsx -- scripts/visual-regression/filter-noisy-baseline-diffs.ts \
  *     --compare-refs origin/devel origin/visual-regression/weekly-refresh
  *
  * Exit codes:
@@ -579,7 +579,7 @@ if (isMain()) {
     }
 
     const __dirname = dirname(fileURLToPath(import.meta.url))
-    const pkgRoot = resolve(__dirname, '..')
+    const pkgRoot = resolve(__dirname, '../..')
     const snapshotDirAbs = resolve(pkgRoot, SNAPSHOT_DIR_REL)
     const repoRoot = findGitRoot(pkgRoot)
     const snapshotRepoRel = relative(repoRoot, snapshotDirAbs).replaceAll('\\', '/')

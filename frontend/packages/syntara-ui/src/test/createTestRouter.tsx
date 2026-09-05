@@ -8,7 +8,7 @@ import {
 } from '@tanstack/react-router'
 import React from 'react'
 
-import { convertWouterPathToTanStack } from '../app/convertParamSyntax'
+import { toTanStackPathTemplate } from '../app/convertParamSyntax'
 
 /**
  * Module-scoped context used to pass test children into the matched route's component.
@@ -33,7 +33,7 @@ function TestRouteComponent() {
  * (which are inherently async in TanStack Router).
  *
  * @param initialPath - The initial URL path (may include query string, e.g. "/users?tab=groups")
- * @param routePattern - Optional wouter-style route pattern (e.g. "/users/:userId") for
+ * @param routePattern - Optional AppRoute-style path pattern (e.g. "/users/:userId") for
  *   `useParams` tests. Converted to TanStack syntax (`$userId`) automatically.
  *   When omitted, a catch-all route is used so location/navigate/search tests work.
  */
@@ -48,7 +48,7 @@ export function createTestRouter(initialPath = '/', routePattern?: string) {
       ? rootRoute.addChildren([
           createRoute({
             getParentRoute: () => rootRoute,
-            path: convertWouterPathToTanStack(routePattern),
+            path: toTanStackPathTemplate(routePattern),
             component: TestRouteComponent,
           }),
         ])

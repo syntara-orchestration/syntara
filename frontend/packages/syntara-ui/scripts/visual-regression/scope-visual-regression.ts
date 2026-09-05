@@ -36,7 +36,7 @@ import { pathToFileURL } from 'node:url'
  * user-facing explanation of this behavior with examples.
  *
  * Usage:
- *   git diff --name-only <base> <head> | npm exec tsx -- scripts/scope-visual-regression.ts
+ *   git diff --name-only <base> <head> | npm exec tsx -- scripts/visual-regression/scope-visual-regression.ts
  *
  * Output (stdout, exactly one line):
  *   SCOPE=NONE                    — no VR-relevant files changed; skip the run entirely
