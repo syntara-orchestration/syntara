@@ -2134,8 +2134,6 @@ class ActivitySyncService:
                 handle, activity_id, activity_data, activity_data.get("output_data")
             )
         else:
-            # ponytail: skip Temporal queries for non-terminal updates;
-            # 600 queries/workflow → replay storm on completed workflows
             input_data = {}
             output_data = activity_data.get("output_data")
 
