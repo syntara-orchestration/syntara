@@ -1,0 +1,119 @@
+# The dispatcher may resolve and dial the hub only. Its Kubernetes requests still
+# retain kubernetes.default.svc as the TLS name, but rest.Config.Dial sends every
+# TCP connection to the hub door.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dispatcher-egress
+  namespace: syntara-control-poc
+spec:
+  podSelector:
+    matchLabels:
+      app: dispatcher-poc
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: receptor-hub
+      ports:
+        - protocol: TCP
+          port: 9443
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: receptor-hub-ingress
+  namespace: syntara-control-poc
+spec:
+  podSelector:
+    matchLabels:
+      app: receptor-hub
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: dispatcher-poc
+      ports:
+        - protocol: TCP
+          port: 9443
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: syntara-execution-poc
+          podSelector:
+            matchLabels:
+              app: receptor-bridge
+      ports:
+        - protocol: TCP
+          port: 2222
+---
+# Native NetworkPolicy cannot select the cluster API Service by DNS name. The
+# bridge is the only component granted this broad HTTPS egress for the POC;
+# production policy should restrict it to that cluster's API endpoint CIDR.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: receptor-bridge-egress
+  namespace: syntara-execution-poc
+spec:
+  podSelector:
+    matchLabels:
+      app: receptor-bridge
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: syntara-control-poc
+          podSelector:
+            matchLabels:
+              app: receptor-hub
+      ports:
+        - protocol: TCP
+          port: 2222
+    - ports:
+        - protocol: TCP
+          port: 443
+---
+# This HTTP executor intentionally permits arbitrary HTTPS destinations for the
+# first isolated-node image. DNS is required to resolve the requested host.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: http-executor-egress
+  namespace: syntara-execution-poc
+spec:
+  podSelector:
+    matchLabels:
+      app: http-executor-worker
+  policyTypes: [Egress]
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 443
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

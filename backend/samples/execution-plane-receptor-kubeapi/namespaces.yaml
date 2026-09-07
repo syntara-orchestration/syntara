@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: syntara-control-poc
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: syntara-execution-poc

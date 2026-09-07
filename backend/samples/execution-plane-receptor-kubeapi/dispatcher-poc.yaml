@@ -1,0 +1,28 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: dispatcher-poc
+  namespace: syntara-control-poc
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app: dispatcher-poc
+    spec:
+      serviceAccountName: dispatcher-poc
+      restartPolicy: Never
+      containers:
+        - name: dispatcher
+          # Build and push this image as described in README.md, then replace it.
+          image: quay.io/ahetheri/execution-plane-dispatcher-poc:dev
+          imagePullPolicy: Always
+          args: ["--timeout=90s"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532

@@ -1,0 +1,9 @@
+---
+- node:
+    id: execution-bridge
+- tcp-peer:
+    address: receptor-hub.syntara-control-poc.svc:2222
+- tcp-client:
+    address: kubernetes.default.svc:443
+    service: kubeapi
+...

@@ -1,0 +1,11 @@
+---
+- node:
+    id: execution-hub
+- tcp-listener:
+    port: 2222
+- tcp-server:
+    bindaddr: 0.0.0.0
+    port: 9443
+    remotenode: execution-bridge
+    remoteservice: kubeapi
+...

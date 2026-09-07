@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: receptor-bridge-config
+  namespace: syntara-execution-poc
+data:
+  receptor.conf: |
+    ---
+    - node:
+        id: execution-bridge
+    - tcp-peer:
+        address: receptor-hub.syntara-control-poc.svc:2222
+    - tcp-client:
+        address: kubernetes.default.svc:443
+        service: kubeapi
+    ...
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: receptor-bridge
+  namespace: syntara-execution-poc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: receptor-bridge
+  template:
+    metadata:
+      labels:
+        app: receptor-bridge
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: receptor
+          image: quay.io/ansible/receptor:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 998
+            runAsGroup: 998
+          volumeMounts:
+            - name: config
+              mountPath: /etc/receptor
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: receptor-bridge-config

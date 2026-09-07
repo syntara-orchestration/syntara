@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: http-executor-worker
+  namespace: syntara-execution-poc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: http-executor-worker
+  template:
+    metadata:
+      labels:
+        app: http-executor-worker
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: http-executor
+          image: quay.io/ahetheri/http-executor:dev
+          imagePullPolicy: Always
+          # Keep the pod warm.  The dispatcher starts the executor with pods/exec.
+          command: ["/bin/sh", "-c", "sleep infinity"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
