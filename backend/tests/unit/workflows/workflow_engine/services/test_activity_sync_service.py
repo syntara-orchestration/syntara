@@ -4088,21 +4088,32 @@ class TestRunMonitorLoop:
 
     @pytest.mark.asyncio
     async def test_returns_false_when_terminal_event_update_fails_transiently(self) -> None:
-        """SATimeoutError from _update_execution_status_from_event triggers retry (returns False)."""
-        from sqlalchemy.exc import TimeoutError as SATimeoutError
+        """DB error inside _update_execution_status_from_event causes _run_monitor_loop to return False.
 
-        event = Mock()
+        The real _update_execution_status_from_event runs (not mocked). Before the fix it swallowed
+        the exception and returned normally, so _run_monitor_loop returned True. After the fix it
+        re-raises, which is caught by the SATimeoutError handler and returns False.
+        """
+        from sqlalchemy.exc import TimeoutError as SATimeoutError
+        from temporalio.api.history.v1 import HistoryEvent
+
+        event = Mock(spec=HistoryEvent)
         event.event_type = EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED
         event.event_id = 99
 
+        mock_session = Mock()
+        mock_session.exec = AsyncMock(side_effect=SATimeoutError("QueuePool limit reached"))
+        mock_session.rollback = AsyncMock()
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+        self.service.session_factory = Mock(return_value=mock_session)
+
         with (
             patch.object(self.service, "_history_event_producer", side_effect=_make_mock_producer(event)),
-            patch.object(
-                self.service,
-                "_dispatch_queue_item",
-                new_callable=AsyncMock,
-                side_effect=SATimeoutError("QueuePool limit reached"),
-            ),
+            patch.object(self.service, "_sync_activities_to_db", new_callable=AsyncMock),
+            patch.object(self.service, "_sync_failed_nodes", new_callable=AsyncMock, return_value={}),
+            patch.object(self.service, "_sync_skipped_nodes", new_callable=AsyncMock),
+            patch.object(self.service, "_sync_detached_nodes", new_callable=AsyncMock),
         ):
             result = await self.service._run_monitor_loop(self.handle, self.metadata, self.execution_id)
 
