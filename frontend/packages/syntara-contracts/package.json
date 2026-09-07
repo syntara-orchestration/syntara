@@ -37,8 +37,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "eslint": "^10.9.0",
+    "eslint": "^10.9.1",
     "openapi-typescript": "^7.13.0",
-    "typescript-eslint": "~8.58.1"
+    "typescript-eslint": "~8.69.0"
   }
 }
