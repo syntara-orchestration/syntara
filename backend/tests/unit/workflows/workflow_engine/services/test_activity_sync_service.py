@@ -4118,6 +4118,8 @@ class TestRunMonitorLoop:
             result = await self.service._run_monitor_loop(self.handle, self.metadata, self.execution_id)
 
         assert result is False
+        # The event id must NOT be advanced past the failed COMPLETED event (re-playing it on retry is the fix)
+        assert self.metadata.last_processed_event_id != 99
 
 
 class TestMonitorExecutionRetry:
