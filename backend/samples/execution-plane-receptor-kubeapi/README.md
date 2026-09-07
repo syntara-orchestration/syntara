@@ -18,6 +18,9 @@ The dispatcher leaves its Kubernetes client host set to
 socket only to `receptor-hub.syntara-control-poc.svc:9443`, preserving the API
 TLS server name and certificate validation. Receptor only forwards bytes.
 
+See [how Receptor bridges the Kubernetes API](receptor_bridging_kube.md) for a
+step-by-step request and response trace.
+
 ## OpenShift deployment
 
 The worker image is public at `quay.io/ahetheri/http-executor:dev`. Build and
