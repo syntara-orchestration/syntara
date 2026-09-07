@@ -1,0 +1,27 @@
+FROM registry.access.redhat.com/ubi9/python-312:9.5@sha256:306e4320c559d67c60874e3bb85c9f84afc84b66c350b3d4afe0abd65201d6e6
+
+USER 0
+
+WORKDIR /opt/app-root/src
+
+# The executor deliberately has no dependency on the Syntara API, Temporal,
+# database, Redis, or service credentials.
+RUN python -m pip install --no-cache-dir --disable-pip-version-check "httpx==0.28.1"
+
+COPY src/syntara/http_executor/ ./syntara/http_executor/
+
+RUN chown -R 1001:0 /opt/app-root && chmod -R g=u /opt/app-root
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/opt/app-root/src \
+    HTTP_EXECUTOR_MAX_TIMEOUT_SECONDS=60 \
+    HTTP_EXECUTOR_MAX_RESPONSE_BYTES=1048576
+
+USER 1001
+
+LABEL org.opencontainers.image.title="Syntara HTTP executor" \
+      org.opencontainers.image.description="Hardened stdin-driven HTTP request executor" \
+      org.opencontainers.image.source="https://github.com/syntara-orchestration/syntara"
+
+ENTRYPOINT ["python", "-m", "syntara.http_executor"]
