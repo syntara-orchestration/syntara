@@ -2125,17 +2125,7 @@ class ActivitySyncService:
         if existing.status in TERMINAL_ACTIVITY_STATUSES and not loop_control_iterating and not is_new:
             return None
 
-        # Query workflow for input/output data.
-        # For running activities, partial output from heartbeat may
-        # already be in the update dict — preserve it if the workflow
-        # query returns None (output not stored until completion).
-        if activity_data.get("status") in TERMINAL_ACTIVITY_STATUSES:
-            input_data, output_data = await self._query_activity_io(
-                handle, activity_id, activity_data, activity_data.get("output_data")
-            )
-        else:
-            input_data = {}
-            output_data = activity_data.get("output_data")
+        input_data, output_data = await self._resolve_activity_io(handle, activity_id, activity_data)
 
         # Loop control nodes: keep the node "running" between iterations so the UI
         # doesn't flash completed→pending on every cycle.  The final iteration
@@ -2165,6 +2155,22 @@ class ActivitySyncService:
             is_loop_control=is_loop_control,
         )
         return existing, old_values, is_new
+
+    async def _resolve_activity_io(
+        self,
+        handle: WorkflowHandle[Any, Any],
+        activity_id: str,
+        activity_data: dict[str, Any],
+    ) -> tuple[dict[str, Any], Any]:
+        """Resolve input/output data for an activity, querying Temporal only for terminal ones.
+
+        Non-terminal activities are skipped to avoid a per-event query storm (~600
+        queries/loop workflow) that exhausts the DB pool. For running activities,
+        partial output from heartbeat may already be in the update dict — preserve it.
+        """
+        if activity_data.get("status") in TERMINAL_ACTIVITY_STATUSES:
+            return await self._query_activity_io(handle, activity_id, activity_data, activity_data.get("output_data"))
+        return {}, activity_data.get("output_data")
 
     @staticmethod
     def _get_or_create_iteration_record(
