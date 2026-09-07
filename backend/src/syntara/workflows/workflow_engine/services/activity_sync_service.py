@@ -2129,9 +2129,15 @@ class ActivitySyncService:
         # For running activities, partial output from heartbeat may
         # already be in the update dict — preserve it if the workflow
         # query returns None (output not stored until completion).
-        input_data, output_data = await self._query_activity_io(
-            handle, activity_id, activity_data, activity_data.get("output_data")
-        )
+        if activity_data.get("status") in TERMINAL_ACTIVITY_STATUSES:
+            input_data, output_data = await self._query_activity_io(
+                handle, activity_id, activity_data, activity_data.get("output_data")
+            )
+        else:
+            # ponytail: skip Temporal queries for non-terminal updates;
+            # 600 queries/workflow → replay storm on completed workflows
+            input_data = {}
+            output_data = activity_data.get("output_data")
 
         # Loop control nodes: keep the node "running" between iterations so the UI
         # doesn't flash completed→pending on every cycle.  The final iteration

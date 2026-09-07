@@ -5355,3 +5355,112 @@ class TestQueryActivityIoOutputMerge:
         assert output_data["job_id"] == 42
         assert output_data["status"] == "completed"
         assert output_data["output"] == "result"
+
+
+class TestNonTerminalIoQuerySkip:
+    """_query_activity_io must not be called for non-terminal activity status updates."""
+
+    def setup_method(self) -> None:
+        self.mock_session_factory = Mock()
+        self.service = ActivitySyncService(Mock(), self.mock_session_factory)
+        self.execution_id = uuid4()
+
+    def _build_activity_data(self, status: ActivityStatus) -> dict[str, Any]:
+        return {
+            "activity_id": "script_1",
+            "activity_name": "script_1",
+            "_is_loop_iteration": False,
+            "_is_loop_control": False,
+            "status": status,
+            "started_at": None,
+            "completed_at": None,
+            "error_details": None,
+            "retry_count": 0,
+            "iteration": None,
+            "scheduled_at": datetime(2025, 1, 20, 10, 0, 0, tzinfo=UTC),
+            "configured_timeout_seconds": None,
+        }
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "status",
+        [ActivityStatus.PENDING, ActivityStatus.RUNNING, ActivityStatus.WAITING, ActivityStatus.RETRYING],
+    )
+    async def test_query_activity_io_skipped_for_non_terminal(self, status: ActivityStatus) -> None:
+        """No Temporal query for non-terminal status updates."""
+        existing = Mock(spec=ActivityExecution)
+        existing.activity_name = "script_1"
+        existing.status = ActivityStatus.PENDING  # initial DB status
+        existing.node_type = NodeType.SCRIPT
+        existing.started_at = None
+        existing.completed_at = None
+        existing.input_data = {}
+        existing.output_data = None
+        existing.error_details = None
+        existing.retry_count = 0
+        existing.iteration = None
+        existing.updated_at = datetime(2025, 1, 20, 10, 0, 0, tzinfo=UTC)
+
+        metadata = create_test_metadata(execution_id=self.execution_id)
+        session = Mock()
+
+        with patch.object(self.service, "_query_activity_io", new_callable=AsyncMock) as mock_query:
+            result = await self.service._process_single_activity_sync(
+                metadata,
+                Mock(),  # handle — should not be used
+                self._build_activity_data(status),
+                {"script_1": existing},
+                session,
+            )
+
+        mock_query.assert_not_called()
+        assert result is not None
+        activity, _old_values, _is_new = result
+        assert activity.status == status
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "status",
+        [ActivityStatus.COMPLETED, ActivityStatus.FAILED, ActivityStatus.CANCELLED],
+    )
+    async def test_query_activity_io_called_for_terminal(self, status: ActivityStatus) -> None:
+        """Temporal I/O query IS made for terminal status updates."""
+        existing = Mock(spec=ActivityExecution)
+        existing.activity_name = "script_1"
+        existing.status = ActivityStatus.RUNNING  # pre-terminal DB status
+        existing.node_type = NodeType.SCRIPT
+        existing.started_at = datetime(2025, 1, 20, 10, 0, 0, tzinfo=UTC)
+        existing.completed_at = None
+        existing.input_data = {}
+        existing.output_data = None
+        existing.error_details = None
+        existing.retry_count = 0
+        existing.iteration = None
+        existing.updated_at = datetime(2025, 1, 20, 10, 0, 0, tzinfo=UTC)
+
+        activity_data = self._build_activity_data(status)
+        if status == ActivityStatus.FAILED:
+            activity_data["error_details"] = "Script failed"
+        if status == ActivityStatus.CANCELLED:
+            activity_data["error_details"] = "Activity was canceled"
+        activity_data["completed_at"] = datetime(2025, 1, 20, 10, 5, 0, tzinfo=UTC)
+
+        metadata = create_test_metadata(execution_id=self.execution_id)
+        session = Mock()
+
+        with patch.object(
+            self.service,
+            "_query_activity_io",
+            new_callable=AsyncMock,
+            return_value=({"input": "data"}, {"output": "data"}),
+        ) as mock_query:
+            result = await self.service._process_single_activity_sync(
+                metadata,
+                Mock(),
+                activity_data,
+                {"script_1": existing},
+                session,
+            )
+
+        mock_query.assert_called_once()
+        assert result is not None
