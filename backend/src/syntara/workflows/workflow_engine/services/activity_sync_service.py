@@ -1647,7 +1647,7 @@ class ActivitySyncService:
                 logger.exception(
                     "Error updating execution status from workflow completion event", execution_id=metadata.execution_id
                 )
-                # Don't raise - monitoring should continue
+                raise
 
     def _update_non_terminal_activities_on_cancel(
         self,

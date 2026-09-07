@@ -1567,6 +1567,28 @@ class TestExecutionStatusUpdates:
         assert execution.completed_at == created_at + datetime.resolution
         mock_session.commit.assert_awaited_once()
 
+    @pytest.mark.asyncio
+    async def test_update_execution_status_from_event_reraises_db_error(self) -> None:
+        """DB errors during terminal-event processing must propagate so the retry loop can handle them."""
+        from sqlalchemy.exc import TimeoutError as SATimeoutError
+
+        metadata = create_test_metadata(execution_id=self.execution_id)
+        event = self._create_workflow_event(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED, event_id=99)
+        # Patch completed event attrs so _extract_execution_status_from_event works
+        attrs = Mock()
+        attrs.result = None
+        event.workflow_execution_completed_event_attributes = attrs
+
+        mock_session = Mock()
+        mock_session.exec = AsyncMock(side_effect=SATimeoutError("QueuePool limit reached"))
+        mock_session.rollback = AsyncMock()
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+        self.mock_session_factory.return_value = mock_session
+
+        with pytest.raises(SATimeoutError):
+            await self.service._update_execution_status_from_event(metadata, event)
+
 
 class TestAgenticActivityFinalizationOnWorkflowCompletion:
     """Test that RUNNING agentic activities are finalized when the workflow completes."""
@@ -4063,6 +4085,28 @@ class TestRunMonitorLoop:
 
         assert result is False
         mock_cancel.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_returns_false_when_terminal_event_update_fails_transiently(self) -> None:
+        """SATimeoutError from _update_execution_status_from_event triggers retry (returns False)."""
+        from sqlalchemy.exc import TimeoutError as SATimeoutError
+
+        event = Mock()
+        event.event_type = EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED
+        event.event_id = 99
+
+        with (
+            patch.object(self.service, "_history_event_producer", side_effect=_make_mock_producer(event)),
+            patch.object(
+                self.service,
+                "_dispatch_queue_item",
+                new_callable=AsyncMock,
+                side_effect=SATimeoutError("QueuePool limit reached"),
+            ),
+        ):
+            result = await self.service._run_monitor_loop(self.handle, self.metadata, self.execution_id)
+
+        assert result is False
 
 
 class TestMonitorExecutionRetry:
