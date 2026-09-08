@@ -13,7 +13,7 @@
 # =============================================================================
 openapi: 3.1.0
 info:
-  title: Syntara API
+  title: Orchestrator API
   version: 1.0.0
   description: A distributed multi-agent workflow orchestration system
 servers:
@@ -106,8 +106,8 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
-            If provided, the credential is decrypted and used instead of environment variables.
+            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
           name: integration_id
@@ -120,7 +120,8 @@ paths:
             title: Integration Id
           description: |
             Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-            When provided, the integration's configured URL is used instead of environment variables.
+            If omitted, the unique visible enabled AAP integration is used.
+            Required when more than one AAP integration is visible.
       responses:
         '200':
           description: Successful Response
@@ -267,8 +268,8 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
-            If provided, the credential is decrypted and used instead of environment variables.
+            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
           name: integration_id
@@ -281,7 +282,8 @@ paths:
             title: Integration Id
           description: |
             Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-            When provided, the integration's configured URL is used instead of environment variables.
+            If omitted, the unique visible enabled AAP integration is used.
+            Required when more than one AAP integration is visible.
         - in: query
           name: organization
           required: false
@@ -444,8 +446,8 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
-            If provided, the credential is decrypted and used instead of environment variables.
+            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
           name: integration_id
@@ -458,7 +460,8 @@ paths:
             title: Integration Id
           description: |
             Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-            When provided, the integration's configured URL is used instead of environment variables.
+            If omitted, the unique visible enabled AAP integration is used.
+            Required when more than one AAP integration is visible.
       responses:
         '200':
           description: Successful Response
@@ -605,8 +608,8 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
-            If provided, the credential is decrypted and used instead of environment variables.
+            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
           name: integration_id
@@ -619,7 +622,8 @@ paths:
             title: Integration Id
           description: |
             Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-            When provided, the integration's configured URL is used instead of environment variables.
+            If omitted, the unique visible enabled AAP integration is used.
+            Required when more than one AAP integration is visible.
         - in: query
           name: organization
           required: false
@@ -782,8 +786,8 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
-            If provided, the credential is decrypted and used instead of environment variables.
+            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
           name: integration_id
@@ -796,7 +800,8 @@ paths:
             title: Integration Id
           description: |
             Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-            When provided, the integration's configured URL is used instead of environment variables.
+            If omitted, the unique visible enabled AAP integration is used.
+            Required when more than one AAP integration is visible.
       responses:
         '200':
           description: Successful Response
@@ -943,8 +948,8 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
-            If provided, the credential is decrypted and used instead of environment variables.
+            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
           name: integration_id
@@ -957,7 +962,8 @@ paths:
             title: Integration Id
           description: |
             Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-            When provided, the integration's configured URL is used instead of environment variables.
+            If omitted, the unique visible enabled AAP integration is used.
+            Required when more than one AAP integration is visible.
         - in: query
           name: organization
           required: false
@@ -1113,8 +1119,8 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
-            If provided, the credential is decrypted and used instead of environment variables.
+            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
           name: integration_id
@@ -1127,7 +1133,8 @@ paths:
             title: Integration Id
           description: |
             Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-            When provided, the integration's configured URL is used instead of environment variables.
+            If omitted, the unique visible enabled AAP integration is used.
+            Required when more than one AAP integration is visible.
         - in: query
           name: organization
           required: false
@@ -1283,8 +1290,8 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
-            If provided, the credential is decrypted and used instead of environment variables.
+            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
           name: integration_id
@@ -1297,7 +1304,8 @@ paths:
             title: Integration Id
           description: |
             Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-            When provided, the integration's configured URL is used instead of environment variables.
+            If omitted, the unique visible enabled AAP integration is used.
+            Required when more than one AAP integration is visible.
       responses:
         '200':
           description: Successful Response
@@ -1444,8 +1452,8 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
-            If provided, the credential is decrypted and used instead of environment variables.
+            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
           name: integration_id
@@ -1458,7 +1466,8 @@ paths:
             title: Integration Id
           description: |
             Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-            When provided, the integration's configured URL is used instead of environment variables.
+            If omitted, the unique visible enabled AAP integration is used.
+            Required when more than one AAP integration is visible.
       responses:
         '200':
           description: Successful Response
@@ -1604,8 +1613,8 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
-            If provided, the credential is decrypted and used instead of environment variables.
+            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
           name: integration_id
@@ -1618,7 +1627,8 @@ paths:
             title: Integration Id
           description: |
             Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-            When provided, the integration's configured URL is used instead of environment variables.
+            If omitted, the unique visible enabled AAP integration is used.
+            Required when more than one AAP integration is visible.
       responses:
         '200':
           description: Successful Response
@@ -13196,7 +13206,7 @@ paths:
         - bearerAuth: []
     delete:
       summary: Delete project
-      description: 'Delete a project (soft-delete). Requires: project:delete permission scoped to this project.'
+      description: 'Delete a project (hard-delete). Requires: project:delete permission scoped to this project.'
       operationId: delete_project
       x-app-permission:
         resource: project
@@ -25216,7 +25226,7 @@ paths:
                 retryable: true
     delete:
       summary: Delete workflow
-      description: Soft delete a workflow.
+      description: Permanently delete a workflow and cascade-delete all its versions and executions.
       operationId: delete_workflow
       tags:
         - Workflows
@@ -29566,7 +29576,7 @@ components:
     OIDCClaimMapping:
       type: object
       title: OIDCClaimMapping
-      description: Maps Syntara user fields to IdP-specific OIDC claim names.
+      description: Maps Orchestrator user fields to IdP-specific OIDC claim names.
       additionalProperties: false
       properties:
         subject:
@@ -29593,7 +29603,7 @@ components:
       type: object
       title: OIDCGroupMappingEntry
       description: |-
-        API-facing schema for a single IdP-to-Syntara group mapping entry.
+        API-facing schema for a single IdP-to-Orchestrator group mapping entry.
 
         Used in API requests/responses. Actual storage is in the
         ``idp_group_mapping_entries`` table.
@@ -29730,7 +29740,7 @@ components:
           items:
             $ref: '#/components/schemas/OIDCGroupMappingEntry'
           title: Group Mapping Entries
-          description: IdP-to-Syntara group mapping entries
+          description: IdP-to-Orchestrator group mapping entries
         allow_all_authenticated:
           type: boolean
           default: false
@@ -29858,7 +29868,7 @@ components:
           items:
             $ref: '#/components/schemas/OIDCGroupMappingEntry'
           title: Group Mapping Entries
-          description: IdP-to-Syntara group mapping entries
+          description: IdP-to-Orchestrator group mapping entries
         allow_all_authenticated:
           type: boolean
           default: false
@@ -29998,7 +30008,7 @@ components:
                 $ref: '#/components/schemas/OIDCGroupMappingEntry'
             - type: 'null'
           title: Group Mapping Entries
-          description: IdP-to-Syntara group mapping entries (omit to keep existing)
+          description: IdP-to-Orchestrator group mapping entries (omit to keep existing)
         allow_all_authenticated:
           anyOf:
             - type: boolean
@@ -33804,18 +33814,6 @@ components:
             $ref: '#/components/schemas/CurrentActivity'
           title: Current Activities
           description: Currently executing activities
-        deleted_at:
-          anyOf:
-            - type: string
-              format: date-time
-            - type: 'null'
-          title: Deleted At
-        deleted_by:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
-          title: Deleted By
         workflow_definition:
           anyOf:
             - $ref: '#/components/schemas/WorkflowDefinition'
@@ -34250,7 +34248,6 @@ components:
         Schema for workflow response (GET /workflows/{id}).
 
         Includes all fields from the database table model.
-        Note: deleted_at and deleted_by are None since soft-deleted workflows are excluded from queries.
       required:
         - name
         - id
@@ -34324,18 +34321,6 @@ components:
           type: string
           format: date-time
           title: Updated At
-        deleted_at:
-          anyOf:
-            - type: string
-              format: date-time
-            - type: 'null'
-          title: Deleted At
-        deleted_by:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
-          title: Deleted By
         validation_result:
           anyOf:
             - $ref: '#/components/schemas/ValidationResult'
@@ -34422,18 +34407,6 @@ components:
           type: string
           format: date-time
           title: Updated At
-        deleted_at:
-          anyOf:
-            - type: string
-              format: date-time
-            - type: 'null'
-          title: Deleted At
-        deleted_by:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
-          title: Deleted By
         validation_result:
           anyOf:
             - $ref: '#/components/schemas/ValidationResult'
@@ -34520,18 +34493,6 @@ components:
           type: string
           format: date-time
           title: Updated At
-        deleted_at:
-          anyOf:
-            - type: string
-              format: date-time
-            - type: 'null'
-          title: Deleted At
-        deleted_by:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
-          title: Deleted By
         validation_result:
           anyOf:
             - $ref: '#/components/schemas/ValidationResult'
@@ -34548,11 +34509,7 @@ components:
     WorkflowVersionRead:
       type: object
       title: WorkflowVersionRead
-      description: |-
-        Schema for workflow version response (GET /workflows/{id}/versions/{version}).
-        WorkflowVersion entities are read-only and managed automatically by the system.
-
-        Note: deleted_at and deleted_by are None since soft-deleted versions are excluded from queries.
+      description: Schema for workflow version response (GET /workflows/{id}/versions/{version}).
       required:
         - id
         - workflow_id
@@ -34628,18 +34585,6 @@ components:
           type: string
           format: date-time
           title: Updated At
-        deleted_at:
-          anyOf:
-            - type: string
-              format: date-time
-            - type: 'null'
-          title: Deleted At
-        deleted_by:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
-          title: Deleted By
     PublishVersionRequest:
       type: object
       title: PublishVersionRequest
@@ -34933,7 +34878,7 @@ components:
         - edges
       title: WorkflowDefinition
       description: |-
-        JSON Schema for graph-based workflow definitions in the Syntara Workflow Engine v2.
+        JSON Schema for graph-based workflow definitions in the Orchestrator Workflow Engine v2.
 
         Attributes:
             schema_version: Schema version that this workflow definition conforms to
@@ -35529,7 +35474,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Syntara credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
+          description: Orchestrator credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
         integration_id:
           anyOf:
             - type: string
@@ -35684,7 +35629,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Syntara credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
+          description: Orchestrator credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
         integration_id:
           anyOf:
             - type: string
@@ -35805,7 +35750,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Syntara credential UUID for authentication or Secret URL.
+          description: Orchestrator credential UUID for authentication or Secret URL.
       type: object
       required:
         - method
@@ -35833,7 +35778,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Syntara credential UUID for LLM provider authentication
+          description: Orchestrator credential UUID for LLM provider authentication
         file_ids:
           items:
             type: string
@@ -35887,7 +35832,7 @@ components:
         credential_id:
           type: string
           title: Credential Id
-          description: Syntara credential UUID for execution calls (distinct from management credential)
+          description: Orchestrator credential UUID for execution calls (distinct from management credential)
       type: object
       required:
         - integration_id
@@ -35917,12 +35862,6 @@ components:
           type: object
           title: Environment
           description: Environment variables
-        credential_id:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Credential Id
-          description: Syntara credential UUID for credential scrubbing
       type: object
       required:
         - language
@@ -35936,7 +35875,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Syntara credential UUID
+          description: Orchestrator credential UUID
         approver_users:
           anyOf:
             - items:

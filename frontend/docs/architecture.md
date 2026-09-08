@@ -380,7 +380,7 @@ flowchart LR
 Each `TNavigationItem` in `navigationItems.tsx` supports two permission fields:
 
 - `requiredPermissions` (array of `{ action, resourceType }`, OR logic): controls navigation visibility. The item is hidden if the user lacks ALL listed permissions. Consumed by `useFilteredNavigationItems`.
-- `routePermission` (single `{ action, resourceType }`): wraps the route component in `ProtectedRoute`, which shows `EmptyStateAccessDenied` when the permission check fails. Used for create/edit routes.
+- `routePermission` (single `{ action, resourceType }`): wraps the route component in `ProtectedRoute`, which shows `SynEmptyStateAccessDenied` when the permission check fails. Used for create/edit routes.
 
 See [`docs/permissions-rbac.md`](permissions-rbac.md) for the full permission gating architecture.
 
@@ -1129,7 +1129,7 @@ queryClient.invalidateQueries({ queryKey: ['get', '/workflows'] })
 
 1. Define `FilterFieldDefinition[]` in a colocated `*Filters.ts` / `*FilterDefinitions.ts`
 2. Use `useCursorPagination` for filters + cursor + `queryParams`
-3. Render `FilterBar` (or `NxListPanelToolbar`) with those definitions
+3. Render `FilterBar` (or `SynListPanelToolbar`) with those definitions
 4. Pass `queryParams` into the typed client's `useQuery`
 5. Use `SynEmptyStateFilter` when filters are active and the list is empty
 
@@ -1165,7 +1165,7 @@ flowchart LR
 
 **Location:** `packages/syntara-ui/src/components/filters/FilterBar.tsx`  
 **Barrel:** `packages/syntara-ui/src/components/filters/index.ts`  
-**List layout wrapper:** `NxListPanelToolbar` in `packages/syntara-ui/src/components/panels/list/NxListPanel.tsx`
+**List layout wrapper:** `SynListPanelToolbar` in `packages/syntara-ui/src/components/panels/list/SynListPanel.tsx`
 
 ```typescript
 export type FilterBarProps = {
@@ -1312,7 +1312,7 @@ const query = workflowClient.useQuery('get', '/workflows', {
 // <Th sort={getSortParams('name')}>Name</Th>
 ```
 
-Wire `filters` / `handleFilterChange` / `handleClearAllFilters` into `FilterBar` or `NxListPanelToolbar`. Use `SynEmptyStateFilter` when filters are active but the list is empty.
+Wire `filters` / `handleFilterChange` / `handleClearAllFilters` into `FilterBar` or `SynListPanelToolbar`. Use `SynEmptyStateFilter` when filters are active but the list is empty.
 
 ### Keyword search default behavior
 

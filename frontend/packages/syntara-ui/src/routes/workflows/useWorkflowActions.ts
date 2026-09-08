@@ -62,7 +62,7 @@ export function useWorkflowActions({
       })
       if (error || !data?.id) {
         showError({
-          title: 'Workflow failed',
+          title: 'Failed to run workflow',
           description: `Failed to start workflow "${workflow.name}": ${getErrorMessage(error)}`,
         })
       } else {
@@ -80,12 +80,12 @@ export function useWorkflowActions({
         { params: { path: { workflow_id: workflow.id } } },
         {
           onSuccess: () => {
-            showSuccess({ title: 'Workflow deleted', description: `Successfully deleted workflow "${workflow.name}"` })
+            showSuccess({ title: 'Workflow deleted', description: `Workflow "${workflow.name}" has been deleted.` })
             onRefetch()
           },
           onError: (error: unknown) => {
             showError({
-              title: 'Delete failed',
+              title: 'Failed to delete workflow',
               description: `Failed to delete workflow "${workflow.name}": ${getErrorMessage(error)}`,
             })
           },
@@ -109,7 +109,7 @@ export function useWorkflowActions({
         },
         {
           onSuccess: () => {
-            showSuccess({ title: 'Workflow published successfully' })
+            showSuccess({ title: 'Workflow published' })
             onRefetch()
           },
           onError: (error: unknown) => {
@@ -132,7 +132,7 @@ export function useWorkflowActions({
         { params: { path: { workflow_id: workflow.id } } },
         {
           onSuccess: () => {
-            showSuccess({ title: 'Workflow unpublished successfully' })
+            showSuccess({ title: 'Workflow unpublished' })
             onRefetch()
           },
           onError: (error: unknown) => {

@@ -99,7 +99,7 @@ export function ValidationBanner({
             <DescriptionListGroup key={`${group.nodeId ?? 'global'}-${group.displayKey}`}>
               <DescriptionListTerm>
                 {group.nodeId && group.displayKey !== 'Workflow' && onNavigateToNode ? (
-                  <Button variant="link" isInline onClick={() => onNavigateToNode(group.nodeId!)}>
+                  <Button variant="link" isInline onClick={() => onNavigateToNode(group.nodeId ?? '')}>
                     {group.displayKey}
                   </Button>
                 ) : (

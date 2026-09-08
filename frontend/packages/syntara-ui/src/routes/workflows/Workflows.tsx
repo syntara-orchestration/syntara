@@ -7,7 +7,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { SynPage, SynPageBody } from '../../components/layout/SynPage'
 import { SynPageHeader } from '../../components/layout/SynPageHeader'
-import { NxListPanel } from '../../components/panels/list/NxListPanel'
+import { SynListPanel } from '../../components/panels/list/SynListPanel'
 import { SynKebabMenu } from '../../components/SynKebabMenu'
 import { SynPageTitle } from '../../components/SynPageTitle'
 import { builtinProjectTooltip } from '../../hooks/permissionUtils'
@@ -241,7 +241,7 @@ export default function Workflows() {
         />
 
         <SynPageBody>
-          <NxListPanel>
+          <SynListPanel>
             <WorkflowsListView
               isPending={workflowsQuery.isPending}
               error={workflowsQuery.error}
@@ -267,7 +267,7 @@ export default function Workflows() {
               getRowActions={getRowActions}
               projectActionCallbacks={projectActionCallbacks}
             />
-          </NxListPanel>
+          </SynListPanel>
         </SynPageBody>
       </SynPage>
 

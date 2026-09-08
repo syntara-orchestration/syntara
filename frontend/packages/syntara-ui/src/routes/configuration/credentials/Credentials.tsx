@@ -163,7 +163,7 @@ export default function Credentials() {
   const typeMap = useMemo(() => {
     const map = new Map<string, CredentialType>()
     for (const t of typesQuery.data?.resources ?? []) {
-      map.set(t.id!, t)
+      if (t.id) map.set(t.id, t)
     }
     return map
   }, [typesQuery.data])
@@ -202,7 +202,11 @@ export default function Credentials() {
   })
 
   const expandableCredentialIds = useMemo(
-    () => credentials.filter((c) => Boolean(c.description?.trim())).map((c) => c.id!),
+    () =>
+      credentials
+        .filter((c) => Boolean(c.description?.trim()))
+        .map((c) => c.id)
+        .filter((id): id is string => id !== undefined),
     [credentials]
   )
 
@@ -248,6 +252,7 @@ export default function Credentials() {
           credentials: [],
         })
       }
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- safe: key was just set via groups.set(projectId, ...) above
       groups.get(projectId)!.credentials.push(credential)
     }
     return groups
@@ -295,6 +300,7 @@ export default function Credentials() {
 
   const handleConfirmDelete = useDeleteAction<Credential, { params: { path: { credential_id: string } } }>({
     deleteFn: (params, callbacks) => deleteCredential(params, callbacks),
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- safe: credentials opened for deletion always have an id (server-assigned); ?? '' would produce an invalid path param
     buildParams: (cred) => ({ params: { path: { credential_id: cred.id! } } }),
     entityLabel: 'credential',
     getItemName: (cred) => cred.name,

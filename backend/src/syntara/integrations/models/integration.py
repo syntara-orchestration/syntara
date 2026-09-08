@@ -114,7 +114,7 @@ class Integration(NamedResource, UserOwnedResource, table=True):
     management_credential_id: UUID | None = Field(
         default=None,
         foreign_key="credentials.id",
-        ondelete="SET NULL",
+        ondelete="RESTRICT",
         description="Optional credential for admin operations (validation, tool/model discovery)",
     )
 

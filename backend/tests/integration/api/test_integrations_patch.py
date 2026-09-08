@@ -264,16 +264,22 @@ class TestIntegrationsPatch:
 
 
 class TestIntegrationCredentialCascade:
-    """Tests for credential deletion impact on integrations (Test 37)."""
+    """Tests for credential deletion impact on integrations (Test 37).
 
-    async def test_delete_credential_nullifies_integration_management_credential(
+    Deleting an in-use credential used to silently succeed and null out the
+    integration's management_credential_id, leaving validation_status stale.
+    The delete is now blocked with 409 while any integration still
+    references the credential, so the integration is never silently broken.
+    """
+
+    async def test_delete_credential_blocked_while_referenced_by_integration(
         self,
         auth_client: AsyncClient,
         test_db_session: AsyncSession,
         integration_factory: IntegrationFactory,
         credential_factory: CredentialFactory,
     ) -> None:
-        """Deleting a credential sets the integration's management_credential_id to NULL."""
+        """Deleting an in-use credential returns 409 and leaves the integration untouched."""
         ct = await credential_factory.create_type("HTTP Bearer Token")
         project = await credential_factory.create_project()
         cred = await credential_factory.create(ct, project, name=f"cascade-{uuid4().hex[:8]}")
@@ -287,8 +293,40 @@ class TestIntegrationCredentialCascade:
         assert get_before.json()["management_credential_id"] == str(cred.id)
 
         delete_resp = await auth_client.delete(f"/api/v1/credentials/{cred.id}")
-        assert delete_resp.status_code == 204
+        assert delete_resp.status_code == 409
+        assert delete_resp.json()["code"] == "CREDENTIAL_IN_USE"
+        assert integration.name in delete_resp.json()["detail"]
 
+        # Integration and credential are both untouched by the rejected delete.
         get_after = await auth_client.get(f"{BASE_URL}/{integration.id}")
         assert get_after.status_code == 200
-        assert get_after.json()["management_credential_id"] is None
+        assert get_after.json()["management_credential_id"] == str(cred.id)
+
+        cred_get = await auth_client.get(f"/api/v1/credentials/{cred.id}")
+        assert cred_get.status_code == 200
+
+    async def test_delete_credential_succeeds_after_detaching_integration(
+        self,
+        auth_client: AsyncClient,
+        test_db_session: AsyncSession,
+        integration_factory: IntegrationFactory,
+        credential_factory: CredentialFactory,
+    ) -> None:
+        """Once the credential is detached from all integrations, delete succeeds normally."""
+        ct = await credential_factory.create_type("HTTP Bearer Token")
+        project = await credential_factory.create_project()
+        cred = await credential_factory.create(ct, project, name=f"cascade-{uuid4().hex[:8]}")
+
+        integration = await integration_factory.create(name=f"cascade-int-{uuid4().hex[:8]}")
+        integration.management_credential_id = cred.id
+        await test_db_session.commit()
+
+        patch_resp = await auth_client.patch(f"{BASE_URL}/{integration.id}", json={"management_credential_id": None})
+        assert patch_resp.status_code == 200
+        assert patch_resp.json()["management_credential_id"] is None
+
+        delete_resp = await auth_client.delete(f"/api/v1/credentials/{cred.id}")
+        assert delete_resp.status_code == 204
+
+        cred_get = await auth_client.get(f"/api/v1/credentials/{cred.id}")
+        assert cred_get.status_code == 404

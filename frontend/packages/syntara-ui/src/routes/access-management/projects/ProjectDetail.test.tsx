@@ -209,7 +209,7 @@ describe('ProjectDetail', () => {
     const { container } = render(<ProjectDetail />, { wrapper })
     let results: Awaited<ReturnType<typeof axe>>
     await act(async () => {
-      // PF6 Tabs generates aria-controls referencing tab panel IDs that jsdom
+      // PF6 Tabs generates aria-controls referencing tab panel IDs that happy-dom
       // does not render (lazy panels), causing a false-positive violation.
       results = await axe(container, {
         rules: { 'aria-valid-attr-value': { enabled: false } },

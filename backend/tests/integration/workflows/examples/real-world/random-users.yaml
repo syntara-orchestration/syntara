@@ -31,7 +31,7 @@ nodes:
       headers:
         Accept: application/json
       query_params:
-        results: ${input.count}
+        results: ${trigger.count}
         nat: us,gb,ca
     outputs:
       users: $.body.results

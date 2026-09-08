@@ -90,7 +90,7 @@ def sync_detailed(
 ) -> Response[Any | ErrorData]:
     """Delete project
 
-     Delete a project (soft-delete). Requires: project:delete permission scoped to this project.
+     Delete a project (hard-delete). Requires: project:delete permission scoped to this project.
 
     Args:
         project_id (UUID):
@@ -121,7 +121,7 @@ def sync(
 ) -> Any | ErrorData | None:
     """Delete project
 
-     Delete a project (soft-delete). Requires: project:delete permission scoped to this project.
+     Delete a project (hard-delete). Requires: project:delete permission scoped to this project.
 
     Args:
         project_id (UUID):
@@ -147,7 +147,7 @@ async def asyncio_detailed(
 ) -> Response[Any | ErrorData]:
     """Delete project
 
-     Delete a project (soft-delete). Requires: project:delete permission scoped to this project.
+     Delete a project (hard-delete). Requires: project:delete permission scoped to this project.
 
     Args:
         project_id (UUID):
@@ -176,7 +176,7 @@ async def asyncio(
 ) -> Any | ErrorData | None:
     """Delete project
 
-     Delete a project (soft-delete). Requires: project:delete permission scoped to this project.
+     Delete a project (hard-delete). Requires: project:delete permission scoped to this project.
 
     Args:
         project_id (UUID):

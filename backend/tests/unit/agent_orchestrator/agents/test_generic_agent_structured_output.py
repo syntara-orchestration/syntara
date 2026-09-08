@@ -103,6 +103,41 @@ class TestGenericAgentStructuredOutputNoTools:
         mock_llm.with_structured_output.assert_called_with(server_info_schema, method="json_mode", include_raw=True)
 
     @pytest.mark.asyncio
+    async def test_execute_structured_collapses_doubled_finish_reason(
+        self, mock_llm: MagicMock, sample_state: AgentState, server_info_schema: dict[str, Any]
+    ) -> None:
+        """Structured output path also collapses chunk-merged scalars (AAP-87759)."""
+        sample_state["response_schema"] = server_info_schema
+        parsed_output = {"hostname": "server-01", "ip": "192.168.1.10", "status": "active"}
+        raw_message = AIMessage(
+            content='{"hostname":"server-01"}',
+            response_metadata={"finish_reason": "stopstop", "model_name": "gpt-4gpt-4"},
+            usage_metadata={"input_tokens": 80, "output_tokens": 20, "total_tokens": 100},
+        )
+        mock_structured_llm = MagicMock()
+        mock_structured_llm.ainvoke = AsyncMock(
+            return_value={"raw": raw_message, "parsed": parsed_output, "parsing_error": None}
+        )
+        mock_llm.with_structured_output.return_value = mock_structured_llm
+        agent = GenericAgent(llm=mock_llm, available_tools=[])
+
+        with patch("syntara.agent_orchestrator.agents.generic_agent.record_llm_call") as mock_record:
+            mock_record.side_effect = _make_record_side_effect()
+            result_state = await agent.execute_as_node(sample_state)
+
+        result = result_state["result"]
+        assert result is not None
+        meta = result.get("response_metadata") or result.get("metadata")
+        assert meta is not None
+        assert meta["finish_reason"] == "stop"
+        assert meta["model_name"] == "gpt-4"
+        assert meta["token_usage"] == {
+            "prompt_tokens": 80,
+            "completion_tokens": 20,
+            "total_tokens": 100,
+        }
+
+    @pytest.mark.asyncio
     async def test_execute_structured_output_no_tools_fallback(
         self, mock_llm: MagicMock, sample_state: AgentState, server_info_schema: dict[str, Any]
     ) -> None:

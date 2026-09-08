@@ -9,6 +9,7 @@ from syntara.core.error_handlers import PROBLEM_TYPES
 from syntara.credentials.error_handlers import (
     credential_decryption_error_handler,
     credential_error_handler,
+    credential_in_use_error_handler,
     credential_name_conflict_handler,
     credential_not_found_handler,
     credential_validation_error_handler,
@@ -16,6 +17,7 @@ from syntara.credentials.error_handlers import (
 from syntara.credentials.exceptions import (
     CredentialDecryptionError,
     CredentialError,
+    CredentialInUseError,
     CredentialNameConflictError,
     CredentialNotFoundError,
     CredentialValidationError,
@@ -77,6 +79,20 @@ class TestCredentialDecryptionHandler:
         assert body["code"] == "CREDENTIAL_DECRYPTION_ERROR"
         assert "wrong key" not in body["detail"]
         assert body["detail"] == "An error occurred while processing credential data"
+
+
+class TestCredentialInUseHandler:
+    """Tests for 409 handler (block delete while integrations reference it)."""
+
+    def test_returns_409(self) -> None:
+        request = _mock_request()
+        exc = CredentialInUseError("my-cred", ["My Integration"], 1)
+        response = credential_in_use_error_handler(request, exc)
+        assert response.status_code == 409
+        body = json.loads(bytes(response.body))
+        assert body["code"] == "CREDENTIAL_IN_USE"
+        assert body["type"] == PROBLEM_TYPES["resource_conflict"]
+        assert "My Integration" in body["detail"]
 
 
 class TestCredentialErrorHandler:

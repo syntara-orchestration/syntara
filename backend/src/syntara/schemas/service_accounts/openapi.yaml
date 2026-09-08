@@ -1,7 +1,7 @@
 ---
 openapi: 3.1.0
 info:
-  title: Syntara Service Accounts API
+  title: Orchestrator Service Accounts API
   description: REST API for managing OAuth 2.0 service accounts for machine-to-machine authentication.
   version: 1.0.0
 servers:

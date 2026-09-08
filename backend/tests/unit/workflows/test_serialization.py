@@ -24,8 +24,6 @@ class TestDeserializeWorkflowVersion:
         version.created_by = overrides.get("created_by", uuid4())
         version.created_at = overrides.get("created_at", datetime.now(UTC))
         version.updated_at = overrides.get("updated_at", datetime.now(UTC))
-        version.deleted_at = overrides.get("deleted_at")
-        version.deleted_by = overrides.get("deleted_by")
         return version
 
     def test_draft_when_never_published(self) -> None:
@@ -119,8 +117,6 @@ class TestDeserializeWorkflowVersion:
         assert result["created_by"] == uid
         assert result["created_at"] == now
         assert result["updated_at"] == now
-        assert result["deleted_at"] is None
-        assert result["deleted_by"] is None
         assert result["status"] == "published"
 
     def test_no_published_at_in_result(self) -> None:
@@ -146,8 +142,6 @@ class TestDeserializePublishTimestamps:
         version.created_by = overrides.get("created_by", uuid4())
         version.created_at = overrides.get("created_at", datetime.now(UTC))
         version.updated_at = overrides.get("updated_at", datetime.now(UTC))
-        version.deleted_at = overrides.get("deleted_at")
-        version.deleted_by = overrides.get("deleted_by")
         return version
 
     def test_last_unpublished_at_when_unpublished_after_published(self) -> None:

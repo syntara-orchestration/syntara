@@ -29,7 +29,7 @@ nodes:
   - id: inner_check
     name: Inner Check
     type: script
-    condition: ${input.outer_value} > 0
+    condition: ${trigger.outer_value} > 0
     parameters:
       language: bash
       code: |
@@ -40,7 +40,7 @@ nodes:
   - id: final_action
     name: Final Action
     type: script
-    condition: ${input.inner_value} > 0
+    condition: ${trigger.inner_value} > 0
     parameters:
       language: bash
       code: |

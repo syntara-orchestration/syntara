@@ -10,7 +10,7 @@ on:
 
 permissions:
   actions: write
-  pull-requests: read
+  pull-requests: write
 
 jobs:
   dispatch:
@@ -27,10 +27,12 @@ jobs:
         uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553 # v9
         with:
           script: |
+            const prNumber = context.issue.number;
+
             const pr = await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              pull_number: context.issue.number,
+              pull_number: prNumber,
             });
             const baseRepo = `${context.repo.owner}/${context.repo.repo}`;
             if (pr.data.head.repo.full_name !== baseRepo) {
@@ -38,7 +40,7 @@ jobs:
               return;
             }
             core.setOutput('ref', pr.data.head.ref);
-            core.setOutput('pr_number', context.issue.number);
+            core.setOutput('pr_number', prNumber);
 
       - name: Dispatch E2E UI workflow
         if: steps.pr.outcome == 'success'
@@ -60,3 +62,37 @@ jobs:
                 pr_ref: prRef,
               },
             });
+
+      - name: Wait for workflow run to be created
+        run: sleep 5
+
+      - name: Find and post workflow run link
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+        run: |
+          # Find the dispatched run by correlating on head_branch + recent timestamp.
+          # GitHub's workflow run inputs field is not reliably populated by the API,
+          # so we correlate by the dispatch ref (head_branch) instead.
+          #
+          # If this ever links the wrong run, use a unique request ID passed as a
+          # workflow input and included in ci-frontend.yml's run-name, then match
+          # that ID here instead of relying on the branch/time window.
+          CUTOFF=$(date -u -v-30S '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -u -d '30 seconds ago' '+%Y-%m-%dT%H:%M:%SZ')
+
+          # shellcheck disable=SC2016
+          # ^ $cutoff is a jq variable from --arg, not a shell variable
+          RUN_ID=$(gh api "repos/$REPO/actions/workflows/ci-frontend.yml/runs?event=workflow_dispatch&per_page=10" \
+            | jq --arg cutoff "$CUTOFF" -r \
+            '[.workflow_runs[] | select(.created_at > $cutoff and .head_branch == "devel")] |
+             .[0].id // empty')
+
+          if [ -z "$RUN_ID" ]; then
+            echo "Warning: Could not find the dispatched workflow run (branch=devel)"
+            exit 0
+          fi
+
+          RUN_URL="https://github.com/$REPO/actions/runs/$RUN_ID"
+
+          gh pr comment "$PR_NUMBER" --repo "$REPO" --body "🚀 E2E UI tests triggered: [View workflow run]($RUN_URL)"

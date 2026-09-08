@@ -9,7 +9,7 @@
 }
 
 .stepForm {
-  max-width: 600px;
+  max-width: var(--syntara-form-max-width);
 }
 
 .stepContainer {

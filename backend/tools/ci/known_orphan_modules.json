@@ -22,7 +22,6 @@
     "syntara/*/background_worker.py": "Background queue worker entrypoint — invoked via python -m in podman-compose",
     "syntara/*/worker_lifecycle.py": "Shared worker lifecycle utilities — imported by worker entrypoints but not by the main application graph",
     "syntara/*/utils.py": "Intra-package utilities — imported via package (from syntara.X import utils), not direct module import",
-    "syntara/workflows/utils/template_resolution.py": "Functions imported directly by name (resolve_value) from consuming modules, not via module path",
     "syntara/files/validators.py": "Imported via package (from syntara.files import validators) in file_manager.py",
     "syntara/audit/models/audit_event_record.py": "Postgres audit event DB model — orphaned by AAP-78344 (export module removed); will be deleted with audit DB retirement in sibling tasks",
     "syntara/workflows/workflow_engine/activities/*_activity.py": "Temporal activities — discovered and registered at runtime by Temporal worker, not via direct imports",

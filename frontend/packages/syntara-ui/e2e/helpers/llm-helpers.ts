@@ -8,9 +8,7 @@
  * discovered models. Use `createLlmIntegration()` before `selectLlmCredential()`.
  */
 
-import { type Page } from '@playwright/test'
-
-import { expect } from '../fixtures'
+import { expect, type Page } from '../fixtures'
 import { apiRequest, ensureProject } from '../utils/api'
 
 /**

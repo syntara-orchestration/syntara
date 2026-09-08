@@ -108,7 +108,6 @@ class TestWorkflowServiceBase:
         is_builtin: bool = False,
         created_at: datetime | None = None,
         updated_at: datetime | None = None,
-        deleted_at: datetime | None = None,
     ) -> Workflow:
         """Create a test Workflow object."""
         now = datetime.now(UTC)
@@ -125,7 +124,6 @@ class TestWorkflowServiceBase:
             published_version_id=None,  # Set after version is created when is_enabled
             created_at=created_at or now,
             updated_at=updated_at or now,
-            deleted_at=deleted_at,
         )
 
     def _create_test_workflow_version(
@@ -138,7 +136,6 @@ class TestWorkflowServiceBase:
         created_by: UUID | None = None,
         change_description: str = "Initial version",
         created_at: datetime | None = None,
-        deleted_at: datetime | None = None,
     ) -> WorkflowVersion:
         """Create a test WorkflowVersion object."""
         return WorkflowVersion(
@@ -150,7 +147,6 @@ class TestWorkflowServiceBase:
             created_by=created_by or uuid4(),
             change_description=change_description,
             created_at=created_at or datetime.now(UTC),
-            deleted_at=deleted_at,
         )
 
     def _create_minimal_workflow_definition(self) -> dict[str, Any]:
@@ -826,10 +822,9 @@ class TestWorkflowServiceDeleteWorkflow(TestWorkflowServiceBase):
 
         await service.delete_workflow(workflow.id)
 
-        # Verify workflow is soft deleted
-        await test_db_session.refresh(workflow)
-        assert workflow.deleted_at is not None
-        assert workflow.deleted_by == test_user.id
+        # Verify workflow is hard deleted
+        result = await test_db_session.get(Workflow, workflow.id)
+        assert result is None
 
     @pytest.mark.asyncio
     async def test_delete_workflow_not_found(self, test_db_session: AsyncSession, test_user: User) -> None:
@@ -2386,8 +2381,7 @@ class TestBuiltinWorkflowGuards(TestWorkflowServiceBase):
         await service.delete_workflow(workflow.id)
 
         result = await test_db_session.get(Workflow, workflow.id)
-        assert result is not None
-        assert result.deleted_at is not None
+        assert result is None
 
     @pytest.mark.asyncio
     async def test_update_builtin_workflow_raises(

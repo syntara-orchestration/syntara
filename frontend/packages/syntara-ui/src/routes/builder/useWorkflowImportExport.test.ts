@@ -173,7 +173,7 @@ describe('useWorkflowImportExport', () => {
       act(() => result.current.handleExport())
 
       expect(mockShowError).toHaveBeenCalledWith({
-        title: 'Export failed',
+        title: 'Failed to export workflow',
         description: 'Build failed',
       })
       expect(mockDispatch).toHaveBeenCalledWith({ type: 'SET_KEBAB_OPEN', payload: false })
@@ -260,7 +260,7 @@ describe('useWorkflowImportExport', () => {
 
       await waitFor(() => {
         expect(mockShowError).toHaveBeenCalledWith({
-          title: 'Import failed',
+          title: 'Failed to import workflow',
           description: 'File is too large',
         })
       })

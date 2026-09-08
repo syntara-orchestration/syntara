@@ -274,8 +274,6 @@ export function ToolsMultiSelect({
       onSelect={handleSelect}
       onOpenChange={handleOpenChange}
       toggle={renderToggle}
-      isScrollable
-      maxMenuHeight="400px"
       shouldFocusToggleOnSelect={false}
       aria-label="Tools"
       popperProps={{ position: 'start' }}

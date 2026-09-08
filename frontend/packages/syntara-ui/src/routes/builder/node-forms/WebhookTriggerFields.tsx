@@ -1,4 +1,13 @@
-import { Alert, Content, ContentVariants, FormGroup, StackItem } from '@patternfly/react-core'
+import {
+  Alert,
+  Content,
+  ContentVariants,
+  FormGroup,
+  FormHelperText,
+  HelperText,
+  HelperTextItem,
+  StackItem,
+} from '@patternfly/react-core'
 import { Controller, useFormContext } from 'react-hook-form'
 
 import { FieldHelpPopover } from '../../../components/FieldHelpPopover'
@@ -17,7 +26,11 @@ import { WebhookUrlPreview } from './WebhookUrlPreview'
 export function WebhookFields({
   errors,
 }: Readonly<{
-  errors: Readonly<{ webhookPath?: { message?: string }; inputSchema?: { message?: string } }>
+  errors: Readonly<{
+    webhookPath?: { message?: string }
+    inputSchema?: { message?: string }
+    authorizedServiceAccountIds?: { message?: string }
+  }>
 }>) {
   const fullWebhookUrl = useWebhookUrl(WEBHOOK_BASE_URL)
   const { control } = useFormContext<TriggerFormData>()
@@ -77,6 +90,13 @@ export function WebhookFields({
               />
             )}
           />
+          {errors.authorizedServiceAccountIds?.message && (
+            <FormHelperText>
+              <HelperText>
+                <HelperTextItem variant="error">{errors.authorizedServiceAccountIds.message}</HelperTextItem>
+              </HelperText>
+            </FormHelperText>
+          )}
         </FormGroup>
       </StackItem>
 

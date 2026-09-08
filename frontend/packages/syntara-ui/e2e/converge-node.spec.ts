@@ -30,8 +30,10 @@ test.describe('Converge Node - E2E Tests', () => {
           await layoutButton.click()
         }
 
-        const addBtn = app.locator('.react-flow').getByRole('button', { name: 'Add connected step' }).nth(0)
-        await expect(addBtn).toBeVisible({ timeout: 10_000 })
+        const addBtns = app.locator('.react-flow').getByRole('button', { name: 'Add connected step' })
+        await expect(addBtns).not.toHaveCount(0, { timeout: 10_000 })
+        const [addBtn] = await addBtns.all()
+        await expect(addBtn).toBeVisible()
         await addBtn.click({ force: true })
 
         const panel = addNodePanel(app)

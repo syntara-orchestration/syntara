@@ -80,9 +80,9 @@ In the monorepo, backend spec changes and frontend contract updates land in **on
 
 | Check | When | Severity |
 |-------|------|----------|
-| Pre-commit `backend-check-openapi-breaking` | `openapi.yaml` changed | **Blocking** — requires `breaking-change-ack:` in the PR description when oasdiff detects breaking changes |
+| Pre-commit `backend-check-openapi-breaking` | `openapi.yaml` changed | **Blocking** — breaking changes on the current major version are always blocked; see override paths below |
 | `check-contract-regeneration.py` | PR touches `backend/src/syntara/schemas/openapi.yaml` (via `ci-backend.yml`) | **Informational** — posts a PR comment if contracts were not regenerated; does not fail the job |
-| `openapi-breaking-changes` CI job | Same trigger | **Informational** — posts breaking-change analysis; the step uses `continue-on-error` |
+| `openapi-breaking-changes` CI job | Same trigger | **Blocking** — fails on unresolved breaking changes; posts breaking-change analysis as a PR comment |
 
 The contract regeneration job runs only when the PR changes `backend/**` (see `ci-backend.yml` path filters).
 
@@ -102,17 +102,11 @@ Use when a spec change has no impact on generated types — for example, updatin
 
 **Severity:** Informational (does not block merge). CI still posts a notice acknowledging the exception.
 
-### Acknowledging breaking changes
+### Breaking changes and versioning
 
-```
-breaking-change-ack: <justification>
-```
+Breaking changes and the `info.version` increment gate are governed by [OpenAPI Spec Management](openapi-spec-management.md#breaking-change-policy) — that is the single source of truth for the gate codes, the version-increment rules, and the `breaking-change-approved` override. In short: breaking changes are blocked in place, and every meaningful spec change must increment `info.version` by the correct segment.
 
-Required when oasdiff detects breaking changes (removed endpoints, changed types, removed fields). Minimum 20 characters explaining why the change is necessary, the migration path, and how the frontend was updated.
-
-**Severity:** Blocking via the pre-commit hook `backend-check-openapi-breaking` (enforced in CI). CI reads the PR description through `OPENAPI_PR_BODY`.
-
-Both markers are case-insensitive and checked by scripts in `backend/scripts/openapi/`.
+**Severity:** Blocking via the pre-commit hook `backend-check-openapi-breaking` and the `openapi-breaking-changes` CI job.
 
 ## WebSocket Scope
 
@@ -145,7 +139,8 @@ The scheduled workflow auto-closes drift issues when the drift is resolved.
 |------|-------------|-----------|
 | Use typed API clients only | ESLint `syntara/no-raw-http-calls` | `eslint-disable-next-line` with justification |
 | Regenerate contracts when spec changes | CI warning + weekly drift check | `no-contract-regen: <justification>` in PR description |
-| Acknowledge breaking API changes | Pre-commit `backend-check-openapi-breaking` | `breaking-change-ack: <justification>` in PR description |
+| Breaking changes blocked in place | Pre-commit + `openapi-breaking-changes` CI job | `breaking-change-approved` label (privileged), or route to a new major version at a new path |
+| Every spec change updates `info.version` | Pre-commit + `openapi-breaking-changes` CI job | N/A — a version update is always required |
 | WebSocket is read-only streaming | Convention (see [WebSocket Standards](websocket.md)) | N/A — REST is the complete CRUD interface |
 | Backend + frontend changes in one PR | CI warning if contracts stale | `no-contract-regen: <justification>` for spec-only changes |
 
