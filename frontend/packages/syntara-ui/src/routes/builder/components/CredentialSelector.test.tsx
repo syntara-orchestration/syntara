@@ -7,8 +7,10 @@ import { axe } from 'vitest-axe'
 
 import { credentialsClient } from '../../../client'
 import { FieldHelpPopover } from '../../../components/FieldHelpPopover'
+import type { Credential } from '../../configuration/credentials/credentialConstants'
 
 import { CredentialSelector, type CredentialSelectorProps } from './CredentialSelector'
+import { useAllCredentials } from './useAllCredentials'
 
 vi.mock('../../../client', () => ({
   credentialsClient: {
@@ -17,6 +19,13 @@ vi.mock('../../../client', () => ({
   },
   authMiddleware: { onRequest: vi.fn() },
   interfaceTagMiddleware: { onRequest: vi.fn() },
+}))
+
+// `useAllCredentials` owns the paginated fetch (see useAllCredentials.test.tsx for its own
+// async/pagination coverage). Mocking it here keeps CredentialSelector's tests synchronous,
+// exactly like they were before it fetched all pages instead of a single page.
+vi.mock('./useAllCredentials', () => ({
+  useAllCredentials: vi.fn(),
 }))
 
 vi.mock('../../configuration/credentials/form/CredentialFormModal', () => ({
@@ -122,21 +131,29 @@ const mockCredentialTypes = [
   },
 ]
 
+type CredentialsListOverride = {
+  data?: { resources?: Record<string, unknown>[] }
+  isPending?: boolean
+}
+
 function mockUseQuery(
   overrides: {
-    credentials?: Record<string, unknown>
+    credentials?: CredentialsListOverride
     credentialTypes?: Record<string, unknown>
     singleCredential?: Record<string, unknown> | null
   } = {}
 ) {
-  const credentialsResponse = {
-    data: { resources: mockCredentials },
-    isPending: false,
+  // `data` is intentionally checked with `in` (not `??`) so that passing `data: undefined`
+  // (the loading-state shape used throughout this file) is distinguishable from omitting it.
+  const credentialsOverride = overrides.credentials ?? {}
+  const listData = 'data' in credentialsOverride ? credentialsOverride.data : { resources: mockCredentials }
+  vi.mocked(useAllCredentials).mockReturnValue({
+    credentials: (listData?.resources ?? []) as Credential[],
+    isLoading: credentialsOverride.isPending ?? false,
     error: null,
-    isFetching: false,
-    refetch: vi.fn(),
-    ...overrides.credentials,
-  }
+    refetch: vi.fn() as unknown as ReturnType<typeof useAllCredentials>['refetch'],
+  })
+
   const typesResponse = {
     data: { resources: mockCredentialTypes },
     isPending: false,
@@ -152,18 +169,15 @@ function mockUseQuery(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   vi.mocked(credentialsClient.useQuery).mockImplementation((_method: string, path: string): any => {
-    if (path === '/credential_types') {
-      return typesResponse
-    }
     if (path === '/credentials/{credential_id}') {
       return singleCredResponse
     }
-    return credentialsResponse
+    return typesResponse
   })
 }
 
 /** Legacy mock helper for tests that don't need grouped display */
-function mockUseQueryLegacy(overrides: Record<string, unknown> = {}) {
+function mockUseQueryLegacy(overrides: CredentialsListOverride = {}) {
   mockUseQuery({
     credentials: overrides,
     credentialTypes: { data: { resources: [] } },
@@ -259,7 +273,7 @@ describe('CredentialSelector', () => {
   })
 
   it('shows loading state', () => {
-    mockUseQueryLegacy({ data: undefined, isPending: true, isFetching: true })
+    mockUseQueryLegacy({ data: undefined, isPending: true })
     renderSelector()
 
     expect(screen.getByLabelText('Loading credentials')).toBeInTheDocument()
@@ -267,7 +281,7 @@ describe('CredentialSelector', () => {
   })
 
   it('disables toggle while loading', () => {
-    mockUseQueryLegacy({ data: undefined, isPending: true, isFetching: true })
+    mockUseQueryLegacy({ data: undefined, isPending: true })
     renderSelector()
 
     expect(screen.getByRole('button', { name: 'Credential' })).toBeDisabled()
@@ -290,13 +304,11 @@ describe('CredentialSelector', () => {
     expect(screen.getByRole('button', { name: 'Credential' })).toBeDisabled()
   })
 
-  it('always fetches all credentials without type filter in query params', () => {
+  it('always fetches all credentials without type filter (filtering happens client-side)', () => {
     mockUseQuery()
     renderSelector({ compatibleTypeNames: ['HTTP Bearer Token'] })
 
-    expect(credentialsClient.useQuery).toHaveBeenCalledWith('get', '/credentials', {
-      params: { query: { sort: 'name', for_action: 'use' } },
-    })
+    expect(useAllCredentials).toHaveBeenCalledWith({ projectId: undefined })
   })
 
   it('filters credentials client-side by compatible type names', async () => {
@@ -357,7 +369,7 @@ describe('CredentialSelector', () => {
   })
 
   it('has no accessibility violations in loading state', async () => {
-    mockUseQueryLegacy({ data: undefined, isPending: true, isFetching: true })
+    mockUseQueryLegacy({ data: undefined, isPending: true })
     const { container } = renderSelector()
 
     const results = await axe(container)
@@ -365,22 +377,18 @@ describe('CredentialSelector', () => {
   })
 
   describe('projectId filtering', () => {
-    it('includes project_id in the query when projectId prop is provided', () => {
+    it('passes projectId through to useAllCredentials when provided', () => {
       mockUseQuery()
       renderSelector({ projectId: 'proj-123' })
 
-      expect(credentialsClient.useQuery).toHaveBeenCalledWith('get', '/credentials', {
-        params: { query: { sort: 'name', project_id: 'proj-123', for_action: 'use' } },
-      })
+      expect(useAllCredentials).toHaveBeenCalledWith({ projectId: 'proj-123' })
     })
 
-    it('does not include project_id filter when projectId is undefined', () => {
+    it('passes projectId as undefined to useAllCredentials when not provided', () => {
       mockUseQuery()
       renderSelector()
 
-      expect(credentialsClient.useQuery).toHaveBeenCalledWith('get', '/credentials', {
-        params: { query: { sort: 'name', for_action: 'use' } },
-      })
+      expect(useAllCredentials).toHaveBeenCalledWith({ projectId: undefined })
     })
 
     it('has no accessibility violations when projectId is provided', async () => {

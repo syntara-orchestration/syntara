@@ -11,6 +11,13 @@ export function hasExpressionValue(...values: (string | undefined)[]): boolean {
   return values.some((v) => v?.includes('${'))
 }
 
+/** True when the job template form is in input-variables (expression) mode. */
+export function isJobTemplateInputVariablesMode(
+  data: Pick<AAPJobTemplateFormData, 'use_input_variables' | 'organization_name' | 'job_template_name'>
+): boolean {
+  return Boolean(data.use_input_variables) || hasExpressionValue(data.organization_name, data.job_template_name)
+}
+
 /**
  * Build an AAP activity in expression mode (template name/org provided as expressions
  * that resolve at runtime rather than a concrete job_template_id).
@@ -22,7 +29,7 @@ export function buildExpressionModeActivity(
 ): ReturnType<typeof createAAPJobTemplateActivity> {
   // job_template_id is set to 0 as a placeholder — expression-mode nodes resolve
   // the template by name at runtime, so the ID is removed from config below.
-  const config = buildAAPConfig(data)
+  const config = { ...buildAAPConfig(data), useInputVariables: true }
   const activity = createAAPJobTemplateActivity(nodeId, name, 0, config)
   if (activity.parameters) {
     activity.parameters.job_template_name = data.job_template_name
@@ -158,6 +165,10 @@ function setDiffModeField(config: AAPJobTemplateConfig, data: AAPJobTemplateForm
   if (data.diff_mode !== undefined) config.diffMode = data.diff_mode
 }
 
+function setUseInputVariablesField(config: AAPJobTemplateConfig, data: AAPJobTemplateFormData): void {
+  if (data.use_input_variables) config.useInputVariables = true
+}
+
 function setInstanceGroupFields(config: AAPJobTemplateConfig, data: AAPJobTemplateFormData): void {
   // Instance group ID (takes precedence over name)
   if (data.instance_group_id !== undefined && data.instance_group_id !== null) {
@@ -185,6 +196,7 @@ export function buildAAPConfig(data: AAPJobTemplateFormData): AAPJobTemplateConf
   setLabelsField(config, data)
   setDiffModeField(config, data)
   setInstanceGroupFields(config, data)
+  setUseInputVariablesField(config, data)
   collectStringFields(config, data)
   collectNumberFields(config, data)
 
