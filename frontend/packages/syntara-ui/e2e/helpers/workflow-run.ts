@@ -17,7 +17,7 @@ export async function runWorkflowFromBuilder(page: Page): Promise<void> {
 
   const gotConflict = await page
     .getByText('newer version available')
-    .waitFor({ state: 'visible', timeout: 3_000 })
+    .waitFor({ state: 'visible', timeout: 10_000 })
     .then(() => true)
     .catch(() => false)
 

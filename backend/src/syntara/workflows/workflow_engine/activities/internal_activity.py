@@ -69,8 +69,13 @@ async def _run_invocation_execution(operation_input: InvocationExecutionInput) -
             actor_type=PrincipalType(actor_type) if actor_type else None,
         )
 
+    from syntara.agent_orchestrator.exceptions import InvocationCancelledError  # noqa: PLC0415
+
     executor = InvocationExecutor()
-    await executor.execute_invocation(UUID(invocation_id), actor_context=actor_context)
+    try:
+        await executor.execute_invocation(UUID(invocation_id), actor_context=actor_context)
+    except InvocationCancelledError as exc:
+        raise ApplicationError(str(exc), type="InvocationCancelledError", non_retryable=True) from exc
     return {"output": {"status": "completed"}}
 
 

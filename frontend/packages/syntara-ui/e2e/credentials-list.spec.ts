@@ -12,7 +12,7 @@
  * - Kebab menu edit action
  * - Kebab menu delete action
  */
-import { createUnavailableGuard, test, expect } from './fixtures'
+import { test, expect } from './fixtures'
 import { APP_TITLE } from './helpers/appTitle'
 import {
   createTestCredential,
@@ -30,12 +30,10 @@ const seededCredentials: SeededCredential[] = []
 test.beforeAll(async ({ browser }) => {
   const page = await browser.newPage()
   const token = await getAuthToken(page)
-  if (token) {
-    const prefix = buildUniqueName('e2e-credlist')
-    for (let i = 1; i <= 3; i++) {
-      const cred = await createCredentialSeed(page, { name: `${prefix}-cred-${i}`, token })
-      if (cred) seededCredentials.push(cred)
-    }
+  if (!token) throw new Error('credentials-list beforeAll: could not obtain auth token')
+  const prefix = buildUniqueName('e2e-credlist')
+  for (let i = 1; i <= 3; i++) {
+    seededCredentials.push(await createCredentialSeed(page, { name: `${prefix}-cred-${i}`, token }))
   }
   await page.close()
 })
@@ -113,7 +111,7 @@ test.describe('Table Display and Sorting', () => {
         .waitFor({ state: 'visible', timeout: 5000 })
         .then(() => true)
         .catch(() => false)
-      test.skip(!hasTable, 'No credential data available; seed data required')
+      expect(hasTable, 'No credential data available; seed data required').toBeTruthy()
 
       await expect(table.getByRole('columnheader', { name: 'Name' })).toBeVisible()
       await expect(table.getByRole('columnheader', { name: 'Type' })).toBeVisible()
@@ -144,8 +142,6 @@ test.describe('Table Display and Sorting', () => {
 // Test 4: Cursor-Based Pagination
 // ---------------------------------------------------------------------------
 test.describe('Cursor-Based Pagination', () => {
-  const guard = createUnavailableGuard('No credential data available; seed data required')
-
   test.beforeEach(async ({ app }) => {
     await goToCredentialsList(app)
     const table = app.getByRole('grid', { name: 'Credentials table' })
@@ -153,8 +149,7 @@ test.describe('Cursor-Based Pagination', () => {
       .waitFor({ state: 'visible', timeout: 5000 })
       .then(() => true)
       .catch(() => false)
-    if (!hasTable) guard.markUnavailable()
-    test.skip(!hasTable, 'No credential data available; seed data required')
+    expect(hasTable, 'No credential data available; seed data required').toBeTruthy()
   })
 
   test('pagination footer displays credential count', async ({ app }) => {

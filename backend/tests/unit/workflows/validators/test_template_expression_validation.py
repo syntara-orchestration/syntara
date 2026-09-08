@@ -60,7 +60,7 @@ def _loop_definition(
     loop = {
         "id": loop_id,
         "type": "loop",
-        "parameters": loop_params or {"type": "for_each", "items": "${input.items}"},
+        "parameters": loop_params or {"type": "for_each", "items": "${trigger.items}"},
     }
     converge = {"id": "converge_node", "type": "converge", "parameters": {}}
     nodes = [loop, *body_nodes, converge]
@@ -182,6 +182,39 @@ class TestInvalidNamespaceScope:
         assert len(errors) == 1
         assert "iteration_index" in errors[0].message
 
+    @pytest.mark.parametrize(
+        ("expression", "scope"),
+        [
+            ("${variables.count}", "variables"),
+            ("${input.env}", "input"),
+            ("${inputs.env}", "inputs"),
+        ],
+    )
+    def test_unknown_names_are_rejected_like_missing_nodes(self, expression: str, scope: str) -> None:
+        defn = _base_definition(
+            nodes=[_script_node("n1", environment={"X": expression})],
+            edges=[{"from": "t1", "to": "n1"}],
+        )
+        node_ids = {"t1", "n1"}
+        errors = check_template_expressions(defn, node_ids)
+        assert len(errors) == 1
+        assert errors[0].category == ValidationCategory.invalid_reference
+        assert scope in errors[0].message
+        assert "unknown activity or scope" in errors[0].message
+        assert "leftover V1" not in errors[0].message
+
+    @pytest.mark.parametrize("node_id", ["input", "inputs", "variables"])
+    def test_node_named_reserved_word_is_a_valid_reference(self, node_id: str) -> None:
+        defn = _base_definition(
+            nodes=[
+                _script_node(node_id),
+                _script_node("n1", environment={"X": f"${{{node_id}.stdout}}"}),
+            ],
+            edges=[{"from": "t1", "to": node_id}, {"from": node_id, "to": "n1"}],
+        )
+        errors = check_template_expressions(defn, {"t1", node_id, "n1"})
+        assert errors == []
+
 
 # ---------------------------------------------------------------------------
 # AC3: All valid expressions produce no findings
@@ -192,9 +225,6 @@ class TestAllValidExpressions:
     @pytest.mark.parametrize(
         "expression",
         [
-            "${input.name}",
-            "${inputs.name}",
-            "${variables.count}",
             "${trigger.data}",
             "${workflow_context.execution.id}",
             "${workflow_context.now}",
@@ -367,7 +397,7 @@ class TestLoopVariables:
         inner_body = _script_node("inner_body", environment={"X": "${loop.item}"})
         defn = _base_definition(
             nodes=[
-                {"id": "outer_loop", "type": "loop", "parameters": {"type": "for_each", "items": "${input.items}"}},
+                {"id": "outer_loop", "type": "loop", "parameters": {"type": "for_each", "items": "${trigger.items}"}},
                 inner_loop,
                 inner_body,
                 {"id": "converge_node", "type": "converge", "parameters": {}},
@@ -471,8 +501,8 @@ class TestExtractExpressions:
     """_extract_expressions finds expressions in nested structures."""
 
     def test_string_with_expression(self) -> None:
-        result = _extract_expressions("${input.name}", "field")
-        assert result == [("input.name", "field")]
+        result = _extract_expressions("${step_1.name}", "field")
+        assert result == [("step_1.name", "field")]
 
     def test_string_with_multiple_expressions(self) -> None:
         result = _extract_expressions("${a.x} and ${b.y}", "field")
@@ -516,10 +546,10 @@ class TestExtractElementExpressions:
         assert codes == []
 
     def test_includes_environment_for_script(self) -> None:
-        node = _script_node("n1", environment={"K": "${input.val}"})
+        node = _script_node("n1", environment={"K": "${step_1.val}"})
         result = _extract_element_expressions(node)
         assert len(result) == 1
-        assert result[0][0] == "input.val"
+        assert result[0][0] == "step_1.val"
 
     def test_node_without_type_uses_empty_skip(self) -> None:
         node: dict[str, Any] = {"id": "n1", "parameters": {"url": "${ghost.val}"}}
@@ -562,7 +592,7 @@ class TestTriggerExpressions:
                 {
                     "id": "t1",
                     "type": "webhook",
-                    "parameters": {"value": "${input.data}"},
+                    "parameters": {"value": "${trigger.data}"},
                 },
             ],
             nodes=[_script_node("n1")],

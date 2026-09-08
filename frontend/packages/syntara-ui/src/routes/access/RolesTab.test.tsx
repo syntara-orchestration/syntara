@@ -6,6 +6,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { useQueryState } from '../../components/states/useQueryState'
+import { invalidateAuthzCaches } from '../../hooks/invalidateAuthzCaches'
 import { AlertProvider } from '../../providers/alerts'
 import { routerTestState } from '../../test/setup'
 
@@ -39,15 +40,27 @@ vi.mock('../../components/states/useQueryState', () => ({
   useQueryState: vi.fn(),
 }))
 
-vi.mock('./useRolePermissions', () => ({
-  useRolePermissions: () => ({
-    canCreate: true,
-    canUpdate: true,
-    canDelete: true,
-    isLoading: false,
-    tooltips: { create: '', update: '', delete: '' },
-  }),
+vi.mock('../../hooks/invalidateAuthzCaches', () => ({
+  invalidateAuthzCaches: vi.fn(),
 }))
+
+vi.mock('./useRolePermissions', () => ({
+  useRolePermissions: () => mockUseRolePermissions(),
+}))
+
+const defaultRolePermissions = {
+  canCreate: true,
+  canUpdate: true,
+  canDelete: true,
+  isLoading: false,
+  tooltips: {
+    create: 'You need permission to create roles.',
+    update: 'You need permission to update roles.',
+    delete: 'You need permission to delete roles.',
+  },
+}
+
+const mockUseRolePermissions = vi.hoisted(() => vi.fn(() => defaultRolePermissions))
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
@@ -109,6 +122,8 @@ describe('RolesTab', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+
+    mockUseRolePermissions.mockImplementation(() => defaultRolePermissions)
 
     // Default: useQueryState returns null (success state)
     vi.mocked(useQueryState).mockReturnValue(null)
@@ -246,8 +261,9 @@ describe('RolesTab', () => {
 
       render(<RolesTab />, { wrapper: createWrapper() })
 
-      expect(screen.getByText('No roles found')).toBeInTheDocument()
+      expect(screen.getByText('No roles yet')).toBeInTheDocument()
       expect(screen.getByText('No roles are available.')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Create role' })).not.toBeInTheDocument()
     })
   })
 
@@ -305,6 +321,35 @@ describe('RolesTab', () => {
 
       expect(screen.getByTestId('error-state')).toBeInTheDocument()
     })
+
+    it('calls refetch when Retry is clicked on a retryable query error', async () => {
+      vi.mocked(accessClient.useQuery).mockImplementation((_method: string, path: string) => {
+        if (path === '/projects') {
+          return {
+            data: [],
+            isPending: false,
+            isError: false,
+            error: null,
+            isFetching: false,
+            refetch: mockRefetch,
+          } as never
+        }
+        return {
+          data: undefined,
+          isPending: false,
+          isError: true,
+          error: { message: 'Failed to load roles', retryable: true },
+          isFetching: false,
+          refetch: mockRefetch,
+        } as never
+      })
+
+      const user = userEvent.setup()
+      render(<RolesTab />, { wrapper: createWrapper() })
+
+      await user.click(screen.getByRole('button', { name: 'Retry' }))
+      expect(mockRefetch).toHaveBeenCalledOnce()
+    })
   })
 
   describe('Row actions', () => {
@@ -329,6 +374,44 @@ describe('RolesTab', () => {
       await waitFor(() => {
         expect(screen.getByText('Edit custom-editor')).toBeInTheDocument()
       })
+    })
+
+    it('disables Edit role when user lacks update permission', async () => {
+      mockUseRolePermissions.mockReturnValue({
+        ...defaultRolePermissions,
+        canUpdate: false,
+        tooltips: {
+          ...defaultRolePermissions.tooltips,
+          update: 'You need permission to update roles.',
+        },
+      })
+
+      const user = userEvent.setup()
+      render(<RolesTab />, { wrapper: createWrapper() })
+
+      const kebabs = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      await user.click(kebabs[0])
+
+      expect(await screen.findByRole('menuitem', { name: /edit role/i })).toHaveAttribute('aria-disabled', 'true')
+    })
+
+    it('disables Delete role when user lacks delete permission', async () => {
+      mockUseRolePermissions.mockReturnValue({
+        ...defaultRolePermissions,
+        canDelete: false,
+        tooltips: {
+          ...defaultRolePermissions.tooltips,
+          delete: 'You need permission to delete roles.',
+        },
+      })
+
+      const user = userEvent.setup()
+      render(<RolesTab />, { wrapper: createWrapper() })
+
+      const kebabs = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      await user.click(kebabs[0])
+
+      expect(await screen.findByRole('menuitem', { name: /delete role/i })).toHaveAttribute('aria-disabled', 'true')
     })
 
     it('opens delete confirmation when delete action is clicked', async () => {
@@ -398,6 +481,7 @@ describe('RolesTab', () => {
         callbacks.onSettled()
       })
 
+      expect(invalidateAuthzCaches).toHaveBeenCalledWith(queryClient)
       expect(mockRefetch).toHaveBeenCalled()
       await waitFor(() => {
         expect(screen.queryByText('Delete role?')).not.toBeInTheDocument()
@@ -449,6 +533,21 @@ describe('RolesTab', () => {
   })
 
   describe('Sorting', () => {
+    async function expectSortAfterColumnClick(columnPattern: RegExp, expectedSort: string) {
+      const user = userEvent.setup()
+      render(<RolesTab />, { wrapper: createWrapper() })
+
+      const header = screen.getByRole('columnheader', { name: columnPattern })
+      await user.click(within(header).getByRole('button'))
+
+      await waitFor(() => {
+        const lastCall = vi.mocked(accessClient.useQuery).mock.calls.at(-1)
+        const queryParams = (lastCall?.[2] as unknown as { params?: { query?: Record<string, unknown> } })?.params
+          ?.query
+        expect(queryParams).toHaveProperty('sort', expectedSort)
+      })
+    }
+
     it('renders sortable Name column', () => {
       render(<RolesTab />, { wrapper: createWrapper() })
 
@@ -512,6 +611,14 @@ describe('RolesTab', () => {
           ?.query
         expect(queryParams).toHaveProperty('sort', '-name')
       })
+    })
+
+    it.each([
+      { column: /Scope/i, sort: 'scope' },
+      { column: /Project/i, sort: 'project_id' },
+      { column: /Type/i, sort: 'is_builtin' },
+    ])('sends $sort sort when column header is clicked', async ({ column, sort }) => {
+      await expectSortAfterColumnClick(column, sort)
     })
   })
 
@@ -577,6 +684,13 @@ describe('RolesTab', () => {
   })
 
   describe('Expandable rows', () => {
+    it('renders a dash when a role has no description', () => {
+      render(<RolesTab />, { wrapper: createWrapper() })
+
+      const viewerRow = screen.getByRole('row', { name: /viewer/i })
+      expect(within(viewerRow).getAllByText('-').length).toBeGreaterThan(0)
+    })
+
     it('policies are hidden by default and shown when row is expanded', async () => {
       const user = userEvent.setup()
       render(<RolesTab />, { wrapper: createWrapper() })
@@ -600,10 +714,22 @@ describe('RolesTab', () => {
       expect(screen.getByText('admin-policy')).toBeVisible()
       expect(screen.getByText('workflow-edit')).toBeVisible()
 
-      await user.click(screen.getByRole('button', { name: /expand all/i }))
+      await user.click(screen.getByRole('button', { name: /expand all|collapse all/i }))
 
       expect(screen.queryByText('admin-policy')).not.toBeVisible()
       expect(screen.queryByText('workflow-edit')).not.toBeVisible()
+    })
+
+    it('collapses an expanded row when the details button is clicked again', async () => {
+      const user = userEvent.setup()
+      render(<RolesTab />, { wrapper: createWrapper() })
+
+      const expandButtons = screen.getAllByRole('button', { name: /details/i })
+      await user.click(expandButtons[0])
+      expect(screen.getByText('admin-policy')).toBeVisible()
+
+      await user.click(expandButtons[0])
+      expect(screen.queryByText('admin-policy')).not.toBeVisible()
     })
 
     it('toggling a single row does not affect other rows', async () => {
@@ -662,7 +788,54 @@ describe('RolesTab', () => {
     })
   })
 
+  describe('Create role permission gating', () => {
+    it('disables Create role when user lacks create permission', () => {
+      mockUseRolePermissions.mockReturnValue({
+        canCreate: false,
+        canUpdate: true,
+        canDelete: true,
+        isLoading: false,
+        tooltips: {
+          create: 'You need permission to create roles.',
+          update: 'You need permission to update roles.',
+          delete: 'You need permission to delete roles.',
+        },
+      })
+
+      render(<RolesTab />, { wrapper: createWrapper() })
+
+      expect(screen.getByRole('button', { name: 'Create role' })).toHaveAttribute('aria-disabled', 'true')
+    })
+  })
+
   describe('Filter empty state', () => {
+    it('shows filter toolbar with Create role when filters are active but no results', async () => {
+      vi.mocked(accessClient.useQuery).mockImplementation((...args: unknown[]) => {
+        const opts = args[2] as { params?: { query?: Record<string, unknown> } } | undefined
+        const hasNameFilter = opts?.params?.query?.['name[contains]']
+        return {
+          data: { resources: hasNameFilter ? [] : mockRoles, next: null, total: hasNameFilter ? 0 : 3 },
+          isPending: false,
+          isError: false,
+          error: null,
+          isFetching: false,
+          refetch: mockRefetch,
+        } as never
+      })
+
+      const user = userEvent.setup()
+      render(<RolesTab />, { wrapper: createWrapper() })
+
+      const textInput = screen.getByRole('textbox', { name: /name filter/i })
+      await user.type(textInput, 'nonexistent')
+      await user.keyboard('{Enter}')
+
+      await waitFor(() => {
+        expect(screen.getByText('No results found')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Create role' })).toBeInTheDocument()
+      })
+    })
+
     it('shows filter empty state when filters are active but no results', async () => {
       // Mock implementation: return data on initial load, empty after filter
       vi.mocked(accessClient.useQuery).mockImplementation((...args: unknown[]) => {

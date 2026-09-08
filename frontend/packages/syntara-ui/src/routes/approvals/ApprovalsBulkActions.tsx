@@ -54,7 +54,12 @@ export function ApprovalsBulkActions({
   )
 
   return (
-    <Flex gap={{ default: 'gapMd' }} alignItems={{ default: 'alignItemsCenter' }}>
+    <Flex
+      role="toolbar"
+      aria-label={hasSelection ? `${selectedCount} selected` : 'Approval actions'}
+      gap={{ default: 'gapMd' }}
+      alignItems={{ default: 'alignItemsCenter' }}
+    >
       {hasSelection && (
         <FlexItem>
           <Content component={ContentVariants.p}>{selectedCount} selected</Content>

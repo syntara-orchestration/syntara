@@ -19,7 +19,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 
 import { approvalsClient } from '../../client'
-import { NxCodeBlock } from '../../components/details/NxCodeBlock'
+import { SynCodeBlock } from '../../components/details/SynCodeBlock'
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { DateCell } from '../../components/table/DateCell'
 import { permissionTooltip } from '../../hooks/permissionUtils'
@@ -388,7 +388,7 @@ export function ApprovalDetailContent({
             />
           </StackItem>
           <StackItem className={styles.codeBlockContainer}>
-            <NxCodeBlock jsonObject={approval} enableCopy enableExpand expandTitle="Approval context" fillHeight />
+            <SynCodeBlock jsonObject={approval} enableCopy enableExpand expandTitle="Approval context" fillHeight />
           </StackItem>
         </Stack>
       </StackItem>

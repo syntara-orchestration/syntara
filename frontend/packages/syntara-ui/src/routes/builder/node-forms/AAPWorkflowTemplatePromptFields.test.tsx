@@ -160,6 +160,27 @@ describe('AAPWorkflowTemplatePromptFields', () => {
     expect(screen.getByText('Skip tags')).toBeInTheDocument()
   })
 
+  it('attaches field help popovers to prompt-on-launch labels', () => {
+    render(
+      <TestWrapper>
+        <AAPWorkflowTemplatePromptFields
+          templateDetail={mockTemplateDetail}
+          isLoadingDetail={false}
+          inventories={mockInventories}
+          loadingInventories={false}
+          labels={mockLabels}
+          loadingLabels={false}
+          onSearchInventories={vi.fn()}
+          onSearchLabels={vi.fn()}
+        />
+      </TestWrapper>
+    )
+
+    for (const label of ['Inventory', 'Labels', 'Limit', 'Source control branch', 'Job tags', 'Skip tags']) {
+      expect(screen.getByRole('button', { name: `More info for ${label}` })).toBeInTheDocument()
+    }
+  })
+
   it('shows default inventory name in placeholder', () => {
     render(
       <TestWrapper>

@@ -49,24 +49,22 @@ The E2E suite uses Playwright tags to control which tests run in different envir
 test.describe('Integration filtering', { tag: '@pr-check' }, () => { ... })
 
 // Individual test tag — applies to one test
-test('my test', { tag: ['@konflux-skip'] }, async ({ app }) => { ... })
+test('my test', { tag: ['@local-only'] }, async ({ app }) => { ... })
 ```
 
 | Tag | What it marks | Runs in | Excluded from | Mechanism |
 |---|---|---|---|---|
 | `@pr-check` | Fast, reliable describe blocks covering the most critical user paths — intended as a quick PR gate subset | All CI environments (full suite always runs; `--grep @pr-check` selects this subset locally) | _(no current CI filter — tag exists for manual use and future CI optimization)_ | `--grep @pr-check` |
-| `@konflux-skip` | Tests confirmed flaky in Konflux's specific execution environment (not flaky in GitHub Actions) | GitHub Actions `test-compose-e2e` job (runs normally) | Konflux `ao-ui-tests` Tekton pipelines | `.tekton/automation-orchestrator-ui-tests-*.yaml` passes `playwright-grep-invert: '@konflux-skip'` → `--grep-invert` |
 | `@local-only` | Visual regression screenshot tests (`e2e/visual-regression/`) | Local development via `npm run e2e:visual-regression` | All CI | `playwright.config.ts` `testIgnore: **/visual-regression/**` + in-test `test.skip(!!process.env.CI)` |
 
 ### Tag rules
 
 - **`@pr-check`** — Tag a `test.describe` when the tests inside are fast (under ~30 s total), reliable (no flaky backend dependencies), and cover the most critical user paths. Do NOT tag slow, data-dependent, or flaky describe blocks.
-- **`@konflux-skip`** — Use only for a test confirmed flaky in Konflux's environment specifically. This is a last resort — fix the root cause first. Each tagged test must have a comment explaining the environment-specific cause. Discuss with the team before tagging additional tests.
 - **`@local-only`** — Reserved for visual regression tests. Do not apply to functional tests.
 
 ### Never commit `test.fixme` as a long-term state
 
-`test.fixme` marks a test as expected-to-fail, which shows up in CI reports as a "known failure" rather than a clean skip. It is appropriate only as a same-PR placeholder (a test whose fix is in the next commit). For environment-specific skipping use `@konflux-skip`; for data-dependent conditional skipping use `test.skip(!condition, 'reason')`.
+`test.fixme` marks a test as expected-to-fail, which shows up in CI reports as a "known failure" rather than a clean skip. It is appropriate only as a same-PR placeholder (a test whose fix is in the next commit). For data-dependent conditional skipping use `test.skip(!condition, 'reason')`. GitHub-only skips may use `test.skip(!!process.env.CI, ...)`. For missing seed data use `expect(value, msg).toBeTruthy()`, not `test.skip`.
 
 ---
 
@@ -117,7 +115,7 @@ To test against the real Syntara backend instead of the mock API:
 
 **Important:** When running against a real backend, test isolation and cleanup are critical — tests operate on a shared persistent database. The patterns in this skill (unique names, try-finally cleanup) ensure tests work reliably in both modes.
 
-**Note on data-dependent tests:** Some tests (integration-filtering, approvals, pagination) require seed data that the mock API provides. Against a fresh real backend these tests skip automatically via `test.skip()` guards. Tests that CREATE their own data (builder, workflows, integrations) work in both modes.
+**Note on data-dependent tests:** Some tests (integration-filtering, approvals, pagination) require seed data that the mock API provides. These tests use a guard pattern: `test.beforeEach()` marks the entire describe block unavailable if seed data is missing, and `expect()` assertions fail loudly so CI surface the data problem. Tests that CREATE their own data (builder, workflows, integrations) work in both modes. `test.skip()` is reserved for environment constraints (CI vs local, real vs mock backend), not for missing seed data.
 
 ---
 
@@ -154,7 +152,7 @@ From the existing tests, note:
 - **File naming:** `feature-name.spec.ts` (kebab-case)
 - **Test titles:** Descriptive, user-action-based ("user creates and saves a multi-step workflow")
 - **Scoping:** Some files use `test.describe()` blocks (accessibility, filtering), others use top-level tests
-- **Conditional skipping:** `test.skip(!condition, 'reason')` for data-dependent tests
+- **Conditional skipping:** `test.skip(!condition, 'reason')` for environment-dependent tests (see [Data-Dependent Tests](#data-dependent-tests--skip-when-seed-data-is-missing) for when to use `test.skip` vs `expect`)
 - **Multi-tab testing:** Some tests use `{ app, context }` to test URL sharing across tabs
 
 **CRITICAL:** New tests MUST match existing style. A reviewer should not be able to distinguish new tests from existing ones.
@@ -415,20 +413,32 @@ const hasRunning = await runningRow
   .waitFor({ state: 'visible', timeout: 5000 })
   .then(() => true)
   .catch(() => false)
-test.skip(!hasRunning, 'Mock API has no running execution; seed data required')
+expect(hasRunning, 'Mock API has no running execution; seed data required').toBeTruthy()
 ```
 
-**When `test.skip()` is and is not acceptable:**
+**When `test.skip()` vs `expect()` — choosing the right guard:**
 
 ```typescript
-// ✅ ACCEPTABLE — data that is impossible to create programmatically
-// (e.g., an approval that must have been approved by a human via the real backend)
-test.skip(!hasApprovalData, 'Requires pre-existing human-approved records')
+// ✅ test.skip — legitimate environment constraints the test cannot control
+test.skip(!!process.env.CI, 'Visual baselines are OS-specific; run locally only')
+test.skip(isRealBackend, 'Relies on mock API seed data')
+test.skip(!isLiveBackend, 'Requires a live backend with SYNTARA_E2E_PASSWORD')
 
-// ❌ NOT ACCEPTABLE — if the test can create the data itself, it must do so
-// Do not skip because setup is complex; use beforeAll + API helpers instead
-test.skip(!hasWorkflows, 'No workflows exist') // ❌ create them via API instead
+// ✅ expect — setup failures that should surface as test failures
+// If beforeAll/beforeEach creates data via API and that fails, fail loudly:
+expect(workflowId, 'Failed to create workflow for tests').toBeTruthy()
+expect(didNavigate, 'Workflow execution failed — engine may not be running').toBeTruthy()
+
+// ✅ expect — seed data that the test environment is expected to provide
+expect(hasTable, 'No roles data available; seed data required').toBeTruthy()
+
+// ❌ NOT ACCEPTABLE — silently skipping when setup fails hides real problems
+test.skip(!workflowId, 'Failed to create workflow') // ❌ should be expect()
+test.skip(!hasTable, 'No data available')            // ❌ should be expect()
+test.skip(!hasWorkflows, 'No workflows exist')       // ❌ create them via API instead
 ```
+
+**Rule of thumb:** Use `test.skip()` only for **environment constraints** (CI vs local, real vs mock backend, missing env vars). Use `expect().toBeTruthy()` for **data availability and setup guards** — if the data should be there but isn't, that's a failure worth knowing about.
 
 ---
 
@@ -703,42 +713,42 @@ API helpers are in `e2e/utils/api.ts`. Use them for setup and teardown; reserve 
 
 ---
 
-### Data-Dependent Tests — Skip When Seed Data Is Missing
+### Data-Dependent Tests — Fail When Expected Data Is Missing
 
-Tests that depend on pre-existing data (filtering, pagination, approvals) must gracefully skip when that data isn't available. Use `test.skip()` with a condition:
+Tests that depend on pre-existing data (filtering, pagination, approvals) must **fail loudly** when that data isn't available. Use `expect()` with a descriptive message:
 
 ```typescript
-// Skip individual tests when required data is missing
+// Fail clearly when required data is missing
 const table = app.getByRole('grid', { name: 'Approvals table' })
 const hasTable = await table
   .waitFor({ state: 'visible', timeout: 5000 })
   .then(() => true)
   .catch(() => false)
-test.skip(!hasTable, 'No approval data available; seed data required')
+expect(hasTable, 'No approval data available; seed data required').toBeTruthy()
 ```
 
-For test suites that all depend on the same data, use `test.beforeEach`:
+For test suites that all depend on the same data, use `expect()` in `test.beforeEach`:
 
 ```typescript
 test.describe('Integration Filtering', () => {
   test.beforeEach(async ({ app }) => {
     await app.goto(toAppUrl('/configuration/integrations'))
     await expect(app.getByRole('heading', { level: 1, name: 'Integrations' })).toBeVisible()
-    const table = app.getByRole('grid', { name: 'Integrations table' })
+    const table = app.getByRole('grid', { name: 'Integrations' })
     const hasTable = await table
       .waitFor({ state: 'visible', timeout: 5000 })
       .then(() => true)
       .catch(() => false)
-    test.skip(!hasTable, 'No integration data available; seed data required')
+    expect(hasTable, 'No integration data available; seed data required').toBeTruthy()
   })
 
   test('keyword search: filter by name', async ({ app }) => {
-    // Only runs when integrations exist
+    // Only runs when integrations exist — fails if they don't
   })
 })
 ```
 
-This ensures tests work against both mock API (with seed data) and real backend (without seed data).
+This ensures missing data is surfaced as a test failure rather than silently skipped. Use `test.skip()` only for **environment constraints** (see [When to use test.skip vs expect](#when-testskip-vs-expect--choosing-the-right-guard)).
 
 ---
 
@@ -933,7 +943,7 @@ const results = await new AxeBuilder({ page })
 expect(results.violations).toEqual([])
 ```
 
-**Note on axe-core limitations:** axe-core catches approximately 30% of real WCAG violations automatically. The rest — keyboard navigation flow, screen reader announcement quality, cognitive accessibility, color contrast in jsdom — requires manual testing. Automated scans are a floor, not a ceiling.
+**Note on axe-core limitations:** axe-core catches approximately 30% of real WCAG violations automatically. The rest — keyboard navigation flow, screen reader announcement quality, cognitive accessibility, color contrast in simulated DOM environments — requires manual testing. Automated scans are a floor, not a ceiling.
 
 ---
 
@@ -1024,11 +1034,17 @@ When test data is mocked deterministically, assertions should fail naturally. Wr
 try {
   await expect(toggle).toBeEnabled()
 } catch {
-  test.skip(true, 'Toggle not enabled')
+  test.skip(true, 'Toggle not enabled')  // hides the real problem
 }
 
 // ✅ GOOD — fails clearly if mock data is wrong
 await expect(toggle).toBeEnabled()
+
+// ❌ BAD — test.skip hides setup failures as green CI
+test.skip(!workflowId, 'Failed to create workflow')
+
+// ✅ GOOD — expect surfaces setup failures as test failures
+expect(workflowId, 'Failed to create workflow').toBeTruthy()
 ```
 
 ### Extract Shared Mock Fixtures
@@ -1166,7 +1182,7 @@ await expect(app.getByRole('heading', { name: 'Workflows' })).toBeVisible()
 - ❌ Hardcode resource names (use `buildUniqueName()`)
 - ❌ Hardcode expected counts or assume a clean database (filter to find your data)
 - ❌ Assert on rows being visible without filtering first (other data may push them off-page)
-- ❌ Use `test.skip()` for data the test can create programmatically — create resources via API in `beforeAll` instead (see Data-Dependent Tests for the narrow exception: data impossible to create programmatically)
+- ❌ Use `test.skip()` for data availability or setup failures — use `expect(value, msg).toBeTruthy()` instead so failures are visible in CI. Reserve `test.skip()` for environment constraints only (CI vs local, real vs mock backend, missing env vars)
 - ❌ Depend on pre-existing data from the mock API or any external source
 - ❌ Share state between tests
 - ❌ Use `page.waitForTimeout()` -- rely on auto-waiting and web-first assertions

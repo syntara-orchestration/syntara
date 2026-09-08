@@ -111,7 +111,7 @@ type ExpressionConditionProps = {
  *
  * Renders inputs for:
  * - NOT checkbox (optional negation) - in separate row
- * - Variable input (e.g., "input.age")
+ * - Variable input (e.g., "trigger.age")
  * - Operator select (unified list)
  * - Value input (e.g., "18") - hidden for unary operators (exists, isEmpty, etc.)
  * - Remove button (if onRemove provided)
@@ -133,7 +133,7 @@ export function ExpressionCondition(props: ExpressionConditionProps) {
     setIsFieldFocused(false)
     const stripped = editingValue.replace(/^\$\{/, '').replace(/\}$/, '')
     if (stripped && !isValidVariableRef(stripped)) {
-      setLocalFieldError('Invalid variable name. Use letters, numbers, dots, and underscores (e.g. input.age).')
+      setLocalFieldError('Invalid variable name. Use letters, numbers, dots, and underscores (e.g. trigger.age).')
       return
     }
     setLocalFieldError(null)
@@ -246,7 +246,7 @@ export function ExpressionCondition(props: ExpressionConditionProps) {
                 onBlur={handleFieldBlur}
                 onDrop={handleFieldDrop}
                 onDragOver={(e) => e.preventDefault()}
-                placeholder="e.g. ${input.age}"
+                placeholder="e.g. ${trigger.age}"
                 style={{ fontFamily: 'monospace', fontSize: 'var(--pf-t--global--font--size--body--sm)' }}
                 validated={fieldValidated}
               />

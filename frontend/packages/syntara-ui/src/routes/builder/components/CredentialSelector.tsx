@@ -13,7 +13,6 @@ import {
   Spinner,
 } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiErrorIcon } from '@patternfly/react-icons'
-import type { CredentialsAPI } from '@syntara/contracts'
 import React, { type ReactElement, useCallback, useMemo, useState } from 'react'
 
 import { credentialsClient } from '../../../client'
@@ -23,6 +22,7 @@ import type { Credential, CredentialType } from '../../configuration/credentials
 import { CredentialFormModal } from '../../configuration/credentials/form/CredentialFormModal'
 
 import { resolveFormGroupLabelHelp } from './resolveFormGroupLabelHelp'
+import { useAllCredentials } from './useAllCredentials'
 
 export type CredentialSelectorProps = {
   /** Currently selected credential ID */
@@ -101,10 +101,6 @@ type TypeGroup = {
   typeId: string
   typeName: string
   credentials: Credential[]
-}
-
-type CredentialQueryParams = CredentialsAPI.operations['list_credentials']['parameters']['query'] & {
-  project_id?: string
 }
 
 type MenuToggleProps = {
@@ -220,17 +216,16 @@ export function CredentialSelector({
   const [isOpen, setIsOpen] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
 
-  const credentialQueryParams: CredentialQueryParams = useMemo(
-    () => ({ sort: 'name', ...(projectId ? { project_id: projectId } : {}), for_action: 'use' }),
-    [projectId]
-  )
-  const { data, isPending, isError, refetch } = credentialsClient.useQuery('get', '/credentials', {
-    params: { query: credentialQueryParams },
-  })
+  const {
+    credentials: allCredentials,
+    isLoading: isPending,
+    error: credentialsError,
+    refetch,
+  } = useAllCredentials({ projectId })
+  const isError = !!credentialsError
 
   const { data: typesData } = credentialsClient.useQuery('get', '/credential_types')
 
-  const allCredentials: Credential[] = useMemo(() => data?.resources ?? [], [data?.resources])
   const credentialTypes: CredentialType[] = useMemo(() => typesData?.resources ?? [], [typesData?.resources])
 
   // Derive compatible type IDs from type names

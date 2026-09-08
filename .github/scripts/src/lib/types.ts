@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod'
 
 /**
  * Validates GitHub Actions workflow run data from the REST API.
@@ -11,7 +11,7 @@ export const WorkflowRunSchema = z.object({
   status: z.string(),
   conclusion: z.string().nullable(),
   created_at: z.string(),
-});
+})
 
 /**
  * Validates a single entry in the GitHub merge queue from GraphQL API.
@@ -25,7 +25,7 @@ export const MergeQueueEntrySchema = z.object({
     number: z.number(),
     title: z.string(),
   }),
-});
+})
 
 /**
  * Validates the GraphQL response for merge queue queries.
@@ -33,13 +33,15 @@ export const MergeQueueEntrySchema = z.object({
  */
 export const MergeQueueResponseSchema = z.object({
   repository: z.object({
-    mergeQueue: z.object({
-      entries: z.object({
-        nodes: z.array(MergeQueueEntrySchema),
-      }),
-    }).nullable(),
+    mergeQueue: z
+      .object({
+        entries: z.object({
+          nodes: z.array(MergeQueueEntrySchema),
+        }),
+      })
+      .nullable(),
   }),
-});
+})
 
 /**
  * Validates GitHub commit data from the REST API.
@@ -55,7 +57,7 @@ export const CommitSchema = z.object({
     }),
   }),
   html_url: z.string(),
-});
+})
 
 /**
  * Validates required GitHub Actions environment variables.
@@ -67,22 +69,22 @@ export const EnvironmentSchema = z.object({
   repository: z.string().min(1, 'GITHUB_REPOSITORY is required'),
   runId: z.number().int().positive('GITHUB_RUN_ID must be a positive integer'),
   headRef: z.string().optional(),
-});
+})
 
-export type WorkflowRun = z.infer<typeof WorkflowRunSchema>;
-export type MergeQueueEntry = z.infer<typeof MergeQueueEntrySchema>;
-export type Commit = z.infer<typeof CommitSchema>;
+export type WorkflowRun = z.infer<typeof WorkflowRunSchema>
+export type MergeQueueEntry = z.infer<typeof MergeQueueEntrySchema>
+export type Commit = z.infer<typeof CommitSchema>
 
 /**
  * Represents the current health state of the merge queue.
  * Includes health status, reason, and optional diagnostic data.
  */
 export type HealthState = {
-  health: 'healthy' | 'unhealthy';
-  reason: 'queue_empty' | 'merging' | 'stalled';
-  queueDepth?: number;
-  minutesSinceMerge?: number;
-  oldestPr?: number;
-};
+  health: 'healthy' | 'unhealthy'
+  reason: 'queue_empty' | 'merging' | 'stalled'
+  queueDepth?: number
+  minutesSinceMerge?: number
+  oldestPr?: number
+}
 
-export type Environment = z.infer<typeof EnvironmentSchema>;
+export type Environment = z.infer<typeof EnvironmentSchema>

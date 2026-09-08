@@ -285,3 +285,66 @@ class TestApplyCursorPagination:
         out_col, out_val = BaseService._coerce_boolean_keyset(col, val=False)
         assert out_val == 0
         assert out_col is not col
+
+
+class TestValidateQueryParams:
+    """Tests for BaseService._validate_query_params unknown-parameter rejection."""
+
+    def _make_service(self) -> BaseService:
+        return object.__new__(BaseService)
+
+    def test_valid_filterable_field_accepted(self) -> None:
+        service = self._make_service()
+        service._validate_query_params({"name": "alice"}, Workflow)
+
+    def test_unknown_field_rejected(self) -> None:
+        service = self._make_service()
+        with pytest.raises(SafeValueError, match=r"Unknown query parameter.*order"):
+            service._validate_query_params({"order": "asc"}, Workflow)
+
+    def test_multiple_unknown_fields_all_listed(self) -> None:
+        service = self._make_service()
+        with pytest.raises(SafeValueError, match="Unknown query parameter") as exc_info:
+            service._validate_query_params({"foo": "bar", "order": "asc"}, Workflow)
+        msg = str(exc_info.value)
+        assert "foo" in msg
+        assert "order" in msg
+
+    def test_error_does_not_leak_valid_fields(self) -> None:
+        service = self._make_service()
+        with pytest.raises(SafeValueError, match="Unknown query parameter") as exc_info:
+            service._validate_query_params({"bogus": "1"}, Workflow)
+        msg = str(exc_info.value)
+        assert "Valid filter fields" not in msg
+        assert "bogus" in msg
+
+    def test_label_bracket_params_accepted(self) -> None:
+        service = self._make_service()
+        service._validate_query_params({"labels[env]": "prod"}, Workflow)
+
+    def test_bracket_notation_valid_field_accepted(self) -> None:
+        service = self._make_service()
+        service._validate_query_params({"name[contains]": "test"}, Workflow)
+
+    def test_bracket_notation_unknown_field_rejected(self) -> None:
+        service = self._make_service()
+        with pytest.raises(SafeValueError, match=r"Unknown query parameter.*bogus"):
+            service._validate_query_params({"bogus[contains]": "test"}, Workflow)
+
+    def test_empty_params_accepted(self) -> None:
+        service = self._make_service()
+        service._validate_query_params({}, Workflow)
+
+    def test_mix_of_valid_and_unknown_rejected(self) -> None:
+        service = self._make_service()
+        with pytest.raises(SafeValueError, match=r"Unknown query parameter.*foo"):
+            service._validate_query_params({"name": "alice", "foo": "bar"}, Workflow)
+
+    def test_invalid_value_raised_before_unknown_param(self) -> None:
+        """When a known field has an invalid value AND unknown params exist.
+
+        The invalid-value error is raised first (loop order).
+        """
+        service = self._make_service()
+        with pytest.raises(SafeValueError, match=r"Invalid value for field 'is_enabled'"):
+            service._validate_query_params({"is_enabled": "not-a-bool", "bogus": "1"}, Workflow)

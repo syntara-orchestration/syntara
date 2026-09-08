@@ -2,7 +2,7 @@ import { ActionGroup, Button, Form, FormSection } from '@patternfly/react-core'
 import type { SettingsAPI } from '@syntara/contracts'
 import { useMemo } from 'react'
 
-import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import { useDialogState } from '../../../hooks/useDialogState'
 
 import { SettingField } from './SettingField'
@@ -117,7 +117,7 @@ export function SettingsCategoryTab({
         </ActionGroup>
       )}
 
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={resetDialog.isOpen}
         onClose={resetDialog.close}
         onConfirm={handleResetAll}
@@ -128,7 +128,7 @@ export function SettingsCategoryTab({
       >
         This will reset all configuration values on this page to their factory defaults. These changes will not take
         effect until you click Save changes.
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
     </Form>
   )
 }

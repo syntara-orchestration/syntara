@@ -281,12 +281,12 @@ class TestRowLevelLockContention:
         self,
         audit_worker_perf_session_factory: async_sessionmaker[AsyncSession],
     ) -> None:
-        """Verify multiple drain workers don't process the same rows.
+        """Verify concurrent drain SELECTs use FOR UPDATE SKIP LOCKED.
 
-        Seeds rows, then fires N concurrent drain SELECTs with
-        FOR UPDATE SKIP LOCKED.  Each drain locks its batch; subsequent
-        drains skip those rows.  Total processed rows across all drains
-        should not exceed total seeded.
+        Seeds rows, then fires N concurrent drain SELECTs.  Each drain
+        locks its batch; overlapping drains skip those rows.  After
+        rollback the rows are visible again, so a second wave (NullPool
+        connect stagger longer than the lock hold) can re-read them.
         """
         seed_count = 200
         concurrent_drains = 5
@@ -335,9 +335,12 @@ class TestRowLevelLockContention:
                 drain_p95_ms=round(drain_latency.p95, 3),
             )
 
-            assert total_rows_seen <= seed_count, (
-                f"Drains processed {total_rows_seen} seeded rows total, but only {seed_count} were seeded — "
-                f"SKIP LOCKED may not be working correctly"
+            # 200: drains overlapped and SKIP LOCKED partitioned the rows.
+            # 400: two serial waves (AAP-87600) — first wave rollbacks, so the
+            # second legally re-reads the same rows. Harmless; not a product bug.
+            assert total_rows_seen in (seed_count, seed_count * 2), (
+                f"Drains processed {total_rows_seen} seeded rows (rows_per_drain={rows_per_drain}); "
+                f"expected {seed_count} (overlapping SKIP LOCKED) or {seed_count * 2} (two waves after rollback)"
             )
 
         finally:

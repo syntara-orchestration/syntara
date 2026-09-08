@@ -9,10 +9,12 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from uuid import UUID
 
 from pydantic import ConfigDict
+from sqlalchemy import UniqueConstraint
 from sqlmodel import CheckConstraint, Field, Index, Relationship, SQLModel, text
 
 from syntara.core.constants import FieldLimits
-from syntara.core.models.base import Resource
+from syntara.core.models.base.named import NamedResource
+from syntara.core.models.base.user_owned import UserOwnedResource
 from syntara.core.models.pagination import ResourcesResponse
 from syntara.workflows.models.validation_finding import ValidationResult
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
@@ -22,49 +24,59 @@ if TYPE_CHECKING:
     from syntara.workflows.models.workflow_version import WorkflowVersion, WorkflowVersionRead
 
 
-class Workflow(Resource, table=True):
+class Workflow(NamedResource, UserOwnedResource, table=True):
     """Workflow model representing complete automation processes.
 
-    Extends Resource (which combines NamedResource, UserOwnedResource, and SoftDeletableResource)
-    with workflow-specific fields.
+    Uses hard deletes per the "Hard Deletes Only" decision record.
 
     Attributes:
         id: Primary key UUID (from BaseResource)
-        name: Human-readable workflow name (from NamedResource, unique across non-deleted)
+        name: Human-readable workflow name (from NamedResource, unique per project)
         description: Optional workflow description (from NamedResource)
         labels: JSONB key-value labels for categorization (from BaseResource)
         created_at: Timestamp of workflow creation (from BaseResource)
         updated_at: Timestamp of last update (from BaseResource)
         created_by: UUID of user who created this workflow (from UserOwnedResource)
         updated_by: UUID of user who last updated this workflow (from UserOwnedResource)
-        deleted_at: Soft delete timestamp (from SoftDeletableResource)
-        deleted_by: UUID of user who performed soft delete (from SoftDeletableResource)
         current_version: Current active version number
         is_enabled: Whether workflow is enabled for execution
 
     Relationships:
-        versions: All versions of this workflow
-        executions: All executions of this workflow
+        versions: All versions of this workflow (CASCADE on delete)
+        executions: All executions of this workflow (CASCADE on delete)
 
     """
 
+    FIELD_SCHEMA_EXTRAS: ClassVar[dict[str, dict[str, Any]]] = {
+        **NamedResource.FIELD_SCHEMA_EXTRAS,
+        **UserOwnedResource.FIELD_SCHEMA_EXTRAS,
+    }
+
     __tablename__ = "workflows"
 
-    # Define filterable fields for API endpoints - extend base Resource fields
-    __filterable_fields__: ClassVar[list[str]] = [
-        *Resource.__filterable_fields__,
-        "is_builtin",
-        "is_enabled",
-        "has_validation_issues",
-        "published_version_id",
-        "project_id",
-    ]
+    __filterable_fields__: ClassVar[list[str]] = list(
+        dict.fromkeys(
+            [
+                *NamedResource.__filterable_fields__,
+                *UserOwnedResource.__filterable_fields__,
+                "is_builtin",
+                "is_enabled",
+                "has_validation_issues",
+                "published_version_id",
+                "project_id",
+            ]
+        )
+    )
 
-    # Define sortable fields for API endpoints - extend base Resource fields
-    __sortable_fields__: ClassVar[list[str]] = [
-        *Resource.__sortable_fields__,
-        "is_enabled",
-    ]
+    __sortable_fields__: ClassVar[list[str]] = list(
+        dict.fromkeys(
+            [
+                *NamedResource.__sortable_fields__,
+                *UserOwnedResource.__sortable_fields__,
+                "is_enabled",
+            ]
+        )
+    )
 
     # Workflow-specific fields
     current_version: int = Field(
@@ -105,40 +117,27 @@ class Workflow(Resource, table=True):
         index=True,
     )
 
-    # Relationships
-    # Note: cascade_delete=False to match DB constraint ondelete="RESTRICT"
-    # The database prevents deleting a Workflow if it has WorkflowVersions.
-    # Use soft delete (workflow.soft_delete()) which doesn't cascade to versions,
-    # or manually delete versions first if hard delete is needed.
+    # Relationships — DB handles CASCADE on delete; passive_deletes tells ORM not to null FKs
     versions: list["WorkflowVersion"] = Relationship(
         back_populates="workflow",
-        cascade_delete=False,
-        sa_relationship_kwargs={"foreign_keys": "WorkflowVersion.workflow_id"},
+        cascade_delete=True,
+        sa_relationship_kwargs={"foreign_keys": "WorkflowVersion.workflow_id", "passive_deletes": True},
     )
 
     executions: list["Execution"] = Relationship(
         back_populates="workflow",
-        cascade_delete=False,
+        cascade_delete=True,
+        sa_relationship_kwargs={"passive_deletes": True},
     )
 
-    # Table arguments for indexes and constraints
     __table_args__ = (
-        # Composite index for creator + enabled status
         Index("ix_workflows_created_by_enabled", "created_by", "is_enabled"),
-        # GIN index on labels for JSONB containment queries
         Index(
             "ix_workflows_labels",
             "labels",
             postgresql_using="gin",
         ),
-        # Partial unique index for name (only for non-deleted workflows)
-        Index(
-            "ix_workflows_name_project_unique",
-            "name",
-            "project_id",
-            unique=True,
-            postgresql_where=text("deleted_at IS NULL"),
-        ),
+        UniqueConstraint("name", "project_id", name="uq_workflows_name_project"),
         CheckConstraint(
             "(published_version_id IS NULL) = (NOT is_enabled)",
             name="ck_workflows_is_enabled_published_version_id",
@@ -228,7 +227,6 @@ class WorkflowRead(WorkflowBase):
     """Schema for workflow response (GET /workflows/{id}).
 
     Includes all fields from the database table model.
-    Note: deleted_at and deleted_by are None since soft-deleted workflows are excluded from queries.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)  # type: ignore[assignment]
@@ -251,8 +249,6 @@ class WorkflowRead(WorkflowBase):
     project_id: UUID
     created_at: datetime
     updated_at: datetime
-    deleted_at: datetime | None = None
-    deleted_by: UUID | None = None
 
 
 class WorkflowReadWithVersion(WorkflowRead):

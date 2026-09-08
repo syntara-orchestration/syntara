@@ -1640,3 +1640,49 @@ class TestResolveUserReferences:
         assert obj2.created_by.name == "bob"
         assert isinstance(obj2.updated_by, UserReference)
         assert obj2.updated_by.name == "alice"
+
+
+class TestFetchLatestExecutions:
+    """Tests for CredentialService._fetch_latest_executions."""
+
+    @pytest.fixture
+    def service(self) -> CredentialService:
+        mock_session = AsyncMock()
+        mock_user = MagicMock()
+        mock_user.id = uuid4()
+        return CredentialService(
+            session=mock_session,
+            user=mock_user,
+            secret_service=AsyncMock(),
+        )
+
+    @pytest.mark.asyncio
+    async def test_returns_empty_dict_for_empty_workflow_ids(self, service: CredentialService) -> None:
+        """Empty input returns empty dict without querying."""
+        result = await service._fetch_latest_executions([])
+        assert result == {}
+        service.session.exec.assert_not_called()  # type: ignore[attr-defined]
+
+    @pytest.mark.asyncio
+    async def test_returns_execution_map_on_success(self, service: CredentialService) -> None:
+        """Returns mapping of workflow_id to (created_at, status) tuples."""
+        from datetime import UTC, datetime
+
+        wf_id = uuid4()
+        now = datetime.now(UTC)
+        mock_result = MagicMock()
+        mock_result.all.return_value = [(wf_id, now, "completed")]
+        service.session.exec = AsyncMock(return_value=mock_result)  # type: ignore[method-assign]
+
+        result = await service._fetch_latest_executions([wf_id])
+
+        assert result == {wf_id: (now, "completed")}
+
+    @pytest.mark.asyncio
+    async def test_returns_empty_dict_on_db_error(self, service: CredentialService) -> None:
+        """Returns empty dict and logs warning on SQLAlchemy errors."""
+        service.session.exec = AsyncMock(side_effect=SQLAlchemyError("connection lost"))  # type: ignore[method-assign]
+
+        result = await service._fetch_latest_executions([uuid4()])
+
+        assert result == {}

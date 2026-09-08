@@ -1,7 +1,6 @@
 """Integration tests for GET /api/v1/executions endpoint."""
 
 import uuid
-from datetime import UTC, datetime
 
 import pytest
 from httpx import AsyncClient
@@ -264,22 +263,23 @@ async def test_list_executions_includes_workflow_name(
 
 
 @pytest.mark.asyncio
-async def test_list_executions_workflow_name_after_soft_delete(
+async def test_list_executions_empty_after_workflow_hard_delete(
     auth_client: AsyncClient,
     test_workflow: Workflow,
     test_user: User,
     test_db_session: AsyncSession,
     executions_factory: ExecutionsFactory,
 ) -> None:
-    """Test that workflow_name is still returned after the workflow is soft-deleted."""
+    """Test that executions are cascade-deleted when their workflow is hard-deleted."""
     await executions_factory.create_executions(count=1)
 
-    test_workflow.soft_delete(user_id=test_user.id, deletion_time=datetime.now(UTC))
+    test_workflow.published_version_id = None
+    test_workflow.is_enabled = False
+    await test_db_session.delete(test_workflow)
     await test_db_session.commit()
 
     response = await auth_client.get("/api/v1/executions")
 
     assert response.status_code == 200
     data = response.json()
-    assert len(data["resources"]) == 1
-    assert data["resources"][0]["workflow_name"] == test_workflow.name
+    assert len(data["resources"]) == 0

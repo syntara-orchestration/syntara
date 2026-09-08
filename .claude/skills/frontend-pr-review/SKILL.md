@@ -119,7 +119,7 @@ Check whether the changes follow:
 | `new Date()` in `syntara-mock-api/src/resources/` or `utils/`  | #28 -- use `mockDate.*` from `mockDates.ts` for deterministic visual regression                           |
 | `Button` with `onClick={() => navigate(...)}`                  | §34 -- use `<Link>` for navigation, `<Button>` for actions                                                |
 | Same `aria-label` on repeated checkboxes/buttons               | §35 -- each instance needs a unique label (e.g., row index or resource name)                              |
-| Raw text for invalid ID or not-found states                    | §36 -- use `SynEmptyState` or `Nx*` empty state components                                                 |
+| Raw text for invalid ID or not-found states                    | §36 -- use `SynEmptyState` or `Syn*` empty state components                                                 |
 | New page test without `expectPageTitle(...)` assertion         | testing guidelines -- add at least one `expectPageTitle` call per page component                          |
 | Empty-state CTA without permission check                       | UX §15 -- gate `addData` with permission flag (pass `undefined` if denied)                                |
 | New `forwardRef(` usage                                        | #30 -- accept `ref` as a prop (React 19); do not add `forwardRef`                                         |
@@ -167,7 +167,7 @@ git diff main...HEAD -- '*.ts' '*.tsx' | grep '^+' | grep -v '^+++' | grep -iE '
 | **New resources have mock `can_i` handlers**    | `frontend/packages/syntara-mock-api/src/handlers.ts` must include role-aware responses for all 4 roles (admin, viewer, auditor, user)                              |
 | **Permission hooks include `isError`**          | Any `useCanI` mock must include `isError: false`; real hook returns `{ allowed, isChecking, isError }`                                                             |
 | **Permission cache invalidation**               | After role/assignment mutations, verify `queryClient.invalidateQueries({ queryKey: ['authz', 'can_i'] })` is called                                                |
-| **New shared components have stories**          | Components in `frontend/packages/syntara-ui/src/components/` (especially `Nx*`) should have Storybook stories for documentation                                    |
+| **New shared components have stories**          | Components in `frontend/packages/syntara-ui/src/components/` (especially `Syn*`) should have Storybook stories for documentation                                    |
 | **Unrelated snapshot changes explained**        | If visual regression screenshots changed for pages not related to the PR, ask why                                                                                  |
 | **Visual regression uses stable data**          | Screenshot baselines must use deterministic mock data -- no timestamps, random IDs, or flaky API state                                                             |
 | **Gated content hidden during loading**         | Permission-dependent UI (tabs, buttons) should hide until permission check resolves, not flash then disappear                                                      |
@@ -209,7 +209,7 @@ Examples:
 - Use `detachPromise(...)` instead of unary `void` for intentionally unawaited promises
 - Use PF6 components (`Button`, `List`, `Content`, `Title`) instead of native HTML (`<button>`, `<ul>`, `<p>`, `<h1>`)
 - Use `useCursorPagination` instead of manual cursor/filter/queryParams boilerplate
-- Use `NxConfirmationDialog` instead of inline Modal+ModalHeader+ModalBody+ModalFooter
+- Use `SynConfirmationDialog` instead of inline Modal+ModalHeader+ModalBody+ModalFooter
 - Use `useDialogState` instead of manual `useState` pairs for dialog open/close
 - Use `useMemo` for derived data (maps, sorted arrays) in custom hooks instead of recomputing on every render
 - Use PF `Content` / `HelperText` / `Title` instead of raw `<span>` / `<p>` / `<div>` for text content

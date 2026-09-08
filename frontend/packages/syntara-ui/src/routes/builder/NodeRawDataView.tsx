@@ -8,7 +8,7 @@ import {
 } from '@patternfly/react-core'
 import type { Node } from '@xyflow/react'
 
-import { NxCodeBlock } from '../../components/details/NxCodeBlock'
+import { SynCodeBlock } from '../../components/details/SynCodeBlock'
 import type { NodeType } from '../workflows/canvas/nodes/NodeType'
 
 type NodeRawDataViewProps = {
@@ -33,7 +33,7 @@ export function NodeRawDataView({ node }: NodeRawDataViewProps) {
       <DescriptionListGroup>
         <DescriptionListTerm>Node data</DescriptionListTerm>
         <DescriptionListDescription>
-          <NxCodeBlock jsonObject={node.data} />
+          <SynCodeBlock jsonObject={node.data} />
         </DescriptionListDescription>
       </DescriptionListGroup>
     </DescriptionList>

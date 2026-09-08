@@ -1,7 +1,7 @@
 import { Th, Thead, Tr, type ThProps } from '@patternfly/react-table'
 import type { WorkflowAPI } from '@syntara/contracts'
 
-import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../components/panels/list/NxListPanel'
+import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../components/panels/list/SynListPanel'
 import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 import type { TableFooterProps } from '../../components/table/SynScrollableTableContainer'
 import type { FilterConfig, FilterFieldDefinition } from '../../types/filters'
@@ -60,7 +60,7 @@ export function WorkflowsListView({
   const isEmpty = sortedWorkflows.length === 0
 
   return (
-    <NxListPanelView
+    <SynListPanelView
       isPending={isPending}
       isFetching={isFetching}
       error={error}
@@ -79,7 +79,7 @@ export function WorkflowsListView({
       }
       toolbar={
         !isEmpty || hasActiveFilters ? (
-          <NxListPanelToolbar
+          <SynListPanelToolbar
             filters={filters}
             filterDefinitions={filterFieldDefinitions}
             onFilterChange={onFilterChange}
@@ -88,7 +88,7 @@ export function WorkflowsListView({
         ) : undefined
       }
       body={
-        <NxListPanelTable caption="Workflows table" footer={footer}>
+        <SynListPanelTable caption="Workflows table" footer={footer}>
           <Thead>
             <Tr>
               <Th sort={getSortParams('name')}>Name</Th>
@@ -109,7 +109,7 @@ export function WorkflowsListView({
           ) : (
             <FlatWorkflowsTableBody workflows={sortedWorkflows} getRowActions={getRowActions} />
           )}
-        </NxListPanelTable>
+        </SynListPanelTable>
       }
     />
   )

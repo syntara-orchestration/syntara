@@ -540,7 +540,7 @@ describe('ApprovalNodeForm', () => {
       expect(await screen.findByText('Project required')).toBeInTheDocument()
       const results = await axe(container, {
         rules: {
-          // This is a known limitation of testing PF Tabs in JSDOM - the components work correctly in real browsers
+          // This is a known limitation of testing PF Tabs in happy-dom - the components work correctly in real browsers
           'aria-valid-attr-value': { enabled: false },
         },
       })
@@ -731,8 +731,8 @@ describe('ApprovalNodeForm', () => {
       expect(await screen.findByText('Approver users')).toBeInTheDocument()
       const results = await axe(container, {
         rules: {
-          // PatternFly Tabs generates aria-controls pointing to tab panels that exist but axe can't find them in JSDOM
-          // This is a known limitation of testing PF Tabs in JSDOM - the components work correctly in real browsers
+          // PatternFly Tabs generates aria-controls pointing to tab panels that exist but axe can't find them in happy-dom
+          // This is a known limitation of testing PF Tabs in happy-dom - the components work correctly in real browsers
           'aria-valid-attr-value': { enabled: false },
         },
       })
@@ -771,7 +771,7 @@ describe('ApprovalNodeForm', () => {
 
       const results = await axe(container, {
         rules: {
-          // This is a known limitation of testing PF Tabs in JSDOM - the components work correctly in real browsers
+          // This is a known limitation of testing PF Tabs in happy-dom - the components work correctly in real browsers
           'aria-valid-attr-value': { enabled: false },
         },
       })

@@ -1,5 +1,5 @@
 ---
-schema_version: '2.0.0'
+schema_version: "2.0.0"
 name: authenticated-request
 description: API request with Authorization header from inputs
 
@@ -20,7 +20,7 @@ nodes:
       method: GET
       url: http://test-api.example.com/api/auth
       headers:
-        Authorization: ${input.apiToken}
+        Authorization: ${trigger.apiToken}
     inputs:
-      apiToken: ${inputs.apiToken}
+      apiToken: ${trigger.apiToken}
 edges: []
