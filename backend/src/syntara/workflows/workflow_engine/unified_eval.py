@@ -8,8 +8,11 @@ Uses AST evaluation with direct namespace lookup instead of string substitution.
 
 Security:
 - Variable values are looked up from namespace (no repr() or string conversion)
+- Visual-builder word operators are rewritten to Python before AST parsing
 - Expression syntax is pre-processed to strip ${} wrappers before AST parsing
 - No eval() or exec() - only AST-based evaluation with allowlist of node types
+- ``ast.Call`` is allowed only for ``len``, ``str.startswith``/``endswith``,
+  and internal ``__exists__`` / ``__re_search__`` helpers
 - AST complexity limits prevent denial-of-service attacks
 
 Type Safety: Values used with original types (no repr() conversion)
@@ -31,6 +34,7 @@ MAX_EXPRESSION_LENGTH = 10_000  # Max characters in expression
 MAX_VARIABLE_NAME_LENGTH = 500  # Max characters in ${variable.path.name}
 MAX_AST_DEPTH = 50  # Max nesting depth (e.g., nested parentheses)
 MAX_AST_NODES = 500  # Max total AST nodes
+MAX_REGEX_PATTERN_LENGTH = 500  # Max characters in a ``matches`` regex
 
 # Allowlist of safe AST node types — reject everything else up front
 # Makes security contract self-documenting and ensures newly introduced AST types
@@ -43,7 +47,16 @@ _ALLOWED_NODE_TYPES = (
     ast.Compare,
     ast.BoolOp,
     ast.UnaryOp,
+    ast.Call,
 )
+
+# Gated Call allowlist — never look these names up in the user namespace
+_ALLOWED_CALL_NAMES = frozenset({"len", "__exists__", "__re_search__"})
+_ALLOWED_METHODS = frozenset({"startswith", "endswith"})
+
+# Visual-builder operands: ${path} or a dotted/subscripted name
+_OPERAND_PATTERN = r"(?:\$\{[^}]+\}|[A-Za-z_][\w.]*(?:\[[^\]]+\])*)"
+_VALUE_PATTERN = r"(?:\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'|\d+(?:\.\d+)?|True|False|\$\{[^}]+\})"
 
 
 def _validate_ast_complexity(tree: ast.AST) -> None:
@@ -69,6 +82,56 @@ def _validate_ast_complexity(tree: ast.AST) -> None:
             check_depth(child, current_depth + 1)
 
     check_depth(tree, 0)
+
+
+def _operand_to_path(operand: str) -> str:
+    """Extract the namespace path from a ``${path}`` operand or a bare name."""
+    if operand.startswith("${") and operand.endswith("}"):
+        return operand[2:-1]
+    return operand
+
+
+def _exists_repl(match: re.Match[str]) -> str:
+    """Rewrite ``${x} exists`` to ``__exists__('x')`` so missing paths are False, not KeyError."""
+    path = _operand_to_path(match.group(1))
+    escaped = path.replace("\\", "\\\\").replace("'", "\\'")
+    return f"__exists__('{escaped}')"
+
+
+def _translate_custom_operators(expression: str) -> str:
+    """Rewrite visual-builder word operators to Python the AST evaluator can parse.
+
+    The serializer already converts ``contains`` to ``in`` when saving, but the
+    remaining operators are stored verbatim (``exists``, ``isEmpty``,
+    ``startsWith``, …) and are not valid Python. Already-published workflows
+    keep those strings, so translation happens at evaluation time.
+    """
+    translated = expression
+    replacements: tuple[tuple[str, str], ...] = (
+        (rf"({_OPERAND_PATTERN})\s+lengthGreaterThan\s+({_VALUE_PATTERN})", r"(len(\1) > \2)"),
+        (rf"({_OPERAND_PATTERN})\s+lengthLessThan\s+({_VALUE_PATTERN})", r"(len(\1) < \2)"),
+        (rf"({_OPERAND_PATTERN})\s+lengthEqualTo\s+({_VALUE_PATTERN})", r"(len(\1) == \2)"),
+        (rf"({_OPERAND_PATTERN})\s+startsWith\s+({_VALUE_PATTERN})", r"(\1.startswith(\2))"),
+        (rf"({_OPERAND_PATTERN})\s+endsWith\s+({_VALUE_PATTERN})", r"(\1.endswith(\2))"),
+        (rf"({_OPERAND_PATTERN})\s+matches\s+({_VALUE_PATTERN})", r"(__re_search__(\2, \1))"),
+        (rf"({_OPERAND_PATTERN})\s+contains\s+({_VALUE_PATTERN})", r"(\2 in \1)"),
+        (rf"({_OPERAND_PATTERN})\s+isEmpty\b", r"(not \1)"),
+    )
+    for pattern, repl in replacements:
+        translated = re.sub(pattern, repl, translated)
+    return re.sub(rf"({_OPERAND_PATTERN})\s+exists\b", _exists_repl, translated)
+
+
+def _path_exists(path: str, namespace: dict[str, Any]) -> bool:
+    """Return True when ``path`` resolves in ``namespace`` to a non-None value."""
+    if not path:
+        return False
+    current: object = namespace
+    for part in path.split("."):
+        if not isinstance(current, dict) or part not in current:
+            return False
+        current = current[part]
+    return current is not None
 
 
 def safe_eval_with_namespace(expression: str, namespace: dict[str, Any]) -> bool:
@@ -115,6 +178,8 @@ def safe_eval_with_namespace(expression: str, namespace: dict[str, Any]) -> bool
     if len(expression) > MAX_EXPRESSION_LENGTH:
         msg = f"Expression too long ({len(expression)} chars, max {MAX_EXPRESSION_LENGTH})"
         raise ValueError(msg)
+
+    expression = _translate_custom_operators(expression)
 
     # Strip ${} wrappers - use simple non-backtracking pattern
     # Fast path: skip regex if no templates present
@@ -248,6 +313,111 @@ def _eval_unary_op(node: ast.UnaryOp, namespace: dict[str, Any]) -> object:
     raise ValueError(msg)
 
 
+def _eval_call(node: ast.Call, namespace: dict[str, Any]) -> object:
+    """Evaluate a gated function/method call.
+
+    Allowed: ``len(x)``, ``x.startswith(s)``, ``x.endswith(s)``,
+    ``__exists__('path')``, ``__re_search__(pattern, value)``.
+    """
+    if node.keywords or any(isinstance(arg, ast.Starred) for arg in node.args):
+        msg = "Keyword and starred arguments are not supported"
+        raise ValueError(msg)
+
+    if isinstance(node.func, ast.Name):
+        return _eval_allowed_function(node.func.id, node.args, namespace)
+
+    if isinstance(node.func, ast.Attribute):
+        return _eval_allowed_method(node.func, node.args, namespace)
+
+    msg = f"Unsupported expression type: {type(node.func).__name__}"
+    raise TypeError(msg)
+
+
+def _eval_allowed_function(
+    func_name: str,
+    arg_nodes: list[ast.expr],
+    namespace: dict[str, Any],
+) -> object:
+    """Evaluate an allowlisted bare function call."""
+    if func_name not in _ALLOWED_CALL_NAMES:
+        msg = f"Unsupported function: {func_name}"
+        raise TypeError(msg)
+
+    args = [_eval_node(arg, namespace) for arg in arg_nodes]
+    if func_name == "len":
+        return _eval_len(args)
+    if func_name == "__exists__":
+        return _eval_exists_call(args, namespace)
+    return _eval_re_search(args)
+
+
+def _eval_len(args: list[object]) -> int:
+    """Evaluate ``len(x)`` for strings and collections."""
+    if len(args) != 1:
+        msg = "len() takes exactly one argument"
+        raise ValueError(msg)
+    value = args[0]
+    if not isinstance(value, (str, list, dict, tuple)):
+        msg = f"len() not supported for {type(value).__name__}"
+        raise TypeError(msg)
+    return len(value)
+
+
+def _eval_exists_call(args: list[object], namespace: dict[str, Any]) -> bool:
+    """Evaluate ``__exists__('path')``."""
+    if len(args) != 1 or not isinstance(args[0], str):
+        msg = "__exists__ requires a single string path"
+        raise ValueError(msg)
+    return _path_exists(args[0], namespace)
+
+
+def _eval_re_search(args: list[object]) -> bool:
+    """Evaluate ``__re_search__(pattern, value)`` for the ``matches`` operator."""
+    expected_args = 2
+    if len(args) != expected_args:
+        msg = "__re_search__ takes exactly two arguments"
+        raise ValueError(msg)
+    pattern, value = args
+    if not isinstance(pattern, str):
+        msg = "matches pattern must be a string"
+        raise TypeError(msg)
+    if len(pattern) > MAX_REGEX_PATTERN_LENGTH:
+        msg = f"matches pattern too long ({len(pattern)} chars, max {MAX_REGEX_PATTERN_LENGTH})"
+        raise ValueError(msg)
+    if value is None:
+        return False
+    text = value if isinstance(value, str) else str(value)
+    try:
+        return re.search(pattern, text) is not None
+    except re.error as exc:
+        msg = f"Invalid matches pattern: {pattern}"
+        raise ValueError(msg) from exc
+
+
+def _eval_allowed_method(
+    func: ast.Attribute,
+    arg_nodes: list[ast.expr],
+    namespace: dict[str, Any],
+) -> bool:
+    """Evaluate allowlisted string methods (startswith / endswith)."""
+    method = func.attr
+    if method not in _ALLOWED_METHODS:
+        msg = f"Unsupported method: {method}"
+        raise TypeError(msg)
+
+    obj = _eval_node(func.value, namespace)
+    args = [_eval_node(arg, namespace) for arg in arg_nodes]
+    if len(args) != 1 or not isinstance(args[0], str):
+        msg = f"{method}() requires a single string argument"
+        raise TypeError(msg)
+    if obj is None:
+        return False
+    text = obj if isinstance(obj, str) else str(obj)
+    if method == "startswith":
+        return text.startswith(args[0])
+    return text.endswith(args[0])
+
+
 def _eval_node(node: ast.expr, namespace: dict[str, Any]) -> object:
     """Evaluate AST node with namespace context.
 
@@ -291,6 +461,8 @@ def _eval_node(node: ast.expr, namespace: dict[str, Any]) -> object:
         return _eval_compare(node, namespace)
     if isinstance(node, ast.BoolOp):
         return _eval_bool_op(node, namespace)
+    if isinstance(node, ast.Call):
+        return _eval_call(node, namespace)
 
     # UnaryOp guaranteed by allowlist above
     return _eval_unary_op(node, namespace)

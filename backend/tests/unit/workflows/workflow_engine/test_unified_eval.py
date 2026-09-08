@@ -379,9 +379,9 @@ class TestErrorMessages:
         assert "namespace" not in error_msg.lower()
 
     def test_unsupported_operation_error_message(self) -> None:
-        """Function calls are not supported."""
-        with pytest.raises(TypeError, match="Unsupported expression type"):
-            safe_eval_with_namespace("len(${items})", {"items": [1, 2, 3]})
+        """Arbitrary function calls are not supported."""
+        with pytest.raises(TypeError, match="Unsupported function"):
+            safe_eval_with_namespace("print(${items})", {"items": [1, 2, 3]})
 
 
 class TestRealWorldScenarios:
@@ -699,3 +699,79 @@ class TestExceptionHandlingFix:
         # This raises IndexError in unified_eval, should propagate as ValueError
         with pytest.raises((IndexError, ValueError)):
             safe_eval_with_namespace("${items[10]} == 1", namespace)
+
+
+class TestVisualBuilderOperators:
+    """Word operators from the visual expression builder must evaluate at runtime."""
+
+    def test_exists_true_when_path_present(self) -> None:
+        assert safe_eval_with_namespace("${node.status} exists", {"node": {"status": "ok"}}) is True
+
+    def test_exists_false_when_nested_key_missing(self) -> None:
+        assert safe_eval_with_namespace("${node.status} exists", {"node": {}}) is False
+
+    def test_exists_false_when_root_missing(self) -> None:
+        assert safe_eval_with_namespace("${node.status} exists", {}) is False
+
+    def test_exists_false_when_value_is_none(self) -> None:
+        assert safe_eval_with_namespace("${node.status} exists", {"node": {"status": None}}) is False
+
+    def test_not_exists(self) -> None:
+        assert safe_eval_with_namespace("not (${node.status} exists)", {"node": {}}) is True
+
+    def test_is_empty_string(self) -> None:
+        assert safe_eval_with_namespace("${text} isEmpty", {"text": ""}) is True
+        assert safe_eval_with_namespace("${text} isEmpty", {"text": "hi"}) is False
+
+    def test_is_empty_list(self) -> None:
+        assert safe_eval_with_namespace("${items} isEmpty", {"items": []}) is True
+        assert safe_eval_with_namespace("${items} isEmpty", {"items": [1]}) is False
+
+    def test_starts_with(self) -> None:
+        assert safe_eval_with_namespace('${username} startsWith "user_"', {"username": "user_abc"}) is True
+        assert safe_eval_with_namespace('${username} startsWith "user_"', {"username": "admin"}) is False
+
+    def test_ends_with(self) -> None:
+        assert safe_eval_with_namespace('${filename} endsWith ".txt"', {"filename": "notes.txt"}) is True
+        assert safe_eval_with_namespace('${filename} endsWith ".txt"', {"filename": "notes.md"}) is False
+
+    def test_matches_regex(self) -> None:
+        assert safe_eval_with_namespace('${code} matches "^[A-Z]{3}$"', {"code": "ABC"}) is True
+        assert safe_eval_with_namespace('${code} matches "^[A-Z]{3}$"', {"code": "ab"}) is False
+
+    def test_invalid_matches_pattern_raises(self) -> None:
+        with pytest.raises(ValueError, match="Invalid matches pattern"):
+            safe_eval_with_namespace('${code} matches "["', {"code": "A"})
+
+    def test_length_equal_to(self) -> None:
+        assert safe_eval_with_namespace("${tags} lengthEqualTo 2", {"tags": ["a", "b"]}) is True
+        assert safe_eval_with_namespace("${tags} lengthEqualTo 2", {"tags": ["a"]}) is False
+
+    def test_length_greater_than(self) -> None:
+        assert safe_eval_with_namespace("${tags} lengthGreaterThan 1", {"tags": ["a", "b"]}) is True
+
+    def test_length_less_than(self) -> None:
+        assert safe_eval_with_namespace("${tags} lengthLessThan 2", {"tags": ["a"]}) is True
+
+    def test_contains_word_form(self) -> None:
+        assert safe_eval_with_namespace('${message} contains "Hello"', {"message": "Hello world"}) is True
+
+    def test_combined_with_and(self) -> None:
+        namespace = {"node": {"status": "ok", "name": "svc-1"}}
+        expr = '${node.status} exists and ${node.name} startsWith "svc"'
+        assert safe_eval_with_namespace(expr, namespace) is True
+
+    def test_len_builtin_allowed(self) -> None:
+        assert safe_eval_with_namespace("len(${items}) == 3", {"items": [1, 2, 3]}) is True
+
+    def test_disallowed_method_rejected(self) -> None:
+        with pytest.raises(TypeError, match="Unsupported method"):
+            safe_eval_with_namespace('${name}.replace("a", "b") == "x"', {"name": "a"})
+
+    def test_disallowed_function_rejected(self) -> None:
+        with pytest.raises(TypeError, match="Unsupported function"):
+            safe_eval_with_namespace("open(${path})", {"path": "file.txt"})
+
+    def test_keyword_args_rejected(self) -> None:
+        with pytest.raises(ValueError, match="Keyword and starred arguments"):
+            safe_eval_with_namespace("len(${items}, default=0)", {"items": [1]})

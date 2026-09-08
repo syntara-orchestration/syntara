@@ -52,13 +52,19 @@ Condition and Switch nodes evaluate boolean expressions with `safe_eval_with_nam
 | Comparison | `==`, `!=`, `>`, `<`, `>=`, `<=` |
 | Boolean | `and`, `or` |
 | Unary | `not`, `-` |
+| Membership | `in`, `not in` |
+| Visual builder | `exists`, `isEmpty`, `contains`, `startsWith`, `endsWith`, `matches`, `lengthEqualTo`, `lengthGreaterThan`, `lengthLessThan` |
 
 ```python
 "${trigger.status} == 'completed'"
 "${step_1.count} >= 10"
 "${trigger.priority} > 5 and ${trigger.environment} == 'production'"
 "not ${step_1.is_error}"
+"${node.status} exists"
+'${filename} endsWith ".txt"'
 ```
+
+The visual builder stores word operators (`exists`, `isEmpty`, `startsWith`, …) in the workflow definition. The evaluator rewrites them to Python before parsing. `exists` is True when the path is present and not `None`; a missing path is False rather than a lookup error.
 
 ## Output Mapping
 
