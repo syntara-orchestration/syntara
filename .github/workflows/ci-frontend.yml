@@ -5,11 +5,11 @@ name: CI Frontend
 
 on:
   pull_request:
-    branches: [devel, early-access]
+    branches: [devel, early-access, 'feat/*']
   merge_group:
-    branches: [devel, early-access]
+    branches: [devel, early-access, 'feat/*']
   push:
-    branches: [devel, early-access]
+    branches: [devel, early-access, 'feat/*']
   schedule:
     # Daily E2E run with Currents reporting at 2 AM UTC
     - cron: '0 2 * * *'

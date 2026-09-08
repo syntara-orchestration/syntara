@@ -8,7 +8,7 @@ name: OpenAPI Breaking Changes
 
 on:
   pull_request:
-    branches: [devel, early-access]
+    branches: [devel, early-access, 'feat/*']
     types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
     paths:
       - 'backend/**'

@@ -1,4 +1,7 @@
-"""Top-level Syntara package exposing subpackages for agents, API, and tool manager."""
+"""Top-level Syntara package exposing subpackages for agents, API, and tool manager.
+
+Test comment for CI workflow verification on feat/* branches.
+"""
 
 # regopy (rego-cpp) must be imported before any module that loads greenlet or
 # temporalio's native bridge: librego_shared.so statically links snmalloc and

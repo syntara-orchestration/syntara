@@ -4,7 +4,7 @@ name: Check Contract Drift
 on:
   pull_request:
   push:
-    branches: [devel, early-access]
+    branches: [devel, early-access, 'feat/*']
   workflow_dispatch:
 
 permissions:

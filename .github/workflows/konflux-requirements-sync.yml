@@ -9,7 +9,7 @@ name: Konflux Requirements
 
 on:
   pull_request_target:
-    branches: [devel, early-access]
+    branches: [devel, early-access, 'feat/*']
     paths:
       - backend/uv.lock
       - backend/requirements.txt
