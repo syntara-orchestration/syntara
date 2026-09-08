@@ -307,8 +307,9 @@ export default tseslint.config(
       // Revisit: promote to `error` once the codebase is clean at this threshold.
       'max-params': ['warn', 3],
       // Applies to all .ts/.tsx files in this package — a file that only re-exports other
-      // modules is a barrel file. `warn` (not `error`) so the existing barrel files are not a
-      // hard build break; new ones are blocked by the Zero New Warnings Policy in review.
+      // modules is a barrel file. See https://tkdodo.eu/blog/please-stop-using-barrel-files
+      // `warn` (not `error`) so the existing barrel files are not a hard build break; new ones
+      // are blocked by the Zero New Warnings Policy in review.
       'barrel-files/avoid-barrel-files': 'warn',
       // Limit nested functions/callbacks (e.g. hooks → timeout → setState updater). Complements max-depth
       // and aligns with Sonar-style “deeply nested functions” maintainability rules. Tests disable this.
@@ -408,11 +409,7 @@ export default tseslint.config(
     // expression defaults) that mostly use `export function`/`export const`, so the rule
     // undercounts their real declarations and misreads a small re-export section as a barrel
     // file. They are not barrel files. See frontend/docs/tickets/fix-barrel-file-warnings.md.
-    files: [
-      'src/stores/useWorkflowStore.ts',
-      'src/stores/workflowFactories.ts',
-      'src/utils/expressions/defaults.ts',
-    ],
+    files: ['src/stores/useWorkflowStore.ts', 'src/stores/workflowFactories.ts', 'src/utils/expressions/defaults.ts'],
     rules: {
       'barrel-files/avoid-barrel-files': 'off',
     },
