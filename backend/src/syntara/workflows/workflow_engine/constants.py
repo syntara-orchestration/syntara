@@ -32,6 +32,14 @@ DEFAULT_ACTIVITY_TIMEOUT_SECONDS = 30
 # seed_builtin.py and as the cancel-key TTL in invocation_service.py.
 AGENT_EXECUTION_TIMEOUT_SECONDS = 3600
 
+# Temporal only delivers activity cancellation through heartbeats, and only to an
+# activity that was scheduled with a heartbeat_timeout -- without one the server
+# drops the beats and a cancelled workflow cannot interrupt a long-running
+# activity. Internal activities beat on this interval; the schedule allows 3x
+# that before Temporal declares the attempt dead. Ref: AAP-88614.
+INTERNAL_ACTIVITY_HEARTBEAT_INTERVAL_SECONDS = 10.0
+INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS = 30.0
+
 # Key injected by the engine into each activity's input config so the activity
 # can use the already-resolved timeout without re-querying the catalog.
 # Must be popped by agentic_activity before forwarding config to the orchestrator.
