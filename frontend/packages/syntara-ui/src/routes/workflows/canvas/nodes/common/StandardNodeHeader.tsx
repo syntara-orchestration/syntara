@@ -1,15 +1,14 @@
 import { Content, Flex, FlexItem, Stack, StackItem } from '@patternfly/react-core'
 import { useStore } from '@xyflow/react'
 
-import { useIsActiveExecution } from '../../../../builder/ActiveExecutionContext'
-import { useIsExecutionView } from '../../../../builder/ExecutionViewContext'
-import { useIsVersionView } from '../../../../builder/VersionViewContext'
-import type { NodeMenuAction } from '../hooks/useNodeMenuActions'
-
 import { NodeExpandToggle } from '../../../../../components/nodes/NodeExpandToggle'
 import { NodeHeader } from '../../../../../components/nodes/NodeHeader'
 import { NodeMenu } from '../../../../../components/nodes/NodeMenu'
 import { NodeTitle } from '../../../../../components/nodes/NodeTitle'
+import { useIsActiveExecution } from '../../../../builder/ActiveExecutionContext'
+import { useIsExecutionView } from '../../../../builder/ExecutionViewContext'
+import { useIsVersionView } from '../../../../builder/VersionViewContext'
+import type { NodeMenuAction } from '../hooks/useNodeMenuActions'
 
 type StandardNodeHeaderProps = {
   icon?: React.ReactNode

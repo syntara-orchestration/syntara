@@ -2,8 +2,8 @@ import { render, screen } from '@testing-library/react'
 import { useMemo, useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
-import { NodeBody } from '../../routes/workflows/canvas/nodes/common/NodeBody'
-import { NodeExpandedContext, type NodeExpandedContextValue } from '../../routes/workflows/canvas/nodes/common/NodeExpandedContext'
+import { NodeBody } from './NodeBody'
+import { NodeExpandedContext, type NodeExpandedContextValue } from './NodeExpandedContext'
 
 describe('NodeBody', () => {
   // Helper to render with context
