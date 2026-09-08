@@ -128,7 +128,6 @@ async def _lookup_local_user(username: str) -> User:
         result = await session.exec(
             select(User).filter(
                 User.username == username.lower(),  # type: ignore[arg-type]
-                User.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
         user = result.one_or_none()
