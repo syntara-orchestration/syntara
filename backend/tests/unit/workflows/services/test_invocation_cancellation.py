@@ -11,6 +11,7 @@ from syntara.core.models import User
 from syntara.workflows.services.invocation_cancellation import (
     cancel_invocations_for_execution,
     find_active_invocations_for_execution,
+    linked_invocation_ids,
 )
 
 
@@ -21,10 +22,21 @@ def _make_invocation(
     inv = Mock(spec=Invocation)
     inv.id = uuid4()
     inv.status = status
-    inv.context_data = {"execution_id": execution_id}
     inv.error_message = None
     inv.completed_at = None
     return inv
+
+
+def _session_for_lookup(linked_ids: list[str], invocations: list[Invocation]) -> Mock:
+    """Session whose first exec() yields the activity-output link, second the rows."""
+    link_result = Mock()
+    link_result.all.return_value = linked_ids
+    invocation_result = Mock()
+    invocation_result.all.return_value = invocations
+
+    mock_session = Mock()
+    mock_session.exec = AsyncMock(side_effect=[link_result, invocation_result])
+    return mock_session
 
 
 def _mock_user() -> User:
@@ -38,25 +50,39 @@ class TestFindActiveInvocationsForExecution:
     async def test_returns_matching_invocations(self) -> None:
         execution_id = uuid4()
         inv = _make_invocation(str(execution_id))
-        mock_result = Mock()
-        mock_result.all.return_value = [inv]
-        mock_session = Mock()
-        mock_session.exec = AsyncMock(return_value=mock_result)
+        mock_session = _session_for_lookup([str(inv.id)], [inv])
 
         result = await find_active_invocations_for_execution(mock_session, execution_id)
 
         assert result == [inv]
+
+    @pytest.mark.asyncio
+    async def test_returns_empty_when_activity_output_has_no_link(self) -> None:
+        """No agentic activity reported an invocation, so nothing is loaded."""
+        execution_id = uuid4()
+        mock_session = _session_for_lookup([], [])
+
+        result = await find_active_invocations_for_execution(mock_session, execution_id)
+
+        assert result == []
         mock_session.exec.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_returns_empty_when_no_match(self) -> None:
+    async def test_returns_empty_when_linked_rows_are_not_cancellable(self) -> None:
         execution_id = uuid4()
-        mock_result = Mock()
-        mock_result.all.return_value = []
-        mock_session = Mock()
-        mock_session.exec = AsyncMock(return_value=mock_result)
+        mock_session = _session_for_lookup([str(uuid4())], [])
 
         result = await find_active_invocations_for_execution(mock_session, execution_id)
+
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_malformed_invocation_id_is_ignored(self) -> None:
+        """A non-UUID in activity output must not break the cancel path."""
+        execution_id = uuid4()
+        mock_session = _session_for_lookup(["not-a-uuid", None], [])  # type: ignore[list-item]
+
+        result = await linked_invocation_ids(mock_session, execution_id)
 
         assert result == []
 
@@ -65,7 +91,7 @@ class TestCancelInvocationsForExecution:
     """Bulk cancel delegates to InvocationService."""
 
     @pytest.mark.asyncio
-    async def test_no_active_invocations_returns_zero(self) -> None:
+    async def test_no_active_invocations_returns_empty(self) -> None:
         execution_id = uuid4()
         mock_session = Mock()
 
@@ -76,7 +102,7 @@ class TestCancelInvocationsForExecution:
         ):
             result = await cancel_invocations_for_execution(mock_session, _mock_user(), execution_id)
 
-        assert result == 0
+        assert result == []
 
     @pytest.mark.asyncio
     async def test_cancels_single_invocation_via_service(self) -> None:
@@ -99,7 +125,7 @@ class TestCancelInvocationsForExecution:
         ):
             result = await cancel_invocations_for_execution(mock_session, _mock_user(), execution_id)
 
-        assert result == 1
+        assert result == [inv.id]
         mock_service.cancel_invocation.assert_awaited_once_with(inv.id, "Workflow execution cancelled")
 
     @pytest.mark.asyncio
@@ -123,7 +149,7 @@ class TestCancelInvocationsForExecution:
         ):
             result = await cancel_invocations_for_execution(mock_session, _mock_user(), execution_id)
 
-        assert result == 3
+        assert result == [inv.id for inv in invocations]
         assert mock_service.cancel_invocation.await_count == 3
 
     @pytest.mark.asyncio
@@ -148,11 +174,11 @@ class TestCancelInvocationsForExecution:
         ):
             result = await cancel_invocations_for_execution(mock_session, _mock_user(), execution_id)
 
-        assert result == 1
+        assert result == [invocations[1].id]
         mock_session.rollback.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_not_cancellable_is_not_counted(self) -> None:
+    async def test_not_cancellable_is_not_returned(self) -> None:
         execution_id = uuid4()
         inv = _make_invocation(str(execution_id))
         mock_session = Mock()
@@ -172,7 +198,7 @@ class TestCancelInvocationsForExecution:
         ):
             result = await cancel_invocations_for_execution(mock_session, _mock_user(), execution_id)
 
-        assert result == 0
+        assert result == []
 
     @pytest.mark.asyncio
     async def test_custom_reason_passed_to_service(self) -> None:

@@ -62,6 +62,7 @@ class TestCancelExecution:
         with patch(
             "syntara.workflows.services.invocation_cancellation.cancel_invocations_for_execution",
             new_callable=AsyncMock,
+            return_value=[],
         ):
             await service.cancel_execution(execution.id)
 
@@ -172,6 +173,7 @@ class TestCancelExecution:
         with patch(
             "syntara.workflows.services.invocation_cancellation.cancel_invocations_for_execution",
             new_callable=AsyncMock,
+            return_value=[],
         ) as mock_cancel:
             await service.cancel_execution(execution.id)
 
