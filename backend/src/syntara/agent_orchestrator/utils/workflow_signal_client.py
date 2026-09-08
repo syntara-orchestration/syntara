@@ -244,3 +244,69 @@ class WorkflowSignalClient:
                 "Unexpected error sending failure signal",
                 invocation_id=invocation_id,
             )
+
+    @staticmethod
+    async def send_cancellation_signal(
+        callback_url: str | None,
+        invocation_id: UUID,
+        reason: str = "User cancelled",
+    ) -> None:
+        """Send cancellation signal to workflow (best-effort).
+
+        Sends ``status: "cancelled"`` so the workflow engine can distinguish
+        cancellations from permanent failures.
+
+        Args:
+            callback_url: Workflow callback URL (None to skip)
+            invocation_id: Invocation UUID
+            reason: Human-readable cancellation reason
+
+        """
+        if not callback_url:
+            logger.debug(
+                "No callback_url for invocation, skipping cancellation signal",
+                invocation_id=invocation_id,
+            )
+            return
+
+        validate_signal_url(callback_url)
+
+        signal_payload = {
+            "signal_data": {
+                "id": str(invocation_id),
+                "status": "cancelled",
+                "reason": reason,
+                "error": {
+                    "message": reason,
+                    "error_type": "InvocationCancelledError",
+                },
+                "timestamp": datetime.now(UTC).isoformat(),
+                "agent_type": "GenericAgent",
+            }
+        }
+
+        logger.info(
+            "CANCELLATION SIGNAL: Sending to callback",
+            callback_url=callback_url,
+            invocation_id=invocation_id,
+        )
+
+        try:
+            await _post_signal(callback_url, signal_payload, invocation_id)
+
+            logger.info(
+                "CANCELLATION SIGNAL: Sent successfully",
+                invocation_id=invocation_id,
+                callback_url=callback_url,
+            )
+        except (httpx.RequestError, httpx.HTTPStatusError, httpx.TimeoutException):
+            logger.exception(
+                "Failed to send cancellation signal",
+                invocation_id=invocation_id,
+                callback_url=callback_url,
+            )
+        except Exception:
+            logger.exception(
+                "Unexpected error sending cancellation signal",
+                invocation_id=invocation_id,
+            )

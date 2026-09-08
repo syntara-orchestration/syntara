@@ -59,6 +59,9 @@ expected to pass on this repository. Prefer reproducing GitHub Actions
 failures locally with `make format`, `make lint`, `make test`, and
 `make typecheck` (plus component docs linked above).
 
+If a known flaky test is blocking a pipeline, see the [test quarantine
+workflow](docs/ci/test-quarantine.md) for the request process.
+
 Branch protection is gated by **`(Backend) Required Checks`** and
 **`(Frontend) Required Checks`**. Those jobs pass when their dependencies
 succeed or are skipped (for example, doc-only PRs). Individual job names

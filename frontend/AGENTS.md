@@ -163,7 +163,10 @@ npm run e2e:visual-regression:update # Same, with --update-snapshots (see packag
 #   @pr-check      Fast critical-path tests; select with --grep @pr-check
 #   @local-only    Visual regression tests; excluded from all CI automatically
 # Full rules: .claude/skills/frontend-playwright-e2e/SKILL.md → "Test Suite Tags"
-#
+
+For a known flaky test that needs temporary quarantine from CI, follow the
+[test quarantine workflow](../docs/ci/test-quarantine.md).
+
 # Run a specific test or coverage
 npx vitest run packages/syntara-ui/path/to/specific/test.test.ts
 npm run test:coverage
