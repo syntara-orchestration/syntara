@@ -115,6 +115,9 @@ class LLMModel(BaseResource, table=True):
         description="Last time this model was synced from the provider",
     )
 
+    # Provider discovery sync is not a user edit; don't bump updated_at for it.
+    __updated_at_exempt_fields__: ClassVar[frozenset[str]] = frozenset({"last_refreshed_at", "profile"})
+
     profile: dict[str, Any] | None = Field(
         default=None,
         sa_column=Column(JSONB, nullable=True),
