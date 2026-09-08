@@ -1943,6 +1943,9 @@ class ActivitySyncService:
         if query_succeeded:
             existing.input_data = input_data or {}
             existing.output_data = output_data
+        elif output_data is not None:
+            # Event-sourced heartbeat partial from activity_data — not from the failed query.
+            existing.output_data = output_data
         existing.error_details = activity_data["error_details"]
         existing.retry_count = activity_data["retry_count"]
         if activity_data.get("iteration") is not None and not is_loop_control:

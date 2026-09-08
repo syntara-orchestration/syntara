@@ -5445,6 +5445,21 @@ class TestUpdateActivityRecordPreservesOnQueryFailure:
         assert existing.input_data == {}
         assert existing.output_data is None
 
+    def test_query_succeeded_false_still_applies_event_sourced_output(self) -> None:
+        existing = self._existing_activity()
+        existing.output_data = None
+
+        ActivitySyncService._update_activity_record(
+            existing,
+            self._activity_data(),
+            {},
+            {"job_id": 42},
+            query_succeeded=False,
+        )
+
+        assert existing.input_data == {"param": "already-recorded"}
+        assert existing.output_data == {"job_id": 42}
+
 
 class TestActivitySyncPreservesIoOnQueryFailure:
     """End-to-end regression: a query failure at terminal transition must not erase recorded I/O."""
@@ -5535,3 +5550,39 @@ class TestActivitySyncPreservesIoOnQueryFailure:
         assert activity.output_data == recorded_output
         # Status still advances to terminal even though the query failed.
         assert activity.status == ActivityStatus.COMPLETED
+
+    @pytest.mark.asyncio
+    async def test_failed_query_on_running_activity_still_persists_heartbeat_partial(self) -> None:
+        """Heartbeat partial output is written even when the workflow query fails."""
+        heartbeat_partial = {"job_id": 42, "job_url": "https://example.com/jobs/42"}
+        activity = self._create_mock_activity_execution(
+            activity_name="script-node",
+            status=ActivityStatus.RUNNING,
+            output_data=None,
+        )
+        self._mock_session_with_activities([activity])
+
+        handle = AsyncMock()
+        handle.query.side_effect = RPCError("worker unreachable", status=RPCStatusCode.UNAVAILABLE, raw_grpc_status=b"")
+
+        metadata = create_test_metadata(
+            execution_id=self.execution_id,
+            activity_index_map={"script-node": 0},
+            pending_activity_updates={
+                10: {
+                    "activity_id": "script-node",
+                    "activity_name": "script-node",
+                    "status": ActivityStatus.RUNNING,
+                    "started_at": datetime.now(UTC),
+                    "completed_at": None,
+                    "error_details": None,
+                    "retry_count": 0,
+                    "output_data": heartbeat_partial,
+                },
+            },
+        )
+
+        await self.service._sync_activities_to_db(metadata, handle)
+
+        assert activity.output_data == heartbeat_partial
+        assert activity.status == ActivityStatus.RUNNING
