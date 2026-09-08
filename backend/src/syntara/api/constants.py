@@ -40,4 +40,10 @@ EXCLUDED_PATHS: frozenset[str] = frozenset(
 # Prefix for paths that should be excluded via startswith matching
 # (handles parameterised routes like /_internal/metrics/kpis/{component}).
 # Any path under these prefixes bypasses audit, metrics, cert, and rate-limit middleware.
+#
+# This prefix REMOVES protections; it is not an authentication mechanism. In
+# particular, skipping ClientCertAuthMiddleware also skips the X-On-Behalf-Of
+# anti-spoof strip, so a handler here must not trust that header. The assumed
+# control is network isolation, which is NOT enforced in this repository.
+# Read backend/docs/internal-path-prefix.md before adding a path here.
 EXCLUDED_PATH_PREFIXES: tuple[str, ...] = ("/_internal/", "/api_docs/")
