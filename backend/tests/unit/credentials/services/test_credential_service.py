@@ -1579,7 +1579,7 @@ class TestLookupUsers:
 
 
 class TestResolveUserReferences:
-    """Unit tests for CredentialService._resolve_user_references."""
+    """Unit tests for CredentialService.resolve_user_references."""
 
     @pytest.mark.asyncio
     async def test_resolves_uuid_to_user_reference(
@@ -1591,7 +1591,7 @@ class TestResolveUserReferences:
         mock_session.exec = AsyncMock(return_value=[(uid, "alice")])
         service = CredentialService(mock_session, mock_user, mock_secret_service)
         obj = MagicMock(created_by=uid, updated_by=uid)
-        await service._resolve_user_references([obj])
+        await service.resolve_user_references([obj])
         assert isinstance(obj.created_by, UserReference)
         assert obj.created_by.id == uid
         assert obj.created_by.name == "alice"
@@ -1605,7 +1605,7 @@ class TestResolveUserReferences:
         mock_session.exec = AsyncMock(return_value=[])
         service = CredentialService(mock_session, mock_user, mock_secret_service)
         obj = MagicMock(created_by=uid, updated_by=None)
-        await service._resolve_user_references([obj])
+        await service.resolve_user_references([obj])
         assert obj.created_by is None
 
     @pytest.mark.asyncio
@@ -1618,7 +1618,7 @@ class TestResolveUserReferences:
         mock_session.exec = AsyncMock(side_effect=SQLAlchemyError("db down"))
         service = CredentialService(mock_session, mock_user, mock_secret_service)
         obj = MagicMock(created_by=uid, updated_by=uid)
-        await service._resolve_user_references([obj])
+        await service.resolve_user_references([obj])
         assert obj.created_by is None
         assert obj.updated_by is None
 
@@ -1633,7 +1633,7 @@ class TestResolveUserReferences:
         service = CredentialService(mock_session, mock_user, mock_secret_service)
         obj1 = MagicMock(created_by=uid1, updated_by=None)
         obj2 = MagicMock(created_by=uid2, updated_by=uid1)
-        await service._resolve_user_references([obj1, obj2])
+        await service.resolve_user_references([obj1, obj2])
         assert isinstance(obj1.created_by, UserReference)
         assert obj1.created_by.name == "alice"
         assert isinstance(obj2.created_by, UserReference)

@@ -1065,6 +1065,21 @@ export interface components {
       instance?: string | null
     }
     /**
+     * UserReference
+     * @description Minimal user identification for embedding in other resources.
+     *     This model captures user identity at the time of an action, providing
+     *     a snapshot that doesn't change even if the user's details are updated later.
+     */
+    UserReference: {
+      /**
+       * Format: uuid
+       * @description User's unique identifier
+       */
+      id: string
+      /** @description User's display name at time of action */
+      name: string
+    }
+    /**
      * ValidationSeverity
      * @description Severity level for a validation finding.
      * @enum {string}
@@ -1170,9 +1185,14 @@ export interface components {
       has_validation_issues?: boolean
       /**
        * Created By
-       * Format: uuid
+       * @description User who created the workflow
        */
-      created_by: string
+      readonly created_by?: components['schemas']['UserReference'] | null
+      /**
+       * Updated By
+       * @description User who last modified the workflow
+       */
+      readonly updated_by?: components['schemas']['UserReference'] | null
       /**
        * Project Id
        * Format: uuid
@@ -1325,21 +1345,6 @@ export interface components {
        * Name
        * @description Group's name
        */
-      name: string
-    }
-    /**
-     * UserReference
-     * @description Minimal user identification for embedding in other resources.
-     *     This model captures user identity at the time of an action, providing
-     *     a snapshot that doesn't change even if the user's details are updated later.
-     */
-    UserReference: {
-      /**
-       * Format: uuid
-       * @description User's unique identifier
-       */
-      id: string
-      /** @description User's display name at time of action */
       name: string
     }
     ApprovalRequestRead: components['schemas']['BaseResource'] & {

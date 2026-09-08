@@ -78,6 +78,44 @@ test.describe('Workflows Table - Display and Navigation', () => {
     }
   })
 
+  test('Created at and Updated at columns show linked usernames', async ({ app }) => {
+    const project = await ensureProject(app)
+    const workflowName = buildUniqueName('e2e-userlink')
+    const workflow = await createWorkflowViaApi(app, {
+      name: workflowName,
+      projectId: project?.id,
+    })
+
+    if (!workflow) throw new Error('Failed to create test workflow')
+
+    try {
+      await app.goto(toAppUrl('/workflows'))
+      await expect(app.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
+
+      await app.getByPlaceholder('Filter by name').fill(workflowName)
+      await app.getByRole('button', { name: 'Apply filter' }).click()
+
+      const table = app.getByRole('grid', { name: 'Workflows table' })
+      const workflowRow = table.getByRole('row', { name: new RegExp(workflowName) })
+      await expect(workflowRow).toBeVisible({ timeout: 15_000 })
+
+      const createdCell = workflowRow.locator('td[data-label="Created at"]')
+      const updatedCell = workflowRow.locator('td[data-label="Updated at"]')
+
+      const userDetailHref = /\/system-administration\/access-management\/users\//
+
+      const createdLink = createdCell.getByRole('link')
+      await expect(createdLink).toBeVisible()
+      await expect(createdLink).toHaveAttribute('href', userDetailHref)
+
+      const updatedLink = updatedCell.getByRole('link')
+      await expect(updatedLink).toBeVisible()
+      await expect(updatedLink).toHaveAttribute('href', userDetailHref)
+    } finally {
+      await deleteWorkflowViaApi(app, workflow.id)
+    }
+  })
+
   test('workflows table displays action controls (kebab menu)', async ({ app }) => {
     // Create a workflow specifically for this test
     const project = await ensureProject(app)

@@ -21,6 +21,7 @@ def _make_mock_workflow() -> MagicMock:
     wf.is_enabled = True
     wf.has_validation_issues = False
     wf.created_by = uuid4()
+    wf.updated_by = None
     wf.project_id = uuid4()
     wf.published_version_id = None
     wf.created_at = "2026-01-01T00:00:00Z"
@@ -49,6 +50,7 @@ def _make_mock_service() -> AsyncMock:
     service = AsyncMock()
     service.session = AsyncMock()
     service.get_publish_context = AsyncMock(return_value=({}, {}))
+    service.resolve_user_references = AsyncMock()
     return service
 
 

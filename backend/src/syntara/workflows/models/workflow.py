@@ -8,7 +8,9 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, ClassVar
 from uuid import UUID
 
-from pydantic import ConfigDict
+from pydantic import ConfigDict, GetJsonSchemaHandler
+from pydantic.json_schema import JsonSchemaValue
+from pydantic_core import CoreSchema as PydanticCoreSchema
 from sqlalchemy import UniqueConstraint
 from sqlmodel import CheckConstraint, Field, Index, Relationship, SQLModel, text
 
@@ -16,6 +18,7 @@ from syntara.core.constants import FieldLimits
 from syntara.core.models.base.named import NamedResource
 from syntara.core.models.base.user_owned import UserOwnedResource
 from syntara.core.models.pagination import ResourcesResponse
+from syntara.core.models.user_reference import UserReference
 from syntara.workflows.models.validation_finding import ValidationResult
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 
@@ -245,10 +248,39 @@ class WorkflowRead(WorkflowBase):
     )
     published_version_id: UUID | None = None
     published_version_number: int | None = None
-    created_by: UUID
+    created_by: UserReference | UUID | str | None = Field(default=None, description="User who created the workflow")
+    updated_by: UserReference | UUID | str | None = Field(
+        default=None, description="User who last modified the workflow"
+    )
     project_id: UUID
     created_at: datetime
     updated_at: datetime
+
+    _USER_REF_SCHEMA: ClassVar[dict[str, Any]] = {
+        "readOnly": True,
+        "anyOf": [
+            {"$ref": "#/components/schemas/UserReference"},
+            {"type": "null"},
+        ],
+    }
+
+    FIELD_SCHEMA_EXTRAS: ClassVar[dict[str, dict[str, Any]]] = {
+        "created_by": _USER_REF_SCHEMA,
+        "updated_by": _USER_REF_SCHEMA,
+    }
+
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, core_schema: PydanticCoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        """Inject field-level OpenAPI metadata into the JSON schema."""
+        json_schema = handler(core_schema)
+        json_schema = handler.resolve_ref_schema(json_schema)
+        props = json_schema.get("properties", {})
+        for field, extras in cls.FIELD_SCHEMA_EXTRAS.items():
+            if field in props:
+                props[field].update(extras)
+        return json_schema
 
 
 class WorkflowReadWithVersion(WorkflowRead):

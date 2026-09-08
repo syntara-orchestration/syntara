@@ -19,13 +19,21 @@ vi.mock('../access-management/useProjectPermissions', () => ({
 
 type Workflow = WorkflowAPI.components['schemas']['WorkflowRead']
 
+const mockUser = { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'demo' }
+
 const baseWorkflow: Workflow = {
   id: 'wf-1',
   name: 'Deploy Pipeline',
+  current_version: 1,
   is_builtin: false,
+  is_enabled: false,
   published_version_id: null,
   project_id: 'proj-1',
-} as Workflow
+  created_at: '2023-01-01T12:00:00Z',
+  updated_at: '2023-01-02T12:00:00Z',
+  created_by: mockUser,
+  updated_by: mockUser,
+}
 
 function renderInTable(ui: ReactNode) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -103,6 +111,16 @@ describe('WorkflowsTableBody', () => {
       renderInTable(<FlatWorkflowsTableBody workflows={[baseWorkflow]} getRowActions={getRowActions} />)
 
       expect(screen.getByText('Deploy Pipeline')).toBeInTheDocument()
+    })
+
+    it('renders linked usernames in Created at and Updated at columns', () => {
+      renderInTable(<FlatWorkflowsTableBody workflows={[baseWorkflow]} getRowActions={getRowActions} />)
+
+      const userLinks = screen.getAllByRole('link', { name: 'demo' })
+      expect(userLinks).toHaveLength(2)
+      for (const link of userLinks) {
+        expect(link).toHaveAttribute('href', expect.stringContaining(mockUser.id))
+      }
     })
   })
 })

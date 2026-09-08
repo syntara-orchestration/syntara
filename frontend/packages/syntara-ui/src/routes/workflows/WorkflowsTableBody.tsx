@@ -6,10 +6,9 @@ import type { WorkflowAPI } from '@syntara/contracts'
 import groupedTableStyles from '../../components/groupedTable.module.css'
 import type { KebabAction } from '../../components/SynKebabMenu'
 import { SynKebabMenu } from '../../components/SynKebabMenu'
-import { DateCell } from '../../components/table/DateCell'
 import { LinkCell } from '../../components/table/LinkCell'
+import { UserTimestamp } from '../../components/table/UserTimestamp'
 import { WorkflowPublishStatusBadge } from '../../components/WorkflowPublishStatusBadge'
-import { getDateField } from '../../utils/getDateField'
 import type { ProjectRead } from '../access/types'
 import { useProjectPermissions } from '../access-management/useProjectPermissions'
 
@@ -35,10 +34,10 @@ function WorkflowRow({ workflow, getRowActions }: Readonly<WorkflowRowProps>) {
         </LinkCell>
       </Td>
       <Td dataLabel="Created at">
-        <DateCell dateString={getDateField(workflow, 'createdAt')} />
+        <UserTimestamp user={workflow.created_by} timestamp={workflow.created_at} inline />
       </Td>
       <Td dataLabel="Updated at">
-        <DateCell dateString={getDateField(workflow, 'updatedAt')} />
+        <UserTimestamp user={workflow.updated_by} timestamp={workflow.updated_at} inline />
       </Td>
       <Td dataLabel="Status">
         <WorkflowPublishStatusBadge
