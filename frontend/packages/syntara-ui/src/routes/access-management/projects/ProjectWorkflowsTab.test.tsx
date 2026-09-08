@@ -189,12 +189,12 @@ describe('ProjectWorkflowsTab', () => {
     expect(link).toHaveAttribute('href', '/workflow-builder/wf-1')
   })
 
-    it('does not render mutating row kebabs in the read-only project view', () => {
-      render(<ProjectWorkflowsTab projectId="proj-1" />, { wrapper })
+  it('does not render mutating row kebabs in the read-only project view', () => {
+    render(<ProjectWorkflowsTab projectId="proj-1" />, { wrapper })
 
-      expect(screen.queryByRole('button', { name: 'Actions for Project Alpha Workflow' })).not.toBeInTheDocument()
-      expect(screen.queryByRole('columnheader', { name: 'Actions' })).not.toBeInTheDocument()
-    })
+    expect(screen.queryByRole('button', { name: 'Actions for Project Alpha Workflow' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('columnheader', { name: 'Actions' })).not.toBeInTheDocument()
+  })
 
   it('shows true empty messaging and create action when the project has no workflows', async () => {
     mockQueries({ resources: [] })

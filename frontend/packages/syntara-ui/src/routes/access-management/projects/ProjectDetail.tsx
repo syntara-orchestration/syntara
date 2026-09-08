@@ -225,7 +225,12 @@ export function ProjectDetail() {
       />
       <SynPageBody>
         <SynListPanel>
-          <SynListPanelTabs basePath={basePath} defaultTab="details" validTabs={urlValidTabs} aria-label="Project details">
+          <SynListPanelTabs
+            basePath={basePath}
+            defaultTab="details"
+            validTabs={urlValidTabs}
+            aria-label="Project details"
+          >
             <Tab eventKey="details" title={<TabTitleText>Details</TabTitleText>} />
             {visibleTabs.includes('workflows') && (
               <Tab eventKey="workflows" title={<TabTitleText>Workflows</TabTitleText>} />
@@ -248,14 +253,13 @@ export function ProjectDetail() {
               body={<ProjectDetailsTab project={projectData} />}
             />
           )}
-          {activeTab === 'workflows' &&
-            canShowTabContent('workflows', visibleTabs, permissionsLoading, activeTab) && (
+          {activeTab === 'workflows' && canShowTabContent('workflows', visibleTabs, permissionsLoading, activeTab) && (
             <ProjectWorkflowsTab projectId={projectId ?? ''} isBuiltin={projectData.is_builtin} />
           )}
           {activeTab === 'role-assignments' &&
             canShowTabContent('role-assignments', visibleTabs, permissionsLoading, activeTab) && (
-            <ProjectRoleAssignmentsTab projectId={projectId ?? ''} />
-          )}
+              <ProjectRoleAssignmentsTab projectId={projectId ?? ''} />
+            )}
         </SynListPanel>
       </SynPageBody>
 
