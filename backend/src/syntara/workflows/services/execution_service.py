@@ -1131,7 +1131,11 @@ class ExecutionService(BaseService):
                 cancel_invocations_for_execution,
             )
 
-            await cancel_invocations_for_execution(self.session, self.user, execution_id)
+            cancelled_invocation_ids = await cancel_invocations_for_execution(self.session, self.user, execution_id)
+            # The invocation status is what stops the agent loop; cancelling the
+            # builtin workflow that runs it just stops it lingering as RUNNING.
+            for invocation_id in cancelled_invocation_ids:
+                await self._cancel_agent_execution_for_invocation(invocation_id)
         except Exception:
             logger.exception(
                 "Best-effort invocation cancellation failed",
@@ -1145,6 +1149,65 @@ class ExecutionService(BaseService):
             action=ExecutionAction.CANCELLED,
             mode=execution.mode.value,
         )
+
+    async def _cancel_agent_execution_for_invocation(self, invocation_id: UUID) -> None:
+        """Cancel the builtin AGENT_EXECUTION workflow running this invocation.
+
+        Marking the invocation CANCELLED stops the agent at its next phase
+        boundary; cancelling the Temporal workflow stops it from lingering as a
+        running execution. Best-effort — the DB status is the effective stop.
+
+        ``input_data`` is caller-supplied, so the lookup is restricted to the
+        builtin "Agent Execution" workflow in the builtin project — matched on
+        the ``is_builtin`` flags as well as the names, the same way
+        ``seed_builtin`` resolves them. Without that restriction any execution
+        could claim an ``invocation_id`` and be cancelled alongside it.
+        """
+        if self.temporal_service is None:
+            return
+
+        from syntara.authz.models.project import Project  # noqa: PLC0415
+        from syntara.workflows.constants import (  # noqa: PLC0415
+            BUILTIN_PROJECT_NAME,
+            BUILTIN_WORKFLOW_AGENT_EXECUTION,
+        )
+
+        builtin_project_id = (
+            select(Project.id)
+            .where(
+                Project.name == BUILTIN_PROJECT_NAME,
+                col(Project.is_builtin).is_(True),
+            )
+            .scalar_subquery()
+        )
+
+        try:
+            result = await self.session.exec(
+                select(Execution)
+                .join(Workflow, Workflow.id == Execution.workflow_id)  # type: ignore[arg-type]
+                .where(col(Execution.input_data)["invocation_id"].astext == str(invocation_id))
+                .where(col(Workflow.name) == BUILTIN_WORKFLOW_AGENT_EXECUTION)
+                .where(col(Workflow.is_builtin).is_(True))
+                .where(Workflow.project_id == builtin_project_id)
+                .where(col(Execution.status).not_in(TERMINAL_EXECUTION_STATUSES))
+            )
+            agent_executions = list(result.all())
+        except Exception:
+            logger.exception(
+                "Failed to look up builtin agent execution",
+                invocation_id=invocation_id,
+            )
+            return
+
+        for agent_execution in agent_executions:
+            try:
+                await self.temporal_service.cancel_workflow(temporal_workflow_id=agent_execution.temporal_workflow_id)
+            except Exception:
+                logger.exception(
+                    "Failed to cancel builtin agent execution",
+                    invocation_id=invocation_id,
+                    execution_id=agent_execution.id,
+                )
 
     async def retry_execution(self, execution_id: UUID) -> ExecutionRead:
         """Retry a completed execution, re-running with the same version and inputs.
