@@ -15,6 +15,7 @@ import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData
 import { useQueryState } from '../../components/states/useQueryState'
 import { SynPageTitle } from '../../components/SynPageTitle'
 import { SynScrollableTableContainer } from '../../components/table/SynScrollableTableContainer'
+import { columnWidths } from '../../components/table/tableColumnWidths'
 import { useCursorPagination, useCursorReset } from '../../hooks/useCursorPagination'
 import { useProjectSelector } from '../../hooks/useProjectSelector'
 import { useProjectsForGrouping } from '../../hooks/useProjectsForGrouping'
@@ -194,11 +195,19 @@ export default function Executions() {
                       <Th modifier="nowrap" sort={getSortParams('workflow_id')}>
                         Workflow name
                       </Th>
-                      <Th sort={getSortParams('status')}>Status</Th>
-                      <Th modifier="nowrap">Version</Th>
-                      <Th sort={getSortParams('created_at')}>Created at</Th>
-                      <Th sort={getSortParams('completed_at')}>Completed at</Th>
-                      <Th screenReaderText="Actions" />
+                      <Th width={columnWidths.status} sort={getSortParams('status')}>
+                        Status
+                      </Th>
+                      <Th width={columnWidths.version} modifier="nowrap">
+                        Version
+                      </Th>
+                      <Th width={columnWidths.dateTimeCompact} sort={getSortParams('created_at')}>
+                        Created at
+                      </Th>
+                      <Th width={columnWidths.dateTimeCompact} sort={getSortParams('completed_at')}>
+                        Completed at
+                      </Th>
+                      <Th width={columnWidths.actions} screenReaderText="Actions" />
                     </Tr>
                   </Thead>
                   {isAllProjects && groupedExecutions ? (
