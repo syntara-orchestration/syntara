@@ -52,7 +52,7 @@ export interface paths {
     post?: never
     /**
      * Delete project
-     * @description Delete a project (soft-delete). Requires: project:delete permission scoped to this project.
+     * @description Delete a project (hard-delete). Requires: project:delete permission scoped to this project.
      */
     delete: operations['delete_project']
     options?: never

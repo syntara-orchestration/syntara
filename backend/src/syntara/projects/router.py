@@ -256,12 +256,12 @@ async def replace_project(
     operation_id="delete_project",
     response_description="Project deleted",
 )
-@audit(EventCategory.USER_ACTION)
+@audit(EventCategory.USER_ACTION, event_action="project_delete", capture_args={"project_id"})
 async def delete_project(
     project_id: UUID,
     service: Annotated[ProjectService, Depends(get_project_service)],
 ) -> None:
-    """Delete a project (soft-delete). Requires: project:delete permission scoped to this project."""
+    """Delete a project (hard-delete). Requires: project:delete permission scoped to this project."""
     await service.delete_project(project_id)
 
 

@@ -400,7 +400,7 @@ export function UserDetail({ isMyProfile }: Readonly<UserDetailProps> = {}) {
 
   const displayName = userDisplayName(userData)
   const pageTitle = isMyProfile ? 'My Profile' : displayName
-  const userBreadcrumbs = isMyProfile ? [] : breadcrumbsUserDetail(displayName, basePath, activeTab)
+  const userBreadcrumbs = isMyProfile ? [] : breadcrumbsUserDetail(displayName)
 
   return (
     <SynPage>

@@ -1787,11 +1787,6 @@ export interface components {
       environment?: {
         [key: string]: string
       }
-      /**
-       * Credential Id
-       * @description Orchestrator credential UUID for credential scrubbing
-       */
-      credential_id?: string | null
     }
     /**
      * ApprovalNodeParameters
