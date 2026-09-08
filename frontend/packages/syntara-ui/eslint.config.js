@@ -301,11 +301,7 @@ export default tseslint.config(
       // Aligns with Sonar typescript:S3358 (nested ternary). Matches SonarCloud carve-outs (e.g. separate JSX `{}` blocks).
       'sonarjs/no-nested-conditional': 'error',
       'max-depth': ['error', 4],
-      // Lowered from `['error', 5]`. Reviewers flag functions at 4 params and ask for an object
-      // parameter instead. Set to `warn` (not `error`) so existing 4+ param functions are not a
-      // hard build break — the Zero New Warnings Policy still blocks new violations in review.
-      // Revisit: promote to `error` once the codebase is clean at this threshold.
-      'max-params': ['warn', 3],
+      'max-params': ['error', 5],
       // Applies to all .ts/.tsx files in this package — a file that only re-exports other
       // modules is a barrel file. See https://tkdodo.eu/blog/please-stop-using-barrel-files
       // `warn` (not `error`) so the existing barrel files are not a hard build break; new ones

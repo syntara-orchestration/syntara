@@ -1977,29 +1977,7 @@ Reference implementation: `useOptimisticCredentialEnabled` (credentials list ena
 
 ---
 
-## 43. Use an Object Parameter for 3 or More Arguments
-
-**A function with 3 or more parameters must take one object parameter, not separate positional parameters.** An object parameter is easier to read at the call site. Each argument has a name. The order of arguments does not matter.
-
-Do not write this:
-
-```ts
-function createWorkflowActivity(name: string, nodeId: string, status: ExecutionStatus, timestamp: string) { ... }
-```
-
-Write this instead:
-
-```ts
-function createWorkflowActivity(input: { name: string; nodeId: string; status: ExecutionStatus; timestamp: string }) { ... }
-```
-
-**Enforcement:** `max-params` is set to `warn` at 3 arguments in `eslint.config.js`. This is a warning, not an error, so it does not break the build on existing code. New or changed code must not add a new warning — see the Zero New Warnings Policy in section 8.
-
-**Exception:** React components take one `props` object already. This rule is about plain functions and hooks with several separate arguments.
-
----
-
-## 44. Do Not Write Barrel Files
+## 43. Do Not Write Barrel Files
 
 **A barrel file is a file that only re-exports things from other files.** Example:
 

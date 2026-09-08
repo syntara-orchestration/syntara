@@ -126,8 +126,7 @@ Check whether the changes follow:
 | New `useRef` + `useEffect` only to attach/detach DOM listeners | #31 -- prefer ref callback cleanup functions (coding standards §38)                                       |
 | New `useContext(` usage                                        | #32 -- use `use(Context)` instead (React 19); see coding standards §39                                    |
 | Hand-rolled pending mirror state for simple toggle mutations   | #33 -- prefer `useOptimistic` + Action/`mutateAsync` (coding standards §40)                               |
-| Function with 3+ separate positional parameters                | #34 -- use one object parameter instead (coding standards §43); `max-params` is `warn`, not `error`, so also check the diff by eye |
-| New file that only re-exports from other files                 | #35 -- do not add a barrel file (coding standards §44); `barrel-files/avoid-barrel-files` is `warn`, not `error`, so also check the diff by eye |
+| New file that only re-exports from other files                 | #34 -- do not add a barrel file (coding standards §43); `barrel-files/avoid-barrel-files` is `warn`, not `error`, so also check the diff by eye |
 | New `type`/`interface` with the same members as an existing imported type | Not ESLint-enforceable (needs structural type comparison) -- flag manually; use `type X = Y` or extend the existing type instead of re-declaring it |
 
 ### 3b. Rule Bypass Checks (BLOCKING -- do not approve if any are found)
