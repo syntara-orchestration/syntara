@@ -73,9 +73,15 @@ export function useDockStateProvider(): DockState {
   const dockedToggleRef = useRef<HTMLButtonElement>(null)
   const mobileToggleRef = useRef<HTMLButtonElement>(null)
   const focusTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
-  const prevIsMobileRef = useRef(isMobile)
+  const isDockExpandedRef = useRef(isDockExpanded)
+  const isDockTextExpandedRef = useRef(isDockTextExpanded)
 
   useEffect(() => () => clearTimeout(focusTimerRef.current), [])
+
+  useEffect(() => {
+    isDockExpandedRef.current = isDockExpanded
+    isDockTextExpandedRef.current = isDockTextExpanded
+  }, [isDockExpanded, isDockTextExpanded])
 
   useEffect(() => {
     writePersistedDockState({ isDockExpanded, isDockTextExpanded })
@@ -84,28 +90,31 @@ export function useDockStateProvider(): DockState {
   useEffect(() => {
     if (typeof window.matchMedia !== 'function') return
     const mq = window.matchMedia(`(max-width: ${DOCK_DESKTOP_BREAKPOINT_PX}px)`)
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    let wasMobile = mq.matches
+
+    const handler = (e: MediaQueryListEvent) => {
+      const nowMobile = e.matches
+      if (wasMobile === nowMobile) {
+        setIsMobile(nowMobile)
+        return
+      }
+
+      if (nowMobile) {
+        if (isDockTextExpandedRef.current && !isDockExpandedRef.current) {
+          setIsDockExpanded(true)
+        }
+      } else if (isDockExpandedRef.current) {
+        setIsDockTextExpanded(true)
+        setIsDockExpanded(false)
+      }
+
+      wasMobile = nowMobile
+      setIsMobile(nowMobile)
+    }
+
     mq.addEventListener('change', handler)
     return () => mq.removeEventListener('change', handler)
   }, [])
-
-  useEffect(() => {
-    const wasMobile = prevIsMobileRef.current
-    prevIsMobileRef.current = isMobile
-    if (wasMobile === isMobile) return
-
-    if (isMobile) {
-      if (isDockTextExpanded && !isDockExpanded) {
-        setIsDockExpanded(true)
-      }
-      return
-    }
-
-    if (isDockExpanded) {
-      setIsDockTextExpanded(true)
-      setIsDockExpanded(false)
-    }
-  }, [isMobile, isDockExpanded, isDockTextExpanded])
 
   const onMobileToggle = useCallback(() => {
     setIsDockExpanded((prev) => !prev)
