@@ -8,16 +8,10 @@ import { useWorkflowPermissions } from '../../workflows/useWorkflowPermissions'
 import { useWorkflowsQuery } from '../../workflows/useWorkflowsQuery'
 import { transformIsEnabledFilter, workflowFilterDefinitions } from '../../workflows/workflowFilterDefinitions'
 import { WorkflowsListView } from '../../workflows/WorkflowsListView'
-import type { RowAction } from '../../workflows/WorkflowsTableBody'
 import { workflowDefaultSort, workflowTableColumns } from '../../workflows/workflowTableColumns'
 
-const EMPTY_ROW_ACTIONS: RowAction[] = []
 const EMPTY_COLLAPSED_PROJECTS = new Set<string>()
 const noopToggleProject = () => undefined
-
-function noRowActions(): RowAction[] {
-  return EMPTY_ROW_ACTIONS
-}
 
 type ProjectWorkflowsTabProps = {
   projectId: string
@@ -78,7 +72,7 @@ export function ProjectWorkflowsTab({ projectId, isBuiltin = false }: Readonly<P
       groupedWorkflows={null}
       collapsedProjects={EMPTY_COLLAPSED_PROJECTS}
       onToggleProject={noopToggleProject}
-      getRowActions={noRowActions}
+      showRowActions={false}
     />
   )
 }

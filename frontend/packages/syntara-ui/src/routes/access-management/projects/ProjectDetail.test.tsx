@@ -376,6 +376,14 @@ describe('ProjectDetail', () => {
     expect(await screen.findByText('Mock Workflows Tab')).toBeInTheDocument()
   })
 
+  it('renders the Workflows tab content while permissions are still loading', async () => {
+    vi.mocked(accessFetchClient.POST).mockImplementation(() => new Promise(() => {}))
+    mockDetailTab.mockReturnValue(['workflows', mockGoToTab])
+    render(<ProjectDetail />, { wrapper })
+
+    expect(await screen.findByText('Mock Workflows Tab')).toBeInTheDocument()
+  })
+
   it('defaults to the Details tab and keeps Details selected on first load', async () => {
     render(<ProjectDetail />, { wrapper })
 

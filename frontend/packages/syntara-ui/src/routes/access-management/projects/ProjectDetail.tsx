@@ -39,6 +39,7 @@ import { ProjectFormModal } from '../ProjectFormModal'
 import { useProjectPermissions } from '../useProjectPermissions'
 
 import { ProjectDeleteDialog } from './ProjectDeleteDialog'
+import { canShowTabContent, computeProjectTabState, type ProjectTab } from './projectDetailTabs'
 import { ProjectNotFoundState } from './ProjectNotFoundState'
 import { ProjectRoleAssignmentsTab } from './ProjectRoleAssignmentsTab'
 import { ProjectWorkflowsTab } from './ProjectWorkflowsTab'
@@ -134,23 +135,6 @@ function ProjectDetailsTab({ project }: Readonly<{ project: ProjectRead }>) {
   )
 }
 
-type ProjectTab = 'details' | 'workflows' | 'role-assignments'
-
-const ALL_PROJECT_TABS: ProjectTab[] = ['details', 'workflows', 'role-assignments']
-
-function computeVisibleTabs(
-  canReadWorkflows: boolean,
-  canReadAssignments: boolean,
-  permissionsLoading: boolean
-): ProjectTab[] {
-  if (permissionsLoading) return ['details']
-  const tabPermissions: Record<string, boolean> = {
-    workflows: canReadWorkflows,
-    'role-assignments': canReadAssignments,
-  }
-  return ALL_PROJECT_TABS.filter((tab) => tabPermissions[tab] ?? true)
-}
-
 export function ProjectDetail() {
   const navigate = useNavigate()
   const projectsDocLink = useDocLink('projects')
@@ -167,9 +151,9 @@ export function ProjectDetail() {
   } = useProjectDetailPermissions(projectId ?? '')
   const { mutate: deleteProject } = accessClient.useMutation('delete', '/projects/{project_id}')
 
-  const validTabs = useMemo(
-    () => computeVisibleTabs(canReadWorkflows, canReadAssignments, permissionsLoading),
-    [canReadWorkflows, canReadAssignments, permissionsLoading]
+  const { visibleTabs, urlValidTabs } = useMemo(
+    () => computeProjectTabState(canReadWorkflows, canReadAssignments, permissionsLoading, activeTab),
+    [canReadWorkflows, canReadAssignments, permissionsLoading, activeTab]
   )
 
   const projectQuery = accessClient.useQuery(
@@ -241,12 +225,12 @@ export function ProjectDetail() {
       />
       <SynPageBody>
         <SynListPanel>
-          <SynListPanelTabs basePath={basePath} defaultTab="details" validTabs={validTabs} aria-label="Project details">
+          <SynListPanelTabs basePath={basePath} defaultTab="details" validTabs={urlValidTabs} aria-label="Project details">
             <Tab eventKey="details" title={<TabTitleText>Details</TabTitleText>} />
-            {validTabs.includes('workflows') && (
+            {visibleTabs.includes('workflows') && (
               <Tab eventKey="workflows" title={<TabTitleText>Workflows</TabTitleText>} />
             )}
-            {validTabs.includes('role-assignments') && (
+            {visibleTabs.includes('role-assignments') && (
               <Tab eventKey="role-assignments" title={<TabTitleText>Assignments</TabTitleText>} />
             )}
           </SynListPanelTabs>
@@ -264,10 +248,12 @@ export function ProjectDetail() {
               body={<ProjectDetailsTab project={projectData} />}
             />
           )}
-          {activeTab === 'workflows' && validTabs.includes('workflows') && (
+          {activeTab === 'workflows' &&
+            canShowTabContent('workflows', visibleTabs, permissionsLoading, activeTab) && (
             <ProjectWorkflowsTab projectId={projectId ?? ''} isBuiltin={projectData.is_builtin} />
           )}
-          {activeTab === 'role-assignments' && validTabs.includes('role-assignments') && (
+          {activeTab === 'role-assignments' &&
+            canShowTabContent('role-assignments', visibleTabs, permissionsLoading, activeTab) && (
             <ProjectRoleAssignmentsTab projectId={projectId ?? ''} />
           )}
         </SynListPanel>

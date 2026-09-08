@@ -32,7 +32,8 @@ export type WorkflowsListViewProps = Readonly<{
   groupedWorkflows: GroupedWorkflows | null
   collapsedProjects: Set<string>
   onToggleProject: (projectId: string) => void
-  getRowActions: (workflow: Workflow) => RowAction[]
+  getRowActions?: (workflow: Workflow) => RowAction[]
+  showRowActions?: boolean
   projectActionCallbacks?: ProjectRowActionCallbacks
   tabKey?: string
   tabLabel?: string
@@ -57,6 +58,7 @@ export function WorkflowsListView({
   collapsedProjects,
   onToggleProject,
   getRowActions,
+  showRowActions = true,
   projectActionCallbacks,
   tabKey,
   tabLabel,
@@ -101,7 +103,7 @@ export function WorkflowsListView({
               <Th sort={getSortParams('created_at')}>Created at</Th>
               <Th sort={getSortParams('updated_at')}>Updated at</Th>
               <Th sort={getSortParams('is_enabled')}>State</Th>
-              <Th screenReaderText="Actions" />
+              {showRowActions && <Th screenReaderText="Actions" />}
             </Tr>
           </Thead>
           {isAllProjects && groupedWorkflows ? (
@@ -110,10 +112,15 @@ export function WorkflowsListView({
               collapsedProjects={collapsedProjects}
               onToggleProject={onToggleProject}
               getRowActions={getRowActions}
+              showRowActions={showRowActions}
               projectActionCallbacks={projectActionCallbacks}
             />
           ) : (
-            <FlatWorkflowsTableBody workflows={sortedWorkflows} getRowActions={getRowActions} />
+            <FlatWorkflowsTableBody
+              workflows={sortedWorkflows}
+              getRowActions={getRowActions}
+              showRowActions={showRowActions}
+            />
           )}
         </SynListPanelTable>
       }
