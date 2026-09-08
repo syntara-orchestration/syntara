@@ -11,6 +11,8 @@ import json
 from typing import TYPE_CHECKING
 
 import structlog
+from starlette import status
+from starlette.exceptions import HTTPException
 
 from syntara.api.constants import EXCLUDED_PATH_PREFIXES, EXCLUDED_PATHS
 from syntara.core.config.base import get_settings
@@ -30,13 +32,20 @@ _PROBLEM_JSON = b"application/problem+json"
 _BODY_METHODS = frozenset({"POST", "PUT", "PATCH"})
 
 
-class BodyTooLargeError(Exception):
-    """Internal signal that the streaming body exceeded the configured limit."""
+class BodyTooLargeError(HTTPException):
+    """Raised when the streaming body exceeds the configured limit.
+
+    Subclasses HTTPException so FastAPI's typed JSON/form body parser
+    propagates 413 instead of converting a plain exception to 400.
+    """
 
     def __init__(self, detail: str) -> None:
-        """Store the human-readable detail message for the response body."""
-        self.detail = detail
-        super().__init__(detail)
+        """Initialize with a human-readable detail message."""
+        super().__init__(status_code=status.HTTP_413_CONTENT_TOO_LARGE, detail=detail)
+
+
+def _exception_detail(exc: BodyTooLargeError) -> str:
+    return exc.detail if isinstance(exc.detail, str) else str(exc.detail)
 
 
 def _header_value(headers: list[tuple[bytes, bytes]], name: bytes) -> str | None:
@@ -224,31 +233,31 @@ class RequestBodySizeMiddleware:
         try:
             await self.app(scope, limited_receive, guard)
         except BodyTooLargeError as exc:
+            detail = _exception_detail(exc)
             if not guard.started:
-                await _send_413(guard, exc.detail)
+                await _send_413(guard, detail)
             else:
                 logger.warning(
                     "request_body_too_large_after_response_start",
                     path=scope["path"],
-                    detail=exc.detail,
+                    detail=detail,
                 )
 
 
 def body_too_large_exception_handler(request: Request, exc: BodyTooLargeError) -> JSONResponse:
-    """Translate BodyTooLargeError to a 413 response.
+    """Translate BodyTooLargeError to a 413 PAYLOAD_TOO_LARGE response.
 
-    BodyTooLargeError is raised deep inside request-body parsing (inside
-    Starlette's ExceptionMiddleware, which sits below this middleware in the
-    stack), so it can reach the app's catch-all exception handler before
-    unwinding back to RequestBodySizeMiddleware's own try/except. Registering
-    this handler ensures it is translated to 413 wherever it surfaces.
+    BodyTooLargeError subclasses HTTPException so FastAPI's body parser
+    propagates it during typed JSON/form parsing. It can still reach the
+    app's exception handler before unwinding to RequestBodySizeMiddleware's
+    try/except; this handler ensures RFC 9457 PAYLOAD_TOO_LARGE everywhere.
     """
     del request
     return create_problem_details_response(
         status_code=413,
         problem_type=PROBLEM_TYPES["payload_too_large"],
         title="Payload Too Large",
-        detail=exc.detail,
+        detail=_exception_detail(exc),
         code="PAYLOAD_TOO_LARGE",
         retryable=False,
     )

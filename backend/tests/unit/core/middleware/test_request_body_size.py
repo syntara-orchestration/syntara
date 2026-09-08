@@ -5,8 +5,10 @@ from collections.abc import MutableMapping
 from typing import Any
 
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, Form
+from pydantic import BaseModel
 from starlette.applications import Starlette
+from starlette.datastructures import FormData
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
@@ -29,6 +31,52 @@ async def _ok_handler(request: Request) -> JSONResponse:
 def _build_app() -> RequestBodySizeMiddleware:
     app = Starlette(routes=[Route("/api/v1/test", _ok_handler, methods=["POST", "GET"])])
     return RequestBodySizeMiddleware(app)
+
+
+def _build_fastapi_app_with_body_limit() -> FastAPI:
+    app = FastAPI()
+    app.add_middleware(RequestBodySizeMiddleware)
+    app.add_exception_handler(BodyTooLargeError, body_too_large_exception_handler)  # type: ignore[arg-type]
+    return app
+
+
+async def _assert_oversized_fastapi_returns_413(app: FastAPI, *, content_type: bytes) -> None:
+    chunks = [b"x" * 5_000_000, b"x" * 5_000_000, b"x" * 5_000_000]
+    chunk_iter = iter(chunks)
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/v1/test",
+        "headers": [
+            (b"content-type", content_type),
+        ],
+        "query_string": b"",
+        "client": ("testclient", 50000),
+        "server": ("testserver", 80),
+        "scheme": "http",
+        "http_version": "1.1",
+    }
+    messages: list[MutableMapping[str, Any]] = []
+
+    async def send(message: MutableMapping[str, Any]) -> None:
+        messages.append(message)
+
+    async def receive() -> dict[str, object]:
+        try:
+            chunk = next(chunk_iter)
+            return {"type": "http.request", "body": chunk, "more_body": True}
+        except StopIteration:
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+    await app(scope, receive, send)
+
+    start = messages[0]
+    assert start["type"] == "http.response.start"
+    assert start["status"] == 413
+    body = messages[1]["body"]
+    assert isinstance(body, bytes)
+    payload = json.loads(body.decode())
+    assert payload["code"] == "PAYLOAD_TOO_LARGE"
 
 
 @pytest.mark.asyncio
@@ -445,50 +493,45 @@ async def test_multipart_limit_clamped_to_hard_ceiling(monkeypatch: pytest.Monke
 
 
 @pytest.mark.asyncio
-async def test_fastapi_exception_handler_returns_413_for_oversized_stream() -> None:
-    """BodyTooLargeError raised inside ExceptionMiddleware must surface as 413, not 500."""
-    app = FastAPI()
-    app.add_middleware(RequestBodySizeMiddleware)
-    app.add_exception_handler(BodyTooLargeError, body_too_large_exception_handler)  # type: ignore[arg-type]
+async def test_fastapi_typed_json_returns_413_without_content_length() -> None:
+    """FastAPI JSON body parsing must surface BodyTooLargeError as 413, not 400."""
+    app = _build_fastapi_app_with_body_limit()
+
+    class Payload(BaseModel):
+        data: str
 
     @app.post("/api/v1/test")
-    async def post_test(request: Request) -> dict[str, int]:
-        body = await request.body()
-        return {"bytes": len(body)}
+    async def post_test(payload: Payload) -> dict[str, str]:
+        return {"data": payload.data}
 
-    chunks = [b"x" * 5_000_000, b"x" * 5_000_000, b"x" * 5_000_000]
-    chunk_iter = iter(chunks)
-    scope = {
-        "type": "http",
-        "method": "POST",
-        "path": "/api/v1/test",
-        "headers": [
-            (b"content-type", b"application/json"),
-        ],
-        "query_string": b"",
-        "client": ("testclient", 50000),
-        "server": ("testserver", 80),
-        "scheme": "http",
-        "http_version": "1.1",
-    }
-    messages: list[MutableMapping[str, Any]] = []
+    await _assert_oversized_fastapi_returns_413(app, content_type=b"application/json")
 
-    async def send(message: MutableMapping[str, Any]) -> None:
-        messages.append(message)
 
-    async def receive() -> dict[str, object]:
-        try:
-            chunk = next(chunk_iter)
-            return {"type": "http.request", "body": chunk, "more_body": True}
-        except StopIteration:
-            return {"type": "http.request", "body": b"", "more_body": False}
+@pytest.mark.asyncio
+async def test_fastapi_form_returns_413_without_content_length(monkeypatch: pytest.MonkeyPatch) -> None:
+    """FastAPI form body parsing must surface BodyTooLargeError as 413, not 400."""
+    original_get_form = Request._get_form
 
-    await app(scope, receive, send)
+    async def get_form_with_large_parts(
+        self,
+        *,
+        max_files: float = 1000,
+        max_fields: float = 1000,
+        max_part_size: int = 1024 * 1024,
+    ) -> FormData:
+        return await original_get_form(
+            self,
+            max_files=max_files,
+            max_fields=max_fields,
+            max_part_size=20 * 1024 * 1024,
+        )
 
-    start = messages[0]
-    assert start["type"] == "http.response.start"
-    assert start["status"] == 413
-    body = messages[1]["body"]
-    assert isinstance(body, bytes)
-    payload = json.loads(body.decode())
-    assert payload["code"] == "PAYLOAD_TOO_LARGE"
+    monkeypatch.setattr(Request, "_get_form", get_form_with_large_parts)
+
+    app = _build_fastapi_app_with_body_limit()
+
+    @app.post("/api/v1/test")
+    async def post_test(name: str = Form(...)) -> dict[str, str]:
+        return {"name": name}
+
+    await _assert_oversized_fastapi_returns_413(app, content_type=b"application/x-www-form-urlencoded")
