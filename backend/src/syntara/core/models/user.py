@@ -1,6 +1,6 @@
 """User SQLModel for authentication and authorization.
 
-This module provides the User model that combines BaseResource and SoftDeletableResource
+This module provides the User model that extends BaseResource
 for managing platform users with authentication and authorization.
 """
 
@@ -9,13 +9,14 @@ from enum import StrEnum
 from typing import Annotated, Any, ClassVar
 from uuid import UUID, uuid4
 
+import sqlalchemy as sa
 from pydantic import StringConstraints
 from sqlalchemy import String, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import JSON, DateTime, Field, Index
 
 from syntara.core.constants import FieldLimits
-from syntara.core.models.base import SoftDeletableResource
+from syntara.core.models.base import BaseResource
 from syntara.core.models.principal import PrincipalType
 
 
@@ -26,19 +27,16 @@ class AuthType(StrEnum):
     FEDERATED = "federated"
 
 
-class User(SoftDeletableResource, table=True):
+class User(BaseResource, table=True):
     """User model representing platform users.
 
-    Extends SoftDeletableResource (which includes BaseResource) with user-specific
-    authentication and profile fields.
+    Extends BaseResource with user-specific authentication and profile fields.
 
     Attributes:
         id: Primary key UUID (from BaseResource)
         created_at: Timestamp of user creation (from BaseResource)
         updated_at: Timestamp of last update (from BaseResource)
         labels: Optional key-value metadata (from BaseResource)
-        deleted_at: Soft delete timestamp (from SoftDeletableResource)
-        deleted_by: UUID of user who performed soft delete (from SoftDeletableResource)
         username: Unique username for authentication
         email: Email address
         first_name: User's first name
@@ -176,20 +174,18 @@ class User(SoftDeletableResource, table=True):
         sa_column_kwargs={"server_default": text("0")},
     )
 
-    # Table arguments for partial unique constraints
+    # Table arguments for unique constraints
     __table_args__ = (
-        # Partial unique index for username (only for non-deleted users)
-        Index(
-            "ix_users_username_unique",
+        # Unique constraint for username
+        sa.UniqueConstraint(
             "username",
-            unique=True,
-            postgresql_where=text("deleted_at IS NULL"),
+            name="uq_users_username",
         ),
         Index(
             "ix_users_email_unique",
             "email",
             unique=True,
-            postgresql_where=text("email IS NOT NULL AND deleted_at IS NULL"),
+            postgresql_where=text("email IS NOT NULL"),
         ),
     )
 
