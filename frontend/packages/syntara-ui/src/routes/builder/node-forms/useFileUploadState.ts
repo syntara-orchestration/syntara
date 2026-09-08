@@ -141,6 +141,7 @@ export function useFileUploadState(fileContext: FileContextType, projectId: stri
   const selectionInFlightRef = useRef(false)
   /** Stable ref for the external callback so beginDeleting/clearDeletingState can notify synchronously. */
   const onDeletingFileIdsChangeRef = useRef(fileContext.onDeletingFileIdsChange)
+  // eslint-disable-next-line react-hooks/refs -- sync callback for synchronous delete notifications without effect lag
   onDeletingFileIdsChangeRef.current = fileContext.onDeletingFileIdsChange
   const { uploadFiles, progress, error } = useFileUploadWithProgress()
   const { showSuccess, showError } = useAlerts()

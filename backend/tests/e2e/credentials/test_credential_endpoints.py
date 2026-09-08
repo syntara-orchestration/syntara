@@ -372,60 +372,72 @@ class TestWorkflowWithDeletedCredential:
 # ===================================================================
 
 
+@requires_httpbin
 class TestCredentialScrubbing:
     """Verify secret values are scrubbed from execution history (AAP-79021)."""
 
-    _SECRET = "test-e2e-scrub-stdout"  # noqa: S105
-
-    def test_script_stdout_secret_is_scrubbed(
+    def test_http_request_response_secret_is_scrubbed(
         self,
         syntara_api: SyntaraApiRegistry,
         first_project_id: UUID,
         create_credential: CredentialFactory,
     ) -> None:
-        """Script node prints credential value to stdout — must be [REDACTED] in execution history."""
+        """HTTP request node echoes bearer token in response — must be [REDACTED] in execution history.
+
+        The credential token value is injected into the Authorization header by the
+        credential resolution machinery. httpbin /bearer echoes it back in the response
+        body, giving us a realistic surface to assert value-based scrubbing.
+        """
         from orchestrator_test_sdk.e2e.helpers import create_and_run_workflow
 
-        cred_id, *_ = create_credential(api=syntara_api, project_id=first_project_id, name="e2e-scrub-stdout")
+        cred_id, _, _, plaintext_secret = create_credential(
+            api=syntara_api, project_id=first_project_id, name="e2e-scrub-http"
+        )
 
-        workflow_name = unique_name("e2e-scrub-stdout-test")
+        workflow_name = unique_name("e2e-scrub-http-test")
 
         definition = {
             "schema_version": "2.0.0",
             "name": workflow_name,
-            "description": "AAP-79021: verify value-based credential scrubbing",
+            "description": "AAP-79021: verify value-based credential scrubbing via http_request",
             "triggers": [{"id": "trigger_manual", "type": "manual_trigger", "parameters": {}}],
             "nodes": [
                 {
-                    "id": "echo_secret",
-                    "name": "Echo Secret",
-                    "type": "script",
+                    "id": "fetch_with_cred",
+                    "name": "Fetch With Credential",
+                    "type": "http_request",
                     "parameters": {
-                        "language": "python",
-                        "code": f'print("{self._SECRET}")',
+                        "url": f"{HTTPBIN_URL}/bearer",
+                        "method": "GET",
                         "credential_id": str(cred_id),
                     },
                 }
             ],
-            "edges": [{"from": "trigger_manual", "to": "echo_secret"}],
+            "edges": [{"from": "trigger_manual", "to": "fetch_with_cred"}],
         }
 
         execution = create_and_run_workflow(
             syntara_api, workflow_name, definition, timeout=30, project_id=first_project_id
         )
+
+        if execution.status == ExecutionStatus.FAILED:
+            output = _get_activity_output(execution, "fetch_with_cred")
+            if not output.get("status_code"):
+                pytest.skip("Backend could not reach httpbin — network connectivity issue in this environment")
+
         status_str = str(execution.status)
         assert status_str in {"completed", "completed_with_errors"}, f"Unexpected status: {status_str}"
 
         full_response = str(execution.to_dict())
-        assert self._SECRET not in full_response, "Plaintext secret leaked into execution response"
+        assert plaintext_secret not in full_response, "Plaintext secret leaked into execution response"
 
         activities = execution.activities or []
-        script_activities = [a for a in activities if a.activity_id == "echo_secret"]
-        assert len(script_activities) == 1, "Expected exactly one echo_secret activity"
+        http_activities = [a for a in activities if a.activity_id == "fetch_with_cred"]
+        assert len(http_activities) == 1, "Expected exactly one fetch_with_cred activity"
 
-        output = script_activities[0].to_dict().get("output_data") or {}
+        output = http_activities[0].to_dict().get("output_data") or {}
         output_str = str(output)
-        assert self._SECRET not in output_str, "Plaintext secret leaked into activity output_data"
+        assert plaintext_secret not in output_str, "Plaintext secret leaked into activity output_data"
         assert "[REDACTED]" in output_str, "Expected [REDACTED] in scrubbed output_data"
 
 

@@ -216,24 +216,30 @@ class TestProjectScopedExecutionWebSocketAuthorization:
         self,
         test_db_session: AsyncSession,
         test_user: User,
-        test_project_id: UUID,
         sync_test_client: TestClient,
     ) -> None:
-        """WebSocket must reject when execution's project doesn't exist.
+        """WebSocket must reject when execution's project has been hard-deleted.
 
-        This tests the edge case where execution.project_id points to a
-        non-existent or soft-deleted project.
+        Create a real project + execution, then cascade-delete the project
+        (which removes the execution too). The stale execution ID should
+        cause the WebSocket to reject the connection.
         """
-        execution = await _create_execution(test_db_session, project_id=test_project_id, created_by=test_user.id)
+        from syntara.projects.service import ProjectService
 
-        # Soft-delete the project so the JOIN in resolve_resource_project returns no rows
-        project = await test_db_session.get(Project, test_project_id)
-        assert project is not None
-        from datetime import UTC, datetime
-
-        project.deleted_at = datetime.now(tz=UTC)
+        project = Project(name=f"ws-test-{uuid4().hex[:8]}", created_by=test_user.id)
         test_db_session.add(project)
+        await test_db_session.flush()
+
+        execution = await _create_execution(test_db_session, project_id=project.id, created_by=test_user.id)
+        stale_execution_id = execution.id
+
+        # Mark execution as terminal so _check_no_active_executions allows deletion
+        execution.status = ExecutionStatus.COMPLETED
+        test_db_session.add(execution)
         await test_db_session.commit()
+
+        service = ProjectService(session=test_db_session, user=test_user)
+        await service.delete_project(project.id)
 
         fake_user = User(
             id=uuid4(),
@@ -246,7 +252,7 @@ class TestProjectScopedExecutionWebSocketAuthorization:
         with (
             patch(_PATCH_AUTHN, AsyncMock(return_value=fake_user)),
             pytest.raises(WebSocketDisconnect) as exc_info,
-            sync_test_client.websocket_connect(f"{EXECUTION_WS_PATH}/{execution.id}?ticket=valid"),
+            sync_test_client.websocket_connect(f"{EXECUTION_WS_PATH}/{stale_execution_id}?ticket=valid"),
         ):
             pytest.fail("Connection should have been rejected - project not found")
 
@@ -337,20 +343,20 @@ class TestProjectScopedInvocationWebSocketAuthorization:
         self,
         test_db_session: AsyncSession,
         test_user: User,
-        test_project_id: UUID,
         sync_test_client: TestClient,
     ) -> None:
-        """WebSocket must reject when invocation's project doesn't exist or is soft-deleted."""
-        invocation = await _create_invocation(test_db_session, project_id=test_project_id, created_by=test_user.id)
+        """WebSocket must reject when invocation's project has been hard-deleted."""
+        from syntara.projects.service import ProjectService
 
-        # Soft-delete the project so the JOIN returns no rows
-        project = await test_db_session.get(Project, test_project_id)
-        assert project is not None
-        from datetime import UTC, datetime
-
-        project.deleted_at = datetime.now(tz=UTC)
+        project = Project(name=f"ws-test-{uuid4().hex[:8]}", created_by=test_user.id)
         test_db_session.add(project)
-        await test_db_session.commit()
+        await test_db_session.flush()
+
+        invocation = await _create_invocation(test_db_session, project_id=project.id, created_by=test_user.id)
+        stale_invocation_id = invocation.id
+
+        service = ProjectService(session=test_db_session, user=test_user)
+        await service.delete_project(project.id)
 
         fake_user = User(
             id=uuid4(),
@@ -363,7 +369,7 @@ class TestProjectScopedInvocationWebSocketAuthorization:
         with (
             patch(_PATCH_AUTHN, AsyncMock(return_value=fake_user)),
             pytest.raises(WebSocketDisconnect) as exc_info,
-            sync_test_client.websocket_connect(f"{INVOCATION_WS_PATH}/{invocation.id}?ticket=valid"),
+            sync_test_client.websocket_connect(f"{INVOCATION_WS_PATH}/{stale_invocation_id}?ticket=valid"),
         ):
             pytest.fail("Connection should have been rejected - project not found")
 

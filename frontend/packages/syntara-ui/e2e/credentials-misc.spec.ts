@@ -71,7 +71,7 @@ test.describe('Credential Workflows Tab', () => {
 
       await retryButton.click()
 
-      const emptyState = app.getByText('No workflows using this credential')
+      const emptyState = app.getByRole('heading', { name: 'No workflows yet' })
       const table = app.getByRole('grid', { name: 'Workflows using this credential' })
       await expect(emptyState.or(table)).toBeVisible({ timeout: 10_000 })
     } finally {
@@ -251,7 +251,7 @@ test.describe('Dynamic Field Renderer — Help Text', () => {
       .waitFor({ state: 'visible', timeout: 5_000 })
       .then(() => true)
       .catch(() => false)
-    test.skip(!hasHelpText, 'Credential type does not have help_text configured on this backend')
+    expect(hasHelpText, 'Credential type does not have help_text configured on this backend').toBeTruthy()
 
     await tokenHelpButton.click()
     // Exact name — the create modal's accessible name also contains "Token help".

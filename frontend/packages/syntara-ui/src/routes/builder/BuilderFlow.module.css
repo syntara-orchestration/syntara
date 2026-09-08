@@ -1,0 +1,4 @@
+.readonlyCanvas :global(.react-flow__handle) {
+  pointer-events: none;
+  opacity: 0;
+}

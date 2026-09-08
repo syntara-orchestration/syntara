@@ -1,5 +1,5 @@
 ---
-schema_version: '2.0.0'
+schema_version: "2.0.0"
 name: transient-error-test
 description: Test retry on transient errors
 
@@ -42,7 +42,7 @@ nodes:
           exit 0
         fi
     inputs:
-      seed: ${input.seed}
+      seed: ${trigger.seed}
     retry_policy:
       maxAttempts: 5
       backoff: exponential

@@ -19,6 +19,38 @@
   object-fit: contain;
 }
 
+/* Docked masthead glass: Compass dock has no background, so restore PF's docked token.
+   backdrop-filter is none so it does not create a stacking context that traps flyout menus. */
+.dockedMasthead {
+  background-color: var(--pf-v6-c-masthead--m-docked--BackgroundColor);
+  backdrop-filter: none;
+}
+
+/* PF hides .pf-m-compact at wider breakpoints; keep the collapsed hat icon visible. */
+.compactLogo {
+  display: flex !important;
+}
+
+.dockedAction {
+  justify-content: flex-start;
+}
+
+/* PF has no --pf-v6-c-nav__toggle--Display token. Hide flyout carets only on the
+   collapsed icon dock so expanded NavExpandable toggles stay visible. */
+.iconDockNav :global(.pf-v6-c-nav__toggle) {
+  display: none;
+}
+
+.flyoutMenu {
+  min-width: var(--syntara-nav-flyout-min-width);
+  width: max-content;
+}
+
+.flyoutMenuItem {
+  color: var(--pf-t--global--text--color--regular);
+  white-space: nowrap;
+}
+
 /*
  * PF NavItem flyout sets internal isHovered state on popper mouseenter but
  * never clears it when the popper unmounts (e.g. switching between flyout

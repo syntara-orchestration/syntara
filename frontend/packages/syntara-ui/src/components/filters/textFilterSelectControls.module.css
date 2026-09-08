@@ -1,5 +1,5 @@
 .truncatedToggle {
-  max-width: 12rem;
+  max-width: var(--syntara-compact-filter-toggle-max-width, 12rem);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

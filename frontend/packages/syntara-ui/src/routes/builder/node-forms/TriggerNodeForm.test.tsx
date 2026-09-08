@@ -362,7 +362,13 @@ describe('TriggerNodeForm Component', () => {
     it('submits webhook trigger with normalized path', async () => {
       const user = userEvent.setup()
       renderWithHeader(
-        <TriggerNodeForm onSubmit={mockOnSubmit} initialData={{ triggerType: TriggerTypeEnum.WEBHOOK_TRIGGER }} />
+        <TriggerNodeForm
+          onSubmit={mockOnSubmit}
+          initialData={{
+            triggerType: TriggerTypeEnum.WEBHOOK_TRIGGER,
+            authorizedServiceAccountIds: ['a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'],
+          }}
+        />
       )
 
       const pathInput = screen.getByLabelText('Webhook path')
@@ -381,12 +387,16 @@ describe('TriggerNodeForm Component', () => {
     })
 
     it('submits form with empty webhook path (permissive schema)', async () => {
-      const user = userEvent.setup()
       renderWithHeader(
-        <TriggerNodeForm onSubmit={mockOnSubmit} initialData={{ triggerType: TriggerTypeEnum.WEBHOOK_TRIGGER }} />
+        <TriggerNodeForm
+          onSubmit={mockOnSubmit}
+          initialData={{
+            triggerType: TriggerTypeEnum.WEBHOOK_TRIGGER,
+            authorizedServiceAccountIds: ['a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'],
+          }}
+        />
       )
 
-      await user.clear(screen.getByLabelText('Webhook path'))
       await submitTriggerForm()
 
       await waitFor(() => {
@@ -485,7 +495,13 @@ describe('TriggerNodeForm Component', () => {
     it('submits EDA trigger with normalized path', async () => {
       const user = userEvent.setup()
       renderWithHeader(
-        <TriggerNodeForm onSubmit={mockOnSubmit} initialData={{ triggerType: TriggerTypeEnum.EDA_TRIGGER }} />
+        <TriggerNodeForm
+          onSubmit={mockOnSubmit}
+          initialData={{
+            triggerType: TriggerTypeEnum.EDA_TRIGGER,
+            authorizedServiceAccountIds: ['a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'],
+          }}
+        />
       )
 
       const pathInput = screen.getByLabelText('Webhook path')
@@ -504,12 +520,16 @@ describe('TriggerNodeForm Component', () => {
     })
 
     it('submits form with empty webhook path (permissive schema)', async () => {
-      const user = userEvent.setup()
       renderWithHeader(
-        <TriggerNodeForm onSubmit={mockOnSubmit} initialData={{ triggerType: TriggerTypeEnum.EDA_TRIGGER }} />
+        <TriggerNodeForm
+          onSubmit={mockOnSubmit}
+          initialData={{
+            triggerType: TriggerTypeEnum.EDA_TRIGGER,
+            authorizedServiceAccountIds: ['a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'],
+          }}
+        />
       )
 
-      await user.clear(screen.getByLabelText('Webhook path'))
       await submitTriggerForm()
 
       await waitFor(() => {

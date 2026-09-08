@@ -64,3 +64,15 @@ class TestOpenAICompatibleProvider:
         """OpenAI does not paginate — base class default returns None."""
         provider = OpenAICompatibleProvider()
         assert provider.next_page_params({"data": [{"id": "gpt-4o"}]}) is None
+
+    def test_credential_confirmation_path(self) -> None:
+        provider = OpenAICompatibleProvider()
+        assert provider.credential_confirmation_path == "/key"
+        assert (
+            provider.build_credential_confirmation_url("https://openrouter.ai/api/v1")
+            == "https://openrouter.ai/api/v1/key"
+        )
+        assert (
+            provider.build_credential_confirmation_url("https://openrouter.ai/api/v1/")
+            == "https://openrouter.ai/api/v1/key"
+        )

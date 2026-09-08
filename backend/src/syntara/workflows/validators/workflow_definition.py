@@ -229,20 +229,45 @@ def _check_approval_node_findings(
     *,
     system_continue_on_failure: bool = False,
 ) -> list[ValidationFinding]:
-    """Warn when fallback_decision is set without continue_on_failure."""
+    """Check approval node configuration against the workflow graph structure.
+
+    Emits:
+    - An error when an ``approval`` node has no successor on the ``approved``
+      output port.
+    - A warning when ``fallback_decision`` is ``approve`` without an effective
+      ``continue_on_failure`` (the fallback would have no effect).
+    """
     findings: list[ValidationFinding] = []
+
+    outgoing_ports: dict[str, set[str]] = defaultdict(set)
+    for edge in workflow_definition.get("edges", []):
+        from_port = edge.get("from_port")
+        if from_port is not None:
+            outgoing_ports[edge["from"]].add(from_port)
+
     for node in workflow_definition.get("nodes", []):
         if node.get("type") != "approval":
             continue
         node_id = node.get("id")
         if node_id is None:
             continue
+        node_name = node.get("name") or node_id
+
+        if "approved" not in outgoing_ports.get(node_id, set()):
+            findings.append(
+                ValidationFinding(
+                    severity=ValidationSeverity.error,
+                    category=ValidationCategory.approval_configuration,
+                    message=f"Approval \"{node_name}\" is missing a connection from the 'Approved' branch",
+                    node_id=node_id,
+                ),
+            )
+
         params = node.get("parameters", {})
         settings = node.get("settings") or {}
         node_cof = settings.get("continue_on_failure")
         effective_cof = node_cof if node_cof is not None else system_continue_on_failure
         if params.get("fallback_decision") == "approve" and not effective_cof:
-            node_name = node.get("name") or node_id
             findings.append(
                 ValidationFinding(
                     severity=ValidationSeverity.warning,

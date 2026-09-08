@@ -29,7 +29,7 @@ nodes:
     type: http_request
     parameters:
       method: GET
-      url: https://api.github.com/repos/${input.owner}/${input.repo}
+      url: https://api.github.com/repos/${trigger.owner}/${trigger.repo}
       headers:
         Accept: application/vnd.github.v3+json
         User-Agent: Syntara-Workflow-Engine
@@ -50,7 +50,7 @@ nodes:
     type: http_request
     parameters:
       method: GET
-      url: https://api.github.com/repos/${input.owner}/${input.repo}/languages
+      url: https://api.github.com/repos/${trigger.owner}/${trigger.repo}/languages
       headers:
         Accept: application/vnd.github.v3+json
         User-Agent: Syntara-Workflow-Engine

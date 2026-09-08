@@ -69,9 +69,9 @@ function getVersionLabel(
 /**
  * Version conflict resolution dialog.
  *
- * Uses a plain PF Modal instead of NxConfirmationDialog because the conflict
+ * Uses a plain PF Modal instead of SynConfirmationDialog because the conflict
  * resolution flow requires three distinct actions (save as newest, duplicate,
- * refresh to latest), which does not fit NxConfirmationDialog's two-button
+ * refresh to latest), which does not fit SynConfirmationDialog's two-button
  * (confirm + cancel) model.
  */
 export function VersionConflictDialog({

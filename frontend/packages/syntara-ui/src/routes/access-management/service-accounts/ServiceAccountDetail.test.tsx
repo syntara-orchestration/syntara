@@ -352,7 +352,7 @@ describe('ServiceAccountDetail', () => {
 
     render(<ServiceAccountDetail />, { wrapper })
 
-    expect(screen.getByText('No role assignments')).toBeInTheDocument()
+    expect(screen.getByText('No role assignments yet')).toBeInTheDocument()
   })
 
   it('calls delete mutation when delete dialog is confirmed', async () => {

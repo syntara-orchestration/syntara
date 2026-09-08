@@ -1,5 +1,5 @@
 ---
-schema_version: '2.0.0'
+schema_version: "2.0.0"
 name: converge-nested-parallel-test
 description: Test converge with nested parallel execution
 triggers:

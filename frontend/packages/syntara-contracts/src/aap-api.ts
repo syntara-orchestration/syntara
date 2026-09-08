@@ -857,13 +857,14 @@ export interface components {
   parameters: {
     /**
      * @description Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
-     *     If provided, the credential is decrypted and used instead of environment variables.
+     *     If omitted, the selected integration's management credential is used.
      *     Credential must be of type "Ansible Automation Platform".
      */
     credentialId: string | null
     /**
      * @description Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-     *     When provided, the integration's configured URL is used instead of environment variables.
+     *     If omitted, the unique visible enabled AAP integration is used.
+     *     Required when more than one AAP integration is visible.
      */
     integrationId: string | null
   }
@@ -880,13 +881,14 @@ export interface operations {
         page_size?: number
         /**
          * @description Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
-         *     If provided, the credential is decrypted and used instead of environment variables.
+         *     If omitted, the selected integration's management credential is used.
          *     Credential must be of type "Ansible Automation Platform".
          */
         credential_id?: components['parameters']['credentialId']
         /**
          * @description Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-         *     When provided, the integration's configured URL is used instead of environment variables.
+         *     If omitted, the unique visible enabled AAP integration is used.
+         *     Required when more than one AAP integration is visible.
          */
         integration_id?: components['parameters']['integrationId']
       }
@@ -922,13 +924,14 @@ export interface operations {
         page_size?: number
         /**
          * @description Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
-         *     If provided, the credential is decrypted and used instead of environment variables.
+         *     If omitted, the selected integration's management credential is used.
          *     Credential must be of type "Ansible Automation Platform".
          */
         credential_id?: components['parameters']['credentialId']
         /**
          * @description Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-         *     When provided, the integration's configured URL is used instead of environment variables.
+         *     If omitted, the unique visible enabled AAP integration is used.
+         *     Required when more than one AAP integration is visible.
          */
         integration_id?: components['parameters']['integrationId']
         organization?: string | null
@@ -965,13 +968,14 @@ export interface operations {
         page_size?: number
         /**
          * @description Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
-         *     If provided, the credential is decrypted and used instead of environment variables.
+         *     If omitted, the selected integration's management credential is used.
          *     Credential must be of type "Ansible Automation Platform".
          */
         credential_id?: components['parameters']['credentialId']
         /**
          * @description Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-         *     When provided, the integration's configured URL is used instead of environment variables.
+         *     If omitted, the unique visible enabled AAP integration is used.
+         *     Required when more than one AAP integration is visible.
          */
         integration_id?: components['parameters']['integrationId']
       }
@@ -1009,13 +1013,14 @@ export interface operations {
         page_size?: number
         /**
          * @description Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
-         *     If provided, the credential is decrypted and used instead of environment variables.
+         *     If omitted, the selected integration's management credential is used.
          *     Credential must be of type "Ansible Automation Platform".
          */
         credential_id?: components['parameters']['credentialId']
         /**
          * @description Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-         *     When provided, the integration's configured URL is used instead of environment variables.
+         *     If omitted, the unique visible enabled AAP integration is used.
+         *     Required when more than one AAP integration is visible.
          */
         integration_id?: components['parameters']['integrationId']
         organization?: string | null
@@ -1052,13 +1057,14 @@ export interface operations {
         page_size?: number
         /**
          * @description Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
-         *     If provided, the credential is decrypted and used instead of environment variables.
+         *     If omitted, the selected integration's management credential is used.
          *     Credential must be of type "Ansible Automation Platform".
          */
         credential_id?: components['parameters']['credentialId']
         /**
          * @description Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-         *     When provided, the integration's configured URL is used instead of environment variables.
+         *     If omitted, the unique visible enabled AAP integration is used.
+         *     Required when more than one AAP integration is visible.
          */
         integration_id?: components['parameters']['integrationId']
       }
@@ -1096,13 +1102,14 @@ export interface operations {
         page_size?: number
         /**
          * @description Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
-         *     If provided, the credential is decrypted and used instead of environment variables.
+         *     If omitted, the selected integration's management credential is used.
          *     Credential must be of type "Ansible Automation Platform".
          */
         credential_id?: components['parameters']['credentialId']
         /**
          * @description Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-         *     When provided, the integration's configured URL is used instead of environment variables.
+         *     If omitted, the unique visible enabled AAP integration is used.
+         *     Required when more than one AAP integration is visible.
          */
         integration_id?: components['parameters']['integrationId']
         organization?: string | null
@@ -1139,13 +1146,14 @@ export interface operations {
         page_size?: number
         /**
          * @description Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
-         *     If provided, the credential is decrypted and used instead of environment variables.
+         *     If omitted, the selected integration's management credential is used.
          *     Credential must be of type "Ansible Automation Platform".
          */
         credential_id?: components['parameters']['credentialId']
         /**
          * @description Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-         *     When provided, the integration's configured URL is used instead of environment variables.
+         *     If omitted, the unique visible enabled AAP integration is used.
+         *     Required when more than one AAP integration is visible.
          */
         integration_id?: components['parameters']['integrationId']
         organization?: string | null
@@ -1182,13 +1190,14 @@ export interface operations {
         page_size?: number
         /**
          * @description Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
-         *     If provided, the credential is decrypted and used instead of environment variables.
+         *     If omitted, the selected integration's management credential is used.
          *     Credential must be of type "Ansible Automation Platform".
          */
         credential_id?: components['parameters']['credentialId']
         /**
          * @description Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-         *     When provided, the integration's configured URL is used instead of environment variables.
+         *     If omitted, the unique visible enabled AAP integration is used.
+         *     Required when more than one AAP integration is visible.
          */
         integration_id?: components['parameters']['integrationId']
       }
@@ -1224,13 +1233,14 @@ export interface operations {
         page_size?: number
         /**
          * @description Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
-         *     If provided, the credential is decrypted and used instead of environment variables.
+         *     If omitted, the selected integration's management credential is used.
          *     Credential must be of type "Ansible Automation Platform".
          */
         credential_id?: components['parameters']['credentialId']
         /**
          * @description Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-         *     When provided, the integration's configured URL is used instead of environment variables.
+         *     If omitted, the unique visible enabled AAP integration is used.
+         *     Required when more than one AAP integration is visible.
          */
         integration_id?: components['parameters']['integrationId']
       }
@@ -1266,13 +1276,14 @@ export interface operations {
         page_size?: number
         /**
          * @description Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
-         *     If provided, the credential is decrypted and used instead of environment variables.
+         *     If omitted, the selected integration's management credential is used.
          *     Credential must be of type "Ansible Automation Platform".
          */
         credential_id?: components['parameters']['credentialId']
         /**
          * @description Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-         *     When provided, the integration's configured URL is used instead of environment variables.
+         *     If omitted, the unique visible enabled AAP integration is used.
+         *     Required when more than one AAP integration is visible.
          */
         integration_id?: components['parameters']['integrationId']
       }

@@ -243,10 +243,6 @@ export interface components {
        * @description Currently executing activities
        */
       current_activities?: components['schemas']['CurrentActivity'][]
-      /** Deleted At */
-      deleted_at?: string | null
-      /** Deleted By */
-      deleted_by?: string | null
       /** @description Workflow definition from the executed version. Only included when requested via ?include=workflow_definition query parameter. */
       workflow_definition?: components['schemas']['WorkflowDefinition'] | null
       /**
@@ -1434,11 +1430,6 @@ export interface components {
       environment?: {
         [key: string]: string
       }
-      /**
-       * Credential Id
-       * @description Orchestrator credential UUID for credential scrubbing
-       */
-      credential_id?: string | null
     }
     /**
      * ScriptNode

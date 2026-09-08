@@ -9,7 +9,6 @@ Tests cover:
 - Relationships with Workflow and User
 """
 
-from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
@@ -48,8 +47,6 @@ async def test_create_workflow_version_with_required_fields(
     assert version.workflow_definition is not None
     assert version.created_by == test_user.id
     assert version.change_description is None
-    assert version.deleted_at is None
-    assert version.deleted_by is None
     assert version.created_at is not None
 
 
@@ -76,12 +73,12 @@ async def test_create_workflow_version_with_all_fields(
 
 
 @pytest.mark.asyncio
-async def test_workflow_version_soft_delete(
+async def test_workflow_version_hard_delete(
     test_db_session: AsyncSession,
     test_user: User,
     test_workflow: Workflow,
 ) -> None:
-    """Test soft delete sets deleted_at and deleted_by correctly."""
+    """Test hard delete removes the version row from the database."""
     version = WorkflowVersion(
         id=uuid4(),
         workflow_id=test_workflow.id,
@@ -93,14 +90,11 @@ async def test_workflow_version_soft_delete(
     test_db_session.add(version)
     await test_db_session.commit()
 
-    # Perform soft delete
-    now = datetime.now(UTC)
-    version.deleted_at = now
-    version.deleted_by = test_user.id
+    await test_db_session.delete(version)
     await test_db_session.commit()
 
-    assert version.deleted_at == now
-    assert version.deleted_by == test_user.id
+    result = await test_db_session.get(WorkflowVersion, version.id)
+    assert result is None
 
 
 @pytest.mark.asyncio
@@ -165,7 +159,6 @@ async def test_workflow_version_multiple_versions_same_workflow(
     result = await test_db_session.exec(
         select(WorkflowVersion).filter(
             WorkflowVersion.workflow_id == test_workflow.id,  # type: ignore[arg-type]
-            WorkflowVersion.deleted_at.is_(None),  # type: ignore[union-attr]
         )
     )
     versions = list(result.all())

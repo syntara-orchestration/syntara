@@ -302,7 +302,7 @@ jobs:
         run: make check-openapi-breaking-pre-commit
         working-directory: backend
         env:
-          OPENAPI_PR_BODY: ${{ github.event.pull_request.body }}
+          OPENAPI_PR_LABELS: ${{ github.event_name == 'pull_request' && toJSON(github.event.pull_request.labels.*.name) || '' }}
 
   verify-test-structure:
     name: (Backend) Verify Test Structure
