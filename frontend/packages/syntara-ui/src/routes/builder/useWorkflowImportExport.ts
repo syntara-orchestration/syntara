@@ -95,7 +95,7 @@ export function useWorkflowImportExport({
           }
         })
         .catch((err: unknown) => {
-          showError({ title: 'Import failed', description: getErrorMessage(err) })
+          showError({ title: 'Failed to import workflow', description: getErrorMessage(err) })
         })
 
       event.target.value = ''
@@ -120,7 +120,7 @@ export function useWorkflowImportExport({
       })
       downloadWorkflowDefinition(definition as Record<string, unknown>, name)
     } catch (err: unknown) {
-      showError({ title: 'Export failed', description: getErrorMessage(err) })
+      showError({ title: 'Failed to export workflow', description: getErrorMessage(err) })
     }
     dispatch({ type: 'SET_KEBAB_OPEN', payload: false })
   }, [dispatch, showError, workflowName, workflowDescription])

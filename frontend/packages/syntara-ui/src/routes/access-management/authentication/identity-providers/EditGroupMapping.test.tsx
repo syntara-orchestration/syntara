@@ -82,6 +82,26 @@ const mockMappedGroups = [
   { id: MOCK_GROUP_ID_2, name: 'users', description: 'Users', created_at: '2026-01-02T00:00:00Z' },
 ]
 
+function createLocalStorageMock(): Storage {
+  const store: Record<string, string> = {}
+  return {
+    getItem: (key: string) => store[key] ?? null,
+    setItem: (key: string, value: string) => {
+      store[key] = value
+    },
+    removeItem: (key: string) => {
+      delete store[key]
+    },
+    clear: () => {
+      Object.keys(store).forEach((key) => delete store[key])
+    },
+    get length() {
+      return Object.keys(store).length
+    },
+    key: (index: number) => Object.keys(store)[index] ?? null,
+  }
+}
+
 const mockProvider = {
   id: VALID_PROVIDER_ID,
   name: 'Test Provider',
@@ -100,6 +120,8 @@ describe('EditGroupMapping', () => {
     mockSearchRef.current = ''
     mockProviderIdRef.current = VALID_PROVIDER_ID
     routerTestState.navigate.mockClear()
+    vi.stubGlobal('localStorage', createLocalStorageMock())
+    vi.mocked(useCanI).mockClear()
     vi.mocked(useCanI).mockReturnValue({ allowed: true, isChecking: false, isError: false })
     vi.mocked(useAllGroups).mockReturnValue({
       groups: mockMappedGroups.map((g) => ({
@@ -326,9 +348,11 @@ describe('EditGroupMapping', () => {
     render(<EditGroupMapping />, { wrapper })
 
     await waitFor(() => {
-      expect(screen.getByText('Access denied')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Access denied', level: 2 })).toBeInTheDocument()
     })
-    expect(screen.getByText(/don't have permission to edit group mapping/i)).toBeInTheDocument()
+    expect(
+      screen.getByText("You don't have permission to edit group mapping. Contact your administrator to request access.")
+    ).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /save mapping/i })).not.toBeInTheDocument()
   })
 
@@ -410,7 +434,7 @@ describe('EditGroupMapping', () => {
     render(<EditGroupMapping />, { wrapper })
 
     await waitFor(() => {
-      expect(screen.getByText('Access denied')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Access denied', level: 2 })).toBeInTheDocument()
     })
     expect(mockOpen).not.toHaveBeenCalled()
 
@@ -462,6 +486,19 @@ describe('EditGroupMapping', () => {
   })
 
   describe('Permission checking', () => {
+    it('enables permission check only for valid provider ids', () => {
+      render(<EditGroupMapping />, { wrapper })
+
+      expect(useCanI).toHaveBeenCalledWith('update', 'identity-provider', { enabled: true })
+    })
+
+    it('disables permission check for invalid provider ids', () => {
+      mockProviderIdRef.current = 'not-a-uuid'
+      render(<EditGroupMapping />, { wrapper })
+
+      expect(useCanI).toHaveBeenCalledWith('update', 'identity-provider', { enabled: false })
+    })
+
     it('shows empty loading state when checking permission', () => {
       vi.mocked(useCanI).mockReturnValue({ allowed: true, isChecking: true, isError: false })
       render(<EditGroupMapping />, { wrapper })
@@ -494,7 +531,7 @@ describe('EditGroupMapping', () => {
       vi.mocked(useCanI).mockReturnValue({ allowed: false, isChecking: false, isError: false })
       const { container } = render(<EditGroupMapping />, { wrapper })
       await waitFor(() => {
-        expect(screen.getByText('Access denied')).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: 'Access denied', level: 2 })).toBeInTheDocument()
       })
       const results = await axe(container)
       expect(results).toHaveNoViolations()

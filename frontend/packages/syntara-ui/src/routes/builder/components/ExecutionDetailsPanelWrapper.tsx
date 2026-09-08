@@ -1,5 +1,4 @@
-import { StackItem } from '@patternfly/react-core'
-
+import { SynPanelStackItem } from '../../../components/layout/SynPanelStack'
 import { ResizableDivider } from '../../../components/ResizableDivider'
 import { ExecutionDetailsPanel } from '../ExecutionDetailsPanel'
 
@@ -31,13 +30,7 @@ export function ExecutionDetailsPanelWrapper(props: ExecutionDetailsPanelWrapper
   return (
     <>
       <ResizableDivider onResize={onResize} />
-      <StackItem
-        style={{
-          height: `${panelHeight}px`,
-          flexShrink: 0,
-          overflow: 'hidden',
-        }}
-      >
+      <SynPanelStackItem style={{ height: `${String(panelHeight)}px` }}>
         <ExecutionDetailsPanel
           executionId={executionId}
           workflowDefinition={workflowDefinition}
@@ -47,7 +40,7 @@ export function ExecutionDetailsPanelWrapper(props: ExecutionDetailsPanelWrapper
           headerLabel="Most recent run details"
           onClosePanel={isTerminalStatus ? onClosePanel : undefined}
         />
-      </StackItem>
+      </SynPanelStackItem>
     </>
   )
 }

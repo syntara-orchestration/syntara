@@ -18,8 +18,6 @@ import { RhUiErrorIcon, RhUiViewIcon, RhUiViewOffIcon } from '@patternfly/react-
 import { useMemo, useState, type Ref } from 'react'
 
 import { FormLabelWithHelp } from '../../../../components/FormLabelWithHelp'
-import { LONG_SELECT_MAX_MENU_HEIGHT, longSelectMenuPopperProps } from '../../../../components/longSelectMenu'
-import longSelectMenuStyles from '../../../../components/longSelectMenu.module.css'
 import { SynSelect } from '../../../../components/SynSelect'
 import { ENCRYPTED_SENTINEL } from '../credentialConstants'
 
@@ -129,10 +127,6 @@ function ChoicesSelect({
         setIsOpen(false)
       }}
       onOpenChange={setIsOpen}
-      isScrollable
-      maxMenuHeight={LONG_SELECT_MAX_MENU_HEIGHT}
-      popperProps={longSelectMenuPopperProps}
-      className={longSelectMenuStyles.containScroll}
       toggle={(toggleRef: Ref<MenuToggleElement>) => (
         <MenuToggle
           ref={toggleRef}

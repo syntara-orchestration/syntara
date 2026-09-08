@@ -24,8 +24,6 @@ import { type Dispatch, useCallback, useMemo, useState } from 'react'
 import { formatDateYMD, parseDateYMD } from '../../utils/dateUtils'
 import type { ScheduleFrequency } from '../../utils/triggerFormatting'
 import { FieldHelpPopover } from '../FieldHelpPopover'
-import { LONG_SELECT_MAX_MENU_HEIGHT, longSelectMenuPopperProps } from '../longSelectMenu'
-import longSelectMenuStyles from '../longSelectMenu.module.css'
 import { SynSelect } from '../SynSelect'
 
 import styles from './ScheduleBuilderFields.module.css'
@@ -197,10 +195,6 @@ function StartDateTimeField({
                 setTzOpen(open)
                 if (!open) setTzFilter('')
               }}
-              isScrollable
-              maxMenuHeight={LONG_SELECT_MAX_MENU_HEIGHT}
-              popperProps={longSelectMenuPopperProps}
-              className={longSelectMenuStyles.containScroll}
               toggle={tzToggle}
             >
               <TextInputGroup>

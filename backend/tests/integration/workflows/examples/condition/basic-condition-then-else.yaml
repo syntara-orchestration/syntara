@@ -17,7 +17,7 @@ nodes:
   - id: age_check
     name: Check Age
     type: condition
-    condition: ${input.age} >= 18
+    condition: ${trigger.age} >= 18
 
   - id: adult_message
     name: Adult Message

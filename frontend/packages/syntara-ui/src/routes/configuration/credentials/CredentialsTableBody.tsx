@@ -62,6 +62,7 @@ function CredentialRow({
               ? {
                   rowIndex,
                   isExpanded,
+                  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- safe: credentials from the API always have an id; rows without id are excluded by the expandableCredentialIds filter upstream
                   onToggle: () => onToggleRow(credential.id!),
                 }
               : undefined
@@ -189,7 +190,7 @@ export function GroupedCredentialsTableBody({
                   credential={credential}
                   credType={typeMap.get(credential.credential_type_id)}
                   rowIndex={(credential.id ? credentialIndexMap.get(credential.id) : undefined) ?? 0}
-                  isExpanded={expandedRows.has(credential.id!)}
+                  isExpanded={expandedRows.has(credential.id ?? '')}
                   onToggleRow={onToggleRow}
                   getRowActions={getRowActions}
                   onToggleEnabled={onToggleEnabled}
@@ -230,7 +231,7 @@ export function FlatCredentialsTableBody({
           credential={credential}
           credType={typeMap.get(credential.credential_type_id)}
           rowIndex={rowIndex}
-          isExpanded={expandedRows.has(credential.id!)}
+          isExpanded={expandedRows.has(credential.id ?? '')}
           onToggleRow={onToggleRow}
           getRowActions={getRowActions}
           onToggleEnabled={onToggleEnabled}

@@ -1,10 +1,9 @@
 import { Button, Flex, FlexItem, StackItem, Truncate } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiTrashIcon } from '@patternfly/react-icons'
-import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
-import type { IAction } from '@patternfly/react-table'
+import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import { useMemo, useState } from 'react'
 
-import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { FilterBar } from '../../../components/filters'
 import { IconLabel } from '../../../components/IconLabel'
@@ -13,6 +12,8 @@ import { SynPanelContentStack } from '../../../components/layout/SynPanelContent
 import { SynEmptyStateFilter } from '../../../components/states/SynEmptyStateFilter'
 import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import { useQueryState } from '../../../components/states/useQueryState'
+import { SynKebabMenu } from '../../../components/SynKebabMenu'
+import type { KebabAction } from '../../../components/SynKebabMenu'
 import { LinkCell } from '../../../components/table/LinkCell'
 import { SynScrollableTableContainer } from '../../../components/table/SynScrollableTableContainer'
 import { useFilterState } from '../../../hooks/useFilterState'
@@ -56,10 +57,12 @@ function getMemberActions(
   member: MemberInfo,
   onRemove: (m: MemberInfo) => void,
   permissions: ReturnType<typeof useGroupPermissions>
-): IAction[] {
+): KebabAction[] {
   return [
     {
-      title: <IconLabel icon={<RhUiTrashIcon />}>Remove</IconLabel>,
+      key: 'remove',
+      title: <IconLabel icon={<RhUiTrashIcon />}>Remove member</IconLabel>,
+      isDanger: true,
       isAriaDisabled: !permissions.canManageMembers,
       tooltipProps: permissions.canManageMembers ? undefined : { content: permissions.tooltips.manageMembers },
       onClick: permissions.canManageMembers ? () => onRemove(member) : undefined,
@@ -146,7 +149,7 @@ export function GroupMembersPanel({ groupId, onMembershipChange }: Readonly<Grou
     return (
       <>
         <SynEmptyStateNoData
-          title="No members"
+          title="No members yet"
           description="Add users to this group to manage their access."
           buttonText="Add member"
           addData={permissions.canManageMembers ? () => setAddModalOpen(true) : undefined}
@@ -254,12 +257,13 @@ export function GroupMembersPanel({ groupId, onMembershipChange }: Readonly<Grou
                   </Td>
                   <Td isActionCell>
                     {!member.is_builtin && (
-                      <ActionsColumn
-                        items={getMemberActions(
+                      <SynKebabMenu
+                        actions={getMemberActions(
                           { id: member.id, username: member.username },
                           setMemberToRemove,
                           permissions
                         )}
+                        aria-label={`Actions for ${member.username}`}
                       />
                     )}
                   </Td>
@@ -278,7 +282,7 @@ export function GroupMembersPanel({ groupId, onMembershipChange }: Readonly<Grou
         existingMemberIds={members.map((m) => m.id)}
       />
 
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={!!memberToRemove}
         onClose={() => setMemberToRemove(null)}
         onConfirm={handleRemove}
@@ -289,7 +293,7 @@ export function GroupMembersPanel({ groupId, onMembershipChange }: Readonly<Grou
       >
         This removes <strong>{memberToRemove?.username}</strong> from the group. They will lose any permissions granted
         through this group membership.
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
     </>
   )
 }

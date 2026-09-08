@@ -204,19 +204,20 @@ async def test_get_execution_by_id_with_duplicate_include_values(
 
 
 @pytest.mark.asyncio
-async def test_get_execution_by_id_workflow_name_after_soft_delete(
+async def test_get_execution_by_id_returns_404_after_workflow_hard_delete(
     auth_client: AsyncClient,
     test_execution: Execution,
     test_workflow: Workflow,
     test_user: User,
     test_db_session: AsyncSession,
 ) -> None:
-    """Test that workflow_name is still returned after the workflow is soft-deleted."""
-    test_workflow.soft_delete(user_id=test_user.id, deletion_time=datetime.now(UTC))
+    """Test that execution is cascade-deleted when its workflow is hard-deleted."""
+    execution_id = test_execution.id
+    test_workflow.published_version_id = None
+    test_workflow.is_enabled = False
+    await test_db_session.delete(test_workflow)
     await test_db_session.commit()
 
-    response = await auth_client.get(f"/api/v1/executions/{test_execution.id}")
+    response = await auth_client.get(f"/api/v1/executions/{execution_id}")
 
-    assert response.status_code == 200
-    data = response.json()
-    assert data["workflow_name"] == test_workflow.name
+    assert response.status_code == 404

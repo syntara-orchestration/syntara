@@ -1,5 +1,5 @@
 ---
-schema_version: '2.0.0'
+schema_version: "2.0.0"
 name: retry-demo
 description: Demonstrates retry policies with exponential backoff
 
@@ -57,9 +57,9 @@ nodes:
           exit 1
         fi
     inputs:
-      failure_rate: ${input.failure_rate}
+      failure_rate: ${trigger.failure_rate}
       attempt: '1'
-      seed: ${input.seed}
+      seed: ${trigger.seed}
     outputs:
       result: $.stdout
     timeout: 10

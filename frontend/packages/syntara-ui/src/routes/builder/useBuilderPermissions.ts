@@ -5,6 +5,7 @@ import { useCanI } from '../../hooks/useCanI'
 
 export type BuilderPermissions = {
   canEdit: boolean
+  canCreate: boolean
   canRun: boolean
   canDelete: boolean
   isLoading: boolean
@@ -15,6 +16,7 @@ export type BuilderPermissions = {
     unpublish: string
     run: string
     delete: string
+    create: string
   }
 }
 
@@ -58,6 +60,7 @@ export function useBuilderPermissions(
 
     return {
       canEdit,
+      canCreate: isBuiltin ? false : canCreate,
       canRun,
       canDelete: isBuiltin ? false : canDelete,
       isLoading,
@@ -68,6 +71,7 @@ export function useBuilderPermissions(
         unpublish: permissionTooltip('unpublish this workflow', 'workflow:update'),
         run: permissionTooltip('run this workflow', 'execution:run'),
         delete: permissionTooltip('delete this workflow', 'workflow:delete'),
+        create: permissionTooltip('duplicate this workflow', 'workflow:create'),
       },
     }
   }, [isNew, isBuiltin, canCreate, canUpdate, canDelete, canRun, c1, c2, c3, c4])

@@ -125,7 +125,8 @@ function identifyLoopStructures(realNodes: NodeType[], realEdges: EdgeType[]) {
 
         while (queue.length > 0 && iterations < MAX_ITERATIONS) {
           iterations++
-          const nodeId = queue.shift()!
+          const nodeId = queue[0]
+          queue.shift()
           if (visited.has(nodeId)) continue
           visited.add(nodeId)
 

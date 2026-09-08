@@ -1,7 +1,7 @@
 """Workflow definition schema models for v2 workflows.
 
 This module provides the Pydantic model for workflow definitions that conform to
-the Syntara Workflow Engine v2 schema.
+the Orchestrator Workflow Engine v2 schema.
 """
 
 from typing import Annotated, Any, Literal
@@ -159,7 +159,7 @@ WorkflowNode = Annotated[_AllNodeTypes, Discriminator("type")]
 
 
 class WorkflowDefinition(SQLModel):
-    """JSON Schema for graph-based workflow definitions in the Syntara Workflow Engine v2.
+    """JSON Schema for graph-based workflow definitions in the Orchestrator Workflow Engine v2.
 
     Attributes:
         schema_version: Schema version that this workflow definition conforms to

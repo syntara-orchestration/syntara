@@ -11,6 +11,14 @@ type CredentialAffectedResourcesWarningsProps = {
   workflowsFetchError: boolean
   affectedIntegrations: Integration[]
   integrationsFetchError: boolean
+  /**
+   * When true, integrations are rendered as a hard blocker (separate danger alert,
+   * "must be detached" copy) instead of being grouped under the generic "Resources
+   * that will be affected" summary. Used by the delete dialog, where the backend
+   * rejects the delete outright while any integration still references the
+   * credential — unlike workflows, which are only warned about, not blocking.
+   */
+  integrationsBlockDeletion?: boolean
 }
 
 /**
@@ -23,13 +31,15 @@ export function CredentialAffectedResourcesWarnings({
   workflowsFetchError,
   affectedIntegrations,
   integrationsFetchError,
+  integrationsBlockDeletion = false,
 }: Readonly<CredentialAffectedResourcesWarningsProps>) {
   const hasWorkflows = affectedWorkflows.length > 0
   const hasIntegrations = affectedIntegrations.length > 0
-  const hasDependencies = hasWorkflows || hasIntegrations
+  const hasBlockingIntegrations = integrationsBlockDeletion && hasIntegrations
+  const hasDependencies = hasWorkflows || (hasIntegrations && !hasBlockingIntegrations)
   const hasFetchError = workflowsFetchError || integrationsFetchError
 
-  if (!hasDependencies && !hasFetchError) return null
+  if (!hasDependencies && !hasBlockingIntegrations && !hasFetchError) return null
 
   return (
     <Stack hasGutter>
@@ -47,6 +57,17 @@ export function CredentialAffectedResourcesWarnings({
           </Alert>
         </StackItem>
       )}
+      {hasBlockingIntegrations && (
+        <StackItem>
+          <Alert
+            variant="danger"
+            isInline
+            title="This credential can't be deleted until it's detached from these integrations"
+          >
+            <CredentialDependencySection label="Integrations" resources={affectedIntegrations} />
+          </Alert>
+        </StackItem>
+      )}
       {hasDependencies && (
         <StackItem>
           <Stack hasGutter>
@@ -60,7 +81,7 @@ export function CredentialAffectedResourcesWarnings({
                 <CredentialDependencySection label="Workflows" resources={affectedWorkflows} />
               </StackItem>
             )}
-            {hasIntegrations && (
+            {hasIntegrations && !hasBlockingIntegrations && (
               <StackItem>
                 <CredentialDependencySection label="Integrations" resources={affectedIntegrations} />
               </StackItem>

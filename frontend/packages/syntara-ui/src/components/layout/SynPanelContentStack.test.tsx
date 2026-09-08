@@ -13,13 +13,13 @@ describe('SynPanelContentStack', () => {
     )
 
     const child = screen.getByText('Main')
-    /* eslint-disable testing-library/no-node-access -- Stack is a layout div with no role; assert styles on the PF wrapper (testing guideline prefer queries first on children). */
-    expect(child.parentElement).toHaveStyle({
-      height: '100%',
-      flexGrow: 1,
-      minHeight: '0px',
-    })
-    /* eslint-enable testing-library/no-node-access */
+    // Assert on the literal inline style rather than toHaveStyle()/getComputedStyle: happy-dom
+    // serializes a zero-length computed min-height as "0" (no unit), so a computed-style
+    // comparison is unreliable here.
+    const stackStyle = child.parentElement?.style
+    expect(stackStyle?.height).toBe('100%')
+    expect(stackStyle?.flexGrow).toBe('1')
+    expect(stackStyle?.minHeight).toBe('0')
   })
 
   it('renders inset variant with horizontal padding token', () => {

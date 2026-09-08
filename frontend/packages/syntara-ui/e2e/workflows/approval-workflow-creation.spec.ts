@@ -1,5 +1,4 @@
-import type { Page } from '@playwright/test'
-
+import { type Page } from '../fixtures'
 import { test, expect, toAppUrl } from '../fixtures'
 import { addApprovalNode, addManualTrigger } from '../helpers/v2-nodes'
 import {

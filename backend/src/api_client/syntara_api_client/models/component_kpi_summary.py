@@ -16,7 +16,7 @@ T = TypeVar("T", bound="ComponentKPISummary")
 
 @_attrs_define
 class ComponentKPISummary:
-    """KPI summary for a single Syntara component.
+    """KPI summary for a single Orchestrator component.
 
     Attributes:
         component (str): Component identifier

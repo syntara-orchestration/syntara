@@ -1,7 +1,7 @@
 import { Content, ContentVariants, Spinner } from '@patternfly/react-core'
 import type React from 'react'
 
-import { NxConfirmationDialog } from '../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../components/dialogs/SynConfirmationDialog'
 
 type RetryExecutionDialogProps = Readonly<{
   isOpen: boolean
@@ -48,7 +48,7 @@ export function RetryExecutionDialog({
   }
 
   return (
-    <NxConfirmationDialog
+    <SynConfirmationDialog
       isOpen={isOpen}
       onClose={onClose}
       onConfirm={onConfirm}
@@ -57,6 +57,6 @@ export function RetryExecutionDialog({
       confirmLoading={confirmLoading}
     >
       {bodyContent}
-    </NxConfirmationDialog>
+    </SynConfirmationDialog>
   )
 }

@@ -40,12 +40,12 @@ export function buildWorkflowRowActions(
   if (workflow.is_builtin) return []
 
   const updatePermissionTooltip = permissions.canUpdate ? undefined : { content: permissions.tooltips.update }
-  const createPermissionTooltip = permissions.canCreate ? undefined : { content: permissions.tooltips.create }
+  const duplicatePermissionTooltip = permissions.canCreate ? undefined : { content: permissions.tooltips.duplicate }
   const deletePermissionTooltip = permissions.canDelete ? undefined : { content: permissions.tooltips.delete }
   const noUpdate = isBuiltinProject ? { content: builtinProjectTooltip('edit this workflow') } : updatePermissionTooltip
-  const noCreate = isBuiltinProject
+  const noDuplicate = isBuiltinProject
     ? { content: builtinProjectTooltip('duplicate this workflow') }
-    : createPermissionTooltip
+    : duplicatePermissionTooltip
   const noRun = permissions.canRun ? undefined : { content: permissions.tooltips.run }
   const noDelete = isBuiltinProject
     ? { content: builtinProjectTooltip('delete this workflow') }
@@ -89,7 +89,7 @@ export function buildWorkflowRowActions(
       title: <IconLabel icon={<RhUiDuplicateIcon />}>Duplicate workflow</IconLabel>,
       isDisabled: callbacks.isDuplicating,
       isAriaDisabled: isBuiltinProject || !permissions.canCreate,
-      tooltipProps: noCreate,
+      tooltipProps: noDuplicate,
       onClick: () => callbacks.onDuplicate(workflow),
     },
     {

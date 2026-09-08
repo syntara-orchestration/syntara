@@ -5,6 +5,8 @@ import { SynPanelContentStack } from '../../../../components/layout/SynPanelCont
 import { SynScrollableTableContainer } from '../../../../components/table/SynScrollableTableContainer'
 import { buildRowKey, toSafeString } from '../utils/tableHelpers'
 
+import styles from './DataTableView.module.css'
+
 export type DataTableViewProps = {
   data: Record<string, unknown> | Record<string, unknown>[] | null
   ariaLabel: string
@@ -41,7 +43,9 @@ export function DataTableView({ data, ariaLabel, renderCell, renderHeader }: Rea
         <Thead>
           <Tr>
             {columns.map((col) => (
-              <Th key={col}>{renderHeader ? renderHeader(col) : col}</Th>
+              <Th key={col} className={styles.cell}>
+                {renderHeader ? renderHeader(col) : col}
+              </Th>
             ))}
           </Tr>
         </Thead>
@@ -51,7 +55,7 @@ export function DataTableView({ data, ariaLabel, renderCell, renderHeader }: Rea
               {columns.map((col) => {
                 const text = toSafeString(row[col])
                 return (
-                  <Td key={col} dataLabel={col}>
+                  <Td key={col} className={styles.cell} dataLabel={col}>
                     {renderCell ? renderCell(text) : text}
                   </Td>
                 )

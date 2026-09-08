@@ -28,6 +28,22 @@
   ],
   "packageRules": [
     {
+      "description": "Separate Python lockfile maintenance into its own branch and PR so it does not collide with rpm-lockfile maintenance",
+      "matchManagers": ["pep621"],
+      "matchUpdateTypes": ["lockFileMaintenance"],
+      "branchTopic": "lock-file-maintenance-python",
+      "commitMessageAction": "Refresh Python lockfile",
+      "labels": ["python-lockfile-maintenance"]
+    },
+    {
+      "description": "Separate npm lockfile maintenance into its own branch and PR so it does not collide with rpm-lockfile maintenance",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["lockFileMaintenance"],
+      "branchTopic": "lock-file-maintenance-npm",
+      "commitMessageAction": "Refresh npm lockfile",
+      "labels": ["npm-lockfile-maintenance"]
+    },
+    {
       "description": "Use in-range-only strategy for all Python dependencies",
       "matchManagers": ["pep621"],
       "matchFileNames": ["backend/**"],

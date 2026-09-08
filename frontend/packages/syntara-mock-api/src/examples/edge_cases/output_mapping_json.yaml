@@ -1,5 +1,5 @@
 ---
-schema_version: '2.0.0'
+schema_version: "2.0.0"
 name: output-mapping-json-test
 description: Test output mapping with JSON parsing
 

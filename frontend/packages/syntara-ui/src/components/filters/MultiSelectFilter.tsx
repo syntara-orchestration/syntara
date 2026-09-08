@@ -4,6 +4,8 @@ import React, { useCallback, useMemo, useState } from 'react'
 import { FilterOperatorEnum, type FilterConfig, type FilterOperator } from '../../types/filters'
 import { SynSelect } from '../SynSelect'
 
+import toggleStyles from './filterToggle.module.css'
+
 const SELECT_ALL_VALUE = '__select_all__'
 const CLEAR_ALL_VALUE = '__clear_all__'
 
@@ -27,6 +29,7 @@ function MultiSelectFilterMenuToggle({
       ref={toggleRef}
       onClick={onToggle}
       isExpanded={isOpen}
+      className={toggleStyles.toggle}
       {...(selectedCount > 0 && {
         badge: (
           <Badge data-testid="filter-badge" isRead>

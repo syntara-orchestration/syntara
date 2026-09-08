@@ -17,38 +17,35 @@ Write tests that verify **what** your code does, not **how** it does it. Tests s
 
 ## Coverage Requirements
 
-**All new and modified files must meet 80% coverage threshold** across:
+**CI (blocks merge):** merged Vitest coverage must meet **85% statements**. That is
+`nyc check-coverage --statements 85` in `packages/syntara-ui/scripts/merge-coverage.js`,
+run by the `(Frontend) Coverage Report` required check. It is a **global** gate on
+merged shards, not a per-file gate.
 
-- **Statements**: 80%
-- **Branches**: 80%
-- **Functions**: 80%
-- **Lines**: 80%
+There is **no** `scripts/check-pr-coverage.js`. Vitest has **no** coverage
+thresholds in config. SonarCloud coverage is informational (not a required check).
 
-This is enforced incrementally - existing files can improve gradually, but new code should meet the standard.
+**Authoring target:** aim for ~80% statements/branches/functions/lines on **new**
+files so the global 85% does not regress. Utilities 90%+. Existing files can
+improve gradually.
 
-**Coverage enforcement:**
-
-Coverage is enforced on changed files in PRs via `scripts/check-pr-coverage.js`. Run locally from `frontend/packages/syntara-ui`:
+Run locally from `frontend/packages/syntara-ui`:
 
 ```bash
-cd packages/syntara-ui
 npm run test:coverage        # Generate coverage report
-npm run test:coverage        # Check coverage (see CI for per-file threshold enforcement)
 ```
-
-CI automatically runs this check and **blocks PRs** where any changed source file falls below 80% on any of the four metrics (lines, statements, functions, branches). All new and modified source files must meet the threshold to merge.
 
 **Critical: files never imported are silently excluded from coverage reports**
 
 Without an explicit `include` glob, modules that are never imported in any test won't appear in coverage output at all — making overall numbers look better than they are:
 
 ```typescript
-// vitest.config.ts
+// vitest.config.ts — include all source so unused files appear in reports.
+// This repo does not set Vitest coverage.thresholds; CI uses nyc 85% statements.
 coverage: {
   provider: 'v8',
   include: ['src/**/*.{ts,tsx}'],           // required — include all source files
   exclude: ['src/**/*.stories.tsx', 'src/**/*.d.ts'],
-  thresholds: { lines: 80, functions: 80, branches: 80, statements: 80 },
 }
 ```
 
@@ -88,15 +85,15 @@ it('increments counter when button clicked', async () => {
 
 ---
 
-## Test Modes: jsdom vs Playwright E2E
+## Test Modes: happy-dom vs Playwright E2E
 
-### Default (jsdom) — Fast, Lightweight for Most Tests
+### Default (happy-dom) — Fast, Lightweight for Most Tests
 
 - File naming: `*.test.ts` or `*.test.tsx`
 - Use for: Component rendering, user interactions, form validation, hooks, utilities
-- Environment: Simulated DOM via jsdom
+- Environment: Simulated DOM via happy-dom (`packages/syntara-ui/vitest.config.ts`)
 
-**Example — jsdom test (use for most cases):**
+**Example — happy-dom test (use for most cases):**
 
 ```typescript
 // File: Counter.test.tsx
@@ -162,7 +159,7 @@ test('user creates a workflow', async ({ app }) => {
 
 ### Why the Distinction Matters
 
-- jsdom/happy-dom **simulate** browser behavior in Node.js and can miss cross-page issues
+- happy-dom **simulates** browser behavior in Node.js and can miss cross-page issues
 - E2E runs in a **real browser** with routing, network, and storage in place
 - Trade-off: E2E is slower but validates full user journeys
 
@@ -172,11 +169,11 @@ test('user creates a workflow', async ({ app }) => {
 Does the component use browser-specific APIs?
 ├─ Yes → Use Playwright E2E (packages/syntara-ui/e2e/*.spec.ts)
 │  └─ Examples: IntersectionObserver, ResizeObserver, Canvas, real layout
-└─ No → Use jsdom (*.test.tsx)
+└─ No → Use happy-dom (*.test.tsx)
    └─ Examples: Rendering, clicks, state, forms, most user interactions
 ```
 
-**Default to jsdom** unless you specifically need browser APIs — it's much faster.
+**Default to happy-dom** unless you specifically need browser APIs — it's much faster.
 
 ### Shift-Left E2E Testing (Test Tagging for PR Checks)
 
@@ -392,7 +389,7 @@ it('has no accessibility violations when rows are expanded', async () => {
 })
 ```
 
-**Important**: vitest-axe requires `jsdom` as the test environment — `happy-dom` has a known bug that causes axe to silently pass even when violations exist. See the full explanation in the Accessibility Testing section below.
+Unit axe tests run under the shared `happy-dom` environment. `src/test/setup.ts` installs polyfills (including the `[hidden] { display: none }` UA rule) so axe-core visibility checks work. See the Accessibility Testing section below for remaining DOM-simulation caveats.
 
 ### 3. Every New Custom Hook Must Have a Dedicated Test File
 
@@ -426,7 +423,7 @@ it('returns debounced value after delay', async () => {
 })
 ```
 
-This ensures the 80% coverage threshold is met on the hook file independently, and prevents regressions when the consuming component changes.
+This ensures the hook file itself is measured (not only indirect coverage from a component test) and prevents regressions when the consuming component changes.
 
 ### 4. Unnecessary `useEffect` in Hooks
 
@@ -896,28 +893,18 @@ npm run e2e -- accessibility.spec.ts # Only accessibility tests
 npm run e2e:ui                       # With Playwright UI for debugging
 ```
 
-**Critical: `vitest-axe` does not work with `happy-dom`**
+**happy-dom + vitest-axe**
 
-`happy-dom` has a known bug in its `Node.prototype.isConnected` implementation that breaks axe-core. Tests run silently with no violations even when violations exist. Always use `jsdom` as the Vitest environment for files that include axe tests:
-
-```typescript
-// vitest.config.ts
-test: {
-  environment: 'jsdom', // required for vitest-axe — happy-dom silently breaks axe
-}
-
-// Or per-file override at the top of the test file:
-// @vitest-environment jsdom
-```
+Vitest uses `environment: 'happy-dom'` project-wide. Keep axe tests on that default — do not add `@vitest-environment jsdom` overrides. `src/test/setup.ts` polyfills gaps that otherwise confuse axe (for example the `[hidden]` UA stylesheet rule).
 
 **axe-core catches approximately 30% of real WCAG violations**
 
 Automated scans are a floor, not a ceiling. The following require manual testing beyond vitest-axe and @axe-core/playwright:
 
-| Check | vitest-axe (jsdom) | @axe-core/playwright | Manual required |
+| Check | vitest-axe (happy-dom) | @axe-core/playwright | Manual required |
 |---|---|---|---|
 | ARIA roles and labels | ✅ | ✅ | — |
-| Color contrast | ❌ (jsdom has no CSS) | ✅ | Supplement |
+| Color contrast | ❌ (happy-dom has no full CSS cascade) | ✅ | Supplement |
 | Focus management (modals) | ❌ | Partial | ✅ |
 | Keyboard navigation flow | ❌ | ❌ | ✅ |
 | Screen reader announcement quality | ❌ | ❌ | ✅ |
@@ -935,12 +922,12 @@ if (results.incomplete.length > 0) {
 }
 ```
 
-**Suppress known jsdom false positives with `configureAxe`:**
+**Suppress known happy-dom false positives with `configureAxe`:**
 
 ```typescript
 import { configureAxe } from 'vitest-axe'
 
-// color-contrast always passes in jsdom (no CSS) — test it via Playwright instead
+// color-contrast is unreliable without a full CSS cascade — test it via Playwright instead
 const axe = configureAxe({
   rules: { 'color-contrast': { enabled: false } },
 })
@@ -950,7 +937,7 @@ const axe = configureAxe({
 
 ## Industry Best Practices for Test Coverage
 
-### Bare Minimum (80%)
+### Bare minimum (authoring target, ~80% on new files)
 
 - **Happy path**: Test the most common user flow
 - **Error cases**: Test at least one error scenario
@@ -974,9 +961,26 @@ describe('Button', () => {
 })
 ```
 
-### Why 80%?
+### Why aim for ~80% on new files?
 
 - Industry standard (Google, Airbnb, Netflix use 80-90%)
 - Catches most bugs without diminishing returns
 - Balances thoroughness with development velocity
 - Forces testing of critical paths without testing getters/setters
+
+---
+
+## Keep Mock Handlers in Sync with Contract Types
+
+When a contract field is renamed, added, or removed, **update `packages/syntara-mock-api/src/handlers.ts` in the same PR.** Stale handler keys are silently ignored by browsers — the mock never exercises the new code path, so developers cannot trigger or test the behavior locally.
+
+```typescript
+// ❌ BAD: contract switched from warnings: string[] → warning?: string | null
+// but the mock still returns the old shape — the warning toast is untestable
+return HttpResponse.json({ ...workflow, warnings: [] })
+
+// ✅ GOOD: keep the mock in sync with the new contract field
+return HttpResponse.json({ ...workflow, warning: null })
+```
+
+**PR checklist item:** Any PR that renames or removes a response field must include a corresponding mock handler update. TypeScript won't catch this automatically because `HttpResponse.json()` is untyped — it's a manual discipline.

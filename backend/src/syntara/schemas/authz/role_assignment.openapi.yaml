@@ -1,10 +1,10 @@
 ---
 openapi: 3.1.0
 info:
-  title: Syntara Role Assignments API
+  title: Orchestrator Role Assignments API
   version: 1.0.0
   description: |
-    Unified role assignment endpoints for the Syntara platform.
+    Unified role assignment endpoints for the Orchestrator platform.
 
     These endpoints manage role assignments to users and groups,
     both at the system level (global) and project-scoped.

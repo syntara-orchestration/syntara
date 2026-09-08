@@ -166,3 +166,20 @@ EXPOSE 8000
 # Default command runs the API server
 # Override with different commands for other services.
 CMD ["start-api"]
+
+# Override UBI name/cpe so Konflux container-first security checks match
+# the product data file.
+ENV DESCRIPTION="Red Hat Ansible Automation Orchestrator" \
+    container=oci
+
+LABEL com.redhat.component="ansible-automation-orchestrator-backend-container" \
+      name="ansible-automation-platform/automation-orchestrator-backend-rhel9" \
+      cpe="cpe:/a:redhat:ansible_automation_orchestrator:2026.8::el9" \
+      summary="${DESCRIPTION}" \
+      io.openshift.expose-services="8000:http" \
+      io.openshift.tags="automation,ansible,orchestrator" \
+      io.k8s.display-name="automation-orchestrator-backend-rhel9" \
+      io.k8s.description="${DESCRIPTION}" \
+      maintainer="Ansible Automation Platform Productization Team" \
+      description="${DESCRIPTION}" \
+      vendor="Red Hat, Inc."

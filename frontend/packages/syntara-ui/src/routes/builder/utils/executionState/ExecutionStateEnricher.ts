@@ -70,8 +70,8 @@ function reachableNodes(entryId: string, adjacency: Map<string, string[]>, stopA
   const visited = new Set<string>()
   const stack = [entryId]
   while (stack.length > 0) {
-    const nodeId = stack.pop()!
-    if (visited.has(nodeId) || nodeId.startsWith('converge-') || nodeId === stopAt) continue
+    const nodeId = stack.pop()
+    if (nodeId === undefined || visited.has(nodeId) || nodeId.startsWith('converge-') || nodeId === stopAt) continue
     visited.add(nodeId)
     for (const child of adjacency.get(nodeId) ?? []) {
       if (!visited.has(child)) stack.push(child)

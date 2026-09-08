@@ -19,13 +19,9 @@ import { IntegrationTypeEnum } from '@syntara/contracts'
 import { useNavigate, useParams } from '@tanstack/react-router'
 
 import { AppRoute } from '../../../app/AppRoute'
-import {
-  breadcrumbsIntegrationDetail,
-  breadcrumbsIntegrationDetailEarlyShell,
-  type IntegrationDetailBreadcrumbTab,
-} from '../../../app/breadcrumbBuilders'
+import { breadcrumbsIntegrationDetail, breadcrumbsIntegrationDetailEarlyShell } from '../../../app/breadcrumbBuilders'
 import { credentialsClient, integrationsClient } from '../../../client'
-import { NxDetail } from '../../../components/details/NxDetail'
+import { SynDetail } from '../../../components/details/SynDetail'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
 import { SynLabel } from '../../../components/labels/SynLabel'
@@ -39,7 +35,7 @@ import { SynKebabMenu } from '../../../components/SynKebabMenu'
 import { SynLink } from '../../../components/SynLink'
 import { SynPageTitle } from '../../../components/SynPageTitle'
 import { DateCell } from '../../../components/table/DateCell.tsx'
-import { NxUrlTabs } from '../../../components/tabs/NxUrlTabs'
+import { SynUrlTabs } from '../../../components/tabs/SynUrlTabs'
 import { useUrlTab } from '../../../hooks/useUrlTab'
 import { detachPromise } from '../../../utils/detachPromise'
 import { useDocLink } from '../../../utils/docs/useDocLink'
@@ -104,33 +100,33 @@ function IntegrationDetailsTab({
     <Stack hasGutter className={styles.tabContent}>
       <StackItem>
         <DescriptionList isHorizontal>
-          <NxDetail label={isLLMProvider(integration) ? 'Name' : 'Server name / ID'}>{integration.name}</NxDetail>
-          <NxDetail label="Description">{integration.description}</NxDetail>
-          <NxDetail label="Integration type">
+          <SynDetail label={isLLMProvider(integration) ? 'Name' : 'Server name / ID'}>{integration.name}</SynDetail>
+          <SynDetail label="Description">{integration.description}</SynDetail>
+          <SynDetail label="Integration type">
             {INTEGRATION_TYPE_LABELS[integration.integration_type ?? ''] ?? integration.integration_type ?? ''}
-          </NxDetail>
-          <NxDetail label="Status">
+          </SynDetail>
+          <SynDetail label="Status">
             <StatusLabel
               status={integration.validation_status ?? 'unknown'}
               errorMessage={integration.validation_error}
             />
-          </NxDetail>
-          <NxDetail label="Last checked">
+          </SynDetail>
+          <SynDetail label="Last checked">
             <DateCell dateString={integration.last_validated_at} />
-          </NxDetail>
-          <NxDetail label="Scope">{integration.scope === 'project' ? 'Project' : 'Global'}</NxDetail>
+          </SynDetail>
+          <SynDetail label="Scope">{integration.scope === 'project' ? 'Project' : 'Global'}</SynDetail>
           {integration.scope === 'project' && integration.id && (
-            <NxDetail label="Assigned projects">
+            <SynDetail label="Assigned projects">
               <IntegrationProjectsList integrationId={integration.id} />
-            </NxDetail>
+            </SynDetail>
           )}
           {isLLMProvider(integration) && (
-            <NxDetail label="Provider type">
+            <SynDetail label="Provider type">
               {PROVIDER_HINT_LABELS[getProviderHint(integration)] ?? getProviderHint(integration)}
-            </NxDetail>
+            </SynDetail>
           )}
-          <NxDetail label="URL">{getBaseUrl(integration) || '—'}</NxDetail>
-          <NxDetail label="Connection credential">
+          <SynDetail label="URL">{getBaseUrl(integration) || '—'}</SynDetail>
+          <SynDetail label="Connection credential">
             {!credentialId || !credentialName ? (
               <>None</>
             ) : (
@@ -149,9 +145,9 @@ function IntegrationDetailsTab({
                 )}
               </Flex>
             )}
-          </NxDetail>
+          </SynDetail>
           {(isLLMProvider(integration) || integration.integration_type === IntegrationTypeEnum.MCP_SERVER) && (
-            <NxDetail label={`Enabled ${resourceNoun}`}>{String(enabledResourceCount)}</NxDetail>
+            <SynDetail label={`Enabled ${resourceNoun}`}>{String(enabledResourceCount)}</SynDetail>
           )}
         </DescriptionList>
       </StackItem>
@@ -280,12 +276,14 @@ function hasResourcesTab(integration: IntegrationsAPI.components['schemas']['Int
   return isLLMProvider(integration) || integration.integration_type === IntegrationTypeEnum.MCP_SERVER
 }
 
+type IntegrationDetailTab = 'details' | 'resources' | 'edit'
+
 export function IntegrationDetail() {
   const { integrationId }: { integrationId: string } = useParams({ strict: false })
   const navigate = useNavigate()
   const integrationBasePath = AppRoute.Configuration.Integrations.Detail.replace(':integrationId', integrationId)
   const editPath = AppRoute.Configuration.Integrations.Edit.replace(':integrationId', integrationId)
-  const [activeTab] = useUrlTab<IntegrationDetailBreadcrumbTab | 'edit'>(integrationBasePath)
+  const [activeTab] = useUrlTab<IntegrationDetailTab>(integrationBasePath)
   const docLink = useDocLink('integrations')
   const permissions = useIntegrationPermissions()
 
@@ -379,7 +377,7 @@ export function IntegrationDetail() {
 
   if (!integration?.id) return null
 
-  const integrationCrumbs = breadcrumbsIntegrationDetail(integration.id, integration.name, activeTab)
+  const integrationCrumbs = breadcrumbsIntegrationDetail(integration.name)
   const footer = activeTab === 'resources' ? <ResourcesFooter {...footerState} /> : undefined
 
   return (
@@ -402,7 +400,7 @@ export function IntegrationDetail() {
 
       <SynPageBody>
         <SynPanel isFullHeight isScrollable footer={footer} className={styles.tabsFullHeight}>
-          <NxUrlTabs
+          <SynUrlTabs
             basePath={integrationBasePath}
             defaultTab="details"
             validTabs={hasResourcesTab(integration) ? ['details', 'resources'] : ['details']}
@@ -446,7 +444,7 @@ export function IntegrationDetail() {
                 />
               </Tab>
             )}
-          </NxUrlTabs>
+          </SynUrlTabs>
         </SynPanel>
       </SynPageBody>
 

@@ -50,7 +50,9 @@ class WorkflowConvergeMixin:
     # Methods provided by OrchestratorWorkflow (resolved via MRO)
     def _are_predecessors_complete(self, node_id: str, graph: WorkflowGraph) -> bool: ...  # type: ignore[empty-body]
 
-    def _mark_downstream_as_skipped(self, start_node_id: str, graph: WorkflowGraph) -> None: ...
+    def _mark_downstream_as_skipped(
+        self, start_node_id: str, graph: WorkflowGraph, boundary: set[str] | None = None
+    ) -> None: ...
 
     @staticmethod
     def _collect_ancestors(node_id: str, graph: WorkflowGraph) -> set[str]:
@@ -362,6 +364,11 @@ class WorkflowConvergeMixin:
         Used both when a converge timeout fires and when an 'any' strategy
         converge node has met its n_required threshold.
 
+        Only propagates the skip to nodes within the converge's parallel section
+        (ancestors of the converge's direct predecessors that are not common to
+        all branches). Nodes that branch off a predecessor but are outside the
+        parallel section are left untouched.
+
         Args:
             node_id: Converge node whose predecessors to check
             graph: Workflow graph
@@ -369,6 +376,7 @@ class WorkflowConvergeMixin:
             pending_tasks: Currently executing node tasks (in-flight nodes are not skipped)
 
         """
+        parallel_section = {k for k, v in self._converge_branch_nodes.items() if node_id in v}
         newly_skipped = []
         for pred_id in graph.get_predecessors(node_id):
             if pred_id not in self.skipped_nodes and not self.resolver.has_namespace(pred_id):
@@ -379,4 +387,4 @@ class WorkflowConvergeMixin:
                 newly_skipped.append(pred_id)
                 workflow.logger.info(f"Converge: predecessor {pred_id} skipped ({reason})")
         for pred_id in newly_skipped:
-            self._mark_downstream_as_skipped(pred_id, graph)
+            self._mark_downstream_as_skipped(pred_id, graph, parallel_section)

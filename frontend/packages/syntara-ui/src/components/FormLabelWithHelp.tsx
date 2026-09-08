@@ -8,14 +8,16 @@ type FormLabelWithHelpProps = {
 }
 
 export function FormLabelWithHelp({ label, helpText }: Readonly<FormLabelWithHelpProps>) {
+  const helpAriaLabel = `${label} help`
+
   return (
     <>
       {label}
       {helpText && (
-        <Popover bodyContent={helpText}>
+        <Popover bodyContent={helpText} aria-label={helpAriaLabel}>
           <Button
             variant="plain"
-            aria-label={`${label} help`}
+            aria-label={helpAriaLabel}
             style={{ padding: 0, marginLeft: 'var(--pf-t--global--spacer--xs)' }}
             icon={<FieldHelpIcon />}
           />

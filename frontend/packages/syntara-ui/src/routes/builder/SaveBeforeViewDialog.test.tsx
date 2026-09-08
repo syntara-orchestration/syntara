@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { SaveBeforeViewDialog } from './SaveBeforeViewDialog'
@@ -66,6 +66,27 @@ describe('SaveBeforeViewDialog', () => {
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
 
     expect(onCancel).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders custom title when provided', () => {
+    const customTitle = 'Save changes before opening the duplicate?'
+    render(<SaveBeforeViewDialog {...defaultProps} title={customTitle} />)
+
+    expect(screen.getByText(customTitle)).toBeInTheDocument()
+  })
+
+  it('renders custom body text when provided', () => {
+    const customBodyText = 'Custom save prompt message'
+    render(<SaveBeforeViewDialog {...defaultProps} bodyText={customBodyText} />)
+
+    expect(screen.getByText(customBodyText)).toBeInTheDocument()
+  })
+
+  it('renders custom button label when provided', () => {
+    const customButtonLabel = 'Open without saving'
+    render(<SaveBeforeViewDialog {...defaultProps} buttonLabel={customButtonLabel} />)
+
+    expect(screen.getByRole('button', { name: customButtonLabel })).toBeInTheDocument()
   })
 
   describe('accessibility', () => {

@@ -1,10 +1,10 @@
 ---
 openapi: 3.1.0
 info:
-  title: Syntara Policies API
+  title: Orchestrator Policies API
   version: 1.0.0
   description: |
-    Policy management endpoints for the Syntara authorization system.
+    Policy management endpoints for the Orchestrator authorization system.
 
     Policies define fine-grained access control rules with allow/deny statements.
     Each statement specifies actions, scope, and optional conditions.

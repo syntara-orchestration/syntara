@@ -211,7 +211,7 @@ describe('GroupMembersPanel', () => {
 
       render(<GroupMembersPanel {...defaultProps} />, { wrapper })
 
-      expect(screen.getByText('No members')).toBeInTheDocument()
+      expect(screen.getByText('No members yet')).toBeInTheDocument()
       expect(screen.getByText(/add users to this group/i)).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /add member/i })).toBeInTheDocument()
     })
@@ -288,7 +288,7 @@ describe('GroupMembersPanel', () => {
       const actionsButtons = within(rows[1]).getAllByRole('button')
       await user.click(actionsButtons[actionsButtons.length - 1])
 
-      const removeItem = await screen.findByText('Remove')
+      const removeItem = await screen.findByText('Remove member')
       await user.click(removeItem)
 
       await waitFor(() => {
@@ -316,7 +316,7 @@ describe('GroupMembersPanel', () => {
       const actionsButtons = within(rows[1]).getAllByRole('button')
       await user.click(actionsButtons[actionsButtons.length - 1])
 
-      const removeItem = await screen.findByText('Remove')
+      const removeItem = await screen.findByText('Remove member')
       await user.click(removeItem)
 
       // Confirm removal
@@ -338,7 +338,7 @@ describe('GroupMembersPanel', () => {
       const actionsButtons = within(rows[1]).getAllByRole('button')
       await user.click(actionsButtons[actionsButtons.length - 1])
 
-      const removeItem = await screen.findByText('Remove')
+      const removeItem = await screen.findByText('Remove member')
       await user.click(removeItem)
 
       // Cancel
@@ -487,7 +487,7 @@ describe('GroupMembersPanel', () => {
       const actionsButtons = within(rows[1]).getAllByRole('button')
       await user.click(actionsButtons[actionsButtons.length - 1])
 
-      const removeItem = await screen.findByText('Remove')
+      const removeItem = await screen.findByText('Remove member')
       await user.click(removeItem)
 
       const removeButton = screen.getByRole('button', { name: 'Remove' })
@@ -517,7 +517,7 @@ describe('GroupMembersPanel', () => {
       const actionsButtons = within(rows[1]).getAllByRole('button')
       await user.click(actionsButtons[actionsButtons.length - 1])
 
-      const removeItem = await screen.findByText('Remove')
+      const removeItem = await screen.findByText('Remove member')
       await user.click(removeItem)
 
       const removeButton = screen.getByRole('button', { name: 'Remove' })
