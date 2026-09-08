@@ -531,7 +531,7 @@ describe('ProjectDetail', () => {
       })
     })
 
-    it('hides permission-gated tabs while permissions are loading', async () => {
+    it('hides permission-gated tabs while permissions are loading', () => {
       vi.mocked(accessFetchClient.POST).mockImplementation(() => new Promise(() => {}))
 
       render(<ProjectDetail />, { wrapper })
