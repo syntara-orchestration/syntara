@@ -33,6 +33,7 @@ describe('useDockStateProvider', () => {
 
   beforeEach(() => {
     vi.useFakeTimers()
+    sessionStorage.clear()
     mockMql = createMockMatchMedia(false)
     vi.stubGlobal(
       'matchMedia',
@@ -181,6 +182,55 @@ describe('useDockStateProvider', () => {
 
     await act(() => vi.advanceTimersByTime(200))
     expect(mockFocus).not.toHaveBeenCalled()
+  })
+
+  it('persists dock expansion to sessionStorage', () => {
+    const { result } = renderHook(() => useDockStateProvider())
+
+    act(() => result.current.onToggleDock())
+    expect(sessionStorage.getItem('syntara-nav-dock-state')).toBe(
+      JSON.stringify({ isDockExpanded: false, isDockTextExpanded: true })
+    )
+  })
+
+  it('restores dock expansion from sessionStorage on mount', () => {
+    sessionStorage.setItem(
+      'syntara-nav-dock-state',
+      JSON.stringify({ isDockExpanded: false, isDockTextExpanded: true })
+    )
+
+    const { result } = renderHook(() => useDockStateProvider())
+    expect(result.current.isDockTextExpanded).toBe(true)
+  })
+
+  it('opens mobile overlay when crossing into mobile with text expanded', () => {
+    const { result } = renderHook(() => useDockStateProvider())
+
+    act(() => result.current.onToggleDock())
+    expect(result.current.isDockTextExpanded).toBe(true)
+
+    act(() => mockMql.trigger(true))
+    expect(result.current.isMobile).toBe(true)
+    expect(result.current.isDockExpanded).toBe(true)
+    expect(result.current.isDockTextExpanded).toBe(true)
+  })
+
+  it('migrates mobile overlay expansion to text expansion when crossing to desktop', () => {
+    mockMql = createMockMatchMedia(true)
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => mockMql.mql)
+    )
+
+    const { result } = renderHook(() => useDockStateProvider())
+
+    act(() => result.current.onToggleDock())
+    expect(result.current.isDockExpanded).toBe(true)
+
+    act(() => mockMql.trigger(false))
+    expect(result.current.isMobile).toBe(false)
+    expect(result.current.isDockTextExpanded).toBe(true)
+    expect(result.current.isDockExpanded).toBe(false)
   })
 })
 

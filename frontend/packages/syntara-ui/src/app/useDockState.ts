@@ -27,14 +27,44 @@ export function useDockState(): DockState {
  * on open/close to maintain keyboard flow.
  */
 const DOCK_DESKTOP_BREAKPOINT_PX = Number.parseInt(globalBreakpointLg.value) * 16
+const DOCK_STATE_STORAGE_KEY = 'syntara-nav-dock-state'
 
 /** Delay before transferring focus between mobile and docked toggle buttons,
  *  allowing PF's CSS transition to complete so the target element is visible. */
 const FOCUS_TRANSFER_DELAY_MS = 200
 
+type PersistedDockState = {
+  isDockExpanded: boolean
+  isDockTextExpanded: boolean
+}
+
+function readPersistedDockState(): PersistedDockState {
+  try {
+    const raw = sessionStorage.getItem(DOCK_STATE_STORAGE_KEY)
+    if (!raw) {
+      return { isDockExpanded: false, isDockTextExpanded: false }
+    }
+    const parsed = JSON.parse(raw) as Partial<PersistedDockState>
+    return {
+      isDockExpanded: parsed.isDockExpanded === true,
+      isDockTextExpanded: parsed.isDockTextExpanded === true,
+    }
+  } catch {
+    return { isDockExpanded: false, isDockTextExpanded: false }
+  }
+}
+
+function writePersistedDockState(state: PersistedDockState) {
+  try {
+    sessionStorage.setItem(DOCK_STATE_STORAGE_KEY, JSON.stringify(state))
+  } catch {
+    // sessionStorage may be unavailable in private browsing or restricted embeds.
+  }
+}
+
 export function useDockStateProvider(): DockState {
-  const [isDockExpanded, setIsDockExpanded] = useState(false)
-  const [isDockTextExpanded, setIsDockTextExpanded] = useState(false)
+  const [isDockExpanded, setIsDockExpanded] = useState(() => readPersistedDockState().isDockExpanded)
+  const [isDockTextExpanded, setIsDockTextExpanded] = useState(() => readPersistedDockState().isDockTextExpanded)
   const [isMobile, setIsMobile] = useState(() =>
     typeof window.matchMedia === 'function'
       ? window.matchMedia(`(max-width: ${DOCK_DESKTOP_BREAKPOINT_PX}px)`).matches
@@ -43,8 +73,13 @@ export function useDockStateProvider(): DockState {
   const dockedToggleRef = useRef<HTMLButtonElement>(null)
   const mobileToggleRef = useRef<HTMLButtonElement>(null)
   const focusTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const prevIsMobileRef = useRef(isMobile)
 
   useEffect(() => () => clearTimeout(focusTimerRef.current), [])
+
+  useEffect(() => {
+    writePersistedDockState({ isDockExpanded, isDockTextExpanded })
+  }, [isDockExpanded, isDockTextExpanded])
 
   useEffect(() => {
     if (typeof window.matchMedia !== 'function') return
@@ -53,6 +88,24 @@ export function useDockStateProvider(): DockState {
     mq.addEventListener('change', handler)
     return () => mq.removeEventListener('change', handler)
   }, [])
+
+  useEffect(() => {
+    const wasMobile = prevIsMobileRef.current
+    prevIsMobileRef.current = isMobile
+    if (wasMobile === isMobile) return
+
+    if (isMobile) {
+      if (isDockTextExpanded && !isDockExpanded) {
+        setIsDockExpanded(true)
+      }
+      return
+    }
+
+    if (isDockExpanded) {
+      setIsDockTextExpanded(true)
+      setIsDockExpanded(false)
+    }
+  }, [isMobile, isDockExpanded, isDockTextExpanded])
 
   const onMobileToggle = useCallback(() => {
     setIsDockExpanded((prev) => !prev)
