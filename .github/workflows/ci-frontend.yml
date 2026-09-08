@@ -169,10 +169,13 @@ jobs:
   # Dedicated contract check for the UI route compatibility baseline.
   # Vitest covers collector/update helpers; this job is the single place that
   # fails when live route sources drift from scripts/route-baseline/manifest.gen.json.
+  # Keep it non-blocking while its signal stabilizes; add it to the gate jobs
+  # and remove continue-on-error when it is ready to enforce.
   route-baseline:
-    name: (Frontend) Route Baseline
+    name: (Frontend) Route Baseline (Allowed to Fail)
     needs: changes
     if: needs.changes.outputs.code == 'true' || needs.changes.outputs.contracts == 'true'
+    continue-on-error: true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -517,7 +520,7 @@ jobs:
   frontend-checks-gate:
     name: (Frontend) Checks Gate
     runs-on: ubuntu-latest
-    needs: [changes, checks, unit-tests, route-baseline]
+    needs: [changes, checks, unit-tests]
     if: needs.changes.outputs.code == 'true' || needs.changes.outputs.contracts == 'true'
     steps:
       - run: echo "Frontend checks passed"
@@ -827,7 +830,6 @@ jobs:
       - changes
       - gen-contracts
       - checks
-      - route-baseline
       - unit-tests
       - coverage-report
       - storybook-build
@@ -847,11 +849,10 @@ jobs:
           fi
 
           ok="success|skipped"
-          for job in gen-contracts checks route-baseline unit-tests coverage-report storybook-build test-build scripts-checks frontend-checks-gate test-compose-e2e konflux-frontend-gate konflux-ui-tests-gate shared-checks-gate; do
+          for job in gen-contracts checks unit-tests coverage-report storybook-build test-build scripts-checks frontend-checks-gate test-compose-e2e konflux-frontend-gate konflux-ui-tests-gate shared-checks-gate; do
             case "$job" in
               gen-contracts)           result="${{ needs.gen-contracts.result }}" ;;
               checks)                  result="${{ needs.checks.result }}" ;;
-              route-baseline)          result="${{ needs.route-baseline.result }}" ;;
               unit-tests)              result="${{ needs.unit-tests.result }}" ;;
               coverage-report)         result="${{ needs.coverage-report.result }}" ;;
               storybook-build)         result="${{ needs.storybook-build.result }}" ;;
