@@ -20,7 +20,7 @@ import { getErrorMessage } from '../../utils/apiErrors'
 import { detachPromise } from '../../utils/detachPromise'
 import { ApprovalSidePanel } from '../executions/ApprovalSidePanel'
 import { transformExecutionStatusFilter } from '../executions/executionFilters'
-import { NodeExpandedAllContext } from '../workflows/canvas/nodes/common/NodeExpandedAllContext'
+import { NodeExpandedAllContext } from '../../components/nodes/NodeExpandedAllContext'
 
 import styles from './BuilderContent.module.css'
 import { BuilderFlow } from './BuilderFlow'

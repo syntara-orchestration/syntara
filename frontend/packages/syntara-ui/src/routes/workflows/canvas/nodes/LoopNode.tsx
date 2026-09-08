@@ -7,7 +7,7 @@ import { getNodeTypeColor } from '../nodeTypeColors'
 import { semanticZoomActivityTitle } from '../semanticZoom'
 
 import { BranchHandle, BranchHandles } from './common/BranchHandle'
-import { NodeComponent } from './common/NodeComponent'
+import { NodeComponent } from '../../../../components/nodes/NodeComponent'
 import { StandardNodeHeader } from './common/StandardNodeHeader'
 import { useLoopIterationCount } from './hooks/useLoopIterationCount'
 import { MenuNodeType, useNodeMenuActions } from './hooks/useNodeMenuActions'

@@ -9,8 +9,8 @@ import type { ActivityStatus } from '../../execution/types'
 import { getNodeTypeColor } from '../nodeTypeColors'
 import { semanticZoomActivityTitle } from '../semanticZoom'
 
-import { NodeBody } from './common/NodeBody'
-import { NodeComponent } from './common/NodeComponent'
+import { NodeBody } from '../../../../components/nodes/NodeBody'
+import { NodeComponent } from '../../../../components/nodes/NodeComponent'
 import { StandardNodeHeader } from './common/StandardNodeHeader'
 import { renderNodeIcon } from './renderNodeIcon'
 

@@ -23,7 +23,7 @@ import {
   type ActivityMetadata,
 } from '../../stores/useWorkflowStore'
 import { parseTriggerIndex } from '../../utils/triggerNodeIds'
-import { NodeMenu } from '../workflows/canvas/nodes/common/NodeMenu'
+import { NodeMenu } from '../../components/nodes/NodeMenu'
 import {
   MenuNodeType,
   type MenuNodeTypeUnion,

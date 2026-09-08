@@ -6,10 +6,10 @@ import { useIsExecutionView } from '../../../../builder/ExecutionViewContext'
 import { useIsVersionView } from '../../../../builder/VersionViewContext'
 import type { NodeMenuAction } from '../hooks/useNodeMenuActions'
 
-import { NodeExpandToggle } from './NodeExpandToggle'
-import { NodeHeader } from './NodeHeader'
-import { NodeMenu } from './NodeMenu'
-import { NodeTitle } from './NodeTitle'
+import { NodeExpandToggle } from '../../../../../components/nodes/NodeExpandToggle'
+import { NodeHeader } from '../../../../../components/nodes/NodeHeader'
+import { NodeMenu } from '../../../../../components/nodes/NodeMenu'
+import { NodeTitle } from '../../../../../components/nodes/NodeTitle'
 
 type StandardNodeHeaderProps = {
   icon?: React.ReactNode

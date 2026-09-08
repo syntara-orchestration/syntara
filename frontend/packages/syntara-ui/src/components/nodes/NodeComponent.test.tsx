@@ -7,7 +7,7 @@ import type { ReactElement } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { FlowNodeType } from '../../../../../constants'
+import { FlowNodeType } from '../../constants'
 
 const viewportState = vi.hoisted(() => ({ zoom: 1 }))
 

@@ -14,7 +14,7 @@ import React, { useCallback, useRef, useState } from 'react'
 import { SynPanel } from '../../../components/layout/SynPanel'
 
 import { CanvasLegend } from './CanvasLegend'
-import { NodeExpandedAllContext } from './nodes/common/NodeExpandedAllContext'
+import { NodeExpandedAllContext } from '../../../components/nodes/NodeExpandedAllContext'
 
 const LEGEND_REGION_ID = 'workflow-canvas-legend'
 
