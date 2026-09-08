@@ -222,7 +222,8 @@ export function useNodeDeletion({
 
             while (queue.length > 0 && iterations < MAX_ITERATIONS) {
               iterations++
-              const currentNodeId = queue.shift()!
+              const currentNodeId = queue[0]
+              queue.shift()
               // Check against both deletedNodeIds (originally deleted) and loopBodyNodes (found during traversal)
               if (visited.has(currentNodeId) || deletedNodeIds.has(currentNodeId) || loopBodyNodes.has(currentNodeId))
                 continue

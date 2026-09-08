@@ -241,3 +241,126 @@ class TestApproveSignal:
         assert output.get("status") == "completed", (
             f"output.status should be 'completed', got: {output.get('status')!r}"
         )
+
+
+def _approval_in_loop_workflow(name: str) -> WorkflowDefinition:
+    """Manual trigger → for_each loop → approval → script (body) → script (after loop)."""
+    return WorkflowDefinition.from_dict(
+        {
+            "name": name,
+            "schema_version": "2.0.0",
+            "triggers": [{"id": "trigger", "type": "manual_trigger", "parameters": {}}],
+            "nodes": [
+                {
+                    "id": "loop",
+                    "name": "For each server",
+                    "type": "loop",
+                    "parameters": {
+                        "type": "for_each",
+                        "items": '["server-1", "server-2"]',
+                    },
+                },
+                {
+                    "id": "a1",
+                    "name": "Approve server",
+                    "type": "approval",
+                    "parameters": {},
+                },
+                {
+                    "id": "body_script",
+                    "name": "Act on server",
+                    "type": "script",
+                    "parameters": {"language": "bash", "code": 'echo "iteration body"'},
+                },
+                {
+                    "id": "after_loop",
+                    "name": "After loop",
+                    "type": "script",
+                    "parameters": {"language": "bash", "code": 'echo "loop complete"'},
+                },
+            ],
+            "edges": [
+                {"from": "trigger", "to": "loop"},
+                {"from": "loop", "to": "a1", "from_port": "iterate"},
+                {"from": "a1", "to": "body_script", "from_port": "approved"},
+                {"from": "body_script", "to": "loop", "to_port": "iterate"},
+                {"from": "loop", "to": "after_loop", "from_port": "complete"},
+            ],
+        }
+    )
+
+
+class TestApproveInLoop:
+    """Each loop iteration creates a distinct approval request."""
+
+    def test_each_iteration_creates_unique_approval(
+        self,
+        syntara_api: SyntaraApiRegistry,
+        workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
+        first_project_id: UUID,
+    ) -> None:
+        """Approving inside a two-item for_each loop succeeds on every iteration.
+
+        Procedure:
+        1. Create workflow: trigger → loop(for_each, 2 items) → approval → script → after-loop.
+        2. Run. Approve the first pending request (iteration 0).
+        3. Approve the second pending request (iteration 1).
+        4. Poll until terminal.
+
+        Expected:
+        - Two distinct rows with approval_node_id ``a1`` and paths [0] then [1].
+        - Execution COMPLETED; body_script and after_loop completed.
+        """
+        name = unique_name("e2e-approve-in-loop")
+        workflow = workflow_factory(
+            WorkflowCreate(
+                name=name,
+                description="E2E: approval node inside a for_each loop",
+                workflow_definition=_approval_in_loop_workflow(name),
+                project_id=first_project_id,
+            )
+        )
+
+        execution = syntara_api.executions.create(
+            body=ExecutionCreate(workflow_id=workflow.id, trigger_node_id="trigger")
+        ).assert_and_get()
+        exec_id = UUID(str(execution.id))
+
+        first = poll_for_pending_approval(syntara_api, exec_id, timeout=_APPROVAL_POLL_TIMEOUT)
+        assert first.approval_node_id == "a1", (
+            f"First iteration approval_node_id should be a1, got: {first.approval_node_id!r}"
+        )
+        assert first.loop_iteration_path == [0], (
+            f"First iteration loop_iteration_path should be [0], got: {first.loop_iteration_path!r}"
+        )
+        syntara_api.approvals.decide(
+            approval_id=UUID(str(first.id)),
+            body=ApprovalDecisionRequest(status=ApprovalDecisionStatus.APPROVED),
+        ).assert_and_get()
+
+        second = poll_for_pending_approval(syntara_api, exec_id, timeout=_APPROVAL_POLL_TIMEOUT)
+        assert second.approval_node_id == "a1", (
+            f"Second iteration approval_node_id should be a1, got: {second.approval_node_id!r}"
+        )
+        assert second.loop_iteration_path == [1], (
+            f"Second iteration loop_iteration_path should be [1], got: {second.loop_iteration_path!r}"
+        )
+        assert second.id != first.id
+        syntara_api.approvals.decide(
+            approval_id=UUID(str(second.id)),
+            body=ApprovalDecisionRequest(status=ApprovalDecisionStatus.APPROVED),
+        ).assert_and_get()
+
+        final = poll_execution(syntara_api, str(exec_id), timeout=_EXECUTION_POLL_TIMEOUT)
+        assert final.status == ExecutionStatus.COMPLETED, (
+            f"Expected COMPLETED after two loop approvals, got {final.status}: {final.error_details}"
+        )
+
+        activities = {a.activity_id: a.status for a in (final.activities or [])}
+        assert activities.get("body_script") == "completed", (
+            f"Loop body script should complete, activities={activities}"
+        )
+        assert activities.get("after_loop") == "completed", (
+            f"After-loop script should complete, activities={activities}"
+        )
+        assert activities.get("loop") == "completed"

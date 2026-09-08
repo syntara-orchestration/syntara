@@ -365,6 +365,29 @@ export function parseCompositeKey(activityId: string): { baseId: string; iterati
   }
 }
 
+/**
+ * Latest activity-sync record for a canvas node.
+ *
+ * The first schedule uses the bare canvas id (iteration 0). Later schedules
+ * use `{canvasId}#iter-{n}` with a monotonic counter, not `loop_iteration_path`.
+ */
+export function latestActivityStateForCanvasNode(
+  activityStates: Map<string, ActivityState>,
+  canvasId: string
+): ActivityState | undefined {
+  let latestIter = -1
+  let latest = activityStates.get(canvasId)
+  for (const [key, state] of activityStates) {
+    const { baseId, iteration } = parseCompositeKey(key)
+    if (baseId !== canvasId || iteration === undefined) continue
+    if (iteration > latestIter) {
+      latestIter = iteration
+      latest = state
+    }
+  }
+  return latest
+}
+
 const TERMINAL_STATUSES: Set<string> = new Set([
   ACTIVITY_STATUS.COMPLETED,
   ACTIVITY_STATUS.FAILED,

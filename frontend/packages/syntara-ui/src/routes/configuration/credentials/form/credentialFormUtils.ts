@@ -192,7 +192,7 @@ function validateRequiredField(
 ): boolean {
   const { typeInputs, inputs, isEditMode, touchedSecrets } = options
   const val = inputs[fieldId]
-  const field = typeInputs!.fields.find((f) => f.id === fieldId)
+  const field = typeInputs?.fields.find((f) => f.id === fieldId)
 
   if (isEditMode) {
     return validateEditModeRequiredDynamicField(fieldId, val, field, touchedSecrets, setError)

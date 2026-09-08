@@ -3,7 +3,7 @@ import { RhUiLockIcon } from '@patternfly/react-icons'
 import { useNavigate } from '@tanstack/react-router'
 
 import { AppRoute } from '../../app/AppRoute'
-import { NxLabel } from '../../components/labels/NxLabel'
+import { SynLabel } from '../../components/labels/SynLabel'
 import { detachPromise } from '../../utils/detachPromise'
 
 import type { PolicyStatement } from './types'
@@ -22,7 +22,7 @@ type ScopeLabelProps = {
 export function ScopeLabel({ scope }: Readonly<ScopeLabelProps>) {
   const display = SCOPE_DISPLAY[scope ?? ''] ?? SCOPE_DISPLAY.system
 
-  return <NxLabel color={display.color}>{display.label}</NxLabel>
+  return <SynLabel color={display.color}>{display.label}</SynLabel>
 }
 
 type PolicyTypeLabelProps = {
@@ -32,12 +32,12 @@ type PolicyTypeLabelProps = {
 export function PolicyTypeLabel({ isBuiltin }: Readonly<PolicyTypeLabelProps>) {
   if (isBuiltin) {
     return (
-      <NxLabel color="grey" icon={<RhUiLockIcon />}>
+      <SynLabel color="grey" icon={<RhUiLockIcon />}>
         Built-in
-      </NxLabel>
+      </SynLabel>
     )
   }
-  return <NxLabel color="blue">Custom</NxLabel>
+  return <SynLabel color="blue">Custom</SynLabel>
 }
 
 type ProjectLabelProps = {
@@ -82,19 +82,19 @@ export function StatementsCell({ statements }: Readonly<StatementsCellProps>) {
         <StackItem key={`${stmt.effect}-${stmt.scope}-${stmt.actions.join('-')}`}>
           <Flex gap={{ default: 'gapXs' }} alignItems={{ default: 'alignItemsCenter' }} flexWrap={{ default: 'wrap' }}>
             <FlexItem>
-              <NxLabel color={stmt.effect === 'allow' ? 'green' : 'red'}>
+              <SynLabel color={stmt.effect === 'allow' ? 'green' : 'red'}>
                 {stmt.effect === 'allow' ? 'Allow' : 'Deny'}
-              </NxLabel>
+              </SynLabel>
             </FlexItem>
             <FlexItem>
-              <NxLabel color="grey">scope: {stmt.scope}</NxLabel>
+              <SynLabel color="grey">scope: {stmt.scope}</SynLabel>
             </FlexItem>
             <FlexItem>
               <LabelGroup isCompact numLabels={2}>
                 {stmt.actions.map((action) => (
-                  <NxLabel key={action} color="grey">
+                  <SynLabel key={action} color="grey">
                     {action}
-                  </NxLabel>
+                  </SynLabel>
                 ))}
               </LabelGroup>
             </FlexItem>

@@ -11,7 +11,10 @@ from syntara.workflows.workflow_engine.activities.aap_job_template_activity impo
 from syntara.workflows.workflow_engine.activities.aap_workflow_job_template_activity import (
     execute_aap_workflow_job_template_activity,
 )
-from syntara.workflows.workflow_engine.activities.agentic_activity import execute_agentic_activity
+from syntara.workflows.workflow_engine.activities.agentic_activity import (
+    cancel_agentic_invocation_activity,
+    execute_agentic_activity,
+)
 from syntara.workflows.workflow_engine.activities.approval_activity import (
     cancel_approval_requests_activity,
     create_approval_request_activity,
@@ -47,6 +50,7 @@ _TEMPORAL_ACTIVITIES: list[Callable[..., Any]] = [
     execute_aap_job_template_activity,
     execute_aap_workflow_job_template_activity,
     execute_agentic_activity,
+    cancel_agentic_invocation_activity,
     cancel_approval_requests_activity,
     create_approval_request_activity,
     expire_approval_requests_activity,

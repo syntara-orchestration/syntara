@@ -14,17 +14,18 @@ export function useIsCurrentVersion(
   workflowVersionId: string | undefined,
   enabled: boolean
 ): UseIsCurrentVersionReturn {
+  // `enabled` guarantees workflowId is defined when the query runs.
   const workflowQuery = workflowClient.useQuery(
     'get',
     '/workflows/{workflow_id}',
-    { params: { path: { workflow_id: workflowId! } } },
+    { params: { path: { workflow_id: workflowId ?? '' } } },
     { enabled: enabled && !!workflowId }
   )
 
   const versionsQuery = workflowClient.useQuery(
     'get',
     '/workflows/{workflow_id}/versions',
-    { params: { path: { workflow_id: workflowId! } } },
+    { params: { path: { workflow_id: workflowId ?? '' } } },
     { enabled: enabled && !!workflowId && !!workflowVersionId }
   )
 

@@ -130,6 +130,33 @@ describe('InputSchemaView', () => {
     expect(setDataCalls[1][1]).toBe('${fetch_order.address.city}')
   })
 
+  it('renders schema for a loop-iteration composite activity id', () => {
+    const data = { name: 'Alice' }
+    render(<InputSchemaView data={data} nodeId="approval2#iter-5" />)
+
+    expect(screen.getByText('T name')).toBeInTheDocument()
+    expect(screen.getByRole('tree', { name: 'Input schema' })).toBeInTheDocument()
+  })
+
+  it('uses the canvas node ID in drag data for loop-iteration composite keys', () => {
+    const data = { name: 'Alice' }
+    render(<InputSchemaView data={data} nodeId="approval2#iter-5" />)
+
+    const setDataCalls: Array<[string, string]> = []
+    const dataTransfer = {
+      setData: (format: string, value: string) => {
+        setDataCalls.push([format, value])
+      },
+      effectAllowed: '',
+    }
+
+    fireEvent.dragStart(screen.getByText('T name'), { dataTransfer })
+
+    const parsed = JSON.parse(setDataCalls[0][1]) as { type: string; nodeId: string; fieldPath: string[] }
+    expect(parsed.nodeId).toBe('approval2')
+    expect(setDataCalls[1][1]).toBe('${approval2.name}')
+  })
+
   it('has no accessibility violations', async () => {
     const data = { name: 'Alice', age: 30, active: true }
     const { container } = render(<InputSchemaView data={data} nodeId="http_request_1" />)

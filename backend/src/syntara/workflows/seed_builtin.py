@@ -23,6 +23,7 @@ from syntara.workflows.models import Workflow, WorkflowVersion
 from syntara.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
 from syntara.workflows.services.scheduled_trigger_service import ScheduledTriggerService
 from syntara.workflows.validators import workflow_validator
+from syntara.workflows.workflow_engine.constants import AGENT_EXECUTION_TIMEOUT_SECONDS
 
 if TYPE_CHECKING:
     from uuid import UUID
@@ -77,7 +78,7 @@ _BUILTIN_DEFINITIONS: list[dict[str, Any]] = [
                     "activity": "invocation_execution",
                     "input": {"invocation_id": "${trigger.invocation_id}"},
                 },
-                "settings": {"timeout": 3600},
+                "settings": {"timeout": AGENT_EXECUTION_TIMEOUT_SECONDS},
             }
         ],
         "edges": [{"from": "trigger_api", "to": "execute"}],
@@ -190,7 +191,6 @@ async def seed_builtin_workflows(session: AsyncSession) -> None:
         select(Project).where(
             Project.name == BUILTIN_PROJECT_NAME,
             Project.is_builtin == True,  # noqa: E712
-            Project.deleted_at.is_(None),  # type: ignore[union-attr]
         )
     )
     system_project = project_result.first()
@@ -257,7 +257,6 @@ async def _seed_one(
         select(Workflow).where(
             col(Workflow.name) == name,
             col(Workflow.is_builtin) == True,  # noqa: E712
-            Workflow.deleted_at.is_(None),  # type: ignore[union-attr]
         )
     )
     existing = result.one_or_none()

@@ -1,23 +1,25 @@
 import { Alert, Button, Flex, FlexItem, LabelGroup, StackItem, Truncate } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiTrashIcon } from '@patternfly/react-icons'
-import { ActionsColumn, ExpandableRowContent, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
-import type { IAction, ThProps } from '@patternfly/react-table'
+import { ExpandableRowContent, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
+import type { ThProps } from '@patternfly/react-table'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useMemo, useState } from 'react'
 
-import { NxConfirmationDialog } from '../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { FilterBar } from '../../components/filters'
 import { IconLabel } from '../../components/IconLabel'
-import { NxLabel } from '../../components/labels/NxLabel'
+import { SynLabel } from '../../components/labels/SynLabel'
 import { SynPageBody } from '../../components/layout/SynPage'
 import { SynPanelContentStack } from '../../components/layout/SynPanelContentStack'
 import { SynEmptyStateFilter } from '../../components/states/SynEmptyStateFilter'
 import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 import { SynErrorState } from '../../components/states/SynErrorState'
 import { SynLoadingState } from '../../components/states/SynLoadingState'
+import type { KebabAction } from '../../components/SynKebabMenu'
+import { SynKebabMenu } from '../../components/SynKebabMenu'
 import { LinkCell } from '../../components/table/LinkCell'
-import { NxScrollableTableContainer } from '../../components/table/NxScrollableTableContainer'
+import { SynScrollableTableContainer } from '../../components/table/SynScrollableTableContainer'
 import { invalidateAuthzCaches } from '../../hooks/invalidateAuthzCaches'
 import { useColumnSortState } from '../../hooks/useColumnSortState'
 import { useExpandableRowIds } from '../../hooks/useExpandableRowIds'
@@ -57,10 +59,12 @@ function getAssignmentActions(
   row: RoleAssignmentRow,
   onUnassign: (row: RoleAssignmentRow) => void,
   permissions: ReturnType<typeof useAssignmentPermissions>
-): IAction[] {
+): KebabAction[] {
   return [
     {
-      title: <IconLabel icon={<RhUiTrashIcon />}>Unassign</IconLabel>,
+      key: 'unassign',
+      title: <IconLabel icon={<RhUiTrashIcon />}>Unassign role</IconLabel>,
+      isDanger: true,
       isAriaDisabled: !permissions.canRevoke,
       tooltipProps: permissions.canRevoke ? undefined : { content: permissions.tooltips.revoke },
       onClick: permissions.canRevoke ? () => onUnassign(row) : undefined,
@@ -106,7 +110,7 @@ function RoleAssignmentsTable({
   const expandableColumnCount = visibleColumns.length + 2
 
   return (
-    <NxScrollableTableContainer
+    <SynScrollableTableContainer
       caption="Role assignments table"
       isExpandable
       footer={{
@@ -164,9 +168,9 @@ function RoleAssignmentsTable({
               )}
               {isVisible('scope') && (
                 <Td dataLabel="Scope">
-                  <NxLabel color={row.scopeType === 'system' ? 'blue' : 'green'}>
+                  <SynLabel color={row.scopeType === 'system' ? 'blue' : 'green'}>
                     {row.scopeType === 'system' ? 'System' : 'Project'}
-                  </NxLabel>
+                  </SynLabel>
                 </Td>
               )}
               {isVisible('project') && (
@@ -181,7 +185,10 @@ function RoleAssignmentsTable({
                 </Td>
               )}
               <Td isActionCell>
-                <ActionsColumn items={getAssignmentActions(row, onUnassign, permissions)} />
+                <SynKebabMenu
+                  actions={getAssignmentActions(row, onUnassign, permissions)}
+                  aria-label={`Actions for ${row.roleName} (${row.scope})`}
+                />
               </Td>
             </Tr>
             {row.policies.length > 0 && (
@@ -190,9 +197,9 @@ function RoleAssignmentsTable({
                   <ExpandableRowContent>
                     <LabelGroup isCompact numLabels={Infinity}>
                       {row.policies.map((policy) => (
-                        <NxLabel key={policy.name} color="grey">
+                        <SynLabel key={policy.name} color="grey">
                           {policy.name}
-                        </NxLabel>
+                        </SynLabel>
                       ))}
                     </LabelGroup>
                   </ExpandableRowContent>
@@ -202,7 +209,7 @@ function RoleAssignmentsTable({
           </Tbody>
         )
       })}
-    </NxScrollableTableContainer>
+    </SynScrollableTableContainer>
   )
 }
 
@@ -256,7 +263,7 @@ function TableContent({
       return (
         <SynPageBody isCentered>
           <SynEmptyStateNoData
-            title="No role assignments"
+            title="No role assignments yet"
             description={`No project-scoped roles have been assigned to this ${principalTypeLabel[principalType]}.`}
             buttonText="Assign role"
             addData={openAssignIfAllowed}
@@ -409,7 +416,7 @@ export function RoleAssignmentsPanel({
     return (
       <>
         <SynEmptyStateNoData
-          title="No role assignments"
+          title="No role assignments yet"
           description={`No roles have been assigned to this ${principalTypeLabel[principalType]}.`}
           buttonText="Assign role"
           addData={openAssignIfAllowed}
@@ -495,7 +502,7 @@ export function RoleAssignmentsPanel({
         onSuccess={refetchAndInvalidateAuthz}
       />
 
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={!!rowToUnassign}
         onClose={() => setRowToUnassign(null)}
         onConfirm={handleUnassign}
@@ -506,7 +513,7 @@ export function RoleAssignmentsPanel({
       >
         This unassigns the role <strong>{rowToUnassign?.roleName}</strong> from this principal. Related permissions will
         be revoked.
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
     </>
   )
 }

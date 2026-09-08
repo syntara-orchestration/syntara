@@ -1,6 +1,6 @@
 import { RhUiWarningFillIcon } from '@patternfly/react-icons'
 
-import { NxLabel } from '../../components/labels/NxLabel'
+import { SynLabel } from '../../components/labels/SynLabel'
 
 type ApprovalPendingBadgeProps = {
   approvalPending?: boolean
@@ -14,8 +14,8 @@ export function ApprovalPendingBadge({ approvalPending }: Readonly<ApprovalPendi
   if (!approvalPending) return null
 
   return (
-    <NxLabel variant="outline" status="warning" icon={<RhUiWarningFillIcon />}>
+    <SynLabel variant="outline" status="warning" icon={<RhUiWarningFillIcon />}>
       Pending approval
-    </NxLabel>
+    </SynLabel>
   )
 }

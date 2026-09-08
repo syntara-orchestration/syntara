@@ -12,9 +12,10 @@ describe('ApprovalsBulkActions', () => {
     onReject: vi.fn(),
   }
 
-  it('renders approve and reject buttons', () => {
+  it('renders approve and reject buttons inside a toolbar', () => {
     render(<ApprovalsBulkActions {...defaultProps} />)
 
+    expect(screen.getByRole('toolbar', { name: 'Approval actions' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /approve/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /reject/i })).toBeInTheDocument()
   })
@@ -37,6 +38,7 @@ describe('ApprovalsBulkActions', () => {
     render(<ApprovalsBulkActions {...defaultProps} selectedCount={5} />)
 
     expect(screen.getByText('5 selected')).toBeInTheDocument()
+    expect(screen.getByRole('toolbar', { name: '5 selected' })).toBeInTheDocument()
   })
 
   it('does not show selection count when no items selected', () => {
@@ -79,6 +81,19 @@ describe('ApprovalsBulkActions', () => {
 
     const results = await axe(container)
     expect(results).toHaveNoViolations()
+  })
+
+  it('disables approve and reject when permission is denied via tooltip', () => {
+    render(
+      <ApprovalsBulkActions
+        {...defaultProps}
+        selectedCount={2}
+        permissionTooltip="To approve or reject approvals, you need a role with the approval:decide policy."
+      />
+    )
+
+    expect(screen.getByRole('button', { name: /approve/i })).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByRole('button', { name: /reject/i })).toHaveAttribute('aria-disabled', 'true')
   })
 
   it('has no accessibility violations when disabled', async () => {

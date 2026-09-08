@@ -94,6 +94,23 @@ async def test_create_user_success(test_db_session: AsyncSession, test_user: Use
 
 
 @pytest.mark.asyncio
+async def test_create_user_without_first_name(test_db_session: AsyncSession, test_user: User) -> None:
+    """Users can be created with a blank first name."""
+    service = UsersService(test_db_session, test_user)
+
+    user = await service.create_user(
+        username="nofirst",
+        email="nofirst@example.com",
+        first_name=None,
+        password=TEST_PASSWORD,
+    )
+
+    assert user.username == "nofirst"
+    assert user.first_name == ""
+    assert user.last_name is None
+
+
+@pytest.mark.asyncio
 async def test_create_user_inactive(test_db_session: AsyncSession, test_user: User) -> None:
     """Test user creation with is_enabled=False."""
     service = UsersService(test_db_session, test_user)

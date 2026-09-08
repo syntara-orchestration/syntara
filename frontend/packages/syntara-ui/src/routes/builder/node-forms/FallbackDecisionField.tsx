@@ -14,7 +14,7 @@ import { useCallback, useState, type ReactElement, type Ref } from 'react'
 import { Controller, useFormContext } from 'react-hook-form'
 
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
-import { NxSelect } from '../../../components/NxSelect'
+import { SynSelect } from '../../../components/SynSelect'
 import { useEffectiveContinueOnFailure } from '../hooks/useEffectiveContinueOnFailure'
 import { useIsVersionView } from '../VersionViewContext'
 
@@ -129,7 +129,7 @@ function FallbackDecisionSelect({ value, onChange, isDisabled, tooltip }: Fallba
   )
 
   return (
-    <NxSelect
+    <SynSelect
       id="approval-fallback-decision"
       isOpen={isOpen}
       selected={value}
@@ -145,7 +145,7 @@ function FallbackDecisionSelect({ value, onChange, isDisabled, tooltip }: Fallba
         <SelectOption value="reject">Reject (default)</SelectOption>
         <SelectOption value="approve">Approve</SelectOption>
       </SelectList>
-    </NxSelect>
+    </SynSelect>
   )
 }
 

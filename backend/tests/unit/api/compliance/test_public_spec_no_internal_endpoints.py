@@ -7,31 +7,38 @@ internal endpoints.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any, ClassVar
 
 import pytest
 import yaml
 
+pytestmark = [pytest.mark.unit, pytest.mark.compliance]
+
 _SCHEMAS_DIR = Path(__file__).resolve().parents[4] / "src" / "syntara" / "schemas"
 _PUBLIC_SPEC_PATH = _SCHEMAS_DIR / "openapi-public.yaml"
+_PUBLIC_SPEC_JSON_PATH = _SCHEMAS_DIR / "openapi-public.json"
 
 
 @pytest.fixture(scope="module")
 def public_spec() -> dict[str, Any]:
     if not _PUBLIC_SPEC_PATH.exists():
-        pytest.skip(f"Public spec not found at {_PUBLIC_SPEC_PATH}")
+        pytest.fail(f"Public spec not found at {_PUBLIC_SPEC_PATH}")
     spec: dict[str, Any] = yaml.safe_load(_PUBLIC_SPEC_PATH.read_text(encoding="utf-8"))
+    return spec
+
+
+@pytest.fixture(scope="module")
+def public_spec_json() -> dict[str, Any]:
+    if not _PUBLIC_SPEC_JSON_PATH.exists():
+        pytest.fail(f"Public JSON spec not found at {_PUBLIC_SPEC_JSON_PATH}")
+    spec: dict[str, Any] = json.loads(_PUBLIC_SPEC_JSON_PATH.read_text(encoding="utf-8"))
     return spec
 
 
 class TestNoInternalPaths:
     """Verify no /_internal/ paths leak into the public spec."""
-
-    def test_no_internal_path_prefix(self, public_spec: dict[str, Any]) -> None:
-        """No path should start with /_internal/."""
-        internal_paths = [p for p in public_spec.get("paths", {}) if p.startswith("/_internal/")]
-        assert internal_paths == [], f"Internal paths leaked into public spec: {internal_paths}"
 
     def test_no_internal_path_anywhere(self, public_spec: dict[str, Any]) -> None:
         """No path should contain '/_internal/' at any position."""
@@ -119,7 +126,7 @@ class TestPublicSpecIsValid:
         """The full spec must have strictly more paths than the public spec."""
         full_path = _SCHEMAS_DIR / "openapi.yaml"
         if not full_path.exists() or not _PUBLIC_SPEC_PATH.exists():
-            pytest.skip("Both specs required for comparison")
+            pytest.fail("Both specs required for path comparison — run 'make api-spec-bundle-all' to regenerate.")
         full_spec = yaml.safe_load(full_path.read_text(encoding="utf-8"))
         public_spec = yaml.safe_load(_PUBLIC_SPEC_PATH.read_text(encoding="utf-8"))
         full_paths = set(full_spec.get("paths", {}).keys())
@@ -127,3 +134,11 @@ class TestPublicSpecIsValid:
         assert full_paths > public_paths, (
             f"Full spec should be a strict superset of public spec paths. Only in public: {public_paths - full_paths}"
         )
+
+
+class TestPublicSpecJsonFormat:
+    """Verify the JSON version of the public spec is valid and in sync with YAML."""
+
+    def test_json_matches_yaml(self, public_spec: dict[str, Any], public_spec_json: dict[str, Any]) -> None:
+        """The JSON spec must be semantically identical to the YAML spec."""
+        assert public_spec == public_spec_json, "JSON and YAML public specs are not semantically identical"

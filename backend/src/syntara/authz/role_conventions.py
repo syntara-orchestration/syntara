@@ -214,8 +214,10 @@ BUILTIN_POLICIES: list[PolicyInfo] = [
     # -- files --
     PolicyInfo("files", "upload", roles=("admin", "user")),
     PolicyInfo("files", "download", roles=("admin", "user")),
+    PolicyInfo("files", "delete", roles=("admin", "user")),
     PolicyInfo("files", "upload", scope="project", roles=("project-admin", "project-user")),
     PolicyInfo("files", "download", scope="project", roles=("project-admin", "project-user", "project-auditor")),
+    PolicyInfo("files", "delete", scope="project", roles=("project-admin", "project-user")),
     # -- service accounts --
     PolicyInfo("service_account", "create", roles=("admin",)),
     PolicyInfo("service_account", "read", roles=("admin", "auditor")),

@@ -17,7 +17,7 @@ import { Controller, useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 
 import { FormFieldError, FormFieldWarning } from '../../components/FormFieldError'
-import { NxSelect } from '../../components/NxSelect'
+import { SynSelect } from '../../components/SynSelect'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { useAlerts } from '../../providers/alerts'
 import { getErrorMessage, isServiceUnavailableError } from '../../utils/apiErrors'
@@ -89,7 +89,7 @@ function SingleSelect({
   )
 
   return (
-    <NxSelect
+    <SynSelect
       id={id}
       aria-label={ariaLabel}
       isOpen={isOpen}
@@ -108,7 +108,7 @@ function SingleSelect({
           </SelectOption>
         ))}
       </SelectList>
-    </NxSelect>
+    </SynSelect>
   )
 }
 

@@ -280,6 +280,63 @@ describe('useBuilderApproval', () => {
     expect(result.current.approvalMessage).toBe('Please review this change.')
   })
 
+  it('prefers persisted prompt over the node Message template', () => {
+    approvalState.pending = {
+      id: 'approval-1',
+      project_id: 'project-1',
+      name: 'Approval',
+      status: 'pending',
+      execution_id: 'exec-1',
+      approval_node_id: 'a2',
+      created_at: '2026-01-01T00:00:00Z',
+      next_step_approved: { id: 'step-a', name: 'Approved Step', type: 'script' },
+      workflow_context: { workflow_id: 'wf-1', workflow_name: 'Test', inputs: {} },
+      prompt: 'Please review prod',
+    }
+
+    const workflow: WorkflowDefinition = {
+      schema_version: '2.0.0',
+      name: 'test',
+      workflow: {
+        activities: [
+          {
+            id: 'a2',
+            name: 'Approval',
+            type: 'approval',
+            parameters: { prompt: 'Please review ${trigger.env}' },
+          },
+        ],
+      },
+    }
+
+    const { result } = renderHook(() => useBuilderApproval(defaultParams({ currentWorkflow: workflow })), {
+      wrapper: makeWrapper(queryClient),
+    })
+
+    expect(result.current.approvalMessage).toBe('Please review prod')
+  })
+
+  it('returns persisted prompt when the workflow definition is missing', () => {
+    approvalState.pending = {
+      id: 'approval-1',
+      project_id: 'project-1',
+      name: 'Approval',
+      status: 'pending',
+      execution_id: 'exec-1',
+      approval_node_id: 'a2',
+      created_at: '2026-01-01T00:00:00Z',
+      next_step_approved: { id: 'step-a', name: 'Approved Step', type: 'script' },
+      workflow_context: { workflow_id: 'wf-1', workflow_name: 'Test', inputs: {} },
+      prompt: 'From approval record',
+    }
+
+    const { result } = renderHook(() => useBuilderApproval(defaultParams({ currentWorkflow: null })), {
+      wrapper: makeWrapper(queryClient),
+    })
+
+    expect(result.current.approvalMessage).toBe('From approval record')
+  })
+
   it('returns undefined approvalMessage when the approval node has no prompt', () => {
     approvalState.pending = {
       id: 'approval-1',

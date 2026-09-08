@@ -151,7 +151,7 @@ class ScheduledExecutionLauncher:
 
         Raises:
             ApplicationError: Non-retryable, if the workflow is missing,
-                soft-deleted, disabled, or has no published version.
+                disabled, or has no published version.
 
         """
         workflow_id = UUID(workflow_id_str)
@@ -200,7 +200,7 @@ class ScheduledExecutionLauncher:
             except Exception:  # noqa: BLE001
                 logger.debug("Failed to record error metric", exc_info=True)
             if isinstance(exc, WorkflowNotPublishedError):
-                # Permanent state: workflow is missing, soft-deleted, disabled,
+                # Permanent state: workflow is missing, disabled,
                 # or has no published version.  Mark non-retryable so Temporal
                 # does not retry the activity forever (AAP-86776).
                 raise ApplicationError(
@@ -345,7 +345,6 @@ class ScheduledExecutionLauncher:
                 WorkflowVersion.id == Workflow.published_version_id,  # type: ignore[arg-type]
             )
             .where(Workflow.id == workflow_id)
-            .where(Workflow.deleted_at.is_(None))  # type: ignore[union-attr]
             .where(Workflow.is_enabled == True)  # noqa: E712
         )
         row = result.first()

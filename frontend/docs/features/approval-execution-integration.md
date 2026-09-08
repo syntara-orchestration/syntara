@@ -41,7 +41,7 @@ function useFetchApprovalForNode(executionId: string): {
 
 - Uses `approvalsClient.useQuery('get', '/approvals', ...)` with `enabled: false` to disable automatic fetching
 - Query params: `execution_id` and `status: 'pending'`
-- `fetchForNode(approvalNodeId)` calls `refetch()`, then filters the returned list by `approval_node_id`
+- `fetchForNode(approvalNodeId)` calls `refetch()`, then filters the returned list by canvas `approval_node_id` (pending first, else latest `loop_iteration_path`). Legacy `{nodeId}_iter_{n}` suffixes are a fallback only.
 - Returns `null` if no matching approval is found
 - `clear()` resets the loading state (e.g., when closing the review view)
 
@@ -110,7 +110,7 @@ The view is laid out as a `Stack` with the following sections (top to bottom):
 1. **Header**: Title + Cancel/Submit buttons
 2. **Summary**: Workflow name, approval initiated timestamp (via `ApprovalSummaryList`)
 3. **Next steps**: Two-column description list showing `next_step_approved` and `next_step_rejected`
-4. **Approval context**: `NxCodeBlock` displaying the full approval object as JSON
+4. **Approval context**: `SynCodeBlock` displaying the full approval object as JSON
 5. **Decision form**: Toggle group + notes field
 
 ### Next Steps Display
@@ -125,10 +125,10 @@ The `next_step_approved` and `next_step_rejected` fields are rendered using a `N
 
 ### Approval Context
 
-The "Approval context" section displays the full approval object as JSON using `NxCodeBlock`:
+The "Approval context" section displays the full approval object as JSON using `SynCodeBlock`:
 
 ```typescript
-<NxCodeBlock jsonObject={approval} enableCopy />
+<SynCodeBlock jsonObject={approval} enableCopy />
 ```
 
 **IMPORTANT**: The section title is **"Approval context"**, not "Previous Step" or any other label.
@@ -203,10 +203,10 @@ decisionMutation.mutate(
 
 ### Approval Context Display
 
-Uses the same `NxCodeBlock` component, but with additional props for expansion:
+Uses the same `SynCodeBlock` component, but with additional props for expansion:
 
 ```typescript
-<NxCodeBlock
+<SynCodeBlock
   jsonObject={approval}
   enableCopy
   enableExpand
@@ -293,10 +293,10 @@ TypeScript types from `@syntara/contracts` enforce this casing at compile time.
 Both `ApprovalReviewView` and `ApprovalDetailContent` resolve human-readable names from the workflow definition:
 
 ```typescript
-const resolveName = (id: string, fallback: string) => activityNameMap?.get(id) ?? fallback
+const resolveName = (id: string, fallback: string) => lookupMapByApprovalNodeId(activityNameMap, id) ?? fallback
 
 const approvalNodeId = approval.approval_node_id
-const resolvedNodeName = approvalNodeId ? activityNameMap?.get(approvalNodeId) : undefined
+const resolvedNodeName = lookupMapByApprovalNodeId(activityNameMap, approvalNodeId)
 const approvalDisplayName = resolvedNodeName ? `Approval for ${resolvedNodeName}` : approval.name
 ```
 

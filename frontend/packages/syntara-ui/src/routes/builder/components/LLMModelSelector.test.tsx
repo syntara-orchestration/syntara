@@ -27,12 +27,12 @@ vi.mock('../../../components/FieldHelpPopover', () => ({
   FieldHelpPopover: ({ headerContent }: { headerContent?: string }) => <span>{headerContent}</span>,
 }))
 
-vi.mock('../../../components/labels/NxLabel', () => ({
-  NxLabel: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
+vi.mock('../../../components/labels/SynLabel', () => ({
+  SynLabel: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
 }))
 
-vi.mock('../../../components/NxLink', () => ({
-  NxLink: ({ to, children }: { to: string; children: React.ReactNode }) => <a href={to}>{children}</a>,
+vi.mock('../../../components/SynLink', () => ({
+  SynLink: ({ to, children }: { to: string; children: React.ReactNode }) => <a href={to}>{children}</a>,
 }))
 
 vi.mock('../../configuration/integrations/useIntegrationPermissions', () => ({

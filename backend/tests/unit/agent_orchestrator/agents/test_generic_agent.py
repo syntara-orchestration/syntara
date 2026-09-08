@@ -103,6 +103,52 @@ class TestGenericAgentLLMIntegration:
         assert result["type"] == "answer"
 
     @pytest.mark.asyncio
+    async def test_persists_collapsed_finish_reason_from_chunk_merge(self) -> None:
+        """LangChain stream-merge doubling must not leak into Task Agent output (AAP-87759)."""
+        mock_llm = Mock()
+        mock_llm_with_tools = AsyncMock()
+        mock_llm_with_tools.ainvoke.return_value = AIMessage(
+            content="The hackathon is going great.",
+            response_metadata={
+                "finish_reason": "stopstop",
+                "model_name": "anthropic/claude-opus-4.6anthropic/claude-opus-4.6",
+                "token_usage": {"prompt_tokens": 24, "completion_tokens": 16, "total_tokens": 40},
+            },
+            usage_metadata={"input_tokens": 12, "output_tokens": 8, "total_tokens": 20},
+        )
+        mock_llm.bind_tools.return_value = mock_llm_with_tools
+        mock_llm.model_name = "anthropic/claude-opus-4.6"
+
+        agent = GenericAgent(llm=mock_llm, available_tools=[])
+        state: AgentState = {
+            "prompt": "Classify sentiment",
+            "original_prompt": "Classify sentiment",
+            "session_id": "test-session",
+            "invocation_id": uuid4(),
+            "actor_context": AuditActorContext(),
+            "context_package": None,
+            "current_agent": "generic_agent",
+            "messages": [HumanMessage("test")],
+            "result": None,
+            "metadata": None,
+            "llm_token_usage_log": [],
+        }
+
+        response = await agent.execute_as_node(state)
+
+        result = response["result"]
+        assert result is not None
+        meta = result.get("response_metadata") or result.get("metadata")
+        assert meta is not None
+        assert meta["finish_reason"] == "stop"
+        assert meta["model_name"] == "anthropic/claude-opus-4.6"
+        assert meta["token_usage"] == {
+            "prompt_tokens": 12,
+            "completion_tokens": 8,
+            "total_tokens": 20,
+        }
+
+    @pytest.mark.asyncio
     async def test_generic_agent_raises_configuration_error_for_invalid_api_key(
         self,
     ) -> None:

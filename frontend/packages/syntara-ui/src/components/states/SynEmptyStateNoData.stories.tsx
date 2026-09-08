@@ -18,7 +18,7 @@ export const Default: Story = {}
 
 export const WithAction: Story = {
   args: {
-    title: 'No workflows found',
+    title: 'No workflows yet',
     description: 'Create your first workflow to get started.',
     buttonText: 'Create workflow',
     addData: fn(),

@@ -8,6 +8,7 @@ import asyncio
 import json
 from datetime import UTC, datetime
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 from fastapi import FastAPI
@@ -225,17 +226,29 @@ class TestWebSocketJsonValidation:
         _ = example_app_server
         lifecycle_manager = get_connection_lifecycle_manager()
 
-        async with websocket_connect("ws://127.0.0.1:9999/ws/testcomp/v1/chat") as websocket:
+        # Tag this connection with a unique User-Agent so we can identify it
+        # server-side among any other "chat" connections.
+        user_agent = f"test-{uuid4()}"
+        async with websocket_connect(
+            "ws://127.0.0.1:9999/ws/testcomp/v1/chat", user_agent_header=user_agent
+        ) as websocket:
             # Send valid message first to establish connection
             await websocket.send(json.dumps({"message": "hello"}))
             json.loads(await websocket.recv())
 
-            # Get connections for the chat channel
-            active_connections = lifecycle_manager.get_connections_for_channel("chat")
-            assert len(active_connections) >= 1
+            for _ in range(10):
+                # Get connections for the chat channel
+                active_connections = [
+                    c for c in lifecycle_manager.get_connections_for_channel("chat") if c.user_agent == user_agent
+                ]
+                if active_connections:
+                    conn_info = active_connections[0]
+                    break
+                await asyncio.sleep(0.2)
+            else:
+                pytest.fail("Cannot get the new connection from lifecycle_manager")
 
             # Get the connection for this channel
-            conn_info = active_connections[0]
             initial_activity = conn_info.last_activity_at
 
             # Wait a bit to ensure timestamp would change

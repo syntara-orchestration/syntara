@@ -34,7 +34,7 @@ describe('PolicySelectToggle', () => {
     expect(results).toHaveNoViolations()
   })
 
-  it('renders selected policies as NxLabel chips', () => {
+  it('renders selected policies as SynLabel chips', () => {
     render(<PolicySelectToggle {...defaultProps} selected={['workflow-admin']} />)
     expect(screen.getByText('workflow-admin')).toBeInTheDocument()
   })

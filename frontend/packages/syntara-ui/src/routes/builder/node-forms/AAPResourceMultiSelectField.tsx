@@ -17,7 +17,7 @@ import type { AAPAPI } from '@syntara/contracts'
 import React, { useEffect, useRef, useState, type ReactElement } from 'react'
 import { Controller, useFormContext } from 'react-hook-form'
 
-import { NxSelect } from '../../../components/NxSelect'
+import { SynSelect } from '../../../components/SynSelect'
 import { DEBOUNCE_MS } from '../../../constants/timing'
 
 import type { AAPJobTemplateFormData } from './aapJobTemplateSchema'
@@ -179,7 +179,7 @@ function MultiSelectContent({
   })
 
   return (
-    <NxSelect
+    <SynSelect
       isOpen={isOpen}
       selected={selectedIds.map(String)}
       onSelect={onSelect}
@@ -205,7 +205,7 @@ function MultiSelectContent({
           ))
         )}
       </SelectList>
-    </NxSelect>
+    </SynSelect>
   )
 }
 

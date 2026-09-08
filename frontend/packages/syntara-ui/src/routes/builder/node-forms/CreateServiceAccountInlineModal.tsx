@@ -23,7 +23,7 @@ import { RhUiAddIcon, RhUiErrorIcon } from '@patternfly/react-icons'
 import { useCallback, useMemo, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 
-import { NxSelect } from '../../../components/NxSelect'
+import { SynSelect } from '../../../components/SynSelect'
 import { useFormMutationErrorHandler } from '../../../hooks/useFormMutationErrorHandler'
 import { formatExpirationDate } from '../../../utils/dateUtils'
 import { detachPromise } from '../../../utils/detachPromise'
@@ -115,7 +115,7 @@ export function ProjectField({
 
   return (
     <FormGroup label="Project" fieldId="sa-inline-project" isRequired>
-      <NxSelect
+      <SynSelect
         id="sa-inline-project"
         aria-label="Project"
         isOpen={isOpen}
@@ -135,7 +135,7 @@ export function ProjectField({
             </SelectOption>
           ))}
         </SelectList>
-      </NxSelect>
+      </SynSelect>
 
       {error && (
         <FormHelperText>

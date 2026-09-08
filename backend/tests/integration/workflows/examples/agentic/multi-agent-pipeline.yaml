@@ -24,14 +24,14 @@ nodes:
       agent: production://research-agent
       model: claude-3-5-sonnet-20241022
       prompt: |
-        Research the topic: ${input.topic}
+        Research the topic: ${trigger.topic}
 
         Focus on:
         - Current state and recent developments
         - Key players and stakeholders
         - Important statistics and data points
     inputs:
-      topic: ${inputs.topic}
+      topic: ${trigger.topic}
     outputs:
       research_data: $.result.data
       sources: $.result.sources

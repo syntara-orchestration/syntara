@@ -1,13 +1,13 @@
-import { List, ListItem, Stack, StackItem } from '@patternfly/react-core'
 import type { WorkflowAPI } from '@syntara/contracts'
 import { useCallback, useState } from 'react'
 
-import { NxConfirmationDialog } from '../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../components/dialogs/SynConfirmationDialog'
 import type { DialogState } from '../../hooks/useDialogState'
 import { useAlerts } from '../../providers/alerts'
 import { detachPromise } from '../../utils/detachPromise'
 import type { ProjectRead } from '../access/types'
 import { ProjectFormModal } from '../access-management/ProjectFormModal'
+import { ProjectDeleteDialog } from '../access-management/projects/ProjectDeleteDialog'
 import { RunWorkflowModal } from '../builder/components/RunWorkflowModal'
 import { PublishWorkflowDialog } from '../builder/PublishWorkflowDialog'
 import { hasNonEmptyInputSchema } from '../builder/utils/triggerReferenceCheck'
@@ -142,7 +142,7 @@ export function WorkflowDialogs({
 
   return (
     <>
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={runDialog.isOpen}
         onClose={runDialog.close}
         onConfirm={handleConfirmRun}
@@ -152,7 +152,7 @@ export function WorkflowDialogs({
       >
         You are about to manually run this workflow. This action will start the workflow immediately, bypassing its
         normal trigger conditions.
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
 
       <RunWorkflowModal
         key={pendingRunInput ? `open-${pendingRunInput.trigger.triggerNodeId}` : 'closed'}
@@ -196,7 +196,7 @@ export function WorkflowDialogs({
         }}
       />
 
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={unpublishDialog.isOpen}
         onClose={unpublishDialog.close}
         onConfirm={() => {
@@ -212,7 +212,7 @@ export function WorkflowDialogs({
       >
         The workflow <strong>{unpublishDialog.item?.name}</strong> will be unpublished. It will no longer be available
         for execution until published again.
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
 
       <ProjectFormModal
         project={projectEditDialog.item}
@@ -224,38 +224,17 @@ export function WorkflowDialogs({
         }}
       />
 
-      <NxConfirmationDialog
+      <ProjectDeleteDialog
+        projectName={projectDeleteDialog.item?.name}
         isOpen={projectDeleteDialog.isOpen}
         onClose={projectDeleteDialog.close}
         onConfirm={() => {
           if (projectDeleteDialog.item) {
             onDeleteProject(projectDeleteDialog.item)
           }
-          // Dialog closes in onSettled callback passed to useProjectActions
         }}
-        title="Delete project?"
-        confirmLabel="Delete"
-        confirmVariant="danger"
-        titleIconVariant="warning"
         confirmLoading={isDeletingProject}
-        destructiveAcknowledgement={{
-          checkboxId: 'delete-project-ack',
-          label:
-            'I understand this project, its workflows, and role assignments will be permanently deleted or removed.',
-        }}
-      >
-        <Stack hasGutter>
-          <StackItem>
-            The project <strong>{projectDeleteDialog.item?.name}</strong> will be deleted. This cannot be undone.
-          </StackItem>
-          <StackItem>
-            <List>
-              <ListItem>All workflows in this project will be permanently deleted.</ListItem>
-              <ListItem>All project role assignments will be removed.</ListItem>
-            </List>
-          </StackItem>
-        </Stack>
-      </NxConfirmationDialog>
+      />
     </>
   )
 }

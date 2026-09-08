@@ -9,11 +9,13 @@ from unittest.mock import AsyncMock, patch
 from uuid import UUID, uuid4
 
 import pytest
+from pydantic import ValidationError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.approvals.exceptions import ApprovalAlreadyRequestedError
 from syntara.approvals.models import ActivitySummary, ApprovalCreateRequest, WorkflowContext
 from syntara.approvals.services.approval_service import ApprovalService
+from syntara.core.constants import FieldLimits
 from syntara.core.models import User
 
 
@@ -221,3 +223,18 @@ async def test_approval_already_requested_error_message(
     error = exc_info.value
     assert error.execution_id == execution_id
     assert error.approval_node_id == approval_node_id
+
+
+def test_approval_create_prompt_rejects_over_max_length() -> None:
+    """Prompt must fit the same description limit as other approval text fields."""
+    too_long = "x" * (FieldLimits.DESCRIPTION_MAX_LENGTH + 1)
+    with pytest.raises(ValidationError):
+        ApprovalCreateRequest(
+            execution_id=uuid4(),
+            project_id=uuid4(),
+            approval_node_id="node",
+            name="Test Approval",
+            prompt=too_long,
+            next_step_approved=ActivitySummary(id="step", name="Step", type="task"),
+            workflow_context=WorkflowContext(workflow_name="Test Workflow", inputs={}),
+        )

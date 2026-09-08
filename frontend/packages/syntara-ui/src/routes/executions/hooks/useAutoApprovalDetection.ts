@@ -40,33 +40,36 @@ export function useAutoApprovalDetection({
     const activityStates = useExecutionStore.getState().activityStates
 
     for (const [nodeId, state] of activityStates) {
+      if (state?.status !== ACTIVITY_STATUS.WAITING) {
+        detectedNodeIds.current.delete(nodeId)
+        continue
+      }
+
       if (detectedNodeIds.current.has(nodeId)) continue
 
-      if (state?.status === ACTIVITY_STATUS.WAITING) {
-        detectedNodeIds.current.add(nodeId)
-        fetchingRef.current = true
-        const generation = generationRef.current
+      detectedNodeIds.current.add(nodeId)
+      fetchingRef.current = true
+      const generation = generationRef.current
 
-        fetchForNode(nodeId)
-          .then((approval) => {
-            if (generation !== generationRef.current) return
-            if (approval) {
-              onApprovalDetected(approval)
-            }
-          })
-          .catch(() => {
-            if (generation === generationRef.current) {
-              detectedNodeIds.current.delete(nodeId)
-            }
-          })
-          .finally(() => {
-            if (generation === generationRef.current) {
-              fetchingRef.current = false
-              scanRef.current()
-            }
-          })
-        break
-      }
+      fetchForNode(nodeId)
+        .then((approval) => {
+          if (generation !== generationRef.current) return
+          if (approval) {
+            onApprovalDetected(approval)
+          }
+        })
+        .catch(() => {
+          if (generation === generationRef.current) {
+            detectedNodeIds.current.delete(nodeId)
+          }
+        })
+        .finally(() => {
+          if (generation === generationRef.current) {
+            fetchingRef.current = false
+            scanRef.current()
+          }
+        })
+      break
     }
   }, [executionId, fetchForNode, onApprovalDetected])
 

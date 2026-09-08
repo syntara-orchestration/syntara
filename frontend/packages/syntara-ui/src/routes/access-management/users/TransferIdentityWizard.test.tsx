@@ -83,7 +83,17 @@ vi.mock('../../../utils/generateUUID', () => ({
 
 vi.mock('./TransferIdentityWizard.module.css', () => ({ default: {} }))
 
-const mockUsers = {
+const mockUsers: {
+  resources: Array<{
+    id: string
+    username: string
+    email: string
+    first_name: string
+    last_name: string | null
+  }>
+  next: null
+  total: number
+} = {
   resources: [
     { id: 'user-1', username: 'alice', email: 'alice@example.com', first_name: 'Alice', last_name: 'Smith' },
     { id: 'user-2', username: 'bob', email: 'bob@example.com', first_name: 'Bob', last_name: 'Jones' },
@@ -337,6 +347,26 @@ describe('TransferIdentityWizard', () => {
       expect(screen.getAllByText(/Bob Jones/i).length).toBeGreaterThan(0)
     })
 
+    it('shows username in step 2 description when selected user has no name', async () => {
+      setupMocks({
+        users: {
+          resources: [
+            ...mockUsers.resources,
+            { id: 'user-3', username: 'noname', email: 'noname@example.com', first_name: '', last_name: null },
+          ],
+          next: null,
+          total: 4,
+        },
+      })
+      const user = userEvent.setup()
+      render(<TransferIdentityWizard />, { wrapper })
+      await user.click(screen.getByText('noname@example.com'))
+      await user.click(screen.getByRole('button', { name: 'Next' }))
+
+      expect(screen.getByText(/Choose one of/i)).toBeInTheDocument()
+      expect(screen.getAllByText(/noname/i).length).toBeGreaterThan(0)
+    })
+
     it('shows empty state when selected user has no identities', async () => {
       setupMocks({ identities: [] })
       const user = userEvent.setup()
@@ -345,7 +375,7 @@ describe('TransferIdentityWizard', () => {
       await user.click(screen.getByText('bob@example.com'))
       await user.click(screen.getByRole('button', { name: 'Next' }))
 
-      expect(screen.getByText('No identities')).toBeInTheDocument()
+      expect(screen.getByText('No identities yet')).toBeInTheDocument()
       expect(screen.getByText('This user has no federated identities to attach.')).toBeInTheDocument()
       expect(screen.queryByRole('heading', { level: 2, name: 'Select an identity' })).not.toBeInTheDocument()
       expect(screen.queryByText(/Choose one of/i)).not.toBeInTheDocument()
@@ -363,7 +393,7 @@ describe('TransferIdentityWizard', () => {
       expect(await screen.findByText('No results found')).toBeInTheDocument()
       expect(screen.getByText(/Choose one of/i)).toBeInTheDocument()
       expect(screen.getByRole('search', { name: 'Filters' })).toBeInTheDocument()
-      expect(screen.queryByText('No identities')).not.toBeInTheDocument()
+      expect(screen.queryByText('No identities yet')).not.toBeInTheDocument()
     })
 
     it('has Transfer identity button disabled until an identity is selected', async () => {

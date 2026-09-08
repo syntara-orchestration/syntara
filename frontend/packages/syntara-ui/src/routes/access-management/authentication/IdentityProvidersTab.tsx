@@ -10,20 +10,20 @@ import {
   Truncate,
 } from '@patternfly/react-core'
 import { RhUiBanIcon, RhUiEditIcon, RhUiSecurityIcon, RhUiTrashIcon } from '@patternfly/react-icons'
-import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
-import type { IAction } from '@patternfly/react-table'
+import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { IdentityProvidersAPI } from '@syntara/contracts'
 import { useNavigate } from '@tanstack/react-router'
 import { useCallback, useLayoutEffect, useMemo, useState } from 'react'
 
 import { AppRoute } from '../../../app/AppRoute'
 import { adminClient, identityProvidersClient } from '../../../client'
-import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
-import { NxLink } from '../../../components/NxLink'
-import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../../components/panels/list/NxListPanel'
+import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../../components/panels/list/SynListPanel'
 import { ProviderIcon } from '../../../components/ProviderIcon'
+import { SynKebabMenu, type KebabAction } from '../../../components/SynKebabMenu'
+import { SynLink } from '../../../components/SynLink'
 import { useCursorPagination } from '../../../hooks/useCursorPagination'
 import { useDeleteAction } from '../../../hooks/useDeleteAction'
 import { useDialogState } from '../../../hooks/useDialogState'
@@ -55,13 +55,14 @@ function getRowActions(
   onRevoke: (provider: IdentityProvider) => void,
   permissions: ReturnType<typeof useIdentityProviderPermissions>,
   onNavigate: (path: string) => void
-): IAction[] {
+): KebabAction[] {
   const { id } = provider
   const canEdit = permissions.canUpdate && !!id
   const canDel = permissions.canDelete && !!id
 
   return [
     {
+      key: 'edit',
       title: <IconLabel icon={<RhUiEditIcon />}>Edit provider</IconLabel>,
       isDisabled: !id,
       isAriaDisabled: !permissions.canUpdate,
@@ -71,6 +72,7 @@ function getRowActions(
         : undefined,
     },
     {
+      key: 'edit-mapping',
       title: <IconLabel icon={<RhUiEditIcon />}>Edit group mapping</IconLabel>,
       isDisabled: !id,
       isAriaDisabled: !permissions.canUpdate,
@@ -80,14 +82,17 @@ function getRowActions(
         : undefined,
     },
     {
+      key: 'revoke',
       title: <IconLabel icon={<RhUiBanIcon />}>Revoke tokens</IconLabel>,
       isAriaDisabled: !permissions.canRevoke,
       tooltipProps: tooltipWhenDenied(permissions.canRevoke, permissions.tooltips.revoke),
       onClick: permissions.canRevoke ? () => onRevoke(provider) : undefined,
     },
-    { isSeparator: true },
+    { key: 'sep-delete', isSeparator: true },
     {
-      title: <IconLabel icon={<RhUiTrashIcon />}>Delete</IconLabel>,
+      key: 'delete',
+      title: <IconLabel icon={<RhUiTrashIcon />}>Delete provider</IconLabel>,
+      isDanger: true,
       isDisabled: !id,
       isAriaDisabled: !permissions.canDelete,
       tooltipProps: tooltipWhenDenied(permissions.canDelete, permissions.tooltips.delete),
@@ -110,7 +115,7 @@ function NoProvidersEmptyState({
   permissions: ReturnType<typeof useIdentityProviderPermissions>
 }>) {
   return (
-    <EmptyState headingLevel="h2" titleText="No identity providers configured" icon={RhUiSecurityIcon}>
+    <EmptyState headingLevel="h2" titleText="No identity providers configured yet" icon={RhUiSecurityIcon}>
       <EmptyStateBody>
         Configure an external identity provider to enable single sign-on for your organization. OIDC (OpenID Connect) is
         the recommended protocol.
@@ -158,9 +163,9 @@ function ProviderRow({
           </FlexItem>
           <FlexItem style={{ minWidth: 0 }}>
             {provider.id ? (
-              <NxLink to={providerDetailPath(provider.id)}>
+              <SynLink to={providerDetailPath(provider.id)}>
                 <Truncate content={provider.name ?? ''} />
-              </NxLink>
+              </SynLink>
             ) : (
               <Truncate content={provider.name ?? ''} />
             )}
@@ -186,10 +191,11 @@ function ProviderRow({
         </DisabledWithTooltip>
       </Td>
       <Td isActionCell>
-        <ActionsColumn
-          items={getRowActions(provider, onDelete, onRevoke, permissions, (path) =>
+        <SynKebabMenu
+          actions={getRowActions(provider, onDelete, onRevoke, permissions, (path) =>
             detachPromise(navigate({ to: path }))
           )}
+          aria-label={`Actions for ${provider.name}`}
         />
       </Td>
     </Tr>
@@ -260,7 +266,9 @@ export function IdentityProvidersTab({ onHeaderToolbarStateChange }: Readonly<Id
 
   const handleDelete = useDeleteAction({
     deleteFn: deleteProvider,
-    buildParams: (provider: IdentityProvider) => ({ params: { path: { provider_id: provider.id! } } }),
+    buildParams: (provider: IdentityProvider) => ({
+      params: { path: { provider_id: provider.id ?? '' } },
+    }),
     entityLabel: 'identity provider',
     getItemName: (provider: IdentityProvider) => provider.name ?? '',
     onSuccess: refetch,
@@ -308,7 +316,7 @@ export function IdentityProvidersTab({ onHeaderToolbarStateChange }: Readonly<Id
 
   return (
     <>
-      <NxListPanelView
+      <SynListPanelView
         isPending={query.isPending}
         isFetching={query.isFetching}
         error={query.error}
@@ -322,7 +330,7 @@ export function IdentityProvidersTab({ onHeaderToolbarStateChange }: Readonly<Id
         }
         toolbar={
           showHeaderToolbar ? (
-            <NxListPanelToolbar
+            <SynListPanelToolbar
               filters={filters}
               filterDefinitions={filterFieldDefinitions}
               onFilterChange={handleFilterChange}
@@ -330,7 +338,7 @@ export function IdentityProvidersTab({ onHeaderToolbarStateChange }: Readonly<Id
           ) : undefined
         }
         body={
-          <NxListPanelTable caption="Identity providers table" footer={getFooterProps(query.data)}>
+          <SynListPanelTable caption="Identity providers table" footer={getFooterProps(query.data)}>
             <Thead>
               <Tr>
                 <Th sort={getSortParams(0)}>Name</Th>
@@ -352,7 +360,7 @@ export function IdentityProvidersTab({ onHeaderToolbarStateChange }: Readonly<Id
                 />
               ))}
             </Tbody>
-          </NxListPanelTable>
+          </SynListPanelTable>
         }
       />
       <IdentityProviderDeleteDialog
@@ -367,7 +375,7 @@ export function IdentityProvidersTab({ onHeaderToolbarStateChange }: Readonly<Id
         onConfirm={handleConfirmDisable}
         onClose={disableDialog.close}
       />
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={revokeDialog.isOpen}
         onClose={revokeDialog.close}
         onConfirm={handleRevoke}
@@ -378,7 +386,7 @@ export function IdentityProvidersTab({ onHeaderToolbarStateChange }: Readonly<Id
       >
         All tokens for users authenticated via <strong>{revokeDialog.item?.name}</strong> will be revoked. Affected
         users will be signed out and must sign in again.
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
       <AAPSetupModal
         isOpen={aapSetupOpen}
         onClose={() => setAapSetupOpen(false)}

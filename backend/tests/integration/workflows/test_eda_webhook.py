@@ -69,6 +69,16 @@ def _skip_sa_authorization() -> Generator[None]:
         yield
 
 
+@pytest.fixture(autouse=True)
+def _skip_sa_binding_sync() -> Generator[None]:
+    """Skip SA binding sync during publish — test SA IDs don't exist in the DB."""
+    with patch(
+        "syntara.workflows.services.webhook_trigger_service.WebhookTriggerService._sync_trigger_sa_bindings",
+        new_callable=AsyncMock,
+    ):
+        yield
+
+
 @pytest.fixture
 def _no_temporal(session_app: FastAPI) -> Generator[None]:
     """Override Temporal dependency to return None (simulate unavailability)."""
@@ -93,6 +103,7 @@ async def eda_workflow(
                 "type": "eda_trigger",
                 "parameters": {
                     "webhook_path": "github-deployments",
+                    "authorized_service_account_ids": [str(uuid4())],
                 },
             }
         ],
@@ -141,6 +152,7 @@ async def eda_workflow_with_schema(
                 "parameters": {
                     "webhook_path": "validated-events",
                     "input_schema": input_schema,
+                    "authorized_service_account_ids": [str(uuid4())],
                 },
             }
         ],
@@ -388,17 +400,17 @@ class TestEDAWebhookEdgeCases:
 
         assert response.status_code == 404
 
-    async def test_webhook_does_not_trigger_soft_deleted_workflow(
+    async def test_webhook_does_not_trigger_deleted_workflow(
         self,
         base_client: AsyncClient,
         eda_workflow: Workflow,
         test_db_session: AsyncSession,
     ) -> None:
-        """Returns 404 when the owning workflow is soft-deleted."""
-        from datetime import UTC, datetime
-
-        eda_workflow.deleted_at = datetime.now(tz=UTC)
-        test_db_session.add(eda_workflow)
+        """Returns 404 when the owning workflow has been hard-deleted (trigger cascades)."""
+        eda_workflow.published_version_id = None
+        eda_workflow.is_enabled = False
+        await test_db_session.flush()
+        await test_db_session.delete(eda_workflow)
         await test_db_session.commit()
 
         response = await base_client.post(
@@ -431,7 +443,11 @@ class TestCrossTypePathIsolation:
                 "schema_version": "2.0.0",
                 "name": "Generic Webhook Workflow",
                 "triggers": [
-                    {"id": "wh_1", "type": "webhook_trigger", "parameters": {"webhook_path": shared_path}},
+                    {
+                        "id": "wh_1",
+                        "type": "webhook_trigger",
+                        "parameters": {"webhook_path": shared_path, "authorized_service_account_ids": [str(uuid4())]},
+                    },
                 ],
                 "nodes": [
                     {"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}},
@@ -450,7 +466,11 @@ class TestCrossTypePathIsolation:
                 "schema_version": "2.0.0",
                 "name": "EDA Webhook Workflow",
                 "triggers": [
-                    {"id": "eda_1", "type": "eda_trigger", "parameters": {"webhook_path": shared_path}},
+                    {
+                        "id": "eda_1",
+                        "type": "eda_trigger",
+                        "parameters": {"webhook_path": shared_path, "authorized_service_account_ids": [str(uuid4())]},
+                    },
                 ],
                 "nodes": [
                     {"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}},

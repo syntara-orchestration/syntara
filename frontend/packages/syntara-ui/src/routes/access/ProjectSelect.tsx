@@ -1,7 +1,7 @@
 import { MenuToggle, type MenuToggleElement, SelectList, SelectOption } from '@patternfly/react-core'
 import { useState } from 'react'
 
-import { NxSelect } from '../../components/NxSelect'
+import { SynSelect } from '../../components/SynSelect'
 
 export function ProjectSelect({
   id,
@@ -17,7 +17,7 @@ export function ProjectSelect({
   const [isOpen, setIsOpen] = useState(false)
   const selectedLabel = projects.find((p) => p.name === value)?.name
   return (
-    <NxSelect
+    <SynSelect
       id={id}
       isOpen={isOpen}
       selected={value || undefined}
@@ -47,6 +47,6 @@ export function ProjectSelect({
           </SelectOption>
         ))}
       </SelectList>
-    </NxSelect>
+    </SynSelect>
   )
 }

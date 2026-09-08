@@ -21,13 +21,13 @@ import {
 import { RhUiAddIcon, RhUiEditIcon, RhUiSyncIcon } from '@patternfly/react-icons'
 import { Tbody } from '@patternfly/react-table'
 import { useCallback, useMemo, useState } from 'react'
-import { Controller, type Control } from 'react-hook-form'
+import { Controller, type Control, type FieldError, type FieldErrors } from 'react-hook-form'
 
 import { FilterBar } from '../../../../components/filters/FilterBar'
 import { SynPanelContentStack } from '../../../../components/layout/SynPanelContentStack'
 import { SynEmptyStateFilter } from '../../../../components/states/SynEmptyStateFilter'
 import { SynEmptyStateNoData } from '../../../../components/states/SynEmptyStateNoData'
-import { NxScrollableTableContainer } from '../../../../components/table/NxScrollableTableContainer'
+import { SynScrollableTableContainer } from '../../../../components/table/SynScrollableTableContainer'
 import type { FilterConfig, FilterFieldDefinition } from '../../../../types/filters'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../../../types/filters'
 import { APP_TITLE } from '../../../../utils/appTitle'
@@ -40,20 +40,24 @@ import type { GroupMappingEntry, MappedGroup } from './groupMappingUtils'
 import { idpHelp } from './idpFieldHelp'
 import { IDP_TYPE_PRESETS } from './idpTypePresets'
 
+type GroupMappingEntryFieldErrors = FieldErrors<GroupMappingEditFormValues['entries'][number]>
+type GroupMappingEntryErrors = FieldErrors<GroupMappingEditFormValues>['entries']
+
+function fieldErrorMessage(error: FieldError | undefined): string | undefined {
+  const message = error?.message
+  return typeof message === 'string' ? message : undefined
+}
+
 function entryFieldErrorMessage(
-  entryErrors: GroupMappingEditFormValues['entries'] | undefined,
+  entryErrors: GroupMappingEntryErrors | undefined,
   index: number,
   field: 'idpGroupValue' | 'mappedGroupId'
 ): string | undefined {
   if (!Array.isArray(entryErrors)) return undefined
-  const row = entryErrors[index]
-  if (!row || typeof row !== 'object') return undefined
-  const fieldError: unknown = row[field]
-  if (fieldError && typeof fieldError === 'object' && 'message' in fieldError) {
-    const message: unknown = fieldError.message
-    return typeof message === 'string' ? message : undefined
-  }
-  return undefined
+  const rows = entryErrors as Array<GroupMappingEntryFieldErrors | undefined>
+  const row = rows.at(index)
+  if (!row) return undefined
+  return fieldErrorMessage(field === 'idpGroupValue' ? row.idpGroupValue : row.mappedGroupId)
 }
 
 const GROUP_MAPPING_KEYWORD_FILTER_FIELDS: FilterFieldDefinition[] = [
@@ -83,7 +87,7 @@ export type EmptyMappingStateProps = {
 
 export function EmptyMappingState({ onTestSignIn, onAddManually }: Readonly<EmptyMappingStateProps>) {
   return (
-    <EmptyState headingLevel="h2" titleText="No group mappings configured" variant="lg">
+    <EmptyState headingLevel="h2" titleText="No group mappings configured yet" variant="lg">
       <EmptyStateBody>
         {`Group mappings automatically assign users to ${APP_TITLE} groups based on their identity provider groups.`}
         {(onTestSignIn ?? onAddManually) && ' Discover groups from your IdP, or add mappings manually.'}
@@ -189,7 +193,7 @@ export type MappingTableProps = {
   mappedGroups: MappedGroup[]
   isReadOnly?: boolean
   showValidation?: boolean
-  entryErrors?: GroupMappingEditFormValues['entries']
+  entryErrors?: GroupMappingEntryErrors
   onRemove: (index: number) => void
   onAdd: () => void
   onCreateGroup: (index: number) => void
@@ -214,12 +218,11 @@ export function MappingTable({
    * (this table does not pass `readOnlyAllowRemove`).
    */
   const showActionsColumn = isReadOnly !== true
-  const showWildcardHelp = isReadOnly !== true
   const showAddButton = !isReadOnly && showAddMappingAction
 
   const table = (
-    <NxScrollableTableContainer caption="Group mappings" variant="compact">
-      <GroupMappingTableHead showActionsColumn={showActionsColumn} showWildcardHelp={showWildcardHelp} />
+    <SynScrollableTableContainer caption="Group mappings" variant="compact">
+      <GroupMappingTableHead showActionsColumn={showActionsColumn} />
       <Tbody>
         {rows.map((row) => {
           if (isReadOnly) {
@@ -260,7 +263,7 @@ export function MappingTable({
           )
         })}
       </Tbody>
-    </NxScrollableTableContainer>
+    </SynScrollableTableContainer>
   )
 
   if (!showAddButton) {
@@ -409,7 +412,7 @@ export function ReadOnlyView({ entries, mappedGroups, onEditMapping }: Readonly<
   if (entries.length === 0) {
     return (
       <SynEmptyStateNoData
-        title="No group mappings"
+        title="No group mappings yet"
         description="There are no group mappings to display for this identity provider."
       />
     )
@@ -428,7 +431,7 @@ export function ReadOnlyView({ entries, mappedGroups, onEditMapping }: Readonly<
           <SynEmptyStateFilter clearAllFilters={clearFiltersAndPage} />
         </StackItem>
       ) : (
-        <NxScrollableTableContainer
+        <SynScrollableTableContainer
           caption="Group mappings"
           variant="compact"
           footer={{
@@ -441,7 +444,7 @@ export function ReadOnlyView({ entries, mappedGroups, onEditMapping }: Readonly<
             onPerPageChange: handlePerPageChange,
           }}
         >
-          <GroupMappingTableHead showActionsColumn={false} showWildcardHelp={false} />
+          <GroupMappingTableHead showActionsColumn={false} />
           <Tbody>
             {paginatedEntries.map((entry, index) => (
               <MappingRow
@@ -459,7 +462,7 @@ export function ReadOnlyView({ entries, mappedGroups, onEditMapping }: Readonly<
               />
             ))}
           </Tbody>
-        </NxScrollableTableContainer>
+        </SynScrollableTableContainer>
       )}
     </SynPanelContentStack>
   )

@@ -15,8 +15,8 @@ import { Fragment } from 'react'
 
 import { AppRoute } from '../../../app/AppRoute'
 import groupedTableStyles from '../../../components/groupedTable.module.css'
-import type { KebabAction } from '../../../components/NxKebabMenu'
-import { NxKebabMenu } from '../../../components/NxKebabMenu'
+import type { KebabAction } from '../../../components/SynKebabMenu'
+import { SynKebabMenu } from '../../../components/SynKebabMenu'
 import { LinkCell } from '../../../components/table/LinkCell'
 import { UserTimestamp } from '../../../components/table/UserTimestamp'
 import type { ProjectRead } from '../../access/types'
@@ -62,6 +62,7 @@ function CredentialRow({
               ? {
                   rowIndex,
                   isExpanded,
+                  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- safe: credentials from the API always have an id; rows without id are excluded by the expandableCredentialIds filter upstream
                   onToggle: () => onToggleRow(credential.id!),
                 }
               : undefined
@@ -107,7 +108,7 @@ function CredentialRow({
           )}
         </Td>
         <Td isActionCell onClick={(e) => e.stopPropagation()}>
-          <NxKebabMenu actions={actions} aria-label={`Actions for ${credential.name}`} />
+          <SynKebabMenu actions={actions} aria-label={`Actions for ${credential.name}`} />
         </Td>
       </Tr>
       {hasDescription && (
@@ -189,7 +190,7 @@ export function GroupedCredentialsTableBody({
                   credential={credential}
                   credType={typeMap.get(credential.credential_type_id)}
                   rowIndex={(credential.id ? credentialIndexMap.get(credential.id) : undefined) ?? 0}
-                  isExpanded={expandedRows.has(credential.id!)}
+                  isExpanded={expandedRows.has(credential.id ?? '')}
                   onToggleRow={onToggleRow}
                   getRowActions={getRowActions}
                   onToggleEnabled={onToggleEnabled}
@@ -230,7 +231,7 @@ export function FlatCredentialsTableBody({
           credential={credential}
           credType={typeMap.get(credential.credential_type_id)}
           rowIndex={rowIndex}
-          isExpanded={expandedRows.has(credential.id!)}
+          isExpanded={expandedRows.has(credential.id ?? '')}
           onToggleRow={onToggleRow}
           getRowActions={getRowActions}
           onToggleEnabled={onToggleEnabled}

@@ -1,10 +1,10 @@
 ---
 openapi: 3.1.0
 info:
-  title: Syntara Roles API
+  title: Orchestrator Roles API
   version: 1.0.0
   description: |
-    Role management endpoints for the Syntara authorization system.
+    Role management endpoints for the Orchestrator authorization system.
 
     Roles are collections of policies that can be assigned to users or groups.
     Builtin roles (e.g., admin, viewer) cannot be modified or deleted.

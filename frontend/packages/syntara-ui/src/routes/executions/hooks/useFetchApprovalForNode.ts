@@ -2,6 +2,7 @@ import type { Approval } from '@syntara/contracts'
 import { useCallback, useState } from 'react'
 
 import { approvalsClient } from '../../../client'
+import { findApprovalForCanvasNode } from '../../approvals/approvalNodeId'
 
 type UseFetchApprovalForNodeResult = {
   /** Whether a fetch is currently in progress. */
@@ -39,7 +40,7 @@ export function useFetchApprovalForNode(executionId: string): UseFetchApprovalFo
       try {
         const result = await refetch()
         const approvals = result.data?.resources ?? []
-        const match = approvals.find((a) => a.approval_node_id === approvalNodeId)
+        const match = findApprovalForCanvasNode(approvals, approvalNodeId)
         const resolved = (match?.id ? match : null) as Approval | null
         return resolved
       } finally {

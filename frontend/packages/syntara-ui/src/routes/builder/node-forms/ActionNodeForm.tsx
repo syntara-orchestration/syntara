@@ -19,7 +19,7 @@ import { ExecutorTypeEnum } from '@syntara/contracts'
 import React, { type ReactNode, use, useEffect, useMemo, useRef, useState } from 'react'
 import { Controller, FormProvider, useForm, useFormContext, useWatch } from 'react-hook-form'
 
-import { NxSelect } from '../../../components/NxSelect'
+import { SynSelect } from '../../../components/SynSelect'
 import {
   ExpandableCodeEditor,
   type CodeLanguage,
@@ -80,7 +80,7 @@ function ScriptLanguageSelect({
   const [isOpen, setIsOpen] = useState(false)
   const selectedLabel = SCRIPT_LANGUAGE_OPTIONS.find((o) => o.value === value)?.label
   return (
-    <NxSelect
+    <SynSelect
       id="action-language"
       isOpen={isOpen}
       selected={value || undefined}
@@ -109,7 +109,7 @@ function ScriptLanguageSelect({
           </SelectOption>
         ))}
       </SelectList>
-    </NxSelect>
+    </SynSelect>
   )
 }
 
@@ -125,7 +125,7 @@ function HttpMethodSelect({
   const [isOpen, setIsOpen] = useState(false)
   const selectedLabel = HTTP_METHOD_OPTIONS.find((o) => o.value === value)?.label
   return (
-    <NxSelect
+    <SynSelect
       id="action-method"
       isOpen={isOpen}
       selected={value || undefined}
@@ -154,7 +154,7 @@ function HttpMethodSelect({
           </SelectOption>
         ))}
       </SelectList>
-    </NxSelect>
+    </SynSelect>
   )
 }
 

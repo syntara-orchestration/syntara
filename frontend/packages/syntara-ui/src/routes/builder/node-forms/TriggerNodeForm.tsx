@@ -26,7 +26,7 @@ import {
   EXECUTION_CONFLICT_HELP,
   SCHEDULE_EXPRESSION_HELP,
 } from '../../../components/forms/scheduleHelpText'
-import { NxSelect } from '../../../components/NxSelect'
+import { SynSelect } from '../../../components/SynSelect'
 import { getDefaultRepeatingInterval } from '../../../utils/triggerFormatting'
 import { generateWebhookPath } from '../../../utils/webhookPath'
 import { NodeEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useNodeEditorAutoSubmit'
@@ -175,7 +175,7 @@ function ExecutionConflictPolicyField({
         fieldId="execution-conflict-policy"
         isRequired
       >
-        <NxSelect
+        <SynSelect
           id="execution-conflict-policy"
           isOpen={isOpen}
           selected={value}
@@ -191,7 +191,7 @@ function ExecutionConflictPolicyField({
               </SelectOption>
             ))}
           </SelectList>
-        </NxSelect>
+        </SynSelect>
       </FormGroup>
     </StackItem>
   )
@@ -208,7 +208,7 @@ function ScheduleTypeSelect({
 }) {
   const [isOpen, setIsOpen] = useState(false)
   return (
-    <NxSelect
+    <SynSelect
       id="schedule-expression"
       isOpen={isOpen}
       selected={value}
@@ -234,7 +234,7 @@ function ScheduleTypeSelect({
         <SelectOption value={ScheduleTypeEnum.INTERVAL}>Visual schedule builder</SelectOption>
         <SelectOption value={ScheduleTypeEnum.CRON}>Custom cron expression</SelectOption>
       </SelectList>
-    </NxSelect>
+    </SynSelect>
   )
 }
 

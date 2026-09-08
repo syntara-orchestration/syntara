@@ -53,10 +53,13 @@ class ApprovalsFactory:
             status, name_prefix, index, timeout_at
         )
         self._node_counter += 1
+        node_id = f"approval_node_{self._node_counter}"
         return ApprovalRequest(
             execution_id=execution_id,
             project_id=self.project_id,
-            approval_node_id=f"approval_node_{self._node_counter}",
+            approval_node_id=node_id,
+            loop_iteration_path=[],
+            temporal_activity_id=node_id,
             name=f"{name_prefix} {index + 1}",
             status=status,
             timeout_at=timeout,

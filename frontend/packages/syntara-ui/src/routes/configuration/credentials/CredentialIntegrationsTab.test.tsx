@@ -119,7 +119,7 @@ describe('CredentialIntegrationsTab', () => {
 
     render(<CredentialIntegrationsTab credentialId="cred-1" />, { wrapper })
 
-    expect(screen.getByText('No integrations using this credential')).toBeInTheDocument()
+    expect(screen.getByText('No integrations yet')).toBeInTheDocument()
     expect(
       screen.getByText(
         'This credential is not currently referenced by any integrations. Integrations will appear here once they are configured to use this credential.'
@@ -233,7 +233,7 @@ describe('CredentialIntegrationsTab', () => {
 
     render(<CredentialIntegrationsTab credentialId="cred-1" />, { wrapper })
 
-    expect(screen.getByText('No integrations using this credential')).toBeInTheDocument()
+    expect(screen.getByText('No integrations yet')).toBeInTheDocument()
   })
 
   it('displays integration type labels correctly', () => {

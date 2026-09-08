@@ -11,9 +11,9 @@ import { RhUiStarIcon } from '@patternfly/react-icons'
 import { Td, Tr } from '@patternfly/react-table'
 
 import { IconLabel } from '../../../components/IconLabel'
-import { NxLabel } from '../../../components/labels/NxLabel'
-import type { KebabAction } from '../../../components/NxKebabMenu'
-import { NxKebabMenu } from '../../../components/NxKebabMenu'
+import { SynLabel } from '../../../components/labels/SynLabel'
+import type { KebabAction } from '../../../components/SynKebabMenu'
+import { SynKebabMenu } from '../../../components/SynKebabMenu'
 
 /** Minimal model shape accepted by {@link ModelRow}. */
 export type ModelRowModel = Readonly<{
@@ -121,7 +121,7 @@ export function ModelRow({
                 </FlexItem>
                 {isDefault && (
                   <FlexItem>
-                    <NxLabel color="blue">Default</NxLabel>
+                    <SynLabel color="blue">Default</SynLabel>
                   </FlexItem>
                 )}
               </Flex>
@@ -135,7 +135,7 @@ export function ModelRow({
         </DescriptionList>
       </Td>
       <Td isActionCell>
-        {kebabActions.length > 0 && <NxKebabMenu actions={kebabActions} aria-label={`Actions for ${model.name}`} />}
+        {kebabActions.length > 0 && <SynKebabMenu actions={kebabActions} aria-label={`Actions for ${model.name}`} />}
       </Td>
     </Tr>
   )

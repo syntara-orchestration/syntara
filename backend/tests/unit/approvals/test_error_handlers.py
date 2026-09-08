@@ -264,7 +264,10 @@ class TestApprovalAlreadyRequestedHandler:
         data = json.loads(bytes(response.body).decode())
         assert data["type"] == PROBLEM_TYPES["resource_conflict"]
         assert data["title"] == "Approval Already Requested"
-        assert data["detail"] == "An approval request already exists for this execution and approval node"
+        assert data["detail"] == (
+            "An approval request already exists for this execution and approval node "
+            f"'{approval_node_id}' with loop_iteration_path []"
+        )
         assert data["code"] == "APPROVAL_ALREADY_REQUESTED"
         assert data["retryable"] is False
         assert data["instance"] == "https://api.example.com/api/v1/approvals"

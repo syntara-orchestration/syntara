@@ -440,14 +440,14 @@ export function ApprovalStatusBadges(props: Readonly<{ status?: ApprovalStatus |
   const capitalizedStatus = props.status.charAt(0).toUpperCase() + props.status.slice(1)
 
   return (
-    <NxLabel variant="outline" status={statusMap[props.status]} icon={<IconComponent />}>
+    <SynLabel variant="outline" status={statusMap[props.status]} icon={<IconComponent />}>
       {capitalizedStatus}
-    </NxLabel>
+    </SynLabel>
   )
 }
 ```
 
-**Uses `NxLabel` for system-generated status indicators** (per `.claude/skills/frontend-coding-standards/SKILL.md` §12).
+**Uses `SynLabel` for system-generated status indicators** (per `.claude/skills/frontend-coding-standards/SKILL.md` §12).
 
 ## Builder Approval Handling (Execution Context)
 
@@ -490,7 +490,7 @@ The builder also handles approval interactions when viewing a live or recent exe
 - **Permission-filtered approver lists** via `useApprovalDecideUsers(projectId)`
 - **System defaults** fetched via `useWorkflowEngineDefaults()` for decision window
 - **Settings tab** with `supportsTimeout: false` (decision window replaces activity timeout)
-- **Status badges** use `NxLabel` with `variant="outline"` and status-specific icons
+- **Status badges** use `SynLabel` with `variant="outline"` and status-specific icons
 
 ## Related Documentation
 

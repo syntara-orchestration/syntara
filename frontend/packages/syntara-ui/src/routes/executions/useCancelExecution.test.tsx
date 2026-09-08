@@ -65,7 +65,7 @@ describe('useCancelExecution', () => {
         onError: expect.any(Function) as unknown,
       })
     )
-    expect(mockShowSuccess).toHaveBeenCalledWith({ title: 'Execution cancellation requested' })
+    expect(mockShowSuccess).toHaveBeenCalledWith({ title: 'Run cancellation requested' })
     expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['get', '/executions/{execution_id}'] })
     expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['get', '/executions'] })
   })
@@ -82,7 +82,7 @@ describe('useCancelExecution', () => {
     })
 
     expect(mockShowError).toHaveBeenCalledWith({
-      title: 'Failed to cancel execution',
+      title: 'Failure to cancel run',
       description: 'Cannot cancel completed execution',
     })
   })

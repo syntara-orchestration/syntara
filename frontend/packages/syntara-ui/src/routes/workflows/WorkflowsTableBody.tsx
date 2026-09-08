@@ -4,8 +4,8 @@ import { Tbody, Td, Tr } from '@patternfly/react-table'
 import type { WorkflowAPI } from '@syntara/contracts'
 
 import groupedTableStyles from '../../components/groupedTable.module.css'
-import type { KebabAction } from '../../components/NxKebabMenu'
-import { NxKebabMenu } from '../../components/NxKebabMenu'
+import type { KebabAction } from '../../components/SynKebabMenu'
+import { SynKebabMenu } from '../../components/SynKebabMenu'
 import { DateCell } from '../../components/table/DateCell'
 import { LinkCell } from '../../components/table/LinkCell'
 import { WorkflowPublishStatusBadge } from '../../components/WorkflowPublishStatusBadge'
@@ -49,7 +49,7 @@ function WorkflowRow({ workflow, getRowActions }: Readonly<WorkflowRowProps>) {
         />
       </Td>
       <Td isActionCell>
-        {actions.length > 0 && <NxKebabMenu actions={actions} aria-label={`Actions for ${workflow.name}`} />}
+        {actions.length > 0 && <SynKebabMenu actions={actions} aria-label={`Actions for ${workflow.name}`} />}
       </Td>
     </Tr>
   )
@@ -101,7 +101,7 @@ function ProjectGroupSection({
         </Td>
         {hasProjectActions && (
           <Td isActionCell onClick={(e) => e.stopPropagation()}>
-            <NxKebabMenu actions={projectActions} aria-label={`Actions for ${project?.name ?? 'project'}`} />
+            <SynKebabMenu actions={projectActions} aria-label={`Actions for ${project?.name ?? 'project'}`} />
           </Td>
         )}
       </Tr>

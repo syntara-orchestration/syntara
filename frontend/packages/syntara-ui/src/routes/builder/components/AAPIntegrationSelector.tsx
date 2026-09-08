@@ -5,7 +5,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { integrationsClient } from '../../../client'
 import { FormLabelWithHelp } from '../../../components/FormLabelWithHelp'
-import { NxSelect } from '../../../components/NxSelect'
+import { SynSelect } from '../../../components/SynSelect'
 import { projectIdParam } from '../../../utils/queryParams'
 
 import styles from './AAPIntegrationSelector.module.css'
@@ -134,15 +134,13 @@ export function AAPIntegrationSelector({
 
   return (
     <FormGroup label={formGroupLabel} fieldId={fieldId} isRequired={isRequired}>
-      <NxSelect
+      <SynSelect
         id={fieldId}
         isOpen={isOpen}
         selected={value}
         onSelect={handleSelect}
         onOpenChange={handleOpenChange}
         toggle={renderToggle}
-        isScrollable
-        maxMenuHeight="300px"
         shouldFocusToggleOnSelect
       >
         <SelectList>
@@ -168,7 +166,7 @@ export function AAPIntegrationSelector({
             )
           })}
         </SelectList>
-      </NxSelect>
+      </SynSelect>
 
       {!isPending && integrations.length === 0 && (
         <IntegrationRequiredHelper integrationLabel="an AAP integration" actionLabel="an integration can be selected" />

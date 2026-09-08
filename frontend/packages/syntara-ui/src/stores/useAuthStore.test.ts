@@ -442,11 +442,12 @@ describe('useAuthStore', () => {
       await useAuthStore.getState().login({ username: 'admin', password: 'admin' })
       expect(useAuthStore.getState().isAuthenticated).toBe(true)
 
-      // Mock window.location.href assignment
+      // window.location's properties are getters on the prototype, not own properties, so
+      // `...window.location` copies nothing. Set origin/href explicitly instead.
       const locationHrefSpy = vi.spyOn(window, 'location', 'get').mockReturnValue({
-        ...window.location,
+        origin: window.location.origin,
         href: window.location.href,
-      })
+      } as Location)
       const hrefSetter = vi.fn()
       Object.defineProperty(window.location, 'href', { set: hrefSetter, configurable: true })
 

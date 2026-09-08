@@ -574,6 +574,8 @@ services-clean: ## Stop all services and remove all data (destructive)
 # ========================================================
 OPENAPI_SPEC ?= src/syntara/schemas/openapi.yaml
 OPENAPI_PUBLIC_SPEC ?= src/syntara/schemas/openapi-public.yaml
+OPENAPI_PUBLIC_SPEC_JSON ?= src/syntara/schemas/openapi-public.json
+OPENAPI_GENERATED_FILES = $(OPENAPI_SPEC) $(OPENAPI_PUBLIC_SPEC) $(OPENAPI_PUBLIC_SPEC_JSON)
 OPENAPI_BASE_REF ?= devel
 VERBOSITY ?= -v
 
@@ -605,7 +607,8 @@ api-spec-bundle-public: ## Bundle public-facing spec (excludes internal endpoint
 	@echo "📦 Bundling public OpenAPI sub-specs..."
 	uv run python tools/bundle_openapi.py --public -o $(OPENAPI_PUBLIC_SPEC)
 	@uv run pre-commit run yamlfmt --files $(OPENAPI_PUBLIC_SPEC) > /dev/null 2>&1 || true
-	@echo "✅ Public spec written to $(OPENAPI_PUBLIC_SPEC)"
+	uv run python tools/bundle_openapi.py --public --format json -o $(OPENAPI_PUBLIC_SPEC_JSON)
+	@echo "✅ Public spec written to $(OPENAPI_PUBLIC_SPEC) and $(OPENAPI_PUBLIC_SPEC_JSON)"
 
 .PHONY: api-spec-drift-public
 api-spec-drift-public: ## Check that committed public spec matches the generated spec
@@ -617,6 +620,10 @@ api-spec-bundle-all: api-spec-bundle api-spec-bundle-public ## Bundle both full 
 
 .PHONY: api-spec-drift-all
 api-spec-drift-all: api-spec-drift api-spec-drift-public ## Check both specs match implementation
+
+.PHONY: print-openapi-generated-files
+print-openapi-generated-files: ## Print the list of generated OpenAPI spec files (for CI drift checks)
+	@echo $(OPENAPI_GENERATED_FILES)
 
 
 # Tools
@@ -793,14 +800,14 @@ check-openapi-breaking: ## Check OpenAPI spec for breaking changes against devel
 		echo "Installing oasdiff..."; \
 		./scripts/openapi/install-oasdiff.sh; \
 	fi
-	@PR_BODY_TEXT="$${PR_BODY:-$${OPENAPI_PR_BODY:-}}"; \
-	if [ -n "$$PR_BODY_TEXT" ]; then \
+	@PR_LABELS_TEXT="$${PR_LABELS:-$${OPENAPI_PR_LABELS:-}}"; \
+	if [ -n "$$PR_LABELS_TEXT" ]; then \
 		./scripts/openapi/check-breaking-changes.py \
 			--base $(OPENAPI_BASE_REF) \
 			--head HEAD \
 			--format text \
 			--fallback-spec-path backend/src/syntara/schemas/openapi.yaml \
-			--pr-body "$$PR_BODY_TEXT"; \
+			--pr-labels "$$PR_LABELS_TEXT"; \
 	else \
 		./scripts/openapi/check-breaking-changes.py \
 			--base $(OPENAPI_BASE_REF) \
@@ -809,15 +816,15 @@ check-openapi-breaking: ## Check OpenAPI spec for breaking changes against devel
 			--fallback-spec-path backend/src/syntara/schemas/openapi.yaml; \
 	fi
 	@echo "Checking public OpenAPI spec for breaking changes..."
-	@PR_BODY_TEXT="$${PR_BODY:-$${OPENAPI_PR_BODY:-}}"; \
-	if [ -n "$$PR_BODY_TEXT" ]; then \
+	@PR_LABELS_TEXT="$${PR_LABELS:-$${OPENAPI_PR_LABELS:-}}"; \
+	if [ -n "$$PR_LABELS_TEXT" ]; then \
 		./scripts/openapi/check-breaking-changes.py \
 			--base $(OPENAPI_BASE_REF) \
 			--head HEAD \
 			--format text \
 			--spec-path backend/src/syntara/schemas/openapi-public.yaml \
 			--fallback-spec-path backend/src/syntara/schemas/openapi-public.yaml \
-			--pr-body "$$PR_BODY_TEXT"; \
+			--pr-labels "$$PR_LABELS_TEXT"; \
 	else \
 		./scripts/openapi/check-breaking-changes.py \
 			--base $(OPENAPI_BASE_REF) \
@@ -836,7 +843,7 @@ check-openapi-breaking-pre-commit: ## Pre-commit: breaking changes when openapi.
 	elif git rev-parse --verify origin/$(OPENAPI_BASE_REF) >/dev/null 2>&1; then \
 		BASE_REF="origin/$(OPENAPI_BASE_REF)"; \
 	fi; \
-	if [ -n "$$BASE_REF" ] && git diff --quiet "$$BASE_REF" -- $(OPENAPI_SPEC) 2>/dev/null; then \
+	if [ -n "$$BASE_REF" ] && git diff --quiet "$$BASE_REF" -- $(OPENAPI_SPEC) $(OPENAPI_PUBLIC_SPEC) 2>/dev/null; then \
 		echo "OpenAPI spec unchanged vs $$BASE_REF, skipping breaking changes check"; \
 		exit 0; \
 	fi; \

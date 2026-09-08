@@ -78,7 +78,11 @@ export interface paths {
     get: operations['get_file_details']
     put?: never
     post?: never
-    delete?: never
+    /**
+     * Delete file
+     * @description Permanently delete a file and its stored content. After a project is soft-deleted, project-scoped files:delete cannot authorize orphan cleanup (the project no longer resolves). Only system-scope files:delete can remove an orphan, and only when the caller already knows the file UUID.
+     */
+    delete: operations['delete_file']
     options?: never
     head?: never
     patch?: never
@@ -197,6 +201,11 @@ export interface components {
       mime_type: string
       /** @description Processing status (pending_conversion) */
       status: components['schemas']['FileStatus']
+      /**
+       * Is Project Deleted
+       * @description True when the owning project has been soft-deleted; the file is retained as an orphan. Null when not computed (e.g. upload response).
+       */
+      is_project_deleted?: boolean | null
     }
     /**
      * FileDetailResponse
@@ -236,6 +245,11 @@ export interface components {
        * @example null
        */
       conversion_error?: string | null
+      /**
+       * Is Project Deleted
+       * @description True when the owning project has been soft-deleted; the file is retained as an orphan. Project-scoped files:delete cannot remove orphans after soft-delete; only system-scope files:delete with a known file UUID can.
+       */
+      is_project_deleted: boolean
     }
     /**
      * FilesMetadataResponse
@@ -593,6 +607,35 @@ export interface operations {
         content: {
           'application/json': components['schemas']['FileDetailResponse']
         }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
+      422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
+  delete_file: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description UUID of the file to delete */
+        file_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description File deleted successfully */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
       }
       400: components['responses']['BadRequestError']
       401: components['responses']['UnauthorizedError']

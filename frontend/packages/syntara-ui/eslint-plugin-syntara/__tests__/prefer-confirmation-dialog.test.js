@@ -60,11 +60,11 @@ ruleTester.run('prefer-confirmation-dialog', rule, {
         );
       `,
     },
-    // NxConfirmationDialog import present — entire file is skipped
+    // SynConfirmationDialog import present — entire file is skipped
     {
       code: `
         import { Modal, ModalHeader, ModalBody, ModalFooter, Button } from '@patternfly/react-core';
-        import { NxConfirmationDialog } from '../components/dialogs/NxConfirmationDialog';
+        import { SynConfirmationDialog } from '../components/dialogs/SynConfirmationDialog';
         const App = () => (
           <Modal>
             <ModalHeader title="Delete workflow" />

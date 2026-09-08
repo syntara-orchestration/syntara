@@ -474,3 +474,56 @@ class TestCreateUserWithEmptyGroupNames:
         assert events[0].event_action == "group_member_added"
         assert events[0].event_category == EventCategory.SECURITY_EVENT
         assert events[0].structured_data.group_name == AUTHENTICATED_GROUP_NAME
+
+
+class TestCreateUserBlankFirstName:
+    """create_user should persist an empty string when first_name is omitted."""
+
+    @pytest.mark.asyncio
+    @patch("syntara.audit.emitter._do_emit_audit_event")
+    @patch("syntara.users.services.user_service.hash_password", return_value="hashed")
+    async def test_none_first_name_stored_as_empty_string(
+        self,
+        mock_hash: Mock,
+        mock_do_emit: AsyncMock,
+        test_user: User,
+    ) -> None:
+        assert mock_hash.return_value == "hashed"
+        auth_group = Group(
+            id=uuid4(),
+            name=AUTHENTICATED_GROUP_NAME,
+            description="auth",
+            is_builtin=True,
+            labels={},
+        )
+        users_group = Group(
+            id=uuid4(),
+            name=DEFAULT_LOCAL_USERS_GROUP_NAME,
+            description="users",
+            is_builtin=True,
+            labels={},
+        )
+
+        mock_session = AsyncMock(spec=AsyncSession)
+        mock_session.add = Mock()
+        mock_session.flush = AsyncMock()
+        mock_session.commit = AsyncMock()
+        mock_session.refresh = AsyncMock()
+        mock_session.begin_nested = Mock(return_value=_AsyncNoopContextManager())
+
+        groups_result = Mock()
+        groups_result.all.return_value = [auth_group, users_group]
+        mock_session.exec = AsyncMock(return_value=groups_result)
+
+        service = UsersService(session=mock_session, user=test_user)
+        plaintext = "fixture-only-value"
+        created = await service.create_user(
+            username="nofirst",
+            first_name=None,
+            password=plaintext,
+        )
+
+        added_user = mock_session.add.call_args[0][0]
+        assert added_user.first_name == ""
+        assert created.first_name == ""
+        assert mock_do_emit.call_count == 2

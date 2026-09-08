@@ -12,7 +12,7 @@ function renderAutoSubmit(
   overrides: {
     defaultValues?: TestFormData
     resolver?: (values: TestFormData) => ResolverResult<TestFormData>
-    onSubmit?: (data: TestFormData) => void
+    onSubmit?: (data: TestFormData) => boolean | void | Promise<boolean | void>
   } = {}
 ) {
   const externalRef: { current: MutableRefObject<AutoSubmitFn | null> | null } = { current: null }
@@ -101,5 +101,56 @@ describe('useRegisterAutoSubmit', () => {
 
     expect(firstCallback).not.toHaveBeenCalled()
     expect(secondCallback).toHaveBeenCalledOnce()
+  })
+
+  it('awaits an async onSubmit before resolving', async () => {
+    let released = false
+    const onSubmit = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          setTimeout(() => {
+            released = true
+            resolve()
+          }, 20)
+        })
+    )
+    const { ref } = renderAutoSubmit({ onSubmit })
+
+    let succeeded: boolean | undefined
+    await act(async () => {
+      succeeded = await ref.current.current!()
+    })
+
+    expect(succeeded).toBe(true)
+    expect(released).toBe(true)
+    expect(onSubmit).toHaveBeenCalledOnce()
+  })
+
+  it('returns false when onSubmit returns false', async () => {
+    const onSubmit = vi.fn(() => false)
+    const { ref } = renderAutoSubmit({ onSubmit })
+
+    let succeeded: boolean | undefined
+    await act(async () => {
+      succeeded = await ref.current.current!()
+    })
+
+    expect(succeeded).toBe(false)
+    expect(onSubmit).toHaveBeenCalledOnce()
+  })
+
+  it('returns false when onSubmit throws', async () => {
+    const onSubmit = vi.fn(() => {
+      throw new Error('persist failed')
+    })
+    const { ref } = renderAutoSubmit({ onSubmit })
+
+    let succeeded: boolean | undefined
+    await act(async () => {
+      succeeded = await ref.current.current!()
+    })
+
+    expect(succeeded).toBe(false)
+    expect(onSubmit).toHaveBeenCalledOnce()
   })
 })

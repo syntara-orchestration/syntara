@@ -28,7 +28,7 @@ class ApprovalCreateRequest:
         Attributes:
             execution_id (UUID): Parent workflow execution ID
             project_id (UUID): Project ID (denormalized from execution)
-            approval_node_id (str): Activity ID from workflow definition
+            approval_node_id (str): Canvas node ID from the workflow definition
             name (str): Display name for the approval request
             next_step_approved (ActivitySummary): Activity summary for workflow context.
 
@@ -40,6 +40,10 @@ class ApprovalCreateRequest:
                 Essential context for approvers to make a decision.
                 Contains workflow identification, inputs, and the output from the immediately
                 preceding activity.
+            prompt (None | str | Unset): Resolved guidance message from the approval node, shown to approvers
+            loop_iteration_path (list[int] | Unset): Enclosing-loop indices, outermost first (empty when not inside a loop)
+            temporal_activity_id (None | str | Unset): Temporal activity ID to signal on decide (defaults to
+                approval_node_id)
             timeout_at (datetime.datetime | None | Unset): When this request expires (null = no timeout)
             next_step_rejected (ActivitySummary | None | Unset): First activity that executes if rejected
             approver_user_ids (list[UUID] | None | Unset): User IDs who can approve (null = any user with approval:decide
@@ -53,6 +57,9 @@ class ApprovalCreateRequest:
     name: str
     next_step_approved: ActivitySummary
     workflow_context: WorkflowContext
+    prompt: None | str | Unset = UNSET
+    loop_iteration_path: list[int] | Unset = UNSET
+    temporal_activity_id: None | str | Unset = UNSET
     timeout_at: datetime.datetime | None | Unset = UNSET
     next_step_rejected: ActivitySummary | None | Unset = UNSET
     approver_user_ids: list[UUID] | None | Unset = UNSET
@@ -73,6 +80,22 @@ class ApprovalCreateRequest:
         next_step_approved = self.next_step_approved.to_dict()
 
         workflow_context = self.workflow_context.to_dict()
+
+        prompt: None | str | Unset
+        if isinstance(self.prompt, Unset):
+            prompt = UNSET
+        else:
+            prompt = self.prompt
+
+        loop_iteration_path: list[int] | Unset = UNSET
+        if not isinstance(self.loop_iteration_path, Unset):
+            loop_iteration_path = self.loop_iteration_path
+
+        temporal_activity_id: None | str | Unset
+        if isinstance(self.temporal_activity_id, Unset):
+            temporal_activity_id = UNSET
+        else:
+            temporal_activity_id = self.temporal_activity_id
 
         timeout_at: None | str | Unset
         if isinstance(self.timeout_at, Unset):
@@ -126,6 +149,12 @@ class ApprovalCreateRequest:
                 "workflow_context": workflow_context,
             }
         )
+        if prompt is not UNSET:
+            field_dict["prompt"] = prompt
+        if loop_iteration_path is not UNSET:
+            field_dict["loop_iteration_path"] = loop_iteration_path
+        if temporal_activity_id is not UNSET:
+            field_dict["temporal_activity_id"] = temporal_activity_id
         if timeout_at is not UNSET:
             field_dict["timeout_at"] = timeout_at
         if next_step_rejected is not UNSET:
@@ -154,6 +183,26 @@ class ApprovalCreateRequest:
         next_step_approved = ActivitySummary.from_dict(d.pop("next_step_approved"))
 
         workflow_context = WorkflowContext.from_dict(d.pop("workflow_context"))
+
+        def _parse_prompt(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        prompt = _parse_prompt(d.pop("prompt", UNSET))
+
+        loop_iteration_path = cast(list[int], d.pop("loop_iteration_path", UNSET))
+
+        def _parse_temporal_activity_id(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        temporal_activity_id = _parse_temporal_activity_id(d.pop("temporal_activity_id", UNSET))
 
         def _parse_timeout_at(data: object) -> datetime.datetime | None | Unset:
             if data is None:
@@ -240,6 +289,9 @@ class ApprovalCreateRequest:
             name=name,
             next_step_approved=next_step_approved,
             workflow_context=workflow_context,
+            prompt=prompt,
+            loop_iteration_path=loop_iteration_path,
+            temporal_activity_id=temporal_activity_id,
             timeout_at=timeout_at,
             next_step_rejected=next_step_rejected,
             approver_user_ids=approver_user_ids,

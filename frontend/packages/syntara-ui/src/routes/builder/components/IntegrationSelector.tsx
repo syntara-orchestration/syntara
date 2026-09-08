@@ -13,8 +13,8 @@ import { IntegrationStatusEnum, IntegrationTypeEnum } from '@syntara/contracts'
 import React, { type ReactElement, useCallback, useMemo, useState } from 'react'
 
 import { integrationsClient } from '../../../client'
-import { NxLabel } from '../../../components/labels/NxLabel'
-import { NxSelect } from '../../../components/NxSelect'
+import { SynLabel } from '../../../components/labels/SynLabel'
+import { SynSelect } from '../../../components/SynSelect'
 import { detachPromise } from '../../../utils/detachPromise'
 import { projectIdParam } from '../../../utils/queryParams'
 
@@ -40,9 +40,9 @@ function StatusBadge({ status }: Readonly<{ status: IntegrationStatus }>) {
   if (!config) return null
   const { label, labelStatus, Icon } = config
   return (
-    <NxLabel variant="outline" status={labelStatus} icon={<Icon />}>
+    <SynLabel variant="outline" status={labelStatus} icon={<Icon />}>
       {label}
-    </NxLabel>
+    </SynLabel>
   )
 }
 
@@ -165,7 +165,7 @@ export function IntegrationSelector({
 
   return (
     <FormGroup label={label} labelHelp={resolvedLabelHelp} fieldId={fieldId}>
-      <NxSelect
+      <SynSelect
         id={fieldId}
         isOpen={isOpen}
         selected={value ?? NO_INTEGRATION_VALUE}
@@ -195,7 +195,7 @@ export function IntegrationSelector({
             </SelectOption>
           )}
         </SelectList>
-      </NxSelect>
+      </SynSelect>
 
       {isError && (
         <Button variant="link" size="sm" onClick={() => detachPromise(refetch())}>

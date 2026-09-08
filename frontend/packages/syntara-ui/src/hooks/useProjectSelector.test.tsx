@@ -749,7 +749,7 @@ describe('useProjectSelector', () => {
 
     it('handleTypeaheadChange suppresses the spurious onChange when the ref is set and dropdown is closed', () => {
       // Directly test the extracted guard logic — PF's programmatic value swap on
-      // close (filterValue → toggleLabel) cannot be replicated in JSDOM because
+      // close (filterValue → toggleLabel) cannot be replicated in happy-dom because
       // React controlled input reconciliation doesn't fire onChange events.
       const suppressRef: RefObject<boolean> = { current: true }
       const updateFilter = vi.fn<(v: string) => void>()

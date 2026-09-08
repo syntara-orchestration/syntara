@@ -4,7 +4,7 @@ import { RhUiInformationIcon } from '@patternfly/react-icons'
 import type { OutputFieldDef } from '@syntara/contracts'
 import { useCallback, useMemo } from 'react'
 
-import { buildExpression } from '../../../../utils/expressions/templateBuilder'
+import { buildExpression, canvasNodeIdForExpression } from '../../../../utils/expressions/templateBuilder'
 import { CopyExpressionAction, DraggableTreeLeaf } from '../components/DraggableTreeLeaf'
 import { DRAG_TYPE_FIELD, type FieldDragData } from '../utils/dragTypes'
 import { getTypeLabel } from '../utils/typeLabels'
@@ -49,15 +49,20 @@ function PreviewField({ field, nodeId }: Readonly<PreviewFieldProps>) {
 }
 
 export function InputSchemaPreview({ fields, nodeId }: Readonly<InputSchemaPreviewProps>) {
+  const expressionNodeId = canvasNodeIdForExpression(nodeId)
   const treeData: TreeViewDataItem[] = useMemo(
     () =>
       fields.map((field) => ({
         id: field.name,
-        name: <PreviewField field={field} nodeId={nodeId} />,
-        action: <CopyExpressionAction expressionText={buildExpression({ nodeId, fieldPath: [field.name] })} />,
+        name: <PreviewField field={field} nodeId={expressionNodeId} />,
+        action: (
+          <CopyExpressionAction
+            expressionText={buildExpression({ nodeId: expressionNodeId, fieldPath: [field.name] })}
+          />
+        ),
         hasBadge: false,
       })),
-    [fields, nodeId]
+    [fields, expressionNodeId]
   )
 
   if (fields.length === 0) {

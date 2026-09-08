@@ -17,6 +17,7 @@ Syntara follows a **domain sub-spec → bundled spec** model:
 src/syntara/schemas/
 ├── openapi.yaml               # Bundled spec — all endpoints (generated — do not edit)
 ├── openapi-public.yaml        # Bundled spec — public endpoints only (generated — do not edit)
+├── openapi-public.json        # Same as above, JSON format (generated — do not edit)
 ├── base/                      # Shared base schemas (skipped during bundling)
 ├── {domain}/
 │   ├── openapi.yaml           # Domain sub-spec (edit this)
@@ -34,7 +35,7 @@ src/syntara/schemas/
 ## OpenAPI Version and Format
 
 - All OpenAPI specs MUST use version **3.1.0**
-- All spec files MUST be **YAML**
+- Domain sub-specs and bundled specs MUST be **YAML**; the public spec is also committed as JSON for the API catalog
 - Nullable fields MUST use modern JSON Schema union typing: `[type, "null"]`, not the deprecated `nullable: true`
 
 ## Makefile Targets
@@ -42,7 +43,7 @@ src/syntara/schemas/
 | Target | Purpose |
 |--------|---------|
 | `make api-spec-bundle` | Merge all domain sub-specs into `src/syntara/schemas/openapi.yaml` |
-| `make api-spec-bundle-public` | Merge public domain sub-specs into `src/syntara/schemas/openapi-public.yaml` |
+| `make api-spec-bundle-public` | Merge public domain sub-specs into `src/syntara/schemas/openapi-public.yaml` and `src/syntara/schemas/openapi-public.json` |
 | `make api-spec-bundle-all` | Run both `api-spec-bundle` and `api-spec-bundle-public` |
 | `make api-spec-drift` | Check that the committed spec matches the generated one (exit 1 if out of sync) |
 | `make api-spec-drift-public` | Same, for the public spec |
@@ -54,7 +55,7 @@ src/syntara/schemas/
 
 1. Edit the relevant domain sub-spec (`src/syntara/schemas/{domain}/openapi.yaml`)
 2. Run `make api-spec-bundle-all` to regenerate both bundled specs
-3. Commit the sub-spec change and both updated spec files
+3. Commit the sub-spec change and all updated spec files (`openapi.yaml`, `openapi-public.yaml`, `openapi-public.json`)
 
 ## Pre-commit Hooks
 
@@ -64,9 +65,68 @@ These hooks run automatically on commit (and in CI via the `pre-commit` job):
 |------|-----------|
 | `backend-api-spec-bundle` | Runs when backend YAML/Python changes; regenerates the bundled spec before commit |
 | `backend-api-spec-drift` | Runs when backend `.py` files change; invokes `make api-spec-drift` to compare the committed spec to the live FastAPI schema; **blocking** |
-| `backend-check-openapi-breaking` | Runs when `openapi.yaml` changes; compares against `devel` and blocks on unacknowledged breaking changes |
+| `backend-check-openapi-breaking` | Runs when `openapi.yaml` changes; compares against `devel` and blocks on breaking changes |
 
-In CI, `OPENAPI_PR_BODY` is set from the pull request description so `breaking-change-ack:` acknowledgments are honored. Locally, add the acknowledgment to your PR description before CI runs.
+### OpenAPI info.version updates
+
+**Every meaningful OpenAPI spec change must update `info.version`.** The version change communicates the nature of the API change to API consumers as well as PR reviewers. A meaningful spec change that leaves `info.version` unchanged is **blocked** (`gate_code: version_bump_required`).
+
+Comparison is **canonical** (semantic): the two specs are parsed and compared as data structures. Serialization-only diffs — whitespace, indentation, line endings, key order, quote style — are **not** considered meaningful changes and do **not** require a version update.
+
+### Required version increment check (enforced)
+
+CI validates that the `info.version` increment is appropriate for the type of specification change. A change using the wrong version increment is **blocked** (`gate_code: incorrect_version_increment`) with an error naming the expected increment.
+
+| Change type | Detected via | Required version change |
+|-------------|--------------|------------------|
+| Additive — new endpoint, field, or enum value | oasdiff reports a structural change entry | Increment the **minor** version |
+| Spec-only — description, example, or annotation edit | canonical diff with no oasdiff structural entry | Increment the **patch** version |
+| Approved in-place breaking change | oasdiff reports a breaking change + `breaking-change-approved` label | Increment the **minor** version (never major — a new major version is a new spec at a new URL path) |
+
+Note: oasdiff does not report pure description/summary/example edits, so those are detected only by the canonical comparison and classified as a **patch** change.
+
+### Dynamic-map / `additionalProperties` content
+
+Changes to dynamic-map fields (`additionalProperties` schemas such as `labels`, `context_data`, `input_data`, `output_data`, `result`) are **not** treated as breaking — oasdiff reports them as non-breaking. Such a change is still a spec change and requires a `patch` bump.
+
+### New major version at a new path
+
+The gate compares each spec only against its own prior state on the base ref. A new major version introduced as a **new spec at a new URL path** (e.g. `/api/v2/`) has no baseline on the base ref, so the check is skipped for it — it does not register as a breaking change to the current spec.
+
+### Detection scope and limitations
+
+Breaking-change detection is delegated entirely to `oasdiff breaking`; there is no secondary classification layer, so coverage equals oasdiff's own ruleset. Two limits follow from this and a green check must **not** be read as full policy compliance:
+
+- **Coverage equals oasdiff.** Categories in the AO REST API Versioning and Deprecation Policy that oasdiff does not model will not be flagged. Audit oasdiff's ruleset against the policy periodically.
+- **Semantic-only changes are undetectable by any schema differ.** A change where the shape is unchanged but the behavior differs for the same request/response (a "semantic change with no type change") cannot be detected by comparing schemas. Our policy classifies that class as breaking; catching it always requires human review. This gate is not a backstop for it.
+
+### Breaking Change Policy
+
+Breaking changes are **always blocked in place** — full stop. Per the AO REST API Versioning and Deprecation Policy, breaking changes never apply in place: v1 and v2 are separate specs served from different URL paths.
+
+The only override for an in-place breaking change is the privileged `breaking-change-approved` GitHub label. The label is sanctioned **only** for a CVE / critical security vulnerability with no non-breaking remediation, after escalation to engineering and BU leadership (Senior Director or above). An approved breaking change must still increment `info.version` by a **minor** version.
+
+| Change type | Gate |
+|-------------|------|
+| No meaningful spec change (incl. serialization-only) | Allowed (`ok`) |
+| Additive change, minor increment | Allowed (`ok`) |
+| Spec-only change, patch increment | Allowed (`ok`) |
+| Meaningful change, no version change | Blocked (`version_bump_required`) |
+| Meaningful change, wrong version increment | Blocked (`incorrect_version_increment`) |
+| Breaking change, no approval label | Blocked (`breaking_blocked`) |
+| Breaking change, `breaking-change-approved` label + minor increment | Allowed (`breaking_approved`) |
+
+### Privileged approval label (enforcement)
+
+CI accepts the override when the PR has the `breaking-change-approved` label, but who may **apply** it is enforced by the **Breaking Change Label Guard** workflow (`.github/workflows/breaking-change-label-guard.yml`):
+
+1. Create the label named exactly `breaking-change-approved`.
+2. When the label is added, the guard verifies the actor who added it is an active member of the `syntara-leads` team. If not, it **fails the check, removes the label, and posts a PR comment** explaining why.
+3. Team-membership lookups require a `read:org`-scoped token. Provision the `SYNTARA_LEADS_READ_TOKEN` secret (a fine-grained PAT or GitHub App token with organization **Members: read**). If it is missing, the guard **fails closed by failing the workflow run itself** (a configuration error); it does not remove the label or post a comment in that case, so making it a required status check (see #5) is what actually blocks the merge.
+4. After a lead applies the label to a failed PR, the OpenAPI Breaking Changes workflow re-runs on `labeled` / `unlabeled`. Re-run **(Backend) Check OpenAPI Breaking Changes** if that required check still shows the pre-label failure.
+5. Make **Breaking Change Label Guard** a required status check so an unauthorized label cannot merge during the window before the OpenAPI job re-runs.
+
+GitHub has no native per-label permission; the label guard is the enforcement point. The contributor handbook for this process is in [CONTRIBUTING.md](../../CONTRIBUTING.md#breaking-change-override-process).
 
 ## CI Checks
 

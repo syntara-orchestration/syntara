@@ -2,8 +2,14 @@ import type { Approval } from '@syntara/contracts'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { useAlerts } from '../../../providers/alerts'
-import { getApprovalPromptFromNode } from '../../approvals/approvalPrompt'
+import {
+  canvasNodeIdFromApprovalNodeId,
+  findApprovalForCanvasNode,
+  findNodeByApprovalNodeId,
+} from '../../approvals/approvalNodeId'
+import { getApprovalPromptFromNode, getApprovalPromptFromRecord } from '../../approvals/approvalPrompt'
 import { ACTIVITY_STATUS, isTerminalState } from '../../builder/utils/executionState/executionHelpers'
+import { latestActivityStateForCanvasNode } from '../../workflows/execution/utils/activityState'
 import { useExecutionStore } from '../../workflows/stores/useExecutionStore'
 
 import { useAutoApprovalDetection } from './useAutoApprovalDetection'
@@ -24,7 +30,8 @@ export type WorkflowDefinitionLike = {
  * - Panel open/close state
  * - URL-based deep linking (`?approval=abc-123`)
  * - WebSocket-based auto-detection of new approvals
- * - Extracting approval message/prompt from workflow definition
+ * - Extracting approval message/prompt from the approval record, with a
+ *   workflow-definition fallback for older rows that have no persisted prompt
  *
  * Part of the approval hooks architecture. See `useExecutionNodeClick.ts` for the full layering explanation.
  */
@@ -127,7 +134,7 @@ export function useExecutionApprovalPanel(
     executionId,
     fetchForNode: async (nodeId: string) => {
       const fetchedApprovals = await fetchApprovals()
-      return fetchedApprovals.find((a) => a.approval_node_id === nodeId) ?? null
+      return findApprovalForCanvasNode(fetchedApprovals, nodeId) ?? null
     },
     onApprovalDetected: handleDetected,
   })
@@ -158,10 +165,10 @@ export function useExecutionApprovalPanel(
   useEffect(() => {
     if (!panelOpen || !currentApproval) return
 
-    const nodeId = currentApproval.approval_node_id
+    const canvasId = canvasNodeIdFromApprovalNodeId(currentApproval.approval_node_id)
 
     const unsubscribe = useExecutionStore.subscribe(() => {
-      const activityState = useExecutionStore.getState().activityStates.get(nodeId)
+      const activityState = latestActivityStateForCanvasNode(useExecutionStore.getState().activityStates, canvasId)
       const status = activityState?.status
       if (status && status !== ACTIVITY_STATUS.WAITING && isTerminalState(status)) {
         dismiss()
@@ -172,9 +179,12 @@ export function useExecutionApprovalPanel(
   }, [panelOpen, currentApproval, dismiss])
 
   const approvalMessage = useMemo(() => {
-    if (!currentApproval || !workflowDefinition) return undefined
+    if (!currentApproval) return undefined
+    const fromRecord = getApprovalPromptFromRecord(currentApproval)
+    if (fromRecord) return fromRecord
+    if (!workflowDefinition) return undefined
     const nodes = workflowDefinition.nodes ?? workflowDefinition.workflow?.activities ?? []
-    const node = nodes.find((n) => n.id === currentApproval.approval_node_id)
+    const node = findNodeByApprovalNodeId(nodes, currentApproval.approval_node_id)
     return getApprovalPromptFromNode(node)
   }, [currentApproval, workflowDefinition])
 

@@ -196,6 +196,32 @@ describe('useUserFormSubmit', () => {
   })
 
   describe('create mode', () => {
+    it('sends null first_name when the field is blank', () => {
+      const { result } = renderHook(() => useUserFormSubmit({ ...defaultOptions, isEdit: false }))
+
+      act(() => {
+        result.current.onSubmit({
+          ...baseFormData,
+          first_name: '',
+          last_name: '',
+          password: COMPLIANT_TEST_PASSWORD,
+        })
+      })
+
+      expect(mockCreateMutate).toHaveBeenCalledTimes(1)
+      expect(mockCreateMutate.mock.calls[0][0]).toEqual({
+        body: {
+          username: 'testuser',
+          email: 'test@example.com',
+          first_name: null,
+          last_name: null,
+          password: COMPLIANT_TEST_PASSWORD,
+          is_enabled: true,
+          group_names: [],
+        },
+      })
+    })
+
     it('calls createUser and shows success on create', () => {
       const { result } = renderHook(() => useUserFormSubmit({ ...defaultOptions, isEdit: false }))
 
@@ -204,6 +230,10 @@ describe('useUserFormSubmit', () => {
       })
 
       expect(mockCreateMutate).toHaveBeenCalledTimes(1)
+      const createArgs = mockCreateMutate.mock.calls[0][0] as {
+        body: { first_name: string | null }
+      }
+      expect(createArgs.body.first_name).toBe('Test')
 
       const callbacks = mockCreateMutate.mock.calls[0][1] as { onSuccess: () => void }
       act(() => {

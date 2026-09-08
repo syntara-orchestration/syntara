@@ -2,7 +2,7 @@ import { Button, Switch } from '@patternfly/react-core'
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { useState } from 'react'
 
-import { NxKebabMenu } from '../NxKebabMenu'
+import { SynKebabMenu } from '../SynKebabMenu'
 
 import { SynPageHeader } from './SynPageHeader'
 
@@ -45,7 +45,7 @@ function DetailPageToolbarHeader() {
             onChange={(_event, checked) => setEnabled(checked)}
           />
           <Button variant="secondary">Edit</Button>
-          <NxKebabMenu aria-label="More actions" actions={kebabActions} />
+          <SynKebabMenu aria-label="More actions" actions={kebabActions} />
         </>
       }
     />
@@ -151,7 +151,7 @@ export const WithKebab: Story = {
     },
   },
   args: {
-    toolbar: <NxKebabMenu aria-label="More actions" actions={kebabActions} />,
+    toolbar: <SynKebabMenu aria-label="More actions" actions={kebabActions} />,
   },
 }
 
