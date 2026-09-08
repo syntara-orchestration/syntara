@@ -1,5 +1,5 @@
 import { Button, Switch } from '@patternfly/react-core'
-import type { Meta, StoryObj } from '@storybook/react-vite'
+import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import { useState } from 'react'
 
 import { SynKebabMenu } from '../SynKebabMenu'
