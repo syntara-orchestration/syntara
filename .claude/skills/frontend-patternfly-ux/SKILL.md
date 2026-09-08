@@ -333,8 +333,31 @@ Filter bar is visible when data exists or when filters are active; hidden only w
   - Destructive items use `isDanger: true` (e.g., "Delete credential" renders in red)
   - Action order: non-destructive actions first (e.g., "Edit credential", "Duplicate workflow", "Disable credential"), then a divider, then destructive actions last (e.g., "Delete credential", "Remove integration")
   - On the **details page header**, the same actions appear in a kebab menu. Frequently used actions (e.g., Edit) are promoted to direct buttons in the header — primary button with icon for the most common action (e.g., `RhUiEditIcon` + "Edit credential"), remaining actions stay in the kebab.
+- **Column widths — fixed vs. flex model:**
+  - `SynScrollableTableContainer` uses `table-layout: fixed` — do not opt out with `useFixedLayout={false}` (except expandable tables, which disable it automatically)
+  - **Predictable columns** (dates, status badges, toggles, counts, short labels, actions) get an explicit `width` via `<Th width={columnWidths.xxx}>` using constants from `components/table/tableColumnWidths.ts`
+  - **Dynamic columns** (names, descriptions, URLs, emails) get **no** `width` — they absorb the remaining space
+  - Available constants and their values:
+
+    | Constant | Width | Use for |
+    | --- | --- | --- |
+    | `actions` | 10% | Kebab / row actions |
+    | `authSource` | 15% | Authentication source label |
+    | `count` | 10% | Members, workflows, statements counts |
+    | `dateTime` | 20% | Full timestamps (tables with few columns) |
+    | `dateTimeCompact` | 15% | Timestamps in column-heavy tables |
+    | `enumLabel` | 15% | Scope, type, principal type labels |
+    | `expand` | 10% | Row expand toggle |
+    | `policies` | 15% | Policy chip groups |
+    | `select` | 10% | Bulk-select checkbox column |
+    | `status` | 10% | Status / state badges |
+    | `switch` | 10% | Enable / disable switch column |
+    | `type` | 15% | Integration / credential type label |
+    | `version` | 10% | Workflow version number |
+
+  - Do **not** set width on primary name / identifier columns
+  - Rollout is incremental — some tables still use equal distribution while migration is in progress
 - **Text truncation** — All text-heavy columns (names, descriptions, emails, URLs) must use PatternFly's `<Truncate>` component. Long values show ellipsis with the full text in a tooltip on hover.
-  - `SynScrollableTableContainer` uses `table-layout: fixed` for equal column distribution — do not opt out with `useFixedLayout={false}`
   - Wrap cell text in `<Truncate content={value} />` for any column that may contain user-generated or variable-length content
   - `LinkCell` children support `<Truncate>` — the link button constrains overflow automatically
 - **`SynKebabMenu` component** — Use `SynKebabMenu` (from `frontend/packages/syntara-ui/src/components/SynKebabMenu.tsx`) for table row actions and contextual overflow menus. API:
