@@ -775,3 +775,10 @@ class TestVisualBuilderOperators:
     def test_keyword_args_rejected(self) -> None:
         with pytest.raises(ValueError, match="Keyword and starred arguments"):
             safe_eval_with_namespace("len(${items}, default=0)", {"items": [1]})
+
+    def test_negated_operators_as_saved_by_serializer(self) -> None:
+        """Backend serialization wraps negation as ``not (<expr>)``."""
+        assert safe_eval_with_namespace("not (${data.optional} exists)", {"data": {}}) is True
+        assert safe_eval_with_namespace("not (${results} isEmpty)", {"results": [1]}) is True
+        assert safe_eval_with_namespace('not (${username} startsWith "user_")', {"username": "admin"}) is True
+        assert safe_eval_with_namespace("not (${items} lengthEqualTo 0)", {"items": [1]}) is True
