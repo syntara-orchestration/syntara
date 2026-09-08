@@ -28,6 +28,7 @@ from syntara.core.lib.encryption import ENCRYPTED_SENTINEL, EncryptionError
 from syntara.core.lib.sanitization import CONTROL_CHAR_MULTILINE_RE, CONTROL_CHAR_SINGLELINE_RE
 from syntara.core.lib.url_validation import validate_host_url
 from syntara.core.models import User
+from syntara.core.models.base.base_resource import external_field_changes, note_external_field_change
 from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin, EnrichQueryMixin
 from syntara.core.services.secret_service import SecretService
@@ -521,6 +522,60 @@ class CredentialService(BaseService):
 
         return response
 
+    async def _build_credential_read_with_counts(
+        self,
+        credential_id: UUID,
+        credential: Credential,
+        credential_type: CredentialType,
+        decrypted_inputs: dict[str, Any],
+    ) -> CredentialRead:
+        """Build a CredentialRead response with workflow/integration counts."""
+        read = self._build_masked_response(credential, credential_type, decrypted_inputs)
+        workflow_counts = await self.get_workflow_counts([credential_id])
+        read.workflow_count = workflow_counts.get(credential_id, 0)
+        integration_counts = await self.get_integration_counts([credential_id])
+        read.integration_count = integration_counts.get(credential_id, 0)
+        await self._resolve_user_references([read])
+        return read
+
+    @staticmethod
+    def _apply_credential_scalar_updates(credential: Credential, data: CredentialUpdate) -> bool:
+        """Apply description, enabled, and labels updates. Returns whether any field changed."""
+        has_changes = False
+        if data.description is not None and data.description != credential.description:
+            credential.description = data.description
+            has_changes = True
+        if data.enabled is not None and data.enabled != credential.enabled:
+            credential.enabled = data.enabled
+            has_changes = True
+        if data.labels is not None and data.labels != credential.labels:
+            credential.labels = data.labels
+            has_changes = True
+        return has_changes
+
+    async def _apply_credential_inputs_update(
+        self,
+        credential: Credential,
+        data: CredentialUpdate,
+        credential_type: CredentialType,
+    ) -> dict[str, Any]:
+        """Merge and persist credential inputs when they actually changed."""
+        if data.inputs is not None:
+            _validate_inputs(data.inputs, credential_type.inputs, allow_sentinel=True)
+        try:
+            if data.inputs is not None:
+                existing_inputs = await self._retrieve_or_empty(credential.secret_id)
+                decrypted_inputs = self._merge_inputs(existing_inputs, data.inputs)
+                _validate_field_constraints(decrypted_inputs, credential_type.inputs)
+                if decrypted_inputs != existing_inputs:
+                    credential.secret_id = await self._store_inputs(credential, decrypted_inputs)
+                    note_external_field_change(credential, "inputs")
+                return decrypted_inputs
+            return await self._retrieve_or_empty(credential.secret_id)
+        except CredentialDecryptionError:
+            self._emit_decryption_failure(credential)
+            raise
+
     async def update_credential(self, credential_id: UUID, data: CredentialUpdate) -> CredentialRead:
         """Update a credential. $encrypted$ preserves existing encrypted values."""
         from syntara.authz.models import Project  # noqa: PLC0415
@@ -539,36 +594,24 @@ class CredentialService(BaseService):
         credential_type = await self._get_credential_type(credential.credential_type_id)
 
         enabled_changed = data.enabled is not None and data.enabled != credential.enabled
+        has_changes = False
 
         if data.name is not None and data.name != credential.name:
             existing = await self._find_by_name(data.name, credential.project_id)
             if existing and existing.id != credential.id:
                 raise CredentialNameConflictError(data.name)
             credential.name = data.name
+            has_changes = True
 
-        if data.description is not None:
-            credential.description = data.description
-        if data.enabled is not None:
-            credential.enabled = data.enabled
-        if data.labels is not None:
-            credential.labels = data.labels
+        has_changes = has_changes or self._apply_credential_scalar_updates(credential, data)
 
-        # Validate inputs (allow $encrypted$ sentinel for PATCH preservation)
-        if data.inputs is not None:
-            _validate_inputs(data.inputs, credential_type.inputs, allow_sentinel=True)
+        decrypted_inputs = await self._apply_credential_inputs_update(credential, data, credential_type)
+        has_changes = has_changes or bool(external_field_changes(credential))
 
-        # Handle inputs update with $encrypted$ preservation via SecretService
-        decrypted_inputs: dict[str, Any] = {}
-        try:
-            if data.inputs is not None:
-                decrypted_inputs = await self._merge_inputs(credential, data.inputs)
-                _validate_field_constraints(decrypted_inputs, credential_type.inputs)
-                credential.secret_id = await self._store_inputs(credential, decrypted_inputs)
-            else:
-                decrypted_inputs = await self._retrieve_or_empty(credential.secret_id)
-        except CredentialDecryptionError:
-            self._emit_decryption_failure(credential)
-            raise
+        if not has_changes and not self.has_pending_user_changes(credential):
+            return await self._build_credential_read_with_counts(
+                credential_id, credential, credential_type, decrypted_inputs
+            )
 
         credential.updated_by = self.user.id
         self.session.add(credential)
@@ -586,16 +629,9 @@ class CredentialService(BaseService):
                 enabled_changed=enabled_changed,
             ),
         )
-        read = self._build_masked_response(credential, credential_type, decrypted_inputs)
-
-        workflow_counts = await self.get_workflow_counts([credential_id])
-        read.workflow_count = workflow_counts.get(credential_id, 0)
-        integration_counts = await self.get_integration_counts([credential_id])
-        read.integration_count = integration_counts.get(credential_id, 0)
-
-        await self._resolve_user_references([read])
-
-        return read
+        return await self._build_credential_read_with_counts(
+            credential_id, credential, credential_type, decrypted_inputs
+        )
 
     async def get_integration_counts(self, credential_ids: list[UUID]) -> dict[UUID, int]:
         """Count integrations using each credential as their management credential.
@@ -974,13 +1010,12 @@ class CredentialService(BaseService):
         result = await self.session.exec(stmt)
         return result.all()  # type: ignore[no-any-return]
 
-    async def _merge_inputs(self, credential: Credential, new_inputs: dict[str, Any]) -> dict[str, Any]:
+    @staticmethod
+    def _merge_inputs(existing_inputs: dict[str, Any], new_inputs: dict[str, Any]) -> dict[str, Any]:
         """Merge new inputs with existing (preserving $encrypted$) without persisting.
 
         Returns the merged plaintext for validation before storage.
         """
-        existing_inputs = await self._retrieve_or_empty(credential.secret_id)
-
         return {
             **existing_inputs,
             **{k: v for k, v in new_inputs.items() if v != ENCRYPTED_SENTINEL},
