@@ -52,6 +52,7 @@ function ProjectPoliciesTable({
     { isSeparator: true },
     {
       title: <IconLabel icon={<RhUiTrashIcon />}>Delete policy</IconLabel>,
+      isDanger: true,
       onClick: () => onDelete(policy),
     },
   ]

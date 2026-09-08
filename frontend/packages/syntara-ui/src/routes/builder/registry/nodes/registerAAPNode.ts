@@ -13,6 +13,7 @@ import {
   buildExpressionModeActivity,
   buildWorkflowExpressionModeActivity,
   hasExpressionValue,
+  isJobTemplateInputVariablesMode,
 } from '../../utils/aapHelpers'
 import { buildNamedActivity } from '../../utils/nodeCreationHelpers'
 import { getDefaultNodeBaseName } from '../../utils/nodeNaming'
@@ -68,7 +69,7 @@ export default function registerAAPNode() {
           // Job Template subtype
           if (subtypeId === RegistryNodeId.AAP_JOB_TEMPLATE) {
             const jobData = data as AAPJobTemplateFormData
-            if (hasExpressionValue(jobData.job_template_name, jobData.organization_name)) {
+            if (isJobTemplateInputVariablesMode(jobData)) {
               const baseName = getDefaultNodeBaseName({
                 nodeTypeId: RegistryNodeId.AAP_JOB_TEMPLATE,
                 label: 'AAP Job Template',

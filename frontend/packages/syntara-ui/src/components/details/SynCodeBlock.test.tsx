@@ -73,12 +73,12 @@ describe('SynCodeBlock', () => {
 
   // fireEvent.click is required here: userEvent's internal scheduler advances setTimeout,
   // which fires the setIsCopied(false) reset before waitFor can observe the tooltip text.
-  // PF's ClipboardCopyButton tooltip is not reliably surfaced via userEvent in jsdom.
+  // PF's ClipboardCopyButton tooltip is not reliably surfaced via userEvent in happy-dom.
   it('shows "Copied to clipboard" after successful copy', async () => {
     render(<SynCodeBlock enableCopy>code</SynCodeBlock>)
 
     const copyButton = screen.getByRole('button', { name: 'Copy to clipboard' })
-    // eslint-disable-next-line testing-library/prefer-user-event -- userEvent does not trigger PF ClipboardCopyButton tooltip in jsdom
+    // eslint-disable-next-line testing-library/prefer-user-event -- userEvent does not trigger PF ClipboardCopyButton tooltip in happy-dom
     fireEvent.click(copyButton)
 
     await waitFor(() => {
@@ -91,7 +91,7 @@ describe('SynCodeBlock', () => {
     render(<SynCodeBlock enableCopy jsonObject={jsonObject} />)
 
     const copyButton = screen.getByRole('button', { name: 'Copy to clipboard' })
-    // eslint-disable-next-line testing-library/prefer-user-event -- userEvent does not trigger PF ClipboardCopyButton tooltip in jsdom
+    // eslint-disable-next-line testing-library/prefer-user-event -- userEvent does not trigger PF ClipboardCopyButton tooltip in happy-dom
     fireEvent.click(copyButton)
 
     // waitFor absorbs the setIsCopied(true) microtask (queued via detachPromise) inside act()

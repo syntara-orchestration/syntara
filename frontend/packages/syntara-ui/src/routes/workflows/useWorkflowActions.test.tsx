@@ -200,7 +200,7 @@ describe('useWorkflowActions', () => {
       await waitFor(() => {
         expect(mockShowSuccess).toHaveBeenCalledWith({
           title: 'Workflow deleted',
-          description: 'Successfully deleted workflow "My Workflow"',
+          description: 'Workflow "My Workflow" has been deleted.',
         })
       })
     })
@@ -222,7 +222,29 @@ describe('useWorkflowActions', () => {
 
       await waitFor(() => {
         expect(mockShowSuccess).toHaveBeenCalledWith({
-          title: 'Workflow published successfully',
+          title: 'Workflow published',
+        })
+      })
+    })
+
+    it('shows correct unpublish success message', async () => {
+      const { result } = renderHook(
+        () =>
+          useWorkflowActions({
+            showSuccess: mockShowSuccess,
+            showError: mockShowError,
+            onNavigate: mockOnNavigate,
+            onRefetch: mockOnRefetch,
+          }),
+        { wrapper: createWrapper() }
+      )
+
+      const workflow = mockWorkflow({ name: 'My Workflow' })
+      result.current.handleUnpublishWorkflow(workflow)
+
+      await waitFor(() => {
+        expect(mockShowSuccess).toHaveBeenCalledWith({
+          title: 'Workflow unpublished',
         })
       })
     })

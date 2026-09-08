@@ -799,7 +799,7 @@ describe('BuilderContent', () => {
       await user.click(screen.getByRole('button', { name: 'Run' }))
 
       await waitFor(() => {
-        expect(screen.getByText('Workflow failed')).toBeInTheDocument()
+        expect(screen.getByText('Failed to run workflow')).toBeInTheDocument()
       })
     })
 
@@ -2312,7 +2312,7 @@ describe('BuilderContent', () => {
 
       await waitFor(() => {
         expect(screen.getByText('No workflow to save')).toBeInTheDocument()
-        expect(screen.getByText('Save failed')).toBeInTheDocument()
+        expect(screen.getByText('Failed to save workflow')).toBeInTheDocument()
       })
     })
   })

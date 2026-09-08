@@ -26,6 +26,7 @@ from syntara.agent_orchestrator.exceptions import EmptyLLMResponseError
 from syntara.agent_orchestrator.models import GenericAgentResponse
 from syntara.agent_orchestrator.models.agent_state import AgentState
 from syntara.agent_orchestrator.utils.keyword_association import annotate_tools_with_relevance
+from syntara.agent_orchestrator.utils.response_metadata import normalize_response_metadata
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.core.utils.retry import retry_with_backoff
 from syntara.metrics.dependencies import get_metrics_recorder
@@ -264,7 +265,10 @@ class GenericAgent(BaseAgent):
         # Update AgentState
         state["messages"] = [result_message]
         state["llm_token_usage_log"] = token_log
-        response_metadata = result_message.response_metadata
+        response_metadata = normalize_response_metadata(
+            result_message.response_metadata,
+            usage_metadata=getattr(result_message, "usage_metadata", None),
+        )
         response_model: GenericAgentResponse = GenericAgentResponse(content=answer, response_metadata=response_metadata)
 
         state["result"] = response_model.model_dump(by_alias=True)
@@ -383,7 +387,10 @@ class GenericAgent(BaseAgent):
 
         result_dict = GenericAgentResponse(
             content=parsed_output,
-            response_metadata=getattr(raw_message, "response_metadata", None) or {},
+            response_metadata=normalize_response_metadata(
+                getattr(raw_message, "response_metadata", None),
+                usage_metadata=getattr(raw_message, "usage_metadata", None),
+            ),
         ).model_dump(by_alias=True)
         result_dict["structured_output_metadata"] = {"fallback_strategy_used": "native"}
         state["result"] = result_dict

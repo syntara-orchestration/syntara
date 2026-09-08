@@ -1,6 +1,6 @@
 import { Badge, Button, Content, Truncate } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiEditFillIcon, RhUiTrashIcon } from '@patternfly/react-icons'
-import { Thead, Tbody, Tr, Th, Td, ActionsColumn } from '@patternfly/react-table'
+import { Thead, Tbody, Tr, Th, Td } from '@patternfly/react-table'
 import type { Group } from '@syntara/contracts'
 import { useNavigate } from '@tanstack/react-router'
 import { useMemo } from 'react'
@@ -12,6 +12,7 @@ import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { IconLabel } from '../../components/IconLabel'
 import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../components/panels/list/SynListPanel'
 import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
+import { SynKebabMenu, type KebabAction } from '../../components/SynKebabMenu'
 import { DateCell } from '../../components/table/DateCell'
 import { useCursorPagination, useCursorReset } from '../../hooks/useCursorPagination'
 import { useDeleteAction } from '../../hooks/useDeleteAction'
@@ -28,6 +29,32 @@ const SORT_FIELDS: Record<number, string> = {
   0: 'name',
   3: 'created_at',
   4: 'updated_at',
+}
+
+function buildGroupRowActions(
+  group: Group,
+  permissions: ReturnType<typeof useGroupPermissions>,
+  onEdit: (group: Group) => void,
+  onDelete: (group: Group) => void
+): KebabAction[] {
+  return [
+    {
+      key: 'edit',
+      title: <IconLabel icon={<RhUiEditFillIcon />}>Edit group</IconLabel>,
+      isAriaDisabled: !permissions.canUpdate,
+      tooltipProps: permissions.canUpdate ? undefined : { content: permissions.tooltips.update },
+      onClick: permissions.canUpdate ? () => onEdit(group) : undefined,
+    },
+    { key: 'sep-delete', isSeparator: true },
+    {
+      key: 'delete',
+      title: <IconLabel icon={<RhUiTrashIcon />}>Delete group</IconLabel>,
+      isDanger: true,
+      isAriaDisabled: !permissions.canDelete,
+      tooltipProps: permissions.canDelete ? undefined : { content: permissions.tooltips.delete },
+      onClick: permissions.canDelete ? () => onDelete(group) : undefined,
+    },
+  ]
 }
 
 export function GroupsTab() {
@@ -176,26 +203,14 @@ export function GroupsTab() {
                     </Td>
                     <Td isActionCell>
                       {!group.is_builtin && (
-                        <ActionsColumn
-                          items={[
-                            {
-                              title: <IconLabel icon={<RhUiEditFillIcon />}>Edit</IconLabel>,
-                              isAriaDisabled: !permissions.canUpdate,
-                              tooltipProps: permissions.canUpdate
-                                ? undefined
-                                : { content: permissions.tooltips.update },
-                              onClick: permissions.canUpdate ? () => formDialog.open(group as Group) : undefined,
-                            },
-                            { isSeparator: true },
-                            {
-                              title: <IconLabel icon={<RhUiTrashIcon />}>Delete</IconLabel>,
-                              isAriaDisabled: !permissions.canDelete,
-                              tooltipProps: permissions.canDelete
-                                ? undefined
-                                : { content: permissions.tooltips.delete },
-                              onClick: permissions.canDelete ? () => deleteDialog.open(group as Group) : undefined,
-                            },
-                          ]}
+                        <SynKebabMenu
+                          actions={buildGroupRowActions(
+                            group as Group,
+                            permissions,
+                            formDialog.open,
+                            deleteDialog.open
+                          )}
+                          aria-label={`Actions for ${group.name}`}
                         />
                       )}
                     </Td>

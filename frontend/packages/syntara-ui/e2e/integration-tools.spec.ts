@@ -21,7 +21,7 @@ import { getAuthToken } from './utils/api'
 async function createIntegration(app: Page, name: string): Promise<SeededIntegration> {
   const token = await getAuthToken(app)
   const integration = await createIntegrationViaApi(app, { name, token: token ?? undefined })
-  if (!integration) throw new Error(`Failed to create integration "${name}" via API`)
+  if (!integration) throw new Error(`Failed to create integration: ${name}`)
   return integration
 }
 

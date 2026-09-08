@@ -6,7 +6,7 @@ import { buildExpression, canvasNodeIdForExpression } from '../../../../utils/ex
 import { highlightText } from '../../../../utils/highlightText'
 import { CopyExpressionAction, DraggableTreeLeaf } from '../components/DraggableTreeLeaf'
 import { DRAG_TYPE_FIELD, type FieldDragData } from '../utils/dragTypes'
-import { formatLeafValue, isExpandable, isUrlValue } from '../utils/treeHelpers'
+import { formatLeafValue, isExpandable, isUrlValue, toTreeItemId } from '../utils/treeHelpers'
 import { getTypeLabelFromValue } from '../utils/typeLabels'
 
 export type InputSchemaViewProps = {
@@ -27,7 +27,7 @@ function buildTreeData(
 
     if (isExpandable(value)) {
       return {
-        id: currentPath.join('.'),
+        id: toTreeItemId([nodeId, ...currentPath]),
         name: (
           <Label isCompact color="grey">
             {typeLabel} {searchTerm ? highlightText(key, searchTerm) : key}
@@ -47,7 +47,7 @@ function buildTreeData(
     const expression = isIterationResultKey ? `\${${key}}` : buildExpression({ nodeId, fieldPath: currentPath })
 
     return {
-      id: pathKey,
+      id: toTreeItemId([nodeId, ...currentPath]),
       name: (
         <LeafNode
           fieldKey={key}

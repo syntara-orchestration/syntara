@@ -154,18 +154,17 @@ describe('AccessManagement', () => {
     })
   })
 
-  it('renders breadcrumbs on all tabs including Users', async () => {
+  it('does not render breadcrumbs on the Users hub tab', async () => {
     await renderAndSettle(<AccessManagement />)
 
-    expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument()
   })
 
-  it('renders breadcrumbs on non-default hub tabs', async () => {
+  it('does not include the tab name in breadcrumbs on non-default hub tabs', async () => {
     routerTestState.pathname = AppRoute.AccessManagement.Groups
     await renderAndSettle(<AccessManagement />)
 
-    expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Access management' })).toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument()
   })
 
   it('defaults to first tab when location does not match any tab path', async () => {

@@ -238,9 +238,6 @@ npx playwright test --grep "user creates a workflow"
 # @pr-check suite — fast, critical-path subset (intended quick gate; not yet used by CI automatically)
 npx playwright test --grep @pr-check
 
-# Simulate Konflux behavior — exclude @konflux-skip tests (mirrors Tekton playwright-grep-invert param)
-npx playwright test --grep-invert @konflux-skip
-
 # Exclude visual-regression (they require npm run e2e:visual-regression, not the default runner)
 npx playwright test --grep-invert @local-only
 
@@ -253,7 +250,6 @@ npx playwright show-trace test-results/*/trace.zip
 | Tag | Select with | Purpose |
 |---|---|---|
 | `@pr-check` | `--grep @pr-check` | Fast critical-path subset for quick local validation |
-| `@konflux-skip` | `--grep-invert @konflux-skip` | Tests skipped in Konflux pipelines (flaky in that env only) |
 | `@local-only` | `--grep-invert @local-only` | Visual regression tests; excluded from all CI automatically |
 
 See `.claude/skills/frontend-playwright-e2e/SKILL.md` → **Test Suite Tags** for the full rules on when to apply each tag.

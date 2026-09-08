@@ -90,10 +90,11 @@ describe('renderNodeIcon', () => {
     render(<>{view}</>)
 
     const iconWrapper = screen.getByTestId('node-icon-wrapper')
-    expect(iconWrapper).toHaveStyle({ color: token })
-    expect(iconWrapper).toHaveStyle({
-      '--pf-v6-c-icon__content--Color': token,
-    })
+    // Assert on the literal inline style rather than toHaveStyle(): getComputedStyle can't
+    // resolve var() (happy-dom does not perform real CSS cascade), so it isn't a
+    // meaningful check for this brand-color token.
+    expect(iconWrapper.style.color).toBe(token)
+    expect(iconWrapper.style.getPropertyValue('--pf-v6-c-icon__content--Color')).toBe(token)
   })
 
   it('does not apply color when not provided', () => {
@@ -101,7 +102,7 @@ describe('renderNodeIcon', () => {
     render(<>{view}</>)
 
     const iconWrapper = screen.getByTestId('node-icon-wrapper')
-    expect(iconWrapper).not.toHaveStyle({ color: expect.anything() })
+    expect(iconWrapper.style.color).toBe('')
   })
 
   it('uses canvas variant by default (md size)', () => {

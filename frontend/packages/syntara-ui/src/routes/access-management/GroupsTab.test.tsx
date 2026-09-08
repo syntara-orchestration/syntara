@@ -527,7 +527,7 @@ describe('GroupsTab Component', () => {
       const user = userEvent.setup()
       render(<GroupsTab />, { wrapper })
 
-      const actionButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const actionButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(actionButtons[0])
 
       const editOption = await screen.findByRole('menuitem', { name: /edit/i })
@@ -542,7 +542,7 @@ describe('GroupsTab Component', () => {
       const user = userEvent.setup()
       render(<GroupsTab />, { wrapper })
 
-      const actionButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const actionButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(actionButtons[0])
 
       const deleteOption = await screen.findByRole('menuitem', { name: /delete/i })
@@ -577,7 +577,7 @@ describe('GroupsTab Component', () => {
       render(<GroupsTab />, { wrapper })
 
       // Open actions menu and click delete (first row is Admins alphabetically)
-      const actionButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const actionButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(actionButtons[0])
       const deleteOption = await screen.findByRole('menuitem', { name: /delete/i })
       await user.click(deleteOption)
@@ -617,7 +617,7 @@ describe('GroupsTab Component', () => {
       render(<GroupsTab />, { wrapper })
 
       // Open delete dialog
-      const actionButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const actionButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(actionButtons[0])
       const deleteOption = await screen.findByRole('menuitem', { name: /delete/i })
       await user.click(deleteOption)
@@ -655,7 +655,7 @@ describe('GroupsTab Component', () => {
       render(<GroupsTab />, { wrapper })
 
       // Open delete dialog
-      const actionButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const actionButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(actionButtons[0])
       const deleteOption = await screen.findByRole('menuitem', { name: /delete/i })
       await user.click(deleteOption)
@@ -688,7 +688,7 @@ describe('GroupsTab Component', () => {
       render(<GroupsTab />, { wrapper })
 
       // Open delete dialog
-      const actionButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const actionButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(actionButtons[0])
       const deleteOption = await screen.findByRole('menuitem', { name: /delete/i })
       await user.click(deleteOption)

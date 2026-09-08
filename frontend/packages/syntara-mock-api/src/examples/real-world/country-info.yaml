@@ -1,5 +1,5 @@
 ---
-schema_version: '2.0.0'
+schema_version: "2.0.0"
 name: country-info
 description: Fetch and analyze country information from REST Countries API
 metadata:

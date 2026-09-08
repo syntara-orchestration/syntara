@@ -393,7 +393,7 @@ async def delete_workflow(
     workflow_id: UUID,
     service: Annotated[WorkflowService, Depends(get_workflow_service)],
 ) -> None:
-    """Soft delete a workflow."""
+    """Permanently delete a workflow and cascade-delete all its versions and executions."""
     await service.delete_workflow(workflow_id)
 
 
@@ -470,7 +470,7 @@ async def get_workflow_version(
     """Get a specific workflow version."""
     db = service.session
     workflow_result = await db.exec(
-        select(Workflow).filter(Workflow.id == workflow_id, Workflow.deleted_at.is_(None))  # type: ignore[arg-type,union-attr]
+        select(Workflow).filter(Workflow.id == workflow_id)  # type: ignore[arg-type]
     )
     workflow = workflow_result.one_or_none()
 
@@ -484,7 +484,6 @@ async def get_workflow_version(
         select(WorkflowVersion).filter(
             WorkflowVersion.workflow_id == workflow_id,  # type: ignore[arg-type]
             WorkflowVersion.version == version,  # type: ignore[arg-type]
-            WorkflowVersion.deleted_at.is_(None),  # type: ignore[union-attr]
         )
     )
     workflow_version = result.one_or_none()

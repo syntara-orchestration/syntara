@@ -3,7 +3,7 @@
 ## Quick Start
 
 ```bash
-# Standard tests (fast, jsdom)
+# Standard tests (fast, happy-dom)
 npm test                    # Run all tests with linting and type checking
 npm run vitest              # Run tests only
 npm run test:coverage       # Run tests with coverage
@@ -34,7 +34,7 @@ report unless `coverage.include` lists `src/**/*.{ts,tsx}`.
 
 ## Test File Naming
 
-- **Standard tests**: `*.test.ts`, `*.test.tsx` (uses jsdom)
+- **Standard tests**: `*.test.ts`, `*.test.tsx` (uses happy-dom)
 - **E2E tests**: `packages/syntara-ui/e2e/*.spec.ts`
 
 ## When to Use Playwright E2E
@@ -46,9 +46,9 @@ Use Playwright E2E when testing:
 - **Integration**: Mock API or real backend behavior
 - **Smoke tests**: Critical paths before releases
 
-**Default to jsdom** for everything else - it's much faster.
+**Default to happy-dom** for everything else - it's much faster.
 
-**Why?** jsdom simulates browser behavior in Node.js (fast), while E2E runs in real browsers (slower but more accurate). E2E eliminates cross-page and integration gaps.
+**Why?** happy-dom simulates browser behavior in Node.js (fast), while E2E runs in real browsers (slower but more accurate). E2E eliminates cross-page and integration gaps.
 
 ## Industry Best Practices (80% Coverage)
 
@@ -124,7 +124,7 @@ it('should do something', async () => {
 **Every PR:**
 
 ```bash
-npm run test:coverage  # jsdom tests with coverage report
+npm run test:coverage  # happy-dom tests with coverage report
 ```
 
 **E2E Tests (Selective):**
@@ -138,14 +138,14 @@ Run E2E tests only when needed:
 
 **Performance:**
 
-- jsdom: ~5-15 seconds
+- happy-dom: ~5-15 seconds
 - Browser: ~30-60 seconds (Playwright overhead)
 
 **Coverage:**
 
-- 90%+ of tests work in jsdom
+- 90%+ of tests work in happy-dom
 - Keep E2E focused on critical workflows
-- Avoid duplicating component-level jsdom tests
+- Avoid duplicating component-level happy-dom tests
 
 ### CI Workflow
 

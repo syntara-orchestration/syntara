@@ -25,6 +25,7 @@ from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
 from syntara.projects.service import ProjectService
 from syntara.workflows.models.execution import Execution
+from syntara.workflows.models.webhook_trigger import WebhookTrigger
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_version import WorkflowVersion
 from tests.helpers.workflow import create_minimal_workflow_definition
@@ -54,7 +55,6 @@ async def test_create_project(seeded_db: AsyncSession, test_user: User) -> None:
     assert project.name == "test-project"
     assert project.description == "A test project"
     assert project.labels == {"env": "dev"}
-    assert project.deleted_at is None
 
     # Creator should be assigned project-admin
     assignments = (await seeded_db.exec(select(RoleAssignment).where(RoleAssignment.project_id == project.id))).all()
@@ -93,7 +93,7 @@ async def test_get_project_not_found(seeded_db: AsyncSession, test_user: User) -
 
 @pytest.mark.asyncio
 async def test_get_deleted_project_not_found(seeded_db: AsyncSession, test_user: User) -> None:
-    """Getting a soft-deleted project raises SafeValueError."""
+    """Getting a hard-deleted project raises ProjectNotFoundError."""
     svc = ProjectService(seeded_db, test_user)
     project = await svc.create_project(name="deleted-project")
     await svc.delete_project(project.id)
@@ -252,7 +252,7 @@ async def test_update_project_partial(seeded_db: AsyncSession, test_user: User) 
 
 @pytest.mark.asyncio
 async def test_delete_project(seeded_db: AsyncSession, test_user: User) -> None:
-    """Soft-delete a project."""
+    """Hard-delete a project."""
     svc = ProjectService(seeded_db, test_user)
     project = await svc.create_project(name="delete-me")
     await svc.delete_project(project.id)
@@ -353,8 +353,8 @@ async def test_delete_project_cascades_custom_policies(seeded_db: AsyncSession, 
 
 
 @pytest.mark.asyncio
-async def test_delete_project_soft_deletes_workflows(seeded_db: AsyncSession, test_user: User) -> None:
-    """Deleting a project soft-deletes all workflows within it."""
+async def test_delete_project_hard_deletes_workflows(seeded_db: AsyncSession, test_user: User) -> None:
+    """Deleting a project hard-deletes all workflows within it."""
     svc = ProjectService(seeded_db, test_user)
     user_id = test_user.id
     project = await svc.create_project(name="cascade-workflows")
@@ -373,14 +373,12 @@ async def test_delete_project_soft_deletes_workflows(seeded_db: AsyncSession, te
 
     seeded_db.expire_all()
     wf = (await seeded_db.exec(select(Workflow).where(Workflow.id == wf_id))).first()
-    assert wf is not None
-    assert wf.deleted_at is not None
-    assert wf.deleted_by == user_id
+    assert wf is None
 
 
 @pytest.mark.asyncio
-async def test_delete_project_soft_deletes_executions(seeded_db: AsyncSession, test_user: User) -> None:
-    """Deleting a project soft-deletes all executions within it."""
+async def test_delete_project_hard_deletes_executions(seeded_db: AsyncSession, test_user: User) -> None:
+    """Deleting a project hard-deletes all executions within it."""
     svc = ProjectService(seeded_db, test_user)
     user_id = test_user.id
     project = await svc.create_project(name="cascade-executions")
@@ -410,7 +408,7 @@ async def test_delete_project_soft_deletes_executions(seeded_db: AsyncSession, t
         workflow_version_id=wf_version.id,
         project_id=project.id,
         temporal_workflow_id=f"temporal-{uuid4().hex[:8]}",
-        status="pending",
+        status="completed",
         created_by=user_id,
         labels={},
     )
@@ -422,9 +420,87 @@ async def test_delete_project_soft_deletes_executions(seeded_db: AsyncSession, t
 
     seeded_db.expire_all()
     ex = (await seeded_db.exec(select(Execution).where(Execution.id == exec_id))).first()
-    assert ex is not None
-    assert ex.deleted_at is not None
-    assert ex.deleted_by == user_id
+    assert ex is None
+
+
+@pytest.mark.asyncio
+async def test_delete_project_blocked_by_active_executions(seeded_db: AsyncSession, test_user: User) -> None:
+    """Deleting a project with non-terminal executions raises ProjectHasActiveExecutionsError."""
+    from syntara.authz.exceptions import ProjectHasActiveExecutionsError
+
+    svc = ProjectService(seeded_db, test_user)
+    user_id = test_user.id
+    project = await svc.create_project(name="active-execs-project")
+
+    workflow = Workflow(
+        name="active-workflow",
+        project_id=project.id,
+        created_by=user_id,
+        labels={},
+    )
+    seeded_db.add(workflow)
+    await seeded_db.flush()
+
+    wf_version = WorkflowVersion(
+        workflow_id=workflow.id,
+        version=1,
+        schema_version="2.0.0",
+        workflow_definition=create_minimal_workflow_definition(name="test-guard"),
+        created_by=user_id,
+        labels={},
+    )
+    seeded_db.add(wf_version)
+    await seeded_db.flush()
+
+    execution = Execution(
+        workflow_id=workflow.id,
+        workflow_version_id=wf_version.id,
+        project_id=project.id,
+        temporal_workflow_id=f"temporal-{uuid4().hex[:8]}",
+        status="running",
+        created_by=user_id,
+        labels={},
+    )
+    seeded_db.add(execution)
+    await seeded_db.commit()
+
+    with pytest.raises(ProjectHasActiveExecutionsError) as exc_info:
+        await svc.delete_project(project.id)
+    assert exc_info.value.active_count == 1
+
+
+@pytest.mark.asyncio
+async def test_delete_project_removes_webhook_triggers(seeded_db: AsyncSession, test_user: User) -> None:
+    """Deleting a project removes webhook triggers for its workflows."""
+    svc = ProjectService(seeded_db, test_user)
+    user_id = test_user.id
+    project = await svc.create_project(name="trigger-cleanup")
+
+    workflow = Workflow(
+        name="trigger-workflow",
+        project_id=project.id,
+        created_by=user_id,
+        labels={},
+    )
+    seeded_db.add(workflow)
+    await seeded_db.flush()
+
+    trigger = WebhookTrigger(
+        id=uuid4(),
+        workflow_id=workflow.id,
+        webhook_path=f"test-trigger-{uuid4().hex[:8]}",
+        trigger_node_id="webhook-node-1",
+        trigger_type="webhook_trigger",
+    )
+    seeded_db.add(trigger)
+    await seeded_db.commit()
+    trigger_id = trigger.id
+
+    await svc.delete_project(project.id)
+
+    seeded_db.expire_all()
+    t = (await seeded_db.exec(select(WebhookTrigger).where(WebhookTrigger.id == trigger_id))).first()
+    assert t is None, "WebhookTrigger should be removed when project is deleted"
 
 
 @pytest.mark.asyncio
@@ -583,7 +659,7 @@ async def test_delete_project_hard_deletes_approval_requests(seeded_db: AsyncSes
         workflow_version_id=wf_version.id,
         project_id=project.id,
         temporal_workflow_id=f"temporal-{uuid4().hex[:8]}",
-        status="pending",
+        status="completed",
         created_by=user_id,
         labels={},
     )
@@ -630,18 +706,16 @@ async def test_delete_project_does_not_affect_other_projects(seeded_db: AsyncSes
     await svc.delete_project(p1_id)
 
     seeded_db.expire_all()
-    # p1 resources should be gone/soft-deleted
+    # p1 resources should be fully deleted
     assert (await seeded_db.exec(select(Role).where(Role.project_id == p1_id))).all() == []
     wf1_row = (await seeded_db.exec(select(Workflow).where(Workflow.project_id == p1_id))).first()
-    assert wf1_row is not None
-    assert wf1_row.deleted_at is not None
+    assert wf1_row is None
 
     # p2 resources should be untouched
     r2 = (await seeded_db.exec(select(Role).where(Role.id == role2_id))).first()
     assert r2 is not None
     wf2_row = (await seeded_db.exec(select(Workflow).where(Workflow.id == wf2_id))).first()
     assert wf2_row is not None
-    assert wf2_row.deleted_at is None
 
 
 @pytest.mark.asyncio
@@ -706,7 +780,6 @@ async def test_delete_default_project_raises(seeded_db: AsyncSession, test_user:
 
     # Still present and still the default after rejected delete
     await seeded_db.refresh(default_project)
-    assert default_project.deleted_at is None
     assert default_project.is_default is True
 
 

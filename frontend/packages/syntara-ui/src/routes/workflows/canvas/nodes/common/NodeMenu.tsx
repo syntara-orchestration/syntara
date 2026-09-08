@@ -1,8 +1,9 @@
 import { Divider, Dropdown, DropdownItem, DropdownList, MenuToggle } from '@patternfly/react-core'
 import type { DropdownProps, MenuToggleElement } from '@patternfly/react-core'
 import { RhUiEllipsisVerticalFillIcon } from '@patternfly/react-icons'
-import { useState } from 'react'
+import { isValidElement, useState } from 'react'
 
+import { IconLabel } from '../../../../../components/IconLabel'
 import type { NodeMenuAction } from '../hooks/useNodeMenuActions'
 
 type NodeMenuProps = {
@@ -68,14 +69,13 @@ export function NodeMenu(props: Readonly<NodeMenuProps>) {
               <DropdownItem
                 data-testid={`node-menu-item-${action.id}`}
                 key={action.id}
-                icon={action.icon}
                 onClick={() => {
                   action.onClick()
                   setIsMenuOpen(false)
                 }}
                 isDanger={action.variant === 'danger'}
               >
-                {action.label}
+                {isValidElement(action.icon) ? <IconLabel icon={action.icon}>{action.label}</IconLabel> : action.label}
               </DropdownItem>
             )
           })}

@@ -1,11 +1,11 @@
 import { useCallback, useState } from 'react'
 
 import { breadcrumbsIdentityProvidersPage } from '../../../app/breadcrumbBuilders'
-import { EmptyStateAccessDenied } from '../../../components/EmptyStateAccessDenied'
 import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../components/layout/SynPanel'
 import { SynListPanel } from '../../../components/panels/list/SynListPanel'
+import { SynEmptyStateAccessDenied } from '../../../components/states/SynEmptyStateAccessDenied'
 import { SynPageTitle } from '../../../components/SynPageTitle'
 import { useCanI } from '../../../hooks/useCanI'
 import { useDocLink } from '../../../utils/docs/useDocLink'
@@ -54,7 +54,7 @@ export default function Authentication() {
         <SynPageHeader title="Identity Providers" breadcrumbs={breadcrumbsIdentityProvidersPage()} />
         <SynPageBody>
           <SynPanel isFullHeight>
-            <EmptyStateAccessDenied description="You don't have permission to view identity providers. Contact your administrator to request access." />
+            <SynEmptyStateAccessDenied description="You don't have permission to view identity providers. Contact your administrator to request access." />
           </SynPanel>
         </SynPageBody>
       </SynPage>

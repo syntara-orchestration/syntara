@@ -872,6 +872,7 @@ describe('AssignmentsTab', () => {
 
       await waitFor(() => {
         expect(screen.queryByText('Remove assignment?')).not.toBeInTheDocument()
+        expect(screen.getByText('Failed to remove assignment')).toBeInTheDocument()
       })
     })
   })

@@ -24,10 +24,8 @@ test.beforeAll(async ({ browser }) => {
   credName = buildUniqueName('e2e-userlink')
   const page = await browser.newPage()
   const token = await getAuthToken(page)
-  if (token) {
-    const cred = await createCredentialSeed(page, { name: credName, token })
-    seededCred = cred
-  }
+  if (!token) throw new Error('credential-user-links beforeAll: could not obtain auth token')
+  seededCred = await createCredentialSeed(page, { name: credName, token })
   await page.close()
 })
 
@@ -41,7 +39,7 @@ test.afterAll(async ({ browser }) => {
 // Real-backend only: credential seed requires auth token; not tagged @pr-check intentionally
 test.describe('Credential Username Links', () => {
   test('credential list shows created_by username as a link to user detail', async ({ app }) => {
-    test.skip(!seededCred, 'Credential seed not available')
+    expect(seededCred, 'Credential seed not available').toBeTruthy()
 
     await goToCredentialsList(app)
     await filterCredentialByName(app, credName)
@@ -58,9 +56,12 @@ test.describe('Credential Username Links', () => {
   })
 
   test('credential detail shows Created username as a link to user detail', async ({ app }) => {
-    test.skip(!seededCred, 'Credential seed not available')
+    expect(seededCred, 'Credential seed not available').toBeTruthy()
+    if (!seededCred) {
+      throw new Error('Credential seed not available')
+    }
 
-    await app.goto(toAppUrl(`/configuration/credentials/${seededCred!.id}`))
+    await app.goto(toAppUrl(`/configuration/credentials/${seededCred.id}`))
     await expect(app.getByRole('heading', { name: credName, level: 1 })).toBeVisible({ timeout: 15_000 })
 
     const detailsTab = app.getByRole('tabpanel', { name: 'Details' })

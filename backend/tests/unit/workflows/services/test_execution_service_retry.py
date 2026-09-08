@@ -1,6 +1,5 @@
 """Unit tests for ExecutionService.retry_execution method."""
 
-from datetime import UTC, datetime
 from unittest.mock import AsyncMock, Mock, patch
 from uuid import uuid4
 
@@ -33,7 +32,6 @@ def _make_execution(
     execution.temporal_workflow_id = f"temporal-{execution.id}"
     execution.input_data = {"key": "value"}
     execution.trigger_node_id = "trigger-1"
-    execution.deleted_at = None
 
     workflow = Mock(spec=Workflow)
     workflow.id = execution.workflow_id
@@ -41,7 +39,6 @@ def _make_execution(
     workflow.project_id = execution.project_id
     workflow.published_version = 1
     workflow.created_by = uuid4()
-    workflow.deleted_at = None
     execution.workflow = workflow
 
     return execution
@@ -261,29 +258,6 @@ class TestRetryExecution:
 
         assert exc_info.value.execution_id == execution.id
         assert "workflow version no longer exists" in exc_info.value.reason
-
-    @pytest.mark.asyncio
-    async def test_retry_execution_soft_deleted_workflow(self) -> None:
-        """Test retry when workflow has been soft-deleted."""
-        execution = _make_execution(ExecutionStatus.FAILED)
-        execution.workflow.deleted_at = datetime.now(UTC)
-        exec_result = Mock()
-        exec_result.one_or_none.return_value = execution
-        mock_session = Mock(spec=AsyncSession)
-        mock_session.exec = AsyncMock(return_value=exec_result)
-        mock_user = Mock(spec=User)
-
-        service = ExecutionService(
-            session=mock_session,
-            user=mock_user,
-            temporal_service=None,
-        )
-
-        with pytest.raises(ExecutionNotRetryableError) as exc_info:
-            await service.retry_execution(execution.id)
-
-        assert exc_info.value.execution_id == execution.id
-        assert "deleted" in exc_info.value.reason
 
     @pytest.mark.asyncio
     async def test_retry_execution_cancels_temporal_on_db_failure(self) -> None:

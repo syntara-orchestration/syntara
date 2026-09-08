@@ -124,7 +124,7 @@ test.describe('Verify button in toolbar', () => {
 
       await triggerVerifyWorkflow(app)
 
-      await expect(app.getByText('Workflow definition is valid')).toBeVisible({ timeout: VERIFY_BANNER_TIMEOUT })
+      await expect(app.getByText('Workflow verified')).toBeVisible({ timeout: VERIFY_BANNER_TIMEOUT })
     } finally {
       await app.unroute(VALIDATE_ROUTE)
       await deleteWorkflow(app, workflowName)
@@ -331,7 +331,7 @@ test.describe('Save with warnings', () => {
 })
 
 test.describe('Variable reference validation', () => {
-  test('reference to nonexistent node shows validation error', { tag: ['@konflux-skip'] }, async ({ app }) => {
+  test('reference to nonexistent node shows validation error', async ({ app }) => {
     test.setTimeout(90_000)
     const workflowName = buildUniqueName('e2e-varref-invalid')
 

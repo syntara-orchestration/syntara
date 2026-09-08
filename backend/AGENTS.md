@@ -59,7 +59,7 @@ Syntara is a distributed multi-agent system that enables coordinated AI agents t
    - Project structure
    - Development workflow
 
-5. **Konflux CI skip patterns**: When a backend E2E test fails only in the Konflux pipeline (not locally or GitHub CI), use one of these patterns rather than disabling the test globally. See the full reference in the root [CLAUDE.md](../CLAUDE.md) under "Konflux CI Environment". Quick summary:
+5. **Konflux CI skip patterns**: When a backend E2E test fails only in the Konflux pipeline (not locally or GitHub CI), use one of these patterns rather than disabling the test globally. See the full reference in the root [CLAUDE.md](../CLAUDE.md) under "Konflux CI Environment". For a known flaky test that needs temporary quarantine from CI, follow the [test quarantine workflow](../docs/ci/test-quarantine.md). Quick summary:
    - **`@requires_httpbin` class marker**: skips the class when httpbin is unreachable from the test runner.
    - **Graceful skip on backend connectivity failure**: when the Temporal worker can't reach an external URL, the execution fails with no `status_code`; check `if not output.get("status_code"): pytest.skip(...)`.
    - **Graceful skip on 502**: catch `UnexpectedResponseException` from `syntara_api_client.types` and `pytest.skip()` when `exc.status_code == 502` — these are transient nginx/backend restart failures under cluster load.
