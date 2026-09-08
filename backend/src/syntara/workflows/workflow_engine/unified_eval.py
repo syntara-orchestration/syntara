@@ -150,6 +150,46 @@ def _path_exists(path: str, namespace: dict[str, Any]) -> bool:
     return value is not None
 
 
+def _lookup_attribute(base: object, attr: str) -> object:
+    """Look up ``attr`` on a dict-like namespace value."""
+    if not isinstance(base, dict):
+        msg = f"Cannot access attribute '{attr}' on {type(base).__name__} (expected dict)"
+        raise TypeError(msg)
+    if attr not in base:
+        msg = f"Attribute '{attr}' not found in {base.keys()}"
+        raise KeyError(msg)
+    return base[attr]
+
+
+def _lookup_subscript(base: object, index: object) -> object:
+    """Look up ``index`` on a dict or list namespace value."""
+    if isinstance(base, dict):
+        if index not in base:
+            msg = f"Key {index!r} not found in dict"
+            raise KeyError(msg)
+        return base[index]
+
+    if isinstance(base, list):
+        if not isinstance(index, int):
+            msg = f"List index must be integer, got {type(index).__name__}"
+            raise TypeError(msg)
+        if index < -len(base) or index >= len(base):
+            msg = f"List index {index} out of range (length {len(base)})"
+            raise IndexError(msg)
+        return base[index]
+
+    msg = f"Cannot subscript {type(base).__name__}"
+    raise TypeError(msg)
+
+
+def _negate_numeric(operand: object) -> object:
+    """Apply unary minus to a numeric operand."""
+    if not isinstance(operand, (int, float, complex)):
+        msg = f"Unary minus requires numeric operand, got {type(operand).__name__}"
+        raise TypeError(msg)
+    return -operand
+
+
 def _exists_resolve(node: ast.expr, namespace: dict[str, Any]) -> object:
     """Resolve an ``exists`` path without evaluating calls or comparisons."""
     if not isinstance(node, _EXISTS_PATH_NODE_TYPES):
@@ -160,55 +200,16 @@ def _exists_resolve(node: ast.expr, namespace: dict[str, Any]) -> object:
     if isinstance(node, ast.Name):
         return _eval_variable(node, namespace)
     if isinstance(node, ast.Attribute):
-        return _exists_resolve_attribute(node, namespace)
+        return _lookup_attribute(_exists_resolve(node.value, namespace), node.attr)
     if isinstance(node, ast.Subscript):
-        return _exists_resolve_subscript(node, namespace)
-    return _exists_resolve_unary(node, namespace)
-
-
-def _exists_resolve_attribute(node: ast.Attribute, namespace: dict[str, Any]) -> object:
-    """Resolve ``base.attr`` for ``exists``."""
-    base = _exists_resolve(node.value, namespace)
-    if not isinstance(base, dict):
-        msg = f"Cannot access attribute '{node.attr}' on {type(base).__name__} (expected dict)"
-        raise TypeError(msg)
-    if node.attr not in base:
-        msg = f"Attribute '{node.attr}' not found"
-        raise KeyError(msg)
-    return base[node.attr]
-
-
-def _exists_resolve_subscript(node: ast.Subscript, namespace: dict[str, Any]) -> object:
-    """Resolve ``base[index]`` for ``exists``."""
-    base = _exists_resolve(node.value, namespace)
-    index = _exists_resolve(node.slice, namespace)
-    if isinstance(base, dict):
-        if index not in base:
-            msg = f"Key {index!r} not found in dict"
-            raise KeyError(msg)
-        return base[index]
-    if isinstance(base, list):
-        if not isinstance(index, int):
-            msg = f"List index must be integer, got {type(index).__name__}"
-            raise TypeError(msg)
-        if index < -len(base) or index >= len(base):
-            msg = f"List index {index} out of range (length {len(base)})"
-            raise IndexError(msg)
-        return base[index]
-    msg = f"Cannot subscript {type(base).__name__}"
-    raise TypeError(msg)
-
-
-def _exists_resolve_unary(node: ast.UnaryOp, namespace: dict[str, Any]) -> object:
-    """Resolve unary minus in a path index (e.g. ``items[-1]``)."""
+        return _lookup_subscript(
+            _exists_resolve(node.value, namespace),
+            _exists_resolve(node.slice, namespace),
+        )
     if not isinstance(node.op, ast.USub):
         msg = "exists does not support this unary operator in a path"
         raise TypeError(msg)
-    operand = _exists_resolve(node.operand, namespace)
-    if not isinstance(operand, (int, float, complex)):
-        msg = f"Unary minus requires numeric operand, got {type(operand).__name__}"
-        raise TypeError(msg)
-    return -operand
+    return _negate_numeric(_exists_resolve(node.operand, namespace))
 
 
 def safe_eval_with_namespace(expression: str, namespace: dict[str, Any]) -> bool:
@@ -308,14 +309,7 @@ def _eval_variable(node: ast.Name, namespace: dict[str, Any]) -> Any:  # noqa: A
 
 def _eval_attribute(node: ast.Attribute, namespace: dict[str, Any]) -> Any:  # noqa: ANN401
     """Evaluate attribute access (e.g., user.role, fetch_order.riskScore)."""
-    base = _eval_node(node.value, namespace)
-    if not isinstance(base, dict):
-        msg = f"Cannot access attribute '{node.attr}' on {type(base).__name__} (expected dict)"
-        raise TypeError(msg)
-    if node.attr not in base:
-        msg = f"Attribute '{node.attr}' not found in {base.keys()}"
-        raise KeyError(msg)
-    return base[node.attr]
+    return _lookup_attribute(_eval_node(node.value, namespace), node.attr)
 
 
 def _eval_subscript(node: ast.Subscript, namespace: dict[str, Any]) -> Any:  # noqa: ANN401
@@ -323,28 +317,7 @@ def _eval_subscript(node: ast.Subscript, namespace: dict[str, Any]) -> Any:  # n
 
     Supports Python-style negative indexing for lists (e.g., items[-1] for last element).
     """
-    base = _eval_node(node.value, namespace)
-    index = _eval_node(node.slice, namespace)
-
-    if isinstance(base, dict):
-        if index not in base:
-            msg = f"Key {index!r} not found in dict"
-            raise KeyError(msg)
-        return base[index]
-
-    if isinstance(base, list):
-        if not isinstance(index, int):
-            msg = f"List index must be integer, got {type(index).__name__}"
-            raise TypeError(msg)
-        # Allow negative indexing: -1 for last element, -2 for second-to-last, etc.
-        # Validate bounds: index must be >= -len(base) and < len(base)
-        if index < -len(base) or index >= len(base):
-            msg = f"List index {index} out of range (length {len(base)})"
-            raise IndexError(msg)
-        return base[index]
-
-    msg = f"Cannot subscript {type(base).__name__}"
-    raise TypeError(msg)
+    return _lookup_subscript(_eval_node(node.value, namespace), _eval_node(node.slice, namespace))
 
 
 def _eval_bool_op(node: ast.BoolOp, namespace: dict[str, Any]) -> bool:
@@ -380,11 +353,7 @@ def _eval_unary_op(node: ast.UnaryOp, namespace: dict[str, Any]) -> object:
         return not operand
 
     if isinstance(node.op, ast.USub):
-        # Validate operand is numeric before negation
-        if not isinstance(operand, (int, float, complex)):
-            msg = f"Unary minus requires numeric operand, got {type(operand).__name__}"
-            raise TypeError(msg)
-        return -operand
+        return _negate_numeric(operand)
 
     msg = f"Unsupported unary operator: {type(node.op).__name__}"
     raise ValueError(msg)

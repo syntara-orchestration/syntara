@@ -4,7 +4,11 @@ from typing import Any
 
 import pytest
 
-from syntara.workflows.workflow_engine.unified_eval import MAX_AST_DEPTH, safe_eval_with_namespace
+from syntara.workflows.workflow_engine.unified_eval import (
+    MAX_AST_DEPTH,
+    MAX_REGEX_PATTERN_LENGTH,
+    safe_eval_with_namespace,
+)
 
 
 class TestBasicEvaluation:
@@ -827,3 +831,91 @@ class TestVisualBuilderOperators:
         assert safe_eval_with_namespace("not (${results} isEmpty)", {"results": [1]}) is True
         assert safe_eval_with_namespace('not (${username} startsWith "user_")', {"username": "admin"}) is True
         assert safe_eval_with_namespace("not (${items} lengthEqualTo 0)", {"items": [1]}) is True
+
+    def test_exists_bare_name_without_template(self) -> None:
+        assert safe_eval_with_namespace("status exists", {"status": "ok"}) is True
+        assert safe_eval_with_namespace("status exists", {}) is False
+
+    def test_exists_dict_string_key(self) -> None:
+        assert safe_eval_with_namespace("${data['key']} exists", {"data": {"key": "v"}}) is True
+        assert safe_eval_with_namespace("${data['key']} exists", {"data": {}}) is False
+
+    def test_exists_false_on_lookup_type_errors(self) -> None:
+        assert safe_eval_with_namespace("${count.foo} exists", {"count": 5}) is False
+        assert safe_eval_with_namespace("${count[0]} exists", {"count": 5}) is False
+        assert safe_eval_with_namespace("${items['a']} exists", {"items": [1]}) is False
+        assert safe_eval_with_namespace("${items[-99]} exists", {"items": [1, 2]}) is False
+        assert safe_eval_with_namespace("${items[-'x']} exists", {"items": [1]}) is False
+
+    def test_exists_empty_and_invalid_paths(self) -> None:
+        assert safe_eval_with_namespace("__exists__('')", {}) is False
+        assert safe_eval_with_namespace("${data[} exists", {"data": [1]}) is False
+
+    def test_exists_rejects_unsupported_path_nodes(self) -> None:
+        with pytest.raises(TypeError, match="exists does not support"):
+            safe_eval_with_namespace("${len(items)} exists", {"items": [1]})
+        with pytest.raises(TypeError, match="exists does not support"):
+            safe_eval_with_namespace("${a == b} exists", {"a": 1, "b": 1})
+        with pytest.raises(TypeError, match="exists does not support"):
+            safe_eval_with_namespace("${items[+1]} exists", {"items": [1, 2]})
+
+    def test_exists_call_requires_single_string_path(self) -> None:
+        with pytest.raises(ValueError, match="__exists__ requires a single string path"):
+            safe_eval_with_namespace("__exists__(1)", {})
+        with pytest.raises(ValueError, match="__exists__ requires a single string path"):
+            safe_eval_with_namespace("__exists__('a', 'b')", {})
+
+    def test_is_empty_rejects_tuple(self) -> None:
+        with pytest.raises(TypeError, match="isEmpty is not supported"):
+            safe_eval_with_namespace("${items} isEmpty", {"items": ()})
+
+    def test_is_empty_wrong_arity(self) -> None:
+        with pytest.raises(ValueError, match="__is_empty__ takes exactly one argument"):
+            safe_eval_with_namespace("__is_empty__()", {})
+        with pytest.raises(ValueError, match="__is_empty__ takes exactly one argument"):
+            safe_eval_with_namespace("__is_empty__(a, b)", {"a": "", "b": ""})
+
+    def test_starts_with_requires_string_argument(self) -> None:
+        with pytest.raises(TypeError, match="requires a single string argument"):
+            safe_eval_with_namespace("${name} startsWith 1", {"name": "abc"})
+        with pytest.raises(TypeError, match="requires a single string argument"):
+            safe_eval_with_namespace("name.startswith()", {"name": "abc"})
+
+    def test_ends_with_requires_string_argument(self) -> None:
+        with pytest.raises(TypeError, match="requires a single string argument"):
+            safe_eval_with_namespace("${name} endsWith 1", {"name": "abc"})
+
+    def test_len_wrong_arity_and_type(self) -> None:
+        with pytest.raises(ValueError, match="len\\(\\) takes exactly one argument"):
+            safe_eval_with_namespace("len()", {})
+        with pytest.raises(ValueError, match="len\\(\\) takes exactly one argument"):
+            safe_eval_with_namespace("len(a, b)", {"a": [1], "b": [2]})
+        with pytest.raises(TypeError, match="len\\(\\) not supported"):
+            safe_eval_with_namespace("${count} lengthEqualTo 1", {"count": 5})
+
+    def test_starred_args_rejected(self) -> None:
+        with pytest.raises(ValueError, match="Keyword and starred arguments"):
+            safe_eval_with_namespace("len(*items)", {"items": [[1, 2]]})
+
+    def test_call_func_must_be_name_or_attribute(self) -> None:
+        with pytest.raises(TypeError, match="Unsupported expression type"):
+            safe_eval_with_namespace("funcs[0]()", {"funcs": [len]})
+
+    def test_matches_pattern_must_be_string(self) -> None:
+        with pytest.raises(TypeError, match="matches pattern must be a string"):
+            safe_eval_with_namespace("${code} matches 123", {"code": "123"})
+
+    def test_matches_pattern_too_long(self) -> None:
+        long_pattern = "a" * (MAX_REGEX_PATTERN_LENGTH + 1)
+        with pytest.raises(ValueError, match="matches pattern too long"):
+            safe_eval_with_namespace(f'${{code}} matches "{long_pattern}"', {"code": "a"})
+
+    def test_re_search_wrong_arity(self) -> None:
+        with pytest.raises(ValueError, match="__re_search__ takes exactly two arguments"):
+            safe_eval_with_namespace("__re_search__('a')", {})
+        with pytest.raises(ValueError, match="__re_search__ takes exactly two arguments"):
+            safe_eval_with_namespace("__re_search__('a', 'b', 'c')", {})
+
+    def test_contains_word_form_on_list(self) -> None:
+        assert safe_eval_with_namespace("${items} contains 2", {"items": [1, 2, 3]}) is True
+        assert safe_eval_with_namespace("${items} contains 9", {"items": [1, 2, 3]}) is False
