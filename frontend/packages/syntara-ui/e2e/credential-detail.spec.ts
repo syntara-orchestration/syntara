@@ -101,7 +101,7 @@ test.describe('Credential Detail Page & Workflows Tab', () => {
 
       // Assert - Workflows tab content loaded (table or empty state)
       const workflowsTable = app.getByRole('grid', { name: 'Workflows using this credential' })
-      const emptyState = app.getByText('No workflows using this credential')
+      const emptyState = app.getByRole('heading', { name: 'No workflows yet' })
       const errorState = app.getByText('Failed to load workflows')
       await expect(workflowsTable.or(emptyState).or(errorState)).toBeVisible()
     } finally {
@@ -117,7 +117,7 @@ test.describe('Credential Detail Page & Workflows Tab', () => {
 
       // This credential was just created — it won't have workflows referencing it
       // Assert the empty state or table renders correctly
-      const emptyState = app.getByText('No workflows using this credential')
+      const emptyState = app.getByRole('heading', { name: 'No workflows yet' })
       const table = app.getByRole('grid', { name: 'Workflows using this credential' })
       const errorState = app.getByText('Failed to load workflows')
       await expect(emptyState.or(table).or(errorState)).toBeVisible()
@@ -134,7 +134,7 @@ test.describe('Credential Detail Page & Workflows Tab', () => {
 
       // Assert - Either count footer, empty state, or error renders
       const countFooter = app.getByText(/\d+ workflows?/)
-      const emptyState = app.getByText('No workflows using this credential')
+      const emptyState = app.getByRole('heading', { name: 'No workflows yet' })
       const errorState = app.getByText('Failed to load workflows')
       await expect(countFooter.or(emptyState).or(errorState)).toBeVisible()
     } finally {
@@ -161,7 +161,7 @@ test.describe('Credential Detail Page & Workflows Tab', () => {
       } else {
         // No workflows or endpoint not available — empty/error state is valid
         const emptyOrError = app
-          .getByText('No workflows using this credential')
+          .getByRole('heading', { name: 'No workflows yet' })
           .or(app.getByText('Failed to load workflows'))
         await expect(emptyOrError).toBeVisible()
       }
@@ -180,7 +180,7 @@ test.describe('Credential Detail Page & Workflows Tab', () => {
 
       // Assert - Integrations tab content loaded (table or empty state)
       const integrationsTable = app.getByRole('grid', { name: 'Integrations using this credential' })
-      const emptyState = app.getByText('No integrations using this credential')
+      const emptyState = app.getByRole('heading', { name: 'No integrations yet' })
       const errorState = app.getByText('Failed to load integrations')
       await expect(integrationsTable.or(emptyState).or(errorState)).toBeVisible()
     } finally {
@@ -195,7 +195,7 @@ test.describe('Credential Detail Page & Workflows Tab', () => {
       await app.getByRole('tab', { name: /Integrations/ }).click()
 
       // Assert - Empty state or error (freshly created credential has no integrations)
-      const emptyState = app.getByText('No integrations using this credential')
+      const emptyState = app.getByRole('heading', { name: 'No integrations yet' })
       const errorState = app.getByText('Failed to load integrations')
       await expect(emptyState.or(errorState)).toBeVisible()
     } finally {
@@ -211,7 +211,7 @@ test.describe('Credential Detail Page & Workflows Tab', () => {
       await app.getByRole('tab', { name: /Workflows/ }).click()
 
       // Assert - Empty state or error (if endpoint not implemented yet)
-      const emptyState = app.getByText('No workflows using this credential')
+      const emptyState = app.getByRole('heading', { name: 'No workflows yet' })
       const errorState = app.getByText('Failed to load workflows')
       await expect(emptyState.or(errorState)).toBeVisible()
     } finally {

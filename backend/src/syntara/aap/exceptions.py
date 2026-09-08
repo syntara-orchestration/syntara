@@ -6,7 +6,7 @@ from syntara.core.exceptions import SyntaraError
 
 @fastapi_exception(handler="syntara.aap.error_handlers.aap_not_configured_handler")
 class AAPNotConfiguredError(SyntaraError):
-    """AAP Controller not configured (no env vars)."""
+    """AAP Controller integration is missing, disabled, or not resolvable."""
 
 
 @fastapi_exception(handler="syntara.aap.error_handlers.aap_connection_error_handler")

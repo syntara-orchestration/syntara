@@ -476,7 +476,7 @@
         },
         "from_port": {
           "type": "string",
-          "description": "Output port on the source. Required for multi-output nodes (condition, loop, switch) to specify which execution path this edge represents. Condition nodes use 'true'/'false', loop nodes use 'iterate'/'complete', switch nodes use dynamic case port names. Port-to-node-type consistency is enforced at the application level.",
+          "description": "Output port on the source. Required for multi-output nodes (condition, loop, switch, approval) to specify which execution path this edge represents. Condition nodes use 'true'/'false', loop nodes use 'iterate'/'complete', switch nodes use dynamic case port names, approval nodes use 'approved'/'rejected' (at least one successor on the 'approved' port is required). Port-to-node-type consistency is enforced at the application level.",
           "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
         },
         "to_port": {

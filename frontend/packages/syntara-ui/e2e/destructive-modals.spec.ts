@@ -2,16 +2,9 @@ import { type Locator } from '@playwright/test'
 
 import { test, expect, toAppUrl } from './fixtures'
 import { buildUniqueName, createBasicWorkflowViaApi, deleteWorkflow } from './helpers/workflows'
-import {
-  createRoleAssignmentViaApi,
-  createUserViaApi,
-  deleteRoleAssignmentViaApi,
-  deleteUserViaApi,
-  type SeededRoleAssignment,
-  type SeededUser,
-} from './seeds/iam'
+import { createUserViaApi, deleteUserViaApi, type SeededUser } from './seeds/iam'
 import { createIntegrationViaApi, deleteIntegrationViaApi, type SeededIntegration } from './seeds/resources'
-import { ensureProject, getAuthToken } from './utils/api'
+import { createRoleAssignmentViaApi, deleteRoleAssignmentViaApi, getAuthToken } from './utils/api'
 
 async function assertWorkflowDeleteModal(modal: Locator, workflowName: string) {
   await expect(modal).toBeVisible()
@@ -39,33 +32,30 @@ async function assertWorkflowDeleteModal(modal: Locator, workflowName: string) {
 
 test.describe('destructive modal UX compliance (AAP-72897)', () => {
   let seededUser: SeededUser | null = null
-  let seededAssignment: SeededRoleAssignment | null = null
+  let seededAssignment: { id: string } | null = null
 
   test.beforeAll(async ({ browser }) => {
     const page = await browser.newPage()
-    const token = await getAuthToken(page)
-    if (token) {
+    try {
+      const token = await getAuthToken(page)
+      if (!token) throw new Error('destructive-modals beforeAll: could not obtain auth token')
+
       const prefix = buildUniqueName('e2e-dm')
       seededUser = await createUserViaApi(page, { username: `${prefix}-user`, token })
 
-      if (seededUser) {
-        const project = await ensureProject(page)
-        if (project) {
-          seededAssignment = await createRoleAssignmentViaApi(page, project.id, {
-            userId: seededUser.id,
-            roleName: 'admin',
-            token,
-          })
-        }
-      }
+      seededAssignment = await createRoleAssignmentViaApi(page, {
+        principal_id: seededUser.id,
+        role_name: 'admin',
+      })
+    } finally {
+      await page.close()
     }
-    await page.close()
   })
 
   test.afterAll(async ({ browser }) => {
     const page = await browser.newPage()
     if (seededAssignment) {
-      await deleteRoleAssignmentViaApi(page, seededAssignment.projectId, seededAssignment.id)
+      await deleteRoleAssignmentViaApi(page, seededAssignment.id)
     }
     if (seededUser) {
       await deleteUserViaApi(page, seededUser.id)
@@ -81,7 +71,7 @@ test.describe('destructive modal UX compliance (AAP-72897)', () => {
       // Create integration via API
       const token = await getAuthToken(app)
       seededIntegration = await createIntegrationViaApi(app, { name: integrationName, token: token ?? undefined })
-      expect(seededIntegration).not.toBeNull()
+      expect(seededIntegration, 'Failed to create integration via API').toBeTruthy()
 
       await app.goto(toAppUrl('/configuration/integrations'))
       await expect(app.getByRole('heading', { level: 1, name: 'Integrations' })).toBeVisible()
@@ -188,41 +178,27 @@ test.describe('destructive modal UX compliance (AAP-72897)', () => {
   })
 
   test('unassign role modal has Tier 2 pattern: warning icon, no checkbox', async ({ app }) => {
-    await app.goto(toAppUrl('/system-administration/access-management/users'))
+    expect(seededUser, 'Seeded user not created in beforeAll').toBeTruthy()
+    expect(seededAssignment, 'Seeded role assignment not created in beforeAll').toBeTruthy()
+    if (!seededUser) {
+      throw new Error('Seeded user not created in beforeAll')
+    }
 
-    const table = app.getByRole('grid', { name: 'Users table' })
-    const hasTable = await table
-      .waitFor({ state: 'visible', timeout: 5000 })
-      .then(() => true)
-      .catch(() => false)
-    test.skip(!hasTable, 'No user data available; seed data required')
-
-    // Navigate to first user's role assignments
-    const firstRow = table.locator('tbody tr:first-child')
-    const firstUserLink = firstRow.getByRole('link')
-    await expect(firstUserLink).toBeVisible()
-    await firstUserLink.click()
+    // Navigate directly to the seeded user's detail page (they have a role assignment)
+    await app.goto(toAppUrl(`/system-administration/access-management/users/${seededUser.id}`))
+    await expect(app.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 10_000 })
 
     // Go to the Assignments tab
     const roleAssignmentsTab = app.getByRole('tab', { name: /Assignments/i })
-    const hasRoleTab = await roleAssignmentsTab
-      .waitFor({ state: 'visible', timeout: 5000 })
-      .then(() => true)
-      .catch(() => false)
-    test.skip(!hasRoleTab, 'No role assignments tab available')
-
+    await expect(roleAssignmentsTab).toBeVisible({ timeout: 10_000 })
     await roleAssignmentsTab.click()
 
-    // Find an unassign button in the assignments table
+    // Open the kebab menu in the assignments table row and click Unassign
     const assignmentsTable = app.getByRole('grid')
-    const unassignButton = assignmentsTable.getByRole('button', { name: /Unassign/i })
-    const hasUnassign = await unassignButton
-      .waitFor({ state: 'visible', timeout: 5000 })
-      .then(() => true)
-      .catch(() => false)
-    test.skip(!hasUnassign, 'No role assignments available to unassign')
-
-    await unassignButton.click()
+    const kebabButton = assignmentsTable.getByRole('button', { name: /Actions|Kebab toggle/i })
+    await expect(kebabButton).toBeVisible({ timeout: 10_000 })
+    await kebabButton.click()
+    await app.getByRole('menuitem', { name: /Unassign/i }).click()
 
     const modal = app.getByRole('dialog')
     await expect(modal).toBeVisible()

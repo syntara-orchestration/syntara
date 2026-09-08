@@ -161,6 +161,8 @@ describe('useWorkflowPermissions', () => {
     const { result } = renderHook(() => useWorkflowPermissions(), { wrapper: createWrapper() })
 
     expect(result.current.tooltips.create).toContain('workflow:create')
+    expect(result.current.tooltips.duplicate).toContain('duplicate this workflow')
+    expect(result.current.tooltips.duplicate).toContain('workflow:create')
     expect(result.current.tooltips.update).toContain('workflow:update')
     expect(result.current.tooltips.delete).toContain('workflow:delete')
     expect(result.current.tooltips.run).toContain('execution:run')

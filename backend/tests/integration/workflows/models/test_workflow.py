@@ -9,7 +9,6 @@ Tests cover:
 - Relationships with User and WorkflowVersion
 """
 
-from datetime import UTC, datetime
 from typing import Any, cast
 from uuid import UUID, uuid4
 
@@ -47,8 +46,6 @@ async def test_create_workflow_with_required_fields(
     assert workflow.current_version == 1
     assert workflow.is_enabled is False
     assert workflow.created_by == test_user.id
-    assert workflow.deleted_at is None
-    assert workflow.deleted_by is None
     assert workflow.created_at is not None
     assert workflow.updated_at is not None
 
@@ -81,13 +78,12 @@ async def test_create_workflow_with_all_fields(
 
 
 @pytest.mark.asyncio
-async def test_workflow_soft_delete(
+async def test_workflow_hard_delete(
     test_db_session: AsyncSession,
     test_user: User,
     test_project_id: UUID,
 ) -> None:
-    """Test soft delete sets deleted_at and deleted_by correctly."""
-    # Create workflow
+    """Test hard delete removes the workflow row from the database."""
     workflow = Workflow(
         id=uuid4(),
         name="delete-me",
@@ -97,14 +93,11 @@ async def test_workflow_soft_delete(
     test_db_session.add(workflow)
     await test_db_session.commit()
 
-    # Perform soft delete
-    now = datetime.now(UTC)
-    workflow.deleted_at = now
-    workflow.deleted_by = test_user.id
+    await test_db_session.delete(workflow)
     await test_db_session.commit()
 
-    assert workflow.deleted_at == now
-    assert workflow.deleted_by == test_user.id
+    result = await test_db_session.get(Workflow, workflow.id)
+    assert result is None
 
 
 @pytest.mark.asyncio

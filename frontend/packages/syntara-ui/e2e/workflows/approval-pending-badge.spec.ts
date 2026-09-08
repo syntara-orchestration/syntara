@@ -61,78 +61,74 @@ async function applyPendingApprovalStatusFilter(app: Page): Promise<void> {
 test.describe('Approval Pending Badge', () => {
   test.skip(!process.env['SYNTARA_E2E_HAS_TEMPORAL_WORKER'], 'Temporal worker unavailable (globalSetup probe)')
 
-  test(
-    'shows "Pending approval" badge in all three locations when execution has pending approval',
-    { tag: ['@konflux-skip'] },
-    async ({ app }) => {
-      let workflowName: string | undefined
+  test('shows "Pending approval" badge in all three locations when execution has pending approval', async ({ app }) => {
+    let workflowName: string | undefined
 
-      try {
-        const result = await createPendingApproval(app)
-        workflowName = result.workflowName
-        const { workflowId, executionId } = result
+    try {
+      const result = await createPendingApproval(app)
+      workflowName = result.workflowName
+      const { workflowId, executionId } = result
 
-        // ===================================================================
-        // LOCATION 1: Execution Detail Page Header
-        // ===================================================================
-        // We're already on the execution detail page from createPendingApproval
-        const pageHeader = app.getByTestId('page-header')
-        const badgeInDetail = pageHeader.getByText('Pending approval')
-        await expect(badgeInDetail).toBeVisible({ timeout: 5_000 })
+      // ===================================================================
+      // LOCATION 1: Execution Detail Page Header
+      // ===================================================================
+      // We're already on the execution detail page from createPendingApproval
+      const pageHeader = app.getByTestId('page-header')
+      const badgeInDetail = pageHeader.getByText('Pending approval')
+      await expect(badgeInDetail).toBeVisible({ timeout: 5_000 })
 
-        // ===================================================================
-        // LOCATION 2: Workflow Run History Panel
-        // ===================================================================
-        // Navigate back to the workflow builder
-        await app.goto(`/workflow-builder/${workflowId}`)
-        await expect(app.getByPlaceholder('Workflow name')).toBeVisible({ timeout: 10_000 })
+      // ===================================================================
+      // LOCATION 2: Workflow Run History Panel
+      // ===================================================================
+      // Navigate back to the workflow builder
+      await app.goto(`/workflow-builder/${workflowId}`)
+      await expect(app.getByPlaceholder('Workflow name')).toBeVisible({ timeout: 10_000 })
 
-        // Open the run history panel via the kebab menu
-        const kebab = app.getByRole('button', { name: 'Workflow actions' })
-        await expect(kebab).toBeVisible({ timeout: 5_000 })
-        await kebab.click()
-        await app.getByRole('menuitem', { name: /Run history/i }).click()
+      // Open the run history panel via the kebab menu
+      const kebab = app.getByRole('button', { name: 'Workflow actions' })
+      await expect(kebab).toBeVisible({ timeout: 5_000 })
+      await kebab.click()
+      await app.getByRole('menuitem', { name: /Run history/i }).click()
 
-        // Verify badge appears in the history panel.
-        // PF6 SimpleList in grouped mode does not apply aria-label to any
-        // role="list" element, so confirm the panel via its heading instead.
-        await expect(app.getByRole('heading', { name: 'Run History' })).toBeVisible({ timeout: 5_000 })
-        const badgeInHistory = app.getByText('Pending approval')
-        await expect(badgeInHistory).toBeVisible({ timeout: 15_000 })
+      // Verify badge appears in the history panel.
+      // PF6 SimpleList in grouped mode does not apply aria-label to any
+      // role="list" element, so confirm the panel via its heading instead.
+      await expect(app.getByRole('heading', { name: 'Run History' })).toBeVisible({ timeout: 5_000 })
+      const badgeInHistory = app.getByText('Pending approval')
+      await expect(badgeInHistory).toBeVisible({ timeout: 15_000 })
 
-        // ===================================================================
-        // LOCATION 3: Executions List Table
-        // ===================================================================
-        // Navigate to executions list
-        await app.goto('/executions')
+      // ===================================================================
+      // LOCATION 3: Executions List Table
+      // ===================================================================
+      // Navigate to executions list
+      await app.goto('/executions')
 
-        // Wait for the table to load
-        await expect(app.getByRole('grid')).toBeVisible({ timeout: 10_000 })
+      // Wait for the table to load
+      await expect(app.getByRole('grid')).toBeVisible({ timeout: 10_000 })
 
-        // Find the row with our execution ID and verify badge is visible
-        const executionRow = app.locator('tr', { has: app.getByText(executionId.slice(0, 8)) })
-        const badgeInList = executionRow.getByText('Pending approval')
+      // Find the row with our execution ID and verify badge is visible
+      const executionRow = app.locator('tr', { has: app.getByText(executionId.slice(0, 8)) })
+      const badgeInList = executionRow.getByText('Pending approval')
 
-        await expect(badgeInList).toBeVisible({ timeout: 5_000 })
+      await expect(badgeInList).toBeVisible({ timeout: 5_000 })
 
-        // Verify the badge appears alongside the "Paused" status
-        const pausedStatus = executionRow.getByText('Paused')
-        await expect(pausedStatus).toBeVisible()
+      // Verify the badge appears alongside the "Paused" status
+      const pausedStatus = executionRow.getByText('Paused')
+      await expect(pausedStatus).toBeVisible()
 
-        // ===================================================================
-        // VERIFICATION: Filter by "Pending approval" via Status filter
-        // ===================================================================
-        await applyPendingApprovalStatusFilter(app)
-        await expect(app).toHaveURL(/approval_pending=true/)
-        await expect(badgeInList).toBeVisible()
-      } finally {
-        // Cleanup: Delete the workflow
-        if (workflowName) {
-          await deleteWorkflow(app, workflowName)
-        }
+      // ===================================================================
+      // VERIFICATION: Filter by "Pending approval" via Status filter
+      // ===================================================================
+      await applyPendingApprovalStatusFilter(app)
+      await expect(app).toHaveURL(/approval_pending=true/)
+      await expect(badgeInList).toBeVisible()
+    } finally {
+      // Cleanup: Delete the workflow
+      if (workflowName) {
+        await deleteWorkflow(app, workflowName)
       }
     }
-  )
+  })
 
   test('does NOT show "Pending approval" badge when execution has no pending approvals', async ({ app }) => {
     let workflowName: string | undefined

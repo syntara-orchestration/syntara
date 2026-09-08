@@ -28,7 +28,6 @@ info:
         +-- Workflow (+ SoftDeletableResource + UserOwnedResource)
             +-- WorkflowWithVersion (+ version details)
 
-    SoftDeletableResource (deleted_at, deleted_by)
     UserOwnedResource (created_by)
     ```
 
@@ -49,17 +48,14 @@ info:
   version: 2.0.0
   contact:
     name: Orchestrator Team
-
 servers:
   - url: /api/v1
     description: API server (relative path)
-
 tags:
   - name: Workflows
     description: Workflow CRUD, versioning, and publishing
   - name: Webhooks
     description: Inbound webhook event receivers
-
 paths:
   /workflows:
     get:
@@ -141,7 +137,6 @@ paths:
           $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
         '500':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
-
   /workflows/validate:
     post:
       summary: Validate workflow definition
@@ -192,7 +187,6 @@ paths:
           $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
         '500':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
-
   /workflows/{workflow_id}:
     get:
       summary: Get workflow
@@ -286,7 +280,7 @@ paths:
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
     delete:
       summary: Delete workflow
-      description: Soft delete a workflow.
+      description: Permanently delete a workflow and cascade-delete all its versions and executions.
       operationId: delete_workflow
       tags:
         - Workflows
@@ -322,7 +316,6 @@ paths:
           $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
         '500':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
-
   /workflows/{workflow_id}/test:
     post:
       summary: Test a single node in a workflow
@@ -372,7 +365,6 @@ paths:
           $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
         '500':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
-
   /workflows/{workflow_id}/versions:
     get:
       summary: List workflow versions
@@ -449,7 +441,6 @@ paths:
           $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
         '500':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
-
   /workflows/{workflow_id}/versions/{version}:
     get:
       summary: Get workflow version
@@ -551,7 +542,6 @@ paths:
           $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
         '500':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
-
   /workflows/{workflow_id}/versions/{version}/publish:
     post:
       summary: Publish workflow version
@@ -608,7 +598,6 @@ paths:
           $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
         '500':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
-
   /workflows/{workflow_id}/unpublish:
     post:
       summary: Unpublish workflow
@@ -652,7 +641,6 @@ paths:
           $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
         '500':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
-
   /workflows/{workflow_id}/versions/{version}/restore:
     post:
       summary: Restore workflow version
@@ -703,7 +691,6 @@ paths:
           $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
         '500':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
-
   /workflows/{workflow_id}/versions/{version}/export:
     get:
       summary: Export workflow version
@@ -752,17 +739,13 @@ paths:
           $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
         '500':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
-
   # Note: Approval endpoints are in a separate API
   # See: src/syntara/schemas/approvals/openapi.yaml
-
   /webhooks/{webhook_path}:
     post:
       summary: Receive webhook event
       description: >-
-        Receive a webhook event from an external system and trigger the matching
-        workflow. Requires a service account Bearer token. Only POST method is
-        supported; other methods receive 405 Method Not Allowed.
+        Receive a webhook event from an external system and trigger the matching workflow. Requires a service account Bearer token. Only POST method is supported; other methods receive 405 Method Not Allowed.
       operationId: receive_webhook
       tags: [Webhooks]
       security:
@@ -822,15 +805,11 @@ paths:
             application/problem+json:
               schema:
                 $ref: '../../base/shared-resources.openapi.yaml#/components/schemas/ErrorData'
-
   /webhooks/eda/{webhook_path}:
     post:
       summary: Receive EDA webhook event
       description: >-
-        Receive a webhook event from Event-Driven Ansible and trigger the
-        matching workflow. Requires a service account Bearer token. Each EDA
-        trigger node has its own unique webhook path. The payload can be any
-        JSON structure.
+        Receive a webhook event from Event-Driven Ansible and trigger the matching workflow. Requires a service account Bearer token. Each EDA trigger node has its own unique webhook path. The payload can be any JSON structure.
       operationId: receive_eda_webhook
       tags: [Webhooks]
       security:
@@ -890,27 +869,19 @@ paths:
             application/problem+json:
               schema:
                 $ref: '../../base/shared-resources.openapi.yaml#/components/schemas/ErrorData'
-
 components:
   schemas:
     # Import workflow-specific schemas
     WorkflowRead:
       $ref: ./shared-schemas.yaml#/components/schemas/WorkflowRead
-
     WorkflowReadWithVersion:
       $ref: ./shared-schemas.yaml#/components/schemas/WorkflowReadWithVersion
-
     PublishWorkflowVersionResponse:
       $ref: ./shared-schemas.yaml#/components/schemas/PublishWorkflowVersionResponse
-
     WorkflowVersionRead:
       type: object
       title: WorkflowVersionRead
-      description: |-
-        Schema for workflow version response (GET /workflows/{id}/versions/{version}).
-        WorkflowVersion entities are read-only and managed automatically by the system.
-
-        Note: deleted_at and deleted_by are None since soft-deleted versions are excluded from queries.
+      description: Schema for workflow version response (GET /workflows/{id}/versions/{version}).
       required:
         - id
         - workflow_id
@@ -986,20 +957,6 @@ components:
           type: string
           format: date-time
           title: Updated At
-        deleted_at:
-          anyOf:
-            - type: string
-              format: date-time
-            - type: 'null'
-          title: Deleted At
-        deleted_by:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
-          title: Deleted By
-
-
     PublishVersionRequest:
       type: object
       title: PublishVersionRequest
@@ -1033,9 +990,7 @@ components:
             - type: 'null'
           title: Expected Version
           description: >-
-            Version the client was editing. If the server's current_version is
-            higher, returns 409 Conflict.
-
+            Version the client was editing. If the server's current_version is higher, returns 409 Conflict.
     WorkflowVersionUpdate:
       type: object
       title: WorkflowVersionUpdate
@@ -1055,7 +1010,6 @@ components:
             - type: 'null'
           title: Change Description
           description: Description of changes
-
     WorkflowVersionListResponse:
       type: object
       title: WorkflowVersionListResponse
@@ -1094,7 +1048,6 @@ components:
           total: 150
         - next: eyJpZCI6Im5leHQifQ
           prev: eyJpZCI6InByZXYifQ
-
     WorkflowListResponse:
       type: object
       required:
@@ -1133,30 +1086,21 @@ components:
           total: 150
         - next: eyJpZCI6Im5leHQifQ
           prev: eyJpZCI6InByZXYifQ
-
     # Note: Approval schemas are in src/syntara/schemas/approvals/openapi.yaml
-
     WorkflowCreate:
       $ref: ./shared-schemas.yaml#/components/schemas/WorkflowCreate
-
     WorkflowUpdate:
       $ref: ./shared-schemas.yaml#/components/schemas/WorkflowUpdate
-
     TestExecutionCreate:
       $ref: ./shared-schemas.yaml#/components/schemas/TestExecutionCreate
-
     PreResolvedNodeOutput:
       $ref: ./shared-schemas.yaml#/components/schemas/PreResolvedNodeOutput
-
     ExecutionMode:
       $ref: ./shared-schemas.yaml#/components/schemas/ExecutionMode
-
     ExecutionRead:
       $ref: ./shared-schemas.yaml#/components/schemas/ExecutionRead
-
     WorkflowDefinition:
       $ref: ./shared-schemas.yaml#/components/schemas/WorkflowDefinition
-
     # Node type schemas (referenced by WorkflowDefinition.nodes oneOf)
     AAPJobTemplateNode:
       $ref: ./shared-schemas.yaml#/components/schemas/AAPJobTemplateNode
@@ -1180,7 +1124,6 @@ components:
       $ref: ./shared-schemas.yaml#/components/schemas/ConvergeNode
     WaitNode:
       $ref: ./shared-schemas.yaml#/components/schemas/WaitNode
-
     # Node parameter and settings schemas
     AAPJobTemplateExecutorParameters:
       $ref: ./shared-schemas.yaml#/components/schemas/AAPJobTemplateExecutorParameters
@@ -1234,7 +1177,6 @@ components:
       $ref: ./shared-schemas.yaml#/components/schemas/AAPVerbosity
     AAPJobType:
       $ref: ./shared-schemas.yaml#/components/schemas/AAPJobType
-
     WebhookResponse:
       type: object
       title: WebhookResponse
@@ -1252,7 +1194,6 @@ components:
           type: string
           title: Message
           description: Human-readable status message
-
     WorkflowValidateRequest:
       type: object
       title: WorkflowValidateRequest
@@ -1271,7 +1212,6 @@ components:
           type: object
           title: Workflow Definition
           description: Workflow definition to validate
-
     ValidationSeverity:
       type: string
       title: ValidationSeverity
@@ -1279,7 +1219,6 @@ components:
       enum:
         - error
         - warning
-
     ValidationCategory:
       type: string
       title: ValidationCategory
@@ -1293,7 +1232,6 @@ components:
         - orphaned_node
         - converge_configuration
         - approval_configuration
-
     ValidationFinding:
       type: object
       title: ValidationFinding
@@ -1329,7 +1267,6 @@ components:
             - type: string
             - type: 'null'
           title: Field Path
-
     ValidationResult:
       type: object
       title: ValidationResult
@@ -1361,7 +1298,6 @@ components:
           items:
             $ref: '#/components/schemas/ValidationFinding'
           title: Findings
-
     DetailedValidationProblemDetail:
       type: object
       title: DetailedValidationProblemDetail
@@ -1402,13 +1338,11 @@ components:
           title: Instance
         validation_result:
           $ref: '#/components/schemas/ValidationResult'
-
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
       description: JWT token authentication
-
 security:
   - bearerAuth: []

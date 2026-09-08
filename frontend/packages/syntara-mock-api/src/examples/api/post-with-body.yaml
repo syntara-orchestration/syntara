@@ -1,5 +1,5 @@
 ---
-schema_version: '2.0.0'
+schema_version: "2.0.0"
 name: post-with-body
 description: HTTP POST request with JSON body and headers
 
@@ -24,7 +24,7 @@ nodes:
       headers:
         Content-Type: application/json
         X-Custom-Header: test-value
-      body: ${input.data}
+      body: ${trigger.data}
     inputs:
-      data: ${inputs.data}
+      data: ${trigger.data}
 edges: []

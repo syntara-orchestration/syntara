@@ -241,7 +241,7 @@ describe('NodeExecutionDetailsPanel', () => {
     const searchInputs = screen.getAllByPlaceholderText('Search')
     await user.type(searchInputs[0], 'host')
 
-    // In JSDOM scrollIntoView might not be called, so just verify search value changed
+    // In happy-dom scrollIntoView might not be called, so just verify search value changed
     expect(searchInputs[0]).toHaveValue('host')
   })
 

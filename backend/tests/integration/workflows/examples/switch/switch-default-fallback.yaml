@@ -21,10 +21,10 @@ nodes:
       cases:
         - port: case_0
           label: Approved
-          condition: "${input.status} == 'approved'"
+          condition: "${trigger.status} == 'approved'"
         - port: case_1
           label: Rejected
-          condition: "${input.status} == 'rejected'"
+          condition: "${trigger.status} == 'rejected'"
       default_port: default
 
   - id: handle_approved

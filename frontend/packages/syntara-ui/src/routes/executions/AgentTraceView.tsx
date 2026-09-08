@@ -17,9 +17,9 @@ import {
 import { RhUiCloseCircleIcon } from '@patternfly/react-icons'
 import { useState } from 'react'
 
-import { NxCodeBlock } from '../../components/details/NxCodeBlock'
-import { NxDetail } from '../../components/details/NxDetail'
-import { NxDetailList } from '../../components/details/NxDetailList'
+import { SynCodeBlock } from '../../components/details/SynCodeBlock'
+import { SynDetail } from '../../components/details/SynDetail'
+import { SynDetailList } from '../../components/details/SynDetailList'
 import { SynLabel } from '../../components/labels/SynLabel'
 import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 
@@ -67,20 +67,20 @@ function StructuredStepBody({ data }: Readonly<{ data: Record<string, unknown> }
   return (
     <Stack hasGutter className={styles.structuredContent}>
       <StackItem>
-        <NxDetailList>
+        <SynDetailList>
           {Object.entries(data).map(([key, value]) => (
-            <NxDetail key={key} label={formatTraceFieldLabel(key)}>
+            <SynDetail key={key} label={formatTraceFieldLabel(key)}>
               <TraceFieldValue value={value} />
-            </NxDetail>
+            </SynDetail>
           ))}
-        </NxDetailList>
+        </SynDetailList>
       </StackItem>
       <StackItem>
         <Content component={ContentVariants.small} className={styles.stepTypeLabel}>
           JSON
         </Content>
-        {/* PatternFly CodeBlock (via NxCodeBlock): read-only display + copy, aligned with schema JSON. */}
-        <NxCodeBlock enableCopy jsonObject={data} />
+        {/* PatternFly CodeBlock (via SynCodeBlock): read-only display + copy, aligned with schema JSON. */}
+        <SynCodeBlock enableCopy jsonObject={data} />
       </StackItem>
     </Stack>
   )
@@ -191,14 +191,14 @@ function ToolCallCard({ group }: Readonly<{ group: ToolCallGroup }>) {
           isExpanded={isExpanded}
           onToggle={(_e, expanded) => setIsExpanded(expanded)}
         >
-          <NxCodeBlock enableCopy copyContent={inputJson}>
+          <SynCodeBlock enableCopy copyContent={inputJson}>
             {inputJson}
-          </NxCodeBlock>
+          </SynCodeBlock>
         </ExpandableSection>
-        <NxDetailList>
-          <NxDetail label="Request">{formatTraceText(group.content)}</NxDetail>
-          <NxDetail label="Response">{formatTraceText(group.toolOutput)}</NxDetail>
-        </NxDetailList>
+        <SynDetailList>
+          <SynDetail label="Request">{formatTraceText(group.content)}</SynDetail>
+          <SynDetail label="Response">{formatTraceText(group.toolOutput)}</SynDetail>
+        </SynDetailList>
       </CardBody>
     </Card>
   )

@@ -1,6 +1,6 @@
 import { Button, Modal, ModalBody, ModalFooter, ModalHeader } from '@patternfly/react-core'
 
-import { NxCodeBlock } from '../../components/details/NxCodeBlock'
+import { SynCodeBlock } from '../../components/details/SynCodeBlock'
 import { useBlurOnOpen } from '../../hooks/useBlurOnOpen'
 
 import { buildPolicyDefinitionJson } from './policyUtils'
@@ -29,7 +29,7 @@ export function PolicyJsonModal({ isOpen, policy, onClose }: Readonly<PolicyJson
     >
       <ModalHeader title={title} labelId={`policy-json-modal-title-${policy.id}`} />
       <ModalBody id="policy-json-modal-body">
-        <NxCodeBlock jsonObject={policyJson} noMaxHeight enableCopy />
+        <SynCodeBlock jsonObject={policyJson} noMaxHeight enableCopy />
       </ModalBody>
       <ModalFooter>
         <Button variant="primary" onClick={onClose} aria-label="Close policy definition">
