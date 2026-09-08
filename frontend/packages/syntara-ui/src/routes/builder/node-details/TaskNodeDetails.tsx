@@ -33,6 +33,7 @@ import {
   buildExpressionModeActivity,
   buildWorkflowExpressionModeActivity,
   hasExpressionValue,
+  isJobTemplateInputVariablesMode,
   validateJobTemplateId,
   validateWorkflowTemplateId,
 } from '../utils/aapHelpers'
@@ -97,7 +98,11 @@ function hasJobTemplateConfig(config: Record<string, unknown>): config is Stored
     'job_template_id' in config ||
     'jobTemplateId' in config ||
     'job_template_name' in config ||
-    'jobTemplateName' in config
+    'jobTemplateName' in config ||
+    'use_input_variables' in config ||
+    'useInputVariables' in config ||
+    'extra_vars' in config ||
+    'extraVars' in config
   )
 }
 
@@ -221,23 +226,49 @@ function getStringField(config: Record<string, unknown>, ...keys: string[]): str
   return undefined
 }
 
+function resolveUseInputVariables(
+  c: StoredAAPConfig,
+  organizationName: string,
+  jobTemplateName: string,
+  inventoryName: string,
+  extraVars: string
+): boolean {
+  return (
+    c.use_input_variables === true ||
+    c.useInputVariables === true ||
+    hasExpressionValue(
+      organizationName,
+      jobTemplateName,
+      inventoryName,
+      c.limit ?? '',
+      c.tags ?? '',
+      c.skip_tags ?? c.skipTags ?? '',
+      extraVars
+    )
+  )
+}
+
 function buildAAPInitialData(taskName: string, config: Record<string, unknown>): Partial<AAPJobTemplateFormData> {
   if (!hasJobTemplateConfig(config)) {
     return { name: taskName }
   }
   const c = config
+  const organizationName = getField(c.organization_name, c.organization, '')
+  const jobTemplateName = getField(c.job_template_name, c.jobTemplateName, '')
+  const inventoryName = getField(c.inventory_name, c.inventoryName, '')
+  const extraVars = serializeExtraVars(c.extra_vars ?? c.extraVars)
 
   return {
     name: taskName,
     credential_id: getStringField(c, 'credential_id', 'credentialId'),
     integration_id: getStringField(c, 'integration_id', 'integrationId'),
     organization_id: c.organization_id ?? c.organizationId,
-    organization_name: getField(c.organization_name, c.organization, ''),
-    job_template_name: getField(c.job_template_name, c.jobTemplateName, ''),
+    organization_name: organizationName,
+    job_template_name: jobTemplateName,
     job_template_id: (c.job_template_id ?? c.jobTemplateId) as number | undefined,
-    inventory_name: getField(c.inventory_name, c.inventoryName, ''),
+    inventory_name: inventoryName,
     inventory_id: c.inventory_id ?? c.inventory,
-    extra_vars: serializeExtraVars(c.extra_vars ?? c.extraVars),
+    extra_vars: extraVars,
     limit: c.limit ?? '',
     tags: c.tags ?? '',
     skip_tags: c.skip_tags ?? c.skipTags ?? '',
@@ -251,6 +282,7 @@ function buildAAPInitialData(taskName: string, config: Record<string, unknown>):
     instance_group: getField(c.instance_group_name, c.instanceGroupName, '') as string | undefined,
     instance_group_id: c.instance_group_id ?? c.instanceGroupId,
     labels: c.labels ?? [],
+    use_input_variables: resolveUseInputVariables(c, organizationName, jobTemplateName, inventoryName, extraVars),
   }
 }
 
@@ -368,7 +400,7 @@ function renderAAPTaskDetails({
 
   const handleAAPSubmit = (data: AAPJobTemplateFormData) => {
     try {
-      if (hasExpressionValue(data.job_template_name, data.organization_name)) {
+      if (isJobTemplateInputVariablesMode(data)) {
         updateActivity(nodeId, buildExpressionModeActivity(nodeId, data.name, data))
       } else {
         const job_template_id = validateJobTemplateId(data.job_template_id)

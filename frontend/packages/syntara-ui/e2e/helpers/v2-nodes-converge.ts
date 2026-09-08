@@ -21,8 +21,8 @@ export async function openConvergeFormOnNewWorkflow(page: Page) {
 }
 
 /** Add a converge node (v2 type: "converge"). */
-export async function addConvergeNode(page: Page, name: string) {
-  await openAddNodePanel(page)
+export async function addConvergeNode(page: Page, name: string, sourceHandle?: string) {
+  await openAddNodePanel(page, sourceHandle)
   await selectCategoryAndType(page, 'Logic', 'Converge')
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
   await page.getByRole('button', { name: 'Create', exact: true }).click()

@@ -72,6 +72,7 @@ export function useModelSave(integrationId: string) {
 
   const saveRef = useRef<(params: SaveParams) => Promise<boolean>>(() => Promise.resolve(false))
 
+  // eslint-disable-next-line react-hooks/refs -- expose latest save closure to parent via stable ref
   saveRef.current = async (params: SaveParams): Promise<boolean> => {
     const { models, enabledModelIds, defaultModelId, serverDefaultId, isDefaultDirty } = params
     setIsSaving(true)

@@ -106,7 +106,7 @@ function processValidateResponse(
     showError: (opts: { title: string; description: string }) => void
   }
 ): void {
-  let backendErrors: ValidationError[] = []
+  let backendErrors: ValidationError[]
 
   if (response.ok && data) {
     backendErrors = mapFindings(data.findings)

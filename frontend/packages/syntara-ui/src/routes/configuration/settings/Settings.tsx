@@ -4,12 +4,12 @@ import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { AppRoute } from '../../../app/AppRoute'
-import { breadcrumbsSettingsCategory, breadcrumbsSettingsPage } from '../../../app/breadcrumbBuilders'
+import { breadcrumbsSettingsPage } from '../../../app/breadcrumbBuilders'
 import { settingsClient } from '../../../client'
-import { EmptyStateAccessDenied } from '../../../components/EmptyStateAccessDenied'
 import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../components/layout/SynPanel'
+import { SynEmptyStateAccessDenied } from '../../../components/states/SynEmptyStateAccessDenied'
 import { useQueryState } from '../../../components/states/useQueryState'
 import { SynPageTitle } from '../../../components/SynPageTitle'
 import { SynUrlTabs } from '../../../components/tabs/SynUrlTabs'
@@ -108,14 +108,6 @@ export default function Settings() {
     return Math.max(idx, 0)
   }, [activeSlug, categories])
 
-  const settingsBreadcrumbs = useMemo(() => {
-    const category = categories[activeIndex]
-    if (category && activeIndex > 0) {
-      return breadcrumbsSettingsCategory(category.name)
-    }
-    return breadcrumbsSettingsPage()
-  }, [categories, activeIndex])
-
   const settingsByCategory = useMemo(() => {
     const grouped = new Map<string, (typeof allSettings)[number][]>()
     for (const setting of allSettings) {
@@ -200,7 +192,7 @@ export default function Settings() {
         <SynPageHeader title="Settings" docLink={settingsDocLink} breadcrumbs={breadcrumbsSettingsPage()} />
         <StackItem isFilled>
           <SynPanel isFullHeight>
-            <EmptyStateAccessDenied description="You don't have permission to view settings. Contact your administrator to request the auditor or admin role." />
+            <SynEmptyStateAccessDenied description="You don't have permission to view settings. Contact your administrator to request the auditor or admin role." />
           </SynPanel>
         </StackItem>
       </SynPage>
@@ -223,7 +215,7 @@ export default function Settings() {
   return (
     <SynPage>
       <SynPageTitle segments={['Settings']} />
-      <SynPageHeader title="Settings" docLink={settingsDocLink} breadcrumbs={settingsBreadcrumbs} />
+      <SynPageHeader title="Settings" docLink={settingsDocLink} breadcrumbs={breadcrumbsSettingsPage()} />
       <SynPageBody>
         <FileStorageAlert />
         <SynPanel

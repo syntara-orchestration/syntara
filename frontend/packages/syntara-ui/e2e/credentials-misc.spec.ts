@@ -251,7 +251,7 @@ test.describe('Dynamic Field Renderer — Help Text', () => {
       .waitFor({ state: 'visible', timeout: 5_000 })
       .then(() => true)
       .catch(() => false)
-    test.skip(!hasHelpText, 'Credential type does not have help_text configured on this backend')
+    expect(hasHelpText, 'Credential type does not have help_text configured on this backend').toBeTruthy()
 
     await tokenHelpButton.click()
     // Exact name — the create modal's accessible name also contains "Token help".

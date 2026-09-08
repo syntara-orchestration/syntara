@@ -61,15 +61,15 @@ test.describe('UI-31: Default Builtin Groups — Visibility', () => {
 
       await expect(auditorsRow).toBeVisible()
       await expect(usersRow).toBeVisible()
-      await expect(auditorsRow.getByRole('button', { name: /Actions|Kebab toggle/i })).not.toBeVisible()
-      await expect(usersRow.getByRole('button', { name: /Actions|Kebab toggle/i })).not.toBeVisible()
+      await expect(auditorsRow.getByRole('button', { name: /^Actions for / })).not.toBeVisible()
+      await expect(usersRow.getByRole('button', { name: /^Actions for / })).not.toBeVisible()
 
       await app.getByRole('textbox', { name: /name filter/i }).fill(groupName)
       await app.getByRole('button', { name: 'Apply filter' }).click()
 
       const customRow = groupsTable.getByRole('row', { name: new RegExp(groupName) })
       await expect(customRow).toBeVisible()
-      await expect(customRow.getByRole('button', { name: /Kebab toggle/i })).toBeVisible()
+      await expect(customRow.getByRole('button', { name: /^Actions for / })).toBeVisible()
     } finally {
       await deleteGroupViaApi(app, groupId)
     }

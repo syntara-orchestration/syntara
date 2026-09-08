@@ -96,7 +96,7 @@ jobs:
           else
             echo "contracts=false" >> "$GITHUB_OUTPUT"
           fi
-          if grep -qE '^\\.github/scripts/' <<< "$FILES"; then
+          if grep -qE '^(\\.github/scripts/|\\.github/workflows/ci-frontend\\.yml$)' <<< "$FILES"; then
             echo "scripts=true" >> "$GITHUB_OUTPUT"
           else
             echo "scripts=false" >> "$GITHUB_OUTPUT"
@@ -251,8 +251,8 @@ jobs:
           path: pr_number.txt
           retention-days: 7
 
-  scripts-tests:
-    name: (Scripts) Tests
+  scripts-checks:
+    name: (Scripts) Checks
     needs: changes
     if: needs.changes.outputs.scripts == 'true'
     runs-on: ubuntu-latest
@@ -269,6 +269,10 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+        working-directory: .github/scripts
+
+      - name: Check formatting
+        run: npm run format:check
         working-directory: .github/scripts
 
       - name: Type check
@@ -781,6 +785,7 @@ jobs:
       - coverage-report
       - storybook-build
       - test-build
+      - scripts-checks
       - frontend-checks-gate
       - konflux-frontend-gate
       - konflux-ui-tests-gate
@@ -795,7 +800,7 @@ jobs:
           fi
 
           ok="success|skipped"
-          for job in gen-contracts checks unit-tests coverage-report storybook-build test-build frontend-checks-gate test-compose-e2e konflux-frontend-gate konflux-ui-tests-gate shared-checks-gate; do
+          for job in gen-contracts checks unit-tests coverage-report storybook-build test-build scripts-checks frontend-checks-gate test-compose-e2e konflux-frontend-gate konflux-ui-tests-gate shared-checks-gate; do
             case "$job" in
               gen-contracts)           result="${{ needs.gen-contracts.result }}" ;;
               checks)                  result="${{ needs.checks.result }}" ;;
@@ -803,6 +808,7 @@ jobs:
               coverage-report)         result="${{ needs.coverage-report.result }}" ;;
               storybook-build)         result="${{ needs.storybook-build.result }}" ;;
               test-build)              result="${{ needs.test-build.result }}" ;;
+              scripts-checks)          result="${{ needs.scripts-checks.result }}" ;;
               frontend-checks-gate)    result="${{ needs.frontend-checks-gate.result }}" ;;
               test-compose-e2e)        result="${{ needs.test-compose-e2e.result }}" ;;
               konflux-frontend-gate)   result="${{ needs.konflux-frontend-gate.result }}" ;;
