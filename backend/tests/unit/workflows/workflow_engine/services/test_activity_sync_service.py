@@ -9,8 +9,8 @@ from unittest.mock import AsyncMock, Mock, patch
 from uuid import UUID, uuid4
 
 import pytest
-from temporalio.api.enums.v1 import EventType, WorkflowExecutionStatus
-from temporalio.client import WorkflowQueryRejectedError
+from temporalio.api.enums.v1 import EventType
+from temporalio.client import WorkflowExecutionStatus, WorkflowQueryRejectedError
 from temporalio.service import RPCError, RPCStatusCode
 
 from syntara.core.exceptions import SafeValueError
@@ -5338,9 +5338,7 @@ class TestQueryActivityIoQueryFailure:
     @pytest.mark.asyncio
     async def test_workflow_query_rejected_error_returns_query_succeeded_false(self) -> None:
         mock_handle = AsyncMock()
-        mock_handle.query.side_effect = WorkflowQueryRejectedError(
-            WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_COMPLETED
-        )
+        mock_handle.query.side_effect = WorkflowQueryRejectedError(WorkflowExecutionStatus.COMPLETED)
         activity_data: dict[str, Any] = {"status": ActivityStatus.COMPLETED}
 
         input_data, output_data, query_succeeded = await self.service._query_activity_io(
@@ -5459,6 +5457,25 @@ class TestUpdateActivityRecordPreservesOnQueryFailure:
 
         assert existing.input_data == {"param": "already-recorded"}
         assert existing.output_data == {"job_id": 42}
+
+    def test_query_succeeded_false_merges_heartbeat_without_clobbering_stored_output(self) -> None:
+        existing = self._existing_activity()
+        existing.output_data = {"job_id": 42, "result": "complete"}
+
+        ActivitySyncService._update_activity_record(
+            existing,
+            self._activity_data(),
+            {},
+            {"job_id": 7, "job_url": "https://example.com/jobs/7"},
+            query_succeeded=False,
+        )
+
+        assert existing.input_data == {"param": "already-recorded"}
+        assert existing.output_data == {
+            "job_id": 42,
+            "job_url": "https://example.com/jobs/7",
+            "result": "complete",
+        }
 
 
 class TestActivitySyncPreservesIoOnQueryFailure:
