@@ -245,3 +245,46 @@ class TestConditionWithNamespace:
             await condition({"condition": "${unknown} == 'value'", "namespace": namespace}, None)
         assert exc_info.value.type == "ConditionEvaluationError"
         assert "unknown" in str(exc_info.value)
+
+
+class TestConditionVisualBuilderOperators:
+    """Word operators from the visual builder must evaluate (AAP-91413)."""
+
+    @pytest.mark.asyncio
+    async def test_exists_true_routes_true_port(self) -> None:
+        result = await condition(
+            {"condition": "${node.status} exists", "namespace": {"node": {"status": "ok"}}},
+            None,
+        )
+        assert result["control"]["next_port"] == "true"
+        assert result["output"]["evaluated_result"] is True
+
+    @pytest.mark.asyncio
+    async def test_exists_false_when_path_missing(self) -> None:
+        result = await condition(
+            {"condition": "${node.status} exists", "namespace": {"node": {}}},
+            None,
+        )
+        assert result["control"]["next_port"] == "false"
+        assert result["output"]["evaluated_result"] is False
+
+    @pytest.mark.asyncio
+    async def test_negated_exists_saved_backend_form(self) -> None:
+        result = await condition(
+            {"condition": "not (${data.optional} exists)", "namespace": {"data": {}}},
+            None,
+        )
+        assert result["control"]["next_port"] == "true"
+
+    @pytest.mark.asyncio
+    async def test_starts_with(self) -> None:
+        result = await condition(
+            {"condition": '${username} startsWith "user_"', "namespace": {"username": "user_abc"}},
+            None,
+        )
+        assert result["control"]["next_port"] == "true"
+
+    @pytest.mark.asyncio
+    async def test_is_empty(self) -> None:
+        result = await condition({"condition": "${text} isEmpty", "namespace": {"text": ""}}, None)
+        assert result["control"]["next_port"] == "true"

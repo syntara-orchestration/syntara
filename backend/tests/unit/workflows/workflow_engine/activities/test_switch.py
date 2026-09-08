@@ -630,3 +630,40 @@ class TestSwitchComplexExpressions:
         result = await switch(config, None)
         assert result["control"]["next_port"] == "default"
         assert result["output"]["matched_port"] == "default"
+
+
+class TestSwitchVisualBuilderOperators:
+    """Word operators from the visual builder must evaluate (AAP-91413)."""
+
+    @pytest.mark.asyncio
+    async def test_exists_operator_matches_without_syntax_error(self) -> None:
+        """Ticket reproduction: '${node.status} exists' used to raise Invalid expression syntax."""
+        cases = [{"port": "case_0", "label": "Has status", "condition": "${node.status} exists"}]
+        result = await switch(_make_config(cases=cases, namespace={"node": {"status": "ok"}}), None)
+        assert result["control"]["next_port"] == "case_0"
+        assert result["output"]["matched_port"] == "case_0"
+
+    @pytest.mark.asyncio
+    async def test_exists_false_when_path_missing_routes_default(self) -> None:
+        cases = [{"port": "case_0", "label": "Has status", "condition": "${node.status} exists"}]
+        result = await switch(_make_config(cases=cases, namespace={"node": {}}), None)
+        assert result["control"]["next_port"] == "default"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("condition", "namespace"),
+        [
+            ("${text} isEmpty", {"text": ""}),
+            ('${username} startsWith "user_"', {"username": "user_abc"}),
+            ('${filename} endsWith ".txt"', {"filename": "notes.txt"}),
+            ('${code} matches "^[A-Z]{3}$"', {"code": "ABC"}),
+            ("${tags} lengthEqualTo 2", {"tags": ["a", "b"]}),
+            ("${tags} lengthGreaterThan 1", {"tags": ["a", "b"]}),
+            ("${tags} lengthLessThan 2", {"tags": ["a"]}),
+            ('"Hello" in ${message}', {"message": "Hello world"}),
+        ],
+    )
+    async def test_visual_builder_operators_match_first_case(self, condition: str, namespace: dict[str, Any]) -> None:
+        cases = [{"port": "case_0", "label": "Match", "condition": condition}]
+        result = await switch(_make_config(cases=cases, namespace=namespace), None)
+        assert result["control"]["next_port"] == "case_0"
