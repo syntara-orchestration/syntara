@@ -1842,6 +1842,38 @@ class TestHandleActivityCallback(TestExecutionServiceBase):
         assert "plain string error" in str(error)
 
     @pytest.mark.asyncio
+    async def test_fails_activity_on_cancelled_status(self) -> None:
+        """Test that cancelled status calls fail_async_activity instead of completing."""
+        service, mock_temporal = self._make_service()
+        service.get_execution = AsyncMock(return_value=self._mock_execution())  # type: ignore[method-assign]
+        await service.handle_activity_callback(
+            uuid4(),
+            "node-1",
+            {"status": "cancelled", "reason": "User requested cancellation"},
+        )
+
+        mock_temporal.fail_async_activity.assert_called_once()
+        mock_temporal.complete_async_activity.assert_not_called()
+        error = mock_temporal.fail_async_activity.call_args.kwargs["error"]
+        assert "InvocationCancelledError" in str(error)
+        assert error.non_retryable is True
+
+    @pytest.mark.asyncio
+    async def test_cancelled_status_uses_default_reason(self) -> None:
+        """Test that cancelled status uses default reason when none provided."""
+        service, mock_temporal = self._make_service()
+        service.get_execution = AsyncMock(return_value=self._mock_execution())  # type: ignore[method-assign]
+        await service.handle_activity_callback(
+            uuid4(),
+            "node-1",
+            {"status": "cancelled"},
+        )
+
+        mock_temporal.fail_async_activity.assert_called_once()
+        error = mock_temporal.fail_async_activity.call_args.kwargs["error"]
+        assert "Invocation cancelled" in str(error)
+
+    @pytest.mark.asyncio
     async def test_raises_temporal_unavailable_when_no_service(self) -> None:
         """Test that TemporalUnavailableError is raised when temporal_service is None."""
         from syntara.workflows.exceptions import TemporalUnavailableError
