@@ -191,7 +191,7 @@ describe('AAPWorkflowTemplateForm', () => {
       ],
       isLoading: false,
       error: null,
-      refetch: vi.fn() as unknown as ReturnType<typeof useAllCredentials>['refetch'],
+      refetch: vi.fn(),
     })
   })
 
