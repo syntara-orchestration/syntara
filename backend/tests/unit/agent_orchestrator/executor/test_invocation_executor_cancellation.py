@@ -8,6 +8,7 @@ from uuid import uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from syntara.agent_orchestrator.exceptions import InvocationCancelledError
 from syntara.agent_orchestrator.executor.invocation_executor import InvocationExecutor
 from syntara.agent_orchestrator.models import InvocationStatus
 
@@ -79,6 +80,53 @@ class TestInvocationExecutorCancellationRaceCondition:
             assert call_args[0][1] == InvocationStatus.RUNNING  # Second positional arg is status
 
     @pytest.mark.asyncio
+    async def test_execute_invocation_raises_when_running_update_fails(self) -> None:
+        """Cancel during file conversion / init makes RUNNING update return False.
+
+        When _update_invocation_status(RUNNING) returns False the invocation was
+        cancelled while waiting for file conversions or during init. The executor
+        must raise InvocationCancelledError and send the cancellation signal instead
+        of proceeding to execute().
+        """
+        mock_session = AsyncMock()
+
+        async def mock_session_factory() -> AsyncGenerator[AsyncSession, None]:
+            yield mock_session
+
+        executor = InvocationExecutor(session_factory=mock_session_factory)
+        invocation_id = uuid4()
+
+        mock_invocation = MagicMock()
+        mock_invocation.id = invocation_id
+        mock_invocation.status = InvocationStatus.RUNNING
+        mock_invocation.prompt = "test prompt"
+        mock_invocation.session_id = "test-session"
+        mock_invocation.context_data = {}
+
+        mock_session.get.return_value = mock_invocation
+
+        with (
+            patch(
+                "syntara.agent_orchestrator.executor.invocation_executor.get_openrouter_llm",
+                return_value=(MagicMock(model_name="test-model", openai_api_base="https://test.example.com"), None),
+            ),
+            patch("syntara.agent_orchestrator.executor.invocation_executor.ContextManagerPlanner"),
+            patch("syntara.agent_orchestrator.executor.invocation_executor.OrchestrationService") as mock_orchestration,
+            patch.object(executor, "_update_invocation_status", return_value=False),
+            patch(
+                "syntara.agent_orchestrator.executor.invocation_executor.WorkflowSignalClient.send_cancellation_signal",
+                new_callable=AsyncMock,
+            ) as mock_cancel_signal,
+        ):
+            mock_orchestration.return_value.execute = AsyncMock()
+
+            with pytest.raises(InvocationCancelledError):
+                await executor.execute_invocation(invocation_id)
+
+            mock_cancel_signal.assert_called_once()
+            mock_orchestration.return_value.execute.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_execute_invocation_completes_normally_when_not_cancelled(self) -> None:
         """Test that invocations complete normally when not cancelled."""
         # Arrange
@@ -134,7 +182,7 @@ class TestInvocationExecutorCancellationRaceCondition:
 
     @pytest.mark.asyncio
     async def test_execute_invocation_handles_pre_execution_cancellation(self) -> None:
-        """Test that invocations cancelled before execution don't execute."""
+        """Test that invocations cancelled before execution raise and notify the workflow."""
         # Arrange
         mock_session = AsyncMock()
 
@@ -148,26 +196,33 @@ class TestInvocationExecutorCancellationRaceCondition:
         mock_invocation = MagicMock()
         mock_invocation.id = invocation_id
         mock_invocation.status = InvocationStatus.CANCELLED
+        mock_invocation.context_data = {
+            "callback_url": "https://syntara:8000/api/v1/executions/abc/activities/step/signal"
+        }
 
         mock_session.get.return_value = mock_invocation
 
-        with patch("syntara.agent_orchestrator.executor.invocation_executor.get_openrouter_llm") as mock_llm:
-            # Act
-            await executor.execute_invocation(invocation_id)
+        with (
+            patch("syntara.agent_orchestrator.executor.invocation_executor.get_openrouter_llm") as mock_llm,
+            patch(
+                "syntara.agent_orchestrator.executor.invocation_executor.WorkflowSignalClient.send_cancellation_signal",
+                new_callable=AsyncMock,
+            ) as mock_cancel_signal,
+        ):
+            with pytest.raises(InvocationCancelledError):
+                await executor.execute_invocation(invocation_id)
 
-            # Assert
-            # 1. LLM should not be created (early return)
+            # LLM should not be created
             mock_llm.assert_not_called()
 
-            # 2. Session should not be committed (early return)
-            mock_session.commit.assert_not_called()
-
-            # 3. Status should remain CANCELLED
-            assert mock_invocation.status == InvocationStatus.CANCELLED
+            # Cancellation signal should be sent to the workflow
+            mock_cancel_signal.assert_called_once()
+            call_args = mock_cancel_signal.call_args[0]
+            assert call_args[1] == invocation_id
 
     @pytest.mark.asyncio
     async def test_execute_invocation_handles_invocation_cancelled_error(self) -> None:
-        """Test that InvocationCancelledError during execution is handled correctly."""
+        """Test that InvocationCancelledError during execution re-raises after sending signal."""
         # Arrange
         mock_session = AsyncMock()
 
@@ -201,22 +256,23 @@ class TestInvocationExecutorCancellationRaceCondition:
             ),
             patch("syntara.agent_orchestrator.executor.invocation_executor.ContextManagerPlanner"),
             patch("syntara.agent_orchestrator.executor.invocation_executor.OrchestrationService") as mock_orchestration,
+            patch(
+                "syntara.agent_orchestrator.executor.invocation_executor.WorkflowSignalClient.send_cancellation_signal",
+                new_callable=AsyncMock,
+            ) as mock_cancel_signal,
         ):
             # Simulate InvocationCancelledError being raised during execution
             mock_orchestration.return_value.execute.side_effect = InvocationCancelledError(
                 str(invocation_id), "test phase"
             )
 
-            # Act
-            await executor.execute_invocation(invocation_id)
+            # Act — should re-raise after sending the cancellation signal
+            with pytest.raises(InvocationCancelledError):
+                await executor.execute_invocation(invocation_id)
 
             # Assert
-            # 1. Only one commit should occur (marking as RUNNING), no final commit
+            mock_cancel_signal.assert_called_once()
             assert mock_session.commit.call_count == 1
-
-            # 2. No status update should occur (exception handled gracefully)
-            # The status would be set to CANCELLED by the cancellation service,
-            # not by the executor
 
     @pytest.mark.asyncio
     async def test_conditional_update_atomically_checks_cancellation(self) -> None:
@@ -428,3 +484,274 @@ class TestInvocationExecutorCancellationRaceCondition:
         assert values[started_at_col].effective_value == explicit_started_at, "Explicit started_at should be preserved"
 
         mock_session.commit.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_cancelled_error_sends_cancellation_signal(self) -> None:
+        """Test that InvocationCancelledError handler sends a cancellation signal."""
+        mock_session = AsyncMock()
+
+        async def mock_session_factory() -> AsyncGenerator[AsyncSession, None]:
+            yield mock_session
+
+        executor = InvocationExecutor(session_factory=mock_session_factory)
+        invocation_id = uuid4()
+
+        mock_invocation = MagicMock()
+        mock_invocation.id = invocation_id
+        mock_invocation.status = InvocationStatus.RUNNING
+        mock_invocation.prompt = "test prompt"
+        mock_invocation.session_id = "test-session"
+        mock_invocation.context_data = {}
+
+        mock_session.get.return_value = mock_invocation
+
+        with (
+            patch(
+                "syntara.agent_orchestrator.executor.invocation_executor.get_openrouter_llm",
+                return_value=(MagicMock(model_name="test-model", openai_api_base="https://test.example.com"), None),
+            ),
+            patch("syntara.agent_orchestrator.executor.invocation_executor.ContextManagerPlanner"),
+            patch("syntara.agent_orchestrator.executor.invocation_executor.OrchestrationService") as mock_orchestration,
+            patch.object(executor, "_update_invocation_status", new=AsyncMock()),
+            patch(
+                "syntara.agent_orchestrator.executor.invocation_executor.WorkflowSignalClient.send_cancellation_signal",
+                new=AsyncMock(),
+            ) as mock_signal,
+        ):
+            mock_orchestration.return_value.execute.side_effect = InvocationCancelledError(
+                str(invocation_id), "streaming"
+            )
+
+            with pytest.raises(InvocationCancelledError):
+                await executor.execute_invocation(invocation_id)
+
+            mock_signal.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_pre_start_cancel_propagates_despite_signal_failure(self) -> None:
+        """InvocationCancelledError propagates even when send_cancellation_signal raises."""
+        mock_session = AsyncMock()
+
+        async def mock_session_factory() -> AsyncGenerator[AsyncSession, None]:
+            yield mock_session
+
+        executor = InvocationExecutor(session_factory=mock_session_factory)
+        invocation_id = uuid4()
+
+        mock_invocation = MagicMock()
+        mock_invocation.id = invocation_id
+        mock_invocation.status = InvocationStatus.CANCELLED
+        mock_invocation.context_data = {"callback_url": "not-a-url"}
+
+        mock_session.get.return_value = mock_invocation
+
+        with patch(
+            "syntara.agent_orchestrator.executor.invocation_executor.WorkflowSignalClient.send_cancellation_signal",
+            new_callable=AsyncMock,
+            side_effect=ValueError("invalid signal URL"),
+        ):
+            with pytest.raises(InvocationCancelledError):
+                await executor.execute_invocation(invocation_id)
+
+    @pytest.mark.asyncio
+    async def test_mid_execution_cancel_propagates_despite_signal_failure(self) -> None:
+        """InvocationCancelledError propagates even when send_cancellation_signal raises mid-execution."""
+        mock_session = AsyncMock()
+
+        async def mock_session_factory() -> AsyncGenerator[AsyncSession, None]:
+            yield mock_session
+
+        executor = InvocationExecutor(session_factory=mock_session_factory)
+        invocation_id = uuid4()
+
+        mock_invocation = MagicMock()
+        mock_invocation.id = invocation_id
+        mock_invocation.status = InvocationStatus.RUNNING
+        mock_invocation.prompt = "test prompt"
+        mock_invocation.session_id = "test-session"
+        mock_invocation.context_data = {"callback_url": "not-a-url"}
+
+        mock_session.get.return_value = mock_invocation
+
+        with (
+            patch(
+                "syntara.agent_orchestrator.executor.invocation_executor.get_openrouter_llm",
+                return_value=(MagicMock(model_name="test-model", openai_api_base="https://test.example.com"), None),
+            ),
+            patch("syntara.agent_orchestrator.executor.invocation_executor.ContextManagerPlanner"),
+            patch("syntara.agent_orchestrator.executor.invocation_executor.OrchestrationService") as mock_orch,
+            patch.object(executor, "_update_invocation_status", new=AsyncMock()),
+            patch(
+                "syntara.agent_orchestrator.executor.invocation_executor.WorkflowSignalClient.send_cancellation_signal",
+                new_callable=AsyncMock,
+                side_effect=ValueError("invalid signal URL"),
+            ),
+        ):
+            mock_orch.return_value.execute.side_effect = InvocationCancelledError(str(invocation_id), "streaming")
+
+            with pytest.raises(InvocationCancelledError):
+                await executor.execute_invocation(invocation_id)
+
+    @pytest.mark.asyncio
+    async def test_generic_error_after_cancel_raises_cancelled(self) -> None:
+        """When an error occurs after the DB row is CANCELLED, raise InvocationCancelledError."""
+        mock_session = AsyncMock()
+
+        async def mock_session_factory() -> AsyncGenerator[AsyncSession, None]:
+            yield mock_session
+
+        executor = InvocationExecutor(session_factory=mock_session_factory)
+        invocation_id = uuid4()
+
+        mock_invocation = MagicMock()
+        mock_invocation.id = invocation_id
+        mock_invocation.status = InvocationStatus.RUNNING
+        mock_invocation.prompt = "test prompt"
+        mock_invocation.session_id = "test-session"
+        mock_invocation.context_data = {}
+
+        mock_session.get.return_value = mock_invocation
+
+        with (
+            patch(
+                "syntara.agent_orchestrator.executor.invocation_executor.get_openrouter_llm",
+                return_value=(MagicMock(model_name="test-model", openai_api_base="https://test.example.com"), None),
+            ),
+            patch("syntara.agent_orchestrator.executor.invocation_executor.ContextManagerPlanner"),
+            patch("syntara.agent_orchestrator.executor.invocation_executor.OrchestrationService") as mock_orch,
+            patch.object(executor, "_update_invocation_status", new=AsyncMock()),
+            patch.object(executor, "_fail_invocation_if_not_cancelled", return_value=False),
+            patch(
+                "syntara.agent_orchestrator.executor.invocation_executor.WorkflowSignalClient.send_cancellation_signal",
+                new_callable=AsyncMock,
+            ) as mock_cancel_signal,
+            patch(
+                "syntara.agent_orchestrator.executor.invocation_executor.WorkflowSignalClient.send_failure_signal",
+                new_callable=AsyncMock,
+            ) as mock_failure_signal,
+        ):
+            mock_orch.return_value.execute.side_effect = RuntimeError("LLM config error")
+
+            with pytest.raises(InvocationCancelledError):
+                await executor.execute_invocation(invocation_id)
+
+            mock_cancel_signal.assert_awaited_once()
+            mock_failure_signal.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_check_cancel_key_sends_signal_and_raises(self) -> None:
+        """_check_cancel_key sends cancellation signal to parent workflow before raising."""
+        from pydantic import SecretStr
+
+        from syntara.agent_orchestrator.models import InvocationContextData
+
+        mock_session = AsyncMock()
+
+        async def mock_session_factory() -> AsyncGenerator[AsyncSession, None]:
+            yield mock_session
+
+        executor = InvocationExecutor(session_factory=mock_session_factory)
+        invocation_id = uuid4()
+        ctx = InvocationContextData(
+            callback_url=SecretStr("https://syntara:8000/api/v1/executions/abc/activities/step/signal")
+        )
+
+        mock_client = AsyncMock()
+        mock_client.key_exists.return_value = True
+
+        with (
+            patch("syntara.agent_orchestrator.executor.invocation_executor.StreamClient") as mock_sc,
+            patch(
+                "syntara.agent_orchestrator.executor.invocation_executor.WorkflowSignalClient.send_cancellation_signal",
+                new_callable=AsyncMock,
+            ) as mock_cancel_signal,
+        ):
+            mock_sc.return_value.__aenter__.return_value = mock_client
+            mock_sc.return_value.__aexit__.return_value = None
+
+            with pytest.raises(InvocationCancelledError):
+                await executor._check_cancel_key(invocation_id, ctx)
+
+            mock_cancel_signal.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_check_cancel_key_db_fallback_on_redis_error(self) -> None:
+        """_check_cancel_key falls back to DB when Redis errors and detects cancellation."""
+        from contextlib import asynccontextmanager
+
+        from redis.exceptions import ConnectionError as RedisConnectionError
+
+        from syntara.agent_orchestrator.models import InvocationContextData
+
+        mock_session = AsyncMock()
+        mock_invocation = MagicMock()
+        mock_invocation.status = InvocationStatus.CANCELLED
+        mock_session.get.return_value = mock_invocation
+
+        @asynccontextmanager
+        async def mock_session_ctx() -> AsyncGenerator[AsyncSession, None]:
+            yield mock_session
+
+        async def mock_session_factory() -> AsyncGenerator[AsyncSession, None]:
+            yield mock_session
+
+        executor = InvocationExecutor(session_factory=mock_session_factory)
+        invocation_id = uuid4()
+        ctx = InvocationContextData()
+
+        mock_client = AsyncMock()
+        mock_client.key_exists.side_effect = RedisConnectionError("Redis down")
+
+        with (
+            patch("syntara.agent_orchestrator.executor.invocation_executor.StreamClient") as mock_sc,
+            patch.object(executor, "get_async_session_context", return_value=mock_session_ctx()),
+        ):
+            mock_sc.return_value.__aenter__.return_value = mock_client
+            mock_sc.return_value.__aexit__.return_value = None
+
+            with pytest.raises(InvocationCancelledError):
+                await executor._check_cancel_key(invocation_id, ctx)
+
+    @pytest.mark.asyncio
+    async def test_init_orchestration_cancel_raises_instead_of_returning_none(self) -> None:
+        """LLM config failure after cancel raises InvocationCancelledError, not return None."""
+        from syntara.agent_orchestrator.exceptions import LLMConfigurationError
+
+        mock_session = AsyncMock()
+
+        async def mock_session_factory() -> AsyncGenerator[AsyncSession, None]:
+            yield mock_session
+
+        executor = InvocationExecutor(session_factory=mock_session_factory)
+        invocation_id = uuid4()
+
+        mock_invocation = MagicMock()
+        mock_invocation.id = invocation_id
+        mock_invocation.status = InvocationStatus.RUNNING
+        mock_invocation.prompt = "test prompt"
+        mock_invocation.session_id = "test-session"
+        mock_invocation.context_data = {}
+        mock_invocation.project_id = None
+
+        mock_session.get.return_value = mock_invocation
+
+        with (
+            patch(
+                "syntara.agent_orchestrator.executor.invocation_executor.get_openrouter_llm",
+                side_effect=LLMConfigurationError("No API key"),
+            ),
+            patch.object(executor, "_update_invocation_status", return_value=False),
+            patch(
+                "syntara.agent_orchestrator.executor.invocation_executor.WorkflowSignalClient.send_cancellation_signal",
+                new_callable=AsyncMock,
+            ) as mock_cancel_signal,
+            patch(
+                "syntara.agent_orchestrator.executor.invocation_executor.WorkflowSignalClient.send_failure_signal",
+                new_callable=AsyncMock,
+            ) as mock_failure_signal,
+        ):
+            with pytest.raises(InvocationCancelledError):
+                await executor.execute_invocation(invocation_id)
+
+            mock_cancel_signal.assert_awaited_once()
+            mock_failure_signal.assert_not_called()
