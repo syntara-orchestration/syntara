@@ -64,7 +64,11 @@ Condition and Switch nodes evaluate boolean expressions with `safe_eval_with_nam
 '${filename} endsWith ".txt"'
 ```
 
-The visual builder stores word operators (`exists`, `isEmpty`, `startsWith`, …) in the workflow definition. The evaluator rewrites them to Python before parsing. `exists` is True when the path is present and not `None`; a missing path is False rather than a lookup error.
+The visual builder stores word operators (`exists`, `isEmpty`, `startsWith`, …) in the workflow definition. The evaluator rewrites them to Python before parsing.
+
+- `exists` is True when the path is present and not `None` (including subscript paths such as `${data[0].name}`). A missing path is False rather than a lookup error.
+- `isEmpty` is True for empty strings, lists, and dicts. Numbers, booleans, and `None` raise `TypeError`.
+- `startsWith`, `endsWith`, and `matches` require string values; other types raise `TypeError`.
 
 ## Output Mapping
 
