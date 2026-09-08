@@ -186,8 +186,7 @@ class TestRevokeUserSessions:
         user_factory,
     ) -> None:
         user = await user_factory(username="goneuser", email="gone@test.com")
-        user.deleted_at = datetime.now(UTC)
-        test_db_session.add(user)
+        await test_db_session.delete(user)
         await test_db_session.commit()
 
         response = await auth_client.post(
