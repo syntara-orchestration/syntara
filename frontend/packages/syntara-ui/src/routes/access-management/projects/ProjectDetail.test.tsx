@@ -240,12 +240,12 @@ describe('ProjectDetail', () => {
     expect(screen.getByText('env: prod')).toBeInTheDocument()
   })
 
-  it('renders tab navigation buttons', () => {
+  it('renders tab navigation buttons', async () => {
     render(<ProjectDetail />, { wrapper })
 
     expect(screen.getByRole('tab', { name: 'Details' })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Workflows' })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Assignments' })).toBeInTheDocument()
+    expect(await screen.findByRole('tab', { name: 'Workflows' })).toBeInTheDocument()
+    expect(await screen.findByRole('tab', { name: 'Assignments' })).toBeInTheDocument()
   })
 
   it('shows not-found state when query has an error', () => {
@@ -362,25 +362,25 @@ describe('ProjectDetail', () => {
     expect(dashes.length).toBeGreaterThan(0)
   })
 
-  it('renders the Role Assignments tab content', () => {
+  it('renders the Role Assignments tab content', async () => {
     mockDetailTab.mockReturnValue(['role-assignments', mockGoToTab])
     render(<ProjectDetail />, { wrapper })
 
-    expect(screen.getByText('Mock Role Assignments Tab')).toBeInTheDocument()
+    expect(await screen.findByText('Mock Role Assignments Tab')).toBeInTheDocument()
   })
 
-  it('renders the Workflows tab content', () => {
+  it('renders the Workflows tab content', async () => {
     mockDetailTab.mockReturnValue(['workflows', mockGoToTab])
     render(<ProjectDetail />, { wrapper })
 
-    expect(screen.getByText('Mock Workflows Tab')).toBeInTheDocument()
+    expect(await screen.findByText('Mock Workflows Tab')).toBeInTheDocument()
   })
 
-  it('defaults to the Details tab and keeps Details selected on first load', () => {
+  it('defaults to the Details tab and keeps Details selected on first load', async () => {
     render(<ProjectDetail />, { wrapper })
 
     expect(screen.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByRole('tab', { name: 'Workflows' })).toHaveAttribute('aria-selected', 'false')
+    expect(await screen.findByRole('tab', { name: 'Workflows' })).toHaveAttribute('aria-selected', 'false')
     expect(screen.getByText('Test project')).toBeInTheDocument()
     expect(screen.queryByText('Mock Workflows Tab')).not.toBeInTheDocument()
   })
@@ -389,7 +389,7 @@ describe('ProjectDetail', () => {
     const user = userEvent.setup()
     render(<ProjectDetail />, { wrapper })
 
-    await user.click(screen.getByRole('tab', { name: 'Workflows' }))
+    await user.click(await screen.findByRole('tab', { name: 'Workflows' }))
 
     expect(mockGoToTab).toHaveBeenCalledWith('workflows')
   })
@@ -496,10 +496,10 @@ describe('ProjectDetail', () => {
       render(<ProjectDetail />, { wrapper })
 
       await waitFor(() => {
-        expect(screen.queryByRole('tab', { name: /Workflows/ })).not.toBeInTheDocument()
+        expect(screen.getByRole('tab', { name: /Assignments/ })).toBeInTheDocument()
       })
+      expect(screen.queryByRole('tab', { name: /Workflows/ })).not.toBeInTheDocument()
       expect(screen.getByRole('tab', { name: /Details/ })).toBeInTheDocument()
-      expect(screen.getByRole('tab', { name: /Assignments/ })).toBeInTheDocument()
     })
 
     it('shows Workflows tab when workflow:read is granted', async () => {
@@ -516,10 +516,10 @@ describe('ProjectDetail', () => {
       render(<ProjectDetail />, { wrapper })
 
       await waitFor(() => {
-        expect(screen.queryByRole('tab', { name: /Assignments/ })).not.toBeInTheDocument()
+        expect(screen.getByRole('tab', { name: /Workflows/ })).toBeInTheDocument()
       })
+      expect(screen.queryByRole('tab', { name: /Assignments/ })).not.toBeInTheDocument()
       expect(screen.getByRole('tab', { name: /Details/ })).toBeInTheDocument()
-      expect(screen.getByRole('tab', { name: /Workflows/ })).toBeInTheDocument()
     })
 
     it('shows Assignments tab when role-assignment:read is granted', async () => {
@@ -529,6 +529,16 @@ describe('ProjectDetail', () => {
       await waitFor(() => {
         expect(screen.getByRole('tab', { name: /Assignments/ })).toBeInTheDocument()
       })
+    })
+
+    it('hides permission-gated tabs while permissions are loading', async () => {
+      vi.mocked(accessFetchClient.POST).mockImplementation(() => new Promise(() => {}))
+
+      render(<ProjectDetail />, { wrapper })
+
+      expect(screen.getByRole('tab', { name: 'Details' })).toBeInTheDocument()
+      expect(screen.queryByRole('tab', { name: /Workflows/ })).not.toBeInTheDocument()
+      expect(screen.queryByRole('tab', { name: /Assignments/ })).not.toBeInTheDocument()
     })
   })
 })

@@ -136,15 +136,19 @@ function ProjectDetailsTab({ project }: Readonly<{ project: ProjectRead }>) {
 
 type ProjectTab = 'details' | 'workflows' | 'role-assignments'
 
+const ALL_PROJECT_TABS: ProjectTab[] = ['details', 'workflows', 'role-assignments']
+
 function computeVisibleTabs(
   canReadWorkflows: boolean,
   canReadAssignments: boolean,
   permissionsLoading: boolean
 ): ProjectTab[] {
-  const tabs: ProjectTab[] = ['details']
-  if (permissionsLoading || canReadWorkflows) tabs.push('workflows')
-  if (permissionsLoading || canReadAssignments) tabs.push('role-assignments')
-  return tabs
+  if (permissionsLoading) return ['details']
+  const tabPermissions: Record<string, boolean> = {
+    workflows: canReadWorkflows,
+    'role-assignments': canReadAssignments,
+  }
+  return ALL_PROJECT_TABS.filter((tab) => tabPermissions[tab] ?? true)
 }
 
 export function ProjectDetail() {
