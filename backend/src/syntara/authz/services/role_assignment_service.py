@@ -642,7 +642,6 @@ class RoleAssignmentService:
         result = await self.session.exec(
             select(Project.name).where(
                 Project.id == project_id,
-                Project.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
         return result.first()

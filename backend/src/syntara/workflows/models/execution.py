@@ -15,7 +15,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import CheckConstraint, Column, DateTime, Field, Index, Relationship, SQLModel
 
 from syntara.core.constants import FieldLimits
-from syntara.core.models.base import SoftDeletableResource, UserOwnedResource
+from syntara.core.models.base import UserOwnedResource
 from syntara.core.models.pagination import ResourcesResponse
 from syntara.core.utils.sqlmodel import postgres_enum_column
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
@@ -73,11 +73,10 @@ FAILURE_EXECUTION_STATUSES = frozenset(
 )
 
 
-class Execution(UserOwnedResource, SoftDeletableResource, table=True):
+class Execution(UserOwnedResource, table=True):
     """Execution model representing workflow runtime instances.
 
-    Combines UserOwnedResource and SoftDeletableResource (both extend BaseResource)
-    with execution-specific fields for tracking workflow execution state and results.
+    Uses hard deletes. Executions are cascade-deleted with their parent workflow.
 
     Attributes:
         id: Primary key UUID (from BaseResource)
@@ -86,10 +85,8 @@ class Execution(UserOwnedResource, SoftDeletableResource, table=True):
         labels: JSONB key-value labels for categorization (from BaseResource)
         created_by: UUID of user who created/started this execution (from UserOwnedResource)
         updated_by: UUID of user who last updated this execution (from UserOwnedResource)
-        deleted_at: Soft delete timestamp (from SoftDeletableResource)
-        deleted_by: UUID of user who performed soft delete (from SoftDeletableResource)
-        workflow_id: Foreign key to parent Workflow
-        workflow_version_id: Foreign key to WorkflowVersion executed
+        workflow_id: Foreign key to parent Workflow (NOT NULL, CASCADE)
+        workflow_version_id: Foreign key to WorkflowVersion (NOT NULL, CASCADE)
         temporal_workflow_id: Temporal workflow ID for orchestration
         status: Current execution status (ExecutionStatus enum)
         completed_at: Timestamp when execution completed/failed/cancelled
@@ -100,8 +97,6 @@ class Execution(UserOwnedResource, SoftDeletableResource, table=True):
     Relationships:
         workflow: Parent workflow
         workflow_version: Specific version executed
-        creator: User who created (started) the execution (from UserOwnedResource)
-        updater: User who last updated the execution (from UserOwnedResource)
 
     """
 
@@ -112,7 +107,6 @@ class Execution(UserOwnedResource, SoftDeletableResource, table=True):
         dict.fromkeys(
             [
                 *UserOwnedResource.__filterable_fields__,
-                *SoftDeletableResource.__filterable_fields__,
                 "workflow_id",
                 "workflow_version_id",
                 "project_id",
@@ -124,12 +118,10 @@ class Execution(UserOwnedResource, SoftDeletableResource, table=True):
         )
     )
 
-    # Define sortable fields for API endpoints - extend base class fields (deduplicated)
     __sortable_fields__: ClassVar[list[str]] = list(
         dict.fromkeys(
             [
                 *UserOwnedResource.__sortable_fields__,
-                *SoftDeletableResource.__sortable_fields__,
                 "id",
                 "workflow_version_id",
                 "workflow_id",
@@ -139,19 +131,19 @@ class Execution(UserOwnedResource, SoftDeletableResource, table=True):
         )
     )
 
-    # Foreign keys
+    # Foreign keys — CASCADE: executions are deleted with their parent workflow
     workflow_id: UUID = Field(
         foreign_key="workflows.id",
+        ondelete="CASCADE",
         nullable=False,
-        ondelete="RESTRICT",
         description="Workflow ID being executed",
         index=True,
     )
 
     workflow_version_id: UUID = Field(
         foreign_key="workflow_versions.id",
+        ondelete="CASCADE",
         nullable=False,
-        ondelete="RESTRICT",
         description="Workflow version ID executed",
     )
 
@@ -481,8 +473,6 @@ class ExecutionRead(SQLModel):
     current_activities: list[CurrentActivity] = Field(
         default_factory=list, description="Currently executing activities"
     )
-    deleted_at: datetime | None = None
-    deleted_by: UUID | None = None
     mode: ExecutionMode = ExecutionMode.STANDARD
     execution_metadata: dict[str, Any] | None = None
     retried_from_execution_id: UUID | None = None

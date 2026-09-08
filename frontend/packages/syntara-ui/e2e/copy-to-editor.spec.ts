@@ -12,12 +12,12 @@
  * - Dialog cancellation (stays on execution page)
  */
 
-import { test, expect, toAppUrl } from './fixtures'
+import { type Page, test, expect, toAppUrl } from './fixtures'
 import { buildUniqueName, createBasicWorkflowViaApi, deleteWorkflow, waitForUIReady } from './helpers/workflows'
 import { publishWorkflowViaApi, deleteWorkflowViaApi } from './utils/api'
 
 /** Run a workflow from the Workflows list page and wait for navigation to the execution detail page. */
-async function runWorkflowFromList(app: import('@playwright/test').Page, workflowName: string) {
+async function runWorkflowFromList(app: Page, workflowName: string) {
   await app.goto(toAppUrl('/workflows'))
   await app.getByPlaceholder('Filter by name').fill(workflowName)
   await app.getByRole('button', { name: 'Apply filter' }).click()
@@ -29,10 +29,7 @@ async function runWorkflowFromList(app: import('@playwright/test').Page, workflo
   await waitForUIReady(app)
 
   // Open kebab menu and click "Run published version"
-  await row
-    .getByRole('button', { name: /Actions|Kebab toggle/i })
-    .nth(0)
-    .click({ force: true })
+  await row.getByRole('button', { name: /Actions|Kebab toggle/i }).click({ force: true })
   await app.getByRole('menuitem', { name: 'Run published version' }).click()
 
   // Confirm run in the dialog

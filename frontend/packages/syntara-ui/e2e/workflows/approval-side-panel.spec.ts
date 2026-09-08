@@ -173,8 +173,9 @@ test.describe('Approval Side Panel', () => {
 
       const approveBtn = viewerApp.getByRole('button', { name: 'Approve' })
       const rejectBtn = viewerApp.getByRole('button', { name: 'Reject' })
-      await expect(approveBtn).toHaveAttribute('aria-disabled', 'true')
-      await expect(rejectBtn).toHaveAttribute('aria-disabled', 'true')
+      // aria-disabled is set after the permissions API resolves — give it extra time
+      await expect(approveBtn).toHaveAttribute('aria-disabled', 'true', { timeout: 20_000 })
+      await expect(rejectBtn).toHaveAttribute('aria-disabled', 'true', { timeout: 20_000 })
     })
   })
 

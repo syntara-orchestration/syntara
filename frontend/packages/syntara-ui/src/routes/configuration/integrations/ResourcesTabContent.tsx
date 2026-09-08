@@ -32,11 +32,12 @@ export function ResourcesTabContent({
   canUpdate: boolean
   updateTooltip?: string
 }>) {
+  const integrationId = integration.id ?? ''
   if (isLLM) {
     return (
       <SynPanelContentStack className={styles.resourcesTabContent}>
         <IntegrationModelsTab
-          integrationId={integration.id!}
+          integrationId={integrationId}
           models={modelsState.models}
           isLoading={modelsState.isLoading}
           error={modelsState.error?.message ?? null}
@@ -65,7 +66,7 @@ export function ResourcesTabContent({
   return (
     <SynPanelContentStack className={styles.resourcesTabContent}>
       <IntegrationResourcesTab
-        integrationId={integration.id!}
+        integrationId={integrationId}
         tools={tools}
         enabledToolIds={enabledToolIds}
         enabledCount={toolEnabledCount}

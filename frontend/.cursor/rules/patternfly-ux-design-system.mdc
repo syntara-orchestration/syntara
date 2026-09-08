@@ -34,7 +34,7 @@ How the UI is anchored:
 - **Automation builder** — Based on [React Flow](https://reactflow.dev/) with PatternFly as visual wrapper
 - **Accessibility** — Must achieve [WCAG 2.1 AA](https://www.w3.org/WAI/WCAG2AA-Conformance) and [Section 508](https://www.section508.gov/) compliance
 - **PatternFly gaps** — Check PF docs first → Raise with UX team → Engage PatternFly → Document with `patternfly-override` label → Resolve upstream
-- **Opinionated component prefixes** — `Syn*` for layout, state, tables, labels, links, and kebab menus (`SynPage`, `SynPanel`, `SynScrollableTableContainer`, `SynLabel`, `SynKebabMenu`); `Nx*` for dialogs, details, tabs, and list panels (`NxConfirmationDialog`, `NxUrlTabs`, `NxListPanel`). Use the wrapper, not raw PF components.
+- **`Syn` prefix convention** — opinionated global components use the `Syn` prefix (e.g., `SynPage`, `SynPanel`, `SynConfirmationDialog`, `SynDetailList`, `SynUrlTabs`, `SynListPanel`) in `src/components/` organized by: `layout/`, `dialogs/`, `details/`, `tabs/`, `states/`, `labels/`, `table/`, `panels/`. Use the `Syn*` wrapper, not the raw PF component.
 
 ## Page Layout (MANDATORY)
 
@@ -59,7 +59,7 @@ Every page must follow this structural hierarchy:
 | **Form page**      | `SynPageBreadcrumbs` → `SynPageHeader` → `SynPanel isFullHeight footer={<ActionGroup>…}` → form body              |
 | **Error in panel** | Same shell → `SynPageBody isCentered` + `ErrorState` inside `SynPanel`                                          |
 
-**`NxListPanel`** — canonical list page implementation. Compound API: `NxListPanelView` (handles loading/error/empty/filter states), `NxListPanelToolbar` (wraps in `<fieldset disabled={isFetching}>` during refetch), `NxListPanelTable`. Use instead of manual `SynPanelContentStack` + `useQueryState` + three-state branching.
+**`SynListPanel`** — canonical list page implementation. Compound API: `SynListPanelView` (handles loading/error/empty/filter states), `SynListPanelToolbar` (wraps in `<fieldset disabled={isFetching}>` during refetch), `SynListPanelTable`. Use instead of manual `SynPanelContentStack` + `useQueryState` + three-state branching.
 
 **Sticky form footer** — Form Save/Cancel buttons live in `SynPanel footer={<ActionGroup>…</ActionGroup>}`, NOT in the page header. `PanelMain` scrolls while footer stays pinned. Cancel uses `variant="link"`. Applies to Create/Edit forms, Configure Integration, Settings tabs. Does NOT apply to builder node editor panels or modals.
 
@@ -96,7 +96,7 @@ Use a docked icon navigation (left sidebar) with PatternFly's flyout panels comp
 ## Tabs
 
 - Tab labels: sentence case, clear and professional, no punctuation
-- **`NxUrlTabs` API:** `basePath`, `defaultTab` (defaults to `"details"`), optional `validTabs`. URL is single source of truth — no local state. Tab panel content owns inner padding (`--pf-t--global--spacer--lg`).
+- **`SynUrlTabs` API:** `basePath`, `defaultTab` (defaults to `"details"`), optional `validTabs`. URL is single source of truth — no local state. Tab panel content owns inner padding (`--pf-t--global--spacer--lg`).
 - **Tab intro paragraphs:** For complex admin sections (Access Management tabs), add a `Content` paragraph above tab content explaining purpose + RBAC context. Spacing: `marginBottom: var(--pf-t--global--spacer--md)`.
 
 ## Filter Bar
@@ -151,9 +151,9 @@ Use a docked icon navigation (left sidebar) with PatternFly's flyout panels comp
 
 ## Details Component
 
-- Use `NxDetailList` + `NxDetail` (vertical default; `isHorizontal` for compact contexts like canvas steps)
-- `NxDetail` with empty/null children **renders nothing** — no manual null checks or placeholders needed
-- Use `NxCodeBlock` for JSON/scripts/logs — supports `enableCopy`, `enableExpand`, `jsonObject`
+- Use `SynDetailList` + `SynDetail` (vertical default; `isHorizontal` for compact contexts like canvas steps)
+- `SynDetail` with empty/null children **renders nothing** — no manual null checks or placeholders needed
+- Use `SynCodeBlock` for JSON/scripts/logs — supports `enableCopy`, `enableExpand`, `jsonObject`
 - Consistent date/duration formatting per PatternFly Date/Time guidelines
 - Header: title + primary actions from the table row
 - **Plain text for informational metadata** — credential type, auth method, etc. are plain text, not `Label` badges. Use `Label` only for statuses or visual distinction.
@@ -198,11 +198,11 @@ Action verb pairings: "Create" ↔ "Delete", "Add" ↔ "Remove" (internal resour
 
 ### Confirmation Dialog — Three-Tier Severity
 
-`NxConfirmationDialog` supports three tiers: **Default/Disable** (primary, no icon) → **Danger** (danger + warning icon, no checkbox) → **DestructiveAcknowledgement** (danger + warning + required checkbox). See Storybook for canonical copy per tier.
+`SynConfirmationDialog` supports three tiers: **Default/Disable** (primary, no icon) → **Danger** (danger + warning icon, no checkbox) → **DestructiveAcknowledgement** (danger + warning + required checkbox). See Storybook for canonical copy per tier.
 
 ### Delete (Destructive) — Three Variants
 
-ALWAYS use `NxConfirmationDialog` from `src/components/dialogs/NxConfirmationDialog.tsx`. Never use raw `Modal` + `ModalHeader` + `ModalBody` + `ModalFooter` for delete actions.
+ALWAYS use `SynConfirmationDialog` from `src/components/dialogs/SynConfirmationDialog.tsx`. Never use raw `Modal` + `ModalHeader` + `ModalBody` + `ModalFooter` for delete actions.
 
 All delete variants share: Small modal, warning icon title, `confirmVariant="danger"`, `confirmLabel="Delete"`, cancel `variant="link"`, checkbox via `destructiveAcknowledgement` (Delete button disabled until checked).
 
@@ -366,7 +366,7 @@ Every domain uses a `use{Domain}Permissions()` hook returning `{ can*, isLoading
 **Gating strategy:**
 
 - **Nav items:** Hide via `requiredPermissions` (OR logic — visible if any granted)
-- **Tabs:** Filter with `NxUrlTabs validTabs`; show all during load; redirect invalid URLs to first visible tab
+- **Tabs:** Filter with `SynUrlTabs validTabs`; show all during load; redirect invalid URLs to first visible tab
 - **Toolbar buttons:** `DisabledWithTooltip` wrapper + `isAriaDisabled` + permission tooltip
 - **Row/kebab actions:** `isAriaDisabled` + `tooltipProps` on action items
 - **Empty state CTA:** Pass `undefined` callback to hide button entirely
@@ -486,4 +486,4 @@ If a global style seems necessary, follow the PatternFly gaps process: check PF 
 
 - `npm run storybook` (port 5174). Preview in light + dark mode via toolbar before sign-off.
 - Stories reflect real app compositions, not isolated prop demos.
-- `Nx*` components with `autodocs`: `SynPage`, `SynPageHeader`, `SynPageBreadcrumbs`, `SynPanel`, `SynPanelContentStack`, `NxUrlTabs`, `NxConfirmationDialog`, `NxCodeBlock`, `NxDetail`, `NxDetailList`, `SynErrorState`, `SynLoadingState`, `SynEmptyStateNoData`, `SynEmptyStateFilter`, `SynEmptyStateServiceUnavailable`, `NxListPanel`, `SynKebabMenu`, `SynLabel`, `SynUserTag`, `SynScrollableTableContainer`.
+- `Syn*` components with `autodocs`: `SynPage`, `SynPageHeader`, `SynPageBreadcrumbs`, `SynPanel`, `SynPanelContentStack`, `SynUrlTabs`, `SynConfirmationDialog`, `SynCodeBlock`, `SynDetail`, `SynDetailList`, `SynErrorState`, `SynLoadingState`, `SynEmptyStateNoData`, `SynEmptyStateFilter`, `SynEmptyStateServiceUnavailable`, `SynListPanel`, `SynKebabMenu`, `SynLabel`, `SynUserTag`, `SynScrollableTableContainer`.

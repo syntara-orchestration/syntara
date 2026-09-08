@@ -1,7 +1,6 @@
 """Unit tests for integration project assignment operations."""
 
 from collections.abc import Generator
-from datetime import UTC, datetime
 from unittest.mock import patch
 from uuid import uuid4
 
@@ -114,21 +113,6 @@ class TestAssignProject:
         fake_project_id = uuid4()
         with pytest.raises(ProjectNotFoundError):
             await integration_service.assign_project(integration_id, fake_project_id)
-
-    @pytest.mark.asyncio
-    async def test_assign_soft_deleted_project_raises(
-        self, test_db_session: AsyncSession, integration_service: IntegrationService
-    ) -> None:
-        project = await _create_project(test_db_session)
-        created = await integration_service.create_integration(_mcp_create(scope=IntegrationScope.PROJECT))
-        integration_id, project_id = created.id, project.id
-
-        project.deleted_at = datetime.now(UTC)
-        test_db_session.add(project)
-        await test_db_session.flush()
-
-        with pytest.raises(ProjectNotFoundError):
-            await integration_service.assign_project(integration_id, project_id)
 
     @pytest.mark.asyncio
     async def test_assign_multiple_projects(

@@ -3,11 +3,11 @@ import { RhUiAddIcon, RhUiEditFillIcon, RhUiTrashIcon } from '@patternfly/react-
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import { useCallback, useMemo } from 'react'
 
-import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
 import { SynLabel } from '../../../components/labels/SynLabel'
-import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../../components/panels/list/NxListPanel'
+import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../../components/panels/list/SynListPanel'
 import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import type { KebabAction } from '../../../components/SynKebabMenu'
 import { SynKebabMenu } from '../../../components/SynKebabMenu'
@@ -260,7 +260,7 @@ export function ServiceAccountsTab() {
 
   return (
     <>
-      <NxListPanelView
+      <SynListPanelView
         tabKey="service-accounts"
         tabLabel="Service accounts"
         isPending={query.isPending}
@@ -280,7 +280,7 @@ export function ServiceAccountsTab() {
         }
         toolbar={
           serviceAccounts.length > 0 || hasActiveFilters ? (
-            <NxListPanelToolbar
+            <SynListPanelToolbar
               filters={filters}
               filterDefinitions={filterFieldDefinitions}
               onFilterChange={handleFilterChange}
@@ -305,7 +305,7 @@ export function ServiceAccountsTab() {
             <Content>
               Service accounts provide programmatic access for external applications using OAuth 2.0 client credentials.
             </Content>
-            <NxListPanelTable caption="Service accounts" footer={getFooterProps(query.data)}>
+            <SynListPanelTable caption="Service accounts" footer={getFooterProps(query.data)}>
               <Thead>
                 <Tr>
                   <Th sort={getSortParams(0)}>Name</Th>
@@ -322,7 +322,7 @@ export function ServiceAccountsTab() {
                 onEdit={editDialog.open}
                 onDelete={deleteDialog.open}
               />
-            </NxListPanelTable>
+            </SynListPanelTable>
           </>
         }
       />
@@ -343,7 +343,7 @@ export function ServiceAccountsTab() {
         />
       )}
 
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={deleteDialog.isOpen}
         onClose={deleteDialog.close}
         onConfirm={() => handleDelete(deleteDialog.item)}
@@ -357,9 +357,9 @@ export function ServiceAccountsTab() {
         }}
       >
         The service account <strong>{deleteDialog.item?.name}</strong> will be deleted. This cannot be undone.
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
 
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={disableDialog.isOpen}
         onClose={disableDialog.close}
         onConfirm={handleDisable}
@@ -369,7 +369,7 @@ export function ServiceAccountsTab() {
       >
         You are about to disable the service account <strong>{disableDialog.item?.name}</strong>. You can re-enable the
         service account at any time.
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
     </>
   )
 }

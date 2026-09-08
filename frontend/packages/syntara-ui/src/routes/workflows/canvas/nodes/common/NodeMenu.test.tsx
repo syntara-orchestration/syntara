@@ -227,23 +227,70 @@ describe('NodeMenu', () => {
 
       expect(parentMouseDownHandler).not.toHaveBeenCalled()
     })
+
+    it('stops Enter key propagation on MenuToggle', async () => {
+      const user = userEvent.setup()
+      const parentKeyDownHandler = vi.fn()
+      const actions = [createMenuAction()]
+
+      render(
+        // eslint-disable-next-line jsx-a11y/no-static-element-interactions
+        <div onKeyDown={parentKeyDownHandler}>
+          <NodeMenu menuActions={actions} />
+        </div>
+      )
+
+      screen.getByRole('button', { name: /step actions menu/i }).focus()
+      await user.keyboard('{Enter}')
+
+      expect(parentKeyDownHandler).not.toHaveBeenCalledWith(expect.objectContaining({ key: 'Enter' }))
+    })
+
+    it('stops Space key propagation on MenuToggle', async () => {
+      const user = userEvent.setup()
+      const parentKeyDownHandler = vi.fn()
+      const actions = [createMenuAction()]
+
+      render(
+        // eslint-disable-next-line jsx-a11y/no-static-element-interactions
+        <div onKeyDown={parentKeyDownHandler}>
+          <NodeMenu menuActions={actions} />
+        </div>
+      )
+
+      screen.getByRole('button', { name: /step actions menu/i }).focus()
+      await user.keyboard(' ')
+
+      expect(parentKeyDownHandler).not.toHaveBeenCalledWith(expect.objectContaining({ key: ' ' }))
+    })
+
+    it('does not stop propagation for other keys on MenuToggle', async () => {
+      const user = userEvent.setup()
+      const parentKeyDownHandler = vi.fn()
+      const actions = [createMenuAction()]
+
+      render(
+        // eslint-disable-next-line jsx-a11y/no-static-element-interactions
+        <div onKeyDown={parentKeyDownHandler}>
+          <NodeMenu menuActions={actions} />
+        </div>
+      )
+
+      screen.getByRole('button', { name: /step actions menu/i }).focus()
+      await user.keyboard('{Escape}')
+
+      expect(parentKeyDownHandler).toHaveBeenCalledWith(expect.objectContaining({ key: 'Escape' }))
+    })
   })
 
   describe('accessibility', () => {
-    it('has button role on wrapper', () => {
+    it('wrapper has no interactive role — interactivity is on the inner MenuToggle button', () => {
       const actions = [createMenuAction()]
       render(<NodeMenu menuActions={actions} />)
 
       const wrapper = screen.getByTestId('node-menu-wrapper')
-      expect(wrapper).toHaveAttribute('role', 'button')
-    })
-
-    it('has tabIndex 0 on wrapper', () => {
-      const actions = [createMenuAction()]
-      render(<NodeMenu menuActions={actions} />)
-
-      const wrapper = screen.getByTestId('node-menu-wrapper')
-      expect(wrapper).toHaveAttribute('tabIndex', '0')
+      expect(wrapper).not.toHaveAttribute('role')
+      expect(wrapper).not.toHaveAttribute('tabIndex')
     })
 
     it('menu toggle has aria-label', () => {

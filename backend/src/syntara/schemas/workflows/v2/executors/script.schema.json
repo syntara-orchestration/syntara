@@ -23,9 +23,6 @@
         "description": "Script code to execute",
         "minLength": 1
       },
-      "credential_id": {
-        "$ref": "../common-definitions.schema.json#/$defs/credential_id"
-      },
       "environment": {
         "type": "object",
         "description": "Environment variables to set during script execution",

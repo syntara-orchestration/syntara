@@ -90,7 +90,7 @@ describe('CredentialWorkflowsTab', () => {
 
     render(<CredentialWorkflowsTab credentialId="cred-1" />, { wrapper })
 
-    expect(screen.getByText('No workflows using this credential')).toBeInTheDocument()
+    expect(screen.getByText('No workflows yet')).toBeInTheDocument()
     expect(
       screen.getByText(
         'This credential is not currently referenced by any workflows. Workflows will appear here once they are configured to use this credential.'
@@ -195,7 +195,7 @@ describe('CredentialWorkflowsTab', () => {
 
     render(<CredentialWorkflowsTab credentialId="cred-1" />, { wrapper })
 
-    expect(screen.getByText('No workflows using this credential')).toBeInTheDocument()
+    expect(screen.getByText('No workflows yet')).toBeInTheDocument()
   })
 
   it('hides descriptions until the row is expanded', async () => {

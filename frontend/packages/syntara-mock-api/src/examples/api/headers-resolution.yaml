@@ -1,5 +1,5 @@
 ---
-schema_version: '2.0.0'
+schema_version: "2.0.0"
 name: headers-resolution
 description: Test header resolution from inputs and variables
 
@@ -24,10 +24,10 @@ nodes:
       method: GET
       url: http://test-api.example.com/api/data
       headers:
-        X-Custom-Header: ${input.customHeader}
-        X-API-Key: ${input.apiKey}
+        X-Custom-Header: ${trigger.customHeader}
+        X-API-Key: ${trigger.apiKey}
         X-Static-Header: static-value
     inputs:
-      customHeader: ${inputs.customHeader}
-      apiKey: ${inputs.apiKey}
+      customHeader: ${trigger.customHeader}
+      apiKey: ${trigger.apiKey}
 edges: []

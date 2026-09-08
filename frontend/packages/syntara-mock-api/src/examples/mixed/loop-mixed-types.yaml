@@ -1,5 +1,5 @@
 ---
-schema_version: '2.0.0'
+schema_version: "2.0.0"
 name: loop-mixed-types
 description: Loop execution with alternating executor types
 
@@ -18,7 +18,7 @@ nodes:
     type: loop
     loop:
       type: forEach
-      items: ${input.items}
+      items: ${trigger.items}
       itemVariable: item
       indexVariable: index
 

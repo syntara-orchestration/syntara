@@ -1,0 +1,9 @@
+/* Compass title is flex-grow: 1 with min-width: auto. Wide title content then
+   forces the page to overflow horizontally and can push the sidebar off-screen. */
+.header :global(.pf-v6-c-compass__main-header-content) {
+  min-width: 0;
+}
+
+.header :global(.pf-v6-c-compass__main-header-title) {
+  min-width: 0;
+}

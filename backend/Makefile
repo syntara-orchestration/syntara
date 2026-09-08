@@ -800,14 +800,14 @@ check-openapi-breaking: ## Check OpenAPI spec for breaking changes against devel
 		echo "Installing oasdiff..."; \
 		./scripts/openapi/install-oasdiff.sh; \
 	fi
-	@PR_BODY_TEXT="$${PR_BODY:-$${OPENAPI_PR_BODY:-}}"; \
-	if [ -n "$$PR_BODY_TEXT" ]; then \
+	@PR_LABELS_TEXT="$${PR_LABELS:-$${OPENAPI_PR_LABELS:-}}"; \
+	if [ -n "$$PR_LABELS_TEXT" ]; then \
 		./scripts/openapi/check-breaking-changes.py \
 			--base $(OPENAPI_BASE_REF) \
 			--head HEAD \
 			--format text \
 			--fallback-spec-path backend/src/syntara/schemas/openapi.yaml \
-			--pr-body "$$PR_BODY_TEXT"; \
+			--pr-labels "$$PR_LABELS_TEXT"; \
 	else \
 		./scripts/openapi/check-breaking-changes.py \
 			--base $(OPENAPI_BASE_REF) \
@@ -816,15 +816,15 @@ check-openapi-breaking: ## Check OpenAPI spec for breaking changes against devel
 			--fallback-spec-path backend/src/syntara/schemas/openapi.yaml; \
 	fi
 	@echo "Checking public OpenAPI spec for breaking changes..."
-	@PR_BODY_TEXT="$${PR_BODY:-$${OPENAPI_PR_BODY:-}}"; \
-	if [ -n "$$PR_BODY_TEXT" ]; then \
+	@PR_LABELS_TEXT="$${PR_LABELS:-$${OPENAPI_PR_LABELS:-}}"; \
+	if [ -n "$$PR_LABELS_TEXT" ]; then \
 		./scripts/openapi/check-breaking-changes.py \
 			--base $(OPENAPI_BASE_REF) \
 			--head HEAD \
 			--format text \
 			--spec-path backend/src/syntara/schemas/openapi-public.yaml \
 			--fallback-spec-path backend/src/syntara/schemas/openapi-public.yaml \
-			--pr-body "$$PR_BODY_TEXT"; \
+			--pr-labels "$$PR_LABELS_TEXT"; \
 	else \
 		./scripts/openapi/check-breaking-changes.py \
 			--base $(OPENAPI_BASE_REF) \
@@ -843,7 +843,7 @@ check-openapi-breaking-pre-commit: ## Pre-commit: breaking changes when openapi.
 	elif git rev-parse --verify origin/$(OPENAPI_BASE_REF) >/dev/null 2>&1; then \
 		BASE_REF="origin/$(OPENAPI_BASE_REF)"; \
 	fi; \
-	if [ -n "$$BASE_REF" ] && git diff --quiet "$$BASE_REF" -- $(OPENAPI_SPEC) 2>/dev/null; then \
+	if [ -n "$$BASE_REF" ] && git diff --quiet "$$BASE_REF" -- $(OPENAPI_SPEC) $(OPENAPI_PUBLIC_SPEC) 2>/dev/null; then \
 		echo "OpenAPI spec unchanged vs $$BASE_REF, skipping breaking changes check"; \
 		exit 0; \
 	fi; \

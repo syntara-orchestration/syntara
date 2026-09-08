@@ -1,8 +1,9 @@
 import { Divider, Dropdown, DropdownItem, DropdownList, MenuToggle } from '@patternfly/react-core'
 import type { DropdownProps, MenuToggleElement } from '@patternfly/react-core'
 import { RhUiEllipsisVerticalFillIcon } from '@patternfly/react-icons'
-import { useState } from 'react'
+import { isValidElement, useState } from 'react'
 
+import { IconLabel } from '../../../../../components/IconLabel'
 import type { NodeMenuAction } from '../hooks/useNodeMenuActions'
 
 type NodeMenuProps = {
@@ -32,20 +33,7 @@ export function NodeMenu(props: Readonly<NodeMenuProps>) {
   }
 
   return (
-    <div
-      data-testid="node-menu-wrapper"
-      onClick={(e) => e.stopPropagation()}
-      onMouseDown={(e) => e.stopPropagation()}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.stopPropagation()
-        }
-      }}
-      className={`nodrag nopan ${props.className ?? ''}`}
-      role="button"
-      tabIndex={0}
-      style={props.style}
-    >
+    <div data-testid="node-menu-wrapper" className={`nodrag nopan ${props.className ?? ''}`} style={props.style}>
       <Dropdown
         isOpen={isMenuOpen}
         onOpenChange={(isOpen) => setIsMenuOpen(isOpen)}
@@ -54,7 +42,16 @@ export function NodeMenu(props: Readonly<NodeMenuProps>) {
           <MenuToggle
             ref={toggleRef}
             variant="plain"
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            onClick={(event) => {
+              event.stopPropagation()
+              setIsMenuOpen(!isMenuOpen)
+            }}
+            onMouseDown={(event) => event.stopPropagation()}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.stopPropagation()
+              }
+            }}
             isExpanded={isMenuOpen}
             aria-label="Step actions menu"
             className="nodrag nopan"
@@ -72,14 +69,13 @@ export function NodeMenu(props: Readonly<NodeMenuProps>) {
               <DropdownItem
                 data-testid={`node-menu-item-${action.id}`}
                 key={action.id}
-                icon={action.icon}
                 onClick={() => {
                   action.onClick()
                   setIsMenuOpen(false)
                 }}
                 isDanger={action.variant === 'danger'}
               >
-                {action.label}
+                {isValidElement(action.icon) ? <IconLabel icon={action.icon}>{action.label}</IconLabel> : action.label}
               </DropdownItem>
             )
           })}

@@ -37,11 +37,12 @@ describe('NodeHeader', () => {
     )
 
     const headerDiv = screen.getByTestId('node-header')
-    expect(headerDiv).toHaveStyle({
-      paddingTop: 'var(--pf-t--global--spacer--md)',
-      paddingLeft: 'var(--pf-t--global--spacer--md)',
-      paddingRight: 'var(--pf-t--global--spacer--md)',
-    })
+    // Assert on the literal inline style rather than toHaveStyle(): getComputedStyle can't
+    // resolve var() (happy-dom does not perform real CSS cascade), so it isn't a
+    // meaningful check for these spacer tokens.
+    expect(headerDiv.style.paddingTop).toBe('var(--pf-t--global--spacer--md)')
+    expect(headerDiv.style.paddingLeft).toBe('var(--pf-t--global--spacer--md)')
+    expect(headerDiv.style.paddingRight).toBe('var(--pf-t--global--spacer--md)')
   })
 
   it('uses Flex layout for children', () => {

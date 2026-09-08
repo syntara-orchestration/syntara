@@ -170,8 +170,6 @@ class TestListWorkflowVersionsCursor:
         mock_version.created_by = user_id_1
         mock_version.created_at = MagicMock()
         mock_version.updated_at = MagicMock()
-        mock_version.deleted_at = None
-        mock_version.deleted_by = None
 
         result = converter(mock_version)
         assert result.created_by_username == "alice"
@@ -232,8 +230,6 @@ class TestListWorkflowVersionsCursor:
         mock_version.created_by = uuid4()
         mock_version.created_at = MagicMock()
         mock_version.updated_at = MagicMock()
-        mock_version.deleted_at = None
-        mock_version.deleted_by = None
 
         result = converter(mock_version)
         assert result.status == "previously_published"
@@ -262,8 +258,6 @@ class TestListWorkflowVersionsCursor:
         mock_version.created_by = uuid4()
         mock_version.created_at = MagicMock()
         mock_version.updated_at = MagicMock()
-        mock_version.deleted_at = None
-        mock_version.deleted_by = None
 
         result = converter(mock_version)
 
@@ -316,8 +310,6 @@ class TestListWorkflowVersionsCursor:
         mock_version.created_by = user_id
         mock_version.created_at = MagicMock()
         mock_version.updated_at = MagicMock()
-        mock_version.deleted_at = None
-        mock_version.deleted_by = None
 
         result = converter(mock_version)
         assert result.created_by_username == "charlie"
@@ -342,8 +334,6 @@ class TestListWorkflowVersionsCursor:
         mock_version.created_by = unknown_user_id
         mock_version.created_at = MagicMock()
         mock_version.updated_at = MagicMock()
-        mock_version.deleted_at = None
-        mock_version.deleted_by = None
 
         result = converter(mock_version)
         assert result.created_by_username is None

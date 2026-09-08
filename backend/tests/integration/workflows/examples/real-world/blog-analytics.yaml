@@ -28,7 +28,7 @@ nodes:
     type: http_request
     parameters:
       method: GET
-      url: https://jsonplaceholder.typicode.com/users/${input.user_id}
+      url: https://jsonplaceholder.typicode.com/users/${trigger.user_id}
       headers:
         Accept: application/json
     outputs:
@@ -48,7 +48,7 @@ nodes:
       headers:
         Accept: application/json
       query_params:
-        userId: ${input.user_id}
+        userId: ${trigger.user_id}
     outputs:
       posts: $.body
     timeout: 30
@@ -62,7 +62,7 @@ nodes:
       headers:
         Accept: application/json
       query_params:
-        userId: ${input.user_id}
+        userId: ${trigger.user_id}
     outputs:
       todos: $.body
     timeout: 30

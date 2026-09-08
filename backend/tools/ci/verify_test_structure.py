@@ -213,6 +213,7 @@ def verify_test_structure(repo_root: Path) -> tuple[bool, list[str], list[str]]:
         "validators",
         "websocket",
         "workflow",
+        "scripts",
     }
 
     # These source domains are allowed to have no tests

@@ -57,9 +57,9 @@ test.describe('Users Table — Authentication Method Filter (UI-34)', () => {
 
     // Verify only local users are shown
     await expect(dataRows).toHaveCount(2)
-    const localRowCount = await dataRows.count()
-    for (let i = 0; i < localRowCount; i++) {
-      await expect(dataRows.nth(i).getByText('Local', { exact: true })).toBeVisible()
+    const localRows = await dataRows.all()
+    for (const row of localRows) {
+      await expect(row.getByText('Local', { exact: true })).toBeVisible()
     }
 
     // Clear Local chip and filter by "AAP"

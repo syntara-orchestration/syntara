@@ -13,11 +13,11 @@
  * from the UI.
  */
 
-import { test, expect, toAppUrl } from '../fixtures'
+import { type Page, test, expect, toAppUrl } from '../fixtures'
 import { createWorkflowViaApi, deleteWorkflowViaApi, simulateConcurrentSave } from '../helpers/workflow-versions'
 import { buildUniqueName, deleteWorkflow, addScriptNode } from '../helpers/workflows'
 
-async function openBuilderAndMakeChange(app: import('@playwright/test').Page, workflowId: string) {
+async function openBuilderAndMakeChange(app: Page, workflowId: string) {
   await app.goto(toAppUrl(`/workflow-builder/${workflowId}`))
   await expect(app.getByPlaceholder('Workflow name')).toBeVisible({ timeout: 15_000 })
 

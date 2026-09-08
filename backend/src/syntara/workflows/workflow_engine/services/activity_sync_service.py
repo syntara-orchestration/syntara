@@ -1301,6 +1301,14 @@ class ActivitySyncService:
 
     def _process_activity_failed(self, event: HistoryEvent, metadata: ExecutionMonitorMetadata) -> None:
         """Process ACTIVITY_TASK_FAILED event."""
+        # TODO(https://redhat.atlassian.net/browse/AAP-86855): InvocationCancelledError raises a
+        # non-retryable ApplicationError, which Temporal records as
+        # ACTIVITY_TASK_FAILED. This unconditionally sets ActivityStatus.FAILED.
+        # Once the activity row is terminal, _sync_nodes_to_terminal_status
+        # skips it, so the Execute Invocation step shows "Failed" even though
+        # the execution-level status is CANCELLED.  Inspect
+        # attrs.failure.application_failure_info.type for
+        # "InvocationCancelledError" and set ActivityStatus.CANCELLED instead.
         attrs = event.activity_task_failed_event_attributes
         scheduled_id = attrs.scheduled_event_id
         if scheduled_id in metadata.pending_activity_updates:
@@ -1355,7 +1363,7 @@ class ActivitySyncService:
             metadata.pending_sync_event_ids.add(scheduled_id)
             metadata.terminal_activity_ids.add(update["activity_id"])
 
-    def _extract_execution_status_from_event(self, event: HistoryEvent) -> tuple[ExecutionStatus, datetime, str | None]:  # noqa: C901
+    def _extract_execution_status_from_event(self, event: HistoryEvent) -> tuple[ExecutionStatus, datetime, str | None]:  # noqa: C901, PLR0912
         """Extract execution status, completion time, and error from workflow completion event.
 
         Args:
@@ -1383,7 +1391,9 @@ class ActivitySyncService:
                     result_data = json.loads(payload.data)
                     if isinstance(result_data, dict):
                         inner_status = result_data.get("status")
-                        if inner_status == "failed":
+                        if inner_status == "cancelled":
+                            status = ExecutionStatus.CANCELLED
+                        elif inner_status == "failed":
                             status = ExecutionStatus.FAILED
                             error_details = self._extract_failed_activity_errors(result_data)
                         elif inner_status == "completed_with_errors":

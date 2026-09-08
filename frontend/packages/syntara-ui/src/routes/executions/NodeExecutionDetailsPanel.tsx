@@ -24,7 +24,7 @@ import {
 import { ActivityTypeEnum } from '@syntara/contracts'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { NxCodeBlock } from '../../components/details/NxCodeBlock'
+import { SynCodeBlock } from '../../components/details/SynCodeBlock'
 import { SynLabel } from '../../components/labels/SynLabel'
 import { SynErrorState } from '../../components/states/SynErrorState'
 import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
@@ -107,9 +107,9 @@ function DataPane({ title, nodeId, data, view, onViewChange, isErrorState = fals
       case 'json':
         return (
           <div style={isErrorState ? { color: 'var(--pf-t--global--color--status--danger--default)' } : undefined}>
-            <NxCodeBlock enableCopy enableExpand expandTitle={`${title} JSON`} noMaxHeight copyContent={jsonText}>
+            <SynCodeBlock enableCopy enableExpand expandTitle={`${title} JSON`} noMaxHeight copyContent={jsonText}>
               {highlightedJson ?? jsonText}
-            </NxCodeBlock>
+            </SynCodeBlock>
           </div>
         )
     }

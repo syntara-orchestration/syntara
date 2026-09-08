@@ -87,7 +87,8 @@ export function useApprovalsData({
           approvals: [],
         })
       }
-      groups.get(projectId)!.approvals.push(approval)
+      const group = groups.get(projectId)
+      if (group) group.approvals.push(approval)
     }
     return groups
   }, [enrichedApprovals, projects, isAllProjects])

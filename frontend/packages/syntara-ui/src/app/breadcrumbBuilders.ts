@@ -46,34 +46,8 @@ function crumbApprovals(): AppBreadcrumbItem {
   return { label: LABEL_APPROVALS, href: AppRoute.Approvals.Root }
 }
 
-function userDetailTabLabel(tab: string): string {
-  if (tab === 'details') return 'Details'
-  if (tab === 'groups') return 'Groups'
-  if (tab === 'identities') return 'Identities'
-  if (tab === 'roles') return 'Assignments'
-  return tab
-}
-
-function groupDetailTabLabel(tab: string): string {
-  if (tab === 'details') return 'Details'
-  if (tab === 'members') return 'Members'
-  if (tab === 'roles') return 'Assignments'
-  return tab
-}
-
-function projectDetailTabLabel(tab: string): string {
-  if (tab === 'details') return 'Details'
-  if (tab === 'role-assignments') return 'Assignments'
-  return tab
-}
-
-function identityProviderDetailTabLabel(tab: string): string {
-  if (tab === 'group-mapping') return 'Group mapping'
-  return 'Details'
-}
-
-export function breadcrumbsAccessManagementHub(activeTabLabel: string): AppBreadcrumbItem[] {
-  return [crumbAccessManagement(), { label: activeTabLabel }]
+export function breadcrumbsAccessManagementHub(): AppBreadcrumbItem[] {
+  return [crumbAccessManagement()]
 }
 
 export function breadcrumbsIdentityProvidersPage(): AppBreadcrumbItem[] {
@@ -88,35 +62,16 @@ export function breadcrumbsEditUser(displayName: string, userBasePath: string): 
   return [crumbAccessManagement(), crumbUsersList(), { label: displayName, href: userBasePath }, { label: 'Edit user' }]
 }
 
-/** `useUrlTab` default; URL with no trailing segment is the same as this tab — omit a redundant last crumb. */
-const DEFAULT_ENTITY_TAB = 'details'
-
-export function breadcrumbsUserDetail(displayName: string, userBasePath: string, tab: string): AppBreadcrumbItem[] {
-  const prefix = [crumbAccessManagement(), crumbUsersList()]
-  if (tab === DEFAULT_ENTITY_TAB) {
-    return [...prefix, { label: displayName }]
-  }
-  return [...prefix, { label: displayName, href: userBasePath }, { label: userDetailTabLabel(tab) }]
+export function breadcrumbsUserDetail(displayName: string): AppBreadcrumbItem[] {
+  return [crumbAccessManagement(), crumbUsersList(), { label: displayName }]
 }
 
-export function breadcrumbsGroupDetail(groupName: string, groupBasePath: string, tab: string): AppBreadcrumbItem[] {
-  const prefix = [crumbAccessManagement(), crumbGroupsList()]
-  if (tab === DEFAULT_ENTITY_TAB) {
-    return [...prefix, { label: groupName }]
-  }
-  return [...prefix, { label: groupName, href: groupBasePath }, { label: groupDetailTabLabel(tab) }]
+export function breadcrumbsGroupDetail(groupName: string): AppBreadcrumbItem[] {
+  return [crumbAccessManagement(), crumbGroupsList(), { label: groupName }]
 }
 
-export function breadcrumbsProjectDetail(
-  projectName: string,
-  projectBasePath: string,
-  tab: string
-): AppBreadcrumbItem[] {
-  const prefix = [crumbAccessManagement(), crumbProjectsList()]
-  if (tab === DEFAULT_ENTITY_TAB) {
-    return [...prefix, { label: projectName }]
-  }
-  return [...prefix, { label: projectName, href: projectBasePath }, { label: projectDetailTabLabel(tab) }]
+export function breadcrumbsProjectDetail(projectName: string): AppBreadcrumbItem[] {
+  return [crumbAccessManagement(), crumbProjectsList(), { label: projectName }]
 }
 
 export function breadcrumbsIdentityProviderAdd(): AppBreadcrumbItem[] {
@@ -141,54 +96,25 @@ export function breadcrumbsIdentityProviderGroupMappingForm(
   ]
 }
 
-export function breadcrumbsIdentityProviderDetail(
-  providerName: string,
-  detailBasePath: string,
-  tab: string
-): AppBreadcrumbItem[] {
-  const prefix = [crumbIdentityProvidersList()]
-  if (tab === DEFAULT_ENTITY_TAB) {
-    return [...prefix, { label: providerName }]
-  }
-  return [...prefix, { label: providerName, href: detailBasePath }, { label: identityProviderDetailTabLabel(tab) }]
-}
-
-export function breadcrumbsSettingsCategory(categoryName: string): AppBreadcrumbItem[] {
-  return [crumbSettings(), { label: categoryName }]
+export function breadcrumbsIdentityProviderDetail(providerName: string): AppBreadcrumbItem[] {
+  return [crumbIdentityProvidersList(), { label: providerName }]
 }
 
 /** Settings page before a category is selected or when only the page title applies. */
 export function breadcrumbsSettingsPage(): AppBreadcrumbItem[] {
-  return [{ label: 'Settings' }]
+  return [crumbSettings()]
 }
 
 export function breadcrumbsIntegrationConfigure(): AppBreadcrumbItem[] {
   return [crumbConfiguration(), crumbIntegrations(), { label: 'Configure integration' }]
 }
 
-export type IntegrationDetailBreadcrumbTab = 'details' | 'resources'
-
-export function breadcrumbsIntegrationDetail(
-  integrationId: string,
-  integrationName: string,
-  tab: IntegrationDetailBreadcrumbTab
-): AppBreadcrumbItem[] {
-  const prefix = [crumbConfiguration(), crumbIntegrations()]
-  if (tab === DEFAULT_ENTITY_TAB) {
-    return [...prefix, { label: integrationName }]
-  }
-  const detailHref = AppRoute.Configuration.Integrations.Detail.replace(':integrationId', integrationId)
-  return [...prefix, { label: integrationName, href: detailHref }, { label: integrationDetailTabLabel(tab) }]
+export function breadcrumbsIntegrationDetail(integrationName: string): AppBreadcrumbItem[] {
+  return [crumbConfiguration(), crumbIntegrations(), { label: integrationName }]
 }
 
 export function breadcrumbsIntegrationDetailEarlyShell(): AppBreadcrumbItem[] {
   return [crumbConfiguration(), crumbIntegrations(), { label: 'Integration details' }]
-}
-
-function integrationDetailTabLabel(tab: string): string {
-  if (tab === 'details') return 'Details'
-  if (tab === 'resources') return 'Enabled resources'
-  return tab
 }
 
 export function breadcrumbsIntegrationEdit(integrationName: string, detailBasePath: string): AppBreadcrumbItem[] {
@@ -200,26 +126,8 @@ export function breadcrumbsIntegrationEdit(integrationName: string, detailBasePa
   ]
 }
 
-export type CredentialDetailBreadcrumbTab = 'details' | 'workflows' | 'integrations'
-
-function credentialDetailTabLabel(tab: string): string {
-  if (tab === 'details') return 'Details'
-  if (tab === 'workflows') return 'Workflows'
-  if (tab === 'integrations') return 'Integrations'
-  return tab
-}
-
-export function breadcrumbsCredentialDetail(
-  credentialId: string,
-  credentialName: string,
-  tab: CredentialDetailBreadcrumbTab
-): AppBreadcrumbItem[] {
-  const prefix = [crumbConfiguration(), crumbCredentials()]
-  if (tab === DEFAULT_ENTITY_TAB) {
-    return [...prefix, { label: credentialName }]
-  }
-  const detailHref = AppRoute.Configuration.Credentials.Detail.replace(':credentialId', credentialId)
-  return [...prefix, { label: credentialName, href: detailHref }, { label: credentialDetailTabLabel(tab) }]
+export function breadcrumbsCredentialDetail(credentialName: string): AppBreadcrumbItem[] {
+  return [crumbConfiguration(), crumbCredentials(), { label: credentialName }]
 }
 
 export function breadcrumbsCredentialEarlyShell(currentLabel: string): AppBreadcrumbItem[] {
@@ -243,19 +151,8 @@ function crumbServiceAccountsList(): AppBreadcrumbItem {
   return { label: 'Service Accounts', href: AppRoute.AccessManagement.ServiceAccounts }
 }
 
-function serviceAccountDetailTabLabel(tab: string): string {
-  if (tab === 'details') return 'Details'
-  if (tab === 'credentials') return 'Credentials'
-  if (tab === 'assignments') return 'Assignments'
-  return tab
-}
-
-export function breadcrumbsServiceAccountDetail(name: string, basePath: string, tab: string): AppBreadcrumbItem[] {
-  const prefix = [crumbAccessManagement(), crumbServiceAccountsList()]
-  if (tab === DEFAULT_ENTITY_TAB) {
-    return [...prefix, { label: name }]
-  }
-  return [...prefix, { label: name, href: basePath }, { label: serviceAccountDetailTabLabel(tab) }]
+export function breadcrumbsServiceAccountDetail(name: string): AppBreadcrumbItem[] {
+  return [crumbAccessManagement(), crumbServiceAccountsList(), { label: name }]
 }
 
 export function breadcrumbsServiceAccountDetailEarlyShell(): AppBreadcrumbItem[] {

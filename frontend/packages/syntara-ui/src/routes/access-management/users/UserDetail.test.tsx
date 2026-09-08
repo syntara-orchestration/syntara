@@ -1057,7 +1057,7 @@ describe('UserDetail', () => {
 
       await user.click(screen.getByRole('tab', { name: /Identities/i }))
 
-      // NxListPanelTabs uses useNavigate (via useUrlTab) for tab navigation
+      // SynListPanelTabs uses useNavigate (via useUrlTab) for tab navigation
       expect(routerTestState.navigate).toHaveBeenCalledWith(
         expect.objectContaining({
           to: `/system-administration/access-management/users/${VALID_USER_ID}/identities`,
@@ -1071,7 +1071,7 @@ describe('UserDetail', () => {
 
       await user.click(screen.getByRole('tab', { name: /Groups/i }))
 
-      // NxListPanelTabs uses useNavigate (via useUrlTab) for tab navigation
+      // SynListPanelTabs uses useNavigate (via useUrlTab) for tab navigation
       expect(routerTestState.navigate).toHaveBeenCalledWith(
         expect.objectContaining({
           to: `/system-administration/access-management/users/${VALID_USER_ID}/groups`,
@@ -1108,7 +1108,7 @@ describe('UserDetail', () => {
 
       await user.click(screen.getByRole('tab', { name: /Assignments/i }))
 
-      // NxListPanelTabs uses useNavigate (via useUrlTab) for tab navigation
+      // SynListPanelTabs uses useNavigate (via useUrlTab) for tab navigation
       expect(routerTestState.navigate).toHaveBeenCalledWith(
         expect.objectContaining({
           to: `/system-administration/access-management/users/${VALID_USER_ID}/roles`,

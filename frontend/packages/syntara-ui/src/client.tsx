@@ -172,7 +172,7 @@ usersFetchClient.use(interfaceTagMiddleware)
 usersFetchClient.use(authMiddleware)
 export const usersClient = createClient(usersFetchClient)
 
-const credentialsFetchClient = createFetchClient<CredentialsAPI.paths>({ baseUrl: '/api/v1/' })
+export const credentialsFetchClient = createFetchClient<CredentialsAPI.paths>({ baseUrl: '/api/v1/' })
 credentialsFetchClient.use(interfaceTagMiddleware)
 credentialsFetchClient.use(authMiddleware)
 export const credentialsClient = createClient(credentialsFetchClient)

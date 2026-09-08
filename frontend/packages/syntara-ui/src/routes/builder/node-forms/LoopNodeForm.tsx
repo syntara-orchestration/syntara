@@ -147,7 +147,7 @@ function LoopFormFields({
               <TextInput
                 {...register('items')}
                 id="loop-items"
-                placeholder="${input.item_list}"
+                placeholder="${trigger.item_list}"
                 style={{ fontFamily: 'monospace' }}
                 type="text"
                 validated={errors.items ? 'error' : 'default'}

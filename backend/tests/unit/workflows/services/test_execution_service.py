@@ -50,8 +50,6 @@ class TestExecutionServiceBase:
         input_data: dict[str, Any] | None = None,
         error_details: str | None = None,
         labels: dict[str, Any] | None = None,
-        deleted_at: datetime | None = None,
-        deleted_by: UUID | None = None,
         project_id: UUID | None = None,
     ) -> Execution:
         """Create a test Execution object with realistic data.
@@ -70,8 +68,6 @@ class TestExecutionServiceBase:
             input_data: Input data dict (defaults to empty dict if None)
             error_details: Error details string (None by default)
             labels: Labels dict (defaults to empty dict if None)
-            deleted_at: Deletion timestamp (None by default)
-            deleted_by: Deleter user UUID (None by default)
             project_id: Project UUID (generates random if None)
 
         Returns:
@@ -119,8 +115,6 @@ class TestExecutionServiceBase:
             input_data=input_data,
             error_details=error_details,
             labels=labels,
-            deleted_at=deleted_at,
-            deleted_by=deleted_by,
             project_id=project_id or uuid4(),
         )
 
@@ -493,7 +487,6 @@ class TestCreateExecution:
         workflow.published_version = None
         workflow.project_id = uuid4()
         workflow.created_by = user_id
-        workflow.deleted_at = None
 
         version = Mock(spec=WorkflowVersion)
         version.id = version_id
@@ -989,7 +982,6 @@ class TestRetryExecutionTriggerNodeId:
 
         workflow = Mock(spec=Workflow)
         workflow.id = uuid4()
-        workflow.deleted_at = None
 
         original = Mock(spec=Execution)
         original.id = uuid4()
@@ -1003,7 +995,6 @@ class TestRetryExecutionTriggerNodeId:
 
         workflow_version = Mock(spec=WorkflowVersion)
         workflow_version.id = original.workflow_version_id
-        workflow_version.deleted_at = None
         workflow_version.workflow_definition = {
             "triggers": [{"id": "t1", "type": "manual_trigger"}],
         }
@@ -1853,6 +1844,38 @@ class TestHandleActivityCallback(TestExecutionServiceBase):
         mock_temporal.fail_async_activity.assert_called_once()
         error = mock_temporal.fail_async_activity.call_args.kwargs["error"]
         assert "plain string error" in str(error)
+
+    @pytest.mark.asyncio
+    async def test_fails_activity_on_cancelled_status(self) -> None:
+        """Test that cancelled status calls fail_async_activity instead of completing."""
+        service, mock_temporal = self._make_service()
+        service.get_execution = AsyncMock(return_value=self._mock_execution())  # type: ignore[method-assign]
+        await service.handle_activity_callback(
+            uuid4(),
+            "node-1",
+            {"status": "cancelled", "reason": "User requested cancellation"},
+        )
+
+        mock_temporal.fail_async_activity.assert_called_once()
+        mock_temporal.complete_async_activity.assert_not_called()
+        error = mock_temporal.fail_async_activity.call_args.kwargs["error"]
+        assert "InvocationCancelledError" in str(error)
+        assert error.non_retryable is True
+
+    @pytest.mark.asyncio
+    async def test_cancelled_status_uses_default_reason(self) -> None:
+        """Test that cancelled status uses default reason when none provided."""
+        service, mock_temporal = self._make_service()
+        service.get_execution = AsyncMock(return_value=self._mock_execution())  # type: ignore[method-assign]
+        await service.handle_activity_callback(
+            uuid4(),
+            "node-1",
+            {"status": "cancelled"},
+        )
+
+        mock_temporal.fail_async_activity.assert_called_once()
+        error = mock_temporal.fail_async_activity.call_args.kwargs["error"]
+        assert "Invocation cancelled" in str(error)
 
     @pytest.mark.asyncio
     async def test_raises_temporal_unavailable_when_no_service(self) -> None:

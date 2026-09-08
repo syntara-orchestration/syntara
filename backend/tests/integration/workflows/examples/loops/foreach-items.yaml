@@ -19,7 +19,7 @@ nodes:
     type: loop
     loop:
       type: forEach
-      items: ${input.item_list}
+      items: ${trigger.item_list}
       itemVariable: item
 
   - id: process_item

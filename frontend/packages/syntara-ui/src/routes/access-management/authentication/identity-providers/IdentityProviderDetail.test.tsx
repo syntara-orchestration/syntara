@@ -612,7 +612,7 @@ describe('IdentityProviderDetail', () => {
     const kebabButton = screen.getByRole('button', { name: /identity provider actions/i })
     await user.click(kebabButton)
 
-    await user.click(screen.getByRole('menuitem', { name: /delete identity provider/i }))
+    await user.click(screen.getByRole('menuitem', { name: 'Delete provider' }))
 
     // The confirmation dialog should now be visible
     expect(screen.getByText('Delete identity provider?')).toBeInTheDocument()
@@ -642,7 +642,7 @@ describe('IdentityProviderDetail', () => {
     render(<IdentityProviderDetail />, { wrapper: createWrapper() })
 
     await user.click(screen.getByRole('button', { name: /identity provider actions/i }))
-    await user.click(screen.getByRole('menuitem', { name: /delete identity provider/i }))
+    await user.click(screen.getByRole('menuitem', { name: 'Delete provider' }))
     expect(screen.getByText('Delete identity provider?')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
@@ -693,7 +693,7 @@ describe('IdentityProviderDetail', () => {
     // Open kebab and click delete
     const kebabButton = screen.getByRole('button', { name: /identity provider actions/i })
     await user.click(kebabButton)
-    await user.click(screen.getByRole('menuitem', { name: /delete identity provider/i }))
+    await user.click(screen.getByRole('menuitem', { name: 'Delete provider' }))
 
     // Check the acknowledgement checkbox before clicking Delete
     await user.click(screen.getByRole('checkbox'))
@@ -714,7 +714,7 @@ describe('IdentityProviderDetail', () => {
     // Open kebab and click delete
     const kebabButton = screen.getByRole('button', { name: /identity provider actions/i })
     await user.click(kebabButton)
-    await user.click(screen.getByRole('menuitem', { name: /delete identity provider/i }))
+    await user.click(screen.getByRole('menuitem', { name: 'Delete provider' }))
 
     expect(screen.getByText('Delete identity provider?')).toBeInTheDocument()
 
@@ -841,7 +841,7 @@ describe('IdentityProviderDetail', () => {
     expect(editMappingItem).toHaveAttribute('aria-disabled', 'true')
     await user.click(editMappingItem)
     expect(routerTestState.navigate).not.toHaveBeenCalled()
-    expect(screen.getByRole('menuitem', { name: /delete identity provider/i })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Delete provider' })).toBeInTheDocument()
   })
 
   it('disables Edit provider button when canUpdate is false', () => {
@@ -875,7 +875,7 @@ describe('IdentityProviderDetail', () => {
     render(<IdentityProviderDetail />, { wrapper: createWrapper() })
 
     await user.click(screen.getByRole('button', { name: /identity provider actions/i }))
-    const deleteItem = screen.getByRole('menuitem', { name: /delete identity provider/i })
+    const deleteItem = screen.getByRole('menuitem', { name: 'Delete provider' })
     expect(deleteItem).toHaveAttribute('aria-disabled', 'true')
     await user.click(deleteItem)
     expect(screen.queryByRole('dialog', { name: /delete identity provider/i })).not.toBeInTheDocument()

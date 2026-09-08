@@ -1,5 +1,7 @@
 import { test, expect, toAppUrl } from './fixtures'
 import { createTestCredential, deleteCredentialByName, goToCredentialsList } from './helpers/credentials'
+import { buildUniqueName, createBasicWorkflowViaApi } from './helpers/workflows'
+import { apiRequest } from './utils/api'
 
 test.describe('Navigational link affordance @pr-check', () => {
   test.describe('Credentials table', () => {
@@ -26,47 +28,59 @@ test.describe('Navigational link affordance @pr-check', () => {
 
   test.describe('Workflows table', () => {
     test('workflow name is a navigational link', async ({ app }) => {
-      await app.goto(toAppUrl('/workflows'))
-      await expect(app.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
+      const workflowName = buildUniqueName('e2e-navlink')
+      const { id } = await createBasicWorkflowViaApi(app, workflowName, 'nav link test step')
 
-      // The workflow name column uses dataLabel="Name". We scope directly to that column
-      // to skip over project group header rows (which have a colSpan cell and no name cell).
-      // Against a real backend with no seed data there will be no name cells at all.
-      const nameLinks = app.locator('[data-label="Name"]').getByRole('link')
-      const linkCount = await nameLinks.count()
-      test.skip(linkCount === 0, 'No workflows available — defensive guard for unseeded real backends')
+      try {
+        await app.goto(toAppUrl('/workflows'))
+        await expect(app.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
 
-      // The workflow name cell must contain an anchor link, not plain text.
-      // eslint-disable-next-line no-restricted-properties -- multiple workflow links are expected; .first() is intentional here (no-nth-in-e2e rule replaces no-restricted-properties)
-      const firstWorkflowLink = nameLinks.first()
-      await expect(firstWorkflowLink).toBeVisible()
+        // Konflux seed volume paginates the list; filter so the row is on page one.
+        await app.getByPlaceholder('Filter by name').fill(workflowName)
+        await app.getByRole('button', { name: 'Apply filter' }).click()
 
-      // Clicking it must navigate to the workflow builder.
-      await firstWorkflowLink.click()
-      await expect(app).toHaveURL(/\/workflow-builder\//)
+        const workflowLink = app.locator('[data-label="Name"]').getByRole('link', { name: workflowName })
+        await expect(workflowLink).toBeVisible({ timeout: 15_000 })
+
+        // Clicking it must navigate to the workflow builder.
+        await workflowLink.click()
+        await expect(app).toHaveURL(/\/workflow-builder\//)
+      } finally {
+        await apiRequest(app, 'delete', `/workflows/${id}`).catch(() => {})
+      }
     })
   })
 
   test.describe('Workflow Runs table', () => {
     test('run ID is a navigational link', async ({ app }) => {
-      await app.goto(toAppUrl('/executions'))
-      await expect(app.getByRole('heading', { level: 1, name: 'Workflow Runs' })).toBeVisible()
+      const workflowName = buildUniqueName('e2e-runlink')
+      const { id: workflowId } = await createBasicWorkflowViaApi(app, workflowName, 'run link test step')
 
-      // Against a real backend with no executions the table would be empty.
-      // Skipping is acceptable because: (a) this test only verifies link affordance,
-      // not execution creation, and (b) executions.spec.ts covers creation end-to-end.
-      const runLinks = app.getByRole('table').locator('[data-label="Run ID"]').getByRole('link')
-      const linkCount = await runLinks.count()
-      test.skip(linkCount === 0, 'No workflow runs available — defensive guard for unseeded real backends')
+      try {
+        const runResp = await apiRequest(app, 'post', '/executions', {
+          data: { workflow_id: workflowId, trigger_node_id: 'trigger_1' },
+        })
+        const body = (await runResp.json()) as { id?: string }
+        expect(body.id, 'POST /executions did not return an execution ID').toBeTruthy()
+        if (!body.id) {
+          throw new Error('POST /executions did not return an execution ID')
+        }
+        const executionId = body.id
 
-      // The run ID cell must contain an anchor link, not plain text.
-      // eslint-disable-next-line no-restricted-properties -- multiple run-ID links are expected; .first() is intentional here (no-nth-in-e2e rule replaces no-restricted-properties)
-      const firstRunLink = runLinks.first()
-      await expect(firstRunLink).toBeVisible()
+        await app.goto(toAppUrl('/executions'))
+        await expect(app.getByRole('heading', { level: 1, name: 'Workflow Runs' })).toBeVisible()
 
-      // Clicking it must navigate to the execution detail page.
-      await firstRunLink.click()
-      await expect(app).toHaveURL(/\/executions\//)
+        const grid = app.getByRole('grid')
+        await expect(grid).toBeVisible({ timeout: 10_000 })
+
+        const runLink = grid.locator('[data-label="Run ID"]').getByRole('link', { name: executionId })
+        await expect(runLink).toBeVisible({ timeout: 10_000 })
+
+        await runLink.click()
+        await expect(app).toHaveURL(new RegExp(`/executions/${executionId}`))
+      } finally {
+        await apiRequest(app, 'delete', `/workflows/${workflowId}`).catch(() => {})
+      }
     })
   })
 })

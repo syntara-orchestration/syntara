@@ -59,7 +59,9 @@ describe('UserDetailToolbar', () => {
       />
     )
 
-    expect(screen.getByRole('button', { name: 'Edit user' })).toBeInTheDocument()
+    const editButton = screen.getByRole('button', { name: 'Edit user' })
+    expect(editButton).toBeInTheDocument()
+    expect(editButton).toHaveClass('pf-m-primary')
     await user.click(screen.getByRole('button', { name: 'User actions' }))
     expect(screen.getByRole('menuitem', { name: 'Revoke tokens' })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: 'Delete user' })).toBeInTheDocument()
