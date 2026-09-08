@@ -862,7 +862,7 @@ async def _check_websocket_authorization(
                 stmt = (
                     select(Project.name)
                     .join(Execution, Execution.project_id == Project.id)  # type: ignore[arg-type]
-                    .where(Execution.id == uuid.UUID(resource_id), Project.deleted_at.is_(None))  # type: ignore[union-attr]
+                    .where(Execution.id == uuid.UUID(resource_id))
                 )
             elif resource_type == "invocation":
                 from syntara.agent_orchestrator.models.invocation import Invocation  # noqa: PLC0415
@@ -870,7 +870,7 @@ async def _check_websocket_authorization(
                 stmt = (
                     select(Project.name)
                     .join(Invocation, Invocation.project_id == Project.id)  # type: ignore[arg-type]
-                    .where(Invocation.id == uuid.UUID(resource_id), Project.deleted_at.is_(None))  # type: ignore[union-attr]
+                    .where(Invocation.id == uuid.UUID(resource_id))
                 )
             else:
                 # Fail closed: new resource types must add a branch here

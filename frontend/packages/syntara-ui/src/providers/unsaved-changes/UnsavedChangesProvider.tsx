@@ -170,6 +170,7 @@ export function UnsavedChangesProvider({ children }: Readonly<UnsavedChangesProv
   }, [isBuilderDirty, proceedNavigation])
 
   const isOnBuilder = location.startsWith('/workflow-builder')
+  // eslint-disable-next-line react-hooks/refs -- read registered dirty-check registry for modal copy while open
   const activeDirtyCheck = getActiveDirtyCheck()
 
   const modalTitle =

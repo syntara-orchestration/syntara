@@ -111,4 +111,9 @@ describe('aapJobTemplateSchema', () => {
     const result = aapJobTemplateSchema.safeParse({ name: 'Incomplete Node' })
     expect(result.success).toBe(true)
   })
+
+  it('accepts use_input_variables without a job template id', () => {
+    const result = aapJobTemplateSchema.safeParse({ name: 'Incomplete Node', use_input_variables: true })
+    expect(result.success).toBe(true)
+  })
 })

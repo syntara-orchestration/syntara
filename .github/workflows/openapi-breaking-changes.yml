@@ -9,6 +9,7 @@ name: OpenAPI Breaking Changes
 on:
   pull_request:
     branches: [devel, early-access]
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
     paths:
       - 'backend/**'
       - 'frontend/packages/syntara-contracts/src/**'
@@ -21,6 +22,7 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
+    if: ${{ !contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || github.event.label.name == 'breaking-change-approved' }}
     permissions:
       contents: read
     steps:
@@ -53,6 +55,15 @@ jobs:
             const fs = require('fs');
             fs.writeFileSync('pr-body.txt', context.payload.pull_request.body || '');
 
+      - name: Extract PR labels
+        if: steps.detect.outputs.changed == 'true'
+        id: labels
+        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553 # v9
+        with:
+          script: |
+            const labels = context.payload.pull_request.labels.map(l => l.name);
+            core.setOutput('labels', JSON.stringify(labels));
+
       - name: Set up Python
         if: steps.detect.outputs.changed == 'true'
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
@@ -67,19 +78,28 @@ jobs:
       - name: Check for breaking changes
         if: steps.detect.outputs.changed == 'true'
         id: breaking
-        continue-on-error: true
         run: |
-          PR_BODY=$(cat "$GITHUB_WORKSPACE/pr-body.txt")
           ./scripts/openapi/check-breaking-changes.py \
             --base origin/${{ github.base_ref }} \
             --head HEAD \
             --output breaking-results.json \
             --fallback-spec-path backend/src/syntara/schemas/openapi.yaml \
-            --pr-body "$PR_BODY"
+            --pr-labels "$OPENAPI_PR_LABELS"
+        working-directory: backend
+        env:
+          OPENAPI_PR_LABELS: ${{ steps.labels.outputs.labels }}
+
+      - name: Show breaking-change results on failure
+        if: failure() && steps.detect.outputs.changed == 'true'
+        run: |
+          if [ -f breaking-results.json ]; then
+            echo "OpenAPI breaking-change gate failed. Results (spec_path, base_version, head_version, version_bumped, breaking_changes):"
+            cat breaking-results.json
+          fi
         working-directory: backend
 
       - name: Check contract regeneration
-        if: steps.detect.outputs.changed == 'true'
+        if: ${{ !cancelled() && steps.detect.outputs.changed == 'true' }}
         run: |
           PR_BODY=$(cat "$GITHUB_WORKSPACE/pr-body.txt")
           ./scripts/openapi/check-contract-regeneration.py \

@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { UserEvent } from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
@@ -11,18 +12,6 @@ import { accessClient } from '../../access/accessClient'
 import type { RoleAssignmentRead } from '../../access/types'
 
 import { ProjectRoleAssignmentsTab } from './ProjectRoleAssignmentsTab'
-
-vi.mock('@patternfly/react-table', async () => {
-  const actual = await vi.importActual<typeof import('@patternfly/react-table')>('@patternfly/react-table')
-  return {
-    ...actual,
-    ActionsColumn: ({ items }: { items: Array<{ title: ReactNode; onClick?: () => void }> }) => (
-      <button type="button" onClick={() => items[0]?.onClick?.()}>
-        Open actions
-      </button>
-    ),
-  }
-})
 
 vi.mock('../../access/accessClient', () => ({
   accessClient: {
@@ -240,6 +229,11 @@ const mockAllAssignments = [
   },
 ]
 
+async function openUnassignDialog(user: UserEvent, principalName: string, roleName: string) {
+  await user.click(screen.getByRole('button', { name: `Actions for ${principalName} ${roleName}` }))
+  await user.click(await screen.findByRole('menuitem', { name: 'Unassign role' }))
+}
+
 describe('ProjectRoleAssignmentsTab', () => {
   const mockRefetch = vi.fn().mockResolvedValue({})
 
@@ -426,8 +420,7 @@ describe('ProjectRoleAssignmentsTab', () => {
     const user = userEvent.setup()
     render(<ProjectRoleAssignmentsTab projectId="proj-1" />, { wrapper })
 
-    const actionButtons = screen.getAllByRole('button', { name: 'Open actions' })
-    await user.click(actionButtons[0])
+    await openUnassignDialog(user, 'alice', 'admin')
 
     expect(screen.getByText('Unassign role?')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Unassign' })).toBeInTheDocument()
@@ -438,8 +431,7 @@ describe('ProjectRoleAssignmentsTab', () => {
     const user = userEvent.setup()
     render(<ProjectRoleAssignmentsTab projectId="proj-1" />, { wrapper })
 
-    const actionButtons = screen.getAllByRole('button', { name: 'Open actions' })
-    await user.click(actionButtons[0])
+    await openUnassignDialog(user, 'alice', 'admin')
     expect(screen.getByText('Unassign role?')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
@@ -453,8 +445,7 @@ describe('ProjectRoleAssignmentsTab', () => {
 
     render(<ProjectRoleAssignmentsTab projectId="proj-1" />, { wrapper })
 
-    const actionButtons = screen.getAllByRole('button', { name: 'Open actions' })
-    await user.click(actionButtons[0])
+    await openUnassignDialog(user, 'alice', 'admin')
     await user.click(screen.getByRole('button', { name: 'Unassign' }))
 
     expect(mutate).toHaveBeenCalledWith(
@@ -470,8 +461,7 @@ describe('ProjectRoleAssignmentsTab', () => {
 
     render(<ProjectRoleAssignmentsTab projectId="proj-1" />, { wrapper })
 
-    const actionButtons = screen.getAllByRole('button', { name: 'Open actions' })
-    await user.click(actionButtons[1])
+    await openUnassignDialog(user, 'devs', 'editor')
     await user.click(screen.getByRole('button', { name: 'Unassign' }))
 
     expect(mutate).toHaveBeenCalledWith(
@@ -486,8 +476,7 @@ describe('ProjectRoleAssignmentsTab', () => {
 
     render(<ProjectRoleAssignmentsTab projectId="proj-1" />, { wrapper })
 
-    const actionButtons = screen.getAllByRole('button', { name: 'Open actions' })
-    await user.click(actionButtons[0])
+    await openUnassignDialog(user, 'alice', 'admin')
     await user.click(screen.getByRole('button', { name: 'Unassign' }))
 
     expect(screen.getByText('Failed to unassign role')).toBeInTheDocument()
@@ -534,8 +523,7 @@ describe('ProjectRoleAssignmentsTab', () => {
     const user = userEvent.setup()
     render(<ProjectRoleAssignmentsTab projectId="proj-1" />, { wrapper })
 
-    const actionButtons = screen.getAllByRole('button', { name: 'Open actions' })
-    await user.click(actionButtons[1])
+    await openUnassignDialog(user, 'devs', 'editor')
 
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByText(/editor/)).toBeInTheDocument()

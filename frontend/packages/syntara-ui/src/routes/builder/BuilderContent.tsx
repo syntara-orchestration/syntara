@@ -294,7 +294,7 @@ export function BuilderContent(props: BuilderContentProps) {
   })
 
   const { runStepDialog, lastRunStepNodeIdRef, pinnedMockDataForDialog, handleRunStep, suppressPanelCloseRef } =
-    useRunStepDialog(handleSaveWorkflow, isTerminalStatus)
+    useRunStepDialog(guardedSaveWorkflow, isTerminalStatus, isNodeEditorOpen)
   const handleCloseNodeEditor = useCallback(() => {
     if (suppressPanelCloseRef.current) return
     dispatch({ type: 'CLOSE_NODE_EDITOR' })

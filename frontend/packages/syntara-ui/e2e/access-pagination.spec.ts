@@ -29,23 +29,23 @@ let seededGroup: SeededGroup | null = null
 
 test.beforeAll(async ({ browser }) => {
   const page = await browser.newPage()
-  const token = await getAuthToken(page)
-  if (token) {
+  try {
+    const token = await getAuthToken(page)
+    if (!token) throw new Error('access-pagination beforeAll: could not obtain auth token')
     const prefix = buildUniqueName('e2e-accpag')
 
     for (let i = 1; i <= 3; i++) {
-      const user = await createUserViaApi(page, { username: `${prefix}-user-${i}`, token })
-      if (user) seededUsers.push(user)
+      seededUsers.push(await createUserViaApi(page, { username: `${prefix}-user-${i}`, token }))
     }
 
     for (let i = 1; i <= 3; i++) {
-      const role = await createRoleViaApi(page, { name: `${prefix}-role-${i}`, token })
-      if (role) seededRoles.push(role)
+      seededRoles.push(await createRoleViaApi(page, { name: `${prefix}-role-${i}`, token }))
     }
 
     seededGroup = await ensureGroupExists(page, `${prefix}-group`)
+  } finally {
+    await page.close()
   }
-  await page.close()
 })
 
 test.afterAll(async ({ browser }) => {
@@ -64,25 +64,16 @@ test.afterAll(async ({ browser }) => {
 
 test.describe('Access Management — Dropdown Pagination', () => {
   test('Assign Role modal shows roles in the multi-select dropdown', async ({ app }) => {
-    await app.goto(toAppUrl('/system-administration/access-management/users'))
-    await expect(app.getByRole('heading', { level: 1, name: 'Access Management' })).toBeVisible()
+    expect(seededUsers.length, 'No seeded users created in beforeAll').toBeGreaterThan(0)
 
-    const usersTable = app.getByRole('grid', { name: 'Users table' })
-    const firstUserRow = usersTable.locator('tbody tr:first-child')
-    const firstUserButton = firstUserRow.getByRole('button')
-    const hasUser = await firstUserButton
-      .waitFor({ state: 'visible', timeout: 5000 })
-      .then(() => true)
-      .catch(() => false)
-    test.skip(!hasUser, 'No users available; seed data required')
-
-    await firstUserButton.click()
+    await app.goto(toAppUrl(`/system-administration/access-management/users/${seededUsers[0].id}`))
+    await expect(app.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 10_000 })
 
     await expect(app).toHaveURL(/system-administration\/access-management\/users\//)
 
-    const rolesTab = app.getByRole('tab', { name: /roles/i })
-    await expect(rolesTab).toBeVisible()
-    await rolesTab.click()
+    const assignmentsTab = app.getByRole('tab', { name: /assignments/i })
+    await expect(assignmentsTab).toBeVisible({ timeout: 10_000 })
+    await assignmentsTab.click()
 
     const assignButton = app.getByRole('button', { name: /assign role/i })
     await expect(assignButton).toBeVisible({ timeout: 10_000 })
@@ -96,12 +87,16 @@ test.describe('Access Management — Dropdown Pagination', () => {
     await expect(roleSearchInput).toBeVisible()
     await roleSearchInput.click()
 
-    const noResults = dialog.getByText(/No results match/i)
-    const roleOptions = dialog.getByRole('option').filter({ hasNotText: /No results match/i })
-    await expect(roleOptions.or(noResults)).toBeVisible({ timeout: 15_000 })
-    expect(await roleOptions.count()).toBeGreaterThan(0)
+    // PatternFly Select renders options in a portal outside the dialog
+    const roleOptions = app.getByRole('option').filter({ hasNotText: /No results match/i })
+    await expect(async () => {
+      expect(await roleOptions.count()).toBeGreaterThan(0)
+    }).toPass({ timeout: 15_000 })
 
-    await dialog.getByRole('button', { name: 'Cancel' }).click()
+    // Close the dialog via its X button — the PF6 Select dropdown is
+    // a portal overlay that blocks the Cancel button, but the close
+    // button in the dialog header is above the dropdown.
+    await dialog.getByRole('button', { name: 'Close', exact: true }).click()
     await expect(dialog).not.toBeVisible()
   })
 
@@ -109,29 +104,13 @@ test.describe('Access Management — Dropdown Pagination', () => {
     test.skip(!!process.env.SYNTARA_E2E_SKIP_WEB_SERVER, 'Group typeahead unreliable against real backend')
 
     test('Add Member modal shows users in the typeahead dropdown', async ({ app }) => {
-      await app.goto(toAppUrl('/system-administration/access-management/groups'))
-      await expect(app.getByRole('heading', { level: 1, name: 'Access Management' })).toBeVisible()
+      if (!seededGroup) throw new Error('No seeded group created in beforeAll')
 
-      const groupsTable = app.getByRole('grid', { name: 'Groups table' })
-      const firstGroupRow = groupsTable.locator('tbody tr:first-child')
-      const firstGroupButton = firstGroupRow.getByRole('button')
-      const hasGroup = await firstGroupButton
-        .waitFor({ state: 'visible', timeout: 5000 })
-        .then(() => true)
-        .catch(() => false)
-      test.skip(!hasGroup, 'No groups available; seed data required')
-
-      await firstGroupButton.click()
-
-      await expect(app).toHaveURL(/system-administration\/access-management\/groups\//)
+      await app.goto(toAppUrl(`/system-administration/access-management/groups/${seededGroup.id}`))
+      await expect(app.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 10_000 })
 
       const membersTab = app.getByRole('tab', { name: /members/i })
-      const hasMembersTab = await membersTab
-        .waitFor({ state: 'visible', timeout: 5000 })
-        .then(() => true)
-        .catch(() => false)
-      test.skip(!hasMembersTab, 'First group has no Members tab (may be the "authenticated" group)')
-
+      await expect(membersTab).toBeVisible({ timeout: 5000 })
       await membersTab.click()
 
       const addMemberButton = app.getByRole('button', { name: /add member/i })
@@ -152,7 +131,7 @@ test.describe('Access Management — Dropdown Pagination', () => {
         .waitFor({ state: 'visible', timeout: 15_000 })
         .then(() => true)
         .catch(() => false)
-      test.skip(!hasOptions, 'Typeahead dropdown did not populate')
+      expect(hasOptions, 'Typeahead dropdown did not populate').toBeTruthy()
       expect(await userOptions.count()).toBeGreaterThan(0)
 
       await dialog.getByRole('button', { name: 'Cancel' }).click()
