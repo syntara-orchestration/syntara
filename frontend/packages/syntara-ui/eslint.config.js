@@ -11,6 +11,7 @@ import noOnlyTests from 'eslint-plugin-no-only-tests'
 import testingLibrary from 'eslint-plugin-testing-library'
 import sonarjs from 'eslint-plugin-sonarjs'
 import unicorn from 'eslint-plugin-unicorn'
+import barrelFiles from 'eslint-plugin-barrel-files'
 import vitest from '@vitest/eslint-plugin'
 import pluginQuery from '@tanstack/eslint-plugin-query'
 import reactUseEffect from 'eslint-plugin-react-you-might-not-need-an-effect'
@@ -233,6 +234,7 @@ export default tseslint.config(
       'no-only-tests': noOnlyTests,
       sonarjs,
       unicorn,
+      'barrel-files': barrelFiles,
       syntara: syntaraPlugin,
       reactYouMightNotNeedAnEffect: reactUseEffect,
     },
@@ -299,7 +301,15 @@ export default tseslint.config(
       // Aligns with Sonar typescript:S3358 (nested ternary). Matches SonarCloud carve-outs (e.g. separate JSX `{}` blocks).
       'sonarjs/no-nested-conditional': 'error',
       'max-depth': ['error', 4],
-      'max-params': ['error', 5],
+      // Lowered from `['error', 5]`. Reviewers flag functions at 4 params and ask for an object
+      // parameter instead. Set to `warn` (not `error`) so existing 4+ param functions are not a
+      // hard build break — the Zero New Warnings Policy still blocks new violations in review.
+      // Revisit: promote to `error` once the codebase is clean at this threshold.
+      'max-params': ['warn', 3],
+      // Applies to all .ts/.tsx files in this package — a file that only re-exports other
+      // modules is a barrel file. `warn` (not `error`) so the existing barrel files are not a
+      // hard build break; new ones are blocked by the Zero New Warnings Policy in review.
+      'barrel-files/avoid-barrel-files': 'warn',
       // Limit nested functions/callbacks (e.g. hooks → timeout → setState updater). Complements max-depth
       // and aligns with Sonar-style “deeply nested functions” maintainability rules. Tests disable this.
       'max-nested-callbacks': ['error', 4],
@@ -389,6 +399,22 @@ export default tseslint.config(
     rules: {
       'no-console': 'off',
       'no-restricted-exports': 'off',
+    },
+  },
+  {
+    // `barrel-files/avoid-barrel-files` only counts a top-level declaration if it is NOT
+    // exported (e.g. `function foo() {}`, not `export function foo() {}`). These three files
+    // are substantial implementation files (a 1000+ line Zustand store, node-factory functions,
+    // expression defaults) that mostly use `export function`/`export const`, so the rule
+    // undercounts their real declarations and misreads a small re-export section as a barrel
+    // file. They are not barrel files. See frontend/docs/tickets/fix-barrel-file-warnings.md.
+    files: [
+      'src/stores/useWorkflowStore.ts',
+      'src/stores/workflowFactories.ts',
+      'src/utils/expressions/defaults.ts',
+    ],
+    rules: {
+      'barrel-files/avoid-barrel-files': 'off',
     },
   },
   {
