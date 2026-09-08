@@ -12,7 +12,7 @@ Security:
 - Expression syntax is pre-processed to strip ${} wrappers before AST parsing
 - No eval() or exec() - only AST-based evaluation with allowlist of node types
 - ``ast.Call`` is allowed only for ``len``, ``str.startswith``/``endswith``,
-  and internal ``__exists__`` / ``__re_search__`` helpers
+  and internal ``__exists__`` / ``__is_empty__`` / ``__re_search__`` helpers
 - AST complexity limits prevent denial-of-service attacks
 
 Type Safety: Values used with original types (no repr() conversion)
@@ -35,6 +35,9 @@ MAX_VARIABLE_NAME_LENGTH = 500  # Max characters in ${variable.path.name}
 MAX_AST_DEPTH = 50  # Max nesting depth (e.g., nested parentheses)
 MAX_AST_NODES = 500  # Max total AST nodes
 MAX_REGEX_PATTERN_LENGTH = 500  # Max characters in a ``matches`` regex
+ERROR_PATTERN_DISPLAY_LENGTH = 80  # Truncate user regex patterns in error messages
+_EMPTYABLE_TYPES = (str, list, dict)
+_EXISTS_PATH_NODE_TYPES = (ast.Constant, ast.Name, ast.Attribute, ast.Subscript, ast.UnaryOp)
 
 # Allowlist of safe AST node types — reject everything else up front
 # Makes security contract self-documenting and ensures newly introduced AST types
@@ -51,7 +54,7 @@ _ALLOWED_NODE_TYPES = (
 )
 
 # Gated Call allowlist — never look these names up in the user namespace
-_ALLOWED_CALL_NAMES = frozenset({"len", "__exists__", "__re_search__"})
+_ALLOWED_CALL_NAMES = frozenset({"len", "__exists__", "__is_empty__", "__re_search__"})
 _ALLOWED_METHODS = frozenset({"startswith", "endswith"})
 
 # Visual-builder operands: ${path} or a dotted/subscripted name
@@ -115,7 +118,7 @@ def _translate_custom_operators(expression: str) -> str:
         (rf"({_OPERAND_PATTERN})\s+endsWith\s+({_VALUE_PATTERN})", r"(\1.endswith(\2))"),
         (rf"({_OPERAND_PATTERN})\s+matches\s+({_VALUE_PATTERN})", r"(__re_search__(\2, \1))"),
         (rf"({_OPERAND_PATTERN})\s+contains\s+({_VALUE_PATTERN})", r"(\2 in \1)"),
-        (rf"({_OPERAND_PATTERN})\s+isEmpty\b", r"(not \1)"),
+        (rf"({_OPERAND_PATTERN})\s+isEmpty\b", r"(__is_empty__(\1))"),
     )
     for pattern, repl in replacements:
         translated = re.sub(pattern, repl, translated)
@@ -123,15 +126,89 @@ def _translate_custom_operators(expression: str) -> str:
 
 
 def _path_exists(path: str, namespace: dict[str, Any]) -> bool:
-    """Return True when ``path`` resolves in ``namespace`` to a non-None value."""
+    """Return True when ``path`` resolves in ``namespace`` to a non-None value.
+
+    Uses the same Name / Attribute / Subscript lookup as condition evaluation
+    (including ``data[0].name`` and ``items[-1]``). Missing keys or indexes are
+    False, not a lookup error. Function calls in the path are rejected.
+    """
     if not path:
         return False
-    current: object = namespace
-    for part in path.split("."):
-        if not isinstance(current, dict) or part not in current:
-            return False
-        current = current[part]
-    return current is not None
+    try:
+        tree = ast.parse(path, mode="eval")
+    except SyntaxError:
+        return False
+    _validate_ast_complexity(tree)
+    try:
+        value = _exists_resolve(tree.body, namespace)
+    except (KeyError, IndexError):
+        return False
+    except TypeError as exc:
+        if "exists does not support" in str(exc):
+            raise
+        return False
+    return value is not None
+
+
+def _exists_resolve(node: ast.expr, namespace: dict[str, Any]) -> object:
+    """Resolve an ``exists`` path without evaluating calls or comparisons."""
+    if not isinstance(node, _EXISTS_PATH_NODE_TYPES):
+        msg = f"exists does not support {type(node).__name__} paths"
+        raise TypeError(msg)
+    if isinstance(node, ast.Constant):
+        return node.value
+    if isinstance(node, ast.Name):
+        return _eval_variable(node, namespace)
+    if isinstance(node, ast.Attribute):
+        return _exists_resolve_attribute(node, namespace)
+    if isinstance(node, ast.Subscript):
+        return _exists_resolve_subscript(node, namespace)
+    return _exists_resolve_unary(node, namespace)
+
+
+def _exists_resolve_attribute(node: ast.Attribute, namespace: dict[str, Any]) -> object:
+    """Resolve ``base.attr`` for ``exists``."""
+    base = _exists_resolve(node.value, namespace)
+    if not isinstance(base, dict):
+        msg = f"Cannot access attribute '{node.attr}' on {type(base).__name__} (expected dict)"
+        raise TypeError(msg)
+    if node.attr not in base:
+        msg = f"Attribute '{node.attr}' not found"
+        raise KeyError(msg)
+    return base[node.attr]
+
+
+def _exists_resolve_subscript(node: ast.Subscript, namespace: dict[str, Any]) -> object:
+    """Resolve ``base[index]`` for ``exists``."""
+    base = _exists_resolve(node.value, namespace)
+    index = _exists_resolve(node.slice, namespace)
+    if isinstance(base, dict):
+        if index not in base:
+            msg = f"Key {index!r} not found in dict"
+            raise KeyError(msg)
+        return base[index]
+    if isinstance(base, list):
+        if not isinstance(index, int):
+            msg = f"List index must be integer, got {type(index).__name__}"
+            raise TypeError(msg)
+        if index < -len(base) or index >= len(base):
+            msg = f"List index {index} out of range (length {len(base)})"
+            raise IndexError(msg)
+        return base[index]
+    msg = f"Cannot subscript {type(base).__name__}"
+    raise TypeError(msg)
+
+
+def _exists_resolve_unary(node: ast.UnaryOp, namespace: dict[str, Any]) -> object:
+    """Resolve unary minus in a path index (e.g. ``items[-1]``)."""
+    if not isinstance(node.op, ast.USub):
+        msg = "exists does not support this unary operator in a path"
+        raise TypeError(msg)
+    operand = _exists_resolve(node.operand, namespace)
+    if not isinstance(operand, (int, float, complex)):
+        msg = f"Unary minus requires numeric operand, got {type(operand).__name__}"
+        raise TypeError(msg)
+    return -operand
 
 
 def safe_eval_with_namespace(expression: str, namespace: dict[str, Any]) -> bool:
@@ -317,7 +394,7 @@ def _eval_call(node: ast.Call, namespace: dict[str, Any]) -> object:
     """Evaluate a gated function/method call.
 
     Allowed: ``len(x)``, ``x.startswith(s)``, ``x.endswith(s)``,
-    ``__exists__('path')``, ``__re_search__(pattern, value)``.
+    ``__exists__('path')``, ``__is_empty__(x)``, ``__re_search__(pattern, value)``.
     """
     if node.keywords or any(isinstance(arg, ast.Starred) for arg in node.args):
         msg = "Keyword and starred arguments are not supported"
@@ -348,6 +425,8 @@ def _eval_allowed_function(
         return _eval_len(args)
     if func_name == "__exists__":
         return _eval_exists_call(args, namespace)
+    if func_name == "__is_empty__":
+        return _eval_is_empty(args)
     return _eval_re_search(args)
 
 
@@ -361,6 +440,25 @@ def _eval_len(args: list[object]) -> int:
         msg = f"len() not supported for {type(value).__name__}"
         raise TypeError(msg)
     return len(value)
+
+
+def _eval_is_empty(args: list[object]) -> bool:
+    """Evaluate ``isEmpty`` for strings and collections only — not Python truthiness."""
+    if len(args) != 1:
+        msg = "__is_empty__ takes exactly one argument"
+        raise ValueError(msg)
+    value = args[0]
+    if not isinstance(value, _EMPTYABLE_TYPES):
+        msg = f"isEmpty is not supported for {type(value).__name__}"
+        raise TypeError(msg)
+    return len(value) == 0
+
+
+def _truncate_for_error(text: str) -> str:
+    """Truncate a user-controlled string for log-safe error messages."""
+    if len(text) <= ERROR_PATTERN_DISPLAY_LENGTH:
+        return text
+    return f"{text[:ERROR_PATTERN_DISPLAY_LENGTH]}..."
 
 
 def _eval_exists_call(args: list[object], namespace: dict[str, Any]) -> bool:
@@ -384,13 +482,17 @@ def _eval_re_search(args: list[object]) -> bool:
     if len(pattern) > MAX_REGEX_PATTERN_LENGTH:
         msg = f"matches pattern too long ({len(pattern)} chars, max {MAX_REGEX_PATTERN_LENGTH})"
         raise ValueError(msg)
-    if value is None:
-        return False
-    text = value if isinstance(value, str) else str(value)
+    if not isinstance(value, str):
+        msg = f"matches() requires a string value, got {type(value).__name__}"
+        raise TypeError(msg)
+    # stdlib ``re.search`` has no timeout. MAX_REGEX_PATTERN_LENGTH bounds input
+    # size but does not prevent catastrophic backtracking (ReDoS), e.g. ``(a+)+$``.
+    # A thread timeout cannot interrupt CPython's C regex engine. Follow-up: evaluate
+    # google-re2 for linear-time matching if ``matches`` is exposed to untrusted patterns.
     try:
-        return re.search(pattern, text) is not None
+        return re.search(pattern, value) is not None
     except re.error as exc:
-        msg = f"Invalid matches pattern: {pattern}"
+        msg = f"Invalid matches pattern: {_truncate_for_error(pattern)}"
         raise ValueError(msg) from exc
 
 
@@ -410,12 +512,12 @@ def _eval_allowed_method(
     if len(args) != 1 or not isinstance(args[0], str):
         msg = f"{method}() requires a single string argument"
         raise TypeError(msg)
-    if obj is None:
-        return False
-    text = obj if isinstance(obj, str) else str(obj)
+    if not isinstance(obj, str):
+        msg = f"{method}() requires a string value, got {type(obj).__name__}"
+        raise TypeError(msg)
     if method == "startswith":
-        return text.startswith(args[0])
-    return text.endswith(args[0])
+        return obj.startswith(args[0])
+    return obj.endswith(args[0])
 
 
 def _eval_node(node: ast.expr, namespace: dict[str, Any]) -> object:

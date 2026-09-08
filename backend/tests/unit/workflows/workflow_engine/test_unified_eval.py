@@ -727,6 +727,39 @@ class TestVisualBuilderOperators:
         assert safe_eval_with_namespace("${items} isEmpty", {"items": []}) is True
         assert safe_eval_with_namespace("${items} isEmpty", {"items": [1]}) is False
 
+    def test_is_empty_dict(self) -> None:
+        assert safe_eval_with_namespace("${data} isEmpty", {"data": {}}) is True
+        assert safe_eval_with_namespace("${data} isEmpty", {"data": {"a": 1}}) is False
+
+    def test_is_empty_rejects_zero_false_and_none(self) -> None:
+        with pytest.raises(TypeError, match="isEmpty is not supported"):
+            safe_eval_with_namespace("${count} isEmpty", {"count": 0})
+        with pytest.raises(TypeError, match="isEmpty is not supported"):
+            safe_eval_with_namespace("${flag} isEmpty", {"flag": False})
+        with pytest.raises(TypeError, match="isEmpty is not supported"):
+            safe_eval_with_namespace("${val} isEmpty", {"val": None})
+
+    def test_exists_subscript_path(self) -> None:
+        assert safe_eval_with_namespace("${data[0]} exists", {"data": ["x"]}) is True
+        assert safe_eval_with_namespace("${data[0]} exists", {"data": []}) is False
+
+    def test_exists_nested_subscript_path(self) -> None:
+        assert safe_eval_with_namespace("${data[0].name} exists", {"data": [{"name": "svc"}]}) is True
+        assert safe_eval_with_namespace("${data[0].name} exists", {"data": [{}]}) is False
+
+    def test_exists_negative_index(self) -> None:
+        assert safe_eval_with_namespace("${items[-1]} exists", {"items": [1, 2]}) is True
+
+    def test_starts_with_rejects_non_string(self) -> None:
+        with pytest.raises(TypeError, match="requires a string value"):
+            safe_eval_with_namespace('${count} startsWith "4"', {"count": 42})
+        with pytest.raises(TypeError, match="requires a string value"):
+            safe_eval_with_namespace('${val} startsWith "x"', {"val": None})
+
+    def test_ends_with_rejects_non_string(self) -> None:
+        with pytest.raises(TypeError, match="requires a string value"):
+            safe_eval_with_namespace('${count} endsWith "2"', {"count": 42})
+
     def test_starts_with(self) -> None:
         assert safe_eval_with_namespace('${username} startsWith "user_"', {"username": "user_abc"}) is True
         assert safe_eval_with_namespace('${username} startsWith "user_"', {"username": "admin"}) is False
@@ -742,6 +775,18 @@ class TestVisualBuilderOperators:
     def test_invalid_matches_pattern_raises(self) -> None:
         with pytest.raises(ValueError, match="Invalid matches pattern"):
             safe_eval_with_namespace('${code} matches "["', {"code": "A"})
+
+    def test_matches_rejects_non_string_value(self) -> None:
+        with pytest.raises(TypeError, match="requires a string value"):
+            safe_eval_with_namespace('${count} matches "^4"', {"count": 42})
+
+    def test_invalid_matches_pattern_is_truncated_in_error(self) -> None:
+        long_pattern = "[" + ("a" * 200)
+        with pytest.raises(ValueError, match="Invalid matches pattern") as exc_info:
+            safe_eval_with_namespace(f'${{code}} matches "{long_pattern}"', {"code": "A"})
+        message = str(exc_info.value)
+        assert "..." in message
+        assert long_pattern not in message
 
     def test_length_equal_to(self) -> None:
         assert safe_eval_with_namespace("${tags} lengthEqualTo 2", {"tags": ["a", "b"]}) is True
