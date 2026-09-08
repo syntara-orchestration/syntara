@@ -304,7 +304,6 @@ class TestToReadConversion:
 
         read = await service.to_read(sa)
         assert read.project_name == "My Project"
-        assert read.is_project_deleted is False
 
     @pytest.mark.asyncio
     async def test_to_read_handles_missing_project(
@@ -344,8 +343,8 @@ class TestResolveProjectInfosBatch:
         mock_session.exec.return_value = mock_result
 
         result = await service._resolve_project_infos({proj_a, proj_b})
-        assert result[proj_a] == ("Project A", False)
-        assert result[proj_b] == ("Project B", False)
+        assert result[proj_a] == "Project A"
+        assert result[proj_b] == "Project B"
 
     @pytest.mark.asyncio
     async def test_missing_projects_omitted(self, service: ServiceAccountService, mock_session: AsyncMock) -> None:
@@ -397,7 +396,6 @@ class TestListServiceAccounts:
             response = await service.list_service_accounts()
 
         assert response.resources[0].project_name == "My Project"
-        assert response.resources[0].is_project_deleted is False
 
     @pytest.mark.asyncio
     async def test_list_handles_hard_deleted_project(
@@ -431,7 +429,6 @@ class TestListServiceAccounts:
             response = await service.list_service_accounts()
 
         assert response.resources[0].project_name is None
-        assert response.resources[0].is_project_deleted is False
 
     @pytest.mark.asyncio
     async def test_list_handles_missing_project(
@@ -465,7 +462,6 @@ class TestListServiceAccounts:
             response = await service.list_service_accounts()
 
         assert response.resources[0].project_name is None
-        assert response.resources[0].is_project_deleted is False
 
     @pytest.mark.asyncio
     async def test_list_empty_resources(
