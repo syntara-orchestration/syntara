@@ -4,7 +4,7 @@ import { useCallback, useRef, type Dispatch, type SetStateAction } from 'react'
 
 import { FlowNodeType } from '../../../constants'
 import type { NodeType } from '../../workflows/canvas/nodes/NodeType'
-import type { ConnectionState, FlowPosition, PendingEdge } from '../types'
+import type { ConnectionState, OnAddNodeFromEdge, PendingEdge } from '../types'
 import { EdgeFactory } from '../utils/EdgeFactory'
 import { getPlaceholderNodeId } from '../utils/edgeHelpers'
 import { consumePendingDragHandle } from '../utils/pendingDragHandle'
@@ -13,13 +13,7 @@ import type { EdgeType } from '../utils/workflowToGraph'
 type UseConnectionHandlersParams = {
   nodes: NodeType[]
   edges: EdgeType[]
-  onAddNodeFromEdge?: (
-    sourceNodeId: string,
-    nodeType?: string,
-    activityId?: string,
-    sourceHandle?: string,
-    desiredPosition?: FlowPosition
-  ) => void
+  onAddNodeFromEdge?: OnAddNodeFromEdge
   setNodes: Dispatch<SetStateAction<NodeType[]>>
   setEdges: Dispatch<SetStateAction<EdgeType[]>>
   setPendingEdge: Dispatch<SetStateAction<PendingEdge | null>>
@@ -199,7 +193,11 @@ export function useConnectionHandlers({
           y: flowPosition.y,
         })
 
-        onAddNodeFromEdge?.(sourceNodeId, undefined, undefined, sourceHandleId ?? undefined, flowPosition)
+        onAddNodeFromEdge?.({
+          sourceNodeId,
+          sourceHandle: sourceHandleId ?? undefined,
+          desiredPosition: flowPosition,
+        })
       }
     },
     [onAddNodeFromEdge, screenToFlowPosition, setPendingEdge]

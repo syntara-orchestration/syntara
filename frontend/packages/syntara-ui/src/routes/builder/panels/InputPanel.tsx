@@ -45,13 +45,14 @@ type InputPanelProps = {
 }
 
 /** Compute the effective upstream nodes, falling back to source ancestors when direct upstream is empty. */
-function computeEffectiveUpstream(
-  upstreamNodes: UpstreamNodeInfo[],
-  sourceNodeId: string | null | undefined,
-  sourceAncestors: UpstreamNodeInfo[],
-  activities: { id: string; name?: string; type: string }[] | undefined,
+function computeEffectiveUpstream(params: {
+  upstreamNodes: UpstreamNodeInfo[]
+  sourceNodeId: string | null | undefined
+  sourceAncestors: UpstreamNodeInfo[]
+  activities: { id: string; name?: string; type: string }[] | undefined
   triggers: { id: string; name?: string; type: string }[] | undefined
-): UpstreamNodeInfo[] {
+}): UpstreamNodeInfo[] {
+  const { upstreamNodes, sourceNodeId, sourceAncestors, activities, triggers } = params
   if (upstreamNodes.length > 0) return upstreamNodes
   if (!sourceNodeId) return []
 
@@ -268,7 +269,7 @@ export function InputPanel({
   const triggers = useWorkflowStore(selectTriggers)
 
   const effectiveUpstream = useMemo(
-    () => computeEffectiveUpstream(upstreamNodes, sourceNodeId, sourceAncestors, activities, triggers),
+    () => computeEffectiveUpstream({ upstreamNodes, sourceNodeId, sourceAncestors, activities, triggers }),
     [upstreamNodes, sourceNodeId, sourceAncestors, activities, triggers]
   )
 
