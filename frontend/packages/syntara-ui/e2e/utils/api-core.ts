@@ -48,8 +48,19 @@ export async function getAuthToken(app: Page): Promise<string | null> {
   return null
 }
 
-function isStaleTokenResponse(response: APIResponse): boolean {
-  return response.status() === 401 && response.headers()['x-auth-failure-type'] === STALE_TOKEN_FAILURE_HEADER
+async function isStaleTokenResponse(response: APIResponse): Promise<boolean> {
+  if (response.status() !== 401) return false
+
+  const failureType = response.headers()['x-auth-failure-type']
+  if (failureType === STALE_TOKEN_FAILURE_HEADER) return true
+
+  // Metrics middleware strips X-Auth-Failure-Type before the response reaches clients.
+  try {
+    const body = (await response.json()) as { code?: string }
+    return body.code === 'TOKEN_STALE'
+  } catch {
+    return false
+  }
 }
 
 async function sendApiRequest(
@@ -84,7 +95,7 @@ export async function apiRequest(
   let token = options?.token ?? (await getAuthToken(app))
   let response = await sendApiRequest(app, method, path, token, options?.data)
 
-  if (isStaleTokenResponse(response)) {
+  if (await isStaleTokenResponse(response)) {
     token = await getAuthToken(app)
     if (!token) return response
     response = await sendApiRequest(app, method, path, token, options?.data)
