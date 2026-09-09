@@ -31,36 +31,38 @@ nodes:
     name: Simulate Unreliable Service
     type: script
     parameters:
-      language: bash
+      language: python
       environment:
         INPUT_FAILURE_RATE: ${trigger.failure_rate}
-        INPUT_ATTEMPT: "1"
         INPUT_SEED: ${trigger.seed}
       code: |
-        ATTEMPT_NUMBER=${INPUT_ATTEMPT:-1}
+        import json
+        import os
+        import random
+        import sys
 
-        echo "Attempt #$ATTEMPT_NUMBER: Calling unreliable service..."
-        echo "Failure rate: ${INPUT_FAILURE_RATE}%"
+        failure_rate = int(os.environ.get("INPUT_FAILURE_RATE", "70"))
+        seed_env = os.environ.get("INPUT_SEED", "")
+        attempt_number = int(os.environ.get("INPUT_TEMPORAL_ATTEMPT", "1"))
 
-        # Seed RANDOM for deterministic testing if seed provided
-        # Advance seed by attempt number to get different values on each retry
-        if [ -n "$INPUT_SEED" ]; then
-          ATTEMPT=${INPUT_TEMPORAL_ATTEMPT:-1}
-          RANDOM_NUM=$(python3 -c "import random, os; seed = int(os.getenv('INPUT_SEED', 0)); attempt = int(os.getenv('INPUT_TEMPORAL_ATTEMPT', 1)); random.seed(seed + attempt - 1); print(random.randint(0, 99))")
-        else
-          RANDOM_NUM=$((RANDOM % 100))
-        fi
-        echo "Random roll: $RANDOM_NUM (need > $INPUT_FAILURE_RATE to succeed)"
+        print(f"Attempt #{attempt_number}: Calling unreliable service...")
+        print(f"Failure rate: {failure_rate}%")
 
-        if [ "$RANDOM_NUM" -gt "$INPUT_FAILURE_RATE" ]; then
-          echo "✓ Success! Service responded correctly"
-          echo "{\"status\": \"success\", \"attempt\": $ATTEMPT_NUMBER, \"random\": $RANDOM_NUM}"
-          exit 0
-        else
-          echo "✗ Failed! Service error (will retry with backoff)"
-          echo "{\"status\": \"failed\", \"attempt\": $ATTEMPT_NUMBER, \"random\": $RANDOM_NUM}" >&2
-          exit 1
-        fi
+        # Seed for deterministic testing; advance by attempt so each retry differs
+        if seed_env:
+            random.seed(int(seed_env) + attempt_number - 1)
+
+        random_num = random.randint(0, 99)
+        print(f"Random roll: {random_num} (need > {failure_rate} to succeed)")
+
+        if random_num > failure_rate:
+            print("Success! Service responded correctly")
+            print(json.dumps({"status": "success", "attempt": attempt_number, "random": random_num}))
+            sys.exit(0)
+        else:
+            print("Failed! Service error (will retry with backoff)", file=sys.stderr)
+            print(json.dumps({"status": "failed", "attempt": attempt_number, "random": random_num}), file=sys.stderr)
+            sys.exit(1)
     timeout: 10
     retry_policy:
       maxAttempts: 5

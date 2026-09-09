@@ -6,7 +6,6 @@ import type { ValidationContext, ValidationError } from '../types'
 
 // Keep in sync with BUILTIN_SCOPES in backend/src/syntara/workflows/validators/template_expressions.py
 const KNOWN_NAMESPACES = new Set(['trigger', 'workflow_context'])
-const UNSUPPORTED_NAMESPACES = new Set(['workflow'])
 const VARIABLE_REF_PATTERN = /\$\{([^}]+)\}/g
 
 type VariableReference = {
@@ -80,16 +79,16 @@ function checkSchemaFieldReference(
 function checkNodeReference(
   ref: VariableReference,
   activity: Activity,
-  activityIds: Set<string>,
+  referenceTargetIds: Set<string>,
   upstreamIds: Set<string>
 ): ValidationError | null {
   const stepName = activity.name ?? activity.id
-  if (!activityIds.has(ref.namespace)) {
+  if (!referenceTargetIds.has(ref.namespace)) {
     return {
       id: `var-ref-node-${activity.id}-${ref.namespace}`,
       severity: 'error',
       rule: 'variable-references',
-      message: `Step "${stepName}" references \${${ref.fullRef}} but node "${ref.namespace}" does not exist in this workflow`,
+      message: `Step "${stepName}" references \${${ref.fullRef}} but node or trigger "${ref.namespace}" does not exist in this workflow`,
       nodeId: activity.id,
       suggestion: 'Check the node ID for typos, or add the referenced node to the workflow',
     }
@@ -110,32 +109,15 @@ function checkNodeReference(
 type RefContext = {
   schemaFields: Set<string>
   schemaSuggestion: string
-  activityIds: Set<string>
+  referenceTargetIds: Set<string>
   upstreamIds: Set<string>
 }
 
-function checkUnsupportedNamespace(ref: VariableReference, activity: Activity): ValidationError {
-  const stepName = activity.name ?? activity.id
-  return {
-    id: `var-ref-unsupported-${activity.id}-${ref.namespace}`,
-    severity: 'error',
-    rule: 'variable-references',
-    message: `Step "${stepName}" references \${${ref.fullRef}} but "${ref.namespace}" is not a supported namespace`,
-    nodeId: activity.id,
-    suggestion: `Workflow-level \${${ref.namespace}.*} is not supported`,
-  }
-}
-
 function validateRef(ref: VariableReference, activity: Activity, ctx: RefContext): ValidationError | null {
-  // Only reject as an unsupported namespace when it is not also a real node id.
-  // A node literally named "workflow" is a valid reference target on the backend
-  // (template_expressions.py has no unsupported blocklist), so treat it as a node ref.
-  if (UNSUPPORTED_NAMESPACES.has(ref.namespace) && !ctx.activityIds.has(ref.namespace))
-    return checkUnsupportedNamespace(ref, activity)
   if (ref.namespace === 'trigger')
     return checkSchemaFieldReference(ref, activity, ctx.schemaFields, ref.namespace, ctx.schemaSuggestion)
   if (KNOWN_NAMESPACES.has(ref.namespace)) return null
-  return checkNodeReference(ref, activity, ctx.activityIds, ctx.upstreamIds)
+  return checkNodeReference(ref, activity, ctx.referenceTargetIds, ctx.upstreamIds)
 }
 
 export function validateVariableReferences(
@@ -146,6 +128,8 @@ export function validateVariableReferences(
   const errors: ValidationError[] = []
   const seenIds = new Set<string>()
   const activityIds = new Set(activities.map((a) => a.id))
+  const triggerIds = new Set(context?.triggers?.map((t) => t.id) ?? [])
+  const referenceTargetIds = new Set([...activityIds, ...triggerIds])
   const schemaFields = getWorkflowInputNames(context?.triggers)
   const available = [...schemaFields].sort((a, b) => a.localeCompare(b)).join(', ')
   const schemaSuggestion = available ? `Available fields: ${available}` : 'Define fields in the trigger configuration'
@@ -155,12 +139,9 @@ export function validateVariableReferences(
     const refs = paramStrings.flatMap(extractVariableReferences)
     if (refs.length === 0) continue
 
-    const needsUpstream = refs.some(
-      (r) =>
-        !KNOWN_NAMESPACES.has(r.namespace) && (!UNSUPPORTED_NAMESPACES.has(r.namespace) || activityIds.has(r.namespace))
-    )
+    const needsUpstream = refs.some((ref) => !KNOWN_NAMESPACES.has(ref.namespace))
     const upstreamIds = needsUpstream ? getUpstreamNodeIds(activity.id, edges) : new Set<string>()
-    const ctx: RefContext = { schemaFields, schemaSuggestion, activityIds, upstreamIds }
+    const ctx: RefContext = { schemaFields, schemaSuggestion, referenceTargetIds, upstreamIds }
 
     for (const ref of refs) {
       const error = validateRef(ref, activity, ctx)

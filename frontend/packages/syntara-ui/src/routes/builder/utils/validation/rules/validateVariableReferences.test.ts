@@ -40,7 +40,7 @@ describe('validateVariableReferences', () => {
         expect(errors).toHaveLength(1)
         expect(errors[0].severity).toBe('error')
         expect(errors[0].nodeId).toBe('task-1')
-        expect(errors[0].message).toContain(`node "${namespace}" does not exist`)
+        expect(errors[0].message).toContain(`"${namespace}" does not exist`)
         expect(errors[0].message).not.toContain('supported namespace')
       }
     )
@@ -51,7 +51,7 @@ describe('validateVariableReferences', () => {
 
       const errors = validateVariableReferences(activities, [], context)
       expect(errors).toHaveLength(1)
-      expect(errors[0].message).toContain('node "input" does not exist')
+      expect(errors[0].message).toContain('"input" does not exist')
     })
 
     it.each(['input', 'inputs', 'variables'])('accepts ${%s.stdout} when a node is actually named %s', (namespace) => {
@@ -65,8 +65,8 @@ describe('validateVariableReferences', () => {
     })
   })
 
-  describe('unsupported leftover namespaces', () => {
-    it('errors on ${workflow.*} even when the field exists on the trigger schema', () => {
+  describe('workflow namespace treated as ordinary node reference', () => {
+    it('errors on ${workflow.*} when no node or trigger has that id', () => {
       const activities: Activity[] = [
         makeActivity({
           id: 'task-1',
@@ -80,8 +80,7 @@ describe('validateVariableReferences', () => {
       expect(errors).toHaveLength(1)
       expect(errors[0].severity).toBe('error')
       expect(errors[0].nodeId).toBe('task-1')
-      expect(errors[0].message).toContain('"workflow" is not a supported namespace')
-      expect(errors[0].suggestion).toContain('workflow')
+      expect(errors[0].message).toContain('"workflow" does not exist')
     })
 
     it('accepts ${workflow.output} when a node is actually named workflow (parity with backend node refs)', () => {
@@ -92,6 +91,17 @@ describe('validateVariableReferences', () => {
       const edges: EdgeConnection[] = [{ id: 'e1', source: 'workflow', target: 'task-1' }]
 
       expect(validateVariableReferences(activities, edges)).toEqual([])
+    })
+
+    it('accepts ${workflow.username} when a trigger is actually named workflow', () => {
+      const trigger = makeActivity({ id: 'workflow', type: 'manual_trigger', parameters: {} })
+      const activities: Activity[] = [
+        makeActivity({ id: 'task-1', type: 'script', parameters: { code: '${workflow.username}' } }),
+      ]
+      const edges: EdgeConnection[] = [{ id: 'e1', source: 'workflow', target: 'task-1' }]
+      const context: ValidationContext = { triggers: [trigger] }
+
+      expect(validateVariableReferences(activities, edges, context)).toEqual([])
     })
   })
 
