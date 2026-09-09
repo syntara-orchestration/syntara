@@ -483,8 +483,10 @@ test.describe('Approval Workflow Operations', () => {
   })
 
   test('UI-29: self-contained approve flow via approvals queue', async ({ app }) => {
-    // Create a workflow with an approval node so we control the approval name
-    const workflowName = buildUniqueName('e2e-approve')
+    // Create a workflow with an approval node so we control the approval name.
+    // Avoid 'approve' in the workflow name — getByRole({ name: 'Approve' }) is a
+    // substring match and collides with the workflow link button on execution detail.
+    const workflowName = buildUniqueName('e2e-ui29')
     const approvalNodeName = buildUniqueName('gate')
     const { id: workflowId } = await createWorkflowViaApi(app, workflowName, [
       { id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} },
@@ -520,8 +522,8 @@ test.describe('Approval Workflow Operations', () => {
       await expect(app).toHaveURL(/\/executions\/[^?]+\?approval=/)
       await expect(app.getByRole('heading', { name: 'Review Approval' })).toBeVisible({ timeout: 15_000 })
 
-      // Approve with notes
-      await app.getByRole('button', { name: 'Approve' }).click()
+      // Approve with notes (exact: true — workflow link names must not substring-match)
+      await app.getByRole('button', { name: 'Approve', exact: true }).click()
       await app.getByPlaceholder(/Explain the reason for approving/i).fill('Approved in E2E test')
       await app.getByRole('button', { name: 'Submit decision' }).click()
 
