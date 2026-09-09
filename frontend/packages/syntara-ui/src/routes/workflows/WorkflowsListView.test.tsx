@@ -116,6 +116,12 @@ describe('WorkflowsListView', () => {
       expect(within(actionsHeader).queryByRole('button')).not.toBeInTheDocument()
     })
 
+    it('omits the actions column when showRowActions is false', () => {
+      render(<WorkflowsListView {...defaultProps} sortedWorkflows={mockWorkflows} showRowActions={false} />)
+
+      expect(screen.queryByRole('columnheader', { name: 'Actions' })).not.toBeInTheDocument()
+    })
+
     it('does not render the no-data empty state when workflows are present', () => {
       render(<WorkflowsListView {...defaultProps} sortedWorkflows={mockWorkflows} />)
       expect(screen.queryByText('No workflows yet')).not.toBeInTheDocument()

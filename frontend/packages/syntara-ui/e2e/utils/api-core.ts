@@ -97,3 +97,29 @@ export async function ensureProject(app: Page, name = 'default'): Promise<{ id: 
     return null
   }
 }
+
+/** Create a project via the API. Returns the project ID. */
+export async function createProjectViaApi(app: Page, name: string, description?: string): Promise<{ id: string }> {
+  const token = await getAuthToken(app)
+  if (!token) throw new Error('createProjectViaApi: could not obtain auth token')
+  const resp = await apiRequest(app, 'post', '/projects', {
+    token,
+    data: { name, description: description ?? `E2E test project: ${name}` },
+  })
+  if (!resp.ok()) {
+    const body = await resp.text().catch(() => '(unreadable)')
+    throw new Error(`POST /projects returned ${resp.status()}: ${body}`)
+  }
+  return (await resp.json()) as { id: string }
+}
+
+/** Delete a project by ID via the API (best-effort cleanup). */
+export async function deleteProjectViaApi(app: Page, projectId: string): Promise<void> {
+  if (app.isClosed()) return
+  try {
+    const token = await getAuthToken(app)
+    if (token) await apiRequest(app, 'delete', `/projects/${projectId}`, { token })
+  } catch {
+    // Best-effort cleanup
+  }
+}
