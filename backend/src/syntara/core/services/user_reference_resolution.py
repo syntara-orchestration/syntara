@@ -8,7 +8,7 @@ to enrich an audit field.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NamedTuple
 from uuid import UUID
 
 import structlog
@@ -18,10 +18,15 @@ from sqlmodel import select
 from syntara.core.models.principal import (
     KNOWN_SERVICE_CNS,
     Principal,
+    PrincipalType,
     service_principal_id,
 )
 from syntara.core.models.user import User, user_display_name
-from syntara.core.models.user_reference import DEFAULT_USER_REFERENCE_FIELDS, UserReference
+from syntara.core.models.user_reference import (
+    DEFAULT_USER_REFERENCE_FIELDS,
+    UserReference,
+    UserReferenceType,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
@@ -33,6 +38,27 @@ logger = structlog.stdlib.get_logger(__name__)
 # Service principals (mTLS-authenticated internal services) get a ``principals``
 # row but no child-table row, so their display name is derived from the cert CN.
 _SERVICE_CN_BY_PRINCIPAL_ID: dict[UUID, str] = {service_principal_id(cn): cn for cn in KNOWN_SERVICE_CNS}
+
+# ``delete_user`` / ``delete_service_account`` remove the child row but keep the
+# ``principals`` row so created_by/updated_by FKs stay valid; such principals must
+# not surface as a raw id. Legacy ``system`` rows never had a child row.
+DELETED_USER_NAME = "Deleted user"
+DELETED_SERVICE_ACCOUNT_NAME = "Deleted service account"
+SYSTEM_PRINCIPAL_NAME = "System"
+
+_REFERENCE_TYPE_BY_PRINCIPAL_TYPE: dict[PrincipalType, UserReferenceType] = {
+    PrincipalType.USER: UserReferenceType.USER,
+    PrincipalType.SERVICE_ACCOUNT: UserReferenceType.SERVICE_ACCOUNT,
+    PrincipalType.SERVICE: UserReferenceType.SERVICE,
+    PrincipalType.SYSTEM: UserReferenceType.SYSTEM,
+}
+
+
+class ResolvedPrincipal(NamedTuple):
+    """Display name and reference type for one ``principals`` row."""
+
+    name: str
+    type: UserReferenceType
 
 
 def user_reference_fields(obj: object) -> tuple[str, ...]:
@@ -64,24 +90,39 @@ def _principal_id_from_value(val: object) -> UUID | None:
     return None
 
 
-def _display_name(
+def _resolve_principal(
     principal_id: UUID,
+    principal_type: PrincipalType | str,
     username: str | None,
     first_name: str | None,
     last_name: str | None,
     service_account_name: str | None,
-) -> str:
-    """Pick the best available display name for a principal.
+) -> ResolvedPrincipal:
+    """Pick the best available display name and the reference type for a principal.
 
     ``created_by``/``updated_by`` reference ``principals.id``, which may be a
     user, a service account, or an internal service. For users this mirrors
     :attr:`User.display_name` (full name, else username) so every API surface
-    shows the same name for the same principal. Falling back to the raw id
-    keeps attribution visible rather than dropping it.
+    shows the same name for the same principal. A ``user`` / ``service_account``
+    principal with no child row is a hard-deleted principal, and a legacy
+    ``system`` principal has no child row by design. Only an internal service
+    whose certificate CN is unknown falls back to the raw id.
     """
+    ptype = PrincipalType(principal_type)
     if username is not None:
-        return user_display_name(username, first_name, last_name)
-    return service_account_name or _SERVICE_CN_BY_PRINCIPAL_ID.get(principal_id) or str(principal_id)
+        return ResolvedPrincipal(
+            user_display_name(username, first_name, last_name), _REFERENCE_TYPE_BY_PRINCIPAL_TYPE[ptype]
+        )
+    if ptype is PrincipalType.USER:
+        return ResolvedPrincipal(DELETED_USER_NAME, UserReferenceType.DELETED_USER)
+    if ptype is PrincipalType.SERVICE_ACCOUNT:
+        if service_account_name is not None:
+            return ResolvedPrincipal(service_account_name, UserReferenceType.SERVICE_ACCOUNT)
+        return ResolvedPrincipal(DELETED_SERVICE_ACCOUNT_NAME, UserReferenceType.DELETED_SERVICE_ACCOUNT)
+    if ptype is PrincipalType.SYSTEM:
+        return ResolvedPrincipal(SYSTEM_PRINCIPAL_NAME, UserReferenceType.SYSTEM)
+    name = _SERVICE_CN_BY_PRINCIPAL_ID.get(principal_id) or str(principal_id)
+    return ResolvedPrincipal(name, UserReferenceType.SERVICE)
 
 
 class UserReferenceResolver:
@@ -114,16 +155,20 @@ class UserReferenceResolver:
                 pid = _principal_id_from_value(getattr(obj, field, None))
                 if pid is None:
                     continue
-                name = principal_map.get(pid)
-                setattr(obj, field, UserReference(id=pid, name=name) if name is not None else None)
+                resolved = principal_map.get(pid)
+                setattr(
+                    obj,
+                    field,
+                    UserReference(id=pid, name=resolved.name, type=resolved.type) if resolved is not None else None,
+                )
 
-    async def lookup(self, objects: Iterable[Any]) -> dict[UUID, str] | None:
+    async def lookup(self, objects: Iterable[Any]) -> dict[UUID, ResolvedPrincipal] | None:
         """Batch-resolve every principal id referenced by *objects*.
 
         Resolves every principal type in a single query: users by name,
         service accounts by name, and internal services by cert CN.
 
-        Returns ``{principal_id: name}``, or ``None`` when the query fails.
+        Returns ``{principal_id: ResolvedPrincipal}``, or ``None`` when the query fails.
         """
         principal_ids: set[UUID] = set()
         for obj in objects:
@@ -140,10 +185,11 @@ class UserReferenceResolver:
 
         try:
             # sqlmodel/sqlalchemy only type select() overloads up to 4 entities;
-            # 5 columns is valid at runtime but has no matching overload.
+            # 6 columns is valid at runtime but has no matching overload.
             stmt = (
                 select(  # type: ignore[call-overload]
                     Principal.id,
+                    Principal.principal_type,
                     User.username,
                     User.first_name,
                     User.last_name,
@@ -162,7 +208,7 @@ class UserReferenceResolver:
                 exc_info=True,
             )
             return None
-        return {row[0]: _display_name(row[0], row[1], row[2], row[3], row[4]) for row in result}
+        return {row[0]: _resolve_principal(*row) for row in result}
 
 
 class UserReferenceResolverMixin:

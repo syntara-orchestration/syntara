@@ -3,7 +3,7 @@
 from pathlib import Path
 from uuid import uuid4
 
-from syntara.core.models.user_reference import UserReference
+from syntara.core.models.user_reference import UserReference, UserReferenceType
 from syntara.credentials.models.credential import (
     CredentialCreate,
     CredentialRead,
@@ -55,15 +55,15 @@ class TestCredentialRead:
 
     def test_accepts_user_reference_objects(self) -> None:
         uid = uuid4()
-        UserReference(id=uid, name="alice")
+        UserReference(id=uid, name="alice", type=UserReferenceType.USER)
         read = CredentialRead.model_validate(
             {
                 "id": str(uuid4()),
                 "name": "test-cred",
                 "credential_type_id": str(uuid4()),
                 "project_id": str(uuid4()),
-                "created_by": {"id": str(uid), "name": "alice"},
-                "updated_by": {"id": str(uid), "name": "alice"},
+                "created_by": {"id": str(uid), "name": "alice", "type": "user"},
+                "updated_by": {"id": str(uid), "name": "alice", "type": "user"},
                 "created_at": "2026-01-01T00:00:00Z",
                 "updated_at": "2026-01-01T00:00:00Z",
                 "labels": {},

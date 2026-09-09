@@ -6,7 +6,7 @@ from uuid import UUID, uuid4
 import pytest
 from pydantic import ValidationError
 
-from syntara.core.models.user_reference import UserReference
+from syntara.core.models.user_reference import UserReference, UserReferenceType
 
 
 def _exec_for_coverage() -> None:
@@ -38,13 +38,13 @@ class TestUserReference:
 
     def test_create_with_valid_data(self) -> None:
         uid = uuid4()
-        ref = UserReference(id=uid, name="alice")
+        ref = UserReference(id=uid, name="alice", type=UserReferenceType.USER)
         assert ref.id == uid
         assert ref.name == "alice"
 
     def test_create_from_dict(self) -> None:
         uid = uuid4()
-        ref = UserReference.model_validate({"id": str(uid), "name": "bob"})
+        ref = UserReference.model_validate({"id": str(uid), "name": "bob", "type": "user"})
         assert ref.id == uid
         assert ref.name == "bob"
 
@@ -55,11 +55,13 @@ class TestUserReference:
             def __init__(self, uid: UUID, name: str) -> None:
                 self.id = uid
                 self.name = name
+                self.type = "service_account"
 
         uid = uuid4()
         ref = UserReference.model_validate(FakeRow(uid, "charlie"))
         assert ref.id == uid
         assert ref.name == "charlie"
+        assert ref.type is UserReferenceType.SERVICE_ACCOUNT
 
     def test_missing_id_raises(self) -> None:
         with pytest.raises(ValidationError):
@@ -72,7 +74,7 @@ class TestUserReference:
 
     def test_invalid_uuid_raises(self) -> None:
         with pytest.raises(ValidationError):
-            UserReference.model_validate({"id": "not-a-uuid", "name": "alice"})
+            UserReference.model_validate({"id": "not-a-uuid", "name": "alice", "type": "user"})
 
 
 class TestUserReferenceSchema:
@@ -94,4 +96,4 @@ class TestUserReferenceSchema:
 
     def test_required_fields(self) -> None:
         schema = UserReference.model_json_schema()
-        assert set(schema["required"]) == {"id", "name"}
+        assert set(schema["required"]) == {"id", "name", "type"}

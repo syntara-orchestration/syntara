@@ -58,6 +58,7 @@ from syntara.approvals.models import (
     UserReference,
 )
 from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.core.models.user_reference import UserReferenceType
 from syntara.core.services import BaseService, GroupMembershipService
 from syntara.core.services.extensions import ConvertResourceMixin, EnrichQueryMixin
 from syntara.core.services.user_reference_resolution import UserReferenceResolverMixin
@@ -118,7 +119,7 @@ class ApprovalServiceConvertResourceMixin(ConvertResourceMixin):
         # type. ApprovalRequestRead types the field strictly, so a placeholder
         # name keeps the model valid until resolution overwrites it.
         if resource.decided_by is not None:
-            result.decided_by = UserReference(id=resource.decided_by, name="")
+            result.decided_by = UserReference(id=resource.decided_by, name="", type=UserReferenceType.USER)
 
         return result
 
@@ -821,7 +822,9 @@ class ApprovalService(UserReferenceResolverMixin, BaseService):
             success=True,
             status=status,
             decided_at=approval.decided_at,
-            decided_by=UserReference(id=self.user.id, name=self.user.display_name),
+            # Placeholder: batch_decide resolves decided_by through the shared
+            # resolver, which knows whether the actor is a user or a service account.
+            decided_by=UserReference(id=self.user.id, name=self.user.display_name, type=UserReferenceType.USER),
             decision_notes=notes,
         )
 
@@ -925,6 +928,10 @@ class ApprovalService(UserReferenceResolverMixin, BaseService):
 
         # Send workflow signals for successful decisions
         await self._send_workflow_signals(results, request.decisions, approvals)
+
+        # The acting principal may be a service account presented as a User;
+        # resolve decided_by from the principals table like every other Read model.
+        await self.resolve_user_references(results)
 
         # Calculate totals and return response
         total_success = sum(1 for r in results if r.success)

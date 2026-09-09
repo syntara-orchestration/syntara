@@ -5,6 +5,7 @@ suitable for embedding in any resource that tracks "who performed this
 action".
 """
 
+from enum import StrEnum
 from typing import Any, ClassVar
 from uuid import UUID
 
@@ -20,6 +21,22 @@ DEFAULT_USER_REFERENCE_FIELDS: tuple[str, ...] = ("created_by", "updated_by")
 # subclass's declaration; check_fields=False lets it name fields a given schema lacks.
 # Adding a new user-reference field means adding it here too.
 GUARDED_USER_REFERENCE_FIELDS: tuple[str, ...] = ("created_by", "updated_by", "decided_by")
+
+
+class UserReferenceType(StrEnum):
+    """Kind of principal a UserReference points at.
+
+    Only ``user`` references have a user detail page. ``deleted_user`` and
+    ``deleted_service_account`` mark principals that were hard-deleted but are
+    still recorded as the actor.
+    """
+
+    USER = "user"
+    SERVICE_ACCOUNT = "service_account"
+    SERVICE = "service"
+    SYSTEM = "system"
+    DELETED_USER = "deleted_user"
+    DELETED_SERVICE_ACCOUNT = "deleted_service_account"
 
 
 class UserReference(SQLModel):
@@ -41,6 +58,14 @@ class UserReference(SQLModel):
             "Not a username: for a user this is their first and last name, falling back to "
             "the username when both are blank; for a service account it is the account name; "
             "for an internal service it is derived from the certificate CN."
+        ),
+    )
+    type: UserReferenceType = Field(
+        ...,
+        description=(
+            "Kind of principal this reference points at. Only `user` references have a user "
+            "detail page; `deleted_user` / `deleted_service_account` are hard-deleted principals "
+            "that are still recorded as the actor."
         ),
     )
 

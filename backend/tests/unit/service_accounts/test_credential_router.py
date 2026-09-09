@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 
-from syntara.core.models.user_reference import UserReference
+from syntara.core.models.user_reference import UserReference, UserReferenceType
 from syntara.service_accounts.credential_router import (
     create_credential,
     delete_credential,
@@ -55,7 +55,7 @@ def _read_for(cred: ServiceAccountCredential) -> ServiceAccountCredentialRead:
     rejected at serialization.
     """
     read = ServiceAccountCredentialRead.model_validate(cred)
-    read.created_by = UserReference(id=cred.created_by, name="tester")
+    read.created_by = UserReference(id=cred.created_by, name="tester", type=UserReferenceType.USER)
     return read
 
 

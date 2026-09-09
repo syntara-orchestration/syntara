@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy.exc import SQLAlchemyError
 
 from syntara.core.models.principal import KNOWN_SERVICE_CNS, service_principal_id
-from syntara.core.models.user_reference import UserReference
+from syntara.core.models.user_reference import UserReference, UserReferenceType
 from syntara.core.services.user_reference_resolution import (
     UserReferenceResolver,
     UserReferenceResolverMixin,
@@ -34,9 +34,18 @@ class _OwnerSchema:
 
 def _row(
     principal_id: object, username: str | None = None, sa_name: str | None = None
-) -> tuple[object, str | None, None, None, str | None]:
-    """Build a lookup row: (principal_id, username, first_name, last_name, service_account_name)."""
-    return (principal_id, username, None, None, sa_name)
+) -> tuple[object, str, str | None, None, None, str | None]:
+    """Build a lookup row: (principal_id, principal_type, username, first_name, last_name, service_account_name).
+
+    The principal type follows from which child-table columns are populated.
+    """
+    if username is not None:
+        ptype = "user"
+    elif sa_name is not None:
+        ptype = "service_account"
+    else:
+        ptype = "service"
+    return (principal_id, ptype, username, None, None, sa_name)
 
 
 @pytest.fixture
@@ -73,9 +82,11 @@ class TestLookup:
     async def test_extracts_ids_from_existing_user_references(self, mock_session: MagicMock) -> None:
         uid = uuid4()
         mock_session.exec = AsyncMock(return_value=[_row(uid, "erin")])
-        obj = SimpleNamespace(created_by=UserReference(id=uid, name="stale"), updated_by=None)
+        obj = SimpleNamespace(
+            created_by=UserReference(id=uid, name="stale", type=UserReferenceType.USER), updated_by=None
+        )
         result = await UserReferenceResolver(mock_session).lookup([obj])
-        assert result == {uid: "erin"}
+        assert result == {uid: ("erin", "user")}
 
     @pytest.mark.asyncio
     async def test_honors_declared_field_names(self, mock_session: MagicMock) -> None:
@@ -83,7 +94,7 @@ class TestLookup:
         mock_session.exec = AsyncMock(return_value=[_row(uid, "carol")])
         # created_by is set but not declared, so it must not be looked up.
         result = await UserReferenceResolver(mock_session).lookup([_OwnerSchema(owner=uid, created_by=uuid4())])
-        assert result == {uid: "carol"}
+        assert result == {uid: ("carol", "user")}
 
 
 class TestResolve:
@@ -132,7 +143,7 @@ class TestDisplayName:
     @pytest.mark.asyncio
     async def test_prefers_full_name_over_username(self, mock_session: MagicMock) -> None:
         uid = uuid4()
-        mock_session.exec = AsyncMock(return_value=[(uid, "gwen", "Gwen", "Stacy", None)])
+        mock_session.exec = AsyncMock(return_value=[(uid, "user", "gwen", "Gwen", "Stacy", None)])
         obj = SimpleNamespace(created_by=uid, updated_by=None)
         await UserReferenceResolver(mock_session).resolve([obj])
         assert obj.created_by.name == "Gwen Stacy"
@@ -140,7 +151,7 @@ class TestDisplayName:
     @pytest.mark.asyncio
     async def test_falls_back_to_username_when_names_blank(self, mock_session: MagicMock) -> None:
         uid = uuid4()
-        mock_session.exec = AsyncMock(return_value=[(uid, "gwen", "  ", None, None)])
+        mock_session.exec = AsyncMock(return_value=[(uid, "user", "gwen", "  ", None, None)])
         obj = SimpleNamespace(created_by=uid, updated_by=None)
         await UserReferenceResolver(mock_session).resolve([obj])
         assert obj.created_by.name == "gwen"
@@ -148,7 +159,7 @@ class TestDisplayName:
     @pytest.mark.asyncio
     async def test_uses_single_name_part_when_only_one_present(self, mock_session: MagicMock) -> None:
         uid = uuid4()
-        mock_session.exec = AsyncMock(return_value=[(uid, "gwen", None, "Stacy", None)])
+        mock_session.exec = AsyncMock(return_value=[(uid, "user", "gwen", None, "Stacy", None)])
         obj = SimpleNamespace(created_by=uid, updated_by=None)
         await UserReferenceResolver(mock_session).resolve([obj])
         assert obj.created_by.name == "Stacy"
@@ -217,3 +228,92 @@ class TestStringIdNormalisation:
         obj = SimpleNamespace(created_by="not-a-uuid", updated_by=None)
         await UserReferenceResolver(mock_session).resolve([obj])
         assert obj.created_by == "not-a-uuid"
+
+
+def _typed_row(
+    principal_id: object,
+    principal_type: str,
+    username: str | None = None,
+    sa_name: str | None = None,
+) -> tuple[object, str, str | None, None, None, str | None]:
+    """Build a lookup row carrying the principal type.
+
+    Shape: (principal_id, principal_type, username, first_name, last_name, service_account_name).
+    """
+    return (principal_id, principal_type, username, None, None, sa_name)
+
+
+class TestPrincipalType:
+    """A UserReference says what kind of principal it points at.
+
+    Only ``user`` principals have a detail page, so clients need the type to
+    decide whether to link. A hard-deleted user keeps its ``principals`` row
+    (``delete_user`` relies on it for FK integrity) but loses its ``users`` row,
+    and must not surface as a raw UUID.
+    """
+
+    @pytest.mark.asyncio
+    async def test_deleted_user_is_named_deleted_user_not_raw_uuid(self, mock_session: MagicMock) -> None:
+        pid = uuid4()
+        # principals.principal_type == "user" but no users row joined.
+        mock_session.exec = AsyncMock(return_value=[_typed_row(pid, "user")])
+        obj = SimpleNamespace(created_by=pid, updated_by=None)
+        await UserReferenceResolver(mock_session).resolve([obj])
+        assert obj.created_by.name == "Deleted user"
+        assert obj.created_by.type == "deleted_user"
+
+    @pytest.mark.asyncio
+    async def test_service_account_reference_carries_principal_type(self, mock_session: MagicMock) -> None:
+        sa_id = uuid4()
+        mock_session.exec = AsyncMock(return_value=[_typed_row(sa_id, "service_account", sa_name="ci-runner")])
+        obj = SimpleNamespace(created_by=sa_id, updated_by=None)
+        await UserReferenceResolver(mock_session).resolve([obj])
+        assert obj.created_by.name == "ci-runner"
+        assert obj.created_by.type == "service_account"
+
+    @pytest.mark.asyncio
+    async def test_live_user_reference_carries_user_type(self, mock_session: MagicMock) -> None:
+        uid = uuid4()
+        mock_session.exec = AsyncMock(return_value=[_typed_row(uid, "user", username="erin")])
+        obj = SimpleNamespace(created_by=uid, updated_by=None)
+        await UserReferenceResolver(mock_session).resolve([obj])
+        assert obj.created_by.name == "erin"
+        assert obj.created_by.type == "user"
+
+
+class TestNamelessPrincipals:
+    """Principals with no child row must never surface as a raw UUID.
+
+    Legacy ``system`` rows have no child table at all, and
+    ``delete_service_account`` keeps the ``principals`` row while dropping the
+    ``service_accounts`` row, exactly like ``delete_user`` does for users.
+    """
+
+    @pytest.mark.asyncio
+    async def test_system_principal_is_named_system(self, mock_session: MagicMock) -> None:
+        pid = uuid4()
+        mock_session.exec = AsyncMock(return_value=[_typed_row(pid, "system")])
+        obj = SimpleNamespace(created_by=pid, updated_by=None)
+        await UserReferenceResolver(mock_session).resolve([obj])
+        assert obj.created_by.name == "System"
+        assert obj.created_by.type == "system"
+
+    @pytest.mark.asyncio
+    async def test_deleted_service_account_is_named_not_raw_uuid(self, mock_session: MagicMock) -> None:
+        sa_id = uuid4()
+        # principals.principal_type == "service_account" but no service_accounts row joined.
+        mock_session.exec = AsyncMock(return_value=[_typed_row(sa_id, "service_account")])
+        obj = SimpleNamespace(created_by=sa_id, updated_by=None)
+        await UserReferenceResolver(mock_session).resolve([obj])
+        assert obj.created_by.name == "Deleted service account"
+        assert obj.created_by.type == "deleted_service_account"
+
+    @pytest.mark.asyncio
+    async def test_internal_service_reference_carries_service_type(self, mock_session: MagicMock) -> None:
+        cn = KNOWN_SERVICE_CNS[0]
+        svc_id = service_principal_id(cn)
+        mock_session.exec = AsyncMock(return_value=[_typed_row(svc_id, "service")])
+        obj = SimpleNamespace(created_by=svc_id, updated_by=None)
+        await UserReferenceResolver(mock_session).resolve([obj])
+        assert obj.created_by.name == cn
+        assert obj.created_by.type == "service"

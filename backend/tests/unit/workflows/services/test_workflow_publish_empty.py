@@ -9,7 +9,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from syntara.core.models.user_reference import UserReference
+from syntara.core.models.user_reference import UserReference, UserReferenceType
 from syntara.workflows.exceptions import (
     ScheduledTriggerSyncError,
     TriggerValidationError,
@@ -349,7 +349,7 @@ async def _stub_to_read(workflow: Any) -> object:  # noqa: ANN401
     from syntara.workflows.models.workflow import WorkflowRead
 
     read = WorkflowRead.model_validate(workflow, from_attributes=True)
-    read.created_by = UserReference(id=workflow.created_by, name="tester")
+    read.created_by = UserReference(id=workflow.created_by, name="tester", type=UserReferenceType.USER)
     read.updated_by = None
     return read
 
@@ -370,7 +370,7 @@ async def _stub_to_version_read(version: Any, *_args: object, **_kwargs: object)
         change_description=version.change_description,
         name=version.name,
         status="draft",
-        created_by=UserReference(id=version.created_by, name="tester"),
+        created_by=UserReference(id=version.created_by, name="tester", type=UserReferenceType.USER),
         created_at=version.created_at,
         updated_at=version.updated_at,
     )
