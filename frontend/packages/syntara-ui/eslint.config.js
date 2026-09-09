@@ -299,7 +299,9 @@ export default tseslint.config(
       // Aligns with Sonar typescript:S3358 (nested ternary). Matches SonarCloud carve-outs (e.g. separate JSX `{}` blocks).
       'sonarjs/no-nested-conditional': 'error',
       'max-depth': ['error', 4],
-      'max-params': ['error', 5],
+      // Lowered from `['error', 5]`. Functions with 5+ separate positional params must take one
+      // object parameter instead (named args at the call site; order does not matter).
+      'max-params': ['error', 4],
       // Limit nested functions/callbacks (e.g. hooks → timeout → setState updater). Complements max-depth
       // and aligns with Sonar-style “deeply nested functions” maintainability rules. Tests disable this.
       'max-nested-callbacks': ['error', 4],
