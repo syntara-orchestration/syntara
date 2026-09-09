@@ -135,7 +135,7 @@ describe('BuilderContent', () => {
     labels: {},
     created_at: '2023-01-01T00:00:00Z',
     updated_at: '2023-01-02T00:00:00Z',
-    created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1' },
+    created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1', type: 'user' },
     current_version: 1,
     version: {
       workflow_definition: {
@@ -2912,7 +2912,7 @@ describe('BuilderContent', () => {
         change_description: 'Second version',
         status: 'draft',
         name: null,
-        created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'sarah.chen' },
+        created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'sarah.chen', type: 'user' },
       },
       {
         id: 'ver-1',
@@ -2924,7 +2924,7 @@ describe('BuilderContent', () => {
         change_description: 'First version',
         status: 'published',
         name: null,
-        created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'marcus.williams' },
+        created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'marcus.williams', type: 'user' },
       },
     ]
 
@@ -3384,7 +3384,7 @@ describe('BuilderContent', () => {
         change_description: 'Second version',
         status: 'draft',
         name: null,
-        created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'sarah.chen' },
+        created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'sarah.chen', type: 'user' },
       },
       {
         id: 'ver-1',
@@ -3396,7 +3396,7 @@ describe('BuilderContent', () => {
         change_description: 'First version',
         status: 'published',
         name: null,
-        created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'marcus.williams' },
+        created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'marcus.williams', type: 'user' },
       },
     ]
 
@@ -3477,7 +3477,7 @@ describe('BuilderContent', () => {
         change_description: 'Second version',
         status: 'draft',
         name: null,
-        created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'sarah.chen' },
+        created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'sarah.chen', type: 'user' },
       },
     ]
 
