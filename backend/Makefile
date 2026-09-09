@@ -142,6 +142,12 @@ else
 	uv run --no-sync pytest tests/performance/ -v --run-performance
 endif
 
+# Scheduler wake-up transport comparison PoC
+# ========================================================
+.PHONY: scheduler-wakeup-poc-up scheduler-wakeup-poc-down scheduler-wakeup-poc-migrate scheduler-wakeup-poc-test scheduler-wakeup-poc-faults scheduler-wakeup-poc-bench scheduler-wakeup-poc-report
+scheduler-wakeup-poc-up scheduler-wakeup-poc-down scheduler-wakeup-poc-migrate scheduler-wakeup-poc-test scheduler-wakeup-poc-faults scheduler-wakeup-poc-bench scheduler-wakeup-poc-report:
+	$(MAKE) -C samples/scheduler-wakeup $@
+
 
 # Coverage targets - separate and combined
 # ========================================================
