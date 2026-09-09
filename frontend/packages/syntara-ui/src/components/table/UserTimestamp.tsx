@@ -3,7 +3,7 @@ import type { CredentialsAPI } from '@syntara/contracts'
 
 import { getUserDetailPath } from '../../routes/access-management/accessManagementPaths'
 import { toDisplayDate } from '../../utils/dateUtils'
-import { userReferenceId, userReferenceName } from '../../utils/userReference'
+import { toLinkedUserId, toUserReferenceName } from '../../utils/userReference'
 import { SynLink } from '../SynLink'
 
 import styles from './UserTimestamp.module.css'
@@ -21,8 +21,9 @@ type UserTimestampProps = {
 
 /**
  * Displays a formatted timestamp with an optional username.
- * When the user is a UserReference (has an id), the username renders as a link
- * to the user detail page. Plain strings render as brand-colored text.
+ * When the user is a UserReference for a live user, the name renders as a link
+ * to the user detail page. Other principals (service accounts, internal services,
+ * deleted users) and plain strings render as brand-colored text.
  * In inline mode (tables): "date by username" on one line.
  * In stacked mode (detail views): date above "by username" on separate lines.
  */
@@ -32,8 +33,8 @@ export function UserTimestamp({
   subtleTimestamp = true,
   inline = false,
 }: Readonly<UserTimestampProps>) {
-  const displayName = userReferenceName(user)
-  const userId = userReferenceId(user)
+  const displayName = toUserReferenceName(user)
+  const userId = toLinkedUserId(user)
   const date = toDisplayDate(timestamp)
   const formattedDate = date ? <Timestamp date={date} dateFormat="medium" timeFormat="medium" /> : '-'
 

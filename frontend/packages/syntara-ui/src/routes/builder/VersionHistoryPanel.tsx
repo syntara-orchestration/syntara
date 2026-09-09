@@ -45,7 +45,7 @@ import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 import type { PaginationFooterProps } from '../../components/table/PaginationFooter'
 import { PaginationFooter } from '../../components/table/PaginationFooter'
 import type { FilterConfig } from '../../types/filters'
-import { userReferenceId, userReferenceName } from '../../utils/userReference'
+import { toLinkedUserId, toUserReferenceName } from '../../utils/userReference'
 
 import { formatHistoryDateTime, getDateGroupLabel } from './historyDateUtils'
 import { resolveVersionStatusForBadge, shouldShowSecondaryVersionDatetime } from './hooks/historyRowModel'
@@ -229,20 +229,44 @@ type VersionRowProps = Readonly<{
   scrollRef?: Ref<HTMLSpanElement>
 }>
 
-/** Renders a version's creator, linked to their user page when the id is known. */
-function VersionCreatedBy({ createdBy }: { createdBy: unknown }) {
-  const name = userReferenceName(createdBy)
-  const id = userReferenceId(createdBy)
-  if (!name) return null
-  if (!id) return <>{name}</>
+/** Links a version's creator to their user page. Render only when both id and name are known. */
+function VersionCreatedByLink({ userId, name }: Readonly<{ userId: string; name: string }>) {
   return (
     <SynLink
-      to={AppRoute.AccessManagement.UserDetail.replace(':userId', id)}
+      to={AppRoute.AccessManagement.UserDetail.replace(':userId', userId)}
       className={styles.usernameLink}
       onClick={(e) => e.stopPropagation()}
     >
       {name}
     </SynLink>
+  )
+}
+
+/**
+ * Secondary "datetime by creator" line under a version's title. The creator is a
+ * link only for live users (see toLinkedUserId); other principals render as text.
+ */
+function VersionSecondaryLine({
+  createdAt,
+  createdBy,
+  showDatetime,
+}: Readonly<{ createdAt: string | null | undefined; createdBy: unknown; showDatetime: boolean }>) {
+  const creatorName = toUserReferenceName(createdBy)
+  const creatorId = toLinkedUserId(createdBy)
+  const datetime = showDatetime && createdAt ? <ExecutionTimestamp dateString={createdAt} /> : null
+  if (!datetime && !creatorName) return null
+
+  let creator: ReactNode = null
+  if (creatorName) {
+    creator = creatorId ? <VersionCreatedByLink userId={creatorId} name={creatorName} /> : creatorName
+  }
+
+  return (
+    <Content component={ContentVariants.small} className={styles.secondaryDatetime}>
+      {datetime}
+      {datetime && creator ? ' by ' : null}
+      {creator}
+    </Content>
   )
 }
 
@@ -266,7 +290,6 @@ function VersionRow({
   scrollRef,
 }: VersionRowProps) {
   const badgeStatus = resolveVersionStatusForBadge(version.status)
-  const creatorName = userReferenceName(version.created_by)
   const showSecondaryDatetime = shouldShowSecondaryVersionDatetime(version.name, version.created_at)
 
   return (
@@ -287,19 +310,11 @@ function VersionRow({
               </Content>
             </Tooltip>
           </FlexItem>
-          {(showSecondaryDatetime && version.created_at) || creatorName ? (
-            <Content component={ContentVariants.small} className={styles.secondaryDatetime}>
-              {showSecondaryDatetime && version.created_at ? (
-                <ExecutionTimestamp dateString={version.created_at} />
-              ) : null}
-              {creatorName ? (
-                <>
-                  {showSecondaryDatetime && version.created_at ? ' by ' : null}
-                  <VersionCreatedBy createdBy={version.created_by} />
-                </>
-              ) : null}
-            </Content>
-          ) : null}
+          <VersionSecondaryLine
+            createdAt={version.created_at}
+            createdBy={version.created_by}
+            showDatetime={showSecondaryDatetime}
+          />
           {badgeStatus ? (
             <div className={styles.labelsRow}>
               <VersionStatusBadge status={badgeStatus} />
