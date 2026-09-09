@@ -5,6 +5,8 @@ import type { ReactNode } from 'react'
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { toDisplayDate } from '../../utils/dateUtils'
 
+import styles from './SaveWorkflowButton.module.css'
+
 type SaveWorkflowButtonProps = Readonly<{
   isPending: boolean
   isDirty: boolean
@@ -30,7 +32,10 @@ export function SaveWorkflowButton({
   const lastSavedDate = toDisplayDate(lastSavedAt)
   const lastSavedText = lastSavedDate ? (
     <>
-      Last saved <Timestamp date={lastSavedDate} dateFormat="medium" timeFormat="medium" />
+      Last saved:{' '}
+      <span className={styles.lastSavedTooltip}>
+        <Timestamp date={lastSavedDate} dateFormat="medium" timeFormat="medium" />
+      </span>
     </>
   ) : null
 
