@@ -153,6 +153,7 @@ components:
       required:
         - id
         - name
+        - type
       properties:
         id:
           type: string
@@ -161,6 +162,26 @@ components:
         name:
           type: string
           description: 'Principal''s current display name, resolved when the response is built. Not a username: for a user this is their first and last name, falling back to the username when both are blank; for a service account it is the account name; for an internal service it is derived from the certificate CN.'
+        type:
+          $ref: '#/components/schemas/UserReferenceType'
+          description: Kind of principal this reference points at. Only `user` references have a user detail page; `deleted_user` / `deleted_service_account` are hard-deleted principals that are still recorded as the actor.
+
+    UserReferenceType:
+      type: string
+      title: UserReferenceType
+      description: |-
+        Kind of principal a UserReference points at.
+
+        Only ``user`` references have a user detail page. ``deleted_user`` and
+        ``deleted_service_account`` mark principals that were hard-deleted but are
+        still recorded as the actor.
+      enum:
+        - user
+        - service_account
+        - service
+        - system
+        - deleted_user
+        - deleted_service_account
 
     Resource:
       allOf:

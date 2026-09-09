@@ -13,7 +13,7 @@ import pytest
 from langchain_core.tools import BaseTool
 
 from syntara.agent_orchestrator.tool_manager import tool_services
-from syntara.core.models.user_reference import UserReference
+from syntara.core.models.user_reference import UserReference, UserReferenceType
 from syntara.integrations.models.integration import (
     IntegrationRead,
     IntegrationStatus,
@@ -46,7 +46,7 @@ def _make_integration(
         validation_error=None,
         created_at="2024-01-01T00:00:00Z",
         updated_at="2024-01-01T00:00:00Z",
-        created_by=UserReference(id=uuid4(), name="tester"),
+        created_by=UserReference(id=uuid4(), name="tester", type=UserReferenceType.USER),
         updated_by=None,
         labels={},
     )
@@ -234,7 +234,7 @@ class TestToolServices:
                 enabled=True,
                 status="available",
                 parameters=[],
-                created_by=UserReference(id=uuid4(), name="tester"),
+                created_by=UserReference(id=uuid4(), name="tester", type=UserReferenceType.USER),
             )
         ]
 
@@ -292,7 +292,7 @@ class TestToolServices:
                 enabled=True,
                 status="available",
                 parameters=[],
-                created_by=UserReference(id=uuid4(), name="tester"),
+                created_by=UserReference(id=uuid4(), name="tester", type=UserReferenceType.USER),
             ),
             ToolWithParameters(
                 id=uuid4(),
@@ -303,7 +303,7 @@ class TestToolServices:
                 enabled=True,
                 status="available",
                 parameters=[],
-                created_by=UserReference(id=uuid4(), name="tester"),
+                created_by=UserReference(id=uuid4(), name="tester", type=UserReferenceType.USER),
             ),
         ]
         # A soft-skipped (no tools); B returned unmatched tools only
@@ -340,7 +340,7 @@ class TestToolServices:
                 enabled=True,
                 status="available",
                 parameters=[],
-                created_by=UserReference(id=uuid4(), name="tester"),
+                created_by=UserReference(id=uuid4(), name="tester", type=UserReferenceType.USER),
             )
         ]
         # Total soft-skip (no MCP tools) → connectivity cause scoped to the selected owner
@@ -378,7 +378,7 @@ class TestToolServices:
                 enabled=True,
                 status="available",
                 parameters=[],
-                created_by=UserReference(id=uuid4(), name="tester"),
+                created_by=UserReference(id=uuid4(), name="tester", type=UserReferenceType.USER),
             )
         ]
         # Owning integration returned tools but none matched enabled entries
@@ -422,7 +422,7 @@ class TestToolServices:
                 enabled=True,
                 status="available",
                 parameters=[],
-                created_by=UserReference(id=uuid4(), name="tester"),
+                created_by=UserReference(id=uuid4(), name="tester", type=UserReferenceType.USER),
             )
         ]
         with pytest.raises(ToolSelectionUnavailableError) as exc_info:
@@ -483,7 +483,7 @@ class TestToolServices:
                 enabled=True,
                 status="available",
                 parameters=[],
-                created_by=UserReference(id=uuid4(), name="tester"),
+                created_by=UserReference(id=uuid4(), name="tester", type=UserReferenceType.USER),
             ),
             ToolWithParameters(
                 id=tool_b_id,
@@ -494,7 +494,7 @@ class TestToolServices:
                 enabled=True,
                 status="available",
                 parameters=[],
-                created_by=UserReference(id=uuid4(), name="tester"),
+                created_by=UserReference(id=uuid4(), name="tester", type=UserReferenceType.USER),
             ),
         ]
         provisioned_b = MagicMock(spec=BaseTool)
@@ -544,7 +544,7 @@ class TestToolServices:
                 enabled=True,
                 status="available",
                 parameters=[],
-                created_by=UserReference(id=uuid4(), name="tester"),
+                created_by=UserReference(id=uuid4(), name="tester", type=UserReferenceType.USER),
             )
         ]
         provisioned_b = MagicMock(spec=BaseTool)

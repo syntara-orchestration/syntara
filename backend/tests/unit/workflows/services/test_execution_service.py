@@ -14,7 +14,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from syntara.core.exceptions import SafeValueError
 from syntara.core.models import User
 from syntara.core.models.pagination import ResourcesResponseBase
-from syntara.core.models.user_reference import UserReference
+from syntara.core.models.user_reference import UserReference, UserReferenceType
 from syntara.metrics.interface_tag import interface_context_var
 from syntara.workflows.exceptions import (
     ExecutionNotFoundError,
@@ -198,7 +198,7 @@ class TestCreateExecution:
         mock_result = Mock()
         mock_result.first = Mock(return_value=(workflow, workflow_version))
         mock_session.exec = AsyncMock(
-            side_effect=_exec_results(mock_result, users=[(user_id, "creator", None, None, None)])
+            side_effect=_exec_results(mock_result, users=[(user_id, "user", "creator", None, None, None)])
         )
         mock_session.scalar = AsyncMock(return_value=0)
         mock_session.add = Mock()
@@ -232,8 +232,8 @@ class TestCreateExecution:
         assert result.temporal_workflow_id == "exec-abc123"
         assert result.status == ExecutionStatus.PENDING
         assert result.input_data == {"key": "value"}
-        assert result.created_by == UserReference(id=user_id, name="creator")
-        assert result.updated_by == UserReference(id=user_id, name="creator")
+        assert result.created_by == UserReference(id=user_id, name="creator", type=UserReferenceType.USER)
+        assert result.updated_by == UserReference(id=user_id, name="creator", type=UserReferenceType.USER)
 
         # Verify Temporal was called
         mock_temporal.start_workflow.assert_awaited_once()
@@ -1217,7 +1217,7 @@ class TestListExecutions(TestExecutionServiceBase):
         mock_main_result = Mock()
         mock_main_result.all.return_value = [exec1]
         mock_session.exec = AsyncMock(
-            side_effect=_exec_results(mock_main_result, users=[(user_id, "creator", None, None, None)])
+            side_effect=_exec_results(mock_main_result, users=[(user_id, "user", "creator", None, None, None)])
         )
         mock_session.scalar = AsyncMock(return_value=0)
 
@@ -1227,7 +1227,7 @@ class TestListExecutions(TestExecutionServiceBase):
         assert isinstance(result, ResourcesResponseBase)
         assert len(result.resources) == 1
         assert isinstance(result.resources[0], ExecutionRead)
-        assert result.resources[0].created_by == UserReference(id=user_id, name="creator")
+        assert result.resources[0].created_by == UserReference(id=user_id, name="creator", type=UserReferenceType.USER)
 
     @pytest.mark.asyncio
     async def test_list_executions_with_labels_filter(self) -> None:

@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 
-from syntara.core.models.user_reference import UserReference
+from syntara.core.models.user_reference import UserReference, UserReferenceType
 from syntara.workflows.models.workflow import (
     PublishWorkflowVersionResponse,
     WorkflowRead,
@@ -58,7 +58,7 @@ async def _to_read(workflow: MagicMock) -> WorkflowRead:
     still holding a raw id is rejected at serialization, so mirror that here.
     """
     read = WorkflowRead.model_validate(workflow, from_attributes=True)
-    read.created_by = UserReference(id=workflow.created_by, name="tester")
+    read.created_by = UserReference(id=workflow.created_by, name="tester", type=UserReferenceType.USER)
     read.updated_by = None
     return read
 
@@ -77,7 +77,7 @@ async def _to_version_read(version: MagicMock, *_args: object, **_kwargs: object
         change_description=version.change_description,
         name=version.name,
         status="draft",
-        created_by=UserReference(id=version.created_by, name="tester"),
+        created_by=UserReference(id=version.created_by, name="tester", type=UserReferenceType.USER),
         created_at=version.created_at,
         updated_at=version.updated_at,
     )
