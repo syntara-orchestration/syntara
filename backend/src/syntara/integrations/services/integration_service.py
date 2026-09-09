@@ -648,8 +648,10 @@ class IntegrationService(BaseService):
         for field in data.model_fields_set:
             setattr(integration, field, getattr(data, field))
 
+        if not self.has_pending_user_changes(integration):
+            return await self._to_read_with_counts(integration)
+
         integration.updated_by = self.user.id
-        integration.updated_at = datetime.now(UTC)
 
         try:
             await self.session.flush()
@@ -1147,8 +1149,6 @@ class IntegrationService(BaseService):
                 existing.status = ToolStatus.AVAILABLE
                 existing.last_refreshed_at = datetime.now(UTC)
                 existing.refresh_error = None
-                existing.updated_by = self.user.id
-                existing.updated_at = datetime.now(UTC)
                 pending_params.append((existing, parameters))
                 updated_count += 1
             else:
@@ -1195,8 +1195,6 @@ class IntegrationService(BaseService):
                     tool_name=name,
                 )
                 tool.status = ToolStatus.MISSING
-                tool.updated_by = self.user.id
-                tool.updated_at = datetime.now(UTC)
                 missing_count += 1
 
         return synced_count, updated_count, missing_count
@@ -1312,7 +1310,6 @@ class IntegrationService(BaseService):
                 existing.name = model_meta.name
                 existing.description = model_meta.description
                 existing.last_refreshed_at = now
-                existing.updated_at = now
                 existing.profile = profile
                 if default_model_id is not None:
                     existing.is_default = model_meta.id == default_model_id

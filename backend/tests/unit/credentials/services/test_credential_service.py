@@ -534,6 +534,47 @@ class TestUpdateCredential:
 
         mock_secret_service.update_secret.assert_not_called()
 
+    @pytest.mark.asyncio
+    async def test_update_noop_skips_commit_and_audit(
+        self,
+        mock_session: MagicMock,
+        mock_user: MagicMock,
+        mock_secret_service: MagicMock,
+        bearer_type: CredentialType,
+    ) -> None:
+        """Unchanged PATCH values must not commit or dispatch audit events."""
+        credential = Credential(
+            id=uuid4(),
+            name="stable-cred",
+            description="same",
+            credential_type_id=bearer_type.id,
+            secret_id=uuid4(),
+            enabled=True,
+            project_id=uuid4(),
+            created_by=mock_user.id,
+            labels={"env": "dev"},
+        )
+        mock_result = MagicMock()
+        mock_result.one_or_none.return_value = credential
+        mock_session.exec.return_value = mock_result
+        mock_session.get.side_effect = [None, bearer_type]
+        mock_secret_service.retrieve_secret.return_value = {"token": "same-token"}
+
+        service = CredentialService(mock_session, mock_user, mock_secret_service)
+        patch_data = CredentialUpdate(
+            description="same",
+            enabled=True,
+            labels={"env": "dev"},
+            inputs={"token": "same-token"},
+        )
+
+        with patch("syntara.credentials.services.credential_service.AuditEventDispatcher") as mock_dispatcher:
+            await service.update_credential(credential.id, patch_data)
+
+        mock_session.commit.assert_not_called()
+        mock_dispatcher.dispatch.assert_not_called()
+        mock_secret_service.update_secret.assert_not_called()
+
 
 class TestDeleteCredential:
     """Tests for CredentialService.delete_credential."""

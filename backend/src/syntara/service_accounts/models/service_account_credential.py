@@ -101,6 +101,9 @@ class ServiceAccountCredential(UserOwnedResource, table=True):
         description="Timestamp of the most recent use of this credential",
     )
 
+    # Token use is telemetry, not a user edit; don't bump updated_at for it.
+    __updated_at_exempt_fields__: ClassVar[frozenset[str]] = frozenset({"last_used_at"})
+
     __table_args__ = (
         Index("ix_sa_credentials_identifier_unique", "identifier", unique=True),
         Index("ix_sa_credentials_sa_id_type", "service_account_id", "credential_type"),
