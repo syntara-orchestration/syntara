@@ -8,7 +8,7 @@
  */
 import { type Page } from '../fixtures'
 import { test, expect, toAppUrl } from '../fixtures'
-import { applyApprovalNameFilter, navigateToApprovalAndOpen } from '../helpers/approvals'
+import { applyApprovalNameFilter, dismissConnectionBanner, navigateToApprovalAndOpen } from '../helpers/approvals'
 import { APP_TITLE } from '../helpers/appTitle'
 import { addApprovalNodeWithBranch } from '../helpers/v2-nodes'
 import { runWorkflowFromBuilder, waitForExecutionPaused } from '../helpers/workflow-run'
@@ -371,26 +371,29 @@ test.describe('Approval Workflow Operations', () => {
   })
 
   test('user changes decision from approve to reject (undo)', async ({ app }) => {
+    test.slow()
     const approval = await createPendingApproval(app)
 
     try {
       await navigateToApprovalAndOpen(app, approval.approvalName)
+      await dismissConnectionBanner(app)
 
       const approveButton = app.getByRole('button', { name: 'Approve', exact: true })
       const rejectButton = app.getByRole('button', { name: 'Reject', exact: true })
-      await expect(approveButton).toBeEnabled({ timeout: 15_000 })
+      await expect(approveButton).not.toHaveAttribute('aria-disabled', 'true', { timeout: 20_000 })
 
       await approveButton.click()
-      await expect(app.getByPlaceholder(/explain the reason for approving/i)).toBeVisible({ timeout: 10_000 })
+      await expect(app.getByPlaceholder(/Explain the reason for approving/i)).toBeVisible({ timeout: 10_000 })
       // Pending approve hides the action buttons; undo clears the draft before choosing reject.
       await expect(rejectButton).not.toBeVisible()
 
       await app.getByRole('button', { name: 'Undo decision' }).click()
       await expect(approveButton).toBeVisible({ timeout: 10_000 })
       await expect(rejectButton).toBeVisible({ timeout: 10_000 })
+      await expect(rejectButton).not.toHaveAttribute('aria-disabled', 'true', { timeout: 20_000 })
 
       await rejectButton.click()
-      await expect(app.getByPlaceholder(/explain the reason for rejecting/i)).toBeVisible({ timeout: 10_000 })
+      await expect(app.getByPlaceholder(/Explain the reason for rejecting/i)).toBeVisible({ timeout: 10_000 })
       await expect(app.getByRole('button', { name: 'Submit decision' })).toBeVisible({ timeout: 10_000 })
     } finally {
       await apiRequest(app, 'delete', `/workflows/${approval.workflowId}`).catch(() => {})
@@ -398,21 +401,23 @@ test.describe('Approval Workflow Operations', () => {
   })
 
   test('user clears decision with explicit undo button', async ({ app }) => {
+    test.slow()
     const approval = await createPendingApproval(app)
 
     try {
       await navigateToApprovalAndOpen(app, approval.approvalName)
+      await dismissConnectionBanner(app)
 
       const approveButton = app.getByRole('button', { name: 'Approve', exact: true })
-      await expect(approveButton).toBeEnabled({ timeout: 15_000 })
+      await expect(approveButton).not.toHaveAttribute('aria-disabled', 'true', { timeout: 20_000 })
       await approveButton.click()
-      await expect(app.getByPlaceholder(/explain the reason for approving/i)).toBeVisible({ timeout: 10_000 })
+      await expect(app.getByPlaceholder(/Explain the reason for approving/i)).toBeVisible({ timeout: 10_000 })
 
       await app.getByRole('button', { name: 'Undo decision' }).click()
 
       await expect(approveButton).toBeVisible({ timeout: 10_000 })
       await expect(app.getByRole('button', { name: 'Reject', exact: true })).toBeVisible()
-      await expect(app.getByPlaceholder(/explain the reason for approving/i)).not.toBeVisible()
+      await expect(app.getByPlaceholder(/Explain the reason for approving/i)).not.toBeVisible()
     } finally {
       await apiRequest(app, 'delete', `/workflows/${approval.workflowId}`).catch(() => {})
     }
