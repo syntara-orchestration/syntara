@@ -19,7 +19,12 @@ describe('ExecutionStateEnricher', () => {
       const edges: EdgeConnection[] = []
       const activityStates = new Map<string, ActivityState>()
 
-      const result = enricher.enrichActivity(activity, null, activityStates, edges)
+      const result = enricher.enrichActivity({
+        activity: activity,
+        executionStatus: null,
+        activityStates: activityStates,
+        edges: edges,
+      })
 
       expect(result).toEqual(activity)
       expect(result.__executionState).toBeUndefined()
@@ -35,7 +40,12 @@ describe('ExecutionStateEnricher', () => {
       const edges: EdgeConnection[] = []
       const activityStates = new Map<string, ActivityState>()
 
-      const result = enricher.enrichActivity(activity, 'running', activityStates, edges)
+      const result = enricher.enrichActivity({
+        activity: activity,
+        executionStatus: 'running',
+        activityStates: activityStates,
+        edges: edges,
+      })
 
       expect(
         ((result as Record<string, unknown>).metadata as Record<string, unknown> | undefined)?.__showExecutionBadge
@@ -53,7 +63,12 @@ describe('ExecutionStateEnricher', () => {
       const edges: EdgeConnection[] = []
       const activityStates = new Map<string, ActivityState>()
 
-      const result = enricher.enrichActivity(activity, 'running', activityStates, edges)
+      const result = enricher.enrichActivity({
+        activity: activity,
+        executionStatus: 'running',
+        activityStates: activityStates,
+        edges: edges,
+      })
 
       expect(result.metadata).toEqual({
         customProp: 'value',
@@ -73,7 +88,12 @@ describe('ExecutionStateEnricher', () => {
         ['task-1', { activityId: 'task-1', status: 'running', startedAt: '2024-01-01T00:00:00Z', completedAt: null }],
       ])
 
-      const result = enricher.enrichActivity(activity, 'running', activityStates, edges)
+      const result = enricher.enrichActivity({
+        activity: activity,
+        executionStatus: 'running',
+        activityStates: activityStates,
+        edges: edges,
+      })
 
       expect(result.__executionState).toEqual({
         status: 'running',
@@ -98,7 +118,12 @@ describe('ExecutionStateEnricher', () => {
         ['loop-1', { activityId: 'loop-1', status: 'running', startedAt: '2024-01-01T00:00:00Z', completedAt: null }],
       ])
 
-      const result = enricher.enrichActivity(activity, 'running', activityStates, edges)
+      const result = enricher.enrichActivity({
+        activity: activity,
+        executionStatus: 'running',
+        activityStates: activityStates,
+        edges: edges,
+      })
 
       expect(result.__executionState?.status).toBe('running')
     })
@@ -121,7 +146,12 @@ describe('ExecutionStateEnricher', () => {
         // loop-1 has NO backend state
       ])
 
-      const result = enricher.enrichActivity(activity, 'running', activityStates, edges)
+      const result = enricher.enrichActivity({
+        activity: activity,
+        executionStatus: 'running',
+        activityStates: activityStates,
+        edges: edges,
+      })
 
       // Should NOT infer 'running' from downstream - should have no execution state
       expect(result.__executionState).toBeUndefined()
@@ -150,7 +180,12 @@ describe('ExecutionStateEnricher', () => {
         ],
       ])
 
-      const result = enricher.enrichActivity(activity, 'running', activityStates, edges)
+      const result = enricher.enrichActivity({
+        activity: activity,
+        executionStatus: 'running',
+        activityStates: activityStates,
+        edges: edges,
+      })
 
       expect(result.__executionState?.status).toBe('completed')
     })
@@ -180,7 +215,12 @@ describe('ExecutionStateEnricher', () => {
         // converge-1 has NO backend state
       ])
 
-      const result = enricher.enrichActivity(activity, 'running', activityStates, edges)
+      const result = enricher.enrichActivity({
+        activity: activity,
+        executionStatus: 'running',
+        activityStates: activityStates,
+        edges: edges,
+      })
 
       // Should NOT infer status from upstream - should have no execution state
       expect(result.__executionState).toBeUndefined()
@@ -209,7 +249,12 @@ describe('ExecutionStateEnricher', () => {
         ],
       ])
 
-      const result = enricher.enrichActivity(activity, 'running', activityStates, edges)
+      const result = enricher.enrichActivity({
+        activity: activity,
+        executionStatus: 'running',
+        activityStates: activityStates,
+        edges: edges,
+      })
 
       expect(result.__executionState?.status).toBe('completed')
     })
@@ -233,7 +278,12 @@ describe('ExecutionStateEnricher', () => {
         // cond-1 has NO backend state
       ])
 
-      const result = enricher.enrichActivity(activity, 'running', activityStates, edges)
+      const result = enricher.enrichActivity({
+        activity: activity,
+        executionStatus: 'running',
+        activityStates: activityStates,
+        edges: edges,
+      })
 
       // Should NOT infer 'completed' from downstream - should have no execution state
       expect(result.__executionState).toBeUndefined()
@@ -271,7 +321,12 @@ describe('ExecutionStateEnricher', () => {
         ],
       ])
 
-      const result = enricher.enrichActivity(activity, 'running', activityStates, edges)
+      const result = enricher.enrichActivity({
+        activity: activity,
+        executionStatus: 'running',
+        activityStates: activityStates,
+        edges: edges,
+      })
 
       expect(result.__executionState?.status).toBe('skipped')
     })
@@ -309,8 +364,14 @@ describe('ExecutionStateEnricher', () => {
       ])
       const allowlist = new Set(['cond-1', 'task-true', 'task-false'])
 
-      const result = enricher.enrichActivity(activity, 'completed', activityStates, edges, {
-        skipInferenceActivityIds: allowlist,
+      const result = enricher.enrichActivity({
+        activity: activity,
+        executionStatus: 'completed',
+        activityStates: activityStates,
+        edges: edges,
+        options: {
+          skipInferenceActivityIds: allowlist,
+        },
       })
 
       expect(result.__executionState?.status).toBe('skipped')
@@ -340,8 +401,14 @@ describe('ExecutionStateEnricher', () => {
       ])
       const allowlist = new Set(['task-1'])
 
-      const result = enricher.enrichActivity(activity, 'completed', activityStates, edges, {
-        skipInferenceActivityIds: allowlist,
+      const result = enricher.enrichActivity({
+        activity: activity,
+        executionStatus: 'completed',
+        activityStates: activityStates,
+        edges: edges,
+        options: {
+          skipInferenceActivityIds: allowlist,
+        },
       })
 
       expect(result.__executionState).toBeUndefined()
@@ -363,7 +430,12 @@ describe('ExecutionStateEnricher', () => {
       ]
       const activityStates = new Map<string, ActivityState>()
 
-      const result = enricher.enrichActivity(activity, 'running', activityStates, edges)
+      const result = enricher.enrichActivity({
+        activity: activity,
+        executionStatus: 'running',
+        activityStates: activityStates,
+        edges: edges,
+      })
 
       // Control nodes without backend state should not get a pending badge
       expect(result.__executionState).toBeUndefined()
@@ -433,7 +505,12 @@ describe('ExecutionStateEnricher', () => {
         ],
       ])
 
-      const result = enricher.enrichActivity(activity, 'failed', activityStates, edges)
+      const result = enricher.enrichActivity({
+        activity: activity,
+        executionStatus: 'failed',
+        activityStates: activityStates,
+        edges: edges,
+      })
 
       expect(result.__executionState?.status).toBe('failed')
       expect(result.__executionState?.error_details).toBe('max_iterations exceeded')
@@ -449,7 +526,12 @@ describe('ExecutionStateEnricher', () => {
       const edges: EdgeConnection[] = []
       const activityStates = new Map<string, ActivityState>()
 
-      const result = enricher.enrichActivity(activity, 'running', activityStates, edges)
+      const result = enricher.enrichActivity({
+        activity: activity,
+        executionStatus: 'running',
+        activityStates: activityStates,
+        edges: edges,
+      })
 
       // Regular tasks without backend state shouldn't get a pending badge
       expect(result.__executionState).toBeUndefined()
@@ -478,7 +560,12 @@ describe('ExecutionStateEnricher', () => {
         ],
       ])
 
-      const result = enricher.enrichActivity(activity, 'running', activityStates, edges)
+      const result = enricher.enrichActivity({
+        activity: activity,
+        executionStatus: 'running',
+        activityStates: activityStates,
+        edges: edges,
+      })
 
       expect(result.__executionState?.status).toBe('completed')
     })
@@ -502,7 +589,12 @@ describe('ExecutionStateEnricher', () => {
         // approval-1 has NO backend state
       ])
 
-      const result = enricher.enrichActivity(activity, 'running', activityStates, edges)
+      const result = enricher.enrichActivity({
+        activity: activity,
+        executionStatus: 'running',
+        activityStates: activityStates,
+        edges: edges,
+      })
 
       // Should NOT infer 'completed' from downstream - should have no execution state
       expect(result.__executionState).toBeUndefined()
@@ -531,7 +623,13 @@ describe('ExecutionStateEnricher', () => {
       ])
       const edges: EdgeConnection[] = []
 
-      const result = enricher.enrichActivity(activity, 'running', activityStates, edges, { preResolvedNodes })
+      const result = enricher.enrichActivity({
+        activity: activity,
+        executionStatus: 'running',
+        activityStates: activityStates,
+        edges: edges,
+        options: { preResolvedNodes },
+      })
 
       expect(result.metadata?.__mockDataPinned).toBe(true)
       expect(result.metadata?.__showExecutionBadge).toBe(true)
@@ -548,7 +646,13 @@ describe('ExecutionStateEnricher', () => {
       const activityStates = new Map<string, ActivityState>()
       const edges: EdgeConnection[] = []
 
-      const result = enricher.enrichActivity(activity, 'running', activityStates, edges, { preResolvedNodes })
+      const result = enricher.enrichActivity({
+        activity: activity,
+        executionStatus: 'running',
+        activityStates: activityStates,
+        edges: edges,
+        options: { preResolvedNodes },
+      })
 
       expect(result.__executionState?.status).toBe('skipped')
       expect(result.metadata?.__mockDataPinned).toBe(true)
@@ -575,7 +679,13 @@ describe('ExecutionStateEnricher', () => {
       ])
       const edges: EdgeConnection[] = []
 
-      const result = enricher.enrichActivity(activity, 'running', activityStates, edges, { preResolvedNodes })
+      const result = enricher.enrichActivity({
+        activity: activity,
+        executionStatus: 'running',
+        activityStates: activityStates,
+        edges: edges,
+        options: { preResolvedNodes },
+      })
 
       expect(result.__executionState?.status).toBe('completed')
       expect(result.metadata?.__mockDataPinned).toBe(true)
@@ -592,7 +702,13 @@ describe('ExecutionStateEnricher', () => {
       const activityStates = new Map<string, ActivityState>()
       const edges: EdgeConnection[] = []
 
-      const result = enricher.enrichActivity(activity, 'running', activityStates, edges, { preResolvedNodes })
+      const result = enricher.enrichActivity({
+        activity: activity,
+        executionStatus: 'running',
+        activityStates: activityStates,
+        edges: edges,
+        options: { preResolvedNodes },
+      })
 
       expect(result.metadata?.__mockDataPinned).toBeUndefined()
     })
@@ -605,7 +721,13 @@ describe('ExecutionStateEnricher', () => {
         ['task-1', { activityId: 'task-1', status: 'running', startedAt: '2024-01-01T00:00:00Z', completedAt: null }],
       ])
 
-      const result = enricher.determineEdgeStatus(edge, activityStates, undefined, undefined, [])
+      const result = enricher.determineEdgeStatus({
+        edge: edge,
+        activityStates: activityStates,
+        activities: undefined,
+        triggerDisplayToRealId: undefined,
+        edges: [],
+      })
 
       expect(result).toBe('pending')
     })
@@ -625,7 +747,13 @@ describe('ExecutionStateEnricher', () => {
         ['task-2', { activityId: 'task-2', status: 'running', startedAt: '2024-01-01T00:01:00Z', completedAt: null }],
       ])
 
-      const result = enricher.determineEdgeStatus(edge, activityStates, undefined, undefined, [])
+      const result = enricher.determineEdgeStatus({
+        edge: edge,
+        activityStates: activityStates,
+        activities: undefined,
+        triggerDisplayToRealId: undefined,
+        edges: [],
+      })
 
       expect(result).toBe('passed')
     })
@@ -645,7 +773,13 @@ describe('ExecutionStateEnricher', () => {
         ['task-2', { activityId: 'task-2', status: 'skipped', startedAt: null, completedAt: null }],
       ])
 
-      const result = enricher.determineEdgeStatus(edge, activityStates, undefined, undefined, [])
+      const result = enricher.determineEdgeStatus({
+        edge: edge,
+        activityStates: activityStates,
+        activities: undefined,
+        triggerDisplayToRealId: undefined,
+        edges: [],
+      })
 
       expect(result).toBe('pending')
     })
@@ -656,7 +790,13 @@ describe('ExecutionStateEnricher', () => {
         ['task-1', { activityId: 'task-1', status: 'pending', startedAt: null, completedAt: null }],
       ])
 
-      const result = enricher.determineEdgeStatus(edge, activityStates, undefined, undefined, [])
+      const result = enricher.determineEdgeStatus({
+        edge: edge,
+        activityStates: activityStates,
+        activities: undefined,
+        triggerDisplayToRealId: undefined,
+        edges: [],
+      })
 
       expect(result).toBe('pending')
     })
@@ -665,7 +805,13 @@ describe('ExecutionStateEnricher', () => {
       const edge = { source: 'task-1', target: 'task-2' }
       const activityStates = new Map<string, ActivityState>()
 
-      const result = enricher.determineEdgeStatus(edge, activityStates, undefined, undefined, [])
+      const result = enricher.determineEdgeStatus({
+        edge: edge,
+        activityStates: activityStates,
+        activities: undefined,
+        triggerDisplayToRealId: undefined,
+        edges: [],
+      })
 
       expect(result).toBe('pending')
     })
@@ -688,7 +834,13 @@ describe('ExecutionStateEnricher', () => {
         ],
       ])
 
-      const result = enricher.determineEdgeStatus(edge, activityStates, undefined, undefined, [])
+      const result = enricher.determineEdgeStatus({
+        edge: edge,
+        activityStates: activityStates,
+        activities: undefined,
+        triggerDisplayToRealId: undefined,
+        edges: [],
+      })
 
       expect(result).toBe('passed')
     })
@@ -708,7 +860,13 @@ describe('ExecutionStateEnricher', () => {
         ['task-true', { activityId: 'task-true', status: 'pending', startedAt: null, completedAt: null }],
       ])
 
-      const result = enricher.determineEdgeStatus(edge, activityStates, undefined, undefined, [])
+      const result = enricher.determineEdgeStatus({
+        edge: edge,
+        activityStates: activityStates,
+        activities: undefined,
+        triggerDisplayToRealId: undefined,
+        edges: [],
+      })
 
       expect(result).toBe('pending')
     })
@@ -728,7 +886,13 @@ describe('ExecutionStateEnricher', () => {
         ['task-false', { activityId: 'task-false', status: 'skipped', startedAt: null, completedAt: null }],
       ])
 
-      const result = enricher.determineEdgeStatus(edge, activityStates, undefined, undefined, [])
+      const result = enricher.determineEdgeStatus({
+        edge: edge,
+        activityStates: activityStates,
+        activities: undefined,
+        triggerDisplayToRealId: undefined,
+        edges: [],
+      })
 
       expect(result).toBe('pending')
     })
@@ -749,7 +913,13 @@ describe('ExecutionStateEnricher', () => {
         ['task-1', { activityId: 'task-1', status: 'running', startedAt: '2024-01-01T00:00:00Z', completedAt: null }],
       ])
 
-      const result = enricher.determineEdgeStatus(edge, activityStates, undefined, triggerMap, [])
+      const result = enricher.determineEdgeStatus({
+        edge: edge,
+        activityStates: activityStates,
+        activities: undefined,
+        triggerDisplayToRealId: triggerMap,
+        edges: [],
+      })
 
       expect(result).toBe('passed')
     })
@@ -760,7 +930,13 @@ describe('ExecutionStateEnricher', () => {
         ['task-1', { activityId: 'task-1', status: 'pending', startedAt: null, completedAt: null }],
       ])
 
-      const result = enricher.determineEdgeStatus(edge, activityStates, undefined, undefined, [])
+      const result = enricher.determineEdgeStatus({
+        edge: edge,
+        activityStates: activityStates,
+        activities: undefined,
+        triggerDisplayToRealId: undefined,
+        edges: [],
+      })
 
       expect(result).toBe('pending')
     })
@@ -769,7 +945,13 @@ describe('ExecutionStateEnricher', () => {
       const edge = { source: 'trigger-0', target: 'task-1', sourceHandle: null }
       const activityStates = new Map<string, ActivityState>()
 
-      const result = enricher.determineEdgeStatus(edge, activityStates, undefined, undefined, [])
+      const result = enricher.determineEdgeStatus({
+        edge: edge,
+        activityStates: activityStates,
+        activities: undefined,
+        triggerDisplayToRealId: undefined,
+        edges: [],
+      })
 
       expect(result).toBe('pending')
     })
@@ -783,7 +965,13 @@ describe('ExecutionStateEnricher', () => {
         ],
       ])
 
-      const result = enricher.determineEdgeStatus(edge, activityStates, undefined, undefined, [])
+      const result = enricher.determineEdgeStatus({
+        edge: edge,
+        activityStates: activityStates,
+        activities: undefined,
+        triggerDisplayToRealId: undefined,
+        edges: [],
+      })
 
       expect(result).toBe('passed')
     })
@@ -794,7 +982,13 @@ describe('ExecutionStateEnricher', () => {
         ['task-after', { activityId: 'task-after', status: 'pending', startedAt: null, completedAt: null }],
       ])
 
-      const result = enricher.determineEdgeStatus(edge, activityStates, undefined, undefined, [])
+      const result = enricher.determineEdgeStatus({
+        edge: edge,
+        activityStates: activityStates,
+        activities: undefined,
+        triggerDisplayToRealId: undefined,
+        edges: [],
+      })
 
       expect(result).toBe('pending')
     })
@@ -809,7 +1003,13 @@ describe('ExecutionStateEnricher', () => {
       ])
       const activities: Activity[] = []
 
-      const result = enricher.determineEdgeStatus(edge, activityStates, activities, undefined, [])
+      const result = enricher.determineEdgeStatus({
+        edge: edge,
+        activityStates: activityStates,
+        activities: activities,
+        triggerDisplayToRealId: undefined,
+        edges: [],
+      })
 
       expect(result).toBe('passed')
     })
@@ -862,7 +1062,13 @@ describe('ExecutionStateEnricher', () => {
       ])
 
       const edge = { source: 'body-1', target: 'body-2', sourceHandle: EdgeHandleEnum.SOURCE }
-      const result = enricher.determineEdgeStatus(edge, activityStates, undefined, undefined, edges)
+      const result = enricher.determineEdgeStatus({
+        edge: edge,
+        activityStates: activityStates,
+        activities: undefined,
+        triggerDisplayToRealId: undefined,
+        edges: edges,
+      })
 
       // body-1's latest iteration (#iter-1) is running, not terminal — edge should be pending
       expect(result).toBe('pending')

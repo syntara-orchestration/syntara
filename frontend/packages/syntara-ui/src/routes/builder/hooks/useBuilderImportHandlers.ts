@@ -57,7 +57,11 @@ export function useBuilderImportHandlers(
     const importDescription = pendingImport.description || importName
     const activities = pendingImport.workflowDef.workflow.activities ?? []
     const triggers = pendingImport.workflowDef.triggers ?? []
-    const fullDefinition = buildWorkflowDefinition(importName, importDescription, activities, triggers, {
+    const fullDefinition = buildWorkflowDefinition({
+      workflowName: importName,
+      workflowDescription: importDescription,
+      activities: activities,
+      triggers: triggers,
       edges: pendingImport.edges,
       nodePositions: pendingImport.nodePositions,
     })

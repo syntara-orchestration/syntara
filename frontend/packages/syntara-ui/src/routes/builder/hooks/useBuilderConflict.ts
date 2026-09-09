@@ -134,13 +134,14 @@ export function useBuilderConflict(params: UseBuilderConflictParams) {
       setIsConflictLoading(true)
       try {
         const { edges, nodePositions } = useWorkflowStore.getState()
-        const definition = buildWorkflowDefinition(
-          workflowName,
-          workflowDescription,
-          currentWorkflow.workflow.activities ?? [],
-          currentWorkflow.triggers ?? [],
-          { edges, nodePositions }
-        )
+        const definition = buildWorkflowDefinition({
+          workflowName: workflowName,
+          workflowDescription: workflowDescription,
+          activities: currentWorkflow.workflow.activities ?? [],
+          triggers: currentWorkflow.triggers ?? [],
+          edges,
+          nodePositions,
+        })
         const projectId = workflowProjectId ?? selectedProjectId
 
         const { data: created, error: createError } = await workflowFetchClient.POST('/workflows', {

@@ -75,17 +75,25 @@ function positionLoopNode(options: PositionLoopNodeOptions): NodeType {
   return node
 }
 
-function positionLoopBodyNode(
-  node: NodeType,
-  newlyAddedNodeIdsRef: RefObject<Set<string>>,
-  loopBodyNodeMap: Map<string, string>,
-  loopPositions: Map<string, { x: number; y: number; width: number; height: number }>,
+type PositionLoopBodyNodeOptions = {
+  node: NodeType
+  newlyAddedNodeIdsRef: RefObject<Set<string>>
+  loopBodyNodeMap: Map<string, string>
+  loopPositions: Map<string, { x: number; y: number; width: number; height: number }>
   positionedNodes: Map<string, NodeType>
-): NodeType {
+}
+
+function positionLoopBodyNode({
+  node,
+  newlyAddedNodeIdsRef,
+  loopBodyNodeMap,
+  loopPositions,
+  positionedNodes,
+}: PositionLoopBodyNodeOptions): NodeType {
   if (!newlyAddedNodeIdsRef.current.has(node.id) || !node.measured || !loopBodyNodeMap.has(node.id)) {
     return node
   }
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- safe: loopBodyNodeMap.has(node.id) is checked in the early-return guard above (line 85)
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- safe: loopBodyNodeMap.has(node.id) is checked in the early-return guard above
   const loopNodeId = loopBodyNodeMap.get(node.id)!
   const loopPos = loopPositions.get(loopNodeId)
   if (!loopPos) return node
@@ -156,7 +164,13 @@ function positionLoopBranch(ctx: LoopPositioningContext) {
         overridePosition,
       })
       if (loopPositioned !== node) return loopPositioned
-      return positionLoopBodyNode(node, newlyAddedNodeIdsRef, loopBodyNodeMap, loopPositions, positionedNodes)
+      return positionLoopBodyNode({
+        node,
+        newlyAddedNodeIdsRef,
+        loopBodyNodeMap,
+        loopPositions,
+        positionedNodes,
+      })
     })
 
     const nodesChanged = updatedNodes.some((node, index) => node !== currentNodes[index])

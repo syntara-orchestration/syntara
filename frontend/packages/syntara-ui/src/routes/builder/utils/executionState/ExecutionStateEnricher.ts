@@ -153,20 +153,16 @@ export class ExecutionStateEnricher {
    * All nodes (including control flow) get their status from backend ActivityExecution
    * records. No inference from downstream nodes is performed.
    *
-   * @param activity - The activity to enrich
-   * @param executionStatus - Current execution status (null if not in execution view)
-   * @param activityStates - Map of activity IDs to their execution states from backend
-   * @param edges - All edges in the workflow
-   * @param options - Optional pre-resolved nodes and copy-to-editor skip allowlist
    * @returns Activity enriched with execution metadata
    */
-  enrichActivity(
-    activity: Activity,
-    executionStatus: string | null | undefined,
-    activityStates: Map<string, ActivityState>,
-    edges: EdgeConnection[],
+  enrichActivity(params: {
+    activity: Activity
+    executionStatus: string | null | undefined
+    activityStates: Map<string, ActivityState>
+    edges: EdgeConnection[]
     options?: EnrichActivityOptions
-  ): ActivityWithMetadata {
+  }): ActivityWithMetadata {
+    const { activity, executionStatus, activityStates, edges, options } = params
     const { preResolvedNodes, skipInferenceActivityIds } = options ?? {}
 
     // If not in execution view, return as-is
@@ -229,7 +225,13 @@ export class ExecutionStateEnricher {
 
     // Step 2: Check if node should be marked as skipped (allowlist-aware after copy-to-editor)
     if (
-      WorkflowTraversal.shouldMarkAsSkipped(activity.id, activityStates, edges, new Set(), skipInferenceActivityIds)
+      WorkflowTraversal.shouldMarkAsSkipped({
+        activityId: activity.id,
+        activityStates,
+        edges,
+        visited: new Set(),
+        skipInferenceActivityIds,
+      })
     ) {
       enrichedActivity = {
         ...enrichedActivity,
@@ -334,13 +336,14 @@ export class ExecutionStateEnricher {
     return !!state && TERMINAL_ACTIVITY_STATUSES.includes(state.status)
   }
 
-  determineEdgeStatus(
-    edge: { source: string; target: string; sourceHandle?: string | null },
-    activityStates: Map<string, ActivityState>,
-    activities: Activity[] | undefined,
-    triggerDisplayToRealId: Map<string, string> | undefined,
+  determineEdgeStatus(params: {
+    edge: { source: string; target: string; sourceHandle?: string | null }
+    activityStates: Map<string, ActivityState>
+    activities: Activity[] | undefined
+    triggerDisplayToRealId: Map<string, string> | undefined
     edges: EdgeConnection[]
-  ): 'passed' | 'pending' {
+  }): 'passed' | 'pending' {
+    const { edge, activityStates, activities, triggerDisplayToRealId, edges } = params
     const targetStarted = this.targetHasStarted(edge.target, activityStates, edges)
 
     if (edge.source.startsWith('trigger-')) {

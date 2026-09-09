@@ -165,7 +165,11 @@ export function useWorkflowVerification({ dispatch }: UseWorkflowVerificationOpt
 
       let definition: ReturnType<typeof buildWorkflowDefinition>
       try {
-        definition = buildWorkflowDefinition(name, description, activities, triggers, {
+        definition = buildWorkflowDefinition({
+          workflowName: name,
+          workflowDescription: description,
+          activities: activities,
+          triggers: triggers,
           edges,
           nodePositions,
         })

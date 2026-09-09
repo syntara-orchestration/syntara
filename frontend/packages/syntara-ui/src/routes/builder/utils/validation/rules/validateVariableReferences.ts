@@ -54,13 +54,14 @@ function getWorkflowInputNames(triggers: Activity[] | undefined): Set<string> {
   return names
 }
 
-function checkSchemaFieldReference(
-  ref: VariableReference,
-  activity: Activity,
-  fields: Set<string>,
-  namespace: string,
+function checkSchemaFieldReference(params: {
+  ref: VariableReference
+  activity: Activity
+  fields: Set<string>
+  namespace: string
   suggestionText: string
-): ValidationError | null {
+}): ValidationError | null {
+  const { ref, activity, fields, namespace, suggestionText } = params
   const fieldPath = ref.fullRef.substring(ref.namespace.length + 1)
   if (!fieldPath) return null
   const topLevelField = fieldPath.split('.')[0]
@@ -115,7 +116,13 @@ type RefContext = {
 
 function validateRef(ref: VariableReference, activity: Activity, ctx: RefContext): ValidationError | null {
   if (ref.namespace === 'trigger')
-    return checkSchemaFieldReference(ref, activity, ctx.schemaFields, ref.namespace, ctx.schemaSuggestion)
+    return checkSchemaFieldReference({
+      ref,
+      activity,
+      fields: ctx.schemaFields,
+      namespace: ref.namespace,
+      suggestionText: ctx.schemaSuggestion,
+    })
   if (KNOWN_NAMESPACES.has(ref.namespace)) return null
   return checkNodeReference(ref, activity, ctx.activityIds, ctx.upstreamIds)
 }

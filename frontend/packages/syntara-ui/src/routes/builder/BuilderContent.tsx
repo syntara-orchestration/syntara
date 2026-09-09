@@ -257,21 +257,23 @@ export function BuilderContent(props: BuilderContentProps) {
     createWorkflow: createWorkflow as UseBuilderSaveWorkflowParams['createWorkflow'],
     updateWorkflow,
   })
-  const guardedSaveWorkflow = useGuardedSaveWorkflow(
+  const guardedSaveWorkflow = useGuardedSaveWorkflow({
     handleSaveWorkflow,
     isNodeEditorOpen,
     nodeEditorMode,
     autoSubmitRef,
-    dispatch
-  )
+    dispatch,
+  })
 
-  const { publish: onPublish, isPublishing } = usePublishWorkflow(
+  const { publish: onPublish, isPublishing } = usePublishWorkflow({
     workflowId,
     currentVersion,
     workflowName,
     workflowDescription,
-    { expectedVersion: loadedVersion, onConflict: handleConflict('publish'), onVersionUpdated }
-  )
+    expectedVersion: loadedVersion,
+    onConflict: handleConflict('publish'),
+    onVersionUpdated,
+  })
 
   const mostRecentExecution = mostRecentExecutionQuery.data
   const {
@@ -456,7 +458,11 @@ export function BuilderContent(props: BuilderContentProps) {
     const { edges, nodePositions } = useWorkflowStore.getState()
     const activities = currentWorkflow.workflow.activities ?? []
     const triggers = currentWorkflow.triggers ?? []
-    const definition = buildWorkflowDefinition(workflowName, workflowDescription, activities, triggers, {
+    const definition = buildWorkflowDefinition({
+      workflowName: workflowName,
+      workflowDescription: workflowDescription,
+      activities: activities,
+      triggers: triggers,
       edges,
       nodePositions,
     })

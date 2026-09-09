@@ -38,13 +38,14 @@ type DeleteFailureContext = {
   showError: (opts: { title: string }) => void
 }
 
-function handleBatchDeleteFailure(
-  failedIndex: number,
-  replacements: UploadedFile[],
-  deleted: UploadedFile[],
-  err: unknown,
+function handleBatchDeleteFailure(params: {
+  failedIndex: number
+  replacements: UploadedFile[]
+  deleted: UploadedFile[]
+  err: unknown
   ctx: DeleteFailureContext
-): void {
+}): void {
+  const { failedIndex, replacements, deleted, err, ctx } = params
   const { clearDeletingState, showError } = ctx
   const file = replacements[failedIndex]
   const msg = err instanceof Error ? err.message : `Unable to delete ${file.file.name}. Please try again.`
@@ -76,7 +77,13 @@ async function deleteSessionReplacements(
       await deleteFileById(replacements[i].id)
       deleted.push(replacements[i])
     } catch (err: unknown) {
-      handleBatchDeleteFailure(i, replacements, deleted, err, { clearDeletingState, showError })
+      handleBatchDeleteFailure({
+        failedIndex: i,
+        replacements,
+        deleted,
+        err,
+        ctx: { clearDeletingState, showError },
+      })
       return { success: false, deleted }
     }
   }

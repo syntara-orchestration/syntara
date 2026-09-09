@@ -523,13 +523,13 @@ export function BuilderFlow(props: BuilderFlowProps) {
         }
         const activity = activitiesById.get(node.id)
         if (!activity) return node
-        const enriched = executionStateEnricher.enrichActivity(
-          activity,
-          effectiveExecutionStatus,
-          activityStates,
-          edgeSnapshot,
-          { preResolvedNodes, skipInferenceActivityIds: copiedRunActivityIds ?? undefined }
-        )
+        const enriched = executionStateEnricher.enrichActivity({
+          activity: activity,
+          executionStatus: effectiveExecutionStatus,
+          activityStates: activityStates,
+          edges: edgeSnapshot,
+          options: { preResolvedNodes, skipInferenceActivityIds: copiedRunActivityIds ?? undefined },
+        })
         return applyEnrichedData(node, enriched, anyChangedRef)
       })
 
