@@ -3019,7 +3019,12 @@ export const handlers = [
     const createdByContains = url.searchParams.get('created_by_name[contains]')
     if (createdByContains) {
       const searchTerm = createdByContains.toLowerCase()
-      resources = resources.filter((g) => userReferenceName(g.created_by).toLowerCase().includes(searchTerm))
+      // Production filters User.username (group_service.handle_created_by_name), not the
+      // display name carried by UserReference.name, so resolve the creator by id.
+      resources = resources.filter((g) => {
+        const creator = users.find((u) => u.id === g.created_by?.id)
+        return creator?.username.toLowerCase().includes(searchTerm) ?? false
+      })
     }
 
     if (sort) {
