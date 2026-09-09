@@ -163,7 +163,7 @@ test.describe('Group Detail — Member add/remove (typeahead)', () => {
       await selectUserFromAddMemberTypeahead(app, user.username)
 
       const addDialog = app.getByRole('dialog', { name: 'Add member' })
-      const addButton = addDialog.getByRole('button', { name: 'Add', exact: true })
+      const addButton = addDialog.getByRole('button', { name: 'Add member', exact: true })
       await expect(addButton).toBeEnabled()
       await addButton.click()
 
