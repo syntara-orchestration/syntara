@@ -21,7 +21,7 @@ function createMockVersion(overrides: Record<string, unknown> = {}): WorkflowVer
     version: 1,
     schema_version: '2.0.0',
     workflow_definition: { schema_version: '2.0.0' as const, name: 'test', triggers: [], nodes: [], edges: [] },
-    created_by: { id: 'user-1', name: 'testuser' },
+    created_by: { id: 'user-1', name: 'testuser', type: 'user' },
     created_at: '2026-05-19T21:59:00.000Z',
     updated_at: '2026-05-19T21:59:00.000Z',
     change_description: 'Initial version',
@@ -38,21 +38,21 @@ const defaultProps = {
       status: 'draft',
       created_at: '2026-05-19T21:59:00.000Z',
       change_description: 'Latest changes',
-      created_by: { id: 'user-1', name: 'sarah.chen' },
+      created_by: { id: 'user-1', name: 'sarah.chen', type: 'user' },
     }),
     createMockVersion({
       version: 2,
       status: 'previously_published',
       created_at: '2026-05-16T21:59:00.000Z',
       change_description: 'Published release',
-      created_by: { id: 'user-1', name: 'marcus.williams' },
+      created_by: { id: 'user-1', name: 'marcus.williams', type: 'user' },
     }),
     createMockVersion({
       version: 1,
       status: 'published',
       created_at: '2026-05-12T21:59:00.000Z',
       change_description: 'Initial version',
-      created_by: { id: 'user-1', name: 'priya.patel' },
+      created_by: { id: 'user-1', name: 'priya.patel', type: 'user' },
     }),
   ],
   onClose: vi.fn(),
@@ -256,7 +256,7 @@ describe('VersionHistoryPanel', () => {
       name: 'Release 1.0',
       status: 'published',
       created_at: '2026-05-19T21:59:00.000Z',
-      created_by: { id: 'user-1', name: 'sarah.chen' },
+      created_by: { id: 'user-1', name: 'sarah.chen', type: 'user' },
     })
     render(<VersionHistoryPanel {...defaultProps} versions={[version]} />)
 
@@ -283,7 +283,7 @@ describe('VersionHistoryPanel', () => {
     const version = createMockVersion({
       version: 2,
       status: 'previously_published',
-      created_by: { id: 'user-1', name: 'marcus.williams' },
+      created_by: { id: 'user-1', name: 'marcus.williams', type: 'user' },
     })
     const { container } = render(<VersionHistoryPanel {...defaultProps} versions={[version]} />)
 
@@ -346,7 +346,7 @@ describe('VersionHistoryPanel', () => {
       created_at: null,
       change_description: null,
       status: null,
-      created_by: { id: 'user-1', name: 'testuser' },
+      created_by: { id: 'user-1', name: 'testuser', type: 'user' },
     })
     render(<VersionHistoryPanel {...defaultProps} versions={[version]} />)
 
@@ -407,17 +407,17 @@ describe('VersionHistoryPanel', () => {
         version: 3,
         created_at: '2026-05-19T10:00:00.000Z',
         change_description: 'v3',
-        created_by: { id: 'user-1', name: 'user-v3' },
+        created_by: { id: 'user-1', name: 'user-v3', type: 'user' },
       }),
       createMockVersion({
         version: 2,
         created_at: '2026-05-19T08:00:00.000Z',
-        created_by: { id: 'user-1', name: 'user-v2' },
+        created_by: { id: 'user-1', name: 'user-v2', type: 'user' },
       }),
       createMockVersion({
         version: 1,
         created_at: '2026-01-15T10:00:00.000Z',
-        created_by: { id: 'user-1', name: 'user-v1' },
+        created_by: { id: 'user-1', name: 'user-v1', type: 'user' },
       }),
     ]
     render(<VersionHistoryPanel {...defaultProps} versions={versions} />)
@@ -439,7 +439,7 @@ describe('VersionHistoryPanel', () => {
       version: 6,
       change_description: null,
       status: null,
-      created_by: { id: 'user-1', name: 'testuser' },
+      created_by: { id: 'user-1', name: 'testuser', type: 'user' },
     })
     render(<VersionHistoryPanel {...defaultProps} versions={[version]} />)
 
@@ -459,7 +459,7 @@ describe('VersionHistoryPanel', () => {
       created_at: null,
       change_description: null,
       status: 'published',
-      created_by: { id: 'user-1', name: 'testuser' },
+      created_by: { id: 'user-1', name: 'testuser', type: 'user' },
     })
     render(<VersionHistoryPanel {...defaultProps} versions={[version]} />)
 
@@ -471,12 +471,12 @@ describe('VersionHistoryPanel', () => {
       createMockVersion({
         version: 3,
         created_at: '2026-05-19T10:00:00.000Z',
-        created_by: { id: 'user-1', name: 'recent-user' },
+        created_by: { id: 'user-1', name: 'recent-user', type: 'user' },
       }),
       createMockVersion({
         version: 2,
         created_at: '2026-01-10T10:00:00.000Z',
-        created_by: { id: 'user-1', name: 'old-user' },
+        created_by: { id: 'user-1', name: 'old-user', type: 'user' },
       }),
     ]
     render(<VersionHistoryPanel {...defaultProps} versions={versions} />)
@@ -568,7 +568,7 @@ describe('VersionHistoryPanel', () => {
       version: 1,
       name: 'Release 1.0',
       created_at: '2026-05-19T10:00:00.000Z',
-      created_by: { id: 'user-1', name: 'testuser' },
+      created_by: { id: 'user-1', name: 'testuser', type: 'user' },
     })
     render(<VersionHistoryPanel {...defaultProps} versions={[version]} />)
 
@@ -580,7 +580,9 @@ describe('VersionHistoryPanel', () => {
     render(
       <VersionHistoryPanel
         {...defaultProps}
-        versions={[createMockVersion({ version: 1, status: 'draft', created_by: { id: 'user-1', name: 'user1' } })]}
+        versions={[
+          createMockVersion({ version: 1, status: 'draft', created_by: { id: 'user-1', name: 'user1', type: 'user' } }),
+        ]}
         canEdit={false}
         editTooltip="You do not have permission"
       />
@@ -600,7 +602,9 @@ describe('VersionHistoryPanel', () => {
     render(
       <VersionHistoryPanel
         {...defaultProps}
-        versions={[createMockVersion({ version: 1, status: 'draft', created_by: { id: 'user-1', name: 'user1' } })]}
+        versions={[
+          createMockVersion({ version: 1, status: 'draft', created_by: { id: 'user-1', name: 'user1', type: 'user' } }),
+        ]}
         canEdit={false}
       />
     )
