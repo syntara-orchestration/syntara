@@ -19,7 +19,7 @@ The first JetStream command installs the optional `nats-py` extra. The sample
 uses its own virtual environment and lockfile, so it does not modify the main
 backend lockfile.
 
-## Recommended: one-command runner
+## Reproduce the benchmark: one-command runner
 
 Use `run-poc.sh` for the reproducible PoC measurement. It runs five batches of
 100 tasks by default, prints the raw timing results, and writes
@@ -31,6 +31,34 @@ cd backend/samples/scheduler-wakeup
 ./run-poc.sh jetstream
 ./run-poc.sh temporal
 ```
+
+Run the commands one at a time on the same otherwise-idle machine. Each
+adapter uses the same workload:
+
+```text
+create 100 queued executions
+→ publish one wake hint
+→ wait for all 100 claims and fake-dispatch completions
+→ repeat five times
+→ report median elapsed time and tasks/second
+```
+
+The runner prints JSON similar to:
+
+```json
+{
+  "adapter": "jetstream",
+  "task_count": 100,
+  "runs": 5,
+  "elapsed_seconds": [0.20, 0.19, 0.21, 0.20, 0.18],
+  "median_seconds": 0.20,
+  "median_tasks_per_second": 500
+}
+```
+
+Treat the generated `metrics.json` as the result to share or compare. It also
+records the adapter and test-environment caveats. The artifact directory is
+ignored by Git.
 
 The HTTP run uses the FastAPI ASGI endpoint in-process. The JetStream run
 starts and removes an ephemeral `nats:2.10-alpine` Docker container. To use a
@@ -46,6 +74,17 @@ worker, then stops both. Extra options are forwarded to the runner:
 ```bash
 ./run-poc.sh http --count 500 --runs 10
 ```
+
+The equivalent Make entry point is:
+
+```bash
+make -C ../../ scheduler-wakeup-poc-bench ADAPTER=http
+make -C ../../ scheduler-wakeup-poc-bench ADAPTER=jetstream
+make -C ../../ scheduler-wakeup-poc-bench ADAPTER=temporal
+```
+
+`run-poc.sh` is the recommended interface because it also handles JetStream
+container lifecycle and accepts `--count`, `--runs`, and `--output-dir`.
 
 The detailed commands below remain useful when debugging a single adapter or
 changing its measurement environment.
