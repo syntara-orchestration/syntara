@@ -1,5 +1,5 @@
 import type { WorkflowAPI } from '@syntara/contracts'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { axe } from 'vitest-axe'
 
@@ -648,8 +648,26 @@ describe('VersionHistoryPanel', () => {
   })
 
   it('has no accessibility violations', async () => {
-    const { container } = render(<VersionHistoryPanel {...defaultProps} versions={[]} />)
+    // Render real rows so nested-interactive is checked: the creator link and the
+    // kebab menu must not sit inside the row's select button. `aria-required-children`
+    // is excluded because PatternFly's SimpleListGroup emits `<ul role="list">` markup
+    // that axe flags regardless of this component (present on the empty state's siblings too).
+    const { container } = render(<VersionHistoryPanel {...defaultProps} />)
 
-    expect(await axe(container)).toHaveNoViolations()
+    expect(await axe(container, { rules: { 'aria-required-children': { enabled: false } } })).toHaveNoViolations()
+  })
+
+  it('keeps the creator link and kebab menu outside the row select button', () => {
+    render(<VersionHistoryPanel {...defaultProps} />)
+
+    const rowButtons = screen
+      .getAllByRole('button')
+      .filter((el) => el.classList.contains('pf-v6-c-simple-list__item-link'))
+    expect(rowButtons.length).toBeGreaterThan(0)
+    for (const button of rowButtons) {
+      expect(within(button).queryByRole('link')).toBeNull()
+      expect(within(button).queryByRole('button')).toBeNull()
+    }
+    expect(screen.getAllByRole('link', { name: 'sarah.chen' })).toHaveLength(1)
   })
 })
