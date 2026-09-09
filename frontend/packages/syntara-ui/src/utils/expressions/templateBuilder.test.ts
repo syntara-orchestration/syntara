@@ -112,8 +112,20 @@ describe('buildExpression', () => {
 })
 
 describe('tryBuildExpression', () => {
+  it('returns built expression for valid payloads', () => {
+    expect(tryBuildExpression({ nodeId: 'step_1', fieldPath: ['status'] })).toBe('${step_1.status}')
+  })
+
   it('returns null instead of throwing for unsafe field segments', () => {
     expect(tryBuildExpression({ nodeId: 'step_1', fieldPath: ['field.with.dots'] })).toBeNull()
+  })
+
+  it('returns null instead of throwing for invalid node IDs', () => {
+    expect(tryBuildExpression({ nodeId: 'bad.id', fieldPath: ['field'] })).toBeNull()
+  })
+
+  it('returns null instead of throwing for empty field segments', () => {
+    expect(tryBuildExpression({ nodeId: 'step_1', fieldPath: [''] })).toBeNull()
   })
 })
 

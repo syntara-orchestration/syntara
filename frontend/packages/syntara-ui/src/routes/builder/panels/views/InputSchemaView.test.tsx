@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { DRAG_TYPE_FIELD } from '../utils/dragTypes'
@@ -158,6 +158,27 @@ describe('InputSchemaView', () => {
 
     expect(screen.getByText(/content\.exists/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Copy expression/i })).not.toBeInTheDocument()
+  })
+
+  it('does not allow dragging fields that cannot be expressed', () => {
+    const data = {
+      result: {
+        'content.exists': true,
+      },
+    }
+    render(<InputSchemaView data={data} nodeId="activity_923ab1e1_3a31_40b7_b7a0_52c8ab5daddc" />)
+
+    const leaf = screen.getByText(/content\.exists/)
+    // eslint-disable-next-line testing-library/no-node-access -- assert draggable lives on ancestor wrapper
+    const dragContainer = leaf.closest('[draggable="false"]')
+    expect(dragContainer).toBeInTheDocument()
+
+    const setData = vi.fn()
+    fireEvent.dragStart(dragContainer!, {
+      dataTransfer: { setData, effectAllowed: '' },
+    })
+
+    expect(setData).not.toHaveBeenCalled()
   })
 
   it('renders schema for a loop-iteration composite activity id', () => {
