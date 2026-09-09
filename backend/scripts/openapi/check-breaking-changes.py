@@ -24,9 +24,12 @@ Policy):
      genuinely new major version is a new spec served from a separate URL path,
      so it would not register as a breaking change here.
 
-Dynamic-map / ``additionalProperties`` content (labels, context_data,
-input_data, output_data, result) is not treated as breaking; oasdiff reports
-such changes as non-breaking.
+Dynamic-map / ``additionalProperties`` fields (labels, context_data,
+input_data, output_data, result) are checked by a secondary policy detector.
+**Tightening** a dynamic-map constraint (e.g. ``additionalProperties: true`` to
+``{ type: string }``) is treated as breaking and requires a minor bump plus the
+``breaking-change-approved`` label. **Loosening** or doc-only edits remain
+non-breaking and require a patch bump. oasdiff alone does not flag either case.
 
 Usage:
     ./check-breaking-changes.py --base devel --head HEAD
@@ -77,6 +80,24 @@ DEFAULT_SPEC_PATH = "backend/src/syntara/schemas/openapi.yaml"
 # ``syntara-leads`` team via the Breaking Change Label Guard workflow; CI here
 # only checks for its presence.
 BREAKING_CHANGE_APPROVED_LABEL = "breaking-change-approved"
+DYNAMIC_MAP_FIELD_NAMES = frozenset({"labels", "context_data", "input_data", "output_data", "result"})
+_SCHEMA_CONSTRAINT_KEYS = frozenset(
+    {
+        "type",
+        "maxLength",
+        "minLength",
+        "pattern",
+        "format",
+        "enum",
+        "maxItems",
+        "minItems",
+        "maximum",
+        "minimum",
+        "exclusiveMaximum",
+        "exclusiveMinimum",
+        "multipleOf",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -112,9 +133,7 @@ def get_spec_from_git(ref: str, spec_path: str) -> str | None:
     fetched in CI), so a bad ref cannot be silently treated as "new spec,
     nothing to check". Also exits with code 2 on other git errors.
     """
-    ref_exists = run_command(
-        ["git", "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"]
-    )
+    ref_exists = run_command(["git", "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"])
     if ref_exists.returncode != 0:
         print(
             f"ERROR: Git ref '{ref}' could not be resolved. "
@@ -319,6 +338,143 @@ def canonicalize_spec(content: str | None) -> tuple[bool, Any]:
     if isinstance(data, dict) and isinstance(data.get("info"), dict):
         data["info"] = {k: v for k, v in data["info"].items() if k != "version"}
     return True, data
+
+
+def _record_dynamic_map_properties(
+    properties: dict[str, Any],
+    path: str,
+    results: dict[str, dict[str, Any]],
+) -> None:
+    for field_name in DYNAMIC_MAP_FIELD_NAMES:
+        field_schema = properties.get(field_name)
+        if isinstance(field_schema, dict):
+            key = f"{path}.properties.{field_name}" if path else f"properties.{field_name}"
+            results[key] = field_schema
+
+
+def _collect_dynamic_map_field_schemas(
+    node: Any,
+    path: str,
+    results: dict[str, dict[str, Any]],
+) -> None:
+    """Collect schema nodes for known dynamic-map object fields."""
+    if isinstance(node, list):
+        for index, item in enumerate(node):
+            _collect_dynamic_map_field_schemas(item, f"{path}[{index}]", results)
+        return
+    if not isinstance(node, dict):
+        return
+
+    properties = node.get("properties")
+    if isinstance(properties, dict):
+        _record_dynamic_map_properties(properties, path, results)
+
+    for key, value in node.items():
+        if key == "properties":
+            continue
+        child_path = f"{path}.{key}" if path else key
+        if isinstance(value, dict):
+            _collect_dynamic_map_field_schemas(value, child_path, results)
+        elif isinstance(value, list):
+            for index, item in enumerate(value):
+                _collect_dynamic_map_field_schemas(item, f"{child_path}[{index}]", results)
+
+
+def _resolve_object_map_branch(schema: dict[str, Any]) -> dict[str, Any] | None:
+    """Return the object branch of a dynamic-map field schema."""
+    if schema.get("type") == "object" or "additionalProperties" in schema:
+        return schema
+    for key in ("anyOf", "oneOf"):
+        variants = schema.get(key)
+        if isinstance(variants, list):
+            for variant in variants:
+                if isinstance(variant, dict) and variant.get("type") != "null":
+                    resolved = _resolve_object_map_branch(variant)
+                    if resolved is not None:
+                        return resolved
+    return None
+
+
+def _json_schema_strictly_narrows(base: dict[str, Any], head: dict[str, Any]) -> bool:
+    """Check whether head adds or tightens JSON Schema constraints relative to base."""
+    if base == head:
+        return False
+    for key in _SCHEMA_CONSTRAINT_KEYS:
+        if key not in head:
+            continue
+        base_val = base.get(key)
+        head_val = head[key]
+        if base_val == head_val:
+            continue
+        if key not in base or key == "type":
+            return True
+        if (
+            key == "enum"
+            and isinstance(base_val, list)
+            and isinstance(head_val, list)
+            and set(head_val) < set(base_val)
+        ):
+            return True
+        if key in ("maxLength", "maximum", "maxItems") and head_val < base_val:
+            return True
+        if key in ("minLength", "minimum", "minItems") and head_val > base_val:
+            return True
+    return False
+
+
+def _additional_properties_tightened(base_obj: dict[str, Any], head_obj: dict[str, Any]) -> bool:
+    """Check whether head narrows dynamic-map value constraints relative to base."""
+    base_ap = base_obj.get("additionalProperties")
+    head_ap = head_obj.get("additionalProperties")
+
+    if base_ap is True or base_ap is None:
+        return isinstance(head_ap, dict)
+
+    if isinstance(base_ap, dict) and head_ap is True:
+        return False
+
+    if isinstance(base_ap, dict) and isinstance(head_ap, dict):
+        return _json_schema_strictly_narrows(base_ap, head_ap)
+
+    return False
+
+
+def detect_dynamic_map_constraint_tightening(
+    base_content: str | None,
+    head_content: str | None,
+) -> tuple[bool, list[str]]:
+    """Detect breaking constraint tightening on dynamic-map fields.
+
+    oasdiff does not report ``additionalProperties`` narrowing as breaking.
+    This secondary check covers fields such as ``labels`` where a move from
+    ``additionalProperties: true`` to a typed schema rejects previously valid
+    client payloads.
+    """
+    base_ok, base_data = canonicalize_spec(base_content)
+    head_ok, head_data = canonicalize_spec(head_content)
+    if not base_ok or not head_ok:
+        return False, []
+    if not isinstance(base_data, dict) or not isinstance(head_data, dict):
+        return False, []
+
+    base_maps: dict[str, dict[str, Any]] = {}
+    head_maps: dict[str, dict[str, Any]] = {}
+    _collect_dynamic_map_field_schemas(base_data, "", base_maps)
+    _collect_dynamic_map_field_schemas(head_data, "", head_maps)
+
+    findings: list[str] = []
+    for path, head_schema in sorted(head_maps.items()):
+        base_schema = base_maps.get(path)
+        if base_schema is None:
+            continue
+        base_obj = _resolve_object_map_branch(base_schema)
+        head_obj = _resolve_object_map_branch(head_schema)
+        if base_obj is None or head_obj is None:
+            continue
+        if _additional_properties_tightened(base_obj, head_obj):
+            findings.append(f"{path}: additionalProperties constraint tightened")
+
+    return bool(findings), findings
 
 
 def has_meaningful_change(
@@ -577,8 +733,18 @@ def main():
     version_bump_type = get_version_bump_type(base_version, head_version) if base_version and head_version else None
     version_bumped = version_bump_type is not None
 
-    # Check for breaking changes
-    has_breaking, breaking_output = check_breaking_changes(base_spec_path, head_spec_path)
+    # Check for breaking changes (oasdiff ERR-level + policy dynamic-map tightening)
+    has_oasdiff_breaking, breaking_output = check_breaking_changes(base_spec_path, head_spec_path)
+    policy_breaking, policy_findings = detect_dynamic_map_constraint_tightening(
+        base_spec_content,
+        head_spec_content,
+    )
+    has_breaking = has_oasdiff_breaking or policy_breaking
+    if policy_findings:
+        policy_text = "Policy breaking changes (dynamic-map constraint tightening):\n" + "\n".join(
+            f"  - {finding}" for finding in policy_findings
+        )
+        breaking_output = f"{breaking_output}\n\n{policy_text}".strip() if has_oasdiff_breaking else policy_text
 
     # Get all changes (human-readable) and structured entries (for classification)
     all_changes = get_all_changes(base_spec_path, head_spec_path)

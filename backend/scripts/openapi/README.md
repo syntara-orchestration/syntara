@@ -22,7 +22,7 @@ Installs the `oasdiff` tool with checksum verification to prevent supply chain a
 - `EXPECTED_CHECKSUM` - Expected SHA256 checksum (pinned for version)
 
 #### `check-breaking-changes.py`
-Checks for breaking changes in OpenAPI spec using `oasdiff`. Automatically resolves the spec path relative to the git root, so it works from any subdirectory (e.g., `backend/` in the monorepo).
+Checks for breaking changes in OpenAPI spec using `oasdiff`, plus a secondary policy detector for dynamic-map constraint tightening (`labels`, `context_data`, `input_data`, `output_data`, `result`). Automatically resolves the spec path relative to the git root, so it works from any subdirectory (e.g., `backend/` in the monorepo).
 
 The gate enforces these rules:
 1. **Every meaningful spec change must update `info.version`.** Comparison is canonical (semantic), so serialization-only diffs (whitespace, key order, quote style) do not require a version change. A meaningful change that leaves `info.version` unchanged is blocked (`version_bump_required`).

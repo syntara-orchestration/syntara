@@ -81,13 +81,19 @@ CI validates that the `info.version` increment is appropriate for the type of sp
 |-------------|--------------|------------------|
 | Additive — new endpoint, field, or enum value | oasdiff reports a structural change entry | Increment the **minor** version |
 | Spec-only — description, example, or annotation edit | canonical diff with no oasdiff structural entry | Increment the **patch** version |
-| Approved in-place breaking change | oasdiff reports a breaking change + `breaking-change-approved` label | Increment the **minor** version (never major — a new major version is a new spec at a new URL path) |
+| Approved in-place breaking change | oasdiff reports a breaking change, **or** dynamic-map constraint tightening (see below), plus `breaking-change-approved` label | Increment the **minor** version (never major — a new major version is a new spec at a new URL path) |
 
 Note: oasdiff does not report pure description/summary/example edits, so those are detected only by the canonical comparison and classified as a **patch** change.
 
 ### Dynamic-map / `additionalProperties` content
 
-Changes to dynamic-map fields (`additionalProperties` schemas such as `labels`, `context_data`, `input_data`, `output_data`, `result`) are **not** treated as breaking — oasdiff reports them as non-breaking. Such a change is still a spec change and requires a `patch` bump.
+Dynamic-map fields (`labels`, `context_data`, `input_data`, `output_data`, `result`) use a secondary policy detector in `check-breaking-changes.py` because oasdiff does not classify their schema edits as breaking.
+
+| Dynamic-map edit | Breaking? | Required version change |
+|------------------|-----------|-------------------------|
+| **Tightening** — e.g. `additionalProperties: true` → `{ type: string }`, or adding `maxLength` / narrowing `enum` | Yes | **minor** + `breaking-change-approved` |
+| **Loosening** — e.g. typed schema → `additionalProperties: true` | No | **patch** |
+| Description / example only on the field | No | **patch** |
 
 ### New major version at a new path
 
@@ -95,9 +101,9 @@ The gate compares each spec only against its own prior state on the base ref. A 
 
 ### Detection scope and limitations
 
-Breaking-change detection is delegated entirely to `oasdiff breaking`; there is no secondary classification layer, so coverage equals oasdiff's own ruleset. Two limits follow from this and a green check must **not** be read as full policy compliance:
+Breaking-change detection is primarily delegated to `oasdiff breaking`, with a secondary policy layer for dynamic-map constraint tightening (above). Two limits follow and a green check must **not** be read as full policy compliance:
 
-- **Coverage equals oasdiff.** Categories in the AO REST API Versioning and Deprecation Policy that oasdiff does not model will not be flagged. Audit oasdiff's ruleset against the policy periodically.
+- **Coverage is mostly oasdiff plus dynamic-map tightening.** Categories in the AO REST API Versioning and Deprecation Policy that neither oasdiff nor the dynamic-map detector model will not be flagged. Audit oasdiff's ruleset against the policy periodically.
 - **Semantic-only changes are undetectable by any schema differ.** A change where the shape is unchanged but the behavior differs for the same request/response (a "semantic change with no type change") cannot be detected by comparing schemas. Our policy classifies that class as breaking; catching it always requires human review. This gate is not a backstop for it.
 
 ### Breaking Change Policy
