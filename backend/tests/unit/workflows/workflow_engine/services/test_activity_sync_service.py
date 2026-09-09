@@ -5388,15 +5388,17 @@ class TestNonTerminalIoQuerySkip:
         "status",
         [ActivityStatus.PENDING, ActivityStatus.RUNNING, ActivityStatus.WAITING, ActivityStatus.RETRYING],
     )
-    async def test_query_activity_io_skipped_for_non_terminal(self, status: ActivityStatus) -> None:
-        """No Temporal query for non-terminal status updates."""
+    async def test_query_activity_io_skipped_for_non_terminal_with_input_already_stored(
+        self, status: ActivityStatus
+    ) -> None:
+        """No Temporal query on subsequent non-terminal events once input is stored (query-storm guard)."""
         existing = Mock(spec=ActivityExecution)
         existing.activity_name = "script_1"
-        existing.status = ActivityStatus.PENDING  # initial DB status
+        existing.status = ActivityStatus.RUNNING  # already past first event
         existing.node_type = NodeType.SCRIPT
         existing.started_at = None
         existing.completed_at = None
-        existing.input_data = {}
+        existing.input_data = {"host": "server-1"}  # input already fetched on the first event
         existing.output_data = None
         existing.error_details = None
         existing.retry_count = 0
@@ -5419,6 +5421,52 @@ class TestNonTerminalIoQuerySkip:
         assert result is not None
         activity, _old_values, _is_new = result
         assert activity.status == status
+        assert activity.input_data == {"host": "server-1"}  # preserved, not blanked
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "status",
+        [ActivityStatus.PENDING, ActivityStatus.RUNNING, ActivityStatus.WAITING, ActivityStatus.RETRYING],
+    )
+    async def test_query_activity_io_fetches_input_once_on_first_non_terminal_event(
+        self, status: ActivityStatus
+    ) -> None:
+        """First non-terminal event fetches input once so the UI input panel is populated mid-run."""
+        existing = Mock(spec=ActivityExecution)
+        existing.activity_name = "script_1"
+        existing.status = ActivityStatus.PENDING  # initial DB status, input not yet stored
+        existing.node_type = NodeType.SCRIPT
+        existing.started_at = None
+        existing.completed_at = None
+        existing.input_data = {}  # empty → first event
+        existing.output_data = None
+        existing.error_details = None
+        existing.retry_count = 0
+        existing.iteration = None
+        existing.updated_at = datetime(2025, 1, 20, 10, 0, 0, tzinfo=UTC)
+
+        metadata = create_test_metadata(execution_id=self.execution_id)
+        session = Mock()
+
+        with patch.object(
+            self.service,
+            "_query_activity_io",
+            new_callable=AsyncMock,
+            return_value=({"host": "server-1"}, None),
+        ) as mock_query:
+            result = await self.service._process_single_activity_sync(
+                metadata,
+                Mock(),
+                self._build_activity_data(status),
+                {"script_1": existing},
+                session,
+            )
+
+        mock_query.assert_called_once()
+        assert result is not None
+        activity, _old_values, _is_new = result
+        assert activity.status == status
+        assert activity.input_data == {"host": "server-1"}
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(

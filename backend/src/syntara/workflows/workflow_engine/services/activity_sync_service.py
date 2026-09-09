@@ -2125,7 +2125,7 @@ class ActivitySyncService:
         if existing.status in TERMINAL_ACTIVITY_STATUSES and not loop_control_iterating and not is_new:
             return None
 
-        input_data, output_data = await self._resolve_activity_io(handle, activity_id, activity_data)
+        input_data, output_data = await self._resolve_activity_io(handle, activity_id, activity_data, existing)
 
         # Loop control nodes: keep the node "running" between iterations so the UI
         # doesn't flash completed→pending on every cycle.  The final iteration
@@ -2161,16 +2161,24 @@ class ActivitySyncService:
         handle: WorkflowHandle[Any, Any],
         activity_id: str,
         activity_data: dict[str, Any],
+        existing: ActivityExecution,
     ) -> tuple[dict[str, Any], Any]:
-        """Resolve input/output data for an activity, querying Temporal only for terminal ones.
+        """Resolve input/output data for an activity, avoiding a per-event query storm.
 
-        Non-terminal activities are skipped to avoid a per-event query storm (~600
-        queries/loop workflow) that exhausts the DB pool. For running activities,
-        partial output from heartbeat may already be in the update dict — preserve it.
+        Querying Temporal on every event of a loop workflow (~600 events) replays
+        history each time and exhausts the DB pool. To avoid that while keeping the
+        UI's input panel populated mid-run:
+        - Terminal statuses: full query (input + final output, with the retry loop).
+        - First non-terminal event (input not yet stored): query once for input only;
+          output stays whatever the event carried (e.g. heartbeat partial output).
+        - Subsequent non-terminal events: no query — reuse the stored input.
         """
         if activity_data.get("status") in TERMINAL_ACTIVITY_STATUSES:
             return await self._query_activity_io(handle, activity_id, activity_data, activity_data.get("output_data"))
-        return {}, activity_data.get("output_data")
+        if not existing.input_data:
+            input_data, _ = await self._query_activity_io(handle, activity_id, activity_data, None)
+            return input_data, activity_data.get("output_data")
+        return existing.input_data, activity_data.get("output_data")
 
     @staticmethod
     def _get_or_create_iteration_record(
