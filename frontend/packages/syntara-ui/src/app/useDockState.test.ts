@@ -203,6 +203,26 @@ describe('useDockStateProvider', () => {
     expect(result.current.isDockTextExpanded).toBe(true)
   })
 
+  it('falls back to collapsed dock state when sessionStorage JSON is invalid', () => {
+    sessionStorage.setItem('syntara-nav-dock-state', 'not-json')
+
+    const { result } = renderHook(() => useDockStateProvider())
+    expect(result.current.isDockExpanded).toBe(false)
+    expect(result.current.isDockTextExpanded).toBe(false)
+  })
+
+  it('normalizes stale mobile overlay state on desktop mount', () => {
+    sessionStorage.setItem(
+      'syntara-nav-dock-state',
+      JSON.stringify({ isDockExpanded: true, isDockTextExpanded: false })
+    )
+
+    const { result } = renderHook(() => useDockStateProvider())
+    expect(result.current.isMobile).toBe(false)
+    expect(result.current.isDockTextExpanded).toBe(true)
+    expect(result.current.isDockExpanded).toBe(false)
+  })
+
   it('opens mobile overlay when crossing into mobile with text expanded', () => {
     const { result } = renderHook(() => useDockStateProvider())
 

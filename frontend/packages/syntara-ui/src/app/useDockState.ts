@@ -54,6 +54,23 @@ function readPersistedDockState(): PersistedDockState {
   }
 }
 
+function readIsMobileViewport(): boolean {
+  return typeof window.matchMedia === 'function'
+    ? window.matchMedia(`(max-width: ${DOCK_DESKTOP_BREAKPOINT_PX}px)`).matches
+    : false
+}
+
+function readInitialDockState(): PersistedDockState & { isMobile: boolean } {
+  const { isDockExpanded, isDockTextExpanded } = readPersistedDockState()
+  const isMobile = readIsMobileViewport()
+
+  if (!isMobile && isDockExpanded && !isDockTextExpanded) {
+    return { isDockExpanded: false, isDockTextExpanded: true, isMobile }
+  }
+
+  return { isDockExpanded, isDockTextExpanded, isMobile }
+}
+
 function writePersistedDockState(state: PersistedDockState) {
   try {
     sessionStorage.setItem(DOCK_STATE_STORAGE_KEY, JSON.stringify(state))
@@ -63,13 +80,10 @@ function writePersistedDockState(state: PersistedDockState) {
 }
 
 export function useDockStateProvider(): DockState {
-  const [isDockExpanded, setIsDockExpanded] = useState(() => readPersistedDockState().isDockExpanded)
-  const [isDockTextExpanded, setIsDockTextExpanded] = useState(() => readPersistedDockState().isDockTextExpanded)
-  const [isMobile, setIsMobile] = useState(() =>
-    typeof window.matchMedia === 'function'
-      ? window.matchMedia(`(max-width: ${DOCK_DESKTOP_BREAKPOINT_PX}px)`).matches
-      : false
-  )
+  const [initialDockState] = useState(readInitialDockState)
+  const [isDockExpanded, setIsDockExpanded] = useState(initialDockState.isDockExpanded)
+  const [isDockTextExpanded, setIsDockTextExpanded] = useState(initialDockState.isDockTextExpanded)
+  const [isMobile, setIsMobile] = useState(initialDockState.isMobile)
   const dockedToggleRef = useRef<HTMLButtonElement>(null)
   const mobileToggleRef = useRef<HTMLButtonElement>(null)
   const focusTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
@@ -94,10 +108,7 @@ export function useDockStateProvider(): DockState {
 
     const handler = (e: MediaQueryListEvent) => {
       const nowMobile = e.matches
-      if (wasMobile === nowMobile) {
-        setIsMobile(nowMobile)
-        return
-      }
+      if (wasMobile === nowMobile) return
 
       if (nowMobile) {
         if (isDockTextExpandedRef.current && !isDockExpandedRef.current) {
