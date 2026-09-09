@@ -171,5 +171,13 @@ describe('WorkflowsTableBody', () => {
         body: { action: 'create', resource_type: 'workflow', resource_project: 'proj-1' },
       })
     })
+
+    it('does not fire can_i or render a kebab when showRowActions is false', () => {
+      renderInTable(<FlatWorkflowsTableBody workflows={[baseWorkflow]} showRowActions={false} />)
+
+      expect(screen.getByText('Deploy Pipeline')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Actions for Deploy Pipeline' })).not.toBeInTheDocument()
+      expect(accessFetchClient.POST).not.toHaveBeenCalled()
+    })
   })
 })
