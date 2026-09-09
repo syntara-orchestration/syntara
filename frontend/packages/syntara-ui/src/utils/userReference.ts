@@ -1,6 +1,18 @@
 import type { WorkflowAPI } from '@syntara/contracts'
+import { z } from 'zod'
 
 type UserReference = WorkflowAPI.components['schemas']['UserReference']
+
+/**
+ * Runtime shape of a UserReference. `type` is kept tolerant so a principal type
+ * this build does not know about still renders its name; only `toLinkedUserId`
+ * cares about the exact value.
+ */
+const userReferenceSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: z.string().optional(),
+})
 
 /**
  * Audit fields (created_by / updated_by) return a UserReference ({ id, name }),
@@ -11,9 +23,7 @@ type UserReference = WorkflowAPI.components['schemas']['UserReference']
  * runtime shape is not guaranteed by the contract types alone.
  */
 export function isUserReference(value: unknown): value is UserReference {
-  if (typeof value !== 'object' || value === null) return false
-  const { id, name } = value as { id?: unknown; name?: unknown }
-  return typeof id === 'string' && typeof name === 'string'
+  return userReferenceSchema.safeParse(value).success
 }
 
 /** Display name for an audit field, or undefined when there is nothing to show. */
