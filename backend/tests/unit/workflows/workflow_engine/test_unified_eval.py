@@ -919,3 +919,99 @@ class TestVisualBuilderOperators:
     def test_contains_word_form_on_list(self) -> None:
         assert safe_eval_with_namespace("${items} contains 2", {"items": [1, 2, 3]}) is True
         assert safe_eval_with_namespace("${items} contains 9", {"items": [1, 2, 3]}) is False
+
+
+# (keyword, literal containing that keyword in non-operator position).
+#
+# Python keywords the frontend normalizer rewrites, listed in its module header
+# (frontend/packages/syntara-ui/src/utils/expressions/normalizer.ts:1-13) and
+# covered by normalizer.test.ts "preserves strings with ... inside".
+PYTHON_KEYWORD_LITERALS = [
+    ("and", "bread and butter"),
+    ("or", "yes or no"),
+    ("not", "not sure"),
+    ("in", "log in"),
+]
+
+# The nine visual-builder word operators, in the order they are declared in
+# frontend/packages/syntara-ui/src/utils/expressions/operators.ts WORD_OPERATORS.
+# These are the operators offered in the node's operator dropdown (OPERATOR_GROUPS
+# String / Existence / Length groups) and the ones _translate_custom_operators
+# rewrites. The Comparison group is symbolic (==, >, <, >=, <=) and has no
+# rewrite rule, so it is not represented here.
+WORD_OPERATOR_LITERALS = [
+    ("startsWith", "name startsWith 5"),
+    ("endsWith", "name endsWith 7"),
+    ("matches", "value matches 3"),
+    ("contains", "list contains 5"),
+    ("exists", "Resource already exists in target"),
+    ("isEmpty", "field isEmpty here"),
+    ("lengthEqualTo", "items lengthEqualTo 2"),
+    ("lengthGreaterThan", "count lengthGreaterThan 1"),
+    ("lengthLessThan", "count lengthLessThan 9"),
+]
+
+
+class TestKeywordInsideStringLiteral:
+    """An operator keyword inside a quoted string literal must stay literal text.
+
+    In the visual builder the operator is chosen from a dropdown (OPERATOR_GROUPS
+    in operators.ts) and only the comparison value is free text, so a keyword
+    appearing inside quotes in a stored condition is always user data, never an
+    operator.
+
+    The frontend upholds this by tokenizing before rewriting (normalizer.ts
+    imports tokenize/detokenize, so a STRING token cannot be modified) and pins it
+    with tests. The backend's `_translate_custom_operators` instead runs `re.sub`
+    over the raw expression string with no notion of quoting, before `ast.parse`.
+
+    Both quoting styles are exercised because they fail differently. The visual
+    builder emits double quotes (`quoteValueIfNeeded` in serializer.ts), where the
+    injected rewrite still parses and the comparison silently returns the wrong
+    branch. Raw-mode and imported definitions can carry single quotes, where the
+    `__exists__('...')` rewrite unbalances the literal and raises instead.
+    """
+
+    @pytest.mark.parametrize(
+        ("keyword", "literal"),
+        PYTHON_KEYWORD_LITERALS,
+        ids=[keyword for keyword, _ in PYTHON_KEYWORD_LITERALS],
+    )
+    @pytest.mark.parametrize("quote", ['"', "'"])
+    def test_python_keyword_inside_literal_is_preserved(self, keyword: str, literal: str, quote: str) -> None:
+        """Control: keywords the backend never rewrites are unaffected by quoting."""
+        expression = f"${{text}} == {quote}{literal}{quote}"
+        assert safe_eval_with_namespace(expression, {"text": literal}) is True, keyword
+
+    @pytest.mark.parametrize(
+        ("operator", "literal"),
+        WORD_OPERATOR_LITERALS,
+        ids=[operator for operator, _ in WORD_OPERATOR_LITERALS],
+    )
+    @pytest.mark.parametrize("quote", ['"', "'"])
+    def test_word_operator_inside_literal_is_preserved(self, operator: str, literal: str, quote: str) -> None:
+        """Reproducer: same invariant, one case per WORD_OPERATORS entry."""
+        expression = f"${{text}} == {quote}{literal}{quote}"
+        assert safe_eval_with_namespace(expression, {"text": literal}) is True, operator
+
+    def test_builder_emitted_condition_matches_its_own_value(self) -> None:
+        """The exact stored condition the visual builder writes for a typed value.
+
+        `quoteValueIfNeeded` (serializer.ts) wraps a free-text value in double
+        quotes, escaping only backslash and double-quote, so this is what a user
+        who typed the value into the Value field gets. It evaluates to the wrong
+        branch with no error raised.
+        """
+        value = "Resource already exists in target"
+        expression = f'${{step_1.output}} == "{value}"'
+        assert safe_eval_with_namespace(expression, {"step_1": {"output": value}}) is True
+
+    def test_single_quoted_exists_literal_does_not_raise(self) -> None:
+        """Same literal single-quoted, as raw mode or an imported definition stores it.
+
+        `_exists_repl` injects single quotes around the extracted path, which
+        unbalances a single-quoted literal and fails the parse.
+        """
+        value = "Resource already exists in target"
+        expression = f"${{step_1.output}} == '{value}'"
+        assert safe_eval_with_namespace(expression, {"step_1": {"output": value}}) is True

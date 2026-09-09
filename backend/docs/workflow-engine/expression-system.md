@@ -45,7 +45,7 @@ A single full-span template preserves its original type. Multiple templates, or 
 
 ## Condition Evaluation
 
-Condition and Switch nodes evaluate boolean expressions with `safe_eval_with_namespace()` (`unified_eval.py`) — an AST-based evaluator, not `eval()`. `${...}` templates are resolved first, then the resulting expression is parsed and only allowlisted AST node types are evaluated.
+Condition and Switch nodes evaluate boolean expressions with `safe_eval_with_namespace()` (`unified_eval.py`) — an AST-based evaluator, not `eval()`. Evaluation proceeds in three stages: (1) visual-builder word operators are translated to Python equivalents, (2) `${...}` templates are resolved to bare names, (3) the resulting expression is parsed and only allowlisted AST node types are evaluated.
 
 | Category | Operators |
 |----------|-----------|
@@ -92,7 +92,7 @@ Input arrives via the selected trigger — manual (`input_data` on the execution
 
 ## Security
 
-The evaluator enforces limits defined in `unified_eval.py`: `MAX_EXPRESSION_LENGTH` (10,000 chars), `MAX_VARIABLE_NAME_LENGTH` (500 chars), `MAX_AST_DEPTH` (50), `MAX_AST_NODES` (500). It also disallows function calls, imports/module access, and attribute access beyond namespace lookup — parsing is AST-based, and only allowlisted node types are ever evaluated.
+The evaluator enforces limits defined in `unified_eval.py`: `MAX_EXPRESSION_LENGTH` (10,000 chars), `MAX_VARIABLE_NAME_LENGTH` (500 chars), `MAX_AST_DEPTH` (50), `MAX_AST_NODES` (500). It disallows imports, module access, and arbitrary function/method calls — parsing is AST-based and only allowlisted node types are ever evaluated. The only permitted calls are a small gated set: `len`, `str.startswith`, `str.endswith`, and the internal helpers `__exists__`, `__is_empty__`, and `__re_search__` (injected by the word-operator translation step; never callable by user expressions directly).
 
 ## Related Documentation
 

@@ -101,15 +101,57 @@ def _exists_repl(match: re.Match[str]) -> str:
     return f"__exists__('{escaped}')"
 
 
+# Matches single- or double-quoted strings including escape sequences.
+# Used as the leading alternative in quote-aware operator substitutions so that
+# operator keywords inside string literals are never rewritten.
+_QUOTED_SPAN = r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\''
+
+
 def _translate_custom_operators(expression: str) -> str:
     """Rewrite visual-builder word operators to Python the AST evaluator can parse.
 
     The serializer already converts ``contains`` to ``in`` when saving, but the
     remaining operators are stored verbatim (``exists``, ``isEmpty``,
-    ``startsWith``, …) and are not valid Python. Already-published workflows
+    ``startsWith``, …) and are not valid Python.  Already-published workflows
     keep those strings, so translation happens at evaluation time.
+
+    The substitution is quote-aware: each regex alternates over a capturing
+    quoted-span group (returned unchanged) and the actual operator pattern
+    (rewritten).  This prevents a keyword that appears inside a string literal —
+    for example, ``"Resource already exists in target"`` in a plain equality
+    check — from being rewritten into a function call and corrupting a
+    previously-valid comparison.
     """
-    translated = expression
+
+    def _qa_sub(pat: str, repl: str, s: str) -> str:
+        """Apply re.sub(pat, repl, s) while skipping occurrences inside quoted spans.
+
+        Combines the quoted-span pattern with ``pat`` in an alternation so that
+        a quoted span is consumed (and returned unchanged) before the operator
+        pattern is attempted.  All backreferences in ``repl`` are shifted by +1
+        to account for the quoted-span capture group inserted at position 1.
+        """
+        combined = rf"({_QUOTED_SPAN})|{pat}"
+        shifted = re.sub(r"\\(\d+)", lambda m: f"\\{int(m.group(1)) + 1}", repl)
+
+        def _repl(m: re.Match[str]) -> str:
+            return m.group(0) if m.group(1) is not None else m.expand(shifted)
+
+        return re.sub(combined, _repl, s)
+
+    def _exists_repl_qa(m: re.Match[str]) -> str:
+        r"""Quote-aware variant of _exists_repl.
+
+        In the combined pattern ``({_QUOTED_SPAN})|({_OPERAND_PATTERN})\s+exists\b``
+        the operand is captured in group 2 (not group 1) because the quoted-span
+        group occupies position 1.
+        """
+        if m.group(1) is not None:
+            return m.group(0)
+        path = _operand_to_path(m.group(2))
+        escaped = path.replace("\\", "\\\\").replace("'", "\\'")
+        return f"__exists__('{escaped}')"
+
     replacements: tuple[tuple[str, str], ...] = (
         (rf"({_OPERAND_PATTERN})\s+lengthGreaterThan\s+({_VALUE_PATTERN})", r"(len(\1) > \2)"),
         (rf"({_OPERAND_PATTERN})\s+lengthLessThan\s+({_VALUE_PATTERN})", r"(len(\1) < \2)"),
@@ -120,9 +162,14 @@ def _translate_custom_operators(expression: str) -> str:
         (rf"({_OPERAND_PATTERN})\s+contains\s+({_VALUE_PATTERN})", r"(\2 in \1)"),
         (rf"({_OPERAND_PATTERN})\s+isEmpty\b", r"(__is_empty__(\1))"),
     )
-    for pattern, repl in replacements:
-        translated = re.sub(pattern, repl, translated)
-    return re.sub(rf"({_OPERAND_PATTERN})\s+exists\b", _exists_repl, translated)
+    translated = expression
+    for pat, repl in replacements:
+        translated = _qa_sub(pat, repl, translated)
+
+    # ``exists`` uses a callable replacement; wire it to the quote-aware variant
+    # so the operand group index matches the combined pattern (group 2, not 1).
+    exists_combined = rf"({_QUOTED_SPAN})|({_OPERAND_PATTERN})\s+exists\b"
+    return re.sub(exists_combined, _exists_repl_qa, translated)
 
 
 def _path_exists(path: str, namespace: dict[str, Any]) -> bool:
