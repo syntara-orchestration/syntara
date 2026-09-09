@@ -14,8 +14,8 @@ triggers:
             type: object
             description: Data to post
             default:
-                name: Test Resource
-                value: 123
+              name: Test Resource
+              value: 123
 
 nodes:
   - id: create_resource
