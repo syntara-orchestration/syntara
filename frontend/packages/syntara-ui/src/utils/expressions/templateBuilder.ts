@@ -13,10 +13,11 @@ const SAFE_NODE_ID = /^[a-zA-Z0-9_-]+$/
 const COMPOSITE_ITER_SEP = '#iter-'
 
 /**
- * Disallowed inside a single field path segment. Dots separate segments in
- * `${node.field.path}`; braces and semicolons invite template injection.
+ * Allowed inside a single field path segment. Dots separate segments in
+ * `${node.field.path}`; brackets support array subscripts (`items[0]`); `@` supports
+ * JSON-LD keys. Reject everything else (quotes, backticks, braces, etc.).
  */
-const UNSAFE_FIELD_SEGMENT = /[.${}\r\n;]/
+const SAFE_FIELD_SEGMENT = /^[a-zA-Z0-9_ \-[\]@]+$/
 
 /**
  * Template expressions always reference the canvas node ID.
@@ -36,7 +37,7 @@ function validateNodeId(nodeId: string): string {
 }
 
 function validateFieldSegment(segment: string): string {
-  if (!segment || UNSAFE_FIELD_SEGMENT.test(segment)) {
+  if (!segment || !SAFE_FIELD_SEGMENT.test(segment)) {
     throw new Error('Invalid expression path segment: contains disallowed characters')
   }
   return segment

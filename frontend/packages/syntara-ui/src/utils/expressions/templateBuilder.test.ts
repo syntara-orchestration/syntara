@@ -109,6 +109,24 @@ describe('buildExpression', () => {
     })
     expect(result).toBe('${step_1.@type}')
   })
+
+  it('throws error for field path with quotes', () => {
+    expect(() =>
+      buildExpression({
+        nodeId: 'step_1',
+        fieldPath: [`field"injection`],
+      })
+    ).toThrow('Invalid expression path segment: contains disallowed characters')
+  })
+
+  it('throws error for field path with backticks', () => {
+    expect(() =>
+      buildExpression({
+        nodeId: 'step_1',
+        fieldPath: ['`rm -rf`'],
+      })
+    ).toThrow('Invalid expression path segment: contains disallowed characters')
+  })
 })
 
 describe('tryBuildExpression', () => {
