@@ -171,7 +171,13 @@ describe('validateEditModeRequiredDynamicField', () => {
     const setError = makeSetError()
     const field: FieldDefinition = { id: 'host', label: 'Host', type: 'string' }
 
-    const result = validateEditModeRequiredDynamicField('host', 'example.com', field, new Set(), setError)
+    const result = validateEditModeRequiredDynamicField({
+      requiredId: 'host',
+      val: 'example.com',
+      field,
+      touchedSecrets: new Set(),
+      setError,
+    })
 
     expect(result).toBe(true)
     expect(setError).not.toHaveBeenCalled()
@@ -181,7 +187,13 @@ describe('validateEditModeRequiredDynamicField', () => {
     const setError = makeSetError()
     const field: FieldDefinition = { id: 'host', label: 'Host', type: 'string' }
 
-    const result = validateEditModeRequiredDynamicField('host', '', field, new Set(), setError)
+    const result = validateEditModeRequiredDynamicField({
+      requiredId: 'host',
+      val: '',
+      field,
+      touchedSecrets: new Set(),
+      setError,
+    })
 
     expect(result).toBe(false)
     expect(setError).toHaveBeenCalledWith('inputs.host', { message: 'Host is required' })
@@ -191,7 +203,13 @@ describe('validateEditModeRequiredDynamicField', () => {
     const setError = makeSetError()
     const field: FieldDefinition = { id: 'token', label: 'Token', type: 'string', secret: true }
 
-    const result = validateEditModeRequiredDynamicField('token', '', field, new Set(), setError)
+    const result = validateEditModeRequiredDynamicField({
+      requiredId: 'token',
+      val: '',
+      field,
+      touchedSecrets: new Set(),
+      setError,
+    })
 
     expect(result).toBe(true)
     expect(setError).not.toHaveBeenCalled()
@@ -202,7 +220,13 @@ describe('validateEditModeRequiredDynamicField', () => {
     const field: FieldDefinition = { id: 'token', label: 'Token', type: 'string', secret: true }
     const touchedSecrets = new Set(['token'])
 
-    const result = validateEditModeRequiredDynamicField('token', '', field, touchedSecrets, setError)
+    const result = validateEditModeRequiredDynamicField({
+      requiredId: 'token',
+      val: '',
+      field,
+      touchedSecrets,
+      setError,
+    })
 
     expect(result).toBe(false)
     expect(setError).toHaveBeenCalledWith('inputs.token', { message: 'Token is required' })
@@ -213,7 +237,13 @@ describe('validateEditModeRequiredDynamicField', () => {
     const field: FieldDefinition = { id: 'token', label: 'Token', type: 'string', secret: true }
     const touchedSecrets = new Set(['token'])
 
-    const result = validateEditModeRequiredDynamicField('token', 'new-value', field, touchedSecrets, setError)
+    const result = validateEditModeRequiredDynamicField({
+      requiredId: 'token',
+      val: 'new-value',
+      field,
+      touchedSecrets,
+      setError,
+    })
 
     expect(result).toBe(true)
     expect(setError).not.toHaveBeenCalled()
@@ -223,7 +253,13 @@ describe('validateEditModeRequiredDynamicField', () => {
     const setError = makeSetError()
     const field: FieldDefinition = { id: 'host', label: 'Host', type: 'string' }
 
-    const result = validateEditModeRequiredDynamicField('host', null, field, new Set(), setError)
+    const result = validateEditModeRequiredDynamicField({
+      requiredId: 'host',
+      val: null,
+      field,
+      touchedSecrets: new Set(),
+      setError,
+    })
 
     expect(result).toBe(false)
     expect(setError).toHaveBeenCalledWith('inputs.host', { message: 'Host is required' })
