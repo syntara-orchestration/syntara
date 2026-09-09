@@ -49,10 +49,7 @@ export async function getAuthToken(app: Page): Promise<string | null> {
 }
 
 function isStaleTokenResponse(response: APIResponse): boolean {
-  return (
-    response.status() === 401 &&
-    response.headers()['x-auth-failure-type'] === STALE_TOKEN_FAILURE_HEADER
-  )
+  return response.status() === 401 && response.headers()['x-auth-failure-type'] === STALE_TOKEN_FAILURE_HEADER
 }
 
 async function sendApiRequest(
