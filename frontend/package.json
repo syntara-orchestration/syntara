@@ -10,6 +10,7 @@
     "build": "npm run build --workspace=packages/syntara-ui",
     "test": "npm run build && concurrently --group npm:test:* npm:format:check -c auto && if [ $? -eq 0 ]; then echo 'All Tests Passed: Success' && exit 0; else echo 'Checks failed: Failure' && exit 1; fi",
     "test:ui": "npm run test --prefix packages/syntara-ui",
+    "test:mock-api": "npm run test --prefix packages/syntara-mock-api",
     "test:coverage": "npm run test:coverage --prefix packages/syntara-ui",
     "check": "NODE_OPTIONS='--max-old-space-size=8192' concurrently --group -c auto --names 'mermaid,tsc,lint,format,knip' 'npm run lint:mermaid' 'npm run tsc' 'npm run lint' 'npm run format:check' 'npm run knip'",
     "e2e": "npm run e2e --prefix packages/syntara-ui",
