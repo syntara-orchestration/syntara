@@ -51,13 +51,19 @@ async function authenticate(ctx: APIRequestContext): Promise<string | null> {
   }
 }
 
-async function api(
-  ctx: APIRequestContext,
-  token: string,
-  method: string,
-  path: string,
+async function api({
+  ctx,
+  token,
+  method,
+  path,
+  data,
+}: {
+  ctx: APIRequestContext
+  token: string
+  method: string
+  path: string
   data?: unknown
-): Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }> {
+}): Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }> {
   const resp = await ctx.fetch(apiUrl(path), {
     method,
     headers: { Authorization: `Bearer ${token}` },
@@ -89,37 +95,49 @@ async function probeExecutionEngine(
   let createdProjectId: string | null = null
 
   try {
-    const projectsResp = await api(ctx, token, 'GET', '/projects')
+    const projectsResp = await api({ ctx, token, method: 'GET', path: '/projects' })
     if (!projectsResp.ok) return result
     const projects = (await projectsResp.json()) as { resources: Array<{ id: string }> }
     let projectId = projects.resources?.[0]?.id
 
     if (!projectId) {
-      const createProject = await api(ctx, token, 'POST', '/projects', {
-        name: 'e2e-probe',
-        description: 'Health probe project',
+      const createProject = await api({
+        ctx,
+        token,
+        method: 'POST',
+        path: '/projects',
+        data: {
+          name: 'e2e-probe',
+          description: 'Health probe project',
+        },
       })
       if (!createProject.ok) return result
       projectId = ((await createProject.json()) as { id: string }).id
       createdProjectId = projectId
     }
 
-    const createResp = await api(ctx, token, 'POST', '/workflows', {
-      name: `__e2e_probe_${Date.now()}`,
-      project_id: projectId,
-      workflow_definition: {
-        schema_version: '2.0.0',
-        name: '__e2e_probe',
-        triggers: [{ id: 't1', type: 'manual_trigger', name: 'Probe trigger', parameters: {} }],
-        nodes: [
-          {
-            id: 'n1',
-            type: 'script',
-            name: 'Probe script',
-            parameters: { language: 'python', code: 'print("probe")' },
-          },
-        ],
-        edges: [{ from: 't1', to: 'n1' }],
+    const createResp = await api({
+      ctx,
+      token,
+      method: 'POST',
+      path: '/workflows',
+      data: {
+        name: `__e2e_probe_${Date.now()}`,
+        project_id: projectId,
+        workflow_definition: {
+          schema_version: '2.0.0',
+          name: '__e2e_probe',
+          triggers: [{ id: 't1', type: 'manual_trigger', name: 'Probe trigger', parameters: {} }],
+          nodes: [
+            {
+              id: 'n1',
+              type: 'script',
+              name: 'Probe script',
+              parameters: { language: 'python', code: 'print("probe")' },
+            },
+          ],
+          edges: [{ from: 't1', to: 'n1' }],
+        },
       },
     })
     if (!createResp.ok) return result
@@ -127,9 +145,15 @@ async function probeExecutionEngine(
     const workflowId = workflow.id
 
     try {
-      await api(ctx, token, 'POST', `/workflows/${workflowId}/versions/${workflow.current_version}/publish`, {})
+      await api({
+        ctx,
+        token,
+        method: 'POST',
+        path: `/workflows/${workflowId}/versions/${workflow.current_version}/publish`,
+        data: {},
+      })
 
-      const runResp = await api(ctx, token, 'POST', `/workflows/${workflowId}/run`, {})
+      const runResp = await api({ ctx, token, method: 'POST', path: `/workflows/${workflowId}/run`, data: {} })
       if (!runResp.ok) {
         // API explicitly rejected the run request — engine is positively down
         result.executionEngineDown = true
@@ -145,7 +169,7 @@ async function probeExecutionEngine(
       let finalStatus = 'pending'
       for (let i = 0; i < 30; i++) {
         await sleep(2000)
-        const statusResp = await api(ctx, token, 'GET', `/executions/${executionId}`)
+        const statusResp = await api({ ctx, token, method: 'GET', path: `/executions/${executionId}` })
         if (!statusResp.ok) return result
         const exec = (await statusResp.json()) as { status: string }
         finalStatus = exec.status
@@ -157,13 +181,13 @@ async function probeExecutionEngine(
         result.temporalWorkerDown = true
       }
     } finally {
-      await api(ctx, token, 'DELETE', `/workflows/${workflowId}`).catch(() => {})
+      await api({ ctx, token, method: 'DELETE', path: `/workflows/${workflowId}` }).catch(() => {})
     }
   } catch {
     // Network/unexpected error — inconclusive, leave fail-open defaults
   } finally {
     if (createdProjectId) {
-      await api(ctx, token, 'DELETE', `/projects/${createdProjectId}`).catch(() => {})
+      await api({ ctx, token, method: 'DELETE', path: `/projects/${createdProjectId}` }).catch(() => {})
     }
   }
 

@@ -283,11 +283,11 @@ test.describe('V2 Workflow Schema Migration', () => {
     const workflowName = buildUniqueName('v2-comprehensive')
 
     // Create workflow via API with all 9 v2 node types
-    const { id: workflowId } = await createWorkflowViaApi(
+    const { id: workflowId } = await createWorkflowViaApi({
       app,
-      workflowName,
-      [{ id: 'trigger_1', type: 'manual_trigger', name: 'Start workflow', parameters: {} }],
-      [
+      name: workflowName,
+      triggers: [{ id: 'trigger_1', type: 'manual_trigger', name: 'Start workflow', parameters: {} }],
+      nodes: [
         {
           id: 'node_1',
           type: 'script',
@@ -313,7 +313,7 @@ test.describe('V2 Workflow Schema Migration', () => {
         },
         { id: 'node_8', type: 'converge', name: 'Merge results', parameters: { strategy: 'all' } },
       ],
-      [
+      edges: [
         { from: 'trigger_1', to: 'node_1' },
         { from: 'node_1', to: 'node_2' },
         { from: 'node_2', to: 'node_3' },
@@ -323,8 +323,8 @@ test.describe('V2 Workflow Schema Migration', () => {
         { from: 'node_6', to: 'node_7', from_port: 'true' },
         { from: 'node_7', to: 'node_7_body', from_port: 'iterate' },
         { from: 'node_7', to: 'node_8', from_port: 'complete' },
-      ]
-    )
+      ],
+    })
 
     try {
       const getResp = await apiRequest(app, 'get', `/workflows/${workflowId}`)

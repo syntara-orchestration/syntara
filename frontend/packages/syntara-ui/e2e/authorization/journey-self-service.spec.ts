@@ -75,7 +75,12 @@ test.describe('Self-service delegation journey', () => {
       const teamLead = await createUserApi(app, `lead-${suffix}`)
       createdUserIds.push(teamLead.id)
 
-      await assignProjectRoleApi(app, project.id, teamLead.id, delegationRole)
+      await assignProjectRoleApi({
+        page: app,
+        projectId: project.id,
+        userId: teamLead.id,
+        roleName: delegationRole,
+      })
 
       // 4. Admin verifies setup in UI
       await loginViaUI(app, 'admin', adminPassword)
@@ -109,7 +114,13 @@ test.describe('Self-service delegation journey', () => {
 
       // 7. Team lead assigns project-user to new hire — refresh token
       teamLeadToken = await loginAsUserApi(app, teamLead.username)
-      const assignment = await assignProjectRoleApi(app, project.id, newHire.id, 'project-user', teamLeadToken)
+      const assignment = await assignProjectRoleApi({
+        page: app,
+        projectId: project.id,
+        userId: newHire.id,
+        roleName: 'project-user',
+        token: teamLeadToken,
+      })
 
       // 8. New hire logs in and sees the workflow
       const newHireToken = await loginAsUserApi(app, newHire.username)
