@@ -31,7 +31,7 @@ describe('useProjectDetailPermissions', () => {
     vi.clearAllMocks()
   })
 
-  it('returns canReadAssignments true when granted for the project', async () => {
+  it('returns canReadWorkflows and canReadAssignments true when granted for the project', async () => {
     vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
 
     const { result } = renderHook(() => useProjectDetailPermissions('proj-1'), {
@@ -42,14 +42,22 @@ describe('useProjectDetailPermissions', () => {
       expect(result.current.isLoading).toBe(false)
     })
 
+    expect(result.current.canReadWorkflows).toBe(true)
     expect(result.current.canReadAssignments).toBe(true)
+    expect(accessFetchClient.POST).toHaveBeenCalledWith('/authz/can_i', {
+      body: { action: 'read', resource_type: 'workflow', resource_project: 'proj-1' },
+    })
     expect(accessFetchClient.POST).toHaveBeenCalledWith('/authz/can_i', {
       body: { action: 'read', resource_type: 'role-assignment', resource_project: 'proj-1' },
     })
   })
 
-  it('returns canReadAssignments false when denied', async () => {
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: false } })
+  it('returns canReadWorkflows false when denied', async () => {
+    vi.mocked(accessFetchClient.POST).mockImplementation((_path, opts) => {
+      const body = (opts as { body?: { resource_type?: string } }).body
+      const allowed = body?.resource_type !== 'workflow'
+      return Promise.resolve({ data: { allowed } })
+    })
 
     const { result } = renderHook(() => useProjectDetailPermissions('proj-1'), {
       wrapper: createWrapper(),
@@ -59,6 +67,26 @@ describe('useProjectDetailPermissions', () => {
       expect(result.current.isLoading).toBe(false)
     })
 
+    expect(result.current.canReadWorkflows).toBe(false)
+    expect(result.current.canReadAssignments).toBe(true)
+  })
+
+  it('returns canReadAssignments false when denied', async () => {
+    vi.mocked(accessFetchClient.POST).mockImplementation((_path, opts) => {
+      const body = (opts as { body?: { resource_type?: string } }).body
+      const allowed = body?.resource_type !== 'role-assignment'
+      return Promise.resolve({ data: { allowed } })
+    })
+
+    const { result } = renderHook(() => useProjectDetailPermissions('proj-1'), {
+      wrapper: createWrapper(),
+    })
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
+
+    expect(result.current.canReadWorkflows).toBe(true)
     expect(result.current.canReadAssignments).toBe(false)
   })
 
@@ -69,6 +97,7 @@ describe('useProjectDetailPermissions', () => {
       wrapper: createWrapper(),
     })
 
+    expect(result.current.canReadWorkflows).toBe(false)
     expect(result.current.canReadAssignments).toBe(false)
     expect(result.current.isLoading).toBe(true)
   })
