@@ -1,8 +1,9 @@
 """Unit tests for the shared user reference resolver."""
 
+import logging
 from types import SimpleNamespace
 from typing import ClassVar
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
@@ -117,6 +118,23 @@ class TestResolve:
         await UserReferenceResolver(mock_session).resolve([obj])
         assert obj.created_by is None
         assert obj.updated_by is None
+
+    @pytest.mark.asyncio
+    async def test_lookup_failure_is_logged_as_error_and_counted(
+        self, mock_session: MagicMock, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Dropped attribution must be distinguishable from "no creator recorded"."""
+        mock_session.exec = AsyncMock(side_effect=SQLAlchemyError("db down"))
+        obj = SimpleNamespace(created_by=uuid4(), updated_by=None)
+        recorder = MagicMock()
+        with (
+            patch("syntara.metrics.dependencies.get_metrics_recorder", return_value=recorder),
+            caplog.at_level(logging.ERROR, logger="syntara.core.services.user_reference_resolution"),
+        ):
+            await UserReferenceResolver(mock_session).resolve([obj])
+        assert any(r.levelno == logging.ERROR for r in caplog.records)
+        recorder.record.assert_called_once()
+        assert recorder.record.call_args.kwargs["labels"]["error_type"] == "user_reference_resolution"
 
     @pytest.mark.asyncio
     async def test_resolves_only_declared_fields(self, mock_session: MagicMock) -> None:
