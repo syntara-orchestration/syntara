@@ -61,6 +61,21 @@ class ResolvedPrincipal(NamedTuple):
     type: UserReferenceType
 
 
+def _record_resolution_failure() -> None:
+    """Count a failed principal lookup in ``orchestrator_errors_total`` (fire-and-forget)."""
+    try:
+        from syntara.metrics.dependencies import get_metrics_recorder  # noqa: PLC0415
+        from syntara.metrics.types import MetricType  # noqa: PLC0415
+
+        get_metrics_recorder().record(
+            MetricType.ERROR,
+            1,
+            labels={"error_type": "user_reference_resolution", "interface": "api"},
+        )
+    except Exception:  # noqa: BLE001
+        logger.debug("user_reference_metrics_recording_failed", exc_info=True)
+
+
 def user_reference_fields(obj: object) -> tuple[str, ...]:
     """Return the fields of *obj* that carry a user reference.
 
@@ -201,12 +216,15 @@ class UserReferenceResolver:
                 .where(Principal.id.in_(principal_ids))  # type: ignore[attr-defined]
             )
             result = await self.session.exec(stmt)
-        except (SQLAlchemyError, OSError):
-            logger.warning(
+        except (SQLAlchemyError, OSError) as exc:
+            # Degrading to null must stay distinguishable from "no creator recorded":
+            # log at ERROR with the traceback and count it so operators can alert on it.
+            logger.exception(
                 "Failed to resolve user references",
                 principal_count=len(principal_ids),
-                exc_info=True,
+                error_type=type(exc).__name__,
             )
+            _record_resolution_failure()
             return None
         return {row[0]: _resolve_principal(*row) for row in result}
 
