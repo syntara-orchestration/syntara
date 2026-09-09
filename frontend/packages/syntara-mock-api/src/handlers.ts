@@ -78,7 +78,7 @@ type MockVersionRecord = {
   change_description: string
   status: string
   name: string | null
-  created_by: { id: string; name: string }
+  created_by: { id: string; name: string; type: 'user' | 'service_account' | 'service' | 'system' | 'deleted_user' }
   created_at: string
   updated_at: string
   deleted_at: null
@@ -89,8 +89,12 @@ const MOCK_VERSION_CREATED_BY = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
 const MOCK_VERSION_CREATED_BY_USERNAME = 'demo'
 
 /** Workflow and version created_by/updated_by are both UserReference objects. */
-const MOCK_WORKFLOW_USER_REF = { id: MOCK_VERSION_CREATED_BY, name: 'user-1' }
-const MOCK_VERSION_USER_REF = { id: MOCK_VERSION_CREATED_BY, name: MOCK_VERSION_CREATED_BY_USERNAME }
+const MOCK_WORKFLOW_USER_REF = { id: MOCK_VERSION_CREATED_BY, name: 'user-1', type: 'user' as const }
+const MOCK_VERSION_USER_REF = {
+  id: MOCK_VERSION_CREATED_BY,
+  name: MOCK_VERSION_CREATED_BY_USERNAME,
+  type: 'user' as const,
+}
 
 /** Creates a 409 WORKFLOW_VERSION_CONFLICT response for save/publish mock handlers. */
 function workflowVersionConflictResponse(
@@ -589,7 +593,7 @@ export const handlers = [
       enabled_model_count: enabledModelCount,
       created_at: now,
       updated_at: now,
-      created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1' },
+      created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1', type: 'user' as const },
       updated_by: null,
       deleted_at: null,
       deleted_by: null,
@@ -1147,7 +1151,7 @@ export const handlers = [
     mutableWorkflow.is_enabled = body.is_enabled ?? workflow.is_enabled
     mutableWorkflow.labels = body.labels ?? workflow.labels
     mutableWorkflow.updated_at = now
-    mutableWorkflow.updated_by = 'user-1'
+    mutableWorkflow.updated_by = MOCK_WORKFLOW_USER_REF
     mutableWorkflow.current_version = nextVersion
     // Tags live only in workflow.labels (above). Keep existing definition when PATCH omits workflow_definition (e.g. details-only edit).
     const nextDefinition = body.workflow_definition ?? workflow.version?.workflow_definition
@@ -2038,7 +2042,7 @@ export const handlers = [
     // Check if already decided (409 conflict)
     const approvalData = approval as unknown as {
       status?: string
-      decided_by?: { id: string; name: string } | null
+      decided_by?: { id: string; name: string; type: 'user' } | null
       decided_at?: string | null
       decision_notes?: string | null
       updatedAt?: string
@@ -2066,6 +2070,7 @@ export const handlers = [
     approvalData.decided_by = {
       id: '770e8400-e29b-41d4-a716-446655440001',
       name: 'Current User',
+      type: 'user',
     }
     approvalData.updatedAt = decidedNow
     ;(approval as { updated_at: string }).updated_at = decidedNow
@@ -2092,7 +2097,7 @@ export const handlers = [
       )
     }
 
-    const mockUser = { id: '770e8400-e29b-41d4-a716-446655440001', name: 'Current User' }
+    const mockUser = { id: '770e8400-e29b-41d4-a716-446655440001', name: 'Current User', type: 'user' as const }
     const now = new Date().toISOString()
 
     const results = body.decisions.map((decision) => {
@@ -2111,7 +2116,7 @@ export const handlers = [
 
       const data = approval as unknown as {
         status?: string
-        decided_by?: { id: string; name: string } | null
+        decided_by?: { id: string; name: string; type: 'user' } | null
         decided_at?: string | null
         decision_notes?: string | null
         updatedAt?: string
@@ -2535,8 +2540,8 @@ export const handlers = [
       },
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      created_by: { id: 'u-004', name: 'admin' },
-      updated_by: { id: 'u-004', name: 'admin' },
+      created_by: { id: 'u-004', name: 'admin', type: 'user' as const },
+      updated_by: { id: 'u-004', name: 'admin', type: 'user' as const },
     }
 
     identityProviders.push(provider)
@@ -3014,11 +3019,7 @@ export const handlers = [
     const createdByContains = url.searchParams.get('created_by_name[contains]')
     if (createdByContains) {
       const searchTerm = createdByContains.toLowerCase()
-      resources = resources.filter((g) => {
-        if (!g.created_by) return false
-        const creatorName = typeof g.created_by === 'string' ? g.created_by : g.created_by.name
-        return creatorName.toLowerCase().includes(searchTerm)
-      })
+      resources = resources.filter((g) => userReferenceName(g.created_by).toLowerCase().includes(searchTerm))
     }
 
     if (sort) {
@@ -3104,7 +3105,7 @@ export const handlers = [
       name: body.name ?? '',
       description: body.description ?? null,
       is_builtin: false,
-      created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'demo' },
+      created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'demo', type: 'user' as const },
       created_at: now,
       updated_at: now,
       source: 'local',
@@ -3465,7 +3466,7 @@ export const handlers = [
       enabled: true,
       created_at: now,
       updated_at: now,
-      created_by: { id: '550e8400-e29b-41d4-a716-446655440001', name: 'user-001' },
+      created_by: { id: '550e8400-e29b-41d4-a716-446655440001', name: 'user-001', type: 'user' as const },
       labels: {},
       deleted_at: null,
       deleted_by: null,
@@ -5088,7 +5089,7 @@ export const handlers = [
       project_id: body.project_id,
       project_name,
       last_authenticated_at: null,
-      created_by: { id: 'u-001', name: 'alice' },
+      created_by: { id: 'u-001', name: 'alice', type: 'user' as const },
       updated_by: null,
       created_at: mockDate.now,
       updated_at: mockDate.now,
@@ -5110,7 +5111,7 @@ export const handlers = [
     const body = (await request.json()) as { name?: string; description?: string | null } | null
     if (body?.name !== undefined) sa.name = body.name
     if (body?.description !== undefined) sa.description = body.description
-    sa.updated_by = { id: 'u-001', name: 'alice' }
+    sa.updated_by = { id: 'u-001', name: 'alice', type: 'user' as const }
     sa.updated_at = mockDate.now
     return HttpResponse.json(sa)
   }),
@@ -5193,7 +5194,7 @@ export const handlers = [
       grace_period_seconds: 3600,
       expires_at: body?.expires_at ?? defaultExpiry,
       last_used_at: null,
-      created_by: { id: 'u-001', name: 'alice' },
+      created_by: { id: 'u-001', name: 'alice', type: 'user' as const },
       updated_by: null,
       created_at: mockDate.now,
       updated_at: mockDate.now,
@@ -5231,7 +5232,7 @@ export const handlers = [
       const gracePeriodSeconds = body?.grace_period_seconds ?? 0
 
       cred.updated_at = mockDate.now
-      cred.updated_by = { id: 'u-001', name: 'alice' }
+      cred.updated_by = { id: 'u-001', name: 'alice', type: 'user' as const }
       cred.grace_period_seconds = gracePeriodSeconds
       cred.old_secret_valid_until =
         gracePeriodSeconds > 0 ? new Date(Date.now() + gracePeriodSeconds * 1000).toISOString() : null

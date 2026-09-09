@@ -6,6 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "tsx src/index.ts",
+    "test": "vitest run",
+    "vitest": "vitest run",
     "lint": "eslint src/resources/ src/utils/",
     "podman:build": "podman build --platform linux/amd64,linux/arm64 --tag syntara-mock-api -f Containerfile ../..",
     "podman:run": "podman run --rm -p 3000:3000 syntara-mock-api"
@@ -23,6 +25,7 @@
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^25.6.0",
     "eslint": "^10.9.0",
-    "typescript-eslint": "^8.61.0"
+    "typescript-eslint": "^8.61.0",
+    "vitest": "^4.1.10"
   }
 }
