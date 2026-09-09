@@ -22,6 +22,11 @@ from syntara.core.models.secret import EncryptedSecret, Secret
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
 from syntara.files.models import FileMetadata
+from syntara.forms.models.form_prompt import FormPrompt
+from syntara.forms.models.form_prompt_responders import (
+    FormPromptResponderGroup,
+    FormPromptResponderUser,
+)
 from syntara.identity_providers.models.identity_provider import IdentityProvider
 from syntara.identity_providers.models.idp_group_mapping import IdpGroupMappingEntry
 from syntara.integrations.models.integration import Integration, IntegrationProjectAssignment
@@ -58,6 +63,9 @@ ALL_MODELS = [
     TokenUsageRecord,
     FileMetadata,
     ApprovalRequest,
+    FormPrompt,
+    FormPromptResponderUser,
+    FormPromptResponderGroup,
     IdentityProvider,
     IdpGroupMappingEntry,
     Integration,
