@@ -269,7 +269,7 @@ export default function registerWebhookNode() {
       },
       (data, onSuccess, onError) => {
         try {
-          const trigger = createEventTrigger('webhook', data.eventType)
+          const trigger = createEventTrigger({ id: 'webhook', source: 'webhook', eventType: data.eventType })
 
           if (trigger) {
             useWorkflowStore.getState().addTrigger(trigger)

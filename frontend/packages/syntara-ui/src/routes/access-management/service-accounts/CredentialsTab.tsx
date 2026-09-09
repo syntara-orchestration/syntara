@@ -359,7 +359,13 @@ export function CredentialsTab({
   const atLimit = totalCredentials >= maxCredentials
   const createDisabledTooltip = getCreateDisabledTooltip(permissions, serviceAccountName, maxCredentials)
 
-  useCursorReset(credentials.length, hasActiveFilters, cursor, query.isFetching, resetPagination)
+  useCursorReset({
+    itemCount: credentials.length,
+    hasActiveFilters,
+    cursor,
+    isFetching: query.isFetching,
+    resetPagination,
+  })
 
   const actions = useCredentialActions(serviceAccountId, query.refetch, disableDialog.open)
 

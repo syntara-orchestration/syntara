@@ -56,7 +56,7 @@ describe('Builder Workflow Store Helpers', () => {
   describe('createEventTrigger', () => {
     it('creates event trigger without filter', async () => {
       const { createEventTrigger } = await import('../../stores/useWorkflowStore')
-      const trigger = createEventTrigger('test-trigger-6', 'github', 'push')
+      const trigger = createEventTrigger({ id: 'test-trigger-6', source: 'github', eventType: 'push' })
 
       expect(trigger.id).toBe('test-trigger-6')
       expect(trigger.type).toBe('event')
@@ -67,7 +67,12 @@ describe('Builder Workflow Store Helpers', () => {
 
     it('creates event trigger with filter', async () => {
       const { createEventTrigger } = await import('../../stores/useWorkflowStore')
-      const trigger = createEventTrigger('test-trigger-7', 'github', 'push', { branch: 'main' })
+      const trigger = createEventTrigger({
+        id: 'test-trigger-7',
+        source: 'github',
+        eventType: 'push',
+        filter: { branch: 'main' },
+      })
 
       expect(trigger.id).toBe('test-trigger-7')
       expect(trigger.type).toBe('event')
