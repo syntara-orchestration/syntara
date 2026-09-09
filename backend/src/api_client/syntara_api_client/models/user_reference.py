@@ -7,6 +7,8 @@ from uuid import UUID
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..models.user_reference_type import UserReferenceType
+
 T = TypeVar("T", bound="UserReference")
 
 
@@ -22,10 +24,16 @@ class UserReference:
             name (str): Principal's current display name, resolved when the response is built. Not a username: for a user
                 this is their first and last name, falling back to the username when both are blank; for a service account it is
                 the account name; for an internal service it is derived from the certificate CN.
+            type_ (UserReferenceType): Kind of principal a UserReference points at.
+
+                Only ``user`` references have a user detail page. ``deleted_user`` and
+                ``deleted_service_account`` mark principals that were hard-deleted but are
+                still recorded as the actor.
     """
 
     id: UUID
     name: str
+    type_: UserReferenceType
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -33,12 +41,15 @@ class UserReference:
 
         name = self.name
 
+        type_ = self.type_.value
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
             {
                 "id": id,
                 "name": name,
+                "type": type_,
             }
         )
 
@@ -51,9 +62,12 @@ class UserReference:
 
         name = d.pop("name")
 
+        type_ = UserReferenceType(d.pop("type"))
+
         user_reference = cls(
             id=id,
             name=name,
+            type_=type_,
         )
 
         user_reference.additional_properties = d
