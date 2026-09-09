@@ -20,7 +20,7 @@ scheduler-wakeup-poc-faults:
 	PYTHONPATH=. uv run pytest -v tests -m faults --adapter=$(ADAPTER) --recovery=$(RECOVERY)
 
 scheduler-wakeup-poc-bench:
-	PYTHONPATH=. uv run python -m scheduler_wakeup_poc.benchmark --adapter=$(ADAPTER) --profile=$(PROFILE)
+	./run-poc.sh $(ADAPTER)
 
 scheduler-wakeup-poc-report:
 	PYTHONPATH=. uv run --project ../.. --no-sync python -m scheduler_wakeup_poc.report

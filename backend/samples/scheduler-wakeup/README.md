@@ -17,6 +17,18 @@ make scheduler-wakeup-poc-test ADAPTER=jetstream RECOVERY=on
 make scheduler-wakeup-poc-test ADAPTER=temporal RECOVERY=on
 ```
 
+Run a reproducible five-run, 100-task measurement with one command:
+
+```bash
+./run-poc.sh http
+./run-poc.sh jetstream
+./run-poc.sh temporal
+```
+
+The JetStream command starts and removes an ephemeral local NATS container.
+Set `POC_NATS_URL` to reuse an already-running broker. Results are saved under
+`artifacts/<adapter>-<id>/metrics.json`.
+
 The checked-in harness supplies the shared execution/outbox store, fencing and
 lease recovery, the three adapters, and isolated functional tests. `poc-migrate`
 runs the local reference path. The remaining commands keep the interfaces in the

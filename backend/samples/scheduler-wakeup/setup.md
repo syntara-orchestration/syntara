@@ -19,6 +19,37 @@ The first JetStream command installs the optional `nats-py` extra. The sample
 uses its own virtual environment and lockfile, so it does not modify the main
 backend lockfile.
 
+## Recommended: one-command runner
+
+Use `run-poc.sh` for the reproducible PoC measurement. It runs five batches of
+100 tasks by default, prints the raw timing results, and writes
+`artifacts/<adapter>-<id>/metrics.json`.
+
+```bash
+cd backend/samples/scheduler-wakeup
+./run-poc.sh http
+./run-poc.sh jetstream
+./run-poc.sh temporal
+```
+
+The HTTP run uses the FastAPI ASGI endpoint in-process. The JetStream run
+starts and removes an ephemeral `nats:2.10-alpine` Docker container. To use a
+pre-existing NATS server instead, set `POC_NATS_URL`:
+
+```bash
+POC_NATS_URL=nats://my-nats.example:4222 ./run-poc.sh jetstream
+```
+
+The Temporal run starts the Temporal Python SDK local test server and a local
+worker, then stops both. Extra options are forwarded to the runner:
+
+```bash
+./run-poc.sh http --count 500 --runs 10
+```
+
+The detailed commands below remain useful when debugging a single adapter or
+changing its measurement environment.
+
 ## First, verify correctness
 
 Run the transport-independent correctness suite with recovery enabled:
