@@ -25,7 +25,13 @@ test('multi-approval navigation: Previous/Next buttons and deep-link counter', a
     { from: `approval_${i + 1}`, to: `post_${i + 1}`, from_port: 'approved' },
   ])
 
-  const { id: workflowId, versionNumber } = await createWorkflowViaApi(app, workflowName, triggers, nodes, edges)
+  const { id: workflowId, versionNumber } = await createWorkflowViaApi({
+    app,
+    name: workflowName,
+    triggers,
+    nodes,
+    edges,
+  })
 
   try {
     await publishWorkflowViaApi(app, workflowId, versionNumber)
