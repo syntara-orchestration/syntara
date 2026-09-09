@@ -212,11 +212,11 @@ test.describe('Execution Details — Activity Filtering', { tag: '@pr-check' }, 
       const page = await browser.newPage()
       try {
         const workflowName = buildUniqueName('e2e-act-filter')
-        ;({ id: workflowId } = await createWorkflowViaApi(
-          page,
-          workflowName,
-          [{ id: 'trigger_manual', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
-          [
+        ;({ id: workflowId } = await createWorkflowViaApi({
+          app: page,
+          name: workflowName,
+          triggers: [{ id: 'trigger_manual', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
+          nodes: [
             {
               id: 'check_temperature',
               type: 'script',
@@ -236,12 +236,12 @@ test.describe('Execution Details — Activity Filtering', { tag: '@pr-check' }, 
               parameters: { language: 'python', code: 'print("hot")' },
             },
           ],
-          [
+          edges: [
             { from: 'trigger_manual', to: 'check_temperature' },
             { from: 'check_temperature', to: 'temperature_routing' },
             { from: 'temperature_routing', to: 'hot_weather', from_port: 'true' },
-          ]
-        ))
+          ],
+        }))
         executionId = await createExecutionViaApi(page, workflowId)
       } finally {
         await page.close()
@@ -377,11 +377,11 @@ test.describe('Execution Details — Activity Filtering', { tag: '@pr-check' }, 
       const page = await browser.newPage()
       try {
         const workflowName = buildUniqueName('e2e-act-status')
-        ;({ id: workflowId } = await createWorkflowViaApi(
-          page,
-          workflowName,
-          [{ id: 'trigger_manual', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
-          [
+        ;({ id: workflowId } = await createWorkflowViaApi({
+          app: page,
+          name: workflowName,
+          triggers: [{ id: 'trigger_manual', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
+          nodes: [
             {
               id: 'staging_tests',
               type: 'script',
@@ -395,11 +395,11 @@ test.describe('Execution Details — Activity Filtering', { tag: '@pr-check' }, 
               parameters: { approvers: [], message: 'Approve deployment' },
             },
           ],
-          [
+          edges: [
             { from: 'trigger_manual', to: 'staging_tests' },
             { from: 'staging_tests', to: 'approval_gate' },
-          ]
-        ))
+          ],
+        }))
         executionId = await createExecutionViaApi(page, workflowId)
       } finally {
         await page.close()
