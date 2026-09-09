@@ -117,7 +117,6 @@ class GroupsService(BaseService):
             .join(User, User.id == user_groups.c.user_id)  # type: ignore[arg-type]
             .where(
                 user_groups.c.group_id.in_(group_ids),
-                User.deleted_at.is_(None),  # type: ignore[union-attr]
             )
             .group_by(user_groups.c.group_id)
         )
@@ -244,7 +243,6 @@ class GroupsService(BaseService):
         result = await self.session.exec(
             select(Group).filter(
                 Group.id == group_id,  # type: ignore[arg-type]
-                Group.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
         group = result.one_or_none()
@@ -300,7 +298,11 @@ class GroupsService(BaseService):
         return group
 
     async def delete_group(self, group_id: UUID) -> None:
-        """Soft delete a group.
+        """Hard-delete a group and clean up linked resources.
+
+        Deletes non-builtin role assignments for the group, then removes
+        the group row. DB CASCADE handles: user_groups, user_idp_groups,
+        idp_group_mapping_entries, approval_approver_groups.
 
         Args:
             group_id: UUID of group to delete
@@ -313,7 +315,17 @@ class GroupsService(BaseService):
         group = await self.get_group_by_id(group_id)
         if group.is_builtin:
             raise BuiltinGroupDeleteError(group.name)
-        group.soft_delete(self.user.id)
+
+        from syntara.authz.models.assignments import RoleAssignment  # noqa: PLC0415
+
+        await self.session.exec(
+            delete(RoleAssignment).where(
+                col(RoleAssignment.group_id) == group_id,
+                col(RoleAssignment.is_builtin) == False,  # noqa: E712
+            )
+        )
+
+        await self.session.delete(group)
         await self.session.commit()
 
     # ========================================================================
@@ -454,7 +466,6 @@ class GroupsService(BaseService):
             .join(user_groups, User.id == user_groups.c.user_id)  # type: ignore[arg-type]
             .where(
                 user_groups.c.group_id == group_id,
-                User.deleted_at.is_(None),  # type: ignore[union-attr]
             )
             .order_by(col(User.username))
         )
@@ -541,7 +552,6 @@ class GroupsService(BaseService):
             .join(user_groups, Group.id == user_groups.c.group_id)  # type: ignore[arg-type]
             .where(
                 user_groups.c.user_id == user_id,
-                Group.deleted_at.is_(None),  # type: ignore[union-attr]
             )
             .order_by(col(Group.name))
         )
@@ -687,7 +697,6 @@ class GroupsService(BaseService):
         auth_result = await self.session.exec(
             select(Group.id).where(
                 Group.name == AUTHENTICATED_GROUP_NAME,
-                Group.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
         auth_group_id = auth_result.first()
@@ -701,7 +710,6 @@ class GroupsService(BaseService):
         result = await self.session.exec(
             select(Group.id).filter(
                 col(Group.id).in_(desired),
-                Group.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
         found = set(result.all())
@@ -823,7 +831,6 @@ class GroupsService(BaseService):
             .where(
                 user_groups.c.group_id == group_id,
                 col(User.id) != exclude_user_id,
-                User.deleted_at.is_(None),  # type: ignore[union-attr]
                 col(User.is_enabled) == True,  # noqa: E712
             )
         )
