@@ -56,13 +56,13 @@ function SelectCheckboxCell({
   isCheckingApproverList: boolean
   onSelectRow?: (approval: ApprovalWithDetails, checked: boolean) => void
 }>) {
-  const showDisabledWithTooltip = !isApprovalSelectable(
+  const showDisabledWithTooltip = !isApprovalSelectable({
     approval,
     canDecideOnThisApproval,
     canDecideBasedOnApproverList,
     isLoadingPermissions,
-    isCheckingApproverList
-  )
+    isCheckingApproverList,
+  })
 
   const disabledTooltip = getDisabledTooltip(approval.status ?? '', canDecideOnThisApproval)
 
