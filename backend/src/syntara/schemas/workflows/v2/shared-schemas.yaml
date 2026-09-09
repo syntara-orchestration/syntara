@@ -196,7 +196,7 @@ components:
             - type: 'null'
           description: Validation findings from the last save operation. Only included in create/update responses; use has_validation_issues for the durable indicator.
         version:
-          $ref: './openapi.yaml#/components/schemas/WorkflowVersionRead'
+          $ref: '#/components/schemas/WorkflowVersionRead'
           description: Current active version details
 
     PublishWorkflowVersionResponse:
@@ -292,13 +292,90 @@ components:
             - type: 'null'
           description: Validation findings from the last save operation. Only included in create/update responses; use has_validation_issues for the durable indicator.
         version:
-          $ref: './openapi.yaml#/components/schemas/WorkflowVersionRead'
+          $ref: '#/components/schemas/WorkflowVersionRead'
           description: Current active version details
         warning:
           type: string
           default: ''
           title: Warning
           description: Non-fatal warning from the publish operation
+
+    WorkflowVersionRead:
+      type: object
+      title: WorkflowVersionRead
+      description: Schema for workflow version response (GET /workflows/{id}/versions/{version}).
+      required:
+        - id
+        - workflow_id
+        - version
+        - schema_version
+        - workflow_definition
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        workflow_id:
+          type: string
+          format: uuid
+          title: Workflow Id
+        version:
+          type: integer
+          title: Version
+        schema_version:
+          type: string
+          title: Schema Version
+        workflow_definition:
+          additionalProperties: true
+          type: object
+          title: Workflow Definition
+        change_description:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Change Description
+        status:
+          type: string
+          default: draft
+          enum:
+            - draft
+            - published
+            - previously_published
+          title: Status
+        last_published_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          title: Last Published At
+        last_unpublished_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          title: Last Unpublished At
+        name:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Name
+        created_by:
+          anyOf:
+            - $ref: ../../base/shared-resources.openapi.yaml#/components/schemas/UserReference
+            - type: 'null'
+          description: User who created the version
+          readOnly: true
+          title: Created By
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
 
     ActivityData:
       type: object
