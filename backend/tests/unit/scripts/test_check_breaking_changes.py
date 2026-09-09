@@ -494,6 +494,175 @@ class TestDetectDynamicMapConstraintTightening:
         assert is_breaking is True
         assert findings
 
+    def test_true_to_false_additional_properties_is_breaking(self):
+        base = textwrap.dedent("""\
+            openapi: "3.1.0"
+            info:
+              title: Test
+              version: 1.0.0
+            components:
+              schemas:
+                WorkflowRead:
+                  type: object
+                  properties:
+                    labels:
+                      type: object
+                      additionalProperties: true
+        """)
+        head = textwrap.dedent("""\
+            openapi: "3.1.0"
+            info:
+              title: Test
+              version: 1.1.0
+            components:
+              schemas:
+                WorkflowRead:
+                  type: object
+                  properties:
+                    labels:
+                      type: object
+                      additionalProperties: false
+        """)
+        is_breaking, findings = check_breaking.detect_dynamic_map_constraint_tightening(base, head)
+        assert is_breaking is True
+        assert findings
+
+    def test_omitted_to_false_additional_properties_is_breaking(self):
+        base = textwrap.dedent("""\
+            openapi: "3.1.0"
+            info:
+              title: Test
+              version: 1.0.0
+            components:
+              schemas:
+                WorkflowRead:
+                  type: object
+                  properties:
+                    labels:
+                      type: object
+        """)
+        head = textwrap.dedent("""\
+            openapi: "3.1.0"
+            info:
+              title: Test
+              version: 1.1.0
+            components:
+              schemas:
+                WorkflowRead:
+                  type: object
+                  properties:
+                    labels:
+                      type: object
+                      additionalProperties: false
+        """)
+        is_breaking, findings = check_breaking.detect_dynamic_map_constraint_tightening(base, head)
+        assert is_breaking is True
+        assert findings
+
+    def test_typed_to_false_additional_properties_is_breaking(self):
+        base = textwrap.dedent("""\
+            openapi: "3.1.0"
+            info:
+              title: Test
+              version: 1.0.0
+            components:
+              schemas:
+                WorkflowRead:
+                  type: object
+                  properties:
+                    labels:
+                      type: object
+                      additionalProperties:
+                        type: string
+        """)
+        head = textwrap.dedent("""\
+            openapi: "3.1.0"
+            info:
+              title: Test
+              version: 1.1.0
+            components:
+              schemas:
+                WorkflowRead:
+                  type: object
+                  properties:
+                    labels:
+                      type: object
+                      additionalProperties: false
+        """)
+        is_breaking, findings = check_breaking.detect_dynamic_map_constraint_tightening(base, head)
+        assert is_breaking is True
+        assert findings
+
+    def test_integer_to_number_type_change_is_not_breaking(self):
+        base = textwrap.dedent("""\
+            openapi: "3.1.0"
+            info:
+              title: Test
+              version: 1.0.0
+            components:
+              schemas:
+                WorkflowRead:
+                  type: object
+                  properties:
+                    labels:
+                      type: object
+                      additionalProperties:
+                        type: integer
+        """)
+        head = textwrap.dedent("""\
+            openapi: "3.1.0"
+            info:
+              title: Test
+              version: 1.0.1
+            components:
+              schemas:
+                WorkflowRead:
+                  type: object
+                  properties:
+                    labels:
+                      type: object
+                      additionalProperties:
+                        type: number
+        """)
+        is_breaking, findings = check_breaking.detect_dynamic_map_constraint_tightening(base, head)
+        assert is_breaking is False
+        assert findings == []
+
+    def test_number_to_integer_type_change_is_breaking(self):
+        base = textwrap.dedent("""\
+            openapi: "3.1.0"
+            info:
+              title: Test
+              version: 1.0.0
+            components:
+              schemas:
+                WorkflowRead:
+                  type: object
+                  properties:
+                    labels:
+                      type: object
+                      additionalProperties:
+                        type: number
+        """)
+        head = textwrap.dedent("""\
+            openapi: "3.1.0"
+            info:
+              title: Test
+              version: 1.1.0
+            components:
+              schemas:
+                WorkflowRead:
+                  type: object
+                  properties:
+                    labels:
+                      type: object
+                      additionalProperties:
+                        type: integer
+        """)
+        is_breaking, findings = check_breaking.detect_dynamic_map_constraint_tightening(base, head)
+        assert is_breaking is True
+        assert findings
+
     def test_unrelated_additional_properties_ignored(self):
         base = textwrap.dedent("""\
             openapi: "3.1.0"

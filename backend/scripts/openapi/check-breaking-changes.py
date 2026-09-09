@@ -86,16 +86,11 @@ _SCHEMA_CONSTRAINT_KEYS = frozenset(
         "type",
         "maxLength",
         "minLength",
-        "pattern",
-        "format",
         "enum",
         "maxItems",
         "minItems",
         "maximum",
         "minimum",
-        "exclusiveMaximum",
-        "exclusiveMinimum",
-        "multipleOf",
     }
 )
 
@@ -395,6 +390,16 @@ def _resolve_object_map_branch(schema: dict[str, Any]) -> dict[str, Any] | None:
     return None
 
 
+def _json_type_tightened(base_type: str, head_type: str) -> bool:
+    """Return True when head's JSON Schema type is narrower than base's."""
+    if base_type == head_type:
+        return False
+    # integer accepts a subset of number; widening integer -> number is not tightening.
+    if base_type == "integer" and head_type == "number":
+        return False
+    return True
+
+
 def _json_schema_strictly_narrows(base: dict[str, Any], head: dict[str, Any]) -> bool:
     """Check whether head adds or tightens JSON Schema constraints relative to base."""
     if base == head:
@@ -406,8 +411,12 @@ def _json_schema_strictly_narrows(base: dict[str, Any], head: dict[str, Any]) ->
         head_val = head[key]
         if base_val == head_val:
             continue
-        if key not in base or key == "type":
+        if key not in base:
             return True
+        if key == "type" and isinstance(base_val, str) and isinstance(head_val, str):
+            if _json_type_tightened(base_val, head_val):
+                return True
+            continue
         if (
             key == "enum"
             and isinstance(base_val, list)
@@ -426,6 +435,9 @@ def _additional_properties_tightened(base_obj: dict[str, Any], head_obj: dict[st
     """Check whether head narrows dynamic-map value constraints relative to base."""
     base_ap = base_obj.get("additionalProperties")
     head_ap = head_obj.get("additionalProperties")
+
+    if head_ap is False and base_ap is not False:
+        return True
 
     if base_ap is True or base_ap is None:
         return isinstance(head_ap, dict)
