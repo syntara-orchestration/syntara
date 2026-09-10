@@ -19,9 +19,13 @@ Type Safety: Values used with original types (no repr() conversion)
 """
 
 import ast
+import json
 import re
+import subprocess
+import sys
 from typing import Any, Literal
 
+from syntara.workflows.json_schema_validation import has_dangerous_pattern
 from syntara.workflows.workflow_engine.expression_resolver import (
     _SAFE_COMPARISON_OPS,
     _compare,
@@ -35,9 +39,25 @@ MAX_VARIABLE_NAME_LENGTH = 500  # Max characters in ${variable.path.name}
 MAX_AST_DEPTH = 50  # Max nesting depth (e.g., nested parentheses)
 MAX_AST_NODES = 500  # Max total AST nodes
 MAX_REGEX_PATTERN_LENGTH = 500  # Max characters in a ``matches`` regex
+MAX_REGEX_SUBJECT_LENGTH = 10_000  # Max characters in the ``matches`` subject string
+REGEX_MATCH_TIMEOUT_SECONDS = 1.0  # Wall-clock cap around ``re.search`` (subprocess)
 ERROR_PATTERN_DISPLAY_LENGTH = 80  # Truncate user regex patterns in error messages
+_REGEX_WORKER_INVALID_EXIT = 2
+# Isolated interpreter (``-S``) so startup stays well under the timeout.
+# Pattern and subject travel on stdin JSON — never on argv — to avoid injection.
+_REGEX_SEARCH_WORKER = """\
+import json, re, sys
+payload = json.load(sys.stdin)
+try:
+    found = re.search(payload["pattern"], payload["value"]) is not None
+except re.error:
+    sys.stdout.write(json.dumps({"error": "invalid"}))
+    raise SystemExit(2)
+sys.stdout.write(json.dumps({"found": found}))
+"""
 _EMPTYABLE_TYPES = (str, list, dict)
 _EXISTS_PATH_NODE_TYPES = (ast.Constant, ast.Name, ast.Attribute, ast.Subscript, ast.UnaryOp)
+_MIN_QUOTED_LITERAL_LENGTH = 2
 
 # Allowlist of safe AST node types — reject everything else up front
 # Makes security contract self-documenting and ensures newly introduced AST types
@@ -158,7 +178,6 @@ def _translate_custom_operators(expression: str) -> str:
         (rf"({_OPERAND_PATTERN})\s+lengthEqualTo\s+({_VALUE_PATTERN})", r"(len(\1) == \2)"),
         (rf"({_OPERAND_PATTERN})\s+startsWith\s+({_VALUE_PATTERN})", r"(\1.startswith(\2))"),
         (rf"({_OPERAND_PATTERN})\s+endsWith\s+({_VALUE_PATTERN})", r"(\1.endswith(\2))"),
-        (rf"({_OPERAND_PATTERN})\s+matches\s+({_VALUE_PATTERN})", r"(__re_search__(\2, \1))"),
         (rf"({_OPERAND_PATTERN})\s+contains\s+({_VALUE_PATTERN})", r"(\2 in \1)"),
         (rf"({_OPERAND_PATTERN})\s+isEmpty\b", r"(__is_empty__(\1))"),
     )
@@ -166,10 +185,31 @@ def _translate_custom_operators(expression: str) -> str:
     for pat, repl in replacements:
         translated = _qa_sub(pat, repl, translated)
 
+    # ``matches`` requires a quoted string literal as the pattern. Templates
+    # such as ``${trigger.regex}`` would otherwise become the regex itself,
+    # letting webhook payloads supply untrusted patterns to ``re.search``.
+    def _matches_repl_qa(m: re.Match[str]) -> str:
+        if m.group(1) is not None:
+            return m.group(0)
+        operand = m.group(2)
+        value = m.group(3)
+        if not _is_quoted_string_literal(value):
+            msg = "matches pattern must be a string literal"
+            raise ValueError(msg)
+        return f"(__re_search__({value}, {operand}))"
+
+    matches_combined = rf"({_QUOTED_SPAN})|({_OPERAND_PATTERN})\s+matches\s+({_VALUE_PATTERN})"
+    translated = re.sub(matches_combined, _matches_repl_qa, translated)
+
     # ``exists`` uses a callable replacement; wire it to the quote-aware variant
     # so the operand group index matches the combined pattern (group 2, not 1).
     exists_combined = rf"({_QUOTED_SPAN})|({_OPERAND_PATTERN})\s+exists\b"
     return re.sub(exists_combined, _exists_repl_qa, translated)
+
+
+def _is_quoted_string_literal(value: str) -> bool:
+    """Return True when ``value`` is a single- or double-quoted string token."""
+    return len(value) >= _MIN_QUOTED_LITERAL_LENGTH and value[0] in {'"', "'"} and value[0] == value[-1]
 
 
 def _path_exists(path: str, namespace: dict[str, Any]) -> bool:
@@ -436,6 +476,9 @@ def _eval_allowed_function(
         msg = f"Unsupported function: {func_name}"
         raise TypeError(msg)
 
+    if func_name == "__re_search__":
+        _require_literal_matches_pattern(arg_nodes)
+
     args = [_eval_node(arg, namespace) for arg in arg_nodes]
     if func_name == "len":
         return _eval_len(args)
@@ -485,6 +528,21 @@ def _eval_exists_call(args: list[object], namespace: dict[str, Any]) -> bool:
     return _path_exists(args[0], namespace)
 
 
+def _require_literal_matches_pattern(arg_nodes: list[ast.expr]) -> None:
+    """Reject ``matches`` / ``__re_search__`` patterns that are not string constants.
+
+    Translation already requires a quoted literal. This AST check also covers
+    raw-mode ``__re_search__(namespace_value, subject)`` so a webhook field
+    cannot become the regex.
+    """
+    if not arg_nodes:
+        return
+    pattern_node = arg_nodes[0]
+    if not isinstance(pattern_node, ast.Constant) or not isinstance(pattern_node.value, str):
+        msg = "matches pattern must be a string literal"
+        raise ValueError(msg)  # noqa: TRY004 - provenance check, not a Python type mismatch
+
+
 def _eval_re_search(args: list[object]) -> bool:
     """Evaluate ``__re_search__(pattern, value)`` for the ``matches`` operator."""
     expected_args = 2
@@ -501,15 +559,49 @@ def _eval_re_search(args: list[object]) -> bool:
     if not isinstance(value, str):
         msg = f"matches() requires a string value, got {type(value).__name__}"
         raise TypeError(msg)
-    # stdlib ``re.search`` has no timeout. MAX_REGEX_PATTERN_LENGTH bounds input
-    # size but does not prevent catastrophic backtracking (ReDoS), e.g. ``(a+)+$``.
-    # A thread timeout cannot interrupt CPython's C regex engine. Follow-up: evaluate
-    # google-re2 for linear-time matching if ``matches`` is exposed to untrusted patterns.
+    if len(value) > MAX_REGEX_SUBJECT_LENGTH:
+        msg = f"matches subject too long ({len(value)} chars, max {MAX_REGEX_SUBJECT_LENGTH})"
+        raise ValueError(msg)
+    if has_dangerous_pattern(pattern):
+        msg = (
+            f"Potentially unsafe matches pattern: {_truncate_for_error(pattern)}. "
+            "Nested quantifiers (e.g. '(a+)+') can cause catastrophic "
+            "backtracking and are not allowed."
+        )
+        raise ValueError(msg)
+    return _re_search_bounded(pattern, value)
+
+
+def _re_search_bounded(pattern: str, value: str) -> bool:
+    """Run ``re.search`` in a subprocess so catastrophic backtracking can be killed.
+
+    CPython's regex engine is C code: a thread timeout cannot interrupt it.
+    A child process can be killed when ``REGEX_MATCH_TIMEOUT_SECONDS`` elapses.
+    """
     try:
-        return re.search(pattern, value) is not None
-    except re.error as exc:
-        msg = f"Invalid matches pattern: {_truncate_for_error(pattern)}"
+        completed = subprocess.run(  # noqa: S603 - argv is a fixed interpreter + worker
+            [sys.executable, "-S", "-c", _REGEX_SEARCH_WORKER],
+            input=json.dumps({"pattern": pattern, "value": value}),
+            capture_output=True,
+            text=True,
+            timeout=REGEX_MATCH_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        msg = "matches timed out"
         raise ValueError(msg) from exc
+    if completed.returncode == _REGEX_WORKER_INVALID_EXIT:
+        msg = f"Invalid matches pattern: {_truncate_for_error(pattern)}"
+        raise ValueError(msg)
+    if completed.returncode != 0:
+        msg = "matches failed"
+        raise ValueError(msg)
+    try:
+        payload = json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        msg = "matches failed"
+        raise ValueError(msg) from exc
+    return bool(payload.get("found"))
 
 
 def _eval_allowed_method(
