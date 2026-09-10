@@ -405,17 +405,21 @@ test.describe('Approval Workflow Operations', () => {
       await expect(approveButton).toBeVisible({ timeout: 15_000 })
       await approveButton.click()
 
-      // Step 4: Verify approval notes field appears
-      const approvalNotesInput = app.getByPlaceholder(/explain.*reason.*approving|optional.*note/i)
+      // Step 4: Verify approval notes field appears (Reject is replaced by Undo)
+      const approvalNotesInput = app.getByRole('textbox', { name: 'Approval notes' })
       await expect(approvalNotesInput).toBeVisible({ timeout: 10_000 })
+      await expect(app.getByRole('button', { name: 'Reject', exact: true })).not.toBeVisible()
 
-      // Step 5: Click "Reject" to undo the approve decision
+      // Step 5: Undo the approve selection, then choose Reject
+      await app.getByRole('button', { name: 'Undo decision' }).click()
+      await expect(approvalNotesInput).not.toBeVisible()
+
       const rejectButton = app.getByRole('button', { name: 'Reject', exact: true })
       await expect(rejectButton).toBeVisible({ timeout: 10_000 })
       await rejectButton.click()
 
       // Step 6: Verify rejection notes field appears (approval notes replaced)
-      const rejectionNotesInput = app.getByPlaceholder(/explain.*reason.*rejecting|optional.*note/i)
+      const rejectionNotesInput = app.getByRole('textbox', { name: 'Rejection notes' })
       await expect(rejectionNotesInput).toBeVisible({ timeout: 10_000 })
 
       // Step 7: Verify approval notes field is no longer visible
