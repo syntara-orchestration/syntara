@@ -7,6 +7,7 @@ import pytest
 from syntara.workflows.workflow_engine.unified_eval import (
     MAX_AST_DEPTH,
     MAX_REGEX_PATTERN_LENGTH,
+    MAX_REGEX_SUBJECT_LENGTH,
     safe_eval_with_namespace,
 )
 
@@ -750,6 +751,17 @@ class TestVisualBuilderOperators:
     def test_exists_nested_subscript_path(self) -> None:
         assert safe_eval_with_namespace("${data[0].name} exists", {"data": [{"name": "svc"}]}) is True
         assert safe_eval_with_namespace("${data[0].name} exists", {"data": [{}]}) is False
+        assert safe_eval_with_namespace("${data[0].name} exists", {"data": []}) is False
+        assert safe_eval_with_namespace("${data[0].name} exists", {"data": [{"other": "value"}]}) is False
+        assert safe_eval_with_namespace("${data[0].name} exists", {"data": [{"name": None}]}) is False
+        users = {
+            "users": [
+                {"id": 1, "profile": {"name": "Alice"}},
+                {"id": 2, "profile": {"name": "Bob"}},
+            ]
+        }
+        assert safe_eval_with_namespace("${users[0].profile.name} exists", users) is True
+        assert safe_eval_with_namespace("${users[2].profile.name} exists", users) is False
 
     def test_exists_negative_index(self) -> None:
         assert safe_eval_with_namespace("${items[-1]} exists", {"items": [1, 2]}) is True
@@ -902,13 +914,53 @@ class TestVisualBuilderOperators:
             safe_eval_with_namespace("funcs[0]()", {"funcs": [len]})
 
     def test_matches_pattern_must_be_string(self) -> None:
-        with pytest.raises(TypeError, match="matches pattern must be a string"):
+        with pytest.raises(ValueError, match="matches pattern must be a string literal"):
             safe_eval_with_namespace("${code} matches 123", {"code": "123"})
 
     def test_matches_pattern_too_long(self) -> None:
         long_pattern = "a" * (MAX_REGEX_PATTERN_LENGTH + 1)
         with pytest.raises(ValueError, match="matches pattern too long"):
             safe_eval_with_namespace(f'${{code}} matches "{long_pattern}"', {"code": "a"})
+
+    def test_matches_rejects_templated_pattern(self) -> None:
+        with pytest.raises(ValueError, match="matches pattern must be a string literal"):
+            safe_eval_with_namespace("${code} matches ${pattern}", {"code": "ABC", "pattern": "^[A-Z]{3}$"})
+
+    def test_re_search_rejects_namespace_pattern(self) -> None:
+        with pytest.raises(ValueError, match="matches pattern must be a string literal"):
+            safe_eval_with_namespace("__re_search__(pattern, code)", {"pattern": "^A", "code": "A"})
+
+    def test_matches_rejects_nested_quantifier(self) -> None:
+        with pytest.raises(ValueError, match="Potentially unsafe matches pattern"):
+            safe_eval_with_namespace('${code} matches "(a+)+$"', {"code": "aaa"})
+
+    def test_matches_subject_too_long(self) -> None:
+        too_long = "a" * (MAX_REGEX_SUBJECT_LENGTH + 1)
+        with pytest.raises(ValueError, match="matches subject too long"):
+            safe_eval_with_namespace('${code} matches "a"', {"code": too_long})
+
+    def test_matches_timeout_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import subprocess
+
+        def _timeout(*_args: object, **_kwargs: object) -> None:
+            raise subprocess.TimeoutExpired(cmd="python", timeout=1)
+
+        monkeypatch.setattr(
+            "syntara.workflows.workflow_engine.unified_eval.subprocess.run",
+            _timeout,
+        )
+        with pytest.raises(ValueError, match="matches timed out"):
+            safe_eval_with_namespace('${code} matches "a"', {"code": "a"})
+
+    def test_matches_worker_failure_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from types import SimpleNamespace
+
+        monkeypatch.setattr(
+            "syntara.workflows.workflow_engine.unified_eval.subprocess.run",
+            lambda *_args, **_kwargs: SimpleNamespace(returncode=1, stdout=""),
+        )
+        with pytest.raises(ValueError, match="matches failed"):
+            safe_eval_with_namespace('${code} matches "a"', {"code": "a"})
 
     def test_re_search_wrong_arity(self) -> None:
         with pytest.raises(ValueError, match="__re_search__ takes exactly two arguments"):
