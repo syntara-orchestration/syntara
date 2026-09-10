@@ -330,6 +330,18 @@ async function createProjectViaDropdown(page: Page) {
   await expect(dialog).not.toBeVisible({ timeout: 15_000 })
 }
 
+/**
+ * Every step of the UI cleanup fallback is bounded by this.
+ *
+ * `playwright.config.ts` deliberately sets no `actionTimeout`, so an action with
+ * no explicit timeout of its own waits out the entire test timeout. That is
+ * survivable inside a test body, where the wait is for something the test needs;
+ * it is not survivable here, because this helper runs from a `finally` and a
+ * stalled cleanup turns a test whose assertions all passed into a bare
+ * "Test timeout of 120000ms exceeded" with no failing assertion to explain it.
+ */
+export const CLEANUP_ACTION_TIMEOUT = 10_000
+
 /** Delete a workflow by unique name. Prefers API delete; falls back to UI kebab flow. */
 export async function deleteWorkflow(page: Page, workflowName: string) {
   if (page.isClosed()) return
@@ -341,27 +353,38 @@ export async function deleteWorkflow(page: Page, workflowName: string) {
     }
 
     await page.goto(toAppUrl('/workflows'))
-    await page.getByPlaceholder('Filter by name').fill(workflowName)
-    await page.getByRole('button', { name: 'Apply filter' }).click()
+
+    // Reaching here means the API lookup found nothing, which is the common case
+    // rather than the exotic one: the workflow was renamed during the test, or an
+    // earlier cleanup call already deleted it. The list is then often empty, and
+    // an empty project renders the "No workflows yet" empty state — which has no
+    // filter toolbar at all. Waiting for the filter to appear is therefore the
+    // step that must be bounded, not just the interactions that follow it.
+    const nameFilter = page.getByPlaceholder('Filter by name')
+    await nameFilter.waitFor({ state: 'visible', timeout: CLEANUP_ACTION_TIMEOUT })
+    await nameFilter.fill(workflowName, { timeout: CLEANUP_ACTION_TIMEOUT })
+    await page.getByRole('button', { name: 'Apply filter' }).click({ timeout: CLEANUP_ACTION_TIMEOUT })
 
     const table = page.getByRole('grid', { name: 'Workflows table' })
     const row = table.getByRole('row', { name: new RegExp(workflowName) })
     const isVisible = await expect(row.first())
-      .toBeVisible()
+      .toBeVisible({ timeout: CLEANUP_ACTION_TIMEOUT })
       .then(() => true)
       .catch(() => false)
     if (isVisible) {
       await row
         .getByRole('button', { name: /Actions|Kebab toggle/i })
         .first()
-        .click({ force: true })
-      await page.getByRole('menuitem', { name: 'Delete workflow' }).click()
-      await page.getByRole('checkbox', { name: /I understand this workflow/i }).check()
-      await page.getByRole('button', { name: 'Delete' }).click()
+        .click({ force: true, timeout: CLEANUP_ACTION_TIMEOUT })
+      await page.getByRole('menuitem', { name: 'Delete workflow' }).click({ timeout: CLEANUP_ACTION_TIMEOUT })
+      await page
+        .getByRole('checkbox', { name: /I understand this workflow/i })
+        .check({ timeout: CLEANUP_ACTION_TIMEOUT })
+      await page.getByRole('button', { name: 'Delete' }).click({ timeout: CLEANUP_ACTION_TIMEOUT })
 
       // Wait for deletion to complete - delete dialog should close
       const deleteDialog = page.getByRole('dialog', { name: /Delete workflow/i })
-      await expect(deleteDialog).not.toBeVisible({ timeout: 10000 })
+      await expect(deleteDialog).not.toBeVisible({ timeout: CLEANUP_ACTION_TIMEOUT })
     }
   } catch {
     // Best-effort cleanup — don't fail the test
