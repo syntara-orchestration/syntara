@@ -8,7 +8,7 @@ resolution-markers = [
 
 [manifest]
 constraints = [
-    { name = "aiohttp", specifier = ">=3.14.1" },
+    { name = "aiohttp", specifier = ">=3.14.2" },
     { name = "attrs", specifier = "<26" },
     { name = "confection", specifier = "<1" },
     { name = "joserfc", specifier = ">=1.6.8" },
