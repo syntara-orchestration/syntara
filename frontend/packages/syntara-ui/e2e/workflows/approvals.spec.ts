@@ -409,13 +409,16 @@ test.describe('Approval Workflow Operations', () => {
       const approvalNotesInput = app.getByPlaceholder(/explain.*reason.*approving|optional.*note/i)
       await expect(approvalNotesInput).toBeVisible({ timeout: 10_000 })
 
-      // Step 5: Click "Reject" to undo the approve decision
+      // Step 5: Undo approve selection, then choose Reject (Approve/Reject buttons are
+      // replaced by the notes form after the first click — use Undo decision to switch)
+      await app.getByRole('button', { name: 'Undo decision' }).click()
+      await expect(app.getByRole('button', { name: 'Approve', exact: true })).toBeVisible()
       const rejectButton = app.getByRole('button', { name: 'Reject', exact: true })
       await expect(rejectButton).toBeVisible({ timeout: 10_000 })
       await rejectButton.click()
 
       // Step 6: Verify rejection notes field appears (approval notes replaced)
-      const rejectionNotesInput = app.getByPlaceholder(/explain.*reason.*rejecting|optional.*note/i)
+      const rejectionNotesInput = app.getByPlaceholder(/explain.*reason.*rejecting/i)
       await expect(rejectionNotesInput).toBeVisible({ timeout: 10_000 })
 
       // Step 7: Verify approval notes field is no longer visible
@@ -562,6 +565,8 @@ test.describe('Approval Workflow Operations', () => {
       await addApprovalNodeWithBranch(app, approvalNodeName)
       await app.getByRole('button', { name: 'Save workflow' }).click()
       await runWorkflowFromBuilder(app)
+      const executionId = app.url().match(/\/executions\/([^/?]+)/)?.[1]
+      expect(executionId, 'Could not parse execution ID after run').toBeTruthy()
 
       // Wait for execution to pause at the approval node (requires Temporal)
       const reachedApproval = await waitForExecutionPaused(app)
@@ -591,9 +596,16 @@ test.describe('Approval Workflow Operations', () => {
       await app.getByPlaceholder(/Explain the reason for approving/i).fill('Approved in E2E test')
       await app.getByRole('button', { name: 'Submit decision' }).click()
 
-      // Verify approval was submitted and execution resumes
+      // Verify approval was submitted, then poll API for terminal state (UI live updates can lag)
       await expect(app.getByText('Approval submitted')).toBeVisible({ timeout: 15_000 })
-      await expect(app.getByText('Completed')).toBeVisible({ timeout: 30_000 })
+      await pollExecutionStatus(app, executionId!, ['completed', 'completed_with_errors', 'failed', 'cancelled'], {
+        timeout: 60_000,
+      })
+      await app.reload()
+      await expect(app.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 })
+      await expect(app.getByTestId('execution-status-badge').getByText('Completed')).toBeVisible({
+        timeout: 30_000,
+      })
     } finally {
       if (workflowId) {
         await apiRequest(app, 'delete', `/workflows/${workflowId}`).catch(() => {})
