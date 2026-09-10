@@ -1,0 +1,15 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-script-executor-egress
+  namespace: syntara-script-executor-poc
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - script-bash-executor-worker
+          - script-python-executor-worker
+  policyTypes: [Egress]
+  egress: []

@@ -1,0 +1,121 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: readonly-paths
+  namespace: syntara-script-executor-poc
+data:
+  README: Paths mounted from this ConfigMap are intentionally read-only.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: script-bash-executor-worker
+  namespace: syntara-script-executor-poc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: script-bash-executor-worker
+  template:
+    metadata:
+      labels:
+        app: script-bash-executor-worker
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: script-bash-executor
+          image: quay.io/ahetheri/script-bash-executor:dev
+          imagePullPolicy: Always
+          env:
+            - name: SCRIPT_EXECUTOR_KEEP_ALIVE
+              value: "true"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+              ephemeral-storage: 16Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+          volumeMounts:
+            - name: readonly-paths
+              mountPath: /tmp
+              readOnly: true
+            - name: readonly-paths
+              mountPath: /nonexistent
+              readOnly: true
+            - name: readonly-paths
+              mountPath: /dev/shm
+              readOnly: true
+      volumes:
+        - name: readonly-paths
+          configMap:
+            name: readonly-paths
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: script-python-executor-worker
+  namespace: syntara-script-executor-poc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: script-python-executor-worker
+  template:
+    metadata:
+      labels:
+        app: script-python-executor-worker
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: script-python-executor
+          image: quay.io/ahetheri/script-python-executor:dev
+          imagePullPolicy: Always
+          env:
+            - name: SCRIPT_EXECUTOR_KEEP_ALIVE
+              value: "true"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+              ephemeral-storage: 16Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+          volumeMounts:
+            - name: readonly-paths
+              mountPath: /tmp
+              readOnly: true
+            - name: readonly-paths
+              mountPath: /nonexistent
+              readOnly: true
+            - name: readonly-paths
+              mountPath: /dev/shm
+              readOnly: true
+      volumes:
+        - name: readonly-paths
+          configMap:
+            name: readonly-paths
