@@ -85,8 +85,41 @@ export async function publishWorkflowViaApi(
 export async function createBasicWorkflowViaApi(
   app: Page,
   name: string,
-  actionName = 'Script'
+  actionName = 'Script',
+  options?: { projectId?: string }
 ): Promise<{ id: string; name: string; versionNumber: number }> {
+  if (options?.projectId) {
+    const token = await getAuthToken(app)
+    if (!token) throw new Error('createBasicWorkflowViaApi: could not obtain auth token')
+    const resp = await apiRequest(app, 'post', '/workflows', {
+      token,
+      data: {
+        name,
+        project_id: options.projectId,
+        workflow_definition: {
+          schema_version: '2.0.0',
+          name,
+          triggers: [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
+          nodes: [
+            {
+              id: 'action_1',
+              type: 'script',
+              name: actionName,
+              parameters: { language: 'python', code: 'print("hello")' },
+            },
+          ],
+          edges: [{ from: 'trigger_1', to: 'action_1' }],
+        },
+      },
+    })
+    if (!resp.ok()) {
+      const body = await resp.text().catch(() => '(unreadable)')
+      throw new Error(`POST /workflows returned ${resp.status()}: ${body}`)
+    }
+    const body = (await resp.json()) as { id: string; current_version: number }
+    return { id: body.id, name, versionNumber: body.current_version }
+  }
+
   const { id, versionNumber } = await createWorkflowViaApi(
     app,
     name,
