@@ -586,8 +586,8 @@ test.describe('Approval Workflow Operations', () => {
       await expect(app).toHaveURL(/\/executions\/[^?]+\?approval=/)
       await expect(app.getByRole('heading', { name: 'Review Approval' })).toBeVisible({ timeout: 15_000 })
 
-      // Approve with notes
-      await app.getByRole('button', { name: 'Approve' }).click()
+      // Approve with notes (exact: true — side panel can expose multiple Approve buttons)
+      await app.getByRole('button', { name: 'Approve', exact: true }).click()
       await app.getByPlaceholder(/Explain the reason for approving/i).fill('Approved in E2E test')
       await app.getByRole('button', { name: 'Submit decision' }).click()
 
