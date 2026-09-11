@@ -1131,7 +1131,12 @@ class ExecutionService(BaseService):
                 cancel_invocations_for_execution,
             )
 
-            cancelled_invocation_ids = await cancel_invocations_for_execution(self.session, self.user, execution_id)
+            cancelled_invocation_ids = await cancel_invocations_for_execution(
+                self.session,
+                self.user,
+                execution_id,
+                temporal_service=self.temporal_service,
+            )
             # The invocation status is what stops the agent loop; cancelling the
             # builtin workflow that runs it just stops it lingering as RUNNING.
             for invocation_id in cancelled_invocation_ids:

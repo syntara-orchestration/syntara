@@ -117,6 +117,7 @@ async def get_invocation_service_with_temporal(
         current_user,
         session_factory=session_factory,
         execution_service=execution_service,
+        temporal_service=temporal_service,
     )
 
 
@@ -536,7 +537,7 @@ async def cancel_invocation(
         ),
     ],
     request_body: InvocationCancelRequest,
-    service: Annotated[InvocationService, Depends(get_invocation_service)],
+    service: Annotated[InvocationService, Depends(get_invocation_service_with_temporal)],
 ) -> InvocationCancelResponse:
     """Cancel a running or pending invocation.
 

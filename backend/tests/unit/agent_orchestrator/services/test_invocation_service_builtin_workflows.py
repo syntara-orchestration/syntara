@@ -46,7 +46,7 @@ def _execution_service(*, agent_execution_id: object = None) -> Mock:
     conversion_execution = Mock()
     conversion_execution.id = uuid4()
 
-    async def create_execution_by_name(*, workflow_name: str, input_data: dict, project_name: str) -> Mock:
+    async def create_execution_by_name(*, workflow_name: str, input_data: dict[str, object], project_name: str) -> Mock:
         del input_data, project_name
         return conversion_execution if workflow_name == "Document Conversion" else agent_execution
 

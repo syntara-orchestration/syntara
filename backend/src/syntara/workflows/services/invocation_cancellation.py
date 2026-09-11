@@ -9,6 +9,7 @@ Redis cancel signal). The running agent stops via the Redis watcher, with a
 DB status fallback when Redis is unavailable.
 """
 
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import structlog
@@ -21,6 +22,9 @@ from syntara.agent_orchestrator.services.invocation_service import InvocationSer
 from syntara.core.models import User
 from syntara.workflows.models.activity_execution import ActivityExecution
 from syntara.workflows.models.execution import Execution
+
+if TYPE_CHECKING:
+    from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -89,12 +93,17 @@ async def cancel_invocations_for_execution(
     user: User,
     execution_id: UUID,
     reason: str = "Workflow execution cancelled",
+    temporal_service: "TemporalExecutionService | None" = None,
 ) -> list[UUID]:
     """Cancel all active invocations belonging to *execution_id*.
 
     Each invocation is cancelled via ``InvocationService`` so one failure does
     not block the others.  Returns the ids of the successfully cancelled
     invocations, so the caller can follow up on exactly those.
+
+    ``temporal_service`` is forwarded so ``InvocationService`` can also cancel
+    the builtin workflow running each invocation; without it the invocations are
+    still marked CANCELLED but those workflows linger as RUNNING.
     """
     invocations = await find_active_invocations_for_execution(session, execution_id)
     if not invocations:
@@ -110,7 +119,7 @@ async def cancel_invocations_for_execution(
         count=len(invocations),
     )
 
-    service = InvocationService(session, user)
+    service = InvocationService(session, user, temporal_service=temporal_service)
     cancelled: list[UUID] = []
     for invocation in invocations:
         try:
