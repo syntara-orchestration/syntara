@@ -63,6 +63,15 @@ TERMINAL_EXECUTION_STATUSES = frozenset(
     }
 )
 
+# Statuses that represent a node/workflow failure — used to gate the
+# human-readable `error` summary exposed on ExecutionRead and in WS snapshots.
+FAILURE_EXECUTION_STATUSES = frozenset(
+    {
+        ExecutionStatus.FAILED,
+        ExecutionStatus.COMPLETED_WITH_ERRORS,
+    }
+)
+
 
 class Execution(UserOwnedResource, table=True):
     """Execution model representing workflow runtime instances.
@@ -313,6 +322,17 @@ class Execution(UserOwnedResource, table=True):
         return f"<Execution(id={self.id}, workflow_id={self.workflow_id}, status={self.status.value})>"
 
 
+def execution_error_summary(execution: Execution) -> str | None:
+    """Human-readable failure summary for an execution, or None outside failure statuses.
+
+    Single source of truth for the `error` field exposed on ExecutionRead (REST,
+    see ExecutionsConvertResourceMixin.convert_resource) and in WS execution
+    snapshots (see ActivityUpdatePublisher._serialize_execution_snapshot) — both
+    derive it from the same Execution instance and must not duplicate this rule.
+    """
+    return execution.error_details if execution.status in FAILURE_EXECUTION_STATUSES else None
+
+
 # ============================================================================
 # API Request/Response Schemas (Pattern 1: Separate models with table=False)
 # ============================================================================
@@ -443,6 +463,11 @@ class ExecutionRead(SQLModel):
     input_data: dict[str, Any]
     trigger_node_id: str | None = None
     error_details: str | None
+    error: str | None = Field(
+        default=None,
+        description="Human-readable failure summary. Populated whenever status is "
+        "'failed' or 'completed_with_errors'; null otherwise.",
+    )
     labels: dict[str, Any] = Field(default_factory=dict)
     approval_pending: bool = False
     current_activities: list[CurrentActivity] = Field(

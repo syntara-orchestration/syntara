@@ -52,6 +52,8 @@ class ExecutionRead:
             workflow_version_name (None | str | Unset): Name of the executed version, if one was set
             workflow_version_created_at (datetime.datetime | None | Unset): Timestamp when the executed version was created
             trigger_node_id (None | str | Unset):
+            error (None | str | Unset): Human-readable failure summary. Populated whenever status is 'failed' or
+                'completed_with_errors'; null otherwise.
             mode (ExecutionMode | Unset): Execution mode for workflow runs.
             execution_metadata (ExecutionReadExecutionMetadataType0 | None | Unset):
             retried_from_execution_id (None | Unset | UUID):
@@ -85,6 +87,7 @@ class ExecutionRead:
     workflow_version_name: None | str | Unset = UNSET
     workflow_version_created_at: datetime.datetime | None | Unset = UNSET
     trigger_node_id: None | str | Unset = UNSET
+    error: None | str | Unset = UNSET
     mode: ExecutionMode | Unset = UNSET
     execution_metadata: ExecutionReadExecutionMetadataType0 | None | Unset = UNSET
     retried_from_execution_id: None | Unset | UUID = UNSET
@@ -167,6 +170,12 @@ class ExecutionRead:
             trigger_node_id = UNSET
         else:
             trigger_node_id = self.trigger_node_id
+
+        error: None | str | Unset
+        if isinstance(self.error, Unset):
+            error = UNSET
+        else:
+            error = self.error
 
         mode: str | Unset = UNSET
         if not isinstance(self.mode, Unset):
@@ -262,6 +271,8 @@ class ExecutionRead:
             field_dict["workflow_version_created_at"] = workflow_version_created_at
         if trigger_node_id is not UNSET:
             field_dict["trigger_node_id"] = trigger_node_id
+        if error is not UNSET:
+            field_dict["error"] = error
         if mode is not UNSET:
             field_dict["mode"] = mode
         if execution_metadata is not UNSET:
@@ -405,6 +416,15 @@ class ExecutionRead:
 
         trigger_node_id = _parse_trigger_node_id(d.pop("trigger_node_id", UNSET))
 
+        def _parse_error(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        error = _parse_error(d.pop("error", UNSET))
+
         _mode = d.pop("mode", UNSET)
         mode: ExecutionMode | Unset
         if isinstance(_mode, Unset):
@@ -540,6 +560,7 @@ class ExecutionRead:
             workflow_version_name=workflow_version_name,
             workflow_version_created_at=workflow_version_created_at,
             trigger_node_id=trigger_node_id,
+            error=error,
             mode=mode,
             execution_metadata=execution_metadata,
             retried_from_execution_id=retried_from_execution_id,
