@@ -836,6 +836,114 @@ class TestSyncWebhookTriggers:
         assert results[0].webhook_path == "eda-hook"
         assert results[0].trigger_type == NodeType.EDA_TRIGGER
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "parameters",
+        [
+            {"webhook_path": "no-sa-import"},
+            {"webhook_path": "no-sa-import", "authorized_service_account_ids": []},
+        ],
+        ids=["missing", "empty"],
+    )
+    async def test_unpublished_missing_or_empty_sa_ids_creates_disabled_trigger(
+        self, parameters: dict[str, object]
+    ) -> None:
+        """Unpublished sync accepts a webhook with omitted or empty SA ids."""
+        mock_session = AsyncMock(spec=AsyncSession)
+        mock_result = Mock()
+        mock_result.all.return_value = []
+        mock_session.exec = AsyncMock(return_value=mock_result)
+        mock_session.flush = AsyncMock()
+
+        service = _make_service(session=mock_session)
+
+        definition = _make_workflow_definition(
+            triggers=[
+                {
+                    "id": "webhook_trigger_1",
+                    "type": "webhook_trigger",
+                    "parameters": parameters,
+                }
+            ]
+        )
+
+        results = await service.sync_webhook_triggers(uuid4(), definition, is_enabled=False)
+
+        assert len(results) == 1
+        assert results[0].webhook_path == "no-sa-import"
+        assert results[0].is_enabled is False
+        mock_session.add.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_unpublished_missing_sa_ids_creates_disabled_eda_trigger(self) -> None:
+        """Unpublished EDA sync accepts a trigger with only webhook_path."""
+        mock_session = AsyncMock(spec=AsyncSession)
+        mock_result = Mock()
+        mock_result.all.return_value = []
+        mock_session.exec = AsyncMock(return_value=mock_result)
+        mock_session.flush = AsyncMock()
+
+        service = _make_service(session=mock_session)
+
+        definition = _make_workflow_definition(
+            triggers=[
+                {
+                    "id": "eda_trigger_1",
+                    "type": "eda_trigger",
+                    "parameters": {"webhook_path": "no-sa-import"},
+                }
+            ]
+        )
+
+        results = await service.sync_webhook_triggers(
+            uuid4(),
+            definition,
+            is_enabled=False,
+            trigger_type=NodeType.EDA_TRIGGER,
+        )
+
+        assert len(results) == 1
+        assert results[0].webhook_path == "no-sa-import"
+        assert results[0].is_enabled is False
+        assert results[0].trigger_type == NodeType.EDA_TRIGGER
+        mock_session.add.assert_called_once()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "parameters",
+        [
+            {"webhook_path": "no-sa-import"},
+            {"webhook_path": "no-sa-import", "authorized_service_account_ids": []},
+        ],
+        ids=["missing", "empty"],
+    )
+    async def test_enabled_missing_or_empty_sa_ids_syncs_without_error(self, parameters: dict[str, object]) -> None:
+        """Re-syncing a legacy definition with no SA ids on enable must not raise (AAP-92369)."""
+        mock_session = AsyncMock(spec=AsyncSession)
+        mock_result = Mock()
+        mock_result.all.return_value = []
+        mock_session.exec = AsyncMock(return_value=mock_result)
+        mock_session.flush = AsyncMock()
+
+        service = _make_service(session=mock_session)
+
+        definition = _make_workflow_definition(
+            triggers=[
+                {
+                    "id": "webhook_trigger_1",
+                    "type": "webhook_trigger",
+                    "parameters": parameters,
+                }
+            ]
+        )
+
+        results = await service.sync_webhook_triggers(uuid4(), definition)
+
+        assert len(results) == 1
+        assert results[0].webhook_path == "no-sa-import"
+        assert results[0].is_enabled is True
+        mock_session.add.assert_called_once()
+
 
 # ============================================================================
 # delete_triggers_for_workflow
