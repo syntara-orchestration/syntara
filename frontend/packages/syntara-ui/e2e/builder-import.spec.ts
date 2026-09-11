@@ -117,7 +117,7 @@ test.skip('import as new workflow creates a new workflow and navigates', async (
     await dialog.getByRole('button', { name: 'Import' }).click()
     await expect(dialog).not.toBeVisible()
 
-    await expect(app).toHaveURL(/workflow-builder\/.+/)
+    await expect(app).toHaveURL(/workflow-builder\/(?!new)/)
     expect(app.url()).not.toBe(originalUrl)
 
     await expect(app.getByText('Workflow imported')).toBeVisible()

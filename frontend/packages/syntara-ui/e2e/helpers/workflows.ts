@@ -236,6 +236,11 @@ export async function selectFirstProject(page: Page) {
   await expect(page.getByPlaceholder('Select a project')).not.toBeVisible()
 }
 
+/** Escape a literal string for embedding in a RegExp. */
+function escapeForRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 /**
  * Select a project in the builder toolbar.
  * Required for new workflows on the real backend (Save is disabled without a project).
@@ -265,7 +270,11 @@ export async function selectProjectIfRequired(page: Page, projectName?: string) 
   await page.getByRole('option').first().waitFor({ state: 'visible', timeout: 10_000 })
 
   if (projectName) {
-    const option = page.getByRole('option', { name: projectName })
+    // Anchor at the start of the option's accessible name. Each option reads
+    // "<name> <description>", so a plain substring match for `default` also
+    // matches the built-in project's "Default project for ..." description and
+    // resolves to two elements.
+    const option = page.getByRole('option', { name: new RegExp(`^${escapeForRegExp(projectName)}(\\s|$)`) })
     await option.waitFor({ state: 'visible', timeout: 15_000 })
     await option.click()
   } else {

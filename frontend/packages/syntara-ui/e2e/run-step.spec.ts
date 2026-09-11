@@ -18,11 +18,12 @@ import { type Page, test, expect, toAppUrl } from './fixtures'
 import {
   buildUniqueName,
   clickAddConnectedStep,
+  clickSaveAndWait,
   closeNodeEditorPanel,
   createBasicWorkflowViaApi,
   deleteWorkflow,
-  openWorkflowInBuilder,
   fillCodeEditor,
+  openWorkflowInBuilder,
   selectProjectIfRequired,
   triggerLayout,
   waitForUIReady,
@@ -61,8 +62,7 @@ async function createTwoNodeWorkflow(app: Page, workflowName: string) {
   // Save
   await selectProjectIfRequired(app)
   await app.getByPlaceholder('Workflow name').fill(workflowName)
-  await app.getByRole('button', { name: 'Save' }).click()
-  await expect(app).toHaveURL(/workflow-builder\/.+/)
+  await clickSaveAndWait(app)
   await triggerLayout(app)
   await expect(
     app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: 'Second action' })

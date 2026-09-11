@@ -43,10 +43,7 @@ test.describe('Workflows - Create New Workflow', () => {
       await workflowNameInput.clear()
       await workflowNameInput.fill(workflowName)
 
-      await app.getByRole('button', { name: 'Save' }).click()
-
-      await expect(app).toHaveURL(/workflow-builder\/.+/, { timeout: 15000 })
-      await expect(app).not.toHaveURL(/workflow-builder\/new/)
+      await clickSaveAndWait(app)
 
       await app.goto(toAppUrl('/workflows'))
       await expect(app.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
@@ -99,11 +96,7 @@ test.describe('Workflows - Create New Workflow', () => {
       await workflowNameInput.clear()
       await workflowNameInput.fill(customName)
 
-      const saveButton = app.getByRole('button', { name: 'Save' })
-      await expect(saveButton).toBeVisible()
-      await saveButton.click()
-
-      await expect(app).toHaveURL(/workflow-builder\/.+/, { timeout: 15000 })
+      await clickSaveAndWait(app)
       await expect(app.getByPlaceholder('Workflow name')).toHaveValue(customName)
     } finally {
       await deleteWorkflow(app, customName)
@@ -128,10 +121,7 @@ test.describe('Workflows - Create New Workflow', () => {
       const nameInput = app.getByPlaceholder('Workflow name')
       await nameInput.clear()
       await nameInput.fill(workflowName)
-      await app.getByRole('button', { name: 'Save' }).click()
-
-      await expect(app).toHaveURL(/workflow-builder\/.+/, { timeout: 15000 })
-      await expect(app).not.toHaveURL(/workflow-builder\/new/)
+      await clickSaveAndWait(app)
 
       await expect(app.getByPlaceholder('Workflow name')).toHaveValue(workflowName)
 
