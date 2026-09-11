@@ -2,6 +2,7 @@
 
 import asyncio
 import time
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -316,7 +317,7 @@ class TestConditionDoesNotBlockEventLoop:
                 await asyncio.sleep(0.01)
                 ticks += 1
 
-        def _blocking_eval(_expr: str, _ns: dict) -> bool:
+        def _blocking_eval(_expr: str, _ns: dict[str, Any]) -> bool:
             time.sleep(block_seconds)  # simulates the synchronous subprocess in `matches`
             return True
 
@@ -346,7 +347,7 @@ class TestConditionDoesNotBlockEventLoop:
         loop_thread_id = threading.get_ident()  # the test coroutine runs on the loop thread
         seen_thread_ids: list[int] = []
 
-        def _record_thread(_expr: str, _ns: dict) -> bool:
+        def _record_thread(_expr: str, _ns: dict[str, Any]) -> bool:
             seen_thread_ids.append(threading.get_ident())
             return True
 
