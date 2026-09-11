@@ -4,11 +4,17 @@ import { createContext, use, useCallback, useEffect, useMemo, useRef, useState }
 export type DockState = {
   isDockExpanded: boolean
   isDockTextExpanded: boolean
+  isDockExpandableExpanded: boolean
   isMobile: boolean
   dockedToggleRef: React.RefObject<HTMLButtonElement | null>
   mobileToggleRef: React.RefObject<HTMLButtonElement | null>
   onToggleDock: () => void
   onMobileToggle: () => void
+  onNavToggle: (
+    event: React.MouseEvent<HTMLButtonElement>,
+    result: { groupId: number | string; isExpanded: boolean }
+  ) => void
+  onNavSelect: () => void
 }
 
 export const DockStateContext = createContext<DockState | null>(null)
@@ -83,6 +89,7 @@ export function useDockStateProvider(): DockState {
   const [initialDockState] = useState(readInitialDockState)
   const [isDockExpanded, setIsDockExpanded] = useState(initialDockState.isDockExpanded)
   const [isDockTextExpanded, setIsDockTextExpanded] = useState(initialDockState.isDockTextExpanded)
+  const [isDockExpandableExpanded, setIsDockExpandableExpanded] = useState(false)
   const [isMobile, setIsMobile] = useState(initialDockState.isMobile)
   const dockedToggleRef = useRef<HTMLButtonElement>(null)
   const mobileToggleRef = useRef<HTMLButtonElement>(null)
@@ -127,6 +134,30 @@ export function useDockStateProvider(): DockState {
     return () => mq.removeEventListener('change', handler)
   }, [])
 
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if ((!isMobile && !isDockExpandableExpanded) || (isMobile && !isDockExpanded)) return
+      const docked = document.getElementById('docked-masthead')
+      const mobileTog = document.getElementById('mobile-masthead-toggle')
+      if (docked && !docked.contains(event.target as Node) && !mobileTog?.contains(event.target as Node)) {
+        setIsDockExpandableExpanded(false)
+        setIsDockExpanded(false)
+      }
+    }
+    const handleKeydown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && (isDockExpandableExpanded || isDockExpanded)) {
+        setIsDockExpandableExpanded(false)
+        setIsDockExpanded(false)
+      }
+    }
+    window.addEventListener('click', handleClickOutside)
+    window.addEventListener('keydown', handleKeydown)
+    return () => {
+      window.removeEventListener('click', handleClickOutside)
+      window.removeEventListener('keydown', handleKeydown)
+    }
+  }, [isDockExpandableExpanded, isDockExpanded, isMobile])
+
   const onMobileToggle = useCallback(() => {
     setIsDockExpanded((prev) => !prev)
     focusTimerRef.current = setTimeout(() => dockedToggleRef.current?.focus(), FOCUS_TRANSFER_DELAY_MS)
@@ -139,20 +170,50 @@ export function useDockStateProvider(): DockState {
         return !prev
       })
     } else {
-      setIsDockTextExpanded((prev) => !prev)
+      const nextTextExpanded = !isDockTextExpanded
+      setIsDockTextExpanded(nextTextExpanded)
+      if (!nextTextExpanded) setIsDockExpandableExpanded(false)
+      if (isDockExpandableExpanded) {
+        setIsDockExpandableExpanded(false)
+        setIsDockTextExpanded(false)
+      }
     }
-  }, [isMobile])
+  }, [isMobile, isDockTextExpanded, isDockExpandableExpanded])
+
+  const onNavToggle: DockState['onNavToggle'] = useCallback(() => {
+    if (!isMobile && !isDockExpandableExpanded && !isDockTextExpanded) {
+      setIsDockExpandableExpanded(true)
+    }
+  }, [isMobile, isDockExpandableExpanded, isDockTextExpanded])
+
+  const onNavSelect = useCallback(() => {
+    setIsDockExpandableExpanded(false)
+    setIsDockTextExpanded(false)
+    setIsDockExpanded(false)
+  }, [])
 
   return useMemo(
     () => ({
       isDockExpanded,
       isDockTextExpanded,
+      isDockExpandableExpanded,
       isMobile,
       dockedToggleRef,
       mobileToggleRef,
       onToggleDock,
       onMobileToggle,
+      onNavToggle,
+      onNavSelect,
     }),
-    [isDockExpanded, isDockTextExpanded, isMobile, onToggleDock, onMobileToggle]
+    [
+      isDockExpanded,
+      isDockTextExpanded,
+      isDockExpandableExpanded,
+      isMobile,
+      onToggleDock,
+      onMobileToggle,
+      onNavToggle,
+      onNavSelect,
+    ]
   )
 }
