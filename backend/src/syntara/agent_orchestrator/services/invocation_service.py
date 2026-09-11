@@ -119,7 +119,7 @@ class InvocationService(BaseService):
 
     async def _start_builtin_workflows(
         self,
-        invocation_id: UUID,
+        invocation: Invocation,
         file_ids: list[str] | None = None,
     ) -> None:
         """Start built-in workflows for this invocation.
@@ -128,13 +128,19 @@ class InvocationService(BaseService):
         document conversion workflows. Workflows are started via Temporal
         (non-blocking RPC) so this returns quickly.
 
+        The agent execution's id is recorded on ``invocation.agent_execution_id``
+        so cancellation can reach its Temporal workflow by primary key instead
+        of scanning ``executions.input_data``.
+
         Args:
-            invocation_id: Invocation ID to execute
+            invocation: Invocation to execute
             file_ids: Optional file UUIDs to convert
 
         """
         if not self.execution_service:
             return
+
+        invocation_id = invocation.id
 
         from syntara.workflows.constants import (  # noqa: PLC0415
             BUILTIN_PROJECT_NAME,
@@ -155,8 +161,12 @@ class InvocationService(BaseService):
                     logger.warning("Builtin workflow 'Document Conversion' not found, skipping")
 
         try:
-            await self.execution_service.create_execution_by_name(
+            agent_execution = await self.execution_service.create_execution_by_name(
                 workflow_name=BUILTIN_WORKFLOW_AGENT_EXECUTION,
+                # invocation_id stays in input_data: it is the builtin workflow's
+                # trigger binding (${trigger.invocation_id}), which the worker
+                # needs.  agent_execution_id below is the reverse link, used for
+                # cancellation.
                 input_data={
                     "invocation_id": str(invocation_id),
                     "actor_id": str(self.user.id),
@@ -167,6 +177,25 @@ class InvocationService(BaseService):
             )
         except WorkflowNotFoundError as exc:
             raise BuiltinWorkflowMissingError(BUILTIN_WORKFLOW_AGENT_EXECUTION) from exc
+
+        # Link the invocation to the execution now running it.  Dirty-attribute
+        # flush emits an UPDATE of this column alone, so a concurrent worker
+        # write of `status` cannot be clobbered.
+        #
+        # Best-effort: the invocation is already committed and the Temporal
+        # workflow is already started, so raising here would 500 a request whose
+        # side effects have all happened.  A NULL link only means the cancel
+        # path cannot reach the Temporal workflow for this invocation.
+        try:
+            invocation.agent_execution_id = agent_execution.id
+            await self.session.commit()
+        except Exception:
+            await self.session.rollback()
+            logger.exception(
+                "Failed to link invocation to agent execution",
+                invocation_id=invocation_id,
+                agent_execution_id=agent_execution.id,
+            )
 
     async def create_invocation(
         self,
@@ -304,7 +333,7 @@ class InvocationService(BaseService):
             raise
 
         # Start builtin workflows AFTER successful commit
-        await self._start_builtin_workflows(invocation_id, file_ids=new_file_ids or None)
+        await self._start_builtin_workflows(invocation, file_ids=new_file_ids or None)
 
         return invocation
 
