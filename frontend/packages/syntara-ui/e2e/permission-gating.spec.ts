@@ -18,6 +18,7 @@
  */
 
 import { type Page, test, expect, toAppUrl, appBaseUrl } from './fixtures'
+import { openRowKebab } from './helpers/patternfly'
 import { buildUniqueName } from './helpers/workflows'
 import {
   apiRequest,
@@ -367,8 +368,10 @@ test.describe('Permission gating — Workflow actions', () => {
         .getByRole('grid', { name: 'Workflows table' })
         .getByRole('row', { name: new RegExp(workflow.name) })
       await expect(workflowRow).toBeVisible({ timeout: 15_000 })
-      const kebab = workflowRow.getByRole('button', { name: /Actions|Kebab toggle/i })
-      await kebab.click({ force: true })
+      // A forced click skips every actionability wait, so it lands even while the
+      // list query is replacing the row — the handler never runs, the menu stays
+      // shut, and each assertion below fails on a missing `menuitem`.
+      await openRowKebab(workflowRow, /Edit workflow/i)
 
       await expect(viewerApp.getByRole('menuitem', { name: /Edit workflow/i })).toHaveAttribute('aria-disabled', 'true')
       await expect(viewerApp.getByRole('menuitem', { name: /Run published version/i })).toHaveAttribute(
@@ -413,8 +416,10 @@ test.describe('Permission gating — Workflow actions', () => {
         .getByRole('grid', { name: 'Workflows table' })
         .getByRole('row', { name: new RegExp(workflow.name) })
       await expect(workflowRow).toBeVisible({ timeout: 15_000 })
-      const kebab = workflowRow.getByRole('button', { name: /Actions|Kebab toggle/i })
-      await kebab.click({ force: true })
+      // A forced click skips every actionability wait, so it lands even while the
+      // list query is replacing the row — the handler never runs, the menu stays
+      // shut, and each assertion below fails on a missing `menuitem`.
+      await openRowKebab(workflowRow, /Edit workflow/i)
 
       await expect(auditorApp.getByRole('menuitem', { name: /Edit workflow/i })).toHaveAttribute(
         'aria-disabled',
@@ -718,8 +723,10 @@ test.describe('Permission gating — Credential actions', () => {
         .getByRole('grid', { name: 'Credentials table' })
         .getByRole('row', { name: new RegExp(credential.name) })
       await expect(credRow).toBeVisible({ timeout: 15_000 })
-      const kebab = credRow.getByRole('button', { name: /Actions|Kebab toggle/i })
-      await kebab.click({ force: true })
+      // A forced click skips every actionability wait, so it lands even while the
+      // list query is replacing the row — the handler never runs, the menu stays
+      // shut, and each assertion below fails on a missing `menuitem`.
+      await openRowKebab(credRow, /Edit credential/i)
 
       await expect(viewerApp.getByRole('menuitem', { name: /Edit credential/i })).toHaveAttribute(
         'aria-disabled',
@@ -747,8 +754,10 @@ test.describe('Permission gating — Credential actions', () => {
         .getByRole('grid', { name: 'Credentials table' })
         .getByRole('row', { name: new RegExp(credential.name) })
       await expect(credRow).toBeVisible({ timeout: 15_000 })
-      const kebab = credRow.getByRole('button', { name: /Actions|Kebab toggle/i })
-      await kebab.click({ force: true })
+      // A forced click skips every actionability wait, so it lands even while the
+      // list query is replacing the row — the handler never runs, the menu stays
+      // shut, and each assertion below fails on a missing `menuitem`.
+      await openRowKebab(credRow, /Edit credential/i)
 
       await expect(auditorApp.getByRole('menuitem', { name: /Edit credential/i })).toHaveAttribute(
         'aria-disabled',
@@ -1025,8 +1034,11 @@ test.describe('Permission gating — Identity Provider actions', () => {
         .getByRole('grid', { name: 'Identity providers table' })
         .getByRole('row', { name: new RegExp(idpName) })
       await expect(idpRow).toBeVisible({ timeout: 15_000 })
-      const kebab = idpRow.getByRole('button', { name: /Actions|Kebab toggle/i })
-      await kebab.click({ force: true })
+      // The identity-providers table refetches while the auditor page settles, so a
+      // single forced click here is regularly swallowed by the row being replaced —
+      // the menu never opens and all three assertions below fail on a missing
+      // `menuitem`. This is the same dequeue seen on PRs that touch no frontend code.
+      await openRowKebab(idpRow, /Edit provider/i)
 
       await expect(auditorApp.getByRole('menuitem', { name: /Edit provider/i })).toHaveAttribute(
         'aria-disabled',

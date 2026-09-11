@@ -74,3 +74,43 @@ export async function clickWhenEnabled(
   await expect(target).toBeEnabled({ timeout })
   await target.click({ timeout })
 }
+
+/** Per-attempt budget for landing the kebab click. */
+const KEBAB_CLICK_TIMEOUT = 5_000
+/** Per-attempt budget for the menu to render once the kebab has been clicked. */
+const KEBAB_MENU_TIMEOUT = 5_000
+/** Total budget for getting the menu open. */
+const KEBAB_RETRY_TIMEOUT = 30_000
+
+/**
+ * Open a table row's kebab menu, returning once `probeItem` is on the page.
+ *
+ * A row is re-rendered whenever the list query behind it resolves — a filter
+ * being applied, a cursor page landing, a refetch after a mutation — and a click
+ * that lands while React is replacing the row is simply lost. The menu never
+ * opens, and the caller fails much later on a missing `menuitem` with nothing in
+ * the trace to say why. `force: true` makes that strictly more likely, because it
+ * skips the actionability wait that would otherwise have held the click until the
+ * row was stable; every row kebab in the suite is clicked that way today.
+ *
+ * Re-opening on a miss is the same remedy `triggerVerifyWorkflow` uses for the
+ * builder kebab. The toggle is only clicked while the menu is closed, since
+ * clicking it again would toggle it shut — so a menu that is merely slow is
+ * waited out rather than dismissed.
+ */
+export async function openRowKebab(row: Locator, probeItem: RegExp | string): Promise<void> {
+  const page = row.page()
+  const kebab = row.getByRole('button', { name: /Actions|Kebab toggle/i })
+  const item = page.getByRole('menuitem', { name: probeItem })
+
+  await expect(async () => {
+    if (!(await item.isVisible().catch(() => false))) {
+      await expect(row).toBeVisible({ timeout: KEBAB_CLICK_TIMEOUT })
+      // Swallow the click failure: Playwright retries a click on its own when the
+      // element detaches, so an unbounded one would sit inside a single attempt
+      // for the whole retry budget instead of letting `toPass` start over.
+      await kebab.click({ timeout: KEBAB_CLICK_TIMEOUT }).catch(() => {})
+    }
+    await expect(item).toBeVisible({ timeout: KEBAB_MENU_TIMEOUT })
+  }).toPass({ timeout: KEBAB_RETRY_TIMEOUT, intervals: [500, 1_000, 2_000] })
+}
