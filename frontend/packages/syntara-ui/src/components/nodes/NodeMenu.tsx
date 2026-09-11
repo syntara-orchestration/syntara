@@ -3,8 +3,8 @@ import type { DropdownProps, MenuToggleElement } from '@patternfly/react-core'
 import { RhUiEllipsisVerticalFillIcon } from '@patternfly/react-icons'
 import { isValidElement, useState } from 'react'
 
-import { IconLabel } from '../../../../../components/IconLabel'
-import type { NodeMenuAction } from '../hooks/useNodeMenuActions'
+import type { NodeMenuAction } from '../../routes/workflows/canvas/nodes/hooks/useNodeMenuActions'
+import { IconLabel } from '../IconLabel'
 
 type NodeMenuProps = {
   menuActions: NodeMenuAction[]

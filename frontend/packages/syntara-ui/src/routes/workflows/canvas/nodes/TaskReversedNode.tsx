@@ -1,11 +1,11 @@
 import type { TaskActivity } from '@syntara/contracts'
 import { type Node, type NodeProps } from '@xyflow/react'
 
+import { NodeComponent } from '../../../../components/nodes/NodeComponent'
 import { FlowNodeType } from '../../../../constants'
 import type { ActivityStatus } from '../../execution/types'
 import { getNodeTypeColor } from '../nodeTypeColors'
 
-import { NodeComponent } from './common/NodeComponent'
 import { nodeMetadata } from './nodeMetadata'
 import { TaskActivityDetails } from './TaskNode'
 import { getTaskSemanticLabels } from './taskSemanticLabels'
