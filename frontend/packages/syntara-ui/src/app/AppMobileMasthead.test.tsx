@@ -25,6 +25,9 @@ describe('AppMobileMasthead', () => {
       mobileToggleRef: { current: null },
       onToggleDock: vi.fn(),
       onMobileToggle: mockOnMobileToggle,
+      isDockExpandableExpanded: false,
+      onNavToggle: vi.fn(),
+      onNavSelect: vi.fn(),
     })
   })
 
@@ -78,6 +81,9 @@ describe('AppMobileMasthead', () => {
       mobileToggleRef: { current: null },
       onToggleDock: vi.fn(),
       onMobileToggle: mockOnMobileToggle,
+      isDockExpandableExpanded: false,
+      onNavToggle: vi.fn(),
+      onNavSelect: vi.fn(),
     })
     render(
       <BrandProvider>

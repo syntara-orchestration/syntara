@@ -113,6 +113,9 @@ describe('AppDockedNav', () => {
       mobileToggleRef: { current: null },
       onToggleDock: mockOnToggleDock,
       onMobileToggle: vi.fn(),
+      isDockExpandableExpanded: false,
+      onNavToggle: vi.fn(),
+      onNavSelect: vi.fn(),
     })
     localStorage.clear()
     document.documentElement.classList.add('pf-v6-theme-dark', 'pf-v6-theme-glass')
@@ -329,6 +332,9 @@ describe('AppDockedNav', () => {
         mobileToggleRef: { current: null },
         onToggleDock: mockOnToggleDock,
         onMobileToggle: vi.fn(),
+        isDockExpandableExpanded: false,
+        onNavToggle: vi.fn(),
+        onNavSelect: vi.fn(),
       })
     })
 
@@ -392,6 +398,9 @@ describe('AppDockedNav', () => {
         mobileToggleRef: { current: null },
         onToggleDock: mockOnToggleDock,
         onMobileToggle: vi.fn(),
+        isDockExpandableExpanded: false,
+        onNavToggle: vi.fn(),
+        onNavSelect: vi.fn(),
       })
     })
 
@@ -429,6 +438,9 @@ describe('AppDockedNav', () => {
         mobileToggleRef: { current: null },
         onToggleDock: mockOnToggleDock,
         onMobileToggle: vi.fn(),
+        isDockExpandableExpanded: false,
+        onNavToggle: vi.fn(),
+        onNavSelect: vi.fn(),
       })
     })
 
@@ -474,6 +486,9 @@ describe('AppDockedNav', () => {
         mobileToggleRef: { current: null },
         onToggleDock: mockOnToggleDock,
         onMobileToggle: vi.fn(),
+        isDockExpandableExpanded: false,
+        onNavToggle: vi.fn(),
+        onNavSelect: vi.fn(),
       })
     })
 
@@ -501,6 +516,9 @@ describe('AppDockedNav', () => {
         mobileToggleRef: { current: null },
         onToggleDock: mockOnToggleDock,
         onMobileToggle: vi.fn(),
+        isDockExpandableExpanded: false,
+        onNavToggle: vi.fn(),
+        onNavSelect: vi.fn(),
       })
     })
 
