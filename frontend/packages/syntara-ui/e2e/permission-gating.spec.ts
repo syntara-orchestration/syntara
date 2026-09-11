@@ -29,9 +29,13 @@ import {
   deleteCredentialViaApi,
   deleteGroupViaApi,
   deleteIdentityProviderViaApi,
+  deleteProjectViaApi,
   deleteServiceAccountViaApi,
   deleteUserViaApi,
+  deleteWorkflowViaApi,
   ensureProject,
+  findProjectIdByName,
+  findWorkflowIdByName,
   getAuthToken,
 } from './utils/api'
 
@@ -492,13 +496,22 @@ test.describe('Permission gating — Project actions', () => {
         },
       })
       if (!createWorkflowResp.ok()) throw new Error('Workflow creation failed')
-      const workflow = (await createWorkflowResp.json()) as { id: string }
 
       // Navigate to All projects view as viewer
       await viewerApp.goto(toAppUrl('/workflows'))
       const projectSelector = viewerApp.getByRole('textbox', { name: 'Project' })
       await projectSelector.click()
       await viewerApp.getByRole('option', { name: 'All projects' }).click()
+
+      // The project row is a group header synthesised from whatever workflows the
+      // page happened to fetch (`useWorkflowGrouping`) — there is no projects query
+      // behind it. That fetch is one page of 20 sorted by `-updated_at`, so under
+      // `fullyParallel` the workflow seeded above is pushed off page 1 by other
+      // specs' newer workflows within seconds and the group header never renders.
+      // Filtering to this workflow puts its group back on the page deterministically.
+      await viewerApp.getByPlaceholder('Filter by name').fill(workflowName)
+      await viewerApp.getByRole('button', { name: 'Apply filter' }).click()
+      await expect(viewerApp.getByRole('row').filter({ hasText: workflowName })).toBeVisible({ timeout: 15_000 })
 
       // Find project row — viewer sees project ID instead of name in group headers
       const projectRow = viewerApp.getByRole('row').filter({ hasText: new RegExp(`${projectName}|${project.id}`) })
@@ -507,29 +520,18 @@ test.describe('Permission gating — Project actions', () => {
       // Viewer has no project write permissions — kebab is completely hidden
       const projectKebab = projectRow.getByRole('button', { name: /Actions for.*project/i })
       await expect(projectKebab).not.toBeVisible()
-
-      // Clean up
-      await apiRequest(app, 'delete', `/workflows/${workflow.id}`)
-      await apiRequest(app, 'delete', `/projects/${project.id}`)
-    } catch (error) {
-      // Best-effort cleanup on failure
-      try {
-        const listResp = await apiRequest(app, 'get', '/workflows')
-        if (listResp.ok()) {
-          const list = (await listResp.json()) as { resources: Array<{ id: string; name: string }> }
-          const wf = list.resources.find((w) => w.name === workflowName)
-          if (wf) await apiRequest(app, 'delete', `/workflows/${wf.id}`)
-        }
-        const projListResp = await apiRequest(app, 'get', '/projects')
-        if (projListResp.ok()) {
-          const projList = (await projListResp.json()) as { resources: Array<{ id: string; name: string }> }
-          const proj = projList.resources.find((p) => p.name === projectName)
-          if (proj) await apiRequest(app, 'delete', `/projects/${proj.id}`)
-        }
-      } catch {
-        // Ignore cleanup errors
-      }
-      throw error
+    } finally {
+      // `finally`, not `catch` + rethrow: the happy path deleted inline and the
+      // catch path duplicated it, so a failure between the two leaked both
+      // resources — and the fallback listed `/workflows` and `/projects`
+      // unfiltered, which under `fullyParallel` frequently does not even contain
+      // them. Every leaked workflow then crowds page 1 for later runs, which is
+      // what made this flake self-reinforcing. Both lookups are filtered now and
+      // both paths run here.
+      const leakedWorkflowId = await findWorkflowIdByName(app, workflowName)
+      if (leakedWorkflowId) await deleteWorkflowViaApi(app, leakedWorkflowId)
+      const leakedProjectId = await findProjectIdByName(app, projectName)
+      if (leakedProjectId) await deleteProjectViaApi(app, leakedProjectId)
     }
   })
 
@@ -561,13 +563,22 @@ test.describe('Permission gating — Project actions', () => {
         },
       })
       if (!createWorkflowResp.ok()) throw new Error('Workflow creation failed')
-      const workflow = (await createWorkflowResp.json()) as { id: string }
 
       // Navigate to All projects view as auditor
       await auditorApp.goto(toAppUrl('/workflows'))
       const projectSelector = auditorApp.getByRole('textbox', { name: 'Project' })
       await projectSelector.click()
       await auditorApp.getByRole('option', { name: 'All projects' }).click()
+
+      // The project row is a group header synthesised from whatever workflows the
+      // page happened to fetch (`useWorkflowGrouping`) — there is no projects query
+      // behind it. That fetch is one page of 20 sorted by `-updated_at`, so under
+      // `fullyParallel` the workflow seeded above is pushed off page 1 by other
+      // specs' newer workflows within seconds and the group header never renders.
+      // Filtering to this workflow puts its group back on the page deterministically.
+      await auditorApp.getByPlaceholder('Filter by name').fill(workflowName)
+      await auditorApp.getByRole('button', { name: 'Apply filter' }).click()
+      await expect(auditorApp.getByRole('row').filter({ hasText: workflowName })).toBeVisible({ timeout: 15_000 })
 
       // Find project row — auditor sees project ID instead of name in group headers
       const projectRow = auditorApp.getByRole('row').filter({ hasText: new RegExp(`${projectName}|${project.id}`) })
@@ -576,29 +587,18 @@ test.describe('Permission gating — Project actions', () => {
       // Auditor has no project write permissions — kebab is completely hidden
       const projectKebab = projectRow.getByRole('button', { name: /Actions for.*project/i })
       await expect(projectKebab).not.toBeVisible()
-
-      // Clean up
-      await apiRequest(app, 'delete', `/workflows/${workflow.id}`)
-      await apiRequest(app, 'delete', `/projects/${project.id}`)
-    } catch (error) {
-      // Best-effort cleanup on failure
-      try {
-        const listResp = await apiRequest(app, 'get', '/workflows')
-        if (listResp.ok()) {
-          const list = (await listResp.json()) as { resources: Array<{ id: string; name: string }> }
-          const wf = list.resources.find((w) => w.name === workflowName)
-          if (wf) await apiRequest(app, 'delete', `/workflows/${wf.id}`)
-        }
-        const projListResp = await apiRequest(app, 'get', '/projects')
-        if (projListResp.ok()) {
-          const projList = (await projListResp.json()) as { resources: Array<{ id: string; name: string }> }
-          const proj = projList.resources.find((p) => p.name === projectName)
-          if (proj) await apiRequest(app, 'delete', `/projects/${proj.id}`)
-        }
-      } catch {
-        // Ignore cleanup errors
-      }
-      throw error
+    } finally {
+      // `finally`, not `catch` + rethrow: the happy path deleted inline and the
+      // catch path duplicated it, so a failure between the two leaked both
+      // resources — and the fallback listed `/workflows` and `/projects`
+      // unfiltered, which under `fullyParallel` frequently does not even contain
+      // them. Every leaked workflow then crowds page 1 for later runs, which is
+      // what made this flake self-reinforcing. Both lookups are filtered now and
+      // both paths run here.
+      const leakedWorkflowId = await findWorkflowIdByName(app, workflowName)
+      if (leakedWorkflowId) await deleteWorkflowViaApi(app, leakedWorkflowId)
+      const leakedProjectId = await findProjectIdByName(app, projectName)
+      if (leakedProjectId) await deleteProjectViaApi(app, leakedProjectId)
     }
   })
 

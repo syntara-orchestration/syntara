@@ -139,6 +139,26 @@ export async function ensureProject(app: Page, name = 'default'): Promise<{ id: 
   }
 }
 
+/**
+ * Look up a project ID by exact name. Returns null when it cannot be found.
+ *
+ * Mirrors `findWorkflowIdByName`, but lists and matches client-side because
+ * `/projects` is not known to support `name[contains]` — `ensureProject` above
+ * already takes the same `?limit=100` approach.
+ */
+export async function findProjectIdByName(app: Page, name: string): Promise<string | null> {
+  try {
+    const token = await getAuthToken(app)
+    if (!token) return null
+    const resp = await apiRequest(app, 'get', '/projects?limit=100', { token })
+    if (!resp.ok()) return null
+    const body = (await resp.json()) as { resources?: Array<{ id: string; name: string }> }
+    return body.resources?.find((project) => project.name === name)?.id ?? null
+  } catch {
+    return null
+  }
+}
+
 /** Create a project via the API. Returns the project ID. */
 export async function createProjectViaApi(app: Page, name: string, description?: string): Promise<{ id: string }> {
   const token = await getAuthToken(app)
