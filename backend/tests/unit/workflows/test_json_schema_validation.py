@@ -12,8 +12,8 @@ import pytest
 from referencing.exceptions import Unresolvable
 
 from syntara.workflows.json_schema_validation import (
-    _has_dangerous_pattern,
     apply_schema_defaults,
+    has_dangerous_pattern,
     validate_json_schema_definition,
 )
 
@@ -214,7 +214,7 @@ class TestValidateJsonSchemaDefinition:
 
 
 # ============================================================================
-# _has_dangerous_pattern
+# has_dangerous_pattern
 # ============================================================================
 
 
@@ -233,7 +233,7 @@ class TestHasDangerousPattern:
     )
     def test_dangerous_patterns_detected(self, pattern: str) -> None:
         """Known ReDoS patterns should be flagged."""
-        assert _has_dangerous_pattern(pattern) is True
+        assert has_dangerous_pattern(pattern) is True
 
     @pytest.mark.parametrize(
         "pattern",
@@ -247,7 +247,7 @@ class TestHasDangerousPattern:
     )
     def test_safe_patterns_pass(self, pattern: str) -> None:
         """Safe regex patterns should not be flagged."""
-        assert _has_dangerous_pattern(pattern) is False
+        assert has_dangerous_pattern(pattern) is False
 
 
 # ============================================================================
