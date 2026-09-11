@@ -89,6 +89,7 @@ class InvocationFactory:
         project_id: UUID | None = None,
         status: InvocationStatus = InvocationStatus.RUNNING,
         context_data: dict[str, Any] | None = None,
+        agent_execution_id: UUID | None = None,
         commit: bool = True,
     ) -> Invocation:
         """Create a single invocation.
@@ -97,6 +98,7 @@ class InvocationFactory:
             project_id: Owning project; a factory-owned project is used if omitted.
             status: Initial invocation status.
             context_data: Raw context JSONB.
+            agent_execution_id: Builtin Agent Execution execution running this invocation.
             commit: Commit (and refresh) instead of only flushing.
 
         Returns:
@@ -110,6 +112,7 @@ class InvocationFactory:
             project_id=project_id if project_id is not None else await self._resolve_project_id(),
             status=status,
             context_data=context_data or {},
+            agent_execution_id=agent_execution_id,
         )
         self.session.add(invocation)
         if commit:
