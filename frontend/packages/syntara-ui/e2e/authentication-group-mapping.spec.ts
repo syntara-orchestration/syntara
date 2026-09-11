@@ -22,6 +22,19 @@ import { createIdentityProviderViaApi, deleteIdentityProviderViaApi, findIdentit
 const VALID_JMESPATH = "groups[?starts_with(@, 'syntara-')]"
 const INVALID_JMESPATH = '[[[bad'
 
+/**
+ * Narrow the identity providers list to one provider before asserting on its row.
+ *
+ * The table is a single unfiltered page of 20 sorted by `name` ascending, so a
+ * provider created here renders only while fewer than 20 sort before it. Other
+ * specs seed providers in bulk — `pagination.spec.ts` creates 21 in its
+ * `beforeAll` — which under `fullyParallel` silently moves this row to page 2.
+ */
+async function filterProvidersByName(app: Page, providerName: string): Promise<void> {
+  await app.getByPlaceholder('Filter by name').fill(providerName)
+  await app.getByRole('button', { name: 'Apply filter' }).click()
+}
+
 async function createMappingTestProvider(app: Page, namePrefix: string): Promise<string> {
   const provider = await createIdentityProviderViaApi(app, {
     name: buildUniqueName(namePrefix),
@@ -157,6 +170,7 @@ test.describe('UI-13: JMESPath filter — entry and validation error', () => {
         await app.getByRole('button', { name: /Add provider/i }).click()
 
         await expect(app.getByText('Identity provider created')).toBeVisible()
+        await filterProvidersByName(app, providerName)
         await expect(app.getByRole('row', { name: new RegExp(providerName) })).toBeVisible()
 
         const created = await findIdentityProviderByName(app, providerName)
@@ -185,6 +199,7 @@ test.describe('UI-14: Claim data configuration screen', () => {
       await app.getByRole('button', { name: /Add provider/i }).click()
 
       await expect(app.getByText('Identity provider created')).toBeVisible()
+      await filterProvidersByName(app, providerName)
       await expect(app.getByRole('row', { name: new RegExp(providerName) })).toBeVisible()
 
       const created = await findIdentityProviderByName(app, providerName)

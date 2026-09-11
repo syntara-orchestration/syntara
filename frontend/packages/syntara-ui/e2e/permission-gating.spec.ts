@@ -293,6 +293,20 @@ test.describe('Permission gating — Route guards', () => {
 
 // ── Action gating — Workflows ────────────────────────────────────────────
 
+/**
+ * Narrow the workflows list to one workflow before asserting on its row.
+ *
+ * The table is a single page of 20 sorted `-updated_at` with no filter applied,
+ * so under `fullyParallel` a row seeded by this spec is pushed off page 1 within
+ * seconds by other specs saving their own workflows — every builder save bumps
+ * `updated_at`. Without this the assertion that follows is a race against the
+ * rest of the suite.
+ */
+async function filterWorkflowsByName(page: Page, workflowName: string): Promise<void> {
+  await page.getByPlaceholder('Filter by name').fill(workflowName)
+  await page.getByRole('button', { name: 'Apply filter' }).click()
+}
+
 test.describe('Permission gating — Workflow actions', () => {
   test('viewer: Create workflow button is disabled with tooltip', async ({ app, viewerApp }) => {
     const { id: workflowId } = await createTestWorkflow(app)
@@ -364,6 +378,10 @@ test.describe('Permission gating — Workflow actions', () => {
       await viewerApp.goto(toAppUrl('/workflows'))
       await expect(viewerApp.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
 
+      await filterWorkflowsByName(viewerApp, workflow.name)
+
+      await filterWorkflowsByName(viewerApp, workflow.name)
+
       const workflowRow = viewerApp
         .getByRole('grid', { name: 'Workflows table' })
         .getByRole('row', { name: new RegExp(workflow.name) })
@@ -411,6 +429,8 @@ test.describe('Permission gating — Workflow actions', () => {
     try {
       await auditorApp.goto(toAppUrl('/workflows'))
       await expect(auditorApp.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
+
+      await filterWorkflowsByName(auditorApp, workflow.name)
 
       const workflowRow = auditorApp
         .getByRole('grid', { name: 'Workflows table' })
@@ -514,8 +534,7 @@ test.describe('Permission gating — Project actions', () => {
       // `fullyParallel` the workflow seeded above is pushed off page 1 by other
       // specs' newer workflows within seconds and the group header never renders.
       // Filtering to this workflow puts its group back on the page deterministically.
-      await viewerApp.getByPlaceholder('Filter by name').fill(workflowName)
-      await viewerApp.getByRole('button', { name: 'Apply filter' }).click()
+      await filterWorkflowsByName(viewerApp, workflowName)
       await expect(viewerApp.getByRole('row').filter({ hasText: workflowName })).toBeVisible({ timeout: 15_000 })
 
       // Find project row — viewer sees project ID instead of name in group headers
@@ -581,8 +600,7 @@ test.describe('Permission gating — Project actions', () => {
       // `fullyParallel` the workflow seeded above is pushed off page 1 by other
       // specs' newer workflows within seconds and the group header never renders.
       // Filtering to this workflow puts its group back on the page deterministically.
-      await auditorApp.getByPlaceholder('Filter by name').fill(workflowName)
-      await auditorApp.getByRole('button', { name: 'Apply filter' }).click()
+      await filterWorkflowsByName(auditorApp, workflowName)
       await expect(auditorApp.getByRole('row').filter({ hasText: workflowName })).toBeVisible({ timeout: 15_000 })
 
       // Find project row — auditor sees project ID instead of name in group headers
