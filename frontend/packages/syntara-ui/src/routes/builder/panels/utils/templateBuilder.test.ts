@@ -109,9 +109,7 @@ describe('buildExpression', () => {
   })
 
   it('rejects field path segments containing quotes', () => {
-    expect(() => buildExpression({ nodeId: 'step_1', fieldPath: [`field"injection`] })).toThrow(
-      'disallowed characters'
-    )
+    expect(() => buildExpression({ nodeId: 'step_1', fieldPath: [`field"injection`] })).toThrow('disallowed characters')
   })
 
   it('rejects field path segments containing backticks', () => {

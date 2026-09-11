@@ -90,15 +90,7 @@ type LeafNodeProps = {
   searchTerm?: string
 }
 
-function LeafNode({
-  fieldKey,
-  value,
-  typeLabel,
-  nodeId,
-  fieldPath,
-  expression,
-  searchTerm,
-}: Readonly<LeafNodeProps>) {
+function LeafNode({ fieldKey, value, typeLabel, nodeId, fieldPath, expression, searchTerm }: Readonly<LeafNodeProps>) {
   const handleDragStart = useCallback(
     (e: React.DragEvent) => {
       if (!expression) {
