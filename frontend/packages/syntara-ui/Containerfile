@@ -19,7 +19,7 @@ RUN npm rebuild
 RUN npm run build
 
 # Production stage - target platform will be used automatically
-FROM mirror.gcr.io/library/nginx:1.27.4-alpine@sha256:4ff102c5d78d254a6f0da062b3cf39eaf07f01eec0927fd21e219d0af8bc0591
+FROM mirror.gcr.io/library/nginx:1.31.5-alpine@sha256:72ba65eb42c10344912a84ff42408db7d34f2feb642204570ab8fc5ffd29f1d3
 
 COPY --from=builder /licenses /licenses
 
