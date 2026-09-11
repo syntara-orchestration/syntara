@@ -28,13 +28,30 @@ import {
 } from './breadcrumbBuilders'
 
 describe('breadcrumbBuilders', () => {
-  it('uses page hierarchy only for project detail, without a tab segment', () => {
-    const items = breadcrumbsProjectDetail('My project')
+  it('uses page hierarchy only for project detail on the default tab, without a tab segment', () => {
+    const base = '/system-administration/access-management/projects/uuid-1'
+    const items = breadcrumbsProjectDetail('My project', base, 'details')
     expect(items).toEqual([
       { label: 'Access management', href: AppRoute.AccessManagement.Root },
       { label: 'Projects', href: AppRoute.AccessManagement.Projects },
       { label: 'My project' },
     ])
+  })
+
+  it('includes a tab segment when not on the default details tab', () => {
+    const base = '/system-administration/access-management/projects/uuid-1'
+    const items = breadcrumbsProjectDetail('My project', base, 'role-assignments')
+    expect(items).toHaveLength(4)
+    expect(items[2]).toEqual({ label: 'My project', href: base })
+    expect(items[3]).toEqual({ label: 'Assignments' })
+  })
+
+  it('labels the project workflows tab in breadcrumbs', () => {
+    const base = '/system-administration/access-management/projects/uuid-1'
+    const items = breadcrumbsProjectDetail('My project', base, 'workflows')
+    expect(items).toHaveLength(4)
+    expect(items[2]).toEqual({ label: 'My project', href: base })
+    expect(items[3]).toEqual({ label: 'Workflows' })
   })
 
   it('uses page hierarchy only for user, group, and identity provider detail', () => {
