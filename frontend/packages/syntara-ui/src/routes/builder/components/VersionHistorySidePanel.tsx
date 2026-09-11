@@ -1,6 +1,6 @@
 import { Content, FlexItem } from '@patternfly/react-core'
 
-import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import { EditVersionDialog } from '../EditVersionDialog'
 import type { VersionSidePanelState } from '../hooks/useBuilderVersionPanel'
 import { PublishWorkflowDialog } from '../PublishWorkflowDialog'
@@ -67,7 +67,7 @@ export function VersionHistorySidePanel({ sidePanel, isNodeEditorOpen, editPermi
       />
 
       {sidePanel.restoreDialog.onConfirm && (
-        <NxConfirmationDialog
+        <SynConfirmationDialog
           isOpen={sidePanel.restoreDialog.isOpen}
           onClose={sidePanel.restoreDialog.onClose}
           onConfirm={sidePanel.restoreDialog.onConfirm}
@@ -79,7 +79,7 @@ export function VersionHistorySidePanel({ sidePanel, isNodeEditorOpen, editPermi
           <Content component="p">
             This will replace your current editor state with the selected version. Any unsaved changes will be lost.
           </Content>
-        </NxConfirmationDialog>
+        </SynConfirmationDialog>
       )}
     </>
   )

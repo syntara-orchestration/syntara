@@ -94,33 +94,28 @@ class ServiceAccountService(BaseService):
     async def to_read(self, service_account: ServiceAccount) -> ServiceAccountRead:
         """Convert a ServiceAccount to a read response (no secret)."""
         read = ServiceAccountRead.model_validate(service_account)
-        project_info = await self._resolve_project_info(service_account.project_id)
-        if project_info:
-            read.project_name = project_info[0]
-            read.is_project_deleted = project_info[1]
+        project_name = await self._resolve_project_info(service_account.project_id)
+        if project_name:
+            read.project_name = project_name
         return read
 
-    async def _resolve_project_info(self, project_id: UUID) -> tuple[str, bool] | None:
+    async def _resolve_project_info(self, project_id: UUID) -> str | None:
         result = await self.session.exec(
-            select(Project.name, Project.deleted_at).where(
+            select(Project.name).where(
                 Project.id == project_id,
             )
         )
-        row = result.first()
-        if row is None:
-            return None
-        name, deleted_at = row
-        return name, deleted_at is not None
+        return result.first()
 
-    async def _resolve_project_infos(self, project_ids: set[UUID]) -> dict[UUID, tuple[str, bool]]:
+    async def _resolve_project_infos(self, project_ids: set[UUID]) -> dict[UUID, str]:
         if not project_ids:
             return {}
         result = await self.session.exec(
-            select(Project.id, Project.name, Project.deleted_at).where(
+            select(Project.id, Project.name).where(
                 Project.id.in_(project_ids),  # type: ignore[attr-defined]
             )
         )
-        return {row_id: (name, deleted_at is not None) for row_id, name, deleted_at in result.all()}
+        return dict(result.all())
 
     async def get_service_account(self, service_account_id: UUID) -> ServiceAccount:
         """Get a service account by ID.
@@ -165,10 +160,9 @@ class ServiceAccountService(BaseService):
         project_ids = {r.project_id for r in response.resources}
         project_infos = await self._resolve_project_infos(project_ids)
         for resource in response.resources:
-            info = project_infos.get(resource.project_id)
-            if info:
-                resource.project_name = info[0]
-                resource.is_project_deleted = info[1]
+            name = project_infos.get(resource.project_id)
+            if name:
+                resource.project_name = name
         response.max_lifetime_days = await get_runtime_settings().get_int(
             "service_accounts.credential_max_lifetime_days"
         )

@@ -57,7 +57,7 @@ export function getProjectTogglePrefixLabelStyle(isDisabled: boolean | undefined
  * `filterValue` back to `toggleLabel`.
  *
  * Extracted as a standalone function so the guard branches can be unit-tested
- * directly — PF's programmatic value swap cannot be replicated in JSDOM.
+ * directly — PF's programmatic value swap cannot be replicated in happy-dom.
  */
 export function handleTypeaheadChange(
   val: string,

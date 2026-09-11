@@ -70,6 +70,9 @@ class DeltaEventData(SQLModel):
     )  # type: ignore[assignment]
 
 
+CANCELLED_REASON_MAX_LENGTH = 200
+
+
 class CancelledEventData(SQLModel):
     """Data payload for streaming cancellation events.
 
@@ -83,7 +86,7 @@ class CancelledEventData(SQLModel):
     reason: str = Field(
         description="Why the streaming was cancelled",
         min_length=1,
-        max_length=200,
+        max_length=CANCELLED_REASON_MAX_LENGTH,
         examples=["user_cancelled", "timeout", "server_shutdown", "llm_error"],
     )
 

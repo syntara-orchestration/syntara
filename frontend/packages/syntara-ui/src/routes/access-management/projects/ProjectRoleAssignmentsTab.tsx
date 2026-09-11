@@ -1,16 +1,17 @@
 import { Button, LabelGroup, Truncate } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiTrashIcon } from '@patternfly/react-icons'
-import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
-import type { IAction, ThProps } from '@patternfly/react-table'
+import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
+import type { ThProps } from '@patternfly/react-table'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useMemo, useState } from 'react'
 
-import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
-import { NxLabel } from '../../../components/labels/NxLabel'
-import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../../components/panels/list/NxListPanel'
+import { SynLabel } from '../../../components/labels/SynLabel'
+import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../../components/panels/list/SynListPanel'
 import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
+import { SynKebabMenu, type KebabAction } from '../../../components/SynKebabMenu'
 import { invalidateAuthzCaches } from '../../../hooks/invalidateAuthzCaches'
 import { useCursorPagination, useCursorReset } from '../../../hooks/useCursorPagination'
 import { useTableSort } from '../../../hooks/useTableSort'
@@ -55,10 +56,12 @@ function getAssignmentActions(
   assignment: RoleAssignmentRead,
   onUnassign: (assignment: RoleAssignmentRead) => void,
   permissions: ReturnType<typeof useAssignmentPermissions>
-): IAction[] {
+): KebabAction[] {
   return [
     {
-      title: <IconLabel icon={<RhUiTrashIcon />}>Unassign</IconLabel>,
+      key: 'unassign',
+      title: <IconLabel icon={<RhUiTrashIcon />}>Unassign role</IconLabel>,
+      isDanger: true,
       isAriaDisabled: !permissions.canRevoke,
       tooltipProps: permissions.canRevoke ? undefined : { content: permissions.tooltips.revoke },
       onClick: permissions.canRevoke ? () => onUnassign(assignment) : undefined,
@@ -103,7 +106,7 @@ function RoleAssignmentsTable({
                 />
               </Td>
               <Td dataLabel="Principal type">
-                <NxLabel color={color}>{text}</NxLabel>
+                <SynLabel color={color}>{text}</SynLabel>
               </Td>
               <Td dataLabel="Role name">
                 <Truncate content={assignment.role_name} />
@@ -112,7 +115,7 @@ function RoleAssignmentsTable({
                 {(assignment.role_policies ?? []).length > 0 ? (
                   <LabelGroup numLabels={3}>
                     {(assignment.role_policies ?? []).map((name) => (
-                      <NxLabel key={name}>{name}</NxLabel>
+                      <SynLabel key={name}>{name}</SynLabel>
                     ))}
                   </LabelGroup>
                 ) : (
@@ -120,7 +123,10 @@ function RoleAssignmentsTable({
                 )}
               </Td>
               <Td isActionCell>
-                <ActionsColumn items={getAssignmentActions(assignment, onUnassign, permissions)} />
+                <SynKebabMenu
+                  actions={getAssignmentActions(assignment, onUnassign, permissions)}
+                  aria-label={`Actions for ${assignment.principal_name} ${assignment.role_name}`}
+                />
               </Td>
             </Tr>
           )
@@ -234,7 +240,7 @@ export function ProjectRoleAssignmentsTab({ projectId }: Readonly<{ projectId: s
 
   return (
     <>
-      <NxListPanelView
+      <SynListPanelView
         tabKey="role-assignments"
         tabLabel="Assignments"
         isPending={query.isPending}
@@ -246,7 +252,7 @@ export function ProjectRoleAssignmentsTab({ projectId }: Readonly<{ projectId: s
         onClearAllFilters={handleClearAllFilters}
         noDataState={
           <SynEmptyStateNoData
-            title="No role assignments"
+            title="No role assignments yet"
             description="No roles have been assigned in this project."
             buttonText="Assign role"
             addData={assignmentPermissions.canAssign ? () => setAssignModalOpen(true) : undefined}
@@ -265,7 +271,7 @@ export function ProjectRoleAssignmentsTab({ projectId }: Readonly<{ projectId: s
         }
         toolbar={
           assignments.length > 0 || hasActiveFilters ? (
-            <NxListPanelToolbar
+            <SynListPanelToolbar
               filters={filters}
               filterDefinitions={filterFieldDefinitions}
               onFilterChange={handleFilterChange}
@@ -303,14 +309,14 @@ export function ProjectRoleAssignmentsTab({ projectId }: Readonly<{ projectId: s
           ) : undefined
         }
         body={
-          <NxListPanelTable caption="Project role assignments" footer={getFooterProps(query.data)}>
+          <SynListPanelTable caption="Project role assignments" footer={getFooterProps(query.data)}>
             <RoleAssignmentsTable
               assignments={assignments}
               getSortParams={getSortParams}
               onUnassign={setAssignmentToUnassign}
               permissions={assignmentPermissions}
             />
-          </NxListPanelTable>
+          </SynListPanelTable>
         }
       />
 
@@ -322,7 +328,7 @@ export function ProjectRoleAssignmentsTab({ projectId }: Readonly<{ projectId: s
         onSuccess={refetchAndInvalidateAuthz}
       />
 
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={!!assignmentToUnassign}
         onClose={() => setAssignmentToUnassign(null)}
         onConfirm={handleUnassign}
@@ -333,7 +339,7 @@ export function ProjectRoleAssignmentsTab({ projectId }: Readonly<{ projectId: s
       >
         This unassigns the role <strong>{assignmentToUnassign?.role_name}</strong> from{' '}
         <strong>{assignmentToUnassign?.principal_name}</strong>. Related permissions will be revoked.
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
 
       {createRoleOpen && (
         <AddProjectRoleDialog

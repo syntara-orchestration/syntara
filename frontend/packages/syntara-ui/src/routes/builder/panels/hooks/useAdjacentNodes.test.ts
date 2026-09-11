@@ -44,7 +44,9 @@ describe('useAdjacentNodes', () => {
 
     const { result } = renderHook(() => useAdjacentNodes('trigger-0'))
 
-    expect(result.current.downstream).toEqual([{ id: 'check-value', name: 'Check Value', type: 'script' }])
+    expect(result.current.downstream).toMatchObject([
+      { id: 'check-value', name: 'Check Value', type: 'script', iconId: 'action-script' },
+    ])
   })
 
   it('memoizes result when edges and nodes do not change', () => {
@@ -72,14 +74,14 @@ describe('useAdjacentNodes', () => {
     const { result, rerender } = renderHook(() => useAdjacentNodes('node-a'))
     const firstResult = result.current
 
-    expect(firstResult.downstream).toEqual([{ id: 'node-b', name: 'B', type: 'unknown' }])
+    expect(firstResult.downstream).toMatchObject([{ id: 'node-b', name: 'B', type: 'unknown' }])
 
     flowGraph.nodes = [...flowGraph.nodes, { id: 'node-c', position: { x: 0, y: 0 }, data: { name: 'C' } }]
     flowGraph.edges = [...flowGraph.edges, { id: 'e2', source: 'node-a', target: 'node-c', type: 'default' }]
     rerender()
 
     expect(result.current).not.toBe(firstResult)
-    expect(result.current.downstream).toEqual([
+    expect(result.current.downstream).toMatchObject([
       { id: 'node-b', name: 'B', type: 'unknown' },
       { id: 'node-c', name: 'C', type: 'unknown' },
     ])

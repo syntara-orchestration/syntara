@@ -60,7 +60,7 @@ describe('NodeComponent semantic zoom', () => {
     )
 
     expect(screen.getByText('Detailed body')).toBeInTheDocument()
-    expect(screen.queryByRole('group', { name: 'T, Agentic' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'T, Task Agent' })).not.toBeInTheDocument()
   })
 
   it('renders semantic color block when zoom is at threshold', () => {
@@ -76,7 +76,7 @@ describe('NodeComponent semantic zoom', () => {
     )
 
     expect(screen.queryByText('Detailed body')).not.toBeInTheDocument()
-    expect(screen.getByRole('group', { name: 'Analyze, Task Agent' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Analyze, Task Agent' })).toBeInTheDocument()
   })
 
   it('semantic zoom layout has no accessibility violations', async () => {

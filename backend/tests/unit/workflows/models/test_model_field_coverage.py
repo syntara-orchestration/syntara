@@ -110,7 +110,6 @@ class TestExecutionFields:
         assert Execution.__sortable_fields__ == [
             "created_at",
             "updated_at",
-            "deleted_at",
             "id",
             "workflow_version_id",
             "workflow_id",

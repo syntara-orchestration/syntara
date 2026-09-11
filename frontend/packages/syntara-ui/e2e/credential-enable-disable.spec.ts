@@ -1,4 +1,4 @@
-import { test, expect, toAppUrl } from './fixtures'
+import { type Page, test, expect, toAppUrl } from './fixtures'
 import {
   createTestCredential,
   deleteCredentialByName,
@@ -6,7 +6,7 @@ import {
   navigateToCredentialDetail,
 } from './helpers/credentials'
 
-async function filterCredentialByName(app: import('@playwright/test').Page, name: string) {
+async function filterCredentialByName(app: Page, name: string) {
   await app.getByPlaceholder('Filter by keyword').fill(name)
   await app.getByRole('button', { name: 'Apply filter' }).click()
 }
@@ -15,15 +15,17 @@ function listRowToggle(row: import('@playwright/test').Locator) {
   return row.getByRole('switch')
 }
 
-function detailPageToggle(app: import('@playwright/test').Page) {
+function detailPageToggle(app: Page) {
   return app.getByRole('switch', { name: /enabled/i })
 }
 
 /** Wait until usage checks finish so the Disable action is actually clickable. */
 async function waitForDisableDialogReady(dialog: import('@playwright/test').Locator, credentialName?: string) {
   await expect(dialog.getByText('Disable credential?')).toBeVisible()
+  // The spinner only clears once the affected-workflows and affected-integrations
+  // API calls both resolve — give it extra time under CI load
   await expect(dialog.getByText(/Checking for workflows and integrations/)).toHaveCount(0, {
-    timeout: 15_000,
+    timeout: 25_000,
   })
   if (credentialName) {
     await expect(dialog.getByText(new RegExp(credentialName))).toBeVisible()

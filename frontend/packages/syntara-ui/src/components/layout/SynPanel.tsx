@@ -17,8 +17,9 @@ type PanelMainBodyProps = Omit<ComponentProps<typeof PanelMainBody>, 'children'>
  *
  * Inherited prop overrides: `isGlass` defaults **on** unless `isGlass={false}`, `isPill`, or
  * `variant="raised"` is set. `isScrollable + isFullHeight` auto-enables `isAutoHeight` (pass
- * `isAutoHeight={false}` to opt out). Avoid `overflow: hidden` between sibling `variant="raised"`
- * panels - it clips the box-shadow; use `SynPageBody` / `minHeight: 0` instead.
+ * `isAutoHeight={false}` to opt out). Avoid `overflow: hidden` on ancestors of sibling panels —
+ * it clips `box-shadow`. Stack them with `SynPanelStack` / `SynPanelStackItem` (min-height 0,
+ * overflow visible). Clip inside the panel (scrollable `PanelMain`, React Flow), not on wrappers.
  */
 export type SynPanelProps = Omit<PanelProps, 'children'> & {
   /** Rendered inside `PanelMainBody`. */

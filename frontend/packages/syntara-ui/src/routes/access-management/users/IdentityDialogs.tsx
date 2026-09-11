@@ -15,7 +15,7 @@ import {
 import { RhUiEllipsisVerticalFillIcon, RhUiLinkBrokenIcon, RhUiLinkIcon } from '@patternfly/react-icons'
 import { useState } from 'react'
 
-import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 
 import type { UserIdentity } from './identityUtils'
 
@@ -31,7 +31,7 @@ function DetachConfirmModal({
   onCancel: () => void
 }>) {
   return (
-    <NxConfirmationDialog
+    <SynConfirmationDialog
       isOpen={!!identity}
       onClose={onCancel}
       onConfirm={onConfirm}
@@ -58,7 +58,7 @@ function DetachConfirmModal({
           </DescriptionListDescription>
         </DescriptionListGroup>
       </DescriptionList>
-    </NxConfirmationDialog>
+    </SynConfirmationDialog>
   )
 }
 
@@ -89,7 +89,7 @@ export function IdentityDialogs({
         onConfirm={onConfirmDetach}
         onCancel={onCancelDetach}
       />
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={!!convertProvider}
         onClose={onCloseConvert}
         onConfirm={onConfirmConvert}
@@ -110,7 +110,7 @@ export function IdentityDialogs({
           <ListItem>You will be signed out and must sign in via the identity provider</ListItem>
           <ListItem>This action cannot be undone</ListItem>
         </List>
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
     </>
   )
 }

@@ -827,7 +827,12 @@ def _approval_definition(
     params: dict[str, Any] | None = None,
     settings: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Build a minimal workflow with an approval node."""
+    """Build a minimal, port-valid workflow with an approval node.
+
+    The approval node is wired to an ``approved``-port successor so the graph
+    satisfies the approved-port requirement. Tests targeting that requirement
+    build their own edges (see ``TestApprovalPortValidation``).
+    """
     node: dict[str, Any] = {
         "id": "approval_1",
         "name": "Review",
@@ -840,8 +845,19 @@ def _approval_definition(
         "schema_version": "2.0.0",
         "name": "approval-test",
         "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
-        "nodes": [node],
-        "edges": [{"from": "t1", "to": "approval_1"}],
+        "nodes": [
+            node,
+            {
+                "id": "after_approve",
+                "name": "After Approve",
+                "type": "script",
+                "parameters": {"language": "python", "code": "pass"},
+            },
+        ],
+        "edges": [
+            {"from": "t1", "to": "approval_1"},
+            {"from": "approval_1", "to": "after_approve", "from_port": "approved"},
+        ],
     }
 
 
@@ -892,7 +908,10 @@ class TestApprovalNodeValidation:
                 "settings": {"continue_on_failure": True},
             }
         )
+        # approval_2 must also have an 'approved' successor to stay port-valid,
+        # so the only approval finding is approval_1's fallback warning.
         definition["edges"].append({"from": "approval_1", "to": "approval_2", "from_port": "approved"})
+        definition["edges"].append({"from": "approval_2", "to": "after_approve", "from_port": "approved"})
         result = validator.collect_findings(definition)
         warnings = [f for f in result.findings if f.category == ValidationCategory.approval_configuration]
         assert len(warnings) == 1
@@ -949,6 +968,123 @@ class TestApprovalNodeValidation:
         )
         approval_findings = [f for f in result.findings if f.category == ValidationCategory.approval_configuration]
         assert approval_findings == []
+
+
+class TestApprovalPortValidation:
+    """Approval nodes require a successor on the 'approved' output port.
+
+    Regression coverage: a portless approval workflow (the intuitive
+    trigger -> approval -> next-step shape with plain edges) used to validate
+    clean and then fail on every execution with a runtime error naming a port
+    the author was never told about. collect_findings must surface this at
+    save time, the way converge predecessor counts are validated.
+    """
+
+    def _portless_approval_definition(self) -> dict[str, Any]:
+        """The intuitive-but-broken shape: a plain edge out of the approval node."""
+        return {
+            "schema_version": "2.0.0",
+            "name": "repro-approval-no-port",
+            "triggers": [{"id": "t_manual", "type": "manual_trigger", "parameters": {}}],
+            "nodes": [
+                {"id": "ap1", "name": "Review", "type": "approval", "parameters": {"prompt": "approve?"}},
+                {"id": "s1", "type": "script", "parameters": {"language": "bash", "code": "echo next"}},
+            ],
+            "edges": [
+                {"from": "t_manual", "to": "ap1"},
+                {"from": "ap1", "to": "s1"},
+            ],
+        }
+
+    def test_no_approved_port_is_error(self, validator: WorkflowValidator) -> None:
+        result = validator.collect_findings(self._portless_approval_definition())
+        assert result.is_valid is False
+        port_errors = [
+            f
+            for f in result.findings
+            if f.category == ValidationCategory.approval_configuration and f.severity == ValidationSeverity.error
+        ]
+        assert len(port_errors) == 1
+        assert port_errors[0].node_id == "ap1"
+        assert "Approved" in port_errors[0].message
+        assert "missing a connection" in port_errors[0].message
+
+    def test_approved_port_present_no_error(self, validator: WorkflowValidator) -> None:
+        definition = self._portless_approval_definition()
+        definition["edges"] = [
+            {"from": "t_manual", "to": "ap1"},
+            {"from": "ap1", "to": "s1", "from_port": "approved"},
+        ]
+        result = validator.collect_findings(definition)
+        approval_errors = [
+            f
+            for f in result.findings
+            if f.category == ValidationCategory.approval_configuration and f.severity == ValidationSeverity.error
+        ]
+        assert approval_errors == []
+
+    def test_rejected_only_still_errors(self, validator: WorkflowValidator) -> None:
+        """A rejected-only successor does not satisfy the mandatory 'approved' port."""
+        definition = self._portless_approval_definition()
+        definition["nodes"].append(
+            {"id": "s2", "type": "script", "parameters": {"language": "bash", "code": "echo rejected"}}
+        )
+        definition["edges"] = [
+            {"from": "t_manual", "to": "ap1"},
+            {"from": "ap1", "to": "s2", "from_port": "rejected"},
+        ]
+        result = validator.collect_findings(definition)
+        port_errors = [
+            f
+            for f in result.findings
+            if f.category == ValidationCategory.approval_configuration and f.severity == ValidationSeverity.error
+        ]
+        assert len(port_errors) == 1
+        assert port_errors[0].node_id == "ap1"
+
+    def test_both_ports_present_no_error(self, validator: WorkflowValidator) -> None:
+        definition = self._portless_approval_definition()
+        definition["nodes"].append(
+            {"id": "s2", "type": "script", "parameters": {"language": "bash", "code": "echo rejected"}}
+        )
+        definition["edges"] = [
+            {"from": "t_manual", "to": "ap1"},
+            {"from": "ap1", "to": "s1", "from_port": "approved"},
+            {"from": "ap1", "to": "s2", "from_port": "rejected"},
+        ]
+        result = validator.collect_findings(definition)
+        approval_errors = [
+            f
+            for f in result.findings
+            if f.category == ValidationCategory.approval_configuration and f.severity == ValidationSeverity.error
+        ]
+        assert approval_errors == []
+
+    def test_only_offending_approval_node_flagged(self, validator: WorkflowValidator) -> None:
+        """With two approval nodes, only the portless one is flagged."""
+        definition: dict[str, Any] = {
+            "schema_version": "2.0.0",
+            "name": "multi-approval",
+            "triggers": [{"id": "t_manual", "type": "manual_trigger", "parameters": {}}],
+            "nodes": [
+                {"id": "ap_good", "type": "approval", "parameters": {"prompt": "a?"}},
+                {"id": "ap_bad", "type": "approval", "parameters": {"prompt": "b?"}},
+                {"id": "s1", "type": "script", "parameters": {"language": "bash", "code": "echo 1"}},
+            ],
+            "edges": [
+                {"from": "t_manual", "to": "ap_good"},
+                {"from": "ap_good", "to": "ap_bad", "from_port": "approved"},
+                {"from": "ap_bad", "to": "s1"},
+            ],
+        }
+        result = validator.collect_findings(definition)
+        port_errors = [
+            f
+            for f in result.findings
+            if f.category == ValidationCategory.approval_configuration and f.severity == ValidationSeverity.error
+        ]
+        assert len(port_errors) == 1
+        assert port_errors[0].node_id == "ap_bad"
 
 
 class TestScheduledTriggerConfigFindings:

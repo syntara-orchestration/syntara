@@ -36,17 +36,12 @@ class WorkflowReadWithVersion:
             created_at (datetime.datetime):
             updated_at (datetime.datetime):
             version (WorkflowVersionRead): Schema for workflow version response (GET /workflows/{id}/versions/{version}).
-                WorkflowVersion entities are read-only and managed automatically by the system.
-
-                Note: deleted_at and deleted_by are None since soft-deleted versions are excluded from queries.
             description (None | str | Unset): Workflow description
             labels (WorkflowReadWithVersionLabels | Unset): Workflow labels
             is_builtin (bool | Unset):  Default: False.
             has_validation_issues (bool | Unset):  Default: False.
             published_version_id (None | Unset | UUID):
             published_version_number (int | None | Unset):
-            deleted_at (datetime.datetime | None | Unset):
-            deleted_by (None | Unset | UUID):
             validation_result (None | Unset | ValidationResult): Validation findings from the last save operation. Only
                 included in create/update responses; use has_validation_issues for the durable indicator.
     """
@@ -66,8 +61,6 @@ class WorkflowReadWithVersion:
     has_validation_issues: bool | Unset = False
     published_version_id: None | Unset | UUID = UNSET
     published_version_number: int | None | Unset = UNSET
-    deleted_at: datetime.datetime | None | Unset = UNSET
-    deleted_by: None | Unset | UUID = UNSET
     validation_result: None | Unset | ValidationResult = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
@@ -120,22 +113,6 @@ class WorkflowReadWithVersion:
         else:
             published_version_number = self.published_version_number
 
-        deleted_at: None | str | Unset
-        if isinstance(self.deleted_at, Unset):
-            deleted_at = UNSET
-        elif isinstance(self.deleted_at, datetime.datetime):
-            deleted_at = self.deleted_at.isoformat()
-        else:
-            deleted_at = self.deleted_at
-
-        deleted_by: None | str | Unset
-        if isinstance(self.deleted_by, Unset):
-            deleted_by = UNSET
-        elif isinstance(self.deleted_by, UUID):
-            deleted_by = str(self.deleted_by)
-        else:
-            deleted_by = self.deleted_by
-
         validation_result: dict[str, Any] | None | Unset
         if isinstance(self.validation_result, Unset):
             validation_result = UNSET
@@ -171,10 +148,6 @@ class WorkflowReadWithVersion:
             field_dict["published_version_id"] = published_version_id
         if published_version_number is not UNSET:
             field_dict["published_version_number"] = published_version_number
-        if deleted_at is not UNSET:
-            field_dict["deleted_at"] = deleted_at
-        if deleted_by is not UNSET:
-            field_dict["deleted_by"] = deleted_by
         if validation_result is not UNSET:
             field_dict["validation_result"] = validation_result
 
@@ -251,40 +224,6 @@ class WorkflowReadWithVersion:
 
         published_version_number = _parse_published_version_number(d.pop("published_version_number", UNSET))
 
-        def _parse_deleted_at(data: object) -> datetime.datetime | None | Unset:
-            if data is None:
-                return data
-            if isinstance(data, Unset):
-                return data
-            try:
-                if not isinstance(data, str):
-                    raise TypeError()
-                deleted_at_type_0 = isoparse(data)
-
-                return deleted_at_type_0
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            return cast(datetime.datetime | None | Unset, data)
-
-        deleted_at = _parse_deleted_at(d.pop("deleted_at", UNSET))
-
-        def _parse_deleted_by(data: object) -> None | Unset | UUID:
-            if data is None:
-                return data
-            if isinstance(data, Unset):
-                return data
-            try:
-                if not isinstance(data, str):
-                    raise TypeError()
-                deleted_by_type_0 = UUID(data)
-
-                return deleted_by_type_0
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            return cast(None | Unset | UUID, data)
-
-        deleted_by = _parse_deleted_by(d.pop("deleted_by", UNSET))
-
         def _parse_validation_result(data: object) -> None | Unset | ValidationResult:
             if data is None:
                 return data
@@ -318,8 +257,6 @@ class WorkflowReadWithVersion:
             has_validation_issues=has_validation_issues,
             published_version_id=published_version_id,
             published_version_number=published_version_number,
-            deleted_at=deleted_at,
-            deleted_by=deleted_by,
             validation_result=validation_result,
         )
 

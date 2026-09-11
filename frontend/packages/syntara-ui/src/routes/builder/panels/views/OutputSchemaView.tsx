@@ -3,7 +3,7 @@ import { RhUiExternalLinkIcon } from '@patternfly/react-icons'
 import { useMemo } from 'react'
 
 import styles from '../panels.module.css'
-import { formatLeafValue, isExpandable, isUrlValue } from '../utils/treeHelpers'
+import { formatLeafValue, isExpandable, isUrlValue, toTreeItemId } from '../utils/treeHelpers'
 import { getTypeLabelFromValue } from '../utils/typeLabels'
 
 export type OutputSchemaViewProps = {
@@ -17,7 +17,7 @@ function buildReadOnlyTreeData(data: Record<string, unknown>, parentPath: string
 
     if (isExpandable(value)) {
       return {
-        id: JSON.stringify(currentPath),
+        id: toTreeItemId(currentPath),
         name: (
           <Label isCompact color="grey">
             {typeLabel} {key}
@@ -31,7 +31,7 @@ function buildReadOnlyTreeData(data: Record<string, unknown>, parentPath: string
     const formatted = formatLeafValue(value)
 
     return {
-      id: JSON.stringify(currentPath),
+      id: toTreeItemId(currentPath),
       name: (
         // eslint-disable-next-line syntara/prefer-pf-text-components, no-restricted-syntax -- span provides aria-label for tree node accessibility; PF6 has no inline text component; aria-label needed here for screen readers to announce the full tree node content
         <span aria-label={`${key}: ${formatted}, type ${typeLabel}`}>

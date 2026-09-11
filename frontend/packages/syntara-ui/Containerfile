@@ -9,8 +9,6 @@ WORKDIR /app
 COPY LICENSE /licenses/LICENSE
 COPY packages/syntara-ui/LICENSE /licenses/syntara-ui-LICENSE
 
-RUN apk add --no-cache openssl
-RUN printf "demo:$(openssl passwd -apr1 coffee)\n" > /app/.htpasswd
 COPY package.json package-lock.json ./
 COPY packages/syntara-contracts/package.json ./packages/syntara-contracts/
 COPY packages/syntara-ui/package.json ./packages/syntara-ui/
@@ -18,7 +16,6 @@ RUN npm ci --no-fund --no-audit --ignore-scripts
 COPY . .
 # Rebuild workspace packages to ensure symlinks are valid after source copy
 RUN npm rebuild
-# RUN npm run test
 RUN npm run build
 
 # Production stage - target platform will be used automatically

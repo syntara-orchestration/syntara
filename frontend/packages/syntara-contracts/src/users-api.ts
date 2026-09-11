@@ -404,7 +404,7 @@ export interface components {
        * First Name
        * @description User's first name
        */
-      first_name: string
+      first_name?: string | null
       /**
        * Last Name
        * @description User's last name

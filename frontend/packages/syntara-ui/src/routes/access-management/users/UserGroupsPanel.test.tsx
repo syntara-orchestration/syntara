@@ -186,7 +186,7 @@ describe('UserGroupsPanel', () => {
   })
 
   describe('Empty State', () => {
-    it('shows "No groups" empty state when no groups returned', () => {
+    it('shows "No groups yet" empty state when no groups returned', () => {
       vi.mocked(accessClient.useQuery).mockImplementation((_method, path) => {
         if (path === '/users/{user_id}/groups') {
           return {
@@ -210,7 +210,7 @@ describe('UserGroupsPanel', () => {
 
       render(<UserGroupsPanel userId="user-123" />, { wrapper })
 
-      expect(screen.getByText('No groups')).toBeInTheDocument()
+      expect(screen.getByText('No groups yet')).toBeInTheDocument()
       expect(screen.getByText('This user is not a member of any groups.')).toBeInTheDocument()
     })
   })
@@ -559,7 +559,7 @@ describe('UserGroupsPanel', () => {
       await user.click(actionsButtons[actionsButtons.length - 1])
 
       // Click "Remove" action
-      const removeItem = await screen.findByText('Remove')
+      const removeItem = await screen.findByText('Remove from group')
       await user.click(removeItem)
 
       // Confirmation dialog should appear
@@ -631,7 +631,7 @@ describe('UserGroupsPanel', () => {
       await user.click(actionsButtons[actionsButtons.length - 1])
 
       // Click Remove
-      const removeItem = await screen.findByText('Remove')
+      const removeItem = await screen.findByText('Remove from group')
       await user.click(removeItem)
 
       // Confirm removal
@@ -676,7 +676,7 @@ describe('UserGroupsPanel', () => {
       const actionsButtons = within(rows[2]).getAllByRole('button')
       await user.click(actionsButtons[actionsButtons.length - 1])
 
-      const removeItem = await screen.findByText('Remove')
+      const removeItem = await screen.findByText('Remove from group')
       await user.click(removeItem)
 
       // Dialog should be open
@@ -1044,7 +1044,7 @@ describe('UserGroupsPanel', () => {
       render(<UserGroupsPanel userId="user-123" />, { wrapper })
 
       // Should show empty state
-      expect(screen.getByText('No groups')).toBeInTheDocument()
+      expect(screen.getByText('No groups yet')).toBeInTheDocument()
 
       // Click "Add to group" from empty state
       const addButton = screen.getByRole('button', { name: /add to group/i })

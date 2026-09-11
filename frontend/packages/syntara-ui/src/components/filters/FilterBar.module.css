@@ -3,6 +3,7 @@
   --pf-v6-c-toolbar--PaddingBlockEnd: var(--pf-t--global--spacer--xs);
   --pf-v6-c-toolbar__content--PaddingInlineEnd: var(--pf-t--global--spacer--md);
   --pf-v6-c-toolbar__content--PaddingInlineStart: var(--pf-t--global--spacer--md);
+  --syntara-compact-filter-toggle-max-width: 9rem;
   min-width: 0;
   max-width: 100%;
 }
@@ -10,8 +11,4 @@
 .compactFilterGroup {
   flex-wrap: wrap;
   row-gap: var(--pf-t--global--spacer--xs);
-}
-
-.compact :global(.pf-v6-c-menu-toggle) {
-  max-width: 9rem;
 }

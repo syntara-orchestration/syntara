@@ -1,7 +1,7 @@
 import { Checkbox, Content, Stack, StackItem } from '@patternfly/react-core'
 import { useMemo, useEffect, useRef, useState, type Dispatch } from 'react'
 
-import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import type { DialogState } from '../../../hooks/useDialogState'
 import { useAlerts } from '../../../providers/alerts'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
@@ -172,7 +172,7 @@ export function BuilderDialogs({
     useRunConfirmState({ confirmDialogOpen, showInputDialog, dispatch, handleRunWorkflow, triggerNodeId })
   return (
     <>
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={showConfirmStep}
         onClose={closeAll}
         onConfirm={handleConfirmRun}
@@ -198,7 +198,7 @@ export function BuilderDialogs({
             />
           </StackItem>
         </Stack>
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
       <RunWorkflowModal
         key={showInputStep ? `open-${triggerNodeId ?? ''}` : 'closed'}
         isOpen={showInputStep}

@@ -406,31 +406,56 @@ export function NodeDetailsPanel(props: NodeDetailsPanelProps) {
         return true
       }
 
-      const handleCreate = (data: Record<string, unknown>) => {
-        selectedNode.onSubmit(
-          data,
-          (newNodeId?: string) => {
-            if (replacementNodeId) {
-              if (!handleReplacement(newNodeId)) {
-                showError({ title: 'Replacement failed', description: 'Failed to replace step — step not found' })
-                return
-              }
-            } else if (sourceNodeId && newNodeId) {
-              moveActivityAfter(newNodeId, sourceNodeId)
-              if (onConnect) {
-                onConnect(sourceNodeId, newNodeId)
-              }
+      const handleCreate = (data: Record<string, unknown>): Promise<boolean> =>
+        new Promise((resolve) => {
+          let settled = false
+          const settle = (ok: boolean) => {
+            if (settled) {
+              return
             }
+            settled = true
+            resolve(ok)
+          }
+          try {
+            selectedNode.onSubmit(
+              data,
+              (newNodeId?: string) => {
+                if (replacementNodeId) {
+                  if (!handleReplacement(newNodeId)) {
+                    showError({ title: 'Replacement failed', description: 'Failed to replace step — step not found' })
+                    settle(false)
+                    return
+                  }
+                } else if (sourceNodeId && newNodeId) {
+                  moveActivityAfter(newNodeId, sourceNodeId)
+                  if (onConnect) {
+                    onConnect(sourceNodeId, newNodeId)
+                  }
+                }
 
-            onClose()
-            onNodeAdded?.()
-          },
-          (error: string) => {
-            showError({ title: 'Add step failed', description: error })
-          },
-          nodeSubtypeId ?? undefined
-        )
-      }
+                onClose()
+                onNodeAdded?.()
+                settle(true)
+              },
+              (error: string) => {
+                showError({ title: 'Add step failed', description: error })
+                settle(false)
+              },
+              nodeSubtypeId ?? undefined
+            )
+            // Registry onSubmit is callback-based and sync. If neither callback
+            // ran, fail closed so AIAgentNodeForm does not hang waiting to markPersisted.
+            if (!settled) {
+              settle(false)
+            }
+          } catch (error) {
+            showError({
+              title: 'Add step failed',
+              description: error instanceof Error ? error.message : 'Failed to add step',
+            })
+            settle(false)
+          }
+        })
 
       return (
         <FormComponent

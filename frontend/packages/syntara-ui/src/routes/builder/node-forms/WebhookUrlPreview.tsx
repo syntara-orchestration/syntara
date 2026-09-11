@@ -1,7 +1,7 @@
 import { ClipboardCopy, Flex, FlexItem, FormGroup, StackItem } from '@patternfly/react-core'
 import type { ReactNode } from 'react'
 
-import { NxLabel } from '../../../components/labels/NxLabel'
+import { SynLabel } from '../../../components/labels/SynLabel'
 
 type WebhookUrlPreviewProps = {
   /** Full webhook URL to display in the ClipboardCopy field. */
@@ -29,7 +29,7 @@ export function WebhookUrlPreview({
       <FormGroup label={urlLabel} fieldId={`${fieldIdPrefix}-url`}>
         <Flex gap={{ default: 'gapSm' }} alignItems={{ default: 'alignItemsCenter' }}>
           <FlexItem>
-            <NxLabel color="blue">{methodLabel}</NxLabel>
+            <SynLabel color="blue">{methodLabel}</SynLabel>
           </FlexItem>
           <FlexItem grow={{ default: 'grow' }}>
             <ClipboardCopy isReadOnly aria-label="Webhook URL">

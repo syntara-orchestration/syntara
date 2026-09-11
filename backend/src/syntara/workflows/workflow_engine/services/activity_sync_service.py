@@ -7,7 +7,6 @@ to the database in real-time by streaming Temporal history events.
 import asyncio
 import json
 import random
-import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -53,6 +52,10 @@ from syntara.workflows.workflow_engine.activities.common import (
 )
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, NodeType
 from syntara.workflows.workflow_engine.utils.credential_scrubber import scrub_credentials
+from syntara.workflows.workflow_engine.utils.loop_iteration_ids import (
+    innermost_iteration_index,
+    strip_loop_iteration_suffixes,
+)
 from syntara.workflows.workflow_engine.utils.timeout_messages import build_timeout_error_message
 
 PRE_RESOLVED_ACTIVITY_ID_PREFIX = "pre-resolved-"
@@ -75,9 +78,6 @@ _DESCRIBE_PROBE_MAX_DELAY_S = 30.0
 _DESCRIBE_PROBE_BACKOFF_FACTOR = 2.0
 _DESCRIBE_PROBE_MAX_TOTAL_S = 600.0  # 10 minutes
 _DESCRIBE_PROBE_MAX_TASKS = 25
-
-_ITER_SUFFIX_RE = re.compile(r"_iter_\d+$")
-_ITER_CAPTURE_RE = re.compile(r"_iter_(\d+)$")
 
 # Wire-format separator for per-iteration composite keys (e.g. "body-1#iter-2").
 # Mirrored in frontend: packages/syntara-ui/src/routes/workflows/execution/utils/activityState.ts
@@ -850,7 +850,8 @@ class ActivitySyncService:
         if not update or update["status"] != ActivityStatus.PENDING:
             return
 
-        activity_def = metadata.activity_definitions_map.get(event.activity_id, {})
+        canvas_id = strip_loop_iteration_suffixes(event.activity_id)
+        activity_def = metadata.activity_definitions_map.get(canvas_id, {})
         activity_type = activity_def.get("type")
         new_status = (
             ActivityStatus.WAITING if activity_type in (NodeType.APPROVAL, NodeType.WAIT) else ActivityStatus.RUNNING
@@ -933,6 +934,7 @@ class ActivitySyncService:
             if failed_node_map is None:
                 failed_node_map = self._extract_failed_activities_from_event(event)
             await self._sync_skipped_nodes(metadata, handle)
+            await self._sync_detached_nodes(metadata, handle)
             await self._update_execution_status_from_event(metadata, event, failed_node_map)
             metadata.last_processed_event_id = event.event_id
             return True
@@ -954,13 +956,15 @@ class ActivitySyncService:
             if attrs and not attrs.activity_id.startswith("__internal__"):
                 probe_tasks[:] = [t for t in probe_tasks if not t.done()]
                 if len(probe_tasks) < _DESCRIBE_PROBE_MAX_TASKS:
-                    activity_id = _ITER_SUFFIX_RE.sub("", attrs.activity_id)
+                    # Temporal pending_activities is keyed by the real activity_id
+                    # (e.g. approval_iter_0). Strip only when looking up canvas
+                    # definitions after STARTED is observed.
                     probe_tasks.append(
                         asyncio.create_task(
                             self._schedule_describe_probe(
                                 handle,
                                 queue,
-                                activity_id,
+                                attrs.activity_id,
                                 event.event_id,
                             )
                         )
@@ -1164,16 +1168,22 @@ class ActivitySyncService:
         attrs = event.activity_task_scheduled_event_attributes
         if attrs.activity_id.startswith("__internal__"):
             return
-        match = _ITER_CAPTURE_RE.search(attrs.activity_id)
-        if match:
-            base_activity_id = attrs.activity_id[: match.start()]
-            iteration_number: int | None = int(match.group(1))
+        iteration_number = innermost_iteration_index(attrs.activity_id)
+        if iteration_number is not None:
+            base_activity_id = strip_loop_iteration_suffixes(attrs.activity_id)
             has_iter_suffix = True
         else:
             base_activity_id = attrs.activity_id
-            iteration_number = None
             has_iter_suffix = False
         is_loop_iteration = has_iter_suffix or base_activity_id in metadata.terminal_activity_ids
+        # Loop *control* nodes use `{loop_id}_iter_{n}` (or
+        # `{loop_id}_iter_{outer}_iter_{inner}` when nested). Body nodes inside
+        # a loop (e.g. approval) reuse that suffix for uniqueness; they must
+        # not be classified as control or their status is held at RUNNING
+        # between iterations. Unknown type keeps the historical control
+        # heuristic so tests without a definitions map still pass.
+        activity_type = metadata.activity_definitions_map.get(base_activity_id, {}).get("type")
+        is_loop_control = has_iter_suffix and activity_type in (None, NodeType.LOOP)
         configured_timeout_seconds: float | None = None
         if attrs.start_to_close_timeout and attrs.start_to_close_timeout.seconds > 0:
             configured_timeout_seconds = attrs.start_to_close_timeout.seconds + (
@@ -1184,7 +1194,7 @@ class ActivitySyncService:
             "activity_id": base_activity_id,
             "activity_name": base_activity_id,
             "_is_loop_iteration": is_loop_iteration,
-            "_is_loop_control": has_iter_suffix,
+            "_is_loop_control": is_loop_control,
             "status": ActivityStatus.PENDING,
             "started_at": None,
             "completed_at": None,
@@ -1291,6 +1301,14 @@ class ActivitySyncService:
 
     def _process_activity_failed(self, event: HistoryEvent, metadata: ExecutionMonitorMetadata) -> None:
         """Process ACTIVITY_TASK_FAILED event."""
+        # TODO(https://redhat.atlassian.net/browse/AAP-86855): InvocationCancelledError raises a
+        # non-retryable ApplicationError, which Temporal records as
+        # ACTIVITY_TASK_FAILED. This unconditionally sets ActivityStatus.FAILED.
+        # Once the activity row is terminal, _sync_nodes_to_terminal_status
+        # skips it, so the Execute Invocation step shows "Failed" even though
+        # the execution-level status is CANCELLED.  Inspect
+        # attrs.failure.application_failure_info.type for
+        # "InvocationCancelledError" and set ActivityStatus.CANCELLED instead.
         attrs = event.activity_task_failed_event_attributes
         scheduled_id = attrs.scheduled_event_id
         if scheduled_id in metadata.pending_activity_updates:
@@ -1345,7 +1363,7 @@ class ActivitySyncService:
             metadata.pending_sync_event_ids.add(scheduled_id)
             metadata.terminal_activity_ids.add(update["activity_id"])
 
-    def _extract_execution_status_from_event(self, event: HistoryEvent) -> tuple[ExecutionStatus, datetime, str | None]:  # noqa: C901
+    def _extract_execution_status_from_event(self, event: HistoryEvent) -> tuple[ExecutionStatus, datetime, str | None]:  # noqa: C901, PLR0912
         """Extract execution status, completion time, and error from workflow completion event.
 
         Args:
@@ -1373,7 +1391,9 @@ class ActivitySyncService:
                     result_data = json.loads(payload.data)
                     if isinstance(result_data, dict):
                         inner_status = result_data.get("status")
-                        if inner_status == "failed":
+                        if inner_status == "cancelled":
+                            status = ExecutionStatus.CANCELLED
+                        elif inner_status == "failed":
                             status = ExecutionStatus.FAILED
                             error_details = self._extract_failed_activity_errors(result_data)
                         elif inner_status == "completed_with_errors":
@@ -1785,6 +1805,11 @@ class ActivitySyncService:
         elif event_type == EventType.EVENT_TYPE_ACTIVITY_TASK_CANCELED:
             self._process_activity_canceled(event, metadata)
 
+    @staticmethod
+    def _merge_output(initial: dict[str, Any] | None, queried: dict[str, Any]) -> dict[str, Any]:
+        """Merge heartbeat partial output with workflow-queried output."""
+        return {**initial, **queried} if initial else queried
+
     async def _query_activity_io(
         self,
         handle: WorkflowHandle[Any, Any],
@@ -1815,7 +1840,7 @@ class ActivitySyncService:
             input_data = await handle.query("get_activity_input", activity_id) or {}
             queried_output = await handle.query("get_activity_output", activity_id)
             if queried_output is not None:
-                output_data = queried_output
+                output_data = self._merge_output(initial_output_data, queried_output)
 
             # Race condition mitigation: If activity is completed but output is None,
             # retry the query. This handles the case where Temporal emits the
@@ -1837,7 +1862,7 @@ class ActivitySyncService:
                     await asyncio.sleep(delay_ms / 1000.0)
                     queried_output = await handle.query("get_activity_output", activity_id)
                     if queried_output is not None:
-                        output_data = queried_output
+                        output_data = self._merge_output(initial_output_data, queried_output)
                         logger.debug(
                             "Successfully retrieved output on retry",
                             activity_id=activity_id,
@@ -2463,6 +2488,45 @@ class ActivitySyncService:
         except Exception:
             logger.exception(
                 "Error syncing skipped nodes to database",
+                execution_id=metadata.execution_id,
+            )
+
+    async def _sync_detached_nodes(
+        self,
+        metadata: ExecutionMonitorMetadata,
+        handle: WorkflowHandle[Any, Any],
+    ) -> None:
+        """Query workflow for detached nodes and mark them as CANCELLED in the database.
+
+        Detached nodes were in-flight when a converge ANY strategy fired.  They are
+        not in skipped_nodes (the workflow deliberately excludes them so their actual
+        Temporal result is preserved when possible), but if the workflow finishes
+        before the detached activity completes, the safety net would otherwise label
+        them SKIPPED.  Querying here and writing CANCELLED first wins the race against
+        _finalize_non_terminal_activities, whose terminal-status guard then leaves the
+        record untouched.
+        """
+        detached_node_ids: list[str] = []
+        try:
+            detached_node_ids = await handle.query("get_detached_nodes")
+        except Exception:
+            logger.exception(
+                "Error querying detached nodes",
+                execution_id=metadata.execution_id,
+            )
+
+        if not detached_node_ids:
+            return
+
+        try:
+            await self._sync_nodes_to_terminal_status(
+                metadata,
+                node_ids=detached_node_ids,
+                target_status=ActivityStatus.CANCELLED,
+            )
+        except Exception:
+            logger.exception(
+                "Error syncing detached nodes to cancelled status",
                 execution_id=metadata.execution_id,
             )
 

@@ -14,7 +14,7 @@ import { RhUiErrorIcon } from '@patternfly/react-icons'
 import type { ReactElement, Ref } from 'react'
 import { Controller, type Control, type ControllerFieldState, type ControllerRenderProps } from 'react-hook-form'
 
-import { NxSelect } from '../../../../components/NxSelect'
+import { SynSelect } from '../../../../components/SynSelect'
 
 import { type IdentityProviderFormData } from './identityProviderFormSchema'
 import { idpHelp } from './idpFieldHelp'
@@ -236,7 +236,7 @@ function ClaimFieldBody({ meta, controller, typeahead }: ClaimFieldBodyProps) {
   return (
     <FormGroup label={label} fieldId={name} isRequired={isRequired} labelHelp={labelHelp}>
       {showDropdown ? (
-        <NxSelect
+        <SynSelect
           id={name}
           isOpen={isOpen}
           selected={currentValue || undefined}
@@ -260,7 +260,7 @@ function ClaimFieldBody({ meta, controller, typeahead }: ClaimFieldBodyProps) {
               filterValue={filterValue}
             />
           </SelectList>
-        </NxSelect>
+        </SynSelect>
       ) : (
         <TextInput
           id={name}

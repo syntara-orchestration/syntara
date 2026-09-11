@@ -87,7 +87,7 @@ class PercentileStats(SQLModel):
 
 
 class ComponentKPISummary(SQLModel):
-    """KPI summary for a single Syntara component."""
+    """KPI summary for a single Orchestrator component."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]
 
@@ -136,7 +136,7 @@ class MetricsRecordPage(SQLModel):
 
 
 class KPIDashboard(SQLModel):
-    """Full KPI dashboard covering all Syntara components."""
+    """Full KPI dashboard covering all Orchestrator components."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]
 
@@ -480,11 +480,11 @@ async def metrics_store_records(
 async def metrics_store_kpis(
     recorder: Annotated[MetricsRecorder, Depends(get_metrics_recorder)],
 ) -> KPIDashboard:
-    """Return a computed KPI dashboard covering all Syntara components.
+    """Return a computed KPI dashboard covering all Orchestrator components.
 
-    Maps metrics to the KPIs defined in the Syntara KPI documents:
-    - Syntara Key Performance Indicators (KPIs)
-    - Syntara LLM/Agent Performance KPIs
+    Maps metrics to the KPIs defined in the Orchestrator KPI documents:
+    - Orchestrator Key Performance Indicators (KPIs)
+    - Orchestrator LLM/Agent Performance KPIs
     """
     await _guard(recorder)
     return _build_kpi_dashboard(recorder)

@@ -109,7 +109,7 @@ describe('useWorkflowVerification', () => {
     expect(clearCall).toBeDefined()
 
     await waitFor(() => {
-      expect(mockShowSuccess).toHaveBeenCalledWith({ title: 'Workflow definition is valid' })
+      expect(mockShowSuccess).toHaveBeenCalledWith({ title: 'Workflow verified' })
     })
   })
 
@@ -128,7 +128,7 @@ describe('useWorkflowVerification', () => {
 
     await waitFor(() => {
       expect(mockDispatch).toHaveBeenCalledWith({ type: 'CLEAR_VALIDATION_ERRORS' })
-      expect(mockShowSuccess).toHaveBeenCalledWith({ title: 'Workflow definition is valid' })
+      expect(mockShowSuccess).toHaveBeenCalledWith({ title: 'Workflow verified' })
     })
   })
 
@@ -382,7 +382,7 @@ describe('useWorkflowVerification', () => {
       act(() => result.current.handleVerify())
 
       await waitFor(() => {
-        expect(mockShowSuccess).toHaveBeenCalledWith({ title: 'Workflow definition is valid' })
+        expect(mockShowSuccess).toHaveBeenCalledWith({ title: 'Workflow verified' })
       })
     })
 

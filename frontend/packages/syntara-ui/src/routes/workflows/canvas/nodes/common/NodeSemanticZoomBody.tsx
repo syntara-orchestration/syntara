@@ -4,6 +4,7 @@ import type { CSSProperties, ReactNode } from 'react'
 import { SEMANTIC_ZOOM_BAR_HEIGHT_PX } from '../../semanticZoom'
 import type { SemanticZoomBranchSource } from '../../semanticZoomTypes'
 
+import styles from './NodeSemanticZoomBody.module.css'
 import { SemanticZoomBranchSourceHandles } from './SemanticZoomBranchSourceHandles'
 
 export function NodeSemanticZoomBody(props: {
@@ -70,7 +71,7 @@ export function NodeSemanticZoomBody(props: {
     width: '100%',
     height: SEMANTIC_ZOOM_BAR_HEIGHT_PX,
     minHeight: SEMANTIC_ZOOM_BAR_HEIGHT_PX,
-    // Not role=button, but the node still selects / opens the builder detail path like full-size nodes
+    // Click bubbles to the ReactFlow node, which selects / opens the builder detail path.
     cursor: 'pointer',
   }
 
@@ -78,22 +79,12 @@ export function NodeSemanticZoomBody(props: {
     <div style={rowStyle}>
       <Tooltip content={tooltipContent} position="top">
         {/*
-          PatternFly Tooltip opens on focus; tabIndex gives keyboard users a trigger. role="group" + aria-label
-          name the bar for SRs (not a button).
+          PatternFly Tooltip opens on focus; the native <button> gives keyboard
+          users a focus target and announces the node name + type to screen readers.
         */}
-        {/* eslint-disable jsx-a11y/no-noninteractive-tabindex -- focus target for tooltip; group is not a button */}
-        <div
-          role="group"
-          aria-label={`${props.title}, ${props.typeLabel}`}
-          tabIndex={0}
-          style={{
-            width: '100%',
-            height: '100%',
-          }}
-        >
+        <button type="button" aria-label={`${props.title}, ${props.typeLabel}`} className={styles.tooltipTrigger}>
           <div style={baseBarStyle} />
-        </div>
-        {/* eslint-enable jsx-a11y/no-noninteractive-tabindex */}
+        </button>
       </Tooltip>
       <SemanticZoomBranchSourceHandles handles={props.branchSources ?? []} />
     </div>

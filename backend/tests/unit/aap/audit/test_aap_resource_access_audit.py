@@ -152,7 +152,7 @@ class TestAAPResourceAccessHandler:
         assert result.structured_data.credential_used is True
 
     def test_credential_not_used_tracking(self) -> None:
-        """credential_used=False (env-level auth) is captured."""
+        """credential_used=False is captured when the event records no Orchestrator credential."""
         event = AAPResourceAccessEvent(
             resource_type=AAPResourceType.LABELS,
             action=AAPAccessAction.LIST,

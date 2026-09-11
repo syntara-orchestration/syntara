@@ -12,15 +12,16 @@ import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
 import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
-import type { KebabAction } from '../../../components/NxKebabMenu'
-import { NxKebabMenu } from '../../../components/NxKebabMenu'
 import {
-  NxListPanel,
-  NxListPanelTable,
-  NxListPanelToolbar,
-  NxListPanelView,
-} from '../../../components/panels/list/NxListPanel'
+  SynListPanel,
+  SynListPanelTable,
+  SynListPanelToolbar,
+  SynListPanelView,
+} from '../../../components/panels/list/SynListPanel'
+import type { KebabAction } from '../../../components/SynKebabMenu'
+import { SynKebabMenu } from '../../../components/SynKebabMenu'
 import { SynPageTitle } from '../../../components/SynPageTitle'
+import { DateCell } from '../../../components/table/DateCell'
 import { LinkCell } from '../../../components/table/LinkCell'
 import { useCursorPagination, useCursorReset } from '../../../hooks/useCursorPagination'
 import type { FilterFieldDefinition } from '../../../types/filters'
@@ -93,6 +94,7 @@ function IntegrationsTableContent({
           <Th sort={getSortParams('integration_type')}>Integration type</Th>
           <Th>API URL</Th>
           <Th>Enabled resources</Th>
+          <Th sort={getSortParams('last_validated_at')}>Last checked</Th>
           <Th sort={getSortParams('enabled')}>State</Th>
           <Th screenReaderText="Actions" />
         </Tr>
@@ -122,6 +124,9 @@ function IntegrationsTableContent({
             <Td dataLabel="Enabled resources">
               <Badge isRead>{getEnabledResourceCount(integration)}</Badge>
             </Td>
+            <Td dataLabel="Last checked">
+              <DateCell dateString={integration.last_validated_at} />
+            </Td>
             <Td dataLabel="State">
               {permissions.isLoading || !permissions.canUpdate ? (
                 <Tooltip content={permissions.tooltips.enable}>
@@ -144,7 +149,7 @@ function IntegrationsTableContent({
               )}
             </Td>
             <Td isActionCell>
-              <NxKebabMenu
+              <SynKebabMenu
                 actions={buildRowActions(integration, validateDialog, deleteDialog, permissions)}
                 aria-label={`Actions for ${integration.name}`}
               />
@@ -242,8 +247,8 @@ export default function Integrations() {
       />
 
       <SynPageBody>
-        <NxListPanel>
-          <NxListPanelView
+        <SynListPanel>
+          <SynListPanelView
             isPending={query.isPending}
             error={query.error}
             onRetry={() => detachPromise(query.refetch())}
@@ -253,7 +258,7 @@ export default function Integrations() {
             noDataState={<IntegrationEmptyState canCreate={permissions.canCreate} />}
             toolbar={
               !isEmpty || hasActiveFilters ? (
-                <NxListPanelToolbar
+                <SynListPanelToolbar
                   filters={filters}
                   filterDefinitions={filterFieldDefinitions}
                   onFilterChange={handleFilterChange}
@@ -262,7 +267,7 @@ export default function Integrations() {
               ) : undefined
             }
             body={
-              <NxListPanelTable caption="Integrations" footer={getFooterProps(query.data)}>
+              <SynListPanelTable caption="Integrations" footer={getFooterProps(query.data)}>
                 <IntegrationsTableContent
                   results={results}
                   getSortParams={getSortParams}
@@ -271,10 +276,10 @@ export default function Integrations() {
                   handleToggleEnabled={handleToggleEnabled}
                   permissions={permissions}
                 />
-              </NxListPanelTable>
+              </SynListPanelTable>
             }
           />
-        </NxListPanel>
+        </SynListPanel>
       </SynPageBody>
 
       <IntegrationDialogs

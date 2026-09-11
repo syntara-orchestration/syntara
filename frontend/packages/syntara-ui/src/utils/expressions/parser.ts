@@ -45,11 +45,11 @@ const CONDITION_REGEX = new RegExp(String.raw`^(.+?)\s*(${[...SYMBOL_OPERATORS, 
  * @returns Expression tree or { root: null } if empty/unparseable
  *
  * @example
- * parseExpression('${input.age} >= 18')
- * // Returns: { root: { type: 'condition', variable: 'input.age', operator: '>=', value: '18' } }
+ * parseExpression('${trigger.age} >= 18')
+ * // Returns: { root: { type: 'condition', variable: 'trigger.age', operator: '>=', value: '18' } }
  *
  * @example
- * parseExpression('${input.age} >= 18 && ${input.score} > 50')
+ * parseExpression('${trigger.age} >= 18 && ${trigger.score} > 50')
  * // Returns: { root: { type: 'group', operator: 'AND', children: [...] } }
  *
  * @example
@@ -212,7 +212,7 @@ export function parseNode(expr: string): ExpressionNode {
 
   // Handle NOT operator - applies to both conditions and groups
   // Supports both ! and not for backward compatibility
-  // Examples: not (input.age >= 18) or !(input.age >= 18) for conditions
+  // Examples: not (trigger.age >= 18) or !(trigger.age >= 18) for conditions
   //           not ((A && B)) or !((A && B)) for groups
   const negateMatch = /^(?:!|not)\s*\((.+)\)$/.exec(expr)
   if (negateMatch) {
@@ -247,7 +247,7 @@ export function parseNode(expr: string): ExpressionNode {
  *
  * Variables should be wrapped with ${...}, values should not be.
  *
- * @param expr - Condition string like "${input.age} >= 18" or "${name} contains admin"
+ * @param expr - Condition string like "${trigger.age} >= 18" or "${name} contains admin"
  * @returns ExpressionCondition
  * @throws Error if not a valid condition
  */

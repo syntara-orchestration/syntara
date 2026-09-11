@@ -17,7 +17,7 @@ import { createWorkflowViaApi, deleteWorkflowViaApi } from '../seeds/resources'
 import { ensureProject } from '../utils/api'
 
 test.describe('Workflows Table - Display and Navigation', () => {
-  test.skip('workflows table displays with name and state columns', async ({ app }) => {
+  test('workflows table displays with name and state columns', async ({ app }) => {
     // Create a workflow specifically for this test
     const project = await ensureProject(app)
     const workflowName = buildUniqueName('e2e-table-display')
@@ -25,8 +25,6 @@ test.describe('Workflows Table - Display and Navigation', () => {
       name: workflowName,
       projectId: project?.id,
     })
-
-    if (!workflow) throw new Error('Failed to create test workflow')
 
     try {
       // Navigate to workflows page
@@ -41,7 +39,6 @@ test.describe('Workflows Table - Display and Navigation', () => {
       await expect(table.getByRole('columnheader', { name: 'Name' })).toBeVisible()
       await expect(table.getByRole('columnheader', { name: 'Created at' })).toBeVisible()
       await expect(table.getByRole('columnheader', { name: 'Updated at' })).toBeVisible()
-      await expect(table.getByRole('columnheader', { name: 'Tags' })).toBeVisible()
       await expect(table.getByRole('columnheader', { name: 'State' })).toBeVisible()
 
       // Verify our workflow row exists
@@ -59,8 +56,6 @@ test.describe('Workflows Table - Display and Navigation', () => {
       name: workflowName,
       projectId: project?.id,
     })
-
-    if (!workflow) throw new Error('Failed to create test workflow')
 
     try {
       // Navigate to workflows page and filter for our specific workflow
@@ -91,8 +86,6 @@ test.describe('Workflows Table - Display and Navigation', () => {
       name: workflowName,
       projectId: project?.id,
     })
-
-    if (!workflow) throw new Error('Failed to create test workflow')
 
     try {
       await app.goto(toAppUrl('/workflows'))
@@ -131,8 +124,6 @@ test.describe('Workflows Table - Display and Navigation', () => {
       name: workflowName,
       projectId: project?.id,
     })
-
-    if (!workflow) throw new Error('Failed to create test workflow')
 
     try {
       // Navigate to workflows page

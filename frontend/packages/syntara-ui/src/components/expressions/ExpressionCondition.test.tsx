@@ -40,7 +40,7 @@ describe('ExpressionCondition', () => {
   it('renders condition with all fields', () => {
     render(<ExpressionCondition {...defaultProps} />)
 
-    expect(screen.getByPlaceholderText('e.g. ${input.age}')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('e.g. ${trigger.age}')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('Enter or drag and drop value')).toBeInTheDocument()
 
     const operatorToggle = screen.getByRole('button', { name: 'Comparison operator' })
@@ -75,23 +75,23 @@ describe('ExpressionCondition', () => {
   })
 
   it('displays variable with ${} wrapper when not focused', () => {
-    const condition = { ...createDefaultCondition(), variable: 'input.age' }
+    const condition = { ...createDefaultCondition(), variable: 'trigger.age' }
     render(<ExpressionCondition {...defaultProps} condition={condition} />)
 
-    expect(screen.getByDisplayValue('${input.age}')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('${trigger.age}')).toBeInTheDocument()
   })
 
   it('keeps ${} wrapper when focused and on blur', async () => {
     const user = userEvent.setup()
-    const condition = { ...createDefaultCondition(), variable: 'input.age' }
+    const condition = { ...createDefaultCondition(), variable: 'trigger.age' }
     render(<ExpressionCondition {...defaultProps} condition={condition} />)
 
-    const fieldInput = screen.getByDisplayValue('${input.age}')
+    const fieldInput = screen.getByDisplayValue('${trigger.age}')
     await user.click(fieldInput)
-    expect(screen.getByDisplayValue('${input.age}')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('${trigger.age}')).toBeInTheDocument()
 
     await user.tab()
-    expect(screen.getByDisplayValue('${input.age}')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('${trigger.age}')).toBeInTheDocument()
   })
 
   it('strips ${} wrapper on blur when user pastes wrapped variable', async () => {
@@ -99,7 +99,7 @@ describe('ExpressionCondition', () => {
     const condition = { ...createDefaultCondition(), variable: '' }
     render(<ControlledExpressionCondition initialCondition={condition} />)
 
-    const fieldInput = screen.getByPlaceholderText('e.g. ${input.age}')
+    const fieldInput = screen.getByPlaceholderText('e.g. ${trigger.age}')
     await user.click(fieldInput)
     await user.paste('${output.name}')
     expect(screen.getByDisplayValue('${output.name}')).toBeInTheDocument()
@@ -113,12 +113,12 @@ describe('ExpressionCondition', () => {
     const condition = { ...createDefaultCondition(), variable: '' }
     render(<ControlledExpressionCondition initialCondition={condition} />)
 
-    const fieldInput = screen.getByPlaceholderText('e.g. ${input.age}')
-    await user.type(fieldInput, 'input.age')
+    const fieldInput = screen.getByPlaceholderText('e.g. ${trigger.age}')
+    await user.type(fieldInput, 'trigger.age')
 
-    expect(screen.getByDisplayValue('input.age')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('trigger.age')).toBeInTheDocument()
     await user.tab()
-    expect(screen.getByDisplayValue('${input.age}')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('${trigger.age}')).toBeInTheDocument()
   })
 
   it('does not strip ${ during typing', async () => {
@@ -126,7 +126,7 @@ describe('ExpressionCondition', () => {
     const condition = { ...createDefaultCondition(), variable: '' }
     render(<ControlledExpressionCondition initialCondition={condition} />)
 
-    const fieldInput = screen.getByPlaceholderText('e.g. ${input.age}')
+    const fieldInput = screen.getByPlaceholderText('e.g. ${trigger.age}')
     await user.type(fieldInput, '$')
     expect(screen.getByDisplayValue('$')).toBeInTheDocument()
   })
@@ -135,26 +135,26 @@ describe('ExpressionCondition', () => {
     const onChange = vi.fn()
     render(<ExpressionCondition {...defaultProps} onChange={onChange} />)
 
-    const fieldInput = screen.getByPlaceholderText('e.g. ${input.age}')
-    const data: Record<string, string> = { 'text/plain': '${input.name}' }
+    const fieldInput = screen.getByPlaceholderText('e.g. ${trigger.age}')
+    const data: Record<string, string> = { 'text/plain': '${trigger.name}' }
     fireEvent.drop(fieldInput, {
       dataTransfer: { getData: (key: string) => data[key] ?? '' },
     })
 
-    expect(onChange).toHaveBeenCalledWith({ variable: 'input.name' })
+    expect(onChange).toHaveBeenCalledWith({ variable: 'trigger.name' })
   })
 
   it('accepts drag-and-drop onto a field that previously had a value', async () => {
     const user = userEvent.setup()
-    const condition = { ...createDefaultCondition(), variable: 'input.age' }
+    const condition = { ...createDefaultCondition(), variable: 'trigger.age' }
     render(<ControlledExpressionCondition initialCondition={condition} />)
 
-    const fieldInput = screen.getByDisplayValue('${input.age}')
+    const fieldInput = screen.getByDisplayValue('${trigger.age}')
     await user.click(fieldInput)
     await user.clear(fieldInput)
     await user.tab()
 
-    const emptyField = screen.getByPlaceholderText('e.g. ${input.age}')
+    const emptyField = screen.getByPlaceholderText('e.g. ${trigger.age}')
     const data: Record<string, string> = { 'text/plain': '${output.result}' }
     fireEvent.drop(emptyField, {
       dataTransfer: { getData: (key: string) => data[key] ?? '' },
@@ -168,11 +168,11 @@ describe('ExpressionCondition', () => {
     const onChange = vi.fn()
     render(<ExpressionCondition {...defaultProps} onChange={onChange} />)
 
-    const fieldInput = screen.getByPlaceholderText('e.g. ${input.age}')
-    await user.type(fieldInput, 'input.age')
+    const fieldInput = screen.getByPlaceholderText('e.g. ${trigger.age}')
+    await user.type(fieldInput, 'trigger.age')
     await user.tab()
 
-    expect(onChange).toHaveBeenCalledWith({ variable: 'input.age' })
+    expect(onChange).toHaveBeenCalledWith({ variable: 'trigger.age' })
   })
 
   it('updates operator field', async () => {
@@ -291,7 +291,7 @@ describe('ExpressionCondition', () => {
     const condition = { ...createDefaultCondition(), variable: '' }
     render(<ExpressionCondition {...defaultProps} condition={condition} error={true} />)
 
-    const fieldInput = screen.getByPlaceholderText('e.g. ${input.age}')
+    const fieldInput = screen.getByPlaceholderText('e.g. ${trigger.age}')
     expect(fieldInput).toHaveAttribute('aria-invalid', 'true')
   })
 
@@ -308,11 +308,11 @@ describe('ExpressionCondition', () => {
     const condition = { ...createDefaultCondition(), variable: '' }
     render(<ExpressionCondition {...defaultProps} condition={condition} error={true} />)
 
-    const fieldInput = screen.getByPlaceholderText('e.g. ${input.age}')
+    const fieldInput = screen.getByPlaceholderText('e.g. ${trigger.age}')
     expect(fieldInput).toHaveAttribute('aria-invalid', 'true')
 
     await user.click(fieldInput)
-    await user.type(fieldInput, 'input.age')
+    await user.type(fieldInput, 'trigger.age')
     expect(fieldInput).not.toHaveAttribute('aria-invalid', 'true')
   })
 
@@ -320,7 +320,7 @@ describe('ExpressionCondition', () => {
     const condition = { ...createDefaultCondition(), variable: '', value: '' }
     render(<ExpressionCondition {...defaultProps} condition={condition} error={false} />)
 
-    expect(screen.getByPlaceholderText('e.g. ${input.age}')).not.toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByPlaceholderText('e.g. ${trigger.age}')).not.toHaveAttribute('aria-invalid', 'true')
     expect(screen.getByPlaceholderText('Enter or drag and drop value')).not.toHaveAttribute('aria-invalid', 'true')
   })
 
@@ -374,7 +374,7 @@ describe('ExpressionCondition', () => {
       const onChange = vi.fn()
       render(<ExpressionCondition {...defaultProps} onChange={onChange} />)
 
-      const fieldInput = screen.getByPlaceholderText('e.g. ${input.age}')
+      const fieldInput = screen.getByPlaceholderText('e.g. ${trigger.age}')
       const data: Record<string, string> = { 'text/plain': text }
       fireEvent.drop(fieldInput, {
         dataTransfer: { getData: (key: string) => data[key] ?? '' },
@@ -388,7 +388,7 @@ describe('ExpressionCondition', () => {
       const onChange = vi.fn()
       render(<ExpressionCondition {...defaultProps} onChange={onChange} />)
 
-      const fieldInput = screen.getByPlaceholderText('e.g. ${input.age}')
+      const fieldInput = screen.getByPlaceholderText('e.g. ${trigger.age}')
       await user.type(fieldInput, 'foo bar!')
       await user.tab()
 
@@ -399,7 +399,7 @@ describe('ExpressionCondition', () => {
       const onChange = vi.fn()
       render(<ExpressionCondition {...defaultProps} onChange={onChange} />)
 
-      const fieldInput = screen.getByPlaceholderText('e.g. ${input.age}')
+      const fieldInput = screen.getByPlaceholderText('e.g. ${trigger.age}')
       const data: Record<string, string> = { 'text/plain': '${fetch_order.output.riskScore}' }
       fireEvent.drop(fieldInput, {
         dataTransfer: { getData: (key: string) => data[key] ?? '' },
@@ -412,7 +412,7 @@ describe('ExpressionCondition', () => {
       const user = userEvent.setup()
       render(<ExpressionCondition {...defaultProps} onChange={vi.fn()} />)
 
-      const fieldInput = screen.getByPlaceholderText('e.g. ${input.age}')
+      const fieldInput = screen.getByPlaceholderText('e.g. ${trigger.age}')
       await user.type(fieldInput, '123bad')
       await user.tab()
 
@@ -424,7 +424,7 @@ describe('ExpressionCondition', () => {
       const user = userEvent.setup()
       render(<ExpressionCondition {...defaultProps} onChange={vi.fn()} />)
 
-      const fieldInput = screen.getByPlaceholderText('e.g. ${input.age}')
+      const fieldInput = screen.getByPlaceholderText('e.g. ${trigger.age}')
       await user.type(fieldInput, '123bad')
       await user.tab()
       expect(screen.getByText(/Invalid variable name/)).toBeInTheDocument()
@@ -439,7 +439,7 @@ describe('ExpressionCondition', () => {
       const onChange = vi.fn()
       render(<ExpressionCondition {...defaultProps} onChange={onChange} />)
 
-      const fieldInput = screen.getByPlaceholderText('e.g. ${input.age}')
+      const fieldInput = screen.getByPlaceholderText('e.g. ${trigger.age}')
       await user.type(fieldInput, 'foo.__proto__.bar')
       await user.tab()
 
@@ -452,7 +452,7 @@ describe('ExpressionCondition', () => {
       const onChange = vi.fn()
       render(<ExpressionCondition {...defaultProps} onChange={onChange} />)
 
-      const fieldInput = screen.getByPlaceholderText('e.g. ${input.age}')
+      const fieldInput = screen.getByPlaceholderText('e.g. ${trigger.age}')
       await user.type(fieldInput, 'obj.constructor')
       await user.tab()
 

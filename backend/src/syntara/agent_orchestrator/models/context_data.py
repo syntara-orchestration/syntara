@@ -190,6 +190,7 @@ class InvocationContextData(BaseModel):
     activity_name: str | None = None
     execution_id: str | None = None
     callback_url: SecretStr | None = None
+    timeout_seconds: int | None = None
     input_data: dict[str, Any] | None = None
     metadata: InvocationMetadata | None = None
 

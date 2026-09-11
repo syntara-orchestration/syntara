@@ -3,7 +3,7 @@
 ## Quick Start
 
 ```bash
-# Standard tests (fast, jsdom)
+# Standard tests (fast, happy-dom)
 npm test                    # Run all tests with linting and type checking
 npm run vitest              # Run tests only
 npm run test:coverage       # Run tests with coverage
@@ -15,36 +15,26 @@ npm run e2e:ui                # Run E2E tests with Playwright UI
 
 ## Coverage Requirements
 
-**All new and modified files should meet 80% coverage:**
+**CI (blocks merge):** merged coverage must be **85% statements**
+(`nyc check-coverage --statements 85` via `scripts/merge-coverage.js`). Global,
+not per-file. There is no `scripts/check-pr-coverage.js`.
 
-- Statements: 80%
-- Branches: 80%
-- Functions: 80%
-- Lines: 80%
+**Authoring target:** ~80% statements/branches/functions/lines on new files so
+the global gate does not regress. Utilities 90%+.
 
 ### How It Works
 
 1. **Write your code** - Create or modify source files in `src/`
-2. **Write tests** - Aim for 80%+ coverage on your changes
+2. **Write tests** - Aim for 80%+ coverage on new files
 3. **Run coverage locally** - `npm run test:coverage`
-4. **CI runs tests** - Coverage report is generated on every PR
+4. **CI merges shards** - `(Frontend) Coverage Report` fails the PR below 85% statements overall
 
-**Incremental coverage** - Coverage is enforced only on files changed in your PR. Existing code can improve gradually while ensuring new code is well-tested.
-
-### CI Enforcement
-
-CI automatically checks coverage for changed source files using `scripts/check-pr-coverage.js`:
-
-```bash
-# Run locally to check your changes
-npm run test:coverage           # Generate coverage report
-```
-
-Coverage threshold is enforced by CI (per-file 80% minimum). The check will **fail the PR** if any changed source file has less than 80% **lines** coverage. The other metrics are still reported in the coverage output for visibility.
+Existing code can improve gradually. Unimported files are missing from the
+report unless `coverage.include` lists `src/**/*.{ts,tsx}`.
 
 ## Test File Naming
 
-- **Standard tests**: `*.test.ts`, `*.test.tsx` (uses jsdom)
+- **Standard tests**: `*.test.ts`, `*.test.tsx` (uses happy-dom)
 - **E2E tests**: `packages/syntara-ui/e2e/*.spec.ts`
 
 ## When to Use Playwright E2E
@@ -56,9 +46,9 @@ Use Playwright E2E when testing:
 - **Integration**: Mock API or real backend behavior
 - **Smoke tests**: Critical paths before releases
 
-**Default to jsdom** for everything else - it's much faster.
+**Default to happy-dom** for everything else - it's much faster.
 
-**Why?** jsdom simulates browser behavior in Node.js (fast), while E2E runs in real browsers (slower but more accurate). E2E eliminates cross-page and integration gaps.
+**Why?** happy-dom simulates browser behavior in Node.js (fast), while E2E runs in real browsers (slower but more accurate). E2E eliminates cross-page and integration gaps.
 
 ## Industry Best Practices (80% Coverage)
 
@@ -134,7 +124,7 @@ it('should do something', async () => {
 **Every PR:**
 
 ```bash
-npm run test:coverage  # jsdom tests with coverage report
+npm run test:coverage  # happy-dom tests with coverage report
 ```
 
 **E2E Tests (Selective):**
@@ -148,14 +138,14 @@ Run E2E tests only when needed:
 
 **Performance:**
 
-- jsdom: ~5-15 seconds
+- happy-dom: ~5-15 seconds
 - Browser: ~30-60 seconds (Playwright overhead)
 
 **Coverage:**
 
-- 90%+ of tests work in jsdom
+- 90%+ of tests work in happy-dom
 - Keep E2E focused on critical workflows
-- Avoid duplicating component-level jsdom tests
+- Avoid duplicating component-level happy-dom tests
 
 ### CI Workflow
 

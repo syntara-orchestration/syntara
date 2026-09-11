@@ -1,7 +1,7 @@
-"""Tests that creating resources against a soft-deleted project is rejected.
+"""Tests that creating resources against a deleted project is rejected.
 
 Validates the fix for AAP-74611 / AAP-74612: workflows, credentials, roles,
-and policies must not be creatable against a project whose deleted_at is set.
+and policies must not be creatable against a project that has been deleted.
 """
 
 from __future__ import annotations
@@ -57,7 +57,7 @@ async def _create_and_delete_project(client: AsyncClient) -> str:
 
 @pytest.mark.asyncio
 async def test_create_workflow_against_deleted_project_returns_404(jwt_client: AsyncClient) -> None:
-    """POST /workflows with a soft-deleted project_id must return 404."""
+    """POST /workflows with a deleted project_id must return 404."""
     project_id = await _create_and_delete_project(jwt_client)
 
     resp = await jwt_client.post(
@@ -80,7 +80,7 @@ async def test_create_credential_against_deleted_project_returns_404(
     jwt_client: AsyncClient,
     bearer_type: CredentialType,
 ) -> None:
-    """POST /credentials with a soft-deleted project_id must return 404."""
+    """POST /credentials with a deleted project_id must return 404."""
     project_id = await _create_and_delete_project(jwt_client)
 
     resp = await jwt_client.post(
@@ -101,7 +101,7 @@ async def test_create_credential_against_deleted_project_returns_404(
 
 @pytest.mark.asyncio
 async def test_create_role_against_deleted_project_is_rejected(admin_client: AsyncClient) -> None:
-    """POST /projects/{id}/roles with a soft-deleted project must be rejected.
+    """POST /projects/{id}/roles with a deleted project must be rejected.
 
     Uses admin_client to bypass authz and test the service-layer check.
     """
@@ -123,7 +123,7 @@ async def test_create_role_against_deleted_project_is_rejected(admin_client: Asy
 
 @pytest.mark.asyncio
 async def test_create_policy_against_deleted_project_is_rejected(admin_client: AsyncClient) -> None:
-    """POST /projects/{id}/policies with a soft-deleted project must be rejected.
+    """POST /projects/{id}/policies with a deleted project must be rejected.
 
     Uses admin_client to bypass authz and test the service-layer check.
     """
@@ -145,7 +145,7 @@ async def test_create_policy_against_deleted_project_is_rejected(admin_client: A
 
 @pytest.mark.asyncio
 async def test_create_role_toplevel_against_deleted_project_is_rejected(admin_client: AsyncClient) -> None:
-    """POST /roles with a soft-deleted project_id in the body must return 404.
+    """POST /roles with a deleted project_id in the body must return 404.
 
     Tests the top-level /roles endpoint (separate from /projects/{id}/roles).
     """
@@ -168,7 +168,7 @@ async def test_create_role_toplevel_against_deleted_project_is_rejected(admin_cl
 
 @pytest.mark.asyncio
 async def test_create_policy_toplevel_against_deleted_project_is_rejected(admin_client: AsyncClient) -> None:
-    """POST /policies with a soft-deleted project_id in the body must return 404.
+    """POST /policies with a deleted project_id in the body must return 404.
 
     Tests the top-level /policies endpoint (separate from /projects/{id}/policies).
     """
@@ -194,7 +194,7 @@ async def test_create_role_assignment_toplevel_against_deleted_project_is_reject
     admin_client: AsyncClient,
     test_user: User,
 ) -> None:
-    """POST /role_assignments with a soft-deleted project_id must return 404."""
+    """POST /role_assignments with a deleted project_id must return 404."""
     project_id = await _create_and_delete_project(admin_client)
 
     resp = await admin_client.post(
@@ -221,11 +221,7 @@ async def test_create_role_assignment_toplevel_against_deleted_project_is_reject
 
 @pytest.mark.asyncio
 async def test_permchecker_path_param_deleted_project_returns_404(jwt_client: AsyncClient) -> None:
-    """PermissionChecker with project_param rejects deleted projects with 404.
-
-    Covers path-based project_id (e.g. /projects/{id}/roles).
-    A non-admin user should get 404, not 403.
-    """
+    """PermissionChecker with project_param rejects deleted projects with 404."""
     project_id = await _create_and_delete_project(jwt_client)
 
     resp = await jwt_client.post(
@@ -239,11 +235,7 @@ async def test_permchecker_path_param_deleted_project_returns_404(jwt_client: As
 
 @pytest.mark.asyncio
 async def test_permchecker_body_field_deleted_project_returns_404(jwt_client: AsyncClient) -> None:
-    """PermissionChecker with body_project_field rejects deleted projects with 404.
-
-    Covers body-based project_id (e.g. POST /workflows with project_id in body).
-    A non-admin user should get 404, not 403.
-    """
+    """PermissionChecker with body_project_field rejects deleted projects with 404."""
     project_id = await _create_and_delete_project(jwt_client)
 
     resp = await jwt_client.post(

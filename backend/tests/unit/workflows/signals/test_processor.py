@@ -182,6 +182,29 @@ class TestWorkflowSignalProcessorProcessSignal:
             assert expected_fragment.lower() in error_msg.lower()
             assert f"{error_type}:" not in error_msg
 
+    def test_process_signal_cancelled_raises_application_error(self) -> None:
+        """Test that cancelled status raises non-retryable ApplicationError."""
+        signal_data = {
+            "status": "cancelled",
+            "reason": "User requested cancellation",
+        }
+
+        with pytest.raises(ApplicationError) as exc_info:
+            WorkflowSignalProcessor.process_signal(signal_data, "agent_1", "exec-456")
+
+        assert exc_info.value.non_retryable is True
+        assert exc_info.value.type == "InvocationCancelledError"
+        assert "User requested cancellation" in str(exc_info.value)
+
+    def test_process_signal_cancelled_uses_default_reason(self) -> None:
+        """Test that cancelled status uses default reason when none provided."""
+        signal_data = {"status": "cancelled"}
+
+        with pytest.raises(ApplicationError) as exc_info:
+            WorkflowSignalProcessor.process_signal(signal_data, "agent_1", "exec-456")
+
+        assert "Invocation cancelled" in str(exc_info.value)
+
     def test_process_signal_with_unknown_status(self) -> None:
         """Test processing signal with unknown status (not 'failed')."""
         # Arrange - any status other than "failed" should be treated as success

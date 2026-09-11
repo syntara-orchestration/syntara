@@ -6,7 +6,7 @@
   "$defs": {
     "credential_id": {
       "type": "string",
-      "description": "Syntara credential UUID for authentication. When provided, the credential is resolved at execution time and injected into the node config.",
+      "description": "Orchestrator credential UUID for authentication. When provided, the credential is resolved at execution time and injected into the node config.",
       "format": "uuid"
     },
     "retry_policy": {

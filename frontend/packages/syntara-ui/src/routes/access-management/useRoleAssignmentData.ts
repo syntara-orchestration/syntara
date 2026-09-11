@@ -70,7 +70,7 @@ export function useRoleAssignmentData(principalType: RolePrincipalType, principa
         roleName: a.role_name,
         roleDescription: a.role_description ?? null,
         policies: policyNames.map((name) => ({ name })),
-        scope: isProject ? (a.project_name ?? a.project_id!) : 'System',
+        scope: a.project_id != null ? (a.project_name ?? a.project_id) : 'System',
         scopeType: isProject ? ('project' as const) : ('system' as const),
         createdAt: a.created_at ?? null,
         projectId: a.project_id ?? undefined,

@@ -303,18 +303,23 @@ async def test_authenticated_user_gets_default_project_access(
 
 
 @pytest.mark.asyncio
-async def test_soft_deleted_default_project_does_not_break_new_user(
+async def test_deleted_default_project_does_not_break_new_user(
     auth_client: AsyncClient,
     test_db_session: AsyncSession,
     test_user: User,
     user_factory: Callable[..., Awaitable[User]],
 ) -> None:
-    """When the default project is soft-deleted, new users can still be created and list projects."""
-    # Soft-delete the default project directly in the DB
+    """When the default project is deleted, new users can still be created and list projects."""
+    from syntara.projects.service import ProjectService
+
+    # Clear the is_default flag so the service allows deletion, then cascade-delete
     default_project = (await test_db_session.exec(select(Project).where(Project.name == "default"))).one()
-    default_project.soft_delete(test_user.id)
+    default_project.is_default = False
     test_db_session.add(default_project)
-    await test_db_session.commit()
+    await test_db_session.flush()
+
+    service = ProjectService(session=test_db_session, user=test_user)
+    await service.delete_project(default_project.id)
 
     # Create a new user — should not error
     new_user = await user_factory(username="post-delete-user", email="post-delete@example.com")

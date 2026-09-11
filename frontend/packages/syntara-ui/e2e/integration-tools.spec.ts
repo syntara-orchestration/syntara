@@ -12,8 +12,7 @@
  * - Save with mixed enabled/disabled tools persists state
  * - Resources tab heading shows enabled count
  */
-import { type Page } from '@playwright/test'
-
+import { type Page } from './fixtures'
 import { test, expect, toAppUrl } from './fixtures'
 import { buildUniqueName } from './helpers/workflows'
 import { createIntegrationViaApi, deleteIntegrationViaApi, type SeededIntegration } from './seeds/resources'
@@ -22,7 +21,7 @@ import { getAuthToken } from './utils/api'
 async function createIntegration(app: Page, name: string): Promise<SeededIntegration> {
   const token = await getAuthToken(app)
   const integration = await createIntegrationViaApi(app, { name, token: token ?? undefined })
-  if (!integration) throw new Error(`Failed to create integration "${name}" via API`)
+  if (!integration) throw new Error(`Failed to create integration: ${name}`)
   return integration
 }
 

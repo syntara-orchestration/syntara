@@ -311,10 +311,12 @@ export function useButtonEdgeMaintenance({
   // Bump when onAddNodeFromEdge identity changes so dedupe does not skip handler refresh (computeNextButtonEdges).
   const onAddHandlerSerialRef = useRef(0)
   const prevOnAddHandlerRef = useRef(onAddNodeFromEdge)
+  /* eslint-disable react-hooks/refs -- track handler identity during render so button-edge dedupe invalidates */
   if (prevOnAddHandlerRef.current !== onAddNodeFromEdge) {
     prevOnAddHandlerRef.current = onAddNodeFromEdge
     onAddHandlerSerialRef.current += 1
   }
+  /* eslint-enable react-hooks/refs */
   const onAddHandlerSignature = onAddHandlerSerialRef.current
 
   // Dedup signature prevents duplicate runs when deps change but content is the same.

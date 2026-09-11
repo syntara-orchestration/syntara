@@ -157,6 +157,33 @@ describe('GroupMembersPanel', () => {
       expect(screen.getByText('bob@example.com')).toBeInTheDocument()
     })
 
+    it('falls back to username in the name column when first_name is empty', () => {
+      vi.mocked(accessClient.useQuery).mockReturnValue({
+        data: {
+          resources: [
+            {
+              id: 'u3',
+              username: 'noname',
+              first_name: '',
+              last_name: null,
+              email: 'noname@example.com',
+              membership_sources: [{ type: 'manual' }],
+            },
+          ],
+        },
+        isPending: false,
+        isError: false,
+        error: null,
+        isFetching: false,
+        refetch: vi.fn(),
+      } as never)
+
+      render(<GroupMembersPanel {...defaultProps} />, { wrapper })
+
+      expect(screen.getByRole('link', { name: 'noname' })).toBeInTheDocument()
+      expect(screen.getAllByText('noname')).toHaveLength(2)
+    })
+
     it('shows source labels for membership sources', () => {
       render(<GroupMembersPanel {...defaultProps} />, { wrapper })
 
@@ -184,7 +211,7 @@ describe('GroupMembersPanel', () => {
 
       render(<GroupMembersPanel {...defaultProps} />, { wrapper })
 
-      expect(screen.getByText('No members')).toBeInTheDocument()
+      expect(screen.getByText('No members yet')).toBeInTheDocument()
       expect(screen.getByText(/add users to this group/i)).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /add member/i })).toBeInTheDocument()
     })
@@ -261,7 +288,7 @@ describe('GroupMembersPanel', () => {
       const actionsButtons = within(rows[1]).getAllByRole('button')
       await user.click(actionsButtons[actionsButtons.length - 1])
 
-      const removeItem = await screen.findByText('Remove')
+      const removeItem = await screen.findByText('Remove member')
       await user.click(removeItem)
 
       await waitFor(() => {
@@ -289,7 +316,7 @@ describe('GroupMembersPanel', () => {
       const actionsButtons = within(rows[1]).getAllByRole('button')
       await user.click(actionsButtons[actionsButtons.length - 1])
 
-      const removeItem = await screen.findByText('Remove')
+      const removeItem = await screen.findByText('Remove member')
       await user.click(removeItem)
 
       // Confirm removal
@@ -311,7 +338,7 @@ describe('GroupMembersPanel', () => {
       const actionsButtons = within(rows[1]).getAllByRole('button')
       await user.click(actionsButtons[actionsButtons.length - 1])
 
-      const removeItem = await screen.findByText('Remove')
+      const removeItem = await screen.findByText('Remove member')
       await user.click(removeItem)
 
       // Cancel
@@ -396,6 +423,47 @@ describe('GroupMembersPanel', () => {
         expect(addTexts.length).toBeGreaterThanOrEqual(2)
       })
     })
+
+    it('shows a display name in the typeahead and omits it when the user has no name', async () => {
+      vi.mocked(useAllUsers).mockReturnValue({
+        users: [
+          {
+            id: 'u-named',
+            username: 'dana',
+            first_name: 'Dana',
+            last_name: 'Lee',
+            email: 'dana@example.com',
+            is_enabled: true,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+          {
+            id: 'u-noname',
+            username: 'noname',
+            first_name: '',
+            last_name: null,
+            email: 'nn@example.com',
+            is_enabled: true,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
+        isLoading: false,
+        error: null,
+        refetch: vi.fn(),
+      })
+
+      const user = userEvent.setup()
+      render(<GroupMembersPanel {...defaultProps} />, { wrapper })
+
+      await user.click(screen.getByRole('button', { name: /add member/i }))
+      await user.click(screen.getByPlaceholderText('Search for a user...'))
+
+      expect(await screen.findByText('Dana Lee')).toBeInTheDocument()
+      expect(screen.getByRole('option', { name: /dana/i })).toBeInTheDocument()
+      expect(screen.getByRole('option', { name: /^noname$/i })).toBeInTheDocument()
+      expect(screen.queryByRole('option', { name: /noname.*Dana Lee/i })).not.toBeInTheDocument()
+    })
   })
 
   describe('Remove member error handling', () => {
@@ -419,7 +487,7 @@ describe('GroupMembersPanel', () => {
       const actionsButtons = within(rows[1]).getAllByRole('button')
       await user.click(actionsButtons[actionsButtons.length - 1])
 
-      const removeItem = await screen.findByText('Remove')
+      const removeItem = await screen.findByText('Remove member')
       await user.click(removeItem)
 
       const removeButton = screen.getByRole('button', { name: 'Remove' })
@@ -449,7 +517,7 @@ describe('GroupMembersPanel', () => {
       const actionsButtons = within(rows[1]).getAllByRole('button')
       await user.click(actionsButtons[actionsButtons.length - 1])
 
-      const removeItem = await screen.findByText('Remove')
+      const removeItem = await screen.findByText('Remove member')
       await user.click(removeItem)
 
       const removeButton = screen.getByRole('button', { name: 'Remove' })

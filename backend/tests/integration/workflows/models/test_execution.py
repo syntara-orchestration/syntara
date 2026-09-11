@@ -13,7 +13,7 @@ Tests cover:
 - String representation
 """
 
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from uuid import uuid4
 
 import pytest
@@ -70,8 +70,6 @@ async def test_create_execution_with_required_fields(
     assert execution.input_data == {}
     assert execution.error_details is None
     assert execution.labels == {}
-    assert execution.deleted_at is None
-    assert execution.deleted_by is None
     assert execution.created_at is not None
     assert execution.updated_at is not None
 
@@ -110,14 +108,13 @@ async def test_create_execution_with_all_fields(
 
 
 @pytest.mark.asyncio
-async def test_execution_soft_delete(
+async def test_execution_hard_delete(
     test_db_session: AsyncSession,
     test_user: User,
     test_workflow: Workflow,
     test_workflow_version: WorkflowVersion,
 ) -> None:
-    """Test soft delete sets deleted_at and deleted_by correctly."""
-    # Create execution
+    """Test hard delete removes the execution row from the database."""
     execution = Execution(
         id=uuid4(),
         workflow_id=test_workflow.id,
@@ -130,14 +127,11 @@ async def test_execution_soft_delete(
     test_db_session.add(execution)
     await test_db_session.commit()
 
-    # Perform soft delete
-    now = datetime.now(UTC)
-    execution.deleted_at = now
-    execution.deleted_by = test_user.id
+    await test_db_session.delete(execution)
     await test_db_session.commit()
 
-    assert execution.deleted_at == now
-    assert execution.deleted_by == test_user.id
+    result = await test_db_session.get(Execution, execution.id)
+    assert result is None
 
 
 @pytest.mark.asyncio

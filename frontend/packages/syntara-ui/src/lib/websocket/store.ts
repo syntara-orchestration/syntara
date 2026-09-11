@@ -318,6 +318,7 @@ export const useWebSocketStore = create<WebSocketStore>((set, get) => {
       if (!subscribers.has(channelId)) {
         subscribers.set(channelId, new Map())
       }
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- safe: key was just set via subscribers.set(channelId, new Map()) above
       subscribers.get(channelId)!.set(id, options as SubscriberOptions)
 
       return () => {

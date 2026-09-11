@@ -2,10 +2,9 @@
 
 All queries are read-only, non-locking, stateless snapshots
 of the current database state. No time-based filtering.
-Soft-deleted records are excluded where applicable (workflows, executions).
 """
 
-from sqlalchemy import ColumnElement, func, select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import InstrumentedAttribute
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -36,15 +35,11 @@ from syntara.workflows.models.workflow import Workflow
 
 
 async def query_workflow_counts(session: AsyncSession) -> WorkflowCounts:
-    """Query current workflow counts from database (excludes soft-deleted)."""
-    not_deleted = Workflow.deleted_at.is_(None)  # type: ignore[union-attr]
-    total = await session.scalar(select(func.count(Workflow.id)).where(not_deleted))  # type: ignore[arg-type]
+    """Query current workflow counts from database."""
+    total = await session.scalar(select(func.count(Workflow.id)))  # type: ignore[arg-type]
     is_enabled = Workflow.is_enabled.is_(True)  # type: ignore[attr-defined]
     enabled = await session.scalar(
-        select(func.count(Workflow.id)).where(  # type: ignore[arg-type]
-            is_enabled,
-            not_deleted,
-        )
+        select(func.count(Workflow.id)).where(is_enabled)  # type: ignore[arg-type]
     )
     return WorkflowCounts(
         total=total or 0,
@@ -54,10 +49,9 @@ async def query_workflow_counts(session: AsyncSession) -> WorkflowCounts:
 
 
 async def query_execution_counts(session: AsyncSession) -> ExecutionCounts:
-    """Query current execution counts from database (excludes soft-deleted)."""
-    not_deleted = Execution.deleted_at.is_(None)  # type: ignore[union-attr]
+    """Query current execution counts from database."""
     result = await session.exec(
-        select(Execution.status, func.count(Execution.id)).where(not_deleted).group_by(Execution.status)  # type: ignore[call-overload,arg-type]
+        select(Execution.status, func.count(Execution.id)).group_by(Execution.status)  # type: ignore[call-overload,arg-type]
     )
     status_counts: dict[str, int] = {}
     for row in result:
@@ -67,12 +61,11 @@ async def query_execution_counts(session: AsyncSession) -> ExecutionCounts:
     avg_duration = await session.scalar(
         select(func.avg(func.extract("epoch", Execution.completed_at - Execution.created_at))).where(  # type: ignore[operator,arg-type]
             Execution.completed_at.isnot(None),  # type: ignore[union-attr]
-            not_deleted,
         )
     )
 
-    by_trigger_type = await _query_execution_counts_by_column(session, Execution.trigger_type, not_deleted)  # type: ignore[arg-type]
-    by_interface = await _query_execution_counts_by_column(session, Execution.interface, not_deleted)  # type: ignore[arg-type]
+    by_trigger_type = await _query_execution_counts_by_column(session, Execution.trigger_type)  # type: ignore[arg-type]
+    by_interface = await _query_execution_counts_by_column(session, Execution.interface)  # type: ignore[arg-type]
 
     return ExecutionCounts(
         total=sum(status_counts.values()),
@@ -91,12 +84,11 @@ async def query_execution_counts(session: AsyncSession) -> ExecutionCounts:
 async def _query_execution_counts_by_column(
     session: AsyncSession,
     column: InstrumentedAttribute[str | None],
-    not_deleted: ColumnElement[bool],
 ) -> dict[str, int]:
     """Group execution counts by a nullable string column, excluding NULLs."""
     result = await session.exec(
         select(column, func.count(Execution.id))  # type: ignore[call-overload,arg-type]
-        .where(not_deleted, column.isnot(None))
+        .where(column.isnot(None))
         .group_by(column)
     )
     return {str(key): int(count) for key, count in result}
@@ -144,11 +136,9 @@ async def _query_credentials_used_in_nodes(session: AsyncSession) -> int:
         JOIN workflows w
             ON w.id = wv.workflow_id
             AND w.current_version = wv.version
-            AND w.deleted_at IS NULL
         CROSS JOIN LATERAL jsonb_path_query(
             wv.workflow_definition, '$.nodes[*].parameters.credential_id'
         ) AS cred_id
-        WHERE wv.deleted_at IS NULL
     """)
     result = await session.scalar(stmt)
     return int(result) if result else 0

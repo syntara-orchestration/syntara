@@ -5,8 +5,7 @@
  * that project's workflow builder tool selector, and that integrations
  * scoped to other projects are excluded.
  */
-import { type Page } from '@playwright/test'
-
+import { type Page } from './fixtures'
 import { test, expect, toAppUrl } from './fixtures'
 import { buildUniqueName, clickAddConnectedStep } from './helpers/workflows'
 import {
@@ -48,8 +47,8 @@ async function openAgentToolSelector(app: Page, projectName: string) {
 }
 
 test.describe('Integration project scope — selector visibility', () => {
-  let projectScopedIntegration: SeededIntegration | null = null
-  let globalIntegration: SeededIntegration | null = null
+  let projectScopedIntegration: SeededIntegration | null
+  let globalIntegration: SeededIntegration | null
   let projectAId: string | null = null
   let projectAName: string | null = null
   let projectBId: string | null = null

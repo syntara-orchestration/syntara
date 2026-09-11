@@ -2,7 +2,7 @@ import { Content, ContentVariants, Stack, StackItem } from '@patternfly/react-co
 import { Tbody, Td, Tr } from '@patternfly/react-table'
 
 import { ExecutionTimeRange } from '../../components/table/ExecutionTimestamp'
-import { NxScrollableTableContainer } from '../../components/table/NxScrollableTableContainer'
+import { SynScrollableTableContainer } from '../../components/table/SynScrollableTableContainer'
 import type { ActivityState } from '../workflows/execution/types'
 import { parseCompositeKey } from '../workflows/execution/utils/activityState'
 
@@ -25,7 +25,7 @@ export function CompactActivityList({
   selectedNodeId,
 }: Readonly<CompactActivityListProps>) {
   return (
-    <NxScrollableTableContainer caption="Activity list" useFixedLayout={false} variant="compact">
+    <SynScrollableTableContainer caption="Activity list" useFixedLayout={false} variant="compact">
       <Tbody>
         {activityOrder.map(({ id, name, type }) => {
           const state = activityStates.get(id)
@@ -60,6 +60,6 @@ export function CompactActivityList({
           )
         })}
       </Tbody>
-    </NxScrollableTableContainer>
+    </SynScrollableTableContainer>
   )
 }

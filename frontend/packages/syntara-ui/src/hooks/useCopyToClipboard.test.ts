@@ -8,7 +8,8 @@ describe('useCopyToClipboard', () => {
 
   beforeEach(() => {
     vi.useFakeTimers()
-    Object.assign(navigator, {
+    vi.stubGlobal('navigator', {
+      ...navigator,
       clipboard: { writeText: writeTextMock },
     })
     writeTextMock.mockResolvedValue(undefined)
@@ -17,6 +18,7 @@ describe('useCopyToClipboard', () => {
   afterEach(() => {
     vi.useRealTimers()
     vi.restoreAllMocks()
+    vi.unstubAllGlobals()
     writeTextMock.mockClear()
   })
 

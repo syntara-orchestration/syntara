@@ -9,7 +9,7 @@ import {
 import { RhUiCloseIcon } from '@patternfly/react-icons'
 import type { Ref, RefObject } from 'react'
 
-import { NxLabel } from '../../components/labels/NxLabel'
+import { SynLabel } from '../../components/labels/SynLabel'
 
 type PolicySelectToggleProps = {
   toggleRef: Ref<HTMLButtonElement>
@@ -65,7 +65,7 @@ export function PolicySelectToggle({
           {selected.length > 0 && (
             <LabelGroup>
               {selected.map((name) => (
-                <NxLabel
+                <SynLabel
                   key={name}
                   color="blue"
                   onClose={(e) => {
@@ -74,7 +74,7 @@ export function PolicySelectToggle({
                   }}
                 >
                   {name}
-                </NxLabel>
+                </SynLabel>
               ))}
             </LabelGroup>
           )}

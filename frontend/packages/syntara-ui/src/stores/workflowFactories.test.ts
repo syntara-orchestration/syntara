@@ -741,6 +741,15 @@ describe('workflowFactories', () => {
         expect(activity.parameters.credential_id).toBe('cred-123')
         expect(activity.parameters.integration_id).toBe('int-aap-1')
       })
+
+      it('persists use_input_variables when useInputVariables is true', () => {
+        const activity = createAAPJobTemplateActivity('aap-1', 'Run Playbook', undefined, {
+          useInputVariables: true,
+        })
+
+        expect(activity.parameters.use_input_variables).toBe(true)
+        expect(activity.parameters).not.toHaveProperty('job_template_id')
+      })
     })
 
     describe('createAAPWorkflowTemplateActivity', () => {

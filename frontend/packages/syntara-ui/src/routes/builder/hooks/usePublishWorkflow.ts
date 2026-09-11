@@ -83,7 +83,7 @@ export function usePublishWorkflow(
                 description: data.warning,
               })
             } else {
-              showSuccess({ title: 'Workflow published successfully' })
+              showSuccess({ title: 'Workflow published' })
             }
             if (workflowDefinition) useWorkflowStore.getState().markClean()
             if (data?.current_version != null) {
@@ -137,7 +137,7 @@ export function useUnpublishWorkflow(workflowId: string | null) {
       },
       {
         onSuccess: () => {
-          showSuccess({ title: 'Workflow unpublished successfully' })
+          showSuccess({ title: 'Workflow unpublished' })
           detachPromise(queryClient.invalidateQueries({ predicate: isWorkflowQuery }))
         },
         onError: (error: unknown) => {

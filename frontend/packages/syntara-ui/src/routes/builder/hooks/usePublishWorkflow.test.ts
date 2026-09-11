@@ -154,7 +154,7 @@ describe('usePublishWorkflow', () => {
       result.current.publish('v1.0', 'release notes')
     })
 
-    expect(mockShowSuccess).toHaveBeenCalledWith({ title: 'Workflow published successfully' })
+    expect(mockShowSuccess).toHaveBeenCalledWith({ title: 'Workflow published' })
     expect(mockShowWarning).not.toHaveBeenCalled()
   })
 
@@ -197,7 +197,7 @@ describe('usePublishWorkflow', () => {
       result.current.publish('v1.0')
     })
 
-    expect(mockShowSuccess).toHaveBeenCalledWith({ title: 'Workflow published successfully' })
+    expect(mockShowSuccess).toHaveBeenCalledWith({ title: 'Workflow published' })
     expect(mockShowWarning).not.toHaveBeenCalled()
   })
 
@@ -503,7 +503,7 @@ describe('useUnpublishWorkflow', () => {
       result.current.unpublish()
     })
 
-    expect(mockShowSuccess).toHaveBeenCalledWith({ title: 'Workflow unpublished successfully' })
+    expect(mockShowSuccess).toHaveBeenCalledWith({ title: 'Workflow unpublished' })
   })
 
   it('shows error alert on unpublish failure', () => {

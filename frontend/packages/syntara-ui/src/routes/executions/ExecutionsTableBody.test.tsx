@@ -21,8 +21,8 @@ vi.mock('../../hooks/routing/useNavigate', () => ({
 vi.mock('../../components/WorkflowName', () => ({
   WorkflowName: ({ workflowId }: { workflowId: string }) => <span>{workflowId}</span>,
 }))
-vi.mock('../../components/NxLink', () => ({
-  NxLink: ({ to, children }: { to: string; children: React.ReactNode }) => <a href={to}>{children}</a>,
+vi.mock('../../components/SynLink', () => ({
+  SynLink: ({ to, children }: { to: string; children: React.ReactNode }) => <a href={to}>{children}</a>,
 }))
 
 vi.mock('../../hooks/useCanI', () => ({

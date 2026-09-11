@@ -709,8 +709,8 @@ describe('Executions Component', () => {
       render(<Executions />, { wrapper: TestWrapper })
 
       // When there's no data and no filters, show EmptyStateNoData without the filter toolbar
-      expect(screen.getByText('No executions found')).toBeInTheDocument()
-      expect(screen.getByText('No executions found.')).toBeInTheDocument()
+      expect(screen.getByText('No executions yet')).toBeInTheDocument()
+      expect(screen.getByText('No workflow runs have been recorded yet.')).toBeInTheDocument()
       expect(screen.queryByRole('search', { name: 'Filters' })).not.toBeInTheDocument()
     })
 
@@ -760,7 +760,7 @@ describe('Executions Component', () => {
       render(<Executions />, { wrapper: TestWrapper })
 
       // FilterBar is always visible; EmptyStateNoData is shown in the table area
-      expect(screen.getByText('No executions found')).toBeInTheDocument()
+      expect(screen.getByText('No executions yet')).toBeInTheDocument()
     })
   })
 

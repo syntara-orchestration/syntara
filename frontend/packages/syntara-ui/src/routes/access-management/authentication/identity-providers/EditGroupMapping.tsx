@@ -5,10 +5,10 @@ import type { ReactNode } from 'react'
 import { useEffect, useRef } from 'react'
 
 import { AppRoute } from '../../../../app/AppRoute'
-import { EmptyStateAccessDenied } from '../../../../components/EmptyStateAccessDenied'
 import { SynPage, SynPageBody } from '../../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../../components/layout/SynPanel'
+import { SynEmptyStateAccessDenied } from '../../../../components/states/SynEmptyStateAccessDenied'
 import { SynPageTitle } from '../../../../components/SynPageTitle'
 import { useCanI } from '../../../../hooks/useCanI'
 import { detachPromise } from '../../../../utils/detachPromise'
@@ -44,7 +44,6 @@ export function EditGroupMapping() {
   const { allowed: canUpdate, isChecking: isCheckingPermission } = useCanI('update', 'identity-provider', {
     enabled: metadata.isValidId,
   })
-
   const discoverStartedRef = useRef(false)
   const openTestSignInRef = useRef<(() => void) | null>(null)
 
@@ -62,9 +61,8 @@ export function EditGroupMapping() {
     detachPromise(Promise.resolve(openTestSignInRef.current()))
   }, [metadata.openDiscoverOnMount, metadata.isReady, canUpdate])
 
-  const navigateToAuthentication = () => {
+  const navigateToAuthentication = () =>
     detachPromise(navigate({ to: AppRoute.SystemAdministration.Authentication.Root }))
-  }
 
   if (!metadata.isValidId) {
     return (
@@ -116,7 +114,9 @@ export function EditGroupMapping() {
   if (!canUpdate) {
     return (
       <GroupMappingPageShell title={metadata.pageTitle} breadcrumbs={metadata.breadcrumbs}>
-        <EmptyStateAccessDenied description="You don't have permission to edit group mapping. Contact your administrator to request access." />
+        {/* v8 ignore start -- phantom branches from SynEmptyStateAccessDenied JSX */}
+        <SynEmptyStateAccessDenied description="You don't have permission to edit group mapping. Contact your administrator to request access." />
+        {/* v8 ignore stop */}
       </GroupMappingPageShell>
     )
   }

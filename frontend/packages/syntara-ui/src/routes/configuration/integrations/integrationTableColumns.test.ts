@@ -10,6 +10,7 @@ describe('integrationTableColumns', () => {
       { field: 'integration_type', label: 'Integration type', isSortable: true },
       { field: 'api_url', label: 'API URL' },
       { field: 'enabled_resources', label: 'Enabled resources' },
+      { field: 'last_validated_at', label: 'Last checked', isSortable: true },
       { field: 'enabled', label: 'State', isSortable: true },
     ])
   })

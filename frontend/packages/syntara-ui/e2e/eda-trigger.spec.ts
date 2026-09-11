@@ -23,7 +23,7 @@ import {
   fillCodeEditor,
   selectProjectIfRequired,
 } from './helpers/workflows'
-import { ensureProject } from './utils/api'
+import { createServiceAccountViaApi, deleteServiceAccountViaApi, ensureProject } from './utils/api'
 
 test.describe('EDA Trigger', () => {
   test('user creates a workflow with EDA trigger and saves it', async ({ app }) => {
@@ -31,11 +31,12 @@ test.describe('EDA Trigger', () => {
     const webhookPath = 'github-deployments'
 
     await ensureProject(app)
+    const sa = await createServiceAccountViaApi(app, buildUniqueName('sa-eda'))
     await app.goto(toAppUrl('/workflow-builder/new'))
 
     try {
       // Add EDA trigger
-      await addEdaTrigger(app, 'GitHub Events', webhookPath)
+      await addEdaTrigger(app, 'GitHub Events', webhookPath, sa.name)
 
       // Add a connected script action
       const panel = await clickAddConnectedStep(app)
@@ -65,6 +66,7 @@ test.describe('EDA Trigger', () => {
       })
     } finally {
       await deleteWorkflow(app, workflowName)
+      await deleteServiceAccountViaApi(app, sa.id)
     }
   })
 

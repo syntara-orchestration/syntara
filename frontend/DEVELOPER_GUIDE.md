@@ -272,7 +272,7 @@ The Playwright config sets `ignoreHTTPSErrors` to `true` in real-backend mode (w
 - Follow AAA pattern (Arrange-Act-Assert)
 - Mock external dependencies with `vi.fn()` and `vi.mock()`
 - All new/modified code must meet **80% coverage** (lines, statements, functions, branches)
-- Use `*.test.tsx` for jsdom unit tests, `*.spec.ts` under `packages/syntara-ui/e2e/` for Playwright E2E tests
+- Use `*.test.tsx` for happy-dom unit tests, `*.spec.ts` under `packages/syntara-ui/e2e/` for Playwright E2E tests
 - **E2E tests** run against mock API by default, real backend supported — See [packages/syntara-ui/TESTING.md](packages/syntara-ui/TESTING.md) for setup
 - **Visual regression** — every route is screenshotted and compared against baselines in CI. New routes must be added to the page registry. See [packages/syntara-ui/VISUAL_REGRESSION.md](packages/syntara-ui/VISUAL_REGRESSION.md)
 

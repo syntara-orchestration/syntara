@@ -7,6 +7,7 @@
  */
 
 import { test, expect } from './fixtures'
+import { pfWidget } from './helpers/patternfly'
 import { buildUniqueName, createBasicWorkflowViaApi, deleteWorkflow, openWorkflowInBuilder } from './helpers/workflows'
 import { ensureProject } from './utils/api'
 
@@ -47,8 +48,8 @@ test.describe('Execution Concurrency Limit', () => {
       await app.getByRole('button', { name: 'Run now' }).click()
       await responsePromise
 
-      // PF6 toast AlertGroup uses role="list"; individual items have class pf-v6-c-alert
-      const alert = app.locator('.pf-v6-c-alert-group .pf-v6-c-alert')
+      // PF6 toast Alert is aria-live only — no role="alert" (see waitForUIReady).
+      const alert = pfWidget(app, 'Alert')
       await expect(alert.filter({ hasText: /concurrency limit/i })).toBeVisible()
       await expect(alert.filter({ hasText: /10\/10 active workflows/i })).toBeVisible()
     } finally {

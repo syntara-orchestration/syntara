@@ -183,7 +183,8 @@ export function getUpstreamNodeIds(nodeId: string, edges: EdgeConnection[]): Set
   const queue = [nodeId]
 
   while (queue.length > 0) {
-    const current = queue.shift()!
+    const current = queue[0]
+    queue.shift()
     const incoming = edges.filter((edge) => edge.target === current && edge.source !== current)
 
     for (const edge of incoming) {

@@ -24,14 +24,14 @@ nodes:
         echo "Checked at: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
         echo "$INPUT_TEMP"
     inputs:
-      temp: ${inputs.temperature}
+      temp: ${trigger.temperature}
     outputs:
       temp_value: $.stdout
 
   - id: temperature_routing
     name: Temperature-Based Routing
     type: condition
-    condition: ${inputs.temperature} > 30
+    condition: ${trigger.temperature} > 30
 
   - id: hot_weather
     name: Hot Weather Action
@@ -48,7 +48,7 @@ nodes:
   - id: check_cold
     name: Check for Cold Weather
     type: condition
-    condition: ${inputs.temperature} < 15
+    condition: ${trigger.temperature} < 15
 
   - id: cold_weather
     name: Cold Weather Action
@@ -73,10 +73,10 @@ nodes:
         echo "  - Enjoy outdoor activities"
         echo "  - No special precautions needed"
     inputs:
-      temp: ${inputs.temperature}
+      temp: ${trigger.temperature}
 
   - id: summary
-    name: "Generate Weather Summary Report (${inputs.temperature})"
+    name: "Generate Weather Summary Report (${trigger.temperature})"
     type: script
     parameters:
       language: bash
@@ -91,7 +91,7 @@ nodes:
         echo "  • Mild weather (15-30°C): Shows pleasant weather message"
         echo "=============================="
     inputs:
-      temp: ${inputs.temperature}
+      temp: ${trigger.temperature}
 edges:
   - source: check_temperature
     target: temperature_routing

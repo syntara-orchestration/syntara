@@ -1,5 +1,8 @@
 import type { Edge, Node } from '@xyflow/react'
 
+import { getCanvasNodeIconDescriptor } from '../../../workflows/canvas/nodes/nodeIconResolver'
+import type { NodeType } from '../../../workflows/canvas/nodes/NodeType'
+
 import type { UpstreamNodeInfo } from './useUpstreamNodes'
 
 export type AdjacentNodes = {
@@ -21,10 +24,17 @@ function isNavigableFlowEdge(edge: Edge): boolean {
 
 function toNodeInfo(node: Node): UpstreamNodeInfo {
   const data = node.data as { name?: string; type?: string; triggerType?: string } | undefined
+  const { icon, id: iconId } = getCanvasNodeIconDescriptor({
+    id: node.id,
+    type: node.type,
+    data: node.data as NodeType['data'],
+  })
   return {
     id: node.id,
     name: data?.name,
     type: data?.type ?? data?.triggerType ?? node.type ?? 'unknown',
+    icon,
+    iconId,
   }
 }
 

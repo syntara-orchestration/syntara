@@ -19,7 +19,7 @@ import { FilterBar } from '../../../../components/filters/FilterBar'
 import { SynPanelContentStack } from '../../../../components/layout/SynPanelContentStack'
 import { SynEmptyStateFilter } from '../../../../components/states/SynEmptyStateFilter'
 import { SynEmptyStateNoData } from '../../../../components/states/SynEmptyStateNoData'
-import { NxScrollableTableContainer } from '../../../../components/table/NxScrollableTableContainer'
+import { SynScrollableTableContainer } from '../../../../components/table/SynScrollableTableContainer'
 import type { FilterConfig, FilterFieldDefinition } from '../../../../types/filters'
 import { getIntegrationNameFilterDefinition } from '../integrationFilters'
 import { ModelRow } from '../ModelRow'
@@ -197,7 +197,7 @@ function EnableModelsStep({
       {hasActiveFilters && filteredModels.length === 0 ? (
         <SynEmptyStateFilter clearAllFilters={handleClearAllFilters} />
       ) : (
-        <NxScrollableTableContainer caption="Enable models">
+        <SynScrollableTableContainer caption="Enable models">
           <colgroup>
             <col className={styles.checkboxCol} />
             <col />
@@ -236,7 +236,7 @@ function EnableModelsStep({
               )
             })}
           </Tbody>
-        </NxScrollableTableContainer>
+        </SynScrollableTableContainer>
       )}
     </SynPanelContentStack>
   )

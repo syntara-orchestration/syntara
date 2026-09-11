@@ -1,5 +1,4 @@
-import type { Page } from '@playwright/test'
-
+import { type Page } from './fixtures'
 import { test, expect, toAppUrl } from './fixtures'
 import { deleteCredentialByName, goToCredentialsList, selectCredentialType } from './helpers/credentials'
 import { buildUniqueName, clickAddConnectedStep, selectProjectIfRequired } from './helpers/workflows'

@@ -9,6 +9,9 @@ Covers:
 - Search attribute registration and server-side filtering
 """
 
+import asyncio
+import gc
+import weakref
 from collections.abc import AsyncIterator, Generator
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -29,11 +32,20 @@ from syntara.workflows.services.scheduled_trigger_service import (
 @pytest.fixture(autouse=True)
 def _reset_module_caches() -> Generator[None]:
     """Reset module-level caches between tests."""
-    _mod._search_attr_available = None
-    _mod._cached_client = None
+
+    def _clear() -> None:
+        for task in {_mod._connect_task, *_mod._pending_connect_tasks}:
+            if task is not None and not task.done():
+                task.cancel()
+        _mod._pending_connect_tasks.clear()
+        _mod._search_attr_available = None
+        _mod._cached_client = None
+        _mod._connect_task = None
+        _mod._connect_started_at = None
+
+    _clear()
     yield
-    _mod._search_attr_available = None
-    _mod._cached_client = None
+    _clear()
 
 
 def _make_workflow_definition(
@@ -490,6 +502,69 @@ class TestDeleteTriggersForWorkflow:
 
         assert isinstance(exc_info.value.__cause__, RPCError)
         assert exc_info.value.__cause__.status == RPCStatusCode.INTERNAL
+
+    async def test_aborts_after_connect_without_listing(self) -> None:
+        """A republish found after connect must not list or delete schedules."""
+        client = _make_mock_client()
+        client.list_schedules = AsyncMock(
+            return_value=_async_iter_from(
+                [_make_schedule_list_entry("orchestrator-sched-wf-123-trigger_1")],
+            )
+        )
+        handle = client.get_schedule_handle.return_value
+        service = ScheduledTriggerService(temporal_client=client)
+
+        deleted = await service.delete_triggers_for_workflow(
+            workflow_id="wf-123",
+            should_abort=AsyncMock(return_value=True),
+        )
+
+        assert deleted == 0
+        client.list_schedules.assert_not_called()
+        handle.delete.assert_not_called()
+
+    async def test_aborts_after_list_without_deleting(self) -> None:
+        """A republish found after listing must not delete the listed IDs."""
+        client = _make_mock_client()
+        client.list_schedules = AsyncMock(
+            return_value=_async_iter_from(
+                [_make_schedule_list_entry("orchestrator-sched-wf-123-trigger_1")],
+            )
+        )
+        handle = client.get_schedule_handle.return_value
+        service = ScheduledTriggerService(temporal_client=client)
+
+        deleted = await service.delete_triggers_for_workflow(
+            workflow_id="wf-123",
+            should_abort=AsyncMock(side_effect=[False, True]),
+        )
+
+        assert deleted == 0
+        client.list_schedules.assert_called()
+        handle.delete.assert_not_called()
+
+    async def test_aborts_before_remaining_deletes(self) -> None:
+        """A republish mid-batch must keep schedules that have not been deleted yet."""
+        client = _make_mock_client()
+        client.list_schedules = AsyncMock(
+            return_value=_async_iter_from(
+                [
+                    _make_schedule_list_entry("orchestrator-sched-wf-123-trigger_1"),
+                    _make_schedule_list_entry("orchestrator-sched-wf-123-trigger_2"),
+                ]
+            )
+        )
+        handle = client.get_schedule_handle.return_value
+        handle.delete = AsyncMock()
+        service = ScheduledTriggerService(temporal_client=client)
+
+        deleted = await service.delete_triggers_for_workflow(
+            workflow_id="wf-123",
+            should_abort=AsyncMock(side_effect=[False, False, False, True]),
+        )
+
+        assert deleted == 1
+        assert handle.delete.call_count == 1
 
 
 class TestGracefulTemporalUnavailability:
@@ -989,6 +1064,364 @@ class TestGetSharedClient:
         ):
             result = await _mod._get_shared_client()
         assert result is None
+
+    async def test_hung_connect_does_not_hold_client_lock(self) -> None:
+        """Client.connect must not hold ``_client_lock`` while it is in flight."""
+        connect_started = asyncio.Event()
+
+        async def _hang(*_args: object, **_kwargs: object) -> MagicMock:
+            connect_started.set()
+            await asyncio.Event().wait()
+            return MagicMock()
+
+        with patch(
+            "syntara.workflows.services.scheduled_trigger_service.Client.connect",
+            new=_hang,
+        ):
+            waiter = asyncio.create_task(_mod._get_shared_client())
+            await asyncio.wait_for(connect_started.wait(), timeout=1.0)
+            assert not _mod._client_lock.locked()
+            with pytest.raises(TimeoutError):
+                async with asyncio.timeout(0.05):
+                    await _mod._get_shared_client()
+            assert _mod._connect_task is not None
+            assert not _mod._connect_task.done()
+            assert not waiter.done()
+            waiter.cancel()
+            await asyncio.gather(waiter, return_exceptions=True)
+
+    async def test_invalidate_does_not_drop_in_flight_connect_task(self) -> None:
+        """Clearing the cache must not drop the strong ref to an in-flight connect."""
+        connect_started = asyncio.Event()
+        connect_calls = 0
+
+        async def _hang(*_args: object, **_kwargs: object) -> MagicMock:
+            nonlocal connect_calls
+            connect_calls += 1
+            connect_started.set()
+            await asyncio.Event().wait()
+            return MagicMock()
+
+        with patch(
+            "syntara.workflows.services.scheduled_trigger_service.Client.connect",
+            new=_hang,
+        ):
+            waiter = asyncio.create_task(_mod._get_shared_client())
+            await asyncio.wait_for(connect_started.wait(), timeout=1.0)
+            in_flight = _mod._connect_task
+            assert in_flight is not None
+            _mod._invalidate_client_cache()
+            later_waiter = asyncio.create_task(_mod._get_shared_client())
+            await asyncio.sleep(0.05)
+            assert _mod._connect_task is in_flight
+            assert not in_flight.done()
+            assert connect_calls == 1
+            waiter.cancel()
+            later_waiter.cancel()
+            await asyncio.gather(waiter, later_waiter, return_exceptions=True)
+
+    async def test_invalidate_after_successful_connect_reconnects(self) -> None:
+        """A finished connect task must not block reconnect after cache invalidation."""
+        first_client = MagicMock()
+        second_client = MagicMock()
+        with patch(
+            "syntara.workflows.services.scheduled_trigger_service.Client.connect",
+            new_callable=AsyncMock,
+            side_effect=[first_client, second_client],
+        ) as mock_connect:
+            assert await _mod._get_shared_client() is first_client
+            _mod._invalidate_client_cache()
+            assert _mod._cached_client is None
+            assert await _mod._get_shared_client() is second_client
+            assert mock_connect.await_count == 2
+
+    async def test_timed_out_waiter_does_not_cancel_overlapping_sibling(self) -> None:
+        """A waiter timeout must leave the shared connect running for later waiters."""
+        connect_started = asyncio.Event()
+        allow_connect = asyncio.Event()
+        client = MagicMock()
+        connect_calls = 0
+
+        async def _connect(*_args: object, **_kwargs: object) -> MagicMock:
+            nonlocal connect_calls
+            connect_calls += 1
+            connect_started.set()
+            await allow_connect.wait()
+            return client
+
+        with (
+            patch(
+                "syntara.workflows.services.scheduled_trigger_service.Client.connect",
+                new=_connect,
+            ),
+            patch("syntara.workflows.services.scheduled_trigger_service._CONNECT_TIMEOUT_SECONDS", 0.25),
+        ):
+            try:
+                first = asyncio.create_task(_mod._get_shared_client())
+                await asyncio.wait_for(connect_started.wait(), timeout=1.0)
+                await asyncio.sleep(0.05)
+                second = asyncio.create_task(_mod._get_shared_client())
+                in_flight = _mod._connect_task
+                assert in_flight is not None
+                assert await asyncio.wait_for(first, timeout=1.0) is None
+                assert not in_flight.done()
+                assert not in_flight.cancelled()
+                assert _mod._connect_task is in_flight
+                assert connect_calls == 1
+                allow_connect.set()
+                assert await asyncio.wait_for(second, timeout=1.0) is client
+                assert _mod._cached_client is client
+            finally:
+                allow_connect.set()
+
+    async def test_stale_replacement_does_not_cancel_joined_waiters(self) -> None:
+        """Replacing a stale connect must not cancel waiters still joined to it."""
+        connect_started = asyncio.Event()
+        replacement_started = asyncio.Event()
+        allow_first = asyncio.Event()
+        first_client = MagicMock(name="original")
+        second_client = MagicMock(name="replacement")
+        connect_calls = 0
+
+        async def _connect(*_args: object, **_kwargs: object) -> MagicMock:
+            nonlocal connect_calls
+            connect_calls += 1
+            if connect_calls == 1:
+                connect_started.set()
+                await allow_first.wait()
+                return first_client
+            replacement_started.set()
+            return second_client
+
+        with (
+            patch(
+                "syntara.workflows.services.scheduled_trigger_service.Client.connect",
+                new=_connect,
+            ),
+            patch("syntara.workflows.services.scheduled_trigger_service._CONNECT_TIMEOUT_SECONDS", 0.4),
+        ):
+            try:
+                first = asyncio.create_task(_mod._get_shared_client())
+                await asyncio.wait_for(connect_started.wait(), timeout=1.0)
+                await asyncio.sleep(0.05)
+                sibling = asyncio.create_task(_mod._get_shared_client())
+                original = _mod._connect_task
+                assert original is not None
+                assert await asyncio.wait_for(first, timeout=1.0) is None
+                third = asyncio.create_task(_mod._get_shared_client())
+                await asyncio.wait_for(replacement_started.wait(), timeout=1.0)
+                assert connect_calls == 2
+                assert _mod._connect_task is not original
+                assert not original.cancelled()
+                allow_first.set()
+                assert await asyncio.wait_for(sibling, timeout=1.0) is not None
+                assert await asyncio.wait_for(third, timeout=1.0) is not None
+                assert connect_calls == 2
+            finally:
+                allow_first.set()
+
+    async def test_late_connect_success_is_cached_after_waiter_timeout(self) -> None:
+        """A slow-but-healthy connect must still be cached after waiters time out."""
+        connect_started = asyncio.Event()
+        allow_connect = asyncio.Event()
+        client = MagicMock()
+
+        async def _connect(*_args: object, **_kwargs: object) -> MagicMock:
+            connect_started.set()
+            await allow_connect.wait()
+            return client
+
+        with (
+            patch(
+                "syntara.workflows.services.scheduled_trigger_service.Client.connect",
+                new=_connect,
+            ),
+            patch("syntara.workflows.services.scheduled_trigger_service._CONNECT_TIMEOUT_SECONDS", 0.05),
+        ):
+            try:
+                assert await asyncio.wait_for(_mod._get_shared_client(), timeout=1.0) is None
+                in_flight = _mod._connect_task
+                assert in_flight is not None
+                assert not in_flight.cancelled()
+                allow_connect.set()
+                assert await asyncio.wait_for(in_flight, timeout=1.0) is client
+                assert _mod._cached_client is client
+                assert await _mod._get_shared_client() is client
+            finally:
+                allow_connect.set()
+
+    async def test_timed_out_connect_is_replaced(self) -> None:
+        """A hung Client.connect older than the waiter budget is replaced on the next wait."""
+        connect_calls = 0
+        first_hang = asyncio.Event()
+        second_client = MagicMock()
+
+        async def _connect(*_args: object, **_kwargs: object) -> MagicMock:
+            nonlocal connect_calls
+            connect_calls += 1
+            if connect_calls == 1:
+                await first_hang.wait()
+                return MagicMock()
+            return second_client
+
+        with (
+            patch(
+                "syntara.workflows.services.scheduled_trigger_service.Client.connect",
+                new=_connect,
+            ),
+            patch("syntara.workflows.services.scheduled_trigger_service._CONNECT_TIMEOUT_SECONDS", 0.05),
+        ):
+            try:
+                first = await asyncio.wait_for(_mod._get_shared_client(), timeout=1.0)
+                assert first is None
+                old_task = _mod._connect_task
+                assert old_task is not None
+                assert not old_task.done()
+                await asyncio.sleep(0.02)
+                assert await _mod._get_shared_client() is second_client
+                assert connect_calls == 2
+                assert not old_task.cancelled()
+            finally:
+                first_hang.set()
+                await asyncio.sleep(0)
+
+    async def test_hung_connect_is_replaced_even_if_connect_ignores_cancel(self) -> None:
+        """Replacement must not wait for Client.connect to honour cancellation."""
+        connect_calls = 0
+        first_hang = asyncio.Event()
+        second_client = MagicMock()
+
+        async def _connect(*_args: object, **_kwargs: object) -> MagicMock:
+            nonlocal connect_calls
+            connect_calls += 1
+            if connect_calls == 1:
+                try:
+                    await first_hang.wait()
+                except asyncio.CancelledError:
+                    await first_hang.wait()
+                return MagicMock()
+            return second_client
+
+        with (
+            patch(
+                "syntara.workflows.services.scheduled_trigger_service.Client.connect",
+                new=_connect,
+            ),
+            patch("syntara.workflows.services.scheduled_trigger_service._CONNECT_TIMEOUT_SECONDS", 0.05),
+        ):
+            try:
+                first = await asyncio.wait_for(_mod._get_shared_client(), timeout=1.0)
+                assert first is None
+                old_task = _mod._connect_task
+                assert old_task is not None
+                await asyncio.sleep(0.02)
+                assert await _mod._get_shared_client() is second_client
+                assert connect_calls == 2
+                assert _mod._cached_client is second_client
+                assert not old_task.cancelled()
+            finally:
+                first_hang.set()
+                await asyncio.sleep(0)
+
+    async def test_stale_connect_does_not_overwrite_newer_client(self) -> None:
+        """A late success from a replaced connect must not replace the new client."""
+        connect_calls = 0
+        allow_first = asyncio.Event()
+        first_client = MagicMock(name="stale")
+        second_client = MagicMock(name="fresh")
+
+        async def _connect(*_args: object, **_kwargs: object) -> MagicMock:
+            nonlocal connect_calls
+            connect_calls += 1
+            if connect_calls == 1:
+                try:
+                    await allow_first.wait()
+                except asyncio.CancelledError:
+                    await allow_first.wait()
+                return first_client
+            return second_client
+
+        with (
+            patch(
+                "syntara.workflows.services.scheduled_trigger_service.Client.connect",
+                new=_connect,
+            ),
+            patch("syntara.workflows.services.scheduled_trigger_service._CONNECT_TIMEOUT_SECONDS", 0.05),
+        ):
+            try:
+                assert await asyncio.wait_for(_mod._get_shared_client(), timeout=1.0) is None
+                old_task = _mod._connect_task
+                assert old_task is not None
+                await asyncio.sleep(0.02)
+                assert await _mod._get_shared_client() is second_client
+                assert not old_task.cancelled()
+                allow_first.set()
+                await asyncio.wait_for(old_task, timeout=1.0)
+                assert _mod._cached_client is second_client
+            finally:
+                allow_first.set()
+
+    async def test_replaced_connect_kept_alive_against_gc(self) -> None:
+        """A replaced connect must survive GC when only the module set holds it.
+
+        Reproduces the drop-on-the-floor bug: after the first waiter times out,
+        the replaced connect is referenced only by ``_pending_connect_tasks``.
+        Unlike the sibling replacement tests, this one keeps no local strong
+        ref to the old task, so ``gc.collect()`` would cancel it ("Task was
+        destroyed but it is pending") without the strong-ref set.
+        """
+        connect_calls = 0
+        allow_first = asyncio.Event()
+        first_client = MagicMock(name="stale")
+        second_client = MagicMock(name="fresh")
+
+        async def _connect(*_args: object, **_kwargs: object) -> MagicMock:
+            nonlocal connect_calls
+            connect_calls += 1
+            if connect_calls == 1:
+                await allow_first.wait()
+                return first_client
+            return second_client
+
+        with (
+            patch(
+                "syntara.workflows.services.scheduled_trigger_service.Client.connect",
+                new=_connect,
+            ),
+            patch("syntara.workflows.services.scheduled_trigger_service._CONNECT_TIMEOUT_SECONDS", 0.05),
+        ):
+            try:
+                # First waiter times out; the connect keeps running in the set.
+                assert await asyncio.wait_for(_mod._get_shared_client(), timeout=1.0) is None
+                stale_ref = weakref.ref(_mod._connect_task)
+                stale_task = stale_ref()
+                assert stale_task is not None
+                assert stale_task in _mod._pending_connect_tasks
+
+                # Replace the stale connect, then drop every local strong ref
+                # to it. Only ``_pending_connect_tasks`` should hold it now.
+                await asyncio.sleep(0.02)
+                assert await _mod._get_shared_client() is second_client
+                assert connect_calls == 2
+                assert _mod._connect_task is not stale_task
+                del stale_task
+                gc.collect()
+
+                # Without the strong-ref set the task would be gone/cancelled.
+                survivor = stale_ref()
+                assert survivor is not None
+                assert survivor in _mod._pending_connect_tasks
+                assert not survivor.cancelled()
+
+                # A late success from the survivor still completes and, once
+                # done, drops itself from the set via the done-callback.
+                allow_first.set()
+                assert await asyncio.wait_for(survivor, timeout=1.0) is not None
+                await asyncio.sleep(0)
+                assert survivor not in _mod._pending_connect_tasks
+                assert _mod._cached_client is second_client
+            finally:
+                allow_first.set()
 
 
 class TestCreateSchedule:

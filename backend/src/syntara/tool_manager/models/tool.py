@@ -189,6 +189,16 @@ class Tool(ToolBase, table=True):
 
     __tablename__ = "tools"
 
+    # Provider sync and execution telemetry are not user edits; don't bump updated_at for them.
+    __updated_at_exempt_fields__: ClassVar[frozenset[str]] = frozenset(
+        {
+            "status",
+            "last_executed_at",
+            "last_refreshed_at",
+            "refresh_error",
+        }
+    )
+
     __filterable_fields__: ClassVar[list[str]] = [
         *NamedResource.__filterable_fields__,
         *UserOwnedResource.__filterable_fields__,

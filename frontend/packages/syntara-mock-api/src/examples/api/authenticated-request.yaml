@@ -20,7 +20,7 @@ nodes:
       method: GET
       url: http://test-api.example.com/api/auth
       headers:
-        Authorization: ${input.apiToken}
+        Authorization: ${trigger.apiToken}
     inputs:
-      apiToken: ${inputs.apiToken}
+      apiToken: ${trigger.apiToken}
 edges: []

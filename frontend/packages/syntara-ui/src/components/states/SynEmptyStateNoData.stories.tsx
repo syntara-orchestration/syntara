@@ -1,5 +1,5 @@
 import { Button } from '@patternfly/react-core'
-import type { Meta, StoryObj } from '@storybook/react-vite'
+import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import { fn } from 'storybook/test'
 
 import { pageDecorator } from './storyDecorators'
@@ -18,7 +18,7 @@ export const Default: Story = {}
 
 export const WithAction: Story = {
   args: {
-    title: 'No workflows found',
+    title: 'No workflows yet',
     description: 'Create your first workflow to get started.',
     buttonText: 'Create workflow',
     addData: fn(),

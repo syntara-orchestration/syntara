@@ -56,6 +56,15 @@ TERMINAL_STATUSES = {
     ExecutionStatus.CANCELLED,
 }
 
+# Activity-level terminal statuses as plain strings, mirroring ActivityStatus in the app.
+# Inlined to avoid importing from syntara app source (see TERMINAL_EXECUTION_STATUSES above).
+TERMINAL_ACTIVITY_STATUSES: frozenset[str] = frozenset({"completed", "failed", "skipped", "cancelled"})
+
+# After an execution reaches a terminal state, its activity_execution rows may still be
+# syncing from Temporal (e.g. an agentic node briefly reported as "running"). Wait up to
+# this many seconds for every present activity to also reach a terminal state.
+ACTIVITY_SETTLE_TIMEOUT = 15
+
 
 def _retry_api_call(fn, *, retries: int = API_RETRIES, delay: float = API_RETRY_DELAY):  # noqa: ANN202
     """Retry an API call on transient failures (connection errors, server disconnects, 500s)."""
@@ -76,10 +85,26 @@ def _retry_api_call(fn, *, retries: int = API_RETRIES, delay: float = API_RETRY_
     raise last_exc  # type: ignore[misc]
 
 
+def _activities_settled(execution: ExecutionRead) -> bool:
+    """True when every present activity has reached a terminal status.
+
+    The execution-level status can flip to terminal a moment before the
+    activity_execution rows finish syncing from Temporal, transiently leaving an
+    activity (e.g. an agentic node) reported as "running". Absent activities
+    (skipped branches with no row yet) are not waited on.
+    """
+    return all(getattr(a.status, "value", a.status) in TERMINAL_ACTIVITY_STATUSES for a in (execution.activities or []))
+
+
 def poll_execution(
     api: SyntaraApiRegistry, exec_id: str, timeout: int = POLL_TIMEOUT, interval: int = POLL_INTERVAL
 ) -> ExecutionRead:
-    """Poll until execution reaches a terminal state, returning the final ExecutionRead."""
+    """Poll until execution reaches a terminal state, returning the final ExecutionRead.
+
+    Once the execution is terminal, waits up to ``ACTIVITY_SETTLE_TIMEOUT`` additional
+    seconds for every present activity row to also reach a terminal status, so callers
+    don't observe an activity still marked "running" after the execution has completed.
+    """
     elapsed = 0
     while elapsed < timeout:
         time.sleep(interval)
@@ -87,6 +112,12 @@ def poll_execution(
         response = _retry_api_call(lambda: api.executions.get(execution_id=UUID(exec_id), include="activities"))
         execution: ExecutionRead = response.assert_and_get()
         if execution.status in TERMINAL_STATUSES:
+            settle_elapsed = 0
+            while not _activities_settled(execution) and settle_elapsed < ACTIVITY_SETTLE_TIMEOUT:
+                time.sleep(interval)
+                settle_elapsed += interval
+                response = _retry_api_call(lambda: api.executions.get(execution_id=UUID(exec_id), include="activities"))
+                execution = response.assert_and_get()
             return execution
     pytest.fail(f"Execution {exec_id} did not finish within {timeout}s")
 
@@ -301,6 +332,11 @@ def poll_execution_until_complete(
     Returns:
         ExecutionRead with final terminal state (completed, failed, cancelled, or completed_with_errors)
 
+    Once the execution is terminal, waits up to ``ACTIVITY_SETTLE_TIMEOUT`` additional
+    seconds for every present activity row to also reach a terminal status, so callers
+    don't observe an activity still marked "running" after the execution has completed
+    (mirrors ``poll_execution``).
+
     Raises:
         AssertionError: If execution does not reach terminal state within timeout
 
@@ -320,6 +356,20 @@ def poll_execution_until_complete(
 
         status = str(execution.status)
         if status in TERMINAL_EXECUTION_STATUSES:
+            settle_elapsed = 0
+            while not _activities_settled(execution) and settle_elapsed < ACTIVITY_SETTLE_TIMEOUT:
+                time.sleep(poll_interval)
+                settle_elapsed += poll_interval
+                try:
+                    execution = syntara_api.executions.get(
+                        execution_id=execution_id,
+                        include="activities",
+                    ).assert_and_get()
+                except UnexpectedResponseException as exc:
+                    # Transient gateway/server errors — treat as "not settled yet" and keep polling
+                    if exc.status_code in (502, 503, 504):
+                        continue
+                    raise
             return execution
 
         time.sleep(poll_interval)

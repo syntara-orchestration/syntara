@@ -5,7 +5,7 @@
   "description": "Workflow entry point triggered by incoming HTTP POST requests from external systems. Supports optional JSON Schema payload validation.",
   "parameterSchema": {
     "type": "object",
-    "required": ["webhook_path"],
+    "required": ["webhook_path", "authorized_service_account_ids"],
     "properties": {
       "webhook_path": {
         "type": "string",
@@ -26,7 +26,7 @@
           "type": "string",
           "format": "uuid"
         },
-        "default": []
+        "minItems": 1
       }
     },
     "additionalProperties": false

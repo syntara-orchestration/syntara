@@ -184,6 +184,27 @@ describe('FileUpload', () => {
       expect(screen.getByLabelText('Download Spec.md')).toHaveAttribute('disabled')
     })
 
+    it('shows remove spinner for each id in deletingFileIds and hides download', () => {
+      const files: UploadedFile[] = [
+        { id: 'file-1', file: new File([''], 'Report_Q2.pdf'), progress: 100, status: 'success' },
+        { id: 'file-2', file: new File([''], 'Notes.txt'), progress: 100, status: 'success' },
+      ]
+
+      render(
+        <FileUpload
+          files={files}
+          onFileDownload={vi.fn()}
+          onFileRemove={vi.fn()}
+          deletingFileIds={new Set(['file-1'])}
+        />
+      )
+
+      expect(screen.getByLabelText('Remove Report_Q2.pdf')).toHaveAttribute('disabled')
+      expect(screen.queryByLabelText('Download Report_Q2.pdf')).not.toBeInTheDocument()
+      expect(screen.getByLabelText('Remove Notes.txt')).not.toHaveAttribute('disabled')
+      expect(screen.getByLabelText('Download Notes.txt')).toBeInTheDocument()
+    })
+
     it('hides remove and shows Cancel for downloading files while others stay interactive', async () => {
       const user = userEvent.setup()
       const onFileDownloadCancel = vi.fn()

@@ -31,7 +31,7 @@ import type {
   ExpressionNode,
   LogicalOperator,
 } from '../../utils/expressions/types'
-import { NxSelect } from '../NxSelect'
+import { SynSelect } from '../SynSelect'
 
 import { ExpressionCondition } from './ExpressionCondition'
 import { HelpPopover } from './HelpPopover'
@@ -141,12 +141,12 @@ function OperatorSelect({ groupId, index, operator, onSelect, isDisabled }: Oper
   )
 
   const select = (
-    <NxSelect isOpen={isOpen} onSelect={handleSelect} onOpenChange={setIsOpen} toggle={toggle} selected={operator}>
+    <SynSelect isOpen={isOpen} onSelect={handleSelect} onOpenChange={setIsOpen} toggle={toggle} selected={operator}>
       <SelectList aria-label="Logical operator">
         <SelectOption value="AND">AND</SelectOption>
         <SelectOption value="OR">OR</SelectOption>
       </SelectList>
-    </NxSelect>
+    </SynSelect>
   )
 
   if (isDisabled) {

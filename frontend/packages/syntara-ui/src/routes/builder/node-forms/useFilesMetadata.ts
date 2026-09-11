@@ -12,7 +12,7 @@ export function useFilesMetadata(fileIds: string[] | undefined): {
     queryKey: ['files', 'metadata', fileIds],
     queryFn: () =>
       filesFetchClient.GET('/files/metadata', {
-        params: { query: { file_ids: fileIds! } },
+        params: { query: { file_ids: fileIds ?? [] } },
       }),
     enabled: !!fileIds && fileIds.length > 0,
     select: (res) =>

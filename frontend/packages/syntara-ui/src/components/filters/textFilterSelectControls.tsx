@@ -14,10 +14,9 @@ import React, { useCallback, useMemo, useRef, useState } from 'react'
 
 import type { FilterConfig, FilterFieldDefinition } from '../../types/filters'
 import { detachPromise } from '../../utils/detachPromise'
-import { LONG_SELECT_MAX_MENU_HEIGHT, longSelectMenuPopperProps } from '../longSelectMenu'
-import longSelectMenuStyles from '../longSelectMenu.module.css'
-import { NxSelect } from '../NxSelect'
+import { SynSelect } from '../SynSelect'
 
+import toggleStyles from './filterToggle.module.css'
 import styles from './textFilterSelectControls.module.css'
 
 export const SEARCH_THRESHOLD = 10
@@ -43,7 +42,12 @@ type FieldSelectorMenuToggleProps = {
 
 function FieldSelectorMenuToggle({ toggleRef, isOpen, onOpenChange, label }: Readonly<FieldSelectorMenuToggleProps>) {
   return (
-    <MenuToggle ref={toggleRef} onClick={() => onOpenChange(!isOpen)} icon={<RhUiFilterIcon />}>
+    <MenuToggle
+      ref={toggleRef}
+      onClick={() => onOpenChange(!isOpen)}
+      icon={<RhUiFilterIcon />}
+      className={toggleStyles.toggle}
+    >
       {label}
     </MenuToggle>
   )
@@ -86,7 +90,7 @@ export function FieldSelector({
   )
 
   return (
-    <NxSelect
+    <SynSelect
       id="attribute-search-field-select"
       isOpen={isOpen}
       selected={selectedField.key}
@@ -102,7 +106,7 @@ export function FieldSelector({
           </SelectOption>
         ))}
       </SelectList>
-    </NxSelect>
+    </SynSelect>
   )
 }
 
@@ -286,6 +290,7 @@ export function SelectFilterInput({
   // Load initial async options on mount
   React.useEffect(() => {
     if (isAsync && isOpen && asyncOptions.length === 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- load options when the menu opens; setState happens inside loadAsyncOptions
       detachPromise(loadAsyncOptions(''))
     }
   }, [isAsync, isOpen, asyncOptions.length, loadAsyncOptions])
@@ -391,20 +396,16 @@ export function SelectFilterInput({
 
   return (
     <ToolbarItem>
-      <NxSelect
+      <SynSelect
         id="attribute-search-value-select"
         isOpen={isOpen}
         selected={activeOption?.value}
         onSelect={handleSelect}
         onOpenChange={handleOpenChange}
-        isScrollable
-        maxMenuHeight={LONG_SELECT_MAX_MENU_HEIGHT}
         popperProps={{
-          ...longSelectMenuPopperProps,
           ...popperProps,
           maxWidth: typeof popperProps?.maxWidth === 'string' ? popperProps.maxWidth : '20rem',
         }}
-        className={longSelectMenuStyles.containScroll}
         toggle={renderValueToggle}
       >
         {showSearch && (
@@ -417,7 +418,7 @@ export function SelectFilterInput({
           />
         )}
         <SelectList>{selectListBody}</SelectList>
-      </NxSelect>
+      </SynSelect>
     </ToolbarItem>
   )
 }
@@ -447,7 +448,7 @@ function MultiSelectFilterInputMenuToggle({
   displayText,
 }: Readonly<MultiSelectFilterInputMenuToggleProps>) {
   return (
-    <MenuToggle ref={toggleRef} onClick={() => onOpenChange(!isOpen)}>
+    <MenuToggle ref={toggleRef} onClick={() => onOpenChange(!isOpen)} className={toggleStyles.toggle}>
       {displayText}
     </MenuToggle>
   )
@@ -494,7 +495,7 @@ export function MultiSelectFilterInput({
 
   return (
     <ToolbarItem>
-      <NxSelect
+      <SynSelect
         id="attribute-search-multiselect"
         isOpen={isOpen}
         onOpenChange={onOpenChange}
@@ -513,7 +514,7 @@ export function MultiSelectFilterInput({
             </SelectOption>
           ))}
         </SelectList>
-      </NxSelect>
+      </SynSelect>
     </ToolbarItem>
   )
 }

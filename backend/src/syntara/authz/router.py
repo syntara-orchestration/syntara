@@ -175,7 +175,6 @@ async def _resolve_project_input(db: AsyncSession, resource_project: str) -> str
     result = await db.exec(
         select(Project.name).where(
             Project.id == project_id,
-            Project.deleted_at.is_(None),  # type: ignore[union-attr]
         )
     )
     return result.first() or resource_project
@@ -186,7 +185,6 @@ async def _ids_to_names(db: AsyncSession, project_ids: set[UUID]) -> set[str]:
     projects_result = await db.exec(
         select(Project.name).where(
             Project.id.in_(list(project_ids)),  # type: ignore[attr-defined]
-            Project.deleted_at.is_(None),  # type: ignore[union-attr]
         )
     )
     return set(projects_result.all())
@@ -454,7 +452,6 @@ async def _scan_authorized_users(
     while len(authorized) < target_count:
         query = select(User).where(
             User.is_enabled.is_(True),  # type: ignore[attr-defined]
-            User.deleted_at.is_(None),  # type: ignore[union-attr]
         )
         if batch_cursor_id is not None:
             query = _apply_who_can_cursor_filter(  # type: ignore[assignment]
@@ -554,7 +551,6 @@ async def _count_authorized_users(
             select(User)
             .where(
                 User.is_enabled.is_(True),  # type: ignore[attr-defined]
-                User.deleted_at.is_(None),  # type: ignore[union-attr]
             )
             .order_by(col(User.id))
             .limit(_WHO_CAN_DB_BATCH_SIZE)

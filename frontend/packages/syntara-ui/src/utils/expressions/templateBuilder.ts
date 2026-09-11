@@ -9,14 +9,27 @@
 /** Safe characters for node IDs: alphanumeric, underscores, hyphens (matches generateActivityId format) */
 const SAFE_NODE_ID = /^[a-zA-Z0-9_-]+$/
 
+/** Execution activity records for later loop iterations use `{nodeId}#iter-{n}`. */
+const COMPOSITE_ITER_SEP = '#iter-'
+
 /** Safe characters for field path segments: alphanumeric, underscores, hyphens, spaces, brackets for array indexing (no dots — dots are path delimiters) */
 const SAFE_FIELD_SEGMENT = /^[a-zA-Z0-9_ \-[\]]+$/
 
+/**
+ * Template expressions always reference the canvas node ID.
+ * Strip execution composite keys (`{nodeId}#iter-{n}`) before interpolating.
+ */
+export function canvasNodeIdForExpression(nodeId: string): string {
+  const hashIdx = nodeId.indexOf(COMPOSITE_ITER_SEP)
+  return hashIdx === -1 ? nodeId : nodeId.slice(0, hashIdx)
+}
+
 function validateNodeId(nodeId: string): string {
-  if (!SAFE_NODE_ID.test(nodeId)) {
+  const canvasId = canvasNodeIdForExpression(nodeId)
+  if (!SAFE_NODE_ID.test(canvasId)) {
     throw new Error('Invalid node ID: contains disallowed characters')
   }
-  return nodeId
+  return canvasId
 }
 
 function validateFieldSegment(segment: string): string {

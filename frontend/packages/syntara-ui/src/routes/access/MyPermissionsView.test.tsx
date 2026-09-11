@@ -137,7 +137,7 @@ describe('MyPermissionsView', () => {
     render(<MyPermissionsView />, { wrapper })
 
     await waitFor(() => {
-      expect(screen.getByText('No permissions')).toBeInTheDocument()
+      expect(screen.getByText('No permissions yet')).toBeInTheDocument()
     })
     expect(screen.getByText('The current user has no permissions assigned.')).toBeInTheDocument()
   })
@@ -283,7 +283,7 @@ describe('MyPermissionsView', () => {
     const { container } = render(<MyPermissionsView />, { wrapper })
 
     await waitFor(() => {
-      expect(screen.getByText('No permissions')).toBeInTheDocument()
+      expect(screen.getByText('No permissions yet')).toBeInTheDocument()
     })
 
     const results = await axe(container)

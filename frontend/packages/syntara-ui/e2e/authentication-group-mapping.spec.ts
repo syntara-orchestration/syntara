@@ -6,8 +6,7 @@
  * - UI-13: JMESPath filter — entry and validation error
  * - UI-14: Claim data configuration screen
  */
-import { type Page } from '@playwright/test'
-
+import { type Page } from './fixtures'
 import { test, expect } from './fixtures'
 import {
   expandGroupMappingAdvanced,

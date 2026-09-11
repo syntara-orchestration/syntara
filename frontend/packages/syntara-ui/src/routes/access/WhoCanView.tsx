@@ -22,7 +22,7 @@ import { z } from 'zod'
 import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 import { SynErrorState } from '../../components/states/SynErrorState'
 import { LinkCell } from '../../components/table/LinkCell'
-import { NxScrollableTableContainer } from '../../components/table/NxScrollableTableContainer'
+import { SynScrollableTableContainer } from '../../components/table/SynScrollableTableContainer'
 import { getErrorMessage } from '../../utils/apiErrors'
 import { getUserDetailPath } from '../access-management/accessManagementPaths'
 
@@ -82,7 +82,7 @@ function WhoCanResults({
         />
       </StackItem>
       {users.length > 0 && (
-        <NxScrollableTableContainer
+        <SynScrollableTableContainer
           caption="Users with access"
           isStriped
           footerContent={
@@ -134,7 +134,7 @@ function WhoCanResults({
               </Tr>
             ))}
           </Tbody>
-        </NxScrollableTableContainer>
+        </SynScrollableTableContainer>
       )}
     </>
   )

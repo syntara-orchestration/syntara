@@ -281,8 +281,6 @@ class TestListWorkflowVersionsCursorCallbacks:
         mock_version.created_by = user_id
         mock_version.created_at = MagicMock()
         mock_version.updated_at = MagicMock()
-        mock_version.deleted_at = None
-        mock_version.deleted_by = None
 
         result = converter(mock_version)
         assert result is not None

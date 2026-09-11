@@ -192,9 +192,7 @@ async def test_project_id(test_db_session: AsyncSession) -> UUID:
 @pytest_asyncio.fixture(autouse=True)
 async def _seed_authenticated_group(test_db_session: AsyncSession) -> None:
     """Ensure the built-in authenticated group exists for every integration test."""
-    result = await test_db_session.exec(
-        select(Group).where(Group.name == AUTHENTICATED_GROUP_NAME, Group.deleted_at.is_(None))  # type: ignore[union-attr]
-    )
+    result = await test_db_session.exec(select(Group).where(Group.name == AUTHENTICATED_GROUP_NAME))
     if not result.first():
         test_db_session.add(Group(id=uuid4(), name=AUTHENTICATED_GROUP_NAME, is_builtin=True, labels={}))
         await test_db_session.flush()

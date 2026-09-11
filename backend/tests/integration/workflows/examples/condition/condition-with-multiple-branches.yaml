@@ -17,7 +17,7 @@ nodes:
   - id: score_evaluation
     name: Evaluate Score
     type: condition
-    condition: ${input.score} >= 60
+    condition: ${trigger.score} >= 60
 
   - id: pass_notification
     name: Pass Notification

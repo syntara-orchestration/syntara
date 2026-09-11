@@ -27,7 +27,7 @@ nodes:
         echo "Environment: ${ENVIRONMENT}"
         echo "User: ${INPUT_USER_NAME}"
     inputs:
-      user_name: ${inputs.user_name}
+      user_name: ${trigger.user_name}
     outputs:
       endpoint: $.stdout
 
@@ -58,7 +58,7 @@ nodes:
 
         print(json.dumps(config, indent=2))
     inputs:
-      user_name: ${inputs.user_name}
+      user_name: ${trigger.user_name}
     outputs:
       parameters: $.output
 
@@ -74,7 +74,7 @@ nodes:
         echo "Max Retries: ${MAX_RETRIES}"
         echo "User: ${INPUT_USER_NAME}"
     inputs:
-      user_name: ${inputs.user_name}
+      user_name: ${trigger.user_name}
     outputs:
       message: $.stdout
 edges:

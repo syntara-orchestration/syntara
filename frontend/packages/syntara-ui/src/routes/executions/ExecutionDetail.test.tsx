@@ -385,7 +385,7 @@ describe('ExecutionDetail', () => {
     )
   })
 
-  it('shows history panel by default', () => {
+  it('does not show history panel by default and keeps the run history icon', () => {
     const queryClient = new QueryClient()
     render(
       <QueryClientProvider client={queryClient}>
@@ -393,7 +393,8 @@ describe('ExecutionDetail', () => {
       </QueryClientProvider>
     )
 
-    expect(screen.getByTestId('workflow-history-card')).toBeInTheDocument()
+    expect(screen.queryByTestId('workflow-history-card')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Run history')).toBeInTheDocument()
   })
 
   it('shows history panel when history=open query param is present', () => {
@@ -435,6 +436,8 @@ describe('ExecutionDetail', () => {
   })
 
   it('toggles history panel closed when history button is clicked', async () => {
+    vi.mocked(useRouterState).mockReturnValue('?history=open' as never)
+
     const user = userEvent.setup()
     const queryClient = new QueryClient()
     render(
@@ -442,6 +445,8 @@ describe('ExecutionDetail', () => {
         <ExecutionDetail />
       </QueryClientProvider>
     )
+
+    expect(screen.getByTestId('workflow-history-card')).toBeInTheDocument()
 
     const historyButton = screen.getByLabelText('Run history')
     await user.click(historyButton)

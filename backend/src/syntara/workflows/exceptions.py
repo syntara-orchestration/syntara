@@ -148,6 +148,22 @@ class WorkflowConcurrencyLimitError(WorkflowError):
         )
 
 
+@fastapi_exception(handler="syntara.workflows.error_handlers.workflow_has_active_executions_handler")
+class WorkflowHasActiveExecutionsError(WorkflowError):
+    """Raised when deleting a workflow or project is blocked by non-terminal executions."""
+
+    def __init__(self, active_count: int, *, workflow_id: UUID | None = None, project_id: UUID | None = None) -> None:
+        """Initialize with the count and either workflow_id or project_id."""
+        self.workflow_id = workflow_id
+        self.project_id = project_id
+        self.active_count = active_count
+        scope = f"workflow {workflow_id}" if workflow_id is not None else f"project {project_id}"
+        super().__init__(
+            f"Cannot delete {scope}: {active_count} execution(s) still running. "
+            "Cancel or wait for active executions to complete before deleting."
+        )
+
+
 # ============================================================================
 # Trigger Exceptions (shared across trigger types)
 # ============================================================================

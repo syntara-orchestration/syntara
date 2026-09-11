@@ -37,6 +37,37 @@ class TestUsersCreateContract:
         assert data["is_enabled"] is True  # default
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("first_name_payload", "username"),
+        [
+            ({}, "omitfirstname"),
+            ({"first_name": None}, "nullfirstname"),
+            ({"first_name": ""}, "emptyfirstname"),
+        ],
+        ids=["omitted", "null", "empty_string"],
+    )
+    async def test_create_user_without_first_name(
+        self,
+        admin_client: AsyncClient,
+        first_name_payload: dict[str, str | None],
+        username: str,
+    ) -> None:
+        """POST /users accepts omitted, null, or empty first_name."""
+        user_data = {
+            "username": username,
+            "email": f"{username}@example.com",
+            "password": "SecurePassword123!",
+            **first_name_payload,
+        }
+
+        response = await admin_client.post(USERS_URL, json=user_data)
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["username"] == username
+        assert data["first_name"] == ""
+
+    @pytest.mark.asyncio
     async def test_create_user_omitted_group_names_assigns_default_users_group(self, admin_client: AsyncClient) -> None:
         """Omitting group_names should assign users + authenticated groups.
 

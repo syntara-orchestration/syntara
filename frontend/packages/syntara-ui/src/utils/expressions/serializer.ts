@@ -22,22 +22,22 @@ import type { Expression, ExpressionNode, ExpressionCondition, ExpressionGroup }
  * serializeExpression({
  *   root: {
  *     type: 'condition',
- *     variable: 'input.age',
+ *     variable: 'trigger.age',
  *     operator: '>=',
  *     value: '18'
  *   }
  * })
- * // Returns: "${input.age} >= 18" (NOT "${input.age >= 18}")
+ * // Returns: "${trigger.age} >= 18" (NOT "${trigger.age >= 18}")
  *
  * @example
  * // With negation for UI display (default)
  * serializeExpression({ root: { ...condition, negate: true } })
- * // Returns: "!(${input.age} >= 18)"
+ * // Returns: "!(${trigger.age} >= 18)"
  *
  * @example
  * // With negation for backend
  * serializeExpression({ root: { ...condition, negate: true } }, { forBackend: true })
- * // Returns: "not (${input.age} >= 18)"
+ * // Returns: "not (${trigger.age} >= 18)"
  */
 export function serializeExpression(expression: Expression, options?: { forBackend?: boolean }): string {
   if (!expression.root) {
@@ -109,12 +109,12 @@ function quoteValueIfNeeded(value: string): string {
  * @example
  * serializeCondition({
  *   type: 'condition',
- *   variable: 'input.age',
+ *   variable: 'trigger.age',
  *   operator: '>=',
  *   value: '18',
  *   negate: false
  * })
- * // Returns: "${input.age} >= 18" (variable wrapped, value not wrapped)
+ * // Returns: "${trigger.age} >= 18" (variable wrapped, value not wrapped)
  *
  * @example
  * serializeCondition({
@@ -216,11 +216,11 @@ function serializeCondition(condition: ExpressionCondition, forBackend: boolean)
  *   type: 'group',
  *   operator: 'AND',
  *   children: [
- *     { type: 'condition', variable: 'input.age', operator: '>=', value: '18' },
- *     { type: 'condition', variable: 'input.score', operator: '>', value: '50' }
+ *     { type: 'condition', variable: 'trigger.age', operator: '>=', value: '18' },
+ *     { type: 'condition', variable: 'trigger.score', operator: '>', value: '50' }
  *   ]
  * })
- * // Returns: "(input.age >= 18 && input.score > 50)"
+ * // Returns: "(trigger.age >= 18 && trigger.score > 50)"
  *
  * @example
  * serializeGroup({
@@ -229,7 +229,7 @@ function serializeCondition(condition: ExpressionCondition, forBackend: boolean)
  *   negate: true,
  *   children: [...]
  * }, false)
- * // Returns: "!((input.age >= 18 && input.score > 50))" (UI display - default)
+ * // Returns: "!((trigger.age >= 18 && trigger.score > 50))" (UI display - default)
  *
  * @example
  * serializeGroup({
@@ -238,7 +238,7 @@ function serializeCondition(condition: ExpressionCondition, forBackend: boolean)
  *   negate: true,
  *   children: [...]
  * }, true)
- * // Returns: "not ((input.age >= 18 && input.score > 50))" (backend mode)
+ * // Returns: "not ((trigger.age >= 18 && trigger.score > 50))" (backend mode)
  */
 function serializeSingleChild(
   result: string,

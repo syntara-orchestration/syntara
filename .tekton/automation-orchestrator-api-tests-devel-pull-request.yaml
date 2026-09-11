@@ -41,7 +41,7 @@ spec:
       - name: name
         value: ao-api-tests
       - name: bundle
-        value: quay.io/aap-ci/tekton-catalog/pipeline/test/ao-api-tests:0.1@sha256:09b63f7777b9d3244a7de072a66c827fc1410bd3c038fe9829e190f9ffb44796
+        value: quay.io/aap-ci/tekton-catalog/pipeline/test/ao-api-tests:0.1@sha256:aab6acb063b7108a554e1406dc6170f2e3d86aef7aa7eef553ee8ccf4d10d4b5
       - name: kind
         value: pipeline
       - name: secret

@@ -1,7 +1,7 @@
 import { RhUiDislikeFillIcon, RhUiLikeFillIcon, RhUiWarningFillIcon } from '@patternfly/react-icons'
 import type { ApprovalStatus } from '@syntara/contracts'
 
-import { NxLabel } from '../../components/labels/NxLabel'
+import { SynLabel } from '../../components/labels/SynLabel'
 
 const statusMap: Record<ApprovalStatus, 'info' | 'success' | 'danger' | 'warning'> = {
   pending: 'warning',
@@ -28,8 +28,8 @@ export function ApprovalStatusBadges(props: Readonly<{ status?: ApprovalStatus |
   const capitalizedStatus = props.status.charAt(0).toUpperCase() + props.status.slice(1)
 
   return (
-    <NxLabel variant="outline" status={statusMap[props.status]} icon={<IconComponent />}>
+    <SynLabel variant="outline" status={statusMap[props.status]} icon={<IconComponent />}>
       {capitalizedStatus}
-    </NxLabel>
+    </SynLabel>
   )
 }

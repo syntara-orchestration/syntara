@@ -10,11 +10,9 @@ inputs:
   lastName:
     type: string
     default: Doe
-
-variables:
-  config:
-    timeout: 30
-    retries: 3
+  timeout:
+    type: number
+    default: 30
 
 triggers:
   - id: trigger_manual
@@ -29,19 +27,19 @@ nodes:
       code: |
         echo "Greeting: $INPUT_GREETING"
     inputs:
-      greeting: Hello, ${input.firstName} ${input.lastName}!
+      greeting: Hello, ${trigger.firstName} ${trigger.lastName}!
     outputs:
       result: $.stdout
 
-  - id: test_variable_reference
-    name: Test Variable Reference
+  - id: test_trigger_field_reference
+    name: Test Trigger Field Reference
     type: script
     parameters:
       language: bash
       code: |
         echo "Timeout: $INPUT_TIMEOUT_VALUE seconds"
     inputs:
-      timeout_value: ${variables.config.timeout}
+      timeout_value: ${trigger.timeout}
     outputs:
       result: $.stdout
 
@@ -58,6 +56,6 @@ nodes:
       final: $.stdout
 edges:
   - source: test_multiple_placeholders
-    target: test_variable_reference
-  - source: test_variable_reference
+    target: test_trigger_field_reference
+  - source: test_trigger_field_reference
     target: test_activity_output_reference

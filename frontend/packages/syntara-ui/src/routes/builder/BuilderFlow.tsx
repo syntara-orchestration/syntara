@@ -35,6 +35,7 @@ import { UndoRedoControls } from '../workflows/canvas/UndoRedoControls'
 import { useExecutionStore } from '../workflows/stores/useExecutionStore'
 
 import { ActiveExecutionContext } from './ActiveExecutionContext'
+import styles from './BuilderFlow.module.css'
 import { builderEdgeTypes, builderNodeTypes, resolveExecutionStatus } from './builderFlowConfig'
 import { BUTTON_EDGE_DEFAULT_STROKE } from './edges/buttonEdgeStrokeColor'
 import { EdgeMarkers } from './edges/edgeMarkers'
@@ -138,8 +139,10 @@ export function BuilderFlow(props: BuilderFlowProps) {
   const lastWorkflowIdRef = useRef<string | null>(workflowId)
   const lastWorkflowVersionRef = useRef<number>(workflowVersion)
   const initialNodesRef = useRef(initialNodes)
+  // eslint-disable-next-line react-hooks/refs -- keep latest props available to effects without re-subscribing
   initialNodesRef.current = initialNodes
   const initialEdgesRef = useRef(initialEdges)
+  // eslint-disable-next-line react-hooks/refs -- keep latest props available to effects without re-subscribing
   initialEdgesRef.current = initialEdges
   const [nodes, setNodes] = useState<NodeType[]>([])
 
@@ -417,6 +420,7 @@ export function BuilderFlow(props: BuilderFlowProps) {
 
   useEffect(() => {
     if (!panelOpen && pendingEdge) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- drop pending edge when the panel closes or its source node is gone
       setPendingEdge(null)
     }
     if (pendingEdge) {
@@ -478,6 +482,7 @@ export function BuilderFlow(props: BuilderFlowProps) {
 
     // In edit mode (effectiveExecutionStatus is null), clear all execution states
     if (!effectiveExecutionStatus) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clear execution overlays when leaving execution view
       setNodes((currentNodes) => {
         const hasExecutionState = currentNodes.some((node) => (node.data as Record<string, unknown>).__executionState)
         if (!hasExecutionState) return currentNodes
@@ -562,7 +567,7 @@ export function BuilderFlow(props: BuilderFlowProps) {
     <ActiveExecutionContext.Provider value={isActiveExecution}>
       <div
         ref={containerRef}
-        className={readOnlyProp ? 'version-view-readonly' : undefined}
+        className={readOnlyProp ? styles.readonlyCanvas : undefined}
         style={{
           width: '100%',
           height: '100%',

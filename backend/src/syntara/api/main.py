@@ -392,7 +392,7 @@ def swagger_ui_parameters(*, enable_try_it_out: bool) -> dict[str, Any]:
 # Create FastAPI application
 _settings = get_settings()
 app = FastAPI(
-    title=f"{_settings.product_name} API",
+    title="Orchestrator API",
     description="A distributed multi-agent workflow orchestration system",
     version=API_V1_VERSION,
     docs_url=None,

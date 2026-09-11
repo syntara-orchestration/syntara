@@ -38,6 +38,7 @@ export function useTextFilterState(
     if (!selectedField) return
     const matchingField = fieldDefinitions.find((f) => f.key === selectedField.key)
     if (matchingField && matchingField !== selectedField) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- keep selectedField object identity in sync when fieldDefinitions reloads
       setSelectedField(matchingField)
     } else if (!matchingField) {
       setSelectedField(fieldDefinitions[0] ?? null)
