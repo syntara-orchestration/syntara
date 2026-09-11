@@ -19,6 +19,8 @@ from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_version import WorkflowVersion
 from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 from tests.integration.helpers.error_data import assert_error_data
+from tests.integration.helpers.invocations import InvocationFactory
+from tests.integration.helpers.workflow import get_or_create_builtin_agent_workflow
 
 
 @pytest.fixture
@@ -243,28 +245,6 @@ async def _make_execution(
     return execution
 
 
-async def _make_invocation(
-    test_db_session: AsyncSession,
-    test_user: User,
-    project_id: uuid.UUID,
-    *,
-    status: InvocationStatus = InvocationStatus.RUNNING,
-    context_data: dict[str, Any] | None = None,
-) -> Invocation:
-    invocation = Invocation(
-        created_by=test_user.id,
-        prompt="summarise the incident report",
-        session_id=f"session-{uuid.uuid4()}",
-        project_id=project_id,
-        status=status,
-        context_data=context_data or {},
-    )
-    test_db_session.add(invocation)
-    await test_db_session.commit()
-    await test_db_session.refresh(invocation)
-    return invocation
-
-
 async def _link_activity(
     test_db_session: AsyncSession,
     execution: Execution,
@@ -310,13 +290,12 @@ class TestCancelExecutionPropagatesToInvocation:
         test_user: User,
         test_workflow: Workflow,
         mock_temporal_service: Mock,
+        invocation_factory: InvocationFactory,
         invocation_status: InvocationStatus,
     ) -> None:
         """Cancelling an execution marks its in-flight invocation CANCELLED."""
         execution = await _make_execution(test_db_session, test_user, test_workflow)
-        invocation = await _make_invocation(
-            test_db_session, test_user, test_workflow.project_id, status=invocation_status
-        )
+        invocation = await invocation_factory.create(project_id=test_workflow.project_id, status=invocation_status)
         await _link_activity(test_db_session, execution, invocation)
 
         response = await auth_client.post(f"/api/v1/executions/{execution.id}/cancel")
@@ -333,6 +312,7 @@ class TestCancelExecutionPropagatesToInvocation:
         test_user: User,
         test_workflow: Workflow,
         mock_temporal_service: Mock,
+        invocation_factory: InvocationFactory,
     ) -> None:
         """context_data is caller-writable and must not drive cancellation.
 
@@ -341,10 +321,8 @@ class TestCancelExecutionPropagatesToInvocation:
         tenant's cancellation reach another tenant's invocation.
         """
         execution = await _make_execution(test_db_session, test_user, test_workflow)
-        forged = await _make_invocation(
-            test_db_session,
-            test_user,
-            test_workflow.project_id,
+        forged = await invocation_factory.create(
+            project_id=test_workflow.project_id,
             context_data={"execution_id": str(execution.id)},
         )
 
@@ -361,6 +339,7 @@ class TestCancelExecutionPropagatesToInvocation:
         test_user: User,
         test_workflow: Workflow,
         mock_temporal_service: Mock,
+        invocation_factory: InvocationFactory,
     ) -> None:
         """Cancellation never crosses a project boundary."""
         from syntara.authz.models.project import Project
@@ -371,7 +350,7 @@ class TestCancelExecutionPropagatesToInvocation:
         await test_db_session.refresh(other_project)
 
         execution = await _make_execution(test_db_session, test_user, test_workflow)
-        foreign = await _make_invocation(test_db_session, test_user, other_project.id)
+        foreign = await invocation_factory.create(project_id=other_project.id)
         await _link_activity(test_db_session, execution, foreign)
 
         response = await auth_client.post(f"/api/v1/executions/{execution.id}/cancel")
@@ -387,10 +366,11 @@ class TestCancelExecutionPropagatesToInvocation:
         test_user: User,
         test_workflow: Workflow,
         mock_temporal_service: Mock,
+        invocation_factory: InvocationFactory,
     ) -> None:
         """Only invocations this execution actually reported are affected."""
         execution = await _make_execution(test_db_session, test_user, test_workflow)
-        unrelated = await _make_invocation(test_db_session, test_user, test_workflow.project_id)
+        unrelated = await invocation_factory.create(project_id=test_workflow.project_id)
 
         response = await auth_client.post(f"/api/v1/executions/{execution.id}/cancel")
         assert response.status_code == status.HTTP_202_ACCEPTED
@@ -407,62 +387,6 @@ class TestCancelExecutionCancelsBuiltinAgentExecution:
     Temporal workflow. Ref: AAP-88614.
     """
 
-    async def _builtin_agent_workflow(
-        self,
-        test_db_session: AsyncSession,
-        test_user: User,
-        test_workflow_definition: dict[str, Any],
-    ) -> Workflow:
-        """Resolve the builtin "Agent Execution" workflow, seeding it if absent.
-
-        seed_builtin normally creates it; look it up so this works either way.
-        """
-        from syntara.authz.models.project import Project
-        from syntara.workflows.constants import BUILTIN_PROJECT_NAME, BUILTIN_WORKFLOW_AGENT_EXECUTION
-
-        project_result = await test_db_session.exec(select(Project).where(Project.name == BUILTIN_PROJECT_NAME))
-        project = project_result.first()
-        if project is None:
-            project = Project(name=BUILTIN_PROJECT_NAME, description="Built-in", is_builtin=True)
-            test_db_session.add(project)
-            await test_db_session.commit()
-            await test_db_session.refresh(project)
-
-        workflow_result = await test_db_session.exec(
-            select(Workflow).where(
-                Workflow.name == BUILTIN_WORKFLOW_AGENT_EXECUTION,
-                Workflow.project_id == project.id,
-            )
-        )
-        existing = workflow_result.first()
-        if existing is not None:
-            return existing
-
-        workflow = Workflow(
-            name=BUILTIN_WORKFLOW_AGENT_EXECUTION,
-            description="Builtin agent execution",
-            created_by=test_user.id,
-            is_enabled=False,
-            is_builtin=True,
-            current_version=1,
-            project_id=project.id,
-        )
-        test_db_session.add(workflow)
-        version = WorkflowVersion(
-            workflow_id=workflow.id,
-            version=1,
-            schema_version="2.0.0",
-            workflow_definition=test_workflow_definition,
-            created_by=test_user.id,
-        )
-        test_db_session.add(version)
-        await test_db_session.flush()
-        workflow.published_version_id = version.id
-        workflow.is_enabled = True
-        await test_db_session.commit()
-        await test_db_session.refresh(workflow)
-        return workflow
-
     async def test_cancel_execution_cancels_builtin_agent_execution(
         self,
         auth_client: AsyncClient,
@@ -471,13 +395,16 @@ class TestCancelExecutionCancelsBuiltinAgentExecution:
         test_workflow: Workflow,
         test_workflow_definition: dict[str, Any],
         mock_temporal_service: Mock,
+        invocation_factory: InvocationFactory,
     ) -> None:
         """The builtin agent execution's Temporal workflow is cancelled too."""
         execution = await _make_execution(test_db_session, test_user, test_workflow)
-        invocation = await _make_invocation(test_db_session, test_user, test_workflow.project_id)
+        invocation = await invocation_factory.create(project_id=test_workflow.project_id)
         await _link_activity(test_db_session, execution, invocation)
 
-        builtin_workflow = await self._builtin_agent_workflow(test_db_session, test_user, test_workflow_definition)
+        builtin_workflow = await get_or_create_builtin_agent_workflow(
+            test_db_session, test_user, test_workflow_definition
+        )
         agent_execution = await _make_execution(
             test_db_session,
             test_user,
@@ -501,6 +428,7 @@ class TestCancelExecutionCancelsBuiltinAgentExecution:
         test_user: User,
         test_workflow: Workflow,
         mock_temporal_service: Mock,
+        invocation_factory: InvocationFactory,
     ) -> None:
         """input_data is caller-supplied, so only the builtin workflow is targeted.
 
@@ -508,7 +436,7 @@ class TestCancelExecutionCancelsBuiltinAgentExecution:
         not be cancelled alongside it.
         """
         execution = await _make_execution(test_db_session, test_user, test_workflow)
-        invocation = await _make_invocation(test_db_session, test_user, test_workflow.project_id)
+        invocation = await invocation_factory.create(project_id=test_workflow.project_id)
         await _link_activity(test_db_session, execution, invocation)
 
         impostor = await _make_execution(
