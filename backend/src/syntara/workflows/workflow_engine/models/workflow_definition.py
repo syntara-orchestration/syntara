@@ -172,6 +172,7 @@ class NodeType(str, Enum):
     AAP_WORKFLOW_JOB_TEMPLATE = "aap_workflow_job_template"
     AGENTIC = "agentic"
     APPROVAL = "approval"
+    FORM_PROMPT = "form_prompt"
     HTTP_REQUEST = "http_request"
     INTERNAL_ACTIVITY = "internal_activity"
     SCRIPT = "script"
@@ -851,6 +852,111 @@ class ApprovalNodeParameters(BaseModel):
     decision_window: int | None = Field(default=None, ge=1, description="Response timeout in seconds")
 
 
+class FormPromptNodeParameters(BaseModel):
+    """Parameters for form prompt nodes."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    message: str | None = Field(
+        default=None,
+        max_length=2000,
+        description="Message shown above the form. Supports ${...} template expressions.",
+    )
+    input_schema: dict[str, Any] = Field(
+        description="JSON Schema (Draft-07) describing the form fields to collect.",
+    )
+    responder_users: list[str] | None = Field(
+        default=None,
+        max_length=100,
+        description="Usernames allowed to respond. Empty/omitted = any user with form_prompt:submit.",
+    )
+    responder_groups: list[str] | None = Field(
+        default=None,
+        max_length=50,
+        description="Group names whose members may respond. Empty/omitted = any user with form_prompt:submit.",
+    )
+    response_window: int | None = Field(
+        default=None,
+        ge=1,
+        description="Seconds the responder has before the prompt expires. "
+        "Falls back to workflow_engine.form_prompt_response_window_seconds.",
+    )
+    fallback_behavior: Literal["fail", "fallback"] = Field(
+        default="fail",
+        description="What happens when the prompt is not answered in time: fail the workflow, "
+        "or route to the 'fallback' output port.",
+    )
+    submit_label: str | None = Field(default=None, max_length=64, description="Submit button label.")
+    success_message: str | None = Field(default=None, max_length=500, description="Shown after submission.")
+    timezone: str | None = Field(
+        default=None,
+        max_length=64,
+        description="IANA timezone for interpreting date/datetime fields. Defaults to UTC if omitted.",
+    )
+    css_override: str | None = Field(
+        default=None,
+        max_length=10000,
+        description="Custom CSS applied to the form view.",
+    )
+
+    @field_validator("input_schema")
+    @classmethod
+    def validate_schema(cls, v: dict[str, Any]) -> dict[str, Any]:
+        """Validate JSON Schema structure and security."""
+        # Structural Draft-07 validity, $ref rejection (SSRF), ReDoS pattern guard.
+        # TO-DO - add field-type catalogue validation on the same hook.
+        validate_json_schema_definition(v)
+        return v
+
+    @field_validator("timezone")
+    @classmethod
+    def validate_timezone(cls, v: str | None) -> str | None:
+        """Validate that timezone is a valid IANA timezone name."""
+        if v is None:
+            return v
+        if v not in _get_valid_timezones():
+            msg = f"Invalid timezone: '{v}'. Must be a valid IANA timezone name (e.g., 'America/New_York')."
+            raise SafeValueError(msg)
+        return v
+
+    @field_validator("css_override")
+    @classmethod
+    def validate_css_override(cls, v: str | None) -> str | None:
+        """Validate CSS for security (reject patterns that enable data exfiltration or code execution)."""
+        if v is None:
+            return v
+
+        # Normalize for case-insensitive matching
+        v_lower = v.lower()
+
+        # Reject url() - can exfiltrate data via background-image, etc.
+        if "url(" in v_lower:
+            msg = "CSS override cannot contain url() - it enables data exfiltration"
+            raise SafeValueError(msg)
+
+        # Reject @import - can load external stylesheets
+        if "@import" in v_lower:
+            msg = "CSS override cannot contain @import - it enables loading external resources"
+            raise SafeValueError(msg)
+
+        # Reject attribute selectors - can exfiltrate form values character by character
+        if "[" in v and "]" in v:
+            msg = "CSS override cannot contain attribute selectors - they enable data exfiltration"
+            raise SafeValueError(msg)
+
+        # Reject expression() - old IE code execution vector
+        if "expression(" in v_lower:
+            msg = "CSS override cannot contain expression() - it enables code execution"
+            raise SafeValueError(msg)
+
+        # Reject behavior: - old IE code execution vector
+        if "behavior:" in v_lower:
+            msg = "CSS override cannot contain behavior: - it enables code execution"
+            raise SafeValueError(msg)
+
+        return v
+
+
 class WebhookTriggerParameters(TemplateAwareBaseModel):
     """Parameters for webhook trigger nodes.
 
@@ -985,6 +1091,17 @@ class ApprovalOutput(NodeOutput):
     decision_notes: str | None = None
 
 
+class FormPromptOutput(NodeOutput):
+    """Output model for form prompt executor nodes."""
+
+    status: ActivityTerminalStatus | None = None
+    outcome: str | None = None  # "submitted" | "expired" | "cancelled"
+    response_data: dict[str, Any] | None = None
+    responded_by: str | None = None
+    responded_at: str | None = None
+    prompt_id: str | None = None
+
+
 class ConditionOutput(NodeOutput):
     """Output model for condition control nodes."""
 
@@ -1023,6 +1140,7 @@ NODE_OUTPUT_MODELS: dict[str, type[NodeOutput]] = {
     NodeType.AAP_WORKFLOW_JOB_TEMPLATE: AAPWorkflowJobTemplateOutput,
     NodeType.AGENTIC: AgenticOutput,
     NodeType.APPROVAL: ApprovalOutput,
+    NodeType.FORM_PROMPT: FormPromptOutput,
     NodeType.CONDITION: ConditionOutput,
     NodeType.SWITCH: SwitchOutput,
     NodeType.CONVERGE: ConvergeOutput,

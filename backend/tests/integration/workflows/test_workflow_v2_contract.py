@@ -726,3 +726,68 @@ class TestNodeSettingsValidation:
         }
         # Should not raise - settings is optional
         self.validator.validate_workflow_definition(defn)
+
+    def test_form_prompt_node_parameters_round_trip(self) -> None:
+        """Form prompt node with full parameters persists and validates correctly (AC-5)."""
+        defn = {
+            "schema_version": "2.0.0",
+            "name": "test-workflow",
+            "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
+            "nodes": [
+                {
+                    "id": "form_1",
+                    "type": "form_prompt",
+                    "parameters": {
+                        "message": "Please fill out the form",
+                        "input_schema": {
+                            "type": "object",
+                            "properties": {
+                                "field1": {"type": "string"},
+                                "field2": {"type": "number"},
+                            },
+                            "required": ["field1"],
+                        },
+                        "responder_users": ["alice", "bob"],
+                        "responder_groups": ["team-a"],
+                        "response_window": 3600,
+                        "fallback_behavior": "fallback",
+                        "submit_label": "Submit",
+                        "success_message": "Thanks!",
+                        "timezone": "America/New_York",
+                        "css_override": ".form { color: blue; }",
+                    },
+                    "settings": {"continue_on_failure": True, "timeout": 7200},
+                },
+                {"id": "s1", "type": "script", "parameters": {"language": "bash", "code": "echo ok"}},
+                {"id": "s2", "type": "script", "parameters": {"language": "bash", "code": "echo fallback"}},
+            ],
+            "edges": [
+                {"from": "t1", "to": "form_1"},
+                {"from": "form_1", "to": "s1", "from_port": "submitted"},
+                {"from": "form_1", "to": "s2", "from_port": "fallback"},
+            ],
+        }
+        # Validate
+        self.validator.validate_workflow_definition(defn)
+
+        # Serialize via Pydantic model
+        from syntara.workflows.models.workflow_definition import WorkflowDefinition
+
+        wf = WorkflowDefinition.model_validate(defn)
+        serialized = wf.model_dump(mode="json")
+
+        # Verify round trip
+        assert serialized["nodes"][0]["type"] == "form_prompt"
+        params = serialized["nodes"][0]["parameters"]
+        assert params["message"] == "Please fill out the form"
+        assert params["input_schema"]["properties"]["field1"]["type"] == "string"
+        assert params["responder_users"] == ["alice", "bob"]
+        assert params["response_window"] == 3600
+        assert params["fallback_behavior"] == "fallback"
+        assert params["timezone"] == "America/New_York"
+        assert params["css_override"] == ".form { color: blue; }"
+
+        # Verify settings tier
+        settings = serialized["nodes"][0]["settings"]
+        assert settings["continue_on_failure"] is True
+        assert settings["timeout"] == 7200

@@ -776,6 +776,21 @@ SETTINGS_CATALOG: list[SettingDefinition] = [
         validation_schema={"min": 1},
     ),
     SettingDefinition(
+        key="workflow_engine.form_prompt_response_window_seconds",
+        name="Form response window (seconds)",
+        category=SettingCategory.WORKFLOW_EXECUTION,
+        value_type=SettingValueType.INTEGER,
+        default_value=86400,
+        description=(
+            "Default time window (in seconds) the responder has to submit a form prompt. "
+            "Can be overridden per node via the response_window parameter. "
+            "If no response is received within this period, the prompt expires."
+        ),
+        helper_text="Minimum 1 second. Default: 86400 (24 hours).",
+        group=WorkflowEngineGroup.EXECUTION,
+        validation_schema={"min": 1},
+    ),
+    SettingDefinition(
         key="workflow_engine.http_request_timeout_seconds",
         name="HTTP request timeout (seconds)",
         category=SettingCategory.WORKFLOW_EXECUTION,

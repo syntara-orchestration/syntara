@@ -21,8 +21,9 @@ from syntara.workflows.workflow_engine.models.workflow_definition import (
 )
 
 # Maps executor node type to its catalog setting key for timeout.
-# Approval and converge are excluded — they use dedicated parameters fields
-# (decision_window and wait_duration) resolved by their own functions below.
+# Approval, form_prompt, and converge are excluded — they use dedicated parameters
+# fields (decision_window, response_window, and wait_duration) resolved by their
+# own functions below.
 _TIMEOUT_CATALOG_KEYS: dict[str, str] = {
     NodeType.SCRIPT: "workflow_engine.script_timeout_seconds",
     NodeType.HTTP_REQUEST: "workflow_engine.http_request_timeout_seconds",
@@ -67,6 +68,17 @@ def resolve_decision_window(node: ActivityNode, runtime_settings: dict[str, Any]
     if node_value is not None:
         return _require_int(node.id, "decision_window", node_value)
     return int(runtime_settings.get("workflow_engine.approval_decision_window_seconds", 86400))
+
+
+def resolve_response_window(node: ActivityNode, runtime_settings: dict[str, Any]) -> int:
+    """Return the response window (seconds) for a form prompt node.
+
+    Resolution: node.parameters.response_window → workflow_engine.form_prompt_response_window_seconds catalog value.
+    """
+    node_value = node.parameters.get("response_window")
+    if node_value is not None:
+        return _require_int(node.id, "response_window", node_value)
+    return int(runtime_settings.get("workflow_engine.form_prompt_response_window_seconds", 86400))
 
 
 def resolve_wait_duration(node: ActivityNode, runtime_settings: dict[str, Any]) -> int:
