@@ -111,6 +111,35 @@ class BaseFormPrompt(BaseResource, table=False):
         description="JSON Schema Draft-07 form definition",
     )
 
+    # Form presentation options (snapshotted at creation for renderer/submit service)
+    submit_label: str | None = Field(
+        default=None,
+        max_length=64,
+        sa_type=String(64),  # type: ignore[call-overload]
+        description="Submit button label shown to the responder",
+    )
+
+    success_message: str | None = Field(
+        default=None,
+        max_length=500,
+        sa_type=String(500),  # type: ignore[call-overload]
+        description="Message shown after successful form submission",
+    )
+
+    timezone: str | None = Field(
+        default=None,
+        max_length=64,
+        sa_type=String(64),  # type: ignore[call-overload]
+        description="IANA timezone name for interpreting date/datetime field values (longest ~40 chars)",
+    )
+
+    css_override: str | None = Field(
+        default=None,
+        max_length=10000,
+        sa_type=String(10000),  # type: ignore[call-overload]
+        description="Custom CSS applied to the form view",
+    )
+
     # Response fields (without responded_by)
     response_data: dict[str, Any] | None = Field(
         default=None,

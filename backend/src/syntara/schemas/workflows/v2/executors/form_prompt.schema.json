@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://automation.example.com/schemas/workflows/v2/executors/form_prompt",
+  "title": "Form Node",
+  "description": "Pauses workflow execution and collects structured input from a user. Routes to successors by output port: outgoing edges must set from_port to 'submitted' or 'fallback'. At least one successor on the 'submitted' port is required. The 'fallback' port is taken when the prompt is not answered within the response window and fallback_behavior is 'fallback'. Submitted values are available to downstream nodes as ${<node_id>.response_data.<field>}.",
+  "parameterSchema": {
+    "type": "object",
+    "required": ["input_schema"],
+    "properties": {
+      "message": {
+        "type": "string",
+        "maxLength": 2000,
+        "description": "Message shown above the form. Supports ${...} template expressions."
+      },
+      "input_schema": {
+        "type": "object",
+        "description": "JSON Schema (Draft-07) describing the form fields to collect."
+      },
+      "responder_users": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "maxItems": 100,
+        "description": "Usernames allowed to respond. Leave empty to allow any user with form_prompt:submit permission."
+      },
+      "responder_groups": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "maxItems": 50,
+        "description": "Group names whose members may respond. Leave empty to allow any user with form_prompt:submit permission."
+      },
+      "response_window": {
+        "type": "integer",
+        "minimum": 1,
+        "description": "Seconds the responder has before the prompt expires. Falls back to workflow_engine.form_prompt_response_window_seconds if not specified."
+      },
+      "fallback_behavior": {
+        "type": "string",
+        "enum": ["fail", "fallback"],
+        "default": "fail",
+        "description": "What happens when the prompt is not answered in time: fail the workflow, or route to the 'fallback' output port."
+      },
+      "submit_label": {
+        "type": "string",
+        "maxLength": 64,
+        "description": "Submit button label."
+      },
+      "success_message": {
+        "type": "string",
+        "maxLength": 500,
+        "description": "Message shown after successful form submission."
+      },
+      "timezone": {
+        "type": "string",
+        "maxLength": 64,
+        "description": "IANA timezone name for interpreting date/datetime field values. Defaults to UTC if omitted."
+      },
+      "css_override": {
+        "type": "string",
+        "maxLength": 10000,
+        "description": "Custom CSS applied to the form view."
+      }
+    },
+    "additionalProperties": false
+  },
+  "settingSchema": {
+    "$ref": "../common-definitions.schema.json#/$defs/nodeSettingsNoRetry"
+  },
+  "resultSchema": {
+    "description": "Result structure available after form submission or timeout",
+    "oneOf": [
+      {
+        "title": "Completed Result",
+        "type": "object",
+        "required": ["status", "outcome"],
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "completed",
+            "description": "Form was submitted or timed out"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": ["submitted", "expired", "cancelled"],
+            "description": "Specific outcome"
+          },
+          "response_data": {
+            "type": "object",
+            "description": "Submitted form field values"
+          },
+          "responded_by": {
+            "type": "string",
+            "description": "Username of the user who submitted (or 'system' for timeout/cancellation)"
+          },
+          "responded_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the response occurred (ISO 8601)"
+          },
+          "prompt_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "ID of the form_prompts row"
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "title": "Failed Result",
+        "type": "object",
+        "required": ["status", "error"],
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "failed"
+          },
+          "error": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": ["string", "null"]
+          },
+          "response_data": {
+            "type": ["object", "null"]
+          },
+          "responded_by": {
+            "type": ["string", "null"]
+          },
+          "responded_at": {
+            "type": ["string", "null"]
+          },
+          "prompt_id": {
+            "type": ["string", "null"]
+          }
+        },
+        "additionalProperties": false,
+        "description": "All executor fields are present but nullable. A null value means the failure occurred before that field was available."
+      }
+    ],
+    "discriminator": {
+      "propertyName": "status"
+    }
+  }
+}

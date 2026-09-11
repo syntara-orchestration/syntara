@@ -18,6 +18,7 @@ from syntara.workflows.workflow_engine.models.workflow_definition import (
     ConvergeNodeParameters,
     DoWhileLoopParameters,
     ForEachLoopParameters,
+    FormPromptNodeParameters,
     SwitchCase,
     SwitchNodeParameters,
     WaitNodeParameters,
@@ -425,3 +426,161 @@ class TestSwitchCaseConditionValidation:
         """Empty condition on a switch case is rejected at validation time."""
         with pytest.raises(ValidationError):
             SwitchCase(port="c0", label="Case 0", condition="")
+
+
+class TestFormPromptNodeParameters:
+    """Tests for FormPromptNodeParameters validation."""
+
+    def test_minimal_valid(self) -> None:
+        """Minimal valid config with input_schema only."""
+        p = FormPromptNodeParameters(input_schema={"type": "object"})
+        assert p.input_schema == {"type": "object"}
+        assert p.message is None
+        assert p.fallback_behavior == "fail"
+
+    def test_fully_populated(self) -> None:
+        """All fields populated."""
+        p = FormPromptNodeParameters(
+            message="Please fill out the form",
+            input_schema={"type": "object", "properties": {"name": {"type": "string"}}},
+            responder_users=["alice", "bob"],
+            responder_groups=["team-a"],
+            response_window=3600,
+            fallback_behavior="fallback",
+            submit_label="Send",
+            success_message="Thanks!",
+            timezone="America/New_York",
+            css_override=".form { color: blue; }",
+        )
+        assert p.message == "Please fill out the form"
+        assert p.responder_users == ["alice", "bob"]
+        assert p.response_window == 3600
+
+    def test_missing_input_schema(self) -> None:
+        """input_schema is required."""
+        with pytest.raises(ValidationError):
+            FormPromptNodeParameters()  # type: ignore[call-arg]
+
+    def test_input_schema_with_ref_rejected(self) -> None:
+        """input_schema containing $ref is rejected (SSRF guard)."""
+        with pytest.raises(ValidationError):
+            FormPromptNodeParameters(input_schema={"$ref": "http://evil.com/schema"})
+
+    def test_input_schema_with_nested_quantifier_rejected(self) -> None:
+        """input_schema with ReDoS pattern is rejected."""
+        with pytest.raises(ValidationError):
+            FormPromptNodeParameters(
+                input_schema={"type": "object", "properties": {"field": {"type": "string", "pattern": "(a+)+$"}}}
+            )
+
+    def test_invalid_input_schema(self) -> None:
+        """Structurally invalid JSON Schema is rejected."""
+        with pytest.raises(ValidationError):
+            FormPromptNodeParameters(input_schema={"type": "invalid_type"})
+
+    def test_response_window_zero_rejected(self) -> None:
+        """response_window=0 violates ge=1."""
+        with pytest.raises(ValidationError):
+            FormPromptNodeParameters(input_schema={"type": "object"}, response_window=0)
+
+    def test_response_window_negative_rejected(self) -> None:
+        """Negative response_window is rejected."""
+        with pytest.raises(ValidationError):
+            FormPromptNodeParameters(input_schema={"type": "object"}, response_window=-1)
+
+    def test_responder_users_max_100(self) -> None:
+        """responder_users max 100 entries."""
+        with pytest.raises(ValidationError):
+            FormPromptNodeParameters(input_schema={"type": "object"}, responder_users=["user"] * 101)
+
+    def test_responder_groups_max_50(self) -> None:
+        """responder_groups max 50 entries."""
+        with pytest.raises(ValidationError):
+            FormPromptNodeParameters(input_schema={"type": "object"}, responder_groups=["group"] * 51)
+
+    def test_message_max_2000(self) -> None:
+        """Message max 2000 chars."""
+        with pytest.raises(ValidationError):
+            FormPromptNodeParameters(input_schema={"type": "object"}, message="x" * 2001)
+
+    def test_invalid_fallback_behavior(self) -> None:
+        """Invalid fallback_behavior value rejected."""
+        with pytest.raises(ValidationError):
+            FormPromptNodeParameters(input_schema={"type": "object"}, fallback_behavior="continue")  # type: ignore[arg-type]
+
+    def test_unknown_parameter_rejected(self) -> None:
+        """extra='forbid' rejects unknown keys."""
+        with pytest.raises(ValidationError):
+            FormPromptNodeParameters(input_schema={"type": "object"}, unknown_field="value")  # type: ignore[call-arg]
+
+    def test_template_in_message(self) -> None:
+        """Template expressions survive in message."""
+        p = FormPromptNodeParameters(input_schema={"type": "object"}, message="User: ${trigger.username}")
+        assert p.message == "User: ${trigger.username}"
+
+    def test_invalid_timezone_rejected(self) -> None:
+        """Invalid timezone is rejected."""
+        with pytest.raises(ValidationError):
+            FormPromptNodeParameters(input_schema={"type": "object"}, timezone="Not/A/Timezone")
+
+    def test_valid_timezone_accepted(self) -> None:
+        """Valid IANA timezone is accepted."""
+        p = FormPromptNodeParameters(input_schema={"type": "object"}, timezone="America/New_York")
+        assert p.timezone == "America/New_York"
+
+    def test_discriminated_union(self) -> None:
+        """form_prompt parses through WorkflowDefinition."""
+        wf = WorkflowDefinition.model_validate(
+            {
+                "schema_version": "2.0.0",
+                "name": "test",
+                "triggers": [{"id": "trigger", "type": "manual_trigger", "parameters": {}}],
+                "nodes": [
+                    {
+                        "id": "form_node",
+                        "type": "form_prompt",
+                        "parameters": {"input_schema": {"type": "object"}},
+                    }
+                ],
+                "edges": [],
+            }
+        )
+        assert wf.nodes[0].type == "form_prompt"
+
+    def test_css_override_with_url_rejected(self) -> None:
+        """css_override containing url() is rejected (data exfiltration risk)."""
+        with pytest.raises(ValidationError, match="url\\(\\)"):
+            FormPromptNodeParameters(
+                input_schema={"type": "object"}, css_override=".form { background: url(http://evil.com); }"
+            )
+
+    def test_css_override_with_import_rejected(self) -> None:
+        """css_override containing @import is rejected."""
+        with pytest.raises(ValidationError, match="@import"):
+            FormPromptNodeParameters(input_schema={"type": "object"}, css_override="@import url(evil.css);")
+
+    def test_css_override_with_attribute_selector_rejected(self) -> None:
+        """css_override containing attribute selectors is rejected (data exfiltration risk)."""
+        with pytest.raises(ValidationError, match="attribute selectors"):
+            FormPromptNodeParameters(
+                input_schema={"type": "object"}, css_override="input[value^='a'] { background: red; }"
+            )
+
+    def test_css_override_with_expression_rejected(self) -> None:
+        """css_override containing expression() is rejected (IE code execution)."""
+        with pytest.raises(ValidationError, match="expression\\(\\)"):
+            FormPromptNodeParameters(input_schema={"type": "object"}, css_override="width: expression(alert(1));")
+
+    def test_css_override_with_behavior_rejected(self) -> None:
+        """css_override containing behavior: is rejected (IE code execution)."""
+        with pytest.raises(ValidationError, match="behavior:"):
+            FormPromptNodeParameters(input_schema={"type": "object"}, css_override="behavior: url(evil.htc);")
+
+    def test_css_override_safe_css_accepted(self) -> None:
+        """Safe CSS without dangerous patterns is accepted."""
+        p = FormPromptNodeParameters(
+            input_schema={"type": "object"},
+            css_override=".form { color: blue; font-size: 14px; margin: 10px; }",
+        )
+        assert p.css_override is not None
+        assert ".form" in p.css_override

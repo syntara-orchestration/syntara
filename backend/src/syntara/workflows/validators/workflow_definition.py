@@ -285,6 +285,84 @@ def _check_approval_node_findings(
     return findings
 
 
+def _check_form_prompt_node_findings(
+    workflow_definition: dict[str, Any],
+) -> list[ValidationFinding]:
+    """Check form prompt node configuration against the workflow graph structure.
+
+    Emits:
+    - An error when a ``form_prompt`` node has no successor on the ``submitted``
+      output port.
+    - An error when ``fallback_behavior`` is ``fallback`` but no successor exists
+      on the ``fallback`` port.
+    - A warning when a ``fallback`` successor exists but ``fallback_behavior`` is
+      ``fail`` (dead branch).
+    """
+    findings: list[ValidationFinding] = []
+
+    outgoing_ports: dict[str, set[str]] = defaultdict(set)
+    for edge in workflow_definition.get("edges", []):
+        from_port = edge.get("from_port")
+        if from_port is not None:
+            outgoing_ports[edge["from"]].add(from_port)
+
+    for node in workflow_definition.get("nodes", []):
+        if node.get("type") != "form_prompt":
+            continue
+        node_id = node.get("id")
+        if node_id is None:
+            continue
+        node_name = node.get("name") or node_id
+
+        ports = outgoing_ports.get(node_id, set())
+        params = node.get("parameters", {})
+        fallback_behavior = params.get("fallback_behavior", "fail")
+
+        # Error: missing submitted port
+        if "submitted" not in ports:
+            findings.append(
+                ValidationFinding(
+                    severity=ValidationSeverity.error,
+                    category=ValidationCategory.form_prompt_configuration,
+                    message=f"Form \"{node_name}\" is missing a connection from the 'Submitted' branch",
+                    node_id=node_id,
+                ),
+            )
+
+        # Error: fallback_behavior is "fallback" but no fallback port
+        if fallback_behavior == "fallback" and "fallback" not in ports:
+            findings.append(
+                ValidationFinding(
+                    severity=ValidationSeverity.error,
+                    category=ValidationCategory.form_prompt_configuration,
+                    message=(
+                        f'Form "{node_name}" is set to route to the fallback branch on timeout, '
+                        f"but the 'Fallback' branch has no connection"
+                    ),
+                    node_id=node_id,
+                    field_path="parameters.fallback_behavior",
+                ),
+            )
+
+        # Warning: fallback port exists but fallback_behavior is "fail"
+        if fallback_behavior == "fail" and "fallback" in ports:
+            findings.append(
+                ValidationFinding(
+                    severity=ValidationSeverity.warning,
+                    category=ValidationCategory.form_prompt_configuration,
+                    message=(
+                        f"Form \"{node_name}\" has a 'Fallback' branch connected, "
+                        f"but On timeout is set to fail the workflow. "
+                        f"The fallback branch will never execute."
+                    ),
+                    node_id=node_id,
+                    field_path="parameters.fallback_behavior",
+                ),
+            )
+
+    return findings
+
+
 def _select_best_branch(
     context_errors: list[jsonschema.ValidationError],
 ) -> tuple[Any, dict[Any, list[jsonschema.ValidationError]]]:
@@ -617,6 +695,7 @@ class WorkflowValidator:
                     system_continue_on_failure=system_continue_on_failure,
                 )
             )
+            findings.extend(_check_form_prompt_node_findings(workflow_definition))
             findings.extend(check_template_expressions(workflow_definition, node_ids))
 
         findings.extend(collect_scheduled_trigger_config_findings(workflow_definition))
