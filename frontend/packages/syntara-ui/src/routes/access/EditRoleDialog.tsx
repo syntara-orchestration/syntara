@@ -145,7 +145,7 @@ export function EditRoleDialog({ role, onClose, onSuccess }: Readonly<EditRoleDi
       </ModalBody>
       <ModalFooter>
         <Button variant="primary" form="edit-role-form" type="submit" isLoading={isPending}>
-          Save
+          Save role
         </Button>
         <Button variant="link" onClick={onClose}>
           Cancel

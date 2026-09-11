@@ -347,19 +347,19 @@ describe('UserForm', () => {
   })
 
   describe('edit mode', () => {
-    it('renders with the user display name in the heading and "Save" submit button', () => {
+    it('renders with the user display name in the heading and "Save user" submit button', () => {
       setupEditMocks()
       render(<UserForm mode="edit" />, { wrapper })
 
       expect(screen.getByRole('heading', { name: 'Edit John Doe' })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Save user' })).toBeInTheDocument()
     })
 
     it('places Save to the left of Cancel', () => {
       setupEditMocks()
       render(<UserForm mode="edit" />, { wrapper })
 
-      const submit = screen.getByRole('button', { name: 'Save' })
+      const submit = screen.getByRole('button', { name: 'Save user' })
       const cancel = screen.getByRole('button', { name: 'Cancel' })
       expect(cancel).toHaveClass('pf-m-link')
       expect(submit.compareDocumentPosition(cancel) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
@@ -410,7 +410,7 @@ describe('UserForm', () => {
       await user.clear(emailInput)
       await user.type(emailInput, 'updated@example.com')
 
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save user' }))
 
       await waitFor(() => {
         expect(mockMutate).toHaveBeenCalled()
@@ -435,7 +435,7 @@ describe('UserForm', () => {
 
       await user.type(screen.getByLabelText('Password'), COMPLIANT_TEST_PASSWORD)
 
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save user' }))
 
       await waitFor(() => {
         expect(mockMutate).toHaveBeenCalled()
@@ -450,7 +450,7 @@ describe('UserForm', () => {
       const user = userEvent.setup()
       render(<UserForm mode="edit" />, { wrapper })
 
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save user' }))
 
       await waitFor(() => {
         expect(mockMutate).toHaveBeenCalled()
@@ -472,7 +472,7 @@ describe('UserForm', () => {
       const user = userEvent.setup()
       render(<UserForm mode="edit" />, { wrapper })
 
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save user' }))
 
       await waitFor(() => {
         expect(mockMutate).toHaveBeenCalled()
@@ -611,7 +611,7 @@ describe('UserForm', () => {
       expect(screen.getByRole('heading', { name: 'Edit user' })).toBeInTheDocument()
       expect(screen.getByRole('progressbar', { name: 'Loading' })).toBeInTheDocument()
       // The form submit button should not be visible in loading state
-      expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Save user' })).not.toBeInTheDocument()
     })
   })
 })

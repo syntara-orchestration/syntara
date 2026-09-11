@@ -30,7 +30,7 @@ async function waitForDisableDialogReady(dialog: import('@playwright/test').Loca
   if (credentialName) {
     await expect(dialog.getByText(new RegExp(credentialName))).toBeVisible()
   }
-  await expect(dialog.getByRole('button', { name: 'Disable' })).toBeEnabled()
+  await expect(dialog.getByRole('button', { name: 'Disable credential' })).toBeEnabled()
 }
 
 test.describe('Credential Enable/Disable State Management', () => {
@@ -80,7 +80,7 @@ test.describe('Credential Enable/Disable State Management', () => {
 
       const dialog = app.getByRole('dialog')
       await waitForDisableDialogReady(dialog)
-      await dialog.getByRole('button', { name: 'Disable' }).click()
+      await dialog.getByRole('button', { name: 'Disable credential' }).click()
 
       await expect(dialog).not.toBeVisible()
       await expect(listRowToggle(row)).not.toBeChecked()
@@ -134,7 +134,7 @@ test.describe('Credential Enable/Disable State Management', () => {
 
       const dialog = app.getByRole('dialog')
       await waitForDisableDialogReady(dialog)
-      await dialog.getByRole('button', { name: 'Disable' }).click()
+      await dialog.getByRole('button', { name: 'Disable credential' }).click()
 
       await expect(detailPageToggle(app)).not.toBeChecked()
     } finally {
@@ -153,7 +153,7 @@ test.describe('Credential Enable/Disable State Management', () => {
       await detailPageToggle(app).click({ force: true })
       const dialog = app.getByRole('dialog')
       await waitForDisableDialogReady(dialog)
-      await dialog.getByRole('button', { name: 'Disable' }).click()
+      await dialog.getByRole('button', { name: 'Disable credential' }).click()
 
       await expect(detailPageToggle(app)).not.toBeChecked()
       await expect(detailsTab.getByText('Disabled')).toBeVisible()
@@ -172,7 +172,7 @@ test.describe('Credential Enable/Disable State Management', () => {
       await listRowToggle(row).click({ force: true })
       const dialog = app.getByRole('dialog')
       await waitForDisableDialogReady(dialog)
-      await dialog.getByRole('button', { name: 'Disable' }).click()
+      await dialog.getByRole('button', { name: 'Disable credential' }).click()
       await expect(listRowToggle(row)).not.toBeChecked()
 
       // Navigate away and back

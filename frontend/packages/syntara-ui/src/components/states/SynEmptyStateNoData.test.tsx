@@ -1,5 +1,5 @@
 import { Button } from '@patternfly/react-core'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
@@ -96,12 +96,13 @@ describe('SynEmptyStateNoData', () => {
     expect(screen.getByRole('img', { name: 'Workflow icon' })).toBeInTheDocument()
   })
 
-  it('renders primary variant button', () => {
+  it('renders primary variant button with add icon', () => {
     const addData = vi.fn()
     render(<SynEmptyStateNoData addData={addData} />)
 
     const button = screen.getByRole('button', { name: 'Add data' })
     expect(button).toHaveClass('pf-m-primary')
+    expect(within(button).getByRole('img', { hidden: true })).toBeInTheDocument()
   })
 
   it('renders addData button without secondary actions when only addData is provided', () => {

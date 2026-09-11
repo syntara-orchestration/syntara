@@ -123,11 +123,11 @@ export function SettingsCategoryTab({
         onConfirm={handleResetAll}
         title="Reset settings?"
         titleIconVariant="warning"
-        confirmLabel="Reset all"
+        confirmLabel="Reset all settings"
         confirmVariant="danger"
       >
         This will reset all configuration values on this page to their factory defaults. These changes will not take
-        effect until you click Save changes.
+        effect until you click Save settings.
       </SynConfirmationDialog>
     </Form>
   )

@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Button, Form, FormGroup, Modal, ModalBody, ModalFooter, ModalHeader } from '@patternfly/react-core'
+import { RhUiAddIcon } from '@patternfly/react-icons'
 import { type ReactElement, useMemo, useState } from 'react'
 import type { Control, FieldValues, Path } from 'react-hook-form'
 import { Controller, useForm, useWatch } from 'react-hook-form'
@@ -297,8 +298,9 @@ export function AssignProjectRoleModal({
           form="assign-project-role-form"
           isDisabled={isPending}
           isLoading={isPending}
+          icon={<RhUiAddIcon />}
         >
-          Assign
+          Assign role
         </Button>
         <Button variant="link" onClick={handleClose} isDisabled={isPending}>
           Cancel

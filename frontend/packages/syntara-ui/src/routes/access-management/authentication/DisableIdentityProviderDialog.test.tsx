@@ -46,7 +46,7 @@ describe('DisableIdentityProviderDialog', () => {
   it('has confirm button with primary variant (not danger)', () => {
     render(<DisableIdentityProviderDialog provider={mockProvider} onConfirm={vi.fn()} onClose={vi.fn()} />)
 
-    const disableButton = screen.getByRole('button', { name: 'Disable' })
+    const disableButton = screen.getByRole('button', { name: 'Disable identity provider' })
     expect(disableButton).toBeEnabled()
     expect(disableButton.classList.contains('pf-m-danger')).toBe(false)
   })
@@ -63,7 +63,7 @@ describe('DisableIdentityProviderDialog', () => {
 
     render(<DisableIdentityProviderDialog provider={mockProvider} onConfirm={mockOnConfirm} onClose={vi.fn()} />)
 
-    await user.click(screen.getByRole('button', { name: 'Disable' }))
+    await user.click(screen.getByRole('button', { name: 'Disable identity provider' }))
     expect(mockOnConfirm).toHaveBeenCalledTimes(1)
   })
 
@@ -91,7 +91,7 @@ describe('DisableIdentityProviderDialog', () => {
       <DisableIdentityProviderDialog provider={mockProvider} isLoading={false} onConfirm={vi.fn()} onClose={vi.fn()} />
     )
 
-    expect(screen.getByRole('button', { name: 'Disable' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Disable identity provider' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled()
   })
 

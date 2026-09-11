@@ -39,7 +39,8 @@ const SAMPLE_ROWS: SampleRow[] = Array.from({ length: 8 }, (_, i) => ({
 
 const ROW_ACTIONS = [
   { title: 'Edit resource', onClick: () => {} },
-  { title: 'Delete resource', onClick: () => {} },
+  { isSeparator: true },
+  { title: 'Delete resource', onClick: () => {}, isDanger: true },
 ]
 
 function SampleTable({ rows, isFetching }: Readonly<{ rows: SampleRow[]; isFetching?: boolean }>) {

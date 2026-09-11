@@ -200,7 +200,7 @@ describe('GroupFormModal Component', () => {
       })
 
       expect(screen.getByText('Edit Admins')).toBeInTheDocument()
-      expect(screen.getByText('Save')).toBeInTheDocument()
+      expect(screen.getByText('Save group')).toBeInTheDocument()
     })
 
     it('pre-populates form fields with group data', () => {
@@ -235,7 +235,7 @@ describe('GroupFormModal Component', () => {
       // Query by role rather than by the button's text: the text lives in a nested span
       // (PatternFly wraps button labels), and happy-dom's implicit-submit handling only
       // fires for a click whose target is the submit button element itself.
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save group' }))
 
       await waitFor(() => {
         expect(mockUpdateMutate).toHaveBeenCalled()
@@ -286,7 +286,7 @@ describe('GroupFormModal Component', () => {
       // Query by role rather than by the button's text: the text lives in a nested span
       // (PatternFly wraps button labels), and happy-dom's implicit-submit handling only
       // fires for a click whose target is the submit button element itself.
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save group' }))
 
       await waitFor(() => {
         expect(mockUpdateMutate).toHaveBeenCalled()

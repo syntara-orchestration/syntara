@@ -195,7 +195,7 @@ test.describe('User Detail — Admin Identity Actions (UI-25, UI-26)', () => {
 
     // Open the kebab menu on the identity row and click Disconnect
     await app.getByRole('button', { name: 'Identity actions' }).click()
-    await app.getByRole('menuitem', { name: 'Disconnect' }).click()
+    await app.getByRole('menuitem', { name: 'Disconnect identity' }).click()
 
     // Confirmation dialog
     const dialog = app.getByRole('dialog', { name: 'Disconnect identity?' })
@@ -205,12 +205,12 @@ test.describe('User Detail — Admin Identity Actions (UI-25, UI-26)', () => {
     await expect(dialog.getByText('jdoe@example.com')).toBeVisible()
 
     // Confirm disconnect
-    await dialog.getByRole('button', { name: 'Disconnect' }).click()
+    await dialog.getByRole('button', { name: 'Disconnect identity' }).click()
 
     // Success alert, identity removed, provider now shows as Not connected
     await expect(app.getByText('Identity disconnected')).toBeVisible({ timeout: 10_000 })
     const table = app.getByRole('grid')
-    await expect(table.getByRole('button', { name: 'Disconnect' })).not.toBeAttached()
+    await expect(table.getByRole('button', { name: 'Disconnect identity' })).not.toBeAttached()
     await expect(app.getByText('Not connected')).toBeVisible()
   })
 })

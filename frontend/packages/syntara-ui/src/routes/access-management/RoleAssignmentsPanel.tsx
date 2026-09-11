@@ -507,7 +507,7 @@ export function RoleAssignmentsPanel({
         onClose={() => setRowToUnassign(null)}
         onConfirm={handleUnassign}
         title="Unassign role?"
-        confirmLabel="Unassign"
+        confirmLabel="Unassign role"
         confirmVariant="danger"
         titleIconVariant="warning"
       >

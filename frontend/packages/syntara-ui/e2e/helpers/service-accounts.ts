@@ -122,7 +122,7 @@ export async function deleteServiceAccountByName(app: Page, name: string) {
 
     const dialog = app.getByRole('dialog')
     await dialog.getByRole('checkbox', { name: /i understand/i }).check()
-    await dialog.getByRole('button', { name: 'Delete' }).click()
+    await dialog.getByRole('button', { name: 'Delete service account' }).click()
   } catch {
     // Best-effort cleanup
   }

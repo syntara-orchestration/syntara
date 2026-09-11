@@ -116,7 +116,7 @@ export function EditVersionDialog({
       </ModalBody>
       <ModalFooter>
         <Button variant="primary" type="submit" form="edit-version-form" isLoading={isSaving} isDisabled={isSaving}>
-          Save
+          Save version
         </Button>
         <Button variant="link" onClick={onClose} isDisabled={isSaving}>
           Cancel

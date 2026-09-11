@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
@@ -16,9 +16,11 @@ const defaultProps = {
 }
 
 describe('SaveWorkflowButton', () => {
-  it('renders Save text', () => {
+  it('renders Save workflow with a save icon', () => {
     render(<SaveWorkflowButton {...defaultProps} />)
-    expect(screen.getByRole('button', { name: /save/i })).toBeInTheDocument()
+    const button = screen.getByRole('button', { name: /save workflow/i })
+    expect(button).toBeInTheDocument()
+    expect(within(button).getByRole('img', { hidden: true })).toBeInTheDocument()
   })
 
   it('shows Saving... when isPending', () => {

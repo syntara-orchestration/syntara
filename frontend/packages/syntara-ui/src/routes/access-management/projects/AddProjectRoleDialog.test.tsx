@@ -122,7 +122,7 @@ describe('AddProjectRoleDialog', () => {
 
     await user.type(screen.getByRole('textbox', { name: 'Role name' }), 'my-role')
     await user.click(screen.getByRole('button', { name: 'Add policy' }))
-    await user.click(screen.getByRole('button', { name: 'Add' }))
+    await user.click(screen.getByRole('button', { name: 'Add role' }))
 
     await waitFor(() => {
       expect(mockMutate).toHaveBeenCalled()
@@ -143,7 +143,7 @@ describe('AddProjectRoleDialog', () => {
 
     await user.type(screen.getByRole('textbox', { name: 'Role name' }), 'my-role')
     await user.click(screen.getByRole('button', { name: 'Add policy' }))
-    await user.click(screen.getByRole('button', { name: 'Add' }))
+    await user.click(screen.getByRole('button', { name: 'Add role' }))
 
     await waitFor(() => {
       expect(mockMutate).toHaveBeenCalled()

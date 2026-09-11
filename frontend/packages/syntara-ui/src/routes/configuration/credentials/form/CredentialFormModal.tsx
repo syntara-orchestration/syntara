@@ -12,7 +12,7 @@ import {
   ModalHeader,
   TextInput,
 } from '@patternfly/react-core'
-import { RhUiAddIcon, RhUiEditIcon, RhUiErrorIcon } from '@patternfly/react-icons'
+import { RhUiAddIcon, RhUiErrorIcon } from '@patternfly/react-icons'
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 
@@ -465,9 +465,9 @@ export function CredentialFormModal({
           onClick={handleSubmit(onSubmit)}
           isDisabled={isSubmitting}
           isLoading={isSubmitting}
-          icon={isEditMode ? <RhUiEditIcon /> : <RhUiAddIcon />}
+          icon={isEditMode ? undefined : <RhUiAddIcon />}
         >
-          {isEditMode ? 'Save changes' : 'Create credential'}
+          {isEditMode ? 'Save credential' : 'Create credential'}
         </Button>
         <Button variant="link" onClick={onClose} isDisabled={isSubmitting}>
           Cancel

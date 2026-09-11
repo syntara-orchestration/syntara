@@ -12,6 +12,7 @@ import {
   ModalHeader,
   TextInput,
 } from '@patternfly/react-core'
+import { RhUiAddIcon } from '@patternfly/react-icons'
 import { Controller, useForm } from 'react-hook-form'
 
 import { useFormMutationErrorHandler } from '../../../hooks/useFormMutationErrorHandler'
@@ -139,8 +140,14 @@ export function AddProjectRoleDialog({ projectId, onClose, onSuccess }: Readonly
         </Form>
       </ModalBody>
       <ModalFooter>
-        <Button variant="primary" form="add-project-role-form" type="submit" isLoading={isPending}>
-          Add
+        <Button
+          variant="primary"
+          form="add-project-role-form"
+          type="submit"
+          isLoading={isPending}
+          icon={<RhUiAddIcon />}
+        >
+          Add role
         </Button>
         <Button variant="link" onClick={onClose}>
           Cancel

@@ -87,7 +87,7 @@ describe('SettingsCategoryTab', () => {
     render(<SettingsCategoryTab settings={settings} {...defaultProps} onChange={onChange} />)
 
     await user.click(screen.getByRole('button', { name: 'Reset to defaults' }))
-    await user.click(screen.getByRole('button', { name: 'Reset all' }))
+    await user.click(screen.getByRole('button', { name: 'Reset all settings' }))
 
     expect(onChange).toHaveBeenCalledWith('a', 100)
     expect(onChange).toHaveBeenCalledWith('b', 200)

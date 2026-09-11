@@ -35,7 +35,7 @@ test.describe('Concurrent Edit Conflict Detection @pr-check', () => {
 
       await simulateConcurrentSave(app, workflow.id)
 
-      await app.getByRole('button', { name: 'Save' }).click()
+      await app.getByRole('button', { name: 'Save workflow' }).click()
 
       const dialog = app.getByRole('dialog')
       await expect(dialog).toBeVisible({ timeout: 15_000 })
@@ -68,7 +68,7 @@ test.describe('Concurrent Edit Conflict Detection @pr-check', () => {
 
       await simulateConcurrentSave(app, workflow.id)
 
-      await app.getByRole('button', { name: 'Save' }).click()
+      await app.getByRole('button', { name: 'Save workflow' }).click()
 
       const dialog = app.getByRole('dialog')
       await expect(dialog).toBeVisible({ timeout: 15_000 })
@@ -92,7 +92,7 @@ test.describe('Concurrent Edit Conflict Detection @pr-check', () => {
 
       await simulateConcurrentSave(app, workflow.id)
 
-      await app.getByRole('button', { name: 'Save' }).click()
+      await app.getByRole('button', { name: 'Save workflow' }).click()
 
       const dialog = app.getByRole('dialog')
       await expect(dialog).toBeVisible({ timeout: 15_000 })
@@ -122,7 +122,7 @@ test.describe('Concurrent Edit Conflict Detection @pr-check', () => {
 
       await simulateConcurrentSave(app, workflow.id)
 
-      await app.getByRole('button', { name: 'Save' }).click()
+      await app.getByRole('button', { name: 'Save workflow' }).click()
 
       const dialog = app.getByRole('dialog')
       await expect(dialog).toBeVisible({ timeout: 15_000 })
@@ -150,7 +150,7 @@ test.describe('Concurrent Edit Conflict Detection @pr-check', () => {
 
       const publishDialog = app.getByRole('dialog')
       await expect(publishDialog).toBeVisible({ timeout: 15_000 })
-      await publishDialog.getByRole('button', { name: /^Publish$/i }).click()
+      await publishDialog.getByRole('button', { name: 'Publish workflow' }).click()
 
       await expect(app.getByText(/conflict: newer version available/i)).toBeVisible({ timeout: 15_000 })
 

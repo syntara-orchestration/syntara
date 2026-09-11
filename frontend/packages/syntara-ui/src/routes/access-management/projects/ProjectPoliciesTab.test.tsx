@@ -219,7 +219,7 @@ describe('ProjectPoliciesTab', () => {
     // Check the acknowledgement checkbox before clicking Delete
     await user.click(screen.getByRole('checkbox'))
 
-    const confirmButton = await screen.findByRole('button', { name: 'Delete' })
+    const confirmButton = await screen.findByRole('button', { name: 'Delete policy' })
     await user.click(confirmButton)
 
     await waitFor(() => {
@@ -337,7 +337,7 @@ describe('ProjectPoliciesTab', () => {
     // Check the acknowledgement checkbox before clicking Delete
     await user.click(screen.getByRole('checkbox'))
 
-    const confirmButton = await screen.findByRole('button', { name: 'Delete' })
+    const confirmButton = await screen.findByRole('button', { name: 'Delete policy' })
     await user.click(confirmButton)
 
     await waitFor(() => {

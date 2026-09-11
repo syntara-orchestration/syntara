@@ -205,7 +205,7 @@ export function ProjectFormModal({ project, isOpen, onClose, onSuccess, onCreate
           icon={isEditMode ? undefined : <RhUiAddIcon />}
           iconPosition={isEditMode ? undefined : 'start'}
         >
-          {isEditMode ? 'Save' : 'Create project'}
+          {isEditMode ? 'Save project' : 'Create project'}
         </Button>
         <Button variant="link" onClick={handleClose} isDisabled={isPending}>
           Cancel

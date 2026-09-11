@@ -140,7 +140,7 @@ function disableConfirmCopy(
   if (!user) {
     return {
       title: 'Disable user?',
-      confirmLabel: 'Disable',
+      confirmLabel: 'Disable user',
       body: null,
     }
   }
@@ -170,7 +170,7 @@ function disableConfirmCopy(
   }
   return {
     title: 'Disable user?',
-    confirmLabel: 'Disable',
+    confirmLabel: 'Disable user',
     body: (
       <>
         The user <strong>{user.username}</strong> will be disabled and will no longer be able to sign in.
@@ -422,7 +422,7 @@ export function UsersTab() {
         onClose={deleteDialog.close}
         onConfirm={() => handleDelete(deleteDialog.item)}
         title="Delete user?"
-        confirmLabel="Delete"
+        confirmLabel="Delete user"
         confirmVariant="danger"
         titleIconVariant="warning"
         destructiveAcknowledgement={DELETE_USER_ACKNOWLEDGEMENT}

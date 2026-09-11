@@ -139,7 +139,7 @@ describe('EditServiceAccountModal', () => {
     await user.clear(nameInput)
     await user.type(nameInput, 'updated-name')
 
-    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await user.click(screen.getByRole('button', { name: 'Save service account' }))
 
     await waitFor(() => {
       expect(mockMutate).toHaveBeenCalled()
@@ -166,7 +166,7 @@ describe('EditServiceAccountModal', () => {
       { wrapper }
     )
 
-    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await user.click(screen.getByRole('button', { name: 'Save service account' }))
 
     await waitFor(() => {
       expect(mockMutate).toHaveBeenCalled()
@@ -195,7 +195,7 @@ describe('EditServiceAccountModal', () => {
 
     const nameInput = screen.getByRole('textbox', { name: 'Name' })
     await user.clear(nameInput)
-    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await user.click(screen.getByRole('button', { name: 'Save service account' }))
 
     await waitFor(() => {
       expect(screen.getByText('Name is required')).toBeInTheDocument()

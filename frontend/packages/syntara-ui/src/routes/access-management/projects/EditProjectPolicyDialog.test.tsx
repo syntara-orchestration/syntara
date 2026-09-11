@@ -120,7 +120,7 @@ describe('EditProjectPolicyDialog', () => {
     const user = userEvent.setup()
     renderDialog()
 
-    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await user.click(screen.getByRole('button', { name: 'Save policy' }))
 
     await waitFor(() => {
       expect(mockMutate).toHaveBeenCalled()
@@ -139,7 +139,7 @@ describe('EditProjectPolicyDialog', () => {
     const user = userEvent.setup()
     renderDialog()
 
-    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await user.click(screen.getByRole('button', { name: 'Save policy' }))
 
     await waitFor(() => {
       expect(mockMutate).toHaveBeenCalled()

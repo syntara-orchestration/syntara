@@ -82,7 +82,7 @@ test.describe('Converge Node - E2E Tests', () => {
         )
         await selectProjectIfRequired(app)
         await app.getByPlaceholder('Workflow name').fill(wfName)
-        await app.getByRole('button', { name: 'Save', exact: true }).click()
+        await app.getByRole('button', { name: 'Save workflow' }).click()
         const saveRequest = await saveRequestPromise
 
         await expect(app.getByText('Converge All')).toBeVisible()
@@ -102,7 +102,7 @@ test.describe('Converge Node - E2E Tests', () => {
 
         await selectProjectIfRequired(app)
         await app.getByPlaceholder('Workflow name').fill(wfName)
-        await app.getByRole('button', { name: 'Save', exact: true }).click()
+        await app.getByRole('button', { name: 'Save workflow' }).click()
         await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/)
 
         await openWorkflowInBuilder(app, wfName)
@@ -118,7 +118,7 @@ test.describe('Converge Node - E2E Tests', () => {
         const saveRequestPromise = app.waitForRequest(
           (req) => req.url().includes('/workflows') && req.method() === 'PATCH'
         )
-        await app.getByRole('button', { name: 'Save', exact: true }).click()
+        await app.getByRole('button', { name: 'Save workflow' }).click()
         const saveRequest = await saveRequestPromise
 
         const payload = getWorkflowPayload(saveRequest)
@@ -139,7 +139,7 @@ test.describe('Converge Node - E2E Tests', () => {
 
         await selectProjectIfRequired(app)
         await app.getByPlaceholder('Workflow name').fill(wfName)
-        await app.getByRole('button', { name: 'Save', exact: true }).click()
+        await app.getByRole('button', { name: 'Save workflow' }).click()
         await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/)
 
         await openWorkflowInBuilder(app, wfName)
@@ -157,7 +157,7 @@ test.describe('Converge Node - E2E Tests', () => {
         const saveRequestPromise = app.waitForRequest(
           (req) => req.url().includes('/workflows') && req.method() === 'PATCH'
         )
-        await app.getByRole('button', { name: 'Save', exact: true }).click()
+        await app.getByRole('button', { name: 'Save workflow' }).click()
         const saveRequest = await saveRequestPromise
 
         const payload = getWorkflowPayload(saveRequest)
@@ -180,7 +180,7 @@ test.describe('Converge Node - E2E Tests', () => {
         )
         await selectProjectIfRequired(app)
         await app.getByPlaceholder('Workflow name').fill(wfName)
-        await app.getByRole('button', { name: 'Save', exact: true }).click()
+        await app.getByRole('button', { name: 'Save workflow' }).click()
         const saveRequest = await saveRequestPromise
 
         const payload = getWorkflowPayload(saveRequest)
@@ -199,7 +199,7 @@ test.describe('Converge Node - E2E Tests', () => {
 
         await selectProjectIfRequired(app)
         await app.getByPlaceholder('Workflow name').fill(wfName)
-        await app.getByRole('button', { name: 'Save', exact: true }).click()
+        await app.getByRole('button', { name: 'Save workflow' }).click()
         await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/)
 
         await openWorkflowInBuilder(app, wfName)
@@ -216,7 +216,7 @@ test.describe('Converge Node - E2E Tests', () => {
         const saveRequestPromise = app.waitForRequest(
           (req) => req.url().includes('/workflows') && req.method() === 'PATCH'
         )
-        await app.getByRole('button', { name: 'Save', exact: true }).click()
+        await app.getByRole('button', { name: 'Save workflow' }).click()
         const saveRequest = await saveRequestPromise
 
         const payload = getWorkflowPayload(saveRequest)
@@ -235,7 +235,7 @@ test.describe('Converge Node - E2E Tests', () => {
 
         await selectProjectIfRequired(app)
         await app.getByPlaceholder('Workflow name').fill(wfName)
-        await app.getByRole('button', { name: 'Save', exact: true }).click()
+        await app.getByRole('button', { name: 'Save workflow' }).click()
         await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/)
 
         await openWorkflowInBuilder(app, wfName)
@@ -256,7 +256,7 @@ test.describe('Converge Node - E2E Tests', () => {
         const saveRequestPromise = app.waitForRequest(
           (req) => req.url().includes('/workflows') && req.method() === 'PATCH'
         )
-        await app.getByRole('button', { name: 'Save', exact: true }).click()
+        await app.getByRole('button', { name: 'Save workflow' }).click()
         const saveRequest = await saveRequestPromise
 
         const payload = getWorkflowPayload(saveRequest)
@@ -278,7 +278,7 @@ test.describe('Converge Node - E2E Tests', () => {
         )
         await selectProjectIfRequired(app)
         await app.getByPlaceholder('Workflow name').fill(wfName)
-        await app.getByRole('button', { name: 'Save', exact: true }).click()
+        await app.getByRole('button', { name: 'Save workflow' }).click()
         const saveRequest = await saveRequestPromise
 
         const payload = getWorkflowPayload(saveRequest)
@@ -318,7 +318,7 @@ test.describe('Converge Node - E2E Tests', () => {
         )
         await selectProjectIfRequired(app)
         await app.getByPlaceholder('Workflow name').fill(wfName)
-        await app.getByRole('button', { name: 'Save', exact: true }).click()
+        await app.getByRole('button', { name: 'Save workflow' }).click()
         const saveRequest = await saveRequestPromise
 
         // 30 + (5*60) + (2*3600) + (1*86400) = 93930
@@ -344,7 +344,7 @@ test.describe('Converge Node - E2E Tests', () => {
 
         await selectProjectIfRequired(app)
         await app.getByPlaceholder('Workflow name').fill(wfName)
-        await app.getByRole('button', { name: 'Save', exact: true }).click()
+        await app.getByRole('button', { name: 'Save workflow' }).click()
         await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/)
 
         await openWorkflowInBuilder(app, wfName)
@@ -377,7 +377,7 @@ test.describe('Converge Node - E2E Tests', () => {
         )
         await selectProjectIfRequired(app)
         await app.getByPlaceholder('Workflow name').fill(wfName)
-        await app.getByRole('button', { name: 'Save', exact: true }).click()
+        await app.getByRole('button', { name: 'Save workflow' }).click()
         const saveRequest = await saveRequestPromise
 
         const payload = getWorkflowPayload(saveRequest)
@@ -416,7 +416,7 @@ test.describe('Converge Node - E2E Tests', () => {
         )
         await selectProjectIfRequired(app)
         await app.getByPlaceholder('Workflow name').fill(wfName)
-        await app.getByRole('button', { name: 'Save', exact: true }).click()
+        await app.getByRole('button', { name: 'Save workflow' }).click()
         const saveRequest = await saveRequestPromise
 
         // 45 + (30*60) + (12*3600) + (2*86400) = 217845
@@ -456,7 +456,7 @@ test.describe('Converge Node - E2E Tests', () => {
         )
         await selectProjectIfRequired(app)
         await app.getByPlaceholder('Workflow name').fill(wfName)
-        await app.getByRole('button', { name: 'Save', exact: true }).click()
+        await app.getByRole('button', { name: 'Save workflow' }).click()
         const saveRequest = await saveRequestPromise
 
         const payload = getWorkflowPayload(saveRequest)

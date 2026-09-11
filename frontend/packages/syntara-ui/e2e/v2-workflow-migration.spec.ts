@@ -105,7 +105,7 @@ test.describe('V2 Workflow Schema Migration', () => {
     const saveRequestPromise = app.waitForRequest((req) => req.url().includes('/workflows') && req.method() === 'POST')
     await selectProjectIfRequired(app)
     await app.getByPlaceholder('Workflow name').fill(workflowName)
-    await app.getByRole('button', { name: 'Save' }).click()
+    await app.getByRole('button', { name: 'Save workflow' }).click()
     const saveRequest = await saveRequestPromise
     const def = getV2DefFromRequest(saveRequest)
 
@@ -165,7 +165,7 @@ test.describe('V2 Workflow Schema Migration', () => {
       )
       await selectProjectIfRequired(app)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
-      await app.getByRole('button', { name: 'Save' }).click()
+      await app.getByRole('button', { name: 'Save workflow' }).click()
       const saveRequest = await saveRequestPromise
       const def = getV2DefFromRequest(saveRequest)
 
@@ -228,7 +228,7 @@ test.describe('V2 Workflow Schema Migration', () => {
       )
       await selectProjectIfRequired(app)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
-      await app.getByRole('button', { name: 'Save' }).click()
+      await app.getByRole('button', { name: 'Save workflow' }).click()
       const saveRequest = await saveRequestPromise
       const def = getV2DefFromRequest(saveRequest)
 
@@ -371,7 +371,7 @@ test.describe('V2 Workflow Schema Migration', () => {
     await addScriptNode(app, 'Test script', 'print("test")')
     await selectProjectIfRequired(app)
     await app.getByPlaceholder('Workflow name').fill(workflowName)
-    await app.getByRole('button', { name: 'Save' }).click()
+    await app.getByRole('button', { name: 'Save workflow' }).click()
     await expect(app).toHaveURL(/workflow-builder\/.+/)
 
     // Navigate to workflows list, find the saved workflow, and reopen it.
@@ -429,7 +429,7 @@ test.describe('V2 Workflow Schema Migration', () => {
       await addScriptNode(app, 'Original script', 'print("original")')
       await selectProjectIfRequired(app)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
-      await app.getByRole('button', { name: 'Save' }).click()
+      await app.getByRole('button', { name: 'Save workflow' }).click()
       await expect(app).toHaveURL(/workflow-builder\/(?!new)/)
 
       // Add a second node (edit the workflow)
@@ -437,7 +437,7 @@ test.describe('V2 Workflow Schema Migration', () => {
 
       // Re-save and capture the PATCH payload
       const patchPromise = app.waitForRequest((req) => req.url().includes('/workflows/') && req.method() === 'PATCH')
-      await app.getByRole('button', { name: 'Save' }).click()
+      await app.getByRole('button', { name: 'Save workflow' }).click()
       const patchRequest = await patchPromise
       const editedDef = getV2DefFromRequest(patchRequest)
 
@@ -474,7 +474,7 @@ test.describe('V2 Workflow Schema Migration', () => {
       const savePromise = app.waitForRequest((req) => req.url().includes('/workflows') && req.method() === 'POST')
       await selectProjectIfRequired(app)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
-      await app.getByRole('button', { name: 'Save' }).click()
+      await app.getByRole('button', { name: 'Save workflow' }).click()
       const saveRequest = await savePromise
       const savedDef = getV2DefFromRequest(saveRequest)
 

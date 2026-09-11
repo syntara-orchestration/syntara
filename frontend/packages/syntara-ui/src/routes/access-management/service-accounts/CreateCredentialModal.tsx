@@ -1,4 +1,5 @@
 import { Button, Content, Form, Modal, ModalBody, ModalFooter, ModalHeader } from '@patternfly/react-core'
+import { RhUiAddIcon } from '@patternfly/react-icons'
 import { useCallback } from 'react'
 
 import { useBlurOnOpen } from '../../../hooks/useBlurOnOpen'
@@ -45,8 +46,14 @@ function CreateCredentialForm({
         </Form>
       </ModalBody>
       <ModalFooter>
-        <Button variant="primary" onClick={handleSubmit} isDisabled={isPending || !!error} isLoading={isPending}>
-          Create
+        <Button
+          variant="primary"
+          onClick={handleSubmit}
+          isDisabled={isPending || !!error}
+          isLoading={isPending}
+          icon={<RhUiAddIcon />}
+        >
+          Create credential
         </Button>
         <Button variant="link" onClick={onClose} isDisabled={isPending}>
           Cancel

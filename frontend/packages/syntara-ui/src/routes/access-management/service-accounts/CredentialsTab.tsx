@@ -424,7 +424,7 @@ export function CredentialsTab({
         onClose={deleteDialog.close}
         onConfirm={() => actions.handleDeleteConfirm(deleteDialog.item, deleteDialog.close)}
         title="Delete credential?"
-        confirmLabel="Delete"
+        confirmLabel="Delete credential"
         confirmVariant="danger"
         titleIconVariant="warning"
         destructiveAcknowledgement={{
@@ -440,7 +440,7 @@ export function CredentialsTab({
         onClose={disableDialog.close}
         onConfirm={() => actions.handleDisableConfirm(disableDialog.item, disableDialog.close)}
         title="Disable credential?"
-        confirmLabel="Disable"
+        confirmLabel="Disable credential"
         confirmVariant="primary"
       >
         You are about to disable the credential <strong>{disableDialog.item?.identifier}</strong>. You can re-enable it

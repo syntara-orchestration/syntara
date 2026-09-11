@@ -26,7 +26,7 @@ export function DisableIdentityProviderDialog({
       onClose={onClose}
       onConfirm={onConfirm}
       title="Disable identity provider?"
-      confirmLabel="Disable"
+      confirmLabel="Disable identity provider"
       confirmVariant="primary"
       confirmLoading={isLoading}
     >

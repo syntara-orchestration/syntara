@@ -570,7 +570,7 @@ describe('UserGroupsPanel', () => {
       })
 
       // Confirm removal
-      const removeButton = screen.getByRole('button', { name: 'Remove' })
+      const removeButton = screen.getByRole('button', { name: 'Remove from group' })
       await user.click(removeButton)
 
       // Verify mutation was called
@@ -635,7 +635,7 @@ describe('UserGroupsPanel', () => {
       await user.click(removeItem)
 
       // Confirm removal
-      const removeButton = await screen.findByRole('button', { name: 'Remove' })
+      const removeButton = await screen.findByRole('button', { name: 'Remove from group' })
       await user.click(removeButton)
 
       // Verify error alert
@@ -709,7 +709,7 @@ describe('UserGroupsPanel', () => {
       })
 
       // Modal should contain the "Add" submit button
-      expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Add to group' })).toBeInTheDocument()
     })
 
     it('closes add to group modal when cancel is clicked', async () => {
@@ -751,18 +751,18 @@ describe('UserGroupsPanel', () => {
       const addButton = screen.getByRole('button', { name: /add to group/i })
       await user.click(addButton)
 
-      // Wait for modal to open (the "Add" submit button appears in the modal)
+      // Wait for modal to open
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument()
+        expect(screen.getByRole('dialog')).toBeInTheDocument()
       })
 
       // Click cancel
       const cancelButtons = screen.getAllByRole('button', { name: 'Cancel' })
       await user.click(cancelButtons[cancelButtons.length - 1])
 
-      // Modal should close - the "Add" submit button should be gone
+      // Modal should close
       await waitFor(() => {
-        expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument()
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
       })
     })
   })
@@ -856,11 +856,11 @@ describe('UserGroupsPanel', () => {
 
       // Wait for modal to open
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Add to group' })).toBeInTheDocument()
       })
 
       // Click "Add" without selecting a group
-      await user.click(screen.getByRole('button', { name: 'Add' }))
+      await user.click(screen.getByRole('button', { name: 'Add to group' }))
 
       // The mutation should NOT be called (validation prevents it)
       expect(mockAddMutate).not.toHaveBeenCalled()
@@ -887,7 +887,7 @@ describe('UserGroupsPanel', () => {
       await user.click(screen.getByRole('button', { name: /add to group/i }))
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Add to group' })).toBeInTheDocument()
       })
 
       // Click on the typeahead input to open the dropdown
@@ -899,7 +899,7 @@ describe('UserGroupsPanel', () => {
       await user.click(testersOption)
 
       // Submit the form
-      await user.click(screen.getByRole('button', { name: 'Add' }))
+      await user.click(screen.getByRole('button', { name: 'Add to group' }))
 
       // Verify mutation was called
       await waitFor(() => {
@@ -933,7 +933,7 @@ describe('UserGroupsPanel', () => {
       await user.click(screen.getByRole('button', { name: /add to group/i }))
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Add to group' })).toBeInTheDocument()
       })
 
       // Select a group
@@ -943,7 +943,7 @@ describe('UserGroupsPanel', () => {
       await user.click(testersOption)
 
       // Submit
-      await user.click(screen.getByRole('button', { name: 'Add' }))
+      await user.click(screen.getByRole('button', { name: 'Add to group' }))
 
       // Verify error alert
       await waitFor(() => {
@@ -1052,7 +1052,7 @@ describe('UserGroupsPanel', () => {
 
       // Modal should open - the "Add" submit button appears in the modal
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Add to group' })).toBeInTheDocument()
       })
     })
   })
