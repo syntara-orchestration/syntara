@@ -2,30 +2,20 @@
 
 from __future__ import annotations
 
-import importlib.util
+import importlib
 import sys
 import textwrap
 from pathlib import Path
+from typing import Any
 
 import yaml
 
-ROOT = Path(__file__).resolve().parents[3]
-TOOLS_CI = ROOT / "tools" / "ci"
-SCRIPTS_OPENAPI = ROOT / "scripts" / "openapi"
-sys.path.insert(0, str(SCRIPTS_OPENAPI))
+SCRIPT_DIR = Path(__file__).resolve().parents[3] / "scripts" / "openapi"
+sys.path.insert(0, str(SCRIPT_DIR))
 
-from dynamic_map_policy import (  # noqa: E402
-    DYNAMIC_MAP_FIELD_NAMES,
-    collect_policy_registry_field_names,
-)
-
-spec = importlib.util.spec_from_file_location(
-    "check_dynamic_map_field_registry",
-    TOOLS_CI / "check_dynamic_map_field_registry.py",
-)
-registry = importlib.util.module_from_spec(spec)
-assert spec.loader is not None
-spec.loader.exec_module(registry)
+dynamic_map_policy: Any = importlib.import_module("dynamic_map_policy")
+DYNAMIC_MAP_FIELD_NAMES = dynamic_map_policy.DYNAMIC_MAP_FIELD_NAMES
+collect_policy_registry_field_names = dynamic_map_policy.collect_policy_registry_field_names
 
 
 class TestCollectPolicyRegistryFieldNames:
