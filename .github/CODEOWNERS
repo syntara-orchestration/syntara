@@ -70,7 +70,7 @@
 /frontend/packages/syntara-ui/LICENSE @syntara-orchestration/syntara-leads
 
 # Architecture decision records and engineering standards
-/backend/decision-records.md @syntara-orchestration/syntara-leads
+/backend/docs/decision-records.md @syntara-orchestration/syntara-leads
 /backend/docs/ @syntara-orchestration/syntara-leads
 
 # Backend framework layer — the substrate every domain package builds on

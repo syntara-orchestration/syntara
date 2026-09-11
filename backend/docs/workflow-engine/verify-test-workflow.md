@@ -139,9 +139,9 @@ For request/response schemas and field definitions, see the OpenAPI spec for `PO
 ## Related Documentation
 
 - [Workflow Definition Guide](workflow-definition-guide.md) — V2 schema structure, node types, edge format
-- [Workflow Management](workflow-management.md) — CRUD operations, credential scope validation, overlapping validation coverage
+- [Workflow Management](../workflow-management.md) — CRUD operations, credential scope validation, overlapping validation coverage
 - [Converge Node](converge-node.md) — converge node strategies and validation rules
 - [Node Settings](node-settings.md) — retry policies and per-node configuration
 - [Switch Node](switch-node.md) — condition node branching
 - [Error Handling Strategy](../error-handling-strategy.md) — RFC 9457 compliance, `DetailedValidationProblemDetail` pipeline
-- [Zustand Architecture](../../frontend/docs/zustand-architecture.md) — `validationErrorCount` store patterns and state management
+- [Zustand Architecture](../../frontend/zustand-architecture.md) — `validationErrorCount` store patterns and state management

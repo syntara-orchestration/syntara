@@ -341,5 +341,5 @@ All field names use snake_case. The approval context section is labeled "Approva
 
 - [Approval Builder Integration](./approval-builder-integration.md) — Form configuration and workflow store integration
 - [Approval UI Architecture](./approval-ui-architecture.md) — Approvals list page, bulk actions, permission-based UI
-- [Approval Overview](../../../backend/docs/approvals/approval-overview.md) — Backend approval system architecture
-- [Approval Authorization Model](../../../backend/docs/approvals/approval-authorization-model.md) — Two-tier authorization (RBAC + approver lists)
+- [Approval Overview](../../backend/approvals/approval-overview.md) — Backend approval system architecture
+- [Approval Authorization Model](../../backend/approvals/approval-authorization-model.md) — Two-tier authorization (RBAC + approver lists)

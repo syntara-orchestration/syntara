@@ -547,13 +547,13 @@ sequenceDiagram
 
 | File                                                                                                                                                        | Purpose                   |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
-| [`packages/syntara-contracts/package.json`](../packages/syntara-contracts/package.json)                                                                     | Type generation scripts   |
-| [`packages/syntara-ui/src/client.tsx`](../packages/syntara-ui/src/client.tsx)                                                                               | API client creation       |
-| [`packages/syntara-ui/src/routes/builder/utils/processExistingWorkflow.ts`](../packages/syntara-ui/src/routes/builder/utils/processExistingWorkflow.ts)     | Load workflow from API    |
-| [`packages/syntara-ui/src/routes/builder/utils/workflowDefinitionBuilder.ts`](../packages/syntara-ui/src/routes/builder/utils/workflowDefinitionBuilder.ts) | Build v2 save payload     |
-| [`packages/syntara-ui/src/routes/builder/BuilderFlow.tsx`](../packages/syntara-ui/src/routes/builder/BuilderFlow.tsx)                                       | Canvas rendering          |
-| [`packages/syntara-ui/src/stores/useWorkflowStore.ts`](../packages/syntara-ui/src/stores/useWorkflowStore.ts)                                               | Workflow state management |
-| [`packages/syntara-ui/src/stores/useAuthStore.ts`](../packages/syntara-ui/src/stores/useAuthStore.ts)                                                       | Authentication state      |
+| [`packages/syntara-contracts/package.json`](https://github.com/syntara-orchestration/syntara/blob/devel/frontend/packages/syntara-contracts/package.json)                                                                     | Type generation scripts   |
+| [`packages/syntara-ui/src/client.tsx`](https://github.com/syntara-orchestration/syntara/blob/devel/frontend/packages/syntara-ui/src/client.tsx)                                                                               | API client creation       |
+| [`packages/syntara-ui/src/routes/builder/utils/processExistingWorkflow.ts`](https://github.com/syntara-orchestration/syntara/blob/devel/frontend/packages/syntara-ui/src/routes/builder/utils/processExistingWorkflow.ts)     | Load workflow from API    |
+| [`packages/syntara-ui/src/routes/builder/utils/workflowDefinitionBuilder.ts`](https://github.com/syntara-orchestration/syntara/blob/devel/frontend/packages/syntara-ui/src/routes/builder/utils/workflowDefinitionBuilder.ts) | Build v2 save payload     |
+| [`packages/syntara-ui/src/routes/builder/BuilderFlow.tsx`](https://github.com/syntara-orchestration/syntara/blob/devel/frontend/packages/syntara-ui/src/routes/builder/BuilderFlow.tsx)                                       | Canvas rendering          |
+| [`packages/syntara-ui/src/stores/useWorkflowStore.ts`](https://github.com/syntara-orchestration/syntara/blob/devel/frontend/packages/syntara-ui/src/stores/useWorkflowStore.ts)                                               | Workflow state management |
+| [`packages/syntara-ui/src/stores/useAuthStore.ts`](https://github.com/syntara-orchestration/syntara/blob/devel/frontend/packages/syntara-ui/src/stores/useAuthStore.ts)                                                       | Authentication state      |
 
 ### Data Flow Summary
 

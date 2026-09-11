@@ -76,7 +76,7 @@ Syntara is a distributed multi-agent system that enables coordinated AI agents t
 Consult these standards when making changes.
 
 **Core:**
-- [Decision Records](/decision-records.md) — technology choices and rationale
+- [Decision Records](/docs/decision-records.md) — technology choices and rationale
 - [Error Handling Strategy](/docs/error-handling-strategy.md) — RFC 9457 compliance, exception patterns
 
 **Domain Standards:**

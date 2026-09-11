@@ -496,5 +496,5 @@ The builder also handles approval interactions when viewing a live or recent exe
 
 - [Approval UI Architecture](./approval-ui-architecture.md) — Approvals list page, bulk actions, permission-based UI
 - [Approval Execution Integration](./approval-execution-integration.md) — Review view and decision submission during execution
-- [Approval Overview](../../../backend/docs/approvals/approval-overview.md) — Backend approval system architecture
-- [Approval Execution Pattern](../../../backend/docs/approvals/approval-execution-pattern.md) — Workflow integration, timeout resolution, signal protocol
+- [Approval Overview](../../backend/approvals/approval-overview.md) — Backend approval system architecture
+- [Approval Execution Pattern](../../backend/approvals/approval-execution-pattern.md) — Workflow integration, timeout resolution, signal protocol

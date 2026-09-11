@@ -769,4 +769,4 @@ Code quality and coverage are tracked via SonarCloud. SonarCloud analysis runs a
 
 - 📖 **[Developer Getting Started Guide](docs/developer-getting-started.md)** - Architecture deep dive with examples
 - 📖 **[Development with Worktrees Guide](docs/development-with-worktrees.md)** - Parallel development setup
-- 📖 **[Architecture Decision Records](decision-records.md)** - Design rationale and decisions
+- 📖 **[Architecture Decision Records](docs/decision-records.md)** - Design rationale and decisions
