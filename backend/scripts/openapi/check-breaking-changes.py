@@ -380,14 +380,56 @@ def _resolve_object_map_branch(schema: dict[str, Any]) -> dict[str, Any] | None:
     return None
 
 
-def _json_type_tightened(base_type: str, head_type: str) -> bool:
-    """Return True when head's JSON Schema type is narrower than base's."""
-    if base_type == head_type:
+def _json_value_key(value: Any) -> str:
+    """Return a stable key for JSON-value equality comparisons."""
+    return json.dumps(value, sort_keys=True, separators=(",", ":"))
+
+
+def _parse_json_type_value(type_val: Any) -> tuple[frozenset[str], bool]:
+    """Parse a JSON Schema ``type`` value into non-null types and nullability."""
+    if isinstance(type_val, str):
+        if type_val == "null":
+            return frozenset(), True
+        return frozenset({type_val}), False
+    if isinstance(type_val, list):
+        str_types = frozenset(t for t in type_val if isinstance(t, str) and t != "null")
+        allows_null = "null" in type_val
+        return str_types, allows_null
+    return frozenset(), False
+
+
+def _type_name_fits(name: str, allowed: frozenset[str]) -> bool:
+    if name in allowed:
+        return True
+    return name == "integer" and "number" in allowed
+
+
+def _json_type_union_tightened(base_val: Any, head_val: Any) -> bool:
+    """Return True when head's JSON Schema type union is narrower than base's."""
+    base_types, base_allows_null = _parse_json_type_value(base_val)
+    head_types, head_allows_null = _parse_json_type_value(head_val)
+
+    if base_allows_null and not head_allows_null:
+        return True
+
+    if not all(_type_name_fits(type_name, base_types) for type_name in head_types):
         return False
+
+    if head_types == base_types:
+        return False
+
     # integer accepts a subset of number; widening integer -> number is not tightening.
-    if base_type == "integer" and head_type == "number":
+    if base_types == frozenset({"integer"}) and head_types == frozenset({"number"}):
         return False
+
     return True
+
+
+def _enum_values_tightened(base_enum: list[Any], head_enum: list[Any]) -> bool:
+    """Return True when head's enum is a strict subset of base's (JSON-value safe)."""
+    base_keys = {_json_value_key(value) for value in base_enum}
+    head_keys = {_json_value_key(value) for value in head_enum}
+    return head_keys < base_keys
 
 
 def _json_schema_strictly_narrows(base: dict[str, Any], head: dict[str, Any]) -> bool:
@@ -403,15 +445,15 @@ def _json_schema_strictly_narrows(base: dict[str, Any], head: dict[str, Any]) ->
             continue
         if key not in base:
             return True
-        if key == "type" and isinstance(base_val, str) and isinstance(head_val, str):
-            if _json_type_tightened(base_val, head_val):
+        if key == "type":
+            if _json_type_union_tightened(base_val, head_val):
                 return True
             continue
         if (
             key == "enum"
             and isinstance(base_val, list)
             and isinstance(head_val, list)
-            and set(head_val) < set(base_val)
+            and _enum_values_tightened(base_val, head_val)
         ):
             return True
         if key in ("maxLength", "maximum", "maxItems") and head_val < base_val:

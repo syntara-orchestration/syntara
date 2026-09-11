@@ -670,6 +670,153 @@ class TestDetectDynamicMapConstraintTightening:
         assert is_breaking is True
         assert findings
 
+    def test_type_array_to_scalar_null_removed_is_breaking(self):
+        base = textwrap.dedent("""\
+            openapi: "3.1.0"
+            info:
+              title: Test
+              version: 1.0.0
+            components:
+              schemas:
+                WorkflowRead:
+                  type: object
+                  properties:
+                    labels:
+                      type: object
+                      additionalProperties:
+                        type: [string, 'null']
+        """)
+        head = textwrap.dedent("""\
+            openapi: "3.1.0"
+            info:
+              title: Test
+              version: 1.1.0
+            components:
+              schemas:
+                WorkflowRead:
+                  type: object
+                  properties:
+                    labels:
+                      type: object
+                      additionalProperties:
+                        type: string
+        """)
+        is_breaking, findings = check_breaking.detect_dynamic_map_constraint_tightening(base, head)
+        assert is_breaking is True
+        assert findings
+
+    def test_type_scalar_to_array_with_null_is_not_breaking(self):
+        base = textwrap.dedent("""\
+            openapi: "3.1.0"
+            info:
+              title: Test
+              version: 1.0.0
+            components:
+              schemas:
+                WorkflowRead:
+                  type: object
+                  properties:
+                    labels:
+                      type: object
+                      additionalProperties:
+                        type: string
+        """)
+        head = textwrap.dedent("""\
+            openapi: "3.1.0"
+            info:
+              title: Test
+              version: 1.0.1
+            components:
+              schemas:
+                WorkflowRead:
+                  type: object
+                  properties:
+                    labels:
+                      type: object
+                      additionalProperties:
+                        type: [string, 'null']
+        """)
+        is_breaking, findings = check_breaking.detect_dynamic_map_constraint_tightening(base, head)
+        assert is_breaking is False
+        assert findings == []
+
+    def test_enum_array_object_values_tightening_is_breaking(self):
+        base = textwrap.dedent("""\
+            openapi: "3.1.0"
+            info:
+              title: Test
+              version: 1.0.0
+            components:
+              schemas:
+                WorkflowRead:
+                  type: object
+                  properties:
+                    labels:
+                      type: object
+                      additionalProperties:
+                        enum:
+                          - [a]
+                          - [b]
+        """)
+        head = textwrap.dedent("""\
+            openapi: "3.1.0"
+            info:
+              title: Test
+              version: 1.1.0
+            components:
+              schemas:
+                WorkflowRead:
+                  type: object
+                  properties:
+                    labels:
+                      type: object
+                      additionalProperties:
+                        enum:
+                          - [a]
+        """)
+        is_breaking, findings = check_breaking.detect_dynamic_map_constraint_tightening(base, head)
+        assert is_breaking is True
+        assert findings
+
+    def test_enum_array_object_values_unchanged_is_not_breaking(self):
+        base = textwrap.dedent("""\
+            openapi: "3.1.0"
+            info:
+              title: Test
+              version: 1.0.0
+            components:
+              schemas:
+                WorkflowRead:
+                  type: object
+                  properties:
+                    labels:
+                      type: object
+                      additionalProperties:
+                        enum:
+                          - [a]
+                          - [b]
+        """)
+        head = textwrap.dedent("""\
+            openapi: "3.1.0"
+            info:
+              title: Test
+              version: 1.0.1
+            components:
+              schemas:
+                WorkflowRead:
+                  type: object
+                  properties:
+                    labels:
+                      type: object
+                      additionalProperties:
+                        enum:
+                          - [a]
+                          - [b]
+        """)
+        is_breaking, findings = check_breaking.detect_dynamic_map_constraint_tightening(base, head)
+        assert is_breaking is False
+        assert findings == []
+
     @pytest.mark.parametrize(
         ("constraint_key", "constraint_value"),
         [
