@@ -5,6 +5,8 @@ import type { ReactNode } from 'react'
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { toDisplayDate } from '../../utils/dateUtils'
 
+import styles from './SaveWorkflowButton.module.css'
+
 type SaveWorkflowButtonProps = Readonly<{
   isPending: boolean
   isDirty: boolean
@@ -29,9 +31,9 @@ export function SaveWorkflowButton({
   const isDisabled = !canEdit || isPending || (!isDirty && !isNew) || !!isNodeEditorOpen
   const lastSavedDate = toDisplayDate(lastSavedAt)
   const lastSavedText = lastSavedDate ? (
-    <>
-      Last saved <Timestamp date={lastSavedDate} dateFormat="medium" timeFormat="medium" />
-    </>
+    <div className={styles.lastSavedTooltip}>
+      Last saved: <Timestamp date={lastSavedDate} dateFormat="medium" timeFormat="medium" />
+    </div>
   ) : null
 
   let disabledTooltip: ReactNode
