@@ -8,7 +8,7 @@
  */
 import { type Page } from '../fixtures'
 import { test, expect, toAppUrl } from '../fixtures'
-import { applyApprovalNameFilter } from '../helpers/approvals'
+import { applyApprovalNameFilter, dismissConnectionBanner, navigateToApprovalAndOpen } from '../helpers/approvals'
 import { APP_TITLE } from '../helpers/appTitle'
 import { addApprovalNodeWithBranch } from '../helpers/v2-nodes'
 import { runWorkflowFromBuilder, waitForExecutionPaused } from '../helpers/workflow-run'
@@ -371,123 +371,54 @@ test.describe('Approval Workflow Operations', () => {
   })
 
   test('user changes decision from approve to reject (undo)', async ({ app }) => {
-    // Create a pending approval to test undo behavior
+    test.slow()
     const approval = await createPendingApproval(app)
 
     try {
-      // Navigate to approvals page
-      await app.goto(toAppUrl('/approvals'))
-      await expect(app.getByRole('heading', { level: 1, name: 'Approvals' })).toBeVisible()
+      await navigateToApprovalAndOpen(app, approval.approvalName)
+      await dismissConnectionBanner(app)
 
-      const table = app.getByRole('grid', { name: 'Approvals table' })
-      await table.waitFor({ state: 'visible', timeout: 15_000 })
-
-      // Filter to show only our test approval
-      await app.getByPlaceholder('Filter by name').fill(approval.approvalName)
-      await app.getByRole('button', { name: 'Apply filter' }).click()
-
-      // Wait for filter chip to confirm filter was applied and table to refresh
-      await expect(app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Name' })).toBeVisible({
-        timeout: 15_000,
-      })
-
-      // Step 1: Click on the pending approval to open side panel
-      const approvalLink = table.getByRole('link', { name: approval.approvalName })
-      await approvalLink.waitFor({ state: 'visible', timeout: 10_000 })
-      await approvalLink.click()
-
-      // Step 2: Verify navigation to execution detail with side panel
-      await expect(app).toHaveURL(/\/executions\/[^?]+\?approval=/, { timeout: 15_000 })
-      await expect(app.getByRole('heading', { name: 'Review Approval' })).toBeVisible({ timeout: 15_000 })
-
-      // Step 3: Click "Approve" button
       const approveButton = app.getByRole('button', { name: 'Approve', exact: true })
-      await expect(approveButton).toBeVisible({ timeout: 15_000 })
-      await approveButton.click()
-
-      // Step 4: Verify approval notes field appears
-      const approvalNotesInput = app.getByPlaceholder(/explain.*reason.*approving|optional.*note/i)
-      await expect(approvalNotesInput).toBeVisible({ timeout: 10_000 })
-
-      // Step 5: Undo approve selection, then choose Reject (Approve/Reject buttons are
-      // replaced by the notes form after the first click — use Undo decision to switch)
-      await app.getByRole('button', { name: 'Undo decision' }).click()
-      await expect(app.getByRole('button', { name: 'Approve', exact: true })).toBeVisible()
       const rejectButton = app.getByRole('button', { name: 'Reject', exact: true })
+      await expect(approveButton).not.toHaveAttribute('aria-disabled', 'true', { timeout: 20_000 })
+
+      await approveButton.click()
+      await expect(app.getByPlaceholder(/Explain the reason for approving/i)).toBeVisible({ timeout: 10_000 })
+      // Pending approve hides the action buttons; undo clears the draft before choosing reject.
+      await expect(rejectButton).not.toBeVisible()
+
+      await app.getByRole('button', { name: 'Undo decision' }).click()
+      await expect(approveButton).toBeVisible({ timeout: 10_000 })
       await expect(rejectButton).toBeVisible({ timeout: 10_000 })
+      await expect(rejectButton).not.toHaveAttribute('aria-disabled', 'true', { timeout: 20_000 })
+
       await rejectButton.click()
-
-      // Step 6: Verify rejection notes field appears (approval notes replaced)
-      const rejectionNotesInput = app.getByPlaceholder(/explain.*reason.*rejecting/i)
-      await expect(rejectionNotesInput).toBeVisible({ timeout: 10_000 })
-
-      // Step 7: Verify approval notes field is no longer visible
-      await expect(approvalNotesInput).not.toBeVisible()
-
-      // Step 8: Verify "Submit decision" button is available for rejection
-      const submitButton = app.getByRole('button', { name: 'Submit decision' })
-      await expect(submitButton).toBeVisible({ timeout: 10_000 })
-
-      // NOTE: This test verifies undo behavior (switching between approve/reject)
-      // without actually submitting to avoid mutating approval state
+      await expect(app.getByPlaceholder(/Explain the reason for rejecting/i)).toBeVisible({ timeout: 10_000 })
+      await expect(app.getByRole('button', { name: 'Submit decision' })).toBeVisible({ timeout: 10_000 })
     } finally {
-      // Cleanup: delete created workflow
       await apiRequest(app, 'delete', `/workflows/${approval.workflowId}`).catch(() => {})
     }
   })
 
   test('user clears decision with explicit undo button', async ({ app }) => {
-    // Create a pending approval to test undo/clear behavior
+    test.slow()
     const approval = await createPendingApproval(app)
 
     try {
-      // Navigate to approvals page
-      await app.goto(toAppUrl('/approvals'))
-      await expect(app.getByRole('heading', { level: 1, name: 'Approvals' })).toBeVisible()
+      await navigateToApprovalAndOpen(app, approval.approvalName)
+      await dismissConnectionBanner(app)
 
-      const table = app.getByRole('grid', { name: 'Approvals table' })
-      await table.waitFor({ state: 'visible', timeout: 15_000 })
-
-      // Filter to show only our test approval
-      await app.getByPlaceholder('Filter by name').fill(approval.approvalName)
-      await app.getByRole('button', { name: 'Apply filter' }).click()
-
-      // Click on the pending approval
-      const approvalLink = table.getByRole('link', { name: approval.approvalName })
-      await approvalLink.waitFor({ state: 'visible', timeout: 10_000 })
-      await approvalLink.click()
-      await expect(app.getByRole('heading', { name: 'Review Approval' })).toBeVisible({ timeout: 15_000 })
-
-      // Step 1: Click "Approve"
       const approveButton = app.getByRole('button', { name: 'Approve', exact: true })
+      await expect(approveButton).not.toHaveAttribute('aria-disabled', 'true', { timeout: 20_000 })
       await approveButton.click()
-      await expect(app.getByPlaceholder(/explain.*reason.*approving/i)).toBeVisible()
+      await expect(app.getByPlaceholder(/Explain the reason for approving/i)).toBeVisible({ timeout: 10_000 })
 
-      // Step 2: Look for "Undo decision" or "Clear" button
-      const undoButton = app.getByRole('button', { name: /undo.*decision|clear.*selection/i })
-      const hasUndoButton = await undoButton.isVisible().catch(() => false)
+      await app.getByRole('button', { name: 'Undo decision' }).click()
 
-      if (hasUndoButton) {
-        await undoButton.click()
-
-        // Step 3: Verify both approve and reject buttons are visible again
-        await expect(app.getByRole('button', { name: 'Approve', exact: true })).toBeVisible()
-        await expect(app.getByRole('button', { name: 'Reject', exact: true })).toBeVisible()
-
-        // Step 4: Verify notes field is cleared
-        const notesField = app.getByPlaceholder(/explain.*reason/i)
-        await expect(notesField).not.toBeVisible()
-      } else {
-        // If no explicit undo button exists, verify switching between approve/reject acts as undo
-        const rejectButton = app.getByRole('button', { name: 'Reject', exact: true })
-        await expect(rejectButton).toBeVisible()
-
-        // Clicking reject after approve is the undo mechanism
-        await rejectButton.click()
-        await expect(app.getByPlaceholder(/explain.*reason.*rejecting/i)).toBeVisible()
-      }
+      await expect(approveButton).toBeVisible({ timeout: 10_000 })
+      await expect(app.getByRole('button', { name: 'Reject', exact: true })).toBeVisible()
+      await expect(app.getByPlaceholder(/Explain the reason for approving/i)).not.toBeVisible()
     } finally {
-      // Cleanup: delete created workflow
       await apiRequest(app, 'delete', `/workflows/${approval.workflowId}`).catch(() => {})
     }
   })
@@ -552,8 +483,10 @@ test.describe('Approval Workflow Operations', () => {
   })
 
   test('UI-29: self-contained approve flow via approvals queue', async ({ app }) => {
-    // Create a workflow with an approval node so we control the approval name
-    const workflowName = buildUniqueName('e2e-approve')
+    // Create a workflow with an approval node so we control the approval name.
+    // Avoid 'approve' in the workflow name — getByRole({ name: 'Approve' }) is a
+    // substring match and collides with the workflow link button on execution detail.
+    const workflowName = buildUniqueName('e2e-ui29')
     const approvalNodeName = buildUniqueName('gate')
     const { id: workflowId } = await createWorkflowViaApi(app, workflowName, [
       { id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} },
@@ -591,7 +524,7 @@ test.describe('Approval Workflow Operations', () => {
       await expect(app).toHaveURL(/\/executions\/[^?]+\?approval=/)
       await expect(app.getByRole('heading', { name: 'Review Approval' })).toBeVisible({ timeout: 15_000 })
 
-      // Approve with notes (exact: true — side panel can expose multiple Approve buttons)
+      // Approve with notes (exact: true — workflow link names must not substring-match)
       await app.getByRole('button', { name: 'Approve', exact: true }).click()
       await app.getByPlaceholder(/Explain the reason for approving/i).fill('Approved in E2E test')
       await app.getByRole('button', { name: 'Submit decision' }).click()
