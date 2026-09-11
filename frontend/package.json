@@ -62,11 +62,16 @@
     "playwright-core": "1.62.1",
     "playwright": "1.62.1",
     "picomatch": "4.0.4",
-    "nanoid": "^3.3.17"
+    "nanoid": "^3.3.17",
+    "@patternfly/react-core": "6.6.1-prerelease.6",
+    "@patternfly/react-table": "6.6.1-prerelease.8",
+    "@patternfly/react-code-editor": "6.6.1-prerelease.7",
+    "@patternfly/react-styles": "6.6.1-prerelease.2"
   },
   "devDependencies": {
     "@emnapi/core": "2.0.0-alpha.3",
     "@emnapi/runtime": "2.0.0-alpha.3",
+    "@patternfly/react-styles": "6.6.1-prerelease.2",
     "@testing-library/dom": "^10.4.1",
     "@vitest/coverage-v8": "^4.1.10",
     "concurrently": "^10.0.4",

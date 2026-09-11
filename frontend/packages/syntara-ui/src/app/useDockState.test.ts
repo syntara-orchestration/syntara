@@ -193,11 +193,14 @@ describe('useDockState', () => {
     const mockState: DockState = {
       isDockExpanded: false,
       isDockTextExpanded: true,
+      isDockExpandableExpanded: false,
       isMobile: false,
       dockedToggleRef: createRef(),
       mobileToggleRef: createRef(),
       onToggleDock: vi.fn(),
       onMobileToggle: vi.fn(),
+      onNavToggle: vi.fn(),
+      onNavSelect: vi.fn(),
     }
     const wrapper = ({ children }: { children: React.ReactNode }) =>
       createElement(DockStateContext.Provider, { value: mockState }, children)

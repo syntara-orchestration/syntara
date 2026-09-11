@@ -1,4 +1,5 @@
 import {
+  Brand,
   Button,
   CompassDockMain,
   Divider,
@@ -11,12 +12,8 @@ import {
   MastheadLogo,
   MastheadMain,
   MastheadToggle,
-  Menu,
-  MenuItem,
-  MenuList,
   MenuToggle,
   Nav,
-  NavContext,
   NavExpandable,
   NavItem,
   NavList,
@@ -34,7 +31,7 @@ import {
   RhUiQuestionMarkCircleIcon,
 } from '@patternfly/react-icons'
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
-import { use, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 
 import { authClient } from '../client'
 import { useAlerts } from '../providers/alerts'
@@ -45,7 +42,6 @@ import { getErrorMessage } from '../utils/apiErrors'
 import { detachPromise } from '../utils/detachPromise'
 import { useDocLink } from '../utils/docs/useDocLink'
 
-import styles from './AppDockedNav.module.css'
 import { AppRoute } from './AppRoute'
 import type { TNavigationItem } from './navigationItems'
 import { useDockState } from './useDockState'
@@ -59,7 +55,7 @@ function findFirstEnabledPath(item: TNavigationItem): string {
   return item.path
 }
 
-/** Items with children that should show a dropdown instead of navigating directly. */
+/** Items with multiple children render as expandable groups instead of direct links. */
 function hasDropdownChildren(item: TNavigationItem): boolean {
   return (item.children?.length ?? 0) > 1
 }
@@ -68,6 +64,16 @@ function createNavItemRefs(items: TNavigationItem[]) {
   const refs: Record<string, React.RefObject<HTMLAnchorElement | null>> = {}
   items.forEach((item) => {
     refs[item.path] = { current: null }
+  })
+  return refs
+}
+
+function createExpandableRefs(items: TNavigationItem[]) {
+  const refs: Record<string, React.RefObject<HTMLButtonElement | null>> = {}
+  items.forEach((item) => {
+    if (hasDropdownChildren(item)) {
+      refs[item.path] = { current: null }
+    }
   })
   return refs
 }
@@ -85,68 +91,18 @@ function openExternalDoc(url: string) {
   globalThis.open(url, '_blank', 'noopener,noreferrer')
 }
 
-function NavDropdownItem({
-  item,
-  isActive,
-  requestNavigation,
-}: Readonly<{
-  item: TNavigationItem
-  isActive: boolean
-  requestNavigation: (path: string) => void
-}>) {
-  const enabledChildren = item.children ?? []
-  const { setFlyoutRef } = use(NavContext)
-
-  const onMenuSelect = (_event: React.MouseEvent | undefined, itemId: string | number | undefined) => {
-    const child = enabledChildren.find((c) => c.path === itemId)
-    if (child) {
-      setFlyoutRef?.(null)
-      requestNavigation(child.path)
-    }
-  }
-
-  /* v8 ignore start -- phantom branches from compiled JSX props and map callback */
-  return (
-    <NavItem
-      preventDefault
-      isActive={isActive}
-      icon={item.icon}
-      aria-label={item.label}
-      itemId={item.path}
-      id={`nav-${item.path.replaceAll('/', '-')}`}
-      className={styles.navFlyoutItem}
-      flyout={
-        <Menu containsFlyout isNavFlyout onSelect={onMenuSelect} className={styles.flyoutMenu}>
-          <MenuList>
-            {enabledChildren.map((child) => (
-              <MenuItem
-                key={child.path}
-                icon={child.icon}
-                itemId={child.path}
-                className={styles.flyoutMenuItem}
-                onClick={(e: React.MouseEvent) => e.preventDefault()}
-              >
-                {child.label}
-              </MenuItem>
-            ))}
-          </MenuList>
-        </Menu>
-      }
-    >
-      {item.label}
-    </NavItem>
-  )
-  /* v8 ignore stop */
-}
-
 function NavExpandableItem({
   item,
   isActive,
+  isMobile,
+  buttonRef,
   location,
   requestNavigation,
 }: Readonly<{
   item: TNavigationItem
   isActive: boolean
+  isMobile: boolean
+  buttonRef?: React.RefObject<HTMLButtonElement | null>
   location: string
   requestNavigation: (path: string) => void
 }>) {
@@ -155,17 +111,13 @@ function NavExpandableItem({
   /* v8 ignore start -- phantom branches from compiled JSX props and map callback */
   return (
     <NavExpandable
-      title={
-        <>
-          <span className={`pf-v6-c-nav__link-icon ${styles.navExpandableIcon}`} aria-hidden="true">
-            {item.icon}
-          </span>
-          {item.label}
-        </>
-      }
+      title={item.label}
+      icon={item.icon}
+      hasExpandableIcon={!isMobile}
       isActive={isActive}
-      isExpanded
       id={`nav-${item.path.replaceAll('/', '-')}`}
+      buttonProps={buttonRef ? { ref: buttonRef } : undefined}
+      aria-label={item.label}
     >
       {enabledChildren.map((child) => (
         <NavItem
@@ -215,7 +167,6 @@ function UserMenuDropdown() {
       variant="plain"
       icon={<RhUiProfileFillIcon />}
       isDocked
-      className={styles.dockedAction}
       aria-label="User menu"
       onClick={() => setIsOpen(!isOpen)}
       onMouseEnter={() => setIsOpen(true)}
@@ -256,7 +207,16 @@ export function AppDockedNav() {
   const { colorScheme, toggleColorScheme } = useColorScheme()
   const brand = useBrand()
   const docsHomeUrl = useDocLink('home')
-  const { isDockExpanded, isDockTextExpanded, isMobile, dockedToggleRef, onToggleDock } = useDockState()
+  const {
+    isDockExpanded,
+    isDockTextExpanded,
+    isDockExpandableExpanded,
+    isMobile,
+    dockedToggleRef,
+    onToggleDock,
+    onNavToggle,
+    onNavSelect,
+  } = useDockState()
 
   const filteredItems = useFilteredNavigationItems()
   const visibleItems = useMemo(
@@ -268,15 +228,15 @@ export function AppDockedNav() {
   const colorSchemeRef = useRef<HTMLButtonElement>(null)
   const helpRef = useRef<HTMLButtonElement>(null)
   const navItemRefs = useMemo(() => createNavItemRefs(visibleItems), [visibleItems])
+  const expandableRefs = useMemo(() => createExpandableRefs(visibleItems), [visibleItems])
 
   const colorSchemeToggleLabel = colorScheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
-  const isExpanded = isDockTextExpanded || isDockExpanded
-  const showTooltips = !isExpanded
+  const showTooltips = !isDockTextExpanded && !isDockExpanded && !isDockExpandableExpanded
 
   /* v8 ignore start -- phantom branches from compiled JSX props, ternaries, and map callbacks */
   return (
     <CompassDockMain {...(isMobile && !isDockExpanded && { inert: true })}>
-      <Masthead id="docked-masthead" variant="docked" className={styles.dockedMasthead}>
+      <Masthead display={{ default: undefined }} id="docked-masthead" variant="docked">
         <MastheadMain>
           <MastheadToggle>
             <Button
@@ -288,30 +248,23 @@ export function AppDockedNav() {
               isExpanded={isDockTextExpanded}
             />
           </MastheadToggle>
-          <MastheadBrand className={!isExpanded ? styles.collapsedBrand : undefined}>
-            {isExpanded ? (
-              <MastheadLogo component={(props) => <Link {...props} to="/" />} aria-label="Home">
-                <img
-                  src={colorScheme === 'dark' ? brand.logoExpandedDark : brand.logoExpandedLight}
-                  alt={brand.appTitle}
-                  className={styles.expandedLogo}
-                  data-testid="brand-logo"
-                />
-              </MastheadLogo>
-            ) : (
-              <MastheadLogo
-                component={(props) => <Link {...props} to="/" />}
-                aria-label="Home"
-                className={`pf-m-compact ${styles.compactLogo}`}
-              >
-                <img
-                  src={brand.logoCollapsed}
-                  alt={brand.appTitle}
-                  className={styles.collapsedLogo}
-                  data-testid="brand-logo"
-                />
-              </MastheadLogo>
-            )}
+          <MastheadBrand>
+            <MastheadLogo component={(props) => <Link {...props} to="/" />} aria-label="Home" isCompact>
+              <Brand
+                src={brand.logoCollapsed}
+                alt={brand.appTitle}
+                heights={{ default: '37px' }}
+                data-testid="brand-logo"
+              />
+            </MastheadLogo>
+            <MastheadLogo component={(props) => <Link {...props} to="/" />} aria-label="Home">
+              <Brand
+                src={colorScheme === 'dark' ? brand.logoExpandedDark : brand.logoExpandedLight}
+                alt={brand.appTitle}
+                heights={{ default: '37px' }}
+                data-testid="brand-logo"
+              />
+            </MastheadLogo>
           </MastheadBrand>
         </MastheadMain>
         <Divider />
@@ -320,12 +273,14 @@ export function AppDockedNav() {
             <ToolbarContent>
               <ToolbarItem>
                 <Nav
-                  onSelect={(_event, selectedItem) =>
+                  onSelect={(_event, selectedItem) => {
                     navigateToNavItem(selectedItem.itemId, visibleItems, requestNavigation)
-                  }
+                    onNavSelect()
+                  }}
+                  onToggle={onNavToggle}
                   variant="docked"
+                  isTextExpanded={isDockTextExpanded}
                   aria-label="Main navigation"
-                  className={!isDockTextExpanded ? styles.iconDockNav : undefined}
                 >
                   <NavList>
                     {visibleItems.flatMap((item) => {
@@ -337,22 +292,15 @@ export function AppDockedNav() {
                       if (hasDropdownChildren(item)) {
                         return [
                           separator,
-                          isExpanded ? (
-                            <NavExpandableItem
-                              key={item.path}
-                              item={item}
-                              isActive={isActive}
-                              location={location}
-                              requestNavigation={requestNavigation}
-                            />
-                          ) : (
-                            <NavDropdownItem
-                              key={item.path}
-                              item={item}
-                              isActive={isActive}
-                              requestNavigation={requestNavigation}
-                            />
-                          ),
+                          <NavExpandableItem
+                            key={item.path}
+                            item={item}
+                            isActive={isActive}
+                            isMobile={isMobile}
+                            buttonRef={expandableRefs[item.path]}
+                            location={location}
+                            requestNavigation={requestNavigation}
+                          />,
                         ]
                       }
                       return [
@@ -375,18 +323,16 @@ export function AppDockedNav() {
                   </NavList>
                 </Nav>
                 {showTooltips &&
-                  visibleItems
-                    .filter((item) => !hasDropdownChildren(item))
-                    .map((item) => (
-                      <Tooltip
-                        key={`tooltip-${item.path}`}
-                        aria="none"
-                        aria-live="off"
-                        triggerRef={navItemRefs[item.path]}
-                        content={item.label}
-                        position="right"
-                      />
-                    ))}
+                  visibleItems.map((item) => (
+                    <Tooltip
+                      key={`tooltip-${item.path}`}
+                      aria="none"
+                      aria-live="off"
+                      triggerRef={expandableRefs[item.path] ?? navItemRefs[item.path]}
+                      content={item.label}
+                      position="right"
+                    />
+                  ))}
               </ToolbarItem>
               <ToolbarGroup
                 variant="action-group-plain"
@@ -397,7 +343,6 @@ export function AppDockedNav() {
                   <Button
                     variant="plain"
                     isDocked
-                    className={styles.dockedAction}
                     icon={colorScheme === 'dark' ? <RhUiDarkModeIcon /> : <RhUiLightModeIcon />}
                     aria-label={colorSchemeToggleLabel}
                     ref={colorSchemeRef}
@@ -410,7 +355,6 @@ export function AppDockedNav() {
                   <Button
                     variant="plain"
                     isDocked
-                    className={styles.dockedAction}
                     icon={<RhUiQuestionMarkCircleIcon />}
                     aria-label="Documentation (opens in a new tab)"
                     ref={helpRef}
