@@ -385,6 +385,11 @@ class TestCancelExecutionCancelsBuiltinAgentExecution:
 
     It is what actually runs the agent loop; leaving it running orphans the
     Temporal workflow. Ref: AAP-88614.
+
+    This is the only end-to-end proof of the whole chain: route ->
+    cancel_execution -> cancel_invocations_for_execution -> InvocationService ->
+    Temporal. Each link is unit-tested in isolation, so a break in the DI wiring
+    between them would otherwise go unnoticed.
     """
 
     async def test_cancel_execution_cancels_builtin_agent_execution(
@@ -397,10 +402,12 @@ class TestCancelExecutionCancelsBuiltinAgentExecution:
         mock_temporal_service: Mock,
         invocation_factory: InvocationFactory,
     ) -> None:
-        """The builtin agent execution's Temporal workflow is cancelled too."""
+        """The builtin agent execution's Temporal workflow is cancelled too.
+
+        The link is the ``agent_execution_id`` FK, written server-side when the
+        builtin workflow was started.
+        """
         execution = await _make_execution(test_db_session, test_user, test_workflow)
-        invocation = await invocation_factory.create(project_id=test_workflow.project_id)
-        await _link_activity(test_db_session, execution, invocation)
 
         builtin_workflow = await get_or_create_builtin_agent_workflow(
             test_db_session, test_user, test_workflow_definition
@@ -409,9 +416,13 @@ class TestCancelExecutionCancelsBuiltinAgentExecution:
             test_db_session,
             test_user,
             builtin_workflow,
-            input_data={"invocation_id": str(invocation.id)},
             prefix="temporal-agent",
         )
+        invocation = await invocation_factory.create(
+            project_id=test_workflow.project_id,
+            agent_execution_id=agent_execution.id,
+        )
+        await _link_activity(test_db_session, execution, invocation)
 
         response = await auth_client.post(f"/api/v1/executions/{execution.id}/cancel")
         assert response.status_code == status.HTTP_202_ACCEPTED
@@ -421,30 +432,34 @@ class TestCancelExecutionCancelsBuiltinAgentExecution:
         }
         assert agent_execution.temporal_workflow_id in cancelled
 
-    async def test_cancel_execution_does_not_cancel_non_builtin_claimant(
+    async def test_cancel_execution_ignores_unlinked_agent_execution(
         self,
         auth_client: AsyncClient,
         test_db_session: AsyncSession,
         test_user: User,
         test_workflow: Workflow,
+        test_workflow_definition: dict[str, Any],
         mock_temporal_service: Mock,
         invocation_factory: InvocationFactory,
     ) -> None:
-        """input_data is caller-supplied, so only the builtin workflow is targeted.
+        """Only the FK is followed, never executions.input_data.
 
-        An ordinary execution whose input happens to name the invocation must
-        not be cancelled alongside it.
+        An execution that merely names the invocation in its caller-supplied
+        input_data is not reachable any more; the FK is the whole story.
         """
         execution = await _make_execution(test_db_session, test_user, test_workflow)
         invocation = await invocation_factory.create(project_id=test_workflow.project_id)
         await _link_activity(test_db_session, execution, invocation)
 
-        impostor = await _make_execution(
+        builtin_workflow = await get_or_create_builtin_agent_workflow(
+            test_db_session, test_user, test_workflow_definition
+        )
+        unlinked = await _make_execution(
             test_db_session,
             test_user,
-            test_workflow,
+            builtin_workflow,
             input_data={"invocation_id": str(invocation.id)},
-            prefix="temporal-impostor",
+            prefix="temporal-unlinked",
         )
 
         response = await auth_client.post(f"/api/v1/executions/{execution.id}/cancel")
@@ -453,4 +468,4 @@ class TestCancelExecutionCancelsBuiltinAgentExecution:
         cancelled = {
             call.kwargs["temporal_workflow_id"] for call in mock_temporal_service.cancel_workflow.call_args_list
         }
-        assert impostor.temporal_workflow_id not in cancelled
+        assert unlinked.temporal_workflow_id not in cancelled
