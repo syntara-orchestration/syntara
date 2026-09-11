@@ -12,27 +12,24 @@ nodes:
     name: Fetch Data
     type: script
     parameters:
-      language: bash
+      language: python
       code: |
-        echo '{"user_id": "123", "name": "Alice", "score": 95}'
-    outputs:
-      data: $.stdout
+        import json
+        print(json.dumps({"user_id": "123", "name": "Alice", "score": 95}))
 
   - id: process_data
     name: Process Data
     type: script
     parameters:
       language: bash
+      environment:
+        INPUT_USER_ID: ${fetch_data.stdout_json.user_id}
+        INPUT_NAME: ${fetch_data.stdout_json.name}
+        INPUT_SCORE: ${fetch_data.stdout_json.score}
       code: |
         echo "Processing data for user: $INPUT_NAME (ID: $INPUT_USER_ID)"
         echo "Score: $INPUT_SCORE"
         echo "Grade: A"
-    inputs:
-      user_id: ${fetch_data.output.data.user_id}
-      name: ${fetch_data.output.data.name}
-      score: ${fetch_data.output.data.score}
-    outputs:
-      result: $.stdout
 
   - id: save_result
     name: Save Result
@@ -41,10 +38,8 @@ nodes:
       language: bash
       code: |
         echo "Saving result complete"
-    outputs:
-      status: $.stdout
 edges:
-  - source: fetch_data
-    target: process_data
-  - source: process_data
-    target: save_result
+  - from: fetch_data
+    to: process_data
+  - from: process_data
+    to: save_result

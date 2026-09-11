@@ -35,7 +35,7 @@ nodes:
         sleep 1
         echo "Task 3 complete"
 edges:
-  - source: task_1
-    target: task_2
-  - source: task_2
-    target: task_3
+  - from: task_1
+    to: task_2
+  - from: task_2
+    to: task_3

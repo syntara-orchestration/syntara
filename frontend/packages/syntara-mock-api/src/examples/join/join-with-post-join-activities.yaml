@@ -17,8 +17,6 @@ nodes:
         echo "Fetching data A"
         sleep 0.1
         echo '{"source": "A", "count": 10}'
-    outputs:
-      data: $.stdout
 
   - id: fetch_data_b
     type: script
@@ -28,8 +26,6 @@ nodes:
         echo "Fetching data B"
         sleep 0.3
         echo '{"source": "B", "count": 20}'
-    outputs:
-      data: $.stdout
 
   - id: fetch_data_c
     type: script
@@ -39,8 +35,6 @@ nodes:
         echo "Fetching data C"
         sleep 0.1
         echo '{"source": "C", "count": 30}'
-    outputs:
-      data: $.stdout
 
   - id: aggregate_data
     type: converge
@@ -61,8 +55,6 @@ nodes:
         echo "Processing aggregated data from all sources"
         echo "All parallel tasks have completed"
         echo "Total sources: 3"
-    outputs:
-      result: $.stdout
 
   - id: send_notification
     name: Send Completion Notification
@@ -72,8 +64,6 @@ nodes:
       code: |
         echo "Notification: All data fetching and aggregation complete"
         echo "Ready for next stage"
-    outputs:
-      status: $.stdout
 edges:
   - from: trigger_manual
     to: parallel_work

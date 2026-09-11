@@ -6,16 +6,18 @@ description: Demonstrates an approval gate before deploying to production
 triggers:
   - id: trigger_manual
     type: manual_trigger
-
-inputs:
-  environment:
-    type: string
-    description: Target deployment environment
-    default: production
-  version:
-    type: string
-    description: Application version to deploy
-    default: '3.2.0'
+    parameters:
+      input_schema:
+        type: object
+        properties:
+          environment:
+            type: string
+            description: Target deployment environment
+            default: production
+          version:
+            type: string
+            description: Application version to deploy
+            default: 3.2.0
 
 nodes:
   - id: staging_tests
@@ -23,17 +25,13 @@ nodes:
     type: script
     parameters:
       language: bash
+      environment:
+        INPUT_VERSION: ${trigger.version}
       code: |
         echo "Running staging tests for v${INPUT_VERSION}"
         echo "Tests passed: 42"
         echo "Tests failed: 0"
         echo "Coverage: 94.5%"
-    inputs:
-      version: ${trigger.version}
-    outputs:
-      tests_passed: 42
-      tests_failed: 0
-      coverage: 94.5
 
   - id: approval_gate
     name: Production Deployment Approval
@@ -50,12 +48,12 @@ nodes:
     type: script
     parameters:
       language: bash
+      environment:
+        INPUT_VERSION: ${trigger.version}
+        INPUT_ENV: ${trigger.environment}
       code: |
         echo "Deploying v${INPUT_VERSION} to ${INPUT_ENV}"
         echo "Deployment successful!"
-    inputs:
-      version: ${trigger.version}
-      env: ${trigger.environment}
 
   - id: rollback_staging
     name: Rollback Staging
@@ -66,11 +64,11 @@ nodes:
         echo "Approval rejected — rolling back staging environment"
 
 edges:
-  - source: staging_tests
-    target: approval_gate
-  - source: approval_gate
-    target: deploy_to_prod
+  - from: staging_tests
+    to: approval_gate
+  - from: approval_gate
+    to: deploy_to_prod
     port: approved
-  - source: approval_gate
-    target: rollback_staging
+  - from: approval_gate
+    to: rollback_staging
     port: rejected

@@ -23,6 +23,4 @@ nodes:
         echo "Processing data with tags: data-processing, production, critical"
         echo "Owner: data-engineering-team"
         echo '{"status": "success", "processed": 100}'
-    outputs:
-      result: $.stdout
 edges: []

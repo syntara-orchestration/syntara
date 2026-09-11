@@ -23,8 +23,6 @@ nodes:
       language: bash
       code: |
         echo "Outer check passed"
-    outputs:
-      outer_result: $.stdout
 
   - id: inner_check
     name: Inner Check
@@ -34,8 +32,6 @@ nodes:
       language: bash
       code: |
         echo "Inner check passed"
-    outputs:
-      inner_result: $.stdout
 
   - id: final_action
     name: Final Action
