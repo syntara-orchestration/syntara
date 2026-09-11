@@ -4,6 +4,10 @@ Tests that the safe expression evaluator correctly handles boolean literals,
 string/numeric comparisons, and rejects malicious or unsupported expressions.
 """
 
+import importlib
+import json
+from pathlib import Path
+
 import pytest
 
 from syntara.workflows.workflow_engine.expression_resolver import safe_eval_condition
@@ -216,3 +220,21 @@ class TestEdgeCases:
         """The 'is' operator is not in the allowed set."""
         with pytest.raises(ValueError, match="Unsupported comparison operator"):
             safe_eval_condition("True is True")
+
+
+class TestOrphanedExpressionResolverRemoved:
+    """The unused ExpressionResolver / template_resolution path must stay gone."""
+
+    def test_expression_resolver_class_removed(self) -> None:
+        import syntara.workflows.workflow_engine.expression_resolver as mod
+
+        assert not hasattr(mod, "ExpressionResolver")
+
+    def test_template_resolution_module_removed(self) -> None:
+        with pytest.raises(ModuleNotFoundError):
+            importlib.import_module("syntara.workflows.utils.template_resolution")
+
+    def test_orphan_allowlist_does_not_list_deleted_module(self) -> None:
+        allowlist = Path(__file__).resolve().parents[4] / "tools" / "ci" / "known_orphan_modules.json"
+        patterns = json.loads(allowlist.read_text())["patterns"]
+        assert "syntara/workflows/utils/template_resolution.py" not in patterns

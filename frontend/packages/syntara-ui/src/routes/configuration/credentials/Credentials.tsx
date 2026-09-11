@@ -1,12 +1,10 @@
 import { Button, StackItem } from '@patternfly/react-core'
-import { RhUiEditIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import { Th, Thead, Tr } from '@patternfly/react-table'
 import { useCallback, useMemo, useState } from 'react'
 
 import { credentialsClient } from '../../../client'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { FilterBar } from '../../../components/filters/FilterBar'
-import { IconLabel } from '../../../components/IconLabel'
 import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../components/layout/SynPanel'
@@ -14,7 +12,7 @@ import { SynPanelContentStack } from '../../../components/layout/SynPanelContent
 import { SynEmptyStateFilter } from '../../../components/states/SynEmptyStateFilter'
 import { useQueryState } from '../../../components/states/useQueryState'
 import { SynPageTitle } from '../../../components/SynPageTitle'
-import { NxScrollableTableContainer } from '../../../components/table/NxScrollableTableContainer'
+import { SynScrollableTableContainer } from '../../../components/table/SynScrollableTableContainer'
 import { builtinProjectTooltip } from '../../../hooks/permissionUtils'
 import { useCursorPagination, useCursorReset } from '../../../hooks/useCursorPagination'
 import { useDeleteAction } from '../../../hooks/useDeleteAction'
@@ -30,7 +28,7 @@ import { useDocLink } from '../../../utils/docs/useDocLink'
 import type { Credential, CredentialType } from './credentialConstants'
 import { CredentialEmptyState } from './CredentialEmptyState'
 import { getCredentialNameFilterDefinition } from './credentialFilters'
-import { FlatCredentialsTableBody, GroupedCredentialsTableBody, type CredentialRowAction } from './CredentialsTableBody'
+import { FlatCredentialsTableBody, GroupedCredentialsTableBody } from './CredentialsTableBody'
 import { DeleteCredentialDialog } from './DeleteCredentialDialog'
 import { DisableCredentialDialog } from './DisableCredentialDialog'
 import { CredentialFormModal } from './form/CredentialFormModal'
@@ -43,43 +41,6 @@ const SORT_FIELDS: Record<number, string> = {
   0: 'name',
   3: 'created_at',
   4: 'updated_at',
-}
-
-function buildCredentialRowActions(
-  credential: Credential,
-  permissions: ReturnType<typeof useCredentialPermissions>,
-  isBuiltinProject: boolean,
-  callbacks: {
-    onEdit: (credential: Credential) => void
-    onDelete: (credential: Credential) => void
-  }
-): CredentialRowAction[] {
-  const updatePermissionTooltip = permissions.canUpdate ? undefined : { content: permissions.tooltips.update }
-  const noUpdate = isBuiltinProject
-    ? { content: builtinProjectTooltip('edit this credential') }
-    : updatePermissionTooltip
-  const deletePermissionTooltip = permissions.canDelete ? undefined : { content: permissions.tooltips.delete }
-  const noDelete = isBuiltinProject
-    ? { content: builtinProjectTooltip('delete this credential') }
-    : deletePermissionTooltip
-  return [
-    {
-      key: 'edit',
-      title: <IconLabel icon={<RhUiEditIcon />}>Edit credential</IconLabel>,
-      isAriaDisabled: isBuiltinProject || !permissions.canUpdate,
-      tooltipProps: noUpdate,
-      onClick: () => callbacks.onEdit(credential),
-    },
-    { key: 'sep-delete', isSeparator: true },
-    {
-      key: 'delete',
-      title: <IconLabel icon={<RhUiTrashIcon />}>Delete credential</IconLabel>,
-      isDanger: true,
-      isAriaDisabled: isBuiltinProject || !permissions.canDelete,
-      tooltipProps: noDelete,
-      onClick: () => callbacks.onDelete(credential),
-    },
-  ]
 }
 
 type CredentialPageToolbarProps = {
@@ -107,7 +68,7 @@ export default function Credentials() {
   const { selectedProject, isAllProjects, projects, ProjectSelector } = useProjectSelector()
   const projectsForGrouping = useProjectsForGrouping(projects, isAllProjects)
   const projectsById = useMemo(() => new Map(projectsForGrouping.map((p) => [p.id, p])), [projectsForGrouping])
-  const permissions = useCredentialPermissions()
+  const permissions = useCredentialPermissions({ resourceProject: selectedProject?.id })
   const isBuiltinSelected = !!selectedProject?.is_builtin
 
   const {
@@ -163,7 +124,7 @@ export default function Credentials() {
   const typeMap = useMemo(() => {
     const map = new Map<string, CredentialType>()
     for (const t of typesQuery.data?.resources ?? []) {
-      map.set(t.id!, t)
+      if (t.id) map.set(t.id, t)
     }
     return map
   }, [typesQuery.data])
@@ -202,7 +163,11 @@ export default function Credentials() {
   })
 
   const expandableCredentialIds = useMemo(
-    () => credentials.filter((c) => Boolean(c.description?.trim())).map((c) => c.id!),
+    () =>
+      credentials
+        .filter((c) => Boolean(c.description?.trim()))
+        .map((c) => c.id)
+        .filter((id): id is string => id !== undefined),
     [credentials]
   )
 
@@ -248,6 +213,7 @@ export default function Credentials() {
           credentials: [],
         })
       }
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- safe: key was just set via groups.set(projectId, ...) above
       groups.get(projectId)!.credentials.push(credential)
     }
     return groups
@@ -295,6 +261,7 @@ export default function Credentials() {
 
   const handleConfirmDelete = useDeleteAction<Credential, { params: { path: { credential_id: string } } }>({
     deleteFn: (params, callbacks) => deleteCredential(params, callbacks),
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- safe: credentials opened for deletion always have an id (server-assigned); ?? '' would produce an invalid path param
     buildParams: (cred) => ({ params: { path: { credential_id: cred.id! } } }),
     entityLabel: 'credential',
     getItemName: (cred) => cred.name,
@@ -302,20 +269,10 @@ export default function Credentials() {
     onSettled: closeDeleteDialog,
   })
 
-  const permissionToggleTooltip = permissions.canUpdate ? undefined : permissions.tooltips.enable
-  const getToggleDisabledTooltip = (credential: Credential): string | undefined => {
-    const isBuiltinProject = !!selectedProject?.is_builtin || !!projectsById.get(credential.project_id)?.is_builtin
-    if (isBuiltinProject) return builtinProjectTooltip('enable or disable this credential')
-    return permissionToggleTooltip
-  }
-
-  const getRowActions = (credential: Credential) => {
-    const isBuiltinProject = !!selectedProject?.is_builtin || !!projectsById.get(credential.project_id)?.is_builtin
-    return buildCredentialRowActions(credential, permissions, isBuiltinProject, {
-      onEdit: setCredentialToEdit,
-      onDelete: openDeleteDialog,
-    })
-  }
+  const getIsBuiltinProject = useCallback(
+    (credential: Credential) => !!selectedProject?.is_builtin || !!projectsById.get(credential.project_id)?.is_builtin,
+    [selectedProject?.is_builtin, projectsById]
+  )
 
   // Query state handling (loading/error)
   const queryState = useQueryState(query, {
@@ -380,7 +337,7 @@ export default function Credentials() {
                   <SynEmptyStateFilter clearAllFilters={handleClearAllFilters} />
                 </SynPageBody>
               ) : (
-                <NxScrollableTableContainer
+                <SynScrollableTableContainer
                   isExpandable
                   caption="Credentials table"
                   footer={getFooterProps(query.data)}
@@ -413,9 +370,10 @@ export default function Credentials() {
                       typeMap={typeMap}
                       expandedRows={expandedRows}
                       onToggleRow={handleToggleRow}
-                      getRowActions={getRowActions}
+                      onEdit={setCredentialToEdit}
+                      onDelete={openDeleteDialog}
                       onToggleEnabled={handleToggleEnabled}
-                      getToggleDisabledTooltip={getToggleDisabledTooltip}
+                      getIsBuiltinProject={getIsBuiltinProject}
                     />
                   ) : (
                     <FlatCredentialsTableBody
@@ -423,12 +381,13 @@ export default function Credentials() {
                       typeMap={typeMap}
                       expandedRows={expandedRows}
                       onToggleRow={handleToggleRow}
-                      getRowActions={getRowActions}
+                      onEdit={setCredentialToEdit}
+                      onDelete={openDeleteDialog}
                       onToggleEnabled={handleToggleEnabled}
-                      getToggleDisabledTooltip={getToggleDisabledTooltip}
+                      getIsBuiltinProject={getIsBuiltinProject}
                     />
                   )}
-                </NxScrollableTableContainer>
+                </SynScrollableTableContainer>
               )}
             </SynPanelContentStack>
           </SynPanel>

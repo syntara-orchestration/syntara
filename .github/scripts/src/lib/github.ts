@@ -1,6 +1,6 @@
-import { Octokit } from '@octokit/rest';
-import { graphql } from '@octokit/graphql';
-import { z } from 'zod';
+import { Octokit } from '@octokit/rest'
+import { graphql } from '@octokit/graphql'
+import { z } from 'zod'
 import {
   WorkflowRunSchema,
   MergeQueueResponseSchema,
@@ -8,51 +8,45 @@ import {
   type WorkflowRun,
   type MergeQueueEntry,
   type Commit,
-} from './types.js';
+} from './types.js'
 
 /**
  * GitHub API client with type-safe wrappers for merge queue monitoring.
  * Combines REST and GraphQL APIs to query workflow runs, queue state, and commits.
  */
 export class GitHubClient {
-  private readonly octokit: Octokit;
-  private readonly graphqlClient: typeof graphql;
-  private readonly owner: string;
-  private readonly repo: string;
+  private readonly octokit: Octokit
+  private readonly graphqlClient: typeof graphql
+  private readonly owner: string
+  private readonly repo: string
 
   constructor(token: string, repository: string) {
-    this.octokit = new Octokit({ auth: token });
+    this.octokit = new Octokit({ auth: token })
     this.graphqlClient = graphql.defaults({
       headers: { authorization: `token ${token}` },
-    });
+    })
 
-    const [owner, repo] = repository.split('/');
-    this.owner = owner;
-    this.repo = repo;
+    const [owner, repo] = repository.split('/')
+    this.owner = owner
+    this.repo = repo
   }
 
   /**
    * Fetches recent workflow runs created after a specific time.
    * Returns only completed runs, optionally excluding a specific run ID.
    */
-  async getWorkflowRuns(
-    workflowFileName: string,
-    since: Date,
-    excludeRunId?: number
-  ): Promise<WorkflowRun[]> {
+  async getWorkflowRuns(workflowFileName: string, since: Date, excludeRunId?: number): Promise<WorkflowRun[]> {
     const response = await this.octokit.actions.listWorkflowRuns({
       owner: this.owner,
       repo: this.repo,
       workflow_id: workflowFileName,
       per_page: 20,
       created: `>=${since.toISOString()}`,
-    });
+    })
 
-    const runs = z.array(WorkflowRunSchema).parse(response.data.workflow_runs);
+    const runs = z.array(WorkflowRunSchema).parse(response.data.workflow_runs)
 
-    return runs.filter(
-      (run) => run.status === 'completed' && run.id !== excludeRunId
-    );
+    return runs.filter((run) => run.status === 'completed' && run.id !== excludeRunId)
   }
 
   /**
@@ -78,24 +72,27 @@ export class GitHubClient {
           }
         }
       }
-    `;
+    `
 
     const response = await this.graphqlClient<unknown>(query, {
       owner: this.owner,
       repo: this.repo,
       branch,
-    });
+    })
 
-    const parsed = MergeQueueResponseSchema.parse(response);
+    const parsed = MergeQueueResponseSchema.parse(response)
 
-    return parsed.repository.mergeQueue?.entries.nodes ?? [];
+    return parsed.repository.mergeQueue?.entries.nodes ?? []
   }
 
   /**
    * Fetches recently merged PRs to a branch.
    * Uses PR merge time, not commit timestamps, for accurate merge activity detection.
    */
-  async getRecentMerges(branch: string, since: Date): Promise<Array<{ number: number; mergedAt: string; title: string }>> {
+  async getRecentMerges(
+    branch: string,
+    since: Date
+  ): Promise<Array<{ number: number; mergedAt: string; title: string }>> {
     const response = await this.octokit.pulls.list({
       owner: this.owner,
       repo: this.repo,
@@ -104,7 +101,7 @@ export class GitHubClient {
       sort: 'updated',
       direction: 'desc',
       per_page: 30,
-    });
+    })
 
     return response.data
       .filter((pr) => pr.merged_at !== null)
@@ -113,7 +110,7 @@ export class GitHubClient {
         number: pr.number,
         mergedAt: pr.merged_at!,
         title: pr.title,
-      }));
+      }))
   }
 
   /**
@@ -125,14 +122,14 @@ export class GitHubClient {
       repo: this.repo,
       sha: branch,
       per_page: 30,
-    });
+    })
 
-    const allCommits = z.array(CommitSchema).parse(response.data);
+    const allCommits = z.array(CommitSchema).parse(response.data)
 
     return allCommits.filter((commit) => {
-      const committerDate = new Date(commit.commit.committer.date);
-      return committerDate >= since;
-    });
+      const committerDate = new Date(commit.commit.committer.date)
+      return committerDate >= since
+    })
   }
 
   /**
@@ -144,9 +141,9 @@ export class GitHubClient {
       owner: this.owner,
       repo: this.repo,
       run_id: runId,
-    });
+    })
 
-    return response.data.jobs;
+    return response.data.jobs
   }
 
   /**
@@ -157,22 +154,22 @@ export class GitHubClient {
     const response = await this.octokit.repos.get({
       owner: this.owner,
       repo: this.repo,
-    });
+    })
 
-    return response.data.default_branch;
+    return response.data.default_branch
   }
 
   /**
    * Builds a URL to the GitHub merge queue page for a branch.
    */
   getQueueUrl(branch: string): string {
-    return `https://github.com/${this.owner}/${this.repo}/queue/${branch}`;
+    return `https://github.com/${this.owner}/${this.repo}/queue/${branch}`
   }
 
   /**
    * Builds a URL to a specific pull request.
    */
   getPrUrl(prNumber: number): string {
-    return `https://github.com/${this.owner}/${this.repo}/pull/${prNumber}`;
+    return `https://github.com/${this.owner}/${this.repo}/pull/${prNumber}`
   }
 }

@@ -87,56 +87,10 @@ test.describe('Task Agent Structured Output', () => {
 
       // Verify the Create button is no longer attached (panel closed successfully)
       await expect(app.getByRole('button', { name: 'Create' })).not.toBeAttached({ timeout: 15_000 })
-    } finally {
-      if (integration) await deleteLlmIntegration(app, integration.id)
-    }
-  })
-
-  // Skip: ensureLlmCredential fails on real backend in CI — LLM Provider credential creation not supported
-  test.skip('can add Task Agent with schema to workflow', async ({ app }) => {
-    const integrationName = buildUniqueName('e2e-llm-integ')
-    let integration: SeededLlmIntegration | undefined
-    try {
-      integration = await createLlmIntegration(app, integrationName)
-      await app.goto(toAppUrl('/workflow-builder/new'))
-      await addManualTrigger(app)
-
-      // Ensure LLM credential exists (required for AI Agent form submission)
-      const { name: credName } = await ensureLlmCredential(app)
-
-      const layoutButton = app.getByRole('button', { name: 'Layout' })
-      await layoutButton.click()
-
-      const addBtn = app.getByRole('button', { name: 'Add connected step' })
-      await addBtn.click({ force: true })
-
-      const panel = addNodePanel(app)
-      await panel.getByRole('button', { name: 'Task Agent' }).click()
-
-      await app.getByRole('textbox', { name: 'Name', exact: true }).fill('SchemaAgent')
-      await app.getByRole('textbox', { name: 'Prompt', exact: true }).fill('Generate report')
-
-      // Select LLM credential (required by Zod validation)
-      await selectLlmCredential(app, credName)
-
-      const validSchema = JSON.stringify({
-        type: 'object',
-        properties: {
-          task: { type: 'string' },
-          status: { type: 'string' },
-        },
-        required: ['task'],
-      })
-
-      await fillCodeEditor(app, { value: validSchema, label: 'Response schema editor' })
-      await app.getByRole('button', { name: 'Create' }).click()
-
-      // Verify the Create button is no longer attached (panel closed successfully)
-      await expect(app.getByRole('button', { name: 'Create' })).not.toBeAttached({ timeout: 15_000 })
 
       // Verify the agent node appears on canvas
       await expect(
-        app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: 'SchemaAgent' })
+        app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: 'TestAgent' })
       ).toBeVisible()
     } finally {
       if (integration) await deleteLlmIntegration(app, integration.id)

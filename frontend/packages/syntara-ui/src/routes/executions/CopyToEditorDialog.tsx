@@ -27,7 +27,7 @@ export function CopyToEditorDialog({
   onFork,
   isForkLoading = false,
 }: CopyToEditorDialogProps) {
-  // 3-button modal (Replace / Fork / Cancel) — NxConfirmationDialog only supports 2 buttons
+  // 3-button modal (Replace / Fork / Cancel) — SynConfirmationDialog only supports 2 buttons
   return (
     <Modal isOpen={isOpen} onClose={onClose} aria-labelledby="copy-to-editor-title" variant="medium">
       <ModalHeader title="Copy run to editor" labelId="copy-to-editor-title" />

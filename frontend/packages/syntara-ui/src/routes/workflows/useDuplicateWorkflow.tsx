@@ -39,13 +39,13 @@ export function useDuplicateWorkflow({ showAlert, showError, setLocation, onSucc
           params: { path: { workflow_id: workflow.id } },
         })
         if (fetchError || !fullWorkflow) {
-          showError({ title: 'Duplicate failed', description: getErrorMessage(fetchError) })
+          showError({ title: 'Failed to duplicate workflow', description: getErrorMessage(fetchError) })
           return
         }
 
         const definition = fullWorkflow.version?.workflow_definition as Record<string, unknown> | undefined
         if (!definition) {
-          showError({ title: 'Duplicate failed', description: 'Workflow has no definition to duplicate' })
+          showError({ title: 'Failed to duplicate workflow', description: 'Workflow has no definition to duplicate' })
           return
         }
 
@@ -85,7 +85,7 @@ export function useDuplicateWorkflow({ showAlert, showError, setLocation, onSucc
         }
 
         if (!workflow.project_id) {
-          showError({ title: 'Duplicate failed', description: 'Workflow must have a project ID' })
+          showError({ title: 'Failed to duplicate workflow', description: 'Workflow must have a project ID' })
           return
         }
 
@@ -103,7 +103,7 @@ export function useDuplicateWorkflow({ showAlert, showError, setLocation, onSucc
         })
 
         if (createError) {
-          showError({ title: 'Duplicate failed', description: getErrorMessage(createError) })
+          showError({ title: 'Failed to duplicate workflow', description: getErrorMessage(createError) })
           return
         }
 
@@ -120,7 +120,7 @@ export function useDuplicateWorkflow({ showAlert, showError, setLocation, onSucc
         })
         onSuccess()
       } catch (err: unknown) {
-        showError({ title: 'Duplicate failed', description: getErrorMessage(err) })
+        showError({ title: 'Failed to duplicate workflow', description: getErrorMessage(err) })
       } finally {
         setIsDuplicating(false)
       }

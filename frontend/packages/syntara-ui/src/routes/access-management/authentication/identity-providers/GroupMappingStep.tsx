@@ -19,7 +19,7 @@ import { RhUiAddIcon, RhUiErrorIcon, RhUiTrashIcon } from '@patternfly/react-ico
 import React, { useCallback, useEffect, useState } from 'react'
 import { Controller, useFieldArray, useWatch, type Control, type UseFormSetValue } from 'react-hook-form'
 
-import { NxSelect } from '../../../../components/NxSelect'
+import { SynSelect } from '../../../../components/SynSelect'
 import { APP_TITLE } from '../../../../utils/appTitle'
 import { useAllGroups } from '../../../access/useAllGroups'
 
@@ -54,7 +54,7 @@ function MappedGroupSelect({
   const [isOpen, setIsOpen] = useState(false)
   const selectedLabel = mappedGroups.find((g) => g.id === value)?.name ?? value
   return (
-    <NxSelect
+    <SynSelect
       isOpen={isOpen}
       selected={value || undefined}
       onSelect={(_event, val) => {
@@ -86,7 +86,7 @@ function MappedGroupSelect({
           </SelectOption>
         ))}
       </SelectList>
-    </NxSelect>
+    </SynSelect>
   )
 }
 

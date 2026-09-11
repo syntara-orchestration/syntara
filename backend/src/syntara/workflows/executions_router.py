@@ -188,9 +188,7 @@ async def create_execution(
     wf_project_id = wf_result.first()
     resource_project = ""
     if wf_project_id:
-        proj_result = await db.exec(
-            select(Project.name).where(Project.id == wf_project_id, Project.deleted_at.is_(None))  # type: ignore[union-attr]
-        )
+        proj_result = await db.exec(select(Project.name).where(Project.id == wf_project_id))
         resource_project = proj_result.first() or ""
 
     evaluator = get_authz_evaluator(http_request)

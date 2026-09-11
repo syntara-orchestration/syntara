@@ -9,6 +9,7 @@ import { AppRoute } from '../../app/AppRoute'
 import { executionsClient } from '../../client'
 import { SynPage, SynPageBody } from '../../components/layout/SynPage'
 import { SynPageHeader } from '../../components/layout/SynPageHeader'
+import { SynPanelStack, SynPanelStackItem } from '../../components/layout/SynPanelStack'
 import { SynReactFlowViewportGuard } from '../../components/layout/SynReactFlowViewportGuard'
 import { ResizableDivider } from '../../components/ResizableDivider'
 import { SynPageTitle } from '../../components/SynPageTitle'
@@ -18,6 +19,7 @@ import { useAlerts } from '../../providers/alerts'
 import type { FilterConfig } from '../../types/filters'
 import { detachPromise } from '../../utils/detachPromise'
 import { useDocLink } from '../../utils/docs/useDocLink'
+import { canvasNodeIdFromApprovalNodeId } from '../approvals/approvalNodeId'
 import { ExecutionDetailsPanel, type WorkflowDefShape } from '../builder/ExecutionDetailsPanel'
 import { ExecutionViewContent } from '../builder/ExecutionViewContent'
 import { useActivityNameMap } from '../builder/useActivityNameMap'
@@ -209,9 +211,8 @@ function ExecutionDetailContent({
             </FlexItem>
           </Flex>
         )}
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-          {/* Workflow Canvas */}
-          <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+        <SynPanelStack>
+          <SynPanelStackItem isFilled>
             <ExecutionViewContent
               workflow={workflow}
               executionStatus={execution?.status ?? null}
@@ -220,12 +221,11 @@ function ExecutionDetailContent({
               onNodeClick={onNodeClick}
               selectedActivityId={currentApprovalNodeId ?? selectedNodeId}
             />
-          </div>
+          </SynPanelStackItem>
 
           <ResizableDivider onResize={handleResize} currentValue={panelHeightPercent} />
 
-          {/* Execution Details Panel */}
-          <div style={{ height: `${String(panelHeight)}px`, flexShrink: 0, overflow: 'hidden' }}>
+          <SynPanelStackItem style={{ height: `${String(panelHeight)}px` }}>
             <ExecutionDetailsPanel
               executionId={executionId}
               workflowDefinition={workflow?.version.workflow_definition}
@@ -233,8 +233,8 @@ function ExecutionDetailContent({
               selectedNodeName={selectedNodeName}
               onNodeSelect={onNodeSelect}
             />
-          </div>
-        </div>
+          </SynPanelStackItem>
+        </SynPanelStack>
       </FlexItem>
 
       {approvalPanel && <FlexItem className={styles.approvalPanelSlot}>{approvalPanel}</FlexItem>}
@@ -301,7 +301,7 @@ export default function ExecutionDetail() {
 
   const historyCardOpen = useMemo(() => {
     const params = new URLSearchParams(searchParams)
-    return params.get('history') !== 'closed'
+    return params.get('history') === 'open'
   }, [searchParams])
 
   const { executionFilters, handleExecutionFilterChange, executionsQuery, executionPaginationFooterProps } =
@@ -428,7 +428,9 @@ export default function ExecutionDetail() {
             selectedNodeId={selectedNodeId}
             selectedNodeName={selectedNodeName}
             onNodeSelect={selectNode}
-            currentApprovalNodeId={currentApproval?.approval_node_id}
+            currentApprovalNodeId={
+              currentApproval ? canvasNodeIdFromApprovalNodeId(currentApproval.approval_node_id) : undefined
+            }
           />
         </SynPageBody>
       </SynReactFlowViewportGuard>

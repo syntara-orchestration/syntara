@@ -61,8 +61,6 @@ class ExecutionRead:
             labels (ExecutionReadLabels | Unset):
             approval_pending (bool | Unset):  Default: False.
             current_activities (list[CurrentActivity] | Unset): Currently executing activities
-            deleted_at (datetime.datetime | None | Unset):
-            deleted_by (None | Unset | UUID):
             workflow_definition (None | Unset | WorkflowDefinition): Workflow definition from the executed version. Only
                 included when requested via ?include=workflow_definition query parameter.
             activities (list[ActivityData] | None | Unset): List of activities with their current status. Only included when
@@ -95,8 +93,6 @@ class ExecutionRead:
     labels: ExecutionReadLabels | Unset = UNSET
     approval_pending: bool | Unset = False
     current_activities: list[CurrentActivity] | Unset = UNSET
-    deleted_at: datetime.datetime | None | Unset = UNSET
-    deleted_by: None | Unset | UUID = UNSET
     workflow_definition: None | Unset | WorkflowDefinition = UNSET
     activities: list[ActivityData] | None | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
@@ -217,22 +213,6 @@ class ExecutionRead:
                 current_activities_item = current_activities_item_data.to_dict()
                 current_activities.append(current_activities_item)
 
-        deleted_at: None | str | Unset
-        if isinstance(self.deleted_at, Unset):
-            deleted_at = UNSET
-        elif isinstance(self.deleted_at, datetime.datetime):
-            deleted_at = self.deleted_at.isoformat()
-        else:
-            deleted_at = self.deleted_at
-
-        deleted_by: None | str | Unset
-        if isinstance(self.deleted_by, Unset):
-            deleted_by = UNSET
-        elif isinstance(self.deleted_by, UUID):
-            deleted_by = str(self.deleted_by)
-        else:
-            deleted_by = self.deleted_by
-
         workflow_definition: dict[str, Any] | None | Unset
         if isinstance(self.workflow_definition, Unset):
             workflow_definition = UNSET
@@ -298,10 +278,6 @@ class ExecutionRead:
             field_dict["approval_pending"] = approval_pending
         if current_activities is not UNSET:
             field_dict["current_activities"] = current_activities
-        if deleted_at is not UNSET:
-            field_dict["deleted_at"] = deleted_at
-        if deleted_by is not UNSET:
-            field_dict["deleted_by"] = deleted_by
         if workflow_definition is not UNSET:
             field_dict["workflow_definition"] = workflow_definition
         if activities is not UNSET:
@@ -506,40 +482,6 @@ class ExecutionRead:
 
                 current_activities.append(current_activities_item)
 
-        def _parse_deleted_at(data: object) -> datetime.datetime | None | Unset:
-            if data is None:
-                return data
-            if isinstance(data, Unset):
-                return data
-            try:
-                if not isinstance(data, str):
-                    raise TypeError()
-                deleted_at_type_0 = isoparse(data)
-
-                return deleted_at_type_0
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            return cast(datetime.datetime | None | Unset, data)
-
-        deleted_at = _parse_deleted_at(d.pop("deleted_at", UNSET))
-
-        def _parse_deleted_by(data: object) -> None | Unset | UUID:
-            if data is None:
-                return data
-            if isinstance(data, Unset):
-                return data
-            try:
-                if not isinstance(data, str):
-                    raise TypeError()
-                deleted_by_type_0 = UUID(data)
-
-                return deleted_by_type_0
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            return cast(None | Unset | UUID, data)
-
-        deleted_by = _parse_deleted_by(d.pop("deleted_by", UNSET))
-
         def _parse_workflow_definition(data: object) -> None | Unset | WorkflowDefinition:
             if data is None:
                 return data
@@ -606,8 +548,6 @@ class ExecutionRead:
             labels=labels,
             approval_pending=approval_pending,
             current_activities=current_activities,
-            deleted_at=deleted_at,
-            deleted_by=deleted_by,
             workflow_definition=workflow_definition,
             activities=activities,
         )

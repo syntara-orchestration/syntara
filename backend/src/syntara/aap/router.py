@@ -3,11 +3,14 @@
 Thin layer that validates query params, resolves dependencies,
 and delegates to AAPProxyService.
 
-Authentication: Endpoints support optional per-user credential forwarding
-via the ``credential_id`` query parameter. If provided, the specified Syntara
-credential (type: "Ansible Automation Platform") is decrypted and used to
-authenticate against the AAP Controller. If not provided, falls back to
-environment variables (APP_AAP_TOKEN or APP_AAP_USERNAME/PASSWORD).
+Authentication: Endpoints accept optional ``credential_id`` and
+``integration_id`` query parameters. When both are omitted, the proxy uses
+the unique visible enabled AAP integration and its management credential.
+When more than one AAP integration is visible, pass ``integration_id`` to
+select one; ``credential_id`` may still be omitted (management credential is
+used). When ``credential_id`` is provided, the specified Syntara credential
+(type: "Ansible Automation Platform") is decrypted and used instead; callers
+may only use credentials they own.
 
 Authorization: The ``current_user`` dependency ensures only authenticated
 Syntara users can call these endpoints. When using credential_id, users can
@@ -58,6 +61,16 @@ router = APIRouter(prefix="/proxies/aap", tags=["Ansible Automation Platform Pro
 _integration_scope = ProjectScopeFilter("integration", "read")
 
 
+def _credential_used_for_audit(error_type: str | None) -> bool:
+    """Whether an Orchestrator credential was resolved for this proxy request.
+
+    True on success and after decrypt (auth/upstream errors). False when the
+    request failed before decrypt (no/ambiguous integration, missing
+    management credential). Env-var auth is not used on this path.
+    """
+    return error_type != "AAPNotConfiguredError"
+
+
 # ============================================================================
 # Dependency Injection
 # ============================================================================
@@ -104,7 +117,7 @@ async def list_organizations(
                 user_id=current_user.id,
                 username=current_user.username,
                 result_count=result_count,
-                credential_used=query.credential_id is not None,
+                credential_used=_credential_used_for_audit(error_type),
                 search_filter=query.search,
                 error_type=error_type,
                 principal_type=current_user.__dict__.get("__principal_type__"),
@@ -136,7 +149,7 @@ async def list_job_templates(
                 user_id=current_user.id,
                 username=current_user.username,
                 result_count=result_count,
-                credential_used=query.credential_id is not None,
+                credential_used=_credential_used_for_audit(error_type),
                 search_filter=query.search,
                 organization_filter=query.organization,
                 error_type=error_type,
@@ -178,7 +191,7 @@ async def get_job_template(
                 username=current_user.username,
                 resource_id=job_template_id,
                 resource_name=resource_name,
-                credential_used=query.credential_id is not None,
+                credential_used=_credential_used_for_audit(error_type),
                 error_type=error_type,
                 principal_type=current_user.__dict__.get("__principal_type__"),
             )
@@ -211,7 +224,7 @@ async def list_workflow_job_templates(
                 user_id=current_user.id,
                 username=current_user.username,
                 result_count=result_count,
-                credential_used=query.credential_id is not None,
+                credential_used=_credential_used_for_audit(error_type),
                 search_filter=query.search,
                 organization_filter=query.organization,
                 error_type=error_type,
@@ -257,7 +270,7 @@ async def get_workflow_job_template(
                 username=current_user.username,
                 resource_id=workflow_job_template_id,
                 resource_name=resource_name,
-                credential_used=query.credential_id is not None,
+                credential_used=_credential_used_for_audit(error_type),
                 error_type=error_type,
                 principal_type=current_user.__dict__.get("__principal_type__"),
             )
@@ -288,7 +301,7 @@ async def list_inventories(
                 user_id=current_user.id,
                 username=current_user.username,
                 result_count=result_count,
-                credential_used=query.credential_id is not None,
+                credential_used=_credential_used_for_audit(error_type),
                 search_filter=query.search,
                 organization_filter=query.organization,
                 error_type=error_type,
@@ -323,7 +336,7 @@ async def list_execution_environments(
                 user_id=current_user.id,
                 username=current_user.username,
                 result_count=result_count,
-                credential_used=query.credential_id is not None,
+                credential_used=_credential_used_for_audit(error_type),
                 search_filter=query.search,
                 organization_filter=query.organization,
                 error_type=error_type,
@@ -356,7 +369,7 @@ async def list_credentials(
                 user_id=current_user.id,
                 username=current_user.username,
                 result_count=result_count,
-                credential_used=query.credential_id is not None,
+                credential_used=_credential_used_for_audit(error_type),
                 search_filter=query.search,
                 error_type=error_type,
                 principal_type=current_user.__dict__.get("__principal_type__"),
@@ -388,7 +401,7 @@ async def list_instance_groups(
                 user_id=current_user.id,
                 username=current_user.username,
                 result_count=result_count,
-                credential_used=query.credential_id is not None,
+                credential_used=_credential_used_for_audit(error_type),
                 search_filter=query.search,
                 error_type=error_type,
                 principal_type=current_user.__dict__.get("__principal_type__"),
@@ -420,7 +433,7 @@ async def list_labels(
                 user_id=current_user.id,
                 username=current_user.username,
                 result_count=result_count,
-                credential_used=query.credential_id is not None,
+                credential_used=_credential_used_for_audit(error_type),
                 search_filter=query.search,
                 error_type=error_type,
                 principal_type=current_user.__dict__.get("__principal_type__"),

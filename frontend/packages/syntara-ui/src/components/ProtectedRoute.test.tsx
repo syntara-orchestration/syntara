@@ -47,7 +47,7 @@ describe('ProtectedRoute', () => {
     )
 
     expect(screen.queryByText('Protected content')).not.toBeInTheDocument()
-    expect(screen.getByText('Access denied')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Access denied', level: 2 })).toBeInTheDocument()
     expect(screen.getByText(/requires user:create/)).toBeInTheDocument()
   })
 

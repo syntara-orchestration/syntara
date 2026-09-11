@@ -2,7 +2,7 @@ import { FormGroup, MenuToggle, type MenuToggleElement, SelectList, SelectOption
 import { useState, useCallback } from 'react'
 
 import { FormLabelWithHelp } from '../../../../components/FormLabelWithHelp'
-import { NxSelect } from '../../../../components/NxSelect'
+import { SynSelect } from '../../../../components/SynSelect'
 
 import type { ExclusiveGroup } from './credentialFormUtils'
 
@@ -57,7 +57,7 @@ export function AuthMethodSelector({ groups, activeIndex, onChange, helpText }: 
 
   return (
     <FormGroup label={label} fieldId="auth-method" isRequired>
-      <NxSelect
+      <SynSelect
         id="auth-method"
         isOpen={isOpen}
         selected={String(activeIndex)}
@@ -74,7 +74,7 @@ export function AuthMethodSelector({ groups, activeIndex, onChange, helpText }: 
             </SelectOption>
           ))}
         </SelectList>
-      </NxSelect>
+      </SynSelect>
     </FormGroup>
   )
 }

@@ -9,6 +9,7 @@ import { FilterTypeEnum } from '../../types/filters'
 
 import type { FilterBarProps } from './FilterBar'
 import { FilterBar } from './FilterBar'
+import toggleStyles from './filterToggle.module.css'
 
 /**
  * Controlled FilterBar wrapper for testing
@@ -130,6 +131,12 @@ describe('FilterBar', () => {
 
       const toolbar = screen.getByRole('search', { name: 'Filters' })
       expect(toolbar.className).toContain('compact')
+    })
+
+    it('constrains compact field-selector toggles via the filter toggle class', () => {
+      render(<FilterBar {...defaultProps} isCompact />)
+
+      expect(screen.getByRole('button', { name: 'Name' })).toHaveClass(toggleStyles.toggle)
     })
 
     it('does not apply compact class when isCompact is false', () => {

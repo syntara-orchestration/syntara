@@ -46,7 +46,7 @@ const TIME_COMPONENT_PATTERN = /(\d+)([HMS])/g
 
 function parseComponents(pattern: RegExp, str: string): Record<string, number> {
   const result: Record<string, number> = {}
-  let m: RegExpExecArray | null = null
+  let m: RegExpExecArray | null
   while ((m = pattern.exec(str)) !== null) {
     result[m[2]] = Number(m[1])
   }

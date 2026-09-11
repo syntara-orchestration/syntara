@@ -200,7 +200,6 @@ test.describe('Run history panel filtering', { tag: '@pr-check' }, () => {
         name: buildUniqueName('e2e-rh-filter'),
         token,
       })
-      if (!workflow) throw new Error('Could not create test workflow')
       workflowId = workflow.id
     } finally {
       await page.close()
@@ -351,8 +350,10 @@ test.describe('Run history panel filtering', { tag: '@pr-check' }, () => {
     const runIdText = `Run ID: ${truncatedRunId(COMPLETED_ID)}`
     await expect(app.getByText(runIdText)).toBeVisible()
 
-    // Scope metadata assertions to the same list item that contains this Run ID
-    const row = app.getByRole('button', { name: new RegExp(runIdText) })
+    // Overlay row link is a sibling of the metadata; scope via the listitem that owns that link
+    const row = app.getByRole('listitem').filter({
+      has: app.getByRole('link', { name: new RegExp(runIdText) }),
+    })
     await expect(row.getByText(/Elapsed time:/)).toBeVisible()
     await expect(row.getByText(/Version:/)).toBeVisible()
   })

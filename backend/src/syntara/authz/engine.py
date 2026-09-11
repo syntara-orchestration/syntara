@@ -286,7 +286,6 @@ async def _resolve_project_ids(db: AsyncSession, project_names: list[str]) -> li
     projects_result = await db.exec(
         select(Project).where(
             Project.name.in_(project_names),  # type: ignore[attr-defined]
-            Project.deleted_at.is_(None),  # type: ignore[union-attr]
         )
     )
     return [p.id for p in projects_result.all()]
@@ -638,7 +637,6 @@ async def assign_authenticated_group_project_user(
     group_result = await db.exec(
         select(Group).where(
             Group.name == AUTHENTICATED_GROUP_NAME,
-            Group.deleted_at.is_(None),  # type: ignore[union-attr]
         )
     )
     group = group_result.first()

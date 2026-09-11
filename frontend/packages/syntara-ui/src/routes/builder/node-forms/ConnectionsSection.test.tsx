@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { credentialsClient } from '../../../client'
+import { useAllCredentials } from '../components/useAllCredentials'
 
 import { ConnectionsSection } from './ConnectionsSection'
 import type { IntegrationConnection } from './ConnectionsSection'
@@ -15,6 +16,12 @@ vi.mock('../../../client', () => ({
   credentialsClient: { useQuery: vi.fn() },
   authMiddleware: { onRequest: vi.fn(({ request }: { request: unknown }) => request) },
   interfaceTagMiddleware: { onRequest: vi.fn() },
+}))
+
+// CredentialSelector fetches its credential list via this hook (see useAllCredentials.test.tsx
+// for its own pagination coverage) — mocking it keeps these tests synchronous.
+vi.mock('../components/useAllCredentials', () => ({
+  useAllCredentials: vi.fn(),
 }))
 
 vi.mock('../../configuration/credentials/form/CredentialFormModal', () => ({
@@ -76,6 +83,12 @@ const noCredentials = {
 
 beforeEach(() => {
   vi.mocked(credentialsClient.useQuery).mockReturnValue(noCredentials as ReturnType<typeof credentialsClient.useQuery>)
+  vi.mocked(useAllCredentials).mockReturnValue({
+    credentials: [],
+    isLoading: false,
+    error: null,
+    refetch: vi.fn() as unknown as ReturnType<typeof useAllCredentials>['refetch'],
+  })
 })
 
 const NONE: ToolSelection = { strategy: 'NONE' }
@@ -281,11 +294,7 @@ describe('ConnectionsSection', () => {
 
       await user.click(screen.getByRole('button', { name: /set up connection for Primary MCP Server/i }))
 
-      const calls = vi.mocked(credentialsClient.useQuery).mock.calls
-      const credentialCall = calls.find(([method, path]) => method === 'get' && path === '/credentials')
-      expect(credentialCall).toBeDefined()
-      const options = credentialCall![2] as unknown as { params: { query: Record<string, string> } }
-      expect(options.params.query.project_id).toBe('project-42')
+      expect(useAllCredentials).toHaveBeenCalledWith({ projectId: 'project-42' })
     })
   })
 })

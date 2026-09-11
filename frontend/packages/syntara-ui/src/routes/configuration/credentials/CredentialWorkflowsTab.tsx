@@ -5,9 +5,9 @@ import { useCallback, useMemo, useState } from 'react'
 
 import { AppRoute } from '../../../app/AppRoute'
 import { credentialsClient } from '../../../client'
-import { NxLabel } from '../../../components/labels/NxLabel'
+import { SynLabel } from '../../../components/labels/SynLabel'
 import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
-import { NxListPanelTable, NxListPanelView } from '../../../components/panels/list/NxListPanel'
+import { SynListPanelTable, SynListPanelView } from '../../../components/panels/list/SynListPanel'
 import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import { DateCell } from '../../../components/table/DateCell'
 import { LinkCell } from '../../../components/table/LinkCell'
@@ -99,9 +99,9 @@ function WorkflowsTable({
                 {workflow.node_names && workflow.node_names.length > 0 ? (
                   <LabelGroup numLabels={5}>
                     {workflow.node_names.map((nodeName) => (
-                      <NxLabel key={nodeName} variant="outline">
+                      <SynLabel key={nodeName} variant="outline">
                         {nodeName}
-                      </NxLabel>
+                      </SynLabel>
                     ))}
                   </LabelGroup>
                 ) : (
@@ -152,7 +152,7 @@ export function CredentialWorkflowsTab({ credentialId }: Readonly<CredentialWork
 
   return (
     <SynPanelContentStack>
-      <NxListPanelView
+      <SynListPanelView
         isPending={query.isPending}
         error={query.error}
         onRetry={() => detachPromise(query.refetch())}
@@ -162,12 +162,12 @@ export function CredentialWorkflowsTab({ credentialId }: Readonly<CredentialWork
         onClearAllFilters={noop}
         noDataState={
           <SynEmptyStateNoData
-            title="No workflows using this credential"
+            title="No workflows yet"
             description="This credential is not currently referenced by any workflows. Workflows will appear here once they are configured to use this credential."
           />
         }
         body={
-          <NxListPanelTable
+          <SynListPanelTable
             caption="Workflows using this credential"
             isExpandable
             footer={{
@@ -187,7 +187,7 @@ export function CredentialWorkflowsTab({ credentialId }: Readonly<CredentialWork
               onToggleRow={handleToggleRow}
               onCollapseAll={handleCollapseAll}
             />
-          </NxListPanelTable>
+          </SynListPanelTable>
         }
       />
     </SynPanelContentStack>

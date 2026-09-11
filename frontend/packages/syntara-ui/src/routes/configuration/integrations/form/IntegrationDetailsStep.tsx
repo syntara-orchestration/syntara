@@ -21,7 +21,7 @@ import { IntegrationTypeEnum } from '@syntara/contracts'
 import { type ReactElement, type ReactNode, type Ref, useCallback, useState } from 'react'
 import { Controller, useWatch, type Control, type UseFormSetValue } from 'react-hook-form'
 
-import { NxSelect } from '../../../../components/NxSelect'
+import { SynSelect } from '../../../../components/SynSelect'
 import { integrationHelp } from '../integrationFieldHelp'
 import { PROVIDERS_HIDING_BASE_URL, PROVIDERS_REQUIRING_BASE_URL } from '../integrationFilters'
 
@@ -131,7 +131,7 @@ function IntegrationTypeSelect({
   renderToggle: (toggleRef: Ref<MenuToggleElement>) => ReactNode
 }>) {
   return (
-    <NxSelect
+    <SynSelect
       id="integration-type"
       isOpen={isOpen}
       selected={value}
@@ -149,7 +149,7 @@ function IntegrationTypeSelect({
           </SelectOption>
         ))}
       </SelectList>
-    </NxSelect>
+    </SynSelect>
   )
 }
 
@@ -167,7 +167,7 @@ function ProviderHintSelect({
   renderToggle: (toggleRef: Ref<MenuToggleElement>) => ReactNode
 }>) {
   return (
-    <NxSelect
+    <SynSelect
       id="provider-hint"
       isOpen={isOpen}
       selected={value}
@@ -185,7 +185,7 @@ function ProviderHintSelect({
           </SelectOption>
         ))}
       </SelectList>
-    </NxSelect>
+    </SynSelect>
   )
 }
 

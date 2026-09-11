@@ -48,6 +48,25 @@ class LLMProviderBase(ABC):
         """Build the full models listing URL. Override for custom paths."""
         return f"{base_url.rstrip('/')}{self.models_endpoint}"
 
+    @property
+    def credential_confirmation_path(self) -> str | None:
+        """Auth-gated path used to prove the API key after a catalog 200.
+
+        ``GET {base_url}{path}`` must return 401/403 for a rejected key.
+        ``None`` means the models listing is already the credential check
+        (Anthropic, Gemini). Used by ``validate()`` only. A 404/405/501 on
+        this path is treated as "endpoint absent" and the models listing
+        result is trusted.
+        """
+        return None
+
+    def build_credential_confirmation_url(self, base_url: str) -> str | None:
+        """Build the credential-confirmation URL, or None if the provider has no probe."""
+        path = self.credential_confirmation_path
+        if not path:
+            return None
+        return f"{base_url.rstrip('/')}{path}"
+
     def next_page_params(self, json_data: dict[str, Any]) -> dict[str, str] | None:  # noqa: ARG002
         """Return query params for the next page, or None if done. Default: single-page."""
         return None

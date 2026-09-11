@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { FormProvider, useForm } from 'react-hook-form'
+import { FormProvider, useForm, type FieldErrors } from 'react-hook-form'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
@@ -16,6 +16,7 @@ import {
 } from './GroupMappingComponents'
 import type { MappingTableProps } from './GroupMappingComponents'
 import { groupMappingEditFormSchema } from './groupMappingEditFormSchema'
+import type { GroupMappingEditFormValues } from './groupMappingEditFormSchema'
 import type { GroupMappingEntry, MappedGroup } from './groupMappingUtils'
 
 const mockMappedGroups: MappedGroup[] = [
@@ -67,6 +68,20 @@ describe('EmptyMappingState', () => {
     expect(screen.getByRole('heading', { name: /no group mappings configured/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /discover groups/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /add manually/i })).not.toBeInTheDocument()
+  })
+
+  it('shows only Discover groups when onAddManually is omitted', () => {
+    render(<EmptyMappingState onTestSignIn={vi.fn()} />)
+
+    expect(screen.getByRole('button', { name: /discover groups/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /add manually/i })).not.toBeInTheDocument()
+  })
+
+  it('shows only Add manually when onTestSignIn is omitted', () => {
+    render(<EmptyMappingState onAddManually={vi.fn()} />)
+
+    expect(screen.queryByRole('button', { name: /discover groups/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /add manually/i })).toBeInTheDocument()
   })
 
   it('has no accessibility violations', async () => {
@@ -362,6 +377,56 @@ describe('MappingTable', () => {
     const results = await axe(container)
     expect(results).toHaveNoViolations()
   })
+
+  it('evaluates entryErrors on read-only rows without crashing', () => {
+    const entryErrors: FieldErrors<GroupMappingEditFormValues>['entries'] = [
+      {
+        idpGroupValue: { type: 'required', message: 'IdP group value is required' },
+        mappedGroupId: { type: 'required', message: 'Select a group' },
+      },
+      undefined,
+    ]
+
+    render(<MappingTable {...defaultProps} rows={mockRows} isReadOnly showValidation entryErrors={entryErrors} />)
+
+    expect(screen.getByText('idp-admin')).toBeInTheDocument()
+  })
+
+  it('ignores invalid entryErrors shapes without crashing', () => {
+    render(
+      <MappingTable
+        {...defaultProps}
+        rows={[{ rowId: 'k1', index: 0, idpGroupValue: 'idp-admin', mappedGroupId: 'g1' }]}
+        isReadOnly
+        showValidation
+        // @ts-expect-error defensive runtime guard when form state is malformed
+        entryErrors="not-an-array"
+      />
+    )
+
+    expect(screen.getByText('idp-admin')).toBeInTheDocument()
+  })
+
+  it('ignores entry field errors with non-string messages', () => {
+    const entryErrors: FieldErrors<GroupMappingEditFormValues>['entries'] = [
+      {
+        idpGroupValue: { type: 'custom', message: 'IdP group value is required' },
+        mappedGroupId: { type: 'required' },
+      },
+    ]
+
+    render(
+      <MappingTable
+        {...defaultProps}
+        rows={[{ rowId: 'k1', index: 0, idpGroupValue: 'idp-admin', mappedGroupId: 'g1' }]}
+        isReadOnly
+        showValidation
+        entryErrors={entryErrors}
+      />
+    )
+
+    expect(screen.getByText('idp-admin')).toBeInTheDocument()
+  })
 })
 
 describe('ReadOnlyView', () => {
@@ -464,6 +529,27 @@ describe('ReadOnlyView', () => {
     await waitFor(() => {
       expect(screen.queryByText('idp-row-0')).not.toBeInTheDocument()
       expect(screen.getByText('idp-row-20')).toBeInTheDocument()
+    })
+  })
+
+  it('returns to the previous page from client-side pagination', async () => {
+    const user = userEvent.setup()
+    const manyEntries: GroupMappingEntry[] = Array.from({ length: 21 }, (_, i) => ({
+      key: `km${i}`,
+      idpGroupValue: `idp-row-${i}`,
+      mappedGroupId: 'g1',
+    }))
+
+    render(<ReadOnlyView {...readOnlyDefaults} entries={manyEntries} />)
+
+    await user.click(screen.getByRole('button', { name: 'Go to next page' }))
+    await waitFor(() => {
+      expect(screen.getByText('idp-row-20')).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Go to previous page' }))
+    await waitFor(() => {
+      expect(screen.getByText('idp-row-0')).toBeInTheDocument()
     })
   })
 })

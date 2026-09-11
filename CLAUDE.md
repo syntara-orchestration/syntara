@@ -125,32 +125,13 @@ uv run podman-compose up -d database redis temporal  # Just infrastructure
 
 Konflux (the Red Hat CI pipeline) runs E2E tests in a restricted environment that differs from local and GitHub CI in several important ways. When E2E tests fail only in Konflux, apply the appropriate skip pattern rather than modifying the test logic.
 
+For a known flaky test that needs temporary quarantine from the pipeline, see
+[the test quarantine workflow](docs/ci/test-quarantine.md).
+
 **Key Konflux constraints:**
 - Does **not** set `CI=true` — guards like `test.skip(!!process.env.CI, ...)` have no effect.
 - The Temporal worker runs in a separate network namespace; it may not reach external URLs (e.g. httpbin.org) even when the test runner can.
 - Cluster load causes 30-second timeouts and transient 502 Bad Gateway responses.
-
-#### Playwright E2E skip pattern (`frontend/packages/syntara-ui/e2e/`)
-
-Add `{ tag: ['@konflux-skip'] }` to any test that reliably fails in Konflux but passes locally:
-
-```typescript
-test('my test', { tag: ['@konflux-skip'] }, async ({ app }) => { ... })
-
-// For long signatures, Prettier wraps to multi-line:
-test(
-  'my long test name',
-  { tag: ['@konflux-skip'] },
-  async ({ app }) => { ... }
-)
-```
-
-Konflux excludes these tests via `--grep-invert @konflux-skip`. They still run locally and in GitHub CI. After adding the tag, run `npx --prefix frontend prettier --write <file>` to keep formatting clean.
-
-**Common reasons to apply `@konflux-skip`:**
-- Test requires the Temporal worker to reach an external URL (httpbin, webhooks, LLM APIs)
-- Test creates real workflow executions and waits for Temporal to complete them (approval flows, multi-step runs) — Temporal under Konflux load frequently times out
-- Test has a >25s wall-clock time; Konflux runner load pushes it over the timeout
 
 #### Backend pytest skip patterns (`backend/tests/e2e/`)
 

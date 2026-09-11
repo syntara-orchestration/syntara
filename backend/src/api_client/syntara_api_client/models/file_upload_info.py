@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 from uuid import UUID
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
 from ..models.file_status import FileStatus
+from ..types import UNSET, Unset
 
 T = TypeVar("T", bound="FileUploadInfo")
 
@@ -32,6 +33,8 @@ class FileUploadInfo:
                     CONVERTING: Conversion in progress
                     CONVERTED: Successfully converted to text/markdown
                     CONVERSION_FAILED: Conversion failed with error
+            is_project_deleted (bool | None | Unset): True when the owning project has been soft-deleted; the file is
+                retained as an orphan. Null when not computed (e.g. upload response).
     """
 
     file_id: UUID
@@ -39,6 +42,7 @@ class FileUploadInfo:
     size_bytes: int
     mime_type: str
     status: FileStatus
+    is_project_deleted: bool | None | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -52,6 +56,12 @@ class FileUploadInfo:
 
         status = self.status.value
 
+        is_project_deleted: bool | None | Unset
+        if isinstance(self.is_project_deleted, Unset):
+            is_project_deleted = UNSET
+        else:
+            is_project_deleted = self.is_project_deleted
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -63,6 +73,8 @@ class FileUploadInfo:
                 "status": status,
             }
         )
+        if is_project_deleted is not UNSET:
+            field_dict["is_project_deleted"] = is_project_deleted
 
         return field_dict
 
@@ -79,12 +91,22 @@ class FileUploadInfo:
 
         status = FileStatus(d.pop("status"))
 
+        def _parse_is_project_deleted(data: object) -> bool | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(bool | None | Unset, data)
+
+        is_project_deleted = _parse_is_project_deleted(d.pop("is_project_deleted", UNSET))
+
         file_upload_info = cls(
             file_id=file_id,
             filename=filename,
             size_bytes=size_bytes,
             mime_type=mime_type,
             status=status,
+            is_project_deleted=is_project_deleted,
         )
 
         file_upload_info.additional_properties = d

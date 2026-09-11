@@ -28,6 +28,10 @@ MAX_ENV_VAR_LENGTH = _settings.max_env_var_length
 # executor nodes use _get_default_timeout() for type-appropriate defaults.
 DEFAULT_ACTIVITY_TIMEOUT_SECONDS = 30
 
+# Timeout for the Agent Execution builtin workflow node.  Used by
+# seed_builtin.py and as the cancel-key TTL in invocation_service.py.
+AGENT_EXECUTION_TIMEOUT_SECONDS = 3600
+
 # Key injected by the engine into each activity's input config so the activity
 # can use the already-resolved timeout without re-querying the catalog.
 # Must be popped by agentic_activity before forwarding config to the orchestrator.

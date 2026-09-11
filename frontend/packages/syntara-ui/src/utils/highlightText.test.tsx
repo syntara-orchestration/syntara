@@ -54,8 +54,9 @@ describe('highlightText', () => {
     render(<>{result}</>)
 
     const mark = screen.getByText('World', { selector: 'mark' })
-    expect(mark).toHaveStyle({ backgroundColor: 'var(--pf-t--global--color--nonstatus--orange--300)' })
-    // Verify color: inherit is in the inline style (not the computed style)
+    // Assert on the literal inline style rather than toHaveStyle(): getComputedStyle can't resolve
+    // var() (happy-dom does not perform real CSS cascade), so it isn't a meaningful check.
+    expect(mark.style.backgroundColor).toBe('var(--pf-t--global--color--nonstatus--orange--300)')
     expect(mark.getAttribute('style')).toContain('color: inherit')
   })
 })

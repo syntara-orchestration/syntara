@@ -73,7 +73,7 @@ function reportSaveError(
 ): void {
   const findings = extractValidationErrorsFromUnknown(error)
   showError({
-    title: `${action.charAt(0).toUpperCase()}${action.slice(1)} failed`,
+    title: `Failed to ${action} workflow`,
     description: formatSaveFailureDescription(error, action),
   })
   if (findings && findings.length > 0) {
@@ -320,7 +320,7 @@ export function useBuilderSaveWorkflow(
       const effectiveExpectedVersion = options?.expectedVersionOverride ?? expectedVersion
       const willPatchExisting = Boolean(workflowId && !isNew)
       if (!currentWorkflow) {
-        showError({ title: 'Save failed', description: 'No workflow to save' })
+        showError({ title: 'Failed to save workflow', description: 'No workflow to save' })
         return false
       }
       if (!willPatchExisting && !selectedProject?.id) {
@@ -340,12 +340,13 @@ export function useBuilderSaveWorkflow(
         nameToSave,
         workflowDescription,
         workflowDef,
-        selectedProjectId: selectedProject!.id,
+        selectedProjectId: selectedProject?.id ?? '',
         expectedVersion: effectiveExpectedVersion,
       })
 
       const saveResult = willPatchExisting
-        ? await promisifyUpdate(updateWorkflow, workflowId!, patchPayload)
+        ? // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- safe: willPatchExisting = Boolean(workflowId && !isNew) ensures workflowId is non-null when this branch executes
+          await promisifyUpdate(updateWorkflow, workflowId!, patchPayload)
         : await promisifyCreate(createWorkflow, createPayload)
 
       // Check for version conflict

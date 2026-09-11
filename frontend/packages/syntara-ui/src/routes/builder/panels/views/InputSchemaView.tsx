@@ -2,11 +2,11 @@ import { Button, Label, TreeView, type TreeViewDataItem } from '@patternfly/reac
 import { RhUiExternalLinkIcon } from '@patternfly/react-icons'
 import { useCallback, useMemo } from 'react'
 
-import { buildExpression } from '../../../../utils/expressions/templateBuilder'
+import { buildExpression, canvasNodeIdForExpression } from '../../../../utils/expressions/templateBuilder'
 import { highlightText } from '../../../../utils/highlightText'
 import { CopyExpressionAction, DraggableTreeLeaf } from '../components/DraggableTreeLeaf'
 import { DRAG_TYPE_FIELD, type FieldDragData } from '../utils/dragTypes'
-import { formatLeafValue, isExpandable, isUrlValue } from '../utils/treeHelpers'
+import { formatLeafValue, isExpandable, isUrlValue, toTreeItemId } from '../utils/treeHelpers'
 import { getTypeLabelFromValue } from '../utils/typeLabels'
 
 export type InputSchemaViewProps = {
@@ -27,7 +27,7 @@ function buildTreeData(
 
     if (isExpandable(value)) {
       return {
-        id: currentPath.join('.'),
+        id: toTreeItemId([nodeId, ...currentPath]),
         name: (
           <Label isCompact color="grey">
             {typeLabel} {searchTerm ? highlightText(key, searchTerm) : key}
@@ -47,7 +47,7 @@ function buildTreeData(
     const expression = isIterationResultKey ? `\${${key}}` : buildExpression({ nodeId, fieldPath: currentPath })
 
     return {
-      id: pathKey,
+      id: toTreeItemId([nodeId, ...currentPath]),
       name: (
         <LeafNode
           fieldKey={key}
@@ -121,10 +121,11 @@ function LeafNode({ fieldKey, value, typeLabel, nodeId, pathKey, searchTerm }: R
 }
 
 export function InputSchemaView({ data, nodeId, searchTerm }: Readonly<InputSchemaViewProps>) {
+  const expressionNodeId = canvasNodeIdForExpression(nodeId)
   const treeData = useMemo(() => {
     if (!data) return []
-    return buildTreeData(data, nodeId, [], searchTerm)
-  }, [data, nodeId, searchTerm])
+    return buildTreeData(data, expressionNodeId, [], searchTerm)
+  }, [data, expressionNodeId, searchTerm])
 
   if (!data || treeData.length === 0) {
     return null

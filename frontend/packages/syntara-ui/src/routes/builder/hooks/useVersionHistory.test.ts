@@ -445,7 +445,7 @@ describe('useVersionHistory', () => {
       })
 
       expect(mockRefetch).toHaveBeenCalled()
-      expect(mockShowSuccess).toHaveBeenCalledWith({ title: 'Version published successfully' })
+      expect(mockShowSuccess).toHaveBeenCalledWith({ title: 'Version published' })
     })
 
     it('calls onVersionUpdated when publish response includes current_version', () => {
@@ -509,7 +509,7 @@ describe('useVersionHistory', () => {
         result.current.publishVersion(2)
       })
 
-      expect(mockShowSuccess).toHaveBeenCalledWith({ title: 'Version published successfully' })
+      expect(mockShowSuccess).toHaveBeenCalledWith({ title: 'Version published' })
     })
 
     it('shows error alert on publish failure', () => {

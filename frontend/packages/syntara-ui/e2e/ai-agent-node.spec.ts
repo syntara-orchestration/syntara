@@ -1,5 +1,4 @@
-import { type Page } from '@playwright/test'
-
+import { type Page } from './fixtures'
 import { test, expect } from './fixtures'
 import { type SeededLlmIntegration, createLlmIntegration, deleteLlmIntegration } from './helpers/llm-helpers'
 import { ensureLlmCredential, selectLlmCredential } from './helpers/v2-nodes'
@@ -177,7 +176,7 @@ test.describe('AI Agent Node @pr-check', () => {
         token: token ?? undefined,
         discoveredTools: [{ name: 'e2e_search_tool', enabled: true }],
       })
-      expect(mcpIntegration).not.toBeNull()
+      expect(mcpIntegration, 'Failed to create MCP integration via API').toBeTruthy()
 
       const { name: credName } = await ensureLlmCredential(app)
 
@@ -391,6 +390,7 @@ test.describe('AI Agent Node @pr-check', () => {
         token: token ?? undefined,
         discoveredTools: [{ name: 'e2e_tool', enabled: true }],
       })
+      expect(mcpIntegration, 'Failed to create MCP integration via API').toBeTruthy()
 
       // Open workflow builder and add an Agent node
       await startWorkflowWithTrigger(app)

@@ -42,7 +42,7 @@ nodes:
           exit 0
         fi
     inputs:
-      seed: ${input.seed}
+      seed: ${trigger.seed}
     retry_policy:
       maxAttempts: 5
       backoff: exponential

@@ -320,7 +320,7 @@ function AppLoginForm() {
   // State A: No IDPs — show original login form
   if (!hasProviders) {
     return (
-      <Login header={header}>
+      <Login header={header} className={styles.login}>
         <LoginMainHeader title={`Log in to ${brand.appTitle}`} subtitle="Enter your credentials to continue" />
         <LoginMainBody>
           {sessionExpiredAlert}
@@ -332,7 +332,7 @@ function AppLoginForm() {
 
   // State B/C: IDPs exist
   return (
-    <Login header={header}>
+    <Login header={header} className={styles.login}>
       <LoginMainHeader
         title={`Log in to ${brand.appTitle}`}
         subtitle={`Select your identity provider to access ${brand.appTitle}. Contact your administrator if you need assistance.`}

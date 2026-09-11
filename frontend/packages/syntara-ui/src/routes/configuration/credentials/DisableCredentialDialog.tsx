@@ -1,7 +1,7 @@
 import { Content, ContentVariants, Spinner, Stack, StackItem } from '@patternfly/react-core'
 import type { IntegrationsAPI } from '@syntara/contracts'
 
-import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 
 import { CredentialAffectedResourcesWarnings } from './CredentialAffectedResourcesWarnings'
 import type { Credential, CredentialWorkflowRef } from './credentialConstants'
@@ -41,7 +41,7 @@ export function DisableCredentialDialog({
     affectedWorkflows.length > 0 || affectedIntegrations.length > 0 || workflowsFetchError || integrationsFetchError
 
   return (
-    <NxConfirmationDialog
+    <SynConfirmationDialog
       isOpen
       onClose={onClose}
       onConfirm={onConfirm}
@@ -79,6 +79,6 @@ export function DisableCredentialDialog({
           )}
         </Stack>
       )}
-    </NxConfirmationDialog>
+    </SynConfirmationDialog>
   )
 }

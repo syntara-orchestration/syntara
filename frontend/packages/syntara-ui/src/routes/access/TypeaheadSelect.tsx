@@ -13,7 +13,7 @@ import {
 import { RhUiCloseIcon } from '@patternfly/react-icons'
 import { type Ref, useCallback, useMemo, useRef, useState } from 'react'
 
-import { NxSelect } from '../../components/NxSelect'
+import { SynSelect } from '../../components/SynSelect'
 
 export type TypeaheadOptionTag = {
   label: string
@@ -193,7 +193,7 @@ export function TypeaheadSelect({
   )
 
   return (
-    <NxSelect
+    <SynSelect
       id={id}
       aria-label={ariaLabel}
       isOpen={isOpen}
@@ -205,6 +205,6 @@ export function TypeaheadSelect({
       <SelectList style={{ maxHeight: '200px', overflow: 'auto' }}>
         {renderOptions(filteredOptions, filterValue, selected, hasMore, isLoading)}
       </SelectList>
-    </NxSelect>
+    </SynSelect>
   )
 }

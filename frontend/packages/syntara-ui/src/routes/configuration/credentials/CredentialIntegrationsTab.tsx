@@ -6,7 +6,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { AppRoute } from '../../../app/AppRoute'
 import { integrationsClient } from '../../../client'
 import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
-import { NxListPanelTable, NxListPanelView } from '../../../components/panels/list/NxListPanel'
+import { SynListPanelTable, SynListPanelView } from '../../../components/panels/list/SynListPanel'
 import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import { LinkCell } from '../../../components/table/LinkCell'
 import { UserTimestamp } from '../../../components/table/UserTimestamp'
@@ -137,7 +137,7 @@ export function CredentialIntegrationsTab({ credentialId }: Readonly<CredentialI
 
   return (
     <SynPanelContentStack>
-      <NxListPanelView
+      <SynListPanelView
         isPending={query.isPending}
         error={query.error}
         onRetry={() => detachPromise(query.refetch())}
@@ -147,12 +147,12 @@ export function CredentialIntegrationsTab({ credentialId }: Readonly<CredentialI
         onClearAllFilters={noop}
         noDataState={
           <SynEmptyStateNoData
-            title="No integrations using this credential"
+            title="No integrations yet"
             description="This credential is not currently referenced by any integrations. Integrations will appear here once they are configured to use this credential."
           />
         }
         body={
-          <NxListPanelTable
+          <SynListPanelTable
             caption="Integrations using this credential"
             isExpandable
             footer={{
@@ -172,7 +172,7 @@ export function CredentialIntegrationsTab({ credentialId }: Readonly<CredentialI
               onToggleRow={handleToggleRow}
               onCollapseAll={handleCollapseAll}
             />
-          </NxListPanelTable>
+          </SynListPanelTable>
         }
       />
     </SynPanelContentStack>

@@ -11,7 +11,7 @@ import {
 import { RhUiCloseIcon } from '@patternfly/react-icons'
 import { type Ref, useEffect, useRef, useState } from 'react'
 
-import { NxSelect } from '../../../components/NxSelect'
+import { SynSelect } from '../../../components/SynSelect'
 
 const DEBOUNCE_MS = 300
 
@@ -130,7 +130,7 @@ export function AAPTypeaheadSelect({
   }
 
   return (
-    <NxSelect
+    <SynSelect
       id={id}
       aria-label={ariaLabel}
       isOpen={isOpen}
@@ -155,6 +155,6 @@ export function AAPTypeaheadSelect({
           ))
         )}
       </SelectList>
-    </NxSelect>
+    </SynSelect>
   )
 }

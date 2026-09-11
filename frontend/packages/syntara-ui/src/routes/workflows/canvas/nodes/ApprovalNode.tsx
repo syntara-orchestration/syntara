@@ -2,7 +2,7 @@ import { Flex, FlexItem } from '@patternfly/react-core'
 import { ActivityTypeEnum, type ApprovalActivity as ApprovalNodeType } from '@syntara/contracts'
 import { type Node, type NodeProps } from '@xyflow/react'
 
-import { NxDetailList } from '../../../../components/details/NxDetailList'
+import { SynDetailList } from '../../../../components/details/SynDetailList'
 import type { ActivityStatus } from '../../execution/types'
 import { getNodeTypeColor } from '../nodeTypeColors'
 import { semanticZoomActivityTitle } from '../semanticZoom'
@@ -77,7 +77,7 @@ export function ApprovalNodeComponent(props: NodeProps<ApprovalNode>) {
           <FlexItem grow={{ default: 'grow' }} style={{ minWidth: 0 }}>
             <NodeBody>
               {approvalConfig.approver_timeout != null && (
-                <NxDetailList>{renderText('Timeout', `${approvalConfig.approver_timeout}s`)}</NxDetailList>
+                <SynDetailList>{renderText('Timeout', `${approvalConfig.approver_timeout}s`)}</SynDetailList>
               )}
             </NodeBody>
           </FlexItem>

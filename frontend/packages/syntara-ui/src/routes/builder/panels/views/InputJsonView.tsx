@@ -1,4 +1,4 @@
-import { NxCodeBlock } from '../../../../components/details/NxCodeBlock'
+import { SynCodeBlock } from '../../../../components/details/SynCodeBlock'
 
 export type InputJsonViewProps = {
   data: Record<string, unknown> | null
@@ -11,7 +11,7 @@ export function InputJsonView({ data }: Readonly<InputJsonViewProps>) {
 
   return (
     <section aria-label="JSON input">
-      <NxCodeBlock jsonObject={data} enableCopy enableExpand expandTitle="Input JSON" noMaxHeight />
+      <SynCodeBlock jsonObject={data} enableCopy enableExpand expandTitle="Input JSON" noMaxHeight />
     </section>
   )
 }

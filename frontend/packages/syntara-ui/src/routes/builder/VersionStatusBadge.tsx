@@ -1,4 +1,4 @@
-import { NxLabel } from '../../components/labels/NxLabel'
+import { SynLabel } from '../../components/labels/SynLabel'
 
 import type { VersionStatus } from './hooks/useVersionHistory'
 export type { VersionStatus }
@@ -12,5 +12,5 @@ const statusConfig: Record<VersionStatus, { label: string; color: 'grey' | 'gree
 export function VersionStatusBadge({ status }: Readonly<{ status: VersionStatus }>) {
   if (status === 'draft') return null
   const { label, color } = statusConfig[status]
-  return <NxLabel color={color}>{label}</NxLabel>
+  return <SynLabel color={color}>{label}</SynLabel>
 }

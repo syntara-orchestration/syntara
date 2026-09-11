@@ -1,7 +1,7 @@
 import { SearchInput, Stack, StackItem } from '@patternfly/react-core'
 import { useMemo, useState } from 'react'
 
-import { NxCodeBlock } from '../../../../components/details/NxCodeBlock'
+import { SynCodeBlock } from '../../../../components/details/SynCodeBlock'
 
 export type OutputJsonViewProps = {
   data: Record<string, unknown> | null
@@ -34,9 +34,9 @@ export function OutputJsonView({ data }: Readonly<OutputJsonViewProps>) {
         />
       </StackItem>
       <StackItem isFilled>
-        <NxCodeBlock enableCopy enableExpand expandTitle="Output JSON" noMaxHeight copyContent={fullJson}>
+        <SynCodeBlock enableCopy enableExpand expandTitle="Output JSON" noMaxHeight copyContent={fullJson}>
           {filteredContent ?? fullJson}
-        </NxCodeBlock>
+        </SynCodeBlock>
       </StackItem>
     </Stack>
   )

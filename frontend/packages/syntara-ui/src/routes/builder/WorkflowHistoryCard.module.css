@@ -5,6 +5,11 @@
 
 .historyRowStack {
   gap: var(--pf-t--global--spacer--sm);
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+  padding-block: var(--pf-t--global--spacer--md);
+  padding-inline: var(--pf-t--global--spacer--md);
 }
 
 .historyMetaStack {
@@ -40,10 +45,25 @@
   position: relative;
 }
 
+.historyRowOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+}
+
+.historyRowRaised {
+  pointer-events: auto;
+  position: relative;
+  z-index: 2;
+}
+
 .historyRowKebab {
   position: absolute;
   top: var(--pf-t--global--spacer--md);
   right: var(--pf-t--global--spacer--md);
+  z-index: 2;
+  pointer-events: auto;
 }
 
 .simpleList {

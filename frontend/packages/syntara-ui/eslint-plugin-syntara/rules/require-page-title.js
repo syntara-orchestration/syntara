@@ -25,9 +25,12 @@ export default {
       ExportDefaultDeclaration() {
         hasDefaultExport = true
       },
-      'Program:exit'() {
+      'Program:exit'(node) {
         if (hasDefaultExport && !hasTitleElement) {
-          context.report({ node: context.sourceCode.ast, messageId: 'missingTitle' })
+          // Report on the first statement (not Program) so file-level
+          // /* eslint-disable */ directives still apply after ESLint 10's
+          // Program.range spans the entire source text.
+          context.report({ node: node.body[0] ?? node, messageId: 'missingTitle' })
         }
       },
     }

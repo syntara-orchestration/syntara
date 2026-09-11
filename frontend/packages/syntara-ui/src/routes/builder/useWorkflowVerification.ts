@@ -106,7 +106,7 @@ function processValidateResponse(
     showError: (opts: { title: string; description: string }) => void
   }
 ): void {
-  let backendErrors: ValidationError[] = []
+  let backendErrors: ValidationError[]
 
   if (response.ok && data) {
     backendErrors = mapFindings(data.findings)
@@ -134,7 +134,7 @@ function processValidateResponse(
   if (callbacks.onValid) {
     callbacks.onValid()
   } else if (!callbacks.silent) {
-    callbacks.showSuccess({ title: 'Workflow definition is valid' })
+    callbacks.showSuccess({ title: 'Workflow verified' })
   }
 }
 

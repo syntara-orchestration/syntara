@@ -159,7 +159,8 @@ function buildAdjacencyGraph(
     if (edge.to_port === 'iterate') continue
     if (!nodeIds.has(edge.from) || !nodeIds.has(edge.to) || edge.from === edge.to) continue
 
-    const neighbors = adjacencyList.get(edge.from)!
+    const neighbors = adjacencyList.get(edge.from)
+    if (!neighbors) continue
     if (!neighbors.includes(edge.to)) {
       neighbors.push(edge.to)
       inDegree.set(edge.to, (inDegree.get(edge.to) ?? 0) + 1)
@@ -185,7 +186,8 @@ function topoSortIds(
 
   while (queue.length > 0) {
     queue.sort((a, b) => compareByStartedAt(a, b, activityStates, a.localeCompare(b, 'en')))
-    const current = queue.shift()!
+    const current = queue.shift()
+    if (current === undefined) break
     sortedIds.push(current)
 
     for (const neighbor of adjacencyList.get(current) ?? []) {

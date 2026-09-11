@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import UTC
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
@@ -300,27 +299,11 @@ class TestToReadConversion:
         sa = ServiceAccount(name="test", project_id=project_id, created_by=uuid4())
 
         mock_result = MagicMock()
-        mock_result.first.return_value = ("My Project", None)
+        mock_result.first.return_value = "My Project"
         mock_session.exec.return_value = mock_result
 
         read = await service.to_read(sa)
         assert read.project_name == "My Project"
-        assert read.is_project_deleted is False
-
-    @pytest.mark.asyncio
-    async def test_to_read_marks_deleted_project(self, service: ServiceAccountService, mock_session: AsyncMock) -> None:
-        from datetime import datetime
-
-        project_id = uuid4()
-        sa = ServiceAccount(name="test", project_id=project_id, created_by=uuid4())
-
-        mock_result = MagicMock()
-        mock_result.first.return_value = ("Old Project", datetime(2026, 1, 1, tzinfo=UTC))
-        mock_session.exec.return_value = mock_result
-
-        read = await service.to_read(sa)
-        assert read.project_name == "Old Project"
-        assert read.is_project_deleted is True
 
     @pytest.mark.asyncio
     async def test_to_read_handles_missing_project(
@@ -354,28 +337,14 @@ class TestResolveProjectInfosBatch:
         proj_b = uuid4()
         mock_result = MagicMock()
         mock_result.all.return_value = [
-            (proj_a, "Project A", None),
-            (proj_b, "Project B", None),
+            (proj_a, "Project A"),
+            (proj_b, "Project B"),
         ]
         mock_session.exec.return_value = mock_result
 
         result = await service._resolve_project_infos({proj_a, proj_b})
-        assert result[proj_a] == ("Project A", False)
-        assert result[proj_b] == ("Project B", False)
-
-    @pytest.mark.asyncio
-    async def test_marks_deleted_projects(self, service: ServiceAccountService, mock_session: AsyncMock) -> None:
-        from datetime import datetime
-
-        proj_id = uuid4()
-        mock_result = MagicMock()
-        mock_result.all.return_value = [
-            (proj_id, "Deleted Project", datetime(2026, 1, 1, tzinfo=UTC)),
-        ]
-        mock_session.exec.return_value = mock_result
-
-        result = await service._resolve_project_infos({proj_id})
-        assert result[proj_id] == ("Deleted Project", True)
+        assert result[proj_a] == "Project A"
+        assert result[proj_b] == "Project B"
 
     @pytest.mark.asyncio
     async def test_missing_projects_omitted(self, service: ServiceAccountService, mock_session: AsyncMock) -> None:
@@ -383,7 +352,7 @@ class TestResolveProjectInfosBatch:
         missing = uuid4()
         mock_result = MagicMock()
         mock_result.all.return_value = [
-            (existing, "Exists", None),
+            (existing, "Exists"),
         ]
         mock_session.exec.return_value = mock_result
 
@@ -421,23 +390,20 @@ class TestListServiceAccounts:
             mp.setattr(service, "list_resources", AsyncMock(return_value=mock_response))
 
             mock_result = MagicMock()
-            mock_result.all.return_value = [(proj_id, "My Project", None)]
+            mock_result.all.return_value = [(proj_id, "My Project")]
             mock_session.exec.return_value = mock_result
 
             response = await service.list_service_accounts()
 
         assert response.resources[0].project_name == "My Project"
-        assert response.resources[0].is_project_deleted is False
 
     @pytest.mark.asyncio
-    async def test_list_marks_deleted_project(
+    async def test_list_handles_hard_deleted_project(
         self,
         service: ServiceAccountService,
         mock_session: AsyncMock,
         override_runtime_settings: Callable[..., AbstractContextManager[object]],
     ) -> None:
-        from datetime import datetime
-
         proj_id = uuid4()
         sa_read = ServiceAccountRead(
             id=uuid4(),
@@ -457,13 +423,12 @@ class TestListServiceAccounts:
             mp.setattr(service, "list_resources", AsyncMock(return_value=mock_response))
 
             mock_result = MagicMock()
-            mock_result.all.return_value = [(proj_id, "Old Project", datetime(2026, 1, 1, tzinfo=UTC))]
+            mock_result.all.return_value = []
             mock_session.exec.return_value = mock_result
 
             response = await service.list_service_accounts()
 
-        assert response.resources[0].project_name == "Old Project"
-        assert response.resources[0].is_project_deleted is True
+        assert response.resources[0].project_name is None
 
     @pytest.mark.asyncio
     async def test_list_handles_missing_project(
@@ -497,7 +462,6 @@ class TestListServiceAccounts:
             response = await service.list_service_accounts()
 
         assert response.resources[0].project_name is None
-        assert response.resources[0].is_project_deleted is False
 
     @pytest.mark.asyncio
     async def test_list_empty_resources(

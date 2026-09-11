@@ -17,6 +17,7 @@
 import { request as playwrightRequest, type APIRequestContext } from '@playwright/test'
 
 import { isSkipWebServerForPlaywrightTests } from './playwrightWebServerEnv'
+import { formatXfailRules, loadXfailEntries, xfailSourceFromEnv } from './xfailFromUrl'
 
 const appBaseUrl: string = process.env['SYNTARA_E2E_BASE_URL'] ?? 'http://localhost:4173'
 
@@ -169,7 +170,20 @@ async function probeExecutionEngine(
   return result
 }
 
+/** Print the active xfail rules once, at the very start of the run. */
+async function logXfailRules(): Promise<void> {
+  const source = xfailSourceFromEnv()
+  if (!source) return
+
+  const entries = await loadXfailEntries(source)
+  for (const line of formatXfailRules(entries, source)) {
+    console.log(`[global-setup] ${line}`)
+  }
+}
+
 export default async function globalSetup(): Promise<void> {
+  await logXfailRules()
+
   // Default to healthy — tests run unless probe positively confirms otherwise
   process.env['SYNTARA_E2E_HAS_EXECUTION_ENGINE'] = '1'
   process.env['SYNTARA_E2E_HAS_TEMPORAL_WORKER'] = '1'

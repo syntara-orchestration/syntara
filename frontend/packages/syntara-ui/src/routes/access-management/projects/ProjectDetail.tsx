@@ -8,10 +8,6 @@ import {
   FlexItem,
   Label,
   LabelGroup,
-  List,
-  ListItem,
-  Stack,
-  StackItem,
   Tab,
   TabTitleText,
 } from '@patternfly/react-core'
@@ -21,15 +17,14 @@ import { useMemo, useState } from 'react'
 
 import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsProjectDetail, breadcrumbsProjectDetailEarlyShell } from '../../../app/breadcrumbBuilders'
-import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
-import { NxLabel } from '../../../components/labels/NxLabel'
+import { SynLabel } from '../../../components/labels/SynLabel'
 import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
-import { NxKebabMenu } from '../../../components/NxKebabMenu'
-import { NxListPanel, NxListPanelTabs, NxListPanelView } from '../../../components/panels/list/NxListPanel'
+import { SynListPanel, SynListPanelTabs, SynListPanelView } from '../../../components/panels/list/SynListPanel'
 import { useQueryState } from '../../../components/states/useQueryState'
+import { SynKebabMenu } from '../../../components/SynKebabMenu'
 import { SynPageTitle } from '../../../components/SynPageTitle'
 import { DateCell } from '../../../components/table/DateCell'
 import { useDeleteAction } from '../../../hooks/useDeleteAction'
@@ -43,8 +38,11 @@ import { DetailPageShell } from '../DetailPageShell'
 import { ProjectFormModal } from '../ProjectFormModal'
 import { useProjectPermissions } from '../useProjectPermissions'
 
+import { ProjectDeleteDialog } from './ProjectDeleteDialog'
+import { canShowTabContent, computeProjectTabState, type ProjectTab } from './projectDetailTabs'
 import { ProjectNotFoundState } from './ProjectNotFoundState'
 import { ProjectRoleAssignmentsTab } from './ProjectRoleAssignmentsTab'
+import { ProjectWorkflowsTab } from './ProjectWorkflowsTab'
 import { useProjectDetailPermissions } from './useProjectDetailPermissions'
 
 const noop = () => {}
@@ -70,7 +68,7 @@ function ProjectDetailToolbar({
           Edit project
         </Button>
       </DisabledWithTooltip>
-      <NxKebabMenu
+      <SynKebabMenu
         actions={[
           {
             key: 'delete',
@@ -97,7 +95,7 @@ function ProjectDetailsTab({ project }: Readonly<{ project: ProjectRead }>) {
         <DescriptionListDescription>
           <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapSm' }}>
             <FlexItem>{project.name}</FlexItem>
-            {project.is_default && <NxLabel color="grey">Default</NxLabel>}
+            {project.is_default && <SynLabel color="grey">Default</SynLabel>}
           </Flex>
         </DescriptionListDescription>
       </DescriptionListGroup>
@@ -137,9 +135,6 @@ function ProjectDetailsTab({ project }: Readonly<{ project: ProjectRead }>) {
   )
 }
 
-type ProjectTab = 'details' | 'role-assignments'
-const ALL_PROJECT_TABS: ProjectTab[] = ['details', 'role-assignments']
-
 export function ProjectDetail() {
   const navigate = useNavigate()
   const projectsDocLink = useDocLink('projects')
@@ -149,13 +144,17 @@ export function ProjectDetail() {
   const [editModalOpen, setEditModalOpen] = useState(false)
   const deleteDialog = useDialogState<ProjectRead>()
   const projectPermissions = useProjectPermissions({ resourceProject: projectId })
-  const { canReadAssignments, isLoading: permissionsLoading } = useProjectDetailPermissions(projectId ?? '')
+  const {
+    canReadWorkflows,
+    canReadAssignments,
+    isLoading: permissionsLoading,
+  } = useProjectDetailPermissions(projectId ?? '')
   const { mutate: deleteProject } = accessClient.useMutation('delete', '/projects/{project_id}')
 
-  const validTabs = useMemo(() => {
-    if (permissionsLoading || canReadAssignments) return ALL_PROJECT_TABS
-    return ALL_PROJECT_TABS.filter((tab) => tab !== 'role-assignments')
-  }, [canReadAssignments, permissionsLoading])
+  const { visibleTabs, urlValidTabs } = useMemo(
+    () => computeProjectTabState(canReadWorkflows, canReadAssignments, permissionsLoading, activeTab),
+    [canReadWorkflows, canReadAssignments, permissionsLoading, activeTab]
+  )
 
   const projectQuery = accessClient.useQuery(
     'get',
@@ -225,16 +224,24 @@ export function ProjectDetail() {
         }
       />
       <SynPageBody>
-        <NxListPanel>
-          <NxListPanelTabs basePath={basePath} defaultTab="details" validTabs={validTabs} aria-label="Project details">
+        <SynListPanel>
+          <SynListPanelTabs
+            basePath={basePath}
+            defaultTab="details"
+            validTabs={urlValidTabs}
+            aria-label="Project details"
+          >
             <Tab eventKey="details" title={<TabTitleText>Details</TabTitleText>} />
-            {validTabs.includes('role-assignments') && (
+            {visibleTabs.includes('workflows') && (
+              <Tab eventKey="workflows" title={<TabTitleText>Workflows</TabTitleText>} />
+            )}
+            {visibleTabs.includes('role-assignments') && (
               <Tab eventKey="role-assignments" title={<TabTitleText>Assignments</TabTitleText>} />
             )}
-          </NxListPanelTabs>
+          </SynListPanelTabs>
 
           {activeTab === 'details' && (
-            <NxListPanelView
+            <SynListPanelView
               tabKey="details"
               tabLabel="Details"
               isPending={false}
@@ -246,10 +253,14 @@ export function ProjectDetail() {
               body={<ProjectDetailsTab project={projectData} />}
             />
           )}
-          {activeTab === 'role-assignments' && validTabs.includes('role-assignments') && (
-            <ProjectRoleAssignmentsTab projectId={projectId ?? ''} />
+          {activeTab === 'workflows' && canShowTabContent('workflows', visibleTabs, permissionsLoading, activeTab) && (
+            <ProjectWorkflowsTab projectId={projectId ?? ''} isBuiltin={projectData.is_builtin} />
           )}
-        </NxListPanel>
+          {activeTab === 'role-assignments' &&
+            canShowTabContent('role-assignments', visibleTabs, permissionsLoading, activeTab) && (
+              <ProjectRoleAssignmentsTab projectId={projectId ?? ''} />
+            )}
+        </SynListPanel>
       </SynPageBody>
 
       <ProjectFormModal
@@ -261,32 +272,12 @@ export function ProjectDetail() {
         }}
       />
 
-      <NxConfirmationDialog
+      <ProjectDeleteDialog
+        projectName={deleteDialog.item?.name}
         isOpen={deleteDialog.isOpen}
         onClose={deleteDialog.close}
         onConfirm={() => handleDelete(deleteDialog.item)}
-        title="Delete project?"
-        confirmLabel="Delete"
-        confirmVariant="danger"
-        titleIconVariant="warning"
-        destructiveAcknowledgement={{
-          checkboxId: 'delete-project-detail-ack',
-          label:
-            'I understand this project, its workflows, and role assignments will be permanently deleted or removed.',
-        }}
-      >
-        <Stack hasGutter>
-          <StackItem>
-            The project <strong>{deleteDialog.item?.name}</strong> will be deleted. This cannot be undone.
-          </StackItem>
-          <StackItem>
-            <List>
-              <ListItem>All workflows in this project will be permanently deleted.</ListItem>
-              <ListItem>All project role assignments will be removed.</ListItem>
-            </List>
-          </StackItem>
-        </Stack>
-      </NxConfirmationDialog>
+      />
     </SynPage>
   )
 }

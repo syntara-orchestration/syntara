@@ -25,7 +25,7 @@ nodes:
     type: http_request
     parameters:
       method: GET
-      url: http://ip-api.com/json/${input.ip_address}
+      url: http://ip-api.com/json/${trigger.ip_address}
       headers:
         Accept: application/json
     outputs:
@@ -80,7 +80,7 @@ nodes:
         }
         EOF
     inputs:
-      ip: ${input.ip_address}
+      ip: ${trigger.ip_address}
       country: ${fetch_location.output.country}
       city: ${fetch_location.output.city}
       region: ${fetch_location.output.region}

@@ -34,9 +34,9 @@ class OIDCConfigurationResponse:
         end_session_endpoint (None | str | Unset): OIDC end session endpoint URL for RP-initiated logout
         enable_rp_initiated_logout (bool | Unset): Enable RP-initiated logout redirect to IdP when user logs out
             Default: False.
-        claim_mapping (OIDCClaimMapping | Unset): Maps Syntara user fields to IdP-specific OIDC claim names.
+        claim_mapping (OIDCClaimMapping | Unset): Maps Orchestrator user fields to IdP-specific OIDC claim names.
         group_jmespath_expression (None | str | Unset): JMESPath expression for group extraction
-        group_mapping_entries (list[OIDCGroupMappingEntry] | Unset): IdP-to-Syntara group mapping entries
+        group_mapping_entries (list[OIDCGroupMappingEntry] | Unset): IdP-to-Orchestrator group mapping entries
         allow_all_authenticated (bool | Unset): Allow all users from this IdP to log in regardless of group mapping
             results Default: False.
         aap_role_mapping_enabled (bool | Unset): Map Ansible Automation Platform aap_system_role claim to built-in

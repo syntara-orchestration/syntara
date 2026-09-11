@@ -85,7 +85,6 @@ async def count_active_executions(session: "AsyncSession") -> int:
         select(func.count())
         .select_from(Execution)
         .where(
-            Execution.deleted_at.is_(None),  # type: ignore[union-attr]
             col(Execution.status).not_in(TERMINAL_EXECUTION_STATUSES),
         )
     )
@@ -145,8 +144,6 @@ class ExecutionsConvertResourceMixin(ConvertResourceMixin):
             error_details=resource.error_details,
             labels=resource.labels,
             approval_pending=resource.approval_pending,
-            deleted_at=resource.deleted_at,
-            deleted_by=resource.deleted_by,
             mode=resource.mode,
             execution_metadata=resource.execution_metadata,
             retried_from_execution_id=resource.retried_from_execution_id,
@@ -155,7 +152,6 @@ class ExecutionsConvertResourceMixin(ConvertResourceMixin):
         )
 
         if self.include and len(self.include) > 0:
-            # Only include workflow_definition if explicitly requested
             if ExecutionInclude.WORKFLOW_DEFINITION in self.include:
                 result.workflow_definition = WorkflowDefinition.model_construct(
                     **resource.workflow_version.workflow_definition
@@ -332,15 +328,12 @@ class ExecutionService(BaseService):
             select(Workflow, WorkflowVersion)
             .join(WorkflowVersion, version_join)  # type: ignore[arg-type]
             .where(Workflow.id == workflow_id)
-            .where(Workflow.deleted_at.is_(None))  # type: ignore[union-attr]
         )
         row = result.first()
 
         if row is None:
             if use_published:
-                wf_check = await self.session.exec(
-                    select(Workflow).where(Workflow.id == workflow_id).where(Workflow.deleted_at.is_(None))  # type: ignore[union-attr]
-                )
+                wf_check = await self.session.exec(select(Workflow).where(Workflow.id == workflow_id))
                 if wf_check.first() is not None:
                     raise WorkflowNotPublishedError(workflow_id)
             raise WorkflowNotFoundError(workflow_id)
@@ -565,12 +558,10 @@ class ExecutionService(BaseService):
             )
             .where(
                 col(Workflow.name) == workflow_name,
-                Workflow.deleted_at.is_(None),  # type: ignore[union-attr]
                 Workflow.project_id
                 == select(Project.id)
                 .where(
                     Project.name == project_name,
-                    Project.deleted_at.is_(None),  # type: ignore[union-attr]
                 )
                 .scalar_subquery(),
             )
@@ -698,7 +689,6 @@ class ExecutionService(BaseService):
                 ),
             )
             .where(Workflow.id == workflow_id)
-            .where(Workflow.deleted_at.is_(None))  # type: ignore[union-attr]
         )
         row = result.first()
 
@@ -877,7 +867,6 @@ class ExecutionService(BaseService):
         query = (
             select(Execution)
             .where(Execution.id == execution_id)
-            .where(Execution.deleted_at.is_(None))  # type: ignore[union-attr]
             .options(selectinload(Execution.workflow))  # type: ignore[arg-type]
             .options(selectinload(Execution.workflow_version))  # type: ignore[arg-type]
         )
@@ -966,9 +955,7 @@ class ExecutionService(BaseService):
 
         """
         # Verify execution exists
-        exec_result = await self.session.exec(
-            select(Execution).where(Execution.id == execution_id).where(Execution.deleted_at.is_(None))  # type: ignore[union-attr]
-        )
+        exec_result = await self.session.exec(select(Execution).where(Execution.id == execution_id))
         if exec_result.one_or_none() is None:
             raise ExecutionNotFoundError(execution_id)
 
@@ -1051,10 +1038,23 @@ class ExecutionService(BaseService):
                 activity_id=activity_id,
                 error=error,
             )
+        elif status == "cancelled":
+            reason = signal_data.get("reason", "Invocation cancelled")
+            msg = f"InvocationCancelledError: {reason}"[:MAX_CALLBACK_ERROR_MSG_LENGTH]
+            error = ApplicationError(
+                msg,
+                type="InvocationCancelledError",
+                non_retryable=True,
+            )
+            await self.temporal_service.fail_async_activity(
+                temporal_workflow_id=execution.temporal_workflow_id,
+                activity_id=activity_id,
+                error=error,
+            )
         else:
-            # Fail-open: any non-"failed" status (including "approved", "rejected",
-            # "completed") completes the activity. The workflow routes based on the
-            # output data (e.g., approval decision), not the Temporal activity state.
+            # Fail-open: any non-"failed"/non-"cancelled" status (including "approved",
+            # "rejected", "completed") completes the activity. The workflow routes based
+            # on the output data (e.g., approval decision), not the Temporal activity state.
             await self.temporal_service.complete_async_activity(
                 temporal_workflow_id=execution.temporal_workflow_id,
                 activity_id=activity_id,
@@ -1084,10 +1084,7 @@ class ExecutionService(BaseService):
 
         """
         query = (
-            select(Execution)
-            .where(Execution.id == execution_id)
-            .where(Execution.deleted_at.is_(None))  # type: ignore[union-attr]
-            .options(selectinload(Execution.workflow))  # type: ignore[arg-type]
+            select(Execution).where(Execution.id == execution_id).options(selectinload(Execution.workflow))  # type: ignore[arg-type]
         )
         result = await self.session.exec(query)
         execution = result.one_or_none()
@@ -1126,6 +1123,21 @@ class ExecutionService(BaseService):
             )
             raise
 
+        # Best-effort: cancel any in-flight agentic invocations linked to
+        # this execution.  Agentic activities use async-completion so the
+        # Temporal cancel above does not reach the running agent process.
+        try:
+            from syntara.workflows.services.invocation_cancellation import (  # noqa: PLC0415
+                cancel_invocations_for_execution,
+            )
+
+            await cancel_invocations_for_execution(self.session, self.user, execution_id)
+        except Exception:
+            logger.exception(
+                "Best-effort invocation cancellation failed",
+                execution_id=execution_id,
+            )
+
         self._emit_lifecycle_event(
             execution_id=execution.id,
             workflow_id=execution.workflow_id,
@@ -1154,10 +1166,7 @@ class ExecutionService(BaseService):
         """
         # Step 1: Fetch original execution with workflow relationship
         query = (
-            select(Execution)
-            .where(Execution.id == execution_id)
-            .where(Execution.deleted_at.is_(None))  # type: ignore[union-attr]
-            .options(selectinload(Execution.workflow))  # type: ignore[arg-type]
+            select(Execution).where(Execution.id == execution_id).options(selectinload(Execution.workflow))  # type: ignore[arg-type]
         )
         result = await self.session.exec(query)
         original = result.one_or_none()
@@ -1174,16 +1183,9 @@ class ExecutionService(BaseService):
         if original.mode == ExecutionMode.TEST:
             raise ExecutionNotRetryableError(execution_id, "test executions cannot be retried")
 
-        # Step 3: Validate workflow is not soft-deleted
-        workflow = original.workflow
-        if workflow.deleted_at is not None:
-            raise ExecutionNotRetryableError(execution_id, "workflow has been deleted")
-
-        # Step 4: Fetch the workflow version used by the original execution
+        # Step 3: Fetch the workflow version used by the original execution
         version_result = await self.session.exec(
-            select(WorkflowVersion)
-            .where(WorkflowVersion.id == original.workflow_version_id)
-            .where(WorkflowVersion.deleted_at.is_(None))  # type: ignore[union-attr]
+            select(WorkflowVersion).where(WorkflowVersion.id == original.workflow_version_id)
         )
         workflow_version = version_result.one_or_none()
         if workflow_version is None:
@@ -1192,7 +1194,7 @@ class ExecutionService(BaseService):
         logger.info(
             "Retrying execution",
             original_execution_id=execution_id,
-            workflow_id=workflow.id,
+            workflow_id=original.workflow_id,
             workflow_version_id=workflow_version.id,
         )
 
@@ -1209,7 +1211,7 @@ class ExecutionService(BaseService):
         component = ComponentLabel.EXECUTION_SERVICE
 
         return await self._start_temporal_and_create_execution(
-            workflow=workflow,
+            workflow=original.workflow,
             workflow_version=workflow_version,
             input_data=original.input_data,
             trigger_node_id=trigger_node_id,

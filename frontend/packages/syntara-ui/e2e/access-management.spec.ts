@@ -16,6 +16,7 @@
  */
 import { test, expect, toAppUrl, createUnavailableGuard } from './fixtures'
 import { APP_TITLE } from './helpers/appTitle'
+import { filterChipGroup } from './helpers/patternfly'
 import { buildUniqueName } from './helpers/workflows'
 import {
   createPolicyViaApi,
@@ -34,22 +35,21 @@ const seededPolicies: SeededPolicy[] = []
 
 test.beforeAll(async ({ browser }) => {
   const page = await browser.newPage()
-  const token = await getAuthToken(page)
-  if (token) {
+  try {
+    const token = await getAuthToken(page)
+    if (!token) throw new Error('access-management beforeAll: could not obtain auth token')
     const prefix = buildUniqueName('e2e-am')
 
     for (let i = 1; i <= 2; i++) {
-      const user = await createUserViaApi(page, { username: `${prefix}-user-${i}`, token })
-      if (user) seededUsers.push(user)
+      seededUsers.push(await createUserViaApi(page, { username: `${prefix}-user-${i}`, token }))
     }
 
     const project = await ensureProject(page)
-    if (project) {
-      const policy = await createPolicyViaApi(page, project.id, { name: `${prefix}-policy`, token })
-      if (policy) seededPolicies.push(policy)
-    }
+    if (!project) throw new Error('access-management beforeAll: could not ensure project')
+    seededPolicies.push(await createPolicyViaApi(page, project.id, { name: `${prefix}-policy`, token }))
+  } finally {
+    await page.close()
   }
-  await page.close()
 })
 
 test.afterAll(async ({ browser }) => {
@@ -124,7 +124,7 @@ test.describe('Access Management — Roles Tab Filtering', () => {
       .then(() => true)
       .catch(() => false)
     if (!hasTable) guard.markUnavailable()
-    test.skip(!hasTable, 'No roles data available; seed data required')
+    expect(hasTable, 'No roles data available; seed data required').toBeTruthy()
   })
 
   test('filter by name syncs to URL', async ({ app }) => {
@@ -132,7 +132,7 @@ test.describe('Access Management — Roles Tab Filtering', () => {
     await app.getByRole('button', { name: 'Apply filter' }).click()
 
     // Filter chip appears
-    const nameChipGroup = app.locator('.pf-v6-c-label-group').filter({ hasText: 'Name' })
+    const nameChipGroup = filterChipGroup(app, 'Name')
     await expect(nameChipGroup.getByText('admin')).toBeVisible()
 
     // URL contains filter
@@ -143,7 +143,7 @@ test.describe('Access Management — Roles Tab Filtering', () => {
     await app.getByPlaceholder('Filter by name').fill('admin')
     await app.getByRole('button', { name: 'Apply filter' }).click()
 
-    const nameChipGroup = app.locator('.pf-v6-c-label-group').filter({ hasText: 'Name' })
+    const nameChipGroup = filterChipGroup(app, 'Name')
     await expect(nameChipGroup.getByText('admin')).toBeVisible()
 
     // Capture filtered URL, navigate away, then back
@@ -153,7 +153,7 @@ test.describe('Access Management — Roles Tab Filtering', () => {
 
     // Filter restored from URL
     await expect(app.getByRole('tab', { name: /Roles/i })).toHaveAttribute('aria-selected', 'true')
-    const restoredChipGroup = app.locator('.pf-v6-c-label-group').filter({ hasText: 'Name' })
+    const restoredChipGroup = filterChipGroup(app, 'Name')
     await expect(restoredChipGroup.getByText('admin')).toBeVisible()
   })
 
@@ -162,7 +162,7 @@ test.describe('Access Management — Roles Tab Filtering', () => {
     await app.getByPlaceholder('Filter by name').fill('admin')
     await app.getByRole('button', { name: 'Apply filter' }).click()
 
-    const nameChipGroup = app.locator('.pf-v6-c-label-group').filter({ hasText: 'Name' })
+    const nameChipGroup = filterChipGroup(app, 'Name')
     await expect(nameChipGroup.getByText('admin')).toBeVisible()
 
     // Clear all filters
@@ -187,7 +187,7 @@ test.describe('Access Management — Roles Tab Sorting', () => {
       .then(() => true)
       .catch(() => false)
     if (!hasTable) guard.markUnavailable()
-    test.skip(!hasTable, 'No roles data available; seed data required')
+    expect(hasTable, 'No roles data available; seed data required').toBeTruthy()
   })
 
   test('clicking column header updates sort in URL', async ({ app }) => {
@@ -227,7 +227,7 @@ test.describe('Access Management — Roles Tab Sorting', () => {
     await app.getByRole('button', { name: 'Apply filter' }).click()
 
     // Wait for filter chip to confirm UI has settled
-    const nameChipGroup = app.locator('.pf-v6-c-label-group').filter({ hasText: 'Name' })
+    const nameChipGroup = filterChipGroup(app, 'Name')
     await expect(nameChipGroup.getByText('admin')).toBeVisible()
 
     // Apply sort — click the table header's sort button.
@@ -251,7 +251,9 @@ test.describe('Access Management — Roles Tab Sorting', () => {
 })
 
 test.describe('Access Management — Shareable URLs', () => {
-  test('filters + sort + tab in URL restore correctly after navigation', async ({ app }) => {
+  const guard = createUnavailableGuard('No roles data available; seed data required')
+
+  test.beforeEach(async ({ app }) => {
     await app.goto(toAppUrl(`${ACCESS_URL}/roles`))
     await expect(app.getByRole('tab', { name: /Roles/i })).toHaveAttribute('aria-selected', 'true')
 
@@ -260,13 +262,16 @@ test.describe('Access Management — Shareable URLs', () => {
       .waitFor({ state: 'visible', timeout: 5000 })
       .then(() => true)
       .catch(() => false)
-    test.skip(!hasTable, 'No roles data available; seed data required')
+    if (!hasTable) guard.markUnavailable()
+    expect(hasTable, 'No roles data available; seed data required').toBeTruthy()
+  })
 
+  test('filters + sort + tab in URL restore correctly after navigation', async ({ app }) => {
     await app.getByPlaceholder('Filter by name').fill('admin')
     await app.getByRole('button', { name: 'Apply filter' }).click()
 
     // Wait for filter chip to confirm UI has settled
-    const nameChipGroup = app.locator('.pf-v6-c-label-group').filter({ hasText: 'Name' })
+    const nameChipGroup = filterChipGroup(app, 'Name')
     await expect(nameChipGroup.getByText('admin')).toBeVisible()
 
     // Click sort — force: true bypasses PF6 tooltip overlay on truncated header
@@ -283,7 +288,7 @@ test.describe('Access Management — Shareable URLs', () => {
 
     await expect(app.getByRole('tab', { name: /Roles/i })).toHaveAttribute('aria-selected', 'true')
 
-    const restoredChip = app.locator('.pf-v6-c-label-group').filter({ hasText: 'Name' })
+    const restoredChip = filterChipGroup(app, 'Name')
     await expect(restoredChip.getByText('admin')).toBeVisible()
 
     const restoredHeader = app.getByRole('columnheader', { name: 'Name' })
@@ -293,23 +298,11 @@ test.describe('Access Management — Shareable URLs', () => {
 
 test.describe('Access Management — User Detail Tabs', () => {
   test('detail sub-tabs sync to URL', async ({ app }) => {
-    await app.goto(toAppUrl(`${ACCESS_URL}/users`))
-    await expect(app.getByRole('tab', { name: /Users/i })).toHaveAttribute('aria-selected', 'true')
+    expect(seededUsers.length, 'Failed to seed users via API').toBeGreaterThan(0)
 
-    // Wait for users table
-    const table = app.getByRole('grid', { name: 'Users table' })
-    const hasTable = await table
-      .waitFor({ state: 'visible', timeout: 5000 })
-      .then(() => true)
-      .catch(() => false)
-    test.skip(!hasTable, 'No users data available; seed data required')
-
-    // Click the first username button in the table to navigate to detail
-    const firstRow = table.getByRole('row').nth(1) // skip header row
-    await firstRow.locator('td[data-label="Username"]').getByRole('button').click()
-
-    // Should be on user detail page
-    await expect(app).toHaveURL(new RegExp(`${ACCESS_URL}/users/`))
+    // Users tab filter placeholder is "Filter by username", not "Filter by name". Go by seeded ID.
+    await app.goto(toAppUrl(`${ACCESS_URL}/users/${seededUsers[0].id}`))
+    await expect(app).toHaveURL(new RegExp(`${ACCESS_URL}/users/${seededUsers[0].id}`))
 
     // Click Groups sub-tab if available
     const groupsTab = app.getByRole('tab', { name: /Groups/i })
@@ -342,7 +335,7 @@ test.describe('Access Management — Policies Tab Columns', () => {
       .then(() => true)
       .catch(() => false)
     if (!hasTable) guard.markUnavailable()
-    test.skip(!hasTable, 'No policies data available; seed data required')
+    expect(hasTable, 'No policies data available; seed data required').toBeTruthy()
   })
 
   test('Statements, Scope, Description and Project columns are visible', async ({ app }) => {
@@ -361,21 +354,24 @@ test.describe('Access Management — Policies Tab Columns', () => {
     const hasAllowLabel = (await statementsColumn.getByText('Allow').count()) > 0
     const hasDenyLabel = (await statementsColumn.getByText('Deny').count()) > 0
 
-    test.skip(!hasAllowLabel && !hasDenyLabel, 'No statement effect labels rendered; statements data required')
+    expect(hasAllowLabel || hasDenyLabel, 'No statement effect labels rendered; statements data required').toBeTruthy()
 
-    // At least one scope label should be visible (e.g. "scope: any")
-    await expect(statementsColumn.getByText(/^scope:/).nth(0)).toBeVisible()
+    // At least one scope label should be visible (e.g. "scope: any").
+    // Use count check rather than toBeVisible so strict mode is not triggered by
+    // having multiple rows each rendering a scope chip.
+    expect(await statementsColumn.getByText(/^scope:/).count()).toBeGreaterThan(0)
   })
 
   test('project-scoped policies show a clickable project link', async ({ app }) => {
+    expect(seededPolicies.length, 'Failed to create a project-scoped policy via API').toBeGreaterThan(0)
+    const policy = seededPolicies[0]
+
     const table = app.getByRole('grid', { name: 'Policies' })
+    await app.getByPlaceholder('Filter by name').fill(policy.name)
+    await app.getByRole('button', { name: 'Apply filter' }).click()
+    await expect(table.getByRole('row').filter({ hasText: policy.name })).toBeVisible({ timeout: 15_000 })
 
-    // Scope into Project column cells via data-label, then look for the link button rendered by ProjectLabel
-    const projectButtons = table.locator('td[data-label="Project"]').getByRole('button')
-    const hasProjectLink = (await projectButtons.count()) > 0
-
-    test.skip(!hasProjectLink, 'No project-scoped policies on this page; seed data required')
-
-    await expect(projectButtons.nth(0)).toBeVisible()
+    const policyRow = table.getByRole('row').filter({ hasText: policy.name })
+    await expect(policyRow.locator('td[data-label="Project"]').getByRole('button')).toBeVisible()
   })
 })

@@ -67,21 +67,20 @@ async def testget_user_group_ids_includes_explicit_groups(seeded_db: AsyncSessio
 
 
 @pytest.mark.asyncio
-async def testget_user_group_ids_excludes_soft_deleted_groups(seeded_db: AsyncSession, test_user: User) -> None:
-    """Soft-deleted groups must not appear in user's group IDs."""
+async def testget_user_group_ids_excludes_deleted_groups(seeded_db: AsyncSession, test_user: User) -> None:
+    """Deleted groups must not appear in user's group IDs."""
     group = Group(id=uuid4(), name="soon-deleted-grp", description="", labels={})
     seeded_db.add(group)
     await seeded_db.flush()
     await seeded_db.exec(insert(user_groups).values(user_id=test_user.id, group_id=group.id))
     await seeded_db.commit()
 
-    # Before soft-delete the group is present
+    # Before delete the group is present
     group_ids = await get_user_group_ids(seeded_db, test_user.id)
     assert group.id in group_ids
 
-    # Soft-delete the group
-    group.soft_delete(user_id=test_user.id)
-    seeded_db.add(group)
+    # Hard-delete the group
+    await seeded_db.delete(group)
     await seeded_db.commit()
 
     group_ids = await get_user_group_ids(seeded_db, test_user.id)
@@ -90,7 +89,7 @@ async def testget_user_group_ids_excludes_soft_deleted_groups(seeded_db: AsyncSe
 
 @pytest.mark.asyncio
 async def test_soft_deleted_group_policies_not_resolved(seeded_db: AsyncSession, test_user: User) -> None:
-    """Soft-deleted group's role assignments must not grant policies to the user."""
+    """Deleted group's role assignments must not grant policies to the user."""
     # Create policy, role, group, and wire them together
     policy = Policy(
         name="deleted-grp:test:any",
@@ -113,13 +112,12 @@ async def test_soft_deleted_group_policies_not_resolved(seeded_db: AsyncSession,
     await seeded_db.exec(insert(user_groups).values(user_id=test_user.id, group_id=group.id))
     await seeded_db.commit()
 
-    # User should have the policy before soft-delete
+    # User should have the policy before delete
     policies = await resolve_effective_policies(seeded_db, test_user.id)
     assert "deleted-grp:test:any" in {p["name"] for p in policies}
 
-    # Soft-delete the group
-    group.soft_delete(user_id=test_user.id)
-    seeded_db.add(group)
+    # Hard-delete the group (CASCADE removes user_groups row)
+    await seeded_db.delete(group)
     await seeded_db.commit()
 
     # User should no longer have the policy

@@ -24,7 +24,7 @@ The top-level component performs permission checks via `useApprovalPermissions()
 
 1. `useApprovalPermissions()` checks `approval:read` permission (via `useCanI`)
 2. While checking: show loading spinner
-3. If denied: show `EmptyStateAccessDenied`
+3. If denied: show `SynEmptyStateAccessDenied`
 4. If allowed: render `ApprovalsPage`
 
 ### Main Page: `ApprovalsPage` Component
@@ -165,7 +165,7 @@ Both dialogs accept `isOpen`, `onClose`, `onConfirm(note)`, `approvalCount`, and
 
 **File:** `packages/syntara-ui/src/routes/approvals/approvalUtils.tsx`
 
-Renders a status badge using `NxLabel` with `variant="outline"` and status-specific icons.
+Renders a status badge using `SynLabel` with `variant="outline"` and status-specific icons.
 
 | Status      | Color   | Icon                  | Label     |
 | ----------- | ------- | --------------------- | --------- |

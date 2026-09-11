@@ -3,7 +3,7 @@ import type { CredentialsAPI } from '@syntara/contracts'
 
 import { getUserDetailPath } from '../../routes/access-management/accessManagementPaths'
 import { toDisplayDate } from '../../utils/dateUtils'
-import { NxLink } from '../NxLink'
+import { SynLink } from '../SynLink'
 
 import styles from './UserTimestamp.module.css'
 
@@ -48,7 +48,7 @@ export function UserTimestamp({
   const formattedDate = date ? <Timestamp date={date} dateFormat="medium" timeFormat="medium" /> : '-'
 
   const userLink = userId ? (
-    <NxLink to={getUserDetailPath(userId)}>{displayName}</NxLink>
+    <SynLink to={getUserDetailPath(userId)}>{displayName}</SynLink>
   ) : (
     <span className={styles.userName}>{displayName}</span>
   )

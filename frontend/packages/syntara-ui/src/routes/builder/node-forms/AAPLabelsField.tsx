@@ -16,7 +16,7 @@ import {
 import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { Controller, useFormContext } from 'react-hook-form'
 
-import { NxSelect } from '../../../components/NxSelect'
+import { SynSelect } from '../../../components/SynSelect'
 import { DEBOUNCE_MS } from '../../../constants/timing'
 import type { AAPLabel } from '../../../hooks/useAAPBrowser'
 
@@ -190,7 +190,7 @@ export function AAPLabelsField({
             }
 
             return (
-              <NxSelect
+              <SynSelect
                 isOpen={isOpen}
                 selected={selectedLabels}
                 onSelect={handleSelect}
@@ -237,7 +237,7 @@ export function AAPLabelsField({
                     ))
                   )}
                 </SelectList>
-              </NxSelect>
+              </SynSelect>
             )
           }}
         />

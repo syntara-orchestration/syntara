@@ -22,6 +22,7 @@ const basePermissions: Permissions = {
   isLoading: false,
   tooltips: {
     create: 'No create permission',
+    duplicate: 'No duplicate permission',
     update: 'No update permission',
     delete: 'No delete permission',
     run: 'No run permission',
@@ -145,7 +146,7 @@ describe('buildWorkflowRowActions', () => {
       )
       const dup = actions.find((a) => a.key === 'duplicate')
       expect(dup?.isAriaDisabled).toBe(true)
-      expect(dup?.tooltipProps?.content).toBe('No create permission')
+      expect(dup?.tooltipProps?.content).toBe('No duplicate permission')
     })
 
     it('disables delete with permission tooltip when canDelete is false', () => {

@@ -95,6 +95,7 @@ class WorkflowApiClient:
         decided_by: str,
         decided_at: str,
         decision_notes: str | None = None,
+        temporal_activity_id: str | None = None,
     ) -> None:
         """Send approval decision signal to workflow engine.
 
@@ -113,6 +114,8 @@ class WorkflowApiClient:
             decided_by: Username of the user who made the decision
             decided_at: ISO 8601 timestamp of when the decision was made
             decision_notes: Optional notes provided by the approver
+            temporal_activity_id: Temporal activity ID to complete. Defaults to
+                ``approval_node_id`` for rows created before this field existed.
 
         Raises:
             httpx.RequestError: If signal delivery fails after all retries
@@ -124,8 +127,8 @@ class WorkflowApiClient:
             handle exceptions and continue processing.
 
         """
-        # Generate the signal URL using workflow utils
-        signal_url = generate_activity_signal_url(execution_id, approval_node_id)
+        activity_id = temporal_activity_id or approval_node_id
+        signal_url = generate_activity_signal_url(execution_id, activity_id)
 
         # Build signal payload with fields matching the approval resultSchema
         signal_payload = {

@@ -18,6 +18,7 @@ from syntara.core.lib.encryption import EncryptionError
 from syntara.core.services.secret_service import SecretService, create_secret_service
 from syntara.credentials.lib.injector_resolver import InjectorResolver
 from syntara.credentials.models.credential import Credential
+from syntara.integrations.models.integration import Integration
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -213,12 +214,33 @@ def _extract_auth_from_extra_vars(
     return auth_headers, basic_auth
 
 
+async def _connection_from_validated_credential(session: AsyncSession, credential: Credential) -> AAPConnection:
+    """Decrypt a type-checked AAP credential. Does not check ownership."""
+    secret_service: SecretService = create_secret_service(session)
+    decrypted_inputs = await _decrypt_credential_inputs(credential, secret_service)
+    extra_vars = _resolve_credential_injectors(credential, decrypted_inputs)
+    auth_headers, basic_auth = _extract_auth_from_extra_vars(extra_vars)
+
+    logger.info(
+        "AAP auth details resolved from credential",
+        credential_id=str(credential.id),
+        credential_name=credential.name,
+        auth_method="oauth" if basic_auth is None else "basic",
+    )
+
+    return AAPConnection(
+        base_url="",
+        headers=dict(auth_headers),
+        basic_auth=basic_auth,
+    )
+
+
 async def resolve_aap_connection_from_credential(
     session: AsyncSession,
     credential_id: UUID | str,
     user_id: UUID,
 ) -> AAPConnection:
-    """Resolve AAP auth from a Syntara credential.
+    """Resolve AAP auth from a Syntara credential the caller owns.
 
     Returns an AAPConnection with authentication fields populated.
     The caller must supply ``base_url`` and ``verify_ssl`` from the
@@ -227,7 +249,7 @@ async def resolve_aap_connection_from_credential(
     Args:
         session: Async database session.
         credential_id: UUID of the credential (accepts UUID or str for conversion).
-        user_id: User ID (UUID) for authorization check (required - credential owner must match).
+        user_id: User ID (UUID) for the owner check. Required.
 
     Returns:
         AAPConnection with decrypted auth. ``base_url`` is empty and
@@ -243,38 +265,31 @@ async def resolve_aap_connection_from_credential(
         - user_id is required (not optional) to prevent accidental bypass of authorization
 
     """
-    # Validate and convert credential_id to UUID
     validated_credential_id = _validate_credential_id(credential_id)
-
-    # Fetch credential from database
     credential = await _fetch_credential(session, validated_credential_id)
-
-    # Validate credential type, enabled status, and ownership
     _validate_credential_type(credential)
     _validate_credential_enabled(credential)
     _validate_credential_ownership(credential, user_id)
+    return await _connection_from_validated_credential(session, credential)
 
-    # Decrypt credential fields
-    secret_service: SecretService = create_secret_service(session)
-    decrypted_inputs = await _decrypt_credential_inputs(credential, secret_service)
 
-    # Resolve injector templates to get mapped field names
-    extra_vars = _resolve_credential_injectors(credential, decrypted_inputs)
+async def resolve_aap_connection_from_management_credential(
+    session: AsyncSession,
+    integration: Integration,
+) -> AAPConnection:
+    """Decrypt the integration's management credential. No owner check.
 
-    # Extract AAP auth from resolved extra_vars
-    auth_headers, basic_auth = _extract_auth_from_extra_vars(extra_vars)
+    Call only after integration visibility has been enforced. Loads
+    ``integration.management_credential_id`` only — not an arbitrary credential ID.
+    """
+    if integration.management_credential_id is None:
+        msg = (
+            f"Integration '{integration.name}' has no management credential; "
+            "pass credential_id or configure a management credential on the integration"
+        )
+        raise AAPNotConfiguredError(msg)
 
-    # Log credential auth resolution
-    # Security: Log at INFO level to prevent infrastructure leakage
-    logger.info(
-        "AAP auth details resolved from credential",
-        credential_id=str(validated_credential_id),
-        credential_name=credential.name,
-        auth_method="oauth" if basic_auth is None else "basic",
-    )
-
-    return AAPConnection(
-        base_url="",
-        headers=dict(auth_headers),
-        basic_auth=basic_auth,
-    )
+    credential = await _fetch_credential(session, integration.management_credential_id)
+    _validate_credential_type(credential)
+    _validate_credential_enabled(credential)
+    return await _connection_from_validated_credential(session, credential)

@@ -142,10 +142,12 @@ Integrations use two distinct credential roles with different scopes:
 
 | Credential | Stored on | Used for |
 |---|---|---|
-| **Management credential** | `Integration.management_credential_id` | Health checks (`validate`, `refresh`), tool/model discovery only |
-| **Execution credential** | `IntegrationConnectionConfig` (per workflow node) | MCP tool calls and LLM invocations during workflow execution |
+| **Management credential** | `Integration.management_credential_id` | Health checks (`validate`, `refresh`), tool/model discovery, and AAP proxy browsing when no execution `credential_id` is passed |
+| **Execution credential** | `IntegrationConnectionConfig` (per workflow node) or AAP node `credential_id` | MCP tool calls, LLM invocations, and AAP job launches during workflow execution |
 
-The system does not reference the management credential during workflow execution or fall back to it. Execution credentials are independently selected by the workflow designer from credentials available in the workflow's project. A user may choose the same credential object for both roles, but the system treats them as separate references — there is no implicit fallback. If no execution credential is configured for an integration, tool calls are made unauthenticated.
+The system does not reference the management credential during **workflow execution** of MCP or LLM calls, or fall back to it there. Execution credentials are independently selected by the workflow designer from credentials available in the workflow's project. A user may choose the same credential object for both roles, but the system treats them as separate references — there is no implicit fallback for those types. If no execution credential is configured for an MCP/LLM integration, tool calls are made unauthenticated.
+
+**AAP proxy exception:** `GET /api/v1/proxies/aap/*` falls back to the integration's management credential when `credential_id` is omitted, so a unique visible enabled AAP integration is enough to list controller resources. With one visible AAP integration, both query params may be omitted. With more than one, pass `integration_id` to select which gateway to use.
 
 Credential requirements vary by integration type. LLM providers and AAP instances always require a management credential — health checks and discovery cannot run without one. MCP servers support unauthenticated connections, so a management credential is only needed when the server itself requires authentication.
 
@@ -203,7 +205,7 @@ The LLM adapter delegates to provider-specific implementations via `LLMProviderB
 
 ### Ansible Automation Platform
 
-The AAP integration stores the API URL and TLS configuration. It does not discover sub-resources — AAP objects (job templates, inventories, organizations) are browsed at workflow-design time through separate proxy endpoints using execution credentials.
+The AAP integration stores the API URL and TLS configuration. It does not discover sub-resources — AAP objects (job templates, inventories, organizations) are browsed at workflow-design time through `GET /api/v1/proxies/aap/*`. The proxy uses the integration's management credential when the caller does not pass an execution `credential_id`, so a unique visible enabled AAP integration is sufficient to list controller resources. If more than one AAP integration is visible, pass `integration_id`; `credential_id` is still optional.
 
 **Design Decisions:**
 - **Static credential authentication.** The adapter uses `aap_oauth_token` (Bearer) if present, falling back to `aap_username` + `aap_password` (Basic Auth). No support for short-lived tokens, token refresh, or OIDC — this is a known limitation.

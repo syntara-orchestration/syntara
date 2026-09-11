@@ -27,7 +27,7 @@ export function useSemanticZoom(nodeId: string, hasSemanticZoomSummary: boolean)
     if (prev === undefined) {
       prevSemanticZoomRef.current = isSemanticZoom
       // Avoid updateNodeInternals on first paint at default zoom — it triggers xyflow layout
-      // in jsdom (DOMMatrixReadOnly). Only measure when the user already has semantic zoom.
+      // in happy-dom (DOMMatrixReadOnly). Only measure when the user already has semantic zoom.
       if (isSemanticZoom) {
         updateNodeInternals(nodeId)
       }

@@ -11,8 +11,8 @@ vi.mock('../../client', () => ({
   interfaceTagMiddleware: { onRequest: vi.fn() },
 }))
 
-vi.mock('../../components/details/NxCodeBlock', () => ({
-  NxCodeBlock: ({ jsonObject }: { jsonObject: unknown }) => <pre>{JSON.stringify(jsonObject)}</pre>,
+vi.mock('../../components/details/SynCodeBlock', () => ({
+  SynCodeBlock: ({ jsonObject }: { jsonObject: unknown }) => <pre>{JSON.stringify(jsonObject)}</pre>,
 }))
 
 const samplePolicy: PolicyRead = {

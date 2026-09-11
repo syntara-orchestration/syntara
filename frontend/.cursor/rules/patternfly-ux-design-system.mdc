@@ -34,7 +34,7 @@ How the UI is anchored:
 - **Automation builder** — Based on [React Flow](https://reactflow.dev/) with PatternFly as visual wrapper
 - **Accessibility** — Must achieve [WCAG 2.1 AA](https://www.w3.org/WAI/WCAG2AA-Conformance) and [Section 508](https://www.section508.gov/) compliance
 - **PatternFly gaps** — Check PF docs first → Raise with UX team → Engage PatternFly → Document with `patternfly-override` label → Resolve upstream
-- **`Nx` prefix convention** — opinionated global components use the `Nx` prefix (e.g., `SynPage`, `SynPanel`, `NxConfirmationDialog`, `NxDetailList`) in `src/components/` organized by: `layout/`, `dialogs/`, `details/`, `tabs/`, `states/`. Use the `Nx*` wrapper, not the raw PF component.
+- **`Syn` prefix convention** — opinionated global components use the `Syn` prefix (e.g., `SynPage`, `SynPanel`, `SynConfirmationDialog`, `SynDetailList`, `SynUrlTabs`, `SynListPanel`) in `src/components/` organized by: `layout/`, `dialogs/`, `details/`, `tabs/`, `states/`, `labels/`, `table/`, `panels/`. Use the `Syn*` wrapper, not the raw PF component.
 
 ## Page Layout (MANDATORY)
 
@@ -59,7 +59,7 @@ Every page must follow this structural hierarchy:
 | **Form page**      | `SynPageBreadcrumbs` → `SynPageHeader` → `SynPanel isFullHeight footer={<ActionGroup>…}` → form body              |
 | **Error in panel** | Same shell → `SynPageBody isCentered` + `ErrorState` inside `SynPanel`                                          |
 
-**`NxListPanel`** — canonical list page implementation. Compound API: `NxListPanelView` (handles loading/error/empty/filter states), `NxListPanelToolbar` (wraps in `<fieldset disabled={isFetching}>` during refetch), `NxListPanelTable`. Use instead of manual `SynPanelContentStack` + `useQueryState` + three-state branching.
+**`SynListPanel`** — canonical list page implementation. Compound API: `SynListPanelView` (handles loading/error/empty/filter states), `SynListPanelToolbar` (wraps in `<fieldset disabled={isFetching}>` during refetch), `SynListPanelTable`. Use instead of manual `SynPanelContentStack` + `useQueryState` + three-state branching.
 
 **Sticky form footer** — Form Save/Cancel buttons live in `SynPanel footer={<ActionGroup>…</ActionGroup>}`, NOT in the page header. `PanelMain` scrolls while footer stays pinned. Cancel uses `variant="link"`. Applies to Create/Edit forms, Configure Integration, Settings tabs. Does NOT apply to builder node editor panels or modals.
 
@@ -68,6 +68,7 @@ Every page must follow this structural hierarchy:
 - **Main page header** — Left-aligned title, right-aligned actions
 - **Details page header** — Left-aligned breadcrumbs (`SynPageBreadcrumbs`) + title; toolbar left→right: Switch → Edit (primary) → kebab
 - **Form page header** — Left-aligned breadcrumbs + title; no action buttons in the header — Save and Cancel live in the `SynPanel` sticky footer
+- **Documentation link** — pass `docLink={useDocLink('key')}` to `SynPageHeader`; never hardcode doc URLs. Add keys to `docsUrls.json`.
 
 ### Breadcrumbs
 
@@ -95,7 +96,7 @@ Use a docked icon navigation (left sidebar) with PatternFly's flyout panels comp
 ## Tabs
 
 - Tab labels: sentence case, clear and professional, no punctuation
-- **`NxUrlTabs` API:** `basePath`, `defaultTab` (defaults to `"details"`), optional `validTabs`. URL is single source of truth — no local state. Tab panel content owns inner padding (`--pf-t--global--spacer--lg`).
+- **`SynUrlTabs` API:** `basePath`, `defaultTab` (defaults to `"details"`), optional `validTabs`. URL is single source of truth — no local state. Tab panel content owns inner padding (`--pf-t--global--spacer--lg`).
 - **Tab intro paragraphs:** For complex admin sections (Access Management tabs), add a `Content` paragraph above tab content explaining purpose + RBAC context. Spacing: `marginBottom: var(--pf-t--global--spacer--md)`.
 
 ## Filter Bar
@@ -108,12 +109,12 @@ Use a docked icon navigation (left sidebar) with PatternFly's flyout panels comp
 
 ## Table Component
 
-- ALWAYS use `NxScrollableTableContainer` wrapper — this applies the standard table variant by default
-- `NxScrollableTableContainer` does not set `variant="compact"` — the default (standard) variant is used for main data tables
+- ALWAYS use `SynScrollableTableContainer` wrapper — this applies the standard table variant by default
+- `SynScrollableTableContainer` does not set `variant="compact"` — the default (standard) variant is used for main data tables
 - Use `variant="compact"` only for dense, supplementary tables (e.g., activity state tables inside panels) where space is constrained
 - ALWAYS include `<Thead>` with column headers
 - Actions column is rightmost (no column header label)
-- All row actions live inside a kebab menu (⋮) — no direct buttons in the actions column. Use `NxKebabMenu` component with `actions` array: `{ key, title, onClick, isSeparator?, isDanger?, isAriaDisabled?, tooltipProps? }`. Per-row `aria-label` must be unique (e.g., `` `Actions for ${name}` ``).
+- All row actions live inside a kebab menu (⋮) — no direct buttons in the actions column. Use `SynKebabMenu` component with `actions` array: `{ key, title, onClick, isSeparator?, isDanger?, isAriaDisabled?, tooltipProps? }`. Per-row `aria-label` must be unique (e.g., `` `Actions for ${name}` ``).
 - **Kebab labels:** Always `"Action + resource"` format (e.g., "Edit credential", "Delete credential") with icons via `IconLabel`; destructive items use `isDanger: true`
 - Action order in kebab: non-destructive first, divider, destructive last
 - On the details page header, same actions appear in a kebab; frequently used actions promoted to primary button with icon (e.g., `RhUiEditIcon` + "Edit credential")
@@ -121,8 +122,8 @@ Use a docked icon navigation (left sidebar) with PatternFly's flyout panels comp
 - Clicking resource name navigates to details view
 - "Created"/"Modified" columns: username (linked) + date together. Date format: `MMM DD, YYYY, H:MM:SS AM/PM` — always use `DateCell` / `formatDateTime()` from `dateUtils.ts` (never `toLocaleString` or PF `Timestamp`)
 - Text-heavy columns (names, descriptions, emails, URLs) MUST use `<Truncate>` — ellipsis with tooltip on hover; `table-layout: fixed` for equal column distribution (do not opt out with `useFixedLayout={false}`)
-- Expandable rows: pass `isExpandable` to `NxScrollableTableContainer`, add expand-all/collapse-all toggle in `<Thead>` via `expand` prop, use `ExpandableRowContent` for nested detail, compact gray `Label` for list data
-- Footer/pagination: cursor-based via `NxScrollableTableContainer`'s `footer` prop (`TableFooterProps`)
+- Expandable rows: pass `isExpandable` to `SynScrollableTableContainer`, add expand-all/collapse-all toggle in `<Thead>` via `expand` prop, use `ExpandableRowContent` for nested detail, compact gray `Label` for list data. Hide expand toggle when row has no nested content. Use `useExpandableRowIds` for expand state. Assignment policies belong in expanded rows, not a crowded column.
+- Footer/pagination: cursor-based via `SynScrollableTableContainer`'s `footer` prop (`TableFooterProps`)
   - Left: item count — `"5 workflows (of 100 total)"`
   - Right: Previous / Next buttons using API cursor tokens (`prev`, `next`) — no page numbers or per-page selector
   - Pass `{ content, prev, next, onPrev, onNext }` to the `footer` prop
@@ -150,9 +151,9 @@ Use a docked icon navigation (left sidebar) with PatternFly's flyout panels comp
 
 ## Details Component
 
-- Use `NxDetailList` + `NxDetail` (vertical default; `isHorizontal` for compact contexts like canvas steps)
-- `NxDetail` with empty/null children **renders nothing** — no manual null checks or placeholders needed
-- Use `NxCodeBlock` for JSON/scripts/logs — supports `enableCopy`, `enableExpand`, `jsonObject`
+- Use `SynDetailList` + `SynDetail` (vertical default; `isHorizontal` for compact contexts like canvas steps)
+- `SynDetail` with empty/null children **renders nothing** — no manual null checks or placeholders needed
+- Use `SynCodeBlock` for JSON/scripts/logs — supports `enableCopy`, `enableExpand`, `jsonObject`
 - Consistent date/duration formatting per PatternFly Date/Time guidelines
 - Header: title + primary actions from the table row
 - **Plain text for informational metadata** — credential type, auth method, etc. are plain text, not `Label` badges. Use `Label` only for statuses or visual distinction.
@@ -191,17 +192,17 @@ Action verb pairings: "Create" ↔ "Delete", "Add" ↔ "Remove" (internal resour
 ### Update/Edit
 
 - **Full page:** 5+ fields, multi-step, or if create is full page
-  - Pre-populate fields, track dirty state, warn on unsaved navigation, show loading while saving
+  - Pre-populate fields, track dirty state, warn on unsaved navigation via `useDirtyFormGuard`, show loading while saving
 - **Modal:** 2–4 fields, or if create is a modal
 - **Inline:** Single-field edits, toggles (use PatternFly Switch Checked with Label), renames
 
 ### Confirmation Dialog — Three-Tier Severity
 
-`NxConfirmationDialog` supports three tiers: **Default/Disable** (primary, no icon) → **Danger** (danger + warning icon, no checkbox) → **DestructiveAcknowledgement** (danger + warning + required checkbox). See Storybook for canonical copy per tier.
+`SynConfirmationDialog` supports three tiers: **Default/Disable** (primary, no icon) → **Danger** (danger + warning icon, no checkbox) → **DestructiveAcknowledgement** (danger + warning + required checkbox). See Storybook for canonical copy per tier.
 
 ### Delete (Destructive) — Three Variants
 
-ALWAYS use `NxConfirmationDialog` from `src/components/dialogs/NxConfirmationDialog.tsx`. Never use raw `Modal` + `ModalHeader` + `ModalBody` + `ModalFooter` for delete actions.
+ALWAYS use `SynConfirmationDialog` from `src/components/dialogs/SynConfirmationDialog.tsx`. Never use raw `Modal` + `ModalHeader` + `ModalBody` + `ModalFooter` for delete actions.
 
 All delete variants share: Small modal, warning icon title, `confirmVariant="danger"`, `confirmLabel="Delete"`, cancel `variant="link"`, checkbox via `destructiveAcknowledgement` (Delete button disabled until checked).
 
@@ -304,8 +305,8 @@ Button alignment differs by context (follows PatternFly convention):
 ## Statuses and Labels
 
 - **Statuses:** PatternFly Outline Status Label component
-- **System labels:** Use `NxLabel` (filled, compact by default) — defaults to gray; use `color` for categories, `status` for statuses
-- **User-generated labels:** Use `NxUserTag` (outlined, compact) for any user-entered values (tags, filter chips)
+- **System labels:** Use `SynLabel` (filled, compact by default) — defaults to gray; use `color` for categories, `status` for statuses
+- **User-generated labels:** Use `SynUserTag` (outlined, compact) for any user-entered values (tags, filter chips)
 - If labels on a table reference a resource, make them clickable, navigating to the details page
 
 ## Icons
@@ -355,6 +356,8 @@ All icons MUST use the **`RhUi` prefix** (e.g., `RhUiAddIcon`, `RhUiEditIcon`, `
 - **Approval side panel:** Right-side panel on execution viewer for inline approval review. Mutually exclusive with history panel; auto-opens on pending approval via `useAutoApprovalDetection`. **Multi-approval navigation:** `ApprovalNavigationHeader` with prev/next arrows, "2 of 5" counter, keyboard nav support.
 - **Wait node countdown:** Live `HH:MM:SS` countdown on canvas during execution via `useWaitCountdown` (1s interval). Clears on terminal status.
 - **Import confirmation:** Modal with radio choices ("Import as new" vs "Import into current") for existing saved workflows. Direct import for new/empty. Warns about unsaved changes when `isDirty`.
+- **Run history rows:** Use `HistoryListItemLink` (real `<a>` via TanStack Router), not `Button` + `navigate`. Overlay pattern when row has nested controls (version link, kebab). `SynLink` cannot be used — it renders a Button.
+- **Browser tab dirty indicator:** Prepend `●` to `<title>` when builder has unsaved changes (via `toPageTitle`).
 
 ## Permission Gating
 
@@ -363,7 +366,7 @@ Every domain uses a `use{Domain}Permissions()` hook returning `{ can*, isLoading
 **Gating strategy:**
 
 - **Nav items:** Hide via `requiredPermissions` (OR logic — visible if any granted)
-- **Tabs:** Filter with `NxUrlTabs validTabs`; show all during load; redirect invalid URLs to first visible tab
+- **Tabs:** Filter with `SynUrlTabs validTabs`; show all during load; redirect invalid URLs to first visible tab
 - **Toolbar buttons:** `DisabledWithTooltip` wrapper + `isAriaDisabled` + permission tooltip
 - **Row/kebab actions:** `isAriaDisabled` + `tooltipProps` on action items
 - **Empty state CTA:** Pass `undefined` callback to hide button entirely
@@ -381,6 +384,7 @@ Non-dismissible alert dialog for security-critical time warnings: `Modal variant
 - 3-step PatternFly Wizard for initial setup: Select type → Configure connection → Review & confirm with "Test connection"
 - Detail page header: integration name + enabled/disabled `Switch` toggle (immediate, no confirmation for enable)
 - "Test connection" secondary button — must pass before enabling tools
+- **Last checked:** show `last_validated_at` as "Last checked" on list (sortable column) and detail (via `DateCell` / `UserTimestamp`)
 - Tools tab: table of available tools with per-row `Switch` to enable/disable individual tools
 
 ## Access Management & My Profile
@@ -388,6 +392,9 @@ Non-dismissible alert dialog for security-critical time warnings: `Modal variant
 - Access Management tab label: **"Check access"** (not "Can I")
 - Self-service flows (Check access, My tokens) live on the **My Profile** page, not Access Management
 - Access Management contains only admin tabs: Users, Groups, Projects, Roles, Policies, Assignments
+- **Role assignment pickers:** filter out already-assigned roles for the selected principal at the relevant scope
+- **Policy multi-select:** include "Select All" that fetches all pages and merges with existing selection
+- **User enabled toggle:** lives on the users list table State column (Switch), not on the edit user form
 - **My Profile** (`/my-profile`): reuses `UserDetail` with `isMyProfile` flag; no breadcrumbs; extra tabs (My tokens, Check access); accessible from user avatar menu in masthead
 
 ## Full-Page Wizard
@@ -479,4 +486,4 @@ If a global style seems necessary, follow the PatternFly gaps process: check PF 
 
 - `npm run storybook` (port 5174). Preview in light + dark mode via toolbar before sign-off.
 - Stories reflect real app compositions, not isolated prop demos.
-- `Nx*` components with `autodocs`: `SynPage`, `SynPageHeader`, `SynPageBreadcrumbs`, `SynPanel`, `SynPanelContentStack`, `NxUrlTabs`, `NxConfirmationDialog`, `NxCodeBlock`, `NxDetail`, `NxDetailList`, `SynErrorState`, `SynLoadingState`, `SynEmptyStateNoData`, `SynEmptyStateFilter`, `SynEmptyStateServiceUnavailable`, `NxListPanel`, `NxKebabMenu`, `NxLabel`, `NxUserTag`, `NxScrollableTableContainer`.
+- `Syn*` components with `autodocs`: `SynPage`, `SynPageHeader`, `SynPageBreadcrumbs`, `SynPanel`, `SynPanelContentStack`, `SynUrlTabs`, `SynConfirmationDialog`, `SynCodeBlock`, `SynDetail`, `SynDetailList`, `SynErrorState`, `SynLoadingState`, `SynEmptyStateNoData`, `SynEmptyStateFilter`, `SynEmptyStateServiceUnavailable`, `SynListPanel`, `SynKebabMenu`, `SynLabel`, `SynUserTag`, `SynScrollableTableContainer`.

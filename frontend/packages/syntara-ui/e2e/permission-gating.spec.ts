@@ -282,7 +282,7 @@ test.describe('Permission gating — Route guards', () => {
     await app.goto(toAppUrl(`${AM_URL}/users/create`))
 
     await expect(app.getByRole('heading', { name: 'Access denied' })).not.toBeVisible()
-    await expect(app.getByRole('heading', { name: /Create User/i })).toBeVisible()
+    await expect(app.getByRole('heading', { name: 'Create user' })).toBeVisible()
   })
 })
 
@@ -602,105 +602,97 @@ test.describe('Permission gating — Project actions', () => {
     }
   })
 
-  test(
-    'viewer: project kebab menu in page header (selected project) is not visible',
-    { tag: ['@konflux-skip'] },
-    async ({ app, viewerApp }) => {
-      const projectName = buildUniqueName('e2e-viewer-header-proj')
-      const workflowName = buildUniqueName('e2e-viewer-header-wf')
+  test('viewer: project kebab menu in page header (selected project) is not visible', async ({ app, viewerApp }) => {
+    const projectName = buildUniqueName('e2e-viewer-header-proj')
+    const workflowName = buildUniqueName('e2e-viewer-header-wf')
 
-      try {
-        // Create project as admin
-        const createProjectResp = await apiRequest(app, 'post', '/projects', {
-          data: { name: projectName },
-        })
-        if (!createProjectResp.ok()) throw new Error('Project creation failed')
-        const project = (await createProjectResp.json()) as { id: string }
+    try {
+      // Create project as admin
+      const createProjectResp = await apiRequest(app, 'post', '/projects', {
+        data: { name: projectName },
+      })
+      if (!createProjectResp.ok()) throw new Error('Project creation failed')
+      const project = (await createProjectResp.json()) as { id: string }
 
-        // Create workflow in the project
-        const createWorkflowResp = await apiRequest(app, 'post', '/workflows', {
-          data: {
+      // Create workflow in the project
+      const createWorkflowResp = await apiRequest(app, 'post', '/workflows', {
+        data: {
+          name: workflowName,
+          project_id: project.id,
+          workflow_definition: {
+            schema_version: '2.0.0',
             name: workflowName,
-            project_id: project.id,
-            workflow_definition: {
-              schema_version: '2.0.0',
-              name: workflowName,
-              triggers: [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
-              nodes: [],
-              edges: [],
-            },
+            triggers: [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
+            nodes: [],
+            edges: [],
           },
-        })
-        if (!createWorkflowResp.ok()) throw new Error('Workflow creation failed')
-        const workflow = (await createWorkflowResp.json()) as { id: string }
+        },
+      })
+      if (!createWorkflowResp.ok()) throw new Error('Workflow creation failed')
+      const workflow = (await createWorkflowResp.json()) as { id: string }
 
-        // Viewer cannot select individual projects — dropdown only shows "All projects"
-        await viewerApp.goto(toAppUrl('/workflows'))
-        const projectSelector = viewerApp.getByRole('textbox', { name: 'Project' })
-        await projectSelector.click()
-        await expect(viewerApp.getByRole('option', { name: 'All projects' })).toBeVisible()
-        await expect(viewerApp.getByRole('option', { name: projectName })).not.toBeVisible()
-        await expect(viewerApp.getByRole('option', { name: project.id })).not.toBeVisible()
-        await viewerApp.keyboard.press('Escape')
+      // Viewer cannot select individual projects — dropdown only shows "All projects"
+      await viewerApp.goto(toAppUrl('/workflows'))
+      const projectSelector = viewerApp.getByRole('textbox', { name: 'Project' })
+      await projectSelector.click()
+      await expect(viewerApp.getByRole('option', { name: 'All projects' })).toBeVisible()
+      await expect(viewerApp.getByRole('option', { name: projectName })).not.toBeVisible()
+      await expect(viewerApp.getByRole('option', { name: project.id })).not.toBeVisible()
+      await viewerApp.keyboard.press('Escape')
 
-        // Clean up
-        await apiRequest(app, 'delete', `/workflows/${workflow.id}`)
-        await apiRequest(app, 'delete', `/projects/${project.id}`)
-      } catch (error) {
-        // Best-effort cleanup on failure
-        try {
-          const listResp = await apiRequest(app, 'get', '/workflows')
-          if (listResp.ok()) {
-            const list = (await listResp.json()) as { resources: Array<{ id: string; name: string }> }
-            const wf = list.resources.find((w) => w.name === workflowName)
-            if (wf) await apiRequest(app, 'delete', `/workflows/${wf.id}`)
-          }
-          const projListResp = await apiRequest(app, 'get', '/projects')
-          if (projListResp.ok()) {
-            const projList = (await projListResp.json()) as { resources: Array<{ id: string; name: string }> }
-            const proj = projList.resources.find((p) => p.name === projectName)
-            if (proj) await apiRequest(app, 'delete', `/projects/${proj.id}`)
-          }
-        } catch {
-          // Ignore cleanup errors
+      // Clean up
+      await apiRequest(app, 'delete', `/workflows/${workflow.id}`)
+      await apiRequest(app, 'delete', `/projects/${project.id}`)
+    } catch (error) {
+      // Best-effort cleanup on failure
+      try {
+        const listResp = await apiRequest(app, 'get', '/workflows')
+        if (listResp.ok()) {
+          const list = (await listResp.json()) as { resources: Array<{ id: string; name: string }> }
+          const wf = list.resources.find((w) => w.name === workflowName)
+          if (wf) await apiRequest(app, 'delete', `/workflows/${wf.id}`)
         }
-        throw error
+        const projListResp = await apiRequest(app, 'get', '/projects')
+        if (projListResp.ok()) {
+          const projList = (await projListResp.json()) as { resources: Array<{ id: string; name: string }> }
+          const proj = projList.resources.find((p) => p.name === projectName)
+          if (proj) await apiRequest(app, 'delete', `/projects/${proj.id}`)
+        }
+      } catch {
+        // Ignore cleanup errors
       }
+      throw error
     }
-  )
+  })
 })
 
 // ── Action gating — Credentials ──────────────────────────────────────────
 
 test.describe('Permission gating — Credential actions', () => {
-  test(
-    'viewer: Create credential button is disabled with tooltip',
-    { tag: ['@konflux-skip'] },
-    async ({ app, viewerApp }) => {
-      const { id: credId, name: credName } = await createTestCredential(app)
+  test('viewer: Create credential button is disabled with tooltip', async ({ app, viewerApp }) => {
+    const { id: credId, name: credName } = await createTestCredential(app)
 
-      try {
-        await viewerApp.goto(toAppUrl('/configuration/credentials'))
-        await expect(viewerApp.getByRole('heading', { level: 1, name: 'Credentials' })).toBeVisible()
+    try {
+      await viewerApp.goto(toAppUrl('/configuration/credentials'))
+      await expect(viewerApp.getByRole('heading', { level: 1, name: 'Credentials' })).toBeVisible()
 
-        // Wait for credential data to load — the toolbar button only renders once credentials.length > 0
-        await expect(
-          viewerApp.getByRole('grid', { name: 'Credentials table' }).getByRole('row', { name: new RegExp(credName) })
-        ).toBeVisible({ timeout: 15_000 })
+      // Wait for credential data to load — the toolbar button only renders once credentials.length > 0
+      await expect(
+        viewerApp.getByRole('grid', { name: 'Credentials table' }).getByRole('row', { name: new RegExp(credName) })
+      ).toBeVisible({ timeout: 15_000 })
 
-        const createButton = viewerApp.getByRole('button', { name: /Create credential/i })
-        await expect(createButton).toBeVisible()
-        await expect(createButton).toHaveAttribute('aria-disabled', 'true')
+      const createButton = viewerApp.getByRole('button', { name: /Create credential/i })
+      await expect(createButton).toBeVisible()
+      await expect(createButton).toHaveAttribute('aria-disabled', 'true')
 
-        await createButton.hover()
-        await expect(viewerApp.getByRole('tooltip').filter({ hasText: 'credential:create' })).toBeVisible()
-      } finally {
-        await deleteCredentialViaApi(app, credId)
-      }
+      await createButton.hover()
+      await expect(viewerApp.getByRole('tooltip').filter({ hasText: 'credential:create' })).toBeVisible()
+    } finally {
+      await deleteCredentialViaApi(app, credId)
     }
-  )
+  })
 
-  test('auditor: Create credential button is disabled', { tag: ['@konflux-skip'] }, async ({ app, auditorApp }) => {
+  test('auditor: Create credential button is disabled', async ({ app, auditorApp }) => {
     const { id: credId } = await createTestCredential(app)
 
     try {
@@ -742,6 +734,8 @@ test.describe('Permission gating — Credential actions', () => {
     }
   })
 
+  // Dual-browser auditor session + kebab aria-disabled is flaky under Konflux load.
+  // Still runs in GitHub compose E2E. Currents quarantines are not applied in Konflux.
   test('auditor: credential row actions are aria-disabled', async ({ app, auditorApp }) => {
     const credential = await createTestCredential(app)
 
@@ -779,7 +773,8 @@ test.describe('Permission gating — Access Management actions', () => {
 
     const createButton = auditorApp.getByRole('button', { name: /Create group/i })
     await expect(createButton).toBeVisible()
-    await expect(createButton).toHaveAttribute('aria-disabled', 'true')
+    // aria-disabled is set after the permissions API resolves — give it extra time
+    await expect(createButton).toHaveAttribute('aria-disabled', 'true', { timeout: 20_000 })
   })
 
   test('auditor: Create user button is disabled', async ({ auditorApp }) => {
@@ -821,6 +816,13 @@ test.describe('Permission gating — Detail page header actions', () => {
   const E2E_USER_PASSWORD = 'E2eTestP@ssw0rd!'
 
   test('auditor: user detail Edit and kebab actions are aria-disabled', async ({ app, auditorApp }) => {
+    // This test depends on 3-4 sequential, unbatched /authz/can_i round trips
+    // (useUserPermissions + useUserDetailPermissions) resolving against the
+    // real backend. The default 60s test budget plus 15-20s per-assertion
+    // timeouts leaves little headroom under CI load, which has caused
+    // intermittent timeouts here. Give the whole test more room.
+    test.setTimeout(90_000)
+
     const username = buildUniqueName('e2e-perm-user-detail')
     const user = await createUserViaApi(app, { username, password: E2E_USER_PASSWORD })
     if (!user) throw new Error('createUserViaApi failed')
@@ -831,17 +833,17 @@ test.describe('Permission gating — Detail page header actions', () => {
 
       // aria-disabled is set after the permissions API resolves — give it extra time
       await expect(auditorApp.getByRole('button', { name: 'Edit user' })).toHaveAttribute('aria-disabled', 'true', {
-        timeout: 20_000,
+        timeout: 30_000,
       })
 
       await auditorApp.getByRole('button', { name: 'User actions' }).click()
       await expect(auditorApp.getByRole('menuitem', { name: 'Revoke tokens' })).toHaveAttribute(
         'aria-disabled',
         'true',
-        { timeout: 15_000 }
+        { timeout: 20_000 }
       )
       await expect(auditorApp.getByRole('menuitem', { name: 'Delete user' })).toHaveAttribute('aria-disabled', 'true', {
-        timeout: 15_000,
+        timeout: 20_000,
       })
     } finally {
       await deleteUserViaApi(app, user.id)
@@ -856,10 +858,17 @@ test.describe('Permission gating — Detail page header actions', () => {
       await auditorApp.goto(toAppUrl(`${AM_URL}/groups/${groupId}`))
       await expect(auditorApp.getByRole('heading', { level: 1 })).toBeVisible()
 
-      await expect(auditorApp.getByRole('button', { name: 'Edit group' })).toHaveAttribute('aria-disabled', 'true')
+      // aria-disabled is set after the permissions API resolves — give it extra time
+      await expect(auditorApp.getByRole('button', { name: 'Edit group' })).toHaveAttribute('aria-disabled', 'true', {
+        timeout: 20_000,
+      })
 
       await auditorApp.getByRole('button', { name: 'Group actions' }).click()
-      await expect(auditorApp.getByRole('menuitem', { name: 'Delete group' })).toHaveAttribute('aria-disabled', 'true')
+      await expect(auditorApp.getByRole('menuitem', { name: 'Delete group' })).toHaveAttribute(
+        'aria-disabled',
+        'true',
+        { timeout: 20_000 }
+      )
     } finally {
       await deleteGroupViaApi(app, groupId)
     }
@@ -875,7 +884,9 @@ test.describe('Permission gating — Detail page header actions', () => {
 
       await expect(auditorApp.getByRole('button', { name: 'Edit project' })).toHaveAttribute('aria-disabled', 'true')
 
-      await auditorApp.getByRole('button', { name: 'Project actions' }).click()
+      const projectActions = auditorApp.getByRole('button', { name: 'Project actions' })
+      await expect(projectActions).toBeVisible({ timeout: 15_000 })
+      await projectActions.click()
       await expect(auditorApp.getByRole('menuitem', { name: 'Delete project' })).toHaveAttribute(
         'aria-disabled',
         'true'
@@ -887,6 +898,12 @@ test.describe('Permission gating — Detail page header actions', () => {
   })
 
   test('auditor: identity provider detail Edit and kebab actions are aria-disabled', async ({ app, auditorApp }) => {
+    // This test depends on several sequential, unbatched /authz/can_i round trips
+    // resolving against the real backend. The default 60s test budget plus 10s
+    // per-assertion timeouts leaves little headroom under CI load, which has caused
+    // intermittent timeouts here. Give the whole test more room.
+    test.setTimeout(90_000)
+
     const idpName = buildUniqueName('e2e-perm-idp-detail')
     const idp = await createIdentityProviderViaApi(app, {
       name: idpName,
@@ -905,17 +922,28 @@ test.describe('Permission gating — Detail page header actions', () => {
       await auditorApp.goto(toAppUrl(`${AUTH_URL}/identity-providers/${idp.id}`))
       await expect(auditorApp.getByRole('heading', { level: 1, name: idpName })).toBeVisible()
 
-      await expect(auditorApp.getByRole('button', { name: 'Edit provider' })).toHaveAttribute('aria-disabled', 'true')
+      // aria-disabled is set after the permissions API resolves — give it extra time
+      await expect(auditorApp.getByRole('button', { name: 'Edit provider' })).toHaveAttribute('aria-disabled', 'true', {
+        timeout: 30_000,
+      })
 
       await auditorApp.getByRole('button', { name: 'Identity provider actions' }).click()
       await expect(auditorApp.getByRole('menuitem', { name: 'Edit group mapping' })).toHaveAttribute(
         'aria-disabled',
-        'true'
+        'true',
+        { timeout: 20_000 }
       )
-      await expect(auditorApp.getByRole('menuitem', { name: 'Revoke tokens' })).toHaveAttribute('aria-disabled', 'true')
-      await expect(auditorApp.getByRole('menuitem', { name: 'Delete identity provider' })).toHaveAttribute(
+      await expect(auditorApp.getByRole('menuitem', { name: 'Revoke tokens' })).toHaveAttribute(
         'aria-disabled',
-        'true'
+        'true',
+        {
+          timeout: 20_000,
+        }
+      )
+      await expect(auditorApp.getByRole('menuitem', { name: 'Delete provider' })).toHaveAttribute(
+        'aria-disabled',
+        'true',
+        { timeout: 20_000 }
       )
     } finally {
       await deleteIdentityProviderViaApi(app, idp.id)
@@ -935,7 +963,8 @@ test.describe('Permission gating — Service Account actions', () => {
 
       const createButton = auditorApp.getByRole('button', { name: /Create service account/i })
       await expect(createButton).toBeVisible({ timeout: 15_000 })
-      await expect(createButton).toHaveAttribute('aria-disabled', 'true')
+      // aria-disabled is set after the permissions API resolves — give it extra time
+      await expect(createButton).toHaveAttribute('aria-disabled', 'true', { timeout: 20_000 })
     } finally {
       await deleteServiceAccountViaApi(app, sa.id)
     }
@@ -951,7 +980,10 @@ test.describe('Permission gating — Service Account actions', () => {
   test('viewer: direct URL to Service Accounts shows access denied', async ({ viewerApp }) => {
     await viewerApp.goto(toAppUrl(`${AM_URL}/service-accounts`))
 
-    await expect(viewerApp.getByRole('heading', { name: 'Access denied', level: 2 })).toBeVisible()
+    // The route guard renders after the permissions API resolves — give it extra time
+    await expect(viewerApp.getByRole('heading', { name: 'Access denied', level: 2 })).toBeVisible({
+      timeout: 20_000,
+    })
   })
 })
 
@@ -970,7 +1002,7 @@ test.describe('Permission gating — Identity Provider actions', () => {
     await expect(auditorApp.getByRole('tooltip').filter({ hasText: 'identity-provider:create' })).toBeVisible()
   })
 
-  test('auditor: IdP row actions are aria-disabled', { tag: ['@konflux-skip'] }, async ({ app, auditorApp }) => {
+  test('auditor: IdP row actions are aria-disabled', async ({ app, auditorApp }) => {
     const idpName = buildUniqueName('e2e-perm-idp')
     const idp = await createIdentityProviderViaApi(app, {
       name: idpName,
@@ -1039,6 +1071,47 @@ test.describe('Permission gating — Builder read-only', () => {
       await expect(auditorApp.getByRole('heading', { name: /read-only mode/i, level: 4 })).toBeVisible({
         timeout: 15_000,
       })
+    } finally {
+      await deleteTestWorkflow(app, workflowId)
+    }
+  })
+
+  test('viewer: Duplicate workflow in builder kebab is aria-disabled with tooltip', async ({ app, viewerApp }) => {
+    const { id: workflowId } = await createTestWorkflow(app)
+
+    try {
+      await viewerApp.goto(toAppUrl(`/workflow-builder/${workflowId}`))
+      await viewerApp.getByRole('navigation', { name: 'Main navigation' }).waitFor()
+      await expect(viewerApp.getByRole('heading', { name: /read-only mode/i, level: 4 })).toBeVisible({
+        timeout: 15_000,
+      })
+
+      await viewerApp.getByRole('button', { name: 'Workflow actions' }).click()
+      const duplicateItem = viewerApp.getByRole('menuitem', { name: /Duplicate workflow/i })
+      await expect(duplicateItem).toHaveAttribute('aria-disabled', 'true')
+
+      await duplicateItem.hover()
+      await expect(viewerApp.getByRole('tooltip').filter({ hasText: 'workflow:create' })).toBeVisible()
+    } finally {
+      await deleteTestWorkflow(app, workflowId)
+    }
+  })
+
+  test('auditor: Duplicate workflow in builder kebab is aria-disabled', async ({ app, auditorApp }) => {
+    const { id: workflowId } = await createTestWorkflow(app)
+
+    try {
+      await auditorApp.goto(toAppUrl(`/workflow-builder/${workflowId}`))
+      await auditorApp.getByRole('navigation', { name: 'Main navigation' }).waitFor()
+      await expect(auditorApp.getByRole('heading', { name: /read-only mode/i, level: 4 })).toBeVisible({
+        timeout: 15_000,
+      })
+
+      await auditorApp.getByRole('button', { name: 'Workflow actions' }).click()
+      await expect(auditorApp.getByRole('menuitem', { name: /Duplicate workflow/i })).toHaveAttribute(
+        'aria-disabled',
+        'true'
+      )
     } finally {
       await deleteTestWorkflow(app, workflowId)
     }

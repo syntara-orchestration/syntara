@@ -1,9 +1,9 @@
 import { Th, Thead, Tr, type ThProps } from '@patternfly/react-table'
 import type { WorkflowAPI } from '@syntara/contracts'
 
-import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../components/panels/list/NxListPanel'
+import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../components/panels/list/SynListPanel'
 import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
-import type { TableFooterProps } from '../../components/table/NxScrollableTableContainer'
+import type { TableFooterProps } from '../../components/table/SynScrollableTableContainer'
 import type { FilterConfig, FilterFieldDefinition } from '../../types/filters'
 import type { ProjectRead } from '../access/types'
 
@@ -32,8 +32,11 @@ export type WorkflowsListViewProps = Readonly<{
   groupedWorkflows: GroupedWorkflows | null
   collapsedProjects: Set<string>
   onToggleProject: (projectId: string) => void
-  getRowActions: (workflow: Workflow) => RowAction[]
+  getRowActions?: (workflow: Workflow) => RowAction[]
+  showRowActions?: boolean
   projectActionCallbacks?: ProjectRowActionCallbacks
+  tabKey?: string
+  tabLabel?: string
 }>
 
 export function WorkflowsListView({
@@ -55,12 +58,17 @@ export function WorkflowsListView({
   collapsedProjects,
   onToggleProject,
   getRowActions,
+  showRowActions = true,
   projectActionCallbacks,
+  tabKey,
+  tabLabel,
 }: WorkflowsListViewProps) {
   const isEmpty = sortedWorkflows.length === 0
 
   return (
-    <NxListPanelView
+    <SynListPanelView
+      tabKey={tabKey}
+      tabLabel={tabLabel}
       isPending={isPending}
       isFetching={isFetching}
       error={error}
@@ -79,7 +87,7 @@ export function WorkflowsListView({
       }
       toolbar={
         !isEmpty || hasActiveFilters ? (
-          <NxListPanelToolbar
+          <SynListPanelToolbar
             filters={filters}
             filterDefinitions={filterFieldDefinitions}
             onFilterChange={onFilterChange}
@@ -88,14 +96,14 @@ export function WorkflowsListView({
         ) : undefined
       }
       body={
-        <NxListPanelTable caption="Workflows table" footer={footer}>
+        <SynListPanelTable caption="Workflows table" footer={footer}>
           <Thead>
             <Tr>
               <Th sort={getSortParams('name')}>Name</Th>
               <Th sort={getSortParams('created_at')}>Created at</Th>
               <Th sort={getSortParams('updated_at')}>Updated at</Th>
               <Th sort={getSortParams('is_enabled')}>State</Th>
-              <Th screenReaderText="Actions" />
+              {showRowActions && <Th screenReaderText="Actions" />}
             </Tr>
           </Thead>
           {isAllProjects && groupedWorkflows ? (
@@ -104,12 +112,17 @@ export function WorkflowsListView({
               collapsedProjects={collapsedProjects}
               onToggleProject={onToggleProject}
               getRowActions={getRowActions}
+              showRowActions={showRowActions}
               projectActionCallbacks={projectActionCallbacks}
             />
           ) : (
-            <FlatWorkflowsTableBody workflows={sortedWorkflows} getRowActions={getRowActions} />
+            <FlatWorkflowsTableBody
+              workflows={sortedWorkflows}
+              getRowActions={getRowActions}
+              showRowActions={showRowActions}
+            />
           )}
-        </NxListPanelTable>
+        </SynListPanelTable>
       }
     />
   )

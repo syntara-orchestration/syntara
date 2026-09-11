@@ -9,8 +9,7 @@
  * Uses Playwright route interception to mock API responses. No backend data is
  * created or modified; route intercepts are cleared automatically after each test.
  */
-import type { Page } from '@playwright/test'
-
+import { type Page } from './fixtures'
 import { test, expect, toAppUrl } from './fixtures'
 import {
   ACCESS_URL,

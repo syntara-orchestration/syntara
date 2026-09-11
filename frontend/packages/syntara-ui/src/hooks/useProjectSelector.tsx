@@ -136,7 +136,7 @@ type UseProjectSelectorResult = {
  * and again in **Projects** with the full current list (PatternFly favorites pattern).
  */
 function favoriteProjectsInResults(projects: ProjectRead[], favoriteProjectIds: readonly string[]): ProjectRead[] {
-  const byId = new Map(projects.filter((p) => p.id).map((p) => [p.id!, p]))
+  const byId = new Map(projects.flatMap((p) => (p.id ? [[p.id, p] as const] : [])))
   return favoriteProjectIds.map((id) => byId.get(id)).filter((p): p is ProjectRead => p !== undefined)
 }
 

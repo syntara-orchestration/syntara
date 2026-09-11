@@ -22,8 +22,8 @@ vi.mock('../../../components/FormLabelWithHelp', () => ({
   FormLabelWithHelp: ({ label }: { label: string }) => <span>{label}</span>,
 }))
 
-vi.mock('../../../components/NxLink', () => ({
-  NxLink: ({ children, to }: { children: React.ReactNode; to: string }) => <a href={to}>{children}</a>,
+vi.mock('../../../components/SynLink', () => ({
+  SynLink: ({ children, to }: { children: React.ReactNode; to: string }) => <a href={to}>{children}</a>,
 }))
 
 vi.mock('../../configuration/integrations/useIntegrationPermissions', () => ({

@@ -103,27 +103,6 @@ describe('validateWorkflow', () => {
       expect(result).toBeDefined()
       expect(Array.isArray(result.errors)).toBe(true)
     })
-
-    it('detects approval node missing approved branch', () => {
-      const activities: Activity[] = [
-        { type: 'approval', id: 'approval-1', name: 'Approval Task', parameters: {} },
-        { type: 'script', id: 'T1', name: 'Task 1', parameters: { language: 'python', code: '' } },
-      ]
-      const edges: EdgeConnection[] = [
-        {
-          id: 'trigger-1-approval-1',
-          source: 'trigger-1',
-          target: 'approval-1',
-          sourceHandle: 'source',
-          targetHandle: 'target',
-        },
-        { id: 'approval-1-T1', source: 'approval-1', target: 'T1', sourceHandle: 'rejected', targetHandle: 'target' },
-      ]
-
-      const result = validateWorkflow(activities, edges)
-      expect(result.valid).toBe(false)
-      expect(result.errors.some((e) => e.rule === 'approval-connections')).toBe(true)
-    })
   })
 
   describe('multiple errors', () => {

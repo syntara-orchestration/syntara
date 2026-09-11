@@ -81,7 +81,9 @@ All config fields support template expressions (e.g., `${trigger.host}`), resolv
 
 ## Authentication
 
-AAP nodes require an **AAP integration** (`integration_id` on the node config) for URL and TLS settings, and a **Syntara credential** (`credential_id`) for auth headers/token. Without an integration, the node fails with `ConfigError: "AAP integration not configured. Attach an AAP integration to this node."`
+AAP **execution** nodes require an **AAP integration** (`integration_id` on the node config) for URL and TLS settings, and a **Syntara credential** (`credential_id`) for auth headers/token. Without an integration, the node fails with `ConfigError: "AAP integration not configured. Attach an AAP integration to this node."`
+
+**Design-time browsing** (cascading dropdowns in the builder) uses `GET /api/v1/proxies/aap/*`, not these node fields. That proxy resolves the Gateway from the AAP integration and authenticates with the integration's management credential when `credential_id` is omitted. With one visible AAP integration, both query params may be omitted. With more than one, pass `integration_id`.
 
 ## Cancellation Propagation
 

@@ -80,6 +80,14 @@ export function resolveVersionStatusForBadge(status: string | null | undefined):
   return null
 }
 
+export function workflowVersionHref(workflowId: string, version: number): string {
+  return `/workflow-builder/${workflowId}?version=${String(version)}`
+}
+
+export function executionDetailHref(executionId: string): string {
+  return `/executions/${executionId}`
+}
+
 export function getClearFiltersHandler<T>(
   onFilterChange: ((filters: T[]) => void) | undefined
 ): (() => void) | undefined {

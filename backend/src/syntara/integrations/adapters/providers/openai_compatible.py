@@ -13,6 +13,11 @@ class OpenAICompatibleProvider(LLMProviderBase):
 
     Auth: ``Authorization: Bearer {api_key}``
     Models endpoint: ``GET {base_url}/models``
+    Credential probe: ``GET {base_url}/key`` during ``validate()`` after a
+    catalog 200. Some gateways (e.g. OpenRouter) publish ``/models`` without
+    checking the key; ``/key`` is auth-gated. A 404/405/501 means the probe
+    is absent (OpenAI, vLLM) and the catalog result is trusted. ``discover()``
+    does not call this probe.
     Response format::
 
         { "data": [{ "id": "gpt-4o", "object": "model", "created": 1686935002, "owned_by": "openai" }] }
@@ -35,6 +40,11 @@ class OpenAICompatibleProvider(LLMProviderBase):
     def default_base_url(self) -> str | None:
         """Default base URL."""
         return self._default_url
+
+    @property
+    def credential_confirmation_path(self) -> str:
+        """OpenRouter-compatible auth-gated key endpoint."""
+        return "/key"
 
     def build_headers(self, api_key: str) -> dict[str, str]:
         """Build Bearer auth headers."""

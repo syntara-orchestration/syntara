@@ -8,12 +8,6 @@
   width: 100%;
 }
 
-.canvasStack {
-  height: 100%;
-  min-height: 0;
-  gap: 0;
-}
-
 .canvasFlexItem {
   position: relative;
   min-width: 0;
@@ -35,9 +29,4 @@
 
 .filledMinHeight {
   min-height: 0;
-}
-
-.executionPanelSlot {
-  flex-shrink: 0;
-  overflow: hidden;
 }

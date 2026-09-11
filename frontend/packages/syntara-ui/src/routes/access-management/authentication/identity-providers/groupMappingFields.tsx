@@ -24,7 +24,7 @@ import {
 } from 'react'
 import { Controller, useWatch, type Control } from 'react-hook-form'
 
-import { NxSelect } from '../../../../components/NxSelect'
+import { SynSelect } from '../../../../components/SynSelect'
 import { LinkCell } from '../../../../components/table/LinkCell'
 import { APP_TITLE } from '../../../../utils/appTitle'
 import { getGroupDetailPath } from '../../accessManagementPaths'
@@ -203,7 +203,7 @@ export function MappedGroupMappingSelect({
   )
 
   return (
-    <NxSelect
+    <SynSelect
       isOpen={isOpen}
       selected={entry.mappedGroupId || undefined}
       onSelect={(_event, value) => {
@@ -246,7 +246,7 @@ export function MappedGroupMappingSelect({
           Create new group
         </SelectOption>
       </SelectList>
-    </NxSelect>
+    </SynSelect>
   )
 }
 

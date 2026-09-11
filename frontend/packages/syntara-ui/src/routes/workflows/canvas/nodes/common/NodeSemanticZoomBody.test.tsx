@@ -17,9 +17,7 @@ describe('NodeSemanticZoomBody', () => {
       />
     )
 
-    const bar = screen.getByRole('group', { name: 'Analyze Data, Task Agent' })
-    expect(bar).toBeInTheDocument()
-    expect(bar).toHaveAttribute('tabindex', '0')
+    expect(screen.getByRole('button', { name: 'Analyze Data, Task Agent' })).toBeInTheDocument()
   })
 
   it('has no accessibility violations', async () => {
@@ -48,7 +46,7 @@ describe('NodeSemanticZoomBody', () => {
       />
     )
 
-    await user.hover(screen.getByRole('group', { name: 'My Task, REST API' }))
+    await user.hover(screen.getByRole('button', { name: 'My Task, REST API' }))
 
     expect(await screen.findByText('My Task')).toBeInTheDocument()
     expect(screen.getByText('REST API')).toBeInTheDocument()

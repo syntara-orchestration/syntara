@@ -1,17 +1,16 @@
-import { Button, Content, Switch, Tooltip, Truncate } from '@patternfly/react-core'
+import { Button, Content, Switch, Truncate } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiEditFillIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import { useCallback, useMemo } from 'react'
 
-import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
-import { NxLabel } from '../../../components/labels/NxLabel'
-import type { KebabAction } from '../../../components/NxKebabMenu'
-import { NxKebabMenu } from '../../../components/NxKebabMenu'
-import { NxLink } from '../../../components/NxLink'
-import { NxListPanelTable, NxListPanelToolbar, NxListPanelView } from '../../../components/panels/list/NxListPanel'
+import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../../components/panels/list/SynListPanel'
 import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
+import type { KebabAction } from '../../../components/SynKebabMenu'
+import { SynKebabMenu } from '../../../components/SynKebabMenu'
+import { SynLink } from '../../../components/SynLink'
 import { DateCell } from '../../../components/table/DateCell'
 import { useCursorPagination, useCursorReset } from '../../../hooks/useCursorPagination'
 import { useDeleteAction } from '../../../hooks/useDeleteAction'
@@ -97,28 +96,15 @@ function ServiceAccountRow({
   return (
     <Tr>
       <Td dataLabel="Name">
-        <NxLink to={getServiceAccountDetailPath(sa.id)}>
+        <SynLink to={getServiceAccountDetailPath(sa.id)}>
           <Truncate content={sa.name} />
-        </NxLink>
+        </SynLink>
       </Td>
       <Td dataLabel="Owning project">
-        {sa.project_name && !sa.is_project_deleted ? (
-          <NxLink to={getProjectDetailPath(sa.project_id)}>{sa.project_name}</NxLink>
+        {sa.project_name ? (
+          <SynLink to={getProjectDetailPath(sa.project_id)}>{sa.project_name}</SynLink>
         ) : (
-          <>
-            {sa.project_name ?? sa.project_id}
-            {sa.is_project_deleted && (
-              <>
-                {' '}
-                <Tooltip content="The owning project for this service account has been deleted">
-                  {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
-                  <span tabIndex={0}>
-                    <NxLabel color="grey">Deleted</NxLabel>
-                  </span>
-                </Tooltip>
-              </>
-            )}
-          </>
+          sa.project_id
         )}
       </Td>
       <Td dataLabel="Created">
@@ -140,7 +126,10 @@ function ServiceAccountRow({
         />
       </Td>
       <Td isActionCell>
-        <NxKebabMenu actions={getRowActions(sa, onEdit, onDelete, permissions)} aria-label={`Actions for ${sa.name}`} />
+        <SynKebabMenu
+          actions={getRowActions(sa, onEdit, onDelete, permissions)}
+          aria-label={`Actions for ${sa.name}`}
+        />
       </Td>
     </Tr>
   )
@@ -257,7 +246,7 @@ export function ServiceAccountsTab() {
 
   return (
     <>
-      <NxListPanelView
+      <SynListPanelView
         tabKey="service-accounts"
         tabLabel="Service accounts"
         isPending={query.isPending}
@@ -277,7 +266,7 @@ export function ServiceAccountsTab() {
         }
         toolbar={
           serviceAccounts.length > 0 || hasActiveFilters ? (
-            <NxListPanelToolbar
+            <SynListPanelToolbar
               filters={filters}
               filterDefinitions={filterFieldDefinitions}
               onFilterChange={handleFilterChange}
@@ -302,7 +291,7 @@ export function ServiceAccountsTab() {
             <Content>
               Service accounts provide programmatic access for external applications using OAuth 2.0 client credentials.
             </Content>
-            <NxListPanelTable caption="Service accounts" footer={getFooterProps(query.data)}>
+            <SynListPanelTable caption="Service accounts" footer={getFooterProps(query.data)}>
               <Thead>
                 <Tr>
                   <Th sort={getSortParams(0)}>Name</Th>
@@ -319,7 +308,7 @@ export function ServiceAccountsTab() {
                 onEdit={editDialog.open}
                 onDelete={deleteDialog.open}
               />
-            </NxListPanelTable>
+            </SynListPanelTable>
           </>
         }
       />
@@ -340,7 +329,7 @@ export function ServiceAccountsTab() {
         />
       )}
 
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={deleteDialog.isOpen}
         onClose={deleteDialog.close}
         onConfirm={() => handleDelete(deleteDialog.item)}
@@ -354,9 +343,9 @@ export function ServiceAccountsTab() {
         }}
       >
         The service account <strong>{deleteDialog.item?.name}</strong> will be deleted. This cannot be undone.
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
 
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={disableDialog.isOpen}
         onClose={disableDialog.close}
         onConfirm={handleDisable}
@@ -366,7 +355,7 @@ export function ServiceAccountsTab() {
       >
         You are about to disable the service account <strong>{disableDialog.item?.name}</strong>. You can re-enable the
         service account at any time.
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
     </>
   )
 }

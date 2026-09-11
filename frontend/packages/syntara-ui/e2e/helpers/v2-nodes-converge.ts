@@ -3,9 +3,7 @@
  * Extracted from v2-nodes.ts to keep file sizes within lint limits.
  */
 
-import { type Page } from '@playwright/test'
-
-import { expect, toAppUrl } from '../fixtures'
+import { expect, type Page, toAppUrl } from '../fixtures'
 
 import { addConditionNodeWithBranch, addManualTrigger, openAddNodePanel, selectCategoryAndType } from './v2-nodes'
 import { buildUniqueName, closeNodeEditorPanel } from './workflows'
@@ -23,8 +21,8 @@ export async function openConvergeFormOnNewWorkflow(page: Page) {
 }
 
 /** Add a converge node (v2 type: "converge"). */
-export async function addConvergeNode(page: Page, name: string) {
-  await openAddNodePanel(page)
+export async function addConvergeNode(page: Page, name: string, sourceHandle?: string) {
+  await openAddNodePanel(page, sourceHandle)
   await selectCategoryAndType(page, 'Logic', 'Converge')
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
   await page.getByRole('button', { name: 'Create', exact: true }).click()

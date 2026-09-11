@@ -128,7 +128,7 @@ test('user can add an Approval node to the canvas', async ({ app }) => {
         throw new Error('No menu items rendered yet')
       }
 
-      const texts = await Promise.all(Array.from({ length: count }, (_, i) => menuItems.nth(i).textContent()))
+      const texts = await Promise.all((await menuItems.all()).map((item) => item.textContent()))
 
       if (!texts.some((t) => t?.includes(expectedUsername))) {
         throw new Error(`${expectedUsername} not found. Available: ${texts.join(', ')}`)
@@ -139,9 +139,9 @@ test('user can add an Approval node to the canvas', async ({ app }) => {
     await app.getByRole('menuitem').filter({ hasText: expectedUsername }).click()
 
     // Wait for form validation to complete
-    await expect(app.getByRole('button', { name: 'Create' })).toBeEnabled({ timeout: 15000 })
+    await expect(app.getByRole('button', { name: 'Create', exact: true })).toBeEnabled({ timeout: 15000 })
 
-    await app.getByRole('button', { name: 'Create' }).click()
+    await app.getByRole('button', { name: 'Create', exact: true }).click()
 
     await closeNodeEditorPanel(app)
 
@@ -181,7 +181,7 @@ test('user can add a Logic (Conditional) node to the canvas', async ({ app }) =>
 
     await app.getByLabel('Raw expression').fill('${status == "active"}')
 
-    await app.getByRole('button', { name: 'Create' }).click()
+    await app.getByRole('button', { name: 'Create', exact: true }).click()
 
     await closeNodeEditorPanel(app)
 
@@ -284,7 +284,7 @@ test('multiple nodes can be added sequentially', async ({ app }) => {
         throw new Error('No menu items rendered yet')
       }
 
-      const texts = await Promise.all(Array.from({ length: count }, (_, i) => menuItems.nth(i).textContent()))
+      const texts = await Promise.all((await menuItems.all()).map((item) => item.textContent()))
 
       if (!texts.some((t) => t?.includes(expectedUsername))) {
         throw new Error(`${expectedUsername} not found. Available: ${texts.join(', ')}`)
@@ -295,7 +295,7 @@ test('multiple nodes can be added sequentially', async ({ app }) => {
     await app.getByRole('menuitem').filter({ hasText: expectedUsername }).click()
 
     // Wait for form validation to complete
-    const saveBtn = app.getByRole('button', { name: 'Create' })
+    const saveBtn = app.getByRole('button', { name: 'Create', exact: true })
     await expect(saveBtn).toBeEnabled({ timeout: 20000 })
     await saveBtn.click()
 
@@ -348,7 +348,7 @@ test('multiple nodes can be added sequentially', async ({ app }) => {
     await app.getByRole('option', { name: 'Custom expression' }).click()
     await app.getByLabel('Raw expression').fill('${x == 1}')
 
-    const logicSaveBtn = app.getByRole('button', { name: 'Create' })
+    const logicSaveBtn = app.getByRole('button', { name: 'Create', exact: true })
     await expect(logicSaveBtn).toBeEnabled({ timeout: 20000 })
     await logicSaveBtn.click()
 
@@ -485,6 +485,9 @@ test('edge is visually distinguishable on canvas', async ({ app }) => {
 })
 
 test('multiple edges can be created sequentially', async ({ app }) => {
+  // 90s needed: creates 3 nodes sequentially, each with a layout trigger and panel wait.
+  // Reduced timeouts caused consistent CI runner timeouts — keep until builder render is faster.
+  test.setTimeout(90_000)
   const workflowName = buildUniqueName('e2e-builder')
   await createWorkflowWithTrigger(app, workflowName)
 

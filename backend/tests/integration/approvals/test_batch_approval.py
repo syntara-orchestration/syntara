@@ -174,6 +174,7 @@ class TestBatchApprovalContract:
             approval_id=approvals[0].id,
             decided_by=ANY,
             decided_at=ANY,
+            temporal_activity_id=ANY,
             decision_notes="Batch alias note",
         )
 
@@ -346,6 +347,7 @@ class TestBatchApprovalContract:
                 approval_id=approvals[0].id,
                 decided_by=ANY,
                 decided_at=ANY,
+                temporal_activity_id=ANY,
                 decision_notes="Single decision test",
             )
 
@@ -492,6 +494,7 @@ class TestBatchApprovalContract:
             approval_id=approvals[0].id,
             decided_by=ANY,
             decided_at=ANY,
+            temporal_activity_id=ANY,
             decision_notes=None,
         )
 

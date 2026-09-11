@@ -72,6 +72,23 @@ class LLMCallMetrics:
 # ---------------------------------------------------------------------------
 
 
+def _collapse_concatenated_scalar(value: str) -> str:
+    """Undo LangChain stream-merge concatenation of string scalars (AAP-86784).
+
+    Same algorithm as ``collapse_concatenated_scalar`` in
+    ``syntara.agent_orchestrator.utils.response_metadata``. Kept local so this
+    module does not import ``agent_orchestrator``.
+    """
+    length = len(value)
+    for unit_len in range(1, length // 2 + 1):
+        if length % unit_len:
+            continue
+        unit = value[:unit_len]
+        if unit * (length // unit_len) == value:
+            return unit
+    return value
+
+
 def _extract_token_usage(response: Any) -> tuple[int, int]:  # noqa: ANN401
     """Extract input/output token counts from a LangChain response.
 
@@ -216,6 +233,8 @@ async def record_llm_call[T](
             input_tokens, output_tokens = _extract_token_usage(result)
             if model is None and hasattr(result, "response_metadata"):
                 meta_model = result.response_metadata.get("model_name")
+                if isinstance(meta_model, str):
+                    meta_model = _collapse_concatenated_scalar(meta_model)
                 if meta_model:
                     resp_model, resp_provider = _resolve_model_provider(
                         model=meta_model,

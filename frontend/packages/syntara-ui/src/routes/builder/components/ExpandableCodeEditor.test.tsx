@@ -236,7 +236,9 @@ describe('ExpandableCodeEditor', () => {
 
     fireEvent.dragOver(dropTarget, { dataTransfer })
 
-    expect(dropTarget.style.outline).toBe('2px solid var(--pf-t--global--color--brand--default)')
+    expect(dropTarget.style.outlineWidth).toBe('2px')
+    expect(dropTarget.style.outlineStyle).toBe('solid')
+    expect(dropTarget.style.outlineColor).toBe('var(--pf-t--global--color--brand--default)')
   })
 
   it('removes drop highlight on dragLeave', () => {
@@ -247,11 +249,11 @@ describe('ExpandableCodeEditor', () => {
 
     // First dragOver to add highlight
     fireEvent.dragOver(dropTarget, { dataTransfer })
-    expect(dropTarget.style.outline).toBe('2px solid var(--pf-t--global--color--brand--default)')
+    expect(dropTarget.style.outlineWidth).toBe('2px')
 
     // Then dragLeave to remove it
     fireEvent.dragLeave(dropTarget)
-    expect(dropTarget.style.outline).toBe('')
+    expect(dropTarget.style.outlineWidth).toBe('')
   })
 
   it('does not call onDropText when no text/plain data is present', () => {

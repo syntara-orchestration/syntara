@@ -437,11 +437,11 @@ class RoleAssignmentService:
             )
             .outerjoin(
                 User,
-                (RoleAssignment.principal_id == User.id) & (User.deleted_at.is_(None)),  # type: ignore[union-attr]
+                RoleAssignment.principal_id == User.id,  # type: ignore[arg-type]
             )
             .outerjoin(
                 Group,
-                (RoleAssignment.group_id == Group.id) & (Group.deleted_at.is_(None)),  # type: ignore[union-attr]
+                RoleAssignment.group_id == Group.id,  # type: ignore[arg-type]
             )
             .outerjoin(
                 ServiceAccount,
@@ -642,7 +642,6 @@ class RoleAssignmentService:
         result = await self.session.exec(
             select(Project.name).where(
                 Project.id == project_id,
-                Project.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
         return result.first()

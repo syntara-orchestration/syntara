@@ -1,7 +1,7 @@
 import { MenuToggle, type MenuToggleElement, SelectList, SelectOption } from '@patternfly/react-core'
 import { useState } from 'react'
 
-import { NxSelect } from '../../components/NxSelect'
+import { SynSelect } from '../../components/SynSelect'
 import { RolePrincipalType } from '../access-management/RoleAssignmentTypes'
 
 const principalTypeLabels: Record<string, string> = {
@@ -13,7 +13,7 @@ const principalTypeLabels: Record<string, string> = {
 export function PrincipalTypeSelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const [isOpen, setIsOpen] = useState(false)
   return (
-    <NxSelect
+    <SynSelect
       id="principal-type"
       isOpen={isOpen}
       selected={value}
@@ -39,6 +39,6 @@ export function PrincipalTypeSelect({ value, onChange }: { value: string; onChan
         <SelectOption value={RolePrincipalType.GROUP}>Group</SelectOption>
         <SelectOption value={RolePrincipalType.SERVICE_ACCOUNT}>Service Account</SelectOption>
       </SelectList>
-    </NxSelect>
+    </SynSelect>
   )
 }

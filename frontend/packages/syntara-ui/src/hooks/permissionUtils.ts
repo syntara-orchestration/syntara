@@ -54,7 +54,7 @@ export function isSystemScope(p: PermissionScopeEntry): boolean {
 }
 
 export function projectScopedNames(entries: PermissionScopeEntry[]): Set<string> {
-  return new Set(entries.filter((p) => p.scope === 'project' && p.project).map((p) => p.project!))
+  return new Set(entries.flatMap((p) => (p.scope === 'project' && p.project ? [p.project] : [])))
 }
 
 export function hasPermissionGrant(

@@ -17,31 +17,36 @@ export function validateNoDanglingNodes(activities: Activity[], edges: EdgeConne
   // Build adjacency map for graph traversal
   const adjacencyMap = new Map<string, Set<string>>()
   edges.forEach((edge) => {
-    if (!adjacencyMap.has(edge.source)) {
-      adjacencyMap.set(edge.source, new Set())
+    let set = adjacencyMap.get(edge.source)
+    if (!set) {
+      set = new Set()
+      adjacencyMap.set(edge.source, set)
     }
-    adjacencyMap.get(edge.source)!.add(edge.target)
+    set.add(edge.target)
   })
 
   // Also build reverse adjacency map to check for incoming edges
   const reverseAdjacencyMap = new Map<string, Set<string>>()
   edges.forEach((edge) => {
-    if (!reverseAdjacencyMap.has(edge.target)) {
-      reverseAdjacencyMap.set(edge.target, new Set())
+    let set = reverseAdjacencyMap.get(edge.target)
+    if (!set) {
+      set = new Set()
+      reverseAdjacencyMap.set(edge.target, set)
     }
-    reverseAdjacencyMap.get(edge.target)!.add(edge.source)
+    set.add(edge.source)
   })
 
   const entryNodes = activities
     .map((a) => a.id)
-    .filter((id) => !reverseAdjacencyMap.has(id) || reverseAdjacencyMap.get(id)!.size === 0)
+    .filter((id) => !reverseAdjacencyMap.has(id) || (reverseAdjacencyMap.get(id)?.size ?? 0) === 0)
 
   // BFS traversal from all entry nodes
   const queue = [...entryNodes]
   const visited = new Set<string>()
 
   while (queue.length > 0) {
-    const nodeId = queue.shift()!
+    const nodeId = queue[0]
+    queue.shift()
     if (visited.has(nodeId)) continue
     visited.add(nodeId)
 
@@ -56,8 +61,9 @@ export function validateNoDanglingNodes(activities: Activity[], edges: EdgeConne
   // Check each activity
   for (const activity of activities) {
     // A node is dangling if it has NO connections (neither incoming nor outgoing)
-    const hasIncomingEdges = reverseAdjacencyMap.has(activity.id) && reverseAdjacencyMap.get(activity.id)!.size > 0
-    const hasOutgoingEdges = adjacencyMap.has(activity.id) && adjacencyMap.get(activity.id)!.size > 0
+    const hasIncomingEdges =
+      reverseAdjacencyMap.has(activity.id) && (reverseAdjacencyMap.get(activity.id)?.size ?? 0) > 0
+    const hasOutgoingEdges = adjacencyMap.has(activity.id) && (adjacencyMap.get(activity.id)?.size ?? 0) > 0
 
     if (!hasIncomingEdges && !hasOutgoingEdges) {
       // Node is completely isolated - dangling

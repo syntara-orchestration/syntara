@@ -24,7 +24,7 @@ import { useMemo, useState } from 'react'
 
 import { SynPanelContentStack } from '../../../../components/layout/SynPanelContentStack'
 import { SynEmptyStateNoData } from '../../../../components/states/SynEmptyStateNoData'
-import { NxScrollableTableContainer } from '../../../../components/table/NxScrollableTableContainer'
+import { SynScrollableTableContainer } from '../../../../components/table/SynScrollableTableContainer'
 
 import styles from './WizardSteps.module.css'
 
@@ -147,7 +147,7 @@ function EnableToolsStep({
         </Toolbar>
       </StackItem>
 
-      <NxScrollableTableContainer caption="Enable tools">
+      <SynScrollableTableContainer caption="Enable tools">
         <colgroup>
           <col className={styles.checkboxCol} />
           <col />
@@ -184,7 +184,7 @@ function EnableToolsStep({
             </Tr>
           ))}
         </Tbody>
-      </NxScrollableTableContainer>
+      </SynScrollableTableContainer>
     </SynPanelContentStack>
   )
 }

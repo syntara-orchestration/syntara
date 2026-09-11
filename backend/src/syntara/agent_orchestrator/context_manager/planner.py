@@ -11,6 +11,7 @@ from typing import NamedTuple
 from uuid import UUID
 
 import structlog
+from redis.exceptions import RedisError
 from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -21,9 +22,11 @@ from syntara.agent_orchestrator.audit.context_planning import (
     ContextPlanningStatus,
 )
 from syntara.agent_orchestrator.exceptions import InvocationCancelledError
-from syntara.agent_orchestrator.models import Invocation, InvocationStatus, LLMCredentialConfig
+from syntara.agent_orchestrator.models import LLMCredentialConfig
 from syntara.agent_orchestrator.token_manager import TokenValidationService
+from syntara.agent_orchestrator.utils.cancellation import get_invocation_cancel_key, is_invocation_cancelled
 from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.core.cache.stream import StreamClient
 from syntara.core.database.session import get_db
 from syntara.settings.cache.settings_cache import get_runtime_settings
 
@@ -105,35 +108,48 @@ class ContextManagerPlanner:
             InvocationCancelledError: If invocation has been cancelled
 
         """
+        cancelled = False
+        redis_available = True
+
+        # Fast path: check Redis cancellation key (O(1), sub-millisecond)
         try:
-            # Create a short-lived session for the cancellation check
-            async with self.get_async_session_context() as session:
-                invocation = await session.get(Invocation, invocation_id)
-                if invocation and invocation.status == InvocationStatus.CANCELLED:
-                    logger.info("Invocation cancelled during phase", phase=phase, invocation_id=invocation_id)
+            async with StreamClient() as client:
+                cancel_key = get_invocation_cancel_key(invocation_id)
+                cancelled = await client.key_exists(cancel_key)
+        except (RedisError, OSError):
+            redis_available = False
+            logger.debug("Redis cancellation check unavailable, falling back to DB", invocation_id=invocation_id)
 
-                    # Emit cancellation detected event
-                    AuditEventDispatcher.dispatch(
-                        CancellationEvent(
-                            phase=phase,
-                            session_id=session_id,
-                            invocation_id=invocation_id,
-                            execution_id=execution_id,
-                            request_id=request_id,
-                            activity_id=activity_id,
-                            activity_name=activity_name,
-                        )
-                    )
+        if not redis_available and not cancelled:
+            # Slow path: only when Redis was down — create a short-lived session
+            try:
+                async with self.get_async_session_context() as session:
+                    cancelled = await is_invocation_cancelled(session, invocation_id)
+            except (SQLAlchemyError, OSError) as e:
+                logger.warning(
+                    "Failed to check cancellation status for invocation, continuing execution",
+                    invocation_id=invocation_id,
+                    error=str(e),
+                    exc_info=True,
+                )
 
-                    raise InvocationCancelledError(str(invocation_id), phase.value)
-        except (SQLAlchemyError, OSError) as e:
-            # Log but don't fail on database errors - graceful degradation
-            logger.warning(
-                "Failed to check cancellation status for invocation, continuing execution",
-                invocation_id=invocation_id,
-                error=str(e),
-                exc_info=True,
+        if cancelled:
+            logger.info("Invocation cancelled during phase", phase=phase, invocation_id=invocation_id)
+
+            # Emit cancellation detected event
+            AuditEventDispatcher.dispatch(
+                CancellationEvent(
+                    phase=phase,
+                    session_id=session_id,
+                    invocation_id=invocation_id,
+                    execution_id=execution_id,
+                    request_id=request_id,
+                    activity_id=activity_id,
+                    activity_name=activity_name,
+                )
             )
+
+            raise InvocationCancelledError(str(invocation_id), phase.value)
 
     async def _resolve_token_budget(self) -> int:
         """Resolve the token budget from the model profile or fallback settings."""
