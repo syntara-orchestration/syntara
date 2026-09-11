@@ -508,7 +508,7 @@ class OIDCService:
             "family_name": id_token_claims.get(mapping.last_name),
             # Hardcoded: "name" is a standard OIDC claim used only as a fallback
             # when given_name/family_name aren't available.  Custom mappings
-            # (e.g. Azure AD "displayName") are handled via claim_mapping.first_name,
+            # (e.g. Azure AD "displayName") are handled via mapping.first_name,
             # which takes priority in _auto_create_user.
             "name": id_token_claims.get("name"),
             "preferred_username": id_token_claims.get(mapping.username),

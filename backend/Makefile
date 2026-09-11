@@ -754,7 +754,7 @@ typecheck: ## Run type checking only with mypy
 .PHONY: typecheck-pyrefly
 typecheck-pyrefly: ## Run type checking with pyrefly (~3s, used in pre-commit)
 	@echo "🔍 Running type checking (pyrefly)..."
-	uv run --with pyrefly pyrefly check
+	uv run pyrefly check
 	@echo "✅ Type checking completed"
 
 .PHONY: check-migrations
