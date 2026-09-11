@@ -17,7 +17,7 @@ from fastapi import status
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from syntara.agent_orchestrator.models.invocation import InvocationStatus
+from syntara.agent_orchestrator.models.invocation import Invocation, InvocationStatus
 from syntara.core.models import User
 from syntara.workflows.models.execution import Execution, ExecutionStatus
 from syntara.workflows.models.workflow import Workflow
@@ -191,5 +191,83 @@ class TestCancelInvocationCancelsAgentExecution:
         )
         assert response.status_code == status.HTTP_200_OK
 
+        await test_db_session.refresh(invocation)
+        assert invocation.status == InvocationStatus.CANCELLED
+
+
+@pytest.mark.asyncio
+class TestInvocationCancelEndToEnd:
+    """Create then cancel an invocation against a real database and Temporal.
+
+    The rest of this module mocks the temporal service to inspect the call. This
+    class does not, so the FK is proven to actually persist through the ORM
+    against the real schema — the write happens in a second commit after the
+    invocation's own, which no mocked-session test can really exercise — and the
+    cancel route is proven to run end to end against a real Temporal client.
+
+    It deliberately does not assert the builtin workflow reaches CANCELED: the
+    mocked LLM returns instantly, so the workflow has usually COMPLETED before
+    the cancel arrives, and such an assertion would pass either way. That the
+    right workflow id is handed to Temporal is asserted above with a mock;
+    confirming Temporal's own reaction to a cancel is not this change's business.
+    """
+
+    async def test_created_invocation_is_linked_to_its_agent_execution(
+        self,
+        auth_client_with_mocked_llm: AsyncClient,
+        test_db_session: AsyncSession,
+        test_project_id: str,
+    ) -> None:
+        """agent_execution_id is populated server-side by POST /invocations."""
+        create = await auth_client_with_mocked_llm.post(
+            "/api/v1/invocations",
+            json={
+                "prompt": "summarise the incident report",
+                "session_id": f"e2e-{uuid.uuid4()}",
+                "project_id": str(test_project_id),
+            },
+        )
+        assert create.status_code == status.HTTP_202_ACCEPTED
+        invocation_id = uuid.UUID(create.json()["id"])
+
+        invocation = await test_db_session.get(Invocation, invocation_id)
+        assert invocation is not None
+        await test_db_session.refresh(invocation)
+        assert invocation.agent_execution_id is not None, "server did not link the agent execution"
+
+        # The link must point at the builtin Agent Execution workflow's execution.
+        agent_execution = await test_db_session.get(Execution, invocation.agent_execution_id)
+        assert agent_execution is not None
+        workflow = await test_db_session.get(Workflow, agent_execution.workflow_id)
+        assert workflow is not None
+        assert workflow.name == "Agent Execution"
+        assert workflow.is_builtin is True
+
+    async def test_cancel_uses_the_link_against_a_real_temporal_client(
+        self,
+        auth_client_with_mocked_llm: AsyncClient,
+        test_db_session: AsyncSession,
+        test_project_id: str,
+    ) -> None:
+        """The cancel route completes against a real Temporal client."""
+        create = await auth_client_with_mocked_llm.post(
+            "/api/v1/invocations",
+            json={
+                "prompt": "summarise the incident report",
+                "session_id": f"e2e-{uuid.uuid4()}",
+                "project_id": str(test_project_id),
+            },
+        )
+        assert create.status_code == status.HTTP_202_ACCEPTED
+        invocation_id = uuid.UUID(create.json()["id"])
+
+        cancel = await auth_client_with_mocked_llm.post(
+            f"/api/v1/invocations/{invocation_id}/cancel",
+            json={"reason": "e2e cancel"},
+        )
+        assert cancel.status_code == status.HTTP_200_OK
+
+        invocation = await test_db_session.get(Invocation, invocation_id)
+        assert invocation is not None
         await test_db_session.refresh(invocation)
         assert invocation.status == InvocationStatus.CANCELLED
