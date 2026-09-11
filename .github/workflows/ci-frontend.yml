@@ -419,7 +419,7 @@ jobs:
   test-compose-e2e:
     name: (Frontend) Test Podman Compose E2E
     needs: [changes, frontend-checks-gate]
-    if: needs.changes.outputs.code == 'true' && github.event_name != 'push'
+    if: needs.changes.outputs.code == 'true' && github.event_name == 'merge_group'
     runs-on: ubuntu-latest-8-cores
     timeout-minutes: 120
     # Job-level concurrency ensures only the latest commit runs this expensive test.

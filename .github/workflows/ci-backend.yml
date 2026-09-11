@@ -519,7 +519,7 @@ jobs:
   test-compose-e2e:
     name: (Backend) Test Podman Compose E2E
     needs: changes
-    if: needs.changes.outputs.backend == 'true'
+    if: needs.changes.outputs.backend == 'true' && github.event_name == 'merge_group'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
