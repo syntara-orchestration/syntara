@@ -398,6 +398,15 @@ class TestSanitizeWebhookServiceAccounts:
         assert definition["triggers"][0]["parameters"]["authorized_service_account_ids"] == [str(project_sa)]
 
     @pytest.mark.asyncio
+    async def test_keeps_uppercase_uuid_when_sa_in_project(self) -> None:
+        project_sa = uuid4()
+        definition = _webhook_definition([str(project_sa).upper()])
+        session = _session_returning_sa_ids([project_sa])
+        findings = await _sanitize_webhook_service_accounts(session, definition, uuid4())
+        assert findings == []
+        assert definition["triggers"][0]["parameters"]["authorized_service_account_ids"] == [str(project_sa)]
+
+    @pytest.mark.asyncio
     async def test_eda_trigger_strips_foreign_ids(self) -> None:
         foreign = str(uuid4())
         definition = _webhook_definition([foreign], trigger_type="eda_trigger", trigger_id="eda_1")

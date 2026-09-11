@@ -325,7 +325,7 @@ async def _sanitize_webhook_service_accounts(
             ServiceAccount.project_id == project_id,
         )
     )
-    found_str = {str(uid) for uid in result.scalars().all()}
+    found_uuids = set(result.scalars().all())
 
     findings: list[ValidationFinding] = []
     for trigger in workflow_definition.get("triggers", []):
@@ -335,22 +335,30 @@ async def _sanitize_webhook_service_accounts(
         if not isinstance(params, dict):
             continue
         raw_ids = params.get("authorized_service_account_ids") or []
-        kept = [raw for raw in raw_ids if str(raw) in found_str]
+        kept: list[str] = []
+        for raw in raw_ids:
+            raw_str = str(raw)
+            if not _is_valid_uuid(raw_str):
+                continue
+            uid = UUID(raw_str)
+            if uid in found_uuids:
+                kept.append(str(uid))
         removed_count = len(raw_ids) - len(kept)
-        if not removed_count:
+        if not removed_count and kept == raw_ids:
             continue
         params["authorized_service_account_ids"] = kept
-        findings.append(
-            ValidationFinding(
-                severity=ValidationSeverity.warning,
-                category=ValidationCategory.invalid_reference,
-                message=(
-                    f"{removed_count} authorized service account(s) are not available in this project "
-                    "and were removed during import"
-                ),
-                node_id=trigger.get("id"),
+        if removed_count:
+            findings.append(
+                ValidationFinding(
+                    severity=ValidationSeverity.warning,
+                    category=ValidationCategory.invalid_reference,
+                    message=(
+                        f"{removed_count} authorized service account(s) are not available in this project "
+                        "and were removed during import"
+                    ),
+                    node_id=trigger.get("id"),
+                )
             )
-        )
 
     return findings
 
