@@ -26,6 +26,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 if TYPE_CHECKING:
     from syntara.workflows.services.execution_service import ExecutionService
+    from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
 from syntara.agent_orchestrator.models import (
     Invocation,
@@ -67,6 +68,7 @@ class InvocationService(BaseService):
         session_factory: Callable[[], AsyncGenerator[AsyncSession, None]] = get_db,
         file_manager_factory: Callable[[], FileManager] = get_file_manager,
         execution_service: "ExecutionService | None" = None,
+        temporal_service: "TemporalExecutionService | None" = None,
     ) -> None:
         """Initialize service with database session.
 
@@ -76,12 +78,16 @@ class InvocationService(BaseService):
             session_factory: Session factory for background tasks (defaults to get_db)
             file_manager_factory: Factory function for creating FileManager
             execution_service: Service for creating workflow executions
+            temporal_service: Service for cancelling Temporal workflows. Without
+                it, cancelling an invocation still marks it CANCELLED but cannot
+                stop the builtin workflow running it.
 
         """
         super().__init__(session, user)
         self.file_manager = file_manager_factory()
         self.session_factory = session_factory
         self.execution_service = execution_service
+        self.temporal_service = temporal_service
 
     async def _handle_file_uploads(self, files: list[UploadFile], project_id: UUID) -> list[FileMetadata]:
         if not files:

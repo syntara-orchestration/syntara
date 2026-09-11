@@ -93,6 +93,7 @@ class TestCancelInvocationsForExecution:
     @pytest.mark.asyncio
     async def test_no_active_invocations_returns_empty(self) -> None:
         execution_id = uuid4()
+        mock_temporal = Mock()
         mock_session = Mock()
 
         with patch(
@@ -100,13 +101,16 @@ class TestCancelInvocationsForExecution:
             new_callable=AsyncMock,
             return_value=[],
         ):
-            result = await cancel_invocations_for_execution(mock_session, _mock_user(), execution_id)
+            result = await cancel_invocations_for_execution(
+                mock_session, _mock_user(), execution_id, temporal_service=mock_temporal
+            )
 
         assert result == []
 
     @pytest.mark.asyncio
     async def test_cancels_single_invocation_via_service(self) -> None:
         execution_id = uuid4()
+        mock_temporal = Mock()
         inv = _make_invocation(str(execution_id))
         mock_session = Mock()
         mock_service = Mock()
@@ -121,16 +125,22 @@ class TestCancelInvocationsForExecution:
             patch(
                 "syntara.workflows.services.invocation_cancellation.InvocationService",
                 return_value=mock_service,
-            ),
+            ) as mock_service_cls,
         ):
-            result = await cancel_invocations_for_execution(mock_session, _mock_user(), execution_id)
+            result = await cancel_invocations_for_execution(
+                mock_session, _mock_user(), execution_id, temporal_service=mock_temporal
+            )
 
         assert result == [inv.id]
         mock_service.cancel_invocation.assert_awaited_once_with(inv.id, "Workflow execution cancelled")
+        # InvocationService owns the Temporal cancel, so it must actually receive
+        # the service — without this the whole cancel path degrades silently.
+        assert mock_service_cls.call_args.kwargs["temporal_service"] is mock_temporal
 
     @pytest.mark.asyncio
     async def test_cancels_multiple_invocations(self) -> None:
         execution_id = uuid4()
+        mock_temporal = Mock()
         invocations = [_make_invocation(str(execution_id)) for _ in range(3)]
         mock_session = Mock()
         mock_service = Mock()
@@ -147,7 +157,9 @@ class TestCancelInvocationsForExecution:
                 return_value=mock_service,
             ),
         ):
-            result = await cancel_invocations_for_execution(mock_session, _mock_user(), execution_id)
+            result = await cancel_invocations_for_execution(
+                mock_session, _mock_user(), execution_id, temporal_service=mock_temporal
+            )
 
         assert result == [inv.id for inv in invocations]
         assert mock_service.cancel_invocation.await_count == 3
@@ -155,6 +167,7 @@ class TestCancelInvocationsForExecution:
     @pytest.mark.asyncio
     async def test_one_failure_does_not_block_others(self) -> None:
         execution_id = uuid4()
+        mock_temporal = Mock()
         invocations = [_make_invocation(str(execution_id)) for _ in range(2)]
         mock_session = Mock()
         mock_session.rollback = AsyncMock()
@@ -172,7 +185,9 @@ class TestCancelInvocationsForExecution:
                 return_value=mock_service,
             ),
         ):
-            result = await cancel_invocations_for_execution(mock_session, _mock_user(), execution_id)
+            result = await cancel_invocations_for_execution(
+                mock_session, _mock_user(), execution_id, temporal_service=mock_temporal
+            )
 
         assert result == [invocations[1].id]
         mock_session.rollback.assert_awaited_once()
@@ -180,6 +195,7 @@ class TestCancelInvocationsForExecution:
     @pytest.mark.asyncio
     async def test_not_cancellable_is_not_returned(self) -> None:
         execution_id = uuid4()
+        mock_temporal = Mock()
         inv = _make_invocation(str(execution_id))
         mock_session = Mock()
         mock_service = Mock()
@@ -196,13 +212,16 @@ class TestCancelInvocationsForExecution:
                 return_value=mock_service,
             ),
         ):
-            result = await cancel_invocations_for_execution(mock_session, _mock_user(), execution_id)
+            result = await cancel_invocations_for_execution(
+                mock_session, _mock_user(), execution_id, temporal_service=mock_temporal
+            )
 
         assert result == []
 
     @pytest.mark.asyncio
     async def test_custom_reason_passed_to_service(self) -> None:
         execution_id = uuid4()
+        mock_temporal = Mock()
         inv = _make_invocation(str(execution_id))
         mock_session = Mock()
         mock_service = Mock()
@@ -219,6 +238,8 @@ class TestCancelInvocationsForExecution:
                 return_value=mock_service,
             ),
         ):
-            await cancel_invocations_for_execution(mock_session, _mock_user(), execution_id, reason="User requested")
+            await cancel_invocations_for_execution(
+                mock_session, _mock_user(), execution_id, reason="User requested", temporal_service=mock_temporal
+            )
 
         mock_service.cancel_invocation.assert_awaited_once_with(inv.id, "User requested")

@@ -28,7 +28,8 @@ async def _agent_execution_id(session: AsyncSession, invocation_id: uuid.UUID) -
     result = await session.exec(
         text("SELECT agent_execution_id FROM invocations WHERE id = :iid").bindparams(iid=invocation_id)  # type: ignore[call-overload]
     )
-    return result.scalar_one()
+    value: uuid.UUID | None = result.scalar_one()
+    return value
 
 
 @pytest.mark.asyncio
