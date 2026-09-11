@@ -95,6 +95,10 @@ Dynamic-map fields (`labels`, `context_data`, `input_data`, `output_data`, `resu
 | **Loosening** — e.g. typed schema → `additionalProperties: true` | No | **patch** |
 | Description / example only on the field | No | **patch** |
 
+The detector compares a fixed set of JSON Schema constraint keys on dynamic-map value schemas (`type`, string/number bounds, `enum`, array bounds). It does **not** compare `pattern`, `format`, `multipleOf`, `exclusiveMinimum`, or `exclusiveMaximum`; tightening via those keys is a known gap and still requires human review plus the normal breaking-change process if it rejects previously valid client payloads.
+
+Field names are maintained in `scripts/openapi/dynamic_map_policy.py`. CI (`tools/ci/check_dynamic_map_field_registry.py`, run via `make api-spec-validation`) fails when a new `labels`-style dynamic-map property (`labels`, `result`, or `*_data` object maps) appears in OpenAPI sources but is missing from that registry.
+
 ### New major version at a new path
 
 The gate compares each spec only against its own prior state on the base ref. A new major version introduced as a **new spec at a new URL path** (e.g. `/api/v2/`) has no baseline on the base ref, so the check is skipped for it — it does not register as a breaking change to the current spec.
@@ -103,7 +107,7 @@ The gate compares each spec only against its own prior state on the base ref. A 
 
 Breaking-change detection is primarily delegated to `oasdiff breaking`, with a secondary policy layer for dynamic-map constraint tightening (above). Two limits follow and a green check must **not** be read as full policy compliance:
 
-- **Coverage is mostly oasdiff plus dynamic-map tightening.** Categories in the AO REST API Versioning and Deprecation Policy that neither oasdiff nor the dynamic-map detector model will not be flagged. Audit oasdiff's ruleset against the policy periodically.
+- **Coverage is mostly oasdiff plus dynamic-map tightening.** Categories in the AO REST API Versioning and Deprecation Policy that neither oasdiff nor the dynamic-map detector model will not be flagged. Audit oasdiff's ruleset against the policy periodically. The dynamic-map detector intentionally omits some JSON Schema constraint keys (`pattern`, `format`, `multipleOf`, `exclusiveMinimum`, `exclusiveMaximum`); see the table above.
 - **Semantic-only changes are undetectable by any schema differ.** A change where the shape is unchanged but the behavior differs for the same request/response (a "semantic change with no type change") cannot be detected by comparing schemas. Our policy classifies that class as breaking; catching it always requires human review. This gate is not a backstop for it.
 
 ### Breaking Change Policy

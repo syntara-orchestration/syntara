@@ -54,6 +54,13 @@ REQUIRED_JSON_FIELDS = (
 ADDITIVE_ENTRY = {"id": "endpoint-added", "text": "endpoint added", "level": 1}
 
 
+def yaml_scalar(value: str | int) -> str:
+    """Render a YAML scalar for inline OpenAPI snippets in tests."""
+    if isinstance(value, str):
+        return f'"{value}"'
+    return str(value)
+
+
 def _spec_yaml(version: str, *, description: str | None = None) -> str:
     extra = f"  description: {description}\n" if description else ""
     return f'openapi: "3.1.0"\ninfo:\n  title: Syntara API\n{extra}  version: {version}\npaths: {{}}\n'
@@ -662,6 +669,55 @@ class TestDetectDynamicMapConstraintTightening:
         is_breaking, findings = check_breaking.detect_dynamic_map_constraint_tightening(base, head)
         assert is_breaking is True
         assert findings
+
+    @pytest.mark.parametrize(
+        ("constraint_key", "constraint_value"),
+        [
+            ("pattern", "^[a-z]+$"),
+            ("format", "email"),
+            ("multipleOf", 2),
+            ("exclusiveMinimum", 0),
+            ("exclusiveMaximum", 100),
+        ],
+    )
+    def test_undocumented_constraint_keys_not_detected_as_breaking(
+        self, constraint_key: str, constraint_value: str | int
+    ):
+        """Document known gaps: constraints outside SCHEMA_CONSTRAINT_KEYS_EVALUATED."""
+        base = textwrap.dedent("""\
+            openapi: "3.1.0"
+            info:
+              title: Test
+              version: 1.0.0
+            components:
+              schemas:
+                WorkflowRead:
+                  type: object
+                  properties:
+                    labels:
+                      type: object
+                      additionalProperties:
+                        type: string
+        """)
+        head = textwrap.dedent(f"""\
+            openapi: "3.1.0"
+            info:
+              title: Test
+              version: 1.1.0
+            components:
+              schemas:
+                WorkflowRead:
+                  type: object
+                  properties:
+                    labels:
+                      type: object
+                      additionalProperties:
+                        type: string
+                        {constraint_key}: {yaml_scalar(constraint_value)}
+        """)
+        is_breaking, findings = check_breaking.detect_dynamic_map_constraint_tightening(base, head)
+        assert is_breaking is False
+        assert findings == []
 
     def test_unrelated_additional_properties_ignored(self):
         base = textwrap.dedent("""\

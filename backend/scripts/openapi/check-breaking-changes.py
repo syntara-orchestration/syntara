@@ -74,25 +74,15 @@ from typing import Any
 
 import yaml
 
+from dynamic_map_policy import DYNAMIC_MAP_FIELD_NAMES, SCHEMA_CONSTRAINT_KEYS_EVALUATED
+
 
 DEFAULT_SPEC_PATH = "backend/src/syntara/schemas/openapi.yaml"
 # Privileged override label for breaking changes. Restricted to the
 # ``syntara-leads`` team via the Breaking Change Label Guard workflow; CI here
 # only checks for its presence.
 BREAKING_CHANGE_APPROVED_LABEL = "breaking-change-approved"
-DYNAMIC_MAP_FIELD_NAMES = frozenset({"labels", "context_data", "input_data", "output_data", "result"})
-_SCHEMA_CONSTRAINT_KEYS = frozenset(
-    {
-        "type",
-        "maxLength",
-        "minLength",
-        "enum",
-        "maxItems",
-        "minItems",
-        "maximum",
-        "minimum",
-    }
-)
+_SCHEMA_CONSTRAINT_KEYS = SCHEMA_CONSTRAINT_KEYS_EVALUATED
 
 
 @dataclass(frozen=True)
