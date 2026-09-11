@@ -78,6 +78,42 @@ function WorkflowsPageToolbar({
   )
 }
 
+type WorkflowRowActionContext = {
+  selectedProject: ReturnType<typeof useProjectSelector>['selectedProject']
+  projectsById: Map<string | undefined, { is_builtin?: boolean | undefined }>
+  permissions: ReturnType<typeof useWorkflowPermissions>
+  navigate: ReturnType<typeof useNavigate>
+  runDialog: ReturnType<typeof useDialogState<Workflow>>
+  publishDialog: ReturnType<typeof useDialogState<Workflow>>
+  unpublishDialog: ReturnType<typeof useDialogState<Workflow>>
+  deleteDialog: ReturnType<typeof useDialogState<Workflow>>
+  duplicateWorkflow: ReturnType<typeof useDuplicateWorkflow>['duplicateWorkflow']
+  isDuplicating: boolean
+  showError: ReturnType<typeof useAlerts>['showError']
+}
+
+function getWorkflowRowActions(workflow: Workflow, ctx: WorkflowRowActionContext) {
+  const isBuiltinProject = !!ctx.selectedProject?.is_builtin || !!ctx.projectsById.get(workflow.project_id)?.is_builtin
+  return buildWorkflowRowActions(workflow, ctx.permissions, isBuiltinProject, {
+    navigate: ctx.navigate,
+    onRun: (wf) => ctx.runDialog.open(wf),
+    onDuplicate: (wf) => detachPromise(ctx.duplicateWorkflow(wf)),
+    onExport: (wf) => {
+      if (wf.id) {
+        detachPromise(
+          downloadWorkflowExportById(wf.id).catch((err: unknown) => {
+            ctx.showError({ title: 'Export failed', description: getErrorMessage(err) })
+          })
+        )
+      }
+    },
+    onPublish: (wf) => ctx.publishDialog.open(wf),
+    onUnpublish: (wf) => ctx.unpublishDialog.open(wf),
+    onDelete: (wf) => ctx.deleteDialog.open(wf),
+    isDuplicating: ctx.isDuplicating,
+  })
+}
+
 export default function Workflows() {
   const workflowsDocLink = useDocLink('workflows')
   const { showAlert, showSuccess, showError } = useAlerts()
@@ -162,7 +198,13 @@ export default function Workflows() {
     isAllProjects
   )
 
-  useCursorReset(sortedWorkflows.length, hasActiveFilters, cursor, workflowsQuery.isFetching, resetPagination)
+  useCursorReset({
+    itemCount: sortedWorkflows.length,
+    hasActiveFilters,
+    cursor,
+    isFetching: workflowsQuery.isFetching,
+    resetPagination,
+  })
 
   const { handleDeleteProject: handleDeleteProjectBase, isDeletingProject } = useProjectActions({
     showSuccess,
@@ -192,27 +234,20 @@ export default function Workflows() {
     projectPermissions,
   })
 
-  const getRowActions = (workflow: Workflow) => {
-    const isBuiltinProject = !!selectedProject?.is_builtin || !!projectsById.get(workflow.project_id)?.is_builtin
-    return buildWorkflowRowActions(workflow, permissions, isBuiltinProject, {
+  const getRowActions = (workflow: Workflow) =>
+    getWorkflowRowActions(workflow, {
+      selectedProject,
+      projectsById,
+      permissions,
       navigate,
-      onRun: (wf) => runDialog.open(wf),
-      onDuplicate: (wf) => detachPromise(duplicateWorkflow(wf)),
-      onExport: (wf) => {
-        if (wf.id) {
-          detachPromise(
-            downloadWorkflowExportById(wf.id).catch((err: unknown) => {
-              showError({ title: 'Export failed', description: getErrorMessage(err) })
-            })
-          )
-        }
-      },
-      onPublish: (wf) => publishDialog.open(wf),
-      onUnpublish: (wf) => unpublishDialog.open(wf),
-      onDelete: (wf) => deleteDialog.open(wf),
+      runDialog,
+      publishDialog,
+      unpublishDialog,
+      deleteDialog,
+      duplicateWorkflow,
       isDuplicating,
+      showError,
     })
-  }
 
   const hasQueryState = workflowsQuery.isPending || !!workflowsQuery.error
   return (

@@ -214,7 +214,7 @@ export default function Integrations() {
   // API order from queryParams.sort — no client-side re-sort
   const results = query.data?.resources ?? []
 
-  useCursorReset(results.length, hasActiveFilters, cursor, query.isFetching, resetPagination)
+  useCursorReset({ itemCount: results.length, hasActiveFilters, cursor, isFetching: query.isFetching, resetPagination })
 
   const isEmpty = results.length === 0
 

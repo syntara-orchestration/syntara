@@ -65,19 +65,19 @@ export function submitLoopLogic(options: {
     return false
   }
 
-  const activity = createLoopActivity(
-    activityId,
+  const activity = createLoopActivity({
+    id: activityId,
     name,
     loopType,
-    {
+    config: {
       items: data.items,
       condition: data.condition,
       maxIterations: data.maxIterations,
       indexVariable: data.indexVariable,
       itemVariable: data.itemVariable,
     },
-    data.settings
-  )
+    settings: data.settings,
+  })
 
   const genericNodeId = `task_${Date.now()}_${generateId()}`
   const genericName = getNodeDisplayName('Generic Step')

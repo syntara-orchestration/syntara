@@ -82,13 +82,19 @@ function buildSearchParams(
   }
 }
 
-function useAAPQueries(
-  state: AAPSearchState,
-  isActive: boolean,
-  credentialId: string | undefined,
-  templateType: AAPBrowserTemplateType,
+function useAAPQueries({
+  state,
+  isActive,
+  credentialId,
+  templateType,
+  integrationId,
+}: {
+  state: AAPSearchState
+  isActive: boolean
+  credentialId: string | undefined
+  templateType: AAPBrowserTemplateType
   integrationId?: string
-) {
+}) {
   const orgsQuery = aapClient.useQuery(
     'get',
     '/proxies/aap/organizations',
@@ -348,7 +354,7 @@ export function useAAPBrowser(
   }))
   const isActive = credentialId !== undefined || integrationId !== undefined
 
-  const queries = useAAPQueries(state, isActive, credentialId, templateType, integrationId)
+  const queries = useAAPQueries({ state, isActive, credentialId, templateType, integrationId })
   const actions = useAAPActions(setState)
 
   const retryAll = useCallback(() => {

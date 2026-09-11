@@ -50,17 +50,20 @@ export function createScheduledTrigger(
   }
 }
 
+export type CreateEventTriggerOptions = {
+  id: string
+  source: string
+  eventType: string
+  filter?: Record<string, unknown>
+  name?: string
+}
+
 /**
  * Create an event trigger (v2).
  * @note This trigger type is not yet in the v2 backend schema
  */
-export function createEventTrigger(
-  id: string,
-  source: string,
-  eventType: string,
-  filter?: Record<string, unknown>,
-  name?: string
-): Activity {
+export function createEventTrigger(options: CreateEventTriggerOptions): Activity {
+  const { id, source, eventType, filter, name } = options
   return {
     id,
     type: TriggerTypeEnum.EVENT,
@@ -73,52 +76,60 @@ export function createEventTrigger(
   }
 }
 
-type WebhookTriggerOptions = { inputSchema?: Record<string, unknown>; authorizedServiceAccountIds?: string[] }
+type CreateWebhookStyleTriggerOptions = {
+  id: string
+  webhookPath: string
+  type: typeof TriggerTypeEnum.WEBHOOK_TRIGGER | typeof TriggerTypeEnum.EDA_TRIGGER
+  name: string
+  inputSchema?: Record<string, unknown>
+  authorizedServiceAccountIds?: string[]
+}
 
-function createWebhookStyleTrigger(
-  id: string,
-  webhookPath: string,
-  type: typeof TriggerTypeEnum.WEBHOOK_TRIGGER | typeof TriggerTypeEnum.EDA_TRIGGER,
-  name: string,
-  options?: WebhookTriggerOptions
-): Activity {
+function createWebhookStyleTrigger(options: CreateWebhookStyleTriggerOptions): Activity {
+  const { id, webhookPath, type, name, inputSchema, authorizedServiceAccountIds } = options
   return {
     id,
     type,
     name,
     parameters: {
       webhook_path: webhookPath,
-      ...(options?.inputSchema && { input_schema: options.inputSchema }),
-      ...(options?.authorizedServiceAccountIds?.length && {
-        authorized_service_account_ids: options.authorizedServiceAccountIds,
+      ...(inputSchema && { input_schema: inputSchema }),
+      ...(authorizedServiceAccountIds?.length && {
+        authorized_service_account_ids: authorizedServiceAccountIds,
       }),
     },
   }
 }
 
-/** Create a webhook trigger (v2). */
-export function createWebhookTrigger(
-  id: string,
-  webhookPath: string,
-  inputSchema?: Record<string, unknown>,
-  name?: string,
+export type CreateWebhookTriggerOptions = {
+  id: string
+  webhookPath: string
+  inputSchema?: Record<string, unknown>
+  name?: string
   authorizedServiceAccountIds?: string[]
-): Activity {
-  return createWebhookStyleTrigger(id, webhookPath, TriggerTypeEnum.WEBHOOK_TRIGGER, name ?? 'Webhook Trigger', {
+}
+
+/** Create a webhook trigger (v2). */
+export function createWebhookTrigger(options: CreateWebhookTriggerOptions): Activity {
+  const { id, webhookPath, inputSchema, name, authorizedServiceAccountIds } = options
+  return createWebhookStyleTrigger({
+    id,
+    webhookPath,
+    type: TriggerTypeEnum.WEBHOOK_TRIGGER,
+    name: name ?? 'Webhook Trigger',
     inputSchema,
     authorizedServiceAccountIds,
   })
 }
 
 /** Create an EDA trigger (v2). */
-export function createEdaTrigger(
-  id: string,
-  webhookPath: string,
-  inputSchema?: Record<string, unknown>,
-  name?: string,
-  authorizedServiceAccountIds?: string[]
-): Activity {
-  return createWebhookStyleTrigger(id, webhookPath, TriggerTypeEnum.EDA_TRIGGER, name ?? 'EDA Trigger', {
+export function createEdaTrigger(options: CreateWebhookTriggerOptions): Activity {
+  const { id, webhookPath, inputSchema, name, authorizedServiceAccountIds } = options
+  return createWebhookStyleTrigger({
+    id,
+    webhookPath,
+    type: TriggerTypeEnum.EDA_TRIGGER,
+    name: name ?? 'EDA Trigger',
     inputSchema,
     authorizedServiceAccountIds,
   })

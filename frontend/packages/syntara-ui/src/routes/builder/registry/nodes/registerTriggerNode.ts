@@ -95,13 +95,13 @@ export default function registerTriggerNode() {
               const inputSchema = parseJsonSchema(data.inputSchema)
               const factory =
                 data.triggerType === TriggerTypeEnum.WEBHOOK_TRIGGER ? createWebhookTrigger : createEdaTrigger
-              return factory(
-                triggerId,
-                normalizeWebhookPath(data.webhookPath ?? ''),
+              return factory({
+                id: triggerId,
+                webhookPath: normalizeWebhookPath(data.webhookPath ?? ''),
                 inputSchema,
                 name,
-                data.authorizedServiceAccountIds
-              )
+                authorizedServiceAccountIds: data.authorizedServiceAccountIds,
+              })
             }
             return createManualTrigger(triggerId, undefined, name)
           })

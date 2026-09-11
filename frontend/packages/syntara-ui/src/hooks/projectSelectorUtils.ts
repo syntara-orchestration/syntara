@@ -59,13 +59,19 @@ export function getProjectTogglePrefixLabelStyle(isDisabled: boolean | undefined
  * Extracted as a standalone function so the guard branches can be unit-tested
  * directly — PF's programmatic value swap cannot be replicated in happy-dom.
  */
-export function handleTypeaheadChange(
-  val: string,
-  suppressRef: RefObject<boolean>,
-  isOpen: boolean,
-  updateFilter: (v: string) => void,
+export function handleTypeaheadChange({
+  val,
+  suppressRef,
+  isOpen,
+  updateFilter,
+  setIsOpen,
+}: {
+  val: string
+  suppressRef: RefObject<boolean>
+  isOpen: boolean
+  updateFilter: (v: string) => void
   setIsOpen: (open: boolean) => void
-): void {
+}): void {
   if (suppressRef.current) {
     suppressRef.current = false
     if (!isOpen) return

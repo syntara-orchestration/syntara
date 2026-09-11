@@ -257,14 +257,21 @@ describe('TaskNodeDetails Component', () => {
     })
     // Setup mockCreateAAPJobTemplateActivity to return proper activity structure
     mockCreateAAPJobTemplateActivity.mockImplementation(
-      (id: string, name: string, job_template_id: number, config?: Record<string, unknown>) => ({
+      (options: {
+        id: string
+        name: string
+        jobTemplateId?: number
+        config?: Record<string, unknown>
+        settings?: unknown
+      }) => ({
         type: 'aap_job_template' as const,
-        id,
-        name,
+        id: options.id,
+        name: options.name,
         parameters: {
-          job_template_id,
-          ...config,
+          ...(options.jobTemplateId !== undefined && { job_template_id: options.jobTemplateId }),
+          ...options.config,
         },
+        ...(options.settings ? { settings: options.settings } : {}),
       })
     )
   })

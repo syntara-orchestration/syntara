@@ -240,13 +240,19 @@ function serializeCondition(condition: ExpressionCondition, forBackend: boolean)
  * }, true)
  * // Returns: "not ((trigger.age >= 18 && trigger.score > 50))" (backend mode)
  */
-function serializeSingleChild(
-  result: string,
-  negatePrefix: string,
-  isGroupNegated: boolean,
-  isChildNegated: boolean,
+function serializeSingleChild({
+  result,
+  negatePrefix,
+  isGroupNegated,
+  isChildNegated,
+  isNested,
+}: {
+  result: string
+  negatePrefix: string
+  isGroupNegated: boolean
+  isChildNegated: boolean
   isNested: boolean
-): string {
+}): string {
   if ((isGroupNegated && isChildNegated) || (isNested && isGroupNegated)) {
     return `${negatePrefix}((${result}))`
   }
@@ -275,7 +281,13 @@ function serializeGroup(group: ExpressionGroup, forBackend: boolean, isNested = 
   const negatePrefix = forBackend ? 'not ' : '!'
 
   if (childExpressions.length === 1) {
-    return serializeSingleChild(childExpressions[0], negatePrefix, !!group.negate, !!group.children[0].negate, isNested)
+    return serializeSingleChild({
+      result: childExpressions[0],
+      negatePrefix,
+      isGroupNegated: !!group.negate,
+      isChildNegated: !!group.children[0].negate,
+      isNested,
+    })
   }
 
   const separator = ` ${operatorSymbol} `

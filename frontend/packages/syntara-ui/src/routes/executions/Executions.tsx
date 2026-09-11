@@ -86,7 +86,13 @@ export default function Executions() {
 
   const executions = useMemo(() => (executionsQuery.data?.resources ?? []) as Execution[], [executionsQuery.data])
 
-  useCursorReset(executions.length, hasActiveFilters, cursor, executionsQuery.isFetching, resetPagination)
+  useCursorReset({
+    itemCount: executions.length,
+    hasActiveFilters,
+    cursor,
+    isFetching: executionsQuery.isFetching,
+    resetPagination,
+  })
 
   const filterFieldDefinitions = useMemo(() => buildFilterFieldDefinitions(executions), [executions])
 

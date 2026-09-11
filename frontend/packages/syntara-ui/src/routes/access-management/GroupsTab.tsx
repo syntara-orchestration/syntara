@@ -99,7 +99,7 @@ export function GroupsTab() {
   const data = query.data
   const groups = data?.resources ?? []
 
-  useCursorReset(groups.length, hasActiveFilters, cursor, query.isFetching, resetPagination)
+  useCursorReset({ itemCount: groups.length, hasActiveFilters, cursor, isFetching: query.isFetching, resetPagination })
 
   const { mutate: deleteGroup } = usersClient.useMutation('delete', '/groups/{group_id}')
 

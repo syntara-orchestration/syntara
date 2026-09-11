@@ -190,7 +190,13 @@ export function ProjectsTab() {
   const projects = data?.resources ?? []
   const refetch = useCallback(() => detachPromise(query.refetch()), [query])
 
-  useCursorReset(projects.length, hasActiveFilters, cursor, query.isFetching, resetPagination)
+  useCursorReset({
+    itemCount: projects.length,
+    hasActiveFilters,
+    cursor,
+    isFetching: query.isFetching,
+    resetPagination,
+  })
 
   const { mutate: deleteProject } = accessClient.useMutation('delete', '/projects/{project_id}')
 

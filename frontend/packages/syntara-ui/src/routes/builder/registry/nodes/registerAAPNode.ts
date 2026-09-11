@@ -86,7 +86,7 @@ export default function registerAAPNode() {
                 label: 'AAP Job Template',
               })
               const { activityId, activity } = buildNamedActivity(baseName, jobData.name, (id, name) =>
-                createAAPJobTemplateActivity(id, name, jobData.job_template_id, config)
+                createAAPJobTemplateActivity({ id, name, jobTemplateId: jobData.job_template_id, config })
               )
               addActivity(activity)
               onSuccess(activityId)
@@ -114,7 +114,12 @@ export default function registerAAPNode() {
                 label: 'AAP Workflow Template',
               })
               const { activityId, activity } = buildNamedActivity(baseName, workflowData.name, (id, name) =>
-                createAAPWorkflowTemplateActivity(id, name, workflowData.workflow_job_template_id, config)
+                createAAPWorkflowTemplateActivity({
+                  id,
+                  name,
+                  workflowTemplateId: workflowData.workflow_job_template_id,
+                  config,
+                })
               )
               addActivity(activity)
               onSuccess(activityId)

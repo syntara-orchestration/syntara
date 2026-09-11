@@ -755,7 +755,7 @@ describe('useProjectSelector', () => {
       const updateFilter = vi.fn<(v: string) => void>()
       const setIsOpen = vi.fn<(open: boolean) => void>()
 
-      handleTypeaheadChange('Alpha', suppressRef, false, updateFilter, setIsOpen)
+      handleTypeaheadChange({ val: 'Alpha', suppressRef, isOpen: false, updateFilter, setIsOpen })
 
       // Guard should have consumed the ref and returned early
       expect(suppressRef.current).toBe(false)
@@ -770,7 +770,7 @@ describe('useProjectSelector', () => {
       const updateFilter = vi.fn<(v: string) => void>()
       const setIsOpen = vi.fn<(open: boolean) => void>()
 
-      handleTypeaheadChange('bet', suppressRef, true, updateFilter, setIsOpen)
+      handleTypeaheadChange({ val: 'bet', suppressRef, isOpen: true, updateFilter, setIsOpen })
 
       expect(suppressRef.current).toBe(false)
       expect(updateFilter).toHaveBeenCalledWith('bet')

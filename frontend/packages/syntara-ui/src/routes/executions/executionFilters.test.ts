@@ -236,7 +236,13 @@ describe('executionFilters', () => {
   describe('createFilterChangeHandler integration', () => {
     it('applies transformExecutionStatusFilter when filters change', () => {
       const setAllFilters = vi.fn()
-      const handler = createFilterChangeHandler(null, vi.fn(), vi.fn(), setAllFilters, transformExecutionStatusFilter)
+      const handler = createFilterChangeHandler({
+        cursor: null,
+        resetCursor: vi.fn(),
+        clearAllFilters: vi.fn(),
+        setAllFilters,
+        transformFilters: transformExecutionStatusFilter,
+      })
 
       handler([{ key: 'status', value: EXECUTION_STATUS_APPROVAL_PENDING }])
 

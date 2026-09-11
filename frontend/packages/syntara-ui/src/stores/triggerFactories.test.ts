@@ -72,7 +72,7 @@ describe('triggerFactories', () => {
 
   describe('createEventTrigger', () => {
     it('creates an event trigger with required fields', () => {
-      const trigger = createEventTrigger('t1', 'github', 'push')
+      const trigger = createEventTrigger({ id: 't1', source: 'github', eventType: 'push' })
       expect(trigger).toEqual({
         id: 't1',
         type: TriggerTypeEnum.EVENT,
@@ -83,7 +83,13 @@ describe('triggerFactories', () => {
 
     it('includes filter when provided', () => {
       const filter = { branch: 'main' }
-      const trigger = createEventTrigger('t1', 'github', 'push', filter, 'Push Trigger')
+      const trigger = createEventTrigger({
+        id: 't1',
+        source: 'github',
+        eventType: 'push',
+        filter,
+        name: 'Push Trigger',
+      })
       expect(trigger.parameters).toEqual({ source: 'github', event_type: 'push', filter })
       expect(trigger.name).toBe('Push Trigger')
     })
@@ -91,7 +97,7 @@ describe('triggerFactories', () => {
 
   describe('createWebhookTrigger', () => {
     it('creates a webhook trigger with path only', () => {
-      const trigger = createWebhookTrigger('t1', 'my-hook')
+      const trigger = createWebhookTrigger({ id: 't1', webhookPath: 'my-hook' })
       expect(trigger).toEqual({
         id: 't1',
         type: TriggerTypeEnum.WEBHOOK_TRIGGER,
@@ -102,7 +108,13 @@ describe('triggerFactories', () => {
 
     it('includes input_schema and authorizedServiceAccountIds', () => {
       const schema = { type: 'object' }
-      const trigger = createWebhookTrigger('t1', 'hook', schema, 'Custom WH', ['sa-1', 'sa-2'])
+      const trigger = createWebhookTrigger({
+        id: 't1',
+        webhookPath: 'hook',
+        inputSchema: schema,
+        name: 'Custom WH',
+        authorizedServiceAccountIds: ['sa-1', 'sa-2'],
+      })
       expect(trigger.parameters).toEqual({
         webhook_path: 'hook',
         input_schema: schema,
@@ -112,14 +124,20 @@ describe('triggerFactories', () => {
     })
 
     it('omits authorized_service_account_ids when array is empty', () => {
-      const trigger = createWebhookTrigger('t1', 'hook', undefined, undefined, [])
+      const trigger = createWebhookTrigger({
+        id: 't1',
+        webhookPath: 'hook',
+        inputSchema: undefined,
+        name: undefined,
+        authorizedServiceAccountIds: [],
+      })
       expect(trigger.parameters).toEqual({ webhook_path: 'hook' })
     })
   })
 
   describe('createEdaTrigger', () => {
     it('creates an EDA trigger with path only', () => {
-      const trigger = createEdaTrigger('t1', 'eda-path')
+      const trigger = createEdaTrigger({ id: 't1', webhookPath: 'eda-path' })
       expect(trigger).toEqual({
         id: 't1',
         type: TriggerTypeEnum.EDA_TRIGGER,
@@ -130,7 +148,13 @@ describe('triggerFactories', () => {
 
     it('includes input_schema and authorizedServiceAccountIds', () => {
       const schema = { type: 'object' }
-      const trigger = createEdaTrigger('t1', 'eda', schema, 'My EDA', ['sa-3'])
+      const trigger = createEdaTrigger({
+        id: 't1',
+        webhookPath: 'eda',
+        inputSchema: schema,
+        name: 'My EDA',
+        authorizedServiceAccountIds: ['sa-3'],
+      })
       expect(trigger.parameters).toEqual({
         webhook_path: 'eda',
         input_schema: schema,
@@ -140,7 +164,13 @@ describe('triggerFactories', () => {
     })
 
     it('omits authorized_service_account_ids when array is empty', () => {
-      const trigger = createEdaTrigger('t1', 'eda', undefined, undefined, [])
+      const trigger = createEdaTrigger({
+        id: 't1',
+        webhookPath: 'eda',
+        inputSchema: undefined,
+        name: undefined,
+        authorizedServiceAccountIds: [],
+      })
       expect(trigger.parameters).toEqual({ webhook_path: 'eda' })
     })
   })
