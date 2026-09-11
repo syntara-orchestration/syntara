@@ -1,0 +1,302 @@
+{
+  "//": "GENERATED FILE. Do not edit by hand. Regenerate with: npm run route-baseline:update",
+  "routes": [
+    {
+      "kind": "fallback",
+      "parameters": [],
+      "redirectTo": "/workflows",
+      "sources": ["router"],
+      "template": "*"
+    },
+    {
+      "kind": "page",
+      "parameters": [],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/approvals"
+    },
+    {
+      "kind": "app",
+      "parameters": [],
+      "sources": ["app", "appRoute"],
+      "template": "/auth/test-signin-callback"
+    },
+    {
+      "kind": "redirect",
+      "parameters": [],
+      "redirectTo": "/configuration/integrations",
+      "sources": ["appRoute", "router"],
+      "template": "/configuration"
+    },
+    {
+      "kind": "page",
+      "parameters": [],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/configuration/credentials"
+    },
+    {
+      "kind": "page",
+      "parameters": ["credentialId"],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/configuration/credentials/$credentialId"
+    },
+    {
+      "kind": "page",
+      "parameters": ["credentialId", "tab"],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/configuration/credentials/$credentialId/$tab"
+    },
+    {
+      "kind": "page",
+      "parameters": [],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/configuration/integrations"
+    },
+    {
+      "kind": "page",
+      "parameters": ["integrationId"],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/configuration/integrations/$integrationId"
+    },
+    {
+      "kind": "page",
+      "parameters": ["integrationId", "tab"],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/configuration/integrations/$integrationId/$tab"
+    },
+    {
+      "kind": "page",
+      "parameters": ["integrationId"],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/configuration/integrations/$integrationId/edit"
+    },
+    {
+      "kind": "page",
+      "parameters": [],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/configuration/integrations/configure"
+    },
+    {
+      "kind": "page",
+      "parameters": [],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/executions"
+    },
+    {
+      "kind": "page",
+      "parameters": ["executionId"],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/executions/$executionId"
+    },
+    {
+      "kind": "page",
+      "parameters": [],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/my-profile"
+    },
+    {
+      "kind": "page",
+      "parameters": ["tab"],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/my-profile/$tab"
+    },
+    {
+      "kind": "page",
+      "parameters": [],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/support/glossary"
+    },
+    {
+      "kind": "page",
+      "parameters": [],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/system-administration/access-management"
+    },
+    {
+      "kind": "page",
+      "parameters": [],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/system-administration/access-management/assignments"
+    },
+    {
+      "kind": "page",
+      "parameters": [],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/system-administration/access-management/check-access"
+    },
+    {
+      "kind": "page",
+      "parameters": [],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/system-administration/access-management/groups"
+    },
+    {
+      "kind": "page",
+      "parameters": ["groupId"],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/system-administration/access-management/groups/$groupId"
+    },
+    {
+      "kind": "page",
+      "parameters": ["groupId", "tab"],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/system-administration/access-management/groups/$groupId/$tab"
+    },
+    {
+      "kind": "page",
+      "parameters": [],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/system-administration/access-management/policies"
+    },
+    {
+      "kind": "page",
+      "parameters": [],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/system-administration/access-management/projects"
+    },
+    {
+      "kind": "page",
+      "parameters": ["projectId"],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/system-administration/access-management/projects/$projectId"
+    },
+    {
+      "kind": "page",
+      "parameters": ["projectId", "tab"],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/system-administration/access-management/projects/$projectId/$tab"
+    },
+    {
+      "kind": "page",
+      "parameters": [],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/system-administration/access-management/roles"
+    },
+    {
+      "kind": "page",
+      "parameters": [],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/system-administration/access-management/service-accounts"
+    },
+    {
+      "kind": "page",
+      "parameters": ["serviceAccountId"],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/system-administration/access-management/service-accounts/$serviceAccountId"
+    },
+    {
+      "kind": "page",
+      "parameters": ["serviceAccountId", "tab"],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/system-administration/access-management/service-accounts/$serviceAccountId/$tab"
+    },
+    {
+      "kind": "page",
+      "parameters": [],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/system-administration/access-management/token-revocation"
+    },
+    {
+      "kind": "page",
+      "parameters": [],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/system-administration/access-management/users"
+    },
+    {
+      "kind": "page",
+      "parameters": ["userId"],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/system-administration/access-management/users/$userId"
+    },
+    {
+      "kind": "page",
+      "parameters": ["userId", "tab"],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/system-administration/access-management/users/$userId/$tab"
+    },
+    {
+      "kind": "page",
+      "parameters": ["userId"],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/system-administration/access-management/users/$userId/edit"
+    },
+    {
+      "kind": "page",
+      "parameters": ["userId"],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/system-administration/access-management/users/$userId/transfer-identity"
+    },
+    {
+      "kind": "page",
+      "parameters": [],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/system-administration/access-management/users/create"
+    },
+    {
+      "kind": "page",
+      "parameters": [],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/system-administration/authentication"
+    },
+    {
+      "kind": "page",
+      "parameters": ["providerId"],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/system-administration/authentication/identity-providers/$providerId"
+    },
+    {
+      "kind": "page",
+      "parameters": ["providerId", "tab"],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/system-administration/authentication/identity-providers/$providerId/$tab"
+    },
+    {
+      "kind": "page",
+      "parameters": ["providerId"],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/system-administration/authentication/identity-providers/$providerId/edit"
+    },
+    {
+      "kind": "page",
+      "parameters": ["providerId"],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/system-administration/authentication/identity-providers/$providerId/group-mapping/edit"
+    },
+    {
+      "kind": "page",
+      "parameters": [],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/system-administration/authentication/identity-providers/add"
+    },
+    {
+      "kind": "page",
+      "parameters": [],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/system-administration/settings"
+    },
+    {
+      "kind": "page",
+      "parameters": ["category"],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/system-administration/settings/$category"
+    },
+    {
+      "kind": "page",
+      "parameters": ["workflowId"],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/workflow-builder/$workflowId"
+    },
+    {
+      "kind": "page",
+      "parameters": [],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/workflow-builder/new"
+    },
+    {
+      "kind": "page",
+      "parameters": [],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/workflows"
+    }
+  ],
+  "version": 1
+}

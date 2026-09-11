@@ -55,7 +55,7 @@ jobs:
 
       - name: Check visual baseline coverage
         id: baselines
-        run: npm exec tsx -- scripts/check-visual-baselines.ts
+        run: npm exec tsx -- scripts/visual-regression/check-visual-baselines.ts
         working-directory: frontend/packages/syntara-ui
         continue-on-error: true
 
@@ -93,7 +93,7 @@ jobs:
         id: filter-noise
         if: always() && steps.screenshots.outcome != 'skipped'
         working-directory: frontend/packages/syntara-ui
-        run: npm exec tsx -- scripts/filter-noisy-baseline-diffs.ts
+        run: npm exec tsx -- scripts/visual-regression/filter-noisy-baseline-diffs.ts
 
       - name: Detect changed baselines
         id: detect

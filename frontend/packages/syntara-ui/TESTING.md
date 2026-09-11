@@ -207,7 +207,7 @@ npx playwright test e2e/visual-regression/page-screenshots
 npx playwright test e2e/visual-regression/page-screenshots --update-snapshots
 
 # Check all routes have baselines
-npm exec tsx -- scripts/check-visual-baselines.ts
+npm exec tsx -- scripts/visual-regression/check-visual-baselines.ts
 ```
 
 Key points:

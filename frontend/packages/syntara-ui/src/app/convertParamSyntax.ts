@@ -1,11 +1,11 @@
 /**
- * Converts a wouter-style path pattern to a TanStack Router path pattern.
+ * Normalize a path template to TanStack Router `$param` syntax.
  *
- * - `:param` → `$param`
- * - `:param?` (optional) → `$param` (TanStack uses a separate route for the base path instead)
+ * Accepts AppRoute-style `:param` / `:param?` templates and leaves existing
+ * `$param` templates unchanged so both catalogs compare as one URL contract.
  *
  * Example: `/users/:userId/groups/:groupId` → `/users/$userId/groups/$groupId`
  */
-export function convertWouterPathToTanStack(path: string): string {
+export function toTanStackPathTemplate(path: string): string {
   return path.replace(/:(\w+)\??/g, '$$$1')
 }
