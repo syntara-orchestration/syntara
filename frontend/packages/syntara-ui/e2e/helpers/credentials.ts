@@ -133,6 +133,54 @@ export async function waitForDisableDialogReady(dialog: Locator, credentialName?
   await expect(dialog.getByRole('button', { name: 'Disable' })).toBeEnabled()
 }
 
+/** Per-attempt budget for landing the Enabled switch click. */
+const DISABLE_TOGGLE_CLICK_TIMEOUT = 5_000
+/** Per-attempt budget for the confirmation dialog to appear after the click. */
+const DISABLE_DIALOG_TIMEOUT = 5_000
+/** Total budget for getting the confirmation dialog open. */
+const DISABLE_DIALOG_RETRY_TIMEOUT = 30_000
+
+/**
+ * Flip a credential's Enabled switch from its list row and return the disable
+ * confirmation dialog, ready to act on.
+ *
+ * PatternFly's `Switch` hides its `<input>` behind a styled span, so every caller
+ * has to click it with `force: true` — which skips the actionability wait
+ * entirely, including the stability check that would otherwise have held the
+ * click until the row stopped moving. The row is re-rendered whenever the
+ * credentials query resolves, and `filterCredentialByName` returns as soon as it
+ * has pressed *Apply filter*, without waiting for the filtered page to land. A
+ * forced click inside that window hits a row React is replacing: no `onChange`
+ * runs, no dialog opens, and the caller fails up to 25s later inside
+ * `waitForDisableDialogReady` on a dialog that was never there.
+ *
+ * Re-opening on a miss is the same remedy `triggerVerifyWorkflow` uses for the
+ * builder kebab. The click is skipped whenever the dialog is already up, so a
+ * slow open is waited out rather than toggled back — `openDisableDialog` is
+ * idempotent, but a second forced click would land on the modal backdrop.
+ */
+export async function openDisableDialogFromRow(app: Page, row: Locator, credentialName?: string): Promise<Locator> {
+  const dialog = app.getByRole('dialog')
+  const title = dialog.getByText('Disable credential?')
+
+  await expect(async () => {
+    if (!(await title.isVisible().catch(() => false))) {
+      await expect(row).toBeVisible({ timeout: DISABLE_TOGGLE_CLICK_TIMEOUT })
+      // Swallow the click failure: Playwright retries a click on its own when the
+      // element detaches, so an unbounded one would sit inside a single attempt
+      // for the whole retry budget instead of letting `toPass` start over.
+      await row
+        .getByRole('switch')
+        .click({ force: true, timeout: DISABLE_TOGGLE_CLICK_TIMEOUT })
+        .catch(() => {})
+    }
+    await expect(title).toBeVisible({ timeout: DISABLE_DIALOG_TIMEOUT })
+  }).toPass({ timeout: DISABLE_DIALOG_RETRY_TIMEOUT, intervals: [500, 1_000, 2_000] })
+
+  await waitForDisableDialogReady(dialog, credentialName)
+  return dialog
+}
+
 /**
  * Flip a credential's Enabled switch off from its list row, returning once the
  * server has recorded it.
@@ -151,9 +199,7 @@ export async function waitForDisableDialogReady(dialog: Locator, credentialName?
  * otherwise consume most of this wait.
  */
 export async function disableCredentialFromRow(app: Page, row: Locator): Promise<void> {
-  await row.getByRole('switch', { name: 'Enabled' }).click({ force: true })
-  const dialog = app.getByRole('dialog')
-  await waitForDisableDialogReady(dialog)
+  const dialog = await openDisableDialogFromRow(app, row)
 
   const patchDone = app.waitForResponse(isCredentialPatchResponse, { timeout: CREDENTIAL_PATCH_TIMEOUT })
   await dialog.getByRole('button', { name: 'Disable' }).click()

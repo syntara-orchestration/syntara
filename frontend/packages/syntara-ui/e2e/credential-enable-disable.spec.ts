@@ -8,6 +8,7 @@ import {
   filterCredentialByName,
   goToCredentialsList,
   navigateToCredentialDetail,
+  openDisableDialogFromRow,
   waitForDisableDialogReady,
 } from './helpers/credentials'
 
@@ -28,12 +29,8 @@ test.describe('Credential Enable/Disable State Management', () => {
       await goToCredentialsList(app)
       await filterCredentialByName(app, name)
       const row = app.getByRole('row', { name: new RegExp(name) })
-      await row.waitFor({ state: 'visible', timeout: 10_000 })
-      await listRowToggle(row).click({ force: true })
-
-      const dialog = app.getByRole('dialog')
+      const dialog = await openDisableDialogFromRow(app, row, name)
       await expect(dialog).toBeVisible()
-      await waitForDisableDialogReady(dialog, name)
     } finally {
       await deleteCredentialByName(app, name)
     }
@@ -45,10 +42,7 @@ test.describe('Credential Enable/Disable State Management', () => {
       await goToCredentialsList(app)
       await filterCredentialByName(app, name)
       const row = app.getByRole('row', { name: new RegExp(name) })
-      await listRowToggle(row).click({ force: true })
-
-      const dialog = app.getByRole('dialog')
-      await waitForDisableDialogReady(dialog, name)
+      const dialog = await openDisableDialogFromRow(app, row, name)
       await expect(dialog.getByText(/You can re-enable the credential at any time/)).toBeVisible()
       await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeVisible()
     } finally {
@@ -62,10 +56,7 @@ test.describe('Credential Enable/Disable State Management', () => {
       await goToCredentialsList(app)
       await filterCredentialByName(app, name)
       const row = app.getByRole('row', { name: new RegExp(name) })
-      await listRowToggle(row).click({ force: true })
-
-      const dialog = app.getByRole('dialog')
-      await waitForDisableDialogReady(dialog)
+      const dialog = await openDisableDialogFromRow(app, row)
       await dialog.getByRole('button', { name: 'Disable' }).click()
 
       await expect(dialog).not.toBeVisible()
@@ -81,10 +72,7 @@ test.describe('Credential Enable/Disable State Management', () => {
       await goToCredentialsList(app)
       await filterCredentialByName(app, name)
       const row = app.getByRole('row', { name: new RegExp(name) })
-      await listRowToggle(row).click({ force: true })
-
-      const dialog = app.getByRole('dialog')
-      await waitForDisableDialogReady(dialog)
+      const dialog = await openDisableDialogFromRow(app, row)
       await dialog.getByRole('button', { name: 'Cancel' }).click()
 
       await expect(dialog).not.toBeVisible()
