@@ -246,8 +246,13 @@ class TestScheduledTrigger:
         triggered = None
         deadline = time.monotonic() + FIRE_TIMEOUT_SECONDS
         while time.monotonic() < deadline:
-            executions = syntara_api.executions.list(
-                additional_params={"workflow_id": str(workflow.id)}, limit=100
+            # _retry_api_call absorbs transient transport/5xx blips so a
+            # momentary error doesn't abort polling of a healthy deployment
+            # (same convention as poll_execution); persistent errors still
+            # surface via assert_and_get.
+            executions = _retry_api_call(
+                lambda: syntara_api.executions.list(additional_params={"workflow_id": str(workflow.id)}, limit=100),
+                delay=1.0,
             ).assert_and_get()
             triggered = next(
                 (e for e in executions.resources if getattr(e, "trigger_type", None) == "scheduled_trigger"),
