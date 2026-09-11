@@ -68,6 +68,21 @@ class Invocation(UserOwnedResource, table=True):
         index=True,
     )
 
+    # Link to the builtin "Agent Execution" workflow execution running this
+    # invocation, written server-side right after that execution is started.
+    # Declared with a string foreign_key and no Relationship() on purpose: a
+    # real import of Execution here would create an agent_orchestrator <->
+    # workflows module cycle. ondelete is SET NULL because
+    # executions_workflow_id_fkey cascades on workflow hard-delete, which would
+    # otherwise raise IntegrityError against a NO ACTION default.
+    agent_execution_id: UUID | None = Field(
+        default=None,
+        foreign_key="executions.id",
+        ondelete="SET NULL",
+        index=True,
+        description="Builtin Agent Execution workflow execution running this invocation",
+    )
+
     # Required fields
     prompt: str = Field(
         min_length=1,
