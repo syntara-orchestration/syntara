@@ -21,13 +21,13 @@ function renderGuard(
 
   const utils = renderHook(() => {
     const autoSubmitRef = useRef<AutoSubmitFn | null>(overrides.autoSubmitFn ?? null)
-    return useGuardedSaveWorkflow(
+    return useGuardedSaveWorkflow({
       handleSaveWorkflow,
-      overrides.isNodeEditorOpen ?? false,
-      overrides.nodeEditorMode ?? null,
+      isNodeEditorOpen: overrides.isNodeEditorOpen ?? false,
+      nodeEditorMode: overrides.nodeEditorMode ?? null,
       autoSubmitRef,
-      dispatch
-    )
+      dispatch,
+    })
   })
 
   return { ...utils, dispatch, handleSaveWorkflow }

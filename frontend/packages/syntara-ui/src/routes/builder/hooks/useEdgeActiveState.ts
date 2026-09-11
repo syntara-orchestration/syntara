@@ -1,6 +1,7 @@
 import { EdgeHandleEnum } from '@syntara/contracts'
 import { useEffect } from 'react'
 
+import type { OnAddNodeFromEdge } from '../types'
 import { markerEnd, type EdgeType } from '../utils/workflowToGraph'
 
 type UseEdgeActiveStateOptions = {
@@ -8,7 +9,7 @@ type UseEdgeActiveStateOptions = {
   activeEdgeId: string | null
   activeEdgeButtonNodeId: string | null
   activeEdgeButtonHandle: string | null
-  onAddNodeFromEdge?: (sourceNodeId: string, targetNodeId?: string, edgeId?: string, sourceHandle?: string) => void
+  onAddNodeFromEdge?: OnAddNodeFromEdge
   setEdges: React.Dispatch<React.SetStateAction<EdgeType[]>>
 }
 

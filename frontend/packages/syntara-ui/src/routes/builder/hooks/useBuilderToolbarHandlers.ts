@@ -17,13 +17,21 @@ import type { ConflictInfo } from '../VersionConflictDialog'
 
 type ShowAlert = (options: AlertMessage) => void
 
-async function checkVersionConflictBeforeRun(
-  workflowId: string,
-  loadedVersion: number,
-  onRunConflict: (info: ConflictInfo) => void,
-  loadedVersionName?: string | null,
+type CheckVersionConflictBeforeRunOptions = {
+  workflowId: string
+  loadedVersion: number
+  onRunConflict: (info: ConflictInfo) => void
+  loadedVersionName?: string | null
   loadedVersionCreatedAt?: string | null
-): Promise<boolean> {
+}
+
+async function checkVersionConflictBeforeRun({
+  workflowId,
+  loadedVersion,
+  onRunConflict,
+  loadedVersionName,
+  loadedVersionCreatedAt,
+}: CheckVersionConflictBeforeRunOptions): Promise<boolean> {
   const { data: latest } = await workflowFetchClient.GET('/workflows/{workflow_id}', {
     params: { path: { workflow_id: workflowId } },
   })
@@ -112,13 +120,13 @@ export function useBuilderToolbarHandlers({
       if (!workflow?.id) return
 
       if (loadedVersion != null && !runOptions?.skipPreflightCheck && onRunConflict) {
-        const hasConflict = await checkVersionConflictBeforeRun(
-          workflow.id,
+        const hasConflict = await checkVersionConflictBeforeRun({
+          workflowId: workflow.id,
           loadedVersion,
           onRunConflict,
           loadedVersionName,
-          loadedVersionCreatedAt
-        )
+          loadedVersionCreatedAt,
+        })
         if (hasConflict) {
           dispatch({ type: 'SET_CONFIRM_DIALOG', payload: false })
           return

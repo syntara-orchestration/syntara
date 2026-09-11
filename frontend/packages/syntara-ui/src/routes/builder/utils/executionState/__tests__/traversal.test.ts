@@ -167,7 +167,11 @@ describe('WorkflowTraversal', () => {
         ],
       ])
 
-      const result = WorkflowTraversal.shouldMarkAsSkipped('task-1', activityStates, edges)
+      const result = WorkflowTraversal.shouldMarkAsSkipped({
+        activityId: 'task-1',
+        activityStates: activityStates,
+        edges: edges,
+      })
 
       expect(result).toBe(false)
     })
@@ -178,7 +182,11 @@ describe('WorkflowTraversal', () => {
       ]
       const activityStates = new Map<string, ActivityState>()
 
-      const result = WorkflowTraversal.shouldMarkAsSkipped('task-1', activityStates, edges)
+      const result = WorkflowTraversal.shouldMarkAsSkipped({
+        activityId: 'task-1',
+        activityStates: activityStates,
+        edges: edges,
+      })
 
       expect(result).toBe(false) // Trigger nodes or orphans should not be skipped
     })
@@ -192,7 +200,11 @@ describe('WorkflowTraversal', () => {
         ['task-3', { activityId: 'task-3', status: 'pending', startedAt: null, completedAt: null }],
       ])
 
-      const result = WorkflowTraversal.shouldMarkAsSkipped('task-2', activityStates, edges)
+      const result = WorkflowTraversal.shouldMarkAsSkipped({
+        activityId: 'task-2',
+        activityStates: activityStates,
+        edges: edges,
+      })
 
       expect(result).toBe(false) // Execution could still reach this node
     })
@@ -224,7 +236,11 @@ describe('WorkflowTraversal', () => {
         // task-false never started - it's on the non-taken branch
       ])
 
-      const result = WorkflowTraversal.shouldMarkAsSkipped('task-false', activityStates, edges)
+      const result = WorkflowTraversal.shouldMarkAsSkipped({
+        activityId: 'task-false',
+        activityStates: activityStates,
+        edges: edges,
+      })
 
       expect(result).toBe(true)
     })
@@ -256,7 +272,11 @@ describe('WorkflowTraversal', () => {
         // task-approved never started - it's on the non-taken branch
       ])
 
-      const result = WorkflowTraversal.shouldMarkAsSkipped('task-approved', activityStates, edges)
+      const result = WorkflowTraversal.shouldMarkAsSkipped({
+        activityId: 'task-approved',
+        activityStates: activityStates,
+        edges: edges,
+      })
 
       expect(result).toBe(true)
     })
@@ -291,10 +311,16 @@ describe('WorkflowTraversal', () => {
       ])
 
       // First verify task-a is skipped
-      expect(WorkflowTraversal.shouldMarkAsSkipped('task-a', activityStates, edges)).toBe(true)
+      expect(
+        WorkflowTraversal.shouldMarkAsSkipped({ activityId: 'task-a', activityStates: activityStates, edges: edges })
+      ).toBe(true)
 
       // Then verify task-c is also skipped (cascading)
-      const result = WorkflowTraversal.shouldMarkAsSkipped('task-c', activityStates, edges)
+      const result = WorkflowTraversal.shouldMarkAsSkipped({
+        activityId: 'task-c',
+        activityStates: activityStates,
+        edges: edges,
+      })
 
       expect(result).toBe(true)
     })
@@ -326,7 +352,11 @@ describe('WorkflowTraversal', () => {
         // task-3 never started - both parents completed but didn't reach it
       ])
 
-      const result = WorkflowTraversal.shouldMarkAsSkipped('task-3', activityStates, edges)
+      const result = WorkflowTraversal.shouldMarkAsSkipped({
+        activityId: 'task-3',
+        activityStates: activityStates,
+        edges: edges,
+      })
 
       expect(result).toBe(true)
     })
@@ -348,7 +378,13 @@ describe('WorkflowTraversal', () => {
       ])
       const allowlist = new Set(['task-1', 'task-skipped'])
 
-      const result = WorkflowTraversal.shouldMarkAsSkipped('task-skipped', activityStates, edges, new Set(), allowlist)
+      const result = WorkflowTraversal.shouldMarkAsSkipped({
+        activityId: 'task-skipped',
+        activityStates,
+        edges,
+        visited: new Set(),
+        skipInferenceActivityIds: allowlist,
+      })
 
       expect(result).toBe(true)
     })
@@ -371,7 +407,13 @@ describe('WorkflowTraversal', () => {
       ])
       const allowlist = new Set(['task-1'])
 
-      const result = WorkflowTraversal.shouldMarkAsSkipped('task-new', activityStates, edges, new Set(), allowlist)
+      const result = WorkflowTraversal.shouldMarkAsSkipped({
+        activityId: 'task-new',
+        activityStates,
+        edges,
+        visited: new Set(),
+        skipInferenceActivityIds: allowlist,
+      })
 
       expect(result).toBe(false)
     })
@@ -384,7 +426,11 @@ describe('WorkflowTraversal', () => {
       const activityStates = new Map<string, ActivityState>()
 
       // Should not throw or hang
-      const result = WorkflowTraversal.shouldMarkAsSkipped('task-1', activityStates, edges)
+      const result = WorkflowTraversal.shouldMarkAsSkipped({
+        activityId: 'task-1',
+        activityStates: activityStates,
+        edges: edges,
+      })
 
       expect(result).toBe(false)
     })
@@ -397,7 +443,11 @@ describe('WorkflowTraversal', () => {
         ['task-1', { activityId: 'task-1', status: 'running', startedAt: '2024-01-01T00:00:00Z', completedAt: null }],
       ])
 
-      const result = WorkflowTraversal.shouldMarkAsSkipped('task-2', activityStates, edges)
+      const result = WorkflowTraversal.shouldMarkAsSkipped({
+        activityId: 'task-2',
+        activityStates: activityStates,
+        edges: edges,
+      })
 
       expect(result).toBe(false) // Parent is running, child could still execute
     })
@@ -410,7 +460,11 @@ describe('WorkflowTraversal', () => {
         ['task-1', { activityId: 'task-1', status: 'pending', startedAt: null, completedAt: null }],
       ])
 
-      const result = WorkflowTraversal.shouldMarkAsSkipped('task-2', activityStates, edges)
+      const result = WorkflowTraversal.shouldMarkAsSkipped({
+        activityId: 'task-2',
+        activityStates: activityStates,
+        edges: edges,
+      })
 
       expect(result).toBe(false) // Parent is pending, child could still execute
     })

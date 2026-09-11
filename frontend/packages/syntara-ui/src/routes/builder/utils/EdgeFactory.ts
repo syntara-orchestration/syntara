@@ -1,6 +1,7 @@
 import { EdgeHandleEnum } from '@syntara/contracts'
 import { addEdge } from '@xyflow/react'
 
+import type { OnAddNodeFromEdge } from '../types'
 import type { EdgeConnection } from '../types/edge'
 
 import { getButtonEdgeId, isBranchHandle } from './edgeHelpers'
@@ -11,7 +12,7 @@ export type CreateEdgeOptions = {
   target: string
   sourceHandle?: string
   targetHandle?: string
-  onAddNode?: (sourceId: string, targetId?: string, edgeId?: string, handle?: string) => void
+  onAddNode?: OnAddNodeFromEdge
 }
 
 /**

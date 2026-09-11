@@ -5,6 +5,7 @@ import { FlowNodeType } from '../../../constants'
 import { buildTriggerNodeId } from '../../../utils/triggerNodeIds'
 import type { NodeType } from '../../workflows/canvas/nodes/NodeType'
 import type { ActivityState } from '../../workflows/execution/types'
+import type { OnAddNodeFromEdge } from '../types'
 import type { EdgeConnection } from '../types/edge'
 import { detectLoopBackNodes } from '../utils/detectLoopBackNodes'
 import { ExecutionStateEnricher, type ActivityWithMetadata } from '../utils/executionState'
@@ -31,7 +32,7 @@ type UseBuilderFlowGraphParams = {
   storedEdges: EdgeConnection[]
   executionStatus: string | null | undefined
   activityStates: Map<string, ActivityState>
-  onAddNodeFromEdge: ((sourceNodeId: string, sourceHandle: string) => void) | undefined
+  onAddNodeFromEdge: OnAddNodeFromEdge | undefined
   workflowVersion: number
   preResolvedNodes?: Set<string>
   skipInferenceActivityIds?: ReadonlySet<string> | null
@@ -105,16 +106,16 @@ export function useBuilderFlowGraph({
         return
       }
 
-      const activityData = executionStateEnricher.enrichActivity(
-        activity,
-        executionStatus,
-        activityStates,
-        storedEdges,
-        {
+      const activityData = executionStateEnricher.enrichActivity({
+        activity: activity,
+        executionStatus: executionStatus,
+        activityStates: activityStates,
+        edges: storedEdges,
+        options: {
           preResolvedNodes,
           skipInferenceActivityIds: inferenceAllowlist,
-        }
-      )
+        },
+      })
       nodes.push({
         id: activity.id,
         type: activity.type,
@@ -140,13 +141,13 @@ export function useBuilderFlowGraph({
 
         let edgeExecutionStatus: 'passed' | 'pending' | undefined
         if (executionStatus) {
-          edgeExecutionStatus = executionStateEnricher.determineEdgeStatus(
-            edge,
-            activityStates,
-            activities,
-            undefined,
-            storedEdges
-          )
+          edgeExecutionStatus = executionStateEnricher.determineEdgeStatus({
+            edge: edge,
+            activityStates: activityStates,
+            activities: activities,
+            triggerDisplayToRealId: undefined,
+            edges: storedEdges,
+          })
         }
 
         // Transform trigger real IDs to display IDs for React Flow
@@ -187,16 +188,16 @@ export function useBuilderFlowGraph({
         nodeType = FlowNodeType.APPROVAL
       }
 
-      const activityData = executionStateEnricher.enrichActivity(
-        activity,
-        executionStatus,
-        activityStates,
-        storedEdges,
-        {
+      const activityData = executionStateEnricher.enrichActivity({
+        activity: activity,
+        executionStatus: executionStatus,
+        activityStates: activityStates,
+        edges: storedEdges,
+        options: {
           preResolvedNodes,
           skipInferenceActivityIds: inferenceAllowlist,
-        }
-      )
+        },
+      })
 
       const node = {
         id: activity.id,

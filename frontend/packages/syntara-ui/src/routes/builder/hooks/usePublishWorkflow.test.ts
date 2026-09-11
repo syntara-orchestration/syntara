@@ -75,7 +75,7 @@ describe('usePublishWorkflow', () => {
   })
 
   it('calls publish mutation with correct params', () => {
-    const { result } = renderHook(() => usePublishWorkflow('wf-123', 3), {
+    const { result } = renderHook(() => usePublishWorkflow({ workflowId: 'wf-123', currentVersion: 3 }), {
       wrapper: makeWrapper(queryClient),
     })
 
@@ -96,7 +96,7 @@ describe('usePublishWorkflow', () => {
   })
 
   it('sends null name when no name provided', () => {
-    const { result } = renderHook(() => usePublishWorkflow('wf-123', 2), {
+    const { result } = renderHook(() => usePublishWorkflow({ workflowId: 'wf-123', currentVersion: 2 }), {
       wrapper: makeWrapper(queryClient),
     })
 
@@ -113,7 +113,7 @@ describe('usePublishWorkflow', () => {
   })
 
   it('does not call mutation when workflowId is null', () => {
-    const { result } = renderHook(() => usePublishWorkflow(null, 1), {
+    const { result } = renderHook(() => usePublishWorkflow({ workflowId: null, currentVersion: 1 }), {
       wrapper: makeWrapper(queryClient),
     })
 
@@ -125,7 +125,7 @@ describe('usePublishWorkflow', () => {
   })
 
   it('does not call mutation when currentVersion is undefined', () => {
-    const { result } = renderHook(() => usePublishWorkflow('wf-123', undefined), {
+    const { result } = renderHook(() => usePublishWorkflow({ workflowId: 'wf-123', currentVersion: undefined }), {
       wrapper: makeWrapper(queryClient),
     })
 
@@ -146,7 +146,7 @@ describe('usePublishWorkflow', () => {
     // Pre-populate the query cache with a workflows query so invalidation has something to match
     queryClient.setQueryData(['get', '/workflows'], { resources: [] })
 
-    const { result } = renderHook(() => usePublishWorkflow('wf-123', 3), {
+    const { result } = renderHook(() => usePublishWorkflow({ workflowId: 'wf-123', currentVersion: 3 }), {
       wrapper: makeWrapper(queryClient),
     })
 
@@ -167,7 +167,7 @@ describe('usePublishWorkflow', () => {
       }
     )
 
-    const { result } = renderHook(() => usePublishWorkflow('wf-123', 3), {
+    const { result } = renderHook(() => usePublishWorkflow({ workflowId: 'wf-123', currentVersion: 3 }), {
       wrapper: makeWrapper(queryClient),
     })
 
@@ -189,7 +189,7 @@ describe('usePublishWorkflow', () => {
       }
     )
 
-    const { result } = renderHook(() => usePublishWorkflow('wf-123', 3), {
+    const { result } = renderHook(() => usePublishWorkflow({ workflowId: 'wf-123', currentVersion: 3 }), {
       wrapper: makeWrapper(queryClient),
     })
 
@@ -207,7 +207,7 @@ describe('usePublishWorkflow', () => {
       callbacks?.onError?.(mockError)
     })
 
-    const { result } = renderHook(() => usePublishWorkflow('wf-123', 3), {
+    const { result } = renderHook(() => usePublishWorkflow({ workflowId: 'wf-123', currentVersion: 3 }), {
       wrapper: makeWrapper(queryClient),
     })
 
@@ -233,7 +233,7 @@ describe('usePublishWorkflow', () => {
       }
     )
 
-    const { result } = renderHook(() => usePublishWorkflow('wf-123', 3), {
+    const { result } = renderHook(() => usePublishWorkflow({ workflowId: 'wf-123', currentVersion: 3 }), {
       wrapper: makeWrapper(queryClient),
     })
 
@@ -245,7 +245,7 @@ describe('usePublishWorkflow', () => {
   })
 
   it('sends description when provided', () => {
-    const { result } = renderHook(() => usePublishWorkflow('wf-123', 2), {
+    const { result } = renderHook(() => usePublishWorkflow({ workflowId: 'wf-123', currentVersion: 2 }), {
       wrapper: makeWrapper(queryClient),
     })
 
@@ -275,9 +275,18 @@ describe('usePublishWorkflow', () => {
       markClean: mockMarkClean,
     } as unknown as ReturnType<typeof useWorkflowStore.getState>)
 
-    const { result } = renderHook(() => usePublishWorkflow('wf-123', 3, 'My WF', 'My Desc'), {
-      wrapper: makeWrapper(queryClient),
-    })
+    const { result } = renderHook(
+      () =>
+        usePublishWorkflow({
+          workflowId: 'wf-123',
+          currentVersion: 3,
+          workflowName: 'My WF',
+          workflowDescription: 'My Desc',
+        }),
+      {
+        wrapper: makeWrapper(queryClient),
+      }
+    )
 
     act(() => {
       result.current.publish('v1.0')
@@ -312,7 +321,7 @@ describe('usePublishWorkflow', () => {
       }
     )
 
-    const { result } = renderHook(() => usePublishWorkflow('wf-123', 3), {
+    const { result } = renderHook(() => usePublishWorkflow({ workflowId: 'wf-123', currentVersion: 3 }), {
       wrapper: makeWrapper(queryClient),
     })
 
@@ -336,7 +345,7 @@ describe('usePublishWorkflow', () => {
       markClean: mockMarkClean,
     } as unknown as ReturnType<typeof useWorkflowStore.getState>)
 
-    const { result } = renderHook(() => usePublishWorkflow('wf-123', 3), {
+    const { result } = renderHook(() => usePublishWorkflow({ workflowId: 'wf-123', currentVersion: 3 }), {
       wrapper: makeWrapper(queryClient),
     })
 
@@ -372,7 +381,7 @@ describe('usePublishWorkflow — version conflict detection', () => {
     })
 
     const { result } = renderHook(
-      () => usePublishWorkflow('wf-123', 3, undefined, undefined, { expectedVersion: 3, onConflict }),
+      () => usePublishWorkflow({ workflowId: 'wf-123', currentVersion: 3, expectedVersion: 3, onConflict }),
       { wrapper: makeWrapper(queryClient) }
     )
 
@@ -394,7 +403,7 @@ describe('usePublishWorkflow — version conflict detection', () => {
     })
 
     const { result } = renderHook(
-      () => usePublishWorkflow('wf-123', 3, undefined, undefined, { expectedVersion: 3, onConflict }),
+      () => usePublishWorkflow({ workflowId: 'wf-123', currentVersion: 3, expectedVersion: 3, onConflict }),
       { wrapper: makeWrapper(queryClient) }
     )
 
@@ -410,9 +419,12 @@ describe('usePublishWorkflow — version conflict detection', () => {
   })
 
   it('sends expected_version in publish body when provided', () => {
-    const { result } = renderHook(() => usePublishWorkflow('wf-123', 3, undefined, undefined, { expectedVersion: 7 }), {
-      wrapper: makeWrapper(queryClient),
-    })
+    const { result } = renderHook(
+      () => usePublishWorkflow({ workflowId: 'wf-123', currentVersion: 3, expectedVersion: 7 }),
+      {
+        wrapper: makeWrapper(queryClient),
+      }
+    )
 
     act(() => {
       result.current.publish('v1.0')
@@ -424,7 +436,7 @@ describe('usePublishWorkflow — version conflict detection', () => {
   })
 
   it('does not send expected_version when not provided', () => {
-    const { result } = renderHook(() => usePublishWorkflow('wf-123', 3), {
+    const { result } = renderHook(() => usePublishWorkflow({ workflowId: 'wf-123', currentVersion: 3 }), {
       wrapper: makeWrapper(queryClient),
     })
 
@@ -438,9 +450,12 @@ describe('usePublishWorkflow — version conflict detection', () => {
   })
 
   it('uses expectedVersionOverride from callOptions over hook-level expectedVersion', () => {
-    const { result } = renderHook(() => usePublishWorkflow('wf-123', 3, undefined, undefined, { expectedVersion: 7 }), {
-      wrapper: makeWrapper(queryClient),
-    })
+    const { result } = renderHook(
+      () => usePublishWorkflow({ workflowId: 'wf-123', currentVersion: 3, expectedVersion: 7 }),
+      {
+        wrapper: makeWrapper(queryClient),
+      }
+    )
 
     act(() => {
       result.current.publish('v1.0', undefined, undefined, { expectedVersionOverride: 10 })

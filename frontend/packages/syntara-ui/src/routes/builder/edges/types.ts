@@ -1,12 +1,12 @@
 import type { EdgeProps } from '@xyflow/react'
 
-import type { FlowPosition } from '../types'
+import type { FlowPosition, OnAddNodeFromEdge } from '../types'
 
 /**
  * Shared edge data interface used by all edge types
  */
 export type EdgeData = {
-  onAddNode?: (sourceNodeId: string, targetNodeId: string, edgeId: string, sourceHandle?: string) => void
+  onAddNode?: OnAddNodeFromEdge
   isActive?: boolean
   isPending?: boolean
   executionStatus?: 'passed' | 'pending'
