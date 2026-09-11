@@ -1030,14 +1030,22 @@ test.describe('Permission gating — Identity Provider actions', () => {
       await auditorApp.goto(toAppUrl(`${AUTH_URL}`))
       await expect(auditorApp.getByRole('heading', { name: 'Identity Providers', level: 1 })).toBeVisible()
 
+      // The identity-providers table is one unfiltered page of 20 sorted by `name`
+      // ascending, so the row seeded above only appears while fewer than 20
+      // providers sort before it. `pagination.spec.ts` seeds 21 named
+      // `e2e-pag-…-idp-N`, and `e2e-pag` sorts before `e2e-perm`, so for as long as
+      // that spec's `beforeAll`/`afterAll` window overlaps this test the row is on
+      // page 2 and never renders. Filtering by name puts it back deterministically.
+      await auditorApp.getByPlaceholder('Filter by name').fill(idpName)
+      await auditorApp.getByRole('button', { name: 'Apply filter' }).click()
+
       const idpRow = auditorApp
         .getByRole('grid', { name: 'Identity providers table' })
         .getByRole('row', { name: new RegExp(idpName) })
       await expect(idpRow).toBeVisible({ timeout: 15_000 })
-      // The identity-providers table refetches while the auditor page settles, so a
-      // single forced click here is regularly swallowed by the row being replaced —
-      // the menu never opens and all three assertions below fail on a missing
-      // `menuitem`. This is the same dequeue seen on PRs that touch no frontend code.
+      // A forced click skips every actionability wait, so it lands even while the
+      // list query is replacing the row — the handler never runs and the menu stays
+      // shut.
       await openRowKebab(idpRow, /Edit provider/i)
 
       await expect(auditorApp.getByRole('menuitem', { name: /Edit provider/i })).toHaveAttribute(
