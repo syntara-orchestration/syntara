@@ -16,6 +16,7 @@ from syntara.core.constants import FieldLimits
 from syntara.core.models.base.named import NamedResource
 from syntara.core.models.base.user_owned import UserOwnedResource
 from syntara.core.models.pagination import ResourcesResponse
+from syntara.core.models.user_reference import UserReference, UserReferenceFieldsMixin
 from syntara.workflows.models.validation_finding import ValidationResult
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 
@@ -223,7 +224,7 @@ class WorkflowUpdate(SQLModel):
     )
 
 
-class WorkflowRead(WorkflowBase):
+class WorkflowRead(UserReferenceFieldsMixin, WorkflowBase):
     """Schema for workflow response (GET /workflows/{id}).
 
     Includes all fields from the database table model.
@@ -245,7 +246,10 @@ class WorkflowRead(WorkflowBase):
     )
     published_version_id: UUID | None = None
     published_version_number: int | None = None
-    created_by: UUID
+    created_by: UserReference | UUID | str | None = Field(default=None, description="User who created the workflow")
+    updated_by: UserReference | UUID | str | None = Field(
+        default=None, description="User who last modified the workflow"
+    )
     project_id: UUID
     created_at: datetime
     updated_at: datetime

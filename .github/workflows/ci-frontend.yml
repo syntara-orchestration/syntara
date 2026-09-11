@@ -160,6 +160,12 @@ jobs:
         run: npm run check
         working-directory: frontend
 
+      # syntara-ui's suite runs sharded in unit-tests; syntara-mock-api's is small
+      # and unsharded, so it runs here rather than four times over.
+      - name: Mock API tests
+        run: npm run test:mock-api
+        working-directory: frontend
+
   unit-tests:
     name: (Frontend) Unit Tests
     needs: changes

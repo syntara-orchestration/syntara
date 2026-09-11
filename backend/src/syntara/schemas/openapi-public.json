@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Orchestrator API",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "description": "A distributed multi-agent workflow orchestration system"
   },
   "servers": [
@@ -38741,10 +38741,11 @@
       "UserReference": {
         "type": "object",
         "title": "UserReference",
-        "description": "Minimal user identification for embedding in other resources.\nThis model captures user identity at the time of an action, providing\na snapshot that doesn't change even if the user's details are updated later.",
+        "description": "Minimal user identification for embedding in other resources.\nThe name is resolved from the database when the response is built, not\nstored alongside the id, so it always reflects the principal's current\nname. Renaming a user therefore changes the name shown for their past actions.",
         "required": [
           "id",
-          "name"
+          "name",
+          "type"
         ],
         "properties": {
           "id": {
@@ -38754,9 +38755,26 @@
           },
           "name": {
             "type": "string",
-            "description": "User's display name at time of action"
+            "description": "Principal's current display name, resolved when the response is built. Not a username: for a user this is their first and last name, falling back to the username when both are blank; for a service account it is the account name; for an internal service it is derived from the certificate CN."
+          },
+          "type": {
+            "$ref": "#/components/schemas/UserReferenceType",
+            "description": "Kind of principal this reference points at. Only `user` references have a user detail page; `deleted_user` / `deleted_service_account` are hard-deleted principals that are still recorded as the actor."
           }
         }
+      },
+      "UserReferenceType": {
+        "type": "string",
+        "title": "UserReferenceType",
+        "description": "Kind of principal a UserReference points at.\n\nOnly ``user`` references have a user detail page. ``deleted_user`` and\n``deleted_service_account`` mark principals that were hard-deleted but are\nstill recorded as the actor.",
+        "enum": [
+          "user",
+          "service_account",
+          "service",
+          "system",
+          "deleted_user",
+          "deleted_service_account"
+        ]
       },
       "ErrorData": {
         "type": "object",
@@ -39944,7 +39962,8 @@
                 "type": "null"
               }
             ],
-            "description": "User who made the decision"
+            "description": "User who made the decision",
+            "readOnly": true
           },
           "decided_at": {
             "anyOf": [
@@ -40428,7 +40447,8 @@
                 "type": "null"
               }
             ],
-            "description": "User who made the decision (if successful)"
+            "description": "User who made the decision (if successful)",
+            "readOnly": true
           },
           "decision_notes": {
             "anyOf": [
@@ -42708,17 +42728,14 @@
           "created_by": {
             "anyOf": [
               {
-                "type": "string"
-              },
-              {
-                "format": "uuid",
-                "type": "string"
+                "$ref": "#/components/schemas/UserReference"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "Username or UUID of the workflow creator",
+            "description": "User who created the workflow",
+            "readOnly": true,
             "title": "Created By"
           },
           "created_at": {
@@ -43883,29 +43900,6 @@
               "team": "platform"
             }
           },
-          "created_by": {
-            "type": "string",
-            "format": "uuid",
-            "readOnly": true,
-            "title": "Created By",
-            "description": "User (or automation) that created the resource",
-            "example": "770e8400-e29b-41d4-a716-446655440000"
-          },
-          "updated_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "readOnly": true,
-            "title": "Updated By",
-            "description": "User (or automation) that last updated the resource",
-            "example": "880e8400-e29b-41d4-a716-446655440000"
-          },
           "name": {
             "type": "string",
             "minLength": 1,
@@ -43928,6 +43922,32 @@
             "description": "Detailed description of the resource",
             "example": "Handles user authentication and authorization workflows"
           },
+          "created_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserReference"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "User who created the identity provider",
+            "readOnly": true,
+            "title": "Created By"
+          },
+          "updated_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserReference"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "User who last modified the identity provider",
+            "readOnly": true,
+            "title": "Updated By"
+          },
           "enabled": {
             "type": "boolean",
             "title": "Enabled",
@@ -43940,7 +43960,6 @@
           }
         },
         "required": [
-          "created_by",
           "name",
           "configuration"
         ],
@@ -44822,44 +44841,6 @@
               "team": "platform"
             }
           },
-          "created_by": {
-            "type": "string",
-            "format": "uuid",
-            "readOnly": true,
-            "title": "Created By",
-            "description": "Username or UUID of the creator",
-            "example": "770e8400-e29b-41d4-a716-446655440000",
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "updated_by": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "readOnly": true,
-            "title": "Updated By",
-            "description": "Username or UUID of the last modifier",
-            "example": "880e8400-e29b-41d4-a716-446655440000"
-          },
           "name": {
             "type": "string",
             "minLength": 1,
@@ -44881,6 +44862,32 @@
             "title": "Description",
             "description": "Detailed description of the resource",
             "example": "Handles user authentication and authorization workflows"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserReference"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "User who created the integration",
+            "readOnly": true,
+            "title": "Created By"
+          },
+          "updated_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserReference"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "User who last modified the integration",
+            "readOnly": true,
+            "title": "Updated By"
           },
           "integration_type": {
             "$ref": "#/components/schemas/IntegrationType"
@@ -45036,7 +45043,6 @@
           }
         },
         "required": [
-          "created_by",
           "name",
           "integration_type",
           "configuration"
@@ -46125,29 +46131,6 @@
               "team": "platform"
             }
           },
-          "created_by": {
-            "type": "string",
-            "format": "uuid",
-            "readOnly": true,
-            "title": "Created By",
-            "description": "User (or automation) that created the resource",
-            "example": "770e8400-e29b-41d4-a716-446655440000"
-          },
-          "updated_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "readOnly": true,
-            "title": "Updated By",
-            "description": "User (or automation) that last updated the resource",
-            "example": "880e8400-e29b-41d4-a716-446655440000"
-          },
           "name": {
             "type": "string",
             "minLength": 1,
@@ -46169,6 +46152,32 @@
             "title": "Description",
             "description": "Detailed description of the resource",
             "example": "Handles user authentication and authorization workflows"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserReference"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "User who created the tool",
+            "readOnly": true,
+            "title": "Created By"
+          },
+          "updated_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserReference"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "User who last modified the tool",
+            "readOnly": true,
+            "title": "Updated By"
           },
           "integration_id": {
             "type": "string",
@@ -46242,7 +46251,6 @@
           }
         },
         "required": [
-          "created_by",
           "name",
           "integration_id",
           "namespaced_name",
@@ -46937,20 +46945,29 @@
             "title": "Last Authenticated At"
           },
           "created_by": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Created By"
-          },
-          "updated_by": {
             "anyOf": [
               {
-                "type": "string",
-                "format": "uuid"
+                "$ref": "#/components/schemas/UserReference"
               },
               {
                 "type": "null"
               }
             ],
+            "description": "User who created the service account",
+            "readOnly": true,
+            "title": "Created By"
+          },
+          "updated_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserReference"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "User who last modified the service account",
+            "readOnly": true,
             "title": "Updated By"
           },
           "created_at": {
@@ -46977,7 +46994,6 @@
           "name",
           "status",
           "project_id",
-          "created_by",
           "created_at",
           "updated_at"
         ],
@@ -47155,20 +47171,29 @@
             "title": "Old Secret Valid Until"
           },
           "created_by": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Created By"
-          },
-          "updated_by": {
             "anyOf": [
               {
-                "type": "string",
-                "format": "uuid"
+                "$ref": "#/components/schemas/UserReference"
               },
               {
                 "type": "null"
               }
             ],
+            "description": "User who created the credential",
+            "readOnly": true,
+            "title": "Created By"
+          },
+          "updated_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserReference"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "User who last modified the credential",
+            "readOnly": true,
             "title": "Updated By"
           },
           "created_at": {
@@ -47190,7 +47215,6 @@
           "identifier",
           "status",
           "grace_period_seconds",
-          "created_by",
           "created_at",
           "updated_at"
         ],
@@ -47260,20 +47284,29 @@
             "title": "Old Secret Valid Until"
           },
           "created_by": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Created By"
-          },
-          "updated_by": {
             "anyOf": [
               {
-                "type": "string",
-                "format": "uuid"
+                "$ref": "#/components/schemas/UserReference"
               },
               {
                 "type": "null"
               }
             ],
+            "description": "User who created the credential",
+            "readOnly": true,
+            "title": "Created By"
+          },
+          "updated_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserReference"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "User who last modified the credential",
+            "readOnly": true,
             "title": "Updated By"
           },
           "created_at": {
@@ -47307,7 +47340,6 @@
           "identifier",
           "status",
           "grace_period_seconds",
-          "created_by",
           "created_at",
           "updated_at"
         ],
@@ -47398,20 +47430,29 @@
             "title": "Old Secret Valid Until"
           },
           "created_by": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Created By"
-          },
-          "updated_by": {
             "anyOf": [
               {
-                "type": "string",
-                "format": "uuid"
+                "$ref": "#/components/schemas/UserReference"
               },
               {
                 "type": "null"
               }
             ],
+            "description": "User who created the credential",
+            "readOnly": true,
+            "title": "Created By"
+          },
+          "updated_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserReference"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "User who last modified the credential",
+            "readOnly": true,
             "title": "Updated By"
           },
           "created_at": {
@@ -47445,7 +47486,6 @@
           "identifier",
           "status",
           "grace_period_seconds",
-          "created_by",
           "created_at",
           "updated_at"
         ],
@@ -48672,13 +48712,14 @@
           "created_by": {
             "anyOf": [
               {
-                "type": "string",
-                "format": "uuid"
+                "$ref": "#/components/schemas/UserReference"
               },
               {
                 "type": "null"
               }
             ],
+            "description": "User who created the group",
+            "readOnly": true,
             "title": "Created By"
           },
           "source": {
@@ -48803,13 +48844,14 @@
           "created_by": {
             "anyOf": [
               {
-                "type": "string",
-                "format": "uuid"
+                "$ref": "#/components/schemas/UserReference"
               },
               {
                 "type": "null"
               }
             ],
+            "description": "User who created the group",
+            "readOnly": true,
             "title": "Created By"
           },
           "source": {
@@ -49345,11 +49387,9 @@
           "project_id",
           "temporal_workflow_id",
           "status",
-          "created_by",
           "created_at",
           "completed_at",
           "updated_at",
-          "updated_by",
           "input_data",
           "error_details"
         ],
@@ -49431,8 +49471,16 @@
             "$ref": "#/components/schemas/ExecutionStatus"
           },
           "created_by": {
-            "type": "string",
-            "format": "uuid",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserReference"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "User who started the execution",
+            "readOnly": true,
             "title": "Created By"
           },
           "created_at": {
@@ -49460,13 +49508,14 @@
           "updated_by": {
             "anyOf": [
               {
-                "type": "string",
-                "format": "uuid"
+                "$ref": "#/components/schemas/UserReference"
               },
               {
                 "type": "null"
               }
             ],
+            "description": "User who last modified the execution",
+            "readOnly": true,
             "title": "Updated By"
           },
           "input_data": {
@@ -50191,7 +50240,6 @@
           "id",
           "current_version",
           "is_enabled",
-          "created_by",
           "project_id",
           "created_at",
           "updated_at"
@@ -50247,9 +50295,30 @@
             "title": "Has Validation Issues"
           },
           "created_by": {
-            "type": "string",
-            "format": "uuid",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserReference"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "User who created the workflow",
+            "readOnly": true,
             "title": "Created By"
+          },
+          "updated_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserReference"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "User who last modified the workflow",
+            "readOnly": true,
+            "title": "Updated By"
           },
           "project_id": {
             "type": "string",
@@ -50311,7 +50380,6 @@
           "id",
           "current_version",
           "is_enabled",
-          "created_by",
           "project_id",
           "created_at",
           "updated_at",
@@ -50368,9 +50436,30 @@
             "title": "Has Validation Issues"
           },
           "created_by": {
-            "type": "string",
-            "format": "uuid",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserReference"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "User who created the workflow",
+            "readOnly": true,
             "title": "Created By"
+          },
+          "updated_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserReference"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "User who last modified the workflow",
+            "readOnly": true,
+            "title": "Updated By"
           },
           "project_id": {
             "type": "string",
@@ -50436,7 +50525,6 @@
           "id",
           "current_version",
           "is_enabled",
-          "created_by",
           "project_id",
           "created_at",
           "updated_at",
@@ -50493,9 +50581,30 @@
             "title": "Has Validation Issues"
           },
           "created_by": {
-            "type": "string",
-            "format": "uuid",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserReference"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "User who created the workflow",
+            "readOnly": true,
             "title": "Created By"
+          },
+          "updated_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserReference"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "User who last modified the workflow",
+            "readOnly": true,
+            "title": "Updated By"
           },
           "project_id": {
             "type": "string",
@@ -50568,7 +50677,6 @@
           "version",
           "schema_version",
           "workflow_definition",
-          "created_by",
           "created_at",
           "updated_at"
         ],
@@ -50653,20 +50761,17 @@
             "title": "Name"
           },
           "created_by": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Created By"
-          },
-          "created_by_username": {
             "anyOf": [
               {
-                "type": "string"
+                "$ref": "#/components/schemas/UserReference"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Created By Username"
+            "description": "User who created the version",
+            "readOnly": true,
+            "title": "Created By"
           },
           "created_at": {
             "type": "string",

@@ -8,6 +8,7 @@ from httpx import AsyncClient
 
 from syntara.core.models import User
 from syntara.core.models.group import Group
+from tests.helpers.user_reference import assert_user_reference
 from tests.integration.helpers.error_data import assert_error_data
 
 GROUPS_URL = "/api/v1/groups"
@@ -99,7 +100,7 @@ class TestGroupsGetContract:
         assert response.status_code == 200
 
         data = response.json()
-        assert data["created_by"] == str(test_user.id)
+        assert_user_reference(data["created_by"], test_user)
 
     @pytest.mark.asyncio
     async def test_get_group_unauthenticated(self, base_client: AsyncClient, test_group: Group) -> None:

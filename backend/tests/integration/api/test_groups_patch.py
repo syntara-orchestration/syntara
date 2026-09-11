@@ -6,7 +6,9 @@ Tests partial update functionality, validation, and conflict handling.
 import pytest
 from httpx import AsyncClient
 
+from syntara.core.models import User
 from syntara.core.models.group import Group
+from tests.helpers.user_reference import assert_user_reference
 from tests.integration.helpers.error_data import assert_error_data
 
 GROUPS_URL = "/api/v1/groups"
@@ -42,7 +44,9 @@ class TestGroupsPatchContract:
         assert data["description"] == "Updated description"
 
     @pytest.mark.asyncio
-    async def test_update_group_preserves_unchanged_fields(self, admin_client: AsyncClient, test_group: Group) -> None:
+    async def test_update_group_preserves_unchanged_fields(
+        self, admin_client: AsyncClient, test_group: Group, test_user: User
+    ) -> None:
         """Test partial update preserves fields not included in patch."""
         patch_data = {"description": "New description only"}
 
@@ -53,7 +57,7 @@ class TestGroupsPatchContract:
         data = response.json()
         assert data["name"] == test_group.name
         assert data["id"] == str(test_group.id)
-        assert data["created_by"] == str(test_group.created_by)
+        assert_user_reference(data["created_by"], test_user)
 
     @pytest.mark.asyncio
     async def test_update_group_empty_patch(self, admin_client: AsyncClient, test_group: Group) -> None:

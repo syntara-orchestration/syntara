@@ -71,6 +71,13 @@ MCP_HEALTH_URL = f"http://localhost:{MCP_PORT}/health"
 
 _API_HEALTH_TIMEOUT = 15.0
 
+# How long to wait for the API to start serving before giving up on the whole
+# session. In CI the deploy step can report success while the backend pods are
+# still rolling out, so a single probe is not enough -- observed rollouts have
+# taken over 100s. Override with E2E_API_READY_TIMEOUT.
+_API_READY_TIMEOUT = float(os.environ.get("E2E_API_READY_TIMEOUT", "300"))
+_API_READY_POLL_INTERVAL = 3.0
+
 # ---------------------------------------------------------------------------
 # Core client fixtures
 # ---------------------------------------------------------------------------
@@ -83,20 +90,38 @@ def auth_headers(syntara_base_url: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+def _wait_until_api_ready(base_url: str) -> None:
+    """Block until the API serves /healthz/ready, or exit the session.
+
+    Polls rather than probing once: CI deploys report success while backend pods
+    are still becoming ready, so a single request races the rollout and aborts
+    the entire run before any test executes.
+    """
+    deadline = time.monotonic() + _API_READY_TIMEOUT
+    last_error: Exception | None = None
+    while True:
+        try:
+            response = httpx.get(f"{base_url}/healthz/ready", timeout=5, verify=e2e_ssl_context())
+            response.raise_for_status()
+        except (httpx.RequestError, httpx.HTTPStatusError) as exc:
+            last_error = exc
+        else:
+            return
+        if time.monotonic() >= deadline:
+            pytest.exit(
+                f"Environment not available at {base_url} after {_API_READY_TIMEOUT:.0f}s: {last_error}\n"
+                "Start the services first with: make services-run && make dev",
+                returncode=1,
+            )
+        time.sleep(_API_READY_POLL_INTERVAL)
+
+
 @pytest.fixture(scope="session")
 def syntara_client(syntara_base_url: str) -> AuthenticatedClient:
     """Return an authenticated Syntara API client connected to the test environment."""
     base_url = syntara_base_url
 
-    try:
-        response = httpx.get(f"{base_url}/healthz/ready", timeout=5, verify=e2e_ssl_context())
-        response.raise_for_status()
-    except (httpx.RequestError, httpx.HTTPStatusError) as exc:
-        pytest.exit(
-            f"Environment not available at {base_url}: {exc}\n"
-            "Start the services first with: make services-run && make dev",
-            returncode=1,
-        )
+    _wait_until_api_ready(base_url)
 
     access_token = _generate_e2e_token(base_url)
 

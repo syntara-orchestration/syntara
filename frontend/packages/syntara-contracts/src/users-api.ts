@@ -681,8 +681,11 @@ export interface components {
        * @default false
        */
       is_builtin?: boolean
-      /** Created By */
-      created_by?: string | null
+      /**
+       * Created By
+       * @description User who created the group
+       */
+      readonly created_by?: components['schemas']['UserReference'] | null
       /**
        * Source
        * @default local
@@ -729,8 +732,11 @@ export interface components {
        * @default false
        */
       is_builtin?: boolean
-      /** Created By */
-      created_by?: string | null
+      /**
+       * Created By
+       * @description User who created the group
+       */
+      readonly created_by?: components['schemas']['UserReference'] | null
       /**
        * Source
        * @default local
@@ -1143,6 +1149,34 @@ export interface components {
       labels?: {
         [key: string]: string
       }
+    }
+    /**
+     * UserReferenceType
+     * @description Kind of principal a UserReference points at.
+     *
+     *     Only ``user`` references have a user detail page. ``deleted_user`` and
+     *     ``deleted_service_account`` mark principals that were hard-deleted but are
+     *     still recorded as the actor.
+     * @enum {string}
+     */
+    UserReferenceType: 'user' | 'service_account' | 'service' | 'system' | 'deleted_user' | 'deleted_service_account'
+    /**
+     * UserReference
+     * @description Minimal user identification for embedding in other resources.
+     *     The name is resolved from the database when the response is built, not
+     *     stored alongside the id, so it always reflects the principal's current
+     *     name. Renaming a user therefore changes the name shown for their past actions.
+     */
+    UserReference: {
+      /**
+       * Format: uuid
+       * @description User's unique identifier
+       */
+      id: string
+      /** @description Principal's current display name, resolved when the response is built. Not a username: for a user this is their first and last name, falling back to the username when both are blank; for a service account it is the account name; for an internal service it is derived from the certificate CN. */
+      name: string
+      /** @description Kind of principal this reference points at. Only `user` references have a user detail page; `deleted_user` / `deleted_service_account` are hard-deleted principals that are still recorded as the actor. */
+      type: components['schemas']['UserReferenceType']
     }
   }
   responses: {

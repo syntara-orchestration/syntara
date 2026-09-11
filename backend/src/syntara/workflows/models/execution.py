@@ -17,6 +17,7 @@ from sqlmodel import CheckConstraint, Column, DateTime, Field, Index, Relationsh
 from syntara.core.constants import FieldLimits
 from syntara.core.models.base import UserOwnedResource
 from syntara.core.models.pagination import ResourcesResponse
+from syntara.core.models.user_reference import UserReference, UserReferenceFieldsMixin
 from syntara.core.utils.sqlmodel import postgres_enum_column
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 
@@ -411,7 +412,7 @@ class ActivityData(SQLModel):
     iteration: int | None = None
 
 
-class ExecutionRead(SQLModel):
+class ExecutionRead(UserReferenceFieldsMixin, SQLModel):
     """Schema for execution response (GET /executions/{id}).
 
     Includes database table fields plus computed fields (workflow_version,
@@ -435,11 +436,13 @@ class ExecutionRead(SQLModel):
     project_id: UUID
     temporal_workflow_id: str
     status: ExecutionStatus
-    created_by: UUID  # User who started the execution
+    created_by: UserReference | UUID | str | None = Field(default=None, description="User who started the execution")
     created_at: datetime  # Timestamp when execution was created/started
     completed_at: datetime | None
     updated_at: datetime
-    updated_by: UUID | None  # User who last modified the execution
+    updated_by: UserReference | UUID | str | None = Field(
+        default=None, description="User who last modified the execution"
+    )
     input_data: dict[str, Any]
     trigger_node_id: str | None = None
     error_details: str | None

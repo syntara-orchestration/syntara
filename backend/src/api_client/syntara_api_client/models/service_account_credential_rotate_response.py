@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime
 from collections.abc import Mapping
-from typing import Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 from uuid import UUID
 
 from attrs import define as _attrs_define
@@ -12,6 +12,10 @@ from dateutil.parser import isoparse
 from ..models.service_account_credential_status import ServiceAccountCredentialStatus
 from ..models.service_account_credential_type import ServiceAccountCredentialType
 from ..types import UNSET, Unset
+
+if TYPE_CHECKING:
+    from ..models.user_reference import UserReference
+
 
 T = TypeVar("T", bound="ServiceAccountCredentialRotateResponse")
 
@@ -27,13 +31,13 @@ class ServiceAccountCredentialRotateResponse:
         identifier (str):
         status (ServiceAccountCredentialStatus): Operational status of a service account credential.
         grace_period_seconds (int):
-        created_by (UUID):
         created_at (datetime.datetime):
         updated_at (datetime.datetime):
         expires_at (datetime.datetime | None | Unset):
         last_used_at (datetime.datetime | None | Unset):
         old_secret_valid_until (datetime.datetime | None | Unset):
-        updated_by (None | Unset | UUID):
+        created_by (None | Unset | UserReference): User who created the credential
+        updated_by (None | Unset | UserReference): User who last modified the credential
         client_secret (None | str | Unset): Plaintext client secret (shown only once)
     """
 
@@ -43,17 +47,19 @@ class ServiceAccountCredentialRotateResponse:
     identifier: str
     status: ServiceAccountCredentialStatus
     grace_period_seconds: int
-    created_by: UUID
     created_at: datetime.datetime
     updated_at: datetime.datetime
     expires_at: datetime.datetime | None | Unset = UNSET
     last_used_at: datetime.datetime | None | Unset = UNSET
     old_secret_valid_until: datetime.datetime | None | Unset = UNSET
-    updated_by: None | Unset | UUID = UNSET
+    created_by: None | Unset | UserReference = UNSET
+    updated_by: None | Unset | UserReference = UNSET
     client_secret: None | str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
+        from ..models.user_reference import UserReference
+
         id = str(self.id)
 
         service_account_id = str(self.service_account_id)
@@ -65,8 +71,6 @@ class ServiceAccountCredentialRotateResponse:
         status = self.status.value
 
         grace_period_seconds = self.grace_period_seconds
-
-        created_by = str(self.created_by)
 
         created_at = self.created_at.isoformat()
 
@@ -96,11 +100,19 @@ class ServiceAccountCredentialRotateResponse:
         else:
             old_secret_valid_until = self.old_secret_valid_until
 
-        updated_by: None | str | Unset
+        created_by: dict[str, Any] | None | Unset
+        if isinstance(self.created_by, Unset):
+            created_by = UNSET
+        elif isinstance(self.created_by, UserReference):
+            created_by = self.created_by.to_dict()
+        else:
+            created_by = self.created_by
+
+        updated_by: dict[str, Any] | None | Unset
         if isinstance(self.updated_by, Unset):
             updated_by = UNSET
-        elif isinstance(self.updated_by, UUID):
-            updated_by = str(self.updated_by)
+        elif isinstance(self.updated_by, UserReference):
+            updated_by = self.updated_by.to_dict()
         else:
             updated_by = self.updated_by
 
@@ -120,7 +132,6 @@ class ServiceAccountCredentialRotateResponse:
                 "identifier": identifier,
                 "status": status,
                 "grace_period_seconds": grace_period_seconds,
-                "created_by": created_by,
                 "created_at": created_at,
                 "updated_at": updated_at,
             }
@@ -131,6 +142,8 @@ class ServiceAccountCredentialRotateResponse:
             field_dict["last_used_at"] = last_used_at
         if old_secret_valid_until is not UNSET:
             field_dict["old_secret_valid_until"] = old_secret_valid_until
+        if created_by is not UNSET:
+            field_dict["created_by"] = created_by
         if updated_by is not UNSET:
             field_dict["updated_by"] = updated_by
         if client_secret is not UNSET:
@@ -140,6 +153,8 @@ class ServiceAccountCredentialRotateResponse:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.user_reference import UserReference
+
         d = dict(src_dict)
         id = UUID(d.pop("id"))
 
@@ -152,8 +167,6 @@ class ServiceAccountCredentialRotateResponse:
         status = ServiceAccountCredentialStatus(d.pop("status"))
 
         grace_period_seconds = d.pop("grace_period_seconds")
-
-        created_by = UUID(d.pop("created_by"))
 
         created_at = isoparse(d.pop("created_at"))
 
@@ -210,20 +223,37 @@ class ServiceAccountCredentialRotateResponse:
 
         old_secret_valid_until = _parse_old_secret_valid_until(d.pop("old_secret_valid_until", UNSET))
 
-        def _parse_updated_by(data: object) -> None | Unset | UUID:
+        def _parse_created_by(data: object) -> None | Unset | UserReference:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
             try:
-                if not isinstance(data, str):
+                if not isinstance(data, dict):
                     raise TypeError()
-                updated_by_type_0 = UUID(data)
+                created_by_type_0 = UserReference.from_dict(data)
+
+                return created_by_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(None | Unset | UserReference, data)
+
+        created_by = _parse_created_by(d.pop("created_by", UNSET))
+
+        def _parse_updated_by(data: object) -> None | Unset | UserReference:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                updated_by_type_0 = UserReference.from_dict(data)
 
                 return updated_by_type_0
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            return cast(None | Unset | UUID, data)
+            return cast(None | Unset | UserReference, data)
 
         updated_by = _parse_updated_by(d.pop("updated_by", UNSET))
 
@@ -243,12 +273,12 @@ class ServiceAccountCredentialRotateResponse:
             identifier=identifier,
             status=status,
             grace_period_seconds=grace_period_seconds,
-            created_by=created_by,
             created_at=created_at,
             updated_at=updated_at,
             expires_at=expires_at,
             last_used_at=last_used_at,
             old_secret_valid_until=old_secret_valid_until,
+            created_by=created_by,
             updated_by=updated_by,
             client_secret=client_secret,
         )

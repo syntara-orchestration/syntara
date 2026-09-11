@@ -45,6 +45,7 @@ import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 import type { PaginationFooterProps } from '../../components/table/PaginationFooter'
 import { PaginationFooter } from '../../components/table/PaginationFooter'
 import type { FilterConfig } from '../../types/filters'
+import { toLinkedUserId, toUserReferenceName } from '../../utils/userReference'
 
 import { formatHistoryDateTime, getDateGroupLabel } from './historyDateUtils'
 import { resolveVersionStatusForBadge, shouldShowSecondaryVersionDatetime } from './hooks/historyRowModel'
@@ -228,6 +229,47 @@ type VersionRowProps = Readonly<{
   scrollRef?: Ref<HTMLSpanElement>
 }>
 
+/** Links a version's creator to their user page. Render only when both id and name are known. */
+function VersionCreatedByLink({ userId, name }: Readonly<{ userId: string; name: string }>) {
+  return (
+    <SynLink to={AppRoute.AccessManagement.UserDetail.replace(':userId', userId)} className={styles.usernameLink}>
+      {name}
+    </SynLink>
+  )
+}
+
+/**
+ * Secondary "datetime by creator" line under a version's title. The creator is a
+ * link only for live users (see toLinkedUserId); other principals render as text.
+ */
+function VersionSecondaryLine({
+  createdAt,
+  createdBy,
+  showDatetime,
+}: Readonly<{
+  createdAt: WorkflowVersion['created_at']
+  createdBy: WorkflowVersion['created_by']
+  showDatetime: boolean
+}>) {
+  const creatorName = toUserReferenceName(createdBy)
+  const creatorId = toLinkedUserId(createdBy)
+  const datetime = showDatetime && createdAt ? <ExecutionTimestamp dateString={createdAt} /> : null
+  if (!datetime && !creatorName) return null
+
+  let creator: ReactNode = null
+  if (creatorName) {
+    creator = creatorId ? <VersionCreatedByLink userId={creatorId} name={creatorName} /> : creatorName
+  }
+
+  return (
+    <Content component={ContentVariants.small} className={styles.secondaryDatetime}>
+      {datetime}
+      {datetime && creator ? ' by ' : null}
+      {creator}
+    </Content>
+  )
+}
+
 function VersionRow({
   version,
   onSelect,
@@ -249,51 +291,43 @@ function VersionRow({
 }: VersionRowProps) {
   const badgeStatus = resolveVersionStatusForBadge(version.status)
   const showSecondaryDatetime = shouldShowSecondaryVersionDatetime(version.name, version.created_at)
+  const rowLabel =
+    version.name || (version.created_at ? formatHistoryDateTime(version.created_at) : `Version ${version.version}`)
 
   return (
-    // eslint-disable-next-line syntara/prefer-pf-list-components -- SimpleListItem renders a <button> wrapper, causing invalid nested <button> with the kebab menu (https://github.com/patternfly/patternfly-react/issues/11368)
+    // eslint-disable-next-line syntara/prefer-pf-list-components -- SimpleListItem renders a <button> wrapper, causing invalid nested interactive elements (https://github.com/patternfly/patternfly-react/issues/11368)
     <li className={`pf-v6-c-simple-list__item ${styles.versionRowItem}`}>
-      <button
-        type="button"
-        className={`pf-v6-c-simple-list__item-link ${isSelected ? 'pf-m-current' : ''}`}
-        onClick={onSelect}
-        data-item-id={version.id}
-      >
-        <span ref={scrollRef} />
-        <Stack className={styles.versionRowStack}>
-          <FlexItem style={{ minWidth: 0 }}>
-            <Tooltip content={version.name || (version.created_at ? formatHistoryDateTime(version.created_at) : '')}>
-              <Content component={ContentVariants.p} className={styles.versionTimestamp}>
-                {version.name || <ExecutionTimestamp dateString={version.created_at} />}
-              </Content>
-            </Tooltip>
-          </FlexItem>
-          {(showSecondaryDatetime && version.created_at) || version.created_by_username ? (
-            <Content component={ContentVariants.small} className={styles.secondaryDatetime}>
-              {showSecondaryDatetime && version.created_at ? (
-                <ExecutionTimestamp dateString={version.created_at} />
-              ) : null}
-              {version.created_by_username ? (
-                <>
-                  {showSecondaryDatetime && version.created_at ? ' by ' : null}
-                  <SynLink
-                    to={AppRoute.AccessManagement.UserDetail.replace(':userId', version.created_by)}
-                    className={styles.usernameLink}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {version.created_by_username}
-                  </SynLink>
-                </>
-              ) : null}
-            </Content>
-          ) : null}
-          {badgeStatus ? (
-            <div className={styles.labelsRow}>
-              <VersionStatusBadge status={badgeStatus} />
-            </div>
-          ) : null}
-        </Stack>
-      </button>
+      {/* Row-wide click target. It is a sibling of the row content, never its ancestor, so the
+          creator link and the kebab menu are not interactive elements nested inside a button
+          (same pattern as WorkflowHistoryCard). */}
+      <Tooltip content={rowLabel}>
+        <button
+          type="button"
+          className={`pf-v6-c-simple-list__item-link ${isSelected ? 'pf-m-current' : ''} ${styles.versionRowSelect}`}
+          onClick={onSelect}
+          data-item-id={version.id}
+          aria-label={rowLabel}
+          aria-current={isSelected ? 'true' : undefined}
+        />
+      </Tooltip>
+      <span ref={scrollRef} />
+      <Stack className={styles.versionRowStack}>
+        <FlexItem style={{ minWidth: 0 }}>
+          <Content component={ContentVariants.p} className={styles.versionTimestamp}>
+            {version.name || <ExecutionTimestamp dateString={version.created_at} />}
+          </Content>
+        </FlexItem>
+        <VersionSecondaryLine
+          createdAt={version.created_at}
+          createdBy={version.created_by}
+          showDatetime={showSecondaryDatetime}
+        />
+        {badgeStatus ? (
+          <div className={styles.labelsRow}>
+            <VersionStatusBadge status={badgeStatus} />
+          </div>
+        ) : null}
+      </Stack>
       <div className={styles.kebabFlexItem}>
         <VersionKebabMenu
           version={version}
