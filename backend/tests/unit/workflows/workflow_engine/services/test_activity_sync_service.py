@@ -1567,6 +1567,28 @@ class TestExecutionStatusUpdates:
         assert execution.completed_at == created_at + datetime.resolution
         mock_session.commit.assert_awaited_once()
 
+    @pytest.mark.asyncio
+    async def test_update_execution_status_from_event_reraises_db_error(self) -> None:
+        """DB errors during terminal-event processing must propagate so the retry loop can handle them."""
+        from sqlalchemy.exc import TimeoutError as SATimeoutError
+
+        metadata = create_test_metadata(execution_id=self.execution_id)
+        event = self._create_workflow_event(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED, event_id=99)
+        # Patch completed event attrs so _extract_execution_status_from_event works
+        attrs = Mock()
+        attrs.result = None
+        event.workflow_execution_completed_event_attributes = attrs
+
+        mock_session = Mock()
+        mock_session.exec = AsyncMock(side_effect=SATimeoutError("QueuePool limit reached"))
+        mock_session.rollback = AsyncMock()
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+        self.mock_session_factory.return_value = mock_session
+
+        with pytest.raises(SATimeoutError):
+            await self.service._update_execution_status_from_event(metadata, event)
+
 
 class TestAgenticActivityFinalizationOnWorkflowCompletion:
     """Test that RUNNING agentic activities are finalized when the workflow completes."""
@@ -4064,6 +4086,41 @@ class TestRunMonitorLoop:
         assert result is False
         mock_cancel.assert_called_once()
 
+    @pytest.mark.asyncio
+    async def test_returns_false_when_terminal_event_update_fails_transiently(self) -> None:
+        """DB error inside _update_execution_status_from_event causes _run_monitor_loop to return False.
+
+        The real _update_execution_status_from_event runs (not mocked). Before the fix it swallowed
+        the exception and returned normally, so _run_monitor_loop returned True. After the fix it
+        re-raises, which is caught by the SATimeoutError handler and returns False.
+        """
+        from sqlalchemy.exc import TimeoutError as SATimeoutError
+        from temporalio.api.history.v1 import HistoryEvent
+
+        event = Mock(spec=HistoryEvent)
+        event.event_type = EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED
+        event.event_id = 99
+
+        mock_session = Mock()
+        mock_session.exec = AsyncMock(side_effect=SATimeoutError("QueuePool limit reached"))
+        mock_session.rollback = AsyncMock()
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+        self.service.session_factory = Mock(return_value=mock_session)
+
+        with (
+            patch.object(self.service, "_history_event_producer", side_effect=_make_mock_producer(event)),
+            patch.object(self.service, "_sync_activities_to_db", new_callable=AsyncMock),
+            patch.object(self.service, "_sync_failed_nodes", new_callable=AsyncMock, return_value={}),
+            patch.object(self.service, "_sync_skipped_nodes", new_callable=AsyncMock),
+            patch.object(self.service, "_sync_detached_nodes", new_callable=AsyncMock),
+        ):
+            result = await self.service._run_monitor_loop(self.handle, self.metadata, self.execution_id)
+
+        assert result is False
+        # The event id must NOT be advanced past the failed COMPLETED event (re-playing it on retry is the fix)
+        assert self.metadata.last_processed_event_id != 99
+
 
 class TestMonitorExecutionRetry:
     """Tests for _monitor_execution retry logic with exponential backoff."""
@@ -5300,3 +5357,160 @@ class TestQueryActivityIoOutputMerge:
         assert output_data["job_id"] == 42
         assert output_data["status"] == "completed"
         assert output_data["output"] == "result"
+
+
+class TestNonTerminalIoQuerySkip:
+    """_query_activity_io must not be called for non-terminal activity status updates."""
+
+    def setup_method(self) -> None:
+        self.mock_session_factory = Mock()
+        self.service = ActivitySyncService(Mock(), self.mock_session_factory)
+        self.execution_id = uuid4()
+
+    def _build_activity_data(self, status: ActivityStatus) -> dict[str, Any]:
+        return {
+            "activity_id": "script_1",
+            "activity_name": "script_1",
+            "_is_loop_iteration": False,
+            "_is_loop_control": False,
+            "status": status,
+            "started_at": None,
+            "completed_at": None,
+            "error_details": None,
+            "retry_count": 0,
+            "iteration": None,
+            "scheduled_at": datetime(2025, 1, 20, 10, 0, 0, tzinfo=UTC),
+            "configured_timeout_seconds": None,
+        }
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "status",
+        [ActivityStatus.PENDING, ActivityStatus.RUNNING, ActivityStatus.WAITING, ActivityStatus.RETRYING],
+    )
+    async def test_query_activity_io_skipped_for_non_terminal_with_input_already_stored(
+        self, status: ActivityStatus
+    ) -> None:
+        """No Temporal query on subsequent non-terminal events once input is stored (query-storm guard)."""
+        existing = Mock(spec=ActivityExecution)
+        existing.activity_name = "script_1"
+        existing.status = ActivityStatus.RUNNING  # already past first event
+        existing.node_type = NodeType.SCRIPT
+        existing.started_at = None
+        existing.completed_at = None
+        existing.input_data = {"host": "server-1"}  # input already fetched on the first event
+        existing.output_data = None
+        existing.error_details = None
+        existing.retry_count = 0
+        existing.iteration = None
+        existing.updated_at = datetime(2025, 1, 20, 10, 0, 0, tzinfo=UTC)
+
+        metadata = create_test_metadata(execution_id=self.execution_id)
+        session = Mock()
+
+        with patch.object(self.service, "_query_activity_io", new_callable=AsyncMock) as mock_query:
+            result = await self.service._process_single_activity_sync(
+                metadata,
+                Mock(),  # handle — should not be used
+                self._build_activity_data(status),
+                {"script_1": existing},
+                session,
+            )
+
+        mock_query.assert_not_called()
+        assert result is not None
+        activity, _old_values, _is_new = result
+        assert activity.status == status
+        assert activity.input_data == {"host": "server-1"}  # preserved, not blanked
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "status",
+        [ActivityStatus.PENDING, ActivityStatus.RUNNING, ActivityStatus.WAITING, ActivityStatus.RETRYING],
+    )
+    async def test_query_activity_io_fetches_input_once_on_first_non_terminal_event(
+        self, status: ActivityStatus
+    ) -> None:
+        """First non-terminal event fetches input once so the UI input panel is populated mid-run."""
+        existing = Mock(spec=ActivityExecution)
+        existing.activity_name = "script_1"
+        existing.status = ActivityStatus.PENDING  # initial DB status, input not yet stored
+        existing.node_type = NodeType.SCRIPT
+        existing.started_at = None
+        existing.completed_at = None
+        existing.input_data = {}  # empty → first event
+        existing.output_data = None
+        existing.error_details = None
+        existing.retry_count = 0
+        existing.iteration = None
+        existing.updated_at = datetime(2025, 1, 20, 10, 0, 0, tzinfo=UTC)
+
+        metadata = create_test_metadata(execution_id=self.execution_id)
+        session = Mock()
+
+        with patch.object(
+            self.service,
+            "_query_activity_io",
+            new_callable=AsyncMock,
+            return_value=({"host": "server-1"}, None),
+        ) as mock_query:
+            result = await self.service._process_single_activity_sync(
+                metadata,
+                Mock(),
+                self._build_activity_data(status),
+                {"script_1": existing},
+                session,
+            )
+
+        mock_query.assert_called_once()
+        assert result is not None
+        activity, _old_values, _is_new = result
+        assert activity.status == status
+        assert activity.input_data == {"host": "server-1"}
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "status",
+        [ActivityStatus.COMPLETED, ActivityStatus.FAILED, ActivityStatus.CANCELLED],
+    )
+    async def test_query_activity_io_called_for_terminal(self, status: ActivityStatus) -> None:
+        """Temporal I/O query IS made for terminal status updates."""
+        existing = Mock(spec=ActivityExecution)
+        existing.activity_name = "script_1"
+        existing.status = ActivityStatus.RUNNING  # pre-terminal DB status
+        existing.node_type = NodeType.SCRIPT
+        existing.started_at = datetime(2025, 1, 20, 10, 0, 0, tzinfo=UTC)
+        existing.completed_at = None
+        existing.input_data = {}
+        existing.output_data = None
+        existing.error_details = None
+        existing.retry_count = 0
+        existing.iteration = None
+        existing.updated_at = datetime(2025, 1, 20, 10, 0, 0, tzinfo=UTC)
+
+        activity_data = self._build_activity_data(status)
+        if status == ActivityStatus.FAILED:
+            activity_data["error_details"] = "Script failed"
+        if status == ActivityStatus.CANCELLED:
+            activity_data["error_details"] = "Activity was canceled"
+        activity_data["completed_at"] = datetime(2025, 1, 20, 10, 5, 0, tzinfo=UTC)
+
+        metadata = create_test_metadata(execution_id=self.execution_id)
+        session = Mock()
+
+        with patch.object(
+            self.service,
+            "_query_activity_io",
+            new_callable=AsyncMock,
+            return_value=({"input": "data"}, {"output": "data"}),
+        ) as mock_query:
+            result = await self.service._process_single_activity_sync(
+                metadata,
+                Mock(),
+                activity_data,
+                {"script_1": existing},
+                session,
+            )
+
+        mock_query.assert_called_once()
+        assert result is not None

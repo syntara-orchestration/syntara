@@ -1647,7 +1647,7 @@ class ActivitySyncService:
                 logger.exception(
                     "Error updating execution status from workflow completion event", execution_id=metadata.execution_id
                 )
-                # Don't raise - monitoring should continue
+                raise
 
     def _update_non_terminal_activities_on_cancel(
         self,
@@ -2125,13 +2125,7 @@ class ActivitySyncService:
         if existing.status in TERMINAL_ACTIVITY_STATUSES and not loop_control_iterating and not is_new:
             return None
 
-        # Query workflow for input/output data.
-        # For running activities, partial output from heartbeat may
-        # already be in the update dict — preserve it if the workflow
-        # query returns None (output not stored until completion).
-        input_data, output_data = await self._query_activity_io(
-            handle, activity_id, activity_data, activity_data.get("output_data")
-        )
+        input_data, output_data = await self._resolve_activity_io(handle, activity_id, activity_data, existing)
 
         # Loop control nodes: keep the node "running" between iterations so the UI
         # doesn't flash completed→pending on every cycle.  The final iteration
@@ -2161,6 +2155,30 @@ class ActivitySyncService:
             is_loop_control=is_loop_control,
         )
         return existing, old_values, is_new
+
+    async def _resolve_activity_io(
+        self,
+        handle: WorkflowHandle[Any, Any],
+        activity_id: str,
+        activity_data: dict[str, Any],
+        existing: ActivityExecution,
+    ) -> tuple[dict[str, Any], Any]:
+        """Resolve input/output data for an activity, avoiding a per-event query storm.
+
+        Querying Temporal on every event of a loop workflow (~600 events) replays
+        history each time and exhausts the DB pool. To avoid that while keeping the
+        UI's input panel populated mid-run:
+        - Terminal statuses: full query (input + final output, with the retry loop).
+        - First non-terminal event (input not yet stored): query once for input only;
+          output stays whatever the event carried (e.g. heartbeat partial output).
+        - Subsequent non-terminal events: no query — reuse the stored input.
+        """
+        if activity_data.get("status") in TERMINAL_ACTIVITY_STATUSES:
+            return await self._query_activity_io(handle, activity_id, activity_data, activity_data.get("output_data"))
+        if not existing.input_data:
+            input_data, _ = await self._query_activity_io(handle, activity_id, activity_data, None)
+            return input_data, activity_data.get("output_data")
+        return existing.input_data, activity_data.get("output_data")
 
     @staticmethod
     def _get_or_create_iteration_record(
