@@ -1,5 +1,5 @@
 import { renderHook } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { NodeType } from '../../workflows/canvas/nodes/NodeType'
 import type { ValidationError } from '../builderReducer'
@@ -10,7 +10,19 @@ function buildNode(id: string, data: Record<string, unknown> = {}): NodeType {
   return { id, data, position: { x: 0, y: 0 } } as unknown as NodeType
 }
 
+const mockStoreState = vi.hoisted(() => ({
+  currentWorkflow: { triggers: [] as Array<{ id: string }> },
+}))
+
+vi.mock('../../../stores/useWorkflowStore', () => ({
+  useWorkflowStore: (selector: (state: typeof mockStoreState) => unknown) => selector(mockStoreState),
+}))
+
 describe('useValidationEnrichment', () => {
+  beforeEach(() => {
+    mockStoreState.currentWorkflow = { triggers: [] }
+  })
+
   it('adds __validationError to nodes matching error node IDs', () => {
     const setNodes = vi.fn()
     const errors: ValidationError[] = [
@@ -108,5 +120,21 @@ describe('useValidationEnrichment', () => {
     rerender({ errors: [{ message: 'New error', nodeId: 'node-2' }] })
 
     expect(setNodes.mock.calls.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('maps webhook trigger definition IDs to React Flow display IDs', () => {
+    mockStoreState.currentWorkflow = { triggers: [{ id: 'snow_trigger' }] }
+    const setNodes = vi.fn()
+    const errors: ValidationError[] = [
+      { message: '"authorized_service_account_ids" must not be empty', nodeId: 'snow_trigger' },
+    ]
+
+    renderHook(() => useValidationEnrichment(errors, true, setNodes))
+
+    const updater = setNodes.mock.calls[0][0] as (nodes: NodeType[]) => NodeType[]
+    const result = updater([buildNode('trigger-0'), buildNode('log_payload')])
+
+    expect((result[0].data as Record<string, unknown>).__validationError).toBe(true)
+    expect((result[1].data as Record<string, unknown>).__validationError).toBeUndefined()
   })
 })

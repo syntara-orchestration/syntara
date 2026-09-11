@@ -1,7 +1,12 @@
 import { MissedSchedulePolicyEnum, TriggerTypeEnum } from '@syntara/contracts'
 import { describe, expect, it } from 'vitest'
 
-import { isValidWebhookPath, normalizeWebhookPath, triggerFormSchema } from './triggerFormSchema'
+import {
+  AUTHORIZED_SERVICE_ACCOUNT_REQUIRED_MESSAGE,
+  isValidWebhookPath,
+  normalizeWebhookPath,
+  triggerFormSchema,
+} from './triggerFormSchema'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -407,7 +412,7 @@ describe('triggerFormSchema — authorized service account validation', () => {
     expect(result.success).toBe(false)
     if (!result.success) {
       expect(result.error.issues.find((i) => i.path.includes('authorizedServiceAccountIds'))?.message).toBe(
-        'At least one authorized service account is required'
+        AUTHORIZED_SERVICE_ACCOUNT_REQUIRED_MESSAGE
       )
     }
   })

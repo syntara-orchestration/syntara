@@ -1,5 +1,8 @@
 import { useEffect, useMemo, type Dispatch, type SetStateAction } from 'react'
 
+import { useWorkflowStore } from '../../../stores/useWorkflowStore'
+import { selectTriggers } from '../../../stores/workflowStoreSelectors'
+import { EMPTY_TRIGGERS, toReactFlowNodeId } from '../../../utils/triggerNodeIds'
 import type { NodeType } from '../../workflows/canvas/nodes/NodeType'
 import type { ValidationError } from '../builderReducer'
 
@@ -29,14 +32,16 @@ export function useValidationEnrichment(
   isInitialized: boolean,
   setNodes: Dispatch<SetStateAction<NodeType[]>>
 ) {
+  const triggers = useWorkflowStore(selectTriggers) ?? EMPTY_TRIGGERS
+
   const validationNodeIds = useMemo(() => {
     if (!validationErrors || validationErrors.length === 0) return null
     const ids = new Set<string>()
     for (const err of validationErrors) {
-      if (err.nodeId) ids.add(err.nodeId)
+      if (err.nodeId) ids.add(toReactFlowNodeId(err.nodeId, triggers))
     }
     return ids.size > 0 ? ids : null
-  }, [validationErrors])
+  }, [validationErrors, triggers])
 
   useEffect(() => {
     if (!isInitialized) return

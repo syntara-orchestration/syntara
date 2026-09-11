@@ -926,12 +926,6 @@ class WorkflowService(BaseService):
         When the workflow is currently published, returns the published version's definition
         rather than the new draft being saved. This preserves live webhook behaviour during
         saves so that in-flight requests are not affected by an unfinished draft.
-
-        The synced definition may carry an empty ``authorized_service_account_ids`` list
-        (e.g. workflows published before that field existed). This is safe: an empty binding
-        set locks the webhook down at invocation time, since
-        ``WebhookTriggerService.verify_service_account_authorization`` denies every bearer
-        token when no service accounts are bound.
         """
         if workflow.published_version_id is not None:
             pub_result = await self.session.exec(
