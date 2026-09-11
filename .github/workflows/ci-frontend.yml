@@ -565,13 +565,6 @@ jobs:
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Cache Playwright browsers
-        id: playwright-cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/packages/syntara-ui/package.json') }}
-
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
@@ -677,29 +670,36 @@ jobs:
           echo "::add-mask::$password"
           echo "SYNTARA_E2E_PASSWORD=$password" >> "$GITHUB_ENV"
 
-      - name: Install npm dependencies and Playwright browsers
-        env:
-          CACHE_HIT: ${{ steps.playwright-cache.outputs.cache-hit }}
+      - name: Get Playwright version from package-lock.json
+        id: playwright-version
         run: |
-          npm ci --prefix frontend
-          if [ "$CACHE_HIT" = "true" ]; then
-            (cd frontend/packages/syntara-ui && npx playwright install-deps chromium)
-          else
-            (cd frontend/packages/syntara-ui && npx playwright install --with-deps chromium)
-          fi
+          VERSION=$(node -p "require('./frontend/package-lock.json').packages['node_modules/@playwright/test'].version")
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Using Playwright version: ${VERSION}"
 
-      - name: Run E2E tests
-        working-directory: frontend/packages/syntara-ui
-        run: npm run e2e -- --timeout 120000
+      - name: Run E2E tests in Playwright container
         env:
-          SYNTARA_E2E_SKIP_WEB_SERVER: '1'
-          SYNTARA_E2E_BASE_URL: http://localhost:8080
-          SYNTARA_E2E_PASSWORD: ${{ env.SYNTARA_E2E_PASSWORD }}
-          SYNTARA_XFAIL_SOURCE: https://raw.githubusercontent.com/syntara-orchestration/syntara-ci/refs/heads/main/
+          PLAYWRIGHT_VERSION: ${{ steps.playwright-version.outputs.version }}
+          E2E_PASSWORD: ${{ env.SYNTARA_E2E_PASSWORD }}
           # Enable Currents reporting only for scheduled daily runs or when manually enabled
           CURRENTS_PROJECT_ID: ${{ (github.event_name == 'schedule' || inputs.enable_currents) && secrets.CURRENTS_PROJECT_ID || '' }}
           CURRENTS_RECORD_KEY: ${{ (github.event_name == 'schedule' || inputs.enable_currents) && secrets.CURRENTS_RECORD_KEY || '' }}
           CURRENTS_API_KEY: ${{ (github.event_name == 'schedule' || inputs.enable_currents) && secrets.CURRENTS_API_KEY || '' }}
+        run: |
+          podman run --rm \
+            --network host \
+            -v "$PWD/frontend:/work:z" \
+            -w /work/packages/syntara-ui \
+            -e SYNTARA_E2E_SKIP_WEB_SERVER=1 \
+            -e SYNTARA_E2E_BASE_URL=http://localhost:8080 \
+            -e SYNTARA_E2E_PASSWORD="${E2E_PASSWORD}" \
+            -e SYNTARA_XFAIL_SOURCE=https://raw.githubusercontent.com/syntara-orchestration/syntara-ci/refs/heads/main/ \
+            -e CURRENTS_PROJECT_ID="${CURRENTS_PROJECT_ID}" \
+            -e CURRENTS_RECORD_KEY="${CURRENTS_RECORD_KEY}" \
+            -e CURRENTS_API_KEY="${CURRENTS_API_KEY}" \
+            -e HOME=/tmp \
+            "mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION}-jammy" \
+            bash -c "cd /work && npm ci && cd packages/syntara-ui && npm run e2e -- --timeout 120000"
 
       - name: Upload Playwright report
         if: always()
