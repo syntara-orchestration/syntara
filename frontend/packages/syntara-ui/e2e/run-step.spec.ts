@@ -14,61 +14,61 @@
  * - Dialog state resets when closed
  */
 
-import { type Page, test, expect, toAppUrl } from './fixtures'
+import { type Page, test, expect } from './fixtures'
 import {
   buildUniqueName,
-  clickAddConnectedStep,
-  clickSaveAndWait,
-  closeNodeEditorPanel,
   createBasicWorkflowViaApi,
   deleteWorkflow,
   fillCodeEditor,
   openWorkflowInBuilder,
-  selectProjectIfRequired,
-  triggerLayout,
   waitForUIReady,
 } from './helpers/workflows'
-import { ensureProject } from './utils/api'
+import { createWorkflowViaApi, deleteWorkflowViaApi } from './utils/api'
 
-/** Create trigger → First action → Second action workflow from scratch. */
-async function createTwoNodeWorkflow(app: Page, workflowName: string) {
-  await ensureProject(app)
-  await app.goto(toAppUrl('/workflow-builder/new'))
-  await expect(app.getByRole('heading', { name: 'Select a trigger node' })).toBeVisible()
+/** Per-attempt budget for each kebab interaction, so one stuck click cannot eat the whole retry budget. */
+const KEBAB_CLICK_TIMEOUT = 5_000
 
-  // Add manual trigger
-  await app.getByRole('button', { name: 'Manual trigger' }).click()
-  await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Manual trigger')
-  await app.getByRole('button', { name: 'Create' }).click()
-
-  // Add first action node
-  const firstPanel = await clickAddConnectedStep(app)
-  await firstPanel.getByRole('button', { name: 'Action', exact: true }).click()
-  await firstPanel.getByRole('button', { name: 'Script', exact: true }).click()
-  await app.getByRole('textbox', { name: 'Name', exact: true }).fill('First action')
-  await fillCodeEditor(app, { value: 'print("first")' })
-  await app.getByRole('button', { name: 'Create' }).click()
-  await closeNodeEditorPanel(app)
-
-  // Add second action node
-  const secondPanel = await clickAddConnectedStep(app)
-  await secondPanel.getByRole('button', { name: 'Action', exact: true }).click()
-  await secondPanel.getByRole('button', { name: 'Script', exact: true }).click()
-  await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Second action')
-  await fillCodeEditor(app, { value: 'print("second")' })
-  await app.getByRole('button', { name: 'Create' }).click()
-  await closeNodeEditorPanel(app)
-
-  // Save
-  await selectProjectIfRequired(app)
-  await app.getByPlaceholder('Workflow name').fill(workflowName)
-  await clickSaveAndWait(app)
-  await triggerLayout(app)
+/**
+ * Trigger → First action → Second action, created via the API.
+ *
+ * The UI equivalent this replaced ended with `triggerLayout`, and "Reset layout"
+ * calls `onLayout({ markDirty: true })`. Every later "Run step" click therefore
+ * ran a save first (`useRunStepDialog`), and `handleRunStep` returns silently
+ * when that save resolves false — so the dialog simply never opened and
+ * `openRunStepDialog` retried a no-op click until its budget ran out. Loading an
+ * API-created workflow auto-layouts with `markDirty: false`, so there is nothing
+ * to save and no save to fail. `run-step.spec.ts`'s own siblings already moved
+ * to this pattern for exactly this reason.
+ */
+async function createTwoNodeWorkflowViaApi(app: Page, workflowName: string): Promise<{ id: string }> {
+  const { id } = await createWorkflowViaApi(
+    app,
+    workflowName,
+    [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
+    [
+      {
+        id: 'action_1',
+        type: 'script',
+        name: 'First action',
+        parameters: { language: 'python', code: 'print("first")' },
+      },
+      {
+        id: 'action_2',
+        type: 'script',
+        name: 'Second action',
+        parameters: { language: 'python', code: 'print("second")' },
+      },
+    ],
+    [
+      { from: 'trigger_1', to: 'action_1' },
+      { from: 'action_1', to: 'action_2' },
+    ]
+  )
+  await openWorkflowInBuilder(app, workflowName, id)
   await expect(
     app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: 'Second action' })
-  ).toBeVisible({
-    timeout: 15_000,
-  })
+  ).toBeVisible({ timeout: 15_000 })
+  return { id }
 }
 
 /**
@@ -85,13 +85,13 @@ async function openNodeKebabMenu(app: Page, nodeText: string) {
   // Ensure node is expanded so the kebab is reachable
   const expandToggle = node.getByTestId('node-expand-toggle')
   if ((await expandToggle.count()) > 0) {
-    await expandToggle.click()
+    await expandToggle.click({ timeout: KEBAB_CLICK_TIMEOUT })
   }
 
   const kebabButton = node.getByLabel('Step actions menu')
   await expect(kebabButton).toBeVisible({ timeout: 10_000 })
-  await kebabButton.click()
-  await expect(app.getByRole('menuitem', { name: 'Run step' })).toBeVisible({ timeout: 5_000 })
+  await kebabButton.click({ timeout: KEBAB_CLICK_TIMEOUT })
+  await expect(app.getByRole('menuitem', { name: 'Run step' })).toBeVisible({ timeout: KEBAB_CLICK_TIMEOUT })
 }
 
 /**
@@ -112,8 +112,8 @@ async function openRunStepDialog(app: Page, nodeText: string) {
       await app.keyboard.press('Escape')
     }
     await openNodeKebabMenu(app, nodeText)
-    await app.getByRole('menuitem', { name: 'Run step' }).click({ force: true })
-    await expect(dialogHeading).toBeVisible({ timeout: 5_000 })
+    await app.getByRole('menuitem', { name: 'Run step' }).click({ force: true, timeout: KEBAB_CLICK_TIMEOUT })
+    await expect(dialogHeading).toBeVisible({ timeout: KEBAB_CLICK_TIMEOUT })
   }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] })
 }
 
@@ -163,11 +163,15 @@ test.describe('Run Step', () => {
     }
   })
 
-  // Skip: kebab menu DOM detaches during canvas layout animation causing flaky timeout in CI
+  // Still skipped, but no longer for the dirty-builder reason the old comment gave:
+  // against a real backend `getByRole('button', { name: 'Set mock data' })` resolves
+  // to three elements — the dialog's own button plus the Input and Output panels'
+  // link toggles. Unchanged sibling tests fail the same way, so this is a separate
+  // pre-existing locator problem, not something this workflow migration can settle.
   test.skip('transitions to mock data editor when "Set mock data" is clicked', async ({ app }) => {
     // Arrange - Create workflow with two nodes so second node has a predecessor to mock
     const workflowName = buildUniqueName('e2e-run-step-mock')
-    await createTwoNodeWorkflow(app, workflowName)
+    const { id } = await createTwoNodeWorkflowViaApi(app, workflowName)
 
     try {
       await openRunStepDialog(app, 'Second action')
@@ -178,7 +182,7 @@ test.describe('Run Step', () => {
       const dialog = app.getByLabel('Set mock data for Second action')
       await expect(dialog.getByRole('button', { name: 'Run', exact: true })).toBeVisible()
     } finally {
-      await deleteWorkflow(app, workflowName)
+      await deleteWorkflowViaApi(app, id)
     }
   })
 
@@ -231,8 +235,8 @@ test.describe('Run Step', () => {
   })
 
   test('closes dialog when Cancel is clicked from mock editor', async ({ app }) => {
-    // Use API-created single-node workflow — createTwoNodeWorkflow + Second action
-    // kebab is flaky in CI (same reason the "transitions to mock data editor" test is skipped).
+    // Single-node workflow via the API — the builder opens clean, so no save runs
+    // ahead of the kebab click.
     const workflowName = buildUniqueName('e2e-run-step-cancel-mock')
     const { id } = await createBasicWorkflowViaApi(app, workflowName, 'Test action')
     await openWorkflowInBuilder(app, workflowName, id)
@@ -274,7 +278,7 @@ test.describe('Run Step', () => {
   test('executes workflow when "Run all previous steps" is clicked', async ({ app }) => {
     // Arrange - Create workflow with two nodes
     const workflowName = buildUniqueName('e2e-run-step-all')
-    await createTwoNodeWorkflow(app, workflowName)
+    const { id } = await createTwoNodeWorkflowViaApi(app, workflowName)
 
     try {
       // Act - Open Run step dialog on second node
@@ -287,7 +291,7 @@ test.describe('Run Step', () => {
       // Assert - Dialog closes after execution completes (dialog closing IS the success signal)
       await expect(app.getByRole('heading', { name: 'Run Second action?' })).not.toBeVisible()
     } finally {
-      await deleteWorkflow(app, workflowName)
+      await deleteWorkflowViaApi(app, id)
     }
   })
 
@@ -316,14 +320,15 @@ test.describe('Run Step', () => {
       // Assert - Dialog remains open
       await expect(app.getByRole('heading', { name: 'Set mock data for Test action' })).toBeVisible()
     } finally {
-      await deleteWorkflow(app, workflowName)
+      await deleteWorkflowViaApi(app, id)
     }
   })
 
+  // Skipped for the same ambiguous "Set mock data" locator as above.
   test.skip('dialog state resets when closed and reopened', async ({ app }) => {
     // Arrange - Create workflow with two nodes
     const workflowName = buildUniqueName('e2e-run-step-reset')
-    await createTwoNodeWorkflow(app, workflowName)
+    const { id } = await createTwoNodeWorkflowViaApi(app, workflowName)
 
     try {
       // Act 1 - Open mock editor on second node
@@ -342,7 +347,7 @@ test.describe('Run Step', () => {
       // Assert - Dialog resets to choice screen
       await expect(app.getByRole('heading', { name: 'Run Second action?' })).toBeVisible()
     } finally {
-      await deleteWorkflow(app, workflowName)
+      await deleteWorkflowViaApi(app, id)
     }
   })
 })
