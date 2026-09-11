@@ -10,9 +10,11 @@ import {
 } from '../utils/api'
 
 import { clickAddConnectedStep } from './add-connected-step'
+import { clickSaveAndWait } from './workflow-save'
 
 export { createBasicWorkflowViaApi, publishWorkflowViaApi }
 export { clickAddConnectedStep }
+export { clickSaveAndWait, isWorkflowSaveResponse } from './workflow-save'
 
 export const buildUniqueName = (prefix: string) => `${prefix}-${Date.now()}-${randomUUID()}`
 
@@ -498,10 +500,10 @@ export async function createBasicWorkflow(page: Page, workflowName: string, acti
   await selectProjectIfRequired(page)
 
   await page.getByPlaceholder('Workflow name').fill(workflowName)
-  await page.getByRole('button', { name: 'Save' }).click()
 
-  // Must navigate away from /new — .+ alone would match "new" and give a false pass
-  await expect(page).toHaveURL(/workflow-builder\/(?!new)/, { timeout: 15_000 })
+  // Gate on the create response, not the URL: the builder routes to
+  // /workflow-builder/<id> before the POST has necessarily landed.
+  await clickSaveAndWait(page)
 }
 
 /**
@@ -524,12 +526,17 @@ export async function startWorkflowWithTrigger(page: Page) {
   await expect(page.getByRole('button', { name: 'Create', exact: true })).not.toBeAttached({ timeout: 10_000 })
 }
 
-/** Save the workflow with the given name. Waits for URL to confirm persistence. */
-export async function saveWorkflow(page: Page, workflowName: string, { timeout = 15_000 } = {}) {
+/**
+ * Name and save the workflow, returning once the server has the change.
+ *
+ * The old `toHaveURL(/workflow-builder\/(?!new)/)` gate only ever meant anything
+ * on create; on an already-saved workflow the URL never changes, so it resolved
+ * without waiting for the PATCH at all. See `clickSaveAndWait`.
+ */
+export async function saveWorkflow(page: Page, workflowName: string, { timeout = 30_000 } = {}) {
   await selectProjectIfRequired(page)
   await page.getByPlaceholder('Workflow name').fill(workflowName)
-  await page.getByRole('button', { name: 'Save' }).click()
-  await expect(page).toHaveURL(/workflow-builder\/(?!new)/, { timeout })
+  await clickSaveAndWait(page, { timeout })
 }
 
 /**
@@ -552,8 +559,7 @@ export async function createWorkflowWithTrigger(page: Page, workflowName: string
   const nameInput = page.getByPlaceholder('Workflow name')
   await nameInput.clear()
   await nameInput.fill(workflowName)
-  await page.getByRole('button', { name: 'Save' }).click()
-  await expect(page).toHaveURL(/workflow-builder\/(?!new)/, { timeout: 15_000 })
+  await clickSaveAndWait(page)
 
   await expect(page.getByText('Manual trigger')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Reset layout', exact: true })).toBeVisible()

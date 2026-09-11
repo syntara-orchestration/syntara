@@ -36,7 +36,13 @@ import {
   deleteLlmIntegration,
 } from './helpers/v2-nodes'
 import { addConvergeNode } from './helpers/v2-nodes-converge'
-import { buildUniqueName, selectProjectIfRequired, deleteWorkflow, triggerLayout } from './helpers/workflows'
+import {
+  buildUniqueName,
+  clickSaveAndWait,
+  selectProjectIfRequired,
+  deleteWorkflow,
+  triggerLayout,
+} from './helpers/workflows'
 import { apiRequest, createWorkflowViaApi, deleteWorkflowViaApi } from './utils/api'
 
 /** Inline v2 schema type (formerly in toV2Definition.ts stub, now replaced by generated contracts). */
@@ -371,8 +377,7 @@ test.describe('V2 Workflow Schema Migration', () => {
     await addScriptNode(app, 'Test script', 'print("test")')
     await selectProjectIfRequired(app)
     await app.getByPlaceholder('Workflow name').fill(workflowName)
-    await app.getByRole('button', { name: 'Save' }).click()
-    await expect(app).toHaveURL(/workflow-builder\/.+/)
+    await clickSaveAndWait(app)
 
     // Navigate to workflows list, find the saved workflow, and reopen it.
     // This is more reliable than page.reload() which can lose session context.

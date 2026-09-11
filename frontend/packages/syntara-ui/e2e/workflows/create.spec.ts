@@ -13,7 +13,7 @@
  */
 
 import { test, expect, toAppUrl } from '../fixtures'
-import { buildUniqueName, deleteWorkflow, selectProjectIfRequired } from '../helpers/workflows'
+import { buildUniqueName, clickSaveAndWait, deleteWorkflow, selectProjectIfRequired } from '../helpers/workflows'
 
 test.describe('Workflows - Create New Workflow', () => {
   test('user creates a new workflow with name and description', async ({ app }) => {
@@ -159,8 +159,7 @@ test.describe('Workflows - Create New Workflow', () => {
       const name1Input = app.getByPlaceholder('Workflow name')
       await name1Input.clear()
       await name1Input.fill(workflow1Name)
-      await app.getByRole('button', { name: 'Save' }).click()
-      await expect(app).toHaveURL(/workflow-builder\/.+/, { timeout: 15000 })
+      await clickSaveAndWait(app)
 
       // Go back and create second workflow
       await app.goto(toAppUrl('/workflows'))
@@ -175,8 +174,7 @@ test.describe('Workflows - Create New Workflow', () => {
       const name2Input = app.getByPlaceholder('Workflow name')
       await name2Input.clear()
       await name2Input.fill(workflow2Name)
-      await app.getByRole('button', { name: 'Save' }).click()
-      await expect(app).toHaveURL(/workflow-builder\/.+/, { timeout: 15000 })
+      await clickSaveAndWait(app)
 
       // Verify both workflows exist in the table
       await app.goto(toAppUrl('/workflows'))
