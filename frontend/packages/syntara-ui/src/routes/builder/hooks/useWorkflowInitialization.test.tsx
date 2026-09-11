@@ -3,6 +3,14 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 
 import { useWorkflowInitialization } from './useWorkflowInitialization'
 
+let workflowStoreState: Record<string, unknown> = { nodePositions: {} }
+
+vi.mock('../../../stores/useWorkflowStore', () => ({
+  useWorkflowStore: {
+    getState: () => workflowStoreState,
+  },
+}))
+
 describe('useWorkflowInitialization', () => {
   const mockOnLayout = vi.fn()
   const mockOnVersionChange = vi.fn()
@@ -10,6 +18,7 @@ describe('useWorkflowInitialization', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.useFakeTimers()
+    workflowStoreState = { nodePositions: {} }
   })
 
   afterEach(() => {
@@ -118,7 +127,8 @@ describe('useWorkflowInitialization', () => {
     expect(mockOnVersionChange).toHaveBeenCalled()
   })
 
-  it('skips layout when hasStoredPositions is true', async () => {
+  it('skips layout when stored node positions exist', async () => {
+    workflowStoreState.nodePositions = { 'node-1': { x: 10, y: 20 } }
     const measuredNodes = [{ id: 'node-1', measured: { width: 100, height: 50 } }] as never[]
 
     renderHook(() =>
@@ -126,7 +136,6 @@ describe('useWorkflowInitialization', () => {
         nodes: measuredNodes,
         workflowVersion: 1,
         onLayout: mockOnLayout,
-        hasStoredPositions: true,
       })
     )
 

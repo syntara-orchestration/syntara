@@ -933,6 +933,8 @@ test.describe('Node editor panels', () => {
 
     await clickNode(app, 'Run script')
 
+    await expect(app.getByRole('heading', { name: 'Input', exact: true })).toBeVisible({ timeout: 10_000 })
+
     const parametersTab = app.getByRole('tab', { name: 'Parameters' })
     const runStepButton = app.getByRole('button', { name: 'Run step' })
 
