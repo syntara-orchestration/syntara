@@ -53,6 +53,7 @@ function buildTreeData(
           typeLabel={typeLabel}
           nodeId={nodeId}
           fieldPath={currentPath}
+          expression={expression}
           searchTerm={searchTerm}
         />
       ),
@@ -85,12 +86,19 @@ type LeafNodeProps = {
   typeLabel: string
   nodeId: string
   fieldPath: string[]
+  expression: string | null
   searchTerm?: string
 }
 
-function LeafNode({ fieldKey, value, typeLabel, nodeId, fieldPath, searchTerm }: Readonly<LeafNodeProps>) {
-  const expression = useMemo(() => tryBuildExpression({ nodeId, fieldPath }), [nodeId, fieldPath])
-
+function LeafNode({
+  fieldKey,
+  value,
+  typeLabel,
+  nodeId,
+  fieldPath,
+  expression,
+  searchTerm,
+}: Readonly<LeafNodeProps>) {
   const handleDragStart = useCallback(
     (e: React.DragEvent) => {
       if (!expression) {

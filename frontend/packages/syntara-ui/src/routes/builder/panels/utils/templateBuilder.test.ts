@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildContextExpression, buildExpression } from '../../../../utils/expressions/templateBuilder'
+import {
+  buildContextExpression,
+  buildExpression,
+  tryBuildExpression,
+} from '../../../../utils/expressions/templateBuilder'
 
 describe('buildExpression', () => {
   it('builds expression with node ID and single field', () => {
@@ -85,6 +89,51 @@ describe('buildExpression', () => {
 
   it('rejects field path segments containing dots', () => {
     expect(() => buildExpression({ nodeId: 'step_1', fieldPath: ['stdout.json'] })).toThrow('disallowed characters')
+  })
+
+  it('builds expressions for UUID-derived activity node IDs', () => {
+    const nodeId = 'activity_923ab1e1_3a31_40b7_b7a0_52c8ab5daddc'
+    const result = buildExpression({
+      nodeId,
+      fieldPath: ['result', 'content', 'exists'],
+    })
+    expect(result).toBe('${activity_923ab1e1_3a31_40b7_b7a0_52c8ab5daddc.result.content.exists}')
+  })
+
+  it('allows field names with at-sign and other JSON key characters', () => {
+    const result = buildExpression({
+      nodeId: 'step_1',
+      fieldPath: ['@type'],
+    })
+    expect(result).toBe('${step_1.@type}')
+  })
+
+  it('rejects field path segments containing quotes', () => {
+    expect(() => buildExpression({ nodeId: 'step_1', fieldPath: [`field"injection`] })).toThrow(
+      'disallowed characters'
+    )
+  })
+
+  it('rejects field path segments containing backticks', () => {
+    expect(() => buildExpression({ nodeId: 'step_1', fieldPath: ['`rm -rf`'] })).toThrow('disallowed characters')
+  })
+})
+
+describe('tryBuildExpression', () => {
+  it('returns built expression for valid payloads', () => {
+    expect(tryBuildExpression({ nodeId: 'step_1', fieldPath: ['status'] })).toBe('${step_1.status}')
+  })
+
+  it('returns null instead of throwing for unsafe field segments', () => {
+    expect(tryBuildExpression({ nodeId: 'step_1', fieldPath: ['field.with.dots'] })).toBeNull()
+  })
+
+  it('returns null instead of throwing for invalid node IDs', () => {
+    expect(tryBuildExpression({ nodeId: 'bad.id', fieldPath: ['field'] })).toBeNull()
+  })
+
+  it('returns null instead of throwing for empty field segments', () => {
+    expect(tryBuildExpression({ nodeId: 'step_1', fieldPath: [''] })).toBeNull()
   })
 })
 
