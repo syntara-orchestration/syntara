@@ -390,8 +390,9 @@ class TestInvocationExecutionHeartbeat:
     """The agent-execution activity must heartbeat while the agent runs.
 
     Temporal only delivers cancellation to activities that heartbeat. Without
-    it, cancelling the builtin AGENT_EXECUTION workflow cannot interrupt an
-    in-flight agent, so a cancelled run keeps calling the LLM. Ref: AAP-88614.
+    it, cancelling the builtin AGENT_EXECUTION workflow — which InvocationService
+    does from ``Invocation.agent_execution_id`` — cannot interrupt an in-flight
+    agent, so a cancelled run keeps calling the LLM. Ref: AAP-88614.
     """
 
     @pytest.mark.anyio

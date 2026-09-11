@@ -21,7 +21,7 @@ from uuid import UUID, uuid4
 
 import structlog
 from fastapi import UploadFile
-from sqlmodel import col, update
+from sqlmodel import col, select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 if TYPE_CHECKING:
@@ -358,6 +358,56 @@ class InvocationService(BaseService):
         """
         return await self.session.get(Invocation, invocation_id)
 
+    async def _cancel_agent_execution(self, invocation_id: UUID) -> None:
+        """Cancel the builtin workflow execution running this invocation.
+
+        Owned here rather than by ExecutionService: cancelling an invocation is
+        this service's job, and splitting it left ``cancel_invocation`` a half
+        cancel — the row went CANCELLED while the Temporal workflow ran on — that
+        every future caller would inherit.
+
+        The execution is found by primary key through
+        ``Invocation.agent_execution_id``, written server-side when the workflow
+        was started.  That replaces a scan of caller-writable
+        ``executions.input_data``, so no is_builtin filtering is needed here; the
+        link is trustworthy by construction.
+
+        Best-effort throughout.  The cancel has already committed, so raising
+        would 500 a request whose effect already landed and a client retry would
+        then get NOT_CANCELLABLE.
+        """
+        # Guarded first so services constructed without a temporal service —
+        # every non-cancel call site — do no work at all.
+        if self.temporal_service is None:
+            return
+
+        from syntara.workflows.models.execution import (  # noqa: PLC0415
+            TERMINAL_EXECUTION_STATUSES,
+            Execution,
+        )
+
+        try:
+            # Re-read the link after the status commit rather than trusting the
+            # instance loaded before it: the FK is written a round-trip after the
+            # execution starts, so a cancel racing invocation creation can see it
+            # appear in between.
+            agent_execution_id = await self.session.scalar(
+                select(Invocation.agent_execution_id).where(Invocation.id == invocation_id)
+            )
+            if agent_execution_id is None:
+                return
+
+            agent_execution = await self.session.get(Execution, agent_execution_id)
+            if agent_execution is None or agent_execution.status in TERMINAL_EXECUTION_STATUSES:
+                return
+
+            await self.temporal_service.cancel_workflow(temporal_workflow_id=agent_execution.temporal_workflow_id)
+        except Exception:
+            logger.exception(
+                "Failed to cancel builtin agent execution",
+                invocation_id=invocation_id,
+            )
+
     async def cancel_invocation(self, invocation_id: UUID, reason: str = "User cancelled") -> CancellationResult:
         """Cancel a running invocation.
 
@@ -459,7 +509,8 @@ class InvocationService(BaseService):
         invocation.checkpoint_data = checkpoint_data
 
         # Note: Document conversion workflows will complete harmlessly even for
-        # cancelled invocations. Execution workflow cancellation is handled by Temporal.
+        # cancelled invocations. The builtin workflow running this invocation is
+        # cancelled below, via _cancel_agent_execution.
 
         cleaned_file_ids: list[UUID] = []
         try:
@@ -471,6 +522,11 @@ class InvocationService(BaseService):
             # terminal cancelled stream event is published by
             # orchestration_service when the agent actually stops.
             await self._signal_cancellation(invocation_id)
+
+            # Stop the builtin workflow running this invocation so it does not
+            # linger as a RUNNING execution.  The DB status above is what
+            # actually stops the agent; this is the tidy-up.
+            await self._cancel_agent_execution(invocation_id)
 
             # Clean up files AFTER the signal is sent.  The agent may still be
             # executing a tool at this point (see _cancellation_watcher known
