@@ -34,7 +34,7 @@ import {
   RhUiQuestionMarkCircleIcon,
 } from '@patternfly/react-icons'
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
-import { use, useMemo, useRef, useState } from 'react'
+import { use, useEffect, useMemo, useRef, useState } from 'react'
 
 import { authClient } from '../client'
 import { useAlerts } from '../providers/alerts'
@@ -186,15 +186,37 @@ function NavExpandableItem({
   /* v8 ignore stop */
 }
 
+const USER_MENU_FLYOUT_CLOSE_DELAY_MS = 100
+
 function UserMenuDropdown() {
   const [isOpen, setIsOpen] = useState(false)
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
   const navigate = useNavigate()
   const logout = useAuthStore((s) => s.logout)
   const { showAlert } = useAlerts()
   const { data: currentUser } = authClient.useQuery('get', '/auth/me')
 
+  const cancelScheduledClose = () => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current)
+      closeTimerRef.current = undefined
+    }
+  }
+
+  const handleOpenChange = (open: boolean) => {
+    cancelScheduledClose()
+    setIsOpen(open)
+  }
+
+  const scheduleClose = () => {
+    cancelScheduledClose()
+    closeTimerRef.current = setTimeout(() => handleOpenChange(false), USER_MENU_FLYOUT_CLOSE_DELAY_MS)
+  }
+
+  useEffect(() => () => cancelScheduledClose(), [])
+
   const handleLogoutClick = () => {
-    setIsOpen(false)
+    handleOpenChange(false)
     detachPromise(logout(), {
       onReject: (error: unknown) => {
         showAlert({
@@ -217,8 +239,9 @@ function UserMenuDropdown() {
       isDocked
       className={styles.dockedAction}
       aria-label="User menu"
-      onClick={() => setIsOpen(!isOpen)}
-      onMouseEnter={() => setIsOpen(true)}
+      onClick={() => handleOpenChange(!isOpen)}
+      onMouseEnter={() => handleOpenChange(true)}
+      onMouseLeave={scheduleClose}
     >
       {currentUser?.username ?? 'User'}
     </MenuToggle>
@@ -227,21 +250,30 @@ function UserMenuDropdown() {
   return (
     <Dropdown
       isOpen={isOpen}
-      onOpenChange={setIsOpen}
+      onOpenChange={handleOpenChange}
       toggle={toggle}
-      popperProps={{ position: 'right', preventOverflow: true }}
+      containsFlyout
+      isNavFlyout
+      className={styles.flyoutMenu}
+      popperProps={{
+        placement: 'right-start',
+        preventOverflow: true,
+        onPopperMouseEnter: cancelScheduledClose,
+        onPopperMouseLeave: scheduleClose,
+      }}
     >
       <DropdownList>
         <DropdownItem
           key="profile"
+          className={styles.flyoutMenuItem}
           onClick={() => {
+            handleOpenChange(false)
             detachPromise(navigate({ to: AppRoute.MyProfile.Root }))
-            setIsOpen(false)
           }}
         >
           My Profile
         </DropdownItem>
-        <DropdownItem key="logout" onClick={handleLogoutClick}>
+        <DropdownItem key="logout" className={styles.flyoutMenuItem} onClick={handleLogoutClick}>
           Logout
         </DropdownItem>
       </DropdownList>

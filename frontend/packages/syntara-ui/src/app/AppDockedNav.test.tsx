@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
@@ -165,15 +165,58 @@ describe('AppDockedNav', () => {
     expect(screen.getByRole('button', { name: 'Global navigation' })).toBeInTheDocument()
   })
 
-  it('shows My Profile and Logout in user menu when hovered', async () => {
+  it('shows My Profile and Logout in a right-positioned user menu flyout when hovered', async () => {
     const user = userEvent.setup()
     renderDockedNav()
 
     await user.hover(screen.getByRole('button', { name: 'User menu' }))
 
-    expect(screen.getByText('My Profile')).toBeInTheDocument()
-    expect(screen.getByText('Logout')).toBeInTheDocument()
+    const menu = screen.getByRole('menu')
+    const menuItems = within(menu).getAllByRole('menuitem')
+    expect(menuItems).toHaveLength(2)
+    expect(menuItems[0]).toHaveTextContent('My Profile')
+    expect(menuItems[1]).toHaveTextContent('Logout')
+    expect(menuItems[0]).toHaveClass(styles.flyoutMenuItem)
+    expect(menu).toHaveClass(styles.flyoutMenu)
     expect(screen.queryByText('Settings')).not.toBeInTheDocument()
+  })
+
+  it('closes user menu flyout when pointer leaves the trigger and flyout', async () => {
+    const user = userEvent.setup()
+    renderDockedNav()
+
+    const userMenuButton = screen.getByRole('button', { name: 'User menu' })
+    await user.hover(userMenuButton)
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+
+    await user.unhover(userMenuButton)
+
+    await waitFor(() => {
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    })
+  })
+
+  it('keeps user menu flyout open while pointer is over a menu item', async () => {
+    const user = userEvent.setup()
+    renderDockedNav()
+
+    const userMenuButton = screen.getByRole('button', { name: 'User menu' })
+    await user.hover(userMenuButton)
+    await user.hover(screen.getByRole('menuitem', { name: 'My Profile' }))
+
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+  })
+
+  it('closes user menu when Escape is pressed', async () => {
+    const user = userEvent.setup()
+    renderDockedNav()
+
+    await user.hover(screen.getByRole('button', { name: 'User menu' }))
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+
+    await user.keyboard('{Escape}')
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 
   it('opens user menu when Enter is pressed while focused', async () => {
