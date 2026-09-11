@@ -1816,7 +1816,7 @@ class ActivitySyncService:
         activity_id: str,
         activity_data: dict[str, Any],
         initial_output_data: dict[str, Any] | None,
-    ) -> tuple[dict[str, Any], dict[str, Any] | None]:
+    ) -> tuple[dict[str, Any], dict[str, Any] | None, bool]:
         """Query workflow for activity input and output data.
 
         Queries ``get_activity_input`` and ``get_activity_output`` from the workflow.
@@ -1830,7 +1830,7 @@ class ActivitySyncService:
             initial_output_data: Pre-existing output data (e.g. from heartbeat partial output)
 
         Returns:
-            Tuple of (input_data, output_data)
+            Tuple of (input_data, output_data, query_succeeded).
 
         """
         input_data: dict[str, Any] = {}
@@ -1878,9 +1878,10 @@ class ActivitySyncService:
                     )
 
         except (TemporalError, ValueError) as e:
-            logger.debug("Could not query activity data", activity_id=activity_id, error=str(e))
+            logger.warning("Could not query activity data", activity_id=activity_id, error=str(e))
+            return input_data, output_data, False
 
-        return input_data, output_data
+        return input_data, output_data, True
 
     @staticmethod
     def _scrub_data(data: Any) -> dict[str, Any] | None:  # noqa: ANN401
@@ -1908,6 +1909,7 @@ class ActivitySyncService:
         output_data: dict[str, Any] | None,
         *,
         is_loop_control: bool = False,
+        query_succeeded: bool = True,
     ) -> dict[str, Any]:
         """Update an ActivityExecution record with new data from Temporal events.
 
@@ -1919,6 +1921,7 @@ class ActivitySyncService:
             input_data: Scrubbed input data
             output_data: Scrubbed output data
             is_loop_control: Whether this is a loop control node
+            query_succeeded: Whether the Temporal query for input/output succeeded.
 
         Returns:
             Dictionary of old field values before the update
@@ -1937,8 +1940,12 @@ class ActivitySyncService:
         existing.status = activity_data["status"]
         existing.started_at = activity_data["started_at"] or (existing.started_at if is_loop_control else None)
         existing.completed_at = activity_data["completed_at"]
-        existing.input_data = input_data or {}
-        existing.output_data = output_data
+        if query_succeeded:
+            existing.input_data = input_data or {}
+            existing.output_data = output_data
+        elif output_data is not None:
+            # Event-sourced heartbeat partial from activity_data — not from the failed query.
+            existing.output_data = output_data | (existing.output_data or {})
         existing.error_details = activity_data["error_details"]
         existing.retry_count = activity_data["retry_count"]
         if activity_data.get("iteration") is not None and not is_loop_control:
@@ -2129,7 +2136,7 @@ class ActivitySyncService:
         # For running activities, partial output from heartbeat may
         # already be in the update dict — preserve it if the workflow
         # query returns None (output not stored until completion).
-        input_data, output_data = await self._query_activity_io(
+        input_data, output_data, query_succeeded = await self._query_activity_io(
             handle, activity_id, activity_data, activity_data.get("output_data")
         )
 
@@ -2159,6 +2166,7 @@ class ActivitySyncService:
             self._scrub_data(input_data),
             self._scrub_data(output_data),
             is_loop_control=is_loop_control,
+            query_succeeded=query_succeeded,
         )
         return existing, old_values, is_new
 
