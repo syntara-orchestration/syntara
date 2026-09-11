@@ -55,7 +55,7 @@ export function ApprovalNodeDetails({
           ...(data.decision_window !== undefined && { decision_window: data.decision_window }),
         },
         settings: data.settings,
-      } as Partial<Activity>)
+      })
       onClose()
     } catch (error) {
       showError({

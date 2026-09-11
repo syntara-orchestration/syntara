@@ -101,7 +101,7 @@ describe('ProjectPoliciesTab', () => {
       isError: false,
       error: null,
       refetch: mockRefetch,
-    } as never)
+    })
 
     vi.mocked(accessClient.useMutation).mockReturnValue(mockMutationReturn)
   }
@@ -162,7 +162,7 @@ describe('ProjectPoliciesTab', () => {
       isError: true,
       error: new Error('Network error'),
       refetch: vi.fn(),
-    } as never)
+    })
 
     render(<ProjectPoliciesTab projectId="proj-1" />, { wrapper })
 
@@ -176,7 +176,7 @@ describe('ProjectPoliciesTab', () => {
       isError: false,
       error: null,
       refetch: vi.fn(),
-    } as never)
+    })
 
     render(<ProjectPoliciesTab projectId="proj-1" />, { wrapper })
 
@@ -312,7 +312,7 @@ describe('ProjectPoliciesTab', () => {
       isError: false,
       error: null,
       refetch: mockRefetch,
-    } as never)
+    })
 
     const user = userEvent.setup()
     render(<ProjectPoliciesTab projectId="proj-1" />, { wrapper })

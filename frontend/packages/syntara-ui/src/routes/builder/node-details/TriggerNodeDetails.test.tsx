@@ -5,6 +5,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import type { Trigger } from '../../../stores/workflowStoreTypes'
+import { expectStringContaining } from '../../../test/test-helpers'
 import * as TriggerNodeFormModule from '../node-forms/TriggerNodeForm'
 
 import { TriggerNodeDetails } from './TriggerNodeDetails'
@@ -473,7 +474,7 @@ describe('TriggerNodeDetails Component', () => {
 
       expect(mockShowError).toHaveBeenCalledWith({
         title: 'Update failed',
-        description: expect.stringContaining('Invalid interval format') as unknown as string,
+        description: expectStringContaining('Invalid interval format'),
       })
       expect(mockOnClose).not.toHaveBeenCalled()
 
@@ -513,7 +514,7 @@ describe('TriggerNodeDetails Component', () => {
 
       expect(mockShowError).toHaveBeenCalledWith({
         title: 'Update failed',
-        description: expect.stringContaining('Invalid interval format') as unknown as string,
+        description: expectStringContaining('Invalid interval format'),
       })
       expect(mockOnClose).not.toHaveBeenCalled()
 
@@ -627,7 +628,7 @@ describe('TriggerNodeDetails Component', () => {
 
       expect(mockShowError).toHaveBeenCalledWith({
         title: 'Update failed',
-        description: expect.stringContaining('Invalid interval format') as unknown as string,
+        description: expectStringContaining('Invalid interval format'),
       })
       expect(mockOnClose).not.toHaveBeenCalled()
 
@@ -667,7 +668,7 @@ describe('TriggerNodeDetails Component', () => {
 
       expect(mockShowError).toHaveBeenCalledWith({
         title: 'Update failed',
-        description: expect.stringContaining('Invalid interval format') as unknown as string,
+        description: expectStringContaining('Invalid interval format'),
       })
       expect(mockOnClose).not.toHaveBeenCalled()
 
@@ -1145,7 +1146,7 @@ describe('TriggerNodeDetails Component', () => {
 
       expect(mockShowError).toHaveBeenCalledWith({
         title: 'Update failed',
-        description: expect.stringContaining('Invalid JSON schema') as unknown as string,
+        description: expectStringContaining('Invalid JSON schema'),
       })
 
       formSpy.mockRestore()

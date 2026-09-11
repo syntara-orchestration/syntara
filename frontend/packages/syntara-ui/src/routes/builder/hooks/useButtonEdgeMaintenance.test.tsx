@@ -189,9 +189,7 @@ describe('useButtonEdgeMaintenance', () => {
     let capturedEdges: unknown[] = []
     mockSetEdges.mockImplementation((updater) => {
       if (typeof updater === 'function') {
-        capturedEdges = updater([
-          { id: 'edge-1', source: 'node-1', target: 'node-2', sourceHandle: 'source' },
-        ] as unknown as EdgeType[])
+        capturedEdges = updater([{ id: 'edge-1', source: 'node-1', target: 'node-2', sourceHandle: 'source' }])
       }
       return capturedEdges
     })
@@ -834,7 +832,7 @@ describe('useButtonEdgeMaintenance', () => {
             targetHandle: 'target',
             data: { isActive: false },
           },
-        ] as unknown as EdgeType[])
+        ])
         edgesCalls.push(result)
         return result
       }
@@ -888,7 +886,7 @@ describe('useButtonEdgeMaintenance', () => {
             targetHandle: 'target',
             data: { isActive: false },
           },
-        ] as unknown as EdgeType[])
+        ])
         edgesCalls.push(result)
         return result
       }
@@ -1014,17 +1012,19 @@ describe('useButtonEdgeMaintenance', () => {
   it('resets signature when transitioning from execution to edit mode', () => {
     const nodes = [{ id: 'node-1', type: 'task', position: { x: 100, y: 100 } }] as never[]
     const edges = [] as never[]
+    type StatusProps = { executionStatus: string | null }
+    const initialProps: StatusProps = { executionStatus: 'running' }
 
     // Start in execution mode
     const { rerender } = renderHook(
-      ({ executionStatus }: { executionStatus: string | null }) =>
+      ({ executionStatus }: StatusProps) =>
         useButtonEdgeMaintenance({
           ...defaultOptions,
           nodes,
           edges,
           executionStatus,
         }),
-      { initialProps: { executionStatus: 'running' as string | null } }
+      { initialProps }
     )
 
     // In execution mode, no button edges should be created

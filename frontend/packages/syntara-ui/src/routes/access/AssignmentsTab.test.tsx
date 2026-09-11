@@ -193,7 +193,7 @@ describe('AssignmentsTab', () => {
       variables: undefined,
       status: 'idle',
       isPaused: false,
-    } as never)
+    })
 
     vi.mocked(accessFetchClient.GET).mockResolvedValue({ data: { resources: [] } } as never)
   })
@@ -1227,7 +1227,7 @@ describe('AssignmentsTab', () => {
           project_name: null,
           created_at: '2024-06-01T00:00:00Z',
         },
-      ] as unknown as RoleAssignmentRead[]
+      ]
       setupAssignmentsQuery(fullRow)
       const user = userEvent.setup()
       render(<AssignmentsTab />, { wrapper })
@@ -1257,7 +1257,7 @@ describe('AssignmentsTab', () => {
           project_name: null,
           created_at: '2024-01-01T00:00:00Z',
         },
-      ] as unknown as RoleAssignmentRead[]
+      ]
       setupAssignmentsQuery(minimalRow)
       render(<AssignmentsTab />, { wrapper })
 
@@ -1412,7 +1412,7 @@ describe('AssignmentsTab', () => {
           project_name: undefined,
           created_at: '2024-01-01T00:00:00Z',
         },
-      ] as unknown as RoleAssignmentRead[]
+      ]
       setupAssignmentsQuery(systemOnly)
       render(<AssignmentsTab />, { wrapper })
 
@@ -1435,7 +1435,7 @@ describe('AssignmentsTab', () => {
           project_name: 'Project Alpha',
           created_at: '2024-05-01T00:00:00Z',
         },
-      ] as unknown as RoleAssignmentRead[]
+      ]
       setupAssignmentsQuery(groupRow)
       const user = userEvent.setup()
       render(<AssignmentsTab />, { wrapper })

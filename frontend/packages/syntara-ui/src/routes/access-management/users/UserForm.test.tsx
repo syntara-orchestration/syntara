@@ -89,7 +89,7 @@ function setupCreateMocks(mutateOverrides?: Partial<ReturnType<typeof vi.fn>>) {
     error: null,
     isFetching: false,
     refetch: vi.fn(),
-  } as never)
+  })
   vi.mocked(accessClient.useQuery).mockReturnValue({
     data: undefined,
     isPending: false,
@@ -97,13 +97,13 @@ function setupCreateMocks(mutateOverrides?: Partial<ReturnType<typeof vi.fn>>) {
     error: null,
     isFetching: false,
     refetch: vi.fn(),
-  } as never)
+  })
   const mockMutate = vi.fn()
   vi.mocked(accessClient.useMutation).mockReturnValue({
     mutate: mockMutate,
     isPending: false,
     ...mutateOverrides,
-  } as never)
+  })
   return { mockMutate }
 }
 
@@ -125,7 +125,7 @@ function setupEditMocks(mutateOverrides?: Partial<ReturnType<typeof vi.fn>>) {
     error: null,
     isFetching: false,
     refetch: vi.fn(),
-  } as never)
+  })
   vi.mocked(accessClient.useQuery).mockReturnValue({
     data: mockUserData,
     isPending: false,
@@ -133,13 +133,13 @@ function setupEditMocks(mutateOverrides?: Partial<ReturnType<typeof vi.fn>>) {
     error: null,
     isFetching: false,
     refetch: vi.fn(),
-  } as never)
+  })
   const mockMutate = vi.fn()
   vi.mocked(accessClient.useMutation).mockReturnValue({
     mutate: mockMutate,
     isPending: false,
     ...mutateOverrides,
-  } as never)
+  })
   return { mockMutate }
 }
 
@@ -288,7 +288,7 @@ describe('UserForm', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(accessClient.useQuery).mockReturnValue({
         data: undefined,
         isPending: false,
@@ -296,11 +296,11 @@ describe('UserForm', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(accessClient.useMutation).mockReturnValue({
         mutate: vi.fn(),
         isPending: true,
-      } as never)
+      })
 
       render(<UserForm mode="create" />, { wrapper })
 
@@ -391,7 +391,7 @@ describe('UserForm', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<UserForm mode="edit" />, { wrapper })
 
@@ -494,7 +494,7 @@ describe('UserForm', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(accessClient.useQuery).mockReturnValue({
         data: undefined,
         isPending: false,
@@ -502,11 +502,11 @@ describe('UserForm', () => {
         error: new Error('Not found'),
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(accessClient.useMutation).mockReturnValue({
         mutate: vi.fn(),
         isPending: false,
-      } as never)
+      })
 
       render(<UserForm mode="edit" />, { wrapper })
 
@@ -526,7 +526,7 @@ describe('UserForm', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(accessClient.useQuery).mockReturnValue({
         data: undefined,
         isPending: false,
@@ -534,11 +534,11 @@ describe('UserForm', () => {
         error: new Error('Not found'),
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(accessClient.useMutation).mockReturnValue({
         mutate: vi.fn(),
         isPending: false,
-      } as never)
+      })
 
       render(<UserForm mode="edit" />, { wrapper })
 
@@ -560,7 +560,7 @@ describe('UserForm', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(accessClient.useQuery).mockReturnValue({
         data: undefined,
         isPending: false,
@@ -568,11 +568,11 @@ describe('UserForm', () => {
         error: new Error('Not found'),
         isFetching: false,
         refetch: mockRefetch,
-      } as never)
+      })
       vi.mocked(accessClient.useMutation).mockReturnValue({
         mutate: vi.fn(),
         isPending: false,
-      } as never)
+      })
 
       render(<UserForm mode="edit" />, { wrapper })
 
@@ -590,7 +590,7 @@ describe('UserForm', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(accessClient.useQuery).mockReturnValue({
         data: undefined,
         isPending: true,
@@ -600,11 +600,11 @@ describe('UserForm', () => {
         refetch: vi.fn(),
         status: 'pending',
         fetchStatus: 'fetching',
-      } as never)
+      })
       vi.mocked(accessClient.useMutation).mockReturnValue({
         mutate: vi.fn(),
         isPending: false,
-      } as never)
+      })
 
       render(<UserForm mode="edit" />, { wrapper })
 

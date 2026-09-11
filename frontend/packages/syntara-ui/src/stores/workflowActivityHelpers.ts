@@ -48,7 +48,7 @@ export function updateActivityInList(
   activityId: string,
   updates: Partial<Activity>
 ): Activity[] {
-  return mapActivityInList(activities, activityId, (activity) => ({ ...activity, ...updates }) as Activity)
+  return mapActivityInList(activities, activityId, (activity) => ({ ...activity, ...updates }))
 }
 
 /**
@@ -57,7 +57,7 @@ export function updateActivityInList(
  * position-dependent consumers (edges, converge nodes) continue to work.
  */
 export function replaceActivityInList(activities: Activity[], activityId: string, newActivity: Activity): Activity[] {
-  return mapActivityInList(activities, activityId, () => ({ ...newActivity, id: activityId }) as Activity)
+  return mapActivityInList(activities, activityId, () => ({ ...newActivity, id: activityId }))
 }
 
 /**

@@ -26,7 +26,7 @@ describe('useIsCurrentVersion', () => {
       data: null,
       isLoading: false,
       error: null,
-    } as never)
+    })
   })
 
   it('returns isCurrentVersion true when no workflow data loaded', () => {
@@ -47,7 +47,7 @@ describe('useIsCurrentVersion', () => {
       data: null,
       isLoading: true,
       error: null,
-    } as never)
+    })
 
     const { result } = renderHook(() => useIsCurrentVersion('wf-1', 'v-1', true), { wrapper: Wrapper })
 
@@ -66,9 +66,7 @@ describe('useIsCurrentVersion', () => {
       error: null,
     }
 
-    vi.mocked(workflowClient.useQuery)
-      .mockReturnValueOnce(mockWorkflowQuery as never)
-      .mockReturnValueOnce(mockVersionsQuery as never)
+    vi.mocked(workflowClient.useQuery).mockReturnValueOnce(mockWorkflowQuery).mockReturnValueOnce(mockVersionsQuery)
 
     const { result } = renderHook(() => useIsCurrentVersion('wf-1', 'current-version-id', true), { wrapper: Wrapper })
 
@@ -94,9 +92,7 @@ describe('useIsCurrentVersion', () => {
       error: null,
     }
 
-    vi.mocked(workflowClient.useQuery)
-      .mockReturnValueOnce(mockWorkflowQuery as never)
-      .mockReturnValueOnce(mockVersionsQuery as never)
+    vi.mocked(workflowClient.useQuery).mockReturnValueOnce(mockWorkflowQuery).mockReturnValueOnce(mockVersionsQuery)
 
     const { result } = renderHook(() => useIsCurrentVersion('wf-1', 'old-version-id', true), { wrapper: Wrapper })
 
@@ -118,9 +114,7 @@ describe('useIsCurrentVersion', () => {
       error: null,
     }
 
-    vi.mocked(workflowClient.useQuery)
-      .mockReturnValueOnce(mockWorkflowQuery as never)
-      .mockReturnValueOnce(mockVersionsQuery as never)
+    vi.mocked(workflowClient.useQuery).mockReturnValueOnce(mockWorkflowQuery).mockReturnValueOnce(mockVersionsQuery)
 
     const { result } = renderHook(() => useIsCurrentVersion('wf-1', 'old-version-id', true), { wrapper: Wrapper })
 
@@ -140,9 +134,7 @@ describe('useIsCurrentVersion', () => {
       error: null,
     }
 
-    vi.mocked(workflowClient.useQuery)
-      .mockReturnValueOnce(mockWorkflowQuery as never)
-      .mockReturnValueOnce(mockVersionsQuery as never)
+    vi.mocked(workflowClient.useQuery).mockReturnValueOnce(mockWorkflowQuery).mockReturnValueOnce(mockVersionsQuery)
 
     const { result } = renderHook(() => useIsCurrentVersion('wf-1', 'old-version-id', true), { wrapper: Wrapper })
 
@@ -162,9 +154,7 @@ describe('useIsCurrentVersion', () => {
       error: null,
     }
 
-    vi.mocked(workflowClient.useQuery)
-      .mockReturnValueOnce(mockWorkflowQuery as never)
-      .mockReturnValueOnce(mockVersionsQuery as never)
+    vi.mocked(workflowClient.useQuery).mockReturnValueOnce(mockWorkflowQuery).mockReturnValueOnce(mockVersionsQuery)
 
     const { result } = renderHook(() => useIsCurrentVersion('wf-1', 'missing-version-id', true), { wrapper: Wrapper })
 

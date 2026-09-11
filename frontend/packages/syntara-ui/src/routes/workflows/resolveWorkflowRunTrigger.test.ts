@@ -85,7 +85,7 @@ describe('resolveWorkflowRunTrigger', () => {
   })
 
   it('fetches the published version when it differs from the current draft', async () => {
-    vi.mocked(workflowFetchClient.GET).mockImplementation(((path: string) => {
+    vi.mocked(workflowFetchClient.GET).mockImplementation((path: string) => {
       if (path === '/workflows/{workflow_id}/versions/{version}') {
         return Promise.resolve(
           mockGetResponse({
@@ -113,7 +113,7 @@ describe('resolveWorkflowRunTrigger', () => {
           },
         })
       )
-    }) as never)
+    })
 
     await expect(resolveWorkflowRunTrigger(mockWorkflow({ published_version_number: 1 }))).resolves.toEqual({
       triggerNodeId: 'published-trigger',
@@ -164,7 +164,7 @@ describe('resolveWorkflowRunTrigger', () => {
   })
 
   it('keeps draft triggers when published version fetch fails', async () => {
-    vi.mocked(workflowFetchClient.GET).mockImplementation(((path: string) => {
+    vi.mocked(workflowFetchClient.GET).mockImplementation((path: string) => {
       if (path === '/workflows/{workflow_id}/versions/{version}') {
         return Promise.resolve(mockGetResponse(undefined, { detail: 'not found' }))
       }
@@ -180,7 +180,7 @@ describe('resolveWorkflowRunTrigger', () => {
           },
         })
       )
-    }) as never)
+    })
 
     await expect(resolveWorkflowRunTrigger(mockWorkflow({ published_version_number: 1 }))).resolves.toEqual({
       triggerNodeId: 'draft-trigger',

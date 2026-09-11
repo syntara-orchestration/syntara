@@ -14,7 +14,7 @@ function resetStoreState() {
     workflowVersion: 1,
     _positionUndoVersion: 0,
     edges: [] as Array<Record<string, unknown>>,
-    nodePositions: {} as Record<string, { x: number; y: number }>,
+    nodePositions: {},
     triggers: [] as Array<Record<string, unknown>>,
     activities: [] as Array<Record<string, unknown>>,
   }

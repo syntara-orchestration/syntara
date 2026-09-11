@@ -6,10 +6,8 @@ import type { EdgeConnection } from './types/edge'
 import { convertV2Definition, parseNodePositions } from './utils/processExistingWorkflow'
 import { buildWorkflowDefinition } from './utils/workflowDefinitionBuilder'
 
-type V2Edge = { from: string; to: string; from_port?: string; to_port?: string }
-
 function makeActivity(overrides: Partial<Activity> & { id: string; type: string }): Activity {
-  return { name: overrides.id, parameters: {}, ...overrides } as Activity
+  return { name: overrides.id, parameters: {}, ...overrides }
 }
 
 function makeEdge(source: string, target: string, sourceHandle?: string, targetHandle?: string): EdgeConnection {
@@ -35,11 +33,7 @@ function roundTrip(
     flattenedActivities,
     edges: loadedEdges,
     triggers: loadedTriggers,
-  } = convertV2Definition(
-    v2Def.nodes as Activity[],
-    v2Def.edges as V2Edge[],
-    v2Def.triggers as Array<Record<string, unknown>>
-  )
+  } = convertV2Definition(v2Def.nodes, v2Def.edges, v2Def.triggers)
 
   const rebuilt = buildWorkflowDefinition(name, description, flattenedActivities, loadedTriggers, {
     edges: loadedEdges,

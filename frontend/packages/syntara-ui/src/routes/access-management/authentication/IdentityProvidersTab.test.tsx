@@ -89,14 +89,14 @@ function setupProviders(providers = [mockProvider]) {
     error: null,
     isPending: false,
     refetch: vi.fn(),
-  } as never)
+  })
   vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
     mutate: vi.fn(),
-  } as never)
+  })
   vi.mocked(adminClient.useMutation).mockReturnValue({
     mutate: vi.fn(),
     isPending: false,
-  } as never)
+  })
 }
 
 function setupEmptyProviders() {
@@ -110,7 +110,7 @@ describe('IdentityProvidersTab', () => {
     vi.mocked(adminClient.useMutation).mockReturnValue({
       mutate: vi.fn(),
       isPending: false,
-    } as never)
+    })
   })
 
   describe('loading state', () => {
@@ -122,10 +122,10 @@ describe('IdentityProvidersTab', () => {
         error: null,
         isPending: true,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
         mutate: vi.fn(),
-      } as never)
+      })
 
       render(<IdentityProvidersTab />, { wrapper })
 
@@ -142,10 +142,10 @@ describe('IdentityProvidersTab', () => {
         error: new Error('Network error'),
         isPending: false,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
         mutate: vi.fn(),
-      } as never)
+      })
 
       render(<IdentityProvidersTab />, { wrapper })
 
@@ -164,10 +164,10 @@ describe('IdentityProvidersTab', () => {
         error: retryableError,
         isPending: false,
         refetch: mockRefetch,
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
         mutate: vi.fn(),
-      } as never)
+      })
 
       render(<IdentityProvidersTab />, { wrapper })
 
@@ -335,10 +335,10 @@ describe('IdentityProvidersTab', () => {
         error: null,
         isPending: false,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
         mutate: vi.fn(),
-      } as never)
+      })
 
       render(<IdentityProvidersTab />, { wrapper })
 
@@ -415,7 +415,7 @@ describe('IdentityProvidersTab', () => {
         error: null,
         isPending: false,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockImplementation(((_method: string, path: string) => {
         if (path === '/identity_providers/{provider_id}' && _method === 'delete') {
           return { mutate: mockDeleteMutate }
@@ -461,7 +461,7 @@ describe('IdentityProvidersTab', () => {
         error: null,
         isPending: false,
         refetch: mockRefetch,
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockImplementation(((_method: string, path: string) => {
         if (path === '/identity_providers/{provider_id}' && _method === 'delete') {
           return { mutate: mockDeleteMutate }
@@ -557,14 +557,14 @@ describe('IdentityProvidersTab', () => {
         error: null,
         isPending: false,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
         mutate: vi.fn(),
-      } as never)
+      })
       vi.mocked(adminClient.useMutation).mockReturnValue({
         mutate: mockRevokeMutate,
         isPending: false,
-      } as never)
+      })
 
       render(<IdentityProvidersTab />, { wrapper })
 
@@ -592,10 +592,10 @@ describe('IdentityProvidersTab', () => {
         error: null,
         isPending: false,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
         mutate: vi.fn(),
-      } as never)
+      })
 
       render(<IdentityProvidersTab />, { wrapper })
 
@@ -617,7 +617,7 @@ describe('IdentityProvidersTab', () => {
         error: null,
         isPending: false,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockImplementation(((_method: string, path: string) => {
         if (_method === 'patch' && path === '/identity_providers/{provider_id}') {
           return { mutate: mockPatchMutate }
@@ -653,7 +653,7 @@ describe('IdentityProvidersTab', () => {
         error: null,
         isPending: false,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockImplementation(((_method: string, path: string) => {
         if (_method === 'patch' && path === '/identity_providers/{provider_id}') {
           return { mutate: mockPatchMutate }
@@ -688,7 +688,7 @@ describe('IdentityProvidersTab', () => {
         error: null,
         isPending: false,
         refetch: mockRefetch,
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockImplementation(((_method: string, path: string) => {
         if (_method === 'patch' && path === '/identity_providers/{provider_id}') {
           return { mutate: mockPatchMutate }
@@ -721,7 +721,7 @@ describe('IdentityProvidersTab', () => {
         error: null,
         isPending: false,
         refetch: mockRefetch,
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockImplementation(((_method: string, path: string) => {
         if (_method === 'patch' && path === '/identity_providers/{provider_id}') {
           return { mutate: mockPatchMutate }
@@ -753,7 +753,7 @@ describe('IdentityProvidersTab', () => {
         error: null,
         isPending: false,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockImplementation(((_method: string, path: string) => {
         if (_method === 'patch' && path === '/identity_providers/{provider_id}') {
           return { mutate: mockPatchMutate }
@@ -785,7 +785,7 @@ describe('IdentityProvidersTab', () => {
         error: null,
         isPending: false,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockImplementation(((_method: string, path: string) => {
         if (_method === 'patch' && path === '/identity_providers/{provider_id}') {
           return { mutate: mockPatchMutate }
@@ -814,7 +814,7 @@ describe('IdentityProvidersTab', () => {
         error: null,
         isPending: false,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockImplementation(((_method: string, path: string) => {
         if (_method === 'patch' && path === '/identity_providers/{provider_id}') {
           return { mutate: mockPatchMutate }
@@ -854,10 +854,10 @@ describe('IdentityProvidersTab', () => {
         error: null,
         isPending: false,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
         mutate: vi.fn(),
-      } as never)
+      })
 
       render(<IdentityProvidersTab />, { wrapper })
 
@@ -877,10 +877,10 @@ describe('IdentityProvidersTab', () => {
         error: null,
         isPending: false,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
         mutate: vi.fn(),
-      } as never)
+      })
 
       render(<IdentityProvidersTab />, { wrapper })
 

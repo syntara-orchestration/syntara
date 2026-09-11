@@ -135,7 +135,7 @@ describe('NodeDetailsPanel', () => {
         </button>
       ),
       onSubmit: mockOnSubmit,
-    } as never)
+    })
 
     render(<NodeDetailsPanel mode="add" nodeTypeId="action" nodeSubtypeId={null} onClose={mockOnClose} />)
 
@@ -174,7 +174,7 @@ describe('NodeDetailsPanel', () => {
         </button>
       ),
       onSubmit: mockOnSubmit,
-    } as never)
+    })
 
     render(
       <NodeDetailsPanel
@@ -229,7 +229,7 @@ describe('NodeDetailsPanel', () => {
         </button>
       ),
       onSubmit: mockOnSubmit,
-    } as never)
+    })
 
     render(
       <NodeDetailsPanel
@@ -266,7 +266,7 @@ describe('NodeDetailsPanel', () => {
         </button>
       ),
       onSubmit: mockOnSubmit,
-    } as never)
+    })
 
     render(<NodeDetailsPanel mode="add" nodeTypeId="action" nodeSubtypeId={null} onClose={mockOnClose} />)
 
@@ -297,7 +297,7 @@ describe('NodeDetailsPanel', () => {
         </button>
       ),
       onSubmit: mockOnSubmit,
-    } as never)
+    })
 
     render(<NodeDetailsPanel mode="add" nodeTypeId="action" nodeSubtypeId={null} onClose={mockOnClose} />)
 
@@ -325,7 +325,7 @@ describe('NodeDetailsPanel', () => {
         </button>
       ),
       onSubmit: mockOnSubmit,
-    } as never)
+    })
 
     render(
       <NodeDetailsPanel
@@ -355,7 +355,7 @@ describe('NodeDetailsPanel', () => {
       category: 'task',
       formComponent: () => <div>Form</div>,
       onSubmit: vi.fn(),
-    } as never)
+    })
 
     render(<NodeDetailsPanel mode="add" nodeTypeId="action" nodeSubtypeId={null} onClose={mockOnClose} />)
 
@@ -369,7 +369,7 @@ describe('NodeDetailsPanel', () => {
       id: 'task-1',
       type: 'task',
       position: { x: 0, y: 0 },
-      data: { id: 'task-1', type: 'task', name: 'Task', task: { executor: 'script', parameters: {} } } as never,
+      data: { id: 'task-1', type: 'task', name: 'Task', task: { executor: 'script', parameters: {} } },
     }
 
     render(<NodeDetailsPanel mode="edit" node={taskNode} onClose={mockOnClose} />)
@@ -383,7 +383,7 @@ describe('NodeDetailsPanel', () => {
       id: 'trigger-0',
       type: 'trigger',
       position: { x: 0, y: 0 },
-      data: { id: 'trigger-0', type: 'trigger', name: 'Trigger' } as never,
+      data: { id: 'trigger-0', type: 'trigger', name: 'Trigger' },
     }
 
     render(<NodeDetailsPanel mode="edit" node={triggerNode} onClose={mockOnClose} />)
@@ -404,7 +404,7 @@ describe('NodeDetailsPanel', () => {
       id: 'task-1',
       type: 'task',
       position: { x: 0, y: 0 },
-      data: { id: 'task-1', type: 'task', name: 'Task', task: { executor: 'script', parameters: {} } } as never,
+      data: { id: 'task-1', type: 'task', name: 'Task', task: { executor: 'script', parameters: {} } },
     }
 
     render(<NodeDetailsPanel mode="edit" node={taskNode} onClose={mockOnClose} />)
@@ -426,13 +426,13 @@ describe('NodeDetailsPanel', () => {
         id: 'condition-1',
         type: 'condition',
         position: { x: 0, y: 0 },
-        data: { id: 'condition-1', type: 'condition', name: 'Condition', condition: 'true' } as never,
+        data: { id: 'condition-1', type: 'condition', name: 'Condition', condition: 'true' },
       },
       loop: {
         id: 'loop-1',
         type: 'loop',
         position: { x: 0, y: 0 },
-        data: { id: 'loop-1', type: 'loop', name: 'Loop', loop: { type: 'forEach', items: 'x', do: [] } } as never,
+        data: { id: 'loop-1', type: 'loop', name: 'Loop', loop: { type: 'forEach', items: 'x', do: [] } },
       },
       converge: {
         id: 'converge-1',
@@ -443,7 +443,7 @@ describe('NodeDetailsPanel', () => {
           type: 'converge',
           name: 'Converge',
           converge: { branches: [], strategy: 'all' },
-        } as never,
+        },
       },
       approval: {
         id: 'approval-1',
@@ -454,7 +454,7 @@ describe('NodeDetailsPanel', () => {
           type: 'approval',
           name: 'Approval',
           task: { executor: 'approval', parameters: {} },
-        } as never,
+        },
       },
     }
 
@@ -483,7 +483,7 @@ describe('NodeDetailsPanel', () => {
       category: 'trigger',
       formComponent: () => <div>Form</div>,
       onSubmit: vi.fn(),
-    } as never)
+    })
 
     render(<NodeDetailsPanel mode="add" nodeTypeId="trigger" nodeSubtypeId={null} onClose={mockOnClose} />)
 
@@ -501,7 +501,7 @@ describe('NodeDetailsPanel', () => {
       workflow: {
         activities: [],
       },
-    } as never
+    }
 
     mockNodeRegistryGet.mockReturnValue({
       id: 'action',
@@ -523,7 +523,7 @@ describe('NodeDetailsPanel', () => {
         </button>
       ),
       onSubmit: mockOnSubmit,
-    } as never)
+    })
 
     render(
       <NodeDetailsPanel
@@ -557,7 +557,7 @@ describe('NodeDetailsPanel', () => {
       workflow: {
         activities: [],
       },
-    } as never
+    }
 
     mockNodeRegistryGet.mockReturnValue({
       id: 'action',
@@ -579,7 +579,7 @@ describe('NodeDetailsPanel', () => {
         </button>
       ),
       onSubmit: mockOnSubmit,
-    } as never)
+    })
 
     render(
       <NodeDetailsPanel
@@ -631,7 +631,7 @@ describe('NodeDetailsPanel', () => {
         </button>
       ),
       onSubmit: mockOnSubmit,
-    } as never)
+    })
 
     render(<NodeDetailsPanel mode="add" nodeTypeId="logic" nodeSubtypeId="condition" onClose={mockOnClose} />)
 
@@ -659,7 +659,7 @@ describe('NodeDetailsPanel', () => {
       ],
       formComponent: () => <div>AAP Form</div>,
       onSubmit: vi.fn(),
-    } as never)
+    })
 
     render(<NodeDetailsPanel mode="add" nodeTypeId="aap" nodeSubtypeId="job_template" onClose={mockOnClose} />)
 
@@ -684,7 +684,7 @@ describe('NodeDetailsPanel', () => {
       category: 'trigger',
       formComponent: () => <div data-testid="trigger-form">Trigger Form</div>,
       onSubmit: vi.fn(),
-    } as never)
+    })
 
     render(<NodeDetailsPanel mode="add" nodeTypeId="trigger" nodeSubtypeId={null} onClose={mockOnClose} />)
 
@@ -697,7 +697,7 @@ describe('NodeDetailsPanel', () => {
       id: 'trigger-0',
       type: 'trigger',
       position: { x: 0, y: 0 },
-      data: { id: 'trigger-0', type: 'trigger', name: 'Trigger' } as never,
+      data: { id: 'trigger-0', type: 'trigger', name: 'Trigger' },
     }
 
     render(<NodeDetailsPanel mode="edit" node={triggerNode} onClose={mockOnClose} />)
@@ -715,7 +715,7 @@ describe('NodeDetailsPanel', () => {
         <div data-testid="project-id">{projectId ?? 'none'}</div>
       ),
       onSubmit: vi.fn(),
-    } as never)
+    })
 
     render(
       <NodeDetailsPanel
@@ -735,7 +735,7 @@ describe('NodeDetailsPanel', () => {
       id: 'task-1',
       type: 'task',
       position: { x: 0, y: 0 },
-      data: { id: 'task-1', type: 'task', name: 'Task', task: { executor: 'script', parameters: {} } } as never,
+      data: { id: 'task-1', type: 'task', name: 'Task', task: { executor: 'script', parameters: {} } },
     }
 
     render(
@@ -757,7 +757,7 @@ describe('NodeDetailsPanel', () => {
       id,
       type: 'task',
       position: { x: 0, y: 0 },
-      data: { id, type: 'script', name: id, parameters: {} } as never,
+      data: { id, type: 'script', name: id, parameters: { language: 'python', code: '' } },
     })
 
     const { rerender } = render(

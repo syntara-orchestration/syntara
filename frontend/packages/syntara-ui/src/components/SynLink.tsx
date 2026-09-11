@@ -5,15 +5,11 @@ import type { ComponentProps, ReactNode } from 'react'
 type ButtonOnClick = ComponentProps<typeof Button>['onClick']
 
 type RouterLinkProps = React.AnchorHTMLAttributes<HTMLAnchorElement>
-type TanStackTo = ComponentProps<typeof TanStackLink>['to']
 
 /** Bridge PF Button's `href` convention to TanStack Router's `to` prop. */
 function RouterLink({ href, children, ...rest }: RouterLinkProps) {
   return (
-    <TanStackLink
-      to={(href ?? '/') as TanStackTo}
-      {...(rest as Omit<ComponentProps<typeof TanStackLink>, 'to' | 'children'>)}
-    >
+    <TanStackLink to={href ?? '/'} {...(rest as Omit<ComponentProps<typeof TanStackLink>, 'to' | 'children'>)}>
       {children}
     </TanStackLink>
   )

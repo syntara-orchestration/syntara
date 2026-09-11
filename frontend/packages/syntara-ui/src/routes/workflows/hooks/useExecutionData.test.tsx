@@ -86,7 +86,7 @@ describe('useExecutionData', () => {
       isSuccess: true,
       error: null,
       refetch: vi.fn(),
-    } as never)
+    })
 
     const { result } = renderHook(() => useExecutionData('exec-123'), { wrapper })
 
@@ -106,7 +106,7 @@ describe('useExecutionData', () => {
       isSuccess: false,
       error: null,
       refetch: vi.fn(),
-    } as never)
+    })
 
     renderHook(() => useExecutionData('exec-123'), { wrapper })
 
@@ -138,7 +138,7 @@ describe('useExecutionData', () => {
       isSuccess: true,
       error: null,
       refetch: vi.fn(),
-    } as never)
+    })
 
     renderHook(() => useExecutionData('exec-123'), { wrapper })
 
@@ -158,7 +158,7 @@ describe('useExecutionData', () => {
       isSuccess: true,
       error: null,
       refetch: vi.fn(),
-    } as never)
+    })
 
     renderHook(() => useExecutionData('exec-123', { autoLoad: false }), { wrapper })
 
@@ -176,7 +176,7 @@ describe('useExecutionData', () => {
       isSuccess: false,
       error: null,
       refetch: vi.fn(),
-    } as never)
+    })
 
     renderHook(() => useExecutionData('exec-123', { enabled: false }), { wrapper })
 
@@ -197,7 +197,7 @@ describe('useExecutionData', () => {
       isSuccess: false,
       error: null,
       refetch: vi.fn(),
-    } as never)
+    })
 
     const { result } = renderHook(() => useExecutionData('exec-123'), { wrapper })
 
@@ -214,7 +214,7 @@ describe('useExecutionData', () => {
       isSuccess: false,
       error: mockError,
       refetch: vi.fn(),
-    } as never)
+    })
 
     const { result } = renderHook(() => useExecutionData('exec-123'), { wrapper })
 
@@ -236,7 +236,7 @@ describe('useExecutionData', () => {
       isSuccess: false,
       error: null,
       refetch: mockRefetch,
-    } as never)
+    })
 
     const { result } = renderHook(() => useExecutionData('exec-123'), { wrapper })
 
@@ -257,7 +257,7 @@ describe('useExecutionData', () => {
       isSuccess: true,
       error: null,
       refetch: vi.fn(),
-    } as never)
+    })
 
     renderHook(() => useExecutionData('exec-123'), { wrapper })
 
@@ -285,7 +285,7 @@ describe('useExecutionData', () => {
       isSuccess: true,
       error: null,
       refetch: vi.fn(),
-    } as never)
+    })
 
     renderHook(() => useExecutionData('exec-123'), { wrapper })
 
@@ -320,7 +320,7 @@ describe('useExecutionData', () => {
           completed_at: null,
         },
       ],
-    } as Partial<Execution>)
+    })
 
     vi.mocked(executionsClient.useQuery).mockReturnValue({
       data: mockExecution,
@@ -328,7 +328,7 @@ describe('useExecutionData', () => {
       isSuccess: true,
       error: null,
       refetch: vi.fn(),
-    } as never)
+    })
 
     renderHook(() => useExecutionData('exec-123'), { wrapper })
 
@@ -358,7 +358,7 @@ describe('useShouldStreamExecution', () => {
       isSuccess: false,
       error: null,
       refetch: vi.fn(),
-    } as never)
+    })
 
     const { result } = renderHook(() => useShouldStreamExecution('exec-123'), { wrapper })
 
@@ -366,7 +366,7 @@ describe('useShouldStreamExecution', () => {
   })
 
   it('returns true for running execution', () => {
-    const mockExecution = createMockExecution({ status: 'running' } as Partial<Execution>)
+    const mockExecution = createMockExecution({ status: 'running' })
 
     vi.mocked(executionsClient.useQuery).mockReturnValue({
       data: mockExecution,
@@ -374,7 +374,7 @@ describe('useShouldStreamExecution', () => {
       isSuccess: true,
       error: null,
       refetch: vi.fn(),
-    } as never)
+    })
 
     const { result } = renderHook(() => useShouldStreamExecution('exec-123'), { wrapper })
 
@@ -382,7 +382,7 @@ describe('useShouldStreamExecution', () => {
   })
 
   it('returns true for pending execution', () => {
-    const mockExecution = createMockExecution({ status: 'pending' } as Partial<Execution>)
+    const mockExecution = createMockExecution({ status: 'pending' })
 
     vi.mocked(executionsClient.useQuery).mockReturnValue({
       data: mockExecution,
@@ -390,7 +390,7 @@ describe('useShouldStreamExecution', () => {
       isSuccess: true,
       error: null,
       refetch: vi.fn(),
-    } as never)
+    })
 
     const { result } = renderHook(() => useShouldStreamExecution('exec-123'), { wrapper })
 
@@ -398,7 +398,7 @@ describe('useShouldStreamExecution', () => {
   })
 
   it('returns true for paused execution', () => {
-    const mockExecution = createMockExecution({ status: 'paused' } as Partial<Execution>)
+    const mockExecution = createMockExecution({ status: 'paused' })
 
     vi.mocked(executionsClient.useQuery).mockReturnValue({
       data: mockExecution,
@@ -406,7 +406,7 @@ describe('useShouldStreamExecution', () => {
       isSuccess: true,
       error: null,
       refetch: vi.fn(),
-    } as never)
+    })
 
     const { result } = renderHook(() => useShouldStreamExecution('exec-123'), { wrapper })
 
@@ -414,7 +414,7 @@ describe('useShouldStreamExecution', () => {
   })
 
   it('returns false for completed execution', () => {
-    const mockExecution = createMockExecution({ status: 'completed' } as Partial<Execution>)
+    const mockExecution = createMockExecution({ status: 'completed' })
 
     vi.mocked(executionsClient.useQuery).mockReturnValue({
       data: mockExecution,
@@ -422,7 +422,7 @@ describe('useShouldStreamExecution', () => {
       isSuccess: true,
       error: null,
       refetch: vi.fn(),
-    } as never)
+    })
 
     const { result } = renderHook(() => useShouldStreamExecution('exec-123'), { wrapper })
 
@@ -430,7 +430,7 @@ describe('useShouldStreamExecution', () => {
   })
 
   it('returns false for failed execution', () => {
-    const mockExecution = createMockExecution({ status: 'failed' } as Partial<Execution>)
+    const mockExecution = createMockExecution({ status: 'failed' })
 
     vi.mocked(executionsClient.useQuery).mockReturnValue({
       data: mockExecution,
@@ -438,7 +438,7 @@ describe('useShouldStreamExecution', () => {
       isSuccess: true,
       error: null,
       refetch: vi.fn(),
-    } as never)
+    })
 
     const { result } = renderHook(() => useShouldStreamExecution('exec-123'), { wrapper })
 
@@ -446,7 +446,7 @@ describe('useShouldStreamExecution', () => {
   })
 
   it('returns false for cancelled execution', () => {
-    const mockExecution = createMockExecution({ status: 'cancelled' } as Partial<Execution>)
+    const mockExecution = createMockExecution({ status: 'cancelled' })
 
     vi.mocked(executionsClient.useQuery).mockReturnValue({
       data: mockExecution,
@@ -454,7 +454,7 @@ describe('useShouldStreamExecution', () => {
       isSuccess: true,
       error: null,
       refetch: vi.fn(),
-    } as never)
+    })
 
     const { result } = renderHook(() => useShouldStreamExecution('exec-123'), { wrapper })
 

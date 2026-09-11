@@ -112,13 +112,13 @@ describe('ExecutionDetailsPanel', () => {
       vi.mocked(executionsClient.useQuery).mockReturnValue({
         ...EXECUTION,
         data: { ...EXECUTION.data, status: 'completed', completed_at: '2024-01-01T00:05:00Z' },
-      } as never)
+      })
 
       const { container } = renderPanel(WORKFLOW_DEF)
 
       expect(container.textContent).toContain(' - ')
 
-      vi.mocked(executionsClient.useQuery).mockReturnValue(EXECUTION as never)
+      vi.mocked(executionsClient.useQuery).mockReturnValue(EXECUTION)
     })
 
     it('shows elapsed time that ticks while running', () => {

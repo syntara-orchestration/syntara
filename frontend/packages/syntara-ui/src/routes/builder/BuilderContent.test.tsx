@@ -301,7 +301,7 @@ describe('BuilderContent', () => {
     vi.mocked(executionsClient.useMutation).mockReturnValue(createMockMutation())
 
     vi.mocked(workflowFetchClient.GET).mockResolvedValue({
-      data: { current_version: 1, version: { version: 1 } } as WorkflowWithVersion,
+      data: { current_version: 1, version: { version: 1 } },
       error: undefined,
       response: new Response(),
     })
@@ -1522,7 +1522,7 @@ describe('BuilderContent', () => {
         act(() => {
           useWorkflowStore.getState().markDirty()
         })
-        const event = new Event('beforeunload', { cancelable: true }) as BeforeUnloadEvent
+        const event = new Event('beforeunload', { cancelable: true })
         act(() => {
           handler(event)
         })
@@ -1586,7 +1586,7 @@ describe('BuilderContent', () => {
       }
 
       await renderBuilder({
-        workflow: workflowNoDescription as WorkflowWithVersion,
+        workflow: workflowNoDescription,
         isNew: false,
         workflowId: 'workflow-1',
       })
@@ -3149,7 +3149,7 @@ describe('BuilderContent', () => {
         ...mockWorkflow.version,
         version: 3,
       },
-    } as unknown as WorkflowWithVersion
+    }
 
     function setupConflictOnSave() {
       const mockUpdateMutate = vi.fn((_params: unknown, callbacks?: MutationCallbacks) => {
@@ -3518,7 +3518,7 @@ describe('BuilderContent', () => {
       const workflowWithProject = {
         ...mockWorkflow,
         project_id: 'project-1',
-      } as unknown as WorkflowWithVersion
+      }
 
       await renderBuilder({ workflow: workflowWithProject, isNew: false, workflowId: 'workflow-1' })
 
@@ -3554,7 +3554,7 @@ describe('BuilderContent', () => {
       const workflowWithProject = {
         ...mockWorkflow,
         project_id: 'project-1',
-      } as unknown as WorkflowWithVersion
+      }
 
       await renderBuilder({ workflow: workflowWithProject, isNew: false, workflowId: 'workflow-1' })
 
@@ -3581,7 +3581,7 @@ describe('BuilderContent', () => {
       const workflowWithProject = {
         ...mockWorkflow,
         project_id: 'project-1',
-      } as unknown as WorkflowWithVersion
+      }
 
       await renderBuilder({ workflow: workflowWithProject, isNew: false, workflowId: 'workflow-1' })
 

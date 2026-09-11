@@ -49,7 +49,7 @@ function syncToolSelectionsFromResponse(responseData: SaveResponseData | undefin
       } else {
         delete newParams.tool_selections
       }
-      store.updateActivity(activity.id, { parameters: newParams } as Partial<typeof activity>)
+      store.updateActivity(activity.id, { parameters: newParams })
       updated = true
     }
   }
@@ -92,13 +92,13 @@ function buildSavePayloads(opts: {
   const createPayload: CreateWorkflowBodyExtended = {
     name: nameToSave,
     description: workflowDescription,
-    workflow_definition: workflowDef as unknown as CreateWorkflowBody['workflow_definition'],
+    workflow_definition: workflowDef,
     project_id: selectedProjectId,
   }
   const patchPayload: PatchWorkflowBody = {
     name: nameToSave,
     description: workflowDescription,
-    workflow_definition: workflowDef as unknown as PatchWorkflowBody['workflow_definition'],
+    workflow_definition: workflowDef,
     ...(expectedVersion != null ? { expected_version: expectedVersion } : {}),
   }
   return { createPayload, patchPayload }

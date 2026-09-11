@@ -39,7 +39,7 @@ describe('useFetchApprovalForNode', () => {
       isPending: false,
       error: null,
       isError: false,
-    } as never)
+    })
   })
 
   it('starts with isLoading false', () => {

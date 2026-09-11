@@ -180,12 +180,12 @@ describe('BuilderContent - Duplicate Workflow', () => {
       error: null,
       isPending: false,
       refetch: vi.fn(),
-    } as never)
+    })
 
     vi.mocked(executionsClient.useMutation).mockReturnValue({
       mutate: mockExecuteMutate,
       isPending: false,
-    } as never)
+    })
 
     vi.mocked(approvalsClient.useQuery).mockReturnValue({
       data: undefined,
@@ -193,7 +193,7 @@ describe('BuilderContent - Duplicate Workflow', () => {
       error: null,
       isPending: false,
       refetch: vi.fn(),
-    } as never)
+    })
 
     vi.mocked(workflowClient.useMutation).mockImplementation((method: string, path: string) => {
       if (method === 'post' && path === '/workflows') {

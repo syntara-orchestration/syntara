@@ -65,7 +65,7 @@ function cleanMetadata(metadata: ActivityMetadata | undefined): ActivityMetadata
   if (!metadata) return undefined
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { __isGeneric: _isGeneric, ...rest } = metadata
-  return Object.keys(rest).length > 0 ? (rest as ActivityMetadata) : undefined
+  return Object.keys(rest).length > 0 ? rest : undefined
 }
 
 /** Get formId for add mode based on node type and subtype */
@@ -164,8 +164,8 @@ function resolveMenuNodeType(flowNodeType: string | undefined): MenuNodeTypeUnio
 }
 
 function getNodeDisabledState(node: Node<NodeType['data']> | undefined): boolean {
-  const nodeData = node?.data as Record<string, unknown> | undefined
-  const nodeSettings = nodeData?.settings as { disabled?: boolean } | undefined
+  if (!node?.data) return false
+  const nodeSettings = Reflect.get(node.data, 'settings') as { disabled?: boolean } | undefined
   return nodeSettings?.disabled ?? false
 }
 

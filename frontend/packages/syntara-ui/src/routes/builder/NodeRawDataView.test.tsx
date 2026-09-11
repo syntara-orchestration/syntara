@@ -16,7 +16,7 @@ describe('NodeRawDataView Component', () => {
         type: 'converge',
         id: 'test-node-1',
         name: 'Test Converge Node',
-      } as unknown as NodeType['data'],
+      },
     }
 
     render(<NodeRawDataView node={node} />)
@@ -30,7 +30,7 @@ describe('NodeRawDataView Component', () => {
       id: 'my-custom-id',
       type: 'parallel',
       position: { x: 0, y: 0 },
-      data: {} as unknown as NodeType['data'],
+      data: {},
     }
 
     render(<NodeRawDataView node={node} />)
@@ -49,7 +49,7 @@ describe('NodeRawDataView Component', () => {
         id: 'data-test',
         name: 'Test Data',
         customField: 'custom value',
-      } as unknown as NodeType['data'],
+      },
     }
 
     render(<NodeRawDataView node={node} />)
@@ -69,7 +69,7 @@ describe('NodeRawDataView Component', () => {
       id: 'test',
       type: 'trigger',
       position: { x: 0, y: 0 },
-      data: {} as unknown as NodeType['data'],
+      data: {},
     }
 
     render(<NodeRawDataView node={node} />)
@@ -83,7 +83,7 @@ describe('NodeRawDataView Component', () => {
       id: 'monospace-test',
       type: 'task',
       position: { x: 0, y: 0 },
-      data: {} as unknown as NodeType['data'],
+      data: {},
     }
 
     render(<NodeRawDataView node={node} />)
@@ -99,7 +99,7 @@ describe('NodeRawDataView Component', () => {
       id: 'empty-data',
       type: 'converge',
       position: { x: 0, y: 0 },
-      data: {} as unknown as NodeType['data'],
+      data: {},
     }
 
     render(<NodeRawDataView node={node} />)
@@ -134,7 +134,7 @@ describe('NodeRawDataView Component', () => {
           },
         ],
         else: [],
-      } as unknown as NodeType['data'],
+      },
     }
 
     render(<NodeRawDataView node={node} />)
@@ -150,7 +150,7 @@ describe('NodeRawDataView Component', () => {
       id: 'style-test',
       type: 'task',
       position: { x: 0, y: 0 },
-      data: {} as unknown as NodeType['data'],
+      data: {},
     }
 
     render(<NodeRawDataView node={node} />)
