@@ -27,7 +27,7 @@ jobs:
 
     steps:
       - name: React to acknowledge the command
-        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553 # v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             await github.rest.reactions.createForIssueComment({
@@ -39,7 +39,7 @@ jobs:
 
       - name: Get PR details
         id: pr
-        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553 # v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             const pr = await github.rest.pulls.get({
@@ -71,7 +71,7 @@ jobs:
 
     steps:
       - name: Post build result comment
-        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553 # v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           BUILD_RESULT: ${{ needs.build.result }}
           PR_NUMBER: ${{ needs.prepare.outputs.pr_number }}
