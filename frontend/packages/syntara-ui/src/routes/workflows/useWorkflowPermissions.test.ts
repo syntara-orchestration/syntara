@@ -79,6 +79,58 @@ describe('useWorkflowPermissions', () => {
     })
   })
 
+  it('createOnly without resourceProject only checks create via check_any_project', async () => {
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+
+    const { result } = renderHook(() => useWorkflowPermissions({ createOnly: true }), { wrapper: createWrapper() })
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
+
+    expect(result.current.canCreate).toBe(true)
+    expect(result.current.canUpdate).toBe(false)
+    expect(result.current.canDelete).toBe(false)
+    expect(result.current.canRun).toBe(false)
+    expect(accessFetchClient.POST).toHaveBeenCalledTimes(1)
+    expect(accessFetchClient.POST).toHaveBeenCalledWith(CAN_I_ENDPOINT, {
+      body: { action: 'create', resource_type: 'workflow', check_any_project: true },
+    })
+  })
+
+  it('createOnly with resourceProject only checks create scoped to that project', async () => {
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+
+    const { result } = renderHook(() => useWorkflowPermissions({ resourceProject: 'proj-1', createOnly: true }), {
+      wrapper: createWrapper(),
+    })
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
+
+    expect(result.current.canCreate).toBe(true)
+    expect(result.current.canUpdate).toBe(false)
+    expect(accessFetchClient.POST).toHaveBeenCalledTimes(1)
+    expect(accessFetchClient.POST).toHaveBeenCalledWith(CAN_I_ENDPOINT, {
+      body: { action: 'create', resource_type: 'workflow', resource_project: 'proj-1' },
+    })
+  })
+
+  it('enabled false skips all can_i calls', () => {
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+
+    const { result } = renderHook(() => useWorkflowPermissions({ resourceProject: 'proj-1', enabled: false }), {
+      wrapper: createWrapper(),
+    })
+
+    expect(result.current.canCreate).toBe(false)
+    expect(result.current.canUpdate).toBe(false)
+    expect(result.current.canDelete).toBe(false)
+    expect(result.current.canRun).toBe(false)
+    expect(accessFetchClient.POST).not.toHaveBeenCalled()
+  })
+
   it('scopes create/update/delete/run to resourceProject when provided', async () => {
     mockCanI({ create: true, update: true, delete: true, run: true })
 

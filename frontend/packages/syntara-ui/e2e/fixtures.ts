@@ -169,11 +169,14 @@ export const test = xfailBase.extend<
     await context.close()
   },
 
-  // Mock-only — no roleSetup support; real-backend tests skip via isRealBackend guard in spec files
-  projectAdminApp: async ({ browser }, use) => {
+  // Mock: intercept as project-admin. Real backend: this test creates a user
+  // and logs in on the page after setup (worker roleSetup has no project-admin).
+  projectAdminApp: async ({ browser, roleSetup }, use) => {
     const context = await browser.newContext()
     const page = await context.newPage()
-    await loginAsRole(page, 'project-admin')
+    if (!roleSetup) {
+      await loginAsRole(page, 'project-admin')
+    }
     await use(page)
     await context.close()
   },
