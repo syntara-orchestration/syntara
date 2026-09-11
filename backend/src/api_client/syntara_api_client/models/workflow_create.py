@@ -33,7 +33,8 @@ class WorkflowCreate:
             description (None | str | Unset): Workflow description
             labels (WorkflowCreateLabels | Unset): Workflow labels
             is_import (bool | Unset): When true, unavailable LLM models are cleared with warnings instead of rejecting the
-                request. Use when importing workflows from other instances. Default: False.
+                request, and webhook or EDA authorized service accounts missing in the target project are removed from the
+                definition and not bound. Use when importing workflows from other instances. Default: False.
     """
 
     name: str

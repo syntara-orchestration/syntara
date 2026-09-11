@@ -1194,3 +1194,65 @@ class TestBestBranchMessages:
                 assert path == list(error.absolute_path)
                 return
         pytest.fail("Expected a no-context error for additional property")
+
+
+class TestWebhookServiceAccountSchemaFindings:
+    """Verify rejects webhook/EDA triggers with an empty authorized_service_account_ids list."""
+
+    def test_webhook_empty_service_accounts_is_invalid(self, validator: WorkflowValidator) -> None:
+        definition: dict[str, Any] = {
+            "schema_version": "2.0.0",
+            "name": "webhook-empty-sa",
+            "triggers": [
+                {
+                    "id": "snow_trigger",
+                    "type": "webhook_trigger",
+                    "parameters": {
+                        "webhook_path": "snow-incident-scn5",
+                        "authorized_service_account_ids": [],
+                    },
+                }
+            ],
+            "nodes": [
+                {
+                    "id": "log_payload",
+                    "type": "script",
+                    "parameters": {"language": "python", "code": "print(1)"},
+                }
+            ],
+            "edges": [{"from": "snow_trigger", "to": "log_payload"}],
+        }
+        result = validator.collect_findings(definition)
+        assert result.is_valid is False
+        sa_errors = [f for f in result.findings if f.field_path == "parameters.authorized_service_account_ids"]
+        assert len(sa_errors) == 1
+        assert sa_errors[0].node_id == "snow_trigger"
+
+    def test_eda_empty_service_accounts_is_invalid(self, validator: WorkflowValidator) -> None:
+        definition: dict[str, Any] = {
+            "schema_version": "2.0.0",
+            "name": "eda-empty-sa",
+            "triggers": [
+                {
+                    "id": "eda_trigger_1",
+                    "type": "eda_trigger",
+                    "parameters": {
+                        "webhook_path": "eda-events",
+                        "authorized_service_account_ids": [],
+                    },
+                }
+            ],
+            "nodes": [
+                {
+                    "id": "log_payload",
+                    "type": "script",
+                    "parameters": {"language": "python", "code": "print(1)"},
+                }
+            ],
+            "edges": [{"from": "eda_trigger_1", "to": "log_payload"}],
+        }
+        result = validator.collect_findings(definition)
+        assert result.is_valid is False
+        sa_errors = [f for f in result.findings if f.field_path == "parameters.authorized_service_account_ids"]
+        assert len(sa_errors) == 1
+        assert sa_errors[0].node_id == "eda_trigger_1"

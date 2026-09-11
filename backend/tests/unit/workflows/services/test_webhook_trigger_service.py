@@ -309,6 +309,34 @@ class TestSyncWebhookTriggers:
         mock_session.add.assert_called_once()
 
     @pytest.mark.asyncio
+    async def test_creates_trigger_with_empty_service_accounts(self) -> None:
+        """Draft/import definitions may have an empty authorized_service_account_ids list."""
+        mock_session = AsyncMock(spec=AsyncSession)
+        mock_result = Mock()
+        mock_result.all.return_value = []
+        mock_session.exec = AsyncMock(return_value=mock_result)
+        mock_session.flush = AsyncMock()
+
+        service = _make_service(session=mock_session)
+
+        workflow_id = uuid4()
+        definition = _make_workflow_definition(
+            triggers=[
+                {
+                    "id": "trigger-1",
+                    "type": "webhook_trigger",
+                    "parameters": {"webhook_path": "import-hook", "authorized_service_account_ids": []},
+                }
+            ]
+        )
+
+        results = await service.sync_webhook_triggers(workflow_id, definition)
+
+        assert len(results) == 1
+        assert results[0].webhook_path == "import-hook"
+        mock_session.add.assert_called_once()
+
+    @pytest.mark.asyncio
     async def test_updates_existing_trigger(self) -> None:
         """Test that an existing trigger is updated when the node still exists."""
         existing = _make_trigger(
@@ -918,7 +946,7 @@ class TestSyncWebhookTriggers:
         ids=["missing", "empty"],
     )
     async def test_enabled_missing_or_empty_sa_ids_syncs_without_error(self, parameters: dict[str, object]) -> None:
-        """Re-syncing a legacy definition with no SA ids on enable must not raise (AAP-92369)."""
+        """Re-syncing a legacy definition with no SA ids on enable must not raise."""
         mock_session = AsyncMock(spec=AsyncSession)
         mock_result = Mock()
         mock_result.all.return_value = []

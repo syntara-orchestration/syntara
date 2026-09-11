@@ -574,8 +574,9 @@ class WorkflowService(BaseService):
             labels: Optional key-value labels
             workflow_definition: V2 workflow definition as dict (triggers + nodes + edges)
             project_id: Project to assign workflow to
-            is_import: When True, missing LLM models are cleared with warnings
-                instead of raising errors (allows import of workflows from other instances)
+            is_import: When True, missing LLM models and webhook/EDA service
+                accounts are cleared with warnings instead of raising errors
+                (allows import of workflows from other instances)
 
         Returns:
             Tuple of (created workflow, initial version, validation result)

@@ -15,11 +15,13 @@ from syntara.integrations.models.integration import (
     IntegrationType,
 )
 from syntara.integrations.models.llm_model import LLMModel
+from syntara.service_accounts.models.service_account import ServiceAccount
 from syntara.tool_manager.models.tool import Tool
 from syntara.workflows.models.validation_finding import ValidationCategory, ValidationFinding, ValidationSeverity
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 
 _AAP_NODE_TYPES: frozenset[str] = frozenset({NodeType.AAP_JOB_TEMPLATE, NodeType.AAP_WORKFLOW_JOB_TEMPLATE})
+_WEBHOOK_STYLE_TRIGGER_TYPES: frozenset[str] = frozenset({NodeType.WEBHOOK_TRIGGER, NodeType.EDA_TRIGGER})
 
 
 def _is_valid_uuid(value: str | None) -> bool:
@@ -288,6 +290,71 @@ async def _clean_unavailable_tool_selections(
     return findings
 
 
+def _extract_webhook_authorized_service_account_ids(workflow_definition: dict[str, Any]) -> set[UUID]:
+    """Return service account UUIDs referenced on webhook-style trigger nodes."""
+    sa_ids: set[UUID] = set()
+    for trigger in workflow_definition.get("triggers", []):
+        if trigger.get("type") not in _WEBHOOK_STYLE_TRIGGER_TYPES:
+            continue
+        params = trigger.get("parameters") or {}
+        for raw in params.get("authorized_service_account_ids") or []:
+            if _is_valid_uuid(str(raw)):
+                sa_ids.add(UUID(str(raw)))
+    return sa_ids
+
+
+async def _sanitize_webhook_service_accounts(
+    session: AsyncSession,
+    workflow_definition: dict[str, Any],
+    project_id: UUID,
+) -> list[ValidationFinding]:
+    """Remove webhook SA IDs missing from the target project during import.
+
+    Mutates ``authorized_service_account_ids`` in place so stored definitions
+    do not keep phantom UUIDs that would satisfy schema ``minItems: 1`` on
+    Verify. Remaining IDs (if any) stay; an empty list is left when none are
+    valid in the project.
+    """
+    sa_ids = _extract_webhook_authorized_service_account_ids(workflow_definition)
+    if not sa_ids:
+        return []
+
+    result = await session.execute(
+        select(ServiceAccount.id).where(
+            col(ServiceAccount.id).in_(sa_ids),
+            ServiceAccount.project_id == project_id,
+        )
+    )
+    found_str = {str(uid) for uid in result.scalars().all()}
+
+    findings: list[ValidationFinding] = []
+    for trigger in workflow_definition.get("triggers", []):
+        if trigger.get("type") not in _WEBHOOK_STYLE_TRIGGER_TYPES:
+            continue
+        params = trigger.get("parameters")
+        if not isinstance(params, dict):
+            continue
+        raw_ids = params.get("authorized_service_account_ids") or []
+        kept = [raw for raw in raw_ids if str(raw) in found_str]
+        removed_count = len(raw_ids) - len(kept)
+        if not removed_count:
+            continue
+        params["authorized_service_account_ids"] = kept
+        findings.append(
+            ValidationFinding(
+                severity=ValidationSeverity.warning,
+                category=ValidationCategory.invalid_reference,
+                message=(
+                    f"{removed_count} authorized service account(s) are not available in this project "
+                    "and were removed during import"
+                ),
+                node_id=trigger.get("id"),
+            )
+        )
+
+    return findings
+
+
 async def _extract_tool_parent_integration_ids(
     session: AsyncSession,
     workflow_definition: dict[str, Any],
@@ -317,6 +384,8 @@ async def validate_workflow_references(
     - Normal save/publish (is_import=False): missing/disabled models raise hard errors.
     - Import (is_import=True): missing/disabled models are auto-cleared with warnings,
       allowing the workflow to be imported in a draft state.
+    - Import (is_import=True): missing webhook/EDA authorized service accounts are
+      removed from the definition with warnings (bindings are skipped).
 
     Returns warning findings for any resources that were auto-cleared.
     """
@@ -329,4 +398,7 @@ async def validate_workflow_references(
     )
     await _validate_integration_types(session, workflow_definition)
     tool_findings = await _clean_unavailable_tool_selections(session, workflow_definition)
-    return model_findings + tool_findings
+    sa_findings: list[ValidationFinding] = []
+    if is_import:
+        sa_findings = await _sanitize_webhook_service_accounts(session, workflow_definition, project_id)
+    return model_findings + tool_findings + sa_findings

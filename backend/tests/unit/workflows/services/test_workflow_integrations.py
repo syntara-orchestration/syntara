@@ -1,12 +1,17 @@
 """Unit tests for workflow reference validation (extraction + type collection)."""
 
+from typing import Any
+from unittest.mock import AsyncMock, Mock
 from uuid import UUID, uuid4
+
+import pytest
 
 from syntara.workflows.validators.workflow_integrations import (
     _collect_expected_integration_types,
     _extract_integration_ids,
     _extract_llm_model_ids,
     _extract_tool_ids,
+    _sanitize_webhook_service_accounts,
 )
 
 
@@ -330,3 +335,74 @@ class TestExtractToolIds:
         }
         result = _extract_tool_ids(definition)
         assert result == {t1, t2}
+
+
+def _webhook_definition(
+    sa_ids: list[str],
+    *,
+    trigger_type: str = "webhook_trigger",
+    trigger_id: str = "snow_trigger",
+) -> dict[str, Any]:
+    return {
+        "triggers": [
+            {
+                "id": trigger_id,
+                "type": trigger_type,
+                "parameters": {"webhook_path": "hook", "authorized_service_account_ids": sa_ids},
+            }
+        ],
+        "nodes": [],
+        "edges": [],
+    }
+
+
+def _session_returning_sa_ids(found: list[UUID]) -> AsyncMock:
+    session = AsyncMock()
+    result = Mock()
+    result.scalars.return_value.all.return_value = found
+    session.execute = AsyncMock(return_value=result)
+    return session
+
+
+class TestSanitizeWebhookServiceAccounts:
+    """Import sanitizer strips SA IDs that are not in the target project."""
+
+    @pytest.mark.asyncio
+    async def test_strips_all_foreign_ids(self) -> None:
+        foreign = str(uuid4())
+        definition = _webhook_definition([foreign])
+        session = _session_returning_sa_ids([])
+        findings = await _sanitize_webhook_service_accounts(session, definition, uuid4())
+        assert len(findings) == 1
+        assert "service account(s)" in findings[0].message
+        assert findings[0].node_id == "snow_trigger"
+        assert definition["triggers"][0]["parameters"]["authorized_service_account_ids"] == []
+
+    @pytest.mark.asyncio
+    async def test_keeps_project_sa_and_drops_foreign(self) -> None:
+        project_sa = uuid4()
+        foreign = str(uuid4())
+        definition = _webhook_definition([foreign, str(project_sa)])
+        session = _session_returning_sa_ids([project_sa])
+        findings = await _sanitize_webhook_service_accounts(session, definition, uuid4())
+        assert len(findings) == 1
+        assert definition["triggers"][0]["parameters"]["authorized_service_account_ids"] == [str(project_sa)]
+
+    @pytest.mark.asyncio
+    async def test_no_op_when_all_in_project(self) -> None:
+        project_sa = uuid4()
+        definition = _webhook_definition([str(project_sa)])
+        session = _session_returning_sa_ids([project_sa])
+        findings = await _sanitize_webhook_service_accounts(session, definition, uuid4())
+        assert findings == []
+        assert definition["triggers"][0]["parameters"]["authorized_service_account_ids"] == [str(project_sa)]
+
+    @pytest.mark.asyncio
+    async def test_eda_trigger_strips_foreign_ids(self) -> None:
+        foreign = str(uuid4())
+        definition = _webhook_definition([foreign], trigger_type="eda_trigger", trigger_id="eda_1")
+        session = _session_returning_sa_ids([])
+        findings = await _sanitize_webhook_service_accounts(session, definition, uuid4())
+        assert len(findings) == 1
+        assert findings[0].node_id == "eda_1"
+        assert definition["triggers"][0]["parameters"]["authorized_service_account_ids"] == []
