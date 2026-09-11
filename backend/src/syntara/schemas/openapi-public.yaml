@@ -14,7 +14,7 @@
 openapi: 3.1.0
 info:
   title: Orchestrator API
-  version: 1.1.0
+  version: 1.2.0
   description: A distributed multi-agent workflow orchestration system
 servers:
   - url: /api/v1
@@ -34268,7 +34268,8 @@ components:
           title: Description
           description: Workflow description
         labels:
-          additionalProperties: true
+          additionalProperties:
+            type: string
           type: object
           title: Labels
           description: Workflow labels
@@ -34354,7 +34355,8 @@ components:
           title: Description
           description: Workflow description
         labels:
-          additionalProperties: true
+          additionalProperties:
+            type: string
           type: object
           title: Labels
           description: Workflow labels
@@ -34440,7 +34442,8 @@ components:
           title: Description
           description: Workflow description
         labels:
-          additionalProperties: true
+          additionalProperties:
+            type: string
           type: object
           title: Labels
           description: Workflow labels
@@ -34699,7 +34702,8 @@ components:
           title: Description
           description: Workflow description
         labels:
-          additionalProperties: true
+          additionalProperties:
+            type: string
           type: object
           title: Labels
           description: Workflow labels
@@ -34748,7 +34752,8 @@ components:
           description: Update workflow description
         labels:
           anyOf:
-            - additionalProperties: true
+            - additionalProperties:
+                type: string
               type: object
             - type: 'null'
           title: Labels

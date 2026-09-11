@@ -5,7 +5,7 @@ SQLModel Pattern 1 (separate models with table=False for API operations).
 """
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, ClassVar, Literal
+from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Literal
 from uuid import UUID
 
 from pydantic import ConfigDict
@@ -14,6 +14,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, Index, Relationship, SQLModel
 
 from syntara.core.constants import FieldLimits
+from syntara.core.jsonb_limits import WorkflowDefinitionSizeValidator
 from syntara.core.models.base import UserOwnedResource
 from syntara.core.models.pagination import ResourcesResponse
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
@@ -177,7 +178,7 @@ class PublishVersionRequest(SQLModel):
 
     name: str | None = Field(None, max_length=255, description="Optional name for this version")
     change_description: str | None = Field(None, max_length=1024, description="Description of changes in this version")
-    workflow_definition: WorkflowDefinition | dict[str, Any] | None = Field(
+    workflow_definition: Annotated[WorkflowDefinition | dict[str, Any] | None, WorkflowDefinitionSizeValidator] = Field(
         None, description="Optional workflow definition to publish directly (skips separate save step)"
     )
     expected_version: int | None = Field(

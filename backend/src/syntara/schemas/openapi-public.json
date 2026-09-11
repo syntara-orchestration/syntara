@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Orchestrator API",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "description": "A distributed multi-agent workflow orchestration system"
   },
   "servers": [
@@ -50218,7 +50218,9 @@
             "description": "Workflow description"
           },
           "labels": {
-            "additionalProperties": true,
+            "additionalProperties": {
+              "type": "string"
+            },
             "type": "object",
             "title": "Labels",
             "description": "Workflow labels"
@@ -50339,7 +50341,9 @@
             "description": "Workflow description"
           },
           "labels": {
-            "additionalProperties": true,
+            "additionalProperties": {
+              "type": "string"
+            },
             "type": "object",
             "title": "Labels",
             "description": "Workflow labels"
@@ -50464,7 +50468,9 @@
             "description": "Workflow description"
           },
           "labels": {
-            "additionalProperties": true,
+            "additionalProperties": {
+              "type": "string"
+            },
             "type": "object",
             "title": "Labels",
             "description": "Workflow labels"
@@ -50871,7 +50877,9 @@
             "description": "Workflow description"
           },
           "labels": {
-            "additionalProperties": true,
+            "additionalProperties": {
+              "type": "string"
+            },
             "type": "object",
             "title": "Labels",
             "description": "Workflow labels"
@@ -50938,7 +50946,9 @@
           "labels": {
             "anyOf": [
               {
-                "additionalProperties": true,
+                "additionalProperties": {
+                  "type": "string"
+                },
                 "type": "object"
               },
               {
