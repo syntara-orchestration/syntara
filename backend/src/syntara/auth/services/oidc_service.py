@@ -499,20 +499,19 @@ class OIDCService:
             (and optionally groups)
 
         """
-        if claim_mapping is None:
-            claim_mapping = OIDCClaimMapping()
+        mapping = claim_mapping if claim_mapping is not None else OIDCClaimMapping()
 
         result: dict[str, str | None] = {
-            "sub": id_token_claims.get(claim_mapping.subject),
-            "email": id_token_claims.get(claim_mapping.email),
-            "given_name": id_token_claims.get(claim_mapping.first_name),
-            "family_name": id_token_claims.get(claim_mapping.last_name),
+            "sub": id_token_claims.get(mapping.subject),
+            "email": id_token_claims.get(mapping.email),
+            "given_name": id_token_claims.get(mapping.first_name),
+            "family_name": id_token_claims.get(mapping.last_name),
             # Hardcoded: "name" is a standard OIDC claim used only as a fallback
             # when given_name/family_name aren't available.  Custom mappings
             # (e.g. Azure AD "displayName") are handled via claim_mapping.first_name,
             # which takes priority in _auto_create_user.
             "name": id_token_claims.get("name"),
-            "preferred_username": id_token_claims.get(claim_mapping.username),
+            "preferred_username": id_token_claims.get(mapping.username),
         }
 
         identity_claims = {"sub", "email"}
