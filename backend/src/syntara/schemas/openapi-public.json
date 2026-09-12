@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Orchestrator API",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "description": "A distributed multi-agent workflow orchestration system"
   },
   "servers": [
@@ -50898,7 +50898,7 @@
           "is_import": {
             "type": "boolean",
             "title": "Is Import",
-            "description": "When true, unavailable LLM models are cleared with warnings instead of rejecting the request. Use when importing workflows from other instances.",
+            "description": "When true, unavailable LLM models are cleared with warnings instead of rejecting the request, and webhook/EDA authorized service accounts that are missing in the target project are removed from the definition and not bound. Use when importing workflows from other instances.",
             "default": false
           }
         }

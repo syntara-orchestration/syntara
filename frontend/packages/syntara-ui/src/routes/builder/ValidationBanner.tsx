@@ -17,12 +17,19 @@ import {
   humanizeValidationMessage,
   mergeHumanizedMessages,
   parseValidationMessage,
+  type ParsedValidationMessage,
 } from './utils/validation/parseValidationMessage'
 
 type ErrorGroup = {
   displayKey: string
   nodeId: string | null
   messages: string[]
+}
+
+function resolveGroupDisplayKey(error: ValidationError, parsed: ParsedValidationMessage): string {
+  if (error.nodeName) return error.nodeName
+  if (error.nodeId && parsed.displayKey === 'Workflow') return error.nodeId
+  return parsed.displayKey
 }
 
 function groupErrors(errors: ValidationError[]): ErrorGroup[] {
@@ -36,7 +43,7 @@ function groupErrors(errors: ValidationError[]): ErrorGroup[] {
       existing.messages.push(...humanized)
     } else {
       groups.set(groupKey, {
-        displayKey: error.nodeName ?? parsed.displayKey,
+        displayKey: resolveGroupDisplayKey(error, parsed),
         nodeId: error.nodeId,
         messages: [...humanized],
       })

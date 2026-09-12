@@ -4,6 +4,8 @@ export function buildTriggerNodeId(index: number): string {
   return `trigger-${index}`
 }
 
+export const EMPTY_TRIGGERS: Array<{ id: string }> = []
+
 export function parseTriggerIndex(nodeId: string): number | undefined {
   if (!nodeId.startsWith('trigger-')) return undefined
   const parts = nodeId.split('-')

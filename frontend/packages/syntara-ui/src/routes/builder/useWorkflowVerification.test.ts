@@ -347,6 +347,159 @@ describe('useWorkflowVerification', () => {
     })
   })
 
+  it('includes nodeName in dispatched errors when webhook trigger matches store', async () => {
+    mockGetState.mockReturnValue({
+      ...workflowState,
+      currentWorkflow: {
+        ...workflowState.currentWorkflow,
+        triggers: [{ type: 'webhook_trigger', id: 'snow_trigger', name: 'Webhook Trigger' }],
+      },
+    })
+    mockBuildDefinition.mockReturnValue({ nodes: [], edges: [], triggers: [] })
+    mockPost.mockResolvedValue({
+      data: {
+        is_valid: false,
+        findings: [{ message: "'' should be non-empty", node_id: 'snow_trigger' }],
+      },
+      error: undefined,
+      response: { ok: true },
+    })
+
+    const { result } = renderVerificationHook()
+
+    act(() => result.current.handleVerify())
+
+    await waitFor(() => {
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'SET_VALIDATION_ERRORS',
+        payload: [
+          {
+            message: "'' should be non-empty",
+            nodeId: 'snow_trigger',
+            nodeName: 'Webhook Trigger',
+            severity: 'error',
+            fieldPath: null,
+          },
+        ],
+      })
+    })
+  })
+
+  it('does not fall back to activity id on verify findings when the activity has no name', async () => {
+    mockGetState.mockReturnValue({
+      ...workflowState,
+      currentWorkflow: {
+        ...workflowState.currentWorkflow,
+        workflow: {
+          activities: [{ type: 'script', id: 'script_no_name', parameters: { language: 'python', code: 'print(1)' } }],
+        },
+      },
+    })
+    mockBuildDefinition.mockReturnValue({ nodes: [], edges: [], triggers: [] })
+    mockPost.mockResolvedValue({
+      data: {
+        is_valid: false,
+        findings: [{ message: 'Invalid configuration', node_id: 'script_no_name' }],
+      },
+      error: undefined,
+      response: { ok: true },
+    })
+
+    const { result } = renderVerificationHook()
+
+    act(() => result.current.handleVerify())
+
+    await waitFor(() => {
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'SET_VALIDATION_ERRORS',
+        payload: [
+          {
+            message: 'Invalid configuration',
+            nodeId: 'script_no_name',
+            nodeName: undefined,
+            severity: 'error',
+            fieldPath: null,
+          },
+        ],
+      })
+    })
+  })
+
+  it('falls back to trigger id when the webhook trigger has no name', async () => {
+    mockGetState.mockReturnValue({
+      ...workflowState,
+      currentWorkflow: {
+        ...workflowState.currentWorkflow,
+        triggers: [{ type: 'eda_trigger', id: 'eda_trigger_1' }],
+      },
+    })
+    mockBuildDefinition.mockReturnValue({ nodes: [], edges: [], triggers: [] })
+    mockPost.mockResolvedValue({
+      data: {
+        is_valid: false,
+        findings: [{ message: "'authorized_service_account_ids' is a required property", node_id: 'eda_trigger_1' }],
+      },
+      error: undefined,
+      response: { ok: true },
+    })
+
+    const { result } = renderVerificationHook()
+
+    act(() => result.current.handleVerify())
+
+    await waitFor(() => {
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'SET_VALIDATION_ERRORS',
+        payload: [
+          {
+            message: "'authorized_service_account_ids' is a required property",
+            nodeId: 'eda_trigger_1',
+            nodeName: 'eda_trigger_1',
+            severity: 'error',
+            fieldPath: null,
+          },
+        ],
+      })
+    })
+  })
+
+  it('includes trigger nodeName on frontend validation errors', async () => {
+    mockGetState.mockReturnValue({
+      ...workflowState,
+      currentWorkflow: {
+        ...workflowState.currentWorkflow,
+        triggers: [{ type: 'webhook_trigger', id: 'snow_trigger', name: 'Webhook Trigger' }],
+      },
+    })
+    mockBuildDefinition.mockReturnValue({ nodes: [], edges: [], triggers: [] })
+    mockValidateWorkflow.mockReturnValue({
+      errors: [{ message: 'Webhook path required', nodeId: 'snow_trigger', severity: 'error' }],
+    })
+    mockPost.mockResolvedValue({
+      data: { is_valid: true, findings: [] },
+      error: undefined,
+      response: { ok: true },
+    })
+
+    const { result } = renderVerificationHook()
+
+    act(() => result.current.handleVerify())
+
+    await waitFor(() => {
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'SET_VALIDATION_ERRORS',
+        payload: [
+          {
+            message: 'Webhook path required',
+            nodeId: 'snow_trigger',
+            nodeName: 'Webhook Trigger',
+            severity: 'error',
+          },
+        ],
+      })
+    })
+  })
+
   describe('onValid callback', () => {
     it('calls onValid callback when workflow is valid', async () => {
       mockGetState.mockReturnValue(workflowState)
@@ -767,6 +920,28 @@ describe('extractValidationErrorsFromUnknown', () => {
         message: 'Step "Orphan Script" is unreachable from any trigger',
         nodeId: 'script3',
         nodeName: 'Orphan Script',
+      }),
+    ])
+  })
+
+  it('resolves webhook trigger names from the store', () => {
+    mockGetState.mockReturnValue({
+      currentWorkflow: {
+        workflow: { activities: [] },
+        triggers: [{ id: 'snow_trigger', name: 'Webhook Trigger', type: 'webhook_trigger' }],
+      },
+    })
+    const result = extractValidationErrorsFromUnknown({
+      detail: 'The workflow definition failed validation',
+      validation_result: {
+        findings: [{ message: "'' should be non-empty", node_id: 'snow_trigger' }],
+      },
+    })
+    expect(result).toEqual([
+      expect.objectContaining({
+        message: "'' should be non-empty",
+        nodeId: 'snow_trigger',
+        nodeName: 'Webhook Trigger',
       }),
     ])
   })
