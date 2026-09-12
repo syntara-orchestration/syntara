@@ -26,12 +26,17 @@ import {
   type SeededPolicy,
   type SeededUser,
 } from './seeds/iam'
+import { createSeedBucket } from './seeds/seed-bucket'
 import { ensureProject, getAuthToken } from './utils/api'
 
 const ACCESS_URL = '/system-administration/access-management'
 
-const seededUsers: SeededUser[] = []
-const seededPolicies: SeededPolicy[] = []
+// Buckets, not bare arrays: `fullyParallel: true` lets a worker run this file's
+// `beforeAll`/`afterAll` around more than one group of its tests, and the module
+// holding them is imported only once, so a list that is only ever pushed to hands
+// later tests a resource an earlier `afterAll` already deleted.
+const seededUsers = createSeedBucket<SeededUser>('access-management users')
+const seededPolicies = createSeedBucket<SeededPolicy>('access-management policies')
 
 test.beforeAll(async ({ browser }) => {
   const page = await browser.newPage()
@@ -41,12 +46,12 @@ test.beforeAll(async ({ browser }) => {
     const prefix = buildUniqueName('e2e-am')
 
     for (let i = 1; i <= 2; i++) {
-      seededUsers.push(await createUserViaApi(page, { username: `${prefix}-user-${i}`, token }))
+      seededUsers.add(await createUserViaApi(page, { username: `${prefix}-user-${i}`, token }))
     }
 
     const project = await ensureProject(page)
     if (!project) throw new Error('access-management beforeAll: could not ensure project')
-    seededPolicies.push(await createPolicyViaApi(page, project.id, { name: `${prefix}-policy`, token }))
+    seededPolicies.add(await createPolicyViaApi(page, project.id, { name: `${prefix}-policy`, token }))
   } finally {
     await page.close()
   }
@@ -54,10 +59,12 @@ test.beforeAll(async ({ browser }) => {
 
 test.afterAll(async ({ browser }) => {
   const page = await browser.newPage()
-  for (const policy of seededPolicies) {
+  // Drain, so a later round in this worker starts from an empty bucket and no
+  // resource is deleted twice.
+  for (const policy of seededPolicies.drain()) {
     await deletePolicyViaApi(page, policy.projectId, policy.id)
   }
-  for (const user of seededUsers) {
+  for (const user of seededUsers.drain()) {
     await deleteUserViaApi(page, user.id)
   }
   await page.close()
@@ -298,11 +305,12 @@ test.describe('Access Management — Shareable URLs', () => {
 
 test.describe('Access Management — User Detail Tabs', () => {
   test('detail sub-tabs sync to URL', async ({ app }) => {
-    expect(seededUsers.length, 'Failed to seed users via API').toBeGreaterThan(0)
+    expect(seededUsers.size(), 'Failed to seed users via API').toBeGreaterThan(0)
 
     // Users tab filter placeholder is "Filter by username", not "Filter by name". Go by seeded ID.
-    await app.goto(toAppUrl(`${ACCESS_URL}/users/${seededUsers[0].id}`))
-    await expect(app).toHaveURL(new RegExp(`${ACCESS_URL}/users/${seededUsers[0].id}`))
+    const seededUser = seededUsers.latest()
+    await app.goto(toAppUrl(`${ACCESS_URL}/users/${seededUser.id}`))
+    await expect(app).toHaveURL(new RegExp(`${ACCESS_URL}/users/${seededUser.id}`))
 
     // Click Groups sub-tab if available
     const groupsTab = app.getByRole('tab', { name: /Groups/i })
@@ -363,8 +371,8 @@ test.describe('Access Management — Policies Tab Columns', () => {
   })
 
   test('project-scoped policies show a clickable project link', async ({ app }) => {
-    expect(seededPolicies.length, 'Failed to create a project-scoped policy via API').toBeGreaterThan(0)
-    const policy = seededPolicies[0]
+    expect(seededPolicies.size(), 'Failed to create a project-scoped policy via API').toBeGreaterThan(0)
+    const policy = seededPolicies.latest()
 
     const table = app.getByRole('grid', { name: 'Policies' })
     await app.getByPlaceholder('Filter by name').fill(policy.name)
