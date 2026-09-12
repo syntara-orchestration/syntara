@@ -3,7 +3,10 @@
 import pytest
 from pydantic import ValidationError
 
-from syntara.telemetry.events.base import BaseTelemetryEvent, _build_context
+from syntara.telemetry.events.base import (
+    BaseTelemetryEvent,
+    _get_container_image_version,
+)
 from syntara.telemetry.events.node_execution import (
     NodeExecutionEvent,
     NodeExecutionEventBuilder,
@@ -69,40 +72,37 @@ class TestBaseTelemetryEventName:
         assert HTMLParserEvent._get_event_name() == "html_parser"
 
 
-class TestBaseTelemetryEventContext:
-    """Tests for the context dict attached to all telemetry events."""
+class TestBaseTelemetryEventContainerImageVersion:
+    """Tests for container_image_version attached to all telemetry events."""
 
     @pytest.fixture(autouse=True)
-    def _clear_context_cache(self) -> None:
-        """Clear the _build_context lru_cache so each test gets fresh values."""
-        _build_context.cache_clear()
+    def _clear_version_cache(self) -> None:
+        """Clear the _get_container_image_version lru_cache for fresh values."""
+        _get_container_image_version.cache_clear()
 
-    def test_to_segment_event_includes_context(self, override_settings) -> None:
-        """to_segment_event() must include a context dict with version info."""
+    def test_container_image_version_in_properties(self, override_settings) -> None:
+        """container_image_version must live in properties so it reaches Amplitude."""
 
         class StubEvent(BaseTelemetryEvent):
             pass
 
         with override_settings(container_image_version="v1.2.3-deadbeef"):
             event = StubEvent(entitlement_id="ent-1")
-            segment_event = event.to_segment_event()
+            props = event.to_segment_event()["properties"]
 
-        ctx = segment_event["context"]
-        assert ctx == {
-            "container_image_version": "v1.2.3-deadbeef",
-        }
+        assert props["container_image_version"] == "v1.2.3-deadbeef"  # type: ignore[index]
 
-    def test_context_not_in_properties(self, override_settings) -> None:
-        """Version info must live in context, not in properties."""
+    def test_no_context_dict_emitted(self, override_settings) -> None:
+        """The Segment context dict is no longer used for version info."""
 
         class StubEvent(BaseTelemetryEvent):
             pass
 
         with override_settings(container_image_version="img-tag"):
             event = StubEvent(entitlement_id="ent-2")
-            props = event.to_segment_event()["properties"]
+            segment_event = event.to_segment_event()
 
-        assert "container_image_version" not in props  # type: ignore[operator]
+        assert "context" not in segment_event
 
 
 # =============================================================================
