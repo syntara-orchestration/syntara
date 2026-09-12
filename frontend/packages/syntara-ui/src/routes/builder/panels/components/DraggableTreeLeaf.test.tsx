@@ -29,6 +29,14 @@ describe('DraggableTreeLeaf', () => {
     expect(onDragStart).toHaveBeenCalledTimes(1)
   })
 
+  it('can disable dragging', () => {
+    render(<DraggableTreeLeaf label="S hostname" draggable={false} />)
+
+    const leaf = screen.getByText('S hostname')
+    // eslint-disable-next-line testing-library/no-node-access -- closest() is the only way to assert the draggable attribute lives on an ancestor element
+    expect(leaf.closest('[draggable="false"]')).toBeInTheDocument()
+  })
+
   it('has no accessibility violations', async () => {
     const { container } = render(
       <DraggableTreeLeaf label="S hostname" secondaryText="server-01" onDragStart={vi.fn()} />
