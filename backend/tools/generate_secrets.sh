@@ -43,6 +43,19 @@ check_dependencies() {
     fi
 }
 
+# Generate a bootstrap admin password that satisfies validate_password_complexity:
+# at least 14 characters and 3 of 4 character classes (upper, lower, digit, other).
+# openssl rand -base64 can miss a class (~0.1% of the time), which flakes CI when
+# orchestrator-admin reset-password validates the secret.
+generate_admin_password() {
+    local upper lower digit punct
+    upper=$(openssl rand -base64 48 | tr -dc 'A-Z' | head -c 4)
+    lower=$(openssl rand -base64 48 | tr -dc 'a-z' | head -c 4)
+    digit=$(openssl rand -base64 48 | tr -dc '0-9' | head -c 4)
+    punct=$(openssl rand -base64 48 | tr -dc '!@#$%^&*+-=' | head -c 4)
+    echo -n "${upper}${lower}${digit}${punct}"
+}
+
 # Generate an ES256 (ECDSA P-256) key pair
 generate_key_pair() {
     local key_name="$1"
@@ -125,8 +138,8 @@ main() {
             echo -n "$APP_ADMIN_PASSWORD" > "$SECRETS_DIR/admin-password"
             info "  Using password from APP_ADMIN_PASSWORD env var"
         else
-            openssl rand -base64 24 > "$SECRETS_DIR/admin-password"
-            info "  Generated random password"
+            generate_admin_password > "$SECRETS_DIR/admin-password"
+            info "  Generated random password (complexity-compliant)"
         fi
         chmod 600 "$SECRETS_DIR/admin-password"
         info "  Password file: $SECRETS_DIR/admin-password"

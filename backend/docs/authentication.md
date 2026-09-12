@@ -600,7 +600,7 @@ make secrets-generate-force   # writes the value to .secrets/admin-password
 make run-all                  # app startup seeds the admin user with this password
 ```
 
-If `APP_ADMIN_PASSWORD` is not set, `generate_secrets.sh` creates a random 24-byte base64 password saved to `.secrets/admin-password`:
+If `APP_ADMIN_PASSWORD` is not set, `generate_secrets.sh` creates a random 16-character password (upper, lower, digit, and punctuation) saved to `.secrets/admin-password`:
 
 ```bash
 cat .secrets/admin-password
