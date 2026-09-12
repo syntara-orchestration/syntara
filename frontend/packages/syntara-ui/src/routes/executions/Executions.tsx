@@ -32,9 +32,9 @@ import {
 import { FlatExecutionsTableBody, GroupedExecutionsTableBody } from './ExecutionsTableBody'
 import { executionDefaultSort, executionTableColumns } from './executionTableColumns'
 
-function buildFilterFieldDefinitions(executions: Execution[]): FilterFieldDefinition[] {
+function buildFilterFieldDefinitions(executions: Execution[], projectId: string | null): FilterFieldDefinition[] {
   return [
-    getExecutionWorkflowFilterDefinition(),
+    getExecutionWorkflowFilterDefinition(projectId),
     getExecutionStatusFilterDefinition(),
     getExecutionVersionFilterFromExecutions(executions),
     getExecutionCreatedAtFilterDefinition(),
@@ -88,7 +88,10 @@ export default function Executions() {
 
   useCursorReset(executions.length, hasActiveFilters, cursor, executionsQuery.isFetching, resetPagination)
 
-  const filterFieldDefinitions = useMemo(() => buildFilterFieldDefinitions(executions), [executions])
+  const filterFieldDefinitions = useMemo(
+    () => buildFilterFieldDefinitions(executions, selectedProjectId),
+    [executions, selectedProjectId]
+  )
 
   const builtinProjectIds = useMemo(
     () => new Set(projectsForGrouping.filter((p) => p.is_builtin).map((p) => p.id)),

@@ -18,6 +18,7 @@
  */
 
 import { type Page, test, expect, toAppUrl, appBaseUrl } from './fixtures'
+import { openRowKebab } from './helpers/patternfly'
 import { buildUniqueName } from './helpers/workflows'
 import {
   apiRequest,
@@ -29,9 +30,13 @@ import {
   deleteCredentialViaApi,
   deleteGroupViaApi,
   deleteIdentityProviderViaApi,
+  deleteProjectViaApi,
   deleteServiceAccountViaApi,
   deleteUserViaApi,
+  deleteWorkflowViaApi,
   ensureProject,
+  findProjectIdByName,
+  findWorkflowIdByName,
   getAuthToken,
 } from './utils/api'
 
@@ -288,6 +293,20 @@ test.describe('Permission gating — Route guards', () => {
 
 // ── Action gating — Workflows ────────────────────────────────────────────
 
+/**
+ * Narrow the workflows list to one workflow before asserting on its row.
+ *
+ * The table is a single page of 20 sorted `-updated_at` with no filter applied,
+ * so under `fullyParallel` a row seeded by this spec is pushed off page 1 within
+ * seconds by other specs saving their own workflows — every builder save bumps
+ * `updated_at`. Without this the assertion that follows is a race against the
+ * rest of the suite.
+ */
+async function filterWorkflowsByName(page: Page, workflowName: string): Promise<void> {
+  await page.getByPlaceholder('Filter by name').fill(workflowName)
+  await page.getByRole('button', { name: 'Apply filter' }).click()
+}
+
 test.describe('Permission gating — Workflow actions', () => {
   test('viewer: Create workflow button is disabled with tooltip', async ({ app, viewerApp }) => {
     const { id: workflowId } = await createTestWorkflow(app)
@@ -359,12 +378,18 @@ test.describe('Permission gating — Workflow actions', () => {
       await viewerApp.goto(toAppUrl('/workflows'))
       await expect(viewerApp.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
 
+      await filterWorkflowsByName(viewerApp, workflow.name)
+
+      await filterWorkflowsByName(viewerApp, workflow.name)
+
       const workflowRow = viewerApp
         .getByRole('grid', { name: 'Workflows table' })
         .getByRole('row', { name: new RegExp(workflow.name) })
       await expect(workflowRow).toBeVisible({ timeout: 15_000 })
-      const kebab = workflowRow.getByRole('button', { name: /Actions|Kebab toggle/i })
-      await kebab.click({ force: true })
+      // A forced click skips every actionability wait, so it lands even while the
+      // list query is replacing the row — the handler never runs, the menu stays
+      // shut, and each assertion below fails on a missing `menuitem`.
+      await openRowKebab(workflowRow, /Edit workflow/i)
 
       await expect(viewerApp.getByRole('menuitem', { name: /Edit workflow/i })).toHaveAttribute('aria-disabled', 'true')
       await expect(viewerApp.getByRole('menuitem', { name: /Run published version/i })).toHaveAttribute(
@@ -405,12 +430,16 @@ test.describe('Permission gating — Workflow actions', () => {
       await auditorApp.goto(toAppUrl('/workflows'))
       await expect(auditorApp.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
 
+      await filterWorkflowsByName(auditorApp, workflow.name)
+
       const workflowRow = auditorApp
         .getByRole('grid', { name: 'Workflows table' })
         .getByRole('row', { name: new RegExp(workflow.name) })
       await expect(workflowRow).toBeVisible({ timeout: 15_000 })
-      const kebab = workflowRow.getByRole('button', { name: /Actions|Kebab toggle/i })
-      await kebab.click({ force: true })
+      // A forced click skips every actionability wait, so it lands even while the
+      // list query is replacing the row — the handler never runs, the menu stays
+      // shut, and each assertion below fails on a missing `menuitem`.
+      await openRowKebab(workflowRow, /Edit workflow/i)
 
       await expect(auditorApp.getByRole('menuitem', { name: /Edit workflow/i })).toHaveAttribute(
         'aria-disabled',
@@ -492,13 +521,21 @@ test.describe('Permission gating — Project actions', () => {
         },
       })
       if (!createWorkflowResp.ok()) throw new Error('Workflow creation failed')
-      const workflow = (await createWorkflowResp.json()) as { id: string }
 
       // Navigate to All projects view as viewer
       await viewerApp.goto(toAppUrl('/workflows'))
       const projectSelector = viewerApp.getByRole('textbox', { name: 'Project' })
       await projectSelector.click()
       await viewerApp.getByRole('option', { name: 'All projects' }).click()
+
+      // The project row is a group header synthesised from whatever workflows the
+      // page happened to fetch (`useWorkflowGrouping`) — there is no projects query
+      // behind it. That fetch is one page of 20 sorted by `-updated_at`, so under
+      // `fullyParallel` the workflow seeded above is pushed off page 1 by other
+      // specs' newer workflows within seconds and the group header never renders.
+      // Filtering to this workflow puts its group back on the page deterministically.
+      await filterWorkflowsByName(viewerApp, workflowName)
+      await expect(viewerApp.getByRole('row').filter({ hasText: workflowName })).toBeVisible({ timeout: 15_000 })
 
       // Find project row — viewer sees project ID instead of name in group headers
       const projectRow = viewerApp.getByRole('row').filter({ hasText: new RegExp(`${projectName}|${project.id}`) })
@@ -507,29 +544,18 @@ test.describe('Permission gating — Project actions', () => {
       // Viewer has no project write permissions — kebab is completely hidden
       const projectKebab = projectRow.getByRole('button', { name: /Actions for.*project/i })
       await expect(projectKebab).not.toBeVisible()
-
-      // Clean up
-      await apiRequest(app, 'delete', `/workflows/${workflow.id}`)
-      await apiRequest(app, 'delete', `/projects/${project.id}`)
-    } catch (error) {
-      // Best-effort cleanup on failure
-      try {
-        const listResp = await apiRequest(app, 'get', '/workflows')
-        if (listResp.ok()) {
-          const list = (await listResp.json()) as { resources: Array<{ id: string; name: string }> }
-          const wf = list.resources.find((w) => w.name === workflowName)
-          if (wf) await apiRequest(app, 'delete', `/workflows/${wf.id}`)
-        }
-        const projListResp = await apiRequest(app, 'get', '/projects')
-        if (projListResp.ok()) {
-          const projList = (await projListResp.json()) as { resources: Array<{ id: string; name: string }> }
-          const proj = projList.resources.find((p) => p.name === projectName)
-          if (proj) await apiRequest(app, 'delete', `/projects/${proj.id}`)
-        }
-      } catch {
-        // Ignore cleanup errors
-      }
-      throw error
+    } finally {
+      // `finally`, not `catch` + rethrow: the happy path deleted inline and the
+      // catch path duplicated it, so a failure between the two leaked both
+      // resources — and the fallback listed `/workflows` and `/projects`
+      // unfiltered, which under `fullyParallel` frequently does not even contain
+      // them. Every leaked workflow then crowds page 1 for later runs, which is
+      // what made this flake self-reinforcing. Both lookups are filtered now and
+      // both paths run here.
+      const leakedWorkflowId = await findWorkflowIdByName(app, workflowName)
+      if (leakedWorkflowId) await deleteWorkflowViaApi(app, leakedWorkflowId)
+      const leakedProjectId = await findProjectIdByName(app, projectName)
+      if (leakedProjectId) await deleteProjectViaApi(app, leakedProjectId)
     }
   })
 
@@ -561,13 +587,21 @@ test.describe('Permission gating — Project actions', () => {
         },
       })
       if (!createWorkflowResp.ok()) throw new Error('Workflow creation failed')
-      const workflow = (await createWorkflowResp.json()) as { id: string }
 
       // Navigate to All projects view as auditor
       await auditorApp.goto(toAppUrl('/workflows'))
       const projectSelector = auditorApp.getByRole('textbox', { name: 'Project' })
       await projectSelector.click()
       await auditorApp.getByRole('option', { name: 'All projects' }).click()
+
+      // The project row is a group header synthesised from whatever workflows the
+      // page happened to fetch (`useWorkflowGrouping`) — there is no projects query
+      // behind it. That fetch is one page of 20 sorted by `-updated_at`, so under
+      // `fullyParallel` the workflow seeded above is pushed off page 1 by other
+      // specs' newer workflows within seconds and the group header never renders.
+      // Filtering to this workflow puts its group back on the page deterministically.
+      await filterWorkflowsByName(auditorApp, workflowName)
+      await expect(auditorApp.getByRole('row').filter({ hasText: workflowName })).toBeVisible({ timeout: 15_000 })
 
       // Find project row — auditor sees project ID instead of name in group headers
       const projectRow = auditorApp.getByRole('row').filter({ hasText: new RegExp(`${projectName}|${project.id}`) })
@@ -576,29 +610,18 @@ test.describe('Permission gating — Project actions', () => {
       // Auditor has no project write permissions — kebab is completely hidden
       const projectKebab = projectRow.getByRole('button', { name: /Actions for.*project/i })
       await expect(projectKebab).not.toBeVisible()
-
-      // Clean up
-      await apiRequest(app, 'delete', `/workflows/${workflow.id}`)
-      await apiRequest(app, 'delete', `/projects/${project.id}`)
-    } catch (error) {
-      // Best-effort cleanup on failure
-      try {
-        const listResp = await apiRequest(app, 'get', '/workflows')
-        if (listResp.ok()) {
-          const list = (await listResp.json()) as { resources: Array<{ id: string; name: string }> }
-          const wf = list.resources.find((w) => w.name === workflowName)
-          if (wf) await apiRequest(app, 'delete', `/workflows/${wf.id}`)
-        }
-        const projListResp = await apiRequest(app, 'get', '/projects')
-        if (projListResp.ok()) {
-          const projList = (await projListResp.json()) as { resources: Array<{ id: string; name: string }> }
-          const proj = projList.resources.find((p) => p.name === projectName)
-          if (proj) await apiRequest(app, 'delete', `/projects/${proj.id}`)
-        }
-      } catch {
-        // Ignore cleanup errors
-      }
-      throw error
+    } finally {
+      // `finally`, not `catch` + rethrow: the happy path deleted inline and the
+      // catch path duplicated it, so a failure between the two leaked both
+      // resources — and the fallback listed `/workflows` and `/projects`
+      // unfiltered, which under `fullyParallel` frequently does not even contain
+      // them. Every leaked workflow then crowds page 1 for later runs, which is
+      // what made this flake self-reinforcing. Both lookups are filtered now and
+      // both paths run here.
+      const leakedWorkflowId = await findWorkflowIdByName(app, workflowName)
+      if (leakedWorkflowId) await deleteWorkflowViaApi(app, leakedWorkflowId)
+      const leakedProjectId = await findProjectIdByName(app, projectName)
+      if (leakedProjectId) await deleteProjectViaApi(app, leakedProjectId)
     }
   })
 
@@ -718,8 +741,10 @@ test.describe('Permission gating — Credential actions', () => {
         .getByRole('grid', { name: 'Credentials table' })
         .getByRole('row', { name: new RegExp(credential.name) })
       await expect(credRow).toBeVisible({ timeout: 15_000 })
-      const kebab = credRow.getByRole('button', { name: /Actions|Kebab toggle/i })
-      await kebab.click({ force: true })
+      // A forced click skips every actionability wait, so it lands even while the
+      // list query is replacing the row — the handler never runs, the menu stays
+      // shut, and each assertion below fails on a missing `menuitem`.
+      await openRowKebab(credRow, /Edit credential/i)
 
       await expect(viewerApp.getByRole('menuitem', { name: /Edit credential/i })).toHaveAttribute(
         'aria-disabled',
@@ -747,8 +772,10 @@ test.describe('Permission gating — Credential actions', () => {
         .getByRole('grid', { name: 'Credentials table' })
         .getByRole('row', { name: new RegExp(credential.name) })
       await expect(credRow).toBeVisible({ timeout: 15_000 })
-      const kebab = credRow.getByRole('button', { name: /Actions|Kebab toggle/i })
-      await kebab.click({ force: true })
+      // A forced click skips every actionability wait, so it lands even while the
+      // list query is replacing the row — the handler never runs, the menu stays
+      // shut, and each assertion below fails on a missing `menuitem`.
+      await openRowKebab(credRow, /Edit credential/i)
 
       await expect(auditorApp.getByRole('menuitem', { name: /Edit credential/i })).toHaveAttribute(
         'aria-disabled',
@@ -1021,12 +1048,23 @@ test.describe('Permission gating — Identity Provider actions', () => {
       await auditorApp.goto(toAppUrl(`${AUTH_URL}`))
       await expect(auditorApp.getByRole('heading', { name: 'Identity Providers', level: 1 })).toBeVisible()
 
+      // The identity-providers table is one unfiltered page of 20 sorted by `name`
+      // ascending, so the row seeded above only appears while fewer than 20
+      // providers sort before it. `pagination.spec.ts` seeds 21 named
+      // `e2e-pag-…-idp-N`, and `e2e-pag` sorts before `e2e-perm`, so for as long as
+      // that spec's `beforeAll`/`afterAll` window overlaps this test the row is on
+      // page 2 and never renders. Filtering by name puts it back deterministically.
+      await auditorApp.getByPlaceholder('Filter by name').fill(idpName)
+      await auditorApp.getByRole('button', { name: 'Apply filter' }).click()
+
       const idpRow = auditorApp
         .getByRole('grid', { name: 'Identity providers table' })
         .getByRole('row', { name: new RegExp(idpName) })
       await expect(idpRow).toBeVisible({ timeout: 15_000 })
-      const kebab = idpRow.getByRole('button', { name: /Actions|Kebab toggle/i })
-      await kebab.click({ force: true })
+      // A forced click skips every actionability wait, so it lands even while the
+      // list query is replacing the row — the handler never runs and the menu stays
+      // shut.
+      await openRowKebab(idpRow, /Edit provider/i)
 
       await expect(auditorApp.getByRole('menuitem', { name: /Edit provider/i })).toHaveAttribute(
         'aria-disabled',

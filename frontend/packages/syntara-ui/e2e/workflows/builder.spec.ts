@@ -432,7 +432,7 @@ test('catalog panel can be closed without adding a node', async ({ app }) => {
 
     await expect(panel).not.toBeVisible()
 
-    await expect(app).toHaveURL(/workflow-builder\/.+/)
+    await expect(app).toHaveURL(/workflow-builder\/(?!new)/)
   } finally {
     await deleteWorkflow(app, workflowName)
   }
