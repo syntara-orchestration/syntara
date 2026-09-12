@@ -37,12 +37,29 @@ async function layoutCanvas(app: Page) {
   }
 }
 
-/** Click a React Flow node by its visible text label. */
+/**
+ * Click a React Flow node by its visible text label and wait for its editor to open.
+ *
+ * `layoutCanvas` above ends with "Fit view" plus a fixed 500ms sleep, so under CI
+ * load the click can land while the React Flow viewport is still transforming.
+ * The click is then lost: no editor opens, and the caller fails much later on a
+ * missing panel heading with nothing in the trace to explain it.
+ *
+ * Retrying the open is the same remedy `openNodeForEditing` already uses for the
+ * double-click path. The success condition is the editor showing *this* node —
+ * the Name field carries the clicked node's name — rather than merely "a panel is
+ * open", which would be satisfied by the previous node's editor in the tests that
+ * click several nodes in a row.
+ */
 async function clickNode(app: Page, nodeText: string) {
   await layoutCanvas(app)
   const node = app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: nodeText })
-  await expect(node).toBeVisible({ timeout: 5_000 })
-  await node.click()
+  const nameInput = app.getByRole('textbox', { name: 'Name', exact: true })
+  await expect(async () => {
+    await expect(node).toBeVisible({ timeout: 5_000 })
+    await node.click({ timeout: 5_000 })
+    await expect(nameInput).toHaveValue(nodeText, { timeout: 5_000 })
+  }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] })
 }
 
 test.describe('Node editor panels', () => {

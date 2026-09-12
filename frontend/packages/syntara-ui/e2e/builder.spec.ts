@@ -3,6 +3,7 @@ import { APP_TITLE } from './helpers/appTitle'
 import {
   buildUniqueName,
   clickAddConnectedStep,
+  clickSaveAndWait,
   closeNodeEditorPanel,
   createBasicWorkflowViaApi,
   fillCodeEditor,
@@ -41,10 +42,12 @@ test('user creates and saves a multi-node workflow', async ({ app }) => {
     // Act - Save workflow (select project first to avoid name reset)
     await selectProjectIfRequired(app)
     await app.getByPlaceholder('Workflow name').fill(workflowName)
-    await app.getByRole('button', { name: 'Save' }).click()
+
+    // Gate on the create response: `toHaveURL(/workflow-builder\/.+/)` also matched
+    // the literal `new`, so the goto below used to abort the POST it raced.
+    await clickSaveAndWait(app)
 
     // Assert - Workflow is persisted in workflows list
-    await expect(app).toHaveURL(/workflow-builder\/.+/)
     await app.goto(toAppUrl('/workflows'))
     await app.getByPlaceholder('Filter by name').fill(workflowName)
     await app.getByRole('button', { name: 'Apply filter' }).click()
@@ -77,7 +80,10 @@ test('user edits an existing workflow and changes persist', async ({ app }) => {
     await app.getByRole('link', { name: workflowName, exact: true }).click()
 
     await app.getByPlaceholder('Workflow name').fill(updatedName)
-    await app.getByRole('button', { name: 'Save' }).click()
+
+    // A rename never changes the URL, so the PATCH response is the only signal
+    // that the change reached the server before the goto tears the page down.
+    await clickSaveAndWait(app)
 
     // Assert - Updated name persists
     await app.goto(toAppUrl('/workflows'))

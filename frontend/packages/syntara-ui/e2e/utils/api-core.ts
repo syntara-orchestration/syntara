@@ -4,6 +4,8 @@
  * Provides authentication, request helpers, and project management
  * that all other domain-specific API modules depend on.
  */
+import type { APIResponse } from '@playwright/test'
+
 import { appBaseUrl, type Page } from '../fixtures'
 
 /** Get the API base URL (proxied through the UI server) */
@@ -13,6 +15,7 @@ export function apiUrl(path: string): string {
 
 const AUTH_ATTEMPTS = 3
 const AUTH_RETRY_DELAY = 500
+const STALE_TOKEN_FAILURE_HEADER = 'stale_token'
 
 /**
  * Authenticate via the API and return an access token.
@@ -45,7 +48,54 @@ export async function getAuthToken(app: Page): Promise<string | null> {
   return null
 }
 
-/** Make an authenticated API request */
+async function isStaleTokenResponse(response: APIResponse): Promise<boolean> {
+  if (response.status() !== 401) return false
+
+  const failureType = response.headers()['x-auth-failure-type']
+  if (failureType === STALE_TOKEN_FAILURE_HEADER) return true
+
+  // Metrics middleware strips X-Auth-Failure-Type before the response reaches clients.
+  try {
+    const body = (await response.json()) as { code?: string }
+    return body.code === 'TOKEN_STALE'
+  } catch {
+    return false
+  }
+}
+
+async function sendApiRequest(
+  app: Page,
+  method: 'get' | 'post' | 'patch' | 'delete',
+  path: string,
+  token: string | null,
+  data?: unknown
+): Promise<APIResponse> {
+  const headers: Record<string, string> = {}
+  if (token) headers['Authorization'] = `Bearer ${token}`
+
+  const url = apiUrl(path)
+  if (method === 'get') return app.request.get(url, { headers })
+  if (method === 'post') return app.request.post(url, { headers, data })
+  if (method === 'patch') return app.request.patch(url, { headers, data })
+  return app.request.delete(url, { headers })
+}
+
+/**
+ * Make an authenticated API request.
+ *
+ * `POST /auth/logout` increments the user's `token_version`, which invalidates
+ * every access token that user holds — not just the session that logged out.
+ * The whole suite authenticates as the same `admin` account, and seed helpers
+ * fetch one token in `beforeAll` then reuse it across dozens of sequential
+ * calls, so one worker running a spec that logs out ages every other worker's
+ * cached token and leaves the spec dead in a hook with
+ * `401 {"code":"TOKEN_STALE",…}`.
+ *
+ * Re-authenticate once and replay — which is exactly what the backend's
+ * `retryable: true` asks the client to do. A refresh that hands back the same
+ * token cannot succeed on replay, so return the original rejection rather than
+ * spending a second request proving it.
+ */
 export async function apiRequest(
   app: Page,
   method: 'get' | 'post' | 'patch' | 'delete',
@@ -53,19 +103,14 @@ export async function apiRequest(
   options?: { data?: unknown; token?: string }
 ) {
   const token = options?.token ?? (await getAuthToken(app))
-  const headers: Record<string, string> = {}
-  if (token) headers['Authorization'] = `Bearer ${token}`
+  const response = await sendApiRequest(app, method, path, token, options?.data)
 
-  if (method === 'get') {
-    return app.request.get(apiUrl(path), { headers })
-  }
-  if (method === 'post') {
-    return app.request.post(apiUrl(path), { headers, data: options?.data })
-  }
-  if (method === 'patch') {
-    return app.request.patch(apiUrl(path), { headers, data: options?.data })
-  }
-  return app.request.delete(apiUrl(path), { headers })
+  if (!(await isStaleTokenResponse(response))) return response
+
+  const refreshed = await getAuthToken(app)
+  if (!refreshed || refreshed === token) return response
+
+  return sendApiRequest(app, method, path, refreshed, options?.data)
 }
 
 /**
@@ -93,6 +138,26 @@ export async function ensureProject(app: Page, name = 'default'): Promise<{ id: 
     }
     // API creation blocked (e.g. RBAC 403) — project will be created via UI
     return null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Look up a project ID by exact name. Returns null when it cannot be found.
+ *
+ * Mirrors `findWorkflowIdByName`, but lists and matches client-side because
+ * `/projects` is not known to support `name[contains]` — `ensureProject` above
+ * already takes the same `?limit=100` approach.
+ */
+export async function findProjectIdByName(app: Page, name: string): Promise<string | null> {
+  try {
+    const token = await getAuthToken(app)
+    if (!token) return null
+    const resp = await apiRequest(app, 'get', '/projects?limit=100', { token })
+    if (!resp.ok()) return null
+    const body = (await resp.json()) as { resources?: Array<{ id: string; name: string }> }
+    return body.resources?.find((project) => project.name === name)?.id ?? null
   } catch {
     return null
   }

@@ -48,7 +48,6 @@ test('user adds Conditional node and saves workflow', async ({ app }) => {
     await saveWorkflow(app, workflowName)
 
     // Assert - Verify workflow is persisted
-    await expect(app).toHaveURL(/workflow-builder\/.+/)
     await expect(app.getByPlaceholder('Workflow name')).toHaveValue(workflowName)
 
     // Verify the node is still visible after save
@@ -177,7 +176,6 @@ test('user configures Conditional node with if/else-if/else branches', async ({ 
     await saveWorkflow(app, workflowName)
 
     // Verify workflow is persisted
-    await expect(app).toHaveURL(/workflow-builder\/.+/)
 
     // Verify output handles on the canvas (at least 2 for if/else-if)
     const conditionalNode = app
@@ -274,7 +272,6 @@ test('user adds condition group to create complex conditional logic', async ({ a
     await saveWorkflow(app, workflowName)
 
     // Verify workflow is persisted
-    await expect(app).toHaveURL(/workflow-builder\/.+/)
     await expect(app.getByPlaceholder('Workflow name')).toHaveValue(workflowName)
   } finally {
     await deleteWorkflow(app, workflowName)

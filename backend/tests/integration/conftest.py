@@ -14,7 +14,7 @@ import contextlib
 import sys
 from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
@@ -810,24 +810,43 @@ components:
     sys.path.remove(str(syntara_dir.parent))
 
 
-async def _wait_for_server(host: str, port: int) -> None:
-    """Poll until the server is accepting TCP connections."""
-    async with asyncio.timeout(10.0):
-        while True:
-            try:
-                _, writer = await asyncio.open_connection(host, port)
-                writer.close()
-                await writer.wait_closed()
-                return
-            except OSError:
-                await asyncio.sleep(0.1)
+class ExampleAppServer(NamedTuple):
+    """A running uvicorn instance serving the websocket example app."""
+
+    project_root: Path
+    app: FastAPI
+    ws_base_url: str
+    """``ws://127.0.0.1:{port}`` for the port this worker's server actually bound."""
+
+
+async def _wait_for_started(server: Server) -> None:
+    """Poll until uvicorn reports it has bound its listening socket.
+
+    Deliberately not a TCP probe. The fixture used to bind a hard-coded port and
+    poll it with ``open_connection``, which under ``-n auto`` saw *another*
+    worker's server on that port and reported success while this worker's uvicorn
+    had already exited with EADDRINUSE. Every test in that worker then talked to
+    the other worker's server and was disconnected with close code 1012 —
+    uvicorn's graceful-shutdown code — the moment the other worker's fixture tore
+    down. ``server.started`` is per-instance, so it cannot be satisfied by a
+    stranger's socket.
+    """
+    for _ in range(200):
+        if server.started:
+            return
+        await asyncio.sleep(0.05)
+    msg = "websocket example server did not bind within 10s"
+    raise TimeoutError(msg)
 
 
 @pytest_asyncio.fixture
-async def example_app_server(websocket_example_app: tuple[Path, FastAPI]) -> AsyncGenerator[tuple[Path, FastAPI], None]:
+async def example_app_server(websocket_example_app: tuple[Path, FastAPI]) -> AsyncGenerator[ExampleAppServer, None]:
     """Create Server with Websocket example channels."""
     project_root, app = websocket_example_app
-    config = Config(app, host="127.0.0.1", port=9999, log_level="error")
+    # port=0 lets the kernel pick a free port, so parallel xdist workers cannot
+    # collide. The real port is read back from the bound socket below, mirroring
+    # `tests/integration/core/tls/conftest.py`.
+    config = Config(app, host="127.0.0.1", port=0, log_level="error")
     server = Server(config)
 
     async def _serve_without_sys_exit() -> None:
@@ -846,7 +865,7 @@ async def example_app_server(websocket_example_app: tuple[Path, FastAPI]) -> Asy
     server_task = asyncio.create_task(_serve_without_sys_exit())
 
     try:
-        await _wait_for_server("127.0.0.1", 9999)
+        await _wait_for_started(server)
     except (TimeoutError, OSError):
         if server_task.done() and not server_task.cancelled():
             try:
@@ -858,7 +877,8 @@ async def example_app_server(websocket_example_app: tuple[Path, FastAPI]) -> Asy
             await server_task
         pytest.fail("Server failed to start within timeout")
 
-    yield project_root, app
+    port = server.servers[0].sockets[0].getsockname()[1]
+    yield ExampleAppServer(project_root, app, f"ws://127.0.0.1:{port}")
 
     # Shutdown server gracefully
     server.should_exit = True

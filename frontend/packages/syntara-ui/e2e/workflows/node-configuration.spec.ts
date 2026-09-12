@@ -28,7 +28,6 @@ test('AI agent node configuration form renders with tools, output, and LLM', asy
     await saveWorkflow(app, workflowName)
 
     // Assert - Verify workflow is persisted
-    await expect(app).toHaveURL(/workflow-builder\/.+/)
     await expect(app.getByPlaceholder('Workflow name')).toHaveValue(workflowName)
 
     // Verify the node is still visible after save
