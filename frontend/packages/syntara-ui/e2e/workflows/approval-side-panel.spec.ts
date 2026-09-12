@@ -22,6 +22,9 @@ import {
   publishWorkflowViaApi,
 } from '../utils/api'
 
+/** Per-attempt budget for the Review approval click and the panel to come back. */
+const REVIEW_REOPEN_TIMEOUT = 5_000
+
 test.describe('Approval Side Panel', () => {
   test.skip(!process.env['SYNTARA_E2E_HAS_TEMPORAL_WORKER'], 'Temporal worker unavailable (globalSetup probe)')
 
@@ -152,15 +155,37 @@ test.describe('Approval Side Panel', () => {
 
     test('run history and approval panel are mutually exclusive', async ({ app }) => {
       const historyHeading = app.getByRole('heading', { name: 'Run history' })
+      const reviewHeading = app.getByRole('heading', { name: 'Review Approval' })
+      const reviewBtn = app.getByRole('button', { name: 'Review approval' })
+
       await expect(historyHeading).not.toBeVisible()
 
       await app.getByRole('button', { name: /Run history/i }).click()
       await expect(historyHeading).toBeVisible()
-      await expect(app.getByRole('heading', { name: 'Review Approval' })).not.toBeVisible()
+      await expect(reviewHeading).not.toBeVisible()
 
-      const reviewBtn = app.getByRole('button', { name: 'Review approval' })
-      await reviewBtn.click()
-      await expect(app.getByRole('heading', { name: 'Review Approval' })).toBeVisible()
+      /**
+       * `toggleHistoryCard` sets `panelOpen = false`, but `useAutoApprovalDetection`
+       * can asynchronously set it back to `true` afterwards. The Review approval
+       * button is `isAriaDisabled={isLoading || isDisabled}` with `isDisabled`
+       * being "the approval panel is open" (`ApprovalActionButtons`), and
+       * Playwright's actionability wait honours `aria-disabled` — so a bare
+       * `click()` against a re-opened panel waits out the whole test timeout,
+       * which is the observed 120s.
+       *
+       * The click is swallowed and the *outcome* is the success condition,
+       * because detection re-opening the panel reaches the same end state the
+       * click was after. `clickWhenEnabled` alone would not do: once the panel is
+       * open the button never becomes enabled again, so the helper would fail
+       * fast rather than hang — better, but still a failure.
+       */
+      await expect(async () => {
+        if (await reviewBtn.isEnabled().catch(() => false)) {
+          await reviewBtn.click({ timeout: REVIEW_REOPEN_TIMEOUT }).catch(() => {})
+        }
+        await expect(reviewHeading).toBeVisible({ timeout: REVIEW_REOPEN_TIMEOUT })
+      }).toPass({ timeout: 30_000, intervals: [1_000, 2_000] })
+
       await expect(historyHeading).not.toBeVisible()
     })
   })

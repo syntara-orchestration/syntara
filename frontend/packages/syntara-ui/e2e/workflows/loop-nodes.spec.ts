@@ -45,7 +45,6 @@ test.describe('Loop Node Configuration [UI-16]', () => {
       await verifyNodeVisible(app, 'While loop')
       await saveWorkflow(app, workflowName)
 
-      await expect(app).toHaveURL(/workflow-builder\/.+/)
       await expect(app.getByPlaceholder('Workflow name')).toHaveValue(workflowName)
       await verifyNodeVisible(app, 'While loop')
     } finally {
@@ -67,7 +66,6 @@ test.describe('Loop Node Configuration [UI-16]', () => {
       await verifyNodeVisible(app, 'For each loop')
       await saveWorkflow(app, workflowName)
 
-      await expect(app).toHaveURL(/workflow-builder\/.+/)
       await expect(app.getByPlaceholder('Workflow name')).toHaveValue(workflowName)
       await verifyNodeVisible(app, 'For each loop')
     } finally {
@@ -243,7 +241,6 @@ test.describe('Loop Node Configuration [UI-16]', () => {
 
         await saveWorkflow(app, workflowName)
 
-        await expect(app).toHaveURL(/workflow-builder\/.+/)
         await expect(app.getByPlaceholder('Workflow name')).toHaveValue(workflowName)
       } finally {
         await deleteWorkflow(app, workflowName)

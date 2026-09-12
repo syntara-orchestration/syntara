@@ -19,6 +19,7 @@ import { addWebhookTrigger } from './helpers/v2-nodes'
 import {
   buildUniqueName,
   clickAddConnectedStep,
+  clickSaveAndWait,
   closeNodeEditorPanel,
   deleteWorkflow,
   fillCodeEditor,
@@ -31,7 +32,7 @@ test.describe('Webhook Trigger', () => {
     const workflowName = buildUniqueName('e2e-webhook')
     const webhookPath = 'jira-updates'
 
-    await ensureProject(app)
+    const project = await ensureProject(app)
     const sa = await createServiceAccountViaApi(app, buildUniqueName('sa-webhook'))
     await app.goto(toAppUrl('/workflow-builder/new'))
 
@@ -49,10 +50,14 @@ test.describe('Webhook Trigger', () => {
       await closeNodeEditorPanel(app)
 
       // Save workflow (select project right before save)
-      await selectProjectIfRequired(app)
+      // Pin the workflow to the service account's own project. `ensureProject`
+      // puts the account in `default`, but an unnamed `selectProjectIfRequired`
+      // picks whichever project the dropdown lists first — and the backend
+      // rejects the save with "Service account(s) not found in this project"
+      // whenever those differ. The weak URL guard used to hide that 422.
+      await selectProjectIfRequired(app, project?.name)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
-      await app.getByRole('button', { name: 'Save' }).click()
-      await expect(app).toHaveURL(/workflow-builder\/.+/)
+      await clickSaveAndWait(app)
 
       // Verify workflow appears in list
       await app.goto(toAppUrl('/workflows'))
@@ -151,7 +156,7 @@ test.describe('Webhook Trigger', () => {
   test('webhook form normalizes path on submit', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-webhook-norm')
 
-    await ensureProject(app)
+    const project = await ensureProject(app)
     const sa = await createServiceAccountViaApi(app, buildUniqueName('sa-webhook'))
     await app.goto(toAppUrl('/workflow-builder/new'))
 
@@ -169,10 +174,14 @@ test.describe('Webhook Trigger', () => {
       await closeNodeEditorPanel(app)
 
       // Save and verify canvas shows normalized path (lowercase, no leading slash)
-      await selectProjectIfRequired(app)
+      // Pin the workflow to the service account's own project. `ensureProject`
+      // puts the account in `default`, but an unnamed `selectProjectIfRequired`
+      // picks whichever project the dropdown lists first — and the backend
+      // rejects the save with "Service account(s) not found in this project"
+      // whenever those differ. The weak URL guard used to hide that 422.
+      await selectProjectIfRequired(app, project?.name)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
-      await app.getByRole('button', { name: 'Save' }).click()
-      await expect(app).toHaveURL(/workflow-builder\/.+/)
+      await clickSaveAndWait(app)
 
       const triggerNode = app
         .locator('[role="group"][aria-roledescription="node"]')
@@ -188,7 +197,7 @@ test.describe('Webhook Trigger', () => {
     const workflowName = buildUniqueName('e2e-webhook-canvas')
     const webhookPath = 'api-v2-events'
 
-    await ensureProject(app)
+    const project = await ensureProject(app)
     const sa = await createServiceAccountViaApi(app, buildUniqueName('sa-webhook'))
     await app.goto(toAppUrl('/workflow-builder/new'))
 
@@ -206,10 +215,14 @@ test.describe('Webhook Trigger', () => {
       await closeNodeEditorPanel(app)
 
       // Save workflow
-      await selectProjectIfRequired(app)
+      // Pin the workflow to the service account's own project. `ensureProject`
+      // puts the account in `default`, but an unnamed `selectProjectIfRequired`
+      // picks whichever project the dropdown lists first — and the backend
+      // rejects the save with "Service account(s) not found in this project"
+      // whenever those differ. The weak URL guard used to hide that 422.
+      await selectProjectIfRequired(app, project?.name)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
-      await app.getByRole('button', { name: 'Save' }).click()
-      await expect(app).toHaveURL(/workflow-builder\/.+/)
+      await clickSaveAndWait(app)
 
       // Verify trigger node on canvas shows webhook path detail
       const triggerNode = app
