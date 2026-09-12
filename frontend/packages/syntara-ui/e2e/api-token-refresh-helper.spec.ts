@@ -34,11 +34,15 @@ const FORBIDDEN_BODY = {
   retryable: false,
 }
 
-function stubResponse(status: number, body: unknown) {
+function stubResponse(status: number, body: unknown, headers: Record<string, string> = {}) {
   const text = JSON.stringify(body)
   return {
     status: () => status,
     ok: () => status >= 200 && status < 300,
+    // `apiRequest` reads `X-Auth-Failure-Type` before falling back to the body,
+    // so the stub has to answer `headers()` — without it every 401 path throws a
+    // TypeError and the test errors rather than failing.
+    headers: () => headers,
     text: () => Promise.resolve(text),
     json: () => Promise.resolve(JSON.parse(text) as unknown),
   }
@@ -51,10 +55,15 @@ function stubResponse(status: number, body: unknown) {
  * another worker performs, and any request presenting an older token afterwards
  * gets the same 401 the real middleware returns.
  */
-function createStubBackend() {
+function createStubBackend({ emitFailureHeader = false }: { emitFailureHeader?: boolean } = {}) {
   const seeded: unknown[] = []
   let tokenVersion = 1
   let logins = 0
+
+  // The metrics middleware normally strips `X-Auth-Failure-Type` before the
+  // response reaches a client, which is why the body `code` is the path that
+  // actually fires in CI. Both are worth pinning.
+  const staleHeaders: Record<string, string> = emitFailureHeader ? { 'x-auth-failure-type': 'stale_token' } : {}
 
   const respondTo = (url: string, headers: Record<string, string> | undefined, data: unknown) => {
     if (url === apiUrl('/auth/login')) {
@@ -64,7 +73,7 @@ function createStubBackend() {
 
     const token = headers?.['Authorization']?.replace('Bearer ', '') ?? null
     if (token === null) return stubResponse(401, FORBIDDEN_BODY)
-    if (token !== `admin-token-v${tokenVersion}`) return stubResponse(401, STALE_TOKEN_BODY)
+    if (token !== `admin-token-v${tokenVersion}`) return stubResponse(401, STALE_TOKEN_BODY, staleHeaders)
 
     seeded.push(data)
     return stubResponse(201, { id: `user-${seeded.length}`, username: 'seeded' })
@@ -113,6 +122,21 @@ test.describe('apiRequest stale-token retry', () => {
     expect(resp.status()).toBe(201)
     expect(backend.seeded).toHaveLength(1)
     // Exactly one extra login: the retry, not a login per attempt.
+    expect(backend.logins).toBe(1)
+  })
+
+  test('recognises the stale token from the X-Auth-Failure-Type header alone', async () => {
+    const backend = createStubBackend({ emitFailureHeader: true })
+    const cachedToken = backend.issueToken()
+
+    backend.revokeTokens()
+
+    const resp = await apiRequest(backend.page, 'post', '/users', {
+      token: cachedToken,
+      data: { username: 'e2e-pag-user-16' },
+    })
+
+    expect(resp.status()).toBe(201)
     expect(backend.logins).toBe(1)
   })
 
