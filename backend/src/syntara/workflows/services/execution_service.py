@@ -1131,7 +1131,14 @@ class ExecutionService(BaseService):
                 cancel_invocations_for_execution,
             )
 
-            await cancel_invocations_for_execution(self.session, self.user, execution_id)
+            # InvocationService owns the rest: it marks each invocation CANCELLED
+            # and cancels the builtin workflow running it.
+            await cancel_invocations_for_execution(
+                self.session,
+                self.user,
+                execution_id,
+                temporal_service=self.temporal_service,
+            )
         except Exception:
             logger.exception(
                 "Best-effort invocation cancellation failed",

@@ -62,6 +62,7 @@ class TestCancelExecution:
         with patch(
             "syntara.workflows.services.invocation_cancellation.cancel_invocations_for_execution",
             new_callable=AsyncMock,
+            return_value=[],
         ):
             await service.cancel_execution(execution.id)
 
@@ -155,8 +156,13 @@ class TestCancelExecution:
             await service.cancel_execution(execution.id)
 
     @pytest.mark.asyncio
-    async def test_cancel_execution_propagates_to_invocations(self) -> None:
-        """Test that invocation cancellation is called after Temporal cancel."""
+    async def test_cancel_execution_forwards_temporal_service_to_invocations(self) -> None:
+        """Invocation cancellation is delegated, temporal service and all.
+
+        ExecutionService cancels its own workflow and hands the rest to
+        cancel_invocations_for_execution; it no longer reaches into the builtin
+        agent execution itself.
+        """
         execution = _make_execution(ExecutionStatus.RUNNING)
         mock_session = _mock_session_returning(execution)
         mock_user = Mock(spec=User)
@@ -172,10 +178,22 @@ class TestCancelExecution:
         with patch(
             "syntara.workflows.services.invocation_cancellation.cancel_invocations_for_execution",
             new_callable=AsyncMock,
+            return_value=[],
         ) as mock_cancel:
             await service.cancel_execution(execution.id)
 
-        mock_cancel.assert_awaited_once_with(mock_session, mock_user, execution.id)
+        # The temporal service must be forwarded: InvocationService owns the
+        # cancel of the builtin workflow running each invocation, and without it
+        # that half of the cancel is silently skipped.
+        mock_cancel.assert_awaited_once_with(
+            mock_session,
+            mock_user,
+            execution.id,
+            temporal_service=mock_temporal,
+        )
+        # Only the user's own execution is cancelled from here; the per-invocation
+        # Temporal cancel now happens inside InvocationService.
+        mock_temporal.cancel_workflow.assert_awaited_once_with(temporal_workflow_id=execution.temporal_workflow_id)
 
     @pytest.mark.asyncio
     async def test_cancel_execution_invocation_failure_does_not_block(self) -> None:
