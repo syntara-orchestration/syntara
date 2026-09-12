@@ -619,7 +619,7 @@ jobs:
           echo "All services are healthy"
 
       - name: Run E2E tests (excluding global revocation)
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
           timeout_minutes: 20
           max_attempts: 3
@@ -633,7 +633,7 @@ jobs:
           SEGMENT_SERVER_URL: http://localhost:9999
 
       - name: Run E2E tests (global revocation, isolated session)
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
           timeout_minutes: 10
           max_attempts: 3
