@@ -301,6 +301,26 @@ async function trySelectRealProject(page: Page): Promise<boolean> {
         await options.first().waitFor({ state: 'visible', timeout: 3_000 })
       }
 
+      // Prefer `default` — the project `ensureProject` guarantees, and the only
+      // one no spec deletes. Taking whatever sorts first instead means picking a
+      // project another worker created and is about to clean up: the builder
+      // holds its id, the delete lands, and the save then fails with
+      // `404 {"detail":"Project <id> not found"}`. That was invisible before
+      // saves were gated on the response, because the weak URL guard passed
+      // regardless.
+      //
+      // Matched on the *accessible* name, not `textContent`. The option renders
+      // name and description as adjacent nodes with no separator, so
+      // `textContent` reads `defaultDefault project` and no anchored match on it
+      // can work; the accessible name joins them with a space. Anchoring matters
+      // either way — a bare `default` also matches the built-in project's
+      // "Default project for built-in workflows" description.
+      const preferred = page.getByRole('option', { name: /^default(\s|$)/ })
+      if ((await preferred.count()) === 1) {
+        await preferred.click()
+        return
+      }
+
       const allOptions = await options.all()
       for (const option of allOptions) {
         const text = await option.textContent()
