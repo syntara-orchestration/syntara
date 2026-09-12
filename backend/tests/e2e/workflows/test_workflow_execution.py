@@ -927,10 +927,12 @@ class TestNodeFailurePropagation:
 
         activities = {a.activity_id: a for a in (result.activities or [])}
 
-        # The healthy branch must have completed.
+        # The healthy branch must not be skipped. If it finished before the
+        # converge failed it is completed; if it was still in flight it is
+        # detached and reported as cancelled (AAP-90400).
         assert activities.get("branch_ok") is not None
-        assert activities["branch_ok"].status == "completed", (
-            f"branch_ok should complete independently of branch_fail, got {activities['branch_ok'].status}"
+        assert activities["branch_ok"].status in ("completed", "cancelled"), (
+            f"branch_ok should complete or be detached, got {activities['branch_ok'].status}"
         )
 
         # The failing branch must be marked failed.
