@@ -1636,6 +1636,16 @@ class JWTSettings(BaseSettings):
         description="Path to file containing the bootstrap admin password (e.g., /run/secrets/admin-password)",
     )
 
+    seed_builtin_schedules_strict: bool = Field(
+        default=False,
+        description=(
+            "Fail seeding (non-zero exit) when the Temporal Schedules for built-in scheduled "
+            "workflows cannot be created or updated. Off by default so a seed run that happens "
+            "before Temporal is available only logs a warning; enable it for re-runs that are "
+            "expected to reach Temporal."
+        ),
+    )
+
 
 class ToolManagerSettings(BaseSettings):
     """Tool Manager client configuration settings.

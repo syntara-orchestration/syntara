@@ -163,8 +163,10 @@ make db-clean
 > re-runs after the initial seed must be safe to execute concurrently — from several processes at
 > once — converging without duplicates. `--only builtin_workflows` is expected to be re-run after the
 > initial seed from a process that can reach Temporal, so the Temporal Schedules for built-in
-> scheduled workflows get created even when the first seed ran before Temporal was up. Keep new
-> seeders within this contract.
+> scheduled workflows get created even when the first seed ran before Temporal was up. A failed
+> schedule sync is a warning by default; set `APP_SEED_BUILTIN_SCHEDULES_STRICT=true` on runs that
+> are expected to reach Temporal to make it fail the command instead. Keep new seeders within this
+> contract.
 
 > **Schema baseline:** Alembic history was flattened into a single baseline. Databases
 > created with the old revision chain cannot be upgraded in place — run `make db-clean`

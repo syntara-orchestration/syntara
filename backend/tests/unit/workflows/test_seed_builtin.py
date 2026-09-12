@@ -295,6 +295,28 @@ class TestSeedBuiltinWorkflows:
         session.commit.assert_awaited_once()
 
     @pytest.mark.asyncio
+    async def test_sync_error_fails_seeding_when_strict(self) -> None:
+        """With APP_SEED_BUILTIN_SCHEDULES_STRICT the sync error aborts the seed pass.
+
+        Used by seed runs that are expected to reach Temporal: a missing
+        schedule must surface as a non-zero exit, not a warning.
+        """
+        self.mock_scheduler.sync_scheduled_triggers = AsyncMock(
+            side_effect=ScheduledTriggerSyncError("some-workflow-id", 1)
+        )
+        admin, project = _mock_admin(), _mock_project()
+        session = _mock_session(admin, project, *[None] * len(_BUILTIN_DEFINITIONS))
+
+        strict_settings = MagicMock(seed_builtin_schedules_strict=True)
+        with (
+            patch("syntara.workflows.seed_builtin.get_settings", return_value=strict_settings),
+            pytest.raises(ScheduledTriggerSyncError),
+        ):
+            await seed_builtin_workflows(session)
+
+        session.commit.assert_not_awaited()
+
+    @pytest.mark.asyncio
     async def test_health_check_definition_has_scheduled_trigger(self) -> None:
         """Health check workflow uses a scheduled_trigger, not manual_trigger."""
         hc_def = next(d for d in _BUILTIN_DEFINITIONS if d["name"] == "Integration Health Check")

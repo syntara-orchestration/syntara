@@ -16,8 +16,10 @@ may be executed again at any time and from several processes at once
 converge to the same state without creating duplicates or failing on rows
 that already exist. In particular ``--only builtin_workflows`` is expected to
 be re-run after the initial seed, from a process that can reach Temporal, to
-create the Temporal Schedules for built-in scheduled workflows; when Temporal
-is unreachable that step logs a warning and the command still exits 0.
+create the Temporal Schedules for built-in scheduled workflows. When Temporal
+is unreachable that step logs a warning and the command still exits 0 by
+default; set ``APP_SEED_BUILTIN_SCHEDULES_STRICT=true`` on runs that are
+expected to reach Temporal so a failed sync exits non-zero instead.
 Changes to seeders must preserve these guarantees.
 """
 
