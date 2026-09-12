@@ -382,8 +382,9 @@ def evaluate_gate(
       * Breaking changes without the approval label -> blocked, full stop.
       * Any meaningful spec change without an info.version bump -> blocked.
       * A bump using the wrong segment -> blocked (names the expected segment).
-      * Approved breaking change (minor bump) or non-breaking change (correct
-        segment) -> allowed.
+      * The ``breaking-change-approved`` label with a minor bump -> allowed, even
+        when oasdiff did not flag the change as breaking or expected a patch bump.
+      * Non-breaking change with the correct segment -> allowed.
     """
     version_bumped = version_bump_type is not None
 
@@ -419,6 +420,16 @@ def evaluate_gate(
             ),
         )
 
+    if breaking_approved and version_bump_type == "minor":
+        return GateDecision(
+            allowed=True,
+            code="breaking_approved",
+            message=(
+                f"ALLOWED: Breaking change permitted via the '{BREAKING_CHANGE_APPROVED_LABEL}' "
+                "label (privileged override) with a minor version bump."
+            ),
+        )
+
     if expected_bump_type is not None and version_bump_type != expected_bump_type:
         return GateDecision(
             allowed=False,
@@ -434,16 +445,6 @@ def evaluate_gate(
                     "one; a new major version is a new spec at a new URL path. "
                 )
                 + f"Set info.version to a '{expected_bump_type}' increment."
-            ),
-        )
-
-    if has_breaking:
-        return GateDecision(
-            allowed=True,
-            code="breaking_approved",
-            message=(
-                f"ALLOWED: Breaking change permitted via the '{BREAKING_CHANGE_APPROVED_LABEL}' "
-                "label (privileged override) with a minor version bump."
             ),
         )
 
