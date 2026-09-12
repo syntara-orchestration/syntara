@@ -5,6 +5,15 @@ even in container images that only sync ``*.py`` files (e.g. Skaffold).
 
 Registered as a **required** seeder — always runs during seeding.
 Built-in workflows cannot be deleted or modified by users.
+
+Operational contract: this seeder must stay idempotent, and re-runs must be
+concurrency-safe. It is expected to be re-run after the initial seed —
+typically at API startup from a process that can reach Temporal — because the
+initial seed may run before Temporal exists, in which case the Temporal
+Schedule sync for scheduled built-in workflows degrades to a warning. Re-runs
+against an unchanged definition must not create new workflow versions, the
+schedule sync must remain create-or-update, and concurrent invocations (e.g.
+several replicas starting together) must converge to the same state.
 """
 
 from __future__ import annotations

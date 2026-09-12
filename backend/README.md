@@ -159,6 +159,13 @@ make db-run
 make db-clean
 ```
 
+> **Seeding contract:** `python -m syntara.seed` (and any `--only` subset) must be idempotent, and
+> re-runs after the initial seed must be safe to execute concurrently — from several processes at
+> once — converging without duplicates. `--only builtin_workflows` is expected to be re-run after the
+> initial seed from a process that can reach Temporal, so the Temporal Schedules for built-in
+> scheduled workflows get created even when the first seed ran before Temporal was up. Keep new
+> seeders within this contract.
+
 > **Schema baseline:** Alembic history was flattened into a single baseline. Databases
 > created with the old revision chain cannot be upgraded in place — run `make db-clean`
 > (or `podman compose down -v` for the full stack), then bring services back up so

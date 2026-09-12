@@ -6,6 +6,19 @@ Usage::
     uv run python -m syntara.seed --all        # include optional (dev) seeders
     uv run python -m syntara.seed --only settings credentials
     uv run python -m syntara.seed --list       # show registered seeders
+
+Operational contract
+--------------------
+Seeders must be **idempotent** and re-runs must be **safe to run
+concurrently**: once the initial seed has populated the database, the command
+may be executed again at any time and from several processes at once
+(deployment hooks, pod init containers, replicas starting together) and must
+converge to the same state without creating duplicates or failing on rows
+that already exist. In particular ``--only builtin_workflows`` is expected to
+be re-run after the initial seed, from a process that can reach Temporal, to
+create the Temporal Schedules for built-in scheduled workflows; when Temporal
+is unreachable that step logs a warning and the command still exits 0.
+Changes to seeders must preserve these guarantees.
 """
 
 from __future__ import annotations
