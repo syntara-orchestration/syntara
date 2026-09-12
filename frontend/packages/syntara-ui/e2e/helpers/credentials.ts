@@ -109,20 +109,111 @@ async function createTestCredentialViaUi(app: Page, name: string): Promise<boole
   }
 }
 
-async function disableCredential(app: Page, name: string): Promise<void> {
-  await goToCredentialsList(app)
-  await app.getByPlaceholder('Filter by keyword').fill(name)
-  await app.getByRole('button', { name: 'Apply filter' }).click()
-  const row = app.getByRole('row', { name: new RegExp(name) })
-  const patchDone = app.waitForResponse(
-    (resp) => resp.url().includes('/credentials/') && resp.request().method() === 'PATCH'
+/** Per-attempt budget for the enable/disable PATCH to come back. */
+const CREDENTIAL_PATCH_TIMEOUT = 20_000
+
+/** The PATCH that the Enabled switch issues (`PATCH /api/v1/credentials/{id}`). */
+export function isCredentialPatchResponse(response: Response): boolean {
+  return (
+    response.request().method() === 'PATCH' && /\/api\/v1\/credentials\/[^/]+$/.test(new URL(response.url()).pathname)
   )
-  await row.getByRole('switch', { name: 'Enabled' }).click({ force: true })
+}
+
+/** Wait until the usage checks finish so the Disable action is actually clickable. */
+export async function waitForDisableDialogReady(dialog: Locator, credentialName?: string): Promise<void> {
+  await expect(dialog.getByText('Disable credential?')).toBeVisible()
+  // The spinner only clears once the affected-workflows and affected-integrations
+  // API calls both resolve — give it extra time under CI load
+  await expect(dialog.getByText(/Checking for workflows and integrations/)).toHaveCount(0, {
+    timeout: 25_000,
+  })
+  if (credentialName) {
+    await expect(dialog.getByText(new RegExp(credentialName))).toBeVisible()
+  }
+  await expect(dialog.getByRole('button', { name: 'Disable' })).toBeEnabled()
+}
+
+/** Per-attempt budget for landing the Enabled switch click. */
+const DISABLE_TOGGLE_CLICK_TIMEOUT = 5_000
+/** Per-attempt budget for the confirmation dialog to appear after the click. */
+const DISABLE_DIALOG_TIMEOUT = 5_000
+/** Total budget for getting the confirmation dialog open. */
+const DISABLE_DIALOG_RETRY_TIMEOUT = 30_000
+
+/**
+ * Flip a credential's Enabled switch from its list row and return the disable
+ * confirmation dialog, ready to act on.
+ *
+ * PatternFly's `Switch` hides its `<input>` behind a styled span, so every caller
+ * has to click it with `force: true` — which skips the actionability wait
+ * entirely, including the stability check that would otherwise have held the
+ * click until the row stopped moving. The row is re-rendered whenever the
+ * credentials query resolves, and `filterCredentialByName` returns as soon as it
+ * has pressed *Apply filter*, without waiting for the filtered page to land. A
+ * forced click inside that window hits a row React is replacing: no `onChange`
+ * runs, no dialog opens, and the caller fails up to 25s later inside
+ * `waitForDisableDialogReady` on a dialog that was never there.
+ *
+ * Re-opening on a miss is the same remedy `triggerVerifyWorkflow` uses for the
+ * builder kebab. The click is skipped whenever the dialog is already up, so a
+ * slow open is waited out rather than toggled back — `openDisableDialog` is
+ * idempotent, but a second forced click would land on the modal backdrop.
+ */
+export async function openDisableDialogFromRow(app: Page, row: Locator, credentialName?: string): Promise<Locator> {
   const dialog = app.getByRole('dialog')
+  const title = dialog.getByText('Disable credential?')
+
+  await expect(async () => {
+    if (!(await title.isVisible().catch(() => false))) {
+      await expect(row).toBeVisible({ timeout: DISABLE_TOGGLE_CLICK_TIMEOUT })
+      // Swallow the click failure: Playwright retries a click on its own when the
+      // element detaches, so an unbounded one would sit inside a single attempt
+      // for the whole retry budget instead of letting `toPass` start over.
+      await row
+        .getByRole('switch')
+        .click({ force: true, timeout: DISABLE_TOGGLE_CLICK_TIMEOUT })
+        .catch(() => {})
+    }
+    await expect(title).toBeVisible({ timeout: DISABLE_DIALOG_TIMEOUT })
+  }).toPass({ timeout: DISABLE_DIALOG_RETRY_TIMEOUT, intervals: [500, 1_000, 2_000] })
+
+  await waitForDisableDialogReady(dialog, credentialName)
+  return dialog
+}
+
+/**
+ * Flip a credential's Enabled switch off from its list row, returning once the
+ * server has recorded it.
+ *
+ * The switch is driven by `useOptimisticCredentialEnabled`, a correct React 19
+ * `useOptimistic` + `startTransition` Action: it flips the UI *before* the PATCH
+ * is issued and rolls back on failure. So `not.toBeChecked()` is satisfied by
+ * optimistic state alone, and any navigation that follows tears the document
+ * down mid-request — the server never records the change, and because
+ * `queryClient` sets no `staleTime` the return trip refetches and renders the
+ * credential still enabled.
+ *
+ * The response wait is armed immediately before the Disable click, not before
+ * the toggle click: between the two sits the affected-workflows and
+ * affected-integrations usage check, which is budgeted 25s on its own and would
+ * otherwise consume most of this wait.
+ */
+export async function disableCredentialFromRow(app: Page, row: Locator): Promise<void> {
+  const dialog = await openDisableDialogFromRow(app, row)
+
+  const patchDone = app.waitForResponse(isCredentialPatchResponse, { timeout: CREDENTIAL_PATCH_TIMEOUT })
   await dialog.getByRole('button', { name: 'Disable' }).click()
-  await patchDone
+
+  const response = await patchDone
+  expect(response.ok(), `PATCH /credentials returned ${response.status()}`).toBe(true)
   await expect(dialog).not.toBeVisible()
   await expect(row.getByRole('switch')).not.toBeChecked()
+}
+
+async function disableCredential(app: Page, name: string): Promise<void> {
+  await goToCredentialsList(app)
+  await filterCredentialByName(app, name)
+  await disableCredentialFromRow(app, app.getByRole('row', { name: new RegExp(name) }))
 }
 
 /**
