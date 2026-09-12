@@ -4,6 +4,8 @@
  * Provides authentication, request helpers, and project management
  * that all other domain-specific API modules depend on.
  */
+import type { APIResponse } from '@playwright/test'
+
 import { appBaseUrl, type Page } from '../fixtures'
 
 /** Get the API base URL (proxied through the UI server) */
@@ -13,6 +15,7 @@ export function apiUrl(path: string): string {
 
 const AUTH_ATTEMPTS = 3
 const AUTH_RETRY_DELAY = 500
+const STALE_TOKEN_FAILURE_HEADER = 'stale_token'
 
 /**
  * Authenticate via the API and return an access token.
@@ -45,27 +48,60 @@ export async function getAuthToken(app: Page): Promise<string | null> {
   return null
 }
 
-/** Make an authenticated API request */
+async function isStaleTokenResponse(response: APIResponse): Promise<boolean> {
+  if (response.status() !== 401) return false
+
+  const failureType = response.headers()['x-auth-failure-type']
+  if (failureType === STALE_TOKEN_FAILURE_HEADER) return true
+
+  // Metrics middleware strips X-Auth-Failure-Type before the response reaches clients.
+  try {
+    const body = (await response.json()) as { code?: string }
+    return body.code === 'TOKEN_STALE'
+  } catch {
+    return false
+  }
+}
+
+async function sendApiRequest(
+  app: Page,
+  method: 'get' | 'post' | 'patch' | 'delete',
+  path: string,
+  token: string | null,
+  data?: unknown
+): Promise<APIResponse> {
+  const headers: Record<string, string> = {}
+  if (token) headers['Authorization'] = `Bearer ${token}`
+
+  const url = apiUrl(path)
+  if (method === 'get') return app.request.get(url, { headers })
+  if (method === 'post') return app.request.post(url, { headers, data })
+  if (method === 'patch') return app.request.patch(url, { headers, data })
+  return app.request.delete(url, { headers })
+}
+
+/**
+ * Make an authenticated API request.
+ *
+ * Re-authenticates and retries once when the backend returns `401 TOKEN_STALE`
+ * (admin token_ver bumped while a worker still holds an older bearer token).
+ */
 export async function apiRequest(
   app: Page,
   method: 'get' | 'post' | 'patch' | 'delete',
   path: string,
   options?: { data?: unknown; token?: string }
 ) {
-  const token = options?.token ?? (await getAuthToken(app))
-  const headers: Record<string, string> = {}
-  if (token) headers['Authorization'] = `Bearer ${token}`
+  let token = options?.token ?? (await getAuthToken(app))
+  let response = await sendApiRequest(app, method, path, token, options?.data)
 
-  if (method === 'get') {
-    return app.request.get(apiUrl(path), { headers })
+  if (await isStaleTokenResponse(response)) {
+    token = await getAuthToken(app)
+    if (!token) return response
+    response = await sendApiRequest(app, method, path, token, options?.data)
   }
-  if (method === 'post') {
-    return app.request.post(apiUrl(path), { headers, data: options?.data })
-  }
-  if (method === 'patch') {
-    return app.request.patch(apiUrl(path), { headers, data: options?.data })
-  }
-  return app.request.delete(apiUrl(path), { headers })
+
+  return response
 }
 
 /**
