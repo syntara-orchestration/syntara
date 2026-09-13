@@ -885,6 +885,19 @@ const {
 })
 ```
 
+### Client-side (in-memory) pagination
+
+For tables that load a full dataset then filter/sort locally, use `useClientPagination` — not `useCursorPagination` and not hand-rolled `page` / `perPage` / `slice` state.
+
+```typescript
+const { paginate, getFooterProps, resetPage } = useClientPagination()
+
+const pageRows = useMemo(() => paginate(sortedRows), [sortedRows, paginate])
+
+// resetPage() when filters or sort change
+<SynScrollableTableContainer footer={getFooterProps(sortedRows.length)} />
+```
+
 ---
 
 ## 15. Stable React context provider values

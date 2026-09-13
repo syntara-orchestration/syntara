@@ -22,6 +22,7 @@ import { useQueryState } from '../../../components/states/useQueryState'
 import { SynLink } from '../../../components/SynLink'
 import { DateCell } from '../../../components/table/DateCell'
 import { SynScrollableTableContainer } from '../../../components/table/SynScrollableTableContainer'
+import { useClientPagination } from '../../../hooks/useClientPagination'
 import { useMutationErrorHandler } from '../../../hooks/useMutationErrorHandler'
 import { useTableSort } from '../../../hooks/useTableSort'
 import { useAlerts, type AlertConfig } from '../../../providers/alerts'
@@ -213,25 +214,6 @@ function DisconnectedIdentityRow({
   )
 }
 
-function useIdentityPagination() {
-  const identitiesFilter = useLocalFilterState()
-  const { setAllFilters } = identitiesFilter
-  const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(20)
-  const handlePerPageChange = useCallback((n: number) => {
-    setPerPage(n)
-    setPage(1)
-  }, [])
-  const handleFilterChange = useCallback(
-    (f: FilterConfig[]) => {
-      setAllFilters(f)
-      setPage(1)
-    },
-    [setAllFilters]
-  )
-  return { identitiesFilter, page, setPage, perPage, handlePerPageChange, handleFilterChange }
-}
-
 function IdentityDialogsWrapper({
   identityToDetach,
   isDetaching,
@@ -311,7 +293,16 @@ export function UserIdentitiesPanel({
   const handleMutationError = useMutationErrorHandler()
   const [identityToDetach, setIdentityToDetach] = useState<UserIdentity | null>(null)
   const [convertProvider, setConvertProvider] = useState<ConvertProviderInfo | null>(null)
-  const { identitiesFilter, page, setPage, perPage, handlePerPageChange, handleFilterChange } = useIdentityPagination()
+  const identitiesFilter = useLocalFilterState()
+  const { setAllFilters } = identitiesFilter
+  const { paginate, getFooterProps, resetPage } = useClientPagination()
+  const handleFilterChange = useCallback(
+    (f: FilterConfig[]) => {
+      setAllFilters(f)
+      resetPage()
+    },
+    [setAllFilters, resetPage]
+  )
   const { providers, isLoading: isProvidersLoading } = useAuthProviders()
   const isSelf = userId === currentUserId
   useLinkError(showAlert)
@@ -453,15 +444,7 @@ export function UserIdentitiesPanel({
       ) : (
         <SynScrollableTableContainer
           caption="User identities table"
-          footer={{
-            page,
-            perPage,
-            total: sortedRows.length,
-            hasNext: page * perPage < sortedRows.length,
-            onPrev: () => setPage((p) => Math.max(1, p - 1)),
-            onNext: () => setPage((p) => p + 1),
-            onPerPageChange: handlePerPageChange,
-          }}
+          footer={getFooterProps(sortedRows.length)}
         >
           <Thead>
             <Tr>
@@ -474,7 +457,7 @@ export function UserIdentitiesPanel({
             </Tr>
           </Thead>
           <Tbody>
-            {sortedRows.slice((page - 1) * perPage, page * perPage).map((row) => {
+            {paginate(sortedRows).map((row) => {
               if (row.kind === 'connected') {
                 return (
                   <ConnectedIdentityRow
