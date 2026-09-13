@@ -31,7 +31,7 @@ const sampleCredential: Credential = {
   enabled: true,
   credential_type_id: 'type-1',
   project_id: 'proj-1',
-} as Credential
+}
 
 function createWrapper() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })

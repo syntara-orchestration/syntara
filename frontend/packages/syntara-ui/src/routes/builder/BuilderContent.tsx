@@ -40,7 +40,7 @@ import { useBuilderDerivedUiFlags } from './hooks/useBuilderDerivedUiFlags'
 import { useBuilderDialogProps } from './hooks/useBuilderDialogProps'
 import { useBuilderFlowInteractionHandlers } from './hooks/useBuilderFlowInteractionHandlers'
 import { useBuilderLiveRunPanel } from './hooks/useBuilderLiveRunPanel'
-import { useBuilderSaveWorkflow, type UseBuilderSaveWorkflowParams } from './hooks/useBuilderSaveWorkflow'
+import { useBuilderSaveWorkflow } from './hooks/useBuilderSaveWorkflow'
 import { useBuilderToolbarHandlers } from './hooks/useBuilderToolbarHandlers'
 import { useBuilderValidation } from './hooks/useBuilderValidation'
 import { useBuilderVersionPanel } from './hooks/useBuilderVersionPanel'
@@ -254,7 +254,7 @@ export function BuilderContent(props: BuilderContentProps) {
       dispatch({ type: 'SET_VALIDATION_ERRORS', payload: errors, source: 'save' })
       useWorkflowStore.getState().setValidationErrorCount(errors.length)
     },
-    createWorkflow: createWorkflow as UseBuilderSaveWorkflowParams['createWorkflow'],
+    createWorkflow: createWorkflow,
     updateWorkflow,
   })
   const guardedSaveWorkflow = useGuardedSaveWorkflow(
@@ -307,7 +307,7 @@ export function BuilderContent(props: BuilderContentProps) {
     handleToggleHistory,
     handleToggleVersionHistory: baseHandleToggleVersionHistory,
   } = useBuilderToolbarHandlers({
-    workflow: workflow as { id: string } | undefined,
+    workflow: workflow,
     workflowName,
     detailsOpen,
     historyCardOpen,
@@ -566,7 +566,7 @@ export function BuilderContent(props: BuilderContentProps) {
     pendingImport,
     setPendingImport,
     selectedProject: stableProjectId ? { id: stableProjectId } : null,
-    createWorkflow: createWorkflow as UseBuilderSaveWorkflowParams['createWorkflow'],
+    createWorkflow: createWorkflow,
     setLocation,
     pinnedMockDataForDialog,
   })
@@ -680,11 +680,7 @@ export function BuilderContent(props: BuilderContentProps) {
                       {showMostRecentRunPanelInEditor && mostRecentExecutionId && (
                         <ExecutionDetailsPanelWrapper
                           executionId={mostRecentExecutionId}
-                          workflowDefinition={
-                            workflow?.version?.workflow_definition as Parameters<
-                              typeof ExecutionDetailsPanelWrapper
-                            >[0]['workflowDefinition']
-                          }
+                          workflowDefinition={workflow?.version?.workflow_definition}
                           selectedNodeId={mostRecentSelectedNodeId}
                           selectedNodeName={mostRecentSelectedNodeName}
                           onNodeSelect={handleMostRecentNodeSelect}

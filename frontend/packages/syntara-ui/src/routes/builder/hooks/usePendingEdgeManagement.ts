@@ -72,7 +72,7 @@ export function usePendingEdgeManagement({
                 isPending: true,
                 isActive: true,
               },
-            } as EdgeType,
+            },
           ]
         }
         return withoutPendingEdges

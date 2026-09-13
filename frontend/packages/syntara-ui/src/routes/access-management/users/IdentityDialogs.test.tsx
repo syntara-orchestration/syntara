@@ -70,12 +70,12 @@ function setupMocks() {
     isError: false,
     error: null,
     refetch: vi.fn(),
-  } as never)
+  })
 
   vi.mocked(usersClient.useMutation).mockReturnValue({
     mutate: vi.fn(),
     isPending: false,
-  } as never)
+  })
 }
 
 const defaultDialogProps = {

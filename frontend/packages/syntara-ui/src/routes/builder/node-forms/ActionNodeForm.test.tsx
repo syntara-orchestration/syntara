@@ -65,17 +65,17 @@ describe('ActionNodeForm', () => {
       isPending: false,
       error: null,
       refetch: vi.fn(),
-    } as never)
+    })
     vi.mocked(useAllCredentials).mockReturnValue({
       credentials: [],
       isLoading: false,
       error: null,
-      refetch: vi.fn() as unknown as ReturnType<typeof useAllCredentials>['refetch'],
+      refetch: vi.fn(),
     })
     vi.mocked(credentialsClient.useMutation).mockReturnValue({
       mutate: vi.fn(),
       isPending: false,
-    } as never)
+    })
     vi.mocked(useAllProjects).mockReturnValue({ projects: [], isLoading: false, error: null, refetch: vi.fn() })
     vi.mocked(useSelectableProjects).mockReturnValue({ projects: [], isLoading: false, error: null, refetch: vi.fn() })
   })
@@ -396,7 +396,7 @@ describe('ActionNodeForm', () => {
         credentials: [mockSecretUrlCredential],
         isLoading: false,
         error: null,
-        refetch: vi.fn() as unknown as ReturnType<typeof useAllCredentials>['refetch'],
+        refetch: vi.fn(),
       })
     }
 
@@ -425,7 +425,7 @@ describe('ActionNodeForm', () => {
         credentials: [mockSecretUrlCredential, mockBearerCredential],
         isLoading: false,
         error: null,
-        refetch: vi.fn() as unknown as ReturnType<typeof useAllCredentials>['refetch'],
+        refetch: vi.fn(),
       })
     }
 
@@ -536,7 +536,7 @@ describe('ActionNodeForm', () => {
         credentials: [mockBearerCredential],
         isLoading: false,
         error: null,
-        refetch: vi.fn() as unknown as ReturnType<typeof useAllCredentials>['refetch'],
+        refetch: vi.fn(),
       })
       renderWithHeader(<ActionNodeForm onSubmit={mockOnSubmit} initialData={{ executor: 'http_request' }} />)
 
@@ -579,7 +579,7 @@ describe('ActionNodeForm', () => {
         isError: false,
         error: null,
         refetch: vi.fn(),
-      } as never)
+      })
       renderWithHeader(
         <ActionNodeForm
           onSubmit={mockOnSubmit}

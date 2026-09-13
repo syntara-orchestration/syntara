@@ -125,7 +125,7 @@ describe('usePermissionChecks', () => {
 
     const wrapper = createWrapper()
     const { result, rerender } = renderHook(({ checks }) => usePermissionChecks(checks), {
-      initialProps: { checks: CHECKS as readonly PermissionRequirement[] },
+      initialProps: { checks: CHECKS },
       wrapper,
     })
 

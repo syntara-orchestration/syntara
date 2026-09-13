@@ -153,7 +153,7 @@ describe('useExecutionStore', () => {
             completed_at: '2025-12-10T15:00:10Z',
           },
         ],
-      } as Partial<Execution>)
+      })
 
       useExecutionStore.getState().setExecution(execution)
 
@@ -165,7 +165,7 @@ describe('useExecutionStore', () => {
     it('handles execution without activities', () => {
       const execution = createMockExecution({
         activities: [],
-      } as Partial<Execution>)
+      })
 
       useExecutionStore.getState().setExecution(execution)
 
@@ -450,7 +450,7 @@ describe('useExecutionStore', () => {
             completed_at: '2025-12-10T15:00:10Z',
           },
         ],
-      } as Partial<Execution>)
+      })
       useExecutionStore.getState().setExecution(execution)
 
       const error = selectActivityError('failed_task')(useExecutionStore.getState())

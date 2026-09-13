@@ -198,7 +198,7 @@ export function useWorkflowVerification({ dispatch }: UseWorkflowVerificationOpt
           },
         })
         .then((resp) => {
-          processValidateResponse(resp as ValidateResponse, dispatch, {
+          processValidateResponse(resp, dispatch, {
             frontendErrors: allFrontendErrors,
             onValid,
             silent,

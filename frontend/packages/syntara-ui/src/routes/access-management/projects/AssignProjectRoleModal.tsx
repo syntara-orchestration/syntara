@@ -80,7 +80,7 @@ function TypeaheadFormField<T extends FieldValues>({
               id={fieldId}
               ariaLabel={ariaLabel}
               options={options}
-              selected={field.value as string}
+              selected={field.value}
               onChange={(value) => {
                 field.onChange(value)
                 onValueChange?.()

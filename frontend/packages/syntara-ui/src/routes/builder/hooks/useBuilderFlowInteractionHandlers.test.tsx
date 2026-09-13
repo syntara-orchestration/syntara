@@ -2,8 +2,6 @@ import { act, renderHook } from '@testing-library/react'
 import type { Edge, Node, ReactFlowInstance } from '@xyflow/react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 
-import type { NodeType } from '../../workflows/canvas/nodes/NodeType'
-
 import { useBuilderFlowInteractionHandlers } from './useBuilderFlowInteractionHandlers'
 
 const moveActivityBefore = vi.fn()
@@ -77,7 +75,7 @@ describe('useBuilderFlowInteractionHandlers', () => {
       data: { __isGeneric: true },
     } as unknown as Node
     act(() => {
-      result.current.handleNodeClick({} as React.MouseEvent, node as unknown as Node<NodeType['data']>)
+      result.current.handleNodeClick({} as React.MouseEvent, node)
     })
     expect(dispatch).toHaveBeenCalledWith({
       type: 'NODE_CLICK',

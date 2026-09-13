@@ -175,7 +175,7 @@ function setupDefaultMocks() {
     refetch: vi.fn(),
   })
 
-  vi.mocked(accessClient.useMutation).mockReturnValue(mockMutationReturn as never)
+  vi.mocked(accessClient.useMutation).mockReturnValue(mockMutationReturn)
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -285,7 +285,7 @@ describe('EditAssignmentDialog', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         ...mockMutationReturn,
         mutateAsync: mutateAsyncSpy,
-      } as never)
+      })
 
       const onSuccess = vi.fn()
       const onClose = vi.fn()
@@ -316,7 +316,7 @@ describe('EditAssignmentDialog', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         ...mockMutationReturn,
         mutateAsync: mutateAsyncSpy,
-      } as never)
+      })
 
       const onSuccess = vi.fn()
       const onClose = vi.fn()
@@ -346,7 +346,7 @@ describe('EditAssignmentDialog', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         ...mockMutationReturn,
         mutateAsync: mutateAsyncSpy,
-      } as never)
+      })
 
       const onClose = vi.fn()
       const onSuccess = vi.fn()
@@ -375,7 +375,7 @@ describe('EditAssignmentDialog', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         ...mockMutationReturn,
         mutateAsync: mutateAsyncSpy,
-      } as never)
+      })
 
       const onClose = vi.fn()
       const onSuccess = vi.fn()
@@ -403,7 +403,7 @@ describe('EditAssignmentDialog', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         ...mockMutationReturn,
         mutateAsync: mutateAsyncSpy,
-      } as never)
+      })
 
       const onSuccess = vi.fn()
       const onClose = vi.fn()
@@ -432,7 +432,7 @@ describe('EditAssignmentDialog', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         ...mockMutationReturn,
         mutateAsync: mutateAsyncSpy,
-      } as never)
+      })
 
       const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries').mockResolvedValue(undefined)
       const user = userEvent.setup()
@@ -514,7 +514,7 @@ describe('EditAssignmentDialog', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         ...mockMutationReturn,
         mutateAsync: mutateAsyncSpy,
-      } as never)
+      })
 
       const user = userEvent.setup()
       render(<EditAssignmentDialog {...defaultProps} row={projectRow} />, { wrapper })
@@ -536,7 +536,7 @@ describe('EditAssignmentDialog', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         ...mockMutationReturn,
         mutateAsync: mutateAsyncSpy,
-      } as never)
+      })
 
       const onClose = vi.fn()
       const onSuccess = vi.fn()
@@ -567,7 +567,7 @@ describe('EditAssignmentDialog', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         ...mockMutationReturn,
         mutateAsync: mutateAsyncSpy,
-      } as never)
+      })
 
       const onSuccess = vi.fn()
       const onClose = vi.fn()
@@ -601,7 +601,7 @@ describe('EditAssignmentDialog', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         ...mockMutationReturn,
         mutateAsync: mutateAsyncSpy,
-      } as never)
+      })
 
       const onSuccess = vi.fn()
       const onClose = vi.fn()
@@ -632,7 +632,7 @@ describe('EditAssignmentDialog', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         ...mockMutationReturn,
         mutateAsync: mutateAsyncSpy,
-      } as never)
+      })
 
       const onSuccess = vi.fn()
       const onClose = vi.fn()
