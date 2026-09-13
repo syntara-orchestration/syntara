@@ -2,12 +2,12 @@ import { Badge, Flex } from '@patternfly/react-core'
 import type { LoopActivity } from '@syntara/contracts'
 import { type Node, type NodeProps } from '@xyflow/react'
 
+import { NodeComponent } from '../../../../components/nodes/NodeComponent'
 import type { ActivityStatus } from '../../execution/types'
 import { getNodeTypeColor } from '../nodeTypeColors'
 import { semanticZoomActivityTitle } from '../semanticZoom'
 
 import { BranchHandle, BranchHandles } from './common/BranchHandle'
-import { NodeComponent } from './common/NodeComponent'
 import { StandardNodeHeader } from './common/StandardNodeHeader'
 import { useLoopIterationCount } from './hooks/useLoopIterationCount'
 import { MenuNodeType, useNodeMenuActions } from './hooks/useNodeMenuActions'

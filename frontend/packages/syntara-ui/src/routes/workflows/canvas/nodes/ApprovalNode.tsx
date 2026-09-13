@@ -3,14 +3,14 @@ import { ActivityTypeEnum, type ApprovalActivity as ApprovalNodeType } from '@sy
 import { type Node, type NodeProps } from '@xyflow/react'
 
 import { SynDetailList } from '../../../../components/details/SynDetailList'
+import { NodeBody } from '../../../../components/nodes/NodeBody'
+import { NodeComponent } from '../../../../components/nodes/NodeComponent'
 import type { ActivityStatus } from '../../execution/types'
 import { getNodeTypeColor } from '../nodeTypeColors'
 import { semanticZoomActivityTitle } from '../semanticZoom'
 
 import { BranchHandle, BranchHandles } from './common/BranchHandle'
 import { renderText } from './common/detailRenderers'
-import { NodeBody } from './common/NodeBody'
-import { NodeComponent } from './common/NodeComponent'
 import { StandardNodeHeader } from './common/StandardNodeHeader'
 import { MenuNodeType, useNodeMenuActions } from './hooks/useNodeMenuActions'
 import { nodeMetadata } from './nodeMetadata'
