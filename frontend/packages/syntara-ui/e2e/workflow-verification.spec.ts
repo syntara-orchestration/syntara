@@ -17,19 +17,19 @@ import { test, expect } from './fixtures'
 import { WCAG_TAGS } from './fixtures/accessibility'
 import { triggerVerifyWorkflow, VALIDATE_ROUTE } from './helpers/workflow-verify'
 import {
-  buildUniqueName,
-  createBasicWorkflowViaApi,
-  openWorkflowInBuilder,
-  createWorkflowWithTrigger,
   addScriptNode,
   addScriptNodeUnconnected,
+  buildUniqueName,
+  clickSaveAndWait,
+  createBasicWorkflowViaApi,
+  createWorkflowWithTrigger,
   deleteWorkflow,
+  openWorkflowInBuilder,
 } from './helpers/workflows'
 import { deleteWorkflowViaApi } from './utils/api'
 
 const VERIFY_BANNER_TIMEOUT = 20_000
 const ERROR_BADGE_TIMEOUT = 5_000
-const SAVE_URL_TIMEOUT = 15_000
 
 function getWorkflowIdFromUrl(app: Page): string {
   const id = app.url().match(/workflow-builder\/([^/?]+)/)?.[1]
@@ -341,8 +341,7 @@ test.describe('Variable reference validation', () => {
     try {
       await addScriptNode(app, 'Ref step', 'echo ${nonexistent_node.result}')
 
-      await app.getByRole('button', { name: 'Save' }).click()
-      await expect(app).toHaveURL(/workflow-builder\/.+/, { timeout: SAVE_URL_TIMEOUT })
+      await clickSaveAndWait(app)
 
       await triggerVerifyWorkflow(app)
 
@@ -372,8 +371,7 @@ test.describe('Variable reference validation', () => {
 
       await addScriptNodeUnconnected(app, 'Isolated step', `echo \${${upstreamNodeId}.result}`)
 
-      await app.getByRole('button', { name: 'Save' }).click()
-      await expect(app).toHaveURL(/workflow-builder\/.+/, { timeout: SAVE_URL_TIMEOUT })
+      await clickSaveAndWait(app)
 
       await triggerVerifyWorkflow(app)
 
@@ -396,8 +394,7 @@ test.describe('Variable reference validation', () => {
     try {
       await addScriptNode(app, 'Field ref step', 'echo ${trigger.missing_field}')
 
-      await app.getByRole('button', { name: 'Save' }).click()
-      await expect(app).toHaveURL(/workflow-builder\/.+/, { timeout: SAVE_URL_TIMEOUT })
+      await clickSaveAndWait(app)
 
       await mockValidateEndpoint(app, {
         valid: false,
