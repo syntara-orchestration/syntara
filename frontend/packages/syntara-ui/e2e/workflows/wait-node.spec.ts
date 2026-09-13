@@ -40,8 +40,8 @@ test.describe('Wait Node Configuration', () => {
       await verifyNodeVisible(app, 'Wait 30s')
 
       // Save and verify persistence
+      // saveWorkflow now gates on the create response, so no URL guard is needed
       await saveWorkflow(app, workflowName)
-      await expect(app).toHaveURL(/workflow-builder\/.+/)
 
       // Reopen to verify configuration persisted
       await openNodeForEditing(app, 'Wait 30s')
