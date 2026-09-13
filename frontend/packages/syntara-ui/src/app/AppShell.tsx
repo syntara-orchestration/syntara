@@ -29,7 +29,7 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
         <SessionTimeoutWarning />
         <DockStateContext.Provider value={dockState}>
           <Compass
-            className="pf-m-no-screen-warning"
+            className={`pf-m-no-screen-warning ${styles.compass}`}
             isDockExpanded={dockState.isDockExpanded}
             isDockTextExpanded={dockState.isDockTextExpanded}
             masthead={<AppMobileMasthead />}

@@ -7,24 +7,21 @@ Bidirectional channels continue using TestClient for consistency with existing t
 """
 
 import json
-from pathlib import Path
 
 import pytest
-from fastapi import FastAPI
 from websockets import connect as websocket_connect
+
+from tests.integration.conftest import ExampleAppServer
 
 
 class TestReceiveOnlyChannelIntegration:
     """Integration tests for receive-only channel behavior."""
 
     @pytest.mark.asyncio
-    async def test_receive_only_channel_sends_events_via_on_connect(
-        self, example_app_server: tuple[Path, FastAPI]
-    ) -> None:
+    async def test_receive_only_channel_sends_events_via_on_connect(self, example_app_server: ExampleAppServer) -> None:
         """Events sent through on_connect handler."""
-        _ = example_app_server
         # Connect to receive-only tokens channel with real WebSocket client
-        async with websocket_connect("ws://127.0.0.1:9999/ws/testcomp/v1/tokens") as websocket:
+        async with websocket_connect(f"{example_app_server.ws_base_url}/ws/testcomp/v1/tokens") as websocket:
             # Receive first token (no send required)
             token0_str = await websocket.recv()
             token0 = json.loads(token0_str)
@@ -50,12 +47,11 @@ class TestReceiveOnlyChannelIntegration:
 
     @pytest.mark.asyncio
     async def test_receive_only_channel_stays_alive_until_disconnect(
-        self, example_app_server: tuple[Path, FastAPI]
+        self, example_app_server: ExampleAppServer
     ) -> None:
         """Connection maintained until all messages sent."""
-        _ = example_app_server
         # Connect to receive-only tokens channel
-        async with websocket_connect("ws://127.0.0.1:9999/ws/testcomp/v1/tokens") as websocket:
+        async with websocket_connect(f"{example_app_server.ws_base_url}/ws/testcomp/v1/tokens") as websocket:
             # Receive all 5 tokens sent by on_connect
             tokens_received = []
             for i in range(5):
@@ -69,11 +65,10 @@ class TestReceiveOnlyChannelIntegration:
             assert len(tokens_received) == 5
 
     @pytest.mark.asyncio
-    async def test_bidirectional_channel_still_requires_handler(self, example_app_server: tuple[Path, FastAPI]) -> None:
-        _ = example_app_server
+    async def test_bidirectional_channel_still_requires_handler(self, example_app_server: ExampleAppServer) -> None:
         """Existing behavior unchanged (regression)."""
         # Connect to bidirectional chat channel using real WebSocket client
-        async with websocket_connect("ws://127.0.0.1:9999/ws/testcomp/v1/chat") as websocket:
+        async with websocket_connect(f"{example_app_server.ws_base_url}/ws/testcomp/v1/chat") as websocket:
             # Send chat message (bidirectional)
             await websocket.send(json.dumps({"message": "hello there"}))
 
