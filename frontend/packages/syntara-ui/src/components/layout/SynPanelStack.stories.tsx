@@ -1,5 +1,5 @@
 import { Content } from '@patternfly/react-core'
-import type { Decorator, Meta, StoryObj } from '@storybook/react-vite'
+import type { Decorator, Meta, StoryObj } from '@storybook/tanstack-react'
 
 import { SynPanel } from './SynPanel'
 import { SynPanelStack, SynPanelStackItem } from './SynPanelStack'

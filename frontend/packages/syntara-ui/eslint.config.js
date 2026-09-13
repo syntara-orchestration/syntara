@@ -28,13 +28,40 @@ const require = createRequire(import.meta.url)
 // Read the installed React version instead of hardcoding.
 const reactVersion = require('react/package.json').version
 
+/** Glob patterns for unit and integration test files. */
 const TEST_FILES = ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}']
+/** Glob pattern for end-to-end test files. */
 const E2E_FILES = ['e2e/**']
+/** Import restrictions shared by TypeScript source files. */
+const SHARED_RESTRICTED_IMPORT_OPTIONS = {
+  patterns: [
+    {
+      group: ['wouter', 'wouter/*'],
+      message: 'wouter has been removed. Use @tanstack/react-router directly.',
+    },
+    {
+      regex: '(?:\\.{1,2}/)*(?:hooks/)?routing/(?:useNavigate|useParams|useSearch|useLocation|navigate|Link)$',
+      message: 'Deprecated bridge hook. Use @tanstack/react-router primitives directly.',
+    },
+    {
+      group: ['@tanstack/react-router'],
+      importNames: ['Link'],
+      message:
+        'Use SynLink from components/SynLink instead of TanStack Link directly. SynLink provides consistent PatternFly styling.',
+    },
+    {
+      group: ['@syntara/contracts/src', '@syntara/contracts/src/**'],
+      message:
+        "Import from '@syntara/contracts' (the public entry point), not from internal source paths. Internal paths are not part of the published API and can break silently when the package restructures.",
+    },
+  ],
+}
 
 export default tseslint.config(
   {
     ignores: [
       'dist',
+      'storybook-static/**',
       'coverage/**',
       'playwright.config.ts',
       'test-results/**',
@@ -164,27 +191,7 @@ export default tseslint.config(
       '@typescript-eslint/no-restricted-imports': [
         'warn',
         {
-          patterns: [
-            {
-              group: ['wouter', 'wouter/*'],
-              message: 'wouter has been removed. Use @tanstack/react-router directly.',
-            },
-            {
-              regex: '(?:\\.{1,2}/)*(?:hooks/)?routing/(?:useNavigate|useParams|useSearch|useLocation|navigate|Link)$',
-              message: 'Deprecated bridge hook. Use @tanstack/react-router primitives directly.',
-            },
-            {
-              group: ['@tanstack/react-router'],
-              importNames: ['Link'],
-              message:
-                'Use SynLink from components/SynLink instead of TanStack Link directly. SynLink provides consistent PatternFly styling.',
-            },
-            {
-              group: ['@syntara/contracts/src', '@syntara/contracts/src/**'],
-              message:
-                "Import from '@syntara/contracts' (the public entry point), not from internal source paths. Internal paths are not part of the published API and can break silently when the package restructures.",
-            },
-          ],
+          ...SHARED_RESTRICTED_IMPORT_OPTIONS,
         },
       ],
     },
@@ -396,6 +403,26 @@ export default tseslint.config(
     },
   },
   {
+    // Storybook stories use the TanStack Router framework integration configured by this package.
+    // Keep the existing TypeScript import restrictions here because flat config replaces
+    // array-valued rules instead of merging them.
+    files: ['**/*.stories.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          ...SHARED_RESTRICTED_IMPORT_OPTIONS,
+          paths: [
+            {
+              name: '@storybook/react-vite',
+              message: 'Use @storybook/tanstack-react for stories in this package.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: [...TEST_FILES, 'e2e/visual-regression/**/*.ts'],
     rules: {
       'max-lines': 'off',
@@ -548,6 +575,19 @@ export default tseslint.config(
             'CallExpression[callee.property.name="locator"] > .arguments:first-child[type="Literal"][value=/^\\.pf-|^#|^\\[class[^\\]]*=[\'"]pf-/]',
           message:
             'Do not use PatternFly CSS class selectors in locator(). Use semantic Playwright locators instead: getByRole, getByLabel, getByPlaceholder, getByText, or getByTestId.',
+        },
+        // `/workflow-builder\/.+/` reads as "we navigated to a saved workflow", but
+        // `.+` matches the literal path segment `new` — so the assertion passes the
+        // instant Save is clicked, before any request is sent. And an existing
+        // workflow never changes URL at all, so no URL gate can work on the PATCH
+        // path. Matches only patterns that mention workflow-builder AND contain
+        // `.+`; the `(?!new)` forms and the deliberate `/workflow-builder\/new/`
+        // and bare `/workflow-builder/` route checks have no `.+` and are exempt.
+        {
+          selector:
+            'CallExpression[callee.property.name="toHaveURL"] > .arguments:first-child[type="Literal"][regex.pattern=/workflow-builder/][regex.pattern=/\\.\\+/]:not([regex.pattern=/\\(\\?!new/])',
+          message:
+            'Do not gate a workflow save on toHaveURL(/workflow-builder\\/.+/) — `.+` matches the literal `new` segment, so the assertion passes before the save request is sent, and an existing workflow never changes URL at all. Use clickSaveAndWait() from e2e/helpers/workflow-save.ts.',
         },
       ],
       // Targets Playwright locator.first() / .nth() -- not standard JS/Array methods,

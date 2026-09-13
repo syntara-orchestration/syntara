@@ -117,7 +117,6 @@ async def _get_user_group_names(db: AsyncSession, user_id: UUID) -> list[str]:
         .join(user_groups, Group.id == user_groups.c.group_id)  # type: ignore[arg-type]
         .where(
             user_groups.c.user_id == user_id,
-            Group.deleted_at.is_(None),  # type: ignore[union-attr]
         )
         .order_by(col(Group.name))
     )
@@ -175,7 +174,6 @@ async def login(
     result = await db.exec(
         select(User).filter(
             User.username == username,  # type: ignore[arg-type]
-            User.deleted_at.is_(None),  # type: ignore[union-attr]
         )
     )
     user = result.one_or_none()
@@ -1083,7 +1081,7 @@ async def _verify_idp_test_permission(request: Request, db: AsyncSession) -> Non
             raise OIDCError(msg)
 
     # Load the user for authz metadata
-    user = await _find_non_deleted_user(db, UUID(str(payload.sub)))
+    user = await _find_user_by_id(db, UUID(str(payload.sub)))
     if not user:
         msg = "Authentication required for test sign-in"
         raise OIDCError(msg)
@@ -1330,12 +1328,11 @@ async def _exchange_and_validate_tokens(
     return user_claims, raw_merged_claims, id_token_raw
 
 
-async def _find_non_deleted_user(db: AsyncSession, user_id: UUID) -> User | None:
-    """Load a non-deleted user by ID, or return None if deleted/missing."""
+async def _find_user_by_id(db: AsyncSession, user_id: UUID) -> User | None:
+    """Load a user by ID, or return None if missing."""
     result = await db.exec(
         select(User).filter(
             User.id == user_id,  # type: ignore[arg-type]
-            User.deleted_at.is_(None),  # type: ignore[union-attr]
         )
     )
     return result.one_or_none()
@@ -1343,7 +1340,7 @@ async def _find_non_deleted_user(db: AsyncSession, user_id: UUID) -> User | None
 
 async def _load_active_user(db: AsyncSession, user_id: UUID) -> User:
     """Load a non-deleted, active user or raise OIDCError."""
-    user = await _find_non_deleted_user(db, user_id)
+    user = await _find_user_by_id(db, user_id)
     if not user:
         msg = "Linked user account has been deleted. Contact your administrator."
         raise OIDCError(msg)
@@ -1372,11 +1369,10 @@ def _validate_sub_claim(user_claims: dict[str, str | None]) -> str:
 
 
 async def _find_user_by_email(db: AsyncSession, email: str) -> User | None:
-    """Find a non-deleted user by email address."""
+    """Find a user by email address."""
     result = await db.exec(
         select(User).filter(
             User.email == email,  # type: ignore[arg-type]
-            User.deleted_at.is_(None),  # type: ignore[union-attr]
         )
     )
     return result.one_or_none()
@@ -1436,7 +1432,7 @@ async def _try_resolve_linked_identity(
     if not identity:
         return None
 
-    linked_user = await _find_non_deleted_user(db, identity.user_id)
+    linked_user = await _find_user_by_id(db, identity.user_id)
     if linked_user:
         if not linked_user.is_enabled:
             logger.warning("OIDC login blocked: user account is deactivated", user_id=str(identity.user_id))
@@ -1527,11 +1523,10 @@ async def _resolve_oidc_user(
 
 
 async def _is_username_taken(db: AsyncSession, value: str) -> bool:
-    """Check if a username is already taken by a non-deleted user."""
+    """Check if a username is already taken."""
     result = await db.exec(
         select(User).filter(
             User.username == value,  # type: ignore[arg-type]
-            User.deleted_at.is_(None),  # type: ignore[union-attr]
         )
     )
     return result.one_or_none() is not None
@@ -1618,11 +1613,7 @@ async def _auto_create_user(
 
 async def _grant_authenticated_group(db: AsyncSession, user: User) -> None:
     """Add an auto-created user to the authenticated group and emit a membership audit."""
-    auth_group = (
-        await db.exec(
-            select(Group).where(Group.name == AUTHENTICATED_GROUP_NAME, Group.deleted_at.is_(None))  # type: ignore[union-attr]
-        )
-    ).first()
+    auth_group = (await db.exec(select(Group).where(Group.name == AUTHENTICATED_GROUP_NAME))).first()
     if not auth_group:
         msg = f"Required built-in group '{AUTHENTICATED_GROUP_NAME}' is missing from the database"
         raise RuntimeError(msg)
@@ -2127,7 +2118,6 @@ async def _resolve_and_login_user(
                 .where(
                     user_groups.c.user_id == user.id,
                     Group.name != AUTHENTICATED_GROUP_NAME,
-                    Group.deleted_at.is_(None),  # type: ignore[union-attr]
                     user_groups.c.group_id.notin_(idp_managed_subq),
                 )
                 .limit(1)
@@ -2244,7 +2234,7 @@ async def _handle_link_flow(
     existing = await identity_service.find_by_issuer_and_subject(issuer, sub)
     if existing:
         # If linked to a deleted user, clean up the stale identity and proceed
-        linked_user = await _find_non_deleted_user(db, existing.user_id)
+        linked_user = await _find_user_by_id(db, existing.user_id)
         if linked_user is None:
             logger.info(
                 "Removing stale identity for deleted user during link flow",

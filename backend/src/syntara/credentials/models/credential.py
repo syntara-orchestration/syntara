@@ -95,6 +95,9 @@ class Credential(NamedResource, UserOwnedResource, table=True):
         "updated_by",
     ]
 
+    # Encrypted inputs are stored off-row via SecretService.
+    __external_change_fields__: ClassVar[frozenset[str]] = frozenset({"inputs"})
+
 
 class CredentialCreate(SQLModel):
     """Schema for creating a new credential."""

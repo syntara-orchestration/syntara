@@ -1,4 +1,4 @@
-import type { Decorator } from '@storybook/react-vite'
+import type { Decorator } from '@storybook/tanstack-react'
 
 import { SynPage, SynPageBody } from '../layout/SynPage'
 import { SynPageHeader } from '../layout/SynPageHeader'

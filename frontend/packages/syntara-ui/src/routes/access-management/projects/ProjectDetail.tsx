@@ -39,8 +39,10 @@ import { ProjectFormModal } from '../ProjectFormModal'
 import { useProjectPermissions } from '../useProjectPermissions'
 
 import { ProjectDeleteDialog } from './ProjectDeleteDialog'
+import { canShowTabContent, computeProjectTabState, type ProjectTab } from './projectDetailTabs'
 import { ProjectNotFoundState } from './ProjectNotFoundState'
 import { ProjectRoleAssignmentsTab } from './ProjectRoleAssignmentsTab'
+import { ProjectWorkflowsTab } from './ProjectWorkflowsTab'
 import { useProjectDetailPermissions } from './useProjectDetailPermissions'
 
 const noop = () => {}
@@ -133,9 +135,6 @@ function ProjectDetailsTab({ project }: Readonly<{ project: ProjectRead }>) {
   )
 }
 
-type ProjectTab = 'details' | 'role-assignments'
-const ALL_PROJECT_TABS: ProjectTab[] = ['details', 'role-assignments']
-
 export function ProjectDetail() {
   const navigate = useNavigate()
   const projectsDocLink = useDocLink('projects')
@@ -145,13 +144,17 @@ export function ProjectDetail() {
   const [editModalOpen, setEditModalOpen] = useState(false)
   const deleteDialog = useDialogState<ProjectRead>()
   const projectPermissions = useProjectPermissions({ resourceProject: projectId })
-  const { canReadAssignments, isLoading: permissionsLoading } = useProjectDetailPermissions(projectId ?? '')
+  const {
+    canReadWorkflows,
+    canReadAssignments,
+    isLoading: permissionsLoading,
+  } = useProjectDetailPermissions(projectId ?? '')
   const { mutate: deleteProject } = accessClient.useMutation('delete', '/projects/{project_id}')
 
-  const validTabs = useMemo(() => {
-    if (permissionsLoading || canReadAssignments) return ALL_PROJECT_TABS
-    return ALL_PROJECT_TABS.filter((tab) => tab !== 'role-assignments')
-  }, [canReadAssignments, permissionsLoading])
+  const { visibleTabs, urlValidTabs } = useMemo(
+    () => computeProjectTabState(canReadWorkflows, canReadAssignments, permissionsLoading, activeTab),
+    [canReadWorkflows, canReadAssignments, permissionsLoading, activeTab]
+  )
 
   const projectQuery = accessClient.useQuery(
     'get',
@@ -203,7 +206,7 @@ export function ProjectDetail() {
 
   if (!projectData) return null
 
-  const projectCrumbs = breadcrumbsProjectDetail(projectData.name)
+  const projectCrumbs = breadcrumbsProjectDetail(projectData.name, basePath, activeTab)
 
   return (
     <SynPage>
@@ -222,9 +225,17 @@ export function ProjectDetail() {
       />
       <SynPageBody>
         <SynListPanel>
-          <SynListPanelTabs basePath={basePath} defaultTab="details" validTabs={validTabs} aria-label="Project details">
+          <SynListPanelTabs
+            basePath={basePath}
+            defaultTab="details"
+            validTabs={urlValidTabs}
+            aria-label="Project details"
+          >
             <Tab eventKey="details" title={<TabTitleText>Details</TabTitleText>} />
-            {validTabs.includes('role-assignments') && (
+            {visibleTabs.includes('workflows') && (
+              <Tab eventKey="workflows" title={<TabTitleText>Workflows</TabTitleText>} />
+            )}
+            {visibleTabs.includes('role-assignments') && (
               <Tab eventKey="role-assignments" title={<TabTitleText>Assignments</TabTitleText>} />
             )}
           </SynListPanelTabs>
@@ -242,9 +253,13 @@ export function ProjectDetail() {
               body={<ProjectDetailsTab project={projectData} />}
             />
           )}
-          {activeTab === 'role-assignments' && validTabs.includes('role-assignments') && (
-            <ProjectRoleAssignmentsTab projectId={projectId ?? ''} />
+          {activeTab === 'workflows' && canShowTabContent('workflows', visibleTabs, permissionsLoading, activeTab) && (
+            <ProjectWorkflowsTab projectId={projectId ?? ''} isBuiltin={projectData.is_builtin} />
           )}
+          {activeTab === 'role-assignments' &&
+            canShowTabContent('role-assignments', visibleTabs, permissionsLoading, activeTab) && (
+              <ProjectRoleAssignmentsTab projectId={projectId ?? ''} />
+            )}
         </SynListPanel>
       </SynPageBody>
 

@@ -81,6 +81,7 @@ dev = [
     "pytest-xdist>=3.8.0",
     "ruff>=0.1.0,<0.14.4",
     "mypy>=1.6.0,<1.19",
+    "pyrefly>=1.3.0,<1.4.0",
     "httpx>=0.25.0",  # for testing FastAPI
     "respx>=0.20.0",  # for mocking httpx requests
     "websockets>=12.0",  # for WebSocket client testing
@@ -202,7 +203,7 @@ ignore = [
 ]
 "tests/performance/conftest.py" = ["E402"]  # pytest_plugins must precede imports
 "src/syntara/api/repositories/*.py" = ["ANN401"]  # Allow Any for database row types
-"src/syntara/core/database/migrations/**/*.py" = ["INP001", "D400", "D415", "PLR0915", "S608"]  # Alembic files (auto-generated, trusted SQL)
+"src/syntara/core/database/migrations/**/*.py" = ["INP001", "D400", "D415", "PLR0915"]  # Alembic files (auto-generated)
 "src/cli/**/*.py" = ["ANN401", "SLF001", "PLC0415"]  # CLI: dynamic types, private access to bundler, deferred imports
 "src/syntara/api/main.py" = ["S104"]  # Binding to all interfaces for development
 "tools/ci/check_migrations.py" = [
