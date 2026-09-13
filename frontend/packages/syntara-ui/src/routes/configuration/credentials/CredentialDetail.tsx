@@ -20,6 +20,7 @@ import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../components/layout/SynPanel'
 import { SynErrorState } from '../../../components/states/SynErrorState'
+import { SynLoadingState } from '../../../components/states/SynLoadingState'
 import { useQueryState } from '../../../components/states/useQueryState'
 import type { KebabAction } from '../../../components/SynKebabMenu'
 import { SynKebabMenu } from '../../../components/SynKebabMenu'
@@ -90,6 +91,63 @@ function DynamicCredentialFields({ typeFields, credInputs }: Readonly<DynamicFie
   })
 }
 
+type CredentialDetailToolbarProps = {
+  credential: Credential
+  canUpdate: boolean
+  canDelete: boolean
+  isPermissionsLoading: boolean
+  tooltips: { update: string; enable: string; delete: string }
+  onToggleEnabled: () => void
+  onEditClick: () => void
+  onDeleteClick: () => void
+}
+
+function CredentialDetailToolbar({
+  credential,
+  canUpdate,
+  canDelete,
+  isPermissionsLoading,
+  tooltips,
+  onToggleEnabled,
+  onEditClick,
+  onDeleteClick,
+}: Readonly<CredentialDetailToolbarProps>) {
+  const updateDisabled = isPermissionsLoading || !canUpdate
+  const deleteDisabled = isPermissionsLoading || !canDelete
+  const deleteTooltip = isPermissionsLoading || canDelete ? undefined : { content: tooltips.delete }
+
+  const kebabActions: KebabAction[] = [
+    {
+      key: 'delete',
+      title: <IconLabel icon={<RhUiTrashIcon />}>Delete credential</IconLabel>,
+      isDanger: true,
+      isAriaDisabled: deleteDisabled,
+      tooltipProps: deleteTooltip,
+      onClick: onDeleteClick,
+    },
+  ]
+
+  return (
+    <>
+      <DisabledWithTooltip isDisabled={updateDisabled} content={tooltips.enable}>
+        <Switch
+          id="credential-detail-toggle"
+          label="Enabled"
+          isChecked={credential.enabled}
+          isDisabled={updateDisabled}
+          onChange={onToggleEnabled}
+        />
+      </DisabledWithTooltip>
+      <DisabledWithTooltip isDisabled={updateDisabled} content={tooltips.update}>
+        <Button variant="primary" icon={<RhUiEditIcon />} isAriaDisabled={updateDisabled} onClick={onEditClick}>
+          Edit credential
+        </Button>
+      </DisabledWithTooltip>
+      <SynKebabMenu actions={kebabActions} aria-label="Credential actions" />
+    </>
+  )
+}
+
 function filterTabsByPermission(
   permissionsLoading: boolean,
   canReadWorkflows: boolean,
@@ -100,7 +158,7 @@ function filterTabsByPermission(
   return ALL_CREDENTIAL_TABS.filter((tab) => tabPermissions[tab] ?? true)
 }
 
-// eslint-disable-next-line max-lines-per-function -- detail page with multiple tabs, dialogs, and toolbar actions
+// eslint-disable-next-line max-lines-per-function, complexity -- detail page: early returns for loading/error/access gate + tabs/dialogs/toolbar push both metrics over threshold
 export default function CredentialDetail() {
   const credentialsDocLink = useDocLink('credentials')
   const { credentialId }: { credentialId: string } = useParams({ strict: false })
@@ -113,7 +171,27 @@ export default function CredentialDetail() {
     [canReadWorkflows, canReadIntegrations, permissionsLoading]
   )
   const [editModalOpen, setEditModalOpen] = useState(false)
-  const { canUpdate, canDelete, tooltips } = useCredentialPermissions()
+
+  // Fetch credential before permission checks so project_id is available
+  const credQuery = credentialsClient.useQuery(
+    'get',
+    '/credentials/{credential_id}',
+    { params: { path: { credential_id: credentialId } } },
+    { enabled: !!credentialId }
+  )
+  const credential = credQuery.data
+
+  const {
+    canRead,
+    canUpdate,
+    canDelete,
+    isLoading: isPermissionsLoading,
+    isReadChecking,
+    tooltips,
+  } = useCredentialPermissions({
+    resourceProject: credential?.project_id,
+    enabled: !!credential?.project_id,
+  })
   const {
     credentialToDelete,
     affectedWorkflows: deleteAffectedWorkflows,
@@ -140,15 +218,6 @@ export default function CredentialDetail() {
   } = useDisableCredentialState()
 
   const { showAlert } = useAlerts()
-
-  // Fetch credential
-  const credQuery = credentialsClient.useQuery(
-    'get',
-    '/credentials/{credential_id}',
-    { params: { path: { credential_id: credentialId } } },
-    { enabled: !!credentialId }
-  )
-  const credential = credQuery.data
 
   // Fetch credential type
   const typeQuery = credentialsClient.useQuery(
@@ -234,19 +303,6 @@ export default function CredentialDetail() {
     onSettled: closeDeleteDialog,
   })
 
-  const kebabActions: KebabAction[] = [
-    {
-      key: 'delete',
-      title: <IconLabel icon={<RhUiTrashIcon />}>Delete credential</IconLabel>,
-      isDanger: true,
-      isAriaDisabled: !canDelete,
-      tooltipProps: canDelete ? undefined : { content: tooltips.delete },
-      onClick: () => {
-        if (credential) openDeleteDialog(credential)
-      },
-    },
-  ]
-
   const queryState = useQueryState(credQuery, {
     title: 'Error loading credential',
     onRetry: () => detachPromise(credQuery.refetch()),
@@ -280,6 +336,34 @@ export default function CredentialDetail() {
 
   if (!credential?.id) return null
 
+  if (isReadChecking) {
+    return (
+      <SynPage>
+        <SynPageTitle segments={['Credential', 'Credentials']} />
+        <SynPageHeader title="Credential" breadcrumbs={breadcrumbsCredentialEarlyShell('Credential')} />
+        <SynPageBody>
+          <SynPanel isFullHeight>
+            <SynLoadingState />
+          </SynPanel>
+        </SynPageBody>
+      </SynPage>
+    )
+  }
+
+  if (!canRead) {
+    return (
+      <SynPage>
+        <SynPageTitle segments={['Credential', 'Credentials']} />
+        <SynPageHeader title="Credential" breadcrumbs={breadcrumbsCredentialEarlyShell('Credential')} />
+        <SynPageBody>
+          <SynPanel isFullHeight>
+            <SynErrorState title="Access Denied" message={tooltips.read} />
+          </SynPanel>
+        </SynPageBody>
+      </SynPage>
+    )
+  }
+
   const credInputs = credential.inputs ?? {}
   const credentialTypeDisplayText = getTypeDisplayText(credType?.name, typeLoadError)
   const hasDescription = Boolean(credential.description?.trim())
@@ -294,28 +378,16 @@ export default function CredentialDetail() {
         title={credential.name}
         docLink={credentialsDocLink}
         toolbar={
-          <>
-            <DisabledWithTooltip isDisabled={!canUpdate} content={tooltips.enable}>
-              <Switch
-                id="credential-detail-toggle"
-                label="Enabled"
-                isChecked={credential.enabled}
-                isDisabled={!canUpdate}
-                onChange={handleToggleEnabled}
-              />
-            </DisabledWithTooltip>
-            <DisabledWithTooltip isDisabled={!canUpdate} content={tooltips.update}>
-              <Button
-                variant="primary"
-                icon={<RhUiEditIcon />}
-                isAriaDisabled={!canUpdate}
-                onClick={() => setEditModalOpen(true)}
-              >
-                Edit credential
-              </Button>
-            </DisabledWithTooltip>
-            <SynKebabMenu actions={kebabActions} aria-label="Credential actions" />
-          </>
+          <CredentialDetailToolbar
+            credential={credential}
+            canUpdate={canUpdate}
+            canDelete={canDelete}
+            isPermissionsLoading={isPermissionsLoading}
+            tooltips={tooltips}
+            onToggleEnabled={handleToggleEnabled}
+            onEditClick={() => setEditModalOpen(true)}
+            onDeleteClick={() => openDeleteDialog(credential)}
+          />
         }
       />
 

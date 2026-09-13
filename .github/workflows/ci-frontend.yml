@@ -472,8 +472,6 @@ jobs:
       - run: echo "Frontend checks passed"
 
   # E2E UI tests run conditionally to reduce CI costs:
-  # - Auto-run on PRs when frontend/ or ci-frontend.yml changes
-  # - Skip on backend-only PRs (save ~15-20 min on 8-core runner)
   # - Always run in merge queue (final safety check)
   # - Daily scheduled run with Currents reporting (2 AM UTC)
   # - Manual trigger via /run-e2e-ui-tests comment (OWNER/MEMBER only)
@@ -481,8 +479,6 @@ jobs:
   test-compose-e2e:
     name: (Frontend) Test Podman Compose E2E
     needs: [changes, frontend-checks-gate]
-    # Only auto-trigger on same-repo PRs with frontend changes, or manual dispatch, or merge queue, or schedule.
-    # Fork PRs are explicitly excluded from auto-triggering to prevent security risks.
     # always() + gate != failure|cancelled lets workflow_dispatch still run when the
     # checks gate is skipped (e.g. docs-only PR), while preserving fast-fail when
     # lint/unit actually failed.
@@ -495,7 +491,6 @@ jobs:
           needs.frontend-checks-gate.result != 'failure' &&
           needs.frontend-checks-gate.result != 'cancelled' &&
           (
-            (needs.changes.outputs.frontend == 'true' && github.event_name != 'push' && github.event.pull_request.head.repo.full_name == github.repository) ||
             github.event_name == 'merge_group' ||
             github.event_name == 'workflow_dispatch'
           )
