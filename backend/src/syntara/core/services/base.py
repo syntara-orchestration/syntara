@@ -23,6 +23,7 @@ from syntara.authz.engine import AllowedProjectsResult
 from syntara.core.constants import FieldLimits
 from syntara.core.exceptions import SafeValueError
 from syntara.core.models import User
+from syntara.core.models.base.base_resource import BaseResource, has_user_visible_changes
 from syntara.core.services.extensions import ConvertResourceMixin, EnrichQueryMixin, PostProcessingMixin
 from syntara.core.services.types import TModel, TResponse
 from syntara.core.utils.cursor import (
@@ -130,6 +131,10 @@ class BaseService:
         self.post_processing_mixin = (
             post_processing_mixin if post_processing_mixin is not None else DefaultPostProcessingMixin()
         )
+
+    def has_pending_user_changes(self, resource: BaseResource) -> bool:
+        """Return whether a resource has real user-visible changes pending flush."""
+        return has_user_visible_changes(resource)
 
     @staticmethod
     def _collect_user_ids(objects: Sequence[Any], field_names: Sequence[str]) -> set[str | UUID]:

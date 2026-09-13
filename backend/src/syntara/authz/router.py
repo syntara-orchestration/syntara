@@ -452,7 +452,6 @@ async def _scan_authorized_users(
     while len(authorized) < target_count:
         query = select(User).where(
             User.is_enabled.is_(True),  # type: ignore[attr-defined]
-            User.deleted_at.is_(None),  # type: ignore[union-attr]
         )
         if batch_cursor_id is not None:
             query = _apply_who_can_cursor_filter(  # type: ignore[assignment]
@@ -552,7 +551,6 @@ async def _count_authorized_users(
             select(User)
             .where(
                 User.is_enabled.is_(True),  # type: ignore[attr-defined]
-                User.deleted_at.is_(None),  # type: ignore[union-attr]
             )
             .order_by(col(User.id))
             .limit(_WHO_CAN_DB_BATCH_SIZE)

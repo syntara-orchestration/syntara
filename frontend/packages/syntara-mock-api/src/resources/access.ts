@@ -604,7 +604,6 @@ export interface MockServiceAccount {
   status: ServiceAccountStatus
   project_id: string
   project_name: string | null
-  is_project_deleted: boolean
   last_authenticated_at: string | null
   created_by: string
   updated_by: string | null
@@ -621,7 +620,6 @@ export const mockServiceAccounts: MockServiceAccount[] = [
     status: 'active',
     project_id: 'p-001',
     project_name: 'default',
-    is_project_deleted: false,
     last_authenticated_at: mockDate.hoursAgo2,
     created_by: 'u-001',
     updated_by: null,
@@ -636,7 +634,6 @@ export const mockServiceAccounts: MockServiceAccount[] = [
     status: 'active',
     project_id: 'p-001',
     project_name: 'default',
-    is_project_deleted: false,
     last_authenticated_at: mockDate.minutesAgo30,
     created_by: 'u-001',
     updated_by: null,
@@ -651,7 +648,6 @@ export const mockServiceAccounts: MockServiceAccount[] = [
     status: 'disabled',
     project_id: 'p-002',
     project_name: 'alice-sandbox',
-    is_project_deleted: false,
     last_authenticated_at: mockDate.daysAgo5,
     created_by: 'u-002',
     updated_by: 'u-001',
@@ -666,7 +662,6 @@ export const mockServiceAccounts: MockServiceAccount[] = [
     status: 'active',
     project_id: 'p-002',
     project_name: 'alice-sandbox',
-    is_project_deleted: false,
     last_authenticated_at: null,
     created_by: 'u-001',
     updated_by: null,
@@ -677,11 +672,10 @@ export const mockServiceAccounts: MockServiceAccount[] = [
   {
     id: 'sa-005',
     name: 'legacy-sync',
-    description: 'Sync agent from a project that has been removed',
+    description: 'Legacy inventory sync agent',
     status: 'disabled',
-    project_id: 'p-deleted-001',
-    project_name: 'retired-infra',
-    is_project_deleted: true,
+    project_id: 'p-002',
+    project_name: 'alice-sandbox',
     last_authenticated_at: mockDate.daysAgo5,
     created_by: 'u-002',
     updated_by: null,

@@ -7,3 +7,7 @@
 .header :global(.pf-v6-c-compass__main-header-title) {
   min-width: 0;
 }
+
+.header :global(.pf-v6-c-compass__main-header-toolbar) {
+  min-width: 0;
+}

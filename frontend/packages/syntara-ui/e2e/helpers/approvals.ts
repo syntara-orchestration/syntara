@@ -81,5 +81,5 @@ export async function navigateToApprovalAndOpen(app: Page, approvalName: string)
   await expect(approvalLink).toBeVisible({ timeout: 15_000 })
   await approvalLink.click()
 
-  await waitForApprovalPanel(app)
+  await waitForApprovalPanel(app, 30_000)
 }

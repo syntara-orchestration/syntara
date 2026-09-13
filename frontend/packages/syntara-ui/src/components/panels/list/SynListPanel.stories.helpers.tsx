@@ -10,7 +10,6 @@ import { useMemo, useState } from 'react'
 
 import { useTableSort } from '../../../hooks/useTableSort'
 import { useUrlTab } from '../../../hooks/useUrlTab'
-import { createTestRouter } from '../../../test/createTestRouter'
 import {
   type FilterConfig,
   type FilterFieldDefinition,
@@ -164,15 +163,9 @@ function TabbedListContent() {
   )
 }
 
-const TabbedListWrapper = createTestRouter(`${TABBED_BASE_PATH}/members`)
-
-/** Renders the tabbed list inside a memory router; for use as a story render function. */
+/** Renders the tabbed list; the story supplies its initial URL through Storybook's router parameters. */
 export function TabbedListStory() {
-  return (
-    <TabbedListWrapper>
-      <TabbedListContent />
-    </TabbedListWrapper>
-  )
+  return <TabbedListContent />
 }
 
 type KitchenRow = { id: string; name: string; status: string; count: number }

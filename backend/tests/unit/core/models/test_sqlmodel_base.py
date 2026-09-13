@@ -6,6 +6,7 @@ These tests will initially fail until the SQLModel classes are implemented.
 """
 
 from datetime import UTC, datetime
+from unittest.mock import MagicMock
 from uuid import UUID, uuid4
 
 import pytest
@@ -17,6 +18,15 @@ from syntara.core.models.base import (
     Resource,
     SoftDeletableResource,
     UserOwnedResource,
+)
+from syntara.core.models.base.base_resource import (
+    clear_external_field_changes,
+    external_field_changes,
+    has_user_visible_changes,
+    note_external_field_change,
+    touch_audit_metadata_before_flush,
+    touch_updated_at_before_flush,
+    user_visible_column_changes,
 )
 from syntara.core.models.pagination import ResourcesResponse, ResourcesResponseBase
 from tests.unit.core.models.mock_shared_resources import MockBaseResource, MockNamedResource, MockResource
@@ -42,6 +52,84 @@ class TestSQLModelBaseClasses:
         # Concrete classes should have table=True
 
         assert hasattr(MockBaseResource, "__table__")
+
+    def test_base_resource_updated_at_has_no_column_onupdate(self) -> None:
+        """updated_at bumps are handled in touch_updated_at_before_flush, not column onupdate."""
+        updated_at_col = MockBaseResource.__table__.c.updated_at  # type: ignore[attr-defined]
+        created_at_col = MockBaseResource.__table__.c.created_at  # type: ignore[attr-defined]
+        assert updated_at_col.onupdate is None
+        assert created_at_col.onupdate is None
+
+    def test_touch_updated_at_before_flush_skips_exempt_only_changes(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """updated_at is only bumped when a non-exempt field actually changed."""
+        baseline_updated_at = datetime(2020, 1, 1, tzinfo=UTC)
+        resource = MockBaseResource(id=uuid4(), created_at=baseline_updated_at, updated_at=baseline_updated_at)
+        session = MagicMock()
+        session.__iter__ = MagicMock(side_effect=lambda: iter([resource]))
+        persistent_state = MagicMock(persistent=True)
+        monkeypatch.setattr("syntara.core.models.base.base_resource.sa_inspect", lambda _obj: persistent_state)
+
+        monkeypatch.setattr(
+            "syntara.core.models.base.base_resource._changed_column_names",
+            lambda _obj: {"labels"},
+        )
+        monkeypatch.setattr(MockBaseResource, "__updated_at_exempt_fields__", frozenset({"labels"}))
+        touch_updated_at_before_flush(session, None, None)
+        assert resource.updated_at == baseline_updated_at
+
+        monkeypatch.setattr(MockBaseResource, "__updated_at_exempt_fields__", frozenset())
+        touch_updated_at_before_flush(session, None, None)
+        assert resource.updated_at > baseline_updated_at
+
+    def test_touch_updated_at_before_flush_skips_auth_telemetry_fields(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Service-account auth timestamps alone must not bump updated_at."""
+        baseline_updated_at = datetime(2020, 1, 1, tzinfo=UTC)
+        resource = MockBaseResource(id=uuid4(), created_at=baseline_updated_at, updated_at=baseline_updated_at)
+        session = MagicMock()
+        session.__iter__ = MagicMock(side_effect=lambda: iter([resource]))
+        persistent_state = MagicMock(persistent=True)
+        monkeypatch.setattr("syntara.core.models.base.base_resource.sa_inspect", lambda _obj: persistent_state)
+
+        monkeypatch.setattr(
+            "syntara.core.models.base.base_resource._changed_column_names",
+            lambda _obj: {"last_authenticated_at", "last_used_at"},
+        )
+        monkeypatch.setattr(
+            MockBaseResource,
+            "__updated_at_exempt_fields__",
+            frozenset({"last_authenticated_at", "last_used_at"}),
+        )
+        touch_updated_at_before_flush(session, None, None)
+        assert resource.updated_at == baseline_updated_at
+
+    def test_external_field_change_helpers(self) -> None:
+        """Off-row markers participate in user-visible change detection."""
+        baseline_updated_at = datetime(2020, 1, 1, tzinfo=UTC)
+        resource = MockBaseResource(id=uuid4(), created_at=baseline_updated_at, updated_at=baseline_updated_at)
+
+        assert external_field_changes(resource) == frozenset()
+        assert has_user_visible_changes(resource) is False
+
+        note_external_field_change(resource, "inputs")
+        assert external_field_changes(resource) == frozenset({"inputs"})
+        assert user_visible_column_changes(resource) == {"inputs"}
+        assert has_user_visible_changes(resource) is True
+
+        clear_external_field_changes(resource)
+        assert external_field_changes(resource) == frozenset()
+
+    def test_touch_audit_metadata_before_flush_bumps_on_external_change(self) -> None:
+        """External field markers bump updated_at even without ORM column edits."""
+        baseline_updated_at = datetime(2020, 1, 1, tzinfo=UTC)
+        resource = MockBaseResource(id=uuid4(), created_at=baseline_updated_at, updated_at=baseline_updated_at)
+        note_external_field_change(resource, "inputs")
+        session = MagicMock()
+        session.__iter__ = MagicMock(side_effect=lambda: iter([resource]))
+
+        touch_audit_metadata_before_flush(session, None, None)
+
+        assert resource.updated_at > baseline_updated_at
+        assert external_field_changes(resource) == frozenset()
 
     def test_base_resource_instance_creation(self) -> None:
         """Test MockBaseResource instance creation with labels."""

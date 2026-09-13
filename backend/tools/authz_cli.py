@@ -682,9 +682,6 @@ async def cmd_clean(args: argparse.Namespace) -> None:
     ]
 
     async with AsyncSessionLocal() as db:
-        # Clear deleted_by on default project first (FK to users)
-        await db.exec(text("UPDATE projects SET deleted_by = NULL, deleted_at = NULL WHERE is_default = true"))
-
         for table, condition in clean_steps:
             sql = f"DELETE FROM {table}"  # noqa: S608
             if condition:

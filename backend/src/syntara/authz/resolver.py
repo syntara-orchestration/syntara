@@ -208,7 +208,6 @@ async def get_user_group_ids(db: AsyncSession, user_id: UUID) -> list[UUID]:
         .join(Group, Group.id == user_groups.c.group_id)  # type: ignore[arg-type]
         .where(
             user_groups.c.user_id == user_id,
-            Group.deleted_at.is_(None),  # type: ignore[union-attr]
         )
     )
     group_ids = list(result.all())
@@ -216,7 +215,6 @@ async def get_user_group_ids(db: AsyncSession, user_id: UUID) -> list[UUID]:
     auth_group_result = await db.exec(
         select(Group).where(
             Group.name == AUTHENTICATED_GROUP_NAME,
-            Group.deleted_at.is_(None),  # type: ignore[union-attr]
         )
     )
     auth_group = auth_group_result.first()
@@ -333,7 +331,6 @@ async def resolve_user_groups(
     groups_result = await db.exec(
         select(Group).where(
             Group.id.in_(group_ids),  # type: ignore[attr-defined]
-            Group.deleted_at.is_(None),  # type: ignore[union-attr]
         )
     )
     return [{"name": g.name, "id": str(g.id), "labels": g.labels} for g in groups_result.all()]
