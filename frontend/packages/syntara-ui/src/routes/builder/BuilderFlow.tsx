@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 // TODO: Refactor into smaller hooks to reduce file size
 // Suggested hooks: useWorkflowGraphInit, useExecutionStateEnrichment, useCanvasInteractions
 
@@ -289,7 +290,12 @@ export function BuilderFlow(props: BuilderFlowProps) {
 
   useExternalNodeSelection(selectedActivityId, setNodes)
 
-  const { onNodeDragStop, onLayout } = usePositionEventHandlers(nodes, edges, setNodes, setEdges)
+  const { onNodeDragStart, onNodeDrag, onNodeDragStop, onLayout } = usePositionEventHandlers(
+    nodes,
+    edges,
+    setNodes,
+    setEdges
+  )
 
   const onEdgesChange = useCallback(
     (changes: EdgeChange<EdgeType>[]) => {
@@ -597,6 +603,8 @@ export function BuilderFlow(props: BuilderFlowProps) {
           nodeTypes={builderNodeTypes}
           edgeTypes={builderEdgeTypes}
           onNodesChange={onNodesChange}
+          onNodeDragStart={isReadOnly ? undefined : onNodeDragStart}
+          onNodeDrag={isReadOnly ? undefined : onNodeDrag}
           onNodeDragStop={isReadOnly ? undefined : onNodeDragStop}
           onEdgesChange={onEdgesChange}
           onNodesDelete={isReadOnly ? undefined : onNodesDelete}

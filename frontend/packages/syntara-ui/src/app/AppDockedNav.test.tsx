@@ -395,6 +395,17 @@ describe('AppDockedNav', () => {
       })
     })
 
+    it('shows label text for docked actions when mobile overlay is expanded', () => {
+      renderDockedNav()
+      expect(screen.getByText('Light mode')).toBeInTheDocument()
+      expect(screen.getByText('Documentation')).toBeInTheDocument()
+    })
+
+    it('does not apply icon-only nav styles when mobile overlay is expanded', () => {
+      renderDockedNav()
+      expect(screen.getByRole('navigation', { name: 'Main navigation' })).not.toHaveClass(styles.iconDockNav)
+    })
+
     it('renders expandable nav groups when dock is expanded on mobile', () => {
       renderDockedNav()
       expect(screen.getByText('Integrations')).toBeInTheDocument()

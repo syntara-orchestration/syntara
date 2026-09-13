@@ -457,6 +457,18 @@ class TestEvaluateGate:
         assert decision.allowed is True
         assert decision.code == "breaking_approved"
 
+    def test_breaking_approved_minor_bump_allowed_when_expected_patch(self):
+        # oasdiff may miss a breaking change; leadership approval + minor bump is enough.
+        decision = self._decide(
+            has_breaking=False,
+            has_changes=True,
+            version_bump_type="minor",
+            expected_bump_type="patch",
+            breaking_approved=True,
+        )
+        assert decision.allowed is True
+        assert decision.code == "breaking_approved"
+
     def test_breaking_approved_with_major_bump_blocked(self):
         # An approved in-place breaking change must be a minor bump, not major.
         decision = self._decide(
@@ -542,6 +554,24 @@ class TestMainGate:
         assert result["breaking_approved"] is True
         assert result["version_bumped"] is True
         assert result["expected_bump_type"] == "minor"
+        assert result["gate_code"] == "breaking_approved"
+
+    def test_breaking_change_with_approval_label_minor_bump_not_flagged_breaking(self, monkeypatch, tmp_path):
+        code, result = _run_main(
+            monkeypatch,
+            tmp_path,
+            base_version="1.1.0",
+            head_version="1.2.0",
+            has_breaking=False,
+            changelog="",
+            changelog_entries=[],
+            head_description="approved change oasdiff did not flag as breaking",
+            pr_labels='["breaking-change-approved"]',
+        )
+        assert code == 0
+        assert result["breaking_approved"] is True
+        assert result["version_bump_type"] == "minor"
+        assert result["expected_bump_type"] == "patch"
         assert result["gate_code"] == "breaking_approved"
 
     def test_breaking_change_approved_but_major_bump_blocked(self, monkeypatch, tmp_path):
