@@ -43,17 +43,42 @@ check_dependencies() {
     fi
 }
 
-# Generate a bootstrap admin password that satisfies validate_password_complexity:
-# at least 14 characters and 3 of 4 character classes (upper, lower, digit, other).
+# Returns 0 when password meets validate_password_complexity rules.
+admin_password_meets_complexity() {
+    local password="$1"
+    local classes=0
+
+    if ((${#password} < 14)); then
+        return 1
+    fi
+
+    [[ "$password" =~ [0-9] ]] && classes=$((classes + 1))
+    [[ "$password" =~ [A-Z] ]] && classes=$((classes + 1))
+    [[ "$password" =~ [a-z] ]] && classes=$((classes + 1))
+    [[ "$password" =~ [^a-zA-Z0-9] ]] && classes=$((classes + 1))
+
+    [[ $classes -ge 3 ]]
+}
+
+# Generate a bootstrap admin password that satisfies validate_password_complexity.
 # openssl rand -base64 can miss a class (~0.1% of the time), which flakes CI when
 # orchestrator-admin reset-password validates the secret.
 generate_admin_password() {
-    local upper lower digit punct
-    upper=$(openssl rand -base64 48 | tr -dc 'A-Z' | head -c 4)
-    lower=$(openssl rand -base64 48 | tr -dc 'a-z' | head -c 4)
-    digit=$(openssl rand -base64 48 | tr -dc '0-9' | head -c 4)
-    punct=$(openssl rand -base64 48 | tr -dc '!@#$%^&*+-=' | head -c 4)
-    echo -n "${upper}${lower}${digit}${punct}"
+    local password
+    local attempt=0
+    local max_attempts=100
+
+    while ((attempt < max_attempts)); do
+        password=$(openssl rand -base64 24 | tr -d '\n')
+        if admin_password_meets_complexity "$password"; then
+            echo -n "$password"
+            return 0
+        fi
+        attempt=$((attempt + 1))
+    done
+
+    error "Failed to generate admin password meeting complexity requirements after ${max_attempts} attempts"
+    exit 1
 }
 
 # Generate an ES256 (ECDSA P-256) key pair
@@ -139,7 +164,7 @@ main() {
             info "  Using password from APP_ADMIN_PASSWORD env var"
         else
             generate_admin_password > "$SECRETS_DIR/admin-password"
-            info "  Generated random password (complexity-compliant)"
+            info "  Generated random password"
         fi
         chmod 600 "$SECRETS_DIR/admin-password"
         info "  Password file: $SECRETS_DIR/admin-password"
