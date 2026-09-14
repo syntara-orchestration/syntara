@@ -45,6 +45,9 @@ class WorkItem(SQLModel, table=True):
     # Set when a worker claims this item.
     execution_target_id: uuid.UUID | None = Field(default=None, foreign_key=f"{EP_SCHEMA}.execution_targets.id")
 
+    # Activity parameters serialized by the Temporal activity before async handoff.
+    payload: dict = Field(default={}, sa_column=Column(JSONB, nullable=False, server_default="{}"))
+
     # Terminal result persisted before signalling Temporal.
     result: dict | None = Field(default=None, sa_column=Column(JSONB, nullable=True))
 

@@ -211,6 +211,11 @@ async def _lifespan_startup(app: FastAPI) -> dict[str, Any]:  # noqa: PLR0915
     else:
         logger.warning("Router discovery disabled - no routers will be automatically registered")
 
+    # Register execution plane router (not under syntara package, so discovered manually)
+    from execution_plane.router import router as ep_router  # noqa: PLC0415
+
+    app.include_router(ep_router)
+
     # Register WebSocket router manually (excluded from router discovery)
     # WebSocket routers use AsyncAPI specification instead of OpenAPI,
     # so they're excluded from the OpenAPI-based validation system and

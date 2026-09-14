@@ -5,11 +5,14 @@ Scripts run in isolated subprocesses with timeout and error handling.
 """
 
 import asyncio
+import base64
 import contextlib
 import json
 import os
 import subprocess
 import sys
+import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -441,6 +444,50 @@ async def _execute_script_common(
             await _cleanup_process(process)
 
 
+async def _dispatch_to_te(
+    input_config: dict[str, Any],
+    output_config: dict[str, str] | None,
+) -> None:
+    """Write a WorkItem to the execution_plane schema for TE worker pickup.
+
+    Called when APP_USE_TE_DISPATCH=true. Stores the Temporal async completion
+    task token and script parameters so the TE worker can execute the script
+    and signal Temporal on completion.
+    """
+    from execution_plane.models.work_item import WorkItem, WorkItemStatus  # noqa: PLC0415
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine  # noqa: PLC0415
+    from sqlalchemy.pool import NullPool  # noqa: PLC0415
+
+    task_token_bytes: bytes = activity.info().task_token
+    task_token_b64 = base64.b64encode(task_token_bytes).decode("ascii")
+    execution_id_str = activity.info().workflow_id
+
+    settings = get_settings()
+    engine = create_async_engine(settings.database_url, poolclass=NullPool)
+    session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    try:
+        execution_id = uuid.UUID(execution_id_str) if execution_id_str else uuid.uuid4()
+    except ValueError:
+        execution_id = uuid.uuid4()
+
+    work_item = WorkItem(
+        id=uuid.uuid4(),
+        execution_id=execution_id,
+        activity_handle=task_token_b64,
+        status=WorkItemStatus.PENDING,
+        payload={"input_config": input_config, "output_config": output_config},
+        created_at=datetime.now(UTC),
+    )
+
+    async with session_factory() as session:
+        session.add(work_item)
+        await session.commit()
+
+    await engine.dispose()
+    activity.logger.info("Dispatched work item to TE", work_item_id=str(work_item.id))
+
+
 @activity.defn(name=ActivityName.SCRIPT)
 async def execute_script_activity(  # noqa: C901
     input_config: dict[str, Any],
@@ -485,6 +532,10 @@ async def execute_script_activity(  # noqa: C901
     if not get_settings().script_nodes_enabled:
         msg = "Script node execution is not enabled."
         raise ApplicationError(msg, type="ScriptNodeDisabled", non_retryable=True)
+
+    if get_settings().use_te_dispatch:
+        await _dispatch_to_te(input_config, output_config)
+        activity.raise_complete_async()
 
     try:
         # Validate config via Pydantic model

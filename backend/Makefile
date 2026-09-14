@@ -268,6 +268,7 @@ db-seed-all: check-deps ## Run all database seeders including dev samples
 dev: check-deps _ensure-secrets _ensure-certs ## Run development server with auto-reload
 	@echo "🔄 Running database migrations..."
 	@APP_ADMIN_PASSWORD_PATH=.secrets/admin-password uv run alembic upgrade head
+	@$(MAKE) ep-migrate
 	@$(MAKE) db-seed
 	@echo "✅ Migrations and seeding complete"
 	@echo "🪣 Ensuring S3 bucket exists on moto..."
@@ -317,6 +318,12 @@ worker-run: check-deps _ensure-secrets _ensure-certs ## Run Temporal workflow wo
 	APP_APPROVALS_API_BASE_URL=$(WORKER_BASE_URL) \
 	APP_TOOL_MANAGER_BASE_URL=$(WORKER_BASE_URL) \
 	uv run python -m syntara.workflows.worker
+
+.PHONY: ep-worker-run
+ep-worker-run: check-deps ## Run execution plane TE worker (polls work_items and completes Temporal activities)
+	@echo "🔄 Starting Execution Plane worker..."
+	APP_USE_TE_DISPATCH=true \
+	uv run python -m execution_plane.worker
 
 .PHONY: background-worker-run
 background-worker-run: check-deps _ensure-secrets _ensure-certs ## Run Temporal workflow background worker

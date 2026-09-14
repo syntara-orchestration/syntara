@@ -1492,6 +1492,11 @@ class WorkflowEngineSettings(BaseSettings):
         description="Enable Script node execution in workflows (Developer Preview)",
     )
 
+    use_te_dispatch: bool = Field(
+        default=False,
+        description="Route script activities through the Execution Plane TE worker instead of running inline",
+    )
+
     agent_orchestrator_base_url: HttpUrl = Field(  # type: ignore[assignment]
         default="http://localhost:8000/api/v1",
         description="Base URL for Agent Orchestrator API",

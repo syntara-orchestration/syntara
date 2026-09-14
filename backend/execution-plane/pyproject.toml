@@ -13,6 +13,8 @@ dependencies = [
     "asyncpg>=0.30.0",
     "fastapi>=0.135.0",
     "sqlmodel>=0.0.22",
+    "structlog>=24.0.0",
+    "temporalio>=1.7.0",
     "uvicorn[standard]>=0.47.0",
 ]
 
@@ -24,6 +26,9 @@ only-include = [
     "src/execution_plane",
     "README.md",
 ]
+
+[project.scripts]
+execution-plane-worker = "execution_plane.worker:main"
 
 [tool.uv.sources]
 # no cross-package deps yet; add syntara here if needed for credential resolution

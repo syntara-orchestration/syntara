@@ -72,6 +72,7 @@ dependencies = [
     "uuid-utils>=0.9.0",
     "pypdf>=6.15.0",
     "nh3>=0.2.21",
+    "execution-plane",
 ]
 
 [project.optional-dependencies]
@@ -287,6 +288,11 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 # AuthzEvaluator module may be treated as untyped in some CI environments
 module = "syntara.authz.evaluator"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# execution_plane is a uv workspace package; mypy does not resolve workspace editable installs
+module = "execution_plane.*"
 ignore_missing_imports = true
 
 
