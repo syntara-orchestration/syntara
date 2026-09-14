@@ -214,7 +214,8 @@ export default function Workflows() {
     })
   }
 
-  const hasQueryState = workflowsQuery.isPending || !!workflowsQuery.error
+  const hasQueryError = !!workflowsQuery.error
+  const isInitialWorkflowsLoad = workflowsQuery.isLoading
   return (
     <>
       <SynPage>
@@ -222,9 +223,9 @@ export default function Workflows() {
         <SynPageHeader
           title="Workflows"
           docLink={workflowsDocLink}
-          projectSelector={hasQueryState ? undefined : ProjectSelector}
+          projectSelector={hasQueryError ? undefined : ProjectSelector}
           toolbar={
-            !hasQueryState && showToolbar ? (
+            !hasQueryError && showToolbar ? (
               <WorkflowsPageToolbar
                 headerProjectActions={headerProjectActions}
                 canCreate={permissions.canCreate && !selectedProject?.is_builtin}
@@ -243,7 +244,7 @@ export default function Workflows() {
         <SynPageBody>
           <SynListPanel>
             <WorkflowsListView
-              isPending={workflowsQuery.isPending}
+              isPending={isInitialWorkflowsLoad}
               error={workflowsQuery.error}
               onRetry={() => detachPromise(workflowsQuery.refetch())}
               isFetching={workflowsQuery.isFetching}
