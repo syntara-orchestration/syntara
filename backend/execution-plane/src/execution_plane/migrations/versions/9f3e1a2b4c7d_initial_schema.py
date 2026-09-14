@@ -47,6 +47,7 @@ def upgrade() -> None:
         sa.Column("activity_handle", sa.Text(), nullable=False),
         sa.Column("status", sa.String(), nullable=False),
         sa.Column("execution_target_id", sa.UUID(), nullable=True),
+        sa.Column("payload", JSONB(), nullable=False, server_default="{}"),
         sa.Column("result", JSONB(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("claimed_at", sa.DateTime(timezone=True), nullable=True),
