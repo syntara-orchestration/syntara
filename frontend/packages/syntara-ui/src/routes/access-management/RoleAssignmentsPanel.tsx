@@ -21,8 +21,8 @@ import { SynKebabMenu } from '../../components/SynKebabMenu'
 import { LinkCell } from '../../components/table/LinkCell'
 import type { PaginationFooterProps } from '../../components/table/PaginationFooter'
 import { SynScrollableTableContainer } from '../../components/table/SynScrollableTableContainer'
-import { useClientPagination } from '../../hooks/useClientPagination'
 import { invalidateAuthzCaches } from '../../hooks/invalidateAuthzCaches'
+import { useClientPagination } from '../../hooks/useClientPagination'
 import { useColumnSortState } from '../../hooks/useColumnSortState'
 import { useExpandableRowIds } from '../../hooks/useExpandableRowIds'
 import { useFilterState } from '../../hooks/useFilterState'
@@ -102,11 +102,7 @@ function RoleAssignmentsTable({
   const expandableColumnCount = visibleColumns.length + 2
 
   return (
-    <SynScrollableTableContainer
-      caption="Role assignments table"
-      isExpandable
-      footer={footer}
-    >
+    <SynScrollableTableContainer caption="Role assignments table" isExpandable footer={footer}>
       <Thead>
         <Tr>
           <Th

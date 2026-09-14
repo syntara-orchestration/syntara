@@ -208,10 +208,7 @@ export const WithPagination: Story = {
     const pageRows = paginate(SAMPLE_ROWS)
 
     return (
-      <SynScrollableTableContainer
-        caption="Paginated resources table"
-        footer={getFooterProps(SAMPLE_ROWS.length)}
-      >
+      <SynScrollableTableContainer caption="Paginated resources table" footer={getFooterProps(SAMPLE_ROWS.length)}>
         <Thead>
           <Tr>
             <Th>Name</Th>

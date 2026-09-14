@@ -210,10 +210,7 @@ export function GroupMembersPanel({ groupId, onMembershipChange }: Readonly<Grou
             />
           </SynPageBody>
         ) : (
-          <SynScrollableTableContainer
-            caption="Group members table"
-            footer={getFooterProps(filteredMembers.length)}
-          >
+          <SynScrollableTableContainer caption="Group members table" footer={getFooterProps(filteredMembers.length)}>
             <Thead>
               <Tr>
                 <Th>Username</Th>

@@ -442,10 +442,7 @@ export function UserIdentitiesPanel({
           <SynEmptyStateFilter clearAllFilters={identitiesFilter.clearAllFilters} />
         </StackItem>
       ) : (
-        <SynScrollableTableContainer
-          caption="User identities table"
-          footer={getFooterProps(sortedRows.length)}
-        >
+        <SynScrollableTableContainer caption="User identities table" footer={getFooterProps(sortedRows.length)}>
           <Thead>
             <Tr>
               <Th sort={getSortParams(0)}>Provider</Th>

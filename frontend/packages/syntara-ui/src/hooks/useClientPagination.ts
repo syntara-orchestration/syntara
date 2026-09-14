@@ -47,7 +47,7 @@ export function useClientPagination(options: UseClientPaginationOptions = {}): U
   )
 
   const paginate = useCallback(
-    <T,>(items: readonly T[]): T[] => {
+    <T>(items: readonly T[]): T[] => {
       const start = (page - 1) * perPage
       return items.slice(start, start + perPage)
     },

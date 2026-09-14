@@ -371,10 +371,7 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
             />
           </SynPageBody>
         ) : (
-          <SynScrollableTableContainer
-            caption="User groups table"
-            footer={getFooterProps(filteredGroups.length)}
-          >
+          <SynScrollableTableContainer caption="User groups table" footer={getFooterProps(filteredGroups.length)}>
             <Thead>
               <Tr>
                 <Th>Name</Th>
