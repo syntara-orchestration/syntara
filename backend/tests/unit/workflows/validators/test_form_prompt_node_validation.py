@@ -230,7 +230,7 @@ class TestFormPromptPortRules:
         assert errors[0].node_id == "form"
 
     def test_fallback_behavior_fallback_without_port(self) -> None:
-        """Error: fallback_behavior='fallback' but no fallback port."""
+        """Allowed: fallback_behavior='fallback' without a fallback port (validation removed)."""
         workflow_def = {
             "schema_version": "2.0.0",
             "name": "test",
@@ -249,16 +249,8 @@ class TestFormPromptPortRules:
             ],
         }
         result = WorkflowValidator().collect_findings(workflow_def)
-        assert not result.is_valid
-        errors = [f for f in result.findings if f.severity == ValidationSeverity.error]
-        fallback_error = [
-            f
-            for f in errors
-            if "fallback branch on timeout" in f.message and "'Fallback' branch has no connection" in f.message
-        ]
-        assert len(fallback_error) == 1
-        assert fallback_error[0].node_id == "form"
-        assert fallback_error[0].field_path == "parameters.fallback_behavior"
+        # This validation was removed - workflow is now valid without fallback port
+        assert result.is_valid
 
     def test_fallback_port_exists_but_behavior_fail(self) -> None:
         """Error: fallback port connected but fallback_behavior='fail' (unreachable branch)."""

@@ -584,3 +584,37 @@ class TestFormPromptNodeParameters:
         )
         assert p.css_override is not None
         assert ".form" in p.css_override
+
+    def test_css_override_unicode_escape_url_rejected(self) -> None:
+        """css_override with Unicode-escaped url() is rejected (bypass attempt)."""
+        # \\75 = 'u', \\72 = 'r', \\6c = 'l' - spells "url"
+        with pytest.raises(ValidationError, match="url\\(\\)"):
+            FormPromptNodeParameters(
+                input_schema={"type": "object"}, css_override="background: \\75rl(http://evil.com);"
+            )
+
+    def test_css_override_unicode_escape_import_rejected(self) -> None:
+        """css_override with Unicode-escaped @import is rejected (bypass attempt)."""
+        # \\40 = '@' - spells "@import"
+        with pytest.raises(ValidationError, match="@import"):
+            FormPromptNodeParameters(input_schema={"type": "object"}, css_override="\\40import 'evil.css';")
+
+    def test_css_override_unicode_escape_attribute_selector_rejected(self) -> None:
+        """css_override with Unicode-escaped attribute selectors is rejected (bypass attempt)."""
+        # \\5b = '[', \\5d = ']' - spells attribute selector
+        with pytest.raises(ValidationError, match="attribute selectors"):
+            FormPromptNodeParameters(
+                input_schema={"type": "object"}, css_override="input\\5bvalue^='a'\\5d { background: red; }"
+            )
+
+    def test_css_override_unicode_escape_expression_rejected(self) -> None:
+        """css_override with Unicode-escaped expression() is rejected (bypass attempt)."""
+        # \\65 = 'e' - spells "expression"
+        with pytest.raises(ValidationError, match="expression\\(\\)"):
+            FormPromptNodeParameters(input_schema={"type": "object"}, css_override="width: \\65xpression(1+1);")
+
+    def test_css_override_unicode_escape_behavior_rejected(self) -> None:
+        """css_override with Unicode-escaped behavior: is rejected (bypass attempt)."""
+        # \\62 = 'b' - space terminates the escape sequence
+        with pytest.raises(ValidationError, match="behavior:"):
+            FormPromptNodeParameters(input_schema={"type": "object"}, css_override="\\62 ehavior: none;")

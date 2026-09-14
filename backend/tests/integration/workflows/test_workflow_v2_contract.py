@@ -728,7 +728,7 @@ class TestNodeSettingsValidation:
         self.validator.validate_workflow_definition(defn)
 
     def test_form_prompt_node_parameters_round_trip(self) -> None:
-        """Form prompt node with full parameters persists and validates correctly (AC-5)."""
+        """Form prompt node with full parameters persists and validates correctly."""
         defn = {
             "schema_version": "2.0.0",
             "name": "test-workflow",

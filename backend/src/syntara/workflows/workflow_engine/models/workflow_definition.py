@@ -29,7 +29,47 @@ logger = structlog.stdlib.get_logger(__name__)
 # Template expression pattern - matches ${...} expressions
 TEMPLATE_PATTERN = re.compile(r"\$\{[^}]+\}")
 
+# CSS Unicode escape pattern: \XX or \XXXXXX (1-6 hex digits, optional trailing space)
+# Used to normalize CSS before security validation to prevent bypasses via \75rl( etc.
+_CSS_UNICODE_ESCAPE = re.compile(r"\\([0-9a-fA-F]{1,6})\s?")
+
+# Maximum valid Unicode codepoint (U+10FFFF per CSS and Unicode specs)
+_MAX_UNICODE_CODEPOINT = 0x10FFFF
+
 _CONFIG_VALIDATION_FAILED = "Config validation failed"
+
+
+def _normalize_css_unicode_escapes(css: str) -> str:
+    r"""Normalize CSS Unicode escape sequences to their character equivalents.
+
+    Converts escape sequences like \75rl( to url(, \40import to @import, etc.
+    This prevents bypassing security checks via Unicode escapes.
+
+    Follows CSS spec: 1-6 hex digits, optional trailing space.
+    Codepoints above U+10FFFF are replaced with U+FFFD per CSS spec.
+
+    Args:
+        css: Raw CSS string that may contain Unicode escapes.
+
+    Returns:
+        CSS with all Unicode escapes converted to their character equivalents.
+
+    Example:
+        >>> _normalize_css_unicode_escapes("\75 rl(http://evil.com)")
+        'url(http://evil.com)'
+        >>> _normalize_css_unicode_escapes("\40import url(bad.css)")
+        '@import url(bad.css)'
+
+    """
+
+    def replace_escape(match: re.Match[str]) -> str:
+        codepoint = int(match.group(1), 16)
+        # CSS spec: codepoints above U+10FFFF are invalid, replaced with U+FFFD
+        if codepoint > _MAX_UNICODE_CODEPOINT:
+            return "�"
+        return chr(codepoint)
+
+    return _CSS_UNICODE_ESCAPE.sub(replace_escape, css)
 
 
 def validate_tool_selection_coherence(
@@ -863,7 +903,7 @@ class FormPromptNodeParameters(BaseModel):
         description="Message shown above the form. Supports ${...} template expressions.",
     )
     input_schema: dict[str, Any] = Field(
-        description="JSON Schema (Draft-07) describing the form fields to collect.",
+        description="JSON Schema describing the form fields to collect.",
     )
     responder_users: list[str] | None = Field(
         default=None,
@@ -891,7 +931,7 @@ class FormPromptNodeParameters(BaseModel):
     timezone: str | None = Field(
         default=None,
         max_length=64,
-        description="IANA timezone for interpreting date/datetime fields. Defaults to UTC if omitted.",
+        description="IANA timezone for interpreting date/datetime field values in the form.",
     )
     css_override: str | None = Field(
         default=None,
@@ -926,31 +966,33 @@ class FormPromptNodeParameters(BaseModel):
         if v is None:
             return v
 
-        # Normalize for case-insensitive matching
-        v_lower = v.lower()
+        # Normalize Unicode escapes before validation to prevent bypasses via \75rl(, \40import, etc.
+        # This converts escape sequences to their character equivalents per CSS spec.
+        normalized = _normalize_css_unicode_escapes(v)
+        normalized_lower = normalized.lower()
 
         # Reject url() - can exfiltrate data via background-image, etc.
-        if "url(" in v_lower:
+        if "url(" in normalized_lower:
             msg = "CSS override cannot contain url() - it enables data exfiltration"
             raise SafeValueError(msg)
 
         # Reject @import - can load external stylesheets
-        if "@import" in v_lower:
+        if "@import" in normalized_lower:
             msg = "CSS override cannot contain @import - it enables loading external resources"
             raise SafeValueError(msg)
 
         # Reject attribute selectors - can exfiltrate form values character by character
-        if "[" in v and "]" in v:
+        if "[" in normalized and "]" in normalized:
             msg = "CSS override cannot contain attribute selectors - they enable data exfiltration"
             raise SafeValueError(msg)
 
         # Reject expression() - old IE code execution vector
-        if "expression(" in v_lower:
+        if "expression(" in normalized_lower:
             msg = "CSS override cannot contain expression() - it enables code execution"
             raise SafeValueError(msg)
 
         # Reject behavior: - old IE code execution vector
-        if "behavior:" in v_lower:
+        if "behavior:" in normalized_lower:
             msg = "CSS override cannot contain behavior: - it enables code execution"
             raise SafeValueError(msg)
 

@@ -293,8 +293,6 @@ def _check_form_prompt_node_findings(
     Emits:
     - An error when a ``form_prompt`` node has no successor on the ``submitted``
       output port.
-    - An error when ``fallback_behavior`` is ``fallback`` but no successor exists
-      on the ``fallback`` port.
     - An error when a ``fallback`` successor exists but ``fallback_behavior`` is
       ``fail`` (unreachable branch - configuration mismatch).
     """
@@ -326,21 +324,6 @@ def _check_form_prompt_node_findings(
                     category=ValidationCategory.form_prompt_configuration,
                     message=f"Form \"{node_name}\" is missing a connection from the 'Submitted' branch",
                     node_id=node_id,
-                ),
-            )
-
-        # Error: fallback_behavior is "fallback" but no fallback port
-        if fallback_behavior == "fallback" and "fallback" not in ports:
-            findings.append(
-                ValidationFinding(
-                    severity=ValidationSeverity.error,
-                    category=ValidationCategory.form_prompt_configuration,
-                    message=(
-                        f'Form "{node_name}" is set to route to the fallback branch on timeout, '
-                        f"but the 'Fallback' branch has no connection"
-                    ),
-                    node_id=node_id,
-                    field_path="parameters.fallback_behavior",
                 ),
             )
 

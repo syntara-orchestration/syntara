@@ -56,7 +56,7 @@
       "timezone": {
         "type": "string",
         "maxLength": 64,
-        "description": "IANA timezone name for interpreting date/datetime field values. Defaults to UTC if omitted."
+        "description": "IANA timezone name for interpreting date/datetime field values in the form."
       },
       "css_override": {
         "type": "string",
