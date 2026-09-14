@@ -5428,7 +5428,6 @@ class TestQueryActivityIoOutputMerge:
         assert output_data["status"] == "completed"
         assert output_data["output"] == "result"
 
-
     @pytest.mark.asyncio
     async def test_completed_update_fails_workflow_done_retries_query(self) -> None:
         """When update fails with NOT_FOUND (workflow completed), retry query immediately."""
@@ -5457,7 +5456,6 @@ class TestQueryActivityIoOutputMerge:
         assert output_data["status"] == "completed"
         assert output_data["output"] == "result"
         assert mock_handle.query.await_count == 3
-
 
     @pytest.mark.asyncio
     async def test_completed_update_fails_non_not_found_propagates(self) -> None:
