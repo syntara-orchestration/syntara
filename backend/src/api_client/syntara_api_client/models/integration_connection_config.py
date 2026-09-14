@@ -22,7 +22,8 @@ class IntegrationConnectionConfig:
 
         Attributes:
             integration_id (str): UUID of the integration
-            credential_id (str): Orchestrator credential UUID for execution calls (distinct from management credential)
+            credential_id (str): Automation Orchestrator credential UUID for execution calls (distinct from management
+                credential)
     """
 
     integration_id: str

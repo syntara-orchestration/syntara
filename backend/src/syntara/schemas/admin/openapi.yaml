@@ -1,10 +1,10 @@
 ---
 openapi: 3.0.3
 info:
-  title: Orchestrator Admin API
+  title: Automation Orchestrator Admin API
   version: 1.0.0
   description: |
-    Administrative operations for the Orchestrator platform.
+    Administrative operations for the Automation Orchestrator platform.
 
     Provides endpoints for global session revocation, per-user session
     revocation, and per-identity-provider session revocation.

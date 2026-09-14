@@ -600,7 +600,7 @@ export interface components {
     AAPJobTemplateExecutorParameters: {
       /**
        * Credential Id
-       * @description Orchestrator credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
+       * @description Automation Orchestrator credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
        */
       credential_id?: string | null
       /**
@@ -808,7 +808,7 @@ export interface components {
     AAPWorkflowJobTemplateExecutorParameters: {
       /**
        * Credential Id
-       * @description Orchestrator credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
+       * @description Automation Orchestrator credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
        */
       credential_id?: string | null
       /**
@@ -937,7 +937,7 @@ export interface components {
       integration_id: string
       /**
        * Credential Id
-       * @description Orchestrator credential UUID for execution calls (distinct from management credential)
+       * @description Automation Orchestrator credential UUID for execution calls (distinct from management credential)
        */
       credential_id: string
     }
@@ -960,7 +960,7 @@ export interface components {
       llm_model_id?: string | null
       /**
        * Credential Id
-       * @description Orchestrator credential UUID for LLM provider authentication
+       * @description Automation Orchestrator credential UUID for LLM provider authentication
        */
       credential_id?: string | null
       /**
@@ -1052,7 +1052,7 @@ export interface components {
     ApprovalNodeParameters: {
       /**
        * Credential Id
-       * @description Orchestrator credential UUID
+       * @description Automation Orchestrator credential UUID
        */
       credential_id?: string | null
       /**
@@ -1281,7 +1281,7 @@ export interface components {
       }
       /**
        * Credential Id
-       * @description Orchestrator credential UUID for authentication or Secret URL.
+       * @description Automation Orchestrator credential UUID for authentication or Secret URL.
        */
       credential_id?: string | null
     }
@@ -1608,7 +1608,7 @@ export interface components {
     }
     /**
      * WorkflowDefinition
-     * @description JSON Schema for graph-based workflow definitions in the Orchestrator Workflow Engine v2.
+     * @description JSON Schema for graph-based workflow definitions in the Automation Orchestrator Workflow Engine v2.
      *
      *     Attributes:
      *         schema_version: Schema version that this workflow definition conforms to

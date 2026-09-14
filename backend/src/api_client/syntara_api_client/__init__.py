@@ -1,4 +1,4 @@
-"""A client library for accessing Orchestrator API"""
+"""A client library for accessing Automation Orchestrator API"""
 
 from .client import AuthenticatedClient, Client
 from .filters import OPERATORS, FilterError, build_filters
