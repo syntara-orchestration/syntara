@@ -14,7 +14,7 @@
       },
       "input_schema": {
         "type": "object",
-        "description": "JSON Schema (Draft-07) describing the form fields to collect."
+        "description": "JSON Schema describing the form fields to collect."
       },
       "responder_users": {
         "type": "array",
@@ -75,7 +75,7 @@
       {
         "title": "Completed Result",
         "type": "object",
-        "required": ["status", "outcome"],
+        "required": ["status", "outcome", "responded_by", "responded_at"],
         "properties": {
           "status": {
             "type": "string",
