@@ -57,18 +57,6 @@ class UserOwnedResource(BaseResource, ABC):
         """
         self.updated_by = user_id
 
-    def is_owned_by(self, user_id: UUID) -> bool:
-        """Check if the resource is owned by the specified user.
-
-        Args:
-            user_id: UUID of the user to check ownership for
-
-        Returns:
-            True if the resource was created by the specified user
-
-        """
-        return self.created_by == user_id
-
     def was_updated_by(self, user_id: UUID) -> bool:
         """Check if the resource was last updated by the specified user.
 

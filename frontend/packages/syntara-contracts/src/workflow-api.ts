@@ -711,7 +711,7 @@ export interface components {
       project_id: string
       /**
        * Is Import
-       * @description When true, unavailable LLM models are cleared with warnings instead of rejecting the request. Use when importing workflows from other instances.
+       * @description When true, unavailable LLM models are cleared with warnings instead of rejecting the request, and webhook/EDA authorized service accounts that are missing in the target project are removed from the definition and not bound. Use when importing workflows from other instances.
        * @default false
        */
       is_import?: boolean

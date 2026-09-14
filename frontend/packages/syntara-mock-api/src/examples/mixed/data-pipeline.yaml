@@ -13,13 +13,13 @@ nodes:
     parameters:
       method: GET
       url: http://test-api.example.com/api/data
-    outputs:
-      fetched_data: $.body
 
   - id: process_data
     type: script
     parameters:
       language: python
+      environment:
+        INPUT_RAW_DATA: ${fetch_data.body}
       code: |
         import json
         import os
@@ -27,15 +27,13 @@ nodes:
         raw_data = os.getenv('INPUT_RAW_DATA', '{}')
         processed = {"processed": True, "original": raw_data}
         print(json.dumps(processed))
-    inputs:
-      raw_data: ${fetch_data.output.fetched_data}
-    outputs:
-      processed_data: $.processed
 
   - id: validate_data
     type: script
     parameters:
       language: bash
+      environment:
+        INPUT_VALIDATED: ${process_data.stdout_json.processed}
       code: |
         # Validation check
         if [ "${INPUT_VALIDATED}" = "true" ]; then
@@ -45,8 +43,6 @@ nodes:
           echo "Validation passed anyway"
           exit 0
         fi
-    inputs:
-      validated: ${process_data.output.processed_data}
 
   - id: send_results
     type: http_request
@@ -55,11 +51,11 @@ nodes:
       url: http://test-api.example.com/api/create
       body:
         validated: true
-        data: ${process_data.output.processed_data}
+        data: ${process_data.stdout_json.processed}
 edges:
-  - source: fetch_data
-    target: process_data
-  - source: process_data
-    target: validate_data
-  - source: validate_data
-    target: send_results
+  - from: fetch_data
+    to: process_data
+  - from: process_data
+    to: validate_data
+  - from: validate_data
+    to: send_results
