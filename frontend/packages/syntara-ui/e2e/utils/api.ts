@@ -5,7 +5,15 @@
  * etc.). This file re-exports everything so existing spec files can continue to
  * import from './utils/api' without changes.
  */
-export { apiUrl, getAuthToken, apiRequest, ensureProject, createProjectViaApi, deleteProjectViaApi } from './api-core'
+export {
+  apiUrl,
+  getAuthToken,
+  apiRequest,
+  ensureProject,
+  createProjectViaApi,
+  deleteProjectViaApi,
+  findProjectIdByName,
+} from './api-core'
 export { createCredentialViaApi, deleteCredentialViaApi, listCredentialsByName } from './api-credentials'
 export {
   createWorkflowViaApi,

@@ -48,7 +48,7 @@ test.describe('Manual Trigger', () => {
       await app.getByRole('link', { name: workflowName, exact: true }).click()
 
       // Wait for builder to load
-      await expect(app).toHaveURL(/workflow-builder\/.+/, { timeout: 15_000 })
+      await expect(app).toHaveURL(/workflow-builder\/(?!new)/, { timeout: 15_000 })
 
       // Click Layout to position nodes within the viewport so both are visible
       const layoutButton = app.getByRole('button', { name: 'Reset layout', exact: true })

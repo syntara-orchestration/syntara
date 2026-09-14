@@ -58,6 +58,8 @@ class WebhookTriggerService(BaseService):
     ) -> None:
         """Verify that a service account is authorized to invoke a trigger.
 
+        An empty binding set denies every caller at invocation time (no row matches).
+
         Args:
             trigger_id: The webhook trigger ID.
             service_account_id: The service account ID from the Bearer token.

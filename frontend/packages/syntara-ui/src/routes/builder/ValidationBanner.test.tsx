@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import type { ValidationError } from './builderReducer'
+import { AUTHORIZED_SERVICE_ACCOUNT_REQUIRED_MESSAGE } from './node-forms/triggerFormSchema'
 import {
   humanizeValidationMessage,
   mergeHumanizedMessages,
@@ -102,6 +103,36 @@ describe('humanizeValidationMessage', () => {
     const result = humanizeValidationMessage("'' should be non-empty", null)
 
     expect(result).toBe('This field must not be empty')
+  })
+
+  it('translates empty-array schema errors into plain language', () => {
+    const result = humanizeValidationMessage('[] should be non-empty')
+
+    expect(result).toBe('This field must not be empty')
+  })
+
+  it('uses the form copy for empty authorized service accounts', () => {
+    const result = humanizeValidationMessage('[] should be non-empty', 'parameters.authorized_service_account_ids')
+
+    expect(result).toBe(AUTHORIZED_SERVICE_ACCOUNT_REQUIRED_MESSAGE)
+  })
+
+  it('humanizes jsonschema "is too short" empty-array errors', () => {
+    const result = humanizeValidationMessage('[] is too short', 'parameters.authorized_service_account_ids')
+
+    expect(result).toBe(AUTHORIZED_SERVICE_ACCOUNT_REQUIRED_MESSAGE)
+  })
+
+  it('uses the last segment of dotted fieldPath for empty-array errors on other fields', () => {
+    const result = humanizeValidationMessage('[] should be non-empty', 'parameters.tool_selections')
+
+    expect(result).toBe('"tool_selections" must not be empty')
+  })
+
+  it('uses the form copy when authorized service accounts are missing', () => {
+    const result = humanizeValidationMessage("'authorized_service_account_ids' is a required property")
+
+    expect(result).toBe(AUTHORIZED_SERVICE_ACCOUNT_REQUIRED_MESSAGE)
   })
 
   it('passes through unrecognized messages unchanged', () => {
@@ -216,6 +247,48 @@ describe('ValidationBanner', () => {
 
     expect(screen.getByRole('button', { name: 'MyNode' })).toBeInTheDocument()
     expect(screen.getByText('is disconnected')).toBeInTheDocument()
+  })
+
+  it('links unprefixed webhook errors to nodeId when nodeName is missing', async () => {
+    const onNavigateToNode = vi.fn()
+    const errors: ValidationError[] = [
+      {
+        message: '[] should be non-empty',
+        nodeId: 'snow_trigger',
+        fieldPath: 'parameters.authorized_service_account_ids',
+      },
+    ]
+
+    render(
+      <ValidationBanner errors={errors} dismissed={false} dispatch={mockDispatch} onNavigateToNode={onNavigateToNode} />
+    )
+    const user = await expandAlert()
+
+    expect(screen.queryByText('Workflow')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'snow_trigger' }))
+
+    expect(onNavigateToNode).toHaveBeenCalledWith('snow_trigger')
+    expect(screen.getByText(AUTHORIZED_SERVICE_ACCOUNT_REQUIRED_MESSAGE)).toBeInTheDocument()
+  })
+
+  it('prefers nodeName over nodeId for unprefixed webhook errors', async () => {
+    const onNavigateToNode = vi.fn()
+    const errors: ValidationError[] = [
+      {
+        message: '[] should be non-empty',
+        nodeId: 'snow_trigger',
+        nodeName: 'Webhook Trigger',
+        fieldPath: 'parameters.authorized_service_account_ids',
+      },
+    ]
+
+    render(
+      <ValidationBanner errors={errors} dismissed={false} dispatch={mockDispatch} onNavigateToNode={onNavigateToNode} />
+    )
+    await expandAlert()
+
+    expect(screen.getByRole('button', { name: 'Webhook Trigger' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'snow_trigger' })).not.toBeInTheDocument()
   })
 
   it('calls onNavigateToNode when node term link is clicked', async () => {
