@@ -25,7 +25,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from temporalio.api.enums.v1 import EventType, PendingActivityState
 from temporalio.api.history.v1 import HistoryEvent
 from temporalio.client import Client, WorkflowHandle, WorkflowHistoryEventFilterType
-from temporalio.exceptions import TemporalError
+from temporalio.exceptions import ApplicationError, TemporalError
 from temporalio.service import RPCError, RPCStatusCode
 
 from syntara.audit.context_managers import actor_context
@@ -1842,26 +1842,44 @@ class ActivitySyncService:
         try:
             input_data = await handle.query("get_activity_input", activity_id) or {}
             queried_output = await handle.query("get_activity_output", activity_id)
+        except (TemporalError, ValueError) as e:
+            logger.warning("Could not query activity data", activity_id=activity_id, error=str(e))
+            raise
 
-            if queried_output is None and activity_data["status"] == ActivityStatus.COMPLETED:
-                try:
-                    queried_output = await handle.execute_update("get_activity_output_when_ready", activity_id)
-                except RPCError as e:
-                    if e.status != RPCStatusCode.NOT_FOUND:
-                        raise
+        if queried_output is None and activity_data["status"] == ActivityStatus.COMPLETED:
+            try:
+                queried_output = await handle.execute_update("get_activity_output_when_ready", activity_id)
+            except RPCError as e:
+                if e.status == RPCStatusCode.NOT_FOUND:
                     # Workflow already completed — the update was rejected because
                     # the server has already recorded the final state.  This means
                     # set_namespace() has run (completion requires it), so a query
                     # against the completed workflow's final state is guaranteed to
                     # return the output.
-                    queried_output = await handle.query("get_activity_output", activity_id)
+                    try:
+                        queried_output = await handle.query("get_activity_output", activity_id)
+                    except (TemporalError, ValueError) as query_err:
+                        logger.warning(
+                            "Could not query activity data",
+                            activity_id=activity_id,
+                            error=str(query_err),
+                        )
+                        raise
+                else:
+                    logger.warning(
+                        "Workflow update for activity output failed",
+                        activity_id=activity_id,
+                        error=str(e),
+                    )
+            except ApplicationError as e:
+                logger.warning(
+                    "Workflow update for activity output timed out",
+                    activity_id=activity_id,
+                    error=str(e),
+                )
 
-            if queried_output is not None:
-                output_data = self._merge_output(initial_output_data, queried_output)
-
-        except (TemporalError, ValueError) as e:
-            logger.warning("Could not query activity data", activity_id=activity_id, error=str(e))
-            raise
+        if queried_output is not None:
+            output_data = self._merge_output(initial_output_data, queried_output)
 
         return input_data, output_data
 
