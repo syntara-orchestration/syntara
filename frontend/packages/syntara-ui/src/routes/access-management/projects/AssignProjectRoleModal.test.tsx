@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -123,14 +123,19 @@ const mockGroups = [
   { id: 'g2', name: 'admins' },
 ]
 
-function getTypeaheadInput(groupName: string) {
-  return within(screen.getByRole('group', { name: groupName })).getByRole('textbox')
+const mockServiceAccounts = [{ id: 'sa1', name: 'my-service-account' }]
+
+const USER_TYPEAHEAD_PLACEHOLDER = 'Select a user...'
+const GROUP_TYPEAHEAD_PLACEHOLDER = 'Select a group...'
+const SERVICE_ACCOUNT_TYPEAHEAD_PLACEHOLDER = 'Select a service account...'
+const ROLE_TYPEAHEAD_PLACEHOLDER = 'Select a role...'
+
+function getTypeaheadInput(placeholder: string) {
+  return screen.getByPlaceholderText(placeholder)
 }
 
-function queryTypeaheadInput(groupName: string) {
-  const group = screen.queryByRole('group', { name: groupName })
-  if (!group) return null
-  return within(group).queryByRole('textbox')
+function queryTypeaheadInput(placeholder: string) {
+  return screen.queryByPlaceholderText(placeholder)
 }
 
 describe('AssignProjectRoleModal', () => {
@@ -160,6 +165,17 @@ describe('AssignProjectRoleModal', () => {
       if (path === '/groups/directory') {
         return {
           data: { resources: mockGroups, next: null },
+          isPending: false,
+          isLoading: false,
+          isError: false,
+          error: null,
+          isFetching: false,
+          refetch: vi.fn(),
+        } as never
+      }
+      if (path === '/service_accounts') {
+        return {
+          data: { resources: mockServiceAccounts, next: null },
           isPending: false,
           isLoading: false,
           isError: false,
@@ -214,8 +230,9 @@ describe('AssignProjectRoleModal', () => {
   it('renders principal type, user, and role form fields', () => {
     renderModal()
     expect(screen.getByLabelText('Principal type')).toBeInTheDocument()
-    expect(getTypeaheadInput('User')).toBeInTheDocument()
-    expect(getTypeaheadInput('Role')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Principal type' })).toHaveTextContent('User')
+    expect(getTypeaheadInput(USER_TYPEAHEAD_PLACEHOLDER)).toBeInTheDocument()
+    expect(getTypeaheadInput(ROLE_TYPEAHEAD_PLACEHOLDER)).toBeInTheDocument()
   })
 
   it('shows all project roles from the project endpoint', () => {
@@ -264,16 +281,16 @@ describe('AssignProjectRoleModal', () => {
     const user = userEvent.setup()
     renderModal()
 
-    const userInput = getTypeaheadInput('User')
+    const userInput = getTypeaheadInput(USER_TYPEAHEAD_PLACEHOLDER)
     await user.click(userInput)
     const aliceOption = await screen.findByRole('option', { name: /alice/i })
     await user.click(aliceOption)
 
     await waitFor(() => {
-      expect(getTypeaheadInput('Role')).not.toBeDisabled()
+      expect(screen.getByDisplayValue('alice')).toBeInTheDocument()
     })
 
-    const roleInput = getTypeaheadInput('Role')
+    const roleInput = getTypeaheadInput(ROLE_TYPEAHEAD_PLACEHOLDER)
     await user.click(roleInput)
     const roleOption = await screen.findByRole('option', { name: /project-admin/i })
     await user.click(roleOption)
@@ -312,6 +329,20 @@ describe('AssignProjectRoleModal', () => {
     expect(mockOnSuccess).not.toHaveBeenCalled()
   })
 
+  it('shows service account selector when principal type is Service Account', async () => {
+    const user = userEvent.setup()
+    renderModal()
+
+    const principalToggle = screen.getByRole('button', { name: 'Principal type' })
+    await user.click(principalToggle)
+    await user.click(screen.getByRole('option', { name: 'Service Account' }))
+
+    await waitFor(() => {
+      expect(getTypeaheadInput(SERVICE_ACCOUNT_TYPEAHEAD_PLACEHOLDER)).toBeInTheDocument()
+    })
+    expect(queryTypeaheadInput(USER_TYPEAHEAD_PLACEHOLDER)).not.toBeInTheDocument()
+  })
+
   it('switches to group selector when principal type is changed to Group', async () => {
     const user = userEvent.setup()
     renderModal()
@@ -320,8 +351,10 @@ describe('AssignProjectRoleModal', () => {
     await user.click(principalToggle)
     await user.click(screen.getByRole('option', { name: 'Group' }))
 
-    expect(getTypeaheadInput('Group')).toBeInTheDocument()
-    expect(queryTypeaheadInput('User')).not.toBeInTheDocument()
+    await waitFor(() => {
+      expect(getTypeaheadInput(GROUP_TYPEAHEAD_PLACEHOLDER)).toBeInTheDocument()
+    })
+    expect(queryTypeaheadInput(USER_TYPEAHEAD_PLACEHOLDER)).not.toBeInTheDocument()
   })
 
   it('submits group assignment with correct body', async () => {
@@ -332,16 +365,20 @@ describe('AssignProjectRoleModal', () => {
     await user.click(principalToggle)
     await user.click(screen.getByRole('option', { name: 'Group' }))
 
-    const groupInput = getTypeaheadInput('Group')
+    await waitFor(() => {
+      expect(getTypeaheadInput(GROUP_TYPEAHEAD_PLACEHOLDER)).toBeInTheDocument()
+    })
+
+    const groupInput = getTypeaheadInput(GROUP_TYPEAHEAD_PLACEHOLDER)
     await user.click(groupInput)
     const groupOption = await screen.findByRole('option', { name: /developers/i })
     await user.click(groupOption)
 
     await waitFor(() => {
-      expect(getTypeaheadInput('Role')).not.toBeDisabled()
+      expect(screen.getByDisplayValue('developers')).toBeInTheDocument()
     })
 
-    const roleInput = getTypeaheadInput('Role')
+    const roleInput = getTypeaheadInput(ROLE_TYPEAHEAD_PLACEHOLDER)
     await user.click(roleInput)
     const roleOption = await screen.findByRole('option', { name: /project-admin/i })
     await user.click(roleOption)
@@ -367,7 +404,7 @@ describe('AssignProjectRoleModal', () => {
     const user = userEvent.setup()
     renderModal()
 
-    const userInput = getTypeaheadInput('User')
+    const userInput = getTypeaheadInput(USER_TYPEAHEAD_PLACEHOLDER)
     await user.click(userInput)
     const aliceOption = await screen.findByRole('option', { name: /alice/i })
     await user.click(aliceOption)
@@ -376,7 +413,8 @@ describe('AssignProjectRoleModal', () => {
     await user.click(principalToggle)
     await user.click(screen.getByRole('option', { name: 'Group' }))
 
-    const groupInput = getTypeaheadInput('Group')
-    expect(groupInput).toHaveValue('')
+    await waitFor(() => {
+      expect(getTypeaheadInput(GROUP_TYPEAHEAD_PLACEHOLDER)).toHaveValue('')
+    })
   })
 })
