@@ -261,7 +261,7 @@ class TestFormPromptPortRules:
         assert fallback_error[0].field_path == "parameters.fallback_behavior"
 
     def test_fallback_port_exists_but_behavior_fail(self) -> None:
-        """Warning: fallback port connected but fallback_behavior='fail'."""
+        """Error: fallback port connected but fallback_behavior='fail' (unreachable branch)."""
         workflow_def = {
             "schema_version": "2.0.0",
             "name": "test",
@@ -282,12 +282,15 @@ class TestFormPromptPortRules:
             ],
         }
         result = WorkflowValidator().collect_findings(workflow_def)
-        warnings = [f for f in result.findings if f.severity == ValidationSeverity.warning]
-        assert len(warnings) == 1
-        assert warnings[0].category == ValidationCategory.form_prompt_configuration
-        assert "fallback branch will never execute" in warnings[0].message
-        assert warnings[0].node_id == "form"
-        assert warnings[0].field_path == "parameters.fallback_behavior"
+        assert not result.is_valid
+        errors = [f for f in result.findings if f.severity == ValidationSeverity.error]
+        fallback_errors = [
+            f for f in errors if f.category == ValidationCategory.form_prompt_configuration and "fallback" in f.message
+        ]
+        assert len(fallback_errors) == 1
+        assert "fallback branch will never execute" in fallback_errors[0].message
+        assert fallback_errors[0].node_id == "form"
+        assert fallback_errors[0].field_path == "parameters.fallback_behavior"
 
 
 class TestFormPromptNoFalsePositives:

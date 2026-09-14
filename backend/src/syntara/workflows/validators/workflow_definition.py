@@ -295,8 +295,8 @@ def _check_form_prompt_node_findings(
       output port.
     - An error when ``fallback_behavior`` is ``fallback`` but no successor exists
       on the ``fallback`` port.
-    - A warning when a ``fallback`` successor exists but ``fallback_behavior`` is
-      ``fail`` (dead branch).
+    - An error when a ``fallback`` successor exists but ``fallback_behavior`` is
+      ``fail`` (unreachable branch - configuration mismatch).
     """
     findings: list[ValidationFinding] = []
 
@@ -344,16 +344,17 @@ def _check_form_prompt_node_findings(
                 ),
             )
 
-        # Warning: fallback port exists but fallback_behavior is "fail"
+        # Error: fallback port exists but fallback_behavior is "fail" (unreachable branch)
         if fallback_behavior == "fail" and "fallback" in ports:
             findings.append(
                 ValidationFinding(
-                    severity=ValidationSeverity.warning,
+                    severity=ValidationSeverity.error,
                     category=ValidationCategory.form_prompt_configuration,
                     message=(
                         f"Form \"{node_name}\" has a 'Fallback' branch connected, "
                         f"but On timeout is set to fail the workflow. "
-                        f"The fallback branch will never execute."
+                        f"The fallback branch will never execute. Remove the fallback connection "
+                        f"or change On timeout to 'Route to fallback'."
                     ),
                     node_id=node_id,
                     field_path="parameters.fallback_behavior",
