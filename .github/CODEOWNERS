@@ -51,8 +51,7 @@
 # shipping artifacts on purpose: pointing it at the whole directory would make
 # @release-team the sole owner of the UI app and displace @ui-team.
 /frontend/packages/syntara-ui/Containerfile @syntara-orchestration/release-team
-/frontend/packages/syntara-ui/Containerfile.konflux @syntara-orchestration/release-team
-/frontend/packages/syntara-ui/nginx.conf.template @syntara-orchestration/release-team
+/frontend/packages/syntara-ui/nginx/ @syntara-orchestration/release-team
 
 # ── Governance & architecture — @syntara-orchestration/syntara-leads ────────────
 # Deliberately narrow. Everything below is either a decision that binds the
