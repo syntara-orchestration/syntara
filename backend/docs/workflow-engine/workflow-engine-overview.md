@@ -125,6 +125,7 @@ Shared infrastructure every node type gets for free, no per-node opt-in required
 - [Switch Node](switch-node.md)
 - [Wait Node](wait-node.md)
 - [Converge Node](converge-node.md)
+- [Sub-workflow Node](sub-workflow-node.md) — composition (Reference mode) architecture baseline
 - [Node Settings](node-settings.md) — timeout and retry configuration resolution
 - [Retry Policies](retry-policies.md) — retry behavior for transient failures
 - [Workflow Definition Guide](workflow-definition-guide.md) — complete guide to defining V2 workflows
