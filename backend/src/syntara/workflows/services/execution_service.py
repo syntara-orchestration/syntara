@@ -51,6 +51,7 @@ from syntara.workflows.models.execution import (
     ExecutionRead,
     ExecutionStatus,
     PreResolvedNodeOutput,
+    execution_error_summary,
 )
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
@@ -142,6 +143,7 @@ class ExecutionsConvertResourceMixin(ConvertResourceMixin):
             input_data=resource.input_data,
             trigger_node_id=resource.trigger_node_id,
             error_details=resource.error_details,
+            error=execution_error_summary(resource),
             labels=resource.labels,
             approval_pending=resource.approval_pending,
             mode=resource.mode,

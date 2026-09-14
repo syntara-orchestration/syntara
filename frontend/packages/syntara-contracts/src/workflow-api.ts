@@ -910,6 +910,11 @@ export interface components {
       trigger_node_id?: string | null
       /** Error Details */
       error_details: string | null
+      /**
+       * Error
+       * @description Human-readable failure summary. Populated whenever status is 'failed' or 'completed_with_errors'; null otherwise.
+       */
+      error?: string | null
       /** @default standard */
       mode?: components['schemas']['ExecutionMode']
       /** Execution Metadata */

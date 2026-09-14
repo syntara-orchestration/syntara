@@ -24,7 +24,11 @@ from syntara.workflows.exceptions import (
 from syntara.workflows.models.execution import Execution, ExecutionRead, ExecutionStatus
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_version import WorkflowVersion
-from syntara.workflows.services.execution_service import ExecutionService, count_active_executions
+from syntara.workflows.services.execution_service import (
+    ExecutionsConvertResourceMixin,
+    ExecutionService,
+    count_active_executions,
+)
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 
 
@@ -2010,3 +2014,47 @@ class TestApplyTriggerSchemaDefaults:
         data: dict[str, Any] = {}
         ExecutionService._apply_trigger_schema_defaults(trigger, data)
         assert data == {"event": "push"}
+
+
+class TestConvertResourceError(TestExecutionServiceBase):
+    """Test that ExecutionsConvertResourceMixin populates the `error` summary field.
+
+    AAP-<ticket>: monitoring clients checking `execution.error` on a failed execution
+    previously found nothing actionable — only `error_details` was populated, under a
+    field name callers had no way to discover. `error` mirrors `error_details` whenever
+    the execution reached a failure status, and is null otherwise.
+    """
+
+    @pytest.mark.parametrize(
+        ("status", "error_details", "expected_error"),
+        [
+            (ExecutionStatus.FAILED, "node_b: KeyError: nonexistent_field", "node_b: KeyError: nonexistent_field"),
+            (
+                ExecutionStatus.COMPLETED_WITH_ERRORS,
+                "node_bad: KeyError: nonexistent_field",
+                "node_bad: KeyError: nonexistent_field",
+            ),
+            (ExecutionStatus.COMPLETED, None, None),
+            (ExecutionStatus.RUNNING, None, None),
+            (ExecutionStatus.PENDING, None, None),
+            (ExecutionStatus.CANCELLED, None, None),
+            # Defensive: error_details set but status not a failure status — error stays null.
+            (ExecutionStatus.COMPLETED, "stale error_details from a prior state", None),
+            # Failure status but no error_details recorded (e.g. reconciliation edge case).
+            (ExecutionStatus.FAILED, None, None),
+        ],
+    )
+    def test_error_mirrors_error_details_only_for_failure_statuses(
+        self,
+        status: ExecutionStatus,
+        error_details: str | None,
+        expected_error: str | None,
+    ) -> None:
+        """`error` equals `error_details` for FAILED/COMPLETED_WITH_ERRORS, else null."""
+        execution = self._create_test_execution(status=status, error_details=error_details)
+
+        result = ExecutionsConvertResourceMixin().convert_resource(execution)
+
+        assert result.error == expected_error
+        # error_details is always passed through untouched, regardless of status.
+        assert result.error_details == error_details

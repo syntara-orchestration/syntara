@@ -19,7 +19,7 @@ import { models } from './resources/models'
 import { workflows } from './resources/workflows'
 import { tools } from './resources/tools'
 import { executions } from './resources/executions'
-import { getExecutionDetail } from './resources/executionDetails'
+import { executionErrorSummary, getExecutionDetail } from './resources/executionDetails'
 import { activityExecutions } from './resources/activityExecutions'
 import { approvals } from './resources/approvals'
 import { settings, settingsCategories } from './resources/settings'
@@ -1732,6 +1732,7 @@ export const handlers = [
       updated_at: timestamp,
       workflow_id: body.workflow_id,
       status,
+      error: executionErrorSummary(status, undefined),
       approval_pending: isPaused,
       started_at: timestamp,
       completed_at: isTerminal ? timestamp : null,
