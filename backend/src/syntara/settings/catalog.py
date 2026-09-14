@@ -161,6 +161,10 @@ class MetricsGroup(StrEnum):
     OBSERVABILITY = "Observability"
 
 
+# Common helper text strings for setting definitions
+_HELPER_TEXT_24_HOUR_DEFAULT = "Minimum 1 second. Default: 86400 (24 hours)."
+
+
 SETTINGS_CATALOG: list[SettingDefinition] = [
     # System settings
     SettingDefinition(
@@ -771,7 +775,7 @@ SETTINGS_CATALOG: list[SettingDefinition] = [
             "Can be overridden per node via the decision_window config field. "
             "If no decision is received within this period, the approval expires."
         ),
-        helper_text="Minimum 1 second. Default: 86400 (24 hours).",
+        helper_text=_HELPER_TEXT_24_HOUR_DEFAULT,
         group=WorkflowEngineGroup.EXECUTION,
         validation_schema={"min": 1},
     ),
@@ -786,7 +790,7 @@ SETTINGS_CATALOG: list[SettingDefinition] = [
             "Can be overridden per node via the response_window parameter. "
             "If no response is received within this period, the prompt expires."
         ),
-        helper_text="Minimum 1 second. Default: 86400 (24 hours).",
+        helper_text=_HELPER_TEXT_24_HOUR_DEFAULT,
         group=WorkflowEngineGroup.EXECUTION,
         validation_schema={"min": 1},
     ),
@@ -817,7 +821,7 @@ SETTINGS_CATALOG: list[SettingDefinition] = [
             "When this duration expires, the converge node stops waiting and the workflow "
             "continues according to the node's continue_on_failure setting."
         ),
-        helper_text="Minimum 1 second. Default: 86400 (24 hours).",
+        helper_text=_HELPER_TEXT_24_HOUR_DEFAULT,
         group=WorkflowEngineGroup.EXECUTION,
         validation_schema={"min": 1},
     ),
