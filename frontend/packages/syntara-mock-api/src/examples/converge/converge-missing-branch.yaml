@@ -20,5 +20,5 @@ nodes:
         - nonexistent_task
       strategy: all
 edges:
-  - from: existing_task
-    to: converge_missing
+  - source: existing_task
+    target: converge_missing

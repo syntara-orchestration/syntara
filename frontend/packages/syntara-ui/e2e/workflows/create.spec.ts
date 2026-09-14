@@ -13,7 +13,7 @@
  */
 
 import { test, expect, toAppUrl } from '../fixtures'
-import { buildUniqueName, clickSaveAndWait, deleteWorkflow, selectProjectIfRequired } from '../helpers/workflows'
+import { buildUniqueName, deleteWorkflow, selectProjectIfRequired } from '../helpers/workflows'
 
 test.describe('Workflows - Create New Workflow', () => {
   test('user creates a new workflow with name and description', async ({ app }) => {
@@ -43,7 +43,10 @@ test.describe('Workflows - Create New Workflow', () => {
       await workflowNameInput.clear()
       await workflowNameInput.fill(workflowName)
 
-      await clickSaveAndWait(app)
+      await app.getByRole('button', { name: 'Save' }).click()
+
+      await expect(app).toHaveURL(/workflow-builder\/.+/, { timeout: 15000 })
+      await expect(app).not.toHaveURL(/workflow-builder\/new/)
 
       await app.goto(toAppUrl('/workflows'))
       await expect(app.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
@@ -96,7 +99,11 @@ test.describe('Workflows - Create New Workflow', () => {
       await workflowNameInput.clear()
       await workflowNameInput.fill(customName)
 
-      await clickSaveAndWait(app)
+      const saveButton = app.getByRole('button', { name: 'Save' })
+      await expect(saveButton).toBeVisible()
+      await saveButton.click()
+
+      await expect(app).toHaveURL(/workflow-builder\/.+/, { timeout: 15000 })
       await expect(app.getByPlaceholder('Workflow name')).toHaveValue(customName)
     } finally {
       await deleteWorkflow(app, customName)
@@ -121,7 +128,10 @@ test.describe('Workflows - Create New Workflow', () => {
       const nameInput = app.getByPlaceholder('Workflow name')
       await nameInput.clear()
       await nameInput.fill(workflowName)
-      await clickSaveAndWait(app)
+      await app.getByRole('button', { name: 'Save' }).click()
+
+      await expect(app).toHaveURL(/workflow-builder\/.+/, { timeout: 15000 })
+      await expect(app).not.toHaveURL(/workflow-builder\/new/)
 
       await expect(app.getByPlaceholder('Workflow name')).toHaveValue(workflowName)
 
@@ -149,7 +159,8 @@ test.describe('Workflows - Create New Workflow', () => {
       const name1Input = app.getByPlaceholder('Workflow name')
       await name1Input.clear()
       await name1Input.fill(workflow1Name)
-      await clickSaveAndWait(app)
+      await app.getByRole('button', { name: 'Save' }).click()
+      await expect(app).toHaveURL(/workflow-builder\/.+/, { timeout: 15000 })
 
       // Go back and create second workflow
       await app.goto(toAppUrl('/workflows'))
@@ -164,7 +175,8 @@ test.describe('Workflows - Create New Workflow', () => {
       const name2Input = app.getByPlaceholder('Workflow name')
       await name2Input.clear()
       await name2Input.fill(workflow2Name)
-      await clickSaveAndWait(app)
+      await app.getByRole('button', { name: 'Save' }).click()
+      await expect(app).toHaveURL(/workflow-builder\/.+/, { timeout: 15000 })
 
       // Verify both workflows exist in the table
       await app.goto(toAppUrl('/workflows'))

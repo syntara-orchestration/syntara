@@ -21,8 +21,8 @@ from syntara.aap.credential_resolver import (
     _resolve_credential_injectors,
     _validate_credential_enabled,
     _validate_credential_id,
+    _validate_credential_ownership,
     _validate_credential_type,
-    _validate_credential_use_permission,
     resolve_aap_connection_from_credential,
     resolve_aap_connection_from_management_credential,
 )
@@ -67,7 +67,6 @@ def _mock_credential(
     enabled: bool = True,
     secret_id: UUID | None | object = _DEFAULT_SENTINEL,
     created_by: UUID | None = None,
-    project_id: UUID | None = None,
 ) -> "Credential":
     """Create a mock Credential."""
     credential = MagicMock()
@@ -85,20 +84,9 @@ def _mock_credential(
     else:
         credential.secret_id = secret_id
     credential.created_by = created_by or uuid4()
-    credential.project_id = project_id or uuid4()
+    # Mock the is_owned_by method
+    credential.is_owned_by = MagicMock(return_value=True)
     return credential
-
-
-def _mock_evaluator(*, allowed: bool = True) -> MagicMock:
-    """Create a mock AuthzEvaluator that returns the given authorization result."""
-    return MagicMock()
-
-
-def _mock_authorize(*, allowed: bool = True) -> AsyncMock:
-    """Create a mock authorize function that returns the given result."""
-    result = MagicMock()
-    result.allowed = allowed
-    return AsyncMock(return_value=result)
 
 
 class TestValidateCredentialId:
@@ -133,24 +121,20 @@ class TestFetchCredential:
     """Tests for _fetch_credential helper."""
 
     @pytest.mark.asyncio
-    async def test_returns_credential_and_project_name(self) -> None:
-        """Should return (credential, project_name) tuple from joined query."""
+    async def test_returns_credential_when_found(self) -> None:
+        """Should return credential when it exists and is not deleted."""
         credential_id = uuid4()
         expected_credential = _mock_credential(credential_id=credential_id)
 
-        mock_row = MagicMock()
-        mock_row.__getitem__ = lambda _, i: (expected_credential, "test-project")[i]
-
         mock_result = MagicMock()
-        mock_result.one_or_none.return_value = mock_row
+        mock_result.one_or_none.return_value = expected_credential
 
         mock_session = AsyncMock()
         mock_session.exec.return_value = mock_result
 
-        credential, project_name = await _fetch_credential(mock_session, credential_id)
+        result = await _fetch_credential(mock_session, credential_id)
 
-        assert credential == expected_credential
-        assert project_name == "test-project"
+        assert result == expected_credential
 
     @pytest.mark.asyncio
     async def test_raises_when_credential_not_found(self) -> None:
@@ -213,48 +197,34 @@ class TestValidateCredentialEnabled:
             _validate_credential_enabled(credential)
 
 
-class TestValidateCredentialUsePermission:
-    """Tests for _validate_credential_use_permission helper."""
+class TestValidateCredentialOwnership:
+    """Tests for _validate_credential_ownership helper."""
 
-    @pytest.mark.asyncio
-    async def test_passes_when_user_has_credential_use_permission(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Should not raise when RBAC grants credential:use permission."""
+    def test_passes_when_user_owns_credential(self) -> None:
+        """Should not raise when user is the credential owner."""
+        from typing import cast
+
         user_id = uuid4()
         credential = _mock_credential()
+        # Type assertion for mypy - cast credential to Any to allow method assignment
+        cast("MagicMock", credential.is_owned_by).return_value = True
 
-        mock_auth = _mock_authorize(allowed=True)
-        monkeypatch.setattr("syntara.aap.credential_resolver.authorize", mock_auth)
+        _validate_credential_ownership(credential, user_id)  # Should not raise
 
-        mock_session = AsyncMock()
-        evaluator = _mock_evaluator()
+        cast("MagicMock", credential.is_owned_by).assert_called_once_with(user_id)
 
-        await _validate_credential_use_permission(mock_session, evaluator, credential, "test-project", user_id, {}, {})
+    def test_raises_when_user_does_not_own_credential(self) -> None:
+        """Should raise AAPAuthenticationError when user is not the owner."""
+        from typing import cast
 
-        mock_auth.assert_called_once()
-        call_args = mock_auth.call_args
-        authz_request = call_args[0][2]
-        assert authz_request.action == "use"
-        assert authz_request.resource_type == "credential"
-        assert authz_request.resource_id == str(credential.id)
-        assert authz_request.resource_project == "test-project"
-
-    @pytest.mark.asyncio
-    async def test_raises_when_user_lacks_credential_use_permission(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Should raise AAPAuthenticationError when RBAC denies credential:use."""
         user_id = uuid4()
         credential_id = uuid4()
         credential = _mock_credential(credential_id=credential_id)
-
-        mock_auth = _mock_authorize(allowed=False)
-        monkeypatch.setattr("syntara.aap.credential_resolver.authorize", mock_auth)
-
-        mock_session = AsyncMock()
-        evaluator = _mock_evaluator()
+        # Type assertion for mypy - cast credential to Any to allow method assignment
+        cast("MagicMock", credential.is_owned_by).return_value = False
 
         with pytest.raises(AAPAuthenticationError, match=f"User {user_id} is not authorized"):
-            await _validate_credential_use_permission(
-                mock_session, evaluator, credential, "test-project", user_id, {}, {}
-            )
+            _validate_credential_ownership(credential, user_id)
 
 
 class TestDecryptCredentialInputs:
@@ -423,17 +393,11 @@ class TestResolveAAPConnectionFromCredential:
         user_id = uuid4()
         credential = _mock_credential(credential_id=credential_id, created_by=user_id)
 
-        # Mock database session — single joined query returns (credential, project_name)
-        mock_row = MagicMock()
-        mock_row.__getitem__ = lambda _, i: (credential, "test-project")[i]
+        # Mock database session
         mock_result = MagicMock()
-        mock_result.one_or_none.return_value = mock_row
+        mock_result.one_or_none.return_value = credential
         mock_session = AsyncMock()
         mock_session.exec.return_value = mock_result
-
-        # Mock authorize to allow
-        mock_auth = _mock_authorize(allowed=True)
-        monkeypatch.setattr("syntara.aap.credential_resolver.authorize", mock_auth)
 
         # Mock secret service
         decrypted_inputs: dict[str, str | bool | int] = {
@@ -455,8 +419,7 @@ class TestResolveAAPConnectionFromCredential:
         mock_injector_resolver.resolve.return_value = mock_resolved
         monkeypatch.setattr("syntara.aap.credential_resolver.InjectorResolver", mock_injector_resolver)
 
-        evaluator = _mock_evaluator()
-        result = await resolve_aap_connection_from_credential(mock_session, credential_id, user_id, evaluator=evaluator)
+        result = await resolve_aap_connection_from_credential(mock_session, credential_id, user_id)
 
         assert isinstance(result, AAPConnection)
         assert result.base_url == ""
@@ -470,15 +433,10 @@ class TestResolveAAPConnectionFromCredential:
         user_id = uuid4()
         credential = _mock_credential(credential_id=credential_id, created_by=user_id)
 
-        mock_row = MagicMock()
-        mock_row.__getitem__ = lambda _, i: (credential, "test-project")[i]
         mock_result = MagicMock()
-        mock_result.one_or_none.return_value = mock_row
+        mock_result.one_or_none.return_value = credential
         mock_session = AsyncMock()
         mock_session.exec.return_value = mock_result
-
-        mock_auth = _mock_authorize(allowed=True)
-        monkeypatch.setattr("syntara.aap.credential_resolver.authorize", mock_auth)
 
         decrypted_inputs: dict[str, str | bool | int] = {
             "username": "admin",
@@ -500,8 +458,7 @@ class TestResolveAAPConnectionFromCredential:
         mock_injector_resolver.resolve.return_value = mock_resolved
         monkeypatch.setattr("syntara.aap.credential_resolver.InjectorResolver", mock_injector_resolver)
 
-        evaluator = _mock_evaluator()
-        result = await resolve_aap_connection_from_credential(mock_session, credential_id, user_id, evaluator=evaluator)
+        result = await resolve_aap_connection_from_credential(mock_session, credential_id, user_id)
 
         assert isinstance(result, AAPConnection)
         assert result.basic_auth is not None
@@ -514,15 +471,10 @@ class TestResolveAAPConnectionFromCredential:
         user_id = uuid4()
         credential = _mock_credential(credential_id=credential_id, created_by=user_id)
 
-        mock_row = MagicMock()
-        mock_row.__getitem__ = lambda _, i: (credential, "test-project")[i]
         mock_result = MagicMock()
-        mock_result.one_or_none.return_value = mock_row
+        mock_result.one_or_none.return_value = credential
         mock_session = AsyncMock()
         mock_session.exec.return_value = mock_result
-
-        mock_auth = _mock_authorize(allowed=True)
-        monkeypatch.setattr("syntara.aap.credential_resolver.authorize", mock_auth)
 
         decrypted_inputs: dict[str, str | bool | int] = {"oauth_token": "token"}
         mock_secret_service = AsyncMock()
@@ -540,11 +492,8 @@ class TestResolveAAPConnectionFromCredential:
         mock_injector_resolver.resolve.return_value = mock_resolved
         monkeypatch.setattr("syntara.aap.credential_resolver.InjectorResolver", mock_injector_resolver)
 
-        evaluator = _mock_evaluator()
         # Pass credential_id as string
-        result = await resolve_aap_connection_from_credential(
-            mock_session, str(credential_id), user_id, evaluator=evaluator
-        )
+        result = await resolve_aap_connection_from_credential(mock_session, str(credential_id), user_id)
 
         assert isinstance(result, AAPConnection)
 
@@ -552,10 +501,9 @@ class TestResolveAAPConnectionFromCredential:
     async def test_raises_on_invalid_credential_id_format(self) -> None:
         """Should raise AAPAuthenticationError for invalid UUID format."""
         mock_session = AsyncMock()
-        evaluator = _mock_evaluator()
 
         with pytest.raises(AAPAuthenticationError, match="Invalid credential_id format"):
-            await resolve_aap_connection_from_credential(mock_session, "not-a-uuid", uuid4(), evaluator=evaluator)
+            await resolve_aap_connection_from_credential(mock_session, "not-a-uuid", uuid4())
 
     @pytest.mark.asyncio
     async def test_raises_when_credential_not_found(self) -> None:
@@ -565,10 +513,9 @@ class TestResolveAAPConnectionFromCredential:
         mock_result.one_or_none.return_value = None
         mock_session = AsyncMock()
         mock_session.exec.return_value = mock_result
-        evaluator = _mock_evaluator()
 
         with pytest.raises(AAPNotConfiguredError, match="not found"):
-            await resolve_aap_connection_from_credential(mock_session, credential_id, uuid4(), evaluator=evaluator)
+            await resolve_aap_connection_from_credential(mock_session, credential_id, uuid4())
 
     @pytest.mark.asyncio
     async def test_raises_when_wrong_credential_type(self) -> None:
@@ -581,16 +528,13 @@ class TestResolveAAPConnectionFromCredential:
             credential_type=_mock_credential_type(name="AWS"),
         )
 
-        mock_row = MagicMock()
-        mock_row.__getitem__ = lambda _, i: (credential, "test-project")[i]
         mock_result = MagicMock()
-        mock_result.one_or_none.return_value = mock_row
+        mock_result.one_or_none.return_value = credential
         mock_session = AsyncMock()
         mock_session.exec.return_value = mock_result
-        evaluator = _mock_evaluator()
 
         with pytest.raises(AAPNotConfiguredError, match="Credential must be of type"):
-            await resolve_aap_connection_from_credential(mock_session, credential_id, user_id, evaluator=evaluator)
+            await resolve_aap_connection_from_credential(mock_session, credential_id, user_id)
 
     @pytest.mark.asyncio
     async def test_raises_when_credential_disabled(self) -> None:
@@ -599,58 +543,70 @@ class TestResolveAAPConnectionFromCredential:
         user_id = uuid4()
         credential = _mock_credential(credential_id=credential_id, created_by=user_id, enabled=False)
 
-        mock_row = MagicMock()
-        mock_row.__getitem__ = lambda _, i: (credential, "test-project")[i]
         mock_result = MagicMock()
-        mock_result.one_or_none.return_value = mock_row
+        mock_result.one_or_none.return_value = credential
         mock_session = AsyncMock()
         mock_session.exec.return_value = mock_result
-        evaluator = _mock_evaluator()
 
         with pytest.raises(AAPNotConfiguredError, match="is disabled"):
-            await resolve_aap_connection_from_credential(mock_session, credential_id, user_id, evaluator=evaluator)
+            await resolve_aap_connection_from_credential(mock_session, credential_id, user_id)
 
     @pytest.mark.asyncio
-    async def test_raises_when_user_lacks_credential_use(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Should raise AAPAuthenticationError when RBAC denies credential:use."""
+    async def test_raises_when_user_not_authorized(self) -> None:
+        """Should raise AAPAuthenticationError when user doesn't own credential."""
+        from typing import cast
+
         credential_id = uuid4()
         user_id = uuid4()
-        credential = _mock_credential(credential_id=credential_id)
+        other_user_id = uuid4()
+        credential = _mock_credential(credential_id=credential_id, created_by=other_user_id)
+        # Type assertion for mypy - cast credential to Any to allow method assignment
+        cast("MagicMock", credential.is_owned_by).return_value = False
 
-        mock_row = MagicMock()
-        mock_row.__getitem__ = lambda _, i: (credential, "test-project")[i]
         mock_result = MagicMock()
-        mock_result.one_or_none.return_value = mock_row
+        mock_result.one_or_none.return_value = credential
         mock_session = AsyncMock()
         mock_session.exec.return_value = mock_result
-
-        mock_auth = _mock_authorize(allowed=False)
-        monkeypatch.setattr("syntara.aap.credential_resolver.authorize", mock_auth)
-
-        evaluator = _mock_evaluator()
 
         with pytest.raises(AAPAuthenticationError, match="is not authorized"):
-            await resolve_aap_connection_from_credential(mock_session, credential_id, user_id, evaluator=evaluator)
+            await resolve_aap_connection_from_credential(mock_session, credential_id, user_id)
 
     @pytest.mark.asyncio
-    async def test_raises_when_credential_project_not_found(self) -> None:
-        """Should raise AAPNotConfiguredError when credential's project doesn't exist."""
-        credential_id = uuid4()
-        user_id = uuid4()
-        project_id = uuid4()
-        credential = _mock_credential(credential_id=credential_id, project_id=project_id)
+    async def test_management_credential_allows_non_owner(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Management-credential helper decrypts without an owner check."""
+        from typing import cast
 
-        mock_row = MagicMock()
-        mock_row.__getitem__ = lambda _, i: (credential, None)[i]
+        credential_id = uuid4()
+        owner_id = uuid4()
+        credential = _mock_credential(credential_id=credential_id, created_by=owner_id)
+        cast("MagicMock", credential.is_owned_by).return_value = False
+
         mock_result = MagicMock()
-        mock_result.one_or_none.return_value = mock_row
+        mock_result.one_or_none.return_value = credential
         mock_session = AsyncMock()
         mock_session.exec.return_value = mock_result
 
-        evaluator = _mock_evaluator()
+        mock_secret_service = AsyncMock()
+        mock_secret_service.retrieve_secret.return_value = {"oauth_token": "secret-token"}
+        monkeypatch.setattr(
+            "syntara.aap.credential_resolver.create_secret_service",
+            MagicMock(return_value=mock_secret_service),
+        )
 
-        with pytest.raises(AAPNotConfiguredError, match="references non-existent project"):
-            await resolve_aap_connection_from_credential(mock_session, credential_id, user_id, evaluator=evaluator)
+        mock_resolved = MagicMock()
+        mock_resolved.extra_vars = {"aap_oauth_token": "secret-token"}
+        mock_injector_resolver = MagicMock()
+        mock_injector_resolver.resolve.return_value = mock_resolved
+        monkeypatch.setattr("syntara.aap.credential_resolver.InjectorResolver", mock_injector_resolver)
+
+        integration = MagicMock()
+        integration.name = "AAP Gateway"
+        integration.management_credential_id = credential_id
+
+        result = await resolve_aap_connection_from_management_credential(mock_session, integration)
+
+        assert result.headers == {"authorization": "Bearer secret-token"}
+        cast("MagicMock", credential.is_owned_by).assert_not_called()
 
     @pytest.mark.asyncio
     async def test_management_credential_missing_raises(self) -> None:

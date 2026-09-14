@@ -3,9 +3,11 @@ import { useCallback, type Dispatch } from 'react'
 
 import { getActivityMetadata, useWorkflowStore } from '../../../stores/useWorkflowStore'
 import { selectTriggers } from '../../../stores/workflowStoreSelectors'
-import { EMPTY_TRIGGERS, toReactFlowNodeId } from '../../../utils/triggerNodeIds'
+import { toReactFlowNodeId } from '../../../utils/triggerNodeIds'
 import type { NodeType } from '../../workflows/canvas/nodes/NodeType'
 import type { BuilderAction } from '../builderReducer'
+
+const EMPTY_TRIGGERS: Array<{ id: string }> = []
 
 export function useNodePanelNavigation(
   reactFlowInstance: ReactFlowInstance,

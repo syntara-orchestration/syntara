@@ -148,6 +148,7 @@ test.describe('Approval Node Configuration', () => {
       await saveWorkflow(app, workflowName)
 
       // Assert - Verify workflow is persisted
+      await expect(app).toHaveURL(/workflow-builder\/.+/)
       await expect(app.getByPlaceholder('Workflow name')).toHaveValue(workflowName)
 
       // Verify the node is still visible after save
@@ -235,6 +236,7 @@ test.describe('Approval Node Configuration', () => {
         await saveWorkflow(app, workflowName)
 
         // Assert - Verify workflow is persisted
+        await expect(app).toHaveURL(/workflow-builder\/.+/)
         await verifyNodeVisible(app, `Approval fallback ${decision}`)
       }
     } finally {
@@ -284,6 +286,7 @@ test.describe('Approval Node Configuration', () => {
 
       // Save the workflow
       await saveWorkflow(app, workflowName)
+      await expect(app).toHaveURL(/workflow-builder\/.+/)
     } finally {
       // Cleanup
       await deleteWorkflow(app, workflowName)

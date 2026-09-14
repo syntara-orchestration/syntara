@@ -14,7 +14,7 @@ Source of intent for dependency constraints. Declares version ranges using seman
 
 - Defines production dependencies in `[project.dependencies]`
 - Defines development dependencies in `[project.optional-dependencies.dev]`
-- Specifies Python version requirement: `requires-python = ">=3.12,<3.15"`
+- Specifies Python version requirement: `requires-python = ">=3.12,<3.14"`
 
 ### uv.lock
 
@@ -174,12 +174,11 @@ make sync-requirements
 
 ## Python Version Policy
 
-Supported Python versions: `>=3.12,<3.15`
+Supported Python versions: `>=3.12,<3.14`
 
 CI matrix tests on:
 - Python 3.12
 - Python 3.13
-- Python 3.14
 
 When adding a new Python version:
 1. Update `requires-python` in pyproject.toml

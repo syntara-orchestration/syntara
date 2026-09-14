@@ -866,10 +866,7 @@ class WebhookTriggerParameters(TemplateAwareBaseModel):
             webhook payloads. If set, requests with non-conforming payloads
             are rejected with 422 Unprocessable Content.
         authorized_service_account_ids: UUIDs of service accounts authorized
-            to invoke this trigger endpoint. May be empty on unpublished drafts;
-            at least one is required to publish (enforced by the trigger JSON
-            schema). See docs/service-accounts.md for the runtime-safety
-            rationale.
+            to invoke this trigger endpoint.
 
     """
 
@@ -884,11 +881,8 @@ class WebhookTriggerParameters(TemplateAwareBaseModel):
         description="Optional JSON Schema (Draft-07) for validating incoming webhook payloads",
     )
     authorized_service_account_ids: list[uuid.UUID] = Field(
-        default_factory=list,
-        description=(
-            "UUIDs of service accounts authorized to invoke this trigger endpoint. "
-            "May be empty on unpublished drafts; at least one is required to publish."
-        ),
+        min_length=1,
+        description="UUIDs of service accounts authorized to invoke this trigger endpoint",
     )
 
     @field_validator("input_schema")

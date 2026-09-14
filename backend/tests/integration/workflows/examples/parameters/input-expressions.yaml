@@ -12,21 +12,22 @@ nodes:
     name: Source Activity
     type: script
     parameters:
-      language: python
+      language: bash
       code: |
-        import json
-        print(json.dumps({"count": 42, "status": "active"}))
+        echo '{"count": 42, "status": "active"}'
+    outputs:
+      data: $.stdout
 
   - id: consumer
     name: Consumer Activity
     type: script
     parameters:
       language: bash
-      environment:
-        INPUT_COUNT: ${source.stdout_json.count}
-        INPUT_STATUS: ${source.stdout_json.status}
       code: |
         echo "Count: $INPUT_COUNT, Status: $INPUT_STATUS"
+    inputs:
+      count: ${source.output.data.count}
+      status: ${source.output.data.status}
 edges:
-  - from: source
-    to: consumer
+  - source: source
+    target: consumer

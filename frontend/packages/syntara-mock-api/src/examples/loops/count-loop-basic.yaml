@@ -20,6 +20,8 @@ nodes:
       language: bash
       code: |
         echo "Count loop iteration"
+    outputs:
+      result: $.stdout
 edges:
   - from: trigger_manual
     to: count_loop

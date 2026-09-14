@@ -18,7 +18,6 @@ import { addEdaTrigger } from './helpers/v2-nodes'
 import {
   buildUniqueName,
   clickAddConnectedStep,
-  clickSaveAndWait,
   closeNodeEditorPanel,
   deleteWorkflow,
   fillCodeEditor,
@@ -31,7 +30,7 @@ test.describe('EDA Trigger', () => {
     const workflowName = buildUniqueName('e2e-eda')
     const webhookPath = 'github-deployments'
 
-    const project = await ensureProject(app)
+    await ensureProject(app)
     const sa = await createServiceAccountViaApi(app, buildUniqueName('sa-eda'))
     await app.goto(toAppUrl('/workflow-builder/new'))
 
@@ -49,14 +48,10 @@ test.describe('EDA Trigger', () => {
       await closeNodeEditorPanel(app)
 
       // Save workflow (select project right before save)
-      // Pin the workflow to the service account's own project. `ensureProject`
-      // puts the account in `default`, but an unnamed `selectProjectIfRequired`
-      // picks whichever project the dropdown lists first — and the backend
-      // rejects the save with "Service account(s) not found in this project"
-      // whenever those differ. The weak URL guard used to hide that 422.
-      await selectProjectIfRequired(app, project?.name)
+      await selectProjectIfRequired(app)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
-      await clickSaveAndWait(app)
+      await app.getByRole('button', { name: 'Save' }).click()
+      await expect(app).toHaveURL(/workflow-builder\/.+/)
 
       // Verify workflow appears in list
       await app.goto(toAppUrl('/workflows'))

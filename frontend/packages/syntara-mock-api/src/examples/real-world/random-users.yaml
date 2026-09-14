@@ -12,16 +12,14 @@ metadata:
 triggers:
   - id: trigger_manual
     type: manual_trigger
-    parameters:
-      input_schema:
-        type: object
-        properties:
-          count:
-            type: integer
-            description: Number of random users to generate
-            default: 5
-            minimum: 1
-            maximum: 20
+
+inputs:
+  count:
+    type: integer
+    description: Number of random users to generate
+    default: 5
+    minimum: 1
+    maximum: 20
 
 nodes:
   - id: fetch_users
@@ -35,6 +33,9 @@ nodes:
       query_params:
         results: ${trigger.count}
         nat: us,gb,ca
+    outputs:
+      users: $.body.results
+      info: $.body.info
     timeout: 30
 
   - id: process_users
@@ -42,8 +43,6 @@ nodes:
     type: script
     parameters:
       language: python
-      environment:
-        INPUT_USERS: ${fetch_users.body.results}
       code: |
         import json
         import os
@@ -85,7 +84,14 @@ nodes:
         }
 
         print(json.dumps(report, indent=2))
+    inputs:
+      users: ${fetch_users.output.users}
+    outputs:
+      directory: $.output
+      total_users: $.output.total_users
+      average_age: $.output.average_age
+      summary: $.output.summary
     timeout: 60
 edges:
-  - from: fetch_users
-    to: process_users
+  - source: fetch_users
+    target: process_users

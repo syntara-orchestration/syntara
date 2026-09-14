@@ -25,4 +25,7 @@ nodes:
         }
 
         print(json.dumps(data))
+    outputs:
+      data: $.output.data
+      result: $.output.result
 edges: []

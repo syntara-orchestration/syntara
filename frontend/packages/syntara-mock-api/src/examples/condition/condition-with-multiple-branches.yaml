@@ -3,17 +3,15 @@ schema_version: "2.0.0"
 name: multi-branch-condition-test
 description: Test condition with multiple activities in then/else branches
 
+inputs:
+  score:
+    type: integer
+    description: Test score
+    default: 75
+
 triggers:
   - id: trigger_manual
     type: manual_trigger
-    parameters:
-      input_schema:
-        type: object
-        properties:
-          score:
-            type: integer
-            description: Test score
-            default: 75
 
 nodes:
   - id: score_evaluation
@@ -28,6 +26,8 @@ nodes:
       language: bash
       code: |
         echo "Congratulations! You passed the test."
+    outputs:
+      result: $.stdout
 
   - id: certificate
     name: Generate Certificate
@@ -37,6 +37,8 @@ nodes:
       code: |
         echo "Certificate generated"
         echo "Grade: PASS"
+    outputs:
+      cert: $.stdout
 
   - id: fail_notification
     name: Fail Notification
@@ -45,6 +47,8 @@ nodes:
       language: bash
       code: |
         echo "Sorry, you did not pass the test."
+    outputs:
+      result: $.stdout
 
   - id: retry_info
     name: Retry Information
@@ -54,14 +58,16 @@ nodes:
       code: |
         echo "You can retake the test after 30 days"
         echo "Study materials: /path/to/materials"
+    outputs:
+      info: $.stdout
 edges:
-  - from: score_evaluation
-    to: pass_notification
+  - source: score_evaluation
+    target: pass_notification
     port: then
-  - from: pass_notification
-    to: certificate
-  - from: score_evaluation
-    to: fail_notification
+  - source: pass_notification
+    target: certificate
+  - source: score_evaluation
+    target: fail_notification
     port: else
-  - from: fail_notification
-    to: retry_info
+  - source: fail_notification
+    target: retry_info

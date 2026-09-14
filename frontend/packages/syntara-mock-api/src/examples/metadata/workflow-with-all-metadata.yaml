@@ -26,4 +26,6 @@ nodes:
         echo "Owner: qa-team"
         echo "Timeout: 30 seconds"
         echo '{"validated": true}'
+    outputs:
+      result: $.stdout
 edges: []

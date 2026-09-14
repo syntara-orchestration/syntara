@@ -26,5 +26,5 @@ nodes:
       backoff: fixed
       initialInterval: 1
 edges:
-  - from: bash_success
-    to: python_fail
+  - source: bash_success
+    target: python_fail

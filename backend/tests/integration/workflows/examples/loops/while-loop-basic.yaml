@@ -12,17 +12,18 @@ nodes:
     name: Initialize Counter
     type: script
     parameters:
-      language: python
+      language: bash
       code: |
-        import json
-        print(json.dumps({"counter": 0}))
+        echo '{"counter": 0}'
+    outputs:
+      data: $.stdout
 
   - id: while_loop
     name: While Loop
     type: loop
     loop:
       type: while
-      condition: ${initialize_counter.stdout_json.counter} < 5
+      condition: ${initialize_counter.output.data.counter} < 5
       maxIterations: 10
 
   - id: loop_task
@@ -31,9 +32,11 @@ nodes:
       language: bash
       code: |
         echo "Loop iteration executed"
+    outputs:
+      result: $.stdout
 edges:
-  - from: initialize_counter
-    to: while_loop
-  - from: while_loop
-    to: loop_task
+  - source: initialize_counter
+    target: while_loop
+  - source: while_loop
+    target: loop_task
     port: body

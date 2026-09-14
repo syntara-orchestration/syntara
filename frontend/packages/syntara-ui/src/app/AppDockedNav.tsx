@@ -270,8 +270,8 @@ export function AppDockedNav() {
   const navItemRefs = useMemo(() => createNavItemRefs(visibleItems), [visibleItems])
 
   const colorSchemeToggleLabel = colorScheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
-  const isDockShowingLabels = isDockTextExpanded || isDockExpanded
-  const showTooltips = !isDockShowingLabels
+  const isExpanded = isDockTextExpanded || isDockExpanded
+  const showTooltips = !isExpanded
 
   /* v8 ignore start -- phantom branches from compiled JSX props, ternaries, and map callbacks */
   return (
@@ -285,11 +285,11 @@ export function AppDockedNav() {
               isHamburger
               onClick={onToggleDock}
               aria-label="Global navigation"
-              isExpanded={isDockShowingLabels}
+              isExpanded={isDockTextExpanded}
             />
           </MastheadToggle>
-          <MastheadBrand className={!isDockShowingLabels ? styles.collapsedBrand : undefined}>
-            {isDockShowingLabels ? (
+          <MastheadBrand className={!isExpanded ? styles.collapsedBrand : undefined}>
+            {isExpanded ? (
               <MastheadLogo component={(props) => <Link {...props} to="/" />} aria-label="Home">
                 <img
                   src={colorScheme === 'dark' ? brand.logoExpandedDark : brand.logoExpandedLight}
@@ -325,7 +325,7 @@ export function AppDockedNav() {
                   }
                   variant="docked"
                   aria-label="Main navigation"
-                  className={!isDockShowingLabels ? styles.iconDockNav : undefined}
+                  className={!isDockTextExpanded ? styles.iconDockNav : undefined}
                 >
                   <NavList>
                     {visibleItems.flatMap((item) => {
@@ -337,7 +337,7 @@ export function AppDockedNav() {
                       if (hasDropdownChildren(item)) {
                         return [
                           separator,
-                          isDockShowingLabels ? (
+                          isExpanded ? (
                             <NavExpandableItem
                               key={item.path}
                               item={item}

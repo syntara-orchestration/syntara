@@ -8,8 +8,6 @@ import type { FlowPosition } from '../types'
 import { LOOP_BODY_SPACING } from '../utils/layoutConstants'
 import type { EdgeType } from '../utils/workflowToGraph'
 
-import { useLoopGroupPositionSync } from './useLoopGroupPositionSync'
-
 type UseNodePositioningParams = {
   nodes: NodeType[]
   edges: EdgeType[]
@@ -283,7 +281,6 @@ export function useNodePositioning({
   desiredPosition,
   onClearDesiredPosition,
 }: UseNodePositioningParams) {
-  useLoopGroupPositionSync({ nodes, edges, isInitialized, updateNodePositions })
   const loopPositionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {

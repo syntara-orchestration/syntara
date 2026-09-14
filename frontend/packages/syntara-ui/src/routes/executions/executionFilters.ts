@@ -26,25 +26,21 @@ export function transformWorkflowsToOptions(
 /**
  * Returns filter definition for filtering executions by workflow with server-side typeahead
  *
- * @param projectId - When set, scopes the typeahead to workflows in that project
- *   (same project selector used by the Workflow Runs table). Omit or pass null when
- *   viewing all projects.
  * @returns FilterFieldDefinition configured for workflow filtering with async SELECT type
  *
  * @remarks
  * Uses server-side typeahead via asyncOptions to support filtering by any workflow,
- * not just the first page of results. Queries /workflows with name[contains] and,
- * when a project is selected, project_id so options match the current project scope.
+ * not just the first page of results. Queries /workflows with name[contains] parameter.
  * Uses the shared authenticated workflowFetchClient from client.tsx.
  *
  * @example
  * ```typescript
- * const filterDef = getExecutionWorkflowFilterDefinition(selectedProjectId)
- * // User types "deploy" → queries /workflows?name[contains]=deploy&project_id=<id>
+ * const filterDef = getExecutionWorkflowFilterDefinition()
+ * // User types "deploy" → queries /workflows?name[contains]=deploy
  * // Generates query param: workflow_id=workflow-123
  * ```
  */
-export const getExecutionWorkflowFilterDefinition = (projectId?: string | null): FilterFieldDefinition => ({
+export const getExecutionWorkflowFilterDefinition = (): FilterFieldDefinition => ({
   key: 'workflow_id',
   label: 'Workflow name',
   type: FilterTypeEnum.SELECT,
@@ -55,10 +51,6 @@ export const getExecutionWorkflowFilterDefinition = (projectId?: string | null):
 
     if (searchValue.trim()) {
       params['name[contains]'] = searchValue.trim()
-    }
-
-    if (projectId) {
-      params.project_id = projectId
     }
 
     try {

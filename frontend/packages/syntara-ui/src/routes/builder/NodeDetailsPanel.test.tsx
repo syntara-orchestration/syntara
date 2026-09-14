@@ -102,7 +102,7 @@ vi.mock('../workflows/canvas/nodes/hooks/useNodeMenuActions', () => ({
   MenuNodeType: { ACTIVITY: 'activity', TRIGGER: 'trigger' },
 }))
 
-vi.mock('../../components/nodes/NodeMenu', () => ({
+vi.mock('../workflows/canvas/nodes/common/NodeMenu', () => ({
   NodeMenu: ({ menuActions }: { menuActions: Array<{ onClick: () => void }> }) => (
     <button onClick={() => menuActions[0]?.onClick()} type="button">
       Menu
