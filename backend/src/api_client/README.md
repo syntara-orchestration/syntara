@@ -1,5 +1,5 @@
 # syntara-api-client
-A client library for accessing Orchestrator API
+A client library for accessing Automation Orchestrator API
 
 ## Usage
 First, create a client:

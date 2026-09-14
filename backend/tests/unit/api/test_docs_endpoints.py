@@ -358,6 +358,24 @@ class TestDocsEnabledWiring:
 class TestProductionAppWiring:
     """Verify the real app has correct doc endpoint wiring for coverage."""
 
+    def test_app_title_uses_configured_product_name(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """The runtime app and OpenAPI document use APP_PRODUCT_NAME."""
+        import importlib
+
+        import syntara.api.main as main_module
+
+        monkeypatch.setenv("APP_PRODUCT_NAME", "Automation Orchestrator")
+        monkeypatch.setenv("APP_ENABLE_API_DOCS", "false")
+        get_settings.cache_clear()
+        importlib.reload(main_module)
+        try:
+            assert main_module.app.title == "Automation Orchestrator API"
+            assert main_module.app.openapi()["info"]["title"] == "Automation Orchestrator API"
+        finally:
+            monkeypatch.setenv("APP_ENABLE_API_DOCS", "false")
+            get_settings.cache_clear()
+            importlib.reload(main_module)
+
     def test_builtin_docs_url_disabled(self) -> None:
         from syntara.api.main import app as real_app
 
