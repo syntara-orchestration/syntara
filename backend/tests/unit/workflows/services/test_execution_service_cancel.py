@@ -6,6 +6,7 @@ from uuid import uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from syntara.agent_orchestrator.services.invocation_service import InvocationService
 from syntara.core.models import User
 from syntara.workflows.exceptions import (
     ExecutionInTerminalStateError,
@@ -156,12 +157,14 @@ class TestCancelExecution:
             await service.cancel_execution(execution.id)
 
     @pytest.mark.asyncio
-    async def test_cancel_execution_forwards_temporal_service_to_invocations(self) -> None:
-        """Invocation cancellation is delegated, temporal service and all.
+    async def test_cancel_execution_injects_a_wired_invocation_service(self) -> None:
+        """Invocation cancellation is delegated to a service built here.
 
         ExecutionService cancels its own workflow and hands the rest to
         cancel_invocations_for_execution; it no longer reaches into the builtin
-        agent execution itself.
+        agent execution itself. It owns temporal_service, so it is the one that
+        constructs the InvocationService with it rather than passing the
+        dependency through a bridge module that never uses it.
         """
         execution = _make_execution(ExecutionStatus.RUNNING)
         mock_session = _mock_session_returning(execution)
@@ -182,15 +185,17 @@ class TestCancelExecution:
         ) as mock_cancel:
             await service.cancel_execution(execution.id)
 
-        # The temporal service must be forwarded: InvocationService owns the
+        mock_cancel.assert_awaited_once()
+        assert mock_cancel.await_args is not None
+        session_arg, execution_id_arg, invocation_service = mock_cancel.await_args.args
+        assert session_arg is mock_session
+        assert execution_id_arg == execution.id
+        # The injected service must carry the Temporal dependency: it owns the
         # cancel of the builtin workflow running each invocation, and without it
         # that half of the cancel is silently skipped.
-        mock_cancel.assert_awaited_once_with(
-            mock_session,
-            mock_user,
-            execution.id,
-            temporal_service=mock_temporal,
-        )
+        assert isinstance(invocation_service, InvocationService)
+        assert invocation_service.temporal_service is mock_temporal
+        assert invocation_service.user is mock_user
         # Only the user's own execution is cancelled from here; the per-invocation
         # Temporal cancel now happens inside InvocationService.
         mock_temporal.cancel_workflow.assert_awaited_once_with(temporal_workflow_id=execution.temporal_workflow_id)
