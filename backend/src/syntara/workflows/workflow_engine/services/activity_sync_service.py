@@ -1830,7 +1830,11 @@ class ActivitySyncService:
             initial_output_data: Pre-existing output data (e.g. from heartbeat partial output)
 
         Returns:
-            Tuple of (input_data, output_data)
+            Tuple of (input_data, output_data).
+
+        Raises:
+            TemporalError: When the workflow query fails (worker unreachable, rejected, etc.).
+            ValueError: When query arguments are invalid.
 
         """
         input_data: dict[str, Any] = {}
@@ -1878,7 +1882,8 @@ class ActivitySyncService:
                     )
 
         except (TemporalError, ValueError) as e:
-            logger.debug("Could not query activity data", activity_id=activity_id, error=str(e))
+            logger.warning("Could not query activity data", activity_id=activity_id, error=str(e))
+            raise
 
         return input_data, output_data
 
@@ -2156,6 +2161,20 @@ class ActivitySyncService:
         )
         return existing, old_values, is_new
 
+    @staticmethod
+    def _io_after_query_failure(
+        existing: ActivityExecution,
+        activity_data: dict[str, Any],
+    ) -> tuple[dict[str, Any], dict[str, Any] | None]:
+        """Return input/output safe to persist when a Temporal query failed."""
+        input_data = existing.input_data or {}
+        event_output = activity_data.get("output_data")
+        if event_output is not None:
+            output_data: dict[str, Any] | None = event_output | (existing.output_data or {})
+        else:
+            output_data = existing.output_data
+        return input_data, output_data
+
     async def _resolve_activity_io(
         self,
         handle: WorkflowHandle[Any, Any],
@@ -2174,10 +2193,18 @@ class ActivitySyncService:
         - Subsequent non-terminal events: no query — reuse the stored input.
         """
         if activity_data.get("status") in TERMINAL_ACTIVITY_STATUSES:
-            return await self._query_activity_io(handle, activity_id, activity_data, activity_data.get("output_data"))
+            try:
+                return await self._query_activity_io(
+                    handle, activity_id, activity_data, activity_data.get("output_data")
+                )
+            except (TemporalError, ValueError):
+                return self._io_after_query_failure(existing, activity_data)
         if not existing.input_data:
-            input_data, _ = await self._query_activity_io(handle, activity_id, activity_data, None)
-            return input_data, activity_data.get("output_data")
+            try:
+                input_data, _ = await self._query_activity_io(handle, activity_id, activity_data, None)
+                return input_data, activity_data.get("output_data")
+            except (TemporalError, ValueError):
+                return self._io_after_query_failure(existing, activity_data)
         return existing.input_data, activity_data.get("output_data")
 
     @staticmethod
