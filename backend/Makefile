@@ -240,6 +240,12 @@ endif
 
 # Development workflow
 # ========================================================
+.PHONY: ep-migrate
+ep-migrate: check-deps ## Apply execution_plane schema migrations (separate from main Syntara migrations)
+	@echo "🔄 Running execution_plane migrations..."
+	@cd execution-plane && APP_ADMIN_PASSWORD_PATH=../.secrets/admin-password uv run alembic upgrade head
+	@echo "✅ execution_plane migrations complete"
+
 .PHONY: db-seed
 db-seed: check-deps ## Run all required database seeders
 	@echo "🌱 Seeding database..."
