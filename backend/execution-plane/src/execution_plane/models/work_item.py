@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime
 from enum import StrEnum
 
+import sqlalchemy as sa
 from sqlalchemy import Column, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.types import DateTime
@@ -40,7 +41,10 @@ class WorkItem(SQLModel, table=True):
     # is received from the execution plane.
     activity_handle: str = Field(sa_column=Column(Text, nullable=False))
 
-    status: WorkItemStatus = Field(default=WorkItemStatus.PENDING, index=True)
+    status: WorkItemStatus = Field(
+        default=WorkItemStatus.PENDING,
+        sa_column=Column(sa.String, nullable=False, index=True),
+    )
 
     # Set when a worker claims this item.
     execution_target_id: uuid.UUID | None = Field(default=None, foreign_key=f"{EP_SCHEMA}.execution_targets.id")

@@ -485,7 +485,7 @@ async def _dispatch_to_te(
         await session.commit()
 
     await engine.dispose()
-    activity.logger.info("Dispatched work item to TE", work_item_id=str(work_item.id))
+    activity.logger.info("Dispatched work item to TE work_item_id=%s", work_item.id)
 
 
 @activity.defn(name=ActivityName.SCRIPT)

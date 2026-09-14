@@ -320,9 +320,11 @@ worker-run: check-deps _ensure-secrets _ensure-certs ## Run Temporal workflow wo
 	uv run python -m syntara.workflows.worker
 
 .PHONY: ep-worker-run
-ep-worker-run: check-deps ## Run execution plane TE worker (polls work_items and completes Temporal activities)
+ep-worker-run: check-deps _ensure-secrets _ensure-certs ## Run execution plane TE worker (polls work_items and completes Temporal activities)
 	@echo "🔄 Starting Execution Plane worker..."
-	APP_USE_TE_DISPATCH=true \
+	$(S2S_TLS_VARS) \
+	APP_S2S_TLS_CERT_PATH=.secrets/certs/worker.crt \
+	APP_S2S_TLS_KEY_PATH=.secrets/certs/worker.key \
 	uv run python -m execution_plane.worker
 
 .PHONY: background-worker-run

@@ -39,7 +39,7 @@ async def _claim_pending_items(session: AsyncSession) -> list[WorkItem]:
 
 async def _execute_work_item(item: WorkItem, temporal_client: object) -> None:
     """Run the script from the work item payload and complete the Temporal activity."""
-    log = logger.bind(work_item_id=str(item.id))
+    wi_id = str(item.id)
     try:
         from syntara.workflows.workflow_engine.activities.script_activity import (  # noqa: PLC0415
             _execute_script_common,
@@ -100,11 +100,11 @@ async def _execute_work_item(item: WorkItem, temporal_client: object) -> None:
         handle = temporal_client.get_async_activity_handle(task_token=task_token)  # type: ignore[attr-defined]
         await handle.complete(activity_result)
 
-        log.info("Work item completed successfully")
+        logger.info("Work item completed successfully", work_item_id=wi_id)
         return activity_result
 
     except ScriptExecutionError as e:
-        log.warning("Script execution failed", error=str(e))
+        logger.warning("Script execution failed", work_item_id=wi_id, error=str(e))
         task_token = base64.b64decode(item.activity_handle)
         handle = temporal_client.get_async_activity_handle(task_token=task_token)  # type: ignore[attr-defined]
         from temporalio.exceptions import ApplicationError  # noqa: PLC0415
@@ -112,7 +112,7 @@ async def _execute_work_item(item: WorkItem, temporal_client: object) -> None:
         raise
 
     except Exception as e:
-        log.error("Unexpected error processing work item", error=str(e))
+        logger.error("Unexpected error processing work item", work_item_id=wi_id, error=str(e))
         task_token = base64.b64decode(item.activity_handle)
         handle = temporal_client.get_async_activity_handle(task_token=task_token)  # type: ignore[attr-defined]
         from temporalio.exceptions import ApplicationError  # noqa: PLC0415
@@ -122,7 +122,7 @@ async def _execute_work_item(item: WorkItem, temporal_client: object) -> None:
 
 async def _process_item(item: WorkItem, session: AsyncSession, temporal_client: object) -> None:
     """Process one work item: execute, then mark completed or failed."""
-    log = logger.bind(work_item_id=str(item.id))
+    wi_id = str(item.id)
     try:
         await _execute_work_item(item, temporal_client)
         item.status = WorkItemStatus.COMPLETED
@@ -130,7 +130,7 @@ async def _process_item(item: WorkItem, session: AsyncSession, temporal_client: 
     except Exception:
         item.status = WorkItemStatus.FAILED
         item.completed_at = datetime.now(UTC)
-        log.warning("Work item failed")
+        logger.warning("Work item failed", work_item_id=wi_id)
     finally:
         await session.commit()
 
@@ -157,19 +157,35 @@ async def _poll_loop(session_factory: async_sessionmaker[AsyncSession], temporal
 
 async def _create_temporal_client() -> object:
     """Connect to Temporal using the same env vars as the Syntara worker."""
+    from pathlib import Path  # noqa: PLC0415
+
     from temporalio.client import Client  # noqa: PLC0415
+    from temporalio.service import TLSConfig  # noqa: PLC0415
 
     temporal_address = os.environ.get("APP_TEMPORAL_ADDRESS", "localhost:7233")
     temporal_namespace = os.environ.get("APP_TEMPORAL_NAMESPACE", "default")
-    client = await Client.connect(temporal_address, namespace=temporal_namespace)
-    logger.info("Connected to Temporal", address=temporal_address, namespace=temporal_namespace)
+
+    tls: TLSConfig | None = None
+    if os.environ.get("APP_S2S_TLS_ENABLED", "").lower() == "true":
+        ca = os.environ.get("APP_S2S_TLS_CA_CERT_PATH")
+        cert = os.environ.get("APP_S2S_TLS_CERT_PATH")
+        key = os.environ.get("APP_S2S_TLS_KEY_PATH")
+        if ca and cert and key:
+            tls = TLSConfig(
+                server_root_ca_cert=Path(ca).read_bytes(),
+                client_cert=Path(cert).read_bytes(),
+                client_private_key=Path(key).read_bytes(),
+            )
+
+    client = await Client.connect(temporal_address, namespace=temporal_namespace, tls=tls)
+    logger.info("Connected to Temporal", address=temporal_address, namespace=temporal_namespace, tls_enabled=tls is not None)
     return client
 
 
 async def _run() -> None:
-    database_url = os.environ.get("DATABASE_URL")
+    database_url = os.environ.get("APP_DATABASE_URL") or os.environ.get("DATABASE_URL")
     if not database_url:
-        logger.error("DATABASE_URL environment variable is required")
+        logger.error("DATABASE_URL (or APP_DATABASE_URL) environment variable is required")
         sys.exit(1)
 
     engine = create_async_engine(database_url)
@@ -185,7 +201,20 @@ async def _run() -> None:
 def main() -> None:
     """Entry point for the execution-plane-worker CLI command."""
     import logging  # noqa: PLC0415
+
+    import structlog  # noqa: PLC0415
+
     logging.basicConfig(level=logging.INFO)
+    structlog.configure(
+        processors=[
+            structlog.stdlib.add_log_level,
+            structlog.stdlib.add_logger_name,
+            structlog.dev.ConsoleRenderer(),
+        ],
+        wrapper_class=structlog.stdlib.BoundLogger,
+        context_class=dict,
+        logger_factory=structlog.stdlib.LoggerFactory(),
+    )
     asyncio.run(_run())
 
 
