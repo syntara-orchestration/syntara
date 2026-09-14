@@ -45,19 +45,16 @@ check_dependencies() {
 
 # Returns 0 when password meets validate_password_complexity rules.
 admin_password_meets_complexity() {
-    local password="$1"
-    local classes=0
+    printf '%s' "$1" |
+        (cd "$PROJECT_ROOT" && uv run python -c '
+import sys
+from syntara.auth.passwords import validate_password_complexity
 
-    if ((${#password} < 14)); then
-        return 1
-    fi
-
-    [[ "$password" =~ [0-9] ]] && classes=$((classes + 1))
-    [[ "$password" =~ [A-Z] ]] && classes=$((classes + 1))
-    [[ "$password" =~ [a-z] ]] && classes=$((classes + 1))
-    [[ "$password" =~ [^a-zA-Z0-9] ]] && classes=$((classes + 1))
-
-    [[ $classes -ge 3 ]]
+try:
+    validate_password_complexity(sys.stdin.read())
+except ValueError:
+    raise SystemExit(1)
+')
 }
 
 # Generate a bootstrap admin password that satisfies validate_password_complexity.
