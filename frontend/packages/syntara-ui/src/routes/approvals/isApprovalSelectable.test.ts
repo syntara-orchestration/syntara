@@ -13,106 +13,130 @@ describe('isApprovalSelectable', () => {
   it('returns true when all conditions are met', () => {
     const approval = mockApproval('pending')
     expect(
-      isApprovalSelectable(
+      isApprovalSelectable({
         approval,
-        true, // canDecideOnThisApproval
-        true, // canDecideBasedOnApproverList
-        false, // isLoadingPermissions
-        false // isCheckingApproverList
-      )
+        canDecideOnThisApproval: true,
+        canDecideBasedOnApproverList: true,
+        isLoadingPermissions: false,
+        isCheckingApproverList: false,
+      })
     ).toBe(true)
   })
 
   it('returns false when status is not pending', () => {
     const approval = mockApproval('approved')
-    expect(isApprovalSelectable(approval, true, true, false, false)).toBe(false)
+    expect(
+      isApprovalSelectable({
+        approval,
+        canDecideOnThisApproval: true,
+        canDecideBasedOnApproverList: true,
+        isLoadingPermissions: false,
+        isCheckingApproverList: false,
+      })
+    ).toBe(false)
   })
 
   it('returns false when isLoadingPermissions is true', () => {
     const approval = mockApproval('pending')
     expect(
-      isApprovalSelectable(
+      isApprovalSelectable({
         approval,
-        true,
-        true,
-        true, // isLoadingPermissions
-        false
-      )
+        canDecideOnThisApproval: true,
+        canDecideBasedOnApproverList: true,
+        isLoadingPermissions: true,
+        isCheckingApproverList: false,
+      })
     ).toBe(false)
   })
 
   it('returns false when isCheckingApproverList is true', () => {
     const approval = mockApproval('pending')
     expect(
-      isApprovalSelectable(
+      isApprovalSelectable({
         approval,
-        true,
-        true,
-        false,
-        true // isCheckingApproverList
-      )
+        canDecideOnThisApproval: true,
+        canDecideBasedOnApproverList: true,
+        isLoadingPermissions: false,
+        isCheckingApproverList: true,
+      })
     ).toBe(false)
   })
 
   it('returns false when canDecideOnThisApproval is false', () => {
     const approval = mockApproval('pending')
     expect(
-      isApprovalSelectable(
+      isApprovalSelectable({
         approval,
-        false, // canDecideOnThisApproval
-        true,
-        false,
-        false
-      )
+        canDecideOnThisApproval: false,
+        canDecideBasedOnApproverList: true,
+        isLoadingPermissions: false,
+        isCheckingApproverList: false,
+      })
     ).toBe(false)
   })
 
   it('returns false when canDecideBasedOnApproverList is false', () => {
     const approval = mockApproval('pending')
     expect(
-      isApprovalSelectable(
+      isApprovalSelectable({
         approval,
-        true,
-        false, // canDecideBasedOnApproverList
-        false,
-        false
-      )
+        canDecideOnThisApproval: true,
+        canDecideBasedOnApproverList: false,
+        isLoadingPermissions: false,
+        isCheckingApproverList: false,
+      })
     ).toBe(false)
   })
 
   it('returns false when both permissions are false', () => {
     const approval = mockApproval('pending')
     expect(
-      isApprovalSelectable(
+      isApprovalSelectable({
         approval,
-        false, // canDecideOnThisApproval
-        false, // canDecideBasedOnApproverList
-        false,
-        false
-      )
+        canDecideOnThisApproval: false,
+        canDecideBasedOnApproverList: false,
+        isLoadingPermissions: false,
+        isCheckingApproverList: false,
+      })
     ).toBe(false)
   })
 
   it('returns false when both loading states are true', () => {
     const approval = mockApproval('pending')
     expect(
-      isApprovalSelectable(
+      isApprovalSelectable({
         approval,
-        true,
-        true,
-        true, // isLoadingPermissions
-        true // isCheckingApproverList
-      )
+        canDecideOnThisApproval: true,
+        canDecideBasedOnApproverList: true,
+        isLoadingPermissions: true,
+        isCheckingApproverList: true,
+      })
     ).toBe(false)
   })
 
   it('returns false for rejected status', () => {
     const approval = mockApproval('rejected')
-    expect(isApprovalSelectable(approval, true, true, false, false)).toBe(false)
+    expect(
+      isApprovalSelectable({
+        approval,
+        canDecideOnThisApproval: true,
+        canDecideBasedOnApproverList: true,
+        isLoadingPermissions: false,
+        isCheckingApproverList: false,
+      })
+    ).toBe(false)
   })
 
   it('returns false for timed_out status', () => {
     const approval = mockApproval('timed_out')
-    expect(isApprovalSelectable(approval, true, true, false, false)).toBe(false)
+    expect(
+      isApprovalSelectable({
+        approval,
+        canDecideOnThisApproval: true,
+        canDecideBasedOnApproverList: true,
+        isLoadingPermissions: false,
+        isCheckingApproverList: false,
+      })
+    ).toBe(false)
   })
 })
