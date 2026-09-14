@@ -30,7 +30,7 @@ ${namespace.field.nested_field}
 | `loop` | Loop iteration data (`item`, `index`), scoped to the enclosing loop | Inside a loop body only |
 | `secrets` | Resolved credential values | **Not available as a namespace** — credentials are injected per-node via `credential_id` and never placed in the resolver |
 
-There is no `input`/`inputs`/`variables` namespace. Trigger payload is `${trigger.*}` (see [Trigger System Overview](triggers/overview.md#how-trigger-output-flows-to-downstream-nodes)). Those strings are ordinary node ids: `${input.foo}` is valid only if a node is actually named `input`.
+There is no `input`/`inputs`/`variables` namespace. Trigger payload is `${trigger.*}` (see [Trigger System Overview](triggers/overview.md#how-trigger-output-flows-to-downstream-nodes)). Those strings are ordinary node ids: `${input.foo}` is valid only if a node is actually named `input`. Leftover `${workflow.*}` is not a builtin namespace — use `${workflow_context.*}` for workflow metadata.
 
 ## Type Preservation
 

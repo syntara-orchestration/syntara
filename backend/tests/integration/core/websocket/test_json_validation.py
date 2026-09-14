@@ -7,24 +7,22 @@ by returning appropriate error responses.
 import asyncio
 import json
 from datetime import UTC, datetime
-from pathlib import Path
 from uuid import uuid4
 
 import pytest
-from fastapi import FastAPI
 from websockets import connect as websocket_connect
 
 from syntara.core.websocket.manager import get_connection_lifecycle_manager
+from tests.integration.conftest import ExampleAppServer
 
 
 class TestWebSocketJsonValidation:
     """Tests for WebSocket JSON validation error handling."""
 
     @pytest.mark.asyncio
-    async def test_non_json_text_input_chat_endpoint(self, example_app_server: tuple[Path, FastAPI]) -> None:
+    async def test_non_json_text_input_chat_endpoint(self, example_app_server: ExampleAppServer) -> None:
         """Test that non-JSON text input returns validation error on chat endpoint."""
-        _ = example_app_server
-        async with websocket_connect("ws://127.0.0.1:9999/ws/testcomp/v1/chat") as websocket:
+        async with websocket_connect(f"{example_app_server.ws_base_url}/ws/testcomp/v1/chat") as websocket:
             # Send non-JSON text
             await websocket.send("asd")
 
@@ -48,10 +46,9 @@ class TestWebSocketJsonValidation:
             assert timestamp.tzinfo is not None
 
     @pytest.mark.asyncio
-    async def test_non_json_text_input_coffee_endpoint(self, example_app_server: tuple[Path, FastAPI]) -> None:
+    async def test_non_json_text_input_coffee_endpoint(self, example_app_server: ExampleAppServer) -> None:
         """Test that non-JSON text input returns validation error on coffee endpoint."""
-        _ = example_app_server
-        async with websocket_connect("ws://127.0.0.1:9999/ws/testcomp/v1/coffee") as websocket:
+        async with websocket_connect(f"{example_app_server.ws_base_url}/ws/testcomp/v1/coffee") as websocket:
             # Send non-JSON text
             await websocket.send("invalid input")
 
@@ -68,10 +65,9 @@ class TestWebSocketJsonValidation:
             assert response["error"] == "INVALID_REQUEST"
 
     @pytest.mark.asyncio
-    async def test_malformed_json_missing_quote(self, example_app_server: tuple[Path, FastAPI]) -> None:
+    async def test_malformed_json_missing_quote(self, example_app_server: ExampleAppServer) -> None:
         """Test that malformed JSON (missing quote) returns validation error."""
-        _ = example_app_server
-        async with websocket_connect("ws://127.0.0.1:9999/ws/testcomp/v1/chat") as websocket:
+        async with websocket_connect(f"{example_app_server.ws_base_url}/ws/testcomp/v1/chat") as websocket:
             # Send malformed JSON (missing closing quote)
             await websocket.send('{"message": "hello}')
 
@@ -86,9 +82,9 @@ class TestWebSocketJsonValidation:
             assert "timestamp" in response
 
     @pytest.mark.asyncio
-    async def test_malformed_json_invalid_structure(self, example_app_server: tuple[Path, FastAPI]) -> None:
+    async def test_malformed_json_invalid_structure(self, example_app_server: ExampleAppServer) -> None:
         """Test that malformed JSON (invalid structure) returns validation error."""
-        async with websocket_connect("ws://127.0.0.1:9999/ws/testcomp/v1/chat") as websocket:
+        async with websocket_connect(f"{example_app_server.ws_base_url}/ws/testcomp/v1/chat") as websocket:
             # Send malformed JSON (invalid structure)
             await websocket.send("{invalid}")
 
@@ -103,10 +99,9 @@ class TestWebSocketJsonValidation:
             assert "timestamp" in response
 
     @pytest.mark.asyncio
-    async def test_connection_continues_after_json_error(self, example_app_server: tuple[Path, FastAPI]) -> None:
+    async def test_connection_continues_after_json_error(self, example_app_server: ExampleAppServer) -> None:
         """Test that WebSocket connection continues after JSON validation error."""
-        _ = example_app_server
-        async with websocket_connect("ws://127.0.0.1:9999/ws/testcomp/v1/chat") as websocket:
+        async with websocket_connect(f"{example_app_server.ws_base_url}/ws/testcomp/v1/chat") as websocket:
             # Send invalid JSON
             await websocket.send("invalid")
 
@@ -132,9 +127,9 @@ class TestWebSocketJsonValidation:
                 assert response["reply"] == "HELLO"
 
     @pytest.mark.asyncio
-    async def test_multiple_json_errors_in_sequence(self, example_app_server: tuple[Path, FastAPI]) -> None:
+    async def test_multiple_json_errors_in_sequence(self, example_app_server: ExampleAppServer) -> None:
         """Test that multiple JSON errors can be handled in sequence."""
-        async with websocket_connect("ws://127.0.0.1:9999/ws/testcomp/v1/chat") as websocket:
+        async with websocket_connect(f"{example_app_server.ws_base_url}/ws/testcomp/v1/chat") as websocket:
             # Send multiple invalid JSON messages
             for i in range(3):
                 await websocket.send(f"invalid{i}")
@@ -152,10 +147,9 @@ class TestWebSocketJsonValidation:
             assert "reply" in response
 
     @pytest.mark.asyncio
-    async def test_empty_string_as_json(self, example_app_server: tuple[Path, FastAPI]) -> None:
+    async def test_empty_string_as_json(self, example_app_server: ExampleAppServer) -> None:
         """Test that empty string returns JSON validation error."""
-        _ = example_app_server
-        async with websocket_connect("ws://127.0.0.1:9999/ws/testcomp/v1/chat") as websocket:
+        async with websocket_connect(f"{example_app_server.ws_base_url}/ws/testcomp/v1/chat") as websocket:
             # Send empty string
             await websocket.send("")
 
@@ -170,10 +164,9 @@ class TestWebSocketJsonValidation:
             assert "timestamp" in response
 
     @pytest.mark.asyncio
-    async def test_json_error_timestamp_is_recent(self, example_app_server: tuple[Path, FastAPI]) -> None:
+    async def test_json_error_timestamp_is_recent(self, example_app_server: ExampleAppServer) -> None:
         """Test that error timestamp is recent and in correct timezone."""
-        _ = example_app_server
-        async with websocket_connect("ws://127.0.0.1:9999/ws/testcomp/v1/chat") as websocket:
+        async with websocket_connect(f"{example_app_server.ws_base_url}/ws/testcomp/v1/chat") as websocket:
             # Record time before sending
             before = datetime.now(UTC)
 
@@ -197,10 +190,9 @@ class TestWebSocketJsonValidation:
             assert error_timestamp.tzinfo is not None
 
     @pytest.mark.asyncio
-    async def test_error_message_contains_useful_information(self, example_app_server: tuple[Path, FastAPI]) -> None:
+    async def test_error_message_contains_useful_information(self, example_app_server: ExampleAppServer) -> None:
         """Test that error message contains useful debugging information."""
-        _ = example_app_server
-        async with websocket_connect("ws://127.0.0.1:9999/ws/testcomp/v1/chat") as websocket:
+        async with websocket_connect(f"{example_app_server.ws_base_url}/ws/testcomp/v1/chat") as websocket:
             # Send invalid JSON
             await websocket.send("{bad json}")
 
@@ -217,7 +209,7 @@ class TestWebSocketJsonValidation:
             assert any(keyword in message_lower for keyword in ["json", "format", "invalid", "parse", "decode"])
 
     @pytest.mark.asyncio
-    async def test_validation_error_updates_activity_timestamp(self, example_app_server: tuple[Path, FastAPI]) -> None:
+    async def test_validation_error_updates_activity_timestamp(self, example_app_server: ExampleAppServer) -> None:
         """Test that ValidationError updates the lifecycle manager activity timestamp.
 
         This verifies that even invalid JSON messages count as connection activity,
@@ -230,7 +222,7 @@ class TestWebSocketJsonValidation:
         # server-side among any other "chat" connections.
         user_agent = f"test-{uuid4()}"
         async with websocket_connect(
-            "ws://127.0.0.1:9999/ws/testcomp/v1/chat", user_agent_header=user_agent
+            f"{example_app_server.ws_base_url}/ws/testcomp/v1/chat", user_agent_header=user_agent
         ) as websocket:
             # Send valid message first to establish connection
             await websocket.send(json.dumps({"message": "hello"}))

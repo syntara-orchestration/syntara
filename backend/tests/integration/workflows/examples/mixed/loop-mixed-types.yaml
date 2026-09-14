@@ -3,15 +3,17 @@ schema_version: "2.0.0"
 name: loop-mixed-types
 description: Loop execution with alternating executor types
 
-inputs:
-  items:
-    type: array
-    description: Items to process
-    default: [item1, item2, item3]
-
 triggers:
   - id: trigger_manual
     type: manual_trigger
+    parameters:
+      input_schema:
+        type: object
+        properties:
+          items:
+            type: array
+            description: Items to process
+            default: [item1, item2, item3]
 
 nodes:
   - id: process_items
@@ -26,15 +28,15 @@ nodes:
     type: script
     parameters:
       language: python
+      environment:
+        INPUT_ITEM: ${loop.item}
+        INPUT_INDEX: ${loop.index}
       code: |
         import os
         item = os.getenv('INPUT_ITEM', '')
         index = os.getenv('INPUT_INDEX', '0')
         print(f"Processing item {item} at index {index}")
-    inputs:
-      item: ${item}
-      index: ${index}
 edges:
-  - source: process_items
-    target: process_item
+  - from: process_items
+    to: process_item
     port: body

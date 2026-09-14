@@ -5,6 +5,7 @@ import type { NodeType } from '../../workflows/canvas/nodes/NodeType'
 
 import { filterRealEdges, filterRealNodes } from './filterHelpers'
 import { LOOP_BODY_SPACING } from './layoutConstants'
+import { getLoopBodyMap } from './loopUtils'
 import type { EdgeType } from './workflowToGraph'
 
 type DagreNodeLabel = {
@@ -101,62 +102,19 @@ function calculateLoopBodyPositions(
 }
 
 /**
- * Identify loop structures and their body nodes
+ * Identify loop structures and their body nodes.
+ * Delegates BFS traversal to getLoopBodyMap and derives auxiliary maps from the result.
  */
 function identifyLoopStructures(realNodes: NodeType[], realEdges: EdgeType[]) {
+  const loopBodies = getLoopBodyMap(realNodes, realEdges)
   const loopBodyNodes = new Set<string>()
   const loopParents = new Map<string, string>() // Map: nodeId -> loopNodeId
-  const loopBodies = new Map<string, string[]>() // Map: loopNodeId -> array of body node IDs
 
-  realNodes.forEach((node) => {
-    if (node.type === 'loop') {
-      // Find all edges from this loop's 'loop' handle
-      const loopEdges = realEdges.filter((e) => e.source === node.id && e.sourceHandle === EdgeHandleEnum.LOOP)
-      const bodyNodeIds: string[] = []
-
-      loopEdges.forEach((loopEdge) => {
-        // Traverse from loop edge to find all nodes that connect back to loop's end handle
-        const visited = new Set<string>()
-        const queue: string[] = [loopEdge.target]
-
-        // SECURITY: Secondary iteration limit as defense-in-depth (visited set is primary defense)
-        const MAX_ITERATIONS = 10_000
-        let iterations = 0
-
-        while (queue.length > 0 && iterations < MAX_ITERATIONS) {
-          iterations++
-          const nodeId = queue[0]
-          queue.shift()
-          if (visited.has(nodeId)) continue
-          visited.add(nodeId)
-
-          loopBodyNodes.add(nodeId)
-          loopParents.set(nodeId, node.id)
-          bodyNodeIds.push(nodeId)
-
-          // SECURITY: Domain-invariant check — loop body can't exceed total node count
-          if (loopBodyNodes.size > realNodes.length) {
-            break
-          }
-
-          // Find outgoing edges (but don't follow edges back to the loop node)
-          // We exclude ANY edge that points back to the loop node to prevent circular traversal
-          const outgoing = realEdges.filter(
-            (e) => e.source === nodeId && e.sourceHandle === EdgeHandleEnum.SOURCE && e.target !== node.id // Don't follow edges back to the loop node itself
-          )
-
-          outgoing.forEach((e) => {
-            if (!visited.has(e.target)) {
-              queue.push(e.target)
-            }
-          })
-        }
-      })
-
-      if (bodyNodeIds.length > 0) {
-        loopBodies.set(node.id, bodyNodeIds)
-      }
-    }
+  loopBodies.forEach((bodyNodeIds, loopNodeId) => {
+    bodyNodeIds.forEach((nodeId) => {
+      loopBodyNodes.add(nodeId)
+      loopParents.set(nodeId, loopNodeId)
+    })
   })
 
   return { loopBodyNodes, loopParents, loopBodies }
