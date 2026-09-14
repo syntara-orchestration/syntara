@@ -11,6 +11,7 @@ import noOnlyTests from 'eslint-plugin-no-only-tests'
 import testingLibrary from 'eslint-plugin-testing-library'
 import sonarjs from 'eslint-plugin-sonarjs'
 import unicorn from 'eslint-plugin-unicorn'
+import barrelFiles from 'eslint-plugin-barrel-files'
 import vitest from '@vitest/eslint-plugin'
 import pluginQuery from '@tanstack/eslint-plugin-query'
 import reactUseEffect from 'eslint-plugin-react-you-might-not-need-an-effect'
@@ -233,6 +234,7 @@ export default tseslint.config(
       'no-only-tests': noOnlyTests,
       sonarjs,
       unicorn,
+      'barrel-files': barrelFiles,
       syntara: syntaraPlugin,
       reactYouMightNotNeedAnEffect: reactUseEffect,
     },
@@ -300,6 +302,11 @@ export default tseslint.config(
       'sonarjs/no-nested-conditional': 'error',
       'max-depth': ['error', 4],
       'max-params': ['error', 5],
+      // Applies to all .ts/.tsx files in this package — a file that only re-exports other
+      // modules is a barrel file. See https://tkdodo.eu/blog/please-stop-using-barrel-files
+      // `warn` (not `error`) so the existing barrel files are not a hard build break; new ones
+      // are blocked by the Zero New Warnings Policy in review.
+      'barrel-files/avoid-barrel-files': 'warn',
       // Limit nested functions/callbacks (e.g. hooks → timeout → setState updater). Complements max-depth
       // and aligns with Sonar-style “deeply nested functions” maintainability rules. Tests disable this.
       'max-nested-callbacks': ['error', 4],
@@ -391,6 +398,14 @@ export default tseslint.config(
     rules: {
       'no-console': 'off',
       'no-restricted-exports': 'off',
+    },
+  },
+  {
+    // These three files are not actually barrel files, but the ESLint plugin is flagging them incorrectly
+    // Ignore them here to avoid the introduction of additional eslint-disable comments
+    files: ['src/stores/useWorkflowStore.ts', 'src/stores/workflowFactories.ts', 'src/utils/expressions/defaults.ts'],
+    rules: {
+      'barrel-files/avoid-barrel-files': 'off',
     },
   },
   {
