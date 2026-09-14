@@ -1,3 +1,5 @@
+import { AUTHORIZED_SERVICE_ACCOUNT_REQUIRED_MESSAGE } from '../../node-forms/triggerFormSchema'
+
 const KEY_PREFIX_PATTERN = /^(\w+(?:\.\w+)*): /
 
 export type ParsedValidationMessage = {
@@ -19,8 +21,12 @@ export function parseValidationMessage(raw: string): ParsedValidationMessage {
 
 const ID_PATTERN = /^'([^']+)' does not match '\^/
 const REQUIRED_PROPERTY_PATTERN = /^'([^']+)' is a required property$/
-const NON_EMPTY_PATTERN = /^'' should be non-empty$/
+const NON_EMPTY_PATTERN = /^(?:''|\[\]) (?:should be non-empty|is too short)$/
 const HUMANIZED_MISSING_FIELD = /^Missing required field "([^"]+)"$/
+
+const EMPTY_FIELD_MESSAGES: Record<string, string> = {
+  authorized_service_account_ids: AUTHORIZED_SERVICE_ACCOUNT_REQUIRED_MESSAGE,
+}
 
 function extractFieldName(fieldPath: string | null | undefined): string | null {
   if (!fieldPath) return null
@@ -36,13 +42,13 @@ export function humanizeValidationMessage(raw: string, fieldPath?: string | null
 
   const requiredMatch = REQUIRED_PROPERTY_PATTERN.exec(raw)
   if (requiredMatch) {
-    return `Missing required field "${requiredMatch[1]}"`
+    return EMPTY_FIELD_MESSAGES[requiredMatch[1]] ?? `Missing required field "${requiredMatch[1]}"`
   }
 
   if (NON_EMPTY_PATTERN.test(raw)) {
     const fieldName = extractFieldName(fieldPath)
     if (fieldName) {
-      return `"${fieldName}" must not be empty`
+      return EMPTY_FIELD_MESSAGES[fieldName] ?? `"${fieldName}" must not be empty`
     }
     return 'This field must not be empty'
   }

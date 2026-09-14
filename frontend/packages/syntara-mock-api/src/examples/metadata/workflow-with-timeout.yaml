@@ -20,8 +20,6 @@ nodes:
         echo "Starting quick task"
         sleep 1
         echo "Quick task completed"
-    outputs:
-      result: $.stdout
 
   - id: slow_task
     name: Slow Task
@@ -32,8 +30,6 @@ nodes:
         echo "Starting slow task"
         sleep 10
         echo "This should not complete due to workflow timeout"
-    outputs:
-      result: $.stdout
 edges:
-  - source: quick_task
-    target: slow_task
+  - from: quick_task
+    to: slow_task

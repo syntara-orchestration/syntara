@@ -14,12 +14,22 @@ import { buildWorkflowDefinition } from './utils/workflowDefinitionBuilder'
 
 type ValidationFinding = { message: string; node_id?: string | null; severity?: string; field_path?: string | null }
 
-function lookupNodeName(nodeId: string | null): string | undefined {
+type LookupNodeNameOptions = Readonly<{
+  activityIdFallback?: boolean
+}>
+
+function lookupNodeName(nodeId: string | null, options?: LookupNodeNameOptions): string | undefined {
   if (!nodeId) return undefined
-  const activities = useWorkflowStore.getState().currentWorkflow?.workflow?.activities
-  if (!activities) return undefined
-  const match = activities.find((a) => a.id === nodeId)
-  return match?.name ?? undefined
+  const currentWorkflow = useWorkflowStore.getState().currentWorkflow
+  const activity = currentWorkflow?.workflow?.activities?.find((item) => item.id === nodeId)
+  if (activity) {
+    return activity.name ?? (options?.activityIdFallback ? nodeId : undefined)
+  }
+  const trigger = currentWorkflow?.triggers?.find((item) => item.id === nodeId)
+  if (trigger) {
+    return trigger.name ?? nodeId
+  }
+  return undefined
 }
 
 function mapFindings(findings: ValidationFinding[] | undefined): ValidationError[] {
@@ -182,11 +192,10 @@ export function useWorkflowVerification({ dispatch }: UseWorkflowVerificationOpt
 
       const frontendResult = validateWorkflow(activities, edges, { triggers })
       const minimumErrors = validateMinimumWorkflow(activities, edges, triggers)
-      const nameMap = new Map(activities.map((a) => [a.id, a.name ?? a.id]))
       const allFrontendErrors: ValidationError[] = [...frontendResult.errors, ...minimumErrors].map((e) => ({
         message: e.message,
         nodeId: e.nodeId ?? null,
-        nodeName: e.nodeId ? nameMap.get(e.nodeId) : undefined,
+        nodeName: lookupNodeName(e.nodeId ?? null, { activityIdFallback: true }),
         severity: (e.severity ?? 'error') as ValidationSeverity,
       }))
 

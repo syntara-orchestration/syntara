@@ -11,6 +11,7 @@
 import { type Page } from './fixtures'
 import { test, expect, toAppUrl } from './fixtures'
 import { MINIMAL_OIDC_PROVIDER_CONFIGURATION } from './helpers/identity-providers'
+import { openRowKebab } from './helpers/patternfly'
 import { buildUniqueName } from './helpers/workflows'
 import { createIdentityProviderViaApi, deleteIdentityProviderViaApi } from './utils/api'
 import { fulfill, mockCanIAllowed, mockUsersForRevocation, revokeTargetUserResponse } from './utils/mockData'
@@ -22,9 +23,22 @@ const TOKEN_REVOCATION_URL = '/system-administration/access-management/token-rev
 const IDP_DELETE_ACK_LABEL =
   /I understand this identity provider and its linked identities will be permanently deleted/i
 
+/**
+ * Open a provider's Delete dialog from the identity providers list.
+ *
+ * The table is one unfiltered page of 20 sorted by `name` ascending, so the
+ * provider seeded by these tests only renders while fewer than 20 providers sort
+ * before it — and `pagination.spec.ts` seeds 21 of them in its `beforeAll`.
+ * Filtering by name first puts the row on the page deterministically, and it also
+ * makes the post-delete `toHaveCount(0)` assertion mean something: unfiltered, it
+ * is satisfied by a row that was never on page 1 in the first place.
+ */
 async function openDeleteDialogFromList(app: Page, providerName: string) {
   await app.goto(toAppUrl(AUTHENTICATION_URL))
   await expect(app.getByRole('heading', { level: 1, name: 'Identity Providers' })).toBeVisible()
+
+  await app.getByPlaceholder('Filter by name').fill(providerName)
+  await app.getByRole('button', { name: 'Apply filter' }).click()
 
   const table = app.getByRole('grid', { name: 'Identity providers table' })
   await expect(table).toBeVisible()
@@ -32,7 +46,7 @@ async function openDeleteDialogFromList(app: Page, providerName: string) {
   const providerRow = table.getByRole('row', { name: new RegExp(providerName) })
   await expect(providerRow).toBeVisible()
 
-  await providerRow.getByRole('button', { name: /Actions|Kebab toggle/i }).click({ force: true })
+  await openRowKebab(providerRow, /Delete provider/i)
   await app.getByRole('menuitem', { name: 'Delete provider' }).click()
 }
 
