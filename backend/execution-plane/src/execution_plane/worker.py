@@ -4,15 +4,21 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import logging
 import os
 import sys
 from datetime import UTC, datetime
+from pathlib import Path
 
 import structlog
-from sqlalchemy import select, text
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from temporalio.client import Client
+from temporalio.exceptions import ApplicationError
+from temporalio.service import TLSConfig
 
 from execution_plane.models.work_item import WorkItem, WorkItemStatus
+from execution_plane.script_executor import ScriptExecutionError, execute_script
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -37,97 +43,38 @@ async def _claim_pending_items(session: AsyncSession) -> list[WorkItem]:
     return items
 
 
-async def _execute_work_item(item: WorkItem, temporal_client: object) -> None:
+async def _execute_work_item(item: WorkItem, temporal_client: Client) -> None:
     """Run the script from the work item payload and complete the Temporal activity."""
     wi_id = str(item.id)
+    input_config: dict = item.payload.get("input_config", {})
+    output_config: dict | None = item.payload.get("output_config")
+    task_token = base64.b64decode(item.activity_handle)
+    handle = temporal_client.get_async_activity_handle(task_token=task_token)
+
     try:
-        from syntara.workflows.workflow_engine.activities.script_activity import (  # noqa: PLC0415
-            _execute_script_common,
-            _enforce_payload_limit,
-            _get_cgroup_memory_limit,
-            _prepend_memory_limit,
-            ScriptExecutionError,
-        )
-        from syntara.workflows.workflow_engine.models.workflow_definition import (  # noqa: PLC0415
-            ScriptExecutorParameters,
-            ScriptOutput,
-        )
-        from syntara.workflows.workflow_engine import constants  # noqa: PLC0415
-        import json  # noqa: PLC0415
-        import contextlib  # noqa: PLC0415
-        import sys  # noqa: PLC0415
-
-        payload = item.payload
-        input_config: dict = payload.get("input_config", {})
-        output_config: dict | None = payload.get("output_config")
-
-        config = ScriptExecutorParameters.model_validate(input_config)
-        language = config.language.value
-        code = config.code
-        environment = dict(config.environment)
-
-        timeout = int(input_config.get(constants.ENGINE_TIMEOUT_SECONDS_KEY, 300))
-        max_output_bytes = int(
-            input_config.get(constants.ENGINE_MAX_OUTPUT_BYTES_KEY, constants.DEFAULT_MAX_OUTPUT_BYTES)
-        )
-
-        cgroup_limit = _get_cgroup_memory_limit()
-        if cgroup_limit:
-            code = _prepend_memory_limit(code, language, int(cgroup_limit * 0.75))
-
-        command = ["bash", "-c", code] if language == "bash" else [sys.executable, "-c", code]
-
-        result = await _execute_script_common(command, environment, timeout, max_output_bytes)
-
-        if language == "python" and result["stdout"].strip():
-            try:
-                result["output"] = json.loads(result["stdout"])
-            except json.JSONDecodeError:
-                lines = [line for line in result["stdout"].strip().split("\n") if line.strip()]
-                if lines:
-                    with contextlib.suppress(json.JSONDecodeError):
-                        result["output"] = json.loads(lines[-1])
-
-        output = ScriptOutput(
-            return_code=result["return_code"],
-            stdout=result["stdout"],
-            stderr=result["stderr"],
-            stdout_json=result.get("output"),
-        )
-        activity_result = _enforce_payload_limit({"output": output.dump(output_config)})
-
-        task_token = base64.b64decode(item.activity_handle)
-        handle = temporal_client.get_async_activity_handle(task_token=task_token)  # type: ignore[attr-defined]
+        activity_result = await execute_script(input_config, output_config)
         await handle.complete(activity_result)
-
         logger.info("Work item completed successfully", work_item_id=wi_id)
-        return activity_result
 
     except ScriptExecutionError as e:
         logger.warning("Script execution failed", work_item_id=wi_id, error=str(e))
-        task_token = base64.b64decode(item.activity_handle)
-        handle = temporal_client.get_async_activity_handle(task_token=task_token)  # type: ignore[attr-defined]
-        from temporalio.exceptions import ApplicationError  # noqa: PLC0415
         await handle.fail(ApplicationError(str(e), type="ScriptExecutionError", non_retryable=True))
         raise
 
     except Exception as e:
-        logger.error("Unexpected error processing work item", work_item_id=wi_id, error=str(e))
-        task_token = base64.b64decode(item.activity_handle)
-        handle = temporal_client.get_async_activity_handle(task_token=task_token)  # type: ignore[attr-defined]
-        from temporalio.exceptions import ApplicationError  # noqa: PLC0415
+        logger.exception("Unexpected error processing work item", work_item_id=wi_id, error=str(e))
         await handle.fail(ApplicationError(str(e), type=type(e).__name__, non_retryable=True))
         raise
 
 
-async def _process_item(item: WorkItem, session: AsyncSession, temporal_client: object) -> None:
+async def _process_item(item: WorkItem, session: AsyncSession, temporal_client: Client) -> None:
     """Process one work item: execute, then mark completed or failed."""
     wi_id = str(item.id)
     try:
         await _execute_work_item(item, temporal_client)
         item.status = WorkItemStatus.COMPLETED
         item.completed_at = datetime.now(UTC)
-    except Exception:
+    except Exception:  # noqa: BLE001
         item.status = WorkItemStatus.FAILED
         item.completed_at = datetime.now(UTC)
         logger.warning("Work item failed", work_item_id=wi_id)
@@ -135,8 +82,8 @@ async def _process_item(item: WorkItem, session: AsyncSession, temporal_client: 
         await session.commit()
 
 
-async def _poll_loop(session_factory: async_sessionmaker[AsyncSession], temporal_client: object) -> None:
-    """Main polling loop: claim and process pending work items every POLL_INTERVAL_SECONDS."""
+async def _poll_loop(session_factory: async_sessionmaker[AsyncSession], temporal_client: Client) -> None:
+    """Poll for and process pending work items every POLL_INTERVAL_SECONDS."""
     logger.info("Execution Plane worker started, polling for work items")
     while True:
         try:
@@ -155,13 +102,8 @@ async def _poll_loop(session_factory: async_sessionmaker[AsyncSession], temporal
         await asyncio.sleep(POLL_INTERVAL_SECONDS)
 
 
-async def _create_temporal_client() -> object:
+async def _create_temporal_client() -> Client:
     """Connect to Temporal using the same env vars as the Syntara worker."""
-    from pathlib import Path  # noqa: PLC0415
-
-    from temporalio.client import Client  # noqa: PLC0415
-    from temporalio.service import TLSConfig  # noqa: PLC0415
-
     temporal_address = os.environ.get("APP_TEMPORAL_ADDRESS", "localhost:7233")
     temporal_namespace = os.environ.get("APP_TEMPORAL_NAMESPACE", "default")
 
@@ -178,7 +120,12 @@ async def _create_temporal_client() -> object:
             )
 
     client = await Client.connect(temporal_address, namespace=temporal_namespace, tls=tls)
-    logger.info("Connected to Temporal", address=temporal_address, namespace=temporal_namespace, tls_enabled=tls is not None)
+    logger.info(
+        "Connected to Temporal",
+        address=temporal_address,
+        namespace=temporal_namespace,
+        tls_enabled=tls is not None,
+    )
     return client
 
 
@@ -200,10 +147,6 @@ async def _run() -> None:
 
 def main() -> None:
     """Entry point for the execution-plane-worker CLI command."""
-    import logging  # noqa: PLC0415
-
-    import structlog  # noqa: PLC0415
-
     logging.basicConfig(level=logging.INFO)
     structlog.configure(
         processors=[

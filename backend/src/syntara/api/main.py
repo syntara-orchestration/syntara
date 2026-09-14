@@ -14,6 +14,7 @@ from typing import Annotated, Any
 
 import structlog
 import uvicorn
+from execution_plane.router import router as ep_router
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -211,9 +212,9 @@ async def _lifespan_startup(app: FastAPI) -> dict[str, Any]:  # noqa: PLR0915
     else:
         logger.warning("Router discovery disabled - no routers will be automatically registered")
 
-    # Register execution plane router (not under syntara package, so discovered manually)
-    from execution_plane.router import router as ep_router  # noqa: PLC0415
-
+    # Extraction boundary: execution_plane is a candidate for an independent service.
+    # This mounts the EP API into Syntara; if execution_plane becomes standalone,
+    # this registration (and the ep_router import) moves out with it.
     app.include_router(ep_router)
 
     # Register WebSocket router manually (excluded from router discovery)

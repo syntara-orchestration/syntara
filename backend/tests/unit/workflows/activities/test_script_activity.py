@@ -7,10 +7,8 @@ from typing import ClassVar
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from temporalio.exceptions import ApplicationError
-
-from syntara.core.config.base import get_settings
-from syntara.workflows.workflow_engine.activities.script_activity import (
+from execution_plane.script_executor import (
+    MAX_ENV_VAR_LENGTH,
     SAFE_ENV_ALLOWLIST,
     ScriptExecutionError,
     _communicate_limited,
@@ -20,8 +18,12 @@ from syntara.workflows.workflow_engine.activities.script_activity import (
     _prepend_memory_limit,
     _process_script_result,
     _sanitize_env_value,
-    execute_script_activity,
+    execute_script,
 )
+from temporalio.exceptions import ApplicationError
+
+from syntara.core.config.base import get_settings
+from syntara.workflows.workflow_engine.activities.script_activity import execute_script_activity
 
 ACTIVITY_INFO_PATH = "syntara.workflows.workflow_engine.activities.script_activity.activity.info"
 
@@ -52,7 +54,7 @@ class TestBashScriptExecution:
     async def test_simple_echo(self) -> None:
         """Test simple echo command."""
         input_config = {"language": "bash", "code": 'echo "Hello, World!"'}
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -68,7 +70,7 @@ echo "Line 2"
 echo "Line 3"
 """
         input_config = {"language": "bash", "code": script}
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -84,7 +86,7 @@ echo "Line 3"
         echo "Hello, $NAME!"
         """
         input_config = {"language": "bash", "code": script}
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -98,7 +100,7 @@ echo "Line 3"
         echo "Date: $date_output"
         """
         input_config = {"language": "bash", "code": script}
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -116,7 +118,7 @@ class TestScriptEnvironmentVariables:
             "code": 'echo "API Key: $API_KEY"',
             "environment": {"API_KEY": "secret123"},
         }
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -134,7 +136,7 @@ echo "User: $DB_USER"
             "code": script,
             "environment": {"DB_HOST": "localhost", "DB_PORT": "5432", "DB_USER": "admin"},
         }
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -154,7 +156,7 @@ print(f"API Key: {api_key}")
             "code": script,
             "environment": {"API_KEY": "secret123"},
         }
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -178,7 +180,7 @@ print(json.dumps(config))
             "code": script,
             "environment": {"DB_HOST": "localhost", "DB_PORT": "5432", "DB_USER": "admin"},
         }
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -198,7 +200,7 @@ echo "Output line 1"
 echo "Output line 2"
 """
         input_config = {"language": "bash", "code": script}
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert "Output line 1" in output["stdout"]
@@ -208,7 +210,7 @@ echo "Output line 2"
     async def test_stderr_capture(self) -> None:
         """Test that stderr is properly captured."""
         input_config = {"language": "bash", "code": 'echo "Error message" >&2'}
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -218,7 +220,7 @@ echo "Output line 2"
     async def test_json_output(self) -> None:
         """Test script that outputs JSON."""
         input_config = {"language": "bash", "code": 'echo \'{"status": "success", "count": 42}\''}
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -229,7 +231,7 @@ echo "Output line 2"
     async def test_empty_output(self) -> None:
         """Test script with no output."""
         input_config = {"language": "bash", "code": "# Just a comment, no output"}
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -242,28 +244,27 @@ class TestScriptErrorHandling:
 
     @pytest.mark.asyncio
     async def test_non_zero_exit_code(self) -> None:
-        """Test script that exits with non-zero code raises ApplicationError."""
+        """Test script that exits with non-zero code raises ScriptExecutionError."""
         input_config = {"language": "bash", "code": "exit 1"}
 
-        with pytest.raises(ApplicationError) as exc_info:
-            await execute_script_activity(input_config, None)
-        assert exc_info.value.type == "ScriptExecutionError"
+        with pytest.raises(ScriptExecutionError):
+            await execute_script(input_config, None)
 
     @pytest.mark.asyncio
     async def test_command_not_found(self) -> None:
-        """Test script with invalid command raises ApplicationError."""
+        """Test script with invalid command raises ScriptExecutionError."""
         input_config = {"language": "bash", "code": "nonexistentcommand12345"}
 
-        with pytest.raises(ApplicationError):
-            await execute_script_activity(input_config, None)
+        with pytest.raises(ScriptExecutionError):
+            await execute_script(input_config, None)
 
     @pytest.mark.asyncio
     async def test_syntax_error(self) -> None:
-        """Test script with bash syntax error raises ApplicationError."""
+        """Test script with bash syntax error raises ScriptExecutionError."""
         input_config = {"language": "bash", "code": 'if [ true ]; then\necho "incomplete"'}
 
-        with pytest.raises(ApplicationError):
-            await execute_script_activity(input_config, None)
+        with pytest.raises(ScriptExecutionError):
+            await execute_script(input_config, None)
 
 
 class TestScriptAdvancedFeatures:
@@ -273,7 +274,7 @@ class TestScriptAdvancedFeatures:
     async def test_script_with_pipes(self) -> None:
         """Test script using pipes."""
         input_config = {"language": "bash", "code": 'echo "hello world" | tr "a-z" "A-Z"'}
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -291,7 +292,7 @@ else
 fi
 """
         input_config = {"language": "bash", "code": script}
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -306,7 +307,7 @@ for i in 1 2 3; do
 done
 """
         input_config = {"language": "bash", "code": script}
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -324,7 +325,7 @@ result=$((a + b))
 echo "Result: $result"
 """
         input_config = {"language": "bash", "code": script}
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -340,7 +341,7 @@ cat "$tmpfile"
 rm "$tmpfile"
 """
         input_config = {"language": "bash", "code": script}
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -354,7 +355,7 @@ output=$(echo "subshell output")
 echo "From subshell: $output"
 """
         input_config = {"language": "bash", "code": script}
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -368,7 +369,7 @@ class TestScriptEdgeCases:
     async def test_empty_script(self) -> None:
         """Test script with no output (minimal valid script)."""
         input_config = {"language": "bash", "code": ":"}
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -378,7 +379,7 @@ class TestScriptEdgeCases:
     async def test_script_with_only_whitespace(self) -> None:
         """Test script with only whitespace."""
         input_config = {"language": "bash", "code": "   \n\n   "}
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -392,7 +393,7 @@ class TestScriptEdgeCases:
 # Another comment
 """
         input_config = {"language": "bash", "code": script}
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -407,7 +408,7 @@ for i in {1..100}; do
 done
 """
         input_config = {"language": "bash", "code": script}
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -418,7 +419,7 @@ done
     async def test_unicode_in_output(self) -> None:
         """Test script with unicode characters."""
         input_config = {"language": "bash", "code": 'echo "Hello 世界"'}
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -440,7 +441,7 @@ class TestPythonScriptExecution:
     async def test_simple_python_print(self) -> None:
         """Test simple Python print statement."""
         input_config = {"language": "python", "code": 'print("Hello from Python!")'}
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -456,7 +457,7 @@ data = {"message": "Hello", "value": 42}
 print(json.dumps(data))
 """
         input_config = {"language": "python", "code": script}
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -472,7 +473,7 @@ for i in range(3):
     print(f"Line {i}")
 """
         input_config = {"language": "python", "code": script}
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -488,7 +489,7 @@ result = 10 + 20
 print(result)
 """
         input_config = {"language": "python", "code": script}
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -500,16 +501,15 @@ class TestPythonScriptErrorHandling:
 
     @pytest.mark.asyncio
     async def test_python_syntax_error(self) -> None:
-        """Test Python script with syntax error raises ApplicationError."""
+        """Test Python script with syntax error raises ScriptExecutionError."""
         input_config = {"language": "python", "code": 'print("Missing closing quote'}
 
-        with pytest.raises(ApplicationError) as exc_info:
-            await execute_script_activity(input_config, None)
-        assert exc_info.value.type == "ScriptExecutionError"
+        with pytest.raises(ScriptExecutionError):
+            await execute_script(input_config, None)
 
     @pytest.mark.asyncio
     async def test_python_runtime_error(self) -> None:
-        """Test Python script with runtime error raises ApplicationError."""
+        """Test Python script with runtime error raises ScriptExecutionError."""
         script = """
 x = 10
 y = 0
@@ -517,16 +517,16 @@ result = x / y  # Division by zero
 """
         input_config = {"language": "python", "code": script}
 
-        with pytest.raises(ApplicationError):
-            await execute_script_activity(input_config, None)
+        with pytest.raises(ScriptExecutionError):
+            await execute_script(input_config, None)
 
     @pytest.mark.asyncio
     async def test_python_import_error(self) -> None:
-        """Test Python script with import error raises ApplicationError."""
+        """Test Python script with import error raises ScriptExecutionError."""
         input_config = {"language": "python", "code": "import nonexistent_module"}
 
-        with pytest.raises(ApplicationError):
-            await execute_script_activity(input_config, None)
+        with pytest.raises(ScriptExecutionError):
+            await execute_script(input_config, None)
 
 
 class TestPythonScriptOutputParsing:
@@ -541,7 +541,7 @@ data = {"status": "success", "items": [1, 2, 3]}
 print(json.dumps(data))
 """
         input_config = {"language": "python", "code": script}
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -554,7 +554,7 @@ print(json.dumps(data))
         """Test Python script with non-JSON output."""
         input_config = {"language": "python", "code": 'print("This is not JSON")'}
 
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -574,7 +574,7 @@ result = {"status": "success", "items_processed": 3, "result": "complete"}
 print(json.dumps(result))
 """
         input_config = {"language": "python", "code": script}
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -592,7 +592,7 @@ print(json.dumps(result))
         """Test Python script with no output."""
         input_config = {"language": "python", "code": "pass"}
 
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -615,7 +615,7 @@ data = {
 print(json.dumps(data))
 """
         input_config = {"language": "python", "code": script}
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -672,7 +672,7 @@ class TestPydanticConfigValidation:
             "code": "echo $KEY",
             "environment": {"KEY": 123},
         }
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
         assert result["output"]["return_code"] == 0
         assert result["output"]["stdout"].strip() == "123"
 
@@ -680,7 +680,7 @@ class TestPydanticConfigValidation:
     async def test_valid_config_at_boundary_timeout_1(self) -> None:
         """Timeout=1 is the minimum valid value."""
         input_config = {"language": "bash", "code": "echo ok", "timeout": 1}
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -689,7 +689,7 @@ class TestPydanticConfigValidation:
     async def test_valid_config_at_boundary_timeout_3600(self) -> None:
         """Timeout=3600 is the maximum valid value."""
         input_config = {"language": "bash", "code": "echo ok", "timeout": 3600}
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -713,7 +713,7 @@ import sys
 print(sys.executable)
 """
         input_config = {"language": "python", "code": script}
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -724,7 +724,7 @@ print(sys.executable)
     async def test_bash_script_does_not_use_sys_executable(self) -> None:
         """Bash scripts should still use 'bash', not sys.executable."""
         input_config = {"language": "bash", "code": "echo $0"}
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -740,17 +740,12 @@ class TestSanitizeEnvValue:
     """Tests for _sanitize_env_value input validation."""
 
     def test_null_byte_raises(self) -> None:
-        from syntara.core.exceptions import SafeValueError
-
-        with pytest.raises(SafeValueError, match="null bytes"):
+        with pytest.raises(ValueError, match="null bytes"):
             _sanitize_env_value("value\x00with_null")
 
     def test_exceeds_max_length_raises(self) -> None:
-        from syntara.core.exceptions import SafeValueError
-        from syntara.workflows.workflow_engine import constants
-
-        with pytest.raises(SafeValueError, match="maximum length"):
-            _sanitize_env_value("x" * (constants.MAX_ENV_VAR_LENGTH + 1))
+        with pytest.raises(ValueError, match="maximum length"):
+            _sanitize_env_value("x" * (MAX_ENV_VAR_LENGTH + 1))
 
     def test_normal_string_passes(self) -> None:
         assert _sanitize_env_value("hello") == "hello"
@@ -788,52 +783,49 @@ class TestProcessScriptResult:
 
 
 class TestGenericExceptionHandler:
-    """Test the outer generic exception handler in execute_script_activity."""
+    """Test the outer generic exception handler in execute_script."""
 
     @pytest.mark.asyncio
-    async def test_subprocess_error_raises_application_error(self) -> None:
-        """SubprocessError falls through to generic ApplicationError handler."""
+    async def test_subprocess_error_raises_script_execution_error(self) -> None:
+        """SubprocessError is wrapped into ScriptExecutionError."""
         import subprocess
 
         with (
             patch(
-                "syntara.workflows.workflow_engine.activities.script_activity.asyncio.create_subprocess_exec",
+                "execution_plane.script_executor.asyncio.create_subprocess_exec",
                 side_effect=subprocess.SubprocessError("spawn failed"),
             ),
-            pytest.raises(ApplicationError) as exc_info,
+            pytest.raises(ScriptExecutionError),
         ):
-            await execute_script_activity({"language": "bash", "code": "echo hi"}, None)
-        assert exc_info.value.non_retryable is True
+            await execute_script({"language": "bash", "code": "echo hi"}, None)
 
 
 class TestScriptActivityTimeoutAndInputs:
     """Cover remaining uncovered paths in script activity."""
 
     @pytest.mark.asyncio
-    async def test_timeout_raises_application_error(self) -> None:
-        """TimeoutError from asyncio.wait_for propagates as ApplicationError with specific message."""
+    async def test_timeout_raises_timeout_error(self) -> None:
+        """TimeoutError from asyncio.wait_for propagates as TimeoutError."""
         mock_process = AsyncMock()
         mock_process.returncode = None
         mock_process.stdin = None
         mock_process._transport = None
         with (
             patch(
-                "syntara.workflows.workflow_engine.activities.script_activity.asyncio.create_subprocess_exec",
+                "execution_plane.script_executor.asyncio.create_subprocess_exec",
                 new_callable=AsyncMock,
                 return_value=mock_process,
             ),
             patch(
-                "syntara.workflows.workflow_engine.activities.script_activity._communicate_limited",
+                "execution_plane.script_executor._communicate_limited",
                 new_callable=AsyncMock,
                 side_effect=TimeoutError(),
             ),
-            pytest.raises(ApplicationError) as exc_info,
+            pytest.raises(TimeoutError),
         ):
-            await execute_script_activity(
+            await execute_script(
                 {"language": "bash", "code": "sleep 999", "_engine_timeout_seconds": 10}, None
             )
-        assert exc_info.value.non_retryable is True
-        assert "timed out after 10 seconds" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_inputs_with_none_value_skipped(self) -> None:
@@ -841,7 +833,7 @@ class TestScriptActivityTimeoutAndInputs:
         script = 'echo "${INPUT_KEY:-missing}"'
         input_config = {"language": "bash", "code": script}
         # V2 resolves templates before calling the activity; inputs dict is empty
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
         assert result["output"]["return_code"] == 0
 
 
@@ -930,7 +922,7 @@ class TestScriptEnvironmentSanitization:
             "language": "bash",
             "code": 'echo "KEY=${APP_SECRET_ENCRYPTION_KEY:-empty}"',
         }
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -944,7 +936,7 @@ class TestScriptEnvironmentSanitization:
             "language": "bash",
             "code": 'echo "PATH=$PATH"',
         }
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -963,7 +955,7 @@ env_keys = list(os.environ.keys())
 print(json.dumps(env_keys))
 """
         input_config = {"language": "python", "code": script}
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
 
         output = result["output"]
         assert output["return_code"] == 0
@@ -1052,7 +1044,7 @@ class TestOutputLimitIntegration:
             # DEFAULT_MAX_OUTPUT_BYTES is 1MB; generate well over that
             "code": "dd if=/dev/zero bs=1024 count=1100 2>/dev/null | base64",
         }
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
         assert "[Output truncated:" in result["output"]["stderr"]
 
     @pytest.mark.asyncio
@@ -1062,7 +1054,7 @@ class TestOutputLimitIntegration:
             "language": "bash",
             "code": "echo hello",
         }
-        result = await execute_script_activity(input_config, None)
+        result = await execute_script(input_config, None)
         assert result["output"]["stdout"].strip() == "hello"
         assert "[Output truncated:" not in result["output"]["stderr"]
 
@@ -1103,21 +1095,21 @@ class TestCgroupMemoryLimit:
 
     def test_returns_none_when_no_cgroup_files(self) -> None:
         """Returns None when cgroup files don't exist."""
-        with patch("syntara.workflows.workflow_engine.activities.script_activity.Path") as mock_path:
+        with patch("execution_plane.script_executor.Path") as mock_path:
             mock_path.return_value.read_text.side_effect = FileNotFoundError
             result = _get_cgroup_memory_limit()
         assert result is None
 
     def test_returns_none_for_max_value(self) -> None:
         """Returns None when cgroup reports 'max' (no limit)."""
-        with patch("syntara.workflows.workflow_engine.activities.script_activity.Path") as mock_path:
+        with patch("execution_plane.script_executor.Path") as mock_path:
             mock_path.return_value.read_text.return_value = "max\n"
             result = _get_cgroup_memory_limit()
         assert result is None
 
     def test_returns_integer_limit(self) -> None:
         """Returns the parsed integer limit."""
-        with patch("syntara.workflows.workflow_engine.activities.script_activity.Path") as mock_path:
+        with patch("execution_plane.script_executor.Path") as mock_path:
             mock_path.return_value.read_text.return_value = "1073741824\n"
             result = _get_cgroup_memory_limit()
         assert result == 1073741824
@@ -1147,10 +1139,10 @@ class TestMemoryLimitIntegration:
     async def test_cgroup_limit_injects_preamble(self) -> None:
         """When cgroup limit exists, script runs with memory limit and still works."""
         with patch(
-            "syntara.workflows.workflow_engine.activities.script_activity._get_cgroup_memory_limit",
+            "execution_plane.script_executor._get_cgroup_memory_limit",
             return_value=1_073_741_824,
         ):
-            result = await execute_script_activity(
+            result = await execute_script(
                 {"language": "bash", "code": "echo wrapped"},
                 None,
             )
@@ -1199,7 +1191,7 @@ class TestScriptNodesGate:
         try:
             with (
                 patch(
-                    "syntara.workflows.workflow_engine.activities.script_activity.asyncio.create_subprocess_exec",
+                    "execution_plane.script_executor.asyncio.create_subprocess_exec",
                 ) as mock_exec,
                 pytest.raises(ApplicationError),
             ):
@@ -1212,6 +1204,6 @@ class TestScriptNodesGate:
     @pytest.mark.asyncio
     async def test_enabled_executes_normally(self) -> None:
         """When script_nodes_enabled is True (autouse fixture), scripts execute."""
-        result = await execute_script_activity({"language": "bash", "code": "echo gate-open"}, None)
+        result = await execute_script({"language": "bash", "code": "echo gate-open"}, None)
         assert result["output"]["return_code"] == 0
         assert "gate-open" in result["output"]["stdout"]
