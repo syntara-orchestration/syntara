@@ -226,16 +226,19 @@ const aapConfigMapping: [keyof AAPJobTemplateConfig, string, 'truthy' | 'defined
   ['useInputVariables', 'use_input_variables', 'truthy'],
 ]
 
+export type CreateAAPJobTemplateActivityOptions = {
+  id: string
+  name: string
+  jobTemplateId?: number
+  config?: AAPJobTemplateConfig
+  settings?: NodeSettings
+}
+
 /**
  * Create an AAP Job Template node (v2).
  */
-export function createAAPJobTemplateActivity(
-  id: string,
-  name: string,
-  jobTemplateId?: number,
-  config?: AAPJobTemplateConfig,
-  settings?: NodeSettings
-): Activity {
+export function createAAPJobTemplateActivity(options: CreateAAPJobTemplateActivityOptions): Activity {
+  const { id, name, jobTemplateId, config, settings } = options
   const activityConfig: Record<string, unknown> = {
     ...(jobTemplateId !== undefined && { job_template_id: jobTemplateId }),
   }
@@ -283,16 +286,19 @@ export type AAPWorkflowTemplateConfig = {
   labels?: string[] // AAP Controller label names (prompt-on-launch override, supports creating new labels)
 }
 
+export type CreateAAPWorkflowTemplateActivityOptions = {
+  id: string
+  name: string
+  workflowTemplateId?: number
+  config?: AAPWorkflowTemplateConfig
+  settings?: NodeSettings
+}
+
 /**
  * Create an AAP Workflow Template node (v2).
  */
-export function createAAPWorkflowTemplateActivity(
-  id: string,
-  name: string,
-  workflowTemplateId?: number,
-  config?: AAPWorkflowTemplateConfig,
-  settings?: NodeSettings
-): Activity {
+export function createAAPWorkflowTemplateActivity(options: CreateAAPWorkflowTemplateActivityOptions): Activity {
+  const { id, name, workflowTemplateId, config, settings } = options
   const activityConfig: Record<string, unknown> = {
     ...(workflowTemplateId !== undefined && { workflow_job_template_id: workflowTemplateId }),
   }
@@ -363,22 +369,25 @@ export function createConditionActivity(id: string, name: string, condition?: st
   }
 }
 
-/**
- * Create a loop node (v2).
- */
-export function createLoopActivity(
-  id: string,
-  name: string,
-  loopType: 'forEach' | 'while',
+export type CreateLoopActivityOptions = {
+  id: string
+  name: string
+  loopType: 'forEach' | 'while'
   config: {
     items?: string
     condition?: string
     maxIterations?: number
     indexVariable?: string
     itemVariable?: string
-  },
+  }
   settings?: NodeSettings
-): Activity {
+}
+
+/**
+ * Create a loop node (v2).
+ */
+export function createLoopActivity(options: CreateLoopActivityOptions): Activity {
+  const { id, name, loopType, config, settings } = options
   const maxIterations =
     config.maxIterations !== undefined && !Number.isNaN(config.maxIterations) ? config.maxIterations : undefined
 

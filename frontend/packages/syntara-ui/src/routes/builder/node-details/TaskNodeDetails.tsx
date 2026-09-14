@@ -226,13 +226,14 @@ function getStringField(config: Record<string, unknown>, ...keys: string[]): str
   return undefined
 }
 
-function resolveUseInputVariables(
-  c: StoredAAPConfig,
-  organizationName: string,
-  jobTemplateName: string,
-  inventoryName: string,
+function resolveUseInputVariables(params: {
+  c: StoredAAPConfig
+  organizationName: string
+  jobTemplateName: string
+  inventoryName: string
   extraVars: string
-): boolean {
+}): boolean {
+  const { c, organizationName, jobTemplateName, inventoryName, extraVars } = params
   return (
     c.use_input_variables === true ||
     c.useInputVariables === true ||
@@ -282,7 +283,13 @@ function buildAAPInitialData(taskName: string, config: Record<string, unknown>):
     instance_group: getField(c.instance_group_name, c.instanceGroupName, '') as string | undefined,
     instance_group_id: c.instance_group_id ?? c.instanceGroupId,
     labels: c.labels ?? [],
-    use_input_variables: resolveUseInputVariables(c, organizationName, jobTemplateName, inventoryName, extraVars),
+    use_input_variables: resolveUseInputVariables({
+      c,
+      organizationName,
+      jobTemplateName,
+      inventoryName,
+      extraVars,
+    }),
   }
 }
 
@@ -365,13 +372,13 @@ function renderAAPTaskDetails({
           const workflowConfig = buildAAPWorkflowTemplateConfig(data)
           updateActivity(
             nodeId,
-            createAAPWorkflowTemplateActivity(
-              nodeId,
-              data.name,
-              workflow_job_template_id,
-              workflowConfig,
-              data.settings
-            )
+            createAAPWorkflowTemplateActivity({
+              id: nodeId,
+              name: data.name,
+              workflowTemplateId: workflow_job_template_id,
+              config: workflowConfig,
+              settings: data.settings,
+            })
           )
         }
 
@@ -407,7 +414,13 @@ function renderAAPTaskDetails({
         const aapNodeConfig = buildAAPConfig(data)
         updateActivity(
           nodeId,
-          createAAPJobTemplateActivity(nodeId, data.name, job_template_id, aapNodeConfig, data.settings)
+          createAAPJobTemplateActivity({
+            id: nodeId,
+            name: data.name,
+            jobTemplateId: job_template_id,
+            config: aapNodeConfig,
+            settings: data.settings,
+          })
         )
       }
 

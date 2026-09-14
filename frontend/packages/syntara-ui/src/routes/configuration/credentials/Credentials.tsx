@@ -117,7 +117,13 @@ export default function Credentials() {
   const query = credentialsClient.useQuery('get', '/credentials', { params: { query: finalQueryParams } })
   const serverCredentials = useMemo(() => query.data?.resources ?? [], [query.data?.resources])
 
-  useCursorReset(serverCredentials.length, hasActiveFilters, cursor, query.isFetching, resetPagination)
+  useCursorReset({
+    itemCount: serverCredentials.length,
+    hasActiveFilters,
+    cursor,
+    isFetching: query.isFetching,
+    resetPagination,
+  })
 
   // Fetch credential types for type name lookup
   const typesQuery = credentialsClient.useQuery('get', '/credential_types')
