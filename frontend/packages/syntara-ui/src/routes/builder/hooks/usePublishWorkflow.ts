@@ -23,28 +23,35 @@ function getDirtyWorkflowDefinition(
   const { currentWorkflow, isDirty, edges, nodePositions } = useWorkflowStore.getState()
   if (!isDirty || !currentWorkflow) return undefined
   const wf = currentWorkflow.workflow as { name?: string; description?: string } | undefined
-  return buildWorkflowDefinition(
-    workflowName || String(wf?.name ?? ''),
-    workflowDescription || String(wf?.description ?? ''),
-    currentWorkflow.workflow.activities ?? [],
-    currentWorkflow.triggers ?? [],
-    { edges, nodePositions }
-  ) as unknown as Record<string, unknown>
+  return buildWorkflowDefinition({
+    workflowName: workflowName || String(wf?.name ?? ''),
+    workflowDescription: workflowDescription || String(wf?.description ?? ''),
+    activities: currentWorkflow.workflow.activities ?? [],
+    triggers: currentWorkflow.triggers ?? [],
+    edges,
+    nodePositions,
+  }) as unknown as Record<string, unknown>
 }
 
 type UsePublishWorkflowOptions = {
+  workflowId: string | null
+  currentVersion: number | undefined
+  workflowName?: string
+  workflowDescription?: string
   expectedVersion?: number | null
   onConflict?: (info: ConflictInfo) => void
   onVersionUpdated?: (version: number) => void
 }
 
-export function usePublishWorkflow(
-  workflowId: string | null,
-  currentVersion: number | undefined,
-  workflowName?: string,
-  workflowDescription?: string,
-  options?: UsePublishWorkflowOptions
-) {
+export function usePublishWorkflow({
+  workflowId,
+  currentVersion,
+  workflowName,
+  workflowDescription,
+  expectedVersion: optionsExpectedVersion,
+  onConflict,
+  onVersionUpdated,
+}: UsePublishWorkflowOptions) {
   const queryClient = useQueryClient()
   const { showSuccess, showError, showWarning } = useAlerts()
 
@@ -64,7 +71,7 @@ export function usePublishWorkflow(
       if (!workflowId || versionToPublish == null) return
 
       const workflowDefinition = getDirtyWorkflowDefinition(workflowName, workflowDescription)
-      const expectedVersion = callOptions?.expectedVersionOverride ?? options?.expectedVersion
+      const expectedVersion = callOptions?.expectedVersionOverride ?? optionsExpectedVersion
       publishMutation(
         {
           params: { path: { workflow_id: workflowId, version: versionToPublish } },
@@ -87,13 +94,13 @@ export function usePublishWorkflow(
             }
             if (workflowDefinition) useWorkflowStore.getState().markClean()
             if (data?.current_version != null) {
-              options?.onVersionUpdated?.(data.current_version)
+              onVersionUpdated?.(data.current_version)
             }
             detachPromise(queryClient.invalidateQueries({ predicate: isWorkflowQuery }))
           },
           onError: (error: unknown) => {
-            if (isWorkflowVersionConflictError(error) && options?.onConflict) {
-              options.onConflict(extractVersionConflictInfo(error))
+            if (isWorkflowVersionConflictError(error) && onConflict) {
+              onConflict(extractVersionConflictInfo(error))
               return
             }
             showError({ title: 'Failed to publish workflow', description: getErrorMessage(error) })
@@ -107,7 +114,9 @@ export function usePublishWorkflow(
       currentVersion,
       workflowName,
       workflowDescription,
-      options,
+      optionsExpectedVersion,
+      onConflict,
+      onVersionUpdated,
       publishMutation,
       queryClient,
       showSuccess,

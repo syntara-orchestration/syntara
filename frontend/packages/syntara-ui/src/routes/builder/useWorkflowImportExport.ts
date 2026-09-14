@@ -114,7 +114,11 @@ export function useWorkflowImportExport({
       const triggers = currentWorkflow.triggers ?? []
       const name = workflowName || 'workflow'
       const description = workflowDescription
-      const definition = buildWorkflowDefinition(name, description, activities, triggers, {
+      const definition = buildWorkflowDefinition({
+        workflowName: name,
+        workflowDescription: description,
+        activities: activities,
+        triggers: triggers,
         edges,
         nodePositions,
       })

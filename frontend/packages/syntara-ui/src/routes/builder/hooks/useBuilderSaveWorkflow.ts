@@ -309,7 +309,11 @@ export function useBuilderSaveWorkflow(
     const activities = freshWorkflow?.workflow.activities ?? []
     const triggers = freshWorkflow?.triggers ?? []
 
-    return buildWorkflowDefinition(workflowName, workflowDescription, activities, triggers, {
+    return buildWorkflowDefinition({
+      workflowName: workflowName,
+      workflowDescription: workflowDescription,
+      activities: activities,
+      triggers: triggers,
       edges,
       nodePositions,
     })

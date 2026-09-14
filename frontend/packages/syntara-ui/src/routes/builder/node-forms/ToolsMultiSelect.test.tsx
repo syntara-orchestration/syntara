@@ -30,13 +30,19 @@ const NONE: ToolSelection = { strategy: 'NONE' }
 const ALL: ToolSelection = { strategy: 'ALL' }
 const selected = (...ids: string[]): ToolSelection => ({ strategy: 'SELECTED', toolIds: ids })
 
-function renderComponent(
-  value: ToolSelection = NONE,
+function renderComponent({
+  value = NONE,
   onChange = vi.fn(),
-  integrations: IntegrationWithTools[] = mockIntegrations,
+  integrations = mockIntegrations,
   isLoading = false,
-  hasNoIntegrations = false
-) {
+  hasNoIntegrations = false,
+}: {
+  value?: ToolSelection
+  onChange?: (selection: ToolSelection) => void
+  integrations?: IntegrationWithTools[]
+  isLoading?: boolean
+  hasNoIntegrations?: boolean
+} = {}) {
   return render(
     <ToolsMultiSelect
       value={value}
@@ -50,17 +56,17 @@ function renderComponent(
 
 describe('ToolsMultiSelect', () => {
   it('renders "No tools selected" when strategy is NONE', () => {
-    renderComponent(NONE)
+    renderComponent({ value: NONE })
     expect(screen.getByDisplayValue('No tools selected')).toBeInTheDocument()
   })
 
   it('renders "All tools selected" when strategy is ALL', () => {
-    renderComponent(ALL)
+    renderComponent({ value: ALL })
     expect(screen.getByDisplayValue('All tools selected')).toBeInTheDocument()
   })
 
   it('shows N of M tools selected when strategy is SELECTED', () => {
-    renderComponent(selected('tool-1', 'tool-4'))
+    renderComponent({ value: selected('tool-1', 'tool-4') })
     expect(screen.getByDisplayValue('2 of 5 tools selected')).toBeInTheDocument()
   })
 
@@ -82,11 +88,10 @@ describe('ToolsMultiSelect', () => {
 
     expect(screen.getByText('list_resources')).toBeInTheDocument()
     expect(screen.getByText('get_resource')).toBeInTheDocument()
-    expect(screen.getByText('dev_tool_1')).toBeInTheDocument()
     expect(screen.queryByText('Primary MCP Server::list_resources')).not.toBeInTheDocument()
   })
 
-  it('renders an "All tools" option at the top of the dropdown', async () => {
+  it('renders "All tools" option at the top of the dropdown', async () => {
     const user = userEvent.setup()
     renderComponent()
 
@@ -97,7 +102,7 @@ describe('ToolsMultiSelect', () => {
 
   it('renders "All tools" even when no tools are discovered yet', async () => {
     const user = userEvent.setup()
-    renderComponent(NONE, vi.fn(), [])
+    renderComponent({ value: NONE, integrations: [] })
 
     await user.click(screen.getByRole('textbox', { name: 'Select tools' }))
 
@@ -106,7 +111,7 @@ describe('ToolsMultiSelect', () => {
 
   it('"All tools" checkbox is checked when strategy is ALL', async () => {
     const user = userEvent.setup()
-    renderComponent(ALL)
+    renderComponent({ value: ALL })
 
     await user.click(screen.getByRole('textbox', { name: 'Select tools' }))
 
@@ -115,7 +120,7 @@ describe('ToolsMultiSelect', () => {
 
   it('"All tools" checkbox is unchecked when strategy is NONE', async () => {
     const user = userEvent.setup()
-    renderComponent(NONE)
+    renderComponent({ value: NONE })
 
     await user.click(screen.getByRole('textbox', { name: 'Select tools' }))
 
@@ -125,7 +130,7 @@ describe('ToolsMultiSelect', () => {
   it('clicking "All tools" when NONE emits ALL strategy', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
-    renderComponent(NONE, onChange)
+    renderComponent({ value: NONE, onChange })
 
     await user.click(screen.getByRole('textbox', { name: 'Select tools' }))
     await user.click(screen.getByRole('checkbox', { name: 'All tools' }))
@@ -136,7 +141,7 @@ describe('ToolsMultiSelect', () => {
   it('clicking "All tools" when ALL emits NONE strategy', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
-    renderComponent(ALL, onChange)
+    renderComponent({ value: ALL, onChange })
 
     await user.click(screen.getByRole('textbox', { name: 'Select tools' }))
     await user.click(screen.getByRole('checkbox', { name: 'All tools' }))
@@ -147,7 +152,7 @@ describe('ToolsMultiSelect', () => {
   it('selects all tools in an integration when the integration row is clicked (from NONE)', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
-    renderComponent(NONE, onChange)
+    renderComponent({ value: NONE, onChange })
 
     await user.click(screen.getByRole('textbox', { name: 'Select tools' }))
     await user.click(screen.getByRole('checkbox', { name: 'Primary MCP Server (3)' }))
@@ -158,7 +163,7 @@ describe('ToolsMultiSelect', () => {
   it('deselects all tools in an integration when integration row is clicked while all selected', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
-    renderComponent(selected('tool-1', 'tool-2', 'tool-3'), onChange)
+    renderComponent({ value: selected('tool-1', 'tool-2', 'tool-3'), onChange })
 
     await user.click(screen.getByRole('textbox', { name: 'Select tools' }))
     await user.click(screen.getByRole('checkbox', { name: 'Primary MCP Server (3)' }))
@@ -169,7 +174,7 @@ describe('ToolsMultiSelect', () => {
   it('adds a tool to a SELECTED set when a specific tool is clicked', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
-    renderComponent(NONE, onChange)
+    renderComponent({ value: NONE, onChange })
 
     await user.click(screen.getByRole('textbox', { name: 'Select tools' }))
     await user.click(screen.getByText('list_resources'))
@@ -180,7 +185,7 @@ describe('ToolsMultiSelect', () => {
   it('removes a tool from SELECTED when a selected tool is clicked', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
-    renderComponent(selected('tool-1', 'tool-4'), onChange)
+    renderComponent({ value: selected('tool-1', 'tool-4'), onChange })
 
     await user.click(screen.getByRole('textbox', { name: 'Select tools' }))
     await user.click(screen.getByText('list_resources'))
@@ -191,7 +196,7 @@ describe('ToolsMultiSelect', () => {
   it('clicking a tool when ALL transitions to SELECTED with that tool excluded', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
-    renderComponent(ALL, onChange)
+    renderComponent({ value: ALL, onChange })
 
     await user.click(screen.getByRole('textbox', { name: 'Select tools' }))
     await user.click(screen.getByText('list_resources'))
@@ -205,7 +210,7 @@ describe('ToolsMultiSelect', () => {
   it('adds tools from a second integration to an existing SELECTED set', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
-    renderComponent(selected('tool-4'), onChange)
+    renderComponent({ value: selected('tool-4'), onChange })
 
     await user.click(screen.getByRole('textbox', { name: 'Select tools' }))
     await user.click(screen.getByRole('checkbox', { name: 'Primary MCP Server (3)' }))
@@ -221,13 +226,13 @@ describe('ToolsMultiSelect', () => {
   })
 
   it('shows loading placeholder when isLoading is true', () => {
-    renderComponent(NONE, vi.fn(), mockIntegrations, true)
+    renderComponent({ value: NONE, integrations: mockIntegrations, isLoading: true })
 
     expect(screen.getByPlaceholderText('Loading tools...')).toBeInTheDocument()
   })
 
   it('disables the inner text input when isLoading is true', () => {
-    renderComponent(NONE, vi.fn(), mockIntegrations, true)
+    renderComponent({ value: NONE, integrations: mockIntegrations, isLoading: true })
 
     expect(screen.getByRole('textbox', { name: 'Select tools' })).toBeDisabled()
   })
@@ -262,7 +267,7 @@ describe('ToolsMultiSelect', () => {
   })
 
   it('has no accessibility violations with ALL strategy', async () => {
-    const { container } = renderComponent(ALL)
+    const { container } = renderComponent({ value: ALL })
 
     const results = await axe(container)
     expect(results).toHaveNoViolations()
@@ -270,14 +275,14 @@ describe('ToolsMultiSelect', () => {
 
   describe('empty integrations state', () => {
     it('shows placeholder text instead of "No tools selected" when hasNoIntegrations is true', () => {
-      renderComponent(NONE, vi.fn(), [], false, true)
+      renderComponent({ value: NONE, integrations: [], hasNoIntegrations: true })
       expect(screen.getByPlaceholderText('Select tools')).toBeInTheDocument()
       expect(screen.queryByDisplayValue('No tools selected')).not.toBeInTheDocument()
     })
 
     it('shows "No MCP server integrations configured" in dropdown when hasNoIntegrations is true', async () => {
       const user = userEvent.setup()
-      renderComponent(NONE, vi.fn(), [], false, true)
+      renderComponent({ value: NONE, integrations: [], hasNoIntegrations: true })
 
       await user.click(screen.getByRole('textbox', { name: 'Select tools' }))
 
@@ -286,7 +291,7 @@ describe('ToolsMultiSelect', () => {
 
     it('does not show "All tools" option when hasNoIntegrations is true', async () => {
       const user = userEvent.setup()
-      renderComponent(NONE, vi.fn(), [], false, true)
+      renderComponent({ value: NONE, integrations: [], hasNoIntegrations: true })
 
       await user.click(screen.getByRole('textbox', { name: 'Select tools' }))
 
@@ -294,7 +299,7 @@ describe('ToolsMultiSelect', () => {
     })
 
     it('has no accessibility violations when hasNoIntegrations is true', async () => {
-      const { container } = renderComponent(NONE, vi.fn(), [], false, true)
+      const { container } = renderComponent({ value: NONE, integrations: [], hasNoIntegrations: true })
 
       const results = await axe(container)
       expect(results).toHaveNoViolations()

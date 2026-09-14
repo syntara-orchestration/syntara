@@ -2,7 +2,7 @@ import { EdgeHandleEnum } from '@syntara/contracts'
 
 import { FlowNodeType } from '../../../constants'
 import type { NodeType } from '../../workflows/canvas/nodes/NodeType'
-import type { FlowPosition } from '../types'
+import type { FlowPosition, OnAddNodeFromEdge } from '../types'
 import { isSwitchCasePort } from '../utils/switchCaseHelpers'
 import type { EdgeType } from '../utils/workflowToGraph'
 
@@ -17,13 +17,7 @@ export type ComputeButtonEdgesParams = {
   nodesNeedingButtonEdges: string[]
   activeEdgeButtonNodeId: string | null
   activeEdgeButtonHandle: string | null
-  onAddNodeFromEdge?: (
-    sourceNodeId: string,
-    targetNodeId?: string,
-    edgeId?: string,
-    sourceHandle?: string,
-    desiredPosition?: FlowPosition
-  ) => void
+  onAddNodeFromEdge?: OnAddNodeFromEdge
 }
 
 function createOnButtonClick(
@@ -32,7 +26,7 @@ function createOnButtonClick(
   handleId: string
 ): (pos: FlowPosition | undefined) => void {
   return (pos: FlowPosition | undefined) => {
-    onAddNodeFromEdge?.(nodeId, undefined, undefined, handleId, pos)
+    onAddNodeFromEdge?.({ sourceNodeId: nodeId, sourceHandle: handleId, desiredPosition: pos })
   }
 }
 
@@ -134,12 +128,20 @@ function collectKeptButtonEdges(
   return kept
 }
 
-function buildRegularNodeButtonEdge(
-  nodeId: string,
-  onAddNodeFromEdge: ComputeButtonEdgesParams['onAddNodeFromEdge'],
-  activeNodeId: string | null,
+type BuildButtonEdgeOptions = {
+  nodeId: string
+  handleId?: string
+  onAddNodeFromEdge: ComputeButtonEdgesParams['onAddNodeFromEdge']
+  activeNodeId: string | null
   activeHandle: string | null
-): EdgeType {
+}
+
+function buildRegularNodeButtonEdge({
+  nodeId,
+  onAddNodeFromEdge,
+  activeNodeId,
+  activeHandle,
+}: BuildButtonEdgeOptions): EdgeType {
   const buttonEdgeId = `button-${nodeId}`
   const placeholderId = `placeholder-${nodeId}`
   return {
@@ -159,13 +161,13 @@ function buildRegularNodeButtonEdge(
   } as unknown as EdgeType
 }
 
-function buildMultiHandleButtonEdge(
-  nodeId: string,
-  handleId: string,
-  onAddNodeFromEdge: ComputeButtonEdgesParams['onAddNodeFromEdge'],
-  activeNodeId: string | null,
-  activeHandle: string | null
-): EdgeType {
+function buildMultiHandleButtonEdge({
+  nodeId,
+  handleId,
+  onAddNodeFromEdge,
+  activeNodeId,
+  activeHandle,
+}: BuildButtonEdgeOptions & { handleId: string }): EdgeType {
   const buttonEdgeId = `button-${nodeId}-${handleId}`
   const placeholderId = `placeholder-${nodeId}-${handleId}`
   return {
@@ -200,7 +202,7 @@ function appendMissingRegularButtonEdges(options: AppendMissingRegularButtonEdge
     if (nodesWithButtonEdge.has(nodeId)) {
       continue
     }
-    buttonEdgesToAdd.push(buildRegularNodeButtonEdge(nodeId, onAddNodeFromEdge, activeNodeId, activeHandle))
+    buttonEdgesToAdd.push(buildRegularNodeButtonEdge({ nodeId, onAddNodeFromEdge, activeNodeId, activeHandle }))
   }
 }
 
@@ -220,7 +222,9 @@ function appendMissingMultiHandleButtonEdges(options: AppendMissingMultiHandleBu
     if (existingKeys.has(key)) {
       continue
     }
-    buttonEdgesToAdd.push(buildMultiHandleButtonEdge(nodeId, handleId, onAddNodeFromEdge, activeNodeId, activeHandle))
+    buttonEdgesToAdd.push(
+      buildMultiHandleButtonEdge({ nodeId, handleId, onAddNodeFromEdge, activeNodeId, activeHandle })
+    )
   }
 }
 
@@ -237,13 +241,21 @@ function anyKeptButtonEdgeChanged(existingButtonEdges: EdgeType[], buttonEdgesTo
   })
 }
 
-function shouldReturnNewEdgeList(
-  currentEdges: EdgeType[],
-  result: EdgeType[],
-  buttonEdgesToAdd: EdgeType[],
-  existingButtonEdges: EdgeType[],
+type ShouldReturnNewEdgeListOptions = {
+  currentEdges: EdgeType[]
+  result: EdgeType[]
+  buttonEdgesToAdd: EdgeType[]
+  existingButtonEdges: EdgeType[]
   buttonEdgesToKeep: EdgeType[]
-): boolean {
+}
+
+function shouldReturnNewEdgeList({
+  currentEdges,
+  result,
+  buttonEdgesToAdd,
+  existingButtonEdges,
+  buttonEdgesToKeep,
+}: ShouldReturnNewEdgeListOptions): boolean {
   if (result.length !== currentEdges.length || buttonEdgesToAdd.length > 0) {
     return true
   }
@@ -322,7 +334,15 @@ export function computeNextButtonEdges(params: ComputeButtonEdgesParams): EdgeTy
 
   const result = [...nonButtonEdges, ...buttonEdgesToKeep, ...buttonEdgesToAdd]
 
-  if (!shouldReturnNewEdgeList(currentEdges, result, buttonEdgesToAdd, existingButtonEdges, buttonEdgesToKeep)) {
+  if (
+    !shouldReturnNewEdgeList({
+      currentEdges,
+      result,
+      buttonEdgesToAdd,
+      existingButtonEdges,
+      buttonEdgesToKeep,
+    })
+  ) {
     return currentEdges
   }
 
