@@ -87,6 +87,7 @@ class TestUserLoginTelemetryEventSegmentConversion:
             "idp": "okta",
             "entitlement_id": "ent-123",
             "request_id": None,
+            "container_image_version": "img-tag",
         }
 
     def test_segment_event_is_json_serializable(self) -> None:

@@ -21,11 +21,12 @@ export type RowAction = KebabAction
 
 type WorkflowRowProps = {
   workflow: Workflow
-  getRowActions: (workflow: Workflow) => RowAction[]
+  getRowActions?: (workflow: Workflow) => RowAction[]
+  showRowActions?: boolean
 }
 
-function WorkflowRow({ workflow, getRowActions }: Readonly<WorkflowRowProps>) {
-  const actions = getRowActions(workflow)
+function WorkflowRow({ workflow, getRowActions, showRowActions = true }: Readonly<WorkflowRowProps>) {
+  const actions = showRowActions && getRowActions ? getRowActions(workflow) : []
 
   return (
     <Tr key={workflow.id}>
@@ -48,9 +49,11 @@ function WorkflowRow({ workflow, getRowActions }: Readonly<WorkflowRowProps>) {
           }
         />
       </Td>
-      <Td isActionCell>
-        {actions.length > 0 && <SynKebabMenu actions={actions} aria-label={`Actions for ${workflow.name}`} />}
-      </Td>
+      {showRowActions && (
+        <Td isActionCell>
+          {actions.length > 0 && <SynKebabMenu actions={actions} aria-label={`Actions for ${workflow.name}`} />}
+        </Td>
+      )}
     </Tr>
   )
 }
@@ -66,7 +69,8 @@ type ProjectGroupSectionProps = {
   workflows: Workflow[]
   isCollapsed: boolean
   onToggleProject: (projectId: string) => void
-  getRowActions: (workflow: Workflow) => RowAction[]
+  getRowActions?: (workflow: Workflow) => RowAction[]
+  showRowActions?: boolean
   projectActionCallbacks?: ProjectRowActionCallbacks
 }
 
@@ -77,6 +81,7 @@ function ProjectGroupSection({
   isCollapsed,
   onToggleProject,
   getRowActions,
+  showRowActions = true,
   projectActionCallbacks,
 }: Readonly<ProjectGroupSectionProps>) {
   const permissions = useProjectPermissions({
@@ -87,11 +92,13 @@ function ProjectGroupSection({
     ? buildProjectRowActions(project, permissions, projectActionCallbacks)
     : []
   const hasProjectActions = projectActions.length > 0
+  const totalColumns = 4 + (showRowActions ? 1 : 0)
+  const headerColSpan = hasProjectActions ? totalColumns - 1 : totalColumns
 
   return (
     <Tbody>
       <Tr className={groupedTableStyles.groupHeader}>
-        <Td colSpan={hasProjectActions ? 4 : 5} onClick={() => onToggleProject(projectId)}>
+        <Td colSpan={headerColSpan} onClick={() => onToggleProject(projectId)}>
           <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapSm' }}>
             <FlexItem>{isCollapsed ? <RhUiCaretRightIcon /> : <RhUiCaretDownIcon />}</FlexItem>
             <FlexItem>
@@ -107,7 +114,12 @@ function ProjectGroupSection({
       </Tr>
       {!isCollapsed &&
         workflows.map((workflow) => (
-          <WorkflowRow key={workflow.id} workflow={workflow} getRowActions={getRowActions} />
+          <WorkflowRow
+            key={workflow.id}
+            workflow={workflow}
+            getRowActions={getRowActions}
+            showRowActions={showRowActions}
+          />
         ))}
     </Tbody>
   )
@@ -117,7 +129,8 @@ type GroupedWorkflowsTableBodyProps = {
   groupedWorkflows: Map<string, ProjectGroup>
   collapsedProjects: Set<string>
   onToggleProject: (projectId: string) => void
-  getRowActions: (workflow: Workflow) => RowAction[]
+  getRowActions?: (workflow: Workflow) => RowAction[]
+  showRowActions?: boolean
   projectActionCallbacks?: ProjectRowActionCallbacks
 }
 
@@ -126,6 +139,7 @@ export function GroupedWorkflowsTableBody({
   collapsedProjects,
   onToggleProject,
   getRowActions,
+  showRowActions = true,
   projectActionCallbacks,
 }: Readonly<GroupedWorkflowsTableBodyProps>) {
   return (
@@ -139,6 +153,7 @@ export function GroupedWorkflowsTableBody({
           isCollapsed={collapsedProjects.has(projectId)}
           onToggleProject={onToggleProject}
           getRowActions={getRowActions}
+          showRowActions={showRowActions}
           projectActionCallbacks={projectActionCallbacks}
         />
       ))}
@@ -148,14 +163,24 @@ export function GroupedWorkflowsTableBody({
 
 type FlatWorkflowsTableBodyProps = {
   workflows: Workflow[]
-  getRowActions: (workflow: Workflow) => RowAction[]
+  getRowActions?: (workflow: Workflow) => RowAction[]
+  showRowActions?: boolean
 }
 
-export function FlatWorkflowsTableBody({ workflows, getRowActions }: Readonly<FlatWorkflowsTableBodyProps>) {
+export function FlatWorkflowsTableBody({
+  workflows,
+  getRowActions,
+  showRowActions = true,
+}: Readonly<FlatWorkflowsTableBodyProps>) {
   return (
     <Tbody>
       {workflows.map((workflow) => (
-        <WorkflowRow key={workflow.id} workflow={workflow} getRowActions={getRowActions} />
+        <WorkflowRow
+          key={workflow.id}
+          workflow={workflow}
+          getRowActions={getRowActions}
+          showRowActions={showRowActions}
+        />
       ))}
     </Tbody>
   )

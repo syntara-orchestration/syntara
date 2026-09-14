@@ -13,8 +13,6 @@ nodes:
       language: bash
       code: |
         echo "10 is greater than 5"
-    outputs:
-      result: $.stdout
 
   - id: test_numeric_equality
     name: Test Numeric Equality
@@ -24,8 +22,6 @@ nodes:
       language: bash
       code: |
         echo "Numbers are equal"
-    outputs:
-      result: $.stdout
 
   - id: test_string_inequality
     name: Test String Inequality
@@ -35,8 +31,6 @@ nodes:
       language: bash
       code: |
         echo "Strings are not equal"
-    outputs:
-      result: $.stdout
 
   - id: test_numeric_less_than
     name: Test Numeric Less Than
@@ -46,8 +40,6 @@ nodes:
       language: bash
       code: |
         echo "3 is less than 5"
-    outputs:
-      result: $.stdout
 
   - id: test_numeric_greater_equal
     name: Test Numeric Greater or Equal
@@ -57,8 +49,6 @@ nodes:
       language: bash
       code: |
         echo "5 is greater or equal to 5"
-    outputs:
-      result: $.stdout
 
   - id: test_numeric_less_equal
     name: Test Numeric Less or Equal
@@ -68,8 +58,6 @@ nodes:
       language: bash
       code: |
         echo "5 is less or equal to 10"
-    outputs:
-      result: $.stdout
 edges:
   - from: trigger_manual
     to: test_numeric_greater_than

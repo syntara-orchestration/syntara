@@ -229,6 +229,7 @@ class TestAPICallEventSegmentConversion:
             "request_payload_size": 0,
             "entitlement_id": "",
             "request_id": None,
+            "container_image_version": "",
         }
 
     def test_to_segment_event_properties_returns_dict(self) -> None:
@@ -242,7 +243,7 @@ class TestAPICallEventSegmentConversion:
         )
         segment_event = event.to_segment_event()
         assert isinstance(segment_event["properties"], dict)
-        assert len(segment_event["properties"]) == 7
+        assert len(segment_event["properties"]) == 8
 
     def test_entitlement_id_in_segment_properties(self) -> None:
         """entitlement_id value must appear in segment event properties."""

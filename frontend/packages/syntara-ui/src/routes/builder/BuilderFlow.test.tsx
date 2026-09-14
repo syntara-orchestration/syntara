@@ -59,6 +59,7 @@ vi.mock('@xyflow/react', () => ({
     getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
     getNode: vi.fn(),
   }),
+  useUpdateNodeInternals: () => vi.fn(),
 }))
 
 vi.mock('../workflows/canvas/CanvasControls', () => ({
@@ -165,6 +166,35 @@ const sampleWorkflow = {
 
 const sampleEdges = [
   { id: 'e1', source: 'trigger-0', target: 'task-1', sourceHandle: 'source', targetHandle: 'target' },
+]
+
+const loopWorkflow = {
+  id: 'wf-1',
+  name: 'Loop Workflow',
+  inputs: {},
+  triggers: [{ type: 'manual_trigger', name: 'Manual Trigger' }],
+  workflow: {
+    activities: [
+      {
+        id: 'loop-1',
+        type: 'loop',
+        name: 'While loop',
+        parameters: { type: 'while', condition: 'true', max_iterations: 100 },
+      },
+      {
+        id: 'task-1',
+        type: 'script',
+        name: 'Loop body',
+        parameters: { type: 'script', language: 'python', code: 'print("body")' },
+      },
+    ],
+  },
+}
+
+const loopEdges = [
+  { id: 'e-trigger', source: 'trigger-0', target: 'loop-1', sourceHandle: 'source', targetHandle: 'target' },
+  { id: 'e-loop', source: 'loop-1', target: 'task-1', sourceHandle: 'loop', targetHandle: 'target' },
+  { id: 'e-back', source: 'task-1', target: 'loop-1', sourceHandle: 'source', targetHandle: 'end', type: 'loopBack' },
 ]
 
 const defaultProps = {
@@ -275,6 +305,40 @@ describe('BuilderFlow (builder mode)', () => {
     onNodeDragStop({}, {}, [{ id: 'task-1', position: { x: 100, y: 200 } }])
 
     expect(mockUpdateNodePositions).toHaveBeenCalledWith({ 'task-1': { x: 100, y: 200 } })
+  })
+
+  it('persists loop group body positions via onNodeDragStop handlers', () => {
+    seedWorkflow({
+      currentWorkflow: loopWorkflow,
+      edges: loopEdges,
+      nodePositions: {
+        'loop-1': { x: 0, y: 0 },
+        'task-1': { x: 200, y: 100 },
+      },
+    })
+    render(<BuilderFlow {...defaultProps} />)
+
+    const onNodeDragStart = latestReactFlowProps?.onNodeDragStart as (
+      event: unknown,
+      node: { id: string; type: string; position: { x: number; y: number } },
+      draggedNodes: Array<{ id: string; type: string; position: { x: number; y: number } }>
+    ) => void
+    const onNodeDragStop = latestReactFlowProps?.onNodeDragStop as (
+      event: unknown,
+      node: { id: string; type: string; position: { x: number; y: number } },
+      draggedNodes: Array<{ id: string; type: string; position: { x: number; y: number } }>
+    ) => void
+
+    const loopNode = { id: 'loop-1', type: 'loop', position: { x: 0, y: 0 } }
+    onNodeDragStart({}, loopNode, [loopNode])
+
+    const movedLoopNode = { id: 'loop-1', type: 'loop', position: { x: 50, y: 30 } }
+    onNodeDragStop({}, movedLoopNode, [movedLoopNode])
+
+    expect(mockUpdateNodePositions).toHaveBeenCalledWith({
+      'loop-1': { x: 50, y: 30 },
+      'task-1': { x: 250, y: 130 },
+    })
   })
 
   it('skips updateNodePositions when no nodes were dragged', () => {
