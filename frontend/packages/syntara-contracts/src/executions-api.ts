@@ -360,6 +360,7 @@ export interface components {
       | 'aap_workflow_job_template'
       | 'agentic'
       | 'approval'
+      | 'form_prompt'
       | 'http_request'
       | 'internal_activity'
       | 'script'
@@ -1121,6 +1122,105 @@ export interface components {
       [key: string]: unknown
     }
     /**
+     * FormPromptNodeParameters
+     * @description Parameters for form prompt nodes.
+     */
+    FormPromptNodeParameters: {
+      /**
+       * Message
+       * @description Message shown above the form. Supports ${...} template expressions.
+       */
+      message?: string | null
+      /**
+       * Input Schema
+       * @description JSON Schema describing the form fields to collect.
+       */
+      input_schema: {
+        [key: string]: unknown
+      }
+      /**
+       * Responder Users
+       * @description Usernames allowed to respond. Empty/omitted = any user with form_prompt:submit.
+       */
+      responder_users?: string[] | null
+      /**
+       * Responder Groups
+       * @description Group names whose members may respond. Empty/omitted = any user with form_prompt:submit.
+       */
+      responder_groups?: string[] | null
+      /**
+       * Response Window
+       * @description Seconds the responder has before the prompt expires. Falls back to workflow_engine.form_prompt_response_window_seconds.
+       */
+      response_window?: number | null
+      /**
+       * Fallback Behavior
+       * @description What happens when the prompt is not answered in time: fail the workflow, or route to the 'fallback' output port.
+       * @default fail
+       * @enum {string}
+       */
+      fallback_behavior?: 'fail' | 'fallback'
+      /**
+       * Submit Label
+       * @description Submit button label.
+       */
+      submit_label?: string | null
+      /**
+       * Success Message
+       * @description Shown after submission.
+       */
+      success_message?: string | null
+      /**
+       * Timezone
+       * @description IANA timezone for interpreting date/datetime field values in the form.
+       */
+      timezone?: string | null
+      /**
+       * Css Override
+       * @description Custom CSS applied to the form view.
+       */
+      css_override?: string | null
+    }
+    /**
+     * FormPromptNode
+     * @description Form prompt node — pauses execution to collect structured user input.
+     */
+    FormPromptNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'form_prompt'
+      parameters: components['schemas']['FormPromptNodeParameters']
+      settings?: components['schemas']['NodeSettingsNoRetry'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
      * ConditionNodeParameters
      * @description Parameters for condition (if/then/else) control nodes.
      */
@@ -1653,6 +1753,7 @@ export interface components {
         | components['schemas']['AgenticNode']
         | components['schemas']['ScriptNode']
         | components['schemas']['ApprovalNode']
+        | components['schemas']['FormPromptNode']
         | components['schemas']['ConditionNode']
         | components['schemas']['SwitchNode']
         | components['schemas']['LoopNode']
