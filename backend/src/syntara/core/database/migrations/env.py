@@ -34,6 +34,16 @@ if config.config_file_name is not None:
 # Set target metadata from models
 target_metadata = SQLModel.metadata
 
+# Schemas managed by other packages (execution_plane, etc.) — never touch these.
+_EXTERNAL_SCHEMAS = {"execution_plane"}
+
+
+def include_object(obj, name, type_, reflected, compare_to):
+    """Exclude tables from externally managed schemas from autogenerate."""
+    if type_ == "table" and getattr(obj, "schema", None) in _EXTERNAL_SCHEMAS:
+        return False
+    return True
+
 
 # Use the same database URL from centralized settings unless overridden.
 config.set_main_option(
@@ -50,6 +60,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        include_object=include_object,
         compare_type=True,
         compare_server_default=True,
     )
@@ -65,6 +76,7 @@ def do_run_migrations(connection: Connection) -> None:
         connection=connection,
         target_metadata=target_metadata,
         include_schemas=True,
+        include_object=include_object,
         compare_type=True,
         compare_server_default=True,
     )
