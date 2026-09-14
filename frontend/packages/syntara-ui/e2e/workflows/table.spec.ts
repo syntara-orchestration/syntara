@@ -71,7 +71,7 @@ test.describe('Workflows Table - Display and Navigation', () => {
 
       await workflowRow.getByRole('link', { name: workflowName, exact: true }).click()
 
-      await expect(app).toHaveURL(/workflow-builder\/.+/)
+      await expect(app).toHaveURL(/workflow-builder\/(?!new)/)
       await expect(app.getByPlaceholder('Workflow name')).toHaveValue(workflowName)
     } finally {
       await deleteWorkflowViaApi(app, workflow.id)

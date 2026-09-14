@@ -192,7 +192,9 @@ class WorkflowCreate(WorkflowBase):
     is_import: bool = Field(
         default=False,
         description="When true, unavailable LLM models are cleared with warnings "
-        "instead of rejecting the request. Use when importing workflows from other instances.",
+        "instead of rejecting the request, and webhook/EDA authorized service accounts "
+        "that are missing in the target project are removed from the definition "
+        "and not bound. Use when importing workflows from other instances.",
     )
 
 
