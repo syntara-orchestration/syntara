@@ -1,111 +1,27 @@
-import { zodResolver } from '@hookform/resolvers/zod'
-import { Button, Form, FormGroup, Modal, ModalBody, ModalFooter, ModalHeader } from '@patternfly/react-core'
-import { type ReactElement, useMemo, useState } from 'react'
-import type { Control, FieldValues, Path } from 'react-hook-form'
-import { Controller, useForm, useWatch } from 'react-hook-form'
-import { z } from 'zod'
+import { Button, Form, Modal, ModalBody, ModalFooter, ModalHeader } from '@patternfly/react-core'
+import { useMemo, useState } from 'react'
+import { useWatch } from 'react-hook-form'
 
-import { FormFieldError } from '../../../components/FormFieldError'
+import { SynForm } from '../../../components/forms/SynForm'
+import { SynFormField } from '../../../components/forms/SynFormField'
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue'
-import { useFormMutationErrorHandler } from '../../../hooks/useFormMutationErrorHandler'
+import type { UseSynFormReturn } from '../../../hooks/useSynForm'
+import { useSynForm } from '../../../hooks/useSynForm'
 import { useAlerts } from '../../../providers/alerts'
 import { accessClient } from '../../access/accessClient'
 import { accessControlHelp } from '../../access/accessControlFieldHelp'
 import { PrincipalTypeSelect } from '../../access/PrincipalTypeSelect'
 import { TypeaheadSelect } from '../../access/TypeaheadSelect'
 import { useAllProjectRoles } from '../../access/useAllProjectRoles'
+import { buildAssignmentBody, RolePrincipalType } from '../RoleAssignmentTypes'
 
-const assignProjectRoleSchema = z
-  .object({
-    principalOrGroup: z.enum(['principal', 'group']),
-    userId: z.string(),
-    groupId: z.string(),
-    roleName: z.string(),
-  })
-  .superRefine((data, ctx) => {
-    if (data.principalOrGroup === 'principal' && !data.userId) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'User is required', path: ['userId'] })
-    }
-    if (data.principalOrGroup === 'group' && !data.groupId) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Group is required', path: ['groupId'] })
-    }
-    if (!data.roleName) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Role is required', path: ['roleName'] })
-    }
-  })
-
-type AssignProjectRoleFormData = z.infer<typeof assignProjectRoleSchema>
+import {
+  assignProjectRoleDefaultValues,
+  assignProjectRoleSchema,
+  type AssignProjectRoleFormData,
+} from './assignProjectRoleSchema'
 
 const PAGE_SIZE = 20
-
-type TypeaheadFormFieldProps<T extends FieldValues> = {
-  name: Path<T>
-  control: Control<T>
-  label: string
-  fieldId: string
-  ariaLabel: string
-  options: { value: string; label: string; description?: string }[]
-  placeholder: string
-  isDisabled?: boolean
-  onSearchChange?: (term: string) => void
-  hasMore?: boolean
-  isLoading?: boolean
-  onValueChange?: () => void
-  labelHelp?: ReactElement
-}
-
-function TypeaheadFormField<T extends FieldValues>({
-  name,
-  control,
-  label,
-  fieldId,
-  ariaLabel,
-  options,
-  placeholder,
-  isDisabled,
-  onSearchChange,
-  hasMore,
-  isLoading,
-  onValueChange,
-  labelHelp,
-}: Readonly<TypeaheadFormFieldProps<T>>) {
-  return (
-    <FormGroup label={label} fieldId={fieldId} isRequired role="group" labelHelp={labelHelp}>
-      <Controller
-        name={name}
-        control={control}
-        render={({ field, fieldState }) => (
-          <>
-            <TypeaheadSelect
-              id={fieldId}
-              ariaLabel={ariaLabel}
-              options={options}
-              selected={field.value as string}
-              onChange={(value) => {
-                field.onChange(value)
-                onValueChange?.()
-              }}
-              placeholder={placeholder}
-              hasError={!!fieldState.error}
-              isDisabled={isDisabled}
-              onSearchChange={onSearchChange}
-              hasMore={hasMore}
-              isLoading={isLoading}
-            />
-            <FormFieldError message={fieldState.error?.message} />
-          </>
-        )}
-      />
-    </FormGroup>
-  )
-}
-
-const defaultValues: AssignProjectRoleFormData = {
-  principalOrGroup: 'principal',
-  userId: '',
-  groupId: '',
-  roleName: '',
-}
 
 type AssignProjectRoleModalProps = {
   projectId: string
@@ -113,6 +29,189 @@ type AssignProjectRoleModalProps = {
   onClose: () => void
   onSuccess: () => void
   assignedRolesByPrincipal: Map<string, Set<string>>
+}
+
+type TypeaheadOption = { value: string; label: string; description?: string }
+
+type AssignProjectRoleFormFieldsProps = {
+  form: UseSynFormReturn<AssignProjectRoleFormData>
+  principalType: RolePrincipalType
+  selectedPrincipalId: string
+  userOptions: TypeaheadOption[]
+  groupOptions: TypeaheadOption[]
+  serviceAccountOptions: TypeaheadOption[]
+  roleOptions: TypeaheadOption[]
+  rolesLoading: boolean
+  onUserSearchChange: (term: string) => void
+  hasMoreUsers: boolean
+  isUsersLoading: boolean
+  onGroupSearchChange: (term: string) => void
+  hasMoreGroups: boolean
+  isGroupsLoading: boolean
+  onServiceAccountSearchChange: (term: string) => void
+  hasMoreServiceAccounts: boolean
+  isServiceAccountsLoading: boolean
+  onResetDependentFields: () => void
+  onPrincipalSelected: () => void
+}
+
+function getSelectedPrincipalId(
+  principalType: RolePrincipalType,
+  userId: string,
+  groupId: string,
+  serviceAccountId: string
+): string {
+  switch (principalType) {
+    case RolePrincipalType.USER:
+      return userId
+    case RolePrincipalType.GROUP:
+      return groupId
+    case RolePrincipalType.SERVICE_ACCOUNT:
+      return serviceAccountId
+    default:
+      return ''
+  }
+}
+
+function AssignProjectRoleFormFields({
+  form,
+  principalType,
+  selectedPrincipalId,
+  userOptions,
+  groupOptions,
+  serviceAccountOptions,
+  roleOptions,
+  rolesLoading,
+  onUserSearchChange,
+  hasMoreUsers,
+  isUsersLoading,
+  onGroupSearchChange,
+  hasMoreGroups,
+  isGroupsLoading,
+  onServiceAccountSearchChange,
+  hasMoreServiceAccounts,
+  isServiceAccountsLoading,
+  onResetDependentFields,
+  onPrincipalSelected,
+}: Readonly<AssignProjectRoleFormFieldsProps>) {
+  return (
+    <SynForm form={form}>
+      <SynFormField<AssignProjectRoleFormData, 'principalType'>
+        name="principalType"
+        label="Principal type"
+        fieldId="principal-type"
+        isRequired
+        labelHelp={accessControlHelp.principalType}
+      >
+        {({ field }) => (
+          <PrincipalTypeSelect
+            value={field.value}
+            onChange={(value) => {
+              field.onChange(value)
+              onResetDependentFields()
+            }}
+          />
+        )}
+      </SynFormField>
+
+      {principalType === RolePrincipalType.USER && (
+        <SynFormField<AssignProjectRoleFormData, 'userId'> name="userId" label="User" fieldId="user-select" isRequired>
+          {({ field, fieldState }) => (
+            <TypeaheadSelect
+              id="user-select"
+              ariaLabel="User"
+              options={userOptions}
+              selected={field.value}
+              onChange={(value) => {
+                field.onChange(value)
+                onPrincipalSelected()
+              }}
+              placeholder="Select a user..."
+              hasError={!!fieldState.error}
+              onSearchChange={onUserSearchChange}
+              hasMore={hasMoreUsers}
+              isLoading={isUsersLoading}
+            />
+          )}
+        </SynFormField>
+      )}
+
+      {principalType === RolePrincipalType.GROUP && (
+        <SynFormField<AssignProjectRoleFormData, 'groupId'>
+          name="groupId"
+          label="Group"
+          fieldId="group-select"
+          isRequired
+        >
+          {({ field, fieldState }) => (
+            <TypeaheadSelect
+              id="group-select"
+              ariaLabel="Group"
+              options={groupOptions}
+              selected={field.value}
+              onChange={(value) => {
+                field.onChange(value)
+                onPrincipalSelected()
+              }}
+              placeholder="Select a group..."
+              hasError={!!fieldState.error}
+              onSearchChange={onGroupSearchChange}
+              hasMore={hasMoreGroups}
+              isLoading={isGroupsLoading}
+            />
+          )}
+        </SynFormField>
+      )}
+
+      {principalType === RolePrincipalType.SERVICE_ACCOUNT && (
+        <SynFormField<AssignProjectRoleFormData, 'serviceAccountId'>
+          name="serviceAccountId"
+          label="Service account"
+          fieldId="service-account-select"
+          isRequired
+        >
+          {({ field, fieldState }) => (
+            <TypeaheadSelect
+              id="service-account-select"
+              ariaLabel="Service account"
+              options={serviceAccountOptions}
+              selected={field.value}
+              onChange={(value) => {
+                field.onChange(value)
+                onPrincipalSelected()
+              }}
+              placeholder="Select a service account..."
+              hasError={!!fieldState.error}
+              onSearchChange={onServiceAccountSearchChange}
+              hasMore={hasMoreServiceAccounts}
+              isLoading={isServiceAccountsLoading}
+            />
+          )}
+        </SynFormField>
+      )}
+
+      <SynFormField<AssignProjectRoleFormData, 'roleName'>
+        name="roleName"
+        label="Role"
+        fieldId="role-select"
+        isRequired
+        labelHelp={accessControlHelp.role}
+      >
+        {({ field, fieldState }) => (
+          <TypeaheadSelect
+            id="role-select"
+            ariaLabel="Role"
+            options={roleOptions}
+            selected={field.value}
+            onChange={field.onChange}
+            placeholder={rolesLoading ? 'Loading roles...' : 'Select a role...'}
+            hasError={!!fieldState.error}
+            isDisabled={rolesLoading || !selectedPrincipalId}
+          />
+        )}
+      </SynFormField>
+    </SynForm>
+  )
 }
 
 export function AssignProjectRoleModal({
@@ -124,43 +223,77 @@ export function AssignProjectRoleModal({
 }: Readonly<AssignProjectRoleModalProps>) {
   const { showSuccess } = useAlerts()
 
-  const { control, handleSubmit, reset, setValue, setError } = useForm<AssignProjectRoleFormData>({
-    resolver: zodResolver(assignProjectRoleSchema, undefined, { mode: 'sync' }),
-    defaultValues,
+  const form = useSynForm({
+    schema: assignProjectRoleSchema,
+    defaultValues: assignProjectRoleDefaultValues,
+    onClose,
   })
+  const { handleSubmit, handleError, handleClose: formHandleClose, setValue, control } = form
 
-  const principalOrGroup = useWatch({ control, name: 'principalOrGroup' })
+  const principalType = useWatch({ control, name: 'principalType' })
   const selectedUserId = useWatch({ control, name: 'userId' })
   const selectedGroupId = useWatch({ control, name: 'groupId' })
-  const selectedPrincipalId = principalOrGroup === 'principal' ? selectedUserId : selectedGroupId
+  const selectedServiceAccountId = useWatch({ control, name: 'serviceAccountId' })
+  const selectedPrincipalId = getSelectedPrincipalId(
+    principalType,
+    selectedUserId,
+    selectedGroupId,
+    selectedServiceAccountId
+  )
 
-  // ── Server-side user search ──────────────────────────────────────────────
   const [userSearchTerm, setUserSearchTerm] = useState('')
   const debouncedUserSearch = useDebouncedValue(userSearchTerm)
 
-  const usersQuery = accessClient.useQuery('get', '/users/directory', {
-    params: {
-      query: {
-        sort: 'username',
-        limit: PAGE_SIZE,
-        ...(debouncedUserSearch ? { 'username[contains]': debouncedUserSearch } : {}),
+  const usersQuery = accessClient.useQuery(
+    'get',
+    '/users/directory',
+    {
+      params: {
+        query: {
+          sort: 'username',
+          limit: PAGE_SIZE,
+          ...(debouncedUserSearch ? { 'username[contains]': debouncedUserSearch } : {}),
+        },
       },
     },
-  })
+    { enabled: isOpen && principalType === RolePrincipalType.USER }
+  )
 
-  // ── Server-side group search ─────────────────────────────────────────────
   const [groupSearchTerm, setGroupSearchTerm] = useState('')
   const debouncedGroupSearch = useDebouncedValue(groupSearchTerm)
 
-  const groupsQuery = accessClient.useQuery('get', '/groups/directory', {
-    params: {
-      query: {
-        sort: 'name',
-        limit: PAGE_SIZE,
-        ...(debouncedGroupSearch ? { 'name[contains]': debouncedGroupSearch } : {}),
+  const groupsQuery = accessClient.useQuery(
+    'get',
+    '/groups/directory',
+    {
+      params: {
+        query: {
+          sort: 'name',
+          limit: PAGE_SIZE,
+          ...(debouncedGroupSearch ? { 'name[contains]': debouncedGroupSearch } : {}),
+        },
       },
     },
-  })
+    { enabled: isOpen && principalType === RolePrincipalType.GROUP }
+  )
+
+  const [serviceAccountSearchTerm, setServiceAccountSearchTerm] = useState('')
+  const debouncedServiceAccountSearch = useDebouncedValue(serviceAccountSearchTerm)
+
+  const serviceAccountsQuery = accessClient.useQuery(
+    'get',
+    '/service_accounts',
+    {
+      params: {
+        query: {
+          sort: 'name',
+          limit: PAGE_SIZE,
+          ...(debouncedServiceAccountSearch ? { 'name[contains]': debouncedServiceAccountSearch } : {}),
+        },
+      },
+    },
+    { enabled: isOpen && principalType === RolePrincipalType.SERVICE_ACCOUNT }
+  )
 
   const { roles: projectRoles, isLoading: rolesLoading } = useAllProjectRoles(projectId)
 
@@ -174,6 +307,11 @@ export function AssignProjectRoleModal({
     [groupsQuery.data]
   )
 
+  const serviceAccountOptions = useMemo(
+    () => (serviceAccountsQuery.data?.resources ?? []).map((sa) => ({ value: sa.id, label: sa.name })),
+    [serviceAccountsQuery.data]
+  )
+
   const roleOptions = useMemo(() => {
     const assignedForPrincipal = selectedPrincipalId ? assignedRolesByPrincipal.get(selectedPrincipalId) : undefined
     return projectRoles
@@ -185,21 +323,29 @@ export function AssignProjectRoleModal({
       }))
   }, [projectRoles, selectedPrincipalId, assignedRolesByPrincipal])
 
-  const handleError = useFormMutationErrorHandler<AssignProjectRoleFormData>(setError)
   const { mutate: assignRole, isPending } = accessClient.useMutation('post', '/projects/{project_id}/role_assignments')
 
   const handleClose = () => {
-    reset(defaultValues)
     setUserSearchTerm('')
     setGroupSearchTerm('')
-    onClose()
+    setServiceAccountSearchTerm('')
+    formHandleClose()
   }
 
-  const onSubmit = handleSubmit((data) => {
-    const body =
-      data.principalOrGroup === 'group'
-        ? { group_id: data.groupId, role_name: data.roleName }
-        : { principal_id: data.userId, role_name: data.roleName }
+  const resetDependentFields = () => {
+    setValue('userId', '', { shouldValidate: false })
+    setValue('groupId', '', { shouldValidate: false })
+    setValue('serviceAccountId', '', { shouldValidate: false })
+    setValue('roleName', '', { shouldValidate: false })
+  }
+
+  const clearRoleSelection = () => {
+    setValue('roleName', '', { shouldValidate: false })
+  }
+
+  const onSubmit = (data: AssignProjectRoleFormData) => {
+    const principalId = getSelectedPrincipalId(data.principalType, data.userId, data.groupId, data.serviceAccountId)
+    const body = buildAssignmentBody(data.principalType, principalId, data.roleName)
     assignRole(
       {
         params: { path: { project_id: projectId } },
@@ -214,79 +360,33 @@ export function AssignProjectRoleModal({
         onError: handleError({ title: 'Failed to assign role' }),
       }
     )
-  })
+  }
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} variant="small">
       <ModalHeader title="Assign role" />
       <ModalBody>
-        <Form id="assign-project-role-form" onSubmit={onSubmit}>
-          <FormGroup
-            label="Principal type"
-            isRequired
-            fieldId="principal-type"
-            role="group"
-            labelHelp={accessControlHelp.principalType}
-          >
-            <Controller
-              name="principalOrGroup"
-              control={control}
-              render={({ field }) => (
-                <PrincipalTypeSelect
-                  value={field.value}
-                  onChange={(value) => {
-                    field.onChange(value)
-                    setValue('userId', '', { shouldValidate: false })
-                    setValue('groupId', '', { shouldValidate: false })
-                    setValue('roleName', '', { shouldValidate: false })
-                  }}
-                />
-              )}
-            />
-          </FormGroup>
-
-          {principalOrGroup === 'principal' && (
-            <TypeaheadFormField
-              name="userId"
-              control={control}
-              label="User"
-              fieldId="user-select"
-              ariaLabel="User"
-              options={userOptions}
-              placeholder="Select a user..."
-              onSearchChange={setUserSearchTerm}
-              hasMore={!!usersQuery.data?.next}
-              isLoading={usersQuery.isFetching}
-              onValueChange={() => setValue('roleName', '', { shouldValidate: false })}
-            />
-          )}
-
-          {principalOrGroup === 'group' && (
-            <TypeaheadFormField
-              name="groupId"
-              control={control}
-              label="Group"
-              fieldId="group-select"
-              ariaLabel="Group"
-              options={groupOptions}
-              placeholder="Select a group..."
-              onSearchChange={setGroupSearchTerm}
-              hasMore={!!groupsQuery.data?.next}
-              isLoading={groupsQuery.isFetching}
-              onValueChange={() => setValue('roleName', '', { shouldValidate: false })}
-            />
-          )}
-
-          <TypeaheadFormField
-            name="roleName"
-            control={control}
-            label="Role"
-            fieldId="role-select"
-            ariaLabel="Role"
-            options={roleOptions}
-            placeholder={rolesLoading ? 'Loading roles...' : 'Select a role...'}
-            isDisabled={rolesLoading || !selectedPrincipalId}
-            labelHelp={accessControlHelp.role}
+        <Form id="assign-project-role-form" onSubmit={handleSubmit(onSubmit)}>
+          <AssignProjectRoleFormFields
+            form={form}
+            principalType={principalType}
+            selectedPrincipalId={selectedPrincipalId}
+            userOptions={userOptions}
+            groupOptions={groupOptions}
+            serviceAccountOptions={serviceAccountOptions}
+            roleOptions={roleOptions}
+            rolesLoading={rolesLoading}
+            onUserSearchChange={setUserSearchTerm}
+            hasMoreUsers={!!usersQuery.data?.next}
+            isUsersLoading={usersQuery.isFetching}
+            onGroupSearchChange={setGroupSearchTerm}
+            hasMoreGroups={!!groupsQuery.data?.next}
+            isGroupsLoading={groupsQuery.isFetching}
+            onServiceAccountSearchChange={setServiceAccountSearchTerm}
+            hasMoreServiceAccounts={!!serviceAccountsQuery.data?.next}
+            isServiceAccountsLoading={serviceAccountsQuery.isFetching}
+            onResetDependentFields={resetDependentFields}
+            onPrincipalSelected={clearRoleSelection}
           />
         </Form>
       </ModalBody>
