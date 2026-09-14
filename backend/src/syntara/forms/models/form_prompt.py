@@ -41,7 +41,7 @@ class BaseFormPrompt(BaseResource, table=False):
     # Project scoping (denormalized from execution for efficient filtering)
     project_id: UUID = Field(
         foreign_key="projects.id",
-        description="Project this form prompt belongs to (denormalized from execution)",
+        description="Project this form prompt belongs to",
         index=True,
     )
 
