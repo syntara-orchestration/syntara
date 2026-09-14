@@ -10,7 +10,7 @@ ARG BRANDING=false
 FROM ${DOWNSTREAM_OVERRIDE} AS override
 
 # Build stage
-FROM registry.access.redhat.com/ubi9/nodejs-24:latest@sha256:09ec365eac116f996dd07507784d06f648401c949eb48c40fe2d961341edd3fb AS builder
+FROM registry.access.redhat.com/ubi9/nodejs-24:latest@sha256:1826d004a079d8c983a587dad372fa06e0905a67e50d7a16f3650b0f01a1cd15 AS builder
 
 ARG BRANDING
 
