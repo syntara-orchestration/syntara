@@ -2187,7 +2187,7 @@ components:
             - type: 'null'
           title: Message
           description: Message shown above the form. Supports ${...} template expressions.
-        input_schema:
+        form_definition:
           additionalProperties: true
           type: object
           title: Input Schema
@@ -2256,7 +2256,7 @@ components:
       additionalProperties: false
       type: object
       required:
-        - input_schema
+        - form_definition
       title: FormPromptNodeParameters
       description: Parameters for form prompt nodes.
     ConditionNodeParameters:

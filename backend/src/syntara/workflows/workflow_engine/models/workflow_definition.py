@@ -539,7 +539,7 @@ class AgenticExecutorParameters(TemplateAwareBaseModel, populate_by_name=True):
 
         Checks structural validity, rejects $ref (SSRF prevention), and detects
         ReDoS-vulnerable regex patterns. Uses the same validation as webhook
-        input_schema for consistency.
+        form_definition for consistency.
 
         Template expressions (str matching ${...}) bypass this validator via
         TemplateAwareBaseModel's wrap validator and arrive here as str.
@@ -915,7 +915,7 @@ class FormPromptNodeParameters(BaseModel):
         max_length=2000,
         description="Message shown above the form. Supports ${...} template expressions.",
     )
-    input_schema: dict[str, Any] = Field(
+    form_definition: dict[str, Any] = Field(
         description="JSON Schema describing the form fields to collect.",
     )
     responder_users: list[str] | None = Field(
@@ -960,7 +960,7 @@ class FormPromptNodeParameters(BaseModel):
         description="Custom CSS applied to the form view.",
     )
 
-    @field_validator("input_schema")
+    @field_validator("form_definition")
     @classmethod
     def validate_schema(cls, v: dict[str, Any]) -> dict[str, Any]:
         """Validate JSON Schema structure and security."""
@@ -1032,7 +1032,7 @@ class WebhookTriggerParameters(TemplateAwareBaseModel):
         webhook_path: Unique URL slug identifying this webhook endpoint
             (e.g., "jira-updates"). Becomes part of the final URL:
             /api/v1/webhooks/{webhook_path}
-        input_schema: Optional JSON Schema (Draft-07) for validating incoming
+        form_definition: Optional JSON Schema (Draft-07) for validating incoming
             webhook payloads. If set, requests with non-conforming payloads
             are rejected with 422 Unprocessable Content.
         authorized_service_account_ids: UUIDs of service accounts authorized
@@ -1049,7 +1049,7 @@ class WebhookTriggerParameters(TemplateAwareBaseModel):
         pattern=WebhookLimits.PATH_PATTERN,
         description="Unique URL slug identifying this webhook endpoint",
     )
-    input_schema: dict[str, Any] | None = Field(
+    form_definition: dict[str, Any] | None = Field(
         default=None,
         description="Optional JSON Schema (Draft-07) for validating incoming webhook payloads",
     )
@@ -1061,7 +1061,7 @@ class WebhookTriggerParameters(TemplateAwareBaseModel):
         ),
     )
 
-    @field_validator("input_schema")
+    @field_validator("form_definition")
     @classmethod
     def validate_schema(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
         """Validate JSON Schema at definition time.

@@ -33,7 +33,7 @@ def create_test_form_prompt(
         message=message,
         status=status,
         timeout_at=timeout_at,
-        input_schema={"type": "object", "properties": {"reason": {"type": "string"}}},
+        form_definition={"type": "object", "properties": {"reason": {"type": "string"}}},
         responded_by=responded_by,
         responded_at=responded_at,
         response_data=response_data,

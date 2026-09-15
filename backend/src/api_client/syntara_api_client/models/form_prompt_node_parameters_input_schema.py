@@ -24,10 +24,10 @@ class FormPromptNodeParametersInputSchema:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        form_prompt_node_parameters_input_schema = cls()
+        form_prompt_node_parameters_form_definition = cls()
 
-        form_prompt_node_parameters_input_schema.additional_properties = d
-        return form_prompt_node_parameters_input_schema
+        form_prompt_node_parameters_form_definition.additional_properties = d
+        return form_prompt_node_parameters_form_definition
 
     @property
     def additional_keys(self) -> list[str]:

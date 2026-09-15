@@ -5,14 +5,14 @@
   "description": "Pauses workflow execution and collects structured input from a user. Routes to successors by output port: outgoing edges must set from_port to 'submitted' or 'fallback'. At least one successor on the 'submitted' port is required. The 'fallback' port is taken when the prompt is not answered within the response window and fallback_behavior is 'fallback'. Submitted values are available to downstream nodes as ${<node_id>.response_data.<field>}.",
   "parameterSchema": {
     "type": "object",
-    "required": ["input_schema"],
+    "required": ["form_definition"],
     "properties": {
       "message": {
         "type": "string",
         "maxLength": 2000,
         "description": "Message shown above the form. Supports ${...} template expressions."
       },
-      "input_schema": {
+      "form_definition": {
         "type": "object",
         "description": "JSON Schema describing the form fields to collect."
       },

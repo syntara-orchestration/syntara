@@ -1135,7 +1135,7 @@ export interface components {
        * Input Schema
        * @description JSON Schema describing the form fields to collect.
        */
-      input_schema: {
+      form_definition: {
         [key: string]: unknown
       }
       /**

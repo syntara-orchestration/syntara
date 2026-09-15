@@ -739,7 +739,7 @@ class TestNodeSettingsValidation:
                     "type": "form_prompt",
                     "parameters": {
                         "message": "Please fill out the form",
-                        "input_schema": {
+                        "form_definition": {
                             "type": "object",
                             "properties": {
                                 "field1": {"type": "string"},
@@ -780,7 +780,7 @@ class TestNodeSettingsValidation:
         assert serialized["nodes"][0]["type"] == "form_prompt"
         params = serialized["nodes"][0]["parameters"]
         assert params["message"] == "Please fill out the form"
-        assert params["input_schema"]["properties"]["field1"]["type"] == "string"
+        assert params["form_definition"]["properties"]["field1"]["type"] == "string"
         assert params["responder_users"] == ["alice", "bob"]
         assert params["response_window"] == 3600
         assert params["fallback_behavior"] == "fallback"

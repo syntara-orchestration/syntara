@@ -105,7 +105,7 @@ class BaseFormPrompt(BaseResource, table=False):
     )
 
     # Form definition
-    input_schema: dict[str, Any] = Field(
+    form_definition: dict[str, Any] = Field(
         default_factory=dict,
         sa_column=Column(JSONB, nullable=False, server_default=text("'{}'::jsonb")),
         description="JSON Schema Draft-07 form definition",
