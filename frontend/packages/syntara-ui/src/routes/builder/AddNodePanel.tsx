@@ -6,6 +6,7 @@ import { SynPanel } from '../../components/layout/SynPanel'
 
 import { NodeTypeOptionsList } from './NodeTypeOptionsList'
 import { NodeRegistry } from './registry/NodeRegistry'
+import { useNodeTypePermissions } from './useNodeTypePermissions'
 
 type AddNodePanelHeaderProps = {
   panelTitle: string
@@ -74,6 +75,7 @@ type AddNodePanelProps = {
   onClose: () => void
   onSelectNode: (nodeTypeId: string, nodeSubtypeId?: string | null) => void
   sourceNodeId?: string | null
+  projectId?: string
   /** Canvas has no workflow steps yet (only trigger selection is shown). */
   hasNoWorkflowNodes?: boolean
   /** React Flow node ID to replace (generic placeholder → real step). */
@@ -97,7 +99,21 @@ export function AddNodePanel(props: AddNodePanelProps) {
     return allNodes
   }, [props.replacementNodeId, props.hasNoWorkflowNodes, props.sourceNodeId])
 
+  const nodeTypeIds = useMemo(() => nodeTypes.map((node) => node.id), [nodeTypes])
+  const { permissions } = useNodeTypePermissions(props.projectId, nodeTypeIds)
+  const visibleNodeTypes = useMemo(
+    () => nodeTypes.filter((node) => permissions[node.id]?.read !== false),
+    [nodeTypes, permissions]
+  )
+  const writeDisabledIds = useMemo(
+    () => new Set(nodeTypeIds.filter((id) => permissions[id]?.write === false)),
+    [nodeTypeIds, permissions]
+  )
+
   const handleNodeClick = (nodeId: string) => {
+    if (writeDisabledIds.has(nodeId)) {
+      return
+    }
     const nodeDef = NodeRegistry.get(nodeId)
     if (nodeDef?.subtypes?.length) {
       setSelectedNodeType(nodeId)
@@ -159,9 +175,14 @@ export function AddNodePanel(props: AddNodePanelProps) {
                   props.onSelectNode(selectedNode.id, subtypeId)
                   setSelectedNodeType(null)
                 }}
+                writeDisabledIds={writeDisabledIds}
               />
             ) : (
-              <NodeTypeOptionsList nodeTypes={nodeTypes} onSelect={handleNodeClick} />
+              <NodeTypeOptionsList
+                nodeTypes={visibleNodeTypes}
+                onSelect={handleNodeClick}
+                writeDisabledIds={writeDisabledIds}
+              />
             )}
           </Stack>
         </StackItem>

@@ -30,6 +30,8 @@ import { accessClient } from './accessClient'
 import { accessControlHelp } from './accessControlFieldHelp'
 import { addRoleSchema } from './addRoleSchema'
 import type { AddRoleFormData } from './addRoleSchema'
+import { NodeTypePolicyScopeAlert } from './NodeTypePolicyScopeAlert'
+import { selectedNodeTypeDenyPolicies } from './nodeTypePolicyUtils'
 import { PolicySelect } from './PolicySelect'
 import { TypeaheadSelect } from './TypeaheadSelect'
 import { useSelectableProjects } from './useAllProjects'
@@ -96,6 +98,9 @@ function AddRoleFormFields({
   onScopeChange,
   onProjectChange,
 }: Readonly<AddRoleFormFieldsProps>) {
+  const selectedPolicies = useWatch({ control, name: 'policies' }) ?? []
+  const showNodeTypePolicyAlert = scope === 'system' && selectedNodeTypeDenyPolicies(selectedPolicies).length > 0
+
   return (
     <>
       <FormGroup label="Name" isRequired fieldId="role-name">
@@ -202,6 +207,7 @@ function AddRoleFormFields({
           )
         )}
       </FormGroup>
+      <NodeTypePolicyScopeAlert visible={showNodeTypePolicyAlert} />
     </>
   )
 }

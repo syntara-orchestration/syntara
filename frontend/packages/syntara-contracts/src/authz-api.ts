@@ -24,6 +24,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/authz/can_i_node_types': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Batch check workflow node-type permissions
+     * @description Evaluates inherited workflow permissions minus explicit node-type deny policies for each requested catalog node type.
+     */
+    post: operations['can_i_node_types']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/authz/who_can': {
     parameters: {
       query?: never
@@ -308,6 +328,40 @@ export interface components {
        * @default
        */
       project?: string
+    }
+    /**
+     * Can I Node Types Request
+     * @description Batch node-type permission check for workflow designer gating.
+     */
+    CanINodeTypesRequest: {
+      /**
+       * Action
+       * @description Node-type action: "read", "write", or "execute"
+       */
+      action: string
+      /**
+       * Resource Project
+       * @description Project name or UUID for workflow inheritance
+       */
+      resource_project: string
+      /**
+       * Node Types
+       * @description Catalog node type ids to evaluate
+       * @default []
+       */
+      node_types?: string[]
+    }
+    /** Node Type Permission Entry */
+    NodeTypePermissionEntry: {
+      /** Node Type */
+      node_type: string
+      /** Allowed */
+      allowed: boolean
+    }
+    /** Can I Node Types Response */
+    CanINodeTypesResponse: {
+      /** Results */
+      results: components['schemas']['NodeTypePermissionEntry'][]
     }
     /**
      * WhatCanIRequest
@@ -650,6 +704,35 @@ export interface operations {
       409: components['responses']['ConflictError']
       422: components['responses']['ValidationError']
       429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
+  can_i_node_types: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CanINodeTypesRequest']
+      }
+    }
+    responses: {
+      /** @description Per node-type authorization decisions */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CanINodeTypesResponse']
+        }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      422: components['responses']['ValidationError']
       500: components['responses']['InternalServerError']
     }
   }

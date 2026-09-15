@@ -13,6 +13,7 @@ import {
 
 import { SynPanel } from '../../components/layout/SynPanel'
 import { AAP_NODE_IDS, RegistryNodeId } from '../../constants'
+import { permissionTooltip } from '../../hooks/permissionUtils'
 import { renderNodeIcon } from '../workflows/canvas/nodes/renderNodeIcon'
 import { getAddNodePanelColor } from '../workflows/canvas/nodeTypeColors'
 
@@ -24,6 +25,7 @@ export type NodeTypeOption = Pick<NodeTypeDefinition | NodeSubtypeDefinition, 'i
 type NodeTypeOptionsListProps = {
   nodeTypes: NodeTypeOption[]
   onSelect: (nodeId: string) => void
+  writeDisabledIds?: Set<string>
 }
 
 export function NodeTypeOptionsList(props: NodeTypeOptionsListProps) {
@@ -34,21 +36,34 @@ export function NodeTypeOptionsList(props: NodeTypeOptionsListProps) {
     const isAAPNode = AAP_NODE_IDS.has(nodeType.id as (typeof RegistryNodeId)[keyof typeof RegistryNodeId])
     const iconColor = isAAPNode ? undefined : accentColor
     const nodeIcon = renderNodeIcon(icon, id, 'list', iconColor)
+    const writeDisabled = props.writeDisabledIds?.has(nodeType.id) ?? false
+    const writeDeniedTooltip = writeDisabled
+      ? permissionTooltip(`add ${nodeType.label} steps`, 'workflow_node_type:write')
+      : undefined
 
     return (
       <StackItem key={nodeType.id}>
         <SynPanel
           isGlass={false}
           isScrollable={false}
-          onClick={() => props.onSelect(nodeType.id)}
+          title={writeDeniedTooltip}
+          onClick={() => {
+            if (!writeDisabled) {
+              props.onSelect(nodeType.id)
+            }
+          }}
           onKeyDown={(e) => {
+            if (writeDisabled) {
+              return
+            }
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault()
               props.onSelect(nodeType.id)
             }
           }}
           style={{
-            cursor: 'pointer',
+            cursor: writeDisabled ? 'not-allowed' : 'pointer',
+            opacity: writeDisabled ? 0.6 : 1,
             ...(accentColor
               ? {
                   borderTopWidth: 4,

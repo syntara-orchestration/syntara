@@ -1,4 +1,4 @@
-import { Button, Flex } from '@patternfly/react-core'
+import { Button, Flex, Content, ContentVariants } from '@patternfly/react-core'
 import type {
   ConditionActivity,
   ConvergeActivity,
@@ -183,6 +183,15 @@ function renderEditModeContent(
   onHeaderContentChange: (content: ReactNode | null) => void,
   projectId?: string
 ): ReactNode {
+  if (getActivityMetadata(node.data)?.__permissionRedacted) {
+    return (
+      <Content component={ContentVariants.p}>
+        Configuration for this step is hidden because your role does not include read access for this node type. Contact
+        your administrator to request the corresponding workflow node read policy.
+      </Content>
+    )
+  }
+
   if (node.type === FlowNodeType.TRIGGER) {
     const triggerIdx = parseTriggerIndex(node.id) ?? 0
     const trigger = currentWorkflow?.triggers?.[triggerIdx]
@@ -298,6 +307,7 @@ type NodeDetailsPanelProps = {
   workflowMetadata?: WorkflowMetadata
   onRunStep?: () => void
   readOnly?: boolean
+  readOnlyMessage?: string
   onNodeAdded?: () => void
 }
 
@@ -326,6 +336,7 @@ export function NodeDetailsPanel(props: NodeDetailsPanelProps) {
     onAddStep,
     onRunStep,
     readOnly,
+    readOnlyMessage,
     onNodeAdded,
   } = props
   const { showError } = useAlerts()
@@ -508,6 +519,7 @@ export function NodeDetailsPanel(props: NodeDetailsPanelProps) {
       workflowMetadata={props.workflowMetadata}
       tabBarAction={tabBarAction}
       readOnly={readOnly}
+      readOnlyMessage={readOnlyMessage}
       mode={mode}
     />
   )

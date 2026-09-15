@@ -32,6 +32,7 @@ type BuilderSidePanelsProps = {
   workflowName: string
   workflowDescription: string
   markDirty: () => void
+  projectId?: string
 }
 
 export const BuilderSidePanels = memo(function BuilderSidePanels({
@@ -54,6 +55,7 @@ export const BuilderSidePanels = memo(function BuilderSidePanels({
   workflowName,
   workflowDescription,
   markDirty,
+  projectId,
 }: Readonly<BuilderSidePanelsProps>) {
   return (
     <>
@@ -70,6 +72,7 @@ export const BuilderSidePanels = memo(function BuilderSidePanels({
             sourceNodeId={sourceNodeId}
             replacementNodeId={replacementNodeId}
             hasNoWorkflowNodes={hasNoWorkflowNodes}
+            projectId={projectId}
           />
         </FlexItem>
       )}

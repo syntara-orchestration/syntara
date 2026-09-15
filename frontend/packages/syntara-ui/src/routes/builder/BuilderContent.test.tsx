@@ -86,6 +86,13 @@ vi.mock('./useBuilderPermissions', () => ({
   useBuilderPermissions: () => mockBuilderPermissions,
 }))
 
+vi.mock('./useNodeTypePermissions', () => ({
+  useNodeTypePermissions: () => ({
+    permissions: {},
+    isLoading: false,
+  }),
+}))
+
 import { BuilderContent } from './BuilderContent'
 
 const queryClient = new QueryClient({

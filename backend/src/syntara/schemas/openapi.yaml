@@ -4352,6 +4352,92 @@ paths:
                 retryable: true
       security:
         - bearerAuth: []
+  /authz/can_i_node_types:
+    post:
+      summary: Batch check workflow node-type permissions
+      description: Evaluates inherited workflow permissions minus explicit node-type deny policies for each requested catalog node type.
+      operationId: can_i_node_types
+      x-app-permission:
+        resource: null
+        action: null
+      tags:
+        - Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CanINodeTypesRequest'
+      responses:
+        '200':
+          description: Per node-type authorization decisions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CanINodeTypesResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/bad-request
+                title: Bad Request
+                detail: The request was malformed or contained invalid parameters
+                code: BAD_REQUEST
+                retryable: false
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/unauthorized
+                title: Unauthorized
+                detail: Authentication is required to access this resource
+                code: UNAUTHORIZED
+                retryable: false
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/forbidden
+                title: Forbidden
+                detail: You do not have permission to access this resource
+                code: FORBIDDEN
+                retryable: false
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/validation-error
+                title: Validation Error
+                detail: Field 'name' must be between 1 and 255 characters
+                code: VALIDATION_ERROR
+                retryable: false
+                instance: /api/v1/workflows
+        '500':
+          description: Internal Server Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/internal-error
+                title: Internal Server Error
+                detail: An unexpected error occurred
+                code: INTERNAL_ERROR
+                retryable: true
+      security:
+        - bearerAuth: []
   /authz/who_can:
     post:
       summary: List users who can perform an action
@@ -28992,6 +29078,53 @@ components:
           default: ''
           title: Project
           description: Project scope (empty for system-level)
+    CanINodeTypesRequest:
+      type: object
+      title: Can I Node Types Request
+      description: Batch node-type permission check for workflow designer gating.
+      required:
+        - action
+        - resource_project
+      properties:
+        action:
+          type: string
+          title: Action
+          description: 'Node-type action: "read", "write", or "execute"'
+        resource_project:
+          type: string
+          title: Resource Project
+          description: Project name or UUID for workflow inheritance
+        node_types:
+          type: array
+          items:
+            type: string
+          title: Node Types
+          description: Catalog node type ids to evaluate
+          default: []
+    NodeTypePermissionEntry:
+      type: object
+      title: Node Type Permission Entry
+      required:
+        - node_type
+        - allowed
+      properties:
+        node_type:
+          type: string
+          title: Node Type
+        allowed:
+          type: boolean
+          title: Allowed
+    CanINodeTypesResponse:
+      type: object
+      title: Can I Node Types Response
+      required:
+        - results
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/NodeTypePermissionEntry'
+          title: Results
     WhatCanIRequest:
       type: object
       title: WhatCanIRequest

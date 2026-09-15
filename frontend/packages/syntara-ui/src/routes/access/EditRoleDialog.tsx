@@ -13,7 +13,7 @@ import {
   TextInput,
 } from '@patternfly/react-core'
 import { useQueryClient } from '@tanstack/react-query'
-import { Controller, useForm } from 'react-hook-form'
+import { Controller, useForm, useWatch } from 'react-hook-form'
 
 import { invalidateAuthzCaches } from '../../hooks/invalidateAuthzCaches'
 import { useFormMutationErrorHandler } from '../../hooks/useFormMutationErrorHandler'
@@ -23,6 +23,8 @@ import { accessClient } from './accessClient'
 import { accessControlHelp } from './accessControlFieldHelp'
 import { roleBaseSchema } from './addRoleSchema'
 import type { EditRoleFormData } from './addRoleSchema'
+import { NodeTypePolicyScopeAlert } from './NodeTypePolicyScopeAlert'
+import { selectedNodeTypeDenyPolicies } from './nodeTypePolicyUtils'
 import { PolicySelect } from './PolicySelect'
 import type { RoleRead } from './types'
 
@@ -53,6 +55,8 @@ export function EditRoleDialog({ role, onClose, onSuccess }: Readonly<EditRoleDi
 
   const handleError = useFormMutationErrorHandler<EditRoleFormData>(setError)
   const { mutate: updateRole, isPending } = accessClient.useMutation('put', '/roles/{role_id}')
+  const selectedPolicies = useWatch({ control, name: 'policies' }) ?? role.policies
+  const showNodeTypePolicyAlert = role.project_id == null && selectedNodeTypeDenyPolicies(selectedPolicies).length > 0
 
   const onSubmit = (data: EditRoleFormData) => {
     updateRole(
@@ -141,6 +145,7 @@ export function EditRoleDialog({ role, onClose, onSuccess }: Readonly<EditRoleDi
               </FormHelperText>
             )}
           </FormGroup>
+          <NodeTypePolicyScopeAlert visible={showNodeTypePolicyAlert} />
         </Form>
       </ModalBody>
       <ModalFooter>
