@@ -645,9 +645,7 @@ class TestFormPromptNodeParameters:
         """css_override with identity-escaped expression() is rejected (bypass attempt)."""
         # expre\\ssion( uses identity escape \\s → s (s is not a hex digit)
         with pytest.raises(ValidationError, match="expression\\(\\)"):
-            FormPromptNodeParameters(
-                input_schema={"type": "object"}, css_override="width: expre\\ssion(1+1);"
-            )
+            FormPromptNodeParameters(input_schema={"type": "object"}, css_override="width: expre\\ssion(1+1);")
 
     def test_css_override_identity_escape_behavior_rejected(self) -> None:
         """css_override with identity-escaped behavior: is rejected (bypass attempt)."""
@@ -674,9 +672,7 @@ class TestFormPromptNodeParameters:
         """css_override with comment-injected expression() is rejected (bypass attempt)."""
         # expression/**/( uses CSS comment to bypass literal "expression(" check
         with pytest.raises(ValidationError, match="expression\\(\\)"):
-            FormPromptNodeParameters(
-                input_schema={"type": "object"}, css_override="width: expression/**/(1+1);"
-            )
+            FormPromptNodeParameters(input_schema={"type": "object"}, css_override="width: expression/**/(1+1);")
 
     def test_css_override_comment_injection_behavior_rejected(self) -> None:
         """css_override with comment-injected behavior: is rejected (bypass attempt)."""
