@@ -10,7 +10,7 @@ import random
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from typing import Any, Literal
+from typing import Any, Literal, cast
 from uuid import UUID
 
 import structlog
@@ -25,7 +25,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from temporalio.api.enums.v1 import EventType, PendingActivityState
 from temporalio.api.history.v1 import HistoryEvent
 from temporalio.client import Client, WorkflowHandle, WorkflowHistoryEventFilterType
-from temporalio.exceptions import TemporalError
+from temporalio.exceptions import ApplicationError, TemporalError
 from temporalio.service import RPCError, RPCStatusCode
 
 from syntara.audit.context_managers import actor_context
@@ -1805,6 +1805,50 @@ class ActivitySyncService:
         """Merge heartbeat partial output with workflow-queried output."""
         return {**initial, **queried} if initial else queried
 
+    async def _fetch_completed_activity_output(
+        self,
+        handle: WorkflowHandle[Any, Any],
+        activity_id: str,
+    ) -> dict[str, Any] | None:
+        """Resolve output for a completed activity when the initial query returned None."""
+        try:
+            return cast(
+                "dict[str, Any] | None",
+                await handle.execute_update("get_activity_output_when_ready", activity_id),
+            )
+        except RPCError as e:
+            if e.status == RPCStatusCode.NOT_FOUND:
+                # Workflow already completed — the update was rejected because
+                # the server has already recorded the final state.  This means
+                # set_namespace() has run (completion requires it), so a query
+                # against the completed workflow's final state is guaranteed to
+                # return the output.
+                try:
+                    return cast(
+                        "dict[str, Any] | None",
+                        await handle.query("get_activity_output", activity_id),
+                    )
+                except (TemporalError, ValueError) as query_err:
+                    logger.warning(
+                        "Could not query activity data",
+                        activity_id=activity_id,
+                        error=str(query_err),
+                    )
+                    raise
+            logger.warning(
+                "Workflow update for activity output failed",
+                activity_id=activity_id,
+                error=str(e),
+            )
+            return None
+        except ApplicationError as e:
+            logger.warning(
+                "Workflow update for activity output timed out",
+                activity_id=activity_id,
+                error=str(e),
+            )
+            return None
+
     async def _query_activity_io(
         self,
         handle: WorkflowHandle[Any, Any],
@@ -1829,7 +1873,11 @@ class ActivitySyncService:
             initial_output_data: Pre-existing output data (e.g. from heartbeat partial output)
 
         Returns:
-            Tuple of (input_data, output_data)
+            Tuple of (input_data, output_data).
+
+        Raises:
+            TemporalError: When the workflow query fails (worker unreachable, rejected, etc.).
+            ValueError: When query arguments are invalid.
 
         """
         input_data: dict[str, Any] = {}
@@ -1838,25 +1886,15 @@ class ActivitySyncService:
         try:
             input_data = await handle.query("get_activity_input", activity_id) or {}
             queried_output = await handle.query("get_activity_output", activity_id)
-
-            if queried_output is None and activity_data["status"] == ActivityStatus.COMPLETED:
-                try:
-                    queried_output = await handle.execute_update("get_activity_output_when_ready", activity_id)
-                except RPCError as e:
-                    if e.status != RPCStatusCode.NOT_FOUND:
-                        raise
-                    # Workflow already completed — the update was rejected because
-                    # the server has already recorded the final state.  This means
-                    # set_namespace() has run (completion requires it), so a query
-                    # against the completed workflow's final state is guaranteed to
-                    # return the output.
-                    queried_output = await handle.query("get_activity_output", activity_id)
-
-            if queried_output is not None:
-                output_data = self._merge_output(initial_output_data, queried_output)
-
         except (TemporalError, ValueError) as e:
-            logger.debug("Could not query activity data", activity_id=activity_id, error=str(e))
+            logger.warning("Could not query activity data", activity_id=activity_id, error=str(e))
+            raise
+
+        if queried_output is None and activity_data["status"] == ActivityStatus.COMPLETED:
+            queried_output = await self._fetch_completed_activity_output(handle, activity_id)
+
+        if queried_output is not None:
+            output_data = self._merge_output(initial_output_data, queried_output)
 
         return input_data, output_data
 
@@ -2134,6 +2172,20 @@ class ActivitySyncService:
         )
         return existing, old_values, is_new
 
+    @staticmethod
+    def _io_after_query_failure(
+        existing: ActivityExecution,
+        activity_data: dict[str, Any],
+    ) -> tuple[dict[str, Any], dict[str, Any] | None]:
+        """Return input/output safe to persist when a Temporal query failed."""
+        input_data = existing.input_data or {}
+        event_output = activity_data.get("output_data")
+        if event_output is not None:
+            output_data: dict[str, Any] | None = event_output | (existing.output_data or {})
+        else:
+            output_data = existing.output_data
+        return input_data, output_data
+
     async def _resolve_activity_io(
         self,
         handle: WorkflowHandle[Any, Any],
@@ -2152,10 +2204,18 @@ class ActivitySyncService:
         - Subsequent non-terminal events: no query — reuse the stored input.
         """
         if activity_data.get("status") in TERMINAL_ACTIVITY_STATUSES:
-            return await self._query_activity_io(handle, activity_id, activity_data, activity_data.get("output_data"))
+            try:
+                return await self._query_activity_io(
+                    handle, activity_id, activity_data, activity_data.get("output_data")
+                )
+            except (TemporalError, ValueError):
+                return self._io_after_query_failure(existing, activity_data)
         if not existing.input_data:
-            input_data, _ = await self._query_activity_io(handle, activity_id, activity_data, None)
-            return input_data, activity_data.get("output_data")
+            try:
+                input_data, _ = await self._query_activity_io(handle, activity_id, activity_data, None)
+                return input_data, activity_data.get("output_data")
+            except (TemporalError, ValueError):
+                return self._io_after_query_failure(existing, activity_data)
         return existing.input_data, activity_data.get("output_data")
 
     @staticmethod
