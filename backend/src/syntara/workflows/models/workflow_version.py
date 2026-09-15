@@ -17,6 +17,7 @@ from syntara.core.constants import FieldLimits
 from syntara.core.jsonb_limits import WorkflowDefinitionSizeValidator
 from syntara.core.models.base import UserOwnedResource
 from syntara.core.models.pagination import ResourcesResponse
+from syntara.core.models.user_reference import UserReference, UserReferenceFieldsMixin
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 
 if TYPE_CHECKING:
@@ -141,10 +142,14 @@ class WorkflowVersion(UserOwnedResource, table=True):
 # ============================================================================
 
 
-class WorkflowVersionRead(SQLModel):
+class WorkflowVersionRead(UserReferenceFieldsMixin, SQLModel):
     """Schema for workflow version response (GET /workflows/{id}/versions/{version})."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)  # type: ignore[assignment]
+
+    # Versions record who authored them but are never themselves updated, so the
+    # audit pair does not apply -- only created_by carries a reference here.
+    USER_REFERENCE_FIELDS: ClassVar[tuple[str, ...]] = ("created_by",)
 
     id: UUID
     workflow_id: UUID
@@ -156,8 +161,7 @@ class WorkflowVersionRead(SQLModel):
     status: Literal["draft", "published", "previously_published"] = "draft"
     last_published_at: datetime | None = None
     last_unpublished_at: datetime | None = None
-    created_by: UUID
-    created_by_username: str | None = None
+    created_by: UserReference | UUID | str | None = Field(default=None, description="User who created the version")
     created_at: datetime
     updated_at: datetime
 

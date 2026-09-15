@@ -1,16 +1,19 @@
 """Models for batch approval response."""
 
 from datetime import datetime
+from typing import ClassVar
 from uuid import UUID
 
 from sqlmodel import Field, SQLModel
 
 from syntara.approvals.models import ApprovalRequestStatus
-from syntara.core.models.user_reference import UserReference
+from syntara.core.models.user_reference import UserReference, UserReferenceFieldsMixin
 
 
-class BatchApprovalResult(SQLModel):
+class BatchApprovalResult(UserReferenceFieldsMixin, SQLModel):
     """Confirmation for a single approval within a batch response."""
+
+    USER_REFERENCE_FIELDS: ClassVar[tuple[str, ...]] = ("decided_by",)
 
     approval_id: UUID = Field(description="ID of the approval request")
     success: bool = Field(description="Whether the decision was successfully recorded")
