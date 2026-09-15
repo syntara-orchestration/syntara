@@ -23,6 +23,7 @@ from temporalio.exceptions import ApplicationError
 
 from syntara.core.exceptions import SafeValueError
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
+from syntara.workflows.workflow_engine.constants import INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS
 from syntara.workflows.workflow_engine.dynamic_workflow import (
     ALLOWED_TRIGGER_TYPES,
     OrchestratorWorkflow,
@@ -199,6 +200,53 @@ class TestExecuteExecutorNodeUnknownType:
         assert result["output"]["status"] == "skipped"
         assert "Unknown executor type" in result["output"]["reason"]
         assert "totally_unknown" in result["output"]["reason"]
+
+
+class TestExecuteExecutorNodeHeartbeatTimeout:
+    """Internal activities must be scheduled with a heartbeat_timeout.
+
+    Temporal delivers activity cancellation only through heartbeats, and only when
+    the schedule carries a heartbeat_timeout -- without one the beats are dropped
+    and cancelling the workflow leaves the agent run executing until
+    start_to_close_timeout. Ref: AAP-88614.
+    """
+
+    @staticmethod
+    async def _schedule(node_type: str) -> dict[str, Any]:
+        wf = _make_workflow()
+        node = ActivityNode("n1", node_type, {})
+        with (
+            patch(
+                "syntara.workflows.workflow_engine.dynamic_workflow.workflow.execute_activity",
+                new=AsyncMock(return_value={"output": {}}),
+            ) as mock_exec,
+            patch(
+                "syntara.workflows.workflow_engine.dynamic_workflow.resolve_retry_policy",
+                return_value=None,
+            ),
+        ):
+            await wf._execute_executor_node(
+                node=node,
+                node_type=node_type,
+                resolved_parameters={},
+                outputs=None,
+                timeout_seconds=3600,
+            )
+        assert mock_exec.await_args is not None, "the activity should have been scheduled"
+        return dict(mock_exec.await_args.kwargs)
+
+    @pytest.mark.asyncio
+    async def test_internal_activity_gets_a_heartbeat_timeout(self) -> None:
+        """Without this the heartbeat loop is inert and a cancel never reaches the agent."""
+        kwargs = await self._schedule(NodeType.INTERNAL_ACTIVITY)
+        assert kwargs["heartbeat_timeout"] == timedelta(seconds=INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS)
+
+    @pytest.mark.asyncio
+    async def test_non_heartbeating_executors_get_no_heartbeat_timeout(self) -> None:
+        """The other executor activities never beat; a timeout would fail them spuriously."""
+        for node_type in (NodeType.HTTP_REQUEST, NodeType.SCRIPT, NodeType.AGENTIC):
+            kwargs = await self._schedule(node_type)
+            assert kwargs["heartbeat_timeout"] is None, f"{node_type} must not get a heartbeat timeout"
 
 
 class TestMarkDownstreamEdgeCases:
