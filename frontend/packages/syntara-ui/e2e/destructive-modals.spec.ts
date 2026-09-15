@@ -30,30 +30,6 @@ async function assertWorkflowDeleteModal(modal: Locator, workflowName: string) {
   await expect(deleteButton).toBeEnabled()
 }
 
-async function assertWorkflowDeleteModal(modal: Locator, workflowName: string) {
-  await expect(modal).toBeVisible()
-  await expect(modal.getByText('Delete workflow?')).toBeVisible()
-  await expect(modal.getByText(new RegExp(workflowName))).toBeVisible()
-  await expect(
-    modal
-      .locator('p')
-      .getByText(/will be deleted and any in-progress runs will stop immediately\. This action cannot be undone/)
-  ).toBeVisible()
-  await expect(modal.getByText(/dependent workflows|use this one as a step/)).toHaveCount(0)
-
-  const checkbox = modal.getByRole('checkbox', {
-    name: /I understand this workflow will be deleted and any in-progress runs will stop immediately/,
-  })
-  await expect(checkbox).toBeVisible()
-  await expect(checkbox).not.toBeChecked()
-
-  const deleteButton = modal.getByRole('button', { name: 'Delete' })
-  await expect(deleteButton).toBeDisabled()
-
-  await checkbox.click()
-  await expect(deleteButton).toBeEnabled()
-}
-
 test.describe('destructive modal UX compliance (AAP-72897)', () => {
   let seededUser: SeededUser | null = null
   let seededAssignment: { id: string } | null = null
