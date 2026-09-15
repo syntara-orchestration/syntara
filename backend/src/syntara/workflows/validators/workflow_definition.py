@@ -650,7 +650,13 @@ class WorkflowValidator:
             return limit_findings
 
         findings.extend(self._collect_schema_findings(workflow_definition))
-        if any(f.severity == ValidationSeverity.error for f in findings):
+
+        # Skip graph traversal only when nodes/edges are structurally unusable
+        # (not lists), not merely because schema errors exist — both schema
+        # violations and structural issues (orphans, cycles) should accumulate.
+        if not isinstance(workflow_definition.get("nodes"), list) or not isinstance(
+            workflow_definition.get("edges"), list
+        ):
             return findings
 
         node_ids = _extract_node_ids(workflow_definition)
