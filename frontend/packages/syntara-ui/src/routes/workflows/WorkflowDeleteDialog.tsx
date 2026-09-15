@@ -1,7 +1,7 @@
 import { Content } from '@patternfly/react-core'
 import { useId } from 'react'
 
-import { NxConfirmationDialog } from '../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../components/dialogs/SynConfirmationDialog'
 
 const DELETE_WORKFLOW_ACK_LABEL =
   'I understand this workflow will be deleted and any in-progress runs will stop immediately.'
@@ -31,7 +31,7 @@ export function WorkflowDeleteDialog({
   const ackCheckboxId = useId()
 
   return (
-    <NxConfirmationDialog
+    <SynConfirmationDialog
       isOpen={isOpen}
       onClose={onClose}
       onConfirm={onConfirm}
@@ -51,6 +51,6 @@ export function WorkflowDeleteDialog({
         The workflow <strong>{workflowName}</strong> will be deleted and any in-progress runs will stop immediately.
         This action cannot be undone.
       </Content>
-    </NxConfirmationDialog>
+    </SynConfirmationDialog>
   )
 }

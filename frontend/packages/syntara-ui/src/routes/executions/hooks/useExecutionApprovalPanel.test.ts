@@ -222,6 +222,67 @@ describe('useExecutionApprovalPanel', () => {
     expect(result.current.approvalMessage).toBe('Deploy to production?')
   })
 
+  it('prefers persisted approval.prompt over workflow definition', () => {
+    const withPrompt = { ...mockApproval, prompt: 'From approval record' }
+    const nodeClick = makeNodeClick(withPrompt, [withPrompt])
+    const wfDef = {
+      nodes: [{ id: 'node-1', parameters: { prompt: 'From definition' } }],
+    }
+
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', nodeClick, wfDef))
+
+    expect(result.current.approvalMessage).toBe('From approval record')
+  })
+
+  it('returns approval.prompt when workflow definition is missing', () => {
+    const withPrompt = { ...mockApproval, prompt: 'From approval record' }
+    const { result } = renderHook(() =>
+      useExecutionApprovalPanel('exec-1', '', makeNodeClick(withPrompt, [withPrompt]), undefined)
+    )
+
+    expect(result.current.approvalMessage).toBe('From approval record')
+  })
+
+  it('returns approvalMessage when approval_node_id has a loop-iteration suffix', () => {
+    const loopApproval = { ...mockApproval, approval_node_id: 'node-1_iter_0' }
+    const nodeClick = makeNodeClick(loopApproval, [loopApproval])
+    const wfDef = {
+      nodes: [{ id: 'node-1', config: { prompt: 'Approve this server?' } }],
+    }
+
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', nodeClick, wfDef))
+
+    expect(result.current.approvalMessage).toBe('Approve this server?')
+  })
+
+  it('returns approvalMessage from v2 parameters.prompt', () => {
+    const nodeClick = makeNodeClick(mockApproval, [mockApproval])
+    const wfDef = {
+      nodes: [{ id: 'node-1', parameters: { prompt: 'Message will go here. User inputs it' } }],
+    }
+
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', nodeClick, wfDef))
+
+    expect(result.current.approvalMessage).toBe('Message will go here. User inputs it')
+  })
+
+  it('prefers parameters.prompt over config.prompt', () => {
+    const nodeClick = makeNodeClick(mockApproval, [mockApproval])
+    const wfDef = {
+      nodes: [
+        {
+          id: 'node-1',
+          parameters: { prompt: 'From parameters' },
+          config: { prompt: 'From config' },
+        },
+      ],
+    }
+
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', nodeClick, wfDef))
+
+    expect(result.current.approvalMessage).toBe('From parameters')
+  })
+
   it('returns undefined approvalMessage when no matching node', () => {
     const nodeClick = makeNodeClick(mockApproval, [mockApproval])
     const wfDef = {
@@ -432,7 +493,7 @@ describe('useExecutionApprovalPanel', () => {
     const nodeClick = makeNodeClick(mockApproval, [mockApproval])
     const wfDef = {
       workflow: {
-        activities: [{ id: 'node-1', config: { prompt: 'Approve deployment?' } }],
+        activities: [{ id: 'node-1', parameters: { prompt: 'Approve deployment?' } }],
       },
     }
 
@@ -544,5 +605,57 @@ describe('useExecutionApprovalPanel', () => {
     })
 
     expect(result.current.panelOpen).toBe(true)
+  })
+
+  it('auto-dismisses using this approval iteration activity key', async () => {
+    mockFetchApprovals.mockResolvedValue([])
+    const loopApproval = { ...mockApproval, loop_iteration_path: [2] }
+    const nodeClick = makeNodeClick(loopApproval, [loopApproval])
+
+    storeHelpers.setStatus('node-1#iter-2', 'waiting')
+
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', nodeClick, undefined))
+
+    act(() => result.current.open())
+    expect(result.current.panelOpen).toBe(true)
+
+    await act(async () => {
+      storeHelpers.setStatus('node-1#iter-2', 'failed')
+      await vi.runAllTimersAsync()
+    })
+
+    expect(result.current.panelOpen).toBe(false)
+    expect(mockClearApprovals).toHaveBeenCalled()
+  })
+
+  it('does not dismiss a nested pass when an earlier canvas record is already completed', async () => {
+    mockFetchApprovals.mockResolvedValue([])
+    const nestedApproval = { ...mockApproval, loop_iteration_path: [1, 0] }
+    const nodeClick = makeNodeClick(nestedApproval, [nestedApproval])
+
+    storeHelpers.setStatus('node-1', 'completed')
+    storeHelpers.setStatus('node-1#iter-0', 'completed')
+    storeHelpers.setStatus('node-1#iter-3', 'waiting')
+
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', nodeClick, undefined))
+
+    act(() => result.current.open())
+    expect(result.current.panelOpen).toBe(true)
+
+    await act(async () => {
+      storeHelpers.setStatus('node-1', 'completed')
+      await vi.runAllTimersAsync()
+    })
+
+    expect(result.current.panelOpen).toBe(true)
+    expect(mockClearApprovals).not.toHaveBeenCalled()
+
+    await act(async () => {
+      storeHelpers.setStatus('node-1#iter-3', 'failed')
+      await vi.runAllTimersAsync()
+    })
+
+    expect(result.current.panelOpen).toBe(false)
+    expect(mockClearApprovals).toHaveBeenCalled()
   })
 })

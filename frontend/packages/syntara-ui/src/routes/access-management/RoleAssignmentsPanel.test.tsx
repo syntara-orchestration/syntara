@@ -45,6 +45,12 @@ vi.mock('../access/useAssignmentPermissions', () => ({
   }),
 }))
 
+vi.mock('../access/useAlreadyAssignedRoles', () => ({
+  useAlreadyAssignedRoles: () => ({ assigned: new Set<string>(), isLoading: false, isError: false }),
+  roleAssignmentsQueryKey: (...args: unknown[]) => ['role-assignments', ...args],
+  PRINCIPAL_ID_FIELD: { user: 'userId', group: 'groupId', service_account: 'serviceAccountId' },
+}))
+
 vi.mock('../../hooks/routing/useSearchParams', async () => {
   const { useState, useEffect } = await import('react')
   const { searchParamsMock: mock } = await import('../../test/searchParamsMock')
@@ -306,7 +312,7 @@ describe('RoleAssignmentsPanel', () => {
       setupMocks({ userAssignments: [] })
       render(<RoleAssignmentsPanel principalType="user" principalId="u1" />, { wrapper })
 
-      expect(screen.getByText('No role assignments')).toBeInTheDocument()
+      expect(screen.getByText('No role assignments yet')).toBeInTheDocument()
       expect(screen.getByText('No roles have been assigned to this user.')).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Assign role' })).toBeInTheDocument()
     })
@@ -315,7 +321,7 @@ describe('RoleAssignmentsPanel', () => {
       setupMocks({ groupAssignments: [] })
       render(<RoleAssignmentsPanel principalType="group" principalId="g1" />, { wrapper })
 
-      expect(screen.getByText('No role assignments')).toBeInTheDocument()
+      expect(screen.getByText('No role assignments yet')).toBeInTheDocument()
       expect(screen.getByText('No roles have been assigned to this group.')).toBeInTheDocument()
     })
 
@@ -587,6 +593,41 @@ describe('RoleAssignmentsPanel', () => {
         expect(screen.getByText('role-0')).toBeInTheDocument()
       })
     })
+
+    it('resets to the first page when per-page size changes', async () => {
+      const manyAssignments: AssignmentResource[] = Array.from({ length: 25 }, (_, i) => ({
+        id: `ua-${String(i)}`,
+        principal_type: 'user' as const,
+        principal_id: 'u1',
+        principal_name: 'user-one',
+        role_name: `role-${String(i)}`,
+        role_description: null,
+        role_policies: [],
+        project_id: null,
+        project_name: null,
+        created_at: '2024-01-01T00:00:00Z',
+      }))
+
+      setupMocks({ userAssignments: manyAssignments })
+
+      const user = userEvent.setup()
+      render(<RoleAssignmentsPanel principalType="user" principalId="u1" />, { wrapper })
+
+      await user.click(screen.getByRole('button', { name: /go to next page/i }))
+      await waitFor(() => {
+        expect(screen.getByText('role-20')).toBeInTheDocument()
+      })
+
+      const perPageToggle = screen.getByRole('button', { name: /21 - 25 of 25/i })
+      await user.click(perPageToggle)
+      const option10 = await screen.findByRole('menuitem', { name: /10 per page/i })
+      await user.click(option10)
+
+      await waitFor(() => {
+        expect(screen.getByText('role-0')).toBeInTheDocument()
+        expect(screen.queryByText('role-20')).not.toBeInTheDocument()
+      })
+    })
   })
 
   describe('Assign role modal', () => {
@@ -624,7 +665,7 @@ describe('RoleAssignmentsPanel', () => {
       const user = userEvent.setup()
       render(<RoleAssignmentsPanel principalType="user" principalId="u1" />, { wrapper })
 
-      const kebabButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const kebabButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(kebabButtons[0])
 
       const unassignItem = await screen.findByRole('menuitem', { name: /Unassign/i })
@@ -642,7 +683,7 @@ describe('RoleAssignmentsPanel', () => {
       const user = userEvent.setup()
       render(<RoleAssignmentsPanel principalType="user" principalId="u1" />, { wrapper })
 
-      const kebabButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const kebabButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(kebabButtons[0])
 
       const unassignItem = await screen.findByRole('menuitem', { name: /Unassign/i })
@@ -663,7 +704,7 @@ describe('RoleAssignmentsPanel', () => {
       const user = userEvent.setup()
       render(<RoleAssignmentsPanel principalType="user" principalId="u1" />, { wrapper })
 
-      const kebabButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const kebabButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(kebabButtons[0])
 
       const unassignItem = await screen.findByRole('menuitem', { name: /Unassign/i })
@@ -708,7 +749,7 @@ describe('RoleAssignmentsPanel', () => {
       const user = userEvent.setup()
       render(<RoleAssignmentsPanel principalType="user" principalId="u1" />, { wrapper })
 
-      const kebabButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const kebabButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(kebabButtons[0])
 
       const unassignItem = await screen.findByRole('menuitem', { name: /Unassign/i })
@@ -736,7 +777,7 @@ describe('RoleAssignmentsPanel', () => {
       const user = userEvent.setup()
       render(<RoleAssignmentsPanel principalType="user" principalId="u1" />, { wrapper })
 
-      const kebabButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const kebabButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(kebabButtons[0])
 
       const unassignItem = await screen.findByRole('menuitem', { name: /Unassign/i })
@@ -771,7 +812,7 @@ describe('RoleAssignmentsPanel', () => {
       const user = userEvent.setup()
       render(<RoleAssignmentsPanel principalType="user" principalId="u1" />, { wrapper })
 
-      const kebabButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const kebabButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(kebabButtons[0])
 
       const unassignItem = await screen.findByRole('menuitem', { name: /Unassign/i })
@@ -809,7 +850,7 @@ describe('RoleAssignmentsPanel', () => {
       const user = userEvent.setup()
       render(<RoleAssignmentsPanel principalType="user" principalId="u1" />, { wrapper })
 
-      const kebabButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const kebabButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(kebabButtons[0])
 
       const unassignItem = await screen.findByRole('menuitem', { name: /Unassign/i })
@@ -874,7 +915,7 @@ describe('RoleAssignmentsPanel', () => {
       setupMocks({ serviceAccountAssignments: [] })
       render(<RoleAssignmentsPanel principalType="service_account" principalId="sa-1" />, { wrapper })
 
-      expect(screen.getByText('No role assignments')).toBeInTheDocument()
+      expect(screen.getByText('No role assignments yet')).toBeInTheDocument()
       expect(screen.getByText('No roles have been assigned to this service account.')).toBeInTheDocument()
     })
 
@@ -893,7 +934,7 @@ describe('RoleAssignmentsPanel', () => {
       const user = userEvent.setup()
       render(<RoleAssignmentsPanel principalType="service_account" principalId="sa-1" />, { wrapper })
 
-      const kebabButtons = screen.getAllByRole('button', { name: 'Kebab toggle' })
+      const kebabButtons = screen.getAllByRole('button', { name: /^Actions for / })
       await user.click(kebabButtons[0])
 
       const unassignItem = await screen.findByRole('menuitem', { name: /Unassign/i })

@@ -6,8 +6,7 @@
  * - UI-13: JMESPath filter — entry and validation error
  * - UI-14: Claim data configuration screen
  */
-import { type Page } from '@playwright/test'
-
+import { type Page } from './fixtures'
 import { test, expect } from './fixtures'
 import {
   expandGroupMappingAdvanced,
@@ -20,8 +19,21 @@ import {
 import { buildUniqueName } from './helpers/workflows'
 import { createIdentityProviderViaApi, deleteIdentityProviderViaApi, findIdentityProviderByName } from './utils/api'
 
-const VALID_JMESPATH = "groups[?starts_with(@, 'nexus-')]"
+const VALID_JMESPATH = "groups[?starts_with(@, 'syntara-')]"
 const INVALID_JMESPATH = '[[[bad'
+
+/**
+ * Narrow the identity providers list to one provider before asserting on its row.
+ *
+ * The table is a single unfiltered page of 20 sorted by `name` ascending, so a
+ * provider created here renders only while fewer than 20 sort before it. Other
+ * specs seed providers in bulk — `pagination.spec.ts` creates 21 in its
+ * `beforeAll` — which under `fullyParallel` silently moves this row to page 2.
+ */
+async function filterProvidersByName(app: Page, providerName: string): Promise<void> {
+  await app.getByPlaceholder('Filter by name').fill(providerName)
+  await app.getByRole('button', { name: 'Apply filter' }).click()
+}
 
 async function createMappingTestProvider(app: Page, namePrefix: string): Promise<string> {
   const provider = await createIdentityProviderViaApi(app, {
@@ -44,7 +56,7 @@ async function saveGroupMapping(app: Page): Promise<void> {
   await app.getByRole('button', { name: /Save mapping/i }).click()
 }
 
-async function selectNexusGroupForRow(app: Page, groupName: string): Promise<void> {
+async function selectMappedGroupForRow(app: Page, groupName: string): Promise<void> {
   const mappingRow = app.getByRole('row').filter({
     has: app.getByRole('textbox', { name: 'IdP group value 1' }),
   })
@@ -79,13 +91,13 @@ test.describe('UI-11: Auto group mapping — configuration screen', () => {
 test.describe('UI-12: Manual group mapping — configuration screen', () => {
   const idpGroupValue = 'platform-admins'
 
-  test('creates manual mapping from IdP group value to Nexus group', async ({ app }) => {
+  test('creates manual mapping from IdP group value to Syntara group', async ({ app }) => {
     const providerId = await createMappingTestProvider(app, 'e2e-manual-mapping')
     try {
       await gotoGroupMappingEdit(app, providerId, 'new=1')
 
       await app.getByRole('textbox', { name: 'IdP group value 1' }).fill(idpGroupValue)
-      await selectNexusGroupForRow(app, 'admins')
+      await selectMappedGroupForRow(app, 'admins')
       await saveGroupMapping(app)
 
       await expect(app.getByText('Group mapping saved')).toBeVisible()
@@ -158,6 +170,7 @@ test.describe('UI-13: JMESPath filter — entry and validation error', () => {
         await app.getByRole('button', { name: /Add provider/i }).click()
 
         await expect(app.getByText('Identity provider created')).toBeVisible()
+        await filterProvidersByName(app, providerName)
         await expect(app.getByRole('row', { name: new RegExp(providerName) })).toBeVisible()
 
         const created = await findIdentityProviderByName(app, providerName)
@@ -186,6 +199,7 @@ test.describe('UI-14: Claim data configuration screen', () => {
       await app.getByRole('button', { name: /Add provider/i }).click()
 
       await expect(app.getByText('Identity provider created')).toBeVisible()
+      await filterProvidersByName(app, providerName)
       await expect(app.getByRole('row', { name: new RegExp(providerName) })).toBeVisible()
 
       const created = await findIdentityProviderByName(app, providerName)

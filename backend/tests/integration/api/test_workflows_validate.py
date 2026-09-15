@@ -555,3 +555,49 @@ class TestValidateProjectScopedUser:
         assert data["findings"] == []
         assert data["error_count"] == 0
         assert data["warning_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_validate_webhook_empty_service_accounts_rejected(jwt_client: AsyncClient) -> None:
+    """Webhook trigger with an empty authorized_service_account_ids list fails Verify."""
+    payload = {
+        "workflow_definition": {
+            "schema_version": "2.0.0",
+            "name": "webhook-empty-sa",
+            "description": "Imported webhook with no in-project service accounts",
+            "triggers": [
+                {
+                    "id": "snow_trigger",
+                    "type": "webhook_trigger",
+                    "parameters": {
+                        "webhook_path": "snow-incident-scn5",
+                        "authorized_service_account_ids": [],
+                    },
+                }
+            ],
+            "nodes": [
+                {
+                    "id": "log_payload",
+                    "name": "Log incident",
+                    "type": "script",
+                    "parameters": {"language": "python", "code": "print('hi')"},
+                },
+            ],
+            "edges": [{"from": "snow_trigger", "to": "log_payload"}],
+        },
+    }
+
+    response = await jwt_client.post("/api/v1/workflows/validate", json=payload)
+
+    assert response.status_code == 422
+    data = response.json()
+    assert data["code"] == "WORKFLOW_DEFINITION_INVALID"
+    vr = data["validation_result"]
+    assert vr["is_valid"] is False
+    sa_errors = [
+        finding
+        for finding in vr["findings"]
+        if finding.get("field_path") == "parameters.authorized_service_account_ids"
+    ]
+    assert len(sa_errors) == 1
+    assert sa_errors[0]["node_id"] == "snow_trigger"

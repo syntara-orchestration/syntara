@@ -53,11 +53,11 @@ export interface paths {
     }
     /**
      * Metrics store KPIs
-     * @description Return a computed KPI dashboard covering all Syntara components.
+     * @description Return a computed KPI dashboard covering all Orchestrator components.
      *
-     *     Maps metrics to the KPIs defined in the Syntara KPI documents:
-     *     - Syntara Key Performance Indicators (KPIs)
-     *     - Syntara LLM/Agent Performance KPIs
+     *     Maps metrics to the KPIs defined in the Orchestrator KPI documents:
+     *     - Orchestrator Key Performance Indicators (KPIs)
+     *     - Orchestrator LLM/Agent Performance KPIs
      */
     get: operations['get_internal_metrics_kpis']
     put?: never
@@ -118,7 +118,7 @@ export interface components {
   schemas: {
     /**
      * ComponentKPISummary
-     * @description KPI summary for a single Syntara component.
+     * @description KPI summary for a single Orchestrator component.
      */
     ComponentKPISummary: {
       /**
@@ -141,7 +141,7 @@ export interface components {
     }
     /**
      * KPIDashboard
-     * @description Full KPI dashboard covering all Syntara components.
+     * @description Full KPI dashboard covering all Orchestrator components.
      */
     KPIDashboard: {
       /**
@@ -188,7 +188,7 @@ export interface components {
     }
     /**
      * MetricType
-     * @description Categories of metrics recorded by Syntara.
+     * @description Categories of metrics recorded by Orchestrator.
      *
      *     Each value corresponds to a specific measurable quantity exposed via the
      *     metrics REST API and (where applicable) Prometheus endpoint.
@@ -222,6 +222,7 @@ export interface components {
       | 'workflow_serialization_duration_ms'
       | 'workflow_validation_duration_ms'
       | 'temporal_queue_depth'
+      | 'active_workflows'
       | 'activity_execution_success_rate'
       | 'workflow_start_latency_ms'
       | 'workflow_completion_rate'

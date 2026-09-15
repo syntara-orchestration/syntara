@@ -1,7 +1,7 @@
 """Metric types, models, and query parameters for the metrics subsystem.
 
 This module defines:
-- MetricType: Enum categorizing all metric types recorded by Syntara
+- MetricType: Enum categorizing all metric types recorded by Orchestrator
 - MetricRecord: Lightweight in-memory metric data point (dataclass with slots)
 - MetricsQuery: Query parameters for the metrics REST API
 - MetricsSummary: Summary response model for quick health checks
@@ -23,7 +23,7 @@ from syntara.core.models.base.query_params import BaseListParams
 
 
 class MetricType(StrEnum):
-    """Categories of metrics recorded by Syntara.
+    """Categories of metrics recorded by Orchestrator.
 
     Each value corresponds to a specific measurable quantity exposed via the
     metrics REST API and (where applicable) Prometheus endpoint.
@@ -73,6 +73,7 @@ class MetricType(StrEnum):
 
     # Temporal Worker Metrics
     TEMPORAL_QUEUE_DEPTH = "temporal_queue_depth"
+    ACTIVE_WORKFLOWS = "active_workflows"
     ACTIVITY_EXECUTION_SUCCESS_RATE = "activity_execution_success_rate"
 
     # Execution Service Metrics
@@ -174,6 +175,7 @@ METRIC_CATEGORIES: dict[MetricsCategoryType, list[MetricType]] = {
     ],
     MetricsCategoryType.TEMPORAL_WORKER: [
         MetricType.TEMPORAL_QUEUE_DEPTH,
+        MetricType.ACTIVE_WORKFLOWS,
         MetricType.ACTIVITY_EXECUTION_SUCCESS_RATE,
         MetricType.ACTIVITY_DURATION,
     ],

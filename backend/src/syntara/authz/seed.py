@@ -111,7 +111,6 @@ async def _seed_groups_and_project(
     existing_proj = await session.exec(
         select(Project).where(
             Project.name == "default",
-            Project.deleted_at.is_(None),  # type: ignore[union-attr]
         )
     )
     default_project = existing_proj.one_or_none()
@@ -124,7 +123,6 @@ async def _seed_groups_and_project(
     existing_system = await session.exec(
         select(Project).where(
             Project.name == BUILTIN_PROJECT_NAME,
-            Project.deleted_at.is_(None),  # type: ignore[union-attr]
         )
     )
     system_project = existing_system.one_or_none()

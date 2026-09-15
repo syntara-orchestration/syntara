@@ -18,7 +18,7 @@ This project ships with AI agent skills (in `.claude/skills/`) that handle the r
 - How to apply the **UX Design System** skill to match the project design language
 - How to review your implementation locally (dev server, browser states, keyboard/accessibility)
 - How to fix common guideline violations flagged during review
-- How to use the `/build-ui-feature` command to walk through the full workflow step by step
+- How to use `/frontend-build-ui-feature` to walk through the full workflow step by step
 
 The guide includes copy-ready prompt templates, a workflow diagram, and worked examples.
 
@@ -119,6 +119,18 @@ The application will be available at:
 - All submissions require review
 - Maintainers will provide feedback
 - Be prepared to make requested changes
+
+### Manual CI Triggers
+
+Some CI jobs can be manually triggered via slash commands in PR comments. Only repository owners and members can use these commands.
+
+#### Manual E2E UI Test Runs
+
+The Podman Compose E2E UI tests automatically run when frontend-relevant changes are detected. For backend-only PRs or other workflow changes, you can manually trigger these tests by commenting:
+
+```
+/run-e2e-ui-tests
+```
 
 ## Code Readability Rules
 

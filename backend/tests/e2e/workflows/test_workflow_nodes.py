@@ -101,7 +101,7 @@ def test_http_request_node(syntara_api: SyntaraApiRegistry):
 
     Note: targets an external URL because SSRF mitigation (AAP-79016) blocks
     private IPs until the allowlist for worker_base_url is propagated by the
-    Operator. Revert to worker_base_url/health once the allowlist is confirmed
+    Operator. Revert to worker_base_url/healthz/live once the allowlist is confirmed
     working in CI.
     """
     result = create_and_run_workflow(
@@ -598,7 +598,7 @@ def test_http_request_then_agentic(
 
     Note: targets an external URL because SSRF mitigation (AAP-79016) blocks
     private IPs until the allowlist for worker_base_url is propagated by the
-    Operator. Revert to worker_base_url/health once the allowlist is confirmed
+    Operator. Revert to worker_base_url/healthz/live once the allowlist is confirmed
     working in CI.
     """
     result = create_and_run_workflow(

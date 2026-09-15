@@ -26,13 +26,13 @@ import { Controller, useForm, useWatch, type Resolver } from 'react-hook-form'
 import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsIntegrationEdit } from '../../../app/breadcrumbBuilders'
 import { integrationsClient } from '../../../client'
-import { NxDetail } from '../../../components/details/NxDetail'
-import { NxPage, NxPageBody } from '../../../components/layout/NxPage'
-import { NxPageHeader } from '../../../components/layout/NxPageHeader'
-import { NxPanel } from '../../../components/layout/NxPanel'
-import { NxPageTitle } from '../../../components/NxPageTitle'
-import { NxErrorState } from '../../../components/states/NxErrorState'
+import { SynDetail } from '../../../components/details/SynDetail'
+import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
+import { SynPageHeader } from '../../../components/layout/SynPageHeader'
+import { SynPanel } from '../../../components/layout/SynPanel'
+import { SynErrorState } from '../../../components/states/SynErrorState'
 import { useQueryState } from '../../../components/states/useQueryState'
+import { SynPageTitle } from '../../../components/SynPageTitle'
 import { useDirtyFormGuard } from '../../../hooks/useDirtyFormGuard'
 import { useFormMutationErrorHandler } from '../../../hooks/useFormMutationErrorHandler'
 import { useAlerts } from '../../../providers/alerts'
@@ -104,13 +104,13 @@ function EditIntegrationFormFields({
       </Title>
 
       <DescriptionList isCompact isHorizontal>
-        <NxDetail label="Integration type">
+        <SynDetail label="Integration type">
           {INTEGRATION_TYPE_LABELS[integration.integration_type ?? ''] ?? integration.integration_type ?? ''}
-        </NxDetail>
+        </SynDetail>
         {isLLM && (
-          <NxDetail label="Provider type">
+          <SynDetail label="Provider type">
             {PROVIDER_HINT_LABELS[getProviderHint(integration)] ?? getProviderHint(integration)}
-          </NxDetail>
+          </SynDetail>
         )}
       </DescriptionList>
 
@@ -427,26 +427,26 @@ export function EditIntegrationForm() {
   })
   if (!integrationId || queryState) {
     return (
-      <NxPage>
-        <NxPageTitle segments={['Edit integration', 'Integrations']} />
-        <NxPageHeader title="Edit integration" breadcrumbs={breadcrumbs} docLink={docLink} />
-        <NxPageBody>
-          <NxPanel isFullHeight>
-            {queryState ?? <NxErrorState message="Missing integration ID" title="Error" />}
-          </NxPanel>
-        </NxPageBody>
-      </NxPage>
+      <SynPage>
+        <SynPageTitle segments={['Edit integration', 'Integrations']} />
+        <SynPageHeader title="Edit integration" breadcrumbs={breadcrumbs} docLink={docLink} />
+        <SynPageBody>
+          <SynPanel isFullHeight>
+            {queryState ?? <SynErrorState message="Missing integration ID" title="Error" />}
+          </SynPanel>
+        </SynPageBody>
+      </SynPage>
     )
   }
 
   if (!integration || (integration.scope === 'project' && assignmentsQuery.isPending)) return null
 
   return (
-    <NxPage>
-      <NxPageTitle segments={['Edit integration', 'Integrations']} />
-      <NxPageHeader title="Edit integration" breadcrumbs={breadcrumbs} docLink={docLink} />
-      <NxPageBody>
-        <NxPanel
+    <SynPage>
+      <SynPageTitle segments={['Edit integration', 'Integrations']} />
+      <SynPageHeader title="Edit integration" breadcrumbs={breadcrumbs} docLink={docLink} />
+      <SynPageBody>
+        <SynPanel
           isFullHeight
           isScrollable
           panelMainBodyProps={{ className: styles.panelBody }}
@@ -471,8 +471,8 @@ export function EditIntegrationForm() {
               onTestConnection={handleTestConnection}
             />
           </Form>
-        </NxPanel>
-      </NxPageBody>
-    </NxPage>
+        </SynPanel>
+      </SynPageBody>
+    </SynPage>
   )
 }

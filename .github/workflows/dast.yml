@@ -59,7 +59,7 @@ jobs:
 
       - name: Verify Syntara API is reachable
         run: |
-          curl -sf http://localhost:8000/health
+          curl -sf http://localhost:8000/healthz/ready
 
       - name: Create results directory
         run: mkdir -p backend/dast/results

@@ -3,7 +3,6 @@ import type { Activity } from '@syntara/contracts'
 import { generateUUID } from '../../../../utils/generateUUID'
 import type { EdgeConnection } from '../../types/edge'
 
-import { validateApprovalConnections } from './rules/validateApprovalConnections'
 import { validateConditionConnections } from './rules/validateConditionConnections'
 import { validateConvergeInputs } from './rules/validateConvergeInputs'
 import { validateLoopNodes } from './rules/validateLoopNodes'
@@ -17,7 +16,6 @@ import type { ValidationContext, ValidationError, ValidationResult, ValidationRu
  */
 const ERROR_RULES: ValidationRule[] = [
   validateNoDanglingNodes,
-  validateApprovalConnections,
   validateConditionConnections,
   validateConvergeInputs,
   validateLoopNodes,

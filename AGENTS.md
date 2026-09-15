@@ -9,7 +9,7 @@ under `.claude/`; review expectations) is in
 ## Component-Specific Standards
 
 - [backend/AGENTS.md](backend/AGENTS.md) — SQLModel, Alembic migrations, uv, pytest, mypy, domain standards
-- [frontend/CLAUDE.md](frontend/CLAUDE.md) — React 19, TypeScript, PatternFly 6, Vitest, Playwright, PR checklist
+- [frontend/AGENTS.md](frontend/AGENTS.md) — React 19, TypeScript, PatternFly 6, Vitest, Playwright, PR checklist
 
 ## Key Commands
 

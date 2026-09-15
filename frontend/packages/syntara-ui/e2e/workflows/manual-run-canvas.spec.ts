@@ -11,8 +11,7 @@
  * - Failed nodes show an error status badge
  */
 
-import { type Page } from '@playwright/test'
-
+import { type Page } from '../fixtures'
 import { test, expect } from '../fixtures'
 import { buildUniqueName, openBuilderById } from '../helpers/workflows'
 import { createWorkflowViaApi, deleteWorkflowViaApi } from '../utils/api'

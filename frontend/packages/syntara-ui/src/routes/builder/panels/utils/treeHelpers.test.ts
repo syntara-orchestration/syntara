@@ -1,6 +1,30 @@
 import { describe, expect, it } from 'vitest'
 
-import { formatLeafValue, isExpandable, isUrlValue } from './treeHelpers'
+import { formatLeafValue, isExpandable, isUrlValue, toTreeItemId } from './treeHelpers'
+
+describe('toTreeItemId', () => {
+  it('joins alphanumeric segments with a node- prefix', () => {
+    expect(toTreeItemId(['node1', 'fieldA'])).toBe('node-node1-fieldA')
+  })
+
+  it('encodes characters that are unsafe in a CSS selector', () => {
+    expect(toTreeItemId(['Day of the month'])).toBe('node-Day_20_of_20_the_20_month')
+  })
+
+  it('produces only alphanumeric, underscore, and hyphen characters', () => {
+    const id = toTreeItemId(['a.b[0]', 'x:y', 'has spaces!'])
+    expect(id).toMatch(/^[a-zA-Z0-9_-]+$/)
+  })
+
+  it('does not collide when a segment already contains a hyphen', () => {
+    // 'a-b' as one segment vs. 'a' and 'b' as two separate segments must stay distinguishable
+    expect(toTreeItemId(['a-b'])).not.toBe(toTreeItemId(['a', 'b']))
+  })
+
+  it('returns just the prefix for an empty path', () => {
+    expect(toTreeItemId([])).toBe('node')
+  })
+})
 
 describe('isExpandable', () => {
   it('returns true for plain objects', () => {

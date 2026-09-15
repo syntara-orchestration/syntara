@@ -11,13 +11,9 @@ import time
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-import httpx
-
 from tests.integration.helpers.perf import generate_pdf_content, generate_text_content
 
 if TYPE_CHECKING:
-    import ssl
-
     from syntara_api_client.api import SyntaraApiRegistry
 
     from syntara.files.models import FileMetadata
@@ -64,23 +60,6 @@ def make_file_metadata(content: bytes, suffix: str = ".txt") -> FileMetadata:
         size_bytes=len(content),
         status=FileStatus.PENDING_CONVERSION,
     )
-
-
-def check_health(
-    base_url: str,
-    *,
-    verify_ssl: bool | ssl.SSLContext = False,
-    timeout: float = 10.0,
-) -> tuple[float, bool]:
-    """Send GET /health and return (elapsed_ms, is_healthy)."""
-    start = time.monotonic()
-    try:
-        response = httpx.get(f"{base_url}/health", timeout=timeout, verify=verify_ssl)
-        elapsed_ms = (time.monotonic() - start) * 1000
-        return elapsed_ms, response.status_code == 200
-    except Exception:
-        elapsed_ms = (time.monotonic() - start) * 1000
-        return elapsed_ms, False
 
 
 def _make_file_payload(descriptor: dict[str, Any], index: int) -> tuple[str, io.BytesIO, str]:

@@ -30,7 +30,7 @@ from syntara.core.logging.logging import (
 
 
 class TestSyntaraLogRecordRenderer:
-    """Test suite for NexusJSONRenderer."""
+    """Test suite for SyntaraJSONRenderer."""
 
     def test_basic_serialization(self) -> None:
         """Test basic JSON serialization with event field first."""

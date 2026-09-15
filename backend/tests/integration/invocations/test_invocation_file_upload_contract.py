@@ -7,7 +7,7 @@ These tests validate contract compliance with the OpenAPI schema:
 - Response includes file_ids array in context_data (AAP-60780)
 - FileMetadata is stored in database, not exposed in API response
 
-Contract matches schemas/invocations/openapi.yaml
+Contract validates the POST /invocations/chat endpoint behavior.
 
 NOTE: With AAP-60780 refactoring, context_data no longer contains file_metadata.
 Instead, it contains file_ids (UUIDs) when files are uploaded.

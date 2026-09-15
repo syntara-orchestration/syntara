@@ -19,6 +19,7 @@ describe('FormLabelWithHelp', () => {
 
     await user.click(screen.getByRole('button', { name: 'Credential type help' }))
 
+    expect(screen.getByRole('dialog', { name: 'Credential type help' })).toBeInTheDocument()
     expect(screen.getByText('Choose the credential type for this field.')).toBeInTheDocument()
   })
 })

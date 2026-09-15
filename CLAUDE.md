@@ -9,7 +9,7 @@ syntara/
 ├── backend/           # Python 3.12+ / FastAPI API, Temporal workflows, PostgreSQL
 │   ├── src/syntara/   # Main Python package (domain-driven, auto-discovered routers)
 │   ├── src/api_client/# Auto-generated Python API client (syntara-api-client)
-│   ├── test-sdk/      # Shared pytest plugin (nexus-test-sdk) — installable via pip from git
+│   ├── test-sdk/      # Shared pytest plugin (orchestrator-test-sdk) — installable via pip from git
 │   ├── tests/         # pytest: unit, integration, contract, E2E, performance
 │   ├── containers/    # Containerfiles for API and MCP server
 │   └── Makefile       # Backend-specific targets (run make -C backend help)
@@ -31,7 +31,7 @@ Read the component docs when working in that area — they contain detailed stan
 | Working on... | Read |
 |---|---|
 | Backend Python code | [backend/AGENTS.md](backend/AGENTS.md) — SQLModel patterns, Alembic migrations, testing standards, 12+ domain-specific standards docs |
-| Frontend React/TypeScript | [frontend/CLAUDE.md](frontend/CLAUDE.md) — PatternFly patterns, 31-item PR checklist, architecture guides |
+| Frontend React/TypeScript | [frontend/AGENTS.md](frontend/AGENTS.md) — PatternFly patterns, 36-item PR checklist, architecture guides |
 | Both (E2E, contracts, infra) | This file |
 
 ### Skills
@@ -119,6 +119,45 @@ The root `podman-compose.yml` defines the full stack. The UI builds from `fronte
 ```bash
 uv run podman-compose up --build    # Full stack
 uv run podman-compose up -d database redis temporal  # Just infrastructure
+```
+
+### Konflux CI Environment
+
+Konflux (the Red Hat CI pipeline) runs E2E tests in a restricted environment that differs from local and GitHub CI in several important ways. When E2E tests fail only in Konflux, apply the appropriate skip pattern rather than modifying the test logic.
+
+For a known flaky test that needs temporary quarantine from the pipeline, see
+[the test quarantine workflow](docs/ci/test-quarantine.md).
+
+**Key Konflux constraints:**
+- Does **not** set `CI=true` — guards like `test.skip(!!process.env.CI, ...)` have no effect.
+- The Temporal worker runs in a separate network namespace; it may not reach external URLs (e.g. httpbin.org) even when the test runner can.
+- Cluster load causes 30-second timeouts and transient 502 Bad Gateway responses.
+
+#### Backend pytest skip patterns (`backend/tests/e2e/`)
+
+**`@requires_httpbin` class marker**: Applied at class level when all tests in a class call httpbin. Skip fires if httpbin is unreachable from the *test runner*. This does not handle the case where the backend Temporal worker can't reach httpbin.
+
+**Graceful skip for backend connectivity failures**: When the Temporal worker can't reach an external URL, the execution completes with `status == FAILED` but the activity output contains no `status_code` (only an `error: "HTTP request failed: ReadTimeout"` key). Add a skip guard:
+
+```python
+if execution.status == ExecutionStatus.FAILED:
+    output = _get_activity_output(execution, "api_call")
+    if not output.get("status_code"):
+        pytest.skip("Backend could not reach httpbin — network connectivity issue in this environment")
+assert execution.status == ExecutionStatus.COMPLETED
+```
+
+**Graceful skip for transient 502**: Nginx briefly returns 502 when the backend restarts under load. Catch `UnexpectedResponseException` from `syntara_api_client.types` and skip on status 502:
+
+```python
+from syntara_api_client.types import UnexpectedResponseException
+
+try:
+    result = syntara_api.workflows.get(workflow_id=wf.id).assert_and_get()
+except UnexpectedResponseException as exc:
+    if exc.status_code == 502:
+        pytest.skip("Backend returned 502 Bad Gateway — transient infrastructure issue")
+    raise
 ```
 
 ### Technology Stack

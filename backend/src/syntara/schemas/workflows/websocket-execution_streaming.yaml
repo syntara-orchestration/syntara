@@ -64,7 +64,7 @@ info:
     - No server broadcast for edge updates (bandwidth optimization)
     - See data-model.md section 2.4 for derivation rules
   contact:
-    name: Syntara Team
+    name: Orchestrator Team
   license:
     name: MIT
   x-api-version: v1

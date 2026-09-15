@@ -133,6 +133,14 @@ describe('AppDockedNav', () => {
     expect(screen.getByRole('button', { name: 'User menu' })).toBeInTheDocument()
   })
 
+  it('scopes docked chrome styles to the masthead and collapsed nav', () => {
+    renderDockedNav()
+
+    expect(screen.getByRole('banner')).toHaveClass(styles.dockedMasthead)
+    expect(screen.getByRole('navigation', { name: 'Main navigation' })).toHaveClass(styles.iconDockNav)
+    expect(screen.getByRole('button', { name: 'User menu' })).toHaveClass(styles.dockedAction)
+  })
+
   it('renders documentation button', () => {
     renderDockedNav()
     expect(screen.getByRole('button', { name: 'Documentation (opens in a new tab)' })).toBeInTheDocument()
@@ -262,6 +270,7 @@ describe('AppDockedNav', () => {
     // Configuration has 2 child items: Integrations, Credentials (Settings moved to System Administration)
     expect(menuItems.length).toBe(2)
     expect(menu).toBeInTheDocument()
+    expect(menuItems[0]).toHaveClass(styles.flyoutMenuItem)
   })
 
   it('applies navFlyoutItem class to collapsed-mode flyout nav items', () => {
@@ -330,6 +339,11 @@ describe('AppDockedNav', () => {
       expect(screen.getByText('Credentials')).toBeInTheDocument()
     })
 
+    it('does not hide nav expand toggles when dock text is expanded', () => {
+      renderDockedNav()
+      expect(screen.getByRole('navigation', { name: 'Main navigation' })).not.toHaveClass(styles.iconDockNav)
+    })
+
     it('shows the brand logo when expanded', () => {
       renderDockedNav()
       const logo = within(screen.getByRole('banner')).getByRole('img', { name: 'Syntara' })
@@ -379,6 +393,17 @@ describe('AppDockedNav', () => {
         onToggleDock: mockOnToggleDock,
         onMobileToggle: vi.fn(),
       })
+    })
+
+    it('shows label text for docked actions when mobile overlay is expanded', () => {
+      renderDockedNav()
+      expect(screen.getByText('Light mode')).toBeInTheDocument()
+      expect(screen.getByText('Documentation')).toBeInTheDocument()
+    })
+
+    it('does not apply icon-only nav styles when mobile overlay is expanded', () => {
+      renderDockedNav()
+      expect(screen.getByRole('navigation', { name: 'Main navigation' })).not.toHaveClass(styles.iconDockNav)
     })
 
     it('renders expandable nav groups when dock is expanded on mobile', () => {

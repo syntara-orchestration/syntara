@@ -11,7 +11,7 @@ import {
   Title,
 } from '@patternfly/react-core'
 
-import { NxPanel } from '../../components/layout/NxPanel'
+import { SynPanel } from '../../components/layout/SynPanel'
 import { AAP_NODE_IDS, RegistryNodeId } from '../../constants'
 import { renderNodeIcon } from '../workflows/canvas/nodes/renderNodeIcon'
 import { getAddNodePanelColor } from '../workflows/canvas/nodeTypeColors'
@@ -37,7 +37,7 @@ export function NodeTypeOptionsList(props: NodeTypeOptionsListProps) {
 
     return (
       <StackItem key={nodeType.id}>
-        <NxPanel
+        <SynPanel
           isGlass={false}
           isScrollable={false}
           onClick={() => props.onSelect(nodeType.id)}
@@ -100,7 +100,7 @@ export function NodeTypeOptionsList(props: NodeTypeOptionsListProps) {
               )}
             </StackItem>
           </Stack>
-        </NxPanel>
+        </SynPanel>
       </StackItem>
     )
   })

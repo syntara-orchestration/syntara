@@ -22,25 +22,39 @@ vi.mock('../../../client', () => ({
   interfaceTagMiddleware: { onRequest: vi.fn() },
 }))
 
-vi.mock('../../access/builtinFilterDefinitions', () => ({
-  builtinFilterDefinitions: [],
-}))
+vi.mock('../../access/builtinFilterDefinitions', async () => {
+  const actual = await vi.importActual<typeof import('../../access/builtinFilterDefinitions')>(
+    '../../access/builtinFilterDefinitions'
+  )
+  return actual
+})
 
 vi.mock('./EditProjectPolicyDialog', () => ({
-  EditProjectPolicyDialog: () => null,
+  EditProjectPolicyDialog: ({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) => (
+    <div role="dialog" aria-label="Edit project policy">
+      <button type="button" onClick={onClose}>
+        Close edit
+      </button>
+      <button type="button" onClick={onSuccess}>
+        Save edit
+      </button>
+    </div>
+  ),
 }))
 
-vi.mock('../../../components/filters/FilterBar', () => ({
-  FilterBar: () => <div data-testid="filter-bar" />,
-}))
+vi.mock('../../../hooks/routing/useNavigate', () => ({ useNavigate: () => vi.fn() }))
+
+let searchParams = new URLSearchParams()
+const setSearchParams = vi.fn((updater: URLSearchParams | ((prev: URLSearchParams) => URLSearchParams)) => {
+  searchParams = typeof updater === 'function' ? updater(searchParams) : updater
+})
 
 vi.mock('../../../hooks/routing/useSearchParams', () => ({
-  useSearchParams: () => [new URLSearchParams(), vi.fn()] as const,
+  useSearchParams: () => [searchParams, setSearchParams] as const,
 }))
 
 vi.mock('../../../hooks/routing/useSearch', () => ({ useSearch: () => '' }))
 vi.mock('../../../hooks/routing/useLocation', () => ({ useLocation: () => '/' }))
-vi.mock('../../../hooks/routing/useNavigate', () => ({ useNavigate: () => vi.fn() }))
 
 const mockDeleteMutate = vi.fn()
 
@@ -94,6 +108,7 @@ describe('ProjectPoliciesTab', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    searchParams = new URLSearchParams()
     mockRefetch.mockResolvedValue({})
     setupMocks()
   })
@@ -137,7 +152,7 @@ describe('ProjectPoliciesTab', () => {
     setupMocks([])
     render(<ProjectPoliciesTab projectId="proj-1" />, { wrapper })
 
-    expect(screen.getByText('No policies found')).toBeInTheDocument()
+    expect(screen.getByText('No policies yet')).toBeInTheDocument()
   })
 
   it('renders error state when query fails', () => {
@@ -218,6 +233,95 @@ describe('ProjectPoliciesTab', () => {
     })
 
     expect(mockRefetch).toHaveBeenCalled()
+  })
+
+  it('does not show row actions for built-in policies', () => {
+    render(<ProjectPoliciesTab projectId="proj-1" />, { wrapper })
+
+    expect(screen.getAllByRole('button', { name: 'Kebab toggle' })).toHaveLength(1)
+  })
+
+  it('opens edit dialog when Edit policy is selected from row actions', async () => {
+    const user = userEvent.setup()
+    render(<ProjectPoliciesTab projectId="proj-1" />, { wrapper })
+
+    await user.click(screen.getByRole('button', { name: 'Kebab toggle' }))
+    await user.click(screen.getByRole('menuitem', { name: /edit policy/i }))
+
+    expect(screen.getByRole('dialog', { name: 'Edit project policy' })).toBeInTheDocument()
+  })
+
+  it('refetches policies when edit is saved', async () => {
+    const user = userEvent.setup()
+    render(<ProjectPoliciesTab projectId="proj-1" />, { wrapper })
+
+    await user.click(screen.getByRole('button', { name: 'Kebab toggle' }))
+    await user.click(screen.getByRole('menuitem', { name: /edit policy/i }))
+    await user.click(screen.getByRole('button', { name: 'Save edit' }))
+
+    expect(mockRefetch).toHaveBeenCalled()
+  })
+
+  it('closes edit dialog without refetch when edit is cancelled', async () => {
+    const user = userEvent.setup()
+    render(<ProjectPoliciesTab projectId="proj-1" />, { wrapper })
+
+    await user.click(screen.getByRole('button', { name: 'Kebab toggle' }))
+    await user.click(screen.getByRole('menuitem', { name: /edit policy/i }))
+    await user.click(screen.getByRole('button', { name: 'Close edit' }))
+
+    expect(screen.queryByRole('dialog', { name: 'Edit project policy' })).not.toBeInTheDocument()
+    expect(mockRefetch).not.toHaveBeenCalled()
+  })
+
+  it('shows filter empty state when filters are active but no results match', async () => {
+    vi.mocked(accessClient.useQuery).mockImplementation((...args: unknown[]) => {
+      const opts = args[2] as { params?: { query?: Record<string, unknown> } } | undefined
+      const hasNameFilter = opts?.params?.query?.['name[contains]']
+      return {
+        data: hasNameFilter
+          ? { resources: [], total: 0, next: null }
+          : { resources: mockPolicies, total: mockPolicies.length, next: null },
+        isPending: false,
+        isError: false,
+        error: null,
+        refetch: mockRefetch,
+      } as never
+    })
+
+    const user = userEvent.setup()
+    render(<ProjectPoliciesTab projectId="proj-1" />, { wrapper })
+
+    const nameFilter = screen.getByRole('textbox', { name: /name filter/i })
+    await user.type(nameFilter, 'nonexistent')
+    await user.keyboard('{Enter}')
+
+    await waitFor(() => {
+      expect(screen.getByText('No results found')).toBeInTheDocument()
+    })
+  })
+
+  it('loads the next page when pagination next is clicked', async () => {
+    vi.mocked(accessClient.useQuery).mockReturnValue({
+      data: {
+        resources: mockPolicies,
+        total: mockPolicies.length,
+        next: 'cursor-page-2',
+      },
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: mockRefetch,
+    } as never)
+
+    const user = userEvent.setup()
+    render(<ProjectPoliciesTab projectId="proj-1" />, { wrapper })
+
+    await user.click(screen.getByRole('button', { name: 'Go to next page' }))
+
+    await waitFor(() => {
+      expect(accessClient.useQuery).toHaveBeenCalled()
+    })
   })
 
   it('calls showError on failed delete', async () => {

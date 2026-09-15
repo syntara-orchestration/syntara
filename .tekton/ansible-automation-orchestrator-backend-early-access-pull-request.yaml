@@ -37,13 +37,13 @@ spec:
     - name: build-args
       value:
         - CONTAINER_IMAGE_VERSION={{revision}}
-        - DOWNSTREAM_OVERRIDE=quay.io/redhat-user-workloads/nexus-tenant/ansible-automation-platform/automation-orchestrator-downstream-override@sha256:2c388549b6eb79f56a83468f60f821319ed48602fbd5b609f3af1508cb7e918c
+        - DOWNSTREAM_OVERRIDE=quay.io/redhat-user-workloads/nexus-tenant/ansible-automation-platform/automation-orchestrator-downstream-override:latest@sha256:ac1435042d17b14a95aaf13fddf9a6c2ead1990b921157287a7aabc44b1466c0
         - BRANDING=true
         - BUILDER_IMAGE=registry.redhat.io/ansible-automation-platform/uv-builder-rhel9:latest@sha256:bdd64fcb4597cfb665c15c4b4841ded098baa26dce1f544b4dbd17a575b8984a
     - name: build-platforms
       value:
-        - linux-c8xlarge/amd64
-        - linux-c8xlarge/arm64
+        - linux-c4xlarge/amd64
+        - linux-c4xlarge/arm64
     - name: hermetic
       value: "true"
     - name: prefetch-input
@@ -57,7 +57,7 @@ spec:
       - name: name
         value: container
       - name: bundle
-        value: quay.io/aap-ci/tekton-catalog/pipeline/build/container:0.2@sha256:401c54b0f4afcdb48e423de491a96a5d2155f4a781f8d7922097542b4ee7d6a7
+        value: quay.io/aap-ci/tekton-catalog/pipeline/build/container:0.2@sha256:85e23e713364af6bed2c0e1c69cb2a49845e64d30cd7dd7ca32341d992cc1449
       - name: kind
         value: pipeline
       - name: secret

@@ -18,24 +18,26 @@ import { addEdaTrigger } from './helpers/v2-nodes'
 import {
   buildUniqueName,
   clickAddConnectedStep,
+  clickSaveAndWait,
   closeNodeEditorPanel,
   deleteWorkflow,
   fillCodeEditor,
   selectProjectIfRequired,
 } from './helpers/workflows'
-import { ensureProject } from './utils/api'
+import { createServiceAccountViaApi, deleteServiceAccountViaApi, ensureProject } from './utils/api'
 
 test.describe('EDA Trigger', () => {
   test('user creates a workflow with EDA trigger and saves it', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-eda')
     const webhookPath = 'github-deployments'
 
-    await ensureProject(app)
+    const project = await ensureProject(app)
+    const sa = await createServiceAccountViaApi(app, buildUniqueName('sa-eda'))
     await app.goto(toAppUrl('/workflow-builder/new'))
 
     try {
       // Add EDA trigger
-      await addEdaTrigger(app, 'GitHub Events', webhookPath)
+      await addEdaTrigger(app, 'GitHub Events', webhookPath, sa.name)
 
       // Add a connected script action
       const panel = await clickAddConnectedStep(app)
@@ -47,10 +49,14 @@ test.describe('EDA Trigger', () => {
       await closeNodeEditorPanel(app)
 
       // Save workflow (select project right before save)
-      await selectProjectIfRequired(app)
+      // Pin the workflow to the service account's own project. `ensureProject`
+      // puts the account in `default`, but an unnamed `selectProjectIfRequired`
+      // picks whichever project the dropdown lists first — and the backend
+      // rejects the save with "Service account(s) not found in this project"
+      // whenever those differ. The weak URL guard used to hide that 422.
+      await selectProjectIfRequired(app, project?.name)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
-      await app.getByRole('button', { name: 'Save' }).click()
-      await expect(app).toHaveURL(/workflow-builder\/.+/)
+      await clickSaveAndWait(app)
 
       // Verify workflow appears in list
       await app.goto(toAppUrl('/workflows'))
@@ -65,6 +71,7 @@ test.describe('EDA Trigger', () => {
       })
     } finally {
       await deleteWorkflow(app, workflowName)
+      await deleteServiceAccountViaApi(app, sa.id)
     }
   })
 

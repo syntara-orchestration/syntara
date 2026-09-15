@@ -15,7 +15,7 @@ function isValidSortField(field: string): boolean {
 }
 
 /**
- * Converts a sort configuration to the Nexus API `sort` query parameter value.
+ * Converts a sort configuration to the Syntara API `sort` query parameter value.
  *
  * API format:
  * - ascending: `field`
@@ -50,7 +50,7 @@ export function buildSortParam(sort: SortConfig | null): string | null {
 }
 
 /**
- * Parses a Nexus API `sort` query parameter value into a SortConfig.
+ * Parses a Syntara API `sort` query parameter value into a SortConfig.
  *
  * Handles a leading `-` as descending; otherwise ascending.
  *

@@ -40,8 +40,9 @@ T = TypeVar("T")
 
 
 class UnexpectedResponseException(Exception):
-    def __init__(self, message: str) -> None:
+    def __init__(self, message: str, status_code: int | None = None) -> None:
         super().__init__(message)
+        self.status_code = status_code
 
 
 @define
@@ -60,13 +61,13 @@ class BaseResponse:
             if self.content:
                 message += f", content: {self.content.decode()}"
         if not self.is_success:
-            raise UnexpectedResponseException(message=message)
+            raise UnexpectedResponseException(message=message, status_code=int(self.status_code))
 
     def assert_error(self, message: str = "") -> None:
         if not message and self.request:
             message = f"Request {self.request.method} was expected to fail, but was successful with status {self.status_code}"
         if self.is_success:
-            raise UnexpectedResponseException(message=message)
+            raise UnexpectedResponseException(message=message, status_code=int(self.status_code))
 
 
 @define

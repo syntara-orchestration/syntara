@@ -10,6 +10,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from orchestrator_test_sdk.e2e import unique_name
+from orchestrator_test_sdk.e2e.helpers import _retry_api_call
 from syntara_api_client.api import SyntaraApiRegistry
 from syntara_api_client.models import WorkflowCreate, WorkflowDefinition, WorkflowRead, WorkflowUpdate
 
@@ -242,7 +243,7 @@ class TestWorkflowAPI:
         # Verify workflow exists before deletion
         syntara_api.workflows.get(workflow_id=workflow.id).assert_successful()
 
-        syntara_api.workflows.delete(workflow_id=workflow.id).assert_successful()
+        _retry_api_call(lambda: syntara_api.workflows.delete(workflow_id=workflow.id)).assert_successful()
 
         # Verify workflow no longer exists (404 Not Found)
         syntara_api.workflows.get(workflow_id=workflow.id).assert_error()

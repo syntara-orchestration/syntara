@@ -22,7 +22,7 @@ export function parseGroupMappingFormSearch(search: string): { isAddFlow: boolea
 
 export type GroupMappingFormEntry = {
   idpGroupValue: string
-  nexusGroupId: string
+  mappedGroupId: string
 }
 
 export function initialGroupMappingFormEntries(
@@ -30,9 +30,9 @@ export function initialGroupMappingFormEntries(
 ): GroupMappingFormEntry[] {
   const fromServer = toFormEntries(groupMapping)
   if (fromServer.length > 0) {
-    return fromServer.map(({ idpGroupValue, nexusGroupId }) => ({ idpGroupValue, nexusGroupId }))
+    return fromServer.map(({ idpGroupValue, mappedGroupId }) => ({ idpGroupValue, mappedGroupId }))
   }
-  return [{ idpGroupValue: '', nexusGroupId: '' }]
+  return [{ idpGroupValue: '', mappedGroupId: '' }]
 }
 
 export function buildGroupMappingFormDefaultValues(

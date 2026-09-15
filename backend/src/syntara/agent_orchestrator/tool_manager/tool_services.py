@@ -13,6 +13,7 @@ import structlog
 from langchain_core.tools import BaseTool
 
 from syntara.agent_orchestrator.audit.tool_management import ToolDiscoveryEvent, ToolDiscoveryStatus
+from syntara.agent_orchestrator.exceptions import ToolDiscoveryError, ToolSelectionUnavailableError
 from syntara.agent_orchestrator.tool_manager.tool_filtering import (
     enhance_namespaced_tools_with_metadata,
     filter_base_tools_by_enabled,
@@ -48,6 +49,26 @@ def _get_tool_manager_client() -> ToolManagerClient:
     )
 
 
+def _sanitize_error_message(error: Exception, max_length: int = 200) -> str:
+    """Produce a safe, truncated error summary for user-facing storage.
+
+    Raw exception messages from external services may contain internal
+    hostnames, credentials, stack traces, or other sensitive data.
+    Uses the same credential patterns as the audit EventSanitizer to
+    detect and redact sensitive tokens embedded in the message.
+    """
+    msg = str(error).split("\n", maxsplit=1)[0].strip()
+    if len(msg) > max_length:
+        msg = msg[:max_length] + "…"
+
+    msg_lower = msg.lower()
+    for pattern in CREDENTIAL_PATTERNS:
+        if re.search(rf"(?:^|[_\-. ])(?:{re.escape(pattern)})(?:[_\-. ]|$)", msg_lower):
+            return f"{type(error).__name__}: {REDACTED}"
+
+    return msg
+
+
 async def _discover_mcp_integrations() -> list[IntegrationRead]:
     """Discover MCP server integrations from the Integrations API.
 
@@ -55,7 +76,9 @@ async def _discover_mcp_integrations() -> list[IntegrationRead]:
 
     Returns:
         List of all MCP server IntegrationRead records.
-        Returns empty list if the API is unavailable or fails.
+
+    Raises:
+        ToolDiscoveryError: If the Integrations/Tool Manager API is unavailable or fails.
 
     """
     try:
@@ -63,9 +86,10 @@ async def _discover_mcp_integrations() -> list[IntegrationRead]:
             all_integrations = await client.get_all_mcp_integrations()
             logger.info("Discovered MCP integrations", integration_count=len(all_integrations))
             return all_integrations
-    except Exception as e:  # noqa: BLE001 (Failure of ToolManagerClient for whatever reason is not critical)
-        logger.warning("Failed to discover MCP integrations, continuing without them", error=str(e))
-        return []
+    except Exception as e:
+        logger.warning("Failed to discover MCP integrations", error=str(e))
+        msg = f"Failed to discover MCP integrations: {type(e).__name__}: {_sanitize_error_message(e)}"
+        raise ToolDiscoveryError(msg) from e
 
 
 async def _discover_tools() -> ToolDiscoveryResult:
@@ -75,7 +99,9 @@ async def _discover_tools() -> ToolDiscoveryResult:
 
     Returns:
         Tuple of (enabled_tools, disabled_tools).
-        Returns empty lists if Tool Manager is unavailable or fails.
+
+    Raises:
+        ToolDiscoveryError: If Tool Manager is unavailable or fails.
 
     """
     try:
@@ -90,9 +116,10 @@ async def _discover_tools() -> ToolDiscoveryResult:
                 total_count=len(all_tools),
             )
             return enabled_tools, disabled_tools
-    except Exception as e:  # noqa: BLE001 (Failure of ToolManagerClient for whatever reason is not critical)
-        logger.warning("Tool Manager failed, continuing without tools", error=str(e))
-        return [], []
+    except Exception as e:
+        logger.warning("Tool Manager discovery failed", error=str(e))
+        msg = f"Failed to discover tools from Tool Manager: {type(e).__name__}: {_sanitize_error_message(e)}"
+        raise ToolDiscoveryError(msg) from e
 
 
 async def report_tool_execution_failure(tool_id: UUID, error_message: str) -> None:
@@ -174,26 +201,6 @@ def _create_namespaced_tools(integration: IntegrationRead, provider_tools: list[
         )
         for tool in provider_tools
     ]
-
-
-def _sanitize_error_message(error: Exception, max_length: int = 200) -> str:
-    """Produce a safe, truncated error summary for user-facing storage.
-
-    Raw exception messages from external services may contain internal
-    hostnames, credentials, stack traces, or other sensitive data.
-    Uses the same credential patterns as the audit EventSanitizer to
-    detect and redact sensitive tokens embedded in the message.
-    """
-    msg = str(error).split("\n", maxsplit=1)[0].strip()
-    if len(msg) > max_length:
-        msg = msg[:max_length] + "…"
-
-    msg_lower = msg.lower()
-    for pattern in CREDENTIAL_PATTERNS:
-        if re.search(rf"(?:^|[_\-. ])(?:{re.escape(pattern)})(?:[_\-. ]|$)", msg_lower):
-            return f"{type(error).__name__}: {REDACTED}"
-
-    return msg
 
 
 async def _process_single_integration(
@@ -324,6 +331,111 @@ def _enhance_tools_with_metadata(
     return enhanced_tools
 
 
+def _selected_tools_provisioned(
+    provisioned_tools: list[BaseTool],
+    tool_selections: set[str] | frozenset[str],
+) -> bool:
+    """Check whether any selected tool IDs appear among provisioned tools."""
+    provisioned_ids = {(t.metadata or {}).get("tool_id", "") for t in provisioned_tools}
+    provisioned_ids.discard("")
+    return bool(provisioned_ids & tool_selections)
+
+
+def _build_provisioning_failure_cause(
+    enabled_tools: list[ToolWithParameters],
+    namespaced_tools: list[NamespacedBaseTool],
+) -> str:
+    """Diagnose why enabled tools failed provisioning (connectivity vs drift)."""
+    owning_integration_ids = {tool.integration_id for tool in enabled_tools}
+    owning_with_mcp_tools = {t.integration_id for t in namespaced_tools if t.integration_id in owning_integration_ids}
+    owning_namespaced_count = sum(1 for t in namespaced_tools if t.integration_id in owning_integration_ids)
+    soft_skipped_owners = owning_integration_ids - owning_with_mcp_tools
+
+    if owning_namespaced_count == 0:
+        return "owning MCP integrations returned no tools — check integration connectivity"
+    if soft_skipped_owners:
+        return (
+            "one or more owning MCP integrations returned no tools while others returned "
+            f"{owning_namespaced_count} unmatched tool(s) — check integration connectivity and registry alignment"
+        )
+    return (
+        f"owning integrations returned {owning_namespaced_count} tool(s) but none matched "
+        "enabled Tool Manager entries — check registry name/integration_id drift"
+    )
+
+
+def _build_selected_provisioning_failure_cause(
+    enabled_tools: list[ToolWithParameters],
+    namespaced_tools: list[NamespacedBaseTool],
+    selections: set[str] | frozenset[str],
+    provisioned_tools: list[BaseTool],
+) -> str:
+    """Diagnose SELECTED failure when none of the selected IDs were provisioned.
+
+    Used for both empty-provision and sibling-provision. Scopes connectivity/drift
+    to owners of the *unavailable selected* tools so a matched sibling or an
+    unrelated enabled tool is not reported as unmatched. If no selected ID is in
+    the enabled catalog, report that instead of all-enabled zero-match wording.
+    """
+    provisioned_ids = {(t.metadata or {}).get("tool_id", "") for t in provisioned_tools}
+    provisioned_ids.discard("")
+    unavailable = selections - provisioned_ids
+
+    enabled_by_id = {str(tool.id): tool for tool in enabled_tools}
+    unavailable_enabled = [enabled_by_id[tid] for tid in sorted(unavailable) if tid in enabled_by_id]
+
+    if not unavailable_enabled:
+        return "selected tools were not among provisioned tools and are missing from the enabled catalog"
+
+    owner_cause = _build_provisioning_failure_cause(unavailable_enabled, namespaced_tools)
+    return f"selected tools were not among provisioned tools; {owner_cause}"
+
+
+def _require_provisioned_tools_when_enabled(
+    enabled_tools: list[ToolWithParameters],
+    provisioned_tools: list[BaseTool],
+    *,
+    namespaced_tools: list[NamespacedBaseTool],
+    tool_selection_strategy: str | None = None,
+    tool_selections: set[str] | frozenset[str] | None = None,
+) -> None:
+    """Fail closed when required tools cannot be provisioned.
+
+    Per-integration MCP failures soft-skip to ``[]``; without this guard, ALL
+    (and SELECTED) would continue toolless and the LLM may fabricate results.
+
+    ALL with an empty enabled catalog may continue toolless. SELECTED with
+    non-empty selections still fail-closes — same catalog-miss class as
+    selections absent from a non-empty catalog.
+    """
+    selections = tool_selections or set()
+    is_selected = tool_selection_strategy == "SELECTED" and bool(selections)
+
+    if not enabled_tools and not is_selected:
+        return
+
+    if provisioned_tools and (not is_selected or _selected_tools_provisioned(provisioned_tools, selections)):
+        return
+
+    if is_selected:
+        cause = _build_selected_provisioning_failure_cause(
+            enabled_tools, namespaced_tools, selections, provisioned_tools
+        )
+    else:
+        cause = _build_provisioning_failure_cause(enabled_tools, namespaced_tools)
+
+    if is_selected:
+        unavailable = sorted(selections)
+        msg = f"None of the requested tools could be provisioned (unavailable tool IDs: {unavailable}); {cause}"
+        raise ToolSelectionUnavailableError(msg)
+
+    enabled_names = sorted({tool.namespaced_name for tool in enabled_tools})
+    msg = (
+        f"Enabled tools could not be provisioned (enabled={enabled_names}); {cause}; refusing to continue without tools"
+    )
+    raise ToolDiscoveryError(msg)
+
+
 class ToolRetriever:
     """Read-only tool retrieval orchestrator for agent execution.
 
@@ -359,11 +471,33 @@ class ToolRetriever:
         self.disabled_tools: list[ToolWithParameters] = []
         self.namespaced_tools: list[NamespacedBaseTool] = []
 
-    async def retrieve_tools(self) -> list[BaseTool]:
+    async def retrieve_tools(
+        self,
+        *,
+        tool_selection_strategy: str | None = None,
+        tool_selections: set[str] | frozenset[str] | None = None,
+    ) -> list[BaseTool]:
         """Retrieve tools from MCP servers, filtered by what is enabled in the DB.
+
+        Args:
+            tool_selection_strategy: Optional strategy from the invocation
+                (``ALL`` / ``SELECTED`` / ``NONE``). When ``SELECTED``, zero
+                provision maps to ``ToolSelectionUnavailableError``.
+            tool_selections: Selected tool IDs when strategy is ``SELECTED``.
 
         Returns:
             List of filtered BaseTools ready for execution
+
+        Raises:
+            ToolDiscoveryError: If Tool Manager / Integrations discovery fails, if
+                enabled tools exist but MCP returned none, or if MCP returned tools
+                that failed ``(integration_id, name)`` matching against enabled
+                Tool Manager entries.
+            ToolSelectionUnavailableError: If strategy is ``SELECTED`` and none of
+                the selected tools could be provisioned.
+            Exception: Propagates unexpected retrieval failures after emitting a
+                FAILED audit event. Callers that require tools must not swallow
+                these errors and continue toolless.
 
         """
         logger.info("Starting tool retrieval", invocation_id=self.invocation_id)
@@ -395,6 +529,13 @@ class ToolRetriever:
 
             # Step 4: Enhance BaseTools with metadata for failure handling
             enhanced_tools = _enhance_tools_with_metadata(filtered_tools, self.enabled_tools)
+            _require_provisioned_tools_when_enabled(
+                self.enabled_tools,
+                enhanced_tools,
+                namespaced_tools=self.namespaced_tools,
+                tool_selection_strategy=tool_selection_strategy,
+                tool_selections=tool_selections,
+            )
 
             logger.info("Tool retrieval completed", invocation_id=self.invocation_id)
 
@@ -435,4 +576,4 @@ class ToolRetriever:
             )
 
             logger.exception("Tool retrieval failed", invocation_id=self.invocation_id)
-            return []
+            raise

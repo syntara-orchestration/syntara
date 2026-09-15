@@ -31,8 +31,6 @@ def _make_serialized_version(wf_id: str, **overrides: object) -> dict[str, objec
         "updated_at": now,
         "created_by": str(uuid4()),
         "created_by_username": None,
-        "deleted_at": None,
-        "deleted_by": None,
     }
     base.update(overrides)
     return base

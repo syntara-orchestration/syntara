@@ -17,7 +17,7 @@ const ABBREVIATED_MONTH_PATTERN = /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|
 const NUMERIC_MONTH_PATTERN = /\d{1,2}\/\d{1,2}\/\d{4}/
 
 test.describe('Date format consistency (AAP-76836)', () => {
-  test.skip('workflows table displays dates with abbreviated month names', async ({ app }) => {
+  test('workflows table displays dates with abbreviated month names', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-date-fmt')
 
     await createBasicWorkflowViaApi(app, workflowName, 'Date format test')

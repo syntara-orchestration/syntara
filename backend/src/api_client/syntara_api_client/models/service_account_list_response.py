@@ -24,7 +24,7 @@ class ServiceAccountListResponse:
         next_ (None | str | Unset): Cursor for next page of results
         prev (None | str | Unset): Cursor for previous page of results
         total (int | None | Unset): Total count of resources (only when include_total=true)
-        max_lifetime_days (int | Unset): Maximum credential lifetime in days (-1 for unlimited) Default: 180.
+        max_lifetime_days (int | Unset): Maximum credential lifetime in days (0 for unlimited) Default: 180.
     """
 
     resources: list[ServiceAccountRead]

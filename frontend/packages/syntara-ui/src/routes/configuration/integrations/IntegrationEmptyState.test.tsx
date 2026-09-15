@@ -14,13 +14,13 @@ describe('IntegrationEmptyState', () => {
   it('renders empty state message', () => {
     render(<IntegrationEmptyState />)
 
-    expect(screen.getByText('No integrations have been configured yet.')).toBeInTheDocument()
+    expect(screen.getByText('No integrations yet')).toBeInTheDocument()
   })
 
   it('renders description text', () => {
     render(<IntegrationEmptyState />)
 
-    expect(screen.getByText(/Configure integrations to use them in workflows/i)).toBeInTheDocument()
+    expect(screen.getByText(/Configure integrations to connect external tools and services/i)).toBeInTheDocument()
   })
 
   it('renders configure integration button', () => {

@@ -377,7 +377,10 @@ class SettingsCache:
                 validation_schema=defn.validation_schema,
             )
         except SettingValidationError:
-            fallback = defn.default_value if defn.default_value is not None else default
+            from syntara.settings.seeder import _resolve_default  # noqa: PLC0415
+
+            raw_fallback = defn.default_value if defn.default_value is not None else default
+            fallback = _resolve_default(raw_fallback)
             logger.warning(
                 "settings.validation_failed_on_read",
                 key=key,

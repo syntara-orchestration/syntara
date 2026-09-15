@@ -491,6 +491,8 @@ describe('AssignRoleDialog', () => {
         })
         expect(onSuccess).toHaveBeenCalled()
         expect(onClose).toHaveBeenCalled()
+        expect(screen.getByText('Assignment added')).toBeInTheDocument()
+        expect(screen.getByText('Assignment for alice has been added.')).toBeInTheDocument()
       }
     }, 25_000)
 

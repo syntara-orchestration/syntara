@@ -1,22 +1,9 @@
-import {
-  Alert,
-  FormGroup,
-  HelperText,
-  HelperTextItem,
-  MenuToggle,
-  type MenuToggleElement,
-  SelectList,
-  SelectOption,
-  Stack,
-  StackItem,
-  TextArea,
-} from '@patternfly/react-core'
+import { Alert, FormGroup, HelperText, HelperTextItem, Stack, StackItem, TextArea } from '@patternfly/react-core'
 import type { Activity } from '@syntara/contracts'
 import type { ReactNode } from 'react'
-import { use, useEffect, useMemo, useState } from 'react'
+import { use, useEffect, useMemo } from 'react'
 import { Controller, FormProvider, useForm, useFormContext, useWatch } from 'react-hook-form'
 
-import { NxSelect } from '../../../components/NxSelect'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import { NodeEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useNodeEditorAutoSubmit'
 import { useWorkflowEngineDefaults } from '../hooks/useWorkflowEngineDefaults'
@@ -37,6 +24,7 @@ import {
   APPROVER_USERS_PLACEHOLDER,
 } from './approverConstants'
 import { ApproverMultiSelect } from './ApproverMultiSelect'
+import { FallbackDecisionField } from './FallbackDecisionField'
 import { ActivityNameField } from './shared/ActivityNameField'
 import { DurationInput } from './shared/DurationInput'
 import { zodResolver } from './shared/formSchemaUtils'
@@ -47,47 +35,6 @@ import { NodeFormTabsLayout } from './shared/NodeFormTabsLayout'
 import { NodeSettingsForm } from './shared/NodeSettingsForm'
 import { useApprovalDecideGroups } from './useApprovalDecideGroups'
 import { useApprovalDecideUsers } from './useApprovalDecideUsers'
-
-function FallbackDecisionSelect({
-  value = 'reject',
-  onChange,
-  isDisabled,
-}: {
-  value?: string
-  onChange: (value: string) => void
-  isDisabled?: boolean
-}) {
-  const [isOpen, setIsOpen] = useState(false)
-  return (
-    <NxSelect
-      id="approval-fallback-decision"
-      isOpen={isOpen}
-      selected={value}
-      onSelect={(_event, val) => {
-        onChange(String(val))
-        setIsOpen(false)
-      }}
-      onOpenChange={setIsOpen}
-      toggle={(toggleRef: React.Ref<MenuToggleElement>) => (
-        <MenuToggle
-          ref={toggleRef}
-          onClick={() => setIsOpen((prev) => !prev)}
-          isExpanded={isOpen}
-          isFullWidth
-          isDisabled={isDisabled}
-          aria-label="Fallback decision"
-        >
-          {value === 'reject' ? 'Reject (default)' : 'Approve'}
-        </MenuToggle>
-      )}
-    >
-      <SelectList>
-        <SelectOption value="reject">Reject (default)</SelectOption>
-        <SelectOption value="approve">Approve</SelectOption>
-      </SelectList>
-    </NxSelect>
-  )
-}
 
 // Approver user type
 type ApproverUser = Readonly<{ id: string; username: string }>
@@ -313,25 +260,7 @@ function ApprovalFormFields({
         </FormGroup>
       </StackItem>
       <StackItem>
-        <FormGroup label="Fallback decision" labelHelp={nodeHelp.approvalFallback} fieldId="approval-fallback-decision">
-          <Controller
-            control={control}
-            name="fallback_decision"
-            render={({ field }) => (
-              <FallbackDecisionSelect
-                value={field.value ?? 'reject'}
-                onChange={field.onChange}
-                isDisabled={isVersionView}
-              />
-            )}
-          />
-          <HelperText>
-            <HelperTextItem>
-              Determines the routing path when the approval cannot complete (decision window expired or send failure).
-              Only takes effect when &ldquo;Continue on failure&rdquo; is enabled in the Settings tab.
-            </HelperTextItem>
-          </HelperText>
-        </FormGroup>
+        <FallbackDecisionField />
       </StackItem>
       <StackItem>
         <FormGroup

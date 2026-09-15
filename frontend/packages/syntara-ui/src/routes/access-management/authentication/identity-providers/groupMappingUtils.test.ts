@@ -9,7 +9,7 @@ import {
   validateGroupJmespathExpression,
   type GroupMappingConfig,
   type GroupMappingEntry,
-  type NexusGroup,
+  type MappedGroup,
 } from './groupMappingUtils'
 
 describe('groupMappingUtils', () => {
@@ -89,8 +89,8 @@ describe('groupMappingUtils', () => {
       }
       const result = toFormEntries(config)
       expect(result).toHaveLength(2)
-      expect(result[0]).toMatchObject({ idpGroupValue: 'admin', nexusGroupId: 'g1' })
-      expect(result[1]).toMatchObject({ idpGroupValue: 'users', nexusGroupId: 'g2' })
+      expect(result[0]).toMatchObject({ idpGroupValue: 'admin', mappedGroupId: 'g1' })
+      expect(result[1]).toMatchObject({ idpGroupValue: 'users', mappedGroupId: 'g2' })
       expect(result[0].key).toBeTruthy()
     })
 
@@ -117,9 +117,9 @@ describe('groupMappingUtils', () => {
         redirect_uri: 'http://localhost/callback',
       }
       const entries: GroupMappingEntry[] = [
-        { key: 'k1', idpGroupValue: 'admin', nexusGroupId: 'g1' },
-        { key: 'k2', idpGroupValue: '', nexusGroupId: '' },
-        { key: 'k3', idpGroupValue: 'users', nexusGroupId: 'g2' },
+        { key: 'k1', idpGroupValue: 'admin', mappedGroupId: 'g1' },
+        { key: 'k2', idpGroupValue: '', mappedGroupId: '' },
+        { key: 'k3', idpGroupValue: 'users', mappedGroupId: 'g2' },
       ]
       const result = buildSavePayload(providerConfig, 'groups[*]', entries)
 
@@ -135,7 +135,7 @@ describe('groupMappingUtils', () => {
     })
 
     it('filters entries where idpGroupValue is empty', () => {
-      const entries: GroupMappingEntry[] = [{ key: 'k1', idpGroupValue: '', nexusGroupId: 'g1' }]
+      const entries: GroupMappingEntry[] = [{ key: 'k1', idpGroupValue: '', mappedGroupId: 'g1' }]
       const result = buildSavePayload(
         { issuer_url: 'https://example.com', client_id: 'test-client', redirect_uri: 'http://localhost/callback' },
         'groups[*]',
@@ -144,8 +144,8 @@ describe('groupMappingUtils', () => {
       expect(result.configuration?.group_mapping_entries).toEqual([])
     })
 
-    it('filters entries where nexusGroupId is empty', () => {
-      const entries: GroupMappingEntry[] = [{ key: 'k1', idpGroupValue: 'admin', nexusGroupId: '' }]
+    it('filters entries where mappedGroupId is empty', () => {
+      const entries: GroupMappingEntry[] = [{ key: 'k1', idpGroupValue: 'admin', mappedGroupId: '' }]
       const result = buildSavePayload(
         { issuer_url: 'https://example.com', client_id: 'test-client', redirect_uri: 'http://localhost/callback' },
         'groups[*]',
@@ -156,66 +156,66 @@ describe('groupMappingUtils', () => {
   })
 
   describe('processDiscoveredGroups', () => {
-    const nexusGroups: NexusGroup[] = [
+    const mappedGroups: MappedGroup[] = [
       { id: 'g1', name: 'admin' },
       { id: 'g2', name: 'users' },
       { id: 'g3', name: 'devs', description: 'Developers' },
     ]
 
     it('returns warning when no groups found', () => {
-      const result = processDiscoveredGroups({}, 'groups[*]', [], nexusGroups)
+      const result = processDiscoveredGroups({}, 'groups[*]', [], mappedGroups)
       expect(result.variant).toBe('warning')
       expect(result.message).toContain('No groups found')
       expect(result.newEntries).toEqual([])
     })
 
-    it('auto-matches discovered groups to nexus groups by name', () => {
+    it('auto-matches discovered groups to mapped groups by name', () => {
       const claims = { groups: ['admin', 'users'] }
-      const result = processDiscoveredGroups(claims, 'groups[*]', [], nexusGroups)
+      const result = processDiscoveredGroups(claims, 'groups[*]', [], mappedGroups)
 
       expect(result.variant).toBe('success')
       expect(result.newEntries).toHaveLength(2)
-      expect(result.newEntries[0]).toMatchObject({ idpGroupValue: 'admin', nexusGroupId: 'g1' })
-      expect(result.newEntries[1]).toMatchObject({ idpGroupValue: 'users', nexusGroupId: 'g2' })
+      expect(result.newEntries[0]).toMatchObject({ idpGroupValue: 'admin', mappedGroupId: 'g1' })
+      expect(result.newEntries[1]).toMatchObject({ idpGroupValue: 'users', mappedGroupId: 'g2' })
       expect(result.message).toContain('Discovered 2 group(s)')
       expect(result.message).toContain('2 matched')
     })
 
     it('preserves existing entries for discovered groups', () => {
-      const existingEntries: GroupMappingEntry[] = [{ key: 'existing-1', idpGroupValue: 'admin', nexusGroupId: 'g3' }]
+      const existingEntries: GroupMappingEntry[] = [{ key: 'existing-1', idpGroupValue: 'admin', mappedGroupId: 'g3' }]
       const claims = { groups: ['admin', 'users'] }
-      const result = processDiscoveredGroups(claims, 'groups[*]', existingEntries, nexusGroups)
+      const result = processDiscoveredGroups(claims, 'groups[*]', existingEntries, mappedGroups)
 
       expect(result.newEntries).toHaveLength(2)
       // Existing entry preserved with its key and custom mapping
-      expect(result.newEntries[0]).toMatchObject({ key: 'existing-1', idpGroupValue: 'admin', nexusGroupId: 'g3' })
+      expect(result.newEntries[0]).toMatchObject({ key: 'existing-1', idpGroupValue: 'admin', mappedGroupId: 'g3' })
       // New entry auto-matched
-      expect(result.newEntries[1]).toMatchObject({ idpGroupValue: 'users', nexusGroupId: 'g2' })
+      expect(result.newEntries[1]).toMatchObject({ idpGroupValue: 'users', mappedGroupId: 'g2' })
     })
 
     it('keeps manually added entries not in discovered groups', () => {
       const existingEntries: GroupMappingEntry[] = [
-        { key: 'manual-1', idpGroupValue: 'custom-group', nexusGroupId: 'g1' },
+        { key: 'manual-1', idpGroupValue: 'custom-group', mappedGroupId: 'g1' },
       ]
       const claims = { groups: ['admin'] }
-      const result = processDiscoveredGroups(claims, 'groups[*]', existingEntries, nexusGroups)
+      const result = processDiscoveredGroups(claims, 'groups[*]', existingEntries, mappedGroups)
 
       expect(result.newEntries).toHaveLength(2)
-      expect(result.newEntries[0]).toMatchObject({ idpGroupValue: 'admin', nexusGroupId: 'g1' })
-      expect(result.newEntries[1]).toMatchObject({ idpGroupValue: 'custom-group', nexusGroupId: 'g1' })
+      expect(result.newEntries[0]).toMatchObject({ idpGroupValue: 'admin', mappedGroupId: 'g1' })
+      expect(result.newEntries[1]).toMatchObject({ idpGroupValue: 'custom-group', mappedGroupId: 'g1' })
     })
 
     it('returns success without match count when no auto-matches', () => {
       const claims = { groups: ['unknown-group'] }
-      const result = processDiscoveredGroups(claims, 'groups[*]', [], nexusGroups)
+      const result = processDiscoveredGroups(claims, 'groups[*]', [], mappedGroups)
 
       expect(result.variant).toBe('success')
       expect(result.message).toBe('Discovered 1 group(s).')
-      expect(result.newEntries[0]).toMatchObject({ idpGroupValue: 'unknown-group', nexusGroupId: '' })
+      expect(result.newEntries[0]).toMatchObject({ idpGroupValue: 'unknown-group', mappedGroupId: '' })
     })
 
-    it('handles nexus groups without id or name', () => {
-      const groups: NexusGroup[] = [
+    it('handles mapped groups without id or name', () => {
+      const groups: MappedGroup[] = [
         { id: undefined, name: 'no-id' },
         { id: 'g-no-name', name: undefined },
       ]
@@ -223,8 +223,8 @@ describe('groupMappingUtils', () => {
       const result = processDiscoveredGroups(claims, 'groups[*]', [], groups)
 
       // Neither should auto-match because id or name is missing
-      expect(result.newEntries[0].nexusGroupId).toBe('')
-      expect(result.newEntries[1].nexusGroupId).toBe('')
+      expect(result.newEntries[0].mappedGroupId).toBe('')
+      expect(result.newEntries[1].mappedGroupId).toBe('')
     })
   })
 })

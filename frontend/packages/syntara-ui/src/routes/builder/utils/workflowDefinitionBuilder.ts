@@ -28,7 +28,7 @@ function isSwitchCaseArray(val: unknown): val is Array<{ port: string; label: st
  * Transform approval node approver lists from objects to string arrays.
  * The API returns {id, username}/{id, name} objects but the workflow schema expects string arrays.
  */
-function transformApprovalApprovers(parameters: Record<string, unknown>): Record<string, unknown> {
+export function transformApprovalApprovers(parameters: Record<string, unknown>): Record<string, unknown> {
   const transformed = { ...parameters }
 
   // Extract usernames from ApproverUserSummary[] -> string[]
@@ -191,6 +191,38 @@ function transformConditionForBackend(condition: string | undefined): string | u
 }
 
 /**
+ * Apply all backend-facing transforms to a single node's parameters.
+ * Consolidates condition, switch, approval, and converge transforms
+ * so both `buildWorkflowDefinition` and version-duplication share one path.
+ */
+export function transformNodeParameters(type: string, parameters: Record<string, unknown>): Record<string, unknown> {
+  let result = parameters
+
+  if ((type === ActivityTypeEnum.CONDITION || type === ActivityTypeEnum.LOOP) && typeof result.condition === 'string') {
+    result = {
+      ...result,
+      condition: transformConditionForBackend(result.condition) ?? result.condition,
+    }
+  }
+
+  if (type === ActivityTypeEnum.SWITCH && isSwitchCaseArray(result.cases)) {
+    result = transformSwitchParametersForBackend(
+      result as Record<string, unknown> & { cases: Array<{ port: string; label: string; condition: string }> }
+    )
+  }
+
+  if (type === ActivityTypeEnum.APPROVAL) {
+    result = transformApprovalApprovers(result)
+  }
+
+  if (type === ActivityTypeEnum.CONVERGE && 'branches' in result) {
+    result = Object.fromEntries(Object.entries(result).filter(([key]) => key !== 'branches'))
+  }
+
+  return result
+}
+
+/**
  * Build a V2 workflow definition for API submission.
  *
  * Transforms internal workflow representation (React Flow format) to V2 API format:
@@ -258,38 +290,7 @@ export function buildWorkflowDefinition(
       const sanitizedNodeName = a.name?.replace(CONTROL_CHAR_PATTERN, '')
       const inputs = hasInputs(a) ? a.inputs : undefined
 
-      // Transform condition expressions to backend format (! → not)
-      let parameters = a.parameters ?? {}
-      if (
-        (a.type === ActivityTypeEnum.CONDITION || a.type === ActivityTypeEnum.LOOP) &&
-        typeof parameters.condition === 'string'
-      ) {
-        parameters = {
-          ...parameters,
-          condition: transformConditionForBackend(parameters.condition) ?? parameters.condition,
-        }
-      }
-
-      if (a.type === ActivityTypeEnum.SWITCH && isSwitchCaseArray(parameters.cases)) {
-        parameters = transformSwitchParametersForBackend(
-          parameters as Record<string, unknown> & { cases: Array<{ port: string; label: string; condition: string }> }
-        )
-      }
-
-      // Transform approval node approvers from objects to string arrays
-      if (a.type === 'approval' && parameters) {
-        parameters = transformApprovalApprovers(parameters)
-      }
-
-      // Strip UI-internal fields from converge parameters before sending to the API.
-      // syncConvergeNodeBranches() writes `branches` into parameters for internal
-      // tracking, but the backend schema has additionalProperties: false and
-      // rejects it. See AAP-XXXX for the proper cleanup.
-      if (a.type === ActivityTypeEnum.CONVERGE && 'branches' in parameters) {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructure to omit `branches` from the payload
-        const { branches, ...rest } = parameters
-        parameters = rest
-      }
+      const parameters = transformNodeParameters(a.type, a.parameters ?? {})
 
       return {
         id: a.id,

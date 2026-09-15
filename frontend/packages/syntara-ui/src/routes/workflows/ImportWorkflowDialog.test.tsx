@@ -149,7 +149,7 @@ describe('ImportWorkflowDialog', () => {
       expect(mockPost).toHaveBeenCalled()
     })
     const callArgs = mockPost.mock.calls[0] as [string, { body: Record<string, unknown> }]
-    expect(callArgs[1].body).toEqual(expect.objectContaining({ project_id: 'p1' }))
+    expect(callArgs[1].body).toEqual(expect.objectContaining({ project_id: 'p1', is_import: true }))
     expect(mockShowAlert).toHaveBeenCalledWith(
       expect.objectContaining({
         variant: 'success',
@@ -298,7 +298,22 @@ describe('ImportWorkflowDialog', () => {
     const user = userEvent.setup()
     const onSuccess = vi.fn()
     const onClose = vi.fn()
-    mockPost.mockResolvedValue({ data: { id: 'new-wf', has_validation_issues: true } })
+    mockPost.mockResolvedValue({
+      data: {
+        id: 'new-wf',
+        has_validation_issues: true,
+        validation_result: {
+          warning_count: 1,
+          findings: [
+            {
+              severity: 'warning',
+              category: 'invalid_reference',
+              message: 'The previously selected LLM model is no longer available and was removed',
+            },
+          ],
+        },
+      },
+    })
 
     const validContent = JSON.stringify({
       triggers: [{ id: 't1', type: 'webhook' }],
@@ -318,11 +333,46 @@ describe('ImportWorkflowDialog', () => {
         expect.objectContaining({
           variant: 'warning',
           title: 'Workflow imported with warnings',
+          description: 'The previously selected LLM model is no longer available and was removed',
         })
       )
     })
     expect(onSuccess).toHaveBeenCalled()
     expect(onClose).toHaveBeenCalled()
+  })
+
+  it('falls back to created-name description when warnings have no finding messages', async () => {
+    const user = userEvent.setup()
+    mockPost.mockResolvedValue({
+      data: {
+        id: 'new-wf',
+        has_validation_issues: true,
+        validation_result: { warning_count: 1, findings: [] },
+      },
+    })
+
+    const validContent = JSON.stringify({
+      triggers: [{ id: 't1', type: 'webhook' }],
+      nodes: [{ id: 'n1', type: 'action' }],
+      edges: [{ from: 't1', to: 'n1' }],
+    })
+
+    render(<ImportWorkflowDialog {...defaultProps} />)
+
+    const file = new File([validContent], 'workflow.json', { type: 'application/json' })
+    await user.upload(getFileInput(), file)
+    await user.type(screen.getByLabelText(/Workflow name/i), 'Imported WF')
+    await user.click(screen.getByRole('button', { name: /^Import$/i }))
+
+    await waitFor(() => {
+      expect(mockShowAlert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: 'warning',
+          title: 'Workflow imported with warnings',
+          description: 'Created "Imported WF"',
+        })
+      )
+    })
   })
 
   it('includes Open workflow action link when import returns an id', async () => {

@@ -58,6 +58,8 @@ class WebhookTriggerService(BaseService):
     ) -> None:
         """Verify that a service account is authorized to invoke a trigger.
 
+        An empty binding set denies every caller at invocation time (no row matches).
+
         Args:
             trigger_id: The webhook trigger ID.
             service_account_id: The service account ID from the Bearer token.
@@ -106,7 +108,6 @@ class WebhookTriggerService(BaseService):
                 WebhookTrigger.webhook_path == webhook_path,
                 WebhookTrigger.is_enabled == True,  # noqa: E712
                 Workflow.is_enabled == True,  # noqa: E712
-                Workflow.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
         trigger = result.one_or_none()
@@ -216,6 +217,15 @@ class WebhookTriggerService(BaseService):
         sa_bindings: list[tuple[UUID, set[UUID]]] = []
 
         for node_id, parameters in webhook_nodes.items():
+            if not is_enabled and node_id in existing_triggers:
+                # Disabling (unpublish): skip parameter validation for historical definitions
+                trigger = existing_triggers.pop(node_id)
+                trigger.is_enabled = False
+                self.session.add(trigger)
+                results.append(WebhookTriggerRead.model_validate(trigger))
+                sa_bindings.append((trigger.id, set()))
+                continue
+
             try:
                 validated = WebhookTriggerParameters.model_validate(parameters)
             except ValidationError as e:

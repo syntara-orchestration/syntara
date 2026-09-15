@@ -36,8 +36,8 @@ describe('CreateCredentialModal', () => {
     expect(screen.getByText(/Maximum lifetime: 180 days/)).toBeInTheDocument()
   })
 
-  it('shows unlimited helper text when maxLifetimeDays is -1', () => {
-    render(<CreateCredentialModal {...defaultProps} maxLifetimeDays={-1} />)
+  it('shows unlimited helper text when maxLifetimeDays is 0', () => {
+    render(<CreateCredentialModal {...defaultProps} maxLifetimeDays={0} />)
 
     expect(screen.getByText('No maximum lifetime configured')).toBeInTheDocument()
   })
@@ -119,7 +119,7 @@ describe('CreateCredentialModal', () => {
     })
 
     it('has no accessibility violations with unlimited lifetime', async () => {
-      const { container } = render(<CreateCredentialModal {...defaultProps} maxLifetimeDays={-1} />)
+      const { container } = render(<CreateCredentialModal {...defaultProps} maxLifetimeDays={0} />)
 
       await waitFor(async () => {
         const results = await axe(container)

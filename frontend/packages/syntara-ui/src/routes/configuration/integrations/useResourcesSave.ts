@@ -27,6 +27,7 @@ export function useResourcesSave(opts: {
 
   const handleSaveRef = useRef<() => Promise<boolean>>(null)
 
+  // eslint-disable-next-line react-hooks/refs -- expose latest save closure to parent via stable ref
   handleSaveRef.current = async () => {
     const toEnable = tools.filter((t) => enabledToolIds.has(t.id)).map((t) => t.id)
     const toDisable = tools.filter((t) => !enabledToolIds.has(t.id)).map((t) => t.id)

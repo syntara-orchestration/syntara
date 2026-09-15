@@ -1,7 +1,6 @@
 import AxeBuilder from '@axe-core/playwright'
-import { type Page } from '@playwright/test'
 
-import { test, expect, toAppUrl } from './fixtures'
+import { type Page, test, expect, toAppUrl } from './fixtures'
 import { WCAG_TAGS } from './fixtures/accessibility'
 
 async function expectNoA11yViolations(page: Page) {

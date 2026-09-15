@@ -9,6 +9,7 @@ import { axe } from 'vitest-axe'
 
 import { credentialsClient, integrationsClient } from '../../../client'
 import { AlertProvider } from '../../../providers/alerts'
+import { formatDateTime } from '../../../utils/dateUtils'
 
 import { IntegrationDetail } from './IntegrationDetail'
 
@@ -336,6 +337,26 @@ describe('IntegrationDetail', () => {
       expect(screen.queryByText('mcp_server')).not.toBeInTheDocument()
     })
 
+    it('shows last checked timestamp', () => {
+      render(<IntegrationDetail />, { wrapper })
+
+      expect(screen.getByText('Last checked')).toBeInTheDocument()
+      expect(screen.getByText(formatDateTime(mockIntegration.last_validated_at))).toBeInTheDocument()
+    })
+
+    it('shows dash for last checked when never validated', () => {
+      setupDefaultMocks({ integration: { last_validated_at: null } })
+      render(<IntegrationDetail />, { wrapper })
+
+      // Term and description elements pair up positionally in the description list,
+      // so scope the dash assertion to the definition aligned with "Last checked".
+      const terms = screen.getAllByRole('term')
+      const definitions = screen.getAllByRole('definition')
+      const index = terms.findIndex((term) => term.textContent === 'Last checked')
+      expect(index).toBeGreaterThanOrEqual(0)
+      expect(within(definitions[index]).getByText(formatDateTime(null))).toBeInTheDocument()
+    })
+
     it('shows scope as Global for global integrations', () => {
       render(<IntegrationDetail />, { wrapper })
 
@@ -347,6 +368,80 @@ describe('IntegrationDetail', () => {
       render(<IntegrationDetail />, { wrapper })
 
       expect(screen.getByText('Project')).toBeInTheDocument()
+    })
+
+    it('lists assigned project labels for project-scoped integrations', () => {
+      vi.mocked(integrationsClient.useQuery).mockImplementation(
+        (_method, path) =>
+          (path === '/integrations/{integration_id}/projects'
+            ? {
+                data: {
+                  resources: [
+                    { project_id: 'p1', project_name: 'Project Alpha' },
+                    { project_id: 'p2', project_name: 'Project Beta' },
+                  ],
+                },
+                isPending: false,
+                isError: false,
+                error: null,
+                refetch: vi.fn(),
+              }
+            : {
+                data: { ...mockIntegration, scope: 'project' },
+                isPending: false,
+                isError: false,
+                error: null,
+                refetch: mockRefetch,
+              }) as never
+      )
+
+      render(<IntegrationDetail />, { wrapper })
+
+      expect(screen.getByText('Assigned projects')).toBeInTheDocument()
+      expect(screen.getByText('Project Alpha')).toBeInTheDocument()
+      expect(screen.getByText('Project Beta')).toBeInTheDocument()
+    })
+
+    it('shows a loading skeleton while assigned projects are fetched', () => {
+      vi.mocked(integrationsClient.useQuery).mockImplementation(
+        (_method, path) =>
+          (path === '/integrations/{integration_id}/projects'
+            ? { data: undefined, isPending: true, isError: false, error: null, refetch: vi.fn() }
+            : {
+                data: { ...mockIntegration, scope: 'project' },
+                isPending: false,
+                isError: false,
+                error: null,
+                refetch: mockRefetch,
+              }) as never
+      )
+
+      render(<IntegrationDetail />, { wrapper })
+
+      // While the projects query is pending, the label renders but no project chips appear yet.
+      expect(screen.getByText('Assigned projects')).toBeInTheDocument()
+      expect(screen.queryByText('Project Alpha')).not.toBeInTheDocument()
+    })
+
+    it('shows a dash when a project-scoped integration has no assigned projects', () => {
+      vi.mocked(integrationsClient.useQuery).mockImplementation(
+        (_method, path) =>
+          (path === '/integrations/{integration_id}/projects'
+            ? { data: { resources: [] }, isPending: false, isError: false, error: null, refetch: vi.fn() }
+            : {
+                data: { ...mockIntegration, scope: 'project' },
+                isPending: false,
+                isError: false,
+                error: null,
+                refetch: mockRefetch,
+              }) as never
+      )
+
+      render(<IntegrationDetail />, { wrapper })
+
+      expect(screen.getByText('Assigned projects')).toBeInTheDocument()
+      const dashes = screen.getAllByText('—')
+      expect(dashes.length).toBeGreaterThanOrEqual(1)
     })
 
     it('shows enabled resource count from tools data', () => {

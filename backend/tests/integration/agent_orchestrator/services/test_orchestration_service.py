@@ -17,6 +17,7 @@ from langchain_openai import ChatOpenAI
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.agent_orchestrator.context_manager.planner import ContextManagerPlanner
+from syntara.agent_orchestrator.exceptions import ToolDiscoveryError
 from syntara.agent_orchestrator.services.orchestration_service import OrchestrationService
 from syntara.agent_orchestrator.tool_manager.tool_manager_client import ToolManagerClient
 from syntara.integrations.models.integration import Integration, IntegrationStatus, IntegrationType
@@ -135,8 +136,9 @@ class TestOrchestrationServiceGetTools:
     ) -> None:
         """Test _get_tools when MCP server returns zero tools.
 
-        The retriever is read-only: it should return no tools but NOT
-        mutate the tool or integration status in the database.
+        Fail-closed: enabled tools exist but none were provisioned, so raise
+        ToolDiscoveryError. The retriever remains read-only and must NOT mutate
+        tool or integration status in the database.
         """
         _integration_id, [enabled_tool_id, disabled_tool_id] = test_integration_with_tools
         session_id = "session-abc"
@@ -154,9 +156,8 @@ class TestOrchestrationServiceGetTools:
             mock_mcp_client_class.return_value = mock_mcp_instance
             mock_mcp_instance.get_tools = AsyncMock(return_value=[])  # No tools from MCP server
 
-            result_tools = await orchestration_service._get_tools(session_id, invocation_id, execution_id)
-
-            assert result_tools == []
+            with pytest.raises(ToolDiscoveryError, match="could not be provisioned"):
+                await orchestration_service._get_tools(session_id, invocation_id, execution_id)
 
             assert mock_mcp_client_class.called, "MultiServerMCPClient class should have been instantiated"
             assert mock_mcp_instance.get_tools.called, "get_tools should have been called"
@@ -237,8 +238,9 @@ class TestOrchestrationServiceGetTools:
     ) -> None:
         """Test that integration state is NOT mutated when MCP server is unreachable.
 
-        The retriever is read-only: a connection failure should return no tools
-        but leave the integration enabled and in AVAILABLE status.
+        Per-integration connect failure soft-skips to ``[]``, but with enabled
+        tools discovered and zero provisioned overall, ``_get_tools`` fail-closes
+        with ToolDiscoveryError. Integration/tool rows must remain unchanged.
         """
         integration = await _create_test_integration(
             test_db_session,
@@ -277,9 +279,8 @@ class TestOrchestrationServiceGetTools:
             mock_mcp_client_class.return_value = mock_mcp_instance
             mock_mcp_instance.get_tools = AsyncMock(side_effect=ConnectionError("Connection refused"))
 
-            result_tools = await orchestration_service._get_tools(session_id, invocation_id, execution_id)
-
-            assert result_tools == []
+            with pytest.raises(ToolDiscoveryError, match="could not be provisioned"):
+                await orchestration_service._get_tools(session_id, invocation_id, execution_id)
 
             # Verify the integration was NOT mutated
             integration_response = await jwt_client.get(f"/api/v1/integrations/{integration_id}")

@@ -61,7 +61,6 @@ class ServiceAccountRead(SQLModel):
     status: ServiceAccountStatus
     project_id: UUID
     project_name: str | None = None
-    is_project_deleted: bool = False
     last_authenticated_at: datetime | None = None
     created_by: UUID
     updated_by: UUID | None = None
@@ -82,5 +81,5 @@ class ServiceAccountListResponse(ResourcesResponse[ServiceAccountRead]):
 
     max_lifetime_days: int = Field(
         default=180,
-        description="Maximum credential lifetime in days (-1 for unlimited)",
+        description="Maximum credential lifetime in days (0 for unlimited)",
     )

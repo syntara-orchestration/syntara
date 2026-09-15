@@ -98,7 +98,7 @@ RUN if [ -n "${PIP_FIND_LINKS:-}" ]; then \
     fi
 
 # Stage 2: Runtime - minimal image with Python and app copied from builder
-FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:83006d535923fcf1345067873524a3980316f51794f01d8655be55d6e9387183
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:8eb2830d0936237fc13a1f2f7e45aecf90d69043380ad167fad0343632937f41
 
 ARG CONTAINER_IMAGE_VERSION=""
 ARG APP_SEGMENT_WRITE_KEY=""
@@ -166,3 +166,20 @@ EXPOSE 8000
 # Default command runs the API server
 # Override with different commands for other services.
 CMD ["start-api"]
+
+# Override UBI name/cpe so Konflux container-first security checks match
+# the product data file.
+ENV DESCRIPTION="Red Hat Ansible Automation Orchestrator" \
+    container=oci
+
+LABEL com.redhat.component="ansible-automation-orchestrator-backend-container" \
+      name="ansible-automation-platform/automation-orchestrator-backend-rhel9" \
+      cpe="cpe:/a:redhat:ansible_automation_orchestrator:2026.8::el9" \
+      summary="${DESCRIPTION}" \
+      io.openshift.expose-services="8000:http" \
+      io.openshift.tags="automation,ansible,orchestrator" \
+      io.k8s.display-name="automation-orchestrator-backend-rhel9" \
+      io.k8s.description="${DESCRIPTION}" \
+      maintainer="Ansible Automation Platform Productization Team" \
+      description="${DESCRIPTION}" \
+      vendor="Red Hat, Inc."

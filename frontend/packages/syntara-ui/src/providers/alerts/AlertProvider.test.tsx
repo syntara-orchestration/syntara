@@ -228,7 +228,7 @@ describe('AlertProvider', () => {
       await user.click(screen.getByRole('button', { name: 'Trigger auto-dismiss' }))
 
       // Assert — alert is rendered (timeout prop is passed to PF Alert,
-      // but transitionend events don't fire in jsdom so we verify the alert
+      // but transitionend events don't fire in happy-dom so we verify the alert
       // appears and can be dismissed programmatically)
       expect(screen.getByText('Custom alert')).toBeInTheDocument()
 
@@ -394,10 +394,10 @@ describe('AlertProvider', () => {
         vi.advanceTimersByTime(4000)
       })
 
-      // PF Alert sets isDismissed=true (without animations in jsdom, it falls
+      // PF Alert sets isDismissed=true (without animations in happy-dom, it falls
       // through to the non-animated path), which triggers onTimeout callback.
       // But since hasAnimations is true on AlertGroup, PF waits for transitionend.
-      // In jsdom this never fires, so the alert persists.
+      // In happy-dom this never fires, so the alert persists.
       // We verify the alert was rendered and the timeout mechanism was engaged.
       // The actual removal is tested via dismissAlert in other tests.
 

@@ -298,7 +298,6 @@ async def test_admin_cannot_delete_default_project(
     assert body["title"] == "Default Project Protected"
 
     await test_db_session.refresh(default_project)
-    assert default_project.deleted_at is None
     assert default_project.is_default is True
 
     _auth_as(test_user)

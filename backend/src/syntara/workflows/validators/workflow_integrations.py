@@ -15,11 +15,13 @@ from syntara.integrations.models.integration import (
     IntegrationType,
 )
 from syntara.integrations.models.llm_model import LLMModel
+from syntara.service_accounts.models.service_account import ServiceAccount
 from syntara.tool_manager.models.tool import Tool
 from syntara.workflows.models.validation_finding import ValidationCategory, ValidationFinding, ValidationSeverity
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 
 _AAP_NODE_TYPES: frozenset[str] = frozenset({NodeType.AAP_JOB_TEMPLATE, NodeType.AAP_WORKFLOW_JOB_TEMPLATE})
+_WEBHOOK_STYLE_TRIGGER_TYPES: frozenset[str] = frozenset({NodeType.WEBHOOK_TRIGGER, NodeType.EDA_TRIGGER})
 
 
 def _is_valid_uuid(value: str | None) -> bool:
@@ -135,11 +137,22 @@ async def _validate_integration_types(
 async def _validate_llm_model_references(
     session: AsyncSession,
     workflow_definition: dict[str, Any],
-) -> set[UUID]:
-    """Validate that all LLM model references exist and are enabled. Returns their parent integration IDs."""
+    *,
+    allow_cleanup: bool = False,
+) -> tuple[set[UUID], list[ValidationFinding]]:
+    """Validate LLM model references in a workflow definition.
+
+    When allow_cleanup is False (default, used for save/publish), missing or
+    disabled models raise SafeValueError.
+
+    When allow_cleanup is True (used for import), unavailable models are cleared
+    from node parameters in-place and returned as warning findings.
+
+    Returns (parent_integration_ids_of_valid_models, warning_findings).
+    """
     model_ids = _extract_llm_model_ids(workflow_definition)
     if not model_ids:
-        return set()
+        return set(), []
     parsed = [UUID(mid) for mid in model_ids]
     result = await session.execute(
         select(LLMModel.id, LLMModel.integration_id, LLMModel.enabled, LLMModel.name).where(
@@ -149,14 +162,39 @@ async def _validate_llm_model_references(
     rows = result.all()
     found_ids = {row.id for row in rows}
     missing = {UUID(mid) for mid in model_ids} - found_ids
-    if missing:
-        msg = "The previously selected LLM model is no longer available"
-        raise SafeValueError(msg)
-    for row in rows:
-        if not row.enabled:
-            msg = f"LLM model '{row.name}' is disabled"
+
+    if not allow_cleanup:
+        if missing:
+            msg = "The previously selected LLM model is no longer available"
             raise SafeValueError(msg)
-    return {row.integration_id for row in rows}
+        for row in rows:
+            if not row.enabled:
+                msg = f"LLM model '{row.name}' is disabled"
+                raise SafeValueError(msg)
+        return {row.integration_id for row in rows}, []
+
+    available = {str(row.id) for row in rows if row.enabled}
+    unavailable_ids = model_ids - available
+    if not unavailable_ids:
+        return {row.integration_id for row in rows}, []
+
+    findings: list[ValidationFinding] = []
+    for node in workflow_definition.get("nodes", []):
+        params = node.get("parameters", {})
+        mid = params.get("llm_model_id")
+        if mid and mid in unavailable_ids:
+            params.pop("llm_model_id", None)
+            findings.append(
+                ValidationFinding(
+                    severity=ValidationSeverity.warning,
+                    category=ValidationCategory.invalid_reference,
+                    message="The previously selected LLM model is no longer available and was removed",
+                    node_id=node.get("id"),
+                )
+            )
+
+    remaining_integration_ids = {row.integration_id for row in rows if str(row.id) in available}
+    return remaining_integration_ids, findings
 
 
 async def _validate_integration_scope(
@@ -252,6 +290,79 @@ async def _clean_unavailable_tool_selections(
     return findings
 
 
+def _extract_webhook_authorized_service_account_ids(workflow_definition: dict[str, Any]) -> set[UUID]:
+    """Return service account UUIDs referenced on webhook-style trigger nodes."""
+    sa_ids: set[UUID] = set()
+    for trigger in workflow_definition.get("triggers", []):
+        if trigger.get("type") not in _WEBHOOK_STYLE_TRIGGER_TYPES:
+            continue
+        params = trigger.get("parameters") or {}
+        for raw in params.get("authorized_service_account_ids") or []:
+            if _is_valid_uuid(str(raw)):
+                sa_ids.add(UUID(str(raw)))
+    return sa_ids
+
+
+async def _sanitize_webhook_service_accounts(
+    session: AsyncSession,
+    workflow_definition: dict[str, Any],
+    project_id: UUID,
+) -> list[ValidationFinding]:
+    """Remove webhook SA IDs missing from the target project during import.
+
+    Mutates ``authorized_service_account_ids`` in place so stored definitions
+    do not keep phantom UUIDs that would satisfy schema ``minItems: 1`` on
+    Verify. Remaining IDs (if any) stay; an empty list is left when none are
+    valid in the project.
+    """
+    sa_ids = _extract_webhook_authorized_service_account_ids(workflow_definition)
+    if not sa_ids:
+        return []
+
+    result = await session.execute(
+        select(ServiceAccount.id).where(
+            col(ServiceAccount.id).in_(sa_ids),
+            ServiceAccount.project_id == project_id,
+        )
+    )
+    found_uuids = set(result.scalars().all())
+
+    findings: list[ValidationFinding] = []
+    for trigger in workflow_definition.get("triggers", []):
+        if trigger.get("type") not in _WEBHOOK_STYLE_TRIGGER_TYPES:
+            continue
+        params = trigger.get("parameters")
+        if not isinstance(params, dict):
+            continue
+        raw_ids = params.get("authorized_service_account_ids") or []
+        kept: list[str] = []
+        for raw in raw_ids:
+            raw_str = str(raw)
+            if not _is_valid_uuid(raw_str):
+                continue
+            uid = UUID(raw_str)
+            if uid in found_uuids:
+                kept.append(str(uid))
+        removed_count = len(raw_ids) - len(kept)
+        if not removed_count and kept == raw_ids:
+            continue
+        params["authorized_service_account_ids"] = kept
+        if removed_count:
+            findings.append(
+                ValidationFinding(
+                    severity=ValidationSeverity.warning,
+                    category=ValidationCategory.invalid_reference,
+                    message=(
+                        f"{removed_count} authorized service account(s) are not available in this project "
+                        "and were removed during import"
+                    ),
+                    node_id=trigger.get("id"),
+                )
+            )
+
+    return findings
+
+
 async def _extract_tool_parent_integration_ids(
     session: AsyncSession,
     workflow_definition: dict[str, Any],
@@ -269,20 +380,33 @@ async def validate_workflow_references(
     session: AsyncSession,
     workflow_definition: dict[str, Any],
     project_id: UUID,
+    *,
+    is_import: bool = False,
 ) -> list[ValidationFinding]:
     """Validate all external references in a workflow definition.
 
-    Integrations and LLM models produce hard errors (required for node execution).
-    Unavailable tools are auto-cleared with warnings (optional, node still functions).
-    Parent integrations of selected tools are also checked — a disabled or out-of-scope
-    integration produces a hard error even though individual tools are auto-cleared.
+    Integrations produce hard errors (required for node execution).
+    Unavailable tools are always auto-cleared with warnings.
 
-    Returns warning findings for any tools that were auto-cleared.
+    LLM model handling depends on context:
+    - Normal save/publish (is_import=False): missing/disabled models raise hard errors.
+    - Import (is_import=True): missing/disabled models are auto-cleared with warnings,
+      allowing the workflow to be imported in a draft state.
+    - Import (is_import=True): missing webhook/EDA authorized service accounts are
+      removed from the definition with warnings (bindings are skipped).
+
+    Returns warning findings for any resources that were auto-cleared.
     """
-    model_integration_ids = await _validate_llm_model_references(session, workflow_definition)
+    model_integration_ids, model_findings = await _validate_llm_model_references(
+        session, workflow_definition, allow_cleanup=is_import
+    )
     tool_integration_ids = await _extract_tool_parent_integration_ids(session, workflow_definition)
     await _validate_integration_scope(
         session, workflow_definition, project_id, model_integration_ids | tool_integration_ids
     )
     await _validate_integration_types(session, workflow_definition)
-    return await _clean_unavailable_tool_selections(session, workflow_definition)
+    tool_findings = await _clean_unavailable_tool_selections(session, workflow_definition)
+    sa_findings: list[ValidationFinding] = []
+    if is_import:
+        sa_findings = await _sanitize_webhook_service_accounts(session, workflow_definition, project_id)
+    return model_findings + tool_findings + sa_findings

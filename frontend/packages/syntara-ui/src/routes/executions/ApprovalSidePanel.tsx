@@ -2,7 +2,7 @@ import { Stack, StackItem } from '@patternfly/react-core'
 import type { Approval } from '@syntara/contracts'
 
 import { ApprovalNavigationHeader } from '../../components/ApprovalNavigationHeader'
-import { NxPanel } from '../../components/layout/NxPanel'
+import { SynPanel } from '../../components/layout/SynPanel'
 import { SidePanelHeader } from '../../components/SidePanelHeader'
 import { ApprovalDetailContent } from '../approvals/ApprovalDetailContent'
 
@@ -38,7 +38,7 @@ type ApprovalSidePanelProps = Readonly<{
 /**
  * Right-side panel for reviewing an approval within the execution viewer.
  * Follows the same layout pattern as WorkflowHistoryCard:
- * fixed-width NxPanel with a header + scrollable body.
+ * fixed-width SynPanel with a header + scrollable body.
  *
  * When multiple approvals exist (totalCount > 1), shows navigation controls
  * to move between approvals without closing the panel.
@@ -60,7 +60,7 @@ export function ApprovalSidePanel({
   const showNavigation = totalCount !== undefined && totalCount > 1 && onNavigatePrev && onNavigateNext
 
   return (
-    <NxPanel hasNoPadding isFullHeight className={styles.panel}>
+    <SynPanel hasNoPadding isFullHeight className={styles.panel}>
       <div className={styles.panelInner}>
         <Stack className={styles.panelStack}>
           <StackItem className={styles.headerPadding}>
@@ -93,6 +93,6 @@ export function ApprovalSidePanel({
           </StackItem>
         </Stack>
       </div>
-    </NxPanel>
+    </SynPanel>
   )
 }

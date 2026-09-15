@@ -1,7 +1,7 @@
 import type { WorkflowAPI } from '@syntara/contracts'
 import { useCallback } from 'react'
 
-import type { AlertMessage } from '../../../providers/alerts'
+import type { AlertConfig, AlertMessage } from '../../../providers/alerts'
 import { getErrorMessage } from '../../../utils/apiErrors'
 import type { BuilderAction } from '../builderReducer'
 import { applyImportToCanvas, type PendingImportData } from '../useWorkflowImportExport'
@@ -17,6 +17,7 @@ export type UseBuilderImportHandlersParams = {
   selectedProject: { id: string } | null
   createWorkflow: UseBuilderSaveWorkflowParams['createWorkflow']
   setLocation: (to: string) => void
+  showAlert: (config: AlertConfig) => void
   showSuccess: (options: AlertMessage) => void
   showError: (options: AlertMessage) => void
   showInfo: (options: AlertMessage) => void
@@ -27,7 +28,17 @@ export function useBuilderImportHandlers(
   pendingImport: PendingImportData | null,
   setPendingImport: (data: PendingImportData | null) => void
 ) {
-  const { dispatch, markDirty, selectedProject, createWorkflow, setLocation, showSuccess, showError, showInfo } = params
+  const {
+    dispatch,
+    markDirty,
+    selectedProject,
+    createWorkflow,
+    setLocation,
+    showAlert,
+    showSuccess,
+    showError,
+    showInfo,
+  } = params
 
   const handleImportCurrent = useCallback(() => {
     if (!pendingImport) return
@@ -57,18 +68,26 @@ export function useBuilderImportHandlers(
           description: importDescription,
           workflow_definition: fullDefinition as unknown as CreateWorkflowBody['workflow_definition'],
           project_id: projectId,
+          is_import: true,
         },
       },
       {
         onSuccess: (data) => {
           setPendingImport(null)
-          const newId =
-            typeof data === 'object' && data !== null && 'id' in data
-              ? String((data as Record<string, unknown>).id)
-              : undefined
-          showSuccess({ title: 'Workflow imported', description: `Created "${importName}"` })
-          if (newId) {
-            setLocation(`/workflow-builder/${newId}`)
+          const { validation_result: validationResult } = data
+          if (validationResult?.warning_count) {
+            const warnings = (validationResult.findings ?? []).map((f) => f.message).join('; ')
+            showAlert({
+              variant: 'warning',
+              autoDismiss: false,
+              title: 'Workflow imported with warnings',
+              description: warnings || `Created "${importName}" with ${validationResult.warning_count} warning(s)`,
+            })
+          } else {
+            showSuccess({ title: 'Workflow imported', description: `Created "${importName}"` })
+          }
+          if (data.id) {
+            setLocation(`/workflow-builder/${data.id}`)
           }
         },
         onError: (error) => {
@@ -76,7 +95,7 @@ export function useBuilderImportHandlers(
         },
       }
     )
-  }, [pendingImport, selectedProject, createWorkflow, showSuccess, showError, setLocation, setPendingImport])
+  }, [pendingImport, selectedProject, createWorkflow, showAlert, showSuccess, showError, setLocation, setPendingImport])
 
   const clearPendingImport = useCallback(() => {
     setPendingImport(null)

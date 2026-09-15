@@ -10,6 +10,7 @@ from uuid import uuid4
 import pytest
 from redis.exceptions import ConnectionError as RedisConnectionError
 
+from syntara.api.constants import EXCLUDED_PATHS
 from syntara.audit.emitter import AuditActorContext, actor_context_var
 from syntara.rate_limiting.middleware import RateLimitMiddleware
 from syntara.rate_limiting.token_bucket import TokenBucketResult
@@ -106,8 +107,9 @@ class TestRateLimitMiddleware:
         send.assert_awaited()
 
     @pytest.mark.asyncio
-    async def test_pass_through_excluded_path(self, middleware: RateLimitMiddleware) -> None:
-        scope = _make_scope(path="/health")
+    @pytest.mark.parametrize("path", sorted(EXCLUDED_PATHS))
+    async def test_pass_through_excluded_path(self, path: str, middleware: RateLimitMiddleware) -> None:
+        scope = _make_scope(path=path)
         send = AsyncMock()
 
         await middleware(scope, AsyncMock(), send)

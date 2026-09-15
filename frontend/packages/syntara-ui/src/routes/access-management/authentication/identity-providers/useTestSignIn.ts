@@ -3,8 +3,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { OIDC_AUTHORIZE_PATH } from '../../../../client'
 import { generateUUID } from '../../../../utils/generateUUID'
 
-export const NONCE_STORAGE_KEY = 'nexus-test-signin-nonce'
-export const RESULT_STORAGE_KEY = 'nexus-test-signin'
+export const NONCE_STORAGE_KEY = 'syntara-test-signin-nonce'
+export const RESULT_STORAGE_KEY = 'syntara-test-signin'
 
 type UseTestSignInOptions = {
   providerId?: string
@@ -22,10 +22,10 @@ export function useTestSignIn({ providerId, onResult, onError }: UseTestSignInOp
   const nonceRef = useRef<string | null>(null)
   const popupRef = useRef<Window | null>(null)
   const onResultRef = useRef(onResult)
-  // eslint-disable-next-line react-hooks/refs -- keep refs in sync so the poll effect doesn't need these as dependencies
+  // eslint-disable-next-line react-hooks/refs -- keep callback refs current for the poll effect without re-subscribing
   onResultRef.current = onResult
   const onErrorRef = useRef(onError)
-  // eslint-disable-next-line react-hooks/refs
+  // eslint-disable-next-line react-hooks/refs -- keep callback refs current for the poll effect without re-subscribing
   onErrorRef.current = onError
 
   useEffect(() => {

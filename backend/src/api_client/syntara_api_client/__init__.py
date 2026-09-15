@@ -1,4 +1,4 @@
-"""A client library for accessing Syntara API"""
+"""A client library for accessing Orchestrator API"""
 
 from .client import AuthenticatedClient, Client
 from .filters import OPERATORS, FilterError, build_filters

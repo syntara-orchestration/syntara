@@ -3,16 +3,19 @@
 Thin layer that validates query params, resolves dependencies,
 and delegates to AAPProxyService.
 
-Authentication: Endpoints support optional per-user credential forwarding
-via the ``credential_id`` query parameter. If provided, the specified Syntara
-credential (type: "Ansible Automation Platform") is decrypted and used to
-authenticate against the AAP Controller. If not provided, falls back to
-environment variables (APP_AAP_TOKEN or APP_AAP_USERNAME/PASSWORD).
+Authentication: Endpoints accept optional ``credential_id`` and
+``integration_id`` query parameters. When both are omitted, the proxy uses
+the unique visible enabled AAP integration and its management credential.
+When more than one AAP integration is visible, pass ``integration_id`` to
+select one; ``credential_id`` may still be omitted (management credential is
+used). When ``credential_id`` is provided, the specified Syntara credential
+(type: "Ansible Automation Platform") is decrypted and used instead; callers
+may only use credentials they own.
 
 Authorization: The ``current_user`` dependency ensures only authenticated
-Syntara users can call these endpoints. When using credential_id, users can
-only use credentials they own (authorization check enforced). When using
-integration_id, project-scoped integration visibility is enforced via
+Syntara users can call these endpoints. When using credential_id, project-scoped
+``credential:use`` RBAC permission is enforced. When using integration_id,
+project-scoped integration visibility is enforced via
 ``ProjectScopeFilter("integration", "read")``.
 """
 
@@ -45,8 +48,9 @@ from syntara.aap.models.responses import (
 from syntara.aap.services.aap_proxy_service import AAPProxyService
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.auth import get_current_user
-from syntara.authz.dependencies import ProjectScopeFilter
+from syntara.authz.dependencies import ProjectScopeFilter, get_authz_evaluator
 from syntara.authz.engine import AllowedProjectsResult
+from syntara.authz.evaluator import AuthzEvaluator
 from syntara.core.config.base import Settings, get_settings
 from syntara.core.database.session import get_db
 from syntara.core.models import User
@@ -58,6 +62,16 @@ router = APIRouter(prefix="/proxies/aap", tags=["Ansible Automation Platform Pro
 _integration_scope = ProjectScopeFilter("integration", "read")
 
 
+def _credential_used_for_audit(error_type: str | None) -> bool:
+    """Whether an Orchestrator credential was resolved for this proxy request.
+
+    True on success and after decrypt (auth/upstream errors). False when the
+    request failed before decrypt (no/ambiguous integration, missing
+    management credential). Env-var auth is not used on this path.
+    """
+    return error_type != "AAPNotConfiguredError"
+
+
 # ============================================================================
 # Dependency Injection
 # ============================================================================
@@ -67,9 +81,11 @@ async def _get_aap_proxy_service(
     settings: Annotated[Settings, Depends(get_settings)],
     db: Annotated[AsyncSession, Depends(get_db)],
     allowed_projects: Annotated[AllowedProjectsResult, Depends(_integration_scope)],
+    evaluator: Annotated[AuthzEvaluator, Depends(get_authz_evaluator)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> AsyncGenerator[AAPProxyService]:
     """Provide AAPProxyService with settings and db session wired; close client after request."""
-    service = AAPProxyService(settings, db, allowed_projects=allowed_projects)
+    service = AAPProxyService(settings, db, allowed_projects=allowed_projects, evaluator=evaluator, user=current_user)
     try:
         yield service
     finally:
@@ -91,7 +107,7 @@ async def list_organizations(
     error_type = None
     result_count = None
     try:
-        result = await service.list_organizations(query, user_id=current_user.id)
+        result = await service.list_organizations(query)
         result_count = result.count
     except Exception as exc:
         error_type = type(exc).__name__
@@ -104,7 +120,7 @@ async def list_organizations(
                 user_id=current_user.id,
                 username=current_user.username,
                 result_count=result_count,
-                credential_used=query.credential_id is not None,
+                credential_used=_credential_used_for_audit(error_type),
                 search_filter=query.search,
                 error_type=error_type,
                 principal_type=current_user.__dict__.get("__principal_type__"),
@@ -123,7 +139,7 @@ async def list_job_templates(
     error_type = None
     result_count = None
     try:
-        result = await service.list_job_templates(query, user_id=current_user.id)
+        result = await service.list_job_templates(query)
         result_count = result.count
     except Exception as exc:
         error_type = type(exc).__name__
@@ -136,7 +152,7 @@ async def list_job_templates(
                 user_id=current_user.id,
                 username=current_user.username,
                 result_count=result_count,
-                credential_used=query.credential_id is not None,
+                credential_used=_credential_used_for_audit(error_type),
                 search_filter=query.search,
                 organization_filter=query.organization,
                 error_type=error_type,
@@ -162,7 +178,6 @@ async def get_job_template(
         result = await service.get_job_template(
             job_template_id,
             credential_id=credential_id_str,
-            user_id=current_user.id,
             integration_id=integration_id_str,
         )
         resource_name = result.name
@@ -178,7 +193,7 @@ async def get_job_template(
                 username=current_user.username,
                 resource_id=job_template_id,
                 resource_name=resource_name,
-                credential_used=query.credential_id is not None,
+                credential_used=_credential_used_for_audit(error_type),
                 error_type=error_type,
                 principal_type=current_user.__dict__.get("__principal_type__"),
             )
@@ -198,7 +213,7 @@ async def list_workflow_job_templates(
     error_type = None
     result_count = None
     try:
-        result = await service.list_workflow_job_templates(query, user_id=current_user.id)
+        result = await service.list_workflow_job_templates(query)
         result_count = result.count
     except Exception as exc:
         error_type = type(exc).__name__
@@ -211,7 +226,7 @@ async def list_workflow_job_templates(
                 user_id=current_user.id,
                 username=current_user.username,
                 result_count=result_count,
-                credential_used=query.credential_id is not None,
+                credential_used=_credential_used_for_audit(error_type),
                 search_filter=query.search,
                 organization_filter=query.organization,
                 error_type=error_type,
@@ -241,7 +256,6 @@ async def get_workflow_job_template(
         result = await service.get_workflow_job_template(
             workflow_job_template_id,
             credential_id=credential_id_str,
-            user_id=current_user.id,
             integration_id=integration_id_str,
         )
         resource_name = result.name
@@ -257,7 +271,7 @@ async def get_workflow_job_template(
                 username=current_user.username,
                 resource_id=workflow_job_template_id,
                 resource_name=resource_name,
-                credential_used=query.credential_id is not None,
+                credential_used=_credential_used_for_audit(error_type),
                 error_type=error_type,
                 principal_type=current_user.__dict__.get("__principal_type__"),
             )
@@ -275,7 +289,7 @@ async def list_inventories(
     error_type = None
     result_count = None
     try:
-        result = await service.list_inventories(query, user_id=current_user.id)
+        result = await service.list_inventories(query)
         result_count = result.count
     except Exception as exc:
         error_type = type(exc).__name__
@@ -288,7 +302,7 @@ async def list_inventories(
                 user_id=current_user.id,
                 username=current_user.username,
                 result_count=result_count,
-                credential_used=query.credential_id is not None,
+                credential_used=_credential_used_for_audit(error_type),
                 search_filter=query.search,
                 organization_filter=query.organization,
                 error_type=error_type,
@@ -310,7 +324,7 @@ async def list_execution_environments(
     error_type = None
     result_count = None
     try:
-        result = await service.list_execution_environments(query, user_id=current_user.id)
+        result = await service.list_execution_environments(query)
         result_count = result.count
     except Exception as exc:
         error_type = type(exc).__name__
@@ -323,7 +337,7 @@ async def list_execution_environments(
                 user_id=current_user.id,
                 username=current_user.username,
                 result_count=result_count,
-                credential_used=query.credential_id is not None,
+                credential_used=_credential_used_for_audit(error_type),
                 search_filter=query.search,
                 organization_filter=query.organization,
                 error_type=error_type,
@@ -343,7 +357,7 @@ async def list_credentials(
     error_type = None
     result_count = None
     try:
-        result = await service.list_credentials(query, user_id=current_user.id)
+        result = await service.list_credentials(query)
         result_count = result.count
     except Exception as exc:
         error_type = type(exc).__name__
@@ -356,7 +370,7 @@ async def list_credentials(
                 user_id=current_user.id,
                 username=current_user.username,
                 result_count=result_count,
-                credential_used=query.credential_id is not None,
+                credential_used=_credential_used_for_audit(error_type),
                 search_filter=query.search,
                 error_type=error_type,
                 principal_type=current_user.__dict__.get("__principal_type__"),
@@ -375,7 +389,7 @@ async def list_instance_groups(
     error_type = None
     result_count = None
     try:
-        result = await service.list_instance_groups(query, user_id=current_user.id)
+        result = await service.list_instance_groups(query)
         result_count = result.count
     except Exception as exc:
         error_type = type(exc).__name__
@@ -388,7 +402,7 @@ async def list_instance_groups(
                 user_id=current_user.id,
                 username=current_user.username,
                 result_count=result_count,
-                credential_used=query.credential_id is not None,
+                credential_used=_credential_used_for_audit(error_type),
                 search_filter=query.search,
                 error_type=error_type,
                 principal_type=current_user.__dict__.get("__principal_type__"),
@@ -407,7 +421,7 @@ async def list_labels(
     error_type = None
     result_count = None
     try:
-        result = await service.list_labels(query, user_id=current_user.id)
+        result = await service.list_labels(query)
         result_count = result.count
     except Exception as exc:
         error_type = type(exc).__name__
@@ -420,7 +434,7 @@ async def list_labels(
                 user_id=current_user.id,
                 username=current_user.username,
                 result_count=result_count,
-                credential_used=query.credential_id is not None,
+                credential_used=_credential_used_for_audit(error_type),
                 search_filter=query.search,
                 error_type=error_type,
                 principal_type=current_user.__dict__.get("__principal_type__"),

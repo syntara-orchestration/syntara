@@ -24,9 +24,7 @@ import { type Dispatch, useCallback, useMemo, useState } from 'react'
 import { formatDateYMD, parseDateYMD } from '../../utils/dateUtils'
 import type { ScheduleFrequency } from '../../utils/triggerFormatting'
 import { FieldHelpPopover } from '../FieldHelpPopover'
-import { LONG_SELECT_MAX_MENU_HEIGHT, longSelectMenuPopperProps } from '../longSelectMenu'
-import longSelectMenuStyles from '../longSelectMenu.module.css'
-import { NxSelect } from '../NxSelect'
+import { SynSelect } from '../SynSelect'
 
 import styles from './ScheduleBuilderFields.module.css'
 import { END_DATE_HELP, FREQUENCY_HELP, INTERVAL_HELP, START_DATE_HELP } from './scheduleHelpText'
@@ -188,7 +186,7 @@ function StartDateTimeField({
             />
           </div>
           <div className={styles.timezoneSelect}>
-            <NxSelect
+            <SynSelect
               id="schedule-timezone"
               isOpen={tzOpen}
               selected={timezone}
@@ -197,10 +195,6 @@ function StartDateTimeField({
                 setTzOpen(open)
                 if (!open) setTzFilter('')
               }}
-              isScrollable
-              maxMenuHeight={LONG_SELECT_MAX_MENU_HEIGHT}
-              popperProps={longSelectMenuPopperProps}
-              className={longSelectMenuStyles.containScroll}
               toggle={tzToggle}
             >
               <TextInputGroup>
@@ -225,7 +219,7 @@ function StartDateTimeField({
                   </SelectOption>
                 ))}
               </SelectList>
-            </NxSelect>
+            </SynSelect>
           </div>
         </div>
         {error && errorMessage && (
@@ -337,7 +331,7 @@ function FrequencySelectField({
   return (
     <StackItem>
       <FormGroup label="Frequency" labelHelp={frequencyLabelHelp} fieldId="schedule-frequency" isRequired={required}>
-        <NxSelect
+        <SynSelect
           id="schedule-frequency"
           isOpen={isOpen}
           selected={frequency}
@@ -353,7 +347,7 @@ function FrequencySelectField({
               </SelectOption>
             ))}
           </SelectList>
-        </NxSelect>
+        </SynSelect>
       </FormGroup>
     </StackItem>
   )

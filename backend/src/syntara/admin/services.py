@@ -113,7 +113,6 @@ async def find_user_by_username(db: AsyncSession, username: str) -> User | None:
     result = await db.exec(
         select(User).filter(
             User.username == username.lower(),  # type: ignore[arg-type]
-            User.deleted_at.is_(None),  # type: ignore[union-attr]
         )
     )
     return result.one_or_none()

@@ -578,13 +578,19 @@ describe('TextFilter', () => {
       await user.click(screen.getByText('Filter by workflow'))
       await user.click(await screen.findByRole('option', { name: 'Alpha workflow' }))
 
-      expect(screen.getByText('Alpha workflow')).toBeInTheDocument()
+      // Use role query to target only the toggle button — not the still-closing menu item
+      // (PatternFly keeps the menu in the DOM during its CSS close transition)
+      const selectedToggle = await screen.findByRole('button', { name: 'Alpha workflow' })
+      await waitFor(() => {
+        expect(screen.queryByRole('option', { name: 'Alpha workflow' })).not.toBeInTheDocument()
+      })
+      expect(selectedToggle).toBeInTheDocument()
 
-      await user.click(screen.getByText('Alpha workflow'))
+      await user.click(selectedToggle)
       await user.type(screen.getByPlaceholderText('Search...'), 'z')
 
       expect(await screen.findByText('No results found')).toBeInTheDocument()
-      expect(screen.getByText('Alpha workflow')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Alpha workflow' })).toBeInTheDocument()
     })
   })
 

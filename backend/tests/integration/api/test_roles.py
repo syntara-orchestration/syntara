@@ -81,6 +81,36 @@ async def test_role_crud_lifecycle(
     assert response.status_code == 404
 
 
+@pytest.mark.asyncio
+async def test_role_put_bumps_updated_at(
+    auth_client: AsyncClient,
+    test_db_session: AsyncSession,
+    test_user: User,
+) -> None:
+    """PUT (replace) is a genuine edit and must bump updated_at, same as PATCH."""
+    await make_admin(test_db_session, test_user)
+
+    create_response = await auth_client.post(
+        "/api/v1/roles",
+        json={
+            "name": "custom-replaceable",
+            "description": "Original description",
+            "policies": ["workflow:read:any"],
+        },
+    )
+    assert create_response.status_code == 201
+    created = create_response.json()
+
+    put_response = await auth_client.put(
+        f"/api/v1/roles/{created['id']}",
+        json={"description": "Replaced description", "policies": ["workflow:read:any"]},
+    )
+    assert put_response.status_code == 200
+    replaced = put_response.json()
+    assert replaced["description"] == "Replaced description"
+    assert replaced["updated_at"] > created["updated_at"]
+
+
 # ============================================================================
 # Policy Validation
 # ============================================================================

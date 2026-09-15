@@ -27,7 +27,7 @@ class ServiceAccountCredentialListResponse:
         max_credentials (int | Unset): Maximum number of credentials allowed per service account Default: 10.
         total_credentials (int | Unset): Total number of credentials for this service account (ignoring filters)
             Default: 0.
-        max_lifetime_days (int | Unset): Maximum credential lifetime in days (-1 for unlimited) Default: 180.
+        max_lifetime_days (int | Unset): Maximum credential lifetime in days (0 for unlimited) Default: 180.
     """
 
     resources: list[ServiceAccountCredentialRead]

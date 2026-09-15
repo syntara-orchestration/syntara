@@ -13,18 +13,16 @@ import {
   Spinner,
 } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiErrorIcon } from '@patternfly/react-icons'
-import type { CredentialsAPI } from '@syntara/contracts'
 import React, { type ReactElement, useCallback, useMemo, useState } from 'react'
 
 import { credentialsClient } from '../../../client'
-import { LONG_SELECT_MAX_MENU_HEIGHT, longSelectMenuPopperProps } from '../../../components/longSelectMenu'
-import longSelectMenuStyles from '../../../components/longSelectMenu.module.css'
-import { NxSelect } from '../../../components/NxSelect'
+import { SynSelect } from '../../../components/SynSelect'
 import { detachPromise } from '../../../utils/detachPromise'
 import type { Credential, CredentialType } from '../../configuration/credentials/credentialConstants'
 import { CredentialFormModal } from '../../configuration/credentials/form/CredentialFormModal'
 
 import { resolveFormGroupLabelHelp } from './resolveFormGroupLabelHelp'
+import { useAllCredentials } from './useAllCredentials'
 
 export type CredentialSelectorProps = {
   /** Currently selected credential ID */
@@ -84,7 +82,7 @@ function buildTypeGroups(credentials: Credential[], credentialTypes: CredentialT
   }
   const typeMap = new Map<string, CredentialType>()
   for (const ct of credentialTypes) {
-    typeMap.set(ct.id!, ct)
+    if (ct.id) typeMap.set(ct.id, ct)
   }
   const groupMap = new Map<string, TypeGroup>()
   for (const cred of credentials) {
@@ -93,6 +91,7 @@ function buildTypeGroups(credentials: Credential[], credentialTypes: CredentialT
       const ct = typeMap.get(typeId)
       groupMap.set(typeId, { typeId, typeName: ct?.name ?? 'Unknown', credentials: [] })
     }
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- safe: key was just set via groupMap.set(typeId, ...) above
     groupMap.get(typeId)!.credentials.push(cred)
   }
   return Array.from(groupMap.values())
@@ -102,10 +101,6 @@ type TypeGroup = {
   typeId: string
   typeName: string
   credentials: Credential[]
-}
-
-type CredentialQueryParams = CredentialsAPI.operations['list_credentials']['parameters']['query'] & {
-  project_id?: string
 }
 
 type MenuToggleProps = {
@@ -221,17 +216,16 @@ export function CredentialSelector({
   const [isOpen, setIsOpen] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
 
-  const credentialQueryParams: CredentialQueryParams = useMemo(
-    () => ({ sort: 'name', ...(projectId ? { project_id: projectId } : {}), for_action: 'use' }),
-    [projectId]
-  )
-  const { data, isPending, isError, refetch } = credentialsClient.useQuery('get', '/credentials', {
-    params: { query: credentialQueryParams },
-  })
+  const {
+    credentials: allCredentials,
+    isLoading: isPending,
+    error: credentialsError,
+    refetch,
+  } = useAllCredentials({ projectId })
+  const isError = !!credentialsError
 
   const { data: typesData } = credentialsClient.useQuery('get', '/credential_types')
 
-  const allCredentials: Credential[] = useMemo(() => data?.resources ?? [], [data?.resources])
   const credentialTypes: CredentialType[] = useMemo(() => typesData?.resources ?? [], [typesData?.resources])
 
   // Derive compatible type IDs from type names
@@ -327,17 +321,13 @@ export function CredentialSelector({
 
   return (
     <FormGroup label={label} labelHelp={resolvedLabelHelp} fieldId={fieldId} isRequired={isRequired}>
-      <NxSelect
+      <SynSelect
         id={fieldId}
         isOpen={isOpen}
         selected={value ?? NO_CREDENTIAL_VALUE}
         onSelect={handleSelect}
         onOpenChange={setIsOpen}
         toggle={renderToggle}
-        isScrollable
-        maxMenuHeight={LONG_SELECT_MAX_MENU_HEIGHT}
-        popperProps={longSelectMenuPopperProps}
-        className={longSelectMenuStyles.containScroll}
       >
         <SelectList aria-label={`${label} options`}>
           <NoCredentialOption isRequired={isRequired} value={value} />
@@ -362,7 +352,7 @@ export function CredentialSelector({
             </SelectOption>
           )}
         </SelectList>
-      </NxSelect>
+      </SynSelect>
 
       <FieldError message={errorMessage} />
       <ReadOnlyCredentialWarning show={isReadOnlyCredential} />

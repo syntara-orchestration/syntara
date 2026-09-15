@@ -75,7 +75,7 @@ class _TokenRefreshTransport(httpx.BaseTransport):
                 new_token = _generate_live_token(self._base_url)
                 if new_token == old_token:
                     logger.warning(
-                        "Token refresh returned the same token (likely a static NEXUS_API_TOKEN). "
+                        "Token refresh returned the same token (likely a static SYNTARA_API_TOKEN). "
                         "Cannot auto-refresh — returning 401 response."
                     )
                     return response
@@ -183,7 +183,7 @@ def syntara_client(syntara_base_url: str) -> AuthenticatedClient:
     last_exc: Exception | None = None
     for attempt in range(_MAX_RETRIES + 1):
         try:
-            response = httpx.get(f"{syntara_base_url}/health", timeout=5, verify=ssl_ctx)
+            response = httpx.get(f"{syntara_base_url}/healthz/ready", timeout=5, verify=ssl_ctx)
             print(f"[syntara_client] health check attempt {attempt + 1}: {response.status_code}", flush=True)  # noqa: T201
             response.raise_for_status()
             last_exc = None

@@ -50,6 +50,20 @@ select = ["ALL"]  # Includes isort (I) rules
 
 Violations of import order will be caught by `make lint` and auto-fixed by `make format`.
 
+## Native Import Order: regopy Loads First
+
+`src/syntara/__init__.py` imports `regopy` before anything else, on purpose. Do not remove or reorder this preload.
+
+**Mechanism:** regopy's native library (`librego_shared.so`, from rego-cpp) statically links the snmalloc allocator and wrongly exports `operator new`/`operator delete` with default visibility. Whichever native library loads first wins the libstdc++ allocator symbol bindings for the whole process. When greenlet (pulled in by SQLAlchemy async) or temporalio's Rust bridge loads before regopy, allocations and frees inside rego evaluations cross two allocators and every `Interpreter.query()` permanently leaks ~69 KB of native memory — about 2.5 MB per cache-missing authorization request, which OOM-killed the backend (2 Gi limit) under E2E load. With regopy loaded first, the same workload leaks ~0.1 KB per evaluation.
+
+**Guards, in order of firing:**
+
+1. **The preload itself** (`src/syntara/__init__.py`) — guarded `import regopy`. Only two failures are tolerated and recorded in `syntara._REGOPY_PRELOAD_ERROR`: regopy not installed, and the known UBI E2E-image gap where `libatomic.so.1` is missing (PR #560). Any other loader failure raises immediately.
+2. **Startup tripwire** (`syntara/authz/evaluator.py`) — `RegoEvaluator.start()` logs a WARNING if greenlet or temporalio's Rust bridge (`temporalio.bridge.temporal_sdk_bridge`) ended up before regopy in `sys.modules` insertion order, including the recorded preload error.
+3. **Unit tests** (`tests/unit/authz/test_regopy_import_order.py`) — subprocess tests assert the preload order and both guard branches.
+4. **Leak canary** (`tests/integration/authz/test_regopy_leak_canary.py`) — measures RSS growth over 800 in-app evaluations; a regression fails at ~55 MB against a 25 MB threshold.
+
+
 ## `__init__.py` Conventions
 
 ### No Re-exports

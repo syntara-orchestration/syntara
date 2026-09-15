@@ -19,7 +19,7 @@ type GroupMappingTabProps = {
 export function GroupMappingTab({ providerId, groupMapping, readOnly = false }: Readonly<GroupMappingTabProps>) {
   const navigate = useNavigate()
   const { groups: allGroupsRaw } = useAllGroups()
-  const nexusGroups = useMemo(() => excludeAuthenticatedGroup(allGroupsRaw), [allGroupsRaw])
+  const mappedGroups = useMemo(() => excludeAuthenticatedGroup(allGroupsRaw), [allGroupsRaw])
 
   const entries = useMemo(() => toFormEntries(groupMapping), [groupMapping])
   const hasEntries = entries.length > 0
@@ -41,7 +41,7 @@ export function GroupMappingTab({ providerId, groupMapping, readOnly = false }: 
   return (
     <ReadOnlyView
       entries={entries}
-      nexusGroups={nexusGroups}
+      mappedGroups={mappedGroups}
       onEditMapping={readOnly ? undefined : () => navigateToEdit()}
     />
   )

@@ -89,7 +89,7 @@ test.describe('Page screenshots', { tag: '@local-only' }, () => {
 
       // Clear persisted project-selector state so every screenshot starts from
       // the same "All projects" baseline regardless of test ordering.
-      await page.evaluate(() => localStorage.removeItem('nexus-selected-project'))
+      await page.evaluate(() => localStorage.removeItem('syntara-selected-project'))
 
       // Navigate to the target page
       await page.goto(toAppUrl(entry.path))
@@ -102,14 +102,11 @@ test.describe('Page screenshots', { tag: '@local-only' }, () => {
         await entry.setup(page)
       }
 
-      // Wait for all network requests to settle before taking the screenshot
-      await page.waitForLoadState('networkidle')
-
       // Wait for PatternFly skeleton loaders and spinner elements to clear.
       // Without this, a screenshot taken while data is still loading captures
       // a skeleton/spinner state — future runs then diff against that instead
       // of the real content, creating permanent false positives.
-      await expect(page.locator('.pf-v6-c-skeleton'))
+      await expect(page.locator('[class*="skeleton"]'))
         .toHaveCount(0, { timeout: 10_000 })
         .catch(() => {})
       await expect(page.locator('[aria-label="Loading"]'))
@@ -205,8 +202,6 @@ test.describe('Login page screenshots', { tag: '@local-only' }, () => {
       if (entry.setup) {
         await entry.setup(page)
       }
-
-      await page.waitForLoadState('networkidle')
 
       await page.evaluate(() => {
         if (document.activeElement instanceof HTMLElement) document.activeElement.blur()

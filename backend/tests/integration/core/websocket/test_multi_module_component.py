@@ -8,19 +8,17 @@ handler files (ws/*.py), ensuring:
 - WebSocket endpoint creation and execution
 """
 
-from pathlib import Path
-
-from fastapi import FastAPI
 from starlette.testclient import TestClient
 
 from syntara.core.websocket.endpoint_factory import _HANDLER_MODULE_CACHE, scan_handler_specs
 from syntara.core.websocket.interceptor import ValidationInterceptor
+from tests.integration.conftest import ExampleAppServer
 
 
 class TestMultiModuleComponent:
     """Integration tests for multi-module component support."""
 
-    def test_scan_discovers_all_files(self, example_app_server: tuple[Path, FastAPI]) -> None:
+    def test_scan_discovers_all_files(self, example_app_server: ExampleAppServer) -> None:
         """Test that scan_handler_specs discovers all handler files."""
         _ = example_app_server
         specs = scan_handler_specs()
@@ -35,7 +33,7 @@ class TestMultiModuleComponent:
         assert "coffee" in channels
         assert "events" in channels
 
-    def test_cache_maps_channels_to_modules(self, example_app_server: tuple[Path, FastAPI]) -> None:
+    def test_cache_maps_channels_to_modules(self, example_app_server: ExampleAppServer) -> None:
         """Test that _HANDLER_MODULE_CACHE correctly maps channels to their modules."""
         _ = example_app_server
         scan_handler_specs()
@@ -58,9 +56,9 @@ class TestMultiModuleComponent:
         assert "handlers1" in channel_modules["chat"].__name__
         assert "handlers2" in channel_modules["events"].__name__
 
-    def test_endpoints_created_for_all_channels(self, example_app_server: tuple[Path, FastAPI]) -> None:
+    def test_endpoints_created_for_all_channels(self, example_app_server: ExampleAppServer) -> None:
         """Test that WebSocket endpoints are created for all channels."""
-        _, app = example_app_server
+        app = example_app_server.app
 
         # Collect paths from top-level routes and included routers
         websocket_paths: set[str] = set()
@@ -76,9 +74,9 @@ class TestMultiModuleComponent:
         assert "/ws/testcomp/v1/coffee" in websocket_paths
         assert "/ws/testcomp/v1/events" in websocket_paths
 
-    def test_chat_endpoint_uses_handlers1(self, example_app_server: tuple[Path, FastAPI]) -> None:
+    def test_chat_endpoint_uses_handlers1(self, example_app_server: ExampleAppServer) -> None:
         """Test that chat endpoint uses handler from handlers1.py."""
-        _, app = example_app_server
+        app = example_app_server.app
 
         with TestClient(app) as client, client.websocket_connect("/ws/testcomp/v1/chat") as websocket:
             # Send chat message
@@ -92,9 +90,9 @@ class TestMultiModuleComponent:
             assert response["type"] == "echo"
             assert response["handler"] == "handlers1"
 
-    def test_coffee_endpoint_uses_handlers1(self, example_app_server: tuple[Path, FastAPI]) -> None:
+    def test_coffee_endpoint_uses_handlers1(self, example_app_server: ExampleAppServer) -> None:
         """Test that coffee endpoint uses handler from handlers1.py."""
-        _, app = example_app_server
+        app = example_app_server.app
 
         with TestClient(app) as client, client.websocket_connect("/ws/testcomp/v1/coffee") as websocket:
             # Send coffee request
@@ -107,9 +105,9 @@ class TestMultiModuleComponent:
             assert response["output"] == "espresso"
             assert response["handler"] == "handlers1"
 
-    def test_events_endpoint_uses_handlers2(self, example_app_server: tuple[Path, FastAPI]) -> None:
+    def test_events_endpoint_uses_handlers2(self, example_app_server: ExampleAppServer) -> None:
         """Test that events endpoint uses handler from handlers2.py."""
-        _, app = example_app_server
+        app = example_app_server.app
 
         with TestClient(app) as client, client.websocket_connect("/ws/testcomp/v1/events") as websocket:
             # Send events request
@@ -123,7 +121,7 @@ class TestMultiModuleComponent:
             assert response["group"] == "log"
             assert response["handler"] == "handlers2"
 
-    def test_validation_succeeds_for_multi_module(self, example_app_server: tuple[Path, FastAPI]) -> None:
+    def test_validation_succeeds_for_multi_module(self, example_app_server: ExampleAppServer) -> None:
         """Test that ValidationInterceptor validates each module correctly."""
         _ = example_app_server
         specs = scan_handler_specs()
@@ -143,9 +141,9 @@ class TestMultiModuleComponent:
         assert len(interceptor.validation_results) > 0
         assert all(result.is_valid for result in interceptor.validation_results)
 
-    def test_all_endpoints_work_concurrently(self, example_app_server: tuple[Path, FastAPI]) -> None:
+    def test_all_endpoints_work_concurrently(self, example_app_server: ExampleAppServer) -> None:
         """Test that all endpoints from different modules work concurrently."""
-        _, app = example_app_server
+        app = example_app_server.app
 
         with (
             TestClient(app) as client,

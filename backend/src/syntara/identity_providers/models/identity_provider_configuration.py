@@ -26,7 +26,7 @@ class OIDCIdpType(StrEnum):
 
 
 class OIDCClaimMapping(SQLModel):
-    """Maps Syntara user fields to IdP-specific OIDC claim names."""
+    """Maps Orchestrator user fields to IdP-specific OIDC claim names."""
 
     subject: str = Field(default="sub")
     email: str = Field(default="email")
@@ -38,7 +38,7 @@ class OIDCClaimMapping(SQLModel):
 
 
 class OIDCGroupMappingEntry(SQLModel):
-    """API-facing schema for a single IdP-to-Syntara group mapping entry.
+    """API-facing schema for a single IdP-to-Orchestrator group mapping entry.
 
     Used in API requests/responses. Actual storage is in the
     ``idp_group_mapping_entries`` table.
@@ -154,7 +154,7 @@ class OIDCConfiguration(BaseConsumerConfiguration):
     group_mapping_entries: list[OIDCGroupMappingEntry] = Field(
         default_factory=list,
         exclude=True,
-        description="IdP-to-Syntara group mapping entries",
+        description="IdP-to-Orchestrator group mapping entries",
     )
     allow_all_authenticated: bool = Field(
         default=False, description="Allow all users from this IdP to log in regardless of group mapping results"
@@ -259,7 +259,7 @@ class OIDCConfigurationResponse(SQLModel):
     claim_mapping: OIDCClaimMapping = Field(default_factory=OIDCClaimMapping)
     group_jmespath_expression: str | None = Field(default=None, description="JMESPath expression for group extraction")
     group_mapping_entries: list[OIDCGroupMappingEntry] = Field(
-        default_factory=list, description="IdP-to-Syntara group mapping entries"
+        default_factory=list, description="IdP-to-Orchestrator group mapping entries"
     )
     allow_all_authenticated: bool = Field(
         default=False, description="Allow all users from this IdP to log in regardless of group mapping results"
@@ -331,7 +331,7 @@ class OIDCConfigurationUpdate(BaseConsumerConfiguration):
     group_mapping_entries: list[OIDCGroupMappingEntry] | None = Field(
         default=None,
         exclude=True,
-        description="IdP-to-Syntara group mapping entries (omit to keep existing)",
+        description="IdP-to-Orchestrator group mapping entries (omit to keep existing)",
     )
     allow_all_authenticated: bool | None = Field(
         default=None,

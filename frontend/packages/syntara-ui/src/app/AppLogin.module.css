@@ -1,3 +1,13 @@
 .loginLogo {
   width: 50%;
 }
+
+/* 75rem matches --pf-t--global--breakpoint--xl (custom properties cannot be used in @media).
+   Pin the login container to the top so the brand logo does not jump when the local-login
+   form expands or collapses (PF uses align-items:center which re-centers on height change). */
+@media (min-width: 75rem) {
+  .login {
+    align-items: start;
+    padding-block-start: 15vh;
+  }
+}

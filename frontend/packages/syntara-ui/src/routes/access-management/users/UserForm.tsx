@@ -9,11 +9,11 @@ import { useForm, useWatch } from 'react-hook-form'
 import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsCreateUser, breadcrumbsEditUser, breadcrumbsUserFormLoading } from '../../../app/breadcrumbBuilders'
 import type { AppBreadcrumbItem } from '../../../app/breadcrumbs/appBreadcrumbItem'
-import { NxPage, NxPageBody } from '../../../components/layout/NxPage'
-import { NxPageHeader } from '../../../components/layout/NxPageHeader'
-import { NxPanel } from '../../../components/layout/NxPanel'
-import { NxPageTitle } from '../../../components/NxPageTitle'
+import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
+import { SynPageHeader } from '../../../components/layout/SynPageHeader'
+import { SynPanel } from '../../../components/layout/SynPanel'
 import { useQueryState } from '../../../components/states/useQueryState'
+import { SynPageTitle } from '../../../components/SynPageTitle'
 import { useDirtyFormGuard } from '../../../hooks/useDirtyFormGuard'
 import { detachPromise } from '../../../utils/detachPromise'
 import { useDocLink } from '../../../utils/docs/useDocLink'
@@ -39,6 +39,22 @@ const DEFAULT_VALUES: UserFormData = {
   group_names: ['users'],
 }
 
+const CREATE_USER_PAGE_TITLE = 'Create user'
+const EDIT_USER_PAGE_TITLE = 'Edit user'
+
+function userFormPageTitle(
+  isEdit: boolean,
+  user: { first_name?: string | null; last_name?: string | null; username: string } | undefined
+): string {
+  if (!isEdit) {
+    return CREATE_USER_PAGE_TITLE
+  }
+  if (user) {
+    return `Edit ${userDisplayName(user)}`
+  }
+  return EDIT_USER_PAGE_TITLE
+}
+
 function PasswordWarningAlert({ isSelf }: Readonly<{ isSelf: boolean }>) {
   const title = isSelf ? 'You will be signed out' : 'User will be signed out'
   const description = isSelf
@@ -57,13 +73,13 @@ function userFormBreadcrumbTrail(
   isEdit: boolean,
   pageTitle: string,
   userId: string | undefined,
-  user: { first_name: string; last_name?: string | null; username: string } | undefined
+  user: { first_name?: string | null; last_name?: string | null; username: string } | undefined
 ): AppBreadcrumbItem[] {
   if (!isEdit) {
     return breadcrumbsCreateUser()
   }
   const userBasePath = userId ? AppRoute.AccessManagement.UserDetail.replace(':userId', userId) : undefined
-  const displayName = user ? userDisplayName(user) || user.username : undefined
+  const displayName = user ? userDisplayName(user) : undefined
   if (displayName && userBasePath) {
     return breadcrumbsEditUser(displayName, userBasePath)
   }
@@ -92,7 +108,7 @@ function UserFormMainPanel({
   footer,
 }: Readonly<UserFormMainPanelProps>) {
   return (
-    <NxPanel
+    <SynPanel
       isFullHeight
       isScrollable
       footer={footer}
@@ -112,31 +128,31 @@ function UserFormMainPanel({
           </Form>
         </StackItem>
       </Stack>
-    </NxPanel>
+    </SynPanel>
   )
 }
 
 function UserFormEditNotFoundPage({ onBack, onRetry }: Readonly<{ onBack: () => void; onRetry: () => void }>) {
   return (
-    <NxPage>
-      <NxPageHeader title="Edit User" breadcrumbs={breadcrumbsUserFormLoading('Edit user')} />
-      <NxPageBody>
-        <NxPanel isFullHeight>
+    <SynPage>
+      <SynPageHeader title="Edit user" breadcrumbs={breadcrumbsUserFormLoading('Edit user')} />
+      <SynPageBody>
+        <SynPanel isFullHeight>
           <UserNotFoundState onBack={onBack} onRetry={onRetry} />
-        </NxPanel>
-      </NxPageBody>
-    </NxPage>
+        </SynPanel>
+      </SynPageBody>
+    </SynPage>
   )
 }
 
 function UserFormEditBusyPage({ pageTitle, children }: Readonly<{ pageTitle: string; children: ReactNode }>) {
   return (
-    <NxPage>
-      <NxPageHeader title={pageTitle} breadcrumbs={breadcrumbsUserFormLoading(pageTitle)} />
-      <NxPageBody>
-        <NxPanel isFullHeight>{children}</NxPanel>
-      </NxPageBody>
-    </NxPage>
+    <SynPage>
+      <SynPageHeader title={pageTitle} breadcrumbs={breadcrumbsUserFormLoading(pageTitle)} />
+      <SynPageBody>
+        <SynPanel isFullHeight>{children}</SynPanel>
+      </SynPageBody>
+    </SynPage>
   )
 }
 
@@ -144,10 +160,10 @@ export function UserForm({ mode }: Readonly<UserFormProps>) {
   const navigate = useNavigate()
   const isEdit = mode === 'edit'
   const usersDocLink = useDocLink(isEdit ? 'users' : 'createUser')
-  const pageTitle = isEdit ? 'Edit User' : 'Create User'
   const submitLabel = isEdit ? 'Save' : 'Create user'
 
   const { userId, isValidId, userQuery, isBuiltinUser, isFederatedUser, isSelf, formValues } = useUserFormData(isEdit)
+  const pageTitle = userFormPageTitle(isEdit, userQuery.data)
 
   const schema = isEdit ? userFormSchema : userCreateSchema
   const {
@@ -212,10 +228,10 @@ export function UserForm({ mode }: Readonly<UserFormProps>) {
   const formBreadcrumbs = userFormBreadcrumbTrail(isEdit, pageTitle, userId, userQuery.data)
 
   return (
-    <NxPage>
-      <NxPageTitle segments={[pageTitle, 'Users']} />
-      <NxPageHeader title={pageTitle} docLink={usersDocLink} breadcrumbs={formBreadcrumbs} />
-      <NxPageBody>
+    <SynPage>
+      <SynPageTitle segments={[pageTitle, 'Users']} />
+      <SynPageHeader title={pageTitle} docLink={usersDocLink} breadcrumbs={formBreadcrumbs} />
+      <SynPageBody>
         <UserFormMainPanel
           control={control}
           isEdit={isEdit}
@@ -241,7 +257,7 @@ export function UserForm({ mode }: Readonly<UserFormProps>) {
             </ActionGroup>
           }
         />
-      </NxPageBody>
-    </NxPage>
+      </SynPageBody>
+    </SynPage>
   )
 }

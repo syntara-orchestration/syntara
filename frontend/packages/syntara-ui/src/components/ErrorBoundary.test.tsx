@@ -67,7 +67,7 @@ describe('ErrorBoundary', () => {
       </ErrorBoundary>
     )
 
-    // Should show the default error UI with NxPage structure
+    // Should show the default error UI with SynPage structure
     expect(screen.getAllByText('Something went wrong').length).toBeGreaterThanOrEqual(1)
     expect(screen.getByTestId('error-state')).toBeInTheDocument()
   })

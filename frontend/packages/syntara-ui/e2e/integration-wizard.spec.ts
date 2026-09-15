@@ -314,7 +314,7 @@ test('discovery failure shows error state, retry after correction succeeds', asy
     await app.getByRole('button', { name: 'Red Hat AI' }).click()
     await app.getByRole('option', { name: 'Custom' }).click()
     await app.getByRole('textbox', { name: 'Name' }).fill(integrationName)
-    await app.getByRole('textbox', { name: 'API URL' }).fill('https://llm-test.example.com/v1')
+    await app.getByRole('textbox', { name: 'API URL' }).fill('https://example.com/v1')
     await app.getByRole('button', { name: 'Next' }).click()
 
     await expect(app.getByRole('heading', { level: 2, name: 'Connection credential' })).toBeVisible()

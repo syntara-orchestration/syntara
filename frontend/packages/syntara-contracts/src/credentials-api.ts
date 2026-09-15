@@ -307,6 +307,11 @@ export interface components {
        * @description Username or UUID of the workflow creator
        */
       created_by?: string | null
+      /**
+       * Created At
+       * @description Timestamp when the workflow was created
+       */
+      created_at?: string | null
       /** Description */
       description?: string | null
       /**

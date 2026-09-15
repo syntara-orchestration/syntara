@@ -76,6 +76,8 @@ class TestApprovalServiceBase:
         approval_node_id: str = "approval_1",
         name: str = "Test Approval",
         timeout_at: datetime | None = None,
+        loop_iteration_path: list[int] | None = None,
+        temporal_activity_id: str | None = None,
     ) -> ApprovalCreateRequest:
         """Create a typed approval request for testing."""
         workflow_context = WorkflowContext(
@@ -99,6 +101,8 @@ class TestApprovalServiceBase:
             next_step_approved=next_step_approved,
             next_step_rejected=None,
             workflow_context=workflow_context,
+            loop_iteration_path=loop_iteration_path or [],
+            temporal_activity_id=temporal_activity_id,
         )
 
     def _create_decision_request(
@@ -386,6 +390,56 @@ class TestApprovalServiceCreate(TestApprovalServiceBase):
         assert exc_info.value.approval_node_id == "duplicate_test"
 
     @pytest.mark.asyncio
+    async def test_create_same_node_different_loop_path_succeeds(
+        self,
+        test_db_session: AsyncSession,
+        test_user: User,
+        executions_factory: ExecutionsFactory,
+    ) -> None:
+        """The same canvas node can have one approval per loop iteration path."""
+        service = self._create_test_service(test_db_session, test_user)
+        executions = await executions_factory.create_executions(count=1)
+        execution = executions[0]
+
+        first = await service.create(
+            self._create_approval_request(
+                execution_id=execution.id,
+                project_id=execution.project_id,
+                approval_node_id="loop_gate",
+                name="Iteration 0",
+                loop_iteration_path=[0],
+                temporal_activity_id="loop_gate_iter_0",
+            )
+        )
+        second = await service.create(
+            self._create_approval_request(
+                execution_id=execution.id,
+                project_id=execution.project_id,
+                approval_node_id="loop_gate",
+                name="Iteration 1",
+                loop_iteration_path=[1],
+                temporal_activity_id="loop_gate_iter_1",
+            )
+        )
+
+        assert first.approval_node_id == "loop_gate"
+        assert second.approval_node_id == "loop_gate"
+        assert first.loop_iteration_path == [0]
+        assert second.loop_iteration_path == [1]
+        assert first.id != second.id
+
+        with pytest.raises(ApprovalAlreadyRequestedError):
+            await service.create(
+                self._create_approval_request(
+                    execution_id=execution.id,
+                    project_id=execution.project_id,
+                    approval_node_id="loop_gate",
+                    name="Iteration 1 again",
+                    loop_iteration_path=[1],
+                )
+            )
+
+    @pytest.mark.asyncio
     async def test_create_nonexistent_execution_raises_not_found(
         self,
         test_db_session: AsyncSession,
@@ -657,6 +711,7 @@ class TestApprovalServiceDecide(TestApprovalServiceBase):
                 approval_id=approval.id,
                 decided_by=test_user.username,
                 decided_at=ANY,
+                temporal_activity_id=ANY,
                 decision_notes="Looks good to proceed!",
             )
 
@@ -703,6 +758,7 @@ class TestApprovalServiceDecide(TestApprovalServiceBase):
                 approval_id=approval.id,
                 decided_by=test_user.username,
                 decided_at=ANY,
+                temporal_activity_id=ANY,
                 decision_notes="Insufficient justification",
             )
 

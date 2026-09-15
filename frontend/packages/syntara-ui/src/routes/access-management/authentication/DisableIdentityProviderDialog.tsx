@@ -1,7 +1,7 @@
 import { Content, ContentVariants } from '@patternfly/react-core'
 import type { IdentityProvidersAPI } from '@syntara/contracts'
 
-import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 
 type IdentityProvider = IdentityProvidersAPI.components['schemas']['IdentityProviderRead']
 
@@ -21,7 +21,7 @@ export function DisableIdentityProviderDialog({
   if (!provider) return null
 
   return (
-    <NxConfirmationDialog
+    <SynConfirmationDialog
       isOpen
       onClose={onClose}
       onConfirm={onConfirm}
@@ -35,6 +35,6 @@ export function DisableIdentityProviderDialog({
         sign in with this provider until it is re-enabled.
       </Content>
       <Content component={ContentVariants.p}>You can re-enable the identity provider at any time.</Content>
-    </NxConfirmationDialog>
+    </SynConfirmationDialog>
   )
 }

@@ -28,7 +28,7 @@ class APIExecutorParameters:
         headers (APIExecutorParametersHeaders | Unset):
         body (APIExecutorParametersBodyType0 | None | str | Unset):
         query_params (APIExecutorParametersQueryParams | Unset):
-        credential_id (None | str | Unset): Syntara credential UUID for authentication or Secret URL.
+        credential_id (None | str | Unset): Orchestrator credential UUID for authentication or Secret URL.
     """
 
     method: HTTPMethod

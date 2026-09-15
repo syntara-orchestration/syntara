@@ -29,8 +29,10 @@ from syntara.auth import get_current_user
 from syntara.authz.dependencies import PermissionChecker, VisibilityFilter
 from syntara.authz.engine import VisibilityResult
 from syntara.core.database.session import get_db
+from syntara.core.exceptions import SafeValueError
 from syntara.core.models import User
 from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
+from syntara.files.audit.file_deleted import FileDeletedEvent
 from syntara.files.audit.file_downloaded import FileDownloadedEvent
 from syntara.files.file_manager import FileManager, get_file_manager
 from syntara.files.health import FileStorageStatus, check_file_storage_health
@@ -89,6 +91,13 @@ class FileUploadInfo(BaseModel):
         title="MIME Type", description="Detected MIME type of the file", examples=["application/pdf"]
     )
     status: FileStatus = Field(description="Processing status (pending_conversion)")
+    is_project_deleted: bool | None = Field(
+        default=None,
+        description=(
+            "True when the owning project has been soft-deleted; the file is "
+            "retained as an orphan. Null when not computed (e.g. upload response)."
+        ),
+    )
 
 
 class FileUploadResponse(BaseModel):
@@ -236,6 +245,13 @@ _files_perm_download = PermissionChecker(
     resource_id_param="file_id",
 )
 
+_files_perm_delete = PermissionChecker(
+    "files",
+    "delete",
+    resource_model=FileMetadata,
+    resource_id_param="file_id",
+)
+
 
 class FileDetailResponse(BaseModel):
     """Response model for GET /api/v1/files/{file_id} endpoint."""
@@ -251,6 +267,14 @@ class FileDetailResponse(BaseModel):
     status: FileStatus = Field(description="Current processing status")
     conversion_error: str | None = Field(
         default=None, description="Error message if conversion failed", examples=[None]
+    )
+    is_project_deleted: bool = Field(
+        description=(
+            "True when the owning project has been soft-deleted; the file is "
+            "retained as an orphan. Project-scoped files:delete cannot remove "
+            "orphans after soft-delete; only system-scope files:delete with a "
+            "known file UUID can."
+        ),
     )
 
 
@@ -319,18 +343,20 @@ async def get_files_metadata(
         db,
         allowed_projects=visibility.to_allowed_projects(),
     )
-    return FilesMetadataResponse(
-        files=[
-            FileUploadInfo(
-                file_id=m.id,
-                filename=m.filename,
-                size_bytes=m.size_bytes,
-                mime_type=m.mime_type,
-                status=m.status,
-            )
-            for m in metadata_list
-        ],
-    )
+    project_ids = {m.project_id for m in metadata_list}
+    project_deleted_map = await file_manager.batch_is_project_deleted(project_ids, db)
+    files_info = [
+        FileUploadInfo(
+            file_id=m.id,
+            filename=m.filename,
+            size_bytes=m.size_bytes,
+            mime_type=m.mime_type,
+            status=m.status,
+            is_project_deleted=project_deleted_map.get(m.project_id, True),
+        )
+        for m in metadata_list
+    ]
+    return FilesMetadataResponse(files=files_info)
 
 
 @router.get(
@@ -464,4 +490,66 @@ async def get_file_details(
         mime_type=metadata.mime_type,
         status=metadata.status,
         conversion_error=metadata.conversion_error,
+        is_project_deleted=await file_manager.is_project_deleted(metadata.project_id, db),
     )
+
+
+@router.delete(
+    "/{file_id}",
+    summary="Delete file",
+    description="Permanently delete a file and its stored content. "
+    "After a project is soft-deleted, project-scoped files:delete cannot "
+    "authorize orphan cleanup (the project no longer resolves). Only "
+    "system-scope files:delete can remove an orphan, and only when the "
+    "caller already knows the file UUID.",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={status.HTTP_204_NO_CONTENT: {"description": "File deleted successfully"}},
+    dependencies=[Depends(_files_perm_delete)],
+    operation_id="delete_file",
+)
+async def delete_file(
+    file_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    file_manager: Annotated[FileManager, Depends(get_file_manager)],
+) -> None:
+    """Delete a file by ID from storage and the database.
+
+    Authorization is handled by PermissionChecker (files:delete). After
+    project soft-delete, project-scoped files:delete does not match (the
+    project is filtered out), so only system-scope files:delete with a
+    known UUID can remove an orphan.
+
+    Raises:
+        HTTPException: 404 if file not found
+
+    """
+    existing = await file_manager.get_file_metadata(file_id, db)
+    if existing is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The requested file could not be found",
+        )
+
+    delete_error: str | None = None
+    try:
+        await file_manager.delete_file(file_id, db)
+    except SafeValueError as e:
+        # Race: deleted between lookup and delete
+        delete_error = type(e).__name__
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The requested file could not be found",
+        ) from e
+    except Exception as e:
+        delete_error = type(e).__name__
+        raise
+    finally:
+        AuditEventDispatcher.dispatch(
+            FileDeletedEvent(
+                file_id=file_id,
+                filename=existing.filename,
+                project_id=existing.project_id,
+                storage_backend="s3",
+                error_type=delete_error,
+            ),
+        )

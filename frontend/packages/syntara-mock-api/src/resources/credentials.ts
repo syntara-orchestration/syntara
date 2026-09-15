@@ -2,6 +2,7 @@ import type { CredentialsAPI } from '@syntara/contracts'
 
 type CredentialRead = CredentialsAPI.components['schemas']['CredentialRead']
 type CredentialTypeRead = CredentialsAPI.components['schemas']['CredentialTypeRead']
+type CredentialWorkflowRef = CredentialsAPI.components['schemas']['CredentialWorkflowRef']
 
 // Type assertion needed because the contract types `inputs` as Record<string, never>,
 // but the runtime JSON contains field schema objects. The UI casts with `as Record<string, unknown>`.
@@ -166,10 +167,15 @@ export const credentialTypes: CredentialTypeRead[] = [
 ]
 
 // Workflow references for credential detail pages
-export const credentialWorkflows: Record<string, { id: string; name: string }[]> = {
+export const credentialWorkflows: Record<string, CredentialWorkflowRef[]> = {
   'cred-001': [
-    { id: 'wf-001', name: 'Production Deployment Pipeline' },
-    { id: 'wf-002', name: 'Nightly Health Check' },
+    {
+      id: 'wf-001',
+      name: 'Production Deployment Pipeline',
+      created_by: 'user-001',
+      created_at: '2025-07-10T14:30:00Z',
+    },
+    { id: 'wf-002', name: 'Nightly Health Check', created_by: 'user-001', created_at: '2025-07-12T10:00:00Z' },
   ],
 }
 

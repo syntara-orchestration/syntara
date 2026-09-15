@@ -24,9 +24,9 @@ import {
 import { ActivityTypeEnum } from '@syntara/contracts'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { NxCodeBlock } from '../../components/details/NxCodeBlock'
-import { NxLabel } from '../../components/labels/NxLabel'
-import { NxErrorState } from '../../components/states/NxErrorState'
+import { SynCodeBlock } from '../../components/details/SynCodeBlock'
+import { SynLabel } from '../../components/labels/SynLabel'
+import { SynErrorState } from '../../components/states/SynErrorState'
 import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 import { useElapsedTime } from '../../hooks/useElapsedTime'
 import { extractAAPJobUrl, isAAPNodeType } from '../../utils/aapJobUrl'
@@ -107,9 +107,9 @@ function DataPane({ title, nodeId, data, view, onViewChange, isErrorState = fals
       case 'json':
         return (
           <div style={isErrorState ? { color: 'var(--pf-t--global--color--status--danger--default)' } : undefined}>
-            <NxCodeBlock enableCopy enableExpand expandTitle={`${title} JSON`} noMaxHeight copyContent={jsonText}>
+            <SynCodeBlock enableCopy enableExpand expandTitle={`${title} JSON`} noMaxHeight copyContent={jsonText}>
               {highlightedJson ?? jsonText}
-            </NxCodeBlock>
+            </SynCodeBlock>
           </div>
         )
     }
@@ -173,9 +173,9 @@ function ApprovalAuditSection({ audit }: Readonly<{ audit: ApprovalAudit }>) {
         <Stack>
           <StackItem className={styles.auditLabel}>Decision</StackItem>
           <StackItem>
-            <NxLabel variant="outline" status={status} icon={IconComponent ? <IconComponent /> : undefined}>
+            <SynLabel variant="outline" status={status} icon={IconComponent ? <IconComponent /> : undefined}>
               {audit.decision.charAt(0).toUpperCase() + audit.decision.slice(1)}
-            </NxLabel>
+            </SynLabel>
           </StackItem>
         </Stack>
       </FlexItem>
@@ -327,7 +327,9 @@ function NodeContentArea({
   const [outputView, setOutputView] = useState<PanelView>('json')
 
   if (error) {
-    return <NxErrorState title="Error loading activity data" message={error} onRetry={() => detachPromise(refetch())} />
+    return (
+      <SynErrorState title="Error loading activity data" message={error} onRetry={() => detachPromise(refetch())} />
+    )
   }
   if (isLoading) {
     return <Spinner aria-label="Loading activity data" />

@@ -31,8 +31,11 @@ class FakeSettingsCache:
     def __init__(self, overrides: dict[str, object] | None = None) -> None:
         """Seed from catalog defaults and apply overrides."""
         from syntara.settings.catalog import SETTINGS_CATALOG
+        from syntara.settings.seeder import _resolve_default
 
-        self._store: dict[str, object] = {entry.key: entry.default_value for entry in SETTINGS_CATALOG}
+        self._store: dict[str, object] = {
+            entry.key: _resolve_default(entry.default_value) for entry in SETTINGS_CATALOG
+        }
         if overrides:
             unknown = [k for k in overrides if k not in self._store]
             if unknown:
@@ -90,7 +93,10 @@ class FakeSettingsCache:
                 validation_schema=defn.validation_schema,
             )
         except SettingValidationError:
-            return defn.default_value if defn.default_value is not None else default
+            from syntara.settings.seeder import _resolve_default
+
+            raw_fallback = defn.default_value if defn.default_value is not None else default
+            return _resolve_default(raw_fallback)
 
         return value
 

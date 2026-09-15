@@ -1,8 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
-import { type Page } from '@playwright/test'
-
-import { expect, toAppUrl } from '../fixtures'
+import { type Page, expect, toAppUrl } from '../fixtures'
 import {
   createBasicWorkflowViaApi,
   deleteWorkflowViaApi,
@@ -11,7 +9,12 @@ import {
   publishWorkflowViaApi,
 } from '../utils/api'
 
+import { clickAddConnectedStep } from './add-connected-step'
+import { clickSaveAndWait } from './workflow-save'
+
 export { createBasicWorkflowViaApi, publishWorkflowViaApi }
+export { clickAddConnectedStep }
+export { clickSaveAndWait, isWorkflowSaveResponse } from './workflow-save'
 
 export const buildUniqueName = (prefix: string) => `${prefix}-${Date.now()}-${randomUUID()}`
 
@@ -24,20 +27,16 @@ export const addNodePanel = (page: Page) =>
  * Wait for UI to be ready by ensuring no toast notifications or loading overlays are blocking interactions
  */
 export async function waitForUIReady(page: Page) {
-  // Wait for any active toast items to disappear. The AlertGroup container is always
-  // mounted even when empty — scope to items *inside* it so an empty group resolves
-  // immediately instead of timing out.
-  const toastItems = page.locator('.pf-v6-c-alert-group .pf-v6-c-alert')
-  await toastItems
-    .first()
-    .waitFor({ state: 'hidden', timeout: 5000 })
+  // Wait for ALL PF6 toast alerts to disappear, not just the first.
+  // Scoped to the toast AlertGroup container (AlertGroup has no OUIA attribute);
+  // inline page alerts (ValidationBanner, BuilderReadOnlyBanner, etc.) are excluded.
+  await expect(page.locator('.pf-v6-c-alert-group [data-ouia-component-type="PF6/Alert"]'))
+    .toHaveCount(0, { timeout: 5000 })
     .catch(() => {})
 
-  // Wait for loading states to clear
-  const loadingStates = page.getByLabel('Loading')
-  await loadingStates
-    .first()
-    .waitFor({ state: 'hidden', timeout: 10000 })
+  // Wait for ALL loading indicators to clear, not just the first.
+  await expect(page.getByLabel('Loading'))
+    .toHaveCount(0, { timeout: 10000 })
     .catch(() => {})
 }
 
@@ -51,43 +50,6 @@ export async function triggerLayout(page: Page) {
   await expect(layoutButton).toBeVisible({ timeout: 10000 })
   await layoutButton.click()
   await waitForUIReady(page)
-}
-
-/**
- * Click "Layout" to position nodes and reveal edge buttons,
- * then click "Add connected step" and return the add-node panel.
- */
-export async function clickAddConnectedStep(page: Page) {
-  // Wait for any toast notifications or loading states to clear
-  await waitForUIReady(page)
-
-  const layoutButton = page.getByRole('button', { name: 'Reset layout', exact: true })
-  await expect(layoutButton).toBeVisible({ timeout: 10000 })
-  await layoutButton.click()
-
-  // Wait again after layout completes
-  await waitForUIReady(page)
-
-  // Wait for canvas to finish re-rendering after layout and "Add connected step" buttons to appear
-  await expect(async () => {
-    const addBtn = page.getByRole('button', { name: 'Add connected step' })
-    await expect(addBtn.first()).toBeVisible()
-  }).toPass({ timeout: 10000, intervals: [500] })
-
-  const addBtn = page.getByRole('button', { name: 'Add connected step' })
-  await addBtn.first().click()
-
-  const panel = addNodePanel(page)
-  await expect(panel).toHaveCount(1)
-
-  // Wait for panel to be fully loaded and stable
-  await expect(async () => {
-    const firstCategoryBtn = panel.getByRole('button', { name: 'Action', exact: true })
-    await expect(firstCategoryBtn).toBeVisible()
-    await expect(firstCategoryBtn).toBeEnabled()
-  }).toPass({ timeout: 15000, intervals: [500, 1000] })
-
-  return panel
 }
 
 export async function closeNodeEditorPanel(page: Page) {
@@ -111,7 +73,7 @@ export async function closeNodeEditorPanel(page: Page) {
     return
   }
   // Scope the "Close" button query to the drawer panel to avoid matching alert close buttons
-  const drawer = page.locator('.pf-v6-c-drawer__panel')
+  const drawer = page.getByRole('dialog').or(page.locator('[class*="drawer"]'))
   const closeButton = drawer.getByRole('button', { name: 'Close node editor' })
   if ((await closeButton.count()) > 0) {
     await expect(closeButton).toBeVisible()
@@ -170,6 +132,16 @@ export async function fillCodeEditor(
 ) {
   const typeInto = async (target: ReturnType<Page['locator']>) => {
     const textbox = target.getByRole('textbox', { name: label }).first()
+    const monacoSurface = target.locator('.monaco-editor').first()
+
+    // Wait for Monaco to finish async initialization — either the accessible
+    // textbox or the .monaco-editor wrapper must be present before interacting.
+    await expect(async () => {
+      const hasTextbox = await textbox.isVisible()
+      const hasMonaco = await monacoSurface.isVisible()
+      if (!hasTextbox && !hasMonaco) throw new Error('Monaco editor not ready')
+    }).toPass({ timeout: 15000, intervals: [500, 1000] })
+
     if (await textbox.isVisible()) {
       await textbox.click({ force: true })
       await page.keyboard.press('ControlOrMeta+A')
@@ -178,8 +150,6 @@ export async function fillCodeEditor(
       return
     }
 
-    const monacoSurface = target.locator('.monaco-editor').first()
-    await expect(monacoSurface).toBeVisible()
     await monacoSurface.click({ force: true })
     const usedMonacoApi = await page.evaluate((text) => {
       const w = window as unknown as Record<string, unknown>
@@ -266,6 +236,11 @@ export async function selectFirstProject(page: Page) {
   await expect(page.getByPlaceholder('Select a project')).not.toBeVisible()
 }
 
+/** Escape a literal string for embedding in a RegExp. */
+function escapeForRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 /**
  * Select a project in the builder toolbar.
  * Required for new workflows on the real backend (Save is disabled without a project).
@@ -288,11 +263,18 @@ export async function selectProjectIfRequired(page: Page, projectName?: string) 
   // already selected and no action is needed.
   if ((await projectInput.count()) === 0) return
 
+  // On saved workflows the project selector is disabled (project already assigned).
+  if (!(await projectInput.isEnabled())) return
+
   await projectInput.click()
   await page.getByRole('option').first().waitFor({ state: 'visible', timeout: 10_000 })
 
   if (projectName) {
-    const option = page.getByRole('option', { name: projectName })
+    // Anchor at the start of the option's accessible name. Each option reads
+    // "<name> <description>", so a plain substring match for `default` also
+    // matches the built-in project's "Default project for ..." description and
+    // resolves to two elements.
+    const option = page.getByRole('option', { name: new RegExp(`^${escapeForRegExp(projectName)}(\\s|$)`) })
     await option.waitFor({ state: 'visible', timeout: 15_000 })
     await option.click()
   } else {
@@ -319,16 +301,36 @@ async function trySelectRealProject(page: Page): Promise<boolean> {
         await options.first().waitFor({ state: 'visible', timeout: 3_000 })
       }
 
-      const count = await options.count()
-      for (let i = 0; i < count; i++) {
-        const text = await options.nth(i).textContent()
+      // Prefer `default` — the project `ensureProject` guarantees, and the only
+      // one no spec deletes. Taking whatever sorts first instead means picking a
+      // project another worker created and is about to clean up: the builder
+      // holds its id, the delete lands, and the save then fails with
+      // `404 {"detail":"Project <id> not found"}`. That was invisible before
+      // saves were gated on the response, because the weak URL guard passed
+      // regardless.
+      //
+      // Matched on the *accessible* name, not `textContent`. The option renders
+      // name and description as adjacent nodes with no separator, so
+      // `textContent` reads `defaultDefault project` and no anchored match on it
+      // can work; the accessible name joins them with a space. Anchoring matters
+      // either way — a bare `default` also matches the built-in project's
+      // "Default project for built-in workflows" description.
+      const preferred = page.getByRole('option', { name: /^default(\s|$)/ })
+      if ((await preferred.count()) === 1) {
+        await preferred.click()
+        return
+      }
+
+      const allOptions = await options.all()
+      for (const option of allOptions) {
+        const text = await option.textContent()
         if (
           text &&
           !text.includes('All projects') &&
           !text.includes('Create project') &&
           !text.toLowerCase().includes('built-in')
         ) {
-          await options.nth(i).click()
+          await option.click()
           return
         }
       }
@@ -359,6 +361,18 @@ async function createProjectViaDropdown(page: Page) {
   await expect(dialog).not.toBeVisible({ timeout: 15_000 })
 }
 
+/**
+ * Every step of the UI cleanup fallback is bounded by this.
+ *
+ * `playwright.config.ts` deliberately sets no `actionTimeout`, so an action with
+ * no explicit timeout of its own waits out the entire test timeout. That is
+ * survivable inside a test body, where the wait is for something the test needs;
+ * it is not survivable here, because this helper runs from a `finally` and a
+ * stalled cleanup turns a test whose assertions all passed into a bare
+ * "Test timeout of 120000ms exceeded" with no failing assertion to explain it.
+ */
+export const CLEANUP_ACTION_TIMEOUT = 10_000
+
 /** Delete a workflow by unique name. Prefers API delete; falls back to UI kebab flow. */
 export async function deleteWorkflow(page: Page, workflowName: string) {
   if (page.isClosed()) return
@@ -370,27 +384,38 @@ export async function deleteWorkflow(page: Page, workflowName: string) {
     }
 
     await page.goto(toAppUrl('/workflows'))
-    await page.getByPlaceholder('Filter by name').fill(workflowName)
-    await page.getByRole('button', { name: 'Apply filter' }).click()
+
+    // Reaching here means the API lookup found nothing, which is the common case
+    // rather than the exotic one: the workflow was renamed during the test, or an
+    // earlier cleanup call already deleted it. The list is then often empty, and
+    // an empty project renders the "No workflows yet" empty state — which has no
+    // filter toolbar at all. Waiting for the filter to appear is therefore the
+    // step that must be bounded, not just the interactions that follow it.
+    const nameFilter = page.getByPlaceholder('Filter by name')
+    await nameFilter.waitFor({ state: 'visible', timeout: CLEANUP_ACTION_TIMEOUT })
+    await nameFilter.fill(workflowName, { timeout: CLEANUP_ACTION_TIMEOUT })
+    await page.getByRole('button', { name: 'Apply filter' }).click({ timeout: CLEANUP_ACTION_TIMEOUT })
 
     const table = page.getByRole('grid', { name: 'Workflows table' })
     const row = table.getByRole('row', { name: new RegExp(workflowName) })
     const isVisible = await expect(row.first())
-      .toBeVisible()
+      .toBeVisible({ timeout: CLEANUP_ACTION_TIMEOUT })
       .then(() => true)
       .catch(() => false)
     if (isVisible) {
       await row
         .getByRole('button', { name: /Actions|Kebab toggle/i })
         .first()
-        .click({ force: true })
-      await page.getByRole('menuitem', { name: 'Delete workflow' }).click()
-      await page.getByRole('checkbox', { name: /I understand this workflow/i }).check()
-      await page.getByRole('button', { name: 'Delete' }).click()
+        .click({ force: true, timeout: CLEANUP_ACTION_TIMEOUT })
+      await page.getByRole('menuitem', { name: 'Delete workflow' }).click({ timeout: CLEANUP_ACTION_TIMEOUT })
+      await page
+        .getByRole('checkbox', { name: /I understand this workflow/i })
+        .check({ timeout: CLEANUP_ACTION_TIMEOUT })
+      await page.getByRole('button', { name: 'Delete' }).click({ timeout: CLEANUP_ACTION_TIMEOUT })
 
       // Wait for deletion to complete - delete dialog should close
       const deleteDialog = page.getByRole('dialog', { name: /Delete workflow/i })
-      await expect(deleteDialog).not.toBeVisible({ timeout: 10000 })
+      await expect(deleteDialog).not.toBeVisible({ timeout: CLEANUP_ACTION_TIMEOUT })
     }
   } catch {
     // Best-effort cleanup — don't fail the test
@@ -451,7 +476,11 @@ export async function deleteProject(page: Page, projectName: string) {
 /** Navigate directly to the builder for a known workflow ID and wait for the canvas to be ready. */
 export async function openBuilderById(page: Page, workflowId: string): Promise<void> {
   await page.goto(toAppUrl(`/workflow-builder/${workflowId}`))
-  await selectProjectIfRequired(page)
+  // Existing workflows already have a project assigned — the project selector
+  // never shows "Select a project", so skip selectProjectIfRequired (which
+  // would burn 2s waiting for an element that will never appear).
+  // Instead, wait for the builder toolbar to render.
+  await page.getByPlaceholder('Workflow name').waitFor({ state: 'visible', timeout: 15_000 })
   await waitForUIReady(page)
   // Confirm the builder actually loaded this workflow (not a 404 or error state)
   await expect(page).toHaveURL(new RegExp(`/workflow-builder/${workflowId}`))
@@ -500,10 +529,10 @@ export async function createBasicWorkflow(page: Page, workflowName: string, acti
   await selectProjectIfRequired(page)
 
   await page.getByPlaceholder('Workflow name').fill(workflowName)
-  await page.getByRole('button', { name: 'Save' }).click()
 
-  // Must navigate away from /new — .+ alone would match "new" and give a false pass
-  await expect(page).toHaveURL(/workflow-builder\/(?!new)/, { timeout: 15_000 })
+  // Gate on the create response, not the URL: the builder routes to
+  // /workflow-builder/<id> before the POST has necessarily landed.
+  await clickSaveAndWait(page)
 }
 
 /**
@@ -520,14 +549,23 @@ export async function startWorkflowWithTrigger(page: Page) {
   await page.getByRole('button', { name: 'Manual trigger' }).click()
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Manual trigger')
   await page.getByRole('button', { name: 'Create', exact: true }).click()
+  // Wait for the editor panel to finish closing before returning — the panel auto-closes
+  // after trigger creation, but callers that immediately call openAddNodePanel would race
+  // against the closing animation and not find the edge "Add connected step" buttons.
+  await expect(page.getByRole('button', { name: 'Create', exact: true })).not.toBeAttached({ timeout: 10_000 })
 }
 
-/** Save the workflow with the given name. Waits for URL to confirm persistence. */
-export async function saveWorkflow(page: Page, workflowName: string, { timeout = 15_000 } = {}) {
+/**
+ * Name and save the workflow, returning once the server has the change.
+ *
+ * The old `toHaveURL(/workflow-builder\/(?!new)/)` gate only ever meant anything
+ * on create; on an already-saved workflow the URL never changes, so it resolved
+ * without waiting for the PATCH at all. See `clickSaveAndWait`.
+ */
+export async function saveWorkflow(page: Page, workflowName: string, { timeout = 30_000 } = {}) {
   await selectProjectIfRequired(page)
   await page.getByPlaceholder('Workflow name').fill(workflowName)
-  await page.getByRole('button', { name: 'Save' }).click()
-  await expect(page).toHaveURL(/workflow-builder\/(?!new)/, { timeout })
+  await clickSaveAndWait(page, { timeout })
 }
 
 /**
@@ -550,8 +588,7 @@ export async function createWorkflowWithTrigger(page: Page, workflowName: string
   const nameInput = page.getByPlaceholder('Workflow name')
   await nameInput.clear()
   await nameInput.fill(workflowName)
-  await page.getByRole('button', { name: 'Save' }).click()
-  await expect(page).toHaveURL(/workflow-builder\/(?!new)/, { timeout: 15_000 })
+  await clickSaveAndWait(page)
 
   await expect(page.getByText('Manual trigger')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Reset layout', exact: true })).toBeVisible()
@@ -629,7 +666,6 @@ export async function addScriptNodeUnconnected(page: Page, name: string, code: s
   const panel = addNodePanel(page)
   await expect(panel).toHaveCount(0, { timeout: 10000 })
   await waitForUIReady(page)
-  await page.waitForLoadState('networkidle')
 
   // Retry the entire "Add step" → Action → Script → fill name sequence,
   // because the panel can remount mid-flow when React re-renders the canvas.

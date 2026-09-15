@@ -95,7 +95,11 @@ Disables without a `-- reason` suffix fail lint.
 
 ### `prefer-confirmation-dialog`
 
-Flags raw Modal compositions that appear to be destructive confirmation dialogs. Use `<NxConfirmationDialog>` for consistent UX.
+Flags raw Modal compositions that appear to be destructive confirmation dialogs. Use `<SynConfirmationDialog>` for consistent UX.
+
+### `prefer-syn-select`
+
+Flags importing `Select` from `@patternfly/react-core`. Use `<SynSelect>` so scrollable-menu defaults (`isScrollable`, `maxMenuHeight`, popper `preventOverflow`, dismiss-on-outer-scroll) stay consistent. `SelectList`, `SelectOption`, `SelectGroup`, and `MenuToggle` still come from PatternFly. The wrapper file `src/components/SynSelect.tsx` is exempt.
 
 ### `prefer-pf-list-components`
 
@@ -132,6 +136,18 @@ Use `DateCell` (table cells / detail fields), `UserTimestamp` (username + date),
 ],
 ```
 
+### `no-nested-component-definitions`
+
+Disallows React component definitions inside other functions or components (Sonar S6478). Nested components are re-created on every render, causing React to unmount and remount the entire subtree. Move the component to module scope and pass data as props.
+
+Test files and test utility directories are exempt — wrapper components defined in tests are idiomatic.
+
+### `no-hardcoded-doc-urls`
+
+Disallows hardcoded documentation URLs in project code. Use `useDocLink('key')` from `src/utils/docs/useDocLink.ts` and add new keys to `docsUrls.json` when needed.
+
+Exempt: `docsUrls.json`, `useDocLink.ts`, and `*.test.*` / `*.spec.*` files.
+
 ## Testing
 
 Run the test suite:
@@ -161,10 +177,10 @@ import { toPageTitle } from '../../utils/toPageTitle'
 
 export default function Workflows() {
   return (
-    <NxPage>
+    <SynPage>
       <title>{toPageTitle(['Workflows'])}</title>
-      <NxPageHeader title="Workflows" ... />
-    </NxPage>
+      <SynPageHeader title="Workflows" ... />
+    </SynPage>
   )
 }
 ```
@@ -175,9 +191,9 @@ export default function Workflows() {
 // ✗ Missing <title> — tab will show the previous page's title on navigation
 export default function Workflows() {
   return (
-    <NxPage>
-      <NxPageHeader title="Workflows" />
-    </NxPage>
+    <SynPage>
+      <SynPageHeader title="Workflows" />
+    </SynPage>
   )
 }
 ```
