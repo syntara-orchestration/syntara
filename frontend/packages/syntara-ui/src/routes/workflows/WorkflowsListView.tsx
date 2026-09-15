@@ -8,7 +8,8 @@ import type { FilterConfig, FilterFieldDefinition } from '../../types/filters'
 import type { ProjectRead } from '../access/types'
 
 import type { ProjectRowActionCallbacks } from './projectRowActions'
-import { FlatWorkflowsTableBody, GroupedWorkflowsTableBody, type RowAction } from './WorkflowsTableBody'
+import type { WorkflowRowActionCallbacks } from './workflowRowActions'
+import { FlatWorkflowsTableBody, GroupedWorkflowsTableBody } from './WorkflowsTableBody'
 
 type Workflow = WorkflowAPI.components['schemas']['WorkflowRead']
 
@@ -32,7 +33,8 @@ export type WorkflowsListViewProps = Readonly<{
   groupedWorkflows: GroupedWorkflows | null
   collapsedProjects: Set<string>
   onToggleProject: (projectId: string) => void
-  getRowActions?: (workflow: Workflow) => RowAction[]
+  isWorkflowProjectBuiltin?: (workflow: Workflow) => boolean
+  rowActionCallbacks?: WorkflowRowActionCallbacks
   showRowActions?: boolean
   projectActionCallbacks?: ProjectRowActionCallbacks
   tabKey?: string
@@ -57,7 +59,8 @@ export function WorkflowsListView({
   groupedWorkflows,
   collapsedProjects,
   onToggleProject,
-  getRowActions,
+  isWorkflowProjectBuiltin,
+  rowActionCallbacks,
   showRowActions = true,
   projectActionCallbacks,
   tabKey,
@@ -111,14 +114,16 @@ export function WorkflowsListView({
               groupedWorkflows={groupedWorkflows}
               collapsedProjects={collapsedProjects}
               onToggleProject={onToggleProject}
-              getRowActions={getRowActions}
+              isWorkflowProjectBuiltin={isWorkflowProjectBuiltin}
+              rowActionCallbacks={rowActionCallbacks}
               showRowActions={showRowActions}
               projectActionCallbacks={projectActionCallbacks}
             />
           ) : (
             <FlatWorkflowsTableBody
               workflows={sortedWorkflows}
-              getRowActions={getRowActions}
+              isWorkflowProjectBuiltin={isWorkflowProjectBuiltin}
+              rowActionCallbacks={rowActionCallbacks}
               showRowActions={showRowActions}
             />
           )}
