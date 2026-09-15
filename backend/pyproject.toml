@@ -72,6 +72,7 @@ dependencies = [
     "uuid-utils>=0.9.0",
     "pypdf>=6.15.0",
     "nh3>=0.2.21",
+    "execution-plane",
 ]
 
 [project.optional-dependencies]
@@ -137,6 +138,7 @@ constraint-dependencies = [
 syntara-api-client = { path = "src/api_client", editable = true }
 orchestrator-cli = { path = "src/cli", editable = true }
 orchestrator-test-sdk = { path = "test-sdk", editable = true }
+execution-plane = { path = "execution-plane", editable = true }
 
 [project.scripts]
 orchestrator-admin = "syntara.orchestrator_admin:app"
@@ -288,12 +290,17 @@ ignore_missing_imports = true
 module = "syntara.authz.evaluator"
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+# execution_plane is a uv workspace package; mypy does not resolve workspace editable installs
+module = "execution_plane.*"
+ignore_missing_imports = true
+
 
 # Pytest configuration
 [tool.pytest.ini_options]
 minversion = "7.0"
 addopts = "-ra -q --strict-markers --strict-config"
-testpaths = ["tests"]
+testpaths = ["tests", "execution-plane/tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]

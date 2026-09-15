@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import asyncio
 from logging.config import fileConfig
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from alembic import context
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Connection
+    from sqlalchemy.sql.schema import SchemaItem
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from sqlmodel import SQLModel
@@ -34,6 +35,22 @@ if config.config_file_name is not None:
 # Set target metadata from models
 target_metadata = SQLModel.metadata
 
+# Schemas owned by external packages — excluded from Syntara autogenerate.
+# See docs/execution-plane-integration.md for why execution_plane is managed
+# separately and what changes when EP becomes a standalone service.
+_EXTERNAL_SCHEMAS = {"execution_plane"}
+
+
+def include_object(
+    obj: SchemaItem,
+    name: str | None,  # noqa: ARG001
+    type_: Literal["schema", "table", "column", "index", "unique_constraint", "foreign_key_constraint"],
+    reflected: bool,  # noqa: ARG001, FBT001
+    compare_to: SchemaItem | None,  # noqa: ARG001
+) -> bool:
+    """Exclude tables from externally managed schemas from autogenerate."""
+    return not (type_ == "table" and getattr(obj, "schema", None) in _EXTERNAL_SCHEMAS)
+
 
 # Use the same database URL from centralized settings unless overridden.
 config.set_main_option(
@@ -50,6 +67,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        include_object=include_object,
         compare_type=True,
         compare_server_default=True,
     )
@@ -65,6 +83,7 @@ def do_run_migrations(connection: Connection) -> None:
         connection=connection,
         target_metadata=target_metadata,
         include_schemas=True,
+        include_object=include_object,
         compare_type=True,
         compare_server_default=True,
     )

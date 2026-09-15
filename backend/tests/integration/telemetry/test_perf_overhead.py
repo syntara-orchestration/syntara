@@ -34,7 +34,7 @@ from syntara.telemetry.events.workflow_execution import (
 )
 from syntara.telemetry.handlers.node_execution import NodeExecutedTelemetryHandler
 from syntara.workflows.audit.node_execution import NodeExecutedEvent
-from syntara.workflows.workflow_engine.activities.script_activity import execute_script_activity
+from syntara.workflows.workflow_engine.activities.ep.ep_dispatch_activity import execute_script_activity
 from syntara.workflows.workflow_engine.models.workflow_definition import (
     ActivityTerminalStatus,
     NodeType,

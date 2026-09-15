@@ -3,12 +3,15 @@
 ARG DOWNSTREAM_OVERRIDE=scratch
 ARG BRANDING=false
 ARG BUILDER_IMAGE=registry.access.redhat.com/ubi9/python-312:latest
+ARG CONTAINER_IMAGE_VERSION=""
+ARG APP_SEGMENT_WRITE_KEY=""
 
 FROM ${DOWNSTREAM_OVERRIDE} AS override
 
-FROM ${BUILDER_IMAGE} AS builder
-
-ARG BRANDING
+# ── builder-base: uv + workspace metadata ───────────────────────────────────
+# Shared by all builder stages; no heavy build tools here so the EP builder
+# stays lean (asyncpg/temporalio ship manylinux wheels — no compilation needed).
+FROM ${BUILDER_IMAGE} AS builder-base
 
 USER 0
 
@@ -19,59 +22,51 @@ ENV PYTHON=python3.12 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PIP_USE_PEP517=1 \
-    PYTHONPATH=/opt/app-root/src/src \
-    CMAKE_ARGS="-DBUILD_TESTING:BOOL=OFF -DRUN_NINJA_TEST:BOOL=OFF -DCMakePythonDistributions_ARCHIVE_DOWNLOAD_DIR:PATH=/cachi2/output/deps/generic"
+    PIP_USE_PEP517=1
 
 WORKDIR /opt/app-root/src
 
-# Build tools required by regopy (C/C++ compiler, cmake, ninja) and its
-# setup.py (git).  uv is the project's package manager.
-# When BUILDER_IMAGE is overridden to uv-builder-rhel9, the dnf packages
-# are already present (no-ops) and the uv guard skips the pip install.
-RUN dnf install --setopt=install_weak_deps=0 --nodocs -y \
-        cmake gcc gcc-c++ git libatomic ninja-build \
-    && dnf clean all \
-    && (command -v uv >/dev/null 2>&1 || pip3.12 install --no-cache-dir uv==0.12.3) \
+# Install uv if not already present in the builder image.
+RUN (command -v uv >/dev/null 2>&1 || pip3.12 install --no-cache-dir uv==0.12.3) \
     && [ -f /usr/local/bin/uv ] || { command -v uv && ln -s "$(command -v uv)" /usr/local/bin/uv; }
 
-# Copy dependency files first (for layer caching)
-COPY pyproject.toml uv.lock LICENSE README.md alembic.ini ./
-COPY tools/ci/sanitize_pyproject_for_hermetic.py /usr/local/bin/sanitize_pyproject_for_hermetic.py
+# Workspace root metadata and all workspace member sources (shared by both builders).
+# execution-plane/ must be present for uv to resolve the full workspace in syntara-builder,
+# and it's the only source ep-builder needs.
+COPY pyproject.toml uv.lock LICENSE ./
+COPY execution-plane/ ./execution-plane/
 
-# Copy application code (excluding ./tools)
+
+# ── syntara-builder: regopy (C/C++) + full workspace ────────────────────────
+FROM builder-base AS syntara-builder
+
+ARG BRANDING
+
+ENV CMAKE_ARGS="-DBUILD_TESTING:BOOL=OFF -DRUN_NINJA_TEST:BOOL=OFF -DCMakePythonDistributions_ARCHIVE_DOWNLOAD_DIR:PATH=/cachi2/output/deps/generic"
+
+# Build tools required by regopy (C/C++ compiler, cmake, ninja) and its
+# setup.py (git).  Not needed by the EP builder.
+RUN dnf install --setopt=install_weak_deps=0 --nodocs -y \
+        cmake gcc gcc-c++ git libatomic ninja-build \
+    && dnf clean all
+
+COPY README.md alembic.ini ./
+COPY tools/ci/sanitize_pyproject_for_hermetic.py /usr/local/bin/sanitize_pyproject_for_hermetic.py
 COPY src/ ./src/
 
-# Apply downstream overrides when BRANDING=true (backend/api/templates/ → src/syntara/api/templates/).
-# Uses --mount instead of COPY so that scratch (empty) override stages don't fail.
 RUN --mount=from=override,source=/,target=/tmp/override \
     if [ "$BRANDING" = "true" ] && [ -d /tmp/override/backend ]; then \
         cp -r /tmp/override/backend/. src/syntara/; \
     fi
 
-# Hermetic Konflux builds: use uv against Hermeto-prefetched sdists.
-# cachi2.env injects PIP_FIND_LINKS/PIP_NO_INDEX; we map that flat directory to
-# uv with --find-links/--no-index and run fully offline.
-# Lock metadata is refreshed in-build against the mounted cache because the
-# Hermeto prefetch directory is generated dynamically per build.
-# requirements-build.txt still matters for prefetch completeness even though uv
-# performs the actual isolated build/install steps.
-# Local (non-hermetic) builds fall through to normal uv sync.
+# Hermetic Konflux builds use uv against Hermeto-prefetched sdists.
+# Local builds fall through to normal uv sync.
 # hadolint ignore=SC2086
 RUN if [ -n "${PIP_FIND_LINKS:-}" ]; then \
-        # --- Hermetic build (Konflux / cachi2) ---
-        # uv lock resolves from pyproject metadata, so strip optional/integration
-        # sections from pyproject in-container before refreshing the lock.
         python3.12 /usr/local/bin/sanitize_pyproject_for_hermetic.py pyproject.toml && \
         UV_FIND_LINKS="${PIP_FIND_LINKS}" \
         uv lock --offline --no-index --find-links "${PIP_FIND_LINKS}" && \
         uv venv && \
-        # regopy's setup.py clones rego-cpp via REGOCPP_REPO; rego-cpp's cmake in turn
-        # uses FetchContent to pull cmake_utils, trieste, snmalloc, and cli11.
-        # Extract all five tarballs from the hermeto generic prefetch cache, then patch
-        # rego-cpp's CMakeLists.txt to redirect every FetchContent call to the local
-        # copies (FETCHCONTENT_SOURCE_DIR_<NAME>) before committing to the local git
-        # repo that setup.py will clone from.
         tar -xzf /cachi2/output/deps/generic/rego-cpp-1.5.1.tar.gz -C /tmp && \
         tar -xzf /cachi2/output/deps/generic/cmake_utils.tar.gz    -C /tmp && \
         tar -xzf /cachi2/output/deps/generic/trieste.tar.gz        -C /tmp && \
@@ -93,82 +88,83 @@ RUN if [ -n "${PIP_FIND_LINKS:-}" ]; then \
         UV_FIND_LINKS="${PIP_FIND_LINKS}" \
         uv sync --frozen --no-dev --no-editable --no-index --find-links "${PIP_FIND_LINKS}" --offline; \
     else \
-        # --- Local (non-hermetic) build ---
         uv sync --frozen --no-dev; \
     fi
 
-# Stage 2: Runtime - minimal image with Python and app copied from builder
-FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:8eb2830d0936237fc13a1f2f7e45aecf90d69043380ad167fad0343632937f41
 
-ARG CONTAINER_IMAGE_VERSION=""
-ARG APP_SEGMENT_WRITE_KEY=""
+# ── ep-builder: execution-plane package only ─────────────────────────────────
+# syntara and its heavy deps (regopy, LLM libs, etc.) are excluded from this venv.
+# execution-plane/ is already present (inherited from builder-base).
+FROM builder-base AS ep-builder
+
+RUN uv sync --frozen --no-dev --no-editable --package execution-plane
+
+
+# ── runtime-base: shared minimal UBI runtime ────────────────────────────────
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:8eb2830d0936237fc13a1f2f7e45aecf90d69043380ad167fad0343632937f41 AS runtime-base
 
 USER root
 
-# Install Python 3.12 runtime and dependencies via RPM
 RUN microdnf install --setopt=install_weak_deps=0 --nodocs -y \
-        libatomic \
         python3.12 \
         python3.12-pip \
-        python3.12-cffi \
-        openblas-serial \
-        libgomp \
     && microdnf clean all
 
-# Set python3 symlink via alternatives
 RUN alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1
 
-# Copy license file for Red Hat certification (HasLicense check)
 COPY LICENSE /licenses/LICENSE
 
-# Copy application and venv from builder
-COPY --from=builder /opt/app-root/ /opt/app-root/
-COPY --from=builder /usr/local/bin/uv /usr/local/bin/uv
-
-# Set environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PYTHONPATH=/opt/app-root/src/src \
-    PATH="/opt/app-root/src/.venv/bin:/opt/app-root/bin:$PATH" \
-    APP_CONTAINER_IMAGE_VERSION="${CONTAINER_IMAGE_VERSION}" \
-    APP_SEGMENT_WRITE_KEY="${APP_SEGMENT_WRITE_KEY}" \
     MALLOC_ARENA_MAX=2 \
     MALLOC_TRIM_THRESHOLD_=131072
 
 WORKDIR /opt/app-root/src
 
-# Create data directories for file uploads and audit exports
+
+# ── syntara: API + Temporal workers ─────────────────────────────────────────
+FROM runtime-base AS syntara
+
+ARG CONTAINER_IMAGE_VERSION=""
+ARG APP_SEGMENT_WRITE_KEY=""
+
+# Extra RPMs needed by regopy (libatomic, openblas) and cryptography (cffi).
+RUN microdnf install --setopt=install_weak_deps=0 --nodocs -y \
+        libatomic \
+        python3.12-cffi \
+        openblas-serial \
+        libgomp \
+    && microdnf clean all
+
+COPY --from=syntara-builder /opt/app-root/ /opt/app-root/
+COPY --from=syntara-builder /usr/local/bin/uv /usr/local/bin/uv
+
+ENV PYTHONPATH=/opt/app-root/src/src \
+    PATH="/opt/app-root/src/.venv/bin:/opt/app-root/bin:$PATH" \
+    APP_CONTAINER_IMAGE_VERSION="${CONTAINER_IMAGE_VERSION}" \
+    APP_SEGMENT_WRITE_KEY="${APP_SEGMENT_WRITE_KEY}"
+
 RUN mkdir -p /data/file-uploads /data/audit-exports && \
     chown -R 1001:0 /data/file-uploads /data/audit-exports && \
     chmod -R g=u /data/file-uploads /data/audit-exports
 
-# Fix permissions for OpenShift/UBI (runs as arbitrary UID)
-RUN chown -R 1001:0 /opt/app-root && \
-    chmod -R g=u /opt/app-root
+RUN chown -R 1001:0 /opt/app-root && chmod -R g=u /opt/app-root
 
-# Copy wrapper scripts for service entry points
 COPY containers/syntara/scripts/start-api /usr/local/bin/start-api
 COPY containers/syntara/scripts/start-worker /usr/local/bin/start-worker
 COPY containers/syntara/scripts/start-background-worker /usr/local/bin/start-background-worker
 COPY containers/syntara/scripts/run-seed /usr/local/bin/run-seed
 
-# Verify timezone data is available in the image (AAP-86297)
 RUN python3.12 -c "from zoneinfo import available_timezones; tzs = available_timezones(); assert len(tzs) > 100, f'Expected >100 timezones, got {len(tzs)}'"
 
-# Switch back to non-root user (UBI default user)
 USER 1001
 
-# Expose API port
 EXPOSE 8000
 
-# Default command runs the API server
-# Override with different commands for other services.
 CMD ["start-api"]
 
-# Override UBI name/cpe so Konflux container-first security checks match
-# the product data file.
 ENV DESCRIPTION="Red Hat Ansible Automation Orchestrator" \
     container=oci
 
@@ -182,4 +178,29 @@ LABEL com.redhat.component="ansible-automation-orchestrator-backend-container" \
       io.k8s.description="${DESCRIPTION}" \
       maintainer="Ansible Automation Platform Productization Team" \
       description="${DESCRIPTION}" \
+      vendor="Red Hat, Inc."
+
+
+# ── execution-plane: EP worker only ─────────────────────────────────────────
+FROM runtime-base AS execution-plane
+
+ARG CONTAINER_IMAGE_VERSION=""
+
+COPY --from=ep-builder /opt/app-root/ /opt/app-root/
+COPY --from=ep-builder /usr/local/bin/uv /usr/local/bin/uv
+
+ENV PATH="/opt/app-root/src/.venv/bin:/opt/app-root/bin:$PATH" \
+    APP_CONTAINER_IMAGE_VERSION="${CONTAINER_IMAGE_VERSION}"
+
+RUN chown -R 1001:0 /opt/app-root && chmod -R g=u /opt/app-root
+
+USER 1001
+
+CMD ["execution-plane-worker"]
+
+LABEL com.redhat.component="ansible-automation-orchestrator-ep-container" \
+      name="ansible-automation-platform/automation-orchestrator-execution-plane-rhel9" \
+      summary="Ansible Automation Orchestrator Execution Plane Worker" \
+      io.k8s.display-name="automation-orchestrator-execution-plane-rhel9" \
+      io.k8s.description="Ansible Automation Orchestrator Execution Plane Worker" \
       vendor="Red Hat, Inc."

@@ -17,6 +17,7 @@ PODMAN_PROJECT ?= syntara
 POSTGRES_IMAGE ?= quay.io/sclorg/postgresql-15-c9s
 REDIS_IMAGE ?= mirror.gcr.io/library/redis:6
 APP_IMAGE ?= localhost/syntara:latest
+EP_IMAGE ?= localhost/execution-plane:latest
 APP_UI_IMAGE ?= quay.io/ansible/syntara-ui
 APP_UI_VERSION ?= latest
 XFAIL_ARGS := $(if $(SYNTARA_XFAIL_SOURCE),--xfail-from-url $(SYNTARA_XFAIL_SOURCE)backend.md,)
@@ -110,7 +111,7 @@ test: test-unit ## Alias to unit tests
 
 .PHONY: test-unit
 test-unit: check-deps ## Run unit tests only
-	$(call run-tests,tests/unit/ -v -n auto)
+	$(call run-tests,tests/unit/ execution-plane/tests/ -v -n auto)
 
 .PHONY: test-api-compliance
 test-api-compliance: check-deps ## Run API compliance tests
@@ -240,6 +241,12 @@ endif
 
 # Development workflow
 # ========================================================
+.PHONY: ep-migrate
+ep-migrate: check-deps ## Apply execution_plane schema migrations (separate from main Syntara migrations)
+	@echo "🔄 Running execution_plane migrations..."
+	@cd execution-plane && APP_ADMIN_PASSWORD_PATH=../.secrets/admin-password uv run alembic upgrade head
+	@echo "✅ execution_plane migrations complete"
+
 .PHONY: db-seed
 db-seed: check-deps ## Run all required database seeders
 	@echo "🌱 Seeding database..."
@@ -262,6 +269,7 @@ db-seed-all: check-deps ## Run all database seeders including dev samples
 dev: check-deps _ensure-secrets _ensure-certs ## Run development server with auto-reload
 	@echo "🔄 Running database migrations..."
 	@APP_ADMIN_PASSWORD_PATH=.secrets/admin-password uv run alembic upgrade head
+	@$(MAKE) ep-migrate
 	@$(MAKE) db-seed
 	@echo "✅ Migrations and seeding complete"
 	@echo "🪣 Ensuring S3 bucket exists on moto..."
@@ -311,6 +319,20 @@ worker-run: check-deps _ensure-secrets _ensure-certs ## Run Temporal workflow wo
 	APP_APPROVALS_API_BASE_URL=$(WORKER_BASE_URL) \
 	APP_TOOL_MANAGER_BASE_URL=$(WORKER_BASE_URL) \
 	uv run python -m syntara.workflows.worker
+
+.PHONY: ep-worker-run
+# NOTE: uv run uses the shared workspace venv (syntara is importable but never imported by
+# the EP worker). For true package-level isolation use the container image built from
+# containers/execution-plane/Containerfile, which installs only execution-plane and its deps.
+ep-worker-run: check-deps _ensure-secrets _ensure-certs ## Run execution plane TE worker (polls work_items and completes Temporal activities)
+	@echo "🔄 Starting Execution Plane worker..."
+	APP_DATABASE_URL=$${APP_DATABASE_URL:-postgresql+asyncpg://admin:admin@localhost:5432/syntara_api} \
+	APP_TEMPORAL_ADDRESS=$${APP_TEMPORAL_ADDRESS:-localhost:7233} \
+	APP_TEMPORAL_NAMESPACE=$${APP_TEMPORAL_NAMESPACE:-default} \
+	$(S2S_TLS_VARS) \
+	APP_S2S_TLS_CERT_PATH=.secrets/certs/worker.crt \
+	APP_S2S_TLS_KEY_PATH=.secrets/certs/worker.key \
+	uv run python -m execution_plane.worker
 
 .PHONY: background-worker-run
 background-worker-run: check-deps _ensure-secrets _ensure-certs ## Run Temporal workflow background worker
@@ -389,12 +411,15 @@ temporal-clean: ## Stop Temporal and remove data
 
 
 .PHONY: build-images
-build-images: ## Build container images for syntara and temporal-worker
+build-images: ## Build container images for syntara, temporal-worker, and execution-plane
 	@echo "🔨 Building container images..."
 	@echo "📦 Building syntara image..."
 	$(COMPOSE_FINAL_CMD) build syntara
+	@echo "📦 Building execution-plane image..."
+	$(COMPOSE_FINAL_CMD) build execution-plane-worker
 	@echo "✅ Container images built successfully"
-	@echo "   Image: $${APP_IMAGE:-localhost/syntara:latest}"
+	@echo "   Syntara image:         $${APP_IMAGE:-localhost/syntara:latest}"
+	@echo "   Execution Plane image: $${EP_IMAGE:-localhost/execution-plane:latest}"
 
 
 # Secrets management
@@ -575,7 +600,8 @@ services-clean: ## Stop all services and remove all data (destructive)
 OPENAPI_SPEC ?= src/syntara/schemas/openapi.yaml
 OPENAPI_PUBLIC_SPEC ?= src/syntara/schemas/openapi-public.yaml
 OPENAPI_PUBLIC_SPEC_JSON ?= src/syntara/schemas/openapi-public.json
-OPENAPI_GENERATED_FILES = $(OPENAPI_SPEC) $(OPENAPI_PUBLIC_SPEC) $(OPENAPI_PUBLIC_SPEC_JSON)
+OPENAPI_EP_SPEC ?= src/syntara/schemas/execution_plane/openapi.yaml
+OPENAPI_GENERATED_FILES = $(OPENAPI_SPEC) $(OPENAPI_PUBLIC_SPEC) $(OPENAPI_PUBLIC_SPEC_JSON) $(OPENAPI_EP_SPEC)
 OPENAPI_BASE_REF ?= devel
 VERBOSITY ?= -v
 
@@ -615,11 +641,23 @@ api-spec-drift-public: ## Check that committed public spec matches the generated
 	@echo "🔍 Checking public OpenAPI spec is up to date..."
 	@uv run python tools/export_openapi.py --public 2>/dev/null | uv run python tools/ci/check_openapi_spec.py $(OPENAPI_PUBLIC_SPEC) $(VERBOSITY)
 
+.PHONY: api-spec-bundle-ep
+api-spec-bundle-ep: ## Generate the Execution Plane OpenAPI spec from the FastAPI router
+	@echo "📦 Generating Execution Plane OpenAPI spec..."
+	@uv run python tools/export_openapi.py --ep -o $(OPENAPI_EP_SPEC) 2>/dev/null
+	@uv run pre-commit run yamlfmt --files $(OPENAPI_EP_SPEC) > /dev/null 2>&1 || true
+	@echo "✅ EP spec written to $(OPENAPI_EP_SPEC)"
+
+.PHONY: api-spec-drift-ep
+api-spec-drift-ep: ## Check that committed EP spec matches the generated spec (VERBOSITY=-v/-vv/-vvv)
+	@echo "🔍 Checking Execution Plane OpenAPI spec is up to date..."
+	@uv run python tools/export_openapi.py --ep 2>/dev/null | uv run python tools/ci/check_openapi_spec.py $(OPENAPI_EP_SPEC) $(VERBOSITY)
+
 .PHONY: api-spec-bundle-all
-api-spec-bundle-all: api-spec-bundle api-spec-bundle-public ## Bundle both full and public specs
+api-spec-bundle-all: api-spec-bundle api-spec-bundle-public api-spec-bundle-ep ## Bundle both full and public specs, and regenerate EP spec
 
 .PHONY: api-spec-drift-all
-api-spec-drift-all: api-spec-drift api-spec-drift-public ## Check both specs match implementation
+api-spec-drift-all: api-spec-drift api-spec-drift-public api-spec-drift-ep ## Check all specs match implementation
 
 .PHONY: print-openapi-generated-files
 print-openapi-generated-files: ## Print the list of generated OpenAPI spec files (for CI drift checks)

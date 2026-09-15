@@ -12,10 +12,10 @@ from temporalio.worker import Worker
 
 from syntara.workflows.workflow_engine.activities.condition import condition
 from syntara.workflows.workflow_engine.activities.converge import converge
+from syntara.workflows.workflow_engine.activities.ep.ep_dispatch_activity import execute_script_activity
 from syntara.workflows.workflow_engine.activities.internal_activity import execute_internal_activity
 from syntara.workflows.workflow_engine.activities.manual_trigger import manual_trigger
 from syntara.workflows.workflow_engine.activities.runtime_settings_activity import fetch_workflow_runtime_settings
-from syntara.workflows.workflow_engine.activities.script_activity import execute_script_activity
 from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
 
 if TYPE_CHECKING:

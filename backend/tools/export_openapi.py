@@ -134,6 +134,21 @@ def _consolidate_identical_input_output_schemas(spec: dict[str, Any]) -> None:
             )
 
 
+def build_ep_spec_app() -> FastAPI:
+    """Build a minimal FastAPI app with only the Execution Plane router for spec generation."""
+    from execution_plane.router import router as ep_router
+
+    configure_app_logging()
+
+    app = FastAPI(
+        title="Execution Plane API",
+        description="Execution Plane operator endpoints — observe execution targets and work items.",
+        version="0.1.0",
+    )
+    app.include_router(ep_router)
+    return app
+
+
 def build_spec_app(*, include_internal: bool = True) -> FastAPI:
     """Build a minimal FastAPI app with all routers for spec generation.
 
@@ -233,9 +248,14 @@ def main() -> int:
         action="store_true",
         help="Exclude internal endpoints (/_internal/*) to produce the public-facing spec",
     )
+    parser.add_argument(
+        "--ep",
+        action="store_true",
+        help="Generate the Execution Plane API spec instead of the main Syntara spec",
+    )
     args = parser.parse_args()
 
-    app = build_spec_app(include_internal=not args.public)
+    app = build_ep_spec_app() if args.ep else build_spec_app(include_internal=not args.public)
     spec = app.openapi()
     apply_rfc9457_media_types(spec)
     _inject_permission_metadata(app, spec)
@@ -249,7 +269,7 @@ def main() -> int:
                 op.get("responses", {}).pop("403", None)
 
     if args.format == "yaml":
-        content = yaml.dump(spec, default_flow_style=False, allow_unicode=True, sort_keys=False)
+        content = yaml.dump(spec, default_flow_style=False, allow_unicode=True, sort_keys=False, explicit_start=True)
     else:
         content = json.dumps(spec, indent=2) + "\n"
 

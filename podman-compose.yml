@@ -125,7 +125,8 @@ services:
         DOWNSTREAM_OVERRIDE: ${DOWNSTREAM_OVERRIDE:-scratch}
         BRANDING: ${BRANDING:-false}
       context: ./backend
-      dockerfile: containers/syntara/Containerfile
+      dockerfile: Containerfile
+      target: syntara
     image: ${APP_IMAGE:-localhost/syntara:latest}
     restart: unless-stopped
     command: [sh, -c, 'chmod -R g+rwX /data/audit-exports 2>/dev/null; uv run --no-sync alembic upgrade head && uv run --no-sync python -m syntara.seed --all && (uv run --no-sync python -c "import os,boto3; boto3.client(\"s3\", endpoint_url=os.environ[\"APP_S3_ENDPOINT_URL\"], aws_access_key_id=os.environ[\"APP_S3_ACCESS_KEY_ID\"], aws_secret_access_key=os.environ[\"APP_S3_SECRET_ACCESS_KEY\"], region_name=os.environ[\"APP_S3_REGION\"]).create_bucket(Bucket=os.environ[\"APP_S3_BUCKET_NAME\"])" || true) && uv run --no-sync python -m syntara.api.main']
@@ -371,6 +372,40 @@ services:
       retries: 3
       start_period: 10s
 
+
+  execution-plane-worker:
+    build:
+      context: ./backend
+      dockerfile: Containerfile
+      target: execution-plane
+    image: ${EP_IMAGE:-localhost/execution-plane:latest}
+    restart: unless-stopped
+    environment:
+      # Construct the URL from component vars so it stays in sync with the database service.
+      - APP_DATABASE_URL=postgresql+asyncpg://${APP_DB_USER:-admin}:${APP_DB_PASSWORD:-admin}@database:5432/${APP_DB_NAME:-syntara_api}
+      - APP_TEMPORAL_ADDRESS=temporal:7233
+      - APP_TEMPORAL_NAMESPACE=default
+      - APP_FALLBACK_LOG_LEVEL=${APP_FALLBACK_LOG_LEVEL:-INFO}
+      - APP_S2S_TLS_ENABLED=${APP_S2S_TLS_ENABLED:-true}
+      - APP_S2S_TLS_CA_CERT_PATH=/run/secrets/s2s-ca.pem
+      - APP_S2S_TLS_CERT_PATH=/run/secrets/s2s-cert.crt
+      - APP_S2S_TLS_KEY_PATH=/run/secrets/s2s-cert.key
+    volumes:
+      # Reuses the workflow worker cert for the MVP; add a dedicated ep-worker cert when needed.
+      - ./backend/.secrets/certs/ca.pem:/run/secrets/s2s-ca.pem:ro,z
+      - ./backend/.secrets/certs/worker.crt:/run/secrets/s2s-cert.crt:ro,z
+      - ./backend/.secrets/certs/worker.key:/run/secrets/s2s-cert.key:ro,z
+    depends_on:
+      database:
+        condition: service_healthy
+      temporal:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD-SHELL, 'cat /proc/[0-9]*/cmdline 2>/dev/null | grep -qa execution_plane.worker']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   mcp-server:
     build:

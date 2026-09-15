@@ -963,6 +963,31 @@ wheels = [
 ]
 
 [[package]]
+name = "execution-plane"
+version = "0.1.0"
+source = { editable = "execution-plane" }
+dependencies = [
+    { name = "alembic" },
+    { name = "asyncpg" },
+    { name = "fastapi" },
+    { name = "sqlmodel" },
+    { name = "structlog" },
+    { name = "temporalio" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "alembic", specifier = ">=1.14.0" },
+    { name = "asyncpg", specifier = ">=0.30.0" },
+    { name = "fastapi", specifier = ">=0.135.0" },
+    { name = "sqlmodel", specifier = ">=0.0.22" },
+    { name = "structlog", specifier = ">=24.0.0" },
+    { name = "temporalio", specifier = ">=1.7.0" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.47.0" },
+]
+
+[[package]]
 name = "fastapi"
 version = "0.141.1"
 source = { registry = "https://pypi.org/simple" }
@@ -4242,6 +4267,7 @@ dependencies = [
     { name = "boto3" },
     { name = "cachetools" },
     { name = "cryptography" },
+    { name = "execution-plane" },
     { name = "fastapi" },
     { name = "filelock" },
     { name = "httpx" },
@@ -4349,6 +4375,7 @@ requires-dist = [
     { name = "boto3-stubs", extras = ["s3"], marker = "extra == 'dev'", specifier = ">=1.35.0" },
     { name = "cachetools", specifier = ">=5.0" },
     { name = "cryptography", specifier = ">=48.0.1" },
+    { name = "execution-plane", editable = "execution-plane" },
     { name = "fastapi", specifier = ">=0.135.0" },
     { name = "fastmcp", marker = "extra == 'dev'", specifier = ">=3.2.0,<4.0.0" },
     { name = "filelock", specifier = ">=3.20.0" },

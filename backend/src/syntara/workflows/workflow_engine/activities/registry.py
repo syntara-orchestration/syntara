@@ -26,6 +26,7 @@ from syntara.workflows.workflow_engine.activities.condition import condition
 from syntara.workflows.workflow_engine.activities.converge import converge
 from syntara.workflows.workflow_engine.activities.credential_resolution_activity import resolve_workflow_credentials
 from syntara.workflows.workflow_engine.activities.eda_trigger import eda_trigger
+from syntara.workflows.workflow_engine.activities.ep.ep_dispatch_activity import execute_script_activity
 from syntara.workflows.workflow_engine.activities.http_request_activity import execute_http_request_activity
 from syntara.workflows.workflow_engine.activities.integration_resolution_activity import resolve_workflow_integration
 from syntara.workflows.workflow_engine.activities.integration_scope_activity import validate_node_references
@@ -35,7 +36,6 @@ from syntara.workflows.workflow_engine.activities.loop import loop
 from syntara.workflows.workflow_engine.activities.manual_trigger import manual_trigger
 from syntara.workflows.workflow_engine.activities.runtime_settings_activity import fetch_workflow_runtime_settings
 from syntara.workflows.workflow_engine.activities.scheduled_trigger import scheduled_trigger
-from syntara.workflows.workflow_engine.activities.script_activity import execute_script_activity
 from syntara.workflows.workflow_engine.activities.switch import switch
 from syntara.workflows.workflow_engine.activities.wait_activity import complete_wait, wait
 from syntara.workflows.workflow_engine.activities.webhook_trigger import webhook_trigger

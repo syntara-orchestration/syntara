@@ -49,7 +49,15 @@ OPENAPI_IGNORE_FILES = {
 }
 
 # Directories within schemas/ that don't represent API domains
-SCHEMA_IGNORE_DIRS = {"base", "internal_metrics", "schemas", "v2"}
+SCHEMA_IGNORE_DIRS = {
+    "base",
+    "internal_metrics",
+    "schemas",
+    "v2",
+    # EP router lives outside the syntara package (execution-plane/src/execution_plane/);
+    # the router-module check does not apply. Drift is checked via api-spec-drift-ep.
+    "execution_plane",
+}
 
 # Maps schema domain names to their Python module domain when they differ.
 # Used when a schema lives in its own folder (e.g. schemas/executions/) but
