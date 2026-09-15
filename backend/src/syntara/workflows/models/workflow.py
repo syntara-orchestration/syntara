@@ -13,7 +13,7 @@ from sqlalchemy import UniqueConstraint
 from sqlmodel import CheckConstraint, Field, Index, Relationship, SQLModel, text
 
 from syntara.core.constants import FieldLimits
-from syntara.core.jsonb_limits import LabelsField, OptionalLabelsField, WorkflowDefinitionSizeValidator
+from syntara.core.jsonb_limits import LabelsField, OptionalLabelsField, WorkflowDefinitionValidator
 from syntara.core.models.base.named import NamedResource
 from syntara.core.models.base.user_owned import UserOwnedResource
 from syntara.core.models.pagination import ResourcesResponse
@@ -189,7 +189,7 @@ class WorkflowCreate(WorkflowBase):
     on failure, the raw dict falls through to the service-level validator.
     """
 
-    workflow_definition: Annotated[WorkflowDefinition | dict[str, Any], WorkflowDefinitionSizeValidator] = Field(
+    workflow_definition: Annotated[WorkflowDefinition | dict[str, Any], WorkflowDefinitionValidator] = Field(
         ..., description="Workflow definition object"
     )
     project_id: UUID = Field(..., description="Project to assign workflow to")
@@ -219,7 +219,7 @@ class WorkflowUpdate(SQLModel):
         None, max_length=FieldLimits.DESCRIPTION_MAX_LENGTH, description="Update workflow description"
     )
     labels: OptionalLabelsField = Field(None, description="Update workflow labels")
-    workflow_definition: Annotated[WorkflowDefinition | dict[str, Any] | None, WorkflowDefinitionSizeValidator] = Field(
+    workflow_definition: Annotated[WorkflowDefinition | dict[str, Any] | None, WorkflowDefinitionValidator] = Field(
         None, description="New workflow definition (auto-creates version)"
     )
     change_description: str | None = Field(None, description="Description of changes for version history")

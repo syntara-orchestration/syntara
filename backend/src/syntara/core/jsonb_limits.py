@@ -14,7 +14,7 @@ from syntara.core.exceptions import SafeValueError
 def serialized_json_size(value: Any) -> int:  # noqa: ANN401
     """Return UTF-8 byte length of JSON-serialized value."""
     try:
-        return len(json.dumps(value, default=str, separators=(",", ":")).encode("utf-8"))
+        return len(json.dumps(value, default=str, separators=(",", ":"), ensure_ascii=False).encode("utf-8"))
     except (TypeError, ValueError):
         return len(str(value).encode("utf-8"))
 
@@ -77,24 +77,43 @@ def validate_labels_dict(labels: dict[str, str] | None) -> dict[str, str] | None
 
 
 def validate_workflow_definition_json[T](value: T) -> T:
-    """Reject oversized raw workflow_definition dict payloads."""
+    """Reject workflow_definition dicts that exceed size or structural complexity bounds."""
     if value is None or not isinstance(value, dict):
         return value
-    return validate_jsonb_size(
+
+    validate_jsonb_size(
         value,
         field_name="workflow_definition",
         max_bytes=JsonbLimits.MAX_WORKFLOW_DEFINITION_BYTES,
     )
+
+    nodes = value.get("nodes", [])
+    node_count = len(nodes) if isinstance(nodes, list) else 0
+    if node_count > JsonbLimits.MAX_WORKFLOW_NODES:
+        msg = (
+            f"workflow_definition has too many nodes: {node_count} exceeds maximum of {JsonbLimits.MAX_WORKFLOW_NODES}"
+        )
+        raise SafeValueError(msg)
+
+    edges = value.get("edges", [])
+    edge_count = len(edges) if isinstance(edges, list) else 0
+    if edge_count > JsonbLimits.MAX_WORKFLOW_EDGES:
+        msg = (
+            f"workflow_definition has too many edges: {edge_count} exceeds maximum of {JsonbLimits.MAX_WORKFLOW_EDGES}"
+        )
+        raise SafeValueError(msg)
+
+    return value
 
 
 # Reusable annotated field types / validators: apply at the field's type annotation
 # instead of redeclaring a per-class field_validator, so new labels/workflow_definition
 # fields get the size cap automatically rather than by convention (a per-class
 # copy-paste validator pattern previously let WorkflowUpdate.labels slip through
-# uncapped). WorkflowDefinitionSizeValidator is exposed standalone (rather than bundled
+# uncapped). WorkflowDefinitionValidator is exposed standalone (rather than bundled
 # into a type alias with WorkflowDefinition) to avoid a circular import: WorkflowDefinition
 # lives in syntara.workflows.models, whose package __init__ transitively imports
 # BaseResource from this module's own callers.
 LabelsField = Annotated[dict[str, str], BeforeValidator(validate_labels_dict)]
 OptionalLabelsField = Annotated[dict[str, str] | None, BeforeValidator(validate_labels_dict)]
-WorkflowDefinitionSizeValidator = BeforeValidator(validate_workflow_definition_json)
+WorkflowDefinitionValidator = BeforeValidator(validate_workflow_definition_json)
