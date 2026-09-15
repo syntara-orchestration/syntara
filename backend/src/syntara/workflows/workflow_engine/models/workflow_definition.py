@@ -1032,7 +1032,7 @@ class WebhookTriggerParameters(TemplateAwareBaseModel):
         webhook_path: Unique URL slug identifying this webhook endpoint
             (e.g., "jira-updates"). Becomes part of the final URL:
             /api/v1/webhooks/{webhook_path}
-        form_definition: Optional JSON Schema (Draft-07) for validating incoming
+        input_schema: Optional JSON Schema (Draft-07) for validating incoming
             webhook payloads. If set, requests with non-conforming payloads
             are rejected with 422 Unprocessable Content.
         authorized_service_account_ids: UUIDs of service accounts authorized
@@ -1049,7 +1049,7 @@ class WebhookTriggerParameters(TemplateAwareBaseModel):
         pattern=WebhookLimits.PATH_PATTERN,
         description="Unique URL slug identifying this webhook endpoint",
     )
-    form_definition: dict[str, Any] | None = Field(
+    input_schema: dict[str, Any] | None = Field(
         default=None,
         description="Optional JSON Schema (Draft-07) for validating incoming webhook payloads",
     )
@@ -1061,7 +1061,7 @@ class WebhookTriggerParameters(TemplateAwareBaseModel):
         ),
     )
 
-    @field_validator("form_definition")
+    @field_validator("input_schema")
     @classmethod
     def validate_schema(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
         """Validate JSON Schema at definition time.
