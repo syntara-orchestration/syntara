@@ -219,6 +219,14 @@ export function transformNodeParameters(type: string, parameters: Record<string,
     result = Object.fromEntries(Object.entries(result).filter(([key]) => key !== 'branches'))
   }
 
+  // `use_input_variables` is UI-only state that drives the AAP form's expression-mode
+  // toggle. It is persisted on the node config so the toggle survives reload, but the
+  // backend aap_job_template schema is closed (additionalProperties: false) and rejects
+  // it. Strip it before submission.
+  if (type === ActivityTypeEnum.AAP_JOB_TEMPLATE && 'use_input_variables' in result) {
+    result = Object.fromEntries(Object.entries(result).filter(([key]) => key !== 'use_input_variables'))
+  }
+
   return result
 }
 

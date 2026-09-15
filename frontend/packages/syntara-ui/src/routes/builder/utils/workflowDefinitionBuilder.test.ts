@@ -1053,4 +1053,24 @@ describe('transformNodeParameters', () => {
       expect(result).toEqual({ timeout: 30 })
     })
   })
+
+  describe('aap job template', () => {
+    it('strips use_input_variables and keeps other parameters', () => {
+      const result = transformNodeParameters(ActivityTypeEnum.AAP_JOB_TEMPLATE, {
+        use_input_variables: true,
+        job_template_name: 'deploy',
+        organization_name: 'Default',
+      })
+
+      expect(result).toEqual({ job_template_name: 'deploy', organization_name: 'Default' })
+    })
+
+    it('leaves parameters unchanged when use_input_variables is absent', () => {
+      const result = transformNodeParameters(ActivityTypeEnum.AAP_JOB_TEMPLATE, {
+        job_template_name: 'deploy',
+      })
+
+      expect(result).toEqual({ job_template_name: 'deploy' })
+    })
+  })
 })
