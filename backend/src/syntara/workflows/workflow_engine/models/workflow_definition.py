@@ -939,26 +939,6 @@ class FormPromptNodeParameters(BaseModel):
         description="What happens when the prompt is not answered in time: fail the workflow, "
         "or route to the 'fallback' output port.",
     )
-    submit_label: str | None = Field(
-        default=None,
-        max_length=FieldLimits.FORM_SUBMIT_LABEL_MAX_LENGTH,
-        description="Submit button label.",
-    )
-    success_message: str | None = Field(
-        default=None,
-        max_length=FieldLimits.FORM_SUCCESS_MESSAGE_MAX_LENGTH,
-        description="Shown after submission.",
-    )
-    timezone: str | None = Field(
-        default=None,
-        max_length=FieldLimits.FORM_TIMEZONE_MAX_LENGTH,
-        description="IANA timezone for interpreting date/datetime field values in the form.",
-    )
-    css_override: str | None = Field(
-        default=None,
-        max_length=FieldLimits.FORM_CSS_OVERRIDE_MAX_LENGTH,
-        description="Custom CSS applied to the form view.",
-    )
 
     @field_validator("form_definition")
     @classmethod
