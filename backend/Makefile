@@ -320,8 +320,14 @@ worker-run: check-deps _ensure-secrets _ensure-certs ## Run Temporal workflow wo
 	uv run python -m syntara.workflows.worker
 
 .PHONY: ep-worker-run
+# NOTE: uv run uses the shared workspace venv (syntara is importable but never imported by
+# the EP worker). For true package-level isolation use the container image built from
+# containers/execution-plane/Containerfile, which installs only execution-plane and its deps.
 ep-worker-run: check-deps _ensure-secrets _ensure-certs ## Run execution plane TE worker (polls work_items and completes Temporal activities)
 	@echo "🔄 Starting Execution Plane worker..."
+	APP_DATABASE_URL=$${APP_DATABASE_URL:-postgresql+asyncpg://admin:admin@localhost:5432/syntara_api} \
+	APP_TEMPORAL_ADDRESS=$${APP_TEMPORAL_ADDRESS:-localhost:7233} \
+	APP_TEMPORAL_NAMESPACE=$${APP_TEMPORAL_NAMESPACE:-default} \
 	$(S2S_TLS_VARS) \
 	APP_S2S_TLS_CERT_PATH=.secrets/certs/worker.crt \
 	APP_S2S_TLS_KEY_PATH=.secrets/certs/worker.key \

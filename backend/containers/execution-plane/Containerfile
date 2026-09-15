@@ -1,0 +1,72 @@
+ARG BUILDER_IMAGE=registry.access.redhat.com/ubi9/python-312:latest
+
+FROM ${BUILDER_IMAGE} AS builder
+
+USER 0
+
+ENV PYTHON=python3.12 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /opt/app-root/src
+
+# uv is the project's package manager.
+# When BUILDER_IMAGE is overridden to uv-builder-rhel9, the uv guard skips the pip install.
+RUN dnf install --setopt=install_weak_deps=0 --nodocs -y \
+        gcc python3.12-devel \
+    && dnf clean all \
+    && (command -v uv >/dev/null 2>&1 || pip3.12 install --no-cache-dir uv==0.12.3) \
+    && [ -f /usr/local/bin/uv ] || { command -v uv && ln -s "$(command -v uv)" /usr/local/bin/uv; }
+
+# Copy workspace root for lock file resolution.
+# Only the execution-plane package is needed — syntara src/ is intentionally omitted.
+COPY pyproject.toml uv.lock LICENSE ./
+COPY execution-plane/ ./execution-plane/
+
+# Install only execution-plane and its transitive dependencies.
+# syntara is a peer workspace member but NOT a dep of execution-plane,
+# so it is excluded from this venv entirely.
+RUN uv sync --frozen --no-dev --no-editable --package execution-plane
+
+
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:8eb2830d0936237fc13a1f2f7e45aecf90d69043380ad167fad0343632937f41
+
+ARG CONTAINER_IMAGE_VERSION=""
+
+USER root
+
+RUN microdnf install --setopt=install_weak_deps=0 --nodocs -y \
+        python3.12 \
+        python3.12-pip \
+    && microdnf clean all
+
+RUN alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1
+
+COPY LICENSE /licenses/LICENSE
+
+COPY --from=builder /opt/app-root/ /opt/app-root/
+COPY --from=builder /usr/local/bin/uv /usr/local/bin/uv
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PATH="/opt/app-root/src/.venv/bin:/opt/app-root/bin:$PATH" \
+    APP_CONTAINER_IMAGE_VERSION="${CONTAINER_IMAGE_VERSION}" \
+    MALLOC_ARENA_MAX=2 \
+    MALLOC_TRIM_THRESHOLD_=131072
+
+WORKDIR /opt/app-root/src
+
+RUN chown -R 1001:0 /opt/app-root && chmod -R g=u /opt/app-root
+
+USER 1001
+
+CMD ["execution-plane-worker"]
+
+LABEL com.redhat.component="ansible-automation-orchestrator-ep-container" \
+      name="ansible-automation-platform/automation-orchestrator-execution-plane-rhel9" \
+      summary="Ansible Automation Orchestrator Execution Plane Worker" \
+      io.k8s.display-name="automation-orchestrator-execution-plane-rhel9" \
+      io.k8s.description="Ansible Automation Orchestrator Execution Plane Worker" \
+      vendor="Red Hat, Inc."
