@@ -55,6 +55,18 @@ The `get_settings()` function uses `@lru_cache` to avoid repeated `.env` file re
 
 **Convention:** Field names use `lowercase_with_underscores`. The `APP_` prefix is added automatically by Pydantic.
 
+## Request and File Upload Limits
+
+The API enforces request-body limits before request parsing. JSON and text bodies for `POST`, `PUT`, and `PATCH` requests default to 10 MiB and are configurable with `APP_API_MAX_REQUEST_BODY_MB` from 1 to 120 MiB. Multipart requests use `(APP_FILE_UPLOAD_MAX_SIZE_MB × APP_FILE_UPLOAD_MAX_FILES) + 1 MiB`, capped at 200 MiB. `APP_FILE_UPLOAD_MAX_SIZE_MB` must be between 1 and 500 MiB, and `APP_FILE_UPLOAD_MAX_FILES` must be between 1 and 100. Invalid upload-setting values prevent application startup; settings whose calculated multipart allowance exceeds 200 MiB emit a startup warning and remain capped.
+
+| Environment variable | Default | Range | Purpose |
+|---|---:|---:|---|
+| `APP_API_MAX_REQUEST_BODY_MB` | `10` | `1-120 MiB` | JSON/text body limit for `POST`, `PUT`, and `PATCH` |
+| `APP_FILE_UPLOAD_MAX_SIZE_MB` | `10` | `1-500 MiB` | Maximum size of each uploaded file |
+| `APP_FILE_UPLOAD_MAX_FILES` | `10` | `1-100` | Maximum files per multipart request |
+
+During upgrades, audit existing resource labels before deployment. Labels must use string keys and values, contain no more than 100 entries, keep keys at or below 253 characters and values at or below 256 characters, and remain within 64 KiB serialized size. Existing rows outside these limits can fail later updates and may fail response validation when read.
+
 ## Field Definition Patterns
 
 ### Basic Fields
