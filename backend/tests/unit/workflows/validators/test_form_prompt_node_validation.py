@@ -19,7 +19,7 @@ class TestFormPromptPlacementMatrix:
                 {
                     "id": "form",
                     "type": "form_prompt",
-                    "parameters": {"input_schema": {"type": "object"}},
+                    "parameters": {"form_definition": {"type": "object"}},
                 },
                 {"id": "done", "type": "script", "parameters": {"language": "bash", "code": "echo done"}},
             ],
@@ -42,7 +42,7 @@ class TestFormPromptPlacementMatrix:
                 {
                     "id": "form",
                     "type": "form_prompt",
-                    "parameters": {"input_schema": {"type": "object"}},
+                    "parameters": {"form_definition": {"type": "object"}},
                 },
                 {"id": "script2", "type": "script", "parameters": {"language": "bash", "code": "echo 2"}},
             ],
@@ -66,7 +66,7 @@ class TestFormPromptPlacementMatrix:
                 {
                     "id": "form",
                     "type": "form_prompt",
-                    "parameters": {"input_schema": {"type": "object"}},
+                    "parameters": {"form_definition": {"type": "object"}},
                 },
                 {"id": "done", "type": "script", "parameters": {"language": "bash", "code": "echo done"}},
             ],
@@ -90,7 +90,7 @@ class TestFormPromptPlacementMatrix:
                 {
                     "id": "form",
                     "type": "form_prompt",
-                    "parameters": {"input_schema": {"type": "object"}},
+                    "parameters": {"form_definition": {"type": "object"}},
                 },
             ],
             "edges": [
@@ -113,7 +113,7 @@ class TestFormPromptPlacementMatrix:
                 {
                     "id": "form",
                     "type": "form_prompt",
-                    "parameters": {"input_schema": {"type": "object"}},
+                    "parameters": {"form_definition": {"type": "object"}},
                 },
                 {"id": "done", "type": "script", "parameters": {"language": "bash", "code": "echo done"}},
             ],
@@ -136,12 +136,12 @@ class TestFormPromptPlacementMatrix:
                 {
                     "id": "form1",
                     "type": "form_prompt",
-                    "parameters": {"input_schema": {"type": "object"}},
+                    "parameters": {"form_definition": {"type": "object"}},
                 },
                 {
                     "id": "form2",
                     "type": "form_prompt",
-                    "parameters": {"input_schema": {"type": "object"}},
+                    "parameters": {"form_definition": {"type": "object"}},
                 },
                 {"id": "done", "type": "script", "parameters": {"language": "bash", "code": "echo done"}},
             ],
@@ -164,7 +164,7 @@ class TestFormPromptPlacementMatrix:
                 {
                     "id": "form",
                     "type": "form_prompt",
-                    "parameters": {"input_schema": {"type": "object"}},
+                    "parameters": {"form_definition": {"type": "object"}},
                 },
                 {"id": "script", "type": "script", "parameters": {"language": "bash", "code": "echo 1"}},
                 {"id": "converge", "type": "converge", "parameters": {}},
@@ -192,7 +192,7 @@ class TestFormPromptPlacementNegative:
                 {
                     "id": "form_trigger",
                     "type": "form_prompt",
-                    "parameters": {"input_schema": {"type": "object"}},
+                    "parameters": {"form_definition": {"type": "object"}},
                 }
             ],
             "nodes": [],
@@ -216,7 +216,7 @@ class TestFormPromptPortRules:
                 {
                     "id": "form",
                     "type": "form_prompt",
-                    "parameters": {"input_schema": {"type": "object"}},
+                    "parameters": {"form_definition": {"type": "object"}},
                 }
             ],
             "edges": [{"from": "trigger", "to": "form"}],
@@ -240,7 +240,7 @@ class TestFormPromptPortRules:
                 {
                     "id": "form",
                     "type": "form_prompt",
-                    "parameters": {"input_schema": {"type": "object"}, "fallback_behavior": "fallback"},
+                    "parameters": {"form_definition": {"type": "object"}, "fallback_behavior": "fallback"},
                 },
             ],
             "edges": [
@@ -264,7 +264,7 @@ class TestFormPromptPortRules:
                 {
                     "id": "form",
                     "type": "form_prompt",
-                    "parameters": {"input_schema": {"type": "object"}, "fallback_behavior": "fail"},
+                    "parameters": {"form_definition": {"type": "object"}, "fallback_behavior": "fail"},
                 },
             ],
             "edges": [
@@ -323,7 +323,7 @@ class TestFormPromptValidationErrorPath:
                 {
                     "id": "form",
                     "type": "form_prompt",
-                    "parameters": {},  # missing required input_schema
+                    "parameters": {},  # missing required form_definition
                 }
             ],
             "edges": [],
