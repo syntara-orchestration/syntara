@@ -337,7 +337,11 @@ export function UserIdentitiesPanel({
 
   const filteredRows = applyLocalFilters(allRows, identitiesFilter.filters, getIdentityFilterValue)
 
-  const { activeSortIndex, getSortParams, sortData } = useTableSort({ initialSortIndex: 1, initialDirection: 'asc' })
+  const { activeSortIndex, getSortParams, sortData } = useTableSort({
+    initialSortIndex: 1,
+    initialDirection: 'asc',
+    onSortChange: resetPage,
+  })
   const sortedRows = sortData(filteredRows, (row) => getIdentitySortKey(activeSortIndex, row))
 
   const queryState = useQueryState(query, {
