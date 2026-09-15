@@ -10,7 +10,7 @@ import random
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from typing import Any, Literal
+from typing import Any, Literal, cast
 from uuid import UUID
 
 import structlog
@@ -1805,6 +1805,50 @@ class ActivitySyncService:
         """Merge heartbeat partial output with workflow-queried output."""
         return {**initial, **queried} if initial else queried
 
+    async def _fetch_completed_activity_output(
+        self,
+        handle: WorkflowHandle[Any, Any],
+        activity_id: str,
+    ) -> dict[str, Any] | None:
+        """Resolve output for a completed activity when the initial query returned None."""
+        try:
+            return cast(
+                "dict[str, Any] | None",
+                await handle.execute_update("get_activity_output_when_ready", activity_id),
+            )
+        except RPCError as e:
+            if e.status == RPCStatusCode.NOT_FOUND:
+                # Workflow already completed — the update was rejected because
+                # the server has already recorded the final state.  This means
+                # set_namespace() has run (completion requires it), so a query
+                # against the completed workflow's final state is guaranteed to
+                # return the output.
+                try:
+                    return cast(
+                        "dict[str, Any] | None",
+                        await handle.query("get_activity_output", activity_id),
+                    )
+                except (TemporalError, ValueError) as query_err:
+                    logger.warning(
+                        "Could not query activity data",
+                        activity_id=activity_id,
+                        error=str(query_err),
+                    )
+                    raise
+            logger.warning(
+                "Workflow update for activity output failed",
+                activity_id=activity_id,
+                error=str(e),
+            )
+            return None
+        except ApplicationError as e:
+            logger.warning(
+                "Workflow update for activity output timed out",
+                activity_id=activity_id,
+                error=str(e),
+            )
+            return None
+
     async def _query_activity_io(
         self,
         handle: WorkflowHandle[Any, Any],
@@ -1847,36 +1891,7 @@ class ActivitySyncService:
             raise
 
         if queried_output is None and activity_data["status"] == ActivityStatus.COMPLETED:
-            try:
-                queried_output = await handle.execute_update("get_activity_output_when_ready", activity_id)
-            except RPCError as e:
-                if e.status == RPCStatusCode.NOT_FOUND:
-                    # Workflow already completed — the update was rejected because
-                    # the server has already recorded the final state.  This means
-                    # set_namespace() has run (completion requires it), so a query
-                    # against the completed workflow's final state is guaranteed to
-                    # return the output.
-                    try:
-                        queried_output = await handle.query("get_activity_output", activity_id)
-                    except (TemporalError, ValueError) as query_err:
-                        logger.warning(
-                            "Could not query activity data",
-                            activity_id=activity_id,
-                            error=str(query_err),
-                        )
-                        raise
-                else:
-                    logger.warning(
-                        "Workflow update for activity output failed",
-                        activity_id=activity_id,
-                        error=str(e),
-                    )
-            except ApplicationError as e:
-                logger.warning(
-                    "Workflow update for activity output timed out",
-                    activity_id=activity_id,
-                    error=str(e),
-                )
+            queried_output = await self._fetch_completed_activity_output(handle, activity_id)
 
         if queried_output is not None:
             output_data = self._merge_output(initial_output_data, queried_output)
