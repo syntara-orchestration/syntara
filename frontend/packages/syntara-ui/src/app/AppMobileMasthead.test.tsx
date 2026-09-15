@@ -26,6 +26,7 @@ describe('AppMobileMasthead', () => {
       onToggleDock: vi.fn(),
       onMobileToggle: mockOnMobileToggle,
       isDockExpandableExpanded: false,
+      isNavGroupExpanded: () => false,
       onNavToggle: vi.fn(),
       onNavSelect: vi.fn(),
     })
@@ -82,6 +83,7 @@ describe('AppMobileMasthead', () => {
       onToggleDock: vi.fn(),
       onMobileToggle: mockOnMobileToggle,
       isDockExpandableExpanded: false,
+      isNavGroupExpanded: () => false,
       onNavToggle: vi.fn(),
       onNavSelect: vi.fn(),
     })

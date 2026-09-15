@@ -1,11 +1,12 @@
 import {
-  Button,
+  Brand,
   Masthead,
   MastheadBrand,
   MastheadContent,
   MastheadLogo,
   MastheadMain,
   MastheadToggle,
+  PageToggleButton,
   Toolbar,
   ToolbarContent,
 } from '@patternfly/react-core'
@@ -13,7 +14,6 @@ import { Link } from '@tanstack/react-router'
 
 import { useBrand } from '../providers/brand'
 
-import styles from './AppMobileMasthead.module.css'
 import { useDockState } from './useDockState'
 
 /**
@@ -32,21 +32,22 @@ export function AppMobileMasthead() {
     <Masthead display={{ default: 'inline' }} id="mobile-masthead">
       <MastheadMain>
         <MastheadToggle>
-          <Button
-            ref={mobileToggleRef}
+          <PageToggleButton
+            innerRef={mobileToggleRef}
+            id="mobile-masthead-toggle"
             variant="plain"
             aria-label="Global navigation"
-            isHamburger
-            isExpanded={isDockExpanded}
-            onClick={onMobileToggle}
+            isHamburgerButton
+            isSidebarOpen={isDockExpanded}
+            onSidebarToggle={onMobileToggle}
           />
         </MastheadToggle>
         <MastheadBrand>
           <MastheadLogo component={(props) => <Link {...props} to="/" />} aria-label="Home">
-            <img
+            <Brand
               src={brand.logoCollapsed}
               alt={brand.appTitle}
-              className={styles.collapsedLogo}
+              heights={{ default: '37px' }}
               data-testid="brand-logo"
             />
           </MastheadLogo>

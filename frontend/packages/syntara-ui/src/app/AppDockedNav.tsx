@@ -91,9 +91,14 @@ function openExternalDoc(url: string) {
   globalThis.open(url, '_blank', 'noopener,noreferrer')
 }
 
+function getNavGroupId(itemPath: string): string {
+  return `nav-expandable-${itemPath.replaceAll('/', '-')}`
+}
+
 function NavExpandableItem({
   item,
   isActive,
+  isExpanded,
   isMobile,
   buttonRef,
   location,
@@ -101,19 +106,23 @@ function NavExpandableItem({
 }: Readonly<{
   item: TNavigationItem
   isActive: boolean
+  isExpanded: boolean
   isMobile: boolean
   buttonRef?: React.RefObject<HTMLButtonElement | null>
   location: string
   requestNavigation: (path: string) => void
 }>) {
   const enabledChildren = item.children ?? []
+  const groupId = getNavGroupId(item.path)
 
   /* v8 ignore start -- phantom branches from compiled JSX props and map callback */
   return (
     <NavExpandable
       title={item.label}
       icon={item.icon}
+      groupId={groupId}
       hasExpandableIcon={!isMobile}
+      isExpanded={isExpanded}
       isActive={isActive}
       id={`nav-${item.path.replaceAll('/', '-')}`}
       buttonProps={buttonRef ? { ref: buttonRef } : undefined}
@@ -124,6 +133,7 @@ function NavExpandableItem({
           key={child.path}
           preventDefault
           id={`nav-${child.path.replaceAll('/', '-')}`}
+          groupId={groupId}
           itemId={child.path}
           href={child.path}
           isActive={location.startsWith(child.path)}
@@ -214,6 +224,7 @@ export function AppDockedNav() {
     isMobile,
     dockedToggleRef,
     onToggleDock,
+    isNavGroupExpanded,
     onNavToggle,
     onNavSelect,
   } = useDockState()
@@ -296,6 +307,7 @@ export function AppDockedNav() {
                             key={item.path}
                             item={item}
                             isActive={isActive}
+                            isExpanded={isNavGroupExpanded(getNavGroupId(item.path))}
                             isMobile={isMobile}
                             buttonRef={expandableRefs[item.path]}
                             location={location}
