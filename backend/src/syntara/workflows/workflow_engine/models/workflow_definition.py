@@ -82,8 +82,7 @@ def _normalize_css(css: str) -> str:
     # Normalize numeric hex escapes (\75 → u)
     css = _CSS_UNICODE_ESCAPE.sub(replace_numeric_escape, css)
     # Normalize identity escapes (\r → r)
-    css = _CSS_IDENTITY_ESCAPE.sub(r"\1", css)
-    return css
+    return _CSS_IDENTITY_ESCAPE.sub(r"\1", css)
 
 
 def validate_tool_selection_coherence(
