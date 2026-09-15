@@ -11,8 +11,8 @@ concurrency-safe. It is expected to be re-run after the initial seed —
 typically at API startup from a process that can reach Temporal — because the
 initial seed may run before Temporal exists, in which case the Temporal
 Schedule sync for scheduled built-in workflows degrades to a warning. Runs
-that are expected to reach Temporal set ``APP_SEED_BUILTIN_SCHEDULES_STRICT``
-so that a failed sync fails the command instead. Re-runs against an unchanged
+that are expected to reach Temporal pass ``--strict`` so that a failed sync
+fails the command instead. Re-runs against an unchanged
 definition must not create new workflow versions, the schedule sync must
 remain create-or-update, and concurrent invocations (e.g. several replicas
 starting together) must converge to the same state.
@@ -27,8 +27,8 @@ import structlog
 from sqlmodel import col, select
 
 from syntara.authz.models import Project
-from syntara.core.config.base import get_settings
 from syntara.core.models import User
+from syntara.core.seed import strict_mode
 from syntara.workflows.constants import BUILTIN_PROJECT_NAME
 from syntara.workflows.exceptions import ScheduledTriggerSyncError
 from syntara.workflows.models import Workflow, WorkflowVersion
@@ -247,7 +247,7 @@ async def _sync_builtin_schedules(workflow_id: UUID, workflow_dict: dict[str, An
                 trigger_count=count,
             )
     except ScheduledTriggerSyncError as exc:
-        if get_settings().seed_builtin_schedules_strict:
+        if strict_mode.get():
             raise
         # Non-fatal by default: the workflow row itself is still seeded
         # correctly even if Temporal is unreachable at startup. Mirrors the

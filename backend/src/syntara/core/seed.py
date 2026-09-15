@@ -17,6 +17,7 @@ Usage (CLI)::
 
 from __future__ import annotations
 
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -30,6 +31,10 @@ if TYPE_CHECKING:
     SeederFunc = Callable[[AsyncSession], Coroutine[Any, Any, None]]
 
 logger = structlog.stdlib.get_logger(__name__)
+
+# Set by run_seeders for the duration of a seed pass. Seeders that can degrade
+# gracefully (e.g. a Temporal sync) read it to decide whether to raise instead.
+strict_mode: ContextVar[bool] = ContextVar("seed_strict_mode", default=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,6 +134,7 @@ async def run_seeders(
     *,
     include_optional: bool = False,
     only: list[str] | None = None,
+    strict: bool = False,
 ) -> None:
     """Execute seeders in dependency order.
 
@@ -138,6 +144,8 @@ async def run_seeders(
         session_factory: ``async_sessionmaker`` or compatible callable.
         include_optional: Include optional (dev-only) seeders.
         only: If provided, run only these named seeders (plus dependencies).
+        strict: Make otherwise non-fatal seeding steps (Temporal Schedule sync
+            for built-in workflows) raise instead of logging a warning.
 
     """
     if only:
@@ -146,13 +154,17 @@ async def run_seeders(
     else:
         ordered = get_seeders(include_optional=include_optional)
 
-    logger.info("seed.run.start", seeders=[s.name for s in ordered])
+    logger.info("seed.run.start", seeders=[s.name for s in ordered], strict=strict)
 
-    for seeder in ordered:
-        logger.info("seed.run.seeder", name=seeder.name)
-        async with session_factory() as session:
-            await seeder.func(session)
-        logger.info("seed.run.seeder.done", name=seeder.name)
+    token = strict_mode.set(strict)
+    try:
+        for seeder in ordered:
+            logger.info("seed.run.seeder", name=seeder.name)
+            async with session_factory() as session:
+                await seeder.func(session)
+            logger.info("seed.run.seeder.done", name=seeder.name)
+    finally:
+        strict_mode.reset(token)
 
     logger.info("seed.run.complete", count=len(ordered))
 
