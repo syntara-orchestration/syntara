@@ -6,62 +6,63 @@ description: Demonstrates retry policies with exponential backoff
 triggers:
   - id: trigger_manual
     type: manual_trigger
-
-inputs:
-  failure_rate:
-    type: integer
-    description: Percentage chance of failure (0-100)
-    default: 70
-    minimum: 0
-    maximum: 100
-  seed:
-    type: integer
-    description: |
-      Random seed for deterministic testing (optional).
-      When provided, ensures reproducible behavior in tests.
-      Seed advances by attempt number (attempt 1=seed, attempt 2=seed+1, etc):
-        - Seed 10: Produces [28, 39] = FAIL, SUCCESS (tests retry mechanism)
-        - Seed 1707: Produces [20, 22, 29, 0, 3] = all failures (tests exhaustion)
-      In production, omit this parameter to use true randomness.
-    required: false
+    parameters:
+      input_schema:
+        type: object
+        properties:
+          failure_rate:
+            type: integer
+            description: Percentage chance of failure (0-100)
+            default: 70
+            minimum: 0
+            maximum: 100
+          seed:
+            type: integer
+            description: |
+              Random seed for deterministic testing (optional).
+              When provided, ensures reproducible behavior in tests.
+              Seed advances by attempt number (attempt 1=seed, attempt 2=seed+1, etc):
+                - Seed 10: Produces [28, 39] = FAIL, SUCCESS (tests retry mechanism)
+                - Seed 1707: Produces [20, 22, 29, 0, 3] = all failures (tests exhaustion)
+              In production, omit this parameter to use true randomness.
 
 nodes:
   - id: unreliable_service
     name: Simulate Unreliable Service
     type: script
     parameters:
-      language: bash
+      language: python
+      environment:
+        INPUT_FAILURE_RATE: ${trigger.failure_rate}
+        INPUT_SEED: ${trigger.seed}
       code: |
-        ATTEMPT_NUMBER=${INPUT_ATTEMPT:-1}
+        import json
+        import os
+        import random
+        import sys
 
-        echo "Attempt #$ATTEMPT_NUMBER: Calling unreliable service..."
-        echo "Failure rate: ${INPUT_FAILURE_RATE}%"
+        failure_rate = int(os.environ.get("INPUT_FAILURE_RATE", "70"))
+        seed_env = os.environ.get("INPUT_SEED", "")
+        attempt_number = int(os.environ.get("INPUT_TEMPORAL_ATTEMPT", "1"))
 
-        # Seed RANDOM for deterministic testing if seed provided
-        # Advance seed by attempt number to get different values on each retry
-        if [ -n "$INPUT_SEED" ]; then
-          ATTEMPT=${INPUT_TEMPORAL_ATTEMPT:-1}
-          RANDOM_NUM=$(python3 -c "import random, os; seed = int(os.getenv('INPUT_SEED', 0)); attempt = int(os.getenv('INPUT_TEMPORAL_ATTEMPT', 1)); random.seed(seed + attempt - 1); print(random.randint(0, 99))")
-        else
-          RANDOM_NUM=$((RANDOM % 100))
-        fi
-        echo "Random roll: $RANDOM_NUM (need > $INPUT_FAILURE_RATE to succeed)"
+        print(f"Attempt #{attempt_number}: Calling unreliable service...")
+        print(f"Failure rate: {failure_rate}%")
 
-        if [ "$RANDOM_NUM" -gt "$INPUT_FAILURE_RATE" ]; then
-          echo "✓ Success! Service responded correctly"
-          echo "{\"status\": \"success\", \"attempt\": $ATTEMPT_NUMBER, \"random\": $RANDOM_NUM}"
-          exit 0
-        else
-          echo "✗ Failed! Service error (will retry with backoff)"
-          echo "{\"status\": \"failed\", \"attempt\": $ATTEMPT_NUMBER, \"random\": $RANDOM_NUM}" >&2
-          exit 1
-        fi
-    inputs:
-      failure_rate: ${trigger.failure_rate}
-      attempt: '1'
-      seed: ${trigger.seed}
-    outputs:
-      result: $.stdout
+        # Seed for deterministic testing; advance by attempt so each retry differs
+        if seed_env:
+            random.seed(int(seed_env) + attempt_number - 1)
+
+        random_num = random.randint(0, 99)
+        print(f"Random roll: {random_num} (need > {failure_rate} to succeed)")
+
+        if random_num > failure_rate:
+            print("Success! Service responded correctly")
+            print(json.dumps({"status": "success", "attempt": attempt_number, "random": random_num}))
+            sys.exit(0)
+        else:
+            print("Failed! Service error (will retry with backoff)", file=sys.stderr)
+            print(json.dumps({"status": "failed", "attempt": attempt_number, "random": random_num}), file=sys.stderr)
+            sys.exit(1)
     timeout: 10
     retry_policy:
       maxAttempts: 5
@@ -75,6 +76,9 @@ nodes:
     type: script
     parameters:
       language: bash
+      environment:
+        INPUT_STATUS: ${unreliable_service.stdout_json.status}
+        INPUT_ATTEMPT: ${unreliable_service.stdout_json.attempt}
       code: |
         echo ""
         echo "=== Service Call Completed ==="
@@ -86,9 +90,6 @@ nodes:
         echo "  ✓ Retry policies help handle transient failures"
         echo "  ✓ Exponential backoff prevents overwhelming failing services"
         echo "  ✓ Timeouts prevent indefinite waiting"
-    inputs:
-      status: ${unreliable_service.output.result.status}
-      attempt: ${unreliable_service.output.result.attempt}
 
   - id: fixed_backoff_example
     name: Fixed Backoff Example
@@ -134,9 +135,9 @@ nodes:
         echo "  --inputs '{\"failure_rate\": 30}'  (easier to succeed)"
         echo "  --inputs '{\"failure_rate\": 90}'  (harder to succeed)"
 edges:
-  - source: unreliable_service
-    target: process_result
-  - source: process_result
-    target: fixed_backoff_example
-  - source: fixed_backoff_example
-    target: summary
+  - from: unreliable_service
+    to: process_result
+  - from: process_result
+    to: fixed_backoff_example
+  - from: fixed_backoff_example
+    to: summary
