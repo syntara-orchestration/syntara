@@ -36905,7 +36905,7 @@ components:
         form_definition:
           additionalProperties: true
           type: object
-          title: Input Schema
+          title: Form Definition
           description: JSON Schema describing the form fields to collect.
         responder_users:
           anyOf:
