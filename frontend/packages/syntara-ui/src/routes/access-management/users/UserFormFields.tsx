@@ -291,7 +291,12 @@ export function UserFormFields({
         labelHelp={emailLabelHelp}
       />
       {!federatedUser && (
-        <SynFormField<UserFormData, 'password'> name="password" label="Password" fieldId="user-password" isRequired={!isEdit}>
+        <SynFormField<UserFormData, 'password'>
+          name="password"
+          label="Password"
+          fieldId="user-password"
+          isRequired={!isEdit}
+        >
           {({ field, fieldState }) => (
             <PasswordFieldInput
               field={field}
@@ -304,7 +309,12 @@ export function UserFormFields({
       )}
       {!isEdit && <GroupField />}
       {!isEdit && (
-        <SynFormField<UserFormData, 'is_enabled'> name="is_enabled" label="Status" fieldId="user-is-enabled" labelHelp={userHelp.status}>
+        <SynFormField<UserFormData, 'is_enabled'>
+          name="is_enabled"
+          label="Status"
+          fieldId="user-is-enabled"
+          labelHelp={userHelp.status}
+        >
           {({ field }) => (
             <Switch
               id="user-is-enabled"

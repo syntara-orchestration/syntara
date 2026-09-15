@@ -151,7 +151,12 @@ function AddToGroupModal({
       <ModalBody>
         <Form id="add-to-group-form" onSubmit={handleSubmit(onFormSubmit)}>
           <SynForm form={form}>
-            <SynFormField<AddToGroupFormData, 'groupId'> name="groupId" label="Group" fieldId="add-to-group-select" isRequired>
+            <SynFormField<AddToGroupFormData, 'groupId'>
+              name="groupId"
+              label="Group"
+              fieldId="add-to-group-select"
+              isRequired
+            >
               {({ field, fieldState }) => (
                 <TypeaheadSelect
                   id="add-to-group-select"
