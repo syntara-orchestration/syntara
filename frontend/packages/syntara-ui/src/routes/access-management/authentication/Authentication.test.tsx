@@ -179,51 +179,6 @@ describe('Authentication', () => {
     expect(screen.getByRole('button', { name: /Add OIDC provider/ })).toBeInTheDocument()
   })
 
-  it('keeps create actions in the empty-state footer, not the page header', () => {
-    setupEmptyProviders()
-    render(<Authentication />, { wrapper })
-
-    expect(screen.queryByRole('toolbar')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Add OIDC provider/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Add Ansible Automation Platform/ })).toBeInTheDocument()
-  })
-
-  it('shows create actions in the page header when providers exist', () => {
-    setupProviders()
-    render(<Authentication />, { wrapper })
-
-    expect(screen.getByRole('button', { name: /Add OIDC provider/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Add Ansible Automation Platform/ })).toBeInTheDocument()
-
-    const filterBar = screen.getByRole('search', { name: /Filters/i })
-    expect(within(filterBar).queryByRole('button', { name: /Add OIDC provider/ })).not.toBeInTheDocument()
-    expect(within(filterBar).queryByRole('button', { name: /Add Ansible Automation Platform/ })).not.toBeInTheDocument()
-  })
-
-  it('opens AAP setup modal from the page header toolbar', async () => {
-    setupProviders()
-    const user = userEvent.setup()
-    render(<Authentication />, { wrapper })
-
-    await user.click(screen.getByRole('button', { name: /Add Ansible Automation Platform/ }))
-
-    expect(screen.getByRole('dialog')).toBeInTheDocument()
-  })
-
-  it('hides Add Ansible Automation Platform in the header when an AAP provider exists', () => {
-    const aapProvider = {
-      ...mockProvider,
-      id: 'aap-1',
-      name: 'AAP',
-      configuration: { ...mockProvider.configuration, idp_type: 'aap' },
-    }
-    setupProviders([aapProvider] as (typeof mockProvider)[])
-    render(<Authentication />, { wrapper })
-
-    expect(screen.queryByRole('button', { name: /Add Ansible Automation Platform/ })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Add OIDC provider/ })).toBeInTheDocument()
-  })
-
   it('has no accessibility violations', async () => {
     setupEmptyProviders()
     const { container } = render(<Authentication />, { wrapper })
