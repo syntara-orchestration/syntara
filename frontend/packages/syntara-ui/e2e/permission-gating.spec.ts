@@ -584,15 +584,16 @@ test.describe('Permission gating — Workflow actions', () => {
       await expect(createButton).toBeVisible()
       await expect(createButton).not.toHaveAttribute('aria-disabled', 'true')
 
-      await projectAdminApp.getByPlaceholder('Filter by name').fill(workflow.name)
-      await projectAdminApp.getByRole('button', { name: 'Apply filter' }).click()
+      await filterWorkflowsByName(projectAdminApp, workflow.name)
 
       const workflowRow = projectAdminApp
         .getByRole('grid', { name: 'Workflows table' })
         .getByRole('row', { name: new RegExp(workflow.name) })
       await expect(workflowRow).toBeVisible({ timeout: 15_000 })
-      const kebab = workflowRow.getByRole('button', { name: /Actions|Kebab toggle/i })
-      await kebab.click({ force: true })
+      // A forced click skips every actionability wait, so it lands even while the
+      // list query is replacing the row — the handler never runs, the menu stays
+      // shut, and each assertion below fails on a missing `menuitem`.
+      await openRowKebab(workflowRow, /Edit workflow/i)
 
       await expect(projectAdminApp.getByRole('menuitem', { name: /Edit workflow/i })).not.toHaveAttribute(
         'aria-disabled',
@@ -630,12 +631,13 @@ test.describe('Permission gating — Workflow actions', () => {
       await viewerApp.goto(toAppUrl('/workflows'))
       await expect(viewerApp.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
 
+      await filterWorkflowsByName(viewerApp, workflow.name)
+
       const workflowRow = viewerApp
         .getByRole('grid', { name: 'Workflows table' })
         .getByRole('row', { name: new RegExp(workflow.name) })
       await expect(workflowRow).toBeVisible({ timeout: 15_000 })
-      const kebab = workflowRow.getByRole('button', { name: /Actions|Kebab toggle/i })
-      await kebab.click()
+      await openRowKebab(workflowRow, /Edit workflow/i)
 
       const editItem = viewerApp.getByRole('menuitem', { name: /Edit workflow/i })
       await expect(editItem).toBeVisible()
