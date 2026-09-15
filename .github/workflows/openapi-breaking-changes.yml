@@ -83,12 +83,27 @@ jobs:
         if: steps.detect.outputs.changed == 'true'
         id: breaking
         run: |
+          set +e
           ./scripts/openapi/check-breaking-changes.py \
             --base origin/${{ github.base_ref }} \
             --head HEAD \
             --output breaking-results.json \
             --fallback-spec-path backend/src/syntara/schemas/openapi.yaml \
             --pr-labels "$OPENAPI_PR_LABELS"
+          EXIT_CODE=$?
+          set -e
+
+          # If targeting a feature/* branch, pass with warning instead of failing
+          if [[ "${{ github.base_ref }}" == feature/* ]] && [ $EXIT_CODE -ne 0 ]; then
+            echo "::warning::OpenAPI breaking changes detected, but allowing for feature branch target. This check would fail when merging to devel/early-access."
+            if [ -f breaking-results.json ]; then
+              echo "::warning::Breaking change details:"
+              cat breaking-results.json
+            fi
+            exit 0
+          fi
+
+          exit $EXIT_CODE
         working-directory: backend
         env:
           OPENAPI_PR_LABELS: ${{ steps.labels.outputs.labels }}
