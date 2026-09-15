@@ -1,4 +1,4 @@
-"""Ensure the OpenAPI spec uses "Orchestrator", not "Syntara"."""
+"""Ensure the OpenAPI spec uses "Automation Orchestrator", not "Syntara" or bare "Orchestrator"."""
 
 from __future__ import annotations
 
@@ -36,13 +36,13 @@ def _collect_strings(obj: dict[str, object] | list[object] | str | object, path:
 
 
 class TestNoSyntaraInSpec:
-    """Verify the API spec uses Orchestrator, not Syntara."""
+    """Verify the API spec uses Automation Orchestrator, not Syntara."""
 
-    def test_title_uses_orchestrator(self, runtime_spec: dict[str, Any]) -> None:
-        """The spec title must use Orchestrator, not Syntara."""
+    def test_title_uses_automation_orchestrator(self, runtime_spec: dict[str, Any]) -> None:
+        """The spec title must use Automation Orchestrator, not Syntara."""
         title = runtime_spec.get("info", {}).get("title", "")
         assert "Syntara" not in title, f"Spec title contains 'Syntara': {title}"
-        assert "Orchestrator" in title, f"Spec title missing 'Orchestrator': {title}"
+        assert "Automation Orchestrator" in title, f"Spec title missing 'Automation Orchestrator': {title}"
 
     def test_no_syntara_in_spec(self, runtime_spec: dict[str, Any]) -> None:
         """No string value in the spec should contain 'Syntara'."""
@@ -54,7 +54,7 @@ class TestNoSyntaraInSpec:
 
 
 class TestNoSyntaraInJsonSchemas:
-    """Verify static JSON schema files use Orchestrator, not Syntara."""
+    """Verify static JSON schema files use Automation Orchestrator, not Syntara."""
 
     def test_no_syntara_in_json_schemas(self) -> None:
         """No JSON schema file should contain 'Syntara'."""

@@ -856,7 +856,7 @@ export interface components {
   }
   parameters: {
     /**
-     * @description Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+     * @description Optional Automation Orchestrator credential ID for Ansible Automation Platform Controller authentication.
      *     If omitted, the selected integration's management credential is used.
      *     Credential must be of type "Ansible Automation Platform".
      */
@@ -880,7 +880,7 @@ export interface operations {
         search?: string | null
         page_size?: number
         /**
-         * @description Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+         * @description Optional Automation Orchestrator credential ID for Ansible Automation Platform Controller authentication.
          *     If omitted, the selected integration's management credential is used.
          *     Credential must be of type "Ansible Automation Platform".
          */
@@ -923,7 +923,7 @@ export interface operations {
         search?: string | null
         page_size?: number
         /**
-         * @description Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+         * @description Optional Automation Orchestrator credential ID for Ansible Automation Platform Controller authentication.
          *     If omitted, the selected integration's management credential is used.
          *     Credential must be of type "Ansible Automation Platform".
          */
@@ -967,7 +967,7 @@ export interface operations {
         search?: string | null
         page_size?: number
         /**
-         * @description Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+         * @description Optional Automation Orchestrator credential ID for Ansible Automation Platform Controller authentication.
          *     If omitted, the selected integration's management credential is used.
          *     Credential must be of type "Ansible Automation Platform".
          */
@@ -1012,7 +1012,7 @@ export interface operations {
         search?: string | null
         page_size?: number
         /**
-         * @description Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+         * @description Optional Automation Orchestrator credential ID for Ansible Automation Platform Controller authentication.
          *     If omitted, the selected integration's management credential is used.
          *     Credential must be of type "Ansible Automation Platform".
          */
@@ -1056,7 +1056,7 @@ export interface operations {
         search?: string | null
         page_size?: number
         /**
-         * @description Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+         * @description Optional Automation Orchestrator credential ID for Ansible Automation Platform Controller authentication.
          *     If omitted, the selected integration's management credential is used.
          *     Credential must be of type "Ansible Automation Platform".
          */
@@ -1101,7 +1101,7 @@ export interface operations {
         search?: string | null
         page_size?: number
         /**
-         * @description Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+         * @description Optional Automation Orchestrator credential ID for Ansible Automation Platform Controller authentication.
          *     If omitted, the selected integration's management credential is used.
          *     Credential must be of type "Ansible Automation Platform".
          */
@@ -1145,7 +1145,7 @@ export interface operations {
         search?: string | null
         page_size?: number
         /**
-         * @description Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+         * @description Optional Automation Orchestrator credential ID for Ansible Automation Platform Controller authentication.
          *     If omitted, the selected integration's management credential is used.
          *     Credential must be of type "Ansible Automation Platform".
          */
@@ -1189,7 +1189,7 @@ export interface operations {
         search?: string | null
         page_size?: number
         /**
-         * @description Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+         * @description Optional Automation Orchestrator credential ID for Ansible Automation Platform Controller authentication.
          *     If omitted, the selected integration's management credential is used.
          *     Credential must be of type "Ansible Automation Platform".
          */
@@ -1232,7 +1232,7 @@ export interface operations {
         search?: string | null
         page_size?: number
         /**
-         * @description Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+         * @description Optional Automation Orchestrator credential ID for Ansible Automation Platform Controller authentication.
          *     If omitted, the selected integration's management credential is used.
          *     Credential must be of type "Ansible Automation Platform".
          */
@@ -1275,7 +1275,7 @@ export interface operations {
         search?: string | null
         page_size?: number
         /**
-         * @description Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+         * @description Optional Automation Orchestrator credential ID for Ansible Automation Platform Controller authentication.
          *     If omitted, the selected integration's management credential is used.
          *     Credential must be of type "Ansible Automation Platform".
          */

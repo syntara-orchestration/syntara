@@ -25,7 +25,7 @@ class AAPWorkflowJobTemplateExecutorParameters:
     inventory, extra_vars, limit, tags, skip_tags, labels, timeout).
 
         Attributes:
-            credential_id (None | str | Unset): Orchestrator credential UUID for Ansible Automation Platform API
+            credential_id (None | str | Unset): Automation Orchestrator credential UUID for Ansible Automation Platform API
                 authentication. Separate from legacy credentials list.
             integration_id (None | str | Unset): UUID of the Ansible Automation Platform Gateway integration for connection
                 URL resolution.
