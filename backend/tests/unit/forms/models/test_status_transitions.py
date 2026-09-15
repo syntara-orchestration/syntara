@@ -3,7 +3,7 @@
 Tests the can_transition function and terminal status constants.
 """
 
-from syntara.forms.models import TERMINAL_PROMPT_STATUSES, FormPromptStatus, can_transition
+from syntara.forms.models.api_models import TERMINAL_PROMPT_STATUSES, FormPromptStatus, can_transition
 
 
 class TestStatusTransitions:

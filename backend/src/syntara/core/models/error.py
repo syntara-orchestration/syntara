@@ -73,6 +73,11 @@ class ErrorData(SQLModel):
         examples=[_EXAMPLE_INVOCATION_PATH],
     )
 
+    errors: list[dict[str, Any]] | None = PydanticField(
+        default=None,
+        description="Optional list of structured error details (RFC 9457 extension member)",
+    )
+
     model_config: ClassVar[ConfigDict] = ConfigDict(
         from_attributes=True,
         validate_by_name=True,

@@ -49,9 +49,8 @@ def upgrade() -> None:
         ),
         sa.Column("timeout_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column(
-            "input_schema",
+            "form_definition",
             postgresql.JSONB(astext_type=sa.Text()),
-            server_default=sa.text("'{}'::jsonb"),
             nullable=False,
         ),
         sa.Column("response_data", postgresql.JSONB(astext_type=sa.Text()), nullable=True),

@@ -4,7 +4,9 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
-from syntara.forms.models import FormPrompt, FormPromptStatus
+from syntara.forms.models.api_models import FormPromptStatus
+from syntara.forms.models.form_fields import FormDefinition, TextField
+from syntara.forms.models.form_prompt import FormPrompt
 
 
 def create_test_form_prompt(
@@ -17,10 +19,16 @@ def create_test_form_prompt(
     responded_by: UUID | None = None,
     responded_at: datetime | None = None,
     response_data: dict[str, Any] | None = None,
+    form_definition: FormDefinition | None = None,
 ) -> FormPrompt:
     """Create a FormPrompt in memory with sensible defaults for unit tests."""
     if execution_id is None:
         execution_id = uuid4()
+
+    if form_definition is None:
+        form_definition = FormDefinition(
+            fields=[TextField(type="text", value_name="reason", label="Reason")],
+        )
 
     if timeout_at is None and status == FormPromptStatus.PENDING:
         timeout_at = datetime.now(UTC) + timedelta(days=1)
@@ -33,7 +41,7 @@ def create_test_form_prompt(
         message=message,
         status=status,
         timeout_at=timeout_at,
-        input_schema={"type": "object", "properties": {"reason": {"type": "string"}}},
+        form_definition=form_definition,
         responded_by=responded_by,
         responded_at=responded_at,
         response_data=response_data,

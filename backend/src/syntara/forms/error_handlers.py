@@ -13,6 +13,7 @@ from syntara.core.error_handlers import PROBLEM_TYPES, create_problem_details_re
 
 if TYPE_CHECKING:
     from syntara.forms.exceptions import (
+        FormDataValidationError,
         FormPromptAlreadyRequestedError,
         FormPromptAlreadyRespondedError,
         FormPromptCancelledError,
@@ -24,7 +25,7 @@ logger = structlog.stdlib.get_logger(__name__)
 
 
 def form_prompt_not_found_handler(request: Request, exc: "FormPromptNotFoundError") -> JSONResponse:
-    """Handle FormPromptNotFoundError with RFC 9457 format."""
+    """Handle FormPromptNotFoundError."""
     logger.error("Form prompt not found", exc_info=exc)
     return create_problem_details_response(
         status_code=status.HTTP_404_NOT_FOUND,
@@ -38,7 +39,7 @@ def form_prompt_not_found_handler(request: Request, exc: "FormPromptNotFoundErro
 
 
 def form_prompt_already_responded_handler(request: Request, exc: "FormPromptAlreadyRespondedError") -> JSONResponse:
-    """Handle FormPromptAlreadyRespondedError with RFC 9457 format."""
+    """Handle FormPromptAlreadyRespondedError."""
     logger.error("Form prompt already responded", exc_info=exc)
     return create_problem_details_response(
         status_code=status.HTTP_409_CONFLICT,
@@ -52,7 +53,7 @@ def form_prompt_already_responded_handler(request: Request, exc: "FormPromptAlre
 
 
 def form_prompt_expired_handler(request: Request, exc: "FormPromptExpiredError") -> JSONResponse:
-    """Handle FormPromptExpiredError with RFC 9457 format."""
+    """Handle FormPromptExpiredError."""
     logger.error("Form prompt expired", exc_info=exc)
     return create_problem_details_response(
         status_code=status.HTTP_409_CONFLICT,
@@ -66,7 +67,7 @@ def form_prompt_expired_handler(request: Request, exc: "FormPromptExpiredError")
 
 
 def form_prompt_cancelled_handler(request: Request, exc: "FormPromptCancelledError") -> JSONResponse:
-    """Handle FormPromptCancelledError with RFC 9457 format."""
+    """Handle FormPromptCancelledError."""
     logger.error("Form prompt cancelled", exc_info=exc)
     return create_problem_details_response(
         status_code=status.HTTP_409_CONFLICT,
@@ -80,7 +81,7 @@ def form_prompt_cancelled_handler(request: Request, exc: "FormPromptCancelledErr
 
 
 def form_prompt_already_requested_handler(request: Request, exc: "FormPromptAlreadyRequestedError") -> JSONResponse:
-    """Handle FormPromptAlreadyRequestedError with RFC 9457 format."""
+    """Handle FormPromptAlreadyRequestedError."""
     logger.error("Form prompt already requested", exc_info=exc)
     return create_problem_details_response(
         status_code=status.HTTP_409_CONFLICT,
@@ -93,4 +94,38 @@ def form_prompt_already_requested_handler(request: Request, exc: "FormPromptAlre
         code="FORM_ALREADY_REQUESTED",
         retryable=False,
         instance=str(request.url),
+    )
+
+
+def form_data_validation_error_handler(request: Request, exc: "FormDataValidationError") -> JSONResponse:
+    """Handle FormDataValidationError.
+
+    Returns HTTP 422 with per-field error details in the errors[] extension member.
+    """
+    logger.warning(
+        "Form validation failed",
+        error_count=len(exc.errors),
+        form_id=exc.form_id,
+    )
+
+    # Convert FormFieldError dataclasses to dicts for the errors[] extension member
+    error_dicts = [
+        {
+            "field": err.field,
+            "label": err.label,
+            "code": err.code,
+            "message": err.message,
+        }
+        for err in exc.errors
+    ]
+
+    return create_problem_details_response(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        problem_type=PROBLEM_TYPES["validation_error"],
+        title="Form Validation Error",
+        detail=f"Form submission failed validation with {len(exc.errors)} error(s)",
+        code="FORM_VALIDATION_ERROR",
+        retryable=False,
+        instance=str(request.url),
+        errors=error_dicts,
     )

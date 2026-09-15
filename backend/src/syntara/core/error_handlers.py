@@ -176,6 +176,7 @@ def create_problem_details_response(
     *,
     retryable: bool = False,
     instance: str | None = None,
+    errors: list[dict[str, Any]] | None = None,
 ) -> JSONResponse:
     """Create RFC 9457 compliant error response.
 
@@ -187,6 +188,7 @@ def create_problem_details_response(
         code: Machine-readable error code
         retryable: Whether the error is retryable
         instance: URI identifying the specific occurrence
+        errors: Optional list of structured error details (RFC 9457 extension member)
 
     Returns:
         JSONResponse with RFC 9457 Problem Details format
@@ -209,6 +211,7 @@ def create_problem_details_response(
         code=code,
         retryable=retryable,
         instance=instance,
+        errors=errors,
     )
 
     logger.debug("Created ErrorData", error_data=error_data.to_dict())

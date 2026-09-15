@@ -11,8 +11,18 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from syntara.forms.models import FormPrompt, FormPromptStatus
+from syntara.forms.models.api_models import FormPromptStatus
+from syntara.forms.models.form_fields import (
+    DropdownField,
+    FormDefinition,
+    StaticOption,
+    StaticOptions,
+    TextField,
+)
+from syntara.forms.models.form_prompt import FormPrompt
 from tests.unit.fixtures.form import create_submitted_form_prompt, create_test_form_prompt
+
+_FORM_DEFINITION = FormDefinition(fields=[TextField(type="text", value_name="reason", label="Reason")])
 
 
 class TestFormPromptPersistence:
@@ -31,7 +41,7 @@ class TestFormPromptPersistence:
             message="Deploy version 1.2.3?",
             status=FormPromptStatus.PENDING,
             timeout_at=datetime.now(UTC),
-            input_schema={"type": "object", "properties": {"reason": {"type": "string"}}},
+            form_definition=_FORM_DEFINITION,
         )
 
         assert prompt.execution_id == execution_id
@@ -41,33 +51,36 @@ class TestFormPromptPersistence:
 
     def test_jsonb_fields_serialize_deserialize(self) -> None:
         """Test that JSONB fields correctly serialize and deserialize nested structures."""
-        complex_schema = {
-            "type": "object",
-            "properties": {
-                "deployment": {
-                    "type": "object",
-                    "properties": {
-                        "version": {"type": "string"},
-                        "environment": {"type": "string"},
-                    },
-                },
-            },
-        }
+        form_definition = FormDefinition(
+            fields=[
+                TextField(type="text", value_name="version", label="Version"),
+                DropdownField(
+                    type="dropdown",
+                    value_name="environment",
+                    label="Environment",
+                    options=StaticOptions(
+                        source="static",
+                        values=[StaticOption(display_label="Prod", value="prod")],
+                    ),
+                    default="prod",
+                ),
+            ],
+        )
 
-        prompt = create_test_form_prompt()
-        prompt.input_schema = complex_schema
+        prompt = create_test_form_prompt(form_definition=form_definition)
         prompt.response_data = {"deployment": {"version": "1.2.3", "environment": "prod"}}
 
         # Serialize to dict
         data = prompt.model_dump()
 
         # Verify nested structures preserved
-        assert data["input_schema"] == complex_schema
+        assert data["form_definition"] == form_definition.model_dump()
+        assert data["form_definition"]["fields"][1]["options"]["values"][0]["value"] == "prod"
         assert data["response_data"]["deployment"]["version"] == "1.2.3"
 
         # Deserialize back
         restored = FormPrompt.model_validate(data)
-        assert restored.input_schema == complex_schema
+        assert restored.form_definition == form_definition
 
     def test_default_values_on_instantiation(self) -> None:
         """Test that default values are correctly applied on model instantiation."""
@@ -76,7 +89,7 @@ class TestFormPromptPersistence:
             project_id=uuid4(),
             prompt_node_id="test",
             name="Test",
-            input_schema={},
+            form_definition=_FORM_DEFINITION,
         )
 
         # Defaults from BaseResource
@@ -166,5 +179,5 @@ class TestFormPromptPersistence:
                 project_id=uuid4(),
                 prompt_node_id="test",
                 name="",  # min_length=1
-                input_schema={},
+                form_definition=_FORM_DEFINITION,
             )

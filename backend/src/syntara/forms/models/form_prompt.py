@@ -16,12 +16,13 @@ from syntara.core.constants import FieldLimits
 from syntara.core.models.base import BaseResource
 from syntara.core.models.pagination import ResourcesResponse
 from syntara.core.models.user_reference import UserReference
-from syntara.core.utils.sqlmodel import postgres_enum_column
+from syntara.core.utils.sqlmodel import DiscriminatedJSONB, postgres_enum_column
 from syntara.forms.models.api_models import (
     FormPromptStatus,
     ResponderGroupSummary,
     ResponderUserSummary,
 )
+from syntara.forms.models.form_fields import FormDefinition
 from syntara.forms.models.form_prompt_responders import (
     FormPromptResponderGroup,
     FormPromptResponderUser,
@@ -105,10 +106,10 @@ class BaseFormPrompt(BaseResource, table=False):
     )
 
     # Form definition
-    input_schema: dict[str, Any] = Field(
-        default_factory=dict,
-        sa_column=Column(JSONB, nullable=False, server_default=text("'{}'::jsonb")),
-        description="JSON Schema Draft-07 form definition",
+    form_definition: FormDefinition = Field(
+        sa_type=DiscriminatedJSONB(FormDefinition),  # type: ignore[call-overload]
+        nullable=False,
+        description="Form definition describing the fields shown to responders",
     )
 
     # Response fields (without responded_by)

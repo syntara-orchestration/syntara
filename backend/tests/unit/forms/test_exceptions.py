@@ -15,7 +15,7 @@ from syntara.forms.exceptions import (
     FormPromptExpiredError,
     FormPromptNotFoundError,
 )
-from syntara.forms.models import FormPromptStatus
+from syntara.forms.models.api_models import FormPromptStatus
 
 
 class TestFormExceptions:
