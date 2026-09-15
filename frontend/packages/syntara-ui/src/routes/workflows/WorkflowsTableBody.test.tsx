@@ -104,6 +104,27 @@ describe('WorkflowsTableBody', () => {
       await user.click(screen.getByText('Project Alpha'))
       expect(onToggleProject).toHaveBeenCalledWith('proj-1')
     })
+
+    it('renders linked usernames in Created at and Updated at columns', () => {
+      const grouped = new Map([
+        ['proj-1', { project: { id: 'proj-1', name: 'Project Alpha' } as never, workflows: [baseWorkflow] }],
+      ])
+
+      renderInTable(
+        <GroupedWorkflowsTableBody
+          groupedWorkflows={grouped}
+          collapsedProjects={new Set()}
+          onToggleProject={vi.fn()}
+          getRowActions={getRowActions}
+        />
+      )
+
+      const userLinks = screen.getAllByRole('link', { name: 'demo' })
+      expect(userLinks).toHaveLength(2)
+      for (const link of userLinks) {
+        expect(link).toHaveAttribute('href', expect.stringContaining(mockUser.id))
+      }
+    })
   })
 
   describe('FlatWorkflowsTableBody', () => {

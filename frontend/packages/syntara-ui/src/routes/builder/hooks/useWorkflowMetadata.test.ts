@@ -23,7 +23,7 @@ describe('useWorkflowMetadata', () => {
         id: 'wf-123',
         current_version: 5,
         published_version_id: 'ver-2',
-        created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'test-user' },
+        created_by: 'admin',
       })
     )
 
@@ -32,7 +32,7 @@ describe('useWorkflowMetadata', () => {
       id: 'wf-123',
       version: 5,
       published: true,
-      author: 'test-user',
+      author: 'admin',
     })
   })
 
@@ -89,18 +89,7 @@ describe('useWorkflowMetadata', () => {
     expect(result.current?.author).toBe('jane')
   })
 
-  it('uses UserReference name as author when created_by is a UserReference', () => {
-    const { result } = renderHook(() =>
-      useWorkflowMetadata({
-        name: 'test',
-        created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'demo' },
-      })
-    )
-
-    expect(result.current?.author).toBe('demo')
-  })
-
-  it('defaults author to Unknown when created_by is not a string or UserReference', () => {
+  it('defaults author to Unknown when created_by is not a string', () => {
     const { result } = renderHook(() => useWorkflowMetadata({ name: 'test', created_by: 42 }))
 
     expect(result.current?.author).toBe('Unknown')
