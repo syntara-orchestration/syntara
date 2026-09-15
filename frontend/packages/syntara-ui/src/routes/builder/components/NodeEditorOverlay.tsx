@@ -6,6 +6,7 @@ import { useDocLink } from '../../../utils/docs/useDocLink'
 import type { NodeType } from '../../workflows/canvas/nodes/NodeType'
 import { NodeDetailsPanel } from '../NodeDetailsPanel'
 import type { WorkflowMetadata } from '../types/workflowMetadata'
+import { useNodeInspectorReadOnly } from '../useNodeInspectorReadOnly'
 import { resolveStepDocKey } from '../utils/resolveStepDocKey'
 import { useIsVersionView } from '../VersionViewContext'
 
@@ -56,6 +57,13 @@ export const NodeEditorOverlay = memo(function NodeEditorOverlay(props: NodeEdit
   const resolvedDocLink = useDocLink(stepDocKey ?? 'builder')
   const stepDocLink = stepDocKey === null ? undefined : resolvedDocLink
 
+  const { inspectorReadOnly, readOnlyMessage } = useNodeInspectorReadOnly({
+    mode,
+    selectedNodeData: selectedNode?.data,
+    projectId,
+    isVersionView,
+  })
+
   if (!isOpen) return null
 
   return (
@@ -84,7 +92,8 @@ export const NodeEditorOverlay = memo(function NodeEditorOverlay(props: NodeEdit
           docLink={stepDocLink}
           workflowMetadata={workflowMetadata}
           onRunStep={isVersionView ? undefined : onRunStep}
-          readOnly={isVersionView}
+          readOnly={inspectorReadOnly}
+          readOnlyMessage={readOnlyMessage}
           onNodeAdded={onNodeAdded}
         />
       </FlexItem>

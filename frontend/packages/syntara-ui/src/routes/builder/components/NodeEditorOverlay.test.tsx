@@ -1,6 +1,6 @@
 import { ExecutorTypeEnum } from '@syntara/contracts'
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, beforeEach } from 'vitest'
 
 import { RegistryNodeId } from '../../../constants'
 import type { DocKey } from '../../../utils/docs/types'
@@ -11,6 +11,13 @@ const useDocLinkMock = vi.fn((key: DocKey) => `https://docs.example/${key}`)
 
 vi.mock('../../../utils/docs/useDocLink', () => ({
   useDocLink: (key: DocKey) => useDocLinkMock(key),
+}))
+
+vi.mock('../useNodeInspectorReadOnly', () => ({
+  useNodeInspectorReadOnly: () => ({
+    inspectorReadOnly: false,
+    readOnlyMessage: undefined,
+  }),
 }))
 
 vi.mock('../NodeDetailsPanel', () => ({

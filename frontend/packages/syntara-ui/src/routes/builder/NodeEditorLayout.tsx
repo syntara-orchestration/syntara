@@ -49,6 +49,8 @@ type NodeEditorLayoutProps = {
   workflowMetadata?: WorkflowMetadata
   tabBarAction?: ReactNode
   readOnly?: boolean
+  /** When set, shown instead of the default version-view read-only message. */
+  readOnlyMessage?: string
   mode?: 'add' | 'edit'
 }
 
@@ -73,6 +75,7 @@ export function NodeEditorLayout({
   workflowMetadata,
   tabBarAction,
   readOnly,
+  readOnlyMessage,
   mode = 'edit',
 }: NodeEditorLayoutProps) {
   const { inputData, outputData } = useNodeExecutionData(nodeId ?? '', executionId, workflowId)
@@ -175,7 +178,7 @@ export function NodeEditorLayout({
             <Alert
               variant="info"
               isInline
-              title="You are viewing a previous version. Return to the editor to make changes."
+              title={readOnlyMessage ?? 'You are viewing a previous version. Return to the editor to make changes.'}
             />
           </StackItem>
         )}

@@ -16,6 +16,13 @@ vi.mock('./registry/NodeRegistry', () => ({
   },
 }))
 
+vi.mock('./useNodeTypePermissions', () => ({
+  useNodeTypePermissions: () => ({
+    permissions: {},
+    isLoading: false,
+  }),
+}))
+
 const mockNodeTypes = [
   {
     id: 'action',

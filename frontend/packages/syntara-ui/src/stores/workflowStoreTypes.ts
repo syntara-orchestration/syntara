@@ -45,6 +45,8 @@ export type WorkflowDefinition = Omit<WorkflowDefinitionBase, 'triggers' | 'node
  */
 export type ActivityMetadata = {
   __isGeneric?: boolean
+  /** Set when the API redacted node config due to workflow_node_type read deny. */
+  __permissionRedacted?: boolean
   __customMessage?: string
   __reverseHandles?: boolean
   /**
@@ -78,6 +80,9 @@ function sanitizeMetadata(raw: Record<string, unknown>): ActivityMetadata {
 
   if ('__isGeneric' in raw) {
     sanitized.__isGeneric = Boolean(raw.__isGeneric)
+  }
+  if ('__permissionRedacted' in raw) {
+    sanitized.__permissionRedacted = Boolean(raw.__permissionRedacted)
   }
   if ('__customMessage' in raw && typeof raw.__customMessage === 'string') {
     sanitized.__customMessage = raw.__customMessage

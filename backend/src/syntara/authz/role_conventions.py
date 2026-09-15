@@ -15,7 +15,7 @@ resolver and merged into API list/get responses by the service layer.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID, uuid5
 
 _BUILTIN_NS = UUID("a3c1f8d0-7e2b-4f5a-9c6d-1b8e3f0a2d4c")
@@ -29,15 +29,29 @@ class PolicyInfo:
     action: str
     scope: str = "any"
     roles: tuple[str, ...] = field(default=(), compare=False, hash=False)
+    effect: Literal["allow", "deny"] = "allow"
+    conditions: dict[str, Any] | None = None
+    policy_name_override: str | None = field(default=None, compare=False, hash=False)
+    node_type_label: str | None = field(default=None, compare=False, hash=False)
 
     @property
     def name(self) -> str:
-        """Canonical 3-part policy name."""
+        """Canonical policy name (3-part or override for node-type templates)."""
+        if self.policy_name_override:
+            return self.policy_name_override
         return f"{self.resource}:{self.action}:{self.scope}"
 
     @property
     def description(self) -> str:
         """Human-readable description."""
+        if self.node_type_label:
+            action_label = {"read": "Read", "write": "Write", "execute": "Execute"}.get(
+                self.action, self.action.capitalize()
+            )
+            return (
+                f"{action_label} {self.node_type_label} workflow nodes "
+                "(system-wide deny template — attach to a system role to restrict access)"
+            )
         scope_label = "own" if self.scope == "self" else self.scope
         action_label = self.action.capitalize()
         return f"{action_label} {scope_label} {self.resource}"
@@ -45,13 +59,14 @@ class PolicyInfo:
     @property
     def statements(self) -> list[dict[str, object]]:
         """Rego policy statement list."""
-        return [
-            {
-                "effect": "allow",
-                "actions": [f"{self.resource}:{self.action}"],
-                "scope": self.scope,
-            }
-        ]
+        stmt: dict[str, object] = {
+            "effect": self.effect,
+            "actions": [f"{self.resource}:{self.action}"],
+            "scope": self.scope,
+        }
+        if self.conditions:
+            stmt["conditions"] = self.conditions
+        return [stmt]
 
     @classmethod
     def from_name(cls, name: str) -> PolicyInfo:
@@ -235,6 +250,10 @@ BUILTIN_POLICIES: list[PolicyInfo] = [
     PolicyInfo("service_account", "disable", scope="project", roles=("project-admin",)),
     PolicyInfo("service_account", "enable", scope="project", roles=("project-admin",)),
 ]
+
+from syntara.authz.workflow_node_type_policies import WORKFLOW_NODE_TYPE_POLICIES  # noqa: E402
+
+BUILTIN_POLICIES.extend(WORKFLOW_NODE_TYPE_POLICIES)
 
 BUILTIN_ROLES: list[RoleInfo] = [
     RoleInfo("admin", "Full access to all resources"),

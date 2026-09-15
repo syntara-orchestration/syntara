@@ -44,6 +44,7 @@ from syntara.workflows.exceptions import (
     BuiltinWorkflowDeleteError,
     BuiltinWorkflowModifyError,
     ScheduledTriggerSyncError,
+    WorkflowDefinitionInvalidError,
     WorkflowHasActiveExecutionsError,
     WorkflowNameConflictError,
     WorkflowNotFoundError,
@@ -192,6 +193,65 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             )
         )
         return result.one_or_none()
+
+    async def _node_permission_findings(
+        self,
+        workflow_definition: dict[str, Any],
+        project_id: UUID,
+        *,
+        previous_definition: dict[str, Any] | None = None,
+    ) -> list[ValidationFinding]:
+        """Return validation findings when node-type permissions block the definition."""
+        if self.opa_client is None:
+            return []
+        from syntara.authz.node_type_permissions import validate_workflow_definition_node_permissions  # noqa: PLC0415
+
+        errors = await validate_workflow_definition_node_permissions(
+            self.session,
+            self.opa_client,
+            self.user,
+            project_id=project_id,
+            workflow_definition=workflow_definition,
+            previous_definition=previous_definition,
+        )
+        return [
+            ValidationFinding(
+                severity=ValidationSeverity.error,
+                category=ValidationCategory.permission_denied,
+                message=msg,
+            )
+            for msg in errors
+        ]
+
+    async def _raise_if_node_permissions_denied(
+        self,
+        workflow_definition: dict[str, Any],
+        project_id: UUID,
+        result: ValidationResult,
+    ) -> None:
+        permission_findings = await self._node_permission_findings(workflow_definition, project_id)
+        if not permission_findings:
+            return
+        merged = ValidationResult.from_findings([*result.findings, *permission_findings])
+        raise WorkflowDefinitionInvalidError(merged)
+
+    async def redact_workflow_definition_for_response(
+        self,
+        project_id: UUID,
+        workflow_definition: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        """Apply node-type read redaction for API responses and export."""
+        if workflow_definition is None or self.opa_client is None:
+            return workflow_definition
+        from syntara.authz.node_type_permissions import filter_workflow_definition_for_user  # noqa: PLC0415
+
+        return await filter_workflow_definition_for_user(
+            self.session,
+            self.opa_client,
+            self.user,
+            project_id=project_id,
+            workflow_definition=workflow_definition,
+        )
 
     async def _create_version_record(
         self,
@@ -629,6 +689,8 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             result = ValidationResult.from_findings([*result.findings, *ref_findings])
             has_validation_issues = True
 
+        await self._raise_if_node_permissions_denied(workflow_definition, project_id, result)
+
         schema_version = workflow_definition.get("schema_version")
         workflow_dict = workflow_definition
 
@@ -855,6 +917,14 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         read = WorkflowVersionRead.model_validate(
             deserialize_workflow_version(version, published_version_id, ever_published, publish_ts)
         )
+        workflow = await self.session.get(Workflow, version.workflow_id)
+        if workflow and workflow.project_id and read.workflow_definition is not None:
+            redacted = await self.redact_workflow_definition_for_response(
+                workflow.project_id,
+                read.workflow_definition,
+            )
+            if redacted is not None:
+                read.workflow_definition = redacted
         await self.resolve_user_references([read])
         return read
 
@@ -1200,6 +1270,21 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             if ref_findings:
                 result = ValidationResult.from_findings([*result.findings, *ref_findings])
                 workflow.has_validation_issues = True
+
+            previous_definition: dict[str, Any] | None = None
+            if workflow.current_version is not None:
+                prev_version = await self._get_version_or_none(workflow.id, workflow.current_version)
+                if prev_version and prev_version.workflow_definition:
+                    previous_definition = prev_version.workflow_definition
+
+            permission_findings = await self._node_permission_findings(
+                workflow_definition,
+                workflow.project_id,
+                previous_definition=previous_definition,
+            )
+            if permission_findings:
+                result = ValidationResult.from_findings([*result.findings, *permission_findings])
+                raise WorkflowDefinitionInvalidError(result)
 
         version = await self._create_version_record(workflow, workflow_definition, change_description)
         return version, result

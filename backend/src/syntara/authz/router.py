@@ -27,7 +27,9 @@ from syntara.authz.engine import AuthzRequest, authorize, resolve_readable_proje
 from syntara.authz.evaluator import AuthzEvaluator
 from syntara.authz.exceptions import AuthorizationDeniedError
 from syntara.authz.models.project import Project
+from syntara.authz.node_type_permissions import is_node_type_action_allowed, resolve_node_type_permissions
 from syntara.authz.resolver import resolve_effective_policies, resolve_user_groups
+from syntara.authz.workflow_node_type_catalog import WORKFLOW_NODE_TYPE_RESOURCE
 from syntara.core.constants import NAME_PATTERN, FieldLimits
 from syntara.core.database.session import get_db
 from syntara.core.exceptions import SafeValueError
@@ -107,6 +109,29 @@ class CanIResponse(SQLModel):
     denied_by: str = Field(title=None, description="Name of the deny policy (empty if allowed)")
 
 
+class CanINodeTypesRequest(SQLModel):
+    """Batch node-type permission check for workflow designer gating."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(title="Can I Node Types Request")  # type: ignore[assignment]
+
+    action: str = Field(description='Node-type action: "read", "write", or "execute"')
+    resource_project: str = Field(description="Project name or UUID for workflow inheritance")
+    node_types: list[str] = Field(default_factory=list, description="Catalog node type ids to evaluate")
+
+
+class NodeTypePermissionEntry(SQLModel):
+    """Permission result for one node type."""
+
+    node_type: str
+    allowed: bool
+
+
+class CanINodeTypesResponse(SQLModel):
+    """Batch node-type authorization decisions."""
+
+    results: list[NodeTypePermissionEntry] = Field(default_factory=list)
+
+
 class WhoCanRequest(BasePaginatedRequest):
     """Request body for the Who can? endpoint."""
 
@@ -178,6 +203,22 @@ async def _resolve_project_input(db: AsyncSession, resource_project: str) -> str
         )
     )
     return result.first() or resource_project
+
+
+async def _resolve_project_uuid(db: AsyncSession, resource_project: str) -> UUID | None:
+    """Resolve resource_project string to a project UUID."""
+    if not resource_project:
+        return None
+    try:
+        return UUID(resource_project)
+    except ValueError:
+        result = await db.exec(
+            select(Project.id).where(
+                Project.name == resource_project,
+            )
+        )
+        project_id = result.first()
+        return project_id if project_id is not None else None
 
 
 async def _ids_to_names(db: AsyncSession, project_ids: set[UUID]) -> set[str]:
@@ -818,6 +859,36 @@ async def can_i(
     """
     resource_project = await _resolve_project_input(db, body.resource_project)
 
+    if body.resource_type == WORKFLOW_NODE_TYPE_RESOURCE:
+        node_type = body.resource_metadata.get("node_type")
+        if not isinstance(node_type, str) or not node_type:
+            msg = "resource_metadata.node_type is required for workflow_node_type checks"
+            raise SafeValueError(msg)
+        project_id = await _resolve_project_uuid(db, body.resource_project)
+        if project_id is None:
+            return CanIResponse(
+                allowed=False,
+                denied=True,
+                matched_policy="",
+                denial_reason="unknown_project",
+                denied_by="",
+            )
+        allowed = await is_node_type_action_allowed(
+            db,
+            evaluator,
+            current_user,
+            project_id=project_id,
+            node_type=node_type,
+            action=body.action,
+        )
+        return CanIResponse(
+            allowed=allowed,
+            denied=not allowed,
+            matched_policy="",
+            denial_reason="" if allowed else "node_type_denied",
+            denied_by="",
+        )
+
     result = await authorize(
         db,
         evaluator,
@@ -842,6 +913,56 @@ async def can_i(
         denial_reason=result.denial_reason,
         denied_by=result.denied_by,
     )
+
+
+@router.post(
+    "/can_i_node_types",
+    dependencies=[NO_PERMISSION],
+    operation_id="can_i_node_types",
+    summary="Batch check workflow node-type permissions",
+    description=(
+        "Evaluates inherited workflow permissions minus explicit node-type deny policies "
+        "for each requested catalog node type."
+    ),
+    response_description="Per node-type authorization decisions",
+)
+async def can_i_node_types(
+    body: CanINodeTypesRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    evaluator: Annotated[AuthzEvaluator, Depends(get_authz_evaluator)],
+) -> CanINodeTypesResponse:
+    """Batch node-type permission check for workflow designer and admin UI."""
+    project_id = await _resolve_project_uuid(db, body.resource_project)
+    if project_id is None:
+        return CanINodeTypesResponse(
+            results=[NodeTypePermissionEntry(node_type=nt, allowed=False) for nt in body.node_types]
+        )
+
+    permissions = await resolve_node_type_permissions(
+        db,
+        evaluator,
+        current_user,
+        project_id=project_id,
+        node_types=set(body.node_types),
+    )
+    action_attr = body.action
+    results: list[NodeTypePermissionEntry] = []
+    for node_type in body.node_types:
+        access = permissions.get(node_type)
+        if access is None:
+            allowed = False
+        elif action_attr == "read":
+            allowed = access.read
+        elif action_attr == "write":
+            allowed = access.write
+        elif action_attr == "execute":
+            allowed = access.execute
+        else:
+            msg = f"Unsupported node-type action: {action_attr}"
+            raise SafeValueError(msg)
+        results.append(NodeTypePermissionEntry(node_type=node_type, allowed=allowed))
+    return CanINodeTypesResponse(results=results)
 
 
 @router.post(

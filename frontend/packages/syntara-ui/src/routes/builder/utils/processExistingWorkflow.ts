@@ -12,6 +12,23 @@ type WorkflowWithVersion = WorkflowAPI.components['schemas']['WorkflowReadWithVe
 
 type V2Edge = { from: string; to: string; from_port?: string; to_port?: string }
 
+/** API flag from workflow definition redaction (backend PERMISSION_REDACTED_KEY). */
+const PERMISSION_REDACTED_API_KEY = '_permission_redacted'
+
+function applyRedactionMetadata(activity: Activity, raw: Record<string, unknown>): Activity {
+  if (raw[PERMISSION_REDACTED_API_KEY] !== true) {
+    return activity
+  }
+  const existing = getActivityMetadata(activity) ?? {}
+  return {
+    ...activity,
+    metadata: {
+      ...existing,
+      __permissionRedacted: true,
+    },
+  } as Activity
+}
+
 const MAX_POSITION_COORD = 1_000_000
 
 /**
@@ -52,10 +69,12 @@ export function convertV2Definition(
   }) as Activity[]
 
   const flattenedActivities = nodes.map((a) => {
-    const meta = getActivityMetadata(a)
-    if (meta) return { ...a, metadata: meta }
+    const raw = a as Record<string, unknown>
+    const activity = applyRedactionMetadata(a, raw)
+    const meta = getActivityMetadata(activity)
+    if (meta) return { ...activity, metadata: meta }
     // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructuring to strip metadata
-    const { metadata: _unsanitized, ...rest } = a as Activity & { metadata?: unknown }
+    const { metadata: _unsanitized, ...rest } = activity as Activity & { metadata?: unknown }
     return rest as Activity
   })
 

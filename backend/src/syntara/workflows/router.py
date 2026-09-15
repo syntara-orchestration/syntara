@@ -593,7 +593,10 @@ async def export_workflow_version(
 
     safe_name = _sanitize_filename(workflow.name)
     filename = f"{safe_name}-v{version}.json"
-    content = json.dumps(version_record.workflow_definition, indent=2)
+    definition = version_record.workflow_definition
+    if workflow.project_id is not None:
+        definition = await service.redact_workflow_definition_for_response(workflow.project_id, definition)
+    content = json.dumps(definition, indent=2)
 
     return StreamingResponse(
         BytesIO(content.encode("utf-8")),

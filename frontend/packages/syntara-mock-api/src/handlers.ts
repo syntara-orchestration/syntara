@@ -5409,6 +5409,14 @@ export const handlers = [
     return HttpResponse.json({ message: 'All tokens have been revoked.' })
   }),
 
+  http.post('/api/v1/authz/can_i_node_types', async ({ request }) => {
+    const body = (await request.json()) as { node_types?: string[]; action?: string } | null
+    const nodeTypes = body?.node_types ?? []
+    return HttpResponse.json({
+      results: nodeTypes.map((node_type) => ({ node_type, allowed: true })),
+    })
+  }),
+
   http.post('/api/v1/admin/revocation/users/:username', ({ params }) => {
     const username = params.username as string
     const user = users.find((u) => u.username === username)

@@ -716,6 +716,7 @@ export function BuilderContent(props: BuilderContentProps) {
                     workflowName={workflowName}
                     workflowDescription={workflowDescription}
                     markDirty={markDirty}
+                    projectId={builderProjectId}
                   />
 
                   {!isNodeEditorOpen && approvalViewOpen && pendingApproval && (
