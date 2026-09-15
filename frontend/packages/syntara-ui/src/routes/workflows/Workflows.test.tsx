@@ -361,6 +361,7 @@ describe('Workflows Component', () => {
       const loadingReturn = {
         data: null,
         isPending: true,
+        isLoading: true,
         isError: false,
         error: null,
       }
@@ -371,6 +372,28 @@ describe('Workflows Component', () => {
       // Expect loading state
       const loadingElement = screen.getByTestId('loading-state')
       expect(loadingElement).toBeInTheDocument()
+    })
+
+    it('keeps page header toolbar visible during background refetch', () => {
+      mockWorkflowQuery({
+        data: {
+          resources: mockWorkflows,
+          next: null,
+          prev: null,
+          total: mockWorkflows.length,
+        },
+        isPending: false,
+        isLoading: false,
+        isFetching: true,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      })
+
+      render(<Workflows />, { wrapper })
+
+      expect(screen.getByRole('button', { name: 'Create workflow' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Import workflow' })).toBeInTheDocument()
     })
 
     it('displays error state', () => {
