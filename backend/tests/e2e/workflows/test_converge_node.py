@@ -616,8 +616,8 @@ def test_converge_one_branch_fails_all_strategy(syntara_api: SyntaraApiRegistry)
 
     The success branches sleep briefly so the failure is processed first.
     ALL strategy is strict: any predecessor failure fails the converge
-    and skips downstream nodes. In-flight parallel branches are not
-    cancelled — they run to completion while the converge node fails.
+    and skips downstream nodes. In-flight siblings are detached, so their
+    recorded status may be cancelled or completed depending on timing.
     """
     result = create_and_run_workflow(
         syntara_api,
@@ -676,10 +676,10 @@ def test_converge_one_branch_fails_all_strategy(syntara_api: SyntaraApiRegistry)
     assert result.status == ExecutionStatus.FAILED
     activities = {a.activity_id: a for a in (result.activities or [])}
 
-    # success_branch_a and _b were in-flight (sleeping) when the failing_branch
-    # triggered _fail_converge_node — they are detached and reported as cancelled.
-    assert activities["success_branch_a"].status == "cancelled"
-    assert activities["success_branch_b"].status == "cancelled"
+    # In-flight siblings are detached when the converge fails. They may already
+    # have finished (completed) or still be running (cancelled) — AAP-90400.
+    assert activities["success_branch_a"].status in ("completed", "cancelled")
+    assert activities["success_branch_b"].status in ("completed", "cancelled")
     assert activities["failing_branch"].status == "failed"
     assert activities["converge_node"].status == "failed"
     assert activities["final_action"].status == "skipped"

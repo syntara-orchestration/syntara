@@ -12,8 +12,12 @@ const SAFE_NODE_ID = /^[a-zA-Z0-9_-]+$/
 /** Execution activity records for later loop iterations use `{nodeId}#iter-{n}`. */
 const COMPOSITE_ITER_SEP = '#iter-'
 
-/** Safe characters for field path segments: alphanumeric, underscores, hyphens, spaces, brackets for array indexing (no dots — dots are path delimiters) */
-const SAFE_FIELD_SEGMENT = /^[a-zA-Z0-9_ \-[\]]+$/
+/**
+ * Allowed inside a single field path segment. Dots separate segments in
+ * `${node.field.path}`; brackets support array subscripts (`items[0]`); `@` supports
+ * JSON-LD keys. Reject everything else (quotes, backticks, braces, etc.).
+ */
+const SAFE_FIELD_SEGMENT = /^[a-zA-Z0-9_ \-[\]@]+$/
 
 /**
  * Template expressions always reference the canvas node ID.
@@ -33,7 +37,7 @@ function validateNodeId(nodeId: string): string {
 }
 
 function validateFieldSegment(segment: string): string {
-  if (!SAFE_FIELD_SEGMENT.test(segment)) {
+  if (!segment || !SAFE_FIELD_SEGMENT.test(segment)) {
     throw new Error('Invalid expression path segment: contains disallowed characters')
   }
   return segment
@@ -50,6 +54,15 @@ export function buildExpression(payload: DragPayload): string {
   const safePath = payload.fieldPath.map(validateFieldSegment)
   const path = [safeNodeId, ...safePath].join('.')
   return `\${${path}}`
+}
+
+/** Non-throwing wrapper for schema trees rendering arbitrary execution JSON. */
+export function tryBuildExpression(payload: DragPayload): string | null {
+  try {
+    return buildExpression(payload)
+  } catch {
+    return null
+  }
 }
 
 export function buildContextExpression(contextPath: string): string {

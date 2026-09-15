@@ -534,39 +534,50 @@ export async function addSwitchNodeWithCases(page: Page, name: string, cases: Sw
   // The form defaults to 2 cases. Fill the visible ones first.
   const defaultCaseCount = 2
 
-  for (let i = 0; i < Math.min(cases.length, defaultCaseCount); i++) {
+  /**
+   * Fill one case, and do not return until the form has actually taken the value.
+   *
+   * The inputs are `react-hook-form` `Controller` fields, and "Add path" calls
+   * `useFieldArray`'s `append`, which snapshots the current form state. A `fill`
+   * whose `onChange` has not reached that state yet is therefore dropped by the
+   * very next `append` — silently, and only for the case filled immediately
+   * before it. That is exactly the shape of the CI failure: in the three-case
+   * test, case index 1 arrived at the API as `""` while 0 and 2 were correct,
+   * because 0 and 2 have other interactions after them and 1 does not.
+   *
+   * Asserting the value back closes the window: these are controlled inputs, so
+   * the DOM only reads back the new value once React has re-rendered from form
+   * state — if the change had not been committed, the re-render would have reset
+   * the field.
+   */
+  const fillCase = async (i: number) => {
     // ExpressionBuilder uses a PatternFly MenuToggle — click to open, then select option
     await page
       .getByLabel(/Expression editor mode/i)
       .nth(i)
       .click()
     await page.getByRole('option', { name: 'Custom expression', exact: true }).click()
-    await page
-      .getByLabel(/Raw expression/i)
-      .nth(i)
-      .fill(cases[i].condition)
-    const label0 = cases[i].label
-    if (label0) {
-      await page.getByLabel(`Path ${i + 1} name`).fill(label0)
+
+    const rawExpression = page.getByLabel(/Raw expression/i).nth(i)
+    await rawExpression.fill(cases[i].condition)
+    await expect(rawExpression).toHaveValue(cases[i].condition)
+
+    const label = cases[i].label
+    if (label) {
+      const labelInput = page.getByLabel(`Path ${i + 1} name`)
+      await labelInput.fill(label)
+      await expect(labelInput).toHaveValue(label)
     }
+  }
+
+  for (let i = 0; i < Math.min(cases.length, defaultCaseCount); i++) {
+    await fillCase(i)
   }
 
   // Add extra cases beyond the default 2
   for (let i = defaultCaseCount; i < cases.length; i++) {
     await page.getByRole('button', { name: 'Add path' }).click()
-    await page
-      .getByLabel(/Expression editor mode/i)
-      .nth(i)
-      .click()
-    await page.getByRole('option', { name: 'Custom expression', exact: true }).click()
-    await page
-      .getByLabel(/Raw expression/i)
-      .nth(i)
-      .fill(cases[i].condition)
-    const labelN = cases[i].label
-    if (labelN) {
-      await page.getByLabel(`Path ${i + 1} name`).fill(labelN)
-    }
+    await fillCase(i)
   }
 
   // Remove surplus default cases (working from the last index downward to avoid re-indexing)

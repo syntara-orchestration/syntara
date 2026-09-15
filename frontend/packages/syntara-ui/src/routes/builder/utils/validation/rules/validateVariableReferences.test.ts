@@ -40,7 +40,7 @@ describe('validateVariableReferences', () => {
         expect(errors).toHaveLength(1)
         expect(errors[0].severity).toBe('error')
         expect(errors[0].nodeId).toBe('task-1')
-        expect(errors[0].message).toContain(`node "${namespace}" does not exist`)
+        expect(errors[0].message).toContain(`"${namespace}" does not exist`)
         expect(errors[0].message).not.toContain('supported namespace')
       }
     )
@@ -51,7 +51,7 @@ describe('validateVariableReferences', () => {
 
       const errors = validateVariableReferences(activities, [], context)
       expect(errors).toHaveLength(1)
-      expect(errors[0].message).toContain('node "input" does not exist')
+      expect(errors[0].message).toContain('"input" does not exist')
     })
 
     it.each(['input', 'inputs', 'variables'])('accepts ${%s.stdout} when a node is actually named %s', (namespace) => {
@@ -62,6 +62,46 @@ describe('validateVariableReferences', () => {
       const edges: EdgeConnection[] = [{ id: 'e1', source: namespace, target: 'task-1' }]
 
       expect(validateVariableReferences(activities, edges)).toEqual([])
+    })
+  })
+
+  describe('workflow namespace treated as ordinary node reference', () => {
+    it('errors on ${workflow.*} when no node or trigger has that id', () => {
+      const activities: Activity[] = [
+        makeActivity({
+          id: 'task-1',
+          type: 'script',
+          parameters: { code: 'echo ${workflow.username}' },
+        }),
+      ]
+      const context: ValidationContext = { triggers: [makeTriggerWithInputs(['username'])] }
+
+      const errors = validateVariableReferences(activities, [], context)
+      expect(errors).toHaveLength(1)
+      expect(errors[0].severity).toBe('error')
+      expect(errors[0].nodeId).toBe('task-1')
+      expect(errors[0].message).toContain('"workflow" does not exist')
+    })
+
+    it('accepts ${workflow.output} when a node is actually named workflow (parity with backend node refs)', () => {
+      const activities: Activity[] = [
+        makeActivity({ id: 'workflow', type: 'script', parameters: { code: 'echo hello' } }),
+        makeActivity({ id: 'task-1', type: 'script', parameters: { code: '${workflow.output}' } }),
+      ]
+      const edges: EdgeConnection[] = [{ id: 'e1', source: 'workflow', target: 'task-1' }]
+
+      expect(validateVariableReferences(activities, edges)).toEqual([])
+    })
+
+    it('accepts ${workflow.username} when a trigger is actually named workflow', () => {
+      const trigger = makeActivity({ id: 'workflow', type: 'manual_trigger', parameters: {} })
+      const activities: Activity[] = [
+        makeActivity({ id: 'task-1', type: 'script', parameters: { code: '${workflow.username}' } }),
+      ]
+      const edges: EdgeConnection[] = [{ id: 'e1', source: 'workflow', target: 'task-1' }]
+      const context: ValidationContext = { triggers: [trigger] }
+
+      expect(validateVariableReferences(activities, edges, context)).toEqual([])
     })
   })
 
@@ -182,12 +222,12 @@ describe('validateVariableReferences', () => {
   })
 
   describe('skipped namespaces', () => {
-    it.each(['workflow', 'workflow_context'])('does not error for ${%s.*} references', (namespace) => {
+    it('does not error for ${workflow_context.*} references', () => {
       const activities: Activity[] = [
         makeActivity({
           id: 'task-1',
           type: 'script',
-          parameters: { code: `\${${namespace}.some_field}` },
+          parameters: { code: '${workflow_context.some_field}' },
         }),
       ]
 

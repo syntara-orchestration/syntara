@@ -302,7 +302,7 @@ export interface components {
        * @description Workflow labels
        */
       labels?: {
-        [key: string]: unknown
+        [key: string]: string
       }
       /**
        * Id
@@ -372,7 +372,7 @@ export interface components {
        * @description Workflow labels
        */
       labels?: {
-        [key: string]: unknown
+        [key: string]: string
       }
       /**
        * Id
@@ -442,7 +442,7 @@ export interface components {
        * @description Workflow labels
        */
       labels?: {
-        [key: string]: unknown
+        [key: string]: string
       }
       /**
        * Id
@@ -692,7 +692,7 @@ export interface components {
        * @description Workflow labels
        */
       labels?: {
-        [key: string]: unknown
+        [key: string]: string
       }
       /**
        * Workflow Definition
@@ -711,7 +711,7 @@ export interface components {
       project_id: string
       /**
        * Is Import
-       * @description When true, unavailable LLM models are cleared with warnings instead of rejecting the request. Use when importing workflows from other instances.
+       * @description When true, unavailable LLM models are cleared with warnings instead of rejecting the request, and webhook/EDA authorized service accounts that are missing in the target project are removed from the definition and not bound. Use when importing workflows from other instances.
        * @default false
        */
       is_import?: boolean
@@ -741,7 +741,7 @@ export interface components {
        * @description Update workflow labels
        */
       labels?: {
-        [key: string]: unknown
+        [key: string]: string
       } | null
       /**
        * Workflow Definition

@@ -956,8 +956,8 @@ describe('useProjectSelector', () => {
       await user.click(screen.getByRole('option', { name: 'Create project' }))
 
       expect(screen.getByRole('dialog')).toBeInTheDocument()
-      expect(screen.getByLabelText('Project name')).toBeInTheDocument()
-      expect(screen.getByLabelText('Description')).toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: 'Project name' })).toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: 'Description' })).toBeInTheDocument()
     })
 
     it('closes modal when Cancel is clicked', async () => {
@@ -1003,8 +1003,8 @@ describe('useProjectSelector', () => {
       await user.click(screen.getByRole('option', { name: 'Create project' }))
 
       // Fill form (name must match projectFormSchema — no spaces)
-      await user.type(screen.getByLabelText('Project name'), 'new-project')
-      await user.type(screen.getByLabelText('Description'), 'A new test project')
+      await user.type(screen.getByRole('textbox', { name: 'Project name' }), 'new-project')
+      await user.type(screen.getByRole('textbox', { name: 'Description' }), 'A new test project')
 
       // Submit
       await user.click(screen.getByRole('button', { name: 'Create project' }))
@@ -1043,7 +1043,7 @@ describe('useProjectSelector', () => {
       await user.click(screen.getByRole('option', { name: 'Create project' }))
 
       // Fill and submit
-      await user.type(screen.getByLabelText('Project name'), 'new-project')
+      await user.type(screen.getByRole('textbox', { name: 'Project name' }), 'new-project')
       await user.click(screen.getByRole('button', { name: 'Create project' }))
 
       await waitFor(() => {
@@ -1081,7 +1081,7 @@ describe('useProjectSelector', () => {
 
       await user.click(screen.getByPlaceholderText('Select a project'))
       await user.click(screen.getByRole('option', { name: 'Create project' }))
-      await user.type(screen.getByLabelText('Project name'), 'created-project')
+      await user.type(screen.getByRole('textbox', { name: 'Project name' }), 'created-project')
       await user.click(screen.getByRole('button', { name: 'Create project' }))
 
       await waitFor(() => expect(mockRefetch).toHaveBeenCalled())
@@ -1104,7 +1104,7 @@ describe('useProjectSelector', () => {
       await user.click(screen.getByRole('option', { name: 'Create project' }))
 
       // Fill and submit
-      await user.type(screen.getByLabelText('Project name'), 'Duplicate')
+      await user.type(screen.getByRole('textbox', { name: 'Project name' }), 'Duplicate')
       await user.click(screen.getByRole('button', { name: 'Create project' }))
 
       await waitFor(() => {

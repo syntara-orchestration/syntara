@@ -52,23 +52,23 @@ nodes:
         - branch2b
       strategy: all
 edges:
-  - source: group1_fork
-    target: branch1a
-  - source: group1_fork
-    target: branch1b
-  - source: branch1a
-    target: group1_join
-  - source: branch1b
-    target: group1_join
-  - source: group1_join
-    target: group2_fork
-  - source: group2_fork
-    target: branch2a
-  - source: group2_fork
-    target: branch2b
-  - source: branch2a
-    target: group2_join
-  - source: branch2b
-    target: group2_join
-  - source: group2_join
-    target: converge_groups
+  - from: group1_fork
+    to: branch1a
+  - from: group1_fork
+    to: branch1b
+  - from: branch1a
+    to: group1_join
+  - from: branch1b
+    to: group1_join
+  - from: group1_join
+    to: group2_fork
+  - from: group2_fork
+    to: branch2a
+  - from: group2_fork
+    to: branch2b
+  - from: branch2a
+    to: group2_join
+  - from: branch2b
+    to: group2_join
+  - from: group2_join
+    to: converge_groups

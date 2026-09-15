@@ -36,7 +36,8 @@ components:
           title: Description
           description: Workflow description
         labels:
-          additionalProperties: true
+          additionalProperties:
+            type: string
           type: object
           title: Labels
           description: Workflow labels
@@ -123,7 +124,8 @@ components:
           title: Description
           description: Workflow description
         labels:
-          additionalProperties: true
+          additionalProperties:
+            type: string
           type: object
           title: Labels
           description: Workflow labels
@@ -210,7 +212,8 @@ components:
           title: Description
           description: Workflow description
         labels:
-          additionalProperties: true
+          additionalProperties:
+            type: string
           type: object
           title: Labels
           description: Workflow labels
@@ -738,7 +741,8 @@ components:
           title: Description
           description: Workflow description
         labels:
-          additionalProperties: true
+          additionalProperties:
+            type: string
           type: object
           title: Labels
           description: Workflow labels
@@ -757,7 +761,7 @@ components:
         is_import:
           type: boolean
           title: Is Import
-          description: When true, unavailable LLM models are cleared with warnings instead of rejecting the request. Use when importing workflows from other instances.
+          description: When true, unavailable LLM models are cleared with warnings instead of rejecting the request, and webhook/EDA authorized service accounts that are missing in the target project are removed from the definition and not bound. Use when importing workflows from other instances.
           default: false
 
     WorkflowUpdate:
@@ -782,7 +786,8 @@ components:
           description: Update workflow description
         labels:
           anyOf:
-            - additionalProperties: true
+            - additionalProperties:
+                type: string
               type: object
             - type: "null"
           title: Labels
