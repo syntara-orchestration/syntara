@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import contextlib
 import logging
 import os
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
+import asyncpg
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -23,6 +25,7 @@ from execution_plane.script_executor import ScriptExecutionError, execute_script
 logger = structlog.stdlib.get_logger(__name__)
 
 POLL_INTERVAL_SECONDS = 5
+NOTIFY_CHANNEL = "execution_plane_work_items"
 
 
 async def _claim_pending_items(session: AsyncSession) -> list[WorkItem]:
@@ -82,9 +85,35 @@ async def _process_item(item: WorkItem, session: AsyncSession, temporal_client: 
         await session.commit()
 
 
-async def _poll_loop(session_factory: async_sessionmaker[AsyncSession], temporal_client: Client) -> None:
-    """Poll for and process pending work items every POLL_INTERVAL_SECONDS."""
+async def _listen_loop(database_url: str, wakeup_event: asyncio.Event) -> None:
+    """Hold a LISTEN connection; set wakeup_event on every NOTIFY."""
+    # asyncpg uses plain postgresql:// (not postgresql+asyncpg://)
+    pg_url = database_url.replace("postgresql+asyncpg://", "postgresql://")
+    while True:
+        try:
+            disconnected = asyncio.Event()
+            conn: asyncpg.Connection = await asyncpg.connect(pg_url)
+            try:
+                conn.add_termination_listener(lambda _, ev=disconnected: ev.set())
+                await conn.add_listener(NOTIFY_CHANNEL, lambda *_: wakeup_event.set())
+                logger.info("Listening for notifications", channel=NOTIFY_CHANNEL)
+                await disconnected.wait()
+            finally:
+                with contextlib.suppress(Exception):
+                    await conn.close()
+        except Exception:
+            logger.exception("Notification listener failed, reconnecting in 5s")
+            await asyncio.sleep(5)
+
+
+async def _poll_loop(
+    session_factory: async_sessionmaker[AsyncSession],
+    temporal_client: Client,
+    wakeup_event: asyncio.Event,
+) -> None:
+    """Poll for and process pending work items; wake immediately on pg_notify."""
     logger.info("Execution Plane worker started, polling for work items")
+    wakeup_event.set()  # process any items already present at startup
     while True:
         try:
             async with session_factory() as session:
@@ -99,7 +128,9 @@ async def _poll_loop(session_factory: async_sessionmaker[AsyncSession], temporal
                             await _process_item(refreshed, item_session, temporal_client)
         except Exception:
             logger.exception("Error in polling loop, will retry")
-        await asyncio.sleep(POLL_INTERVAL_SECONDS)
+        wakeup_event.clear()
+        with contextlib.suppress(TimeoutError):
+            await asyncio.wait_for(wakeup_event.wait(), timeout=POLL_INTERVAL_SECONDS)
 
 
 async def _create_temporal_client() -> Client:
@@ -137,10 +168,15 @@ async def _run() -> None:
 
     engine = create_async_engine(database_url)
     session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-
     temporal_client = await _create_temporal_client()
+
+    wakeup_event = asyncio.Event()
     try:
-        await _poll_loop(session_factory, temporal_client)
+        async with asyncio.TaskGroup() as tg:
+            tg.create_task(_listen_loop(database_url, wakeup_event), name="ep-listener")
+            tg.create_task(
+                _poll_loop(session_factory, temporal_client, wakeup_event), name="ep-poll"
+            )
     finally:
         await engine.dispose()
 

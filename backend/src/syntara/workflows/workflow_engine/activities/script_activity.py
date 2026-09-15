@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from execution_plane.models.work_item import WorkItem, WorkItemStatus
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 from temporalio import activity
@@ -62,6 +63,8 @@ async def _dispatch_to_te(
 
     async with session_factory() as session:
         session.add(work_item)
+        # pg_notify is transactional — delivered to listeners only after this commit
+        await session.execute(text("SELECT pg_notify('execution_plane_work_items', '')"))
         await session.commit()
 
     await engine.dispose()
