@@ -1,27 +1,20 @@
-import { zodResolver } from '@hookform/resolvers/zod'
-import {
-  Button,
-  Form,
-  FormGroup,
-  FormHelperText,
-  HelperText,
-  HelperTextItem,
-  Modal,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
-  TextArea,
-  TextInput,
-} from '@patternfly/react-core'
-import { useForm } from 'react-hook-form'
+import { Button, Form, Modal, ModalBody, ModalFooter, ModalHeader } from '@patternfly/react-core'
 import { z } from 'zod'
 
-import { useFormMutationErrorHandler } from '../../../hooks/useFormMutationErrorHandler'
+import { SynForm } from '../../../components/forms/SynForm'
+import { SynTextAreaField } from '../../../components/forms/SynTextAreaField'
+import { SynTextField } from '../../../components/forms/SynTextField'
+import { useSynForm } from '../../../hooks/useSynForm'
 import { useAlerts } from '../../../providers/alerts'
 import { accessClient } from '../../access/accessClient'
 import type { ProjectPolicyRead } from '../../access/types'
 
-import { addProjectPolicySchema, policyStatementSchema } from './addProjectPolicySchema'
+import {
+  addProjectPolicySchema,
+  policyStatementSchema,
+  PROJECT_POLICY_NAME_HINT,
+  STATEMENTS_JSON_HINT,
+} from './addProjectPolicySchema'
 import type { AddProjectPolicyFormData } from './addProjectPolicySchema'
 
 type EditProjectPolicyDialogProps = {
@@ -39,21 +32,17 @@ export function EditProjectPolicyDialog({
 }: Readonly<EditProjectPolicyDialogProps>) {
   const { showSuccess } = useAlerts()
 
-  const {
-    register,
-    handleSubmit,
-    setError,
-    formState: { errors },
-  } = useForm<AddProjectPolicyFormData>({
-    resolver: zodResolver(addProjectPolicySchema, undefined, { mode: 'sync' }),
+  const form = useSynForm({
+    schema: addProjectPolicySchema,
     defaultValues: {
       name: policy.name,
       description: policy.description ?? '',
       statementsJson: JSON.stringify(policy.statements ?? [], null, 2),
     },
+    onClose,
   })
+  const { handleSubmit, handleError, handleClose } = form
 
-  const handleError = useFormMutationErrorHandler<AddProjectPolicyFormData>(setError)
   const { mutate: updatePolicy, isPending } = accessClient.useMutation(
     'put',
     '/projects/{project_id}/policies/{policy_id}'
@@ -73,8 +62,8 @@ export function EditProjectPolicyDialog({
       {
         onSuccess: () => {
           showSuccess({ title: 'Policy updated', description: 'Policy updated successfully' })
+          handleClose()
           onSuccess()
-          onClose()
         },
         onError: handleError({ title: 'Failed to update policy' }),
       }
@@ -82,81 +71,42 @@ export function EditProjectPolicyDialog({
   }
 
   return (
-    <Modal isOpen onClose={onClose} variant="medium">
+    <Modal isOpen onClose={handleClose} variant="medium">
       <ModalHeader title="Edit Project Policy" />
       <ModalBody>
         <Form id="edit-project-policy-form" onSubmit={handleSubmit(onSubmit)}>
-          <FormGroup label="Name" isRequired fieldId="project-policy-name">
-            <TextInput
-              id="project-policy-name"
+          <SynForm form={form}>
+            <SynTextField
+              name="name"
+              label="Policy name"
+              fieldId="project-policy-name"
               isRequired
-              aria-label="Policy name"
-              validated={errors.name ? 'error' : 'default'}
-              {...register('name')}
+              hint={PROJECT_POLICY_NAME_HINT}
             />
-            {errors.name ? (
-              <FormHelperText>
-                <HelperText>
-                  <HelperTextItem variant="error">{errors.name.message}</HelperTextItem>
-                </HelperText>
-              </FormHelperText>
-            ) : (
-              <FormHelperText>
-                <HelperText>
-                  <HelperTextItem>Lowercase alphanumeric with hyphens (e.g. my-custom-policy)</HelperTextItem>
-                </HelperText>
-              </FormHelperText>
-            )}
-          </FormGroup>
-
-          <FormGroup label="Description" fieldId="project-policy-description">
-            <TextInput
-              id="project-policy-description"
-              aria-label="Policy description"
-              validated={errors.description ? 'error' : 'default'}
-              {...register('description')}
-            />
-            {errors.description && (
-              <FormHelperText>
-                <HelperText>
-                  <HelperTextItem variant="error">{errors.description.message}</HelperTextItem>
-                </HelperText>
-              </FormHelperText>
-            )}
-          </FormGroup>
-
-          <FormGroup label="Statements" isRequired fieldId="project-policy-statements">
-            <TextArea
-              id="project-policy-statements"
-              aria-label="Policy statements JSON"
-              validated={errors.statementsJson ? 'error' : 'default'}
+            <SynTextField name="description" label="Policy description" fieldId="project-policy-description" />
+            <SynTextAreaField
+              name="statementsJson"
+              label="Policy statements JSON"
+              fieldId="project-policy-statements"
+              isRequired
+              hint={STATEMENTS_JSON_HINT}
               rows={10}
               resizeOrientation="vertical"
-              {...register('statementsJson')}
             />
-            {errors.statementsJson ? (
-              <FormHelperText>
-                <HelperText>
-                  <HelperTextItem variant="error">{errors.statementsJson.message}</HelperTextItem>
-                </HelperText>
-              </FormHelperText>
-            ) : (
-              <FormHelperText>
-                <HelperText>
-                  <HelperTextItem>
-                    JSON array of statement objects with effect, actions, and scope fields
-                  </HelperTextItem>
-                </HelperText>
-              </FormHelperText>
-            )}
-          </FormGroup>
+          </SynForm>
         </Form>
       </ModalBody>
       <ModalFooter>
-        <Button variant="primary" form="edit-project-policy-form" type="submit" isLoading={isPending}>
+        <Button
+          variant="primary"
+          form="edit-project-policy-form"
+          type="submit"
+          isDisabled={isPending}
+          isLoading={isPending}
+        >
           Save
         </Button>
-        <Button variant="link" onClick={onClose}>
+        <Button variant="link" onClick={handleClose} isDisabled={isPending}>
           Cancel
         </Button>
       </ModalFooter>
