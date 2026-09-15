@@ -5,7 +5,7 @@ from typing import Annotated, Any, ClassVar
 from pydantic import ConfigDict, Field
 from sqlmodel import SQLModel
 
-from syntara.core.jsonb_limits import WorkflowDefinitionSizeValidator
+from syntara.core.jsonb_limits import WorkflowDefinitionValidator
 
 
 class WorkflowValidateRequest(SQLModel):
@@ -16,7 +16,7 @@ class WorkflowValidateRequest(SQLModel):
     reporting with node-level attribution.
     """
 
-    workflow_definition: Annotated[dict[str, Any], WorkflowDefinitionSizeValidator] = Field(
+    workflow_definition: Annotated[dict[str, Any], WorkflowDefinitionValidator] = Field(
         ..., description="Workflow definition to validate"
     )
 

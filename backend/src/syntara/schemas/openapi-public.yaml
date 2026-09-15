@@ -34859,6 +34859,7 @@ components:
                 script: '#/components/schemas/ScriptNode'
                 switch: '#/components/schemas/SwitchNode'
                 wait: '#/components/schemas/WaitNode'
+          maxItems: 200
           type: array
           title: Nodes
           description: Execution and control nodes in the workflow graph
@@ -34866,6 +34867,7 @@ components:
           items:
             additionalProperties: true
             type: object
+          maxItems: 500
           type: array
           title: Edges
           description: List of directed edges connecting triggers and nodes in the workflow graph
@@ -36290,6 +36292,7 @@ components:
         - orphaned_node
         - converge_configuration
         - approval_configuration
+        - definition_limits
     ValidationFinding:
       type: object
       title: ValidationFinding
