@@ -133,6 +133,17 @@
       "since": "2.0.0"
     },
     {
+      "type": "form_prompt",
+      "name": "Form",
+      "description": "Pause the workflow and collect structured input from a user",
+      "labels": {
+        "category": "executor"
+      },
+      "schema_ref": "../executors/form_prompt.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
       "type": "internal_activity",
       "name": "Internal Activity",
       "description": "Execute built-in system operations as native Temporal activities",

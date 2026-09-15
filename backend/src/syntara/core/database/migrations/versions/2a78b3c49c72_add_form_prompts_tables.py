@@ -12,6 +12,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
+from syntara.core.constants import FieldLimits
+
 # revision identifiers, used by Alembic.
 revision: str = "2a78b3c49c72"
 down_revision: str | Sequence[str] | None = "c4a7e1f93d21"
@@ -49,11 +51,15 @@ def upgrade() -> None:
         ),
         sa.Column("timeout_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column(
-            "input_schema",
+            "form_definition",
             postgresql.JSONB(astext_type=sa.Text()),
             server_default=sa.text("'{}'::jsonb"),
             nullable=False,
         ),
+        sa.Column("submit_label", sa.String(length=FieldLimits.FORM_SUBMIT_LABEL_MAX_LENGTH), nullable=True),
+        sa.Column("success_message", sa.String(length=FieldLimits.FORM_SUCCESS_MESSAGE_MAX_LENGTH), nullable=True),
+        sa.Column("timezone", sa.String(length=FieldLimits.FORM_TIMEZONE_MAX_LENGTH), nullable=True),
+        sa.Column("css_override", sa.String(length=FieldLimits.FORM_CSS_OVERRIDE_MAX_LENGTH), nullable=True),
         sa.Column("response_data", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("responded_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("responded_by", sa.Uuid(), nullable=True),

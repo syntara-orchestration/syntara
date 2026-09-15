@@ -1,5 +1,7 @@
 """Tests for node_settings_resolver pure functions."""
 
+import pytest
+
 from syntara.settings.catalog import SETTINGS_CATALOG
 from syntara.workflows.workflow_engine.constants import DEFAULT_MAX_OUTPUT_BYTES
 from syntara.workflows.workflow_engine.graph import ActivityNode
@@ -50,3 +52,41 @@ def test_resolve_max_output_bytes_non_script_node() -> None:
     node = ActivityNode(node_id="n", node_type="http_request", parameters={})
     result = resolve_max_output_bytes(node, {"workflow_engine.script_max_output_kb": 512})
     assert result == DEFAULT_MAX_OUTPUT_BYTES
+
+
+def test_resolve_response_window_from_node() -> None:
+    """Node parameter value is used when present."""
+    from syntara.workflows.workflow_engine.node_settings_resolver import resolve_response_window
+
+    node = ActivityNode(node_id="n", node_type="form_prompt", parameters={"response_window": 7200})
+    result = resolve_response_window(node, {})
+    assert result == 7200
+
+
+def test_resolve_response_window_from_catalog() -> None:
+    """Catalog value is used when node value is absent."""
+    from syntara.workflows.workflow_engine.node_settings_resolver import resolve_response_window
+
+    node = ActivityNode(node_id="n", node_type="form_prompt", parameters={})
+    result = resolve_response_window(node, {"workflow_engine.form_prompt_response_window_seconds": 3600})
+    assert result == 3600
+
+
+def test_resolve_response_window_fallback() -> None:
+    """Falls back to 86400 when no catalog value."""
+    from syntara.workflows.workflow_engine.node_settings_resolver import resolve_response_window
+
+    node = ActivityNode(node_id="n", node_type="form_prompt", parameters={})
+    result = resolve_response_window(node, {})
+    assert result == 86400
+
+
+def test_resolve_response_window_non_integer_raises() -> None:
+    """Non-integer response_window raises ConfigError."""
+    from temporalio.exceptions import ApplicationError
+
+    from syntara.workflows.workflow_engine.node_settings_resolver import resolve_response_window
+
+    node = ActivityNode(node_id="n", node_type="form_prompt", parameters={"response_window": "not_an_int"})
+    with pytest.raises(ApplicationError, match="ConfigError"):
+        resolve_response_window(node, {})

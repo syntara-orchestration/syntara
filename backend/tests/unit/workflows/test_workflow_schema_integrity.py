@@ -209,3 +209,18 @@ class TestWorkflowSchemaReferenceIntegrity:
                 if result:
                     return result
         return None
+
+
+class TestCatalogCompleteness:
+    """Catalog includes all expected node types."""
+
+    def test_catalog_includes_form_prompt(self) -> None:
+        """node_type_catalog.json includes form_prompt."""
+        import json
+
+        from syntara.schemas import SCHEMA_DIR
+
+        catalog_path = SCHEMA_DIR / "workflows" / "v2" / "catalog" / "node_type_catalog.json"
+        catalog = json.loads(catalog_path.read_text())
+        types = {entry["type"] for entry in catalog["node_types"]}
+        assert "form_prompt" in types

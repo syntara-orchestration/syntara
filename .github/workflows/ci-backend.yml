@@ -299,10 +299,17 @@ jobs:
         working-directory: backend
 
       - name: Check OpenAPI breaking changes against devel
+        id: breaking-check
+        continue-on-error: ${{ startsWith(github.base_ref, 'feature/') }}
         run: make check-openapi-breaking-pre-commit
         working-directory: backend
         env:
           OPENAPI_PR_LABELS: ${{ github.event_name == 'pull_request' && toJSON(github.event.pull_request.labels.*.name) || '' }}
+
+      - name: Warn on feature branch breaking changes
+        if: steps.breaking-check.outcome == 'failure' && startsWith(github.base_ref, 'feature/')
+        run: |
+          echo "::warning title=Breaking Changes on Feature Branch::OpenAPI breaking changes detected. This PR targets a feature branch, so the check passes with a warning. This check would FAIL when merging to devel/early-access."
 
   verify-test-structure:
     name: (Backend) Verify Test Structure

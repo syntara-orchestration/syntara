@@ -17,7 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validat
 from pydantic.functional_validators import ModelWrapValidatorHandler
 
 from syntara.aap.models.responses import AAPJobType as AAPJobType  # noqa: PLC0414
-from syntara.core.constants import WebhookLimits
+from syntara.core.constants import FieldLimits, WebhookLimits
 from syntara.core.exceptions import SafeValueError
 from syntara.workflows.json_schema_validation import validate_json_schema_definition
 from syntara.workflows.utils.iso8601_interval import parse_iso8601_repeating_interval
@@ -29,7 +29,60 @@ logger = structlog.stdlib.get_logger(__name__)
 # Template expression pattern - matches ${...} expressions
 TEMPLATE_PATTERN = re.compile(r"\$\{[^}]+\}")
 
+# CSS Unicode escape pattern: \XX or \XXXXXX (1-6 hex digits, optional trailing space)
+# Used to normalize CSS before security validation to prevent bypasses via \75rl( etc.
+_CSS_UNICODE_ESCAPE = re.compile(r"\\([0-9a-fA-F]{1,6})\s?")
+
+# CSS identity escape pattern: \ followed by any non-hex-digit, non-newline character
+# Resolves to that character (backslash dropped). Prevents bypasses via u\rl(, @\import, etc.
+_CSS_IDENTITY_ESCAPE = re.compile(r"\\([^0-9a-fA-F\r\n])")
+
+# CSS comment pattern: /* ... */ (DOTALL to match across newlines)
+# Prevents bypasses via behavior/**/: url(x.htc), url/**/(http://evil.com), etc.
+_CSS_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
+
+# Maximum valid Unicode codepoint (U+10FFFF per CSS and Unicode specs)
+_MAX_UNICODE_CODEPOINT = 0x10FFFF
+
 _CONFIG_VALIDATION_FAILED = "Config validation failed"
+
+
+def _normalize_css(css: str) -> str:
+    r"""Normalize CSS to prevent security check bypasses.
+
+    Performs three normalization steps:
+    1. Strips CSS comments (/* ... */) to prevent bypasses like behavior/**/: url(x.htc)
+    2. Normalizes numeric hex escapes: \XX or \XXXXXX (1-6 hex digits, optional trailing space)
+       Example: \75rl( → url(, \40import → @import
+    3. Normalizes identity escapes: \ followed by any non-hex-digit, non-newline character
+       Example: u\rl( → url(, @\import → @import
+
+    This prevents bypassing security checks via comments, numeric escapes, and identity escapes.
+
+    Follows CSS spec for escape sequences. Numeric codepoints above U+10FFFF
+    are replaced with U+FFFD per CSS spec.
+
+    Args:
+        css: Raw CSS string that may contain comments and/or CSS escapes.
+
+    Returns:
+        CSS with comments stripped and all escape sequences converted to their character equivalents.'
+
+    """
+
+    def replace_numeric_escape(match: re.Match[str]) -> str:
+        codepoint = int(match.group(1), 16)
+        # CSS spec: codepoints above U+10FFFF are invalid, replaced with U+FFFD
+        if codepoint > _MAX_UNICODE_CODEPOINT:
+            return "�"
+        return chr(codepoint)
+
+    # Strip CSS comments (/* ... */)
+    css = _CSS_COMMENT.sub("", css)
+    # Normalize numeric hex escapes (\75 → u)
+    css = _CSS_UNICODE_ESCAPE.sub(replace_numeric_escape, css)
+    # Normalize identity escapes (\r → r)
+    return _CSS_IDENTITY_ESCAPE.sub(r"\1", css)
 
 
 def validate_tool_selection_coherence(
@@ -172,6 +225,7 @@ class NodeType(str, Enum):
     AAP_WORKFLOW_JOB_TEMPLATE = "aap_workflow_job_template"
     AGENTIC = "agentic"
     APPROVAL = "approval"
+    FORM_PROMPT = "form_prompt"
     HTTP_REQUEST = "http_request"
     INTERNAL_ACTIVITY = "internal_activity"
     SCRIPT = "script"
@@ -485,7 +539,7 @@ class AgenticExecutorParameters(TemplateAwareBaseModel, populate_by_name=True):
 
         Checks structural validity, rejects $ref (SSRF prevention), and detects
         ReDoS-vulnerable regex patterns. Uses the same validation as webhook
-        input_schema for consistency.
+        form_definition for consistency.
 
         Template expressions (str matching ${...}) bypass this validator via
         TemplateAwareBaseModel's wrap validator and arrive here as str.
@@ -851,6 +905,122 @@ class ApprovalNodeParameters(BaseModel):
     decision_window: int | None = Field(default=None, ge=1, description="Response timeout in seconds")
 
 
+class FormPromptNodeParameters(BaseModel):
+    """Parameters for form prompt nodes."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    message: str | None = Field(
+        default=None,
+        max_length=2000,
+        description="Message shown above the form. Supports ${...} template expressions.",
+    )
+    form_definition: dict[str, Any] = Field(
+        description="JSON Schema describing the form fields to collect.",
+    )
+    responder_users: list[str] | None = Field(
+        default=None,
+        max_length=100,
+        description="Usernames allowed to respond. Empty/omitted = any user with form_prompt:submit.",
+    )
+    responder_groups: list[str] | None = Field(
+        default=None,
+        max_length=50,
+        description="Group names whose members may respond. Empty/omitted = any user with form_prompt:submit.",
+    )
+    response_window: int | None = Field(
+        default=None,
+        ge=1,
+        description="Seconds the responder has before the prompt expires. "
+        "Falls back to workflow_engine.form_prompt_response_window_seconds.",
+    )
+    fallback_behavior: Literal["fail", "fallback"] = Field(
+        default="fail",
+        description="What happens when the prompt is not answered in time: fail the workflow, "
+        "or route to the 'fallback' output port.",
+    )
+    submit_label: str | None = Field(
+        default=None,
+        max_length=FieldLimits.FORM_SUBMIT_LABEL_MAX_LENGTH,
+        description="Submit button label.",
+    )
+    success_message: str | None = Field(
+        default=None,
+        max_length=FieldLimits.FORM_SUCCESS_MESSAGE_MAX_LENGTH,
+        description="Shown after submission.",
+    )
+    timezone: str | None = Field(
+        default=None,
+        max_length=FieldLimits.FORM_TIMEZONE_MAX_LENGTH,
+        description="IANA timezone for interpreting date/datetime field values in the form.",
+    )
+    css_override: str | None = Field(
+        default=None,
+        max_length=FieldLimits.FORM_CSS_OVERRIDE_MAX_LENGTH,
+        description="Custom CSS applied to the form view.",
+    )
+
+    @field_validator("form_definition")
+    @classmethod
+    def validate_schema(cls, v: dict[str, Any]) -> dict[str, Any]:
+        """Validate JSON Schema structure and security."""
+        # Structural Draft-07 validity, $ref rejection (SSRF), ReDoS pattern guard.
+        # TO-DO - add field-type catalogue validation on the same hook.
+        validate_json_schema_definition(v)
+        return v
+
+    @field_validator("timezone")
+    @classmethod
+    def validate_timezone(cls, v: str | None) -> str | None:
+        """Validate that timezone is a valid IANA timezone name."""
+        if v is None:
+            return v
+        if v not in _get_valid_timezones():
+            msg = f"Invalid timezone: '{v}'. Must be a valid IANA timezone name (e.g., 'America/New_York')."
+            raise SafeValueError(msg)
+        return v
+
+    @field_validator("css_override")
+    @classmethod
+    def validate_css_override(cls, v: str | None) -> str | None:
+        """Validate CSS for security (reject patterns that enable data exfiltration or code execution)."""
+        if v is None:
+            return v
+
+        # Normalize CSS before validation to prevent bypasses
+        normalized = _normalize_css(v)
+        normalized_lower = normalized.lower()
+
+        # Reject url() - can exfiltrate data via background-image, etc.
+        if "url(" in normalized_lower:
+            msg = "CSS override cannot contain url() - it enables data exfiltration"
+            raise SafeValueError(msg)
+
+        # Reject @import - can load external stylesheets
+        if "@import" in normalized_lower:
+            msg = "CSS override cannot contain @import - it enables loading external resources"
+            raise SafeValueError(msg)
+
+        # Reject attribute selectors - can exfiltrate form values character by character
+        # NOTE: Over-blocks legitimate bracket uses in string literals (e.g., content: "[Required]").
+        # Accepted trade-off: over-blocking is safe; parsing strings would be complex and error-prone.
+        if "[" in normalized and "]" in normalized:
+            msg = "CSS override cannot contain attribute selectors - they enable data exfiltration"
+            raise SafeValueError(msg)
+
+        # Reject expression() - old IE code execution vector
+        if "expression(" in normalized_lower:
+            msg = "CSS override cannot contain expression() - it enables code execution"
+            raise SafeValueError(msg)
+
+        # Reject behavior: - old IE code execution vector
+        if "behavior:" in normalized_lower:
+            msg = "CSS override cannot contain behavior: - it enables code execution"
+            raise SafeValueError(msg)
+
+        return v
+
+
 class WebhookTriggerParameters(TemplateAwareBaseModel):
     """Parameters for webhook trigger nodes.
 
@@ -991,6 +1161,17 @@ class ApprovalOutput(NodeOutput):
     decision_notes: str | None = None
 
 
+class FormPromptOutput(NodeOutput):
+    """Output model for form prompt executor nodes."""
+
+    status: ActivityTerminalStatus | None = None
+    outcome: str | None = None  # "submitted" | "expired" | "cancelled"
+    response_data: dict[str, Any] | None = None
+    responded_by: str | None = None
+    responded_at: str | None = None
+    prompt_id: str | None = None
+
+
 class ConditionOutput(NodeOutput):
     """Output model for condition control nodes."""
 
@@ -1029,6 +1210,7 @@ NODE_OUTPUT_MODELS: dict[str, type[NodeOutput]] = {
     NodeType.AAP_WORKFLOW_JOB_TEMPLATE: AAPWorkflowJobTemplateOutput,
     NodeType.AGENTIC: AgenticOutput,
     NodeType.APPROVAL: ApprovalOutput,
+    NodeType.FORM_PROMPT: FormPromptOutput,
     NodeType.CONDITION: ConditionOutput,
     NodeType.SWITCH: SwitchOutput,
     NodeType.CONVERGE: ConvergeOutput,

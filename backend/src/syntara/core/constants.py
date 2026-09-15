@@ -26,6 +26,12 @@ class FieldLimits:
     TIME_WINDOW_MAX_LENGTH = 50
     NAMESPACED_NAME_MAX_LENGTH = 200
 
+    # Form prompt presentation field limits
+    FORM_SUBMIT_LABEL_MAX_LENGTH = 64
+    FORM_SUCCESS_MESSAGE_MAX_LENGTH = 500
+    FORM_TIMEZONE_MAX_LENGTH = 64  # IANA timezone names (~40 chars max)
+    FORM_CSS_OVERRIDE_MAX_LENGTH = 10000
+
     # List length limits
     APPROVER_LIST_MAX_LENGTH = 1000
 

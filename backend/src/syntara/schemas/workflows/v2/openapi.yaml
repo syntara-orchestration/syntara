@@ -1114,6 +1114,8 @@ components:
       $ref: ./shared-schemas.yaml#/components/schemas/ScriptNode
     ApprovalNode:
       $ref: ./shared-schemas.yaml#/components/schemas/ApprovalNode
+    FormPromptNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/FormPromptNode
     ConditionNode:
       $ref: ./shared-schemas.yaml#/components/schemas/ConditionNode
     SwitchNode:
@@ -1139,6 +1141,8 @@ components:
       $ref: ./shared-schemas.yaml#/components/schemas/ScriptExecutorParameters
     ApprovalNodeParameters:
       $ref: ./shared-schemas.yaml#/components/schemas/ApprovalNodeParameters
+    FormPromptNodeParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/FormPromptNodeParameters
     ConditionNodeParameters:
       $ref: ./shared-schemas.yaml#/components/schemas/ConditionNodeParameters
     SwitchNodeParameters:
@@ -1232,6 +1236,7 @@ components:
         - orphaned_node
         - converge_configuration
         - approval_configuration
+        - form_prompt_configuration
     ValidationFinding:
       type: object
       title: ValidationFinding

@@ -224,6 +224,61 @@ def _check_converge_node_findings(
     return findings
 
 
+def _check_required_output_port(
+    workflow_definition: dict[str, Any],
+    *,
+    node_type: str,
+    required_port: str,
+    category: ValidationCategory,
+    branch_label: str,
+) -> list[ValidationFinding]:
+    """Check that nodes of a given type have a required output port connected.
+
+    Shared helper for approval and form_prompt nodes, and any future gated node types.
+
+    Args:
+        workflow_definition: Workflow definition dict with nodes and edges.
+        node_type: Node type to check (e.g., "approval", "form_prompt").
+        required_port: Port name that must have a connection (e.g., "approved", "submitted").
+        category: ValidationCategory for the finding.
+        branch_label: Human-readable branch name for the error message (e.g., "Approved", "Submitted").
+
+    Returns:
+        List of validation findings (one error per node missing the required port).
+
+    """
+    findings: list[ValidationFinding] = []
+
+    # Build map of node_id → set of outgoing port names
+    outgoing_ports: dict[str, set[str]] = defaultdict(set)
+    for edge in workflow_definition.get("edges", []):
+        from_port = edge.get("from_port")
+        if from_port is not None:
+            outgoing_ports[edge["from"]].add(from_port)
+
+    # Check each node of the target type
+    for node in workflow_definition.get("nodes", []):
+        if node.get("type") != node_type:
+            continue
+        node_id = node.get("id")
+        if node_id is None:
+            continue
+        node_name = node.get("name") or node_id
+
+        if required_port not in outgoing_ports.get(node_id, set()):
+            node_label = node_type.replace("_", " ").title()
+            findings.append(
+                ValidationFinding(
+                    severity=ValidationSeverity.error,
+                    category=category,
+                    message=f"{node_label} \"{node_name}\" is missing a connection from the '{branch_label}' branch",
+                    node_id=node_id,
+                ),
+            )
+
+    return findings
+
+
 def _check_approval_node_findings(
     workflow_definition: dict[str, Any],
     *,
@@ -237,14 +292,16 @@ def _check_approval_node_findings(
     - A warning when ``fallback_decision`` is ``approve`` without an effective
       ``continue_on_failure`` (the fallback would have no effect).
     """
-    findings: list[ValidationFinding] = []
+    # Check for missing "approved" port using shared helper
+    findings: list[ValidationFinding] = _check_required_output_port(
+        workflow_definition,
+        node_type="approval",
+        required_port="approved",
+        category=ValidationCategory.approval_configuration,
+        branch_label="Approved",
+    )
 
-    outgoing_ports: dict[str, set[str]] = defaultdict(set)
-    for edge in workflow_definition.get("edges", []):
-        from_port = edge.get("from_port")
-        if from_port is not None:
-            outgoing_ports[edge["from"]].add(from_port)
-
+    # Check approval-specific fallback_decision warning
     for node in workflow_definition.get("nodes", []):
         if node.get("type") != "approval":
             continue
@@ -252,16 +309,6 @@ def _check_approval_node_findings(
         if node_id is None:
             continue
         node_name = node.get("name") or node_id
-
-        if "approved" not in outgoing_ports.get(node_id, set()):
-            findings.append(
-                ValidationFinding(
-                    severity=ValidationSeverity.error,
-                    category=ValidationCategory.approval_configuration,
-                    message=f"Approval \"{node_name}\" is missing a connection from the 'Approved' branch",
-                    node_id=node_id,
-                ),
-            )
 
         params = node.get("parameters", {})
         settings = node.get("settings") or {}
@@ -282,6 +329,66 @@ def _check_approval_node_findings(
                     field_path="parameters.fallback_decision",
                 ),
             )
+    return findings
+
+
+def _check_form_prompt_node_findings(
+    workflow_definition: dict[str, Any],
+) -> list[ValidationFinding]:
+    """Check form prompt node configuration against the workflow graph structure.
+
+    Emits:
+    - An error when a ``form_prompt`` node has no successor on the ``submitted``
+      output port.
+    - An error when a ``fallback`` successor exists but ``fallback_behavior`` is
+      ``fail`` (unreachable branch - configuration mismatch).
+    """
+    # Check for missing "submitted" port using shared helper
+    findings: list[ValidationFinding] = _check_required_output_port(
+        workflow_definition,
+        node_type="form_prompt",
+        required_port="submitted",
+        category=ValidationCategory.form_prompt_configuration,
+        branch_label="Submitted",
+    )
+
+    # Build outgoing ports map for form_prompt-specific fallback check
+    outgoing_ports: dict[str, set[str]] = defaultdict(set)
+    for edge in workflow_definition.get("edges", []):
+        from_port = edge.get("from_port")
+        if from_port is not None:
+            outgoing_ports[edge["from"]].add(from_port)
+
+    # Check form_prompt-specific unreachable fallback branch
+    for node in workflow_definition.get("nodes", []):
+        if node.get("type") != "form_prompt":
+            continue
+        node_id = node.get("id")
+        if node_id is None:
+            continue
+        node_name = node.get("name") or node_id
+
+        ports = outgoing_ports.get(node_id, set())
+        params = node.get("parameters", {})
+        fallback_behavior = params.get("fallback_behavior", "fail")
+
+        # Error: fallback port exists but fallback_behavior is "fail" (unreachable branch)
+        if fallback_behavior == "fail" and "fallback" in ports:
+            findings.append(
+                ValidationFinding(
+                    severity=ValidationSeverity.error,
+                    category=ValidationCategory.form_prompt_configuration,
+                    message=(
+                        f"Form \"{node_name}\" has a 'Fallback' branch connected, "
+                        f"but On timeout is set to fail the workflow. "
+                        f"The fallback branch will never execute. Remove the fallback connection "
+                        f"or change On timeout to 'Route to fallback'."
+                    ),
+                    node_id=node_id,
+                    field_path="parameters.fallback_behavior",
+                ),
+            )
+
     return findings
 
 
@@ -617,6 +724,7 @@ class WorkflowValidator:
                     system_continue_on_failure=system_continue_on_failure,
                 )
             )
+            findings.extend(_check_form_prompt_node_findings(workflow_definition))
             findings.extend(check_template_expressions(workflow_definition, node_ids))
 
         findings.extend(collect_scheduled_trigger_config_findings(workflow_definition))

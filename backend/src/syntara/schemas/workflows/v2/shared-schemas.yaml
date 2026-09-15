@@ -609,6 +609,7 @@ components:
         - aap_workflow_job_template
         - agentic
         - approval
+        - form_prompt
         - http_request
         - internal_activity
         - script
@@ -1068,6 +1069,7 @@ components:
               - $ref: '#/components/schemas/AgenticNode'
               - $ref: '#/components/schemas/ScriptNode'
               - $ref: '#/components/schemas/ApprovalNode'
+              - $ref: '#/components/schemas/FormPromptNode'
               - $ref: '#/components/schemas/ConditionNode'
               - $ref: '#/components/schemas/SwitchNode'
               - $ref: '#/components/schemas/LoopNode'
@@ -1080,6 +1082,7 @@ components:
                 aap_workflow_job_template: '#/components/schemas/AAPWorkflowJobTemplateNode'
                 agentic: '#/components/schemas/AgenticNode'
                 approval: '#/components/schemas/ApprovalNode'
+                form_prompt: '#/components/schemas/FormPromptNode'
                 condition: '#/components/schemas/ConditionNode'
                 converge: '#/components/schemas/ConvergeNode'
                 http_request: '#/components/schemas/HTTPRequestNode'
@@ -1419,6 +1422,58 @@ components:
         - parameters
       title: ApprovalNode
       description: Approval gate node.
+    FormPromptNode:
+      properties:
+        id:
+          type: string
+          pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
+          title: Id
+          description: Unique identifier for the node within the workflow
+        name:
+          anyOf:
+            - type: string
+              minLength: 1
+            - type: 'null'
+          title: Name
+          description: Human-readable name for the node
+        description:
+          anyOf:
+            - type: string
+              minLength: 1
+            - type: 'null'
+          title: Description
+          description: Human-readable description of the node purpose
+        outputs:
+          anyOf:
+            - additionalProperties:
+                type: string
+              type: object
+            - type: 'null'
+          title: Outputs
+          description: Output extraction mapping
+        position:
+          anyOf:
+            - $ref: '#/components/schemas/NodePosition'
+            - type: 'null'
+          description: Optional UI position hint
+        type:
+          type: string
+          const: form_prompt
+          title: Type
+        parameters:
+          $ref: '#/components/schemas/FormPromptNodeParameters'
+        settings:
+          anyOf:
+            - $ref: '#/components/schemas/NodeSettingsNoRetry'
+            - type: 'null'
+      additionalProperties: true
+      type: object
+      required:
+        - id
+        - type
+        - parameters
+      title: FormPromptNode
+      description: Form prompt node — pauses execution to collect structured user input.
     ConditionNode:
       properties:
         id:
@@ -2123,6 +2178,87 @@ components:
       type: object
       title: ApprovalNodeParameters
       description: Parameters for approval gate nodes.
+    FormPromptNodeParameters:
+      properties:
+        message:
+          anyOf:
+            - type: string
+              maxLength: 2000
+            - type: 'null'
+          title: Message
+          description: Message shown above the form. Supports ${...} template expressions.
+        form_definition:
+          additionalProperties: true
+          type: object
+          title: Form Definition
+          description: JSON Schema describing the form fields to collect.
+        responder_users:
+          anyOf:
+            - items:
+                type: string
+              type: array
+              maxItems: 100
+            - type: 'null'
+          title: Responder Users
+          description: Usernames allowed to respond. Empty/omitted = any user with form_prompt:submit.
+        responder_groups:
+          anyOf:
+            - items:
+                type: string
+              type: array
+              maxItems: 50
+            - type: 'null'
+          title: Responder Groups
+          description: Group names whose members may respond. Empty/omitted = any user with form_prompt:submit.
+        response_window:
+          anyOf:
+            - type: integer
+              minimum: 1.0
+            - type: 'null'
+          title: Response Window
+          description: Seconds the responder has before the prompt expires. Falls back to workflow_engine.form_prompt_response_window_seconds.
+        fallback_behavior:
+          type: string
+          enum:
+            - fail
+            - fallback
+          title: Fallback Behavior
+          description: 'What happens when the prompt is not answered in time: fail the workflow, or route to the ''fallback'' output port.'
+          default: fail
+        submit_label:
+          anyOf:
+            - type: string
+              maxLength: 64
+            - type: 'null'
+          title: Submit Label
+          description: Submit button label.
+        success_message:
+          anyOf:
+            - type: string
+              maxLength: 500
+            - type: 'null'
+          title: Success Message
+          description: Shown after submission.
+        timezone:
+          anyOf:
+            - type: string
+              maxLength: 64
+            - type: 'null'
+          title: Timezone
+          description: IANA timezone for interpreting date/datetime field values in the form.
+        css_override:
+          anyOf:
+            - type: string
+              maxLength: 10000
+            - type: 'null'
+          title: Css Override
+          description: Custom CSS applied to the form view.
+      additionalProperties: false
+      type: object
+      required:
+        - form_definition
+      title: FormPromptNodeParameters
+      description: Parameters for form prompt nodes.
     ConditionNodeParameters:
       properties:
         condition:

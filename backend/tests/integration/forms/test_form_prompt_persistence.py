@@ -31,7 +31,7 @@ class TestFormPromptPersistence:
             message="Deploy version 1.2.3?",
             status=FormPromptStatus.PENDING,
             timeout_at=datetime.now(UTC),
-            input_schema={"type": "object", "properties": {"reason": {"type": "string"}}},
+            form_definition={"type": "object", "properties": {"reason": {"type": "string"}}},
         )
 
         assert prompt.execution_id == execution_id
@@ -55,19 +55,19 @@ class TestFormPromptPersistence:
         }
 
         prompt = create_test_form_prompt()
-        prompt.input_schema = complex_schema
+        prompt.form_definition = complex_schema
         prompt.response_data = {"deployment": {"version": "1.2.3", "environment": "prod"}}
 
         # Serialize to dict
         data = prompt.model_dump()
 
         # Verify nested structures preserved
-        assert data["input_schema"] == complex_schema
+        assert data["form_definition"] == complex_schema
         assert data["response_data"]["deployment"]["version"] == "1.2.3"
 
         # Deserialize back
         restored = FormPrompt.model_validate(data)
-        assert restored.input_schema == complex_schema
+        assert restored.form_definition == complex_schema
 
     def test_default_values_on_instantiation(self) -> None:
         """Test that default values are correctly applied on model instantiation."""
@@ -76,7 +76,7 @@ class TestFormPromptPersistence:
             project_id=uuid4(),
             prompt_node_id="test",
             name="Test",
-            input_schema={},
+            form_definition={},
         )
 
         # Defaults from BaseResource
@@ -166,5 +166,5 @@ class TestFormPromptPersistence:
                 project_id=uuid4(),
                 prompt_node_id="test",
                 name="",  # min_length=1
-                input_schema={},
+                form_definition={},
             )

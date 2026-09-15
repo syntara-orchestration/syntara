@@ -1,0 +1,62 @@
+---
+schema_version: "2.0.0"
+name: form-prompt-full
+description: Form prompt with all parameters populated
+
+triggers:
+  - id: trigger
+    type: manual_trigger
+
+nodes:
+  - id: collect_info
+    type: form_prompt
+    parameters:
+      message: "Please provide deployment details to continue"
+      input_schema:
+        type: object
+        properties:
+          environment:
+            type: string
+            enum: [dev, staging, production]
+          version:
+            type: string
+            pattern: "^v[0-9]+\\.[0-9]+\\.[0-9]+$"
+          confirmation:
+            type: boolean
+        required: [environment, version, confirmation]
+      responder_users:
+        - alice
+        - bob
+      responder_groups:
+        - team-sre
+      response_window: 3600
+      fallback_behavior: fallback
+      submit_label: Deploy
+      success_message: Deployment request submitted successfully
+      timezone: America/New_York
+      css_override: ".form { max-width: 600px; margin: 0 auto; }"
+    settings:
+      timeout: 3700
+      continue_on_failure: false
+  - id: deploy
+    type: script
+    parameters:
+      language: bash
+      code: |
+        echo "Deploying to: ${collect_info.response_data.environment}"
+        echo "Version: ${collect_info.response_data.version}"
+  - id: fallback_handler
+    type: script
+    parameters:
+      language: bash
+      code: echo "Form expired, using defaults"
+
+edges:
+  - from: trigger
+    to: collect_info
+  - from: collect_info
+    to: deploy
+    from_port: submitted
+  - from: collect_info
+    to: fallback_handler
+    from_port: fallback
