@@ -29,7 +29,7 @@ describe('IconLabel', () => {
     render(<IconLabel color="red">Colored text</IconLabel>)
 
     const flexContainer = screen.getByTestId('icon-label')
-    expect(flexContainer).toHaveStyle({ color: 'rgb(255, 0, 0)' })
+    expect(flexContainer).toHaveStyle({ color: 'red' })
   })
 
   it('does not apply color style when not provided', () => {
@@ -50,7 +50,7 @@ describe('IconLabel', () => {
     expect(screen.getByText('Success message')).toBeInTheDocument()
 
     const flexContainer = screen.getByTestId('icon-label')
-    expect(flexContainer).toHaveStyle({ color: 'rgb(0, 128, 0)' })
+    expect(flexContainer).toHaveStyle({ color: 'green' })
   })
 
   it('renders complex children', () => {

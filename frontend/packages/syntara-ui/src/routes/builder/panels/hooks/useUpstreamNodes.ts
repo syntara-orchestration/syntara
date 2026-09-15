@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, type ComponentType } from 'react'
 
 import { useWorkflowStore } from '../../../../stores/useWorkflowStore'
 import { selectEdges, selectActivities, selectTriggers } from '../../../../stores/workflowStoreSelectors'
@@ -9,6 +9,8 @@ export type UpstreamNodeInfo = {
   id: string
   name?: string
   type: string
+  icon?: ComponentType<{ className?: string }>
+  iconId?: string
 }
 
 /**

@@ -19,15 +19,15 @@ import {
   TextInput,
 } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiEditIcon, RhUiSyncIcon } from '@patternfly/react-icons'
-import { Tbody, Table } from '@patternfly/react-table'
+import { Tbody } from '@patternfly/react-table'
 import { useCallback, useMemo, useState } from 'react'
-import { Controller, type Control } from 'react-hook-form'
+import { Controller, type Control, type FieldError, type FieldErrors } from 'react-hook-form'
 
 import { FilterBar } from '../../../../components/filters/FilterBar'
-import { NxPanelContentStack } from '../../../../components/layout/NxPanelContentStack'
-import { NxEmptyStateFilter } from '../../../../components/states/NxEmptyStateFilter'
-import { NxEmptyStateNoData } from '../../../../components/states/NxEmptyStateNoData'
-import { NxScrollableTableContainer } from '../../../../components/table/NxScrollableTableContainer'
+import { SynPanelContentStack } from '../../../../components/layout/SynPanelContentStack'
+import { SynEmptyStateFilter } from '../../../../components/states/SynEmptyStateFilter'
+import { SynEmptyStateNoData } from '../../../../components/states/SynEmptyStateNoData'
+import { SynScrollableTableContainer } from '../../../../components/table/SynScrollableTableContainer'
 import type { FilterConfig, FilterFieldDefinition } from '../../../../types/filters'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../../../types/filters'
 import { APP_TITLE } from '../../../../utils/appTitle'
@@ -36,24 +36,28 @@ import { HintOrError } from './formFieldHelpers'
 import type { GroupMappingEditFormValues } from './groupMappingEditFormSchema'
 import { EditMappingRow, MappingRow } from './groupMappingFields'
 import { GroupMappingTableHead } from './groupMappingTableHead'
-import type { GroupMappingEntry, NexusGroup } from './groupMappingUtils'
+import type { GroupMappingEntry, MappedGroup } from './groupMappingUtils'
 import { idpHelp } from './idpFieldHelp'
 import { IDP_TYPE_PRESETS } from './idpTypePresets'
 
+type GroupMappingEntryFieldErrors = FieldErrors<GroupMappingEditFormValues['entries'][number]>
+type GroupMappingEntryErrors = FieldErrors<GroupMappingEditFormValues>['entries']
+
+function fieldErrorMessage(error: FieldError | undefined): string | undefined {
+  const message = error?.message
+  return typeof message === 'string' ? message : undefined
+}
+
 function entryFieldErrorMessage(
-  entryErrors: GroupMappingEditFormValues['entries'] | undefined,
+  entryErrors: GroupMappingEntryErrors | undefined,
   index: number,
-  field: 'idpGroupValue' | 'nexusGroupId'
+  field: 'idpGroupValue' | 'mappedGroupId'
 ): string | undefined {
   if (!Array.isArray(entryErrors)) return undefined
-  const row = entryErrors[index]
-  if (!row || typeof row !== 'object') return undefined
-  const fieldError: unknown = row[field]
-  if (fieldError && typeof fieldError === 'object' && 'message' in fieldError) {
-    const message: unknown = fieldError.message
-    return typeof message === 'string' ? message : undefined
-  }
-  return undefined
+  const rows = entryErrors as Array<GroupMappingEntryFieldErrors | undefined>
+  const row = rows.at(index)
+  if (!row) return undefined
+  return fieldErrorMessage(field === 'idpGroupValue' ? row.idpGroupValue : row.mappedGroupId)
 }
 
 const GROUP_MAPPING_KEYWORD_FILTER_FIELDS: FilterFieldDefinition[] = [
@@ -83,7 +87,7 @@ export type EmptyMappingStateProps = {
 
 export function EmptyMappingState({ onTestSignIn, onAddManually }: Readonly<EmptyMappingStateProps>) {
   return (
-    <EmptyState headingLevel="h2" titleText="No group mappings configured" variant="lg">
+    <EmptyState headingLevel="h2" titleText="No group mappings configured yet" variant="lg">
       <EmptyStateBody>
         {`Group mappings automatically assign users to ${APP_TITLE} groups based on their identity provider groups.`}
         {(onTestSignIn ?? onAddManually) && ' Discover groups from your IdP, or add mappings manually.'}
@@ -180,16 +184,16 @@ export type MappingTableRow = {
   index: number
   /** Read-only list rows include display values */
   idpGroupValue?: string
-  nexusGroupId?: string
+  mappedGroupId?: string
 }
 
 export type MappingTableProps = {
   rows: MappingTableRow[]
   control?: Control<GroupMappingEditFormValues>
-  nexusGroups: NexusGroup[]
+  mappedGroups: MappedGroup[]
   isReadOnly?: boolean
   showValidation?: boolean
-  entryErrors?: GroupMappingEditFormValues['entries']
+  entryErrors?: GroupMappingEntryErrors
   onRemove: (index: number) => void
   onAdd: () => void
   onCreateGroup: (index: number) => void
@@ -200,7 +204,7 @@ export type MappingTableProps = {
 export function MappingTable({
   rows,
   control,
-  nexusGroups,
+  mappedGroups,
   isReadOnly,
   showValidation,
   entryErrors,
@@ -214,31 +218,30 @@ export function MappingTable({
    * (this table does not pass `readOnlyAllowRemove`).
    */
   const showActionsColumn = isReadOnly !== true
-  const showWildcardHelp = isReadOnly !== true
   const showAddButton = !isReadOnly && showAddMappingAction
 
   const table = (
-    <Table aria-label="Group mappings" variant="compact">
-      <GroupMappingTableHead showActionsColumn={showActionsColumn} showWildcardHelp={showWildcardHelp} />
+    <SynScrollableTableContainer caption="Group mappings" variant="compact">
+      <GroupMappingTableHead showActionsColumn={showActionsColumn} />
       <Tbody>
         {rows.map((row) => {
           if (isReadOnly) {
             const entry: GroupMappingEntry = {
               key: row.rowId,
               idpGroupValue: row.idpGroupValue ?? '',
-              nexusGroupId: row.nexusGroupId ?? '',
+              mappedGroupId: row.mappedGroupId ?? '',
             }
             return (
               <MappingRow
                 key={row.rowId}
                 entry={entry}
                 index={row.index}
-                nexusGroups={nexusGroups}
+                mappedGroups={mappedGroups}
                 isReadOnly={isReadOnly}
                 readOnlyPlainCells={Boolean(isReadOnly)}
                 showValidation={showValidation}
                 idpErrorMessage={entryFieldErrorMessage(entryErrors, row.index, 'idpGroupValue')}
-                nexusErrorMessage={entryFieldErrorMessage(entryErrors, row.index, 'nexusGroupId')}
+                groupErrorMessage={entryFieldErrorMessage(entryErrors, row.index, 'mappedGroupId')}
                 onRemove={onRemove}
                 onCreateGroup={onCreateGroup}
               />
@@ -253,14 +256,14 @@ export function MappingTable({
               rowId={row.rowId}
               index={row.index}
               control={control}
-              nexusGroups={nexusGroups}
+              mappedGroups={mappedGroups}
               onRemove={onRemove}
               onCreateGroup={onCreateGroup}
             />
           )
         })}
       </Tbody>
-    </Table>
+    </SynScrollableTableContainer>
   )
 
   if (!showAddButton) {
@@ -269,7 +272,7 @@ export function MappingTable({
 
   return (
     <Stack hasGutter>
-      <StackItem>{table}</StackItem>
+      {table}
       <StackItem>
         <Button variant="link" icon={<RhUiAddIcon />} onClick={onAdd}>
           Add mapping
@@ -312,7 +315,7 @@ export function GroupMappingFormActions({ onAdd, onReDiscover, isListening }: Re
 const noopIdpGroupValueChange: (index: number, value: string) => void = () => {
   /* Read-only list view: controls are disabled; handler required by MappingRow */
 }
-const noopNexusGroupIdChange: (index: number, nexusGroupId: string) => void = () => {
+const noopMappedGroupIdChange: (index: number, mappedGroupId: string) => void = () => {
   /* Read-only list view */
 }
 const noopCreateGroup: (index: number) => void = () => {
@@ -359,12 +362,12 @@ function GroupMappingReadOnlyToolbar({
 
 export type ReadOnlyViewProps = {
   entries: GroupMappingEntry[]
-  nexusGroups: NexusGroup[]
+  mappedGroups: MappedGroup[]
   /** When undefined, the "Edit group mapping" button is hidden (read-only mode). */
   onEditMapping?: () => void
 }
 
-export function ReadOnlyView({ entries, nexusGroups, onEditMapping }: Readonly<ReadOnlyViewProps>) {
+export function ReadOnlyView({ entries, mappedGroups, onEditMapping }: Readonly<ReadOnlyViewProps>) {
   const [filters, setFilters] = useState<FilterConfig[]>([])
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(20)
@@ -395,10 +398,10 @@ export function ReadOnlyView({ entries, nexusGroups, onEditMapping }: Readonly<R
   const filteredEntries = useMemo(() => {
     if (!filterTerm) return entries
     return entries.filter((e) => {
-      const groupName = nexusGroups.find((g) => g.id === e.nexusGroupId)?.name ?? ''
+      const groupName = mappedGroups.find((g) => g.id === e.mappedGroupId)?.name ?? ''
       return e.idpGroupValue.toLowerCase().includes(filterTerm) || groupName.toLowerCase().includes(filterTerm)
     })
-  }, [entries, filterTerm, nexusGroups])
+  }, [entries, filterTerm, mappedGroups])
 
   const paginatedEntries = useMemo(() => {
     const start = (page - 1) * perPage
@@ -408,15 +411,15 @@ export function ReadOnlyView({ entries, nexusGroups, onEditMapping }: Readonly<R
   /** Defensive: parent normally switches to empty state before rendering read-only with zero rows */
   if (entries.length === 0) {
     return (
-      <NxEmptyStateNoData
-        title="No group mappings"
+      <SynEmptyStateNoData
+        title="No group mappings yet"
         description="There are no group mappings to display for this identity provider."
       />
     )
   }
 
   return (
-    <NxPanelContentStack hasGutter>
+    <SynPanelContentStack hasGutter>
       <GroupMappingReadOnlyToolbar
         filters={filters}
         onFilterChange={handleFilterChange}
@@ -425,11 +428,12 @@ export function ReadOnlyView({ entries, nexusGroups, onEditMapping }: Readonly<R
       />
       {filteredEntries.length === 0 ? (
         <StackItem isFilled style={READ_ONLY_EMPTY_FILTER_STATE_STYLE}>
-          <NxEmptyStateFilter clearAllFilters={clearFiltersAndPage} />
+          <SynEmptyStateFilter clearAllFilters={clearFiltersAndPage} />
         </StackItem>
       ) : (
-        <NxScrollableTableContainer
+        <SynScrollableTableContainer
           caption="Group mappings"
+          variant="compact"
           footer={{
             page,
             perPage,
@@ -440,26 +444,26 @@ export function ReadOnlyView({ entries, nexusGroups, onEditMapping }: Readonly<R
             onPerPageChange: handlePerPageChange,
           }}
         >
-          <GroupMappingTableHead showActionsColumn={false} showWildcardHelp={false} />
+          <GroupMappingTableHead showActionsColumn={false} />
           <Tbody>
             {paginatedEntries.map((entry, index) => (
               <MappingRow
                 key={entry.key}
                 entry={entry}
                 index={index}
-                nexusGroups={nexusGroups}
+                mappedGroups={mappedGroups}
                 isReadOnly
                 readOnlyPlainCells
                 showValidation={false}
                 onIdpGroupValueChange={noopIdpGroupValueChange}
-                onNexusGroupIdChange={noopNexusGroupIdChange}
+                onMappedGroupIdChange={noopMappedGroupIdChange}
                 onRemove={noopRemoveMapping}
                 onCreateGroup={noopCreateGroup}
               />
             ))}
           </Tbody>
-        </NxScrollableTableContainer>
+        </SynScrollableTableContainer>
       )}
-    </NxPanelContentStack>
+    </SynPanelContentStack>
   )
 }

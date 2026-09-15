@@ -15,6 +15,7 @@ from syntara.metrics.queue_depth_poller import (
     _ensure_client,
     _make_poll_callback,
     _query_queue_depth,
+    _query_running_workflow_count,
     get_queue_depth_poller,
 )
 
@@ -127,6 +128,35 @@ class TestQueryQueueDepth:
         assert depth == 0
 
 
+class TestQueryRunningWorkflowCount:
+    """Tests for _query_running_workflow_count visibility API helper."""
+
+    @pytest.mark.asyncio
+    async def test_returns_count_from_temporal(self) -> None:
+        """Should return the count from Temporal's count_workflows response."""
+        mock_result = MagicMock()
+        mock_result.count = 42
+
+        mock_client = MagicMock()
+        mock_client.count_workflows = AsyncMock(return_value=mock_result)
+
+        count = await _query_running_workflow_count(mock_client)
+        assert count == 42
+        mock_client.count_workflows.assert_called_once_with("ExecutionStatus='Running'")
+
+    @pytest.mark.asyncio
+    async def test_returns_zero_when_no_running_workflows(self) -> None:
+        """Should return 0 when no workflows are running."""
+        mock_result = MagicMock()
+        mock_result.count = 0
+
+        mock_client = MagicMock()
+        mock_client.count_workflows = AsyncMock(return_value=mock_result)
+
+        count = await _query_running_workflow_count(mock_client)
+        assert count == 0
+
+
 class TestPollCallback:
     """Tests for the poll callback produced by _make_poll_callback."""
 
@@ -144,6 +174,7 @@ class TestPollCallback:
         mock_resp.stats.approximate_backlog_count = 5
         mock_resp.task_queue_status = None
         mock_client.workflow_service.describe_task_queue = AsyncMock(return_value=mock_resp)
+        mock_client.count_workflows = AsyncMock(return_value=MagicMock(count=10))
 
         mock_recorder = MagicMock()
 
@@ -163,11 +194,13 @@ class TestPollCallback:
 
         from syntara.metrics.types import ComponentLabel, MetricType
 
-        mock_recorder.record.assert_called_once_with(
-            MetricType.TEMPORAL_QUEUE_DEPTH,
-            5.0,
-            component=ComponentLabel.TEMPORAL_WORKER,
-            labels={"task_queue": "orchestrator-workflow-queue"},
+        queue_depth_calls = [
+            c for c in mock_recorder.record.call_args_list if c.args[0] == MetricType.TEMPORAL_QUEUE_DEPTH
+        ]
+        assert len(queue_depth_calls) == 1
+        assert queue_depth_calls[0] == (
+            (MetricType.TEMPORAL_QUEUE_DEPTH, 5.0),
+            {"component": ComponentLabel.TEMPORAL_WORKER, "labels": {"task_queue": "orchestrator-workflow-queue"}},
         )
 
     @pytest.mark.asyncio
@@ -178,6 +211,7 @@ class TestPollCallback:
         mock_resp.stats.approximate_backlog_count = 3
         mock_resp.task_queue_status = None
         mock_client.workflow_service.describe_task_queue = AsyncMock(return_value=mock_resp)
+        mock_client.count_workflows = AsyncMock(return_value=MagicMock(count=0))
 
         mock_recorder = MagicMock()
 
@@ -199,11 +233,13 @@ class TestPollCallback:
 
         from syntara.metrics.types import ComponentLabel, MetricType
 
-        assert mock_recorder.record.call_count == 2
-        calls = mock_recorder.record.call_args_list
-        recorded_queues = {c.kwargs["labels"]["task_queue"] for c in calls}
+        queue_depth_calls = [
+            c for c in mock_recorder.record.call_args_list if c.args[0] == MetricType.TEMPORAL_QUEUE_DEPTH
+        ]
+        assert len(queue_depth_calls) == 2
+        recorded_queues = {c.kwargs["labels"]["task_queue"] for c in queue_depth_calls}
         assert recorded_queues == set(queues)
-        for call in calls:
+        for call in queue_depth_calls:
             assert call.args == (MetricType.TEMPORAL_QUEUE_DEPTH, 3.0)
             assert call.kwargs["component"] == ComponentLabel.TEMPORAL_WORKER
 
@@ -245,6 +281,7 @@ class TestPollCallback:
                 ok_resp,
             ]
         )
+        mock_client.count_workflows = AsyncMock(return_value=MagicMock(count=3))
         mock_recorder = MagicMock()
 
         with (
@@ -265,12 +302,93 @@ class TestPollCallback:
 
         from syntara.metrics.types import ComponentLabel, MetricType
 
-        mock_recorder.record.assert_called_once_with(
-            MetricType.TEMPORAL_QUEUE_DEPTH,
-            7.0,
-            component=ComponentLabel.TEMPORAL_WORKER,
-            labels={"task_queue": "orchestrator-background-queue"},
+        queue_depth_calls = [
+            c for c in mock_recorder.record.call_args_list if c.args[0] == MetricType.TEMPORAL_QUEUE_DEPTH
+        ]
+        assert len(queue_depth_calls) == 1
+        assert queue_depth_calls[0] == (
+            (MetricType.TEMPORAL_QUEUE_DEPTH, 7.0),
+            {"component": ComponentLabel.TEMPORAL_WORKER, "labels": {"task_queue": "orchestrator-background-queue"}},
         )
+
+    @pytest.mark.asyncio
+    async def test_records_active_workflows_count(self) -> None:
+        """Callback should emit ACTIVE_WORKFLOWS from Temporal count_workflows."""
+        mock_client = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.stats.approximate_backlog_count = 0
+        mock_resp.task_queue_status = None
+        mock_client.workflow_service.describe_task_queue = AsyncMock(return_value=mock_resp)
+        mock_client.count_workflows = AsyncMock(return_value=MagicMock(count=15))
+
+        mock_recorder = MagicMock()
+
+        with (
+            patch(
+                "syntara.metrics.queue_depth_poller.Client.connect",
+                new_callable=AsyncMock,
+                return_value=mock_client,
+            ),
+            patch(
+                "syntara.metrics.queue_depth_poller.get_metrics_recorder",
+                return_value=mock_recorder,
+            ),
+        ):
+            callback = _make_poll_callback("localhost:7233", "default", ["orchestrator-workflow-queue"])
+            await callback(None)
+
+        from syntara.metrics.types import ComponentLabel, MetricType
+
+        workflow_count_calls = [
+            c for c in mock_recorder.record.call_args_list if c.args[0] == MetricType.ACTIVE_WORKFLOWS
+        ]
+        assert len(workflow_count_calls) == 1
+        assert workflow_count_calls[0] == (
+            (MetricType.ACTIVE_WORKFLOWS, 15.0),
+            {"component": ComponentLabel.TEMPORAL_WORKER},
+        )
+
+    @pytest.mark.asyncio
+    async def test_count_workflows_rpc_error_does_not_affect_queue_depth(self) -> None:
+        """An RPCError from count_workflows should not prevent queue depth recording."""
+        from temporalio.service import RPCError, RPCStatusCode
+
+        mock_client = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.stats.approximate_backlog_count = 4
+        mock_resp.task_queue_status = None
+        mock_client.workflow_service.describe_task_queue = AsyncMock(return_value=mock_resp)
+        mock_client.count_workflows = AsyncMock(
+            side_effect=RPCError("unavailable", RPCStatusCode.UNAVAILABLE, b""),
+        )
+
+        mock_recorder = MagicMock()
+
+        with (
+            patch(
+                "syntara.metrics.queue_depth_poller.Client.connect",
+                new_callable=AsyncMock,
+                return_value=mock_client,
+            ),
+            patch(
+                "syntara.metrics.queue_depth_poller.get_metrics_recorder",
+                return_value=mock_recorder,
+            ),
+        ):
+            callback = _make_poll_callback("localhost:7233", "default", ["orchestrator-workflow-queue"])
+            await callback(None)
+
+        from syntara.metrics.types import MetricType
+
+        queue_depth_calls = [
+            c for c in mock_recorder.record.call_args_list if c.args[0] == MetricType.TEMPORAL_QUEUE_DEPTH
+        ]
+        assert len(queue_depth_calls) == 1
+
+        workflow_count_calls = [
+            c for c in mock_recorder.record.call_args_list if c.args[0] == MetricType.ACTIVE_WORKFLOWS
+        ]
+        assert len(workflow_count_calls) == 0
 
 
 class TestGetQueueDepthPoller:

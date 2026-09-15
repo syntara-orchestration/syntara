@@ -36,18 +36,18 @@
     "podman:build:ui": "podman build -f packages/syntara-ui/Containerfile -t syntara-ui:latest -t localhost/syntara-ui:latest .",
     "podman:build:mock-api": "podman build -f packages/syntara-mock-api/Containerfile -t syntara-mock-api:latest -t localhost/syntara-mock-api:latest .",
     "podman:run": "concurrently npm:podman:run:* -c auto",
-    "podman:run:ui": "podman run --rm -p 4000:80 --name syntara-ui localhost/syntara-ui:latest",
+    "podman:run:ui": "podman run --rm -p 4000:8080 --name syntara-ui localhost/syntara-ui:latest",
     "podman:run:mock-api": "podman run --rm -p 3000:3000 --name syntara-mock-api localhost/syntara-mock-api:latest"
   },
   "workspaces": [
     "packages/*"
   ],
   "overrides": {
-    "eslint": "^9.39.4",
-    "@eslint/js": "^9.39.4",
+    "eslint": "^10.9.0",
+    "@eslint/js": "^10.0.1",
     "brace-expansion": "5.0.9",
-    "dompurify": "3.4.12",
-    "js-yaml": "4.3.1",
+    "dompurify": "3.4.15",
+    "js-yaml": "4.3.2",
     "lodash": "^4.18.1",
     "lodash-es": "^4.18.1",
     "minimatch": "10.2.6",
@@ -65,13 +65,15 @@
     "nanoid": "^3.3.17"
   },
   "devDependencies": {
+    "@emnapi/core": "2.0.0-alpha.3",
+    "@emnapi/runtime": "2.0.0-alpha.3",
     "@testing-library/dom": "^10.4.1",
     "@vitest/coverage-v8": "^4.1.10",
     "concurrently": "^10.0.4",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-import-x": "^4.16.2",
-    "eslint-plugin-no-only-tests": "^3.3.0",
-    "jsdom": "^29.1.1",
+    "eslint-plugin-import-x": "^4.17.1",
+    "eslint-plugin-no-only-tests": "^3.4.0",
+    "happy-dom": "^20.11.2",
     "mermaid": "^11.16.0",
     "prettier": "3.8.4",
     "vitest": "^4.1.10"

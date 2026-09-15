@@ -1,7 +1,7 @@
 import type { ReactElement, ReactNode } from 'react'
 
 import { breadcrumbsUserDetailEarlyShell } from '../../../app/breadcrumbBuilders'
-import { NxLoadingState } from '../../../components/states/NxLoadingState'
+import { SynLoadingState } from '../../../components/states/SynLoadingState'
 import { detachPromise } from '../../../utils/detachPromise'
 import { DetailPageShell } from '../DetailPageShell'
 
@@ -25,7 +25,7 @@ export function renderUserDetailEarlyShell({
   if (isMyProfile && isMeQueryPending) {
     return (
       <DetailPageShell title="My Profile" breadcrumbs={[]}>
-        <NxLoadingState />
+        <SynLoadingState />
       </DetailPageShell>
     )
   }

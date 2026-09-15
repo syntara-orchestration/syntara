@@ -1,11 +1,16 @@
 """Authorization exceptions."""
 
+from typing import TYPE_CHECKING
+
 from fastapi import Request, status
 from fastapi.responses import JSONResponse
 
 from syntara.core.error_handlers import PROBLEM_TYPES, create_problem_details_response
 from syntara.core.exception_registry import fastapi_exception
 from syntara.core.exceptions import SyntaraError
+
+if TYPE_CHECKING:
+    from uuid import UUID
 
 
 def authorization_denied_handler(
@@ -95,6 +100,33 @@ def _default_project_protection_handler(request: Request, exc: SyntaraError) -> 
 @fastapi_exception(handler=_default_project_protection_handler)
 class DefaultProjectProtectionError(SyntaraError):
     """Raised when attempting to delete the default project."""
+
+
+def _project_active_executions_handler(request: Request, exc: "ProjectHasActiveExecutionsError") -> JSONResponse:
+    return create_problem_details_response(
+        status_code=status.HTTP_409_CONFLICT,
+        problem_type=PROBLEM_TYPES["resource_conflict"],
+        title="Project Has Active Executions",
+        detail=exc.message,
+        code="PROJECT_HAS_ACTIVE_EXECUTIONS",
+        retryable=True,
+        instance=str(request.url),
+    )
+
+
+@fastapi_exception(handler=_project_active_executions_handler)
+class ProjectHasActiveExecutionsError(SyntaraError):
+    """Raised when a project cannot be deleted because it has non-terminal executions."""
+
+    def __init__(self, project_id: "UUID", active_count: int) -> None:
+        """Initialize with project ID and active execution count."""
+        self.project_id = project_id
+        self.active_count = active_count
+        plural = "s" if active_count != 1 else ""
+        super().__init__(
+            f"Cannot delete project: {active_count} execution{plural} still running. "
+            "Wait for them to complete or cancel them first."
+        )
 
 
 @fastapi_exception(handler=_conflict_handler)

@@ -36,7 +36,7 @@ export function ConditionNodeDetails({
         ...conditionData,
         name: data.name,
         parameters: {
-          condition: data.condition!,
+          condition: data.condition ?? '',
         },
       } as ConditionActivity
 

@@ -7,6 +7,7 @@ the expected configurations.
 import json
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import jsonschema
 import pytest
@@ -41,7 +42,7 @@ async def test_eda_config_requires_webhook_path(eda_schema: dict[str, Any]) -> N
 
 async def test_eda_config_valid_minimal(eda_schema: dict[str, Any]) -> None:
     """Minimal config with just webhook_path should be valid."""
-    config = {"webhook_path": "my-eda-endpoint"}
+    config = {"webhook_path": "my-eda-endpoint", "authorized_service_account_ids": [str(uuid4())]}
     jsonschema.validate(instance=config, schema=eda_schema["parameterSchema"])
 
 
@@ -53,8 +54,29 @@ async def test_eda_config_valid_with_input_schema(eda_schema: dict[str, Any]) ->
             "type": "object",
             "properties": {"event": {"type": "string"}},
         },
+        "authorized_service_account_ids": [str(uuid4())],
     }
     jsonschema.validate(instance=config, schema=eda_schema["parameterSchema"])
+
+
+async def test_eda_config_requires_authorized_service_account_ids(eda_schema: dict[str, Any]) -> None:
+    """Config schema should require authorized_service_account_ids."""
+    config_schema = eda_schema["parameterSchema"]
+    assert "authorized_service_account_ids" in config_schema.get("required", [])
+
+
+async def test_eda_config_rejects_empty_authorized_service_account_ids(eda_schema: dict[str, Any]) -> None:
+    """Config with empty authorized_service_account_ids should be rejected (minItems: 1)."""
+    config = {"webhook_path": "test", "authorized_service_account_ids": []}
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(instance=config, schema=eda_schema["parameterSchema"])
+
+
+async def test_eda_config_rejects_missing_authorized_service_account_ids(eda_schema: dict[str, Any]) -> None:
+    """Config without authorized_service_account_ids should be rejected (field is required)."""
+    config = {"webhook_path": "test"}
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(instance=config, schema=eda_schema["parameterSchema"])
 
 
 async def test_eda_config_rejects_missing_path(eda_schema: dict[str, Any]) -> None:
@@ -66,7 +88,7 @@ async def test_eda_config_rejects_missing_path(eda_schema: dict[str, Any]) -> No
 
 async def test_eda_config_rejects_additional_properties(eda_schema: dict[str, Any]) -> None:
     """Config with unknown properties should be rejected."""
-    config = {"webhook_path": "test", "unknown_field": "value"}
+    config = {"webhook_path": "test", "authorized_service_account_ids": [str(uuid4())], "unknown_field": "value"}
     with pytest.raises(jsonschema.ValidationError):
         jsonschema.validate(instance=config, schema=eda_schema["parameterSchema"])
 

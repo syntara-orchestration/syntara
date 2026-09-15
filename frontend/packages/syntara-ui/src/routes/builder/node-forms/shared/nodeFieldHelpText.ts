@@ -71,7 +71,18 @@ export const APPROVAL_MESSAGE_HELP =
   'Enter a message for the approver describing the request. This message appears as part of the approval request when an approver reviews it.'
 
 export const APPROVAL_FALLBACK_DECISION_HELP =
-  'Select how to resolve the approval if the decision window expires: Reject (default) follows the rejected path; Approve follows the approved path. Takes effect only when Continue on failure is enabled on the Settings tab.'
+  'Select how to resolve the approval if the decision window expires: Reject (default) follows the rejected path; Approve follows the approved path. Requires Continue on failure to be enabled on the Settings tab — when the workflow is set to stop on failure, this setting has no effect.'
+
+export const APPROVAL_FALLBACK_ENABLED_HELPER =
+  'Determines the routing path when the approval cannot complete (decision window expired or send failure).'
+
+export const APPROVAL_FALLBACK_DISABLED_SYSTEM_DEFAULT =
+  'On failure behavior is System default (stop on failure), so this fallback will not be used.'
+
+export const APPROVAL_FALLBACK_DISABLED_EXPLICIT_STOP =
+  'On failure behavior is set to stop the workflow, so this fallback will not be used.'
+
+export const APPROVAL_FALLBACK_ENABLE_LINK = 'Enable continue on failure'
 
 export const APPROVAL_DECISION_WINDOW_HELP =
   'Enter the amount of time that approvers have to respond. If no approver responds within this window, the request expires and the approval step fails. Falls back to the system default if not set.'

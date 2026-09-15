@@ -130,7 +130,52 @@ describe('Authentication', () => {
     setupEmptyProviders()
     render(<Authentication />, { wrapper })
 
-    expect(screen.getByText('No identity providers configured')).toBeInTheDocument()
+    expect(screen.getByText('No identity providers configured yet')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Add OIDC provider/ })).toBeInTheDocument()
+  })
+
+  it('keeps create actions in the empty-state footer, not the page header', () => {
+    setupEmptyProviders()
+    render(<Authentication />, { wrapper })
+
+    expect(screen.queryByRole('toolbar')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Add OIDC provider/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Add Ansible Automation Platform/ })).toBeInTheDocument()
+  })
+
+  it('shows create actions in the page header when providers exist', () => {
+    setupProviders()
+    render(<Authentication />, { wrapper })
+
+    expect(screen.getByRole('button', { name: /Add OIDC provider/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Add Ansible Automation Platform/ })).toBeInTheDocument()
+
+    const filterBar = screen.getByRole('search', { name: /Filters/i })
+    expect(within(filterBar).queryByRole('button', { name: /Add OIDC provider/ })).not.toBeInTheDocument()
+    expect(within(filterBar).queryByRole('button', { name: /Add Ansible Automation Platform/ })).not.toBeInTheDocument()
+  })
+
+  it('opens AAP setup modal from the page header toolbar', async () => {
+    setupProviders()
+    const user = userEvent.setup()
+    render(<Authentication />, { wrapper })
+
+    await user.click(screen.getByRole('button', { name: /Add Ansible Automation Platform/ }))
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('hides Add Ansible Automation Platform in the header when an AAP provider exists', () => {
+    const aapProvider = {
+      ...mockProvider,
+      id: 'aap-1',
+      name: 'AAP',
+      configuration: { ...mockProvider.configuration, idp_type: 'aap' },
+    }
+    setupProviders([aapProvider] as (typeof mockProvider)[])
+    render(<Authentication />, { wrapper })
+
+    expect(screen.queryByRole('button', { name: /Add Ansible Automation Platform/ })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Add OIDC provider/ })).toBeInTheDocument()
   })
 
@@ -208,7 +253,7 @@ describe('Authentication', () => {
       expect(screen.getByRole('heading', { level: 1, name: 'Identity Providers' })).toBeInTheDocument()
       expect(screen.getByText('Access denied')).toBeInTheDocument()
       expect(screen.getByText(/You don't have permission to view identity providers/)).toBeInTheDocument()
-      expect(screen.queryByText('No identity providers configured')).not.toBeInTheDocument()
+      expect(screen.queryByText('No identity providers configured yet')).not.toBeInTheDocument()
     })
 
     it('has no accessibility violations in access denied state', async () => {
@@ -228,7 +273,7 @@ describe('Authentication', () => {
 
       expect(screen.getByRole('heading', { level: 1, name: 'Identity Providers' })).toBeInTheDocument()
       expect(screen.queryByText('Access denied')).not.toBeInTheDocument()
-      expect(screen.queryByText('No identity providers configured')).not.toBeInTheDocument()
+      expect(screen.queryByText('No identity providers configured yet')).not.toBeInTheDocument()
     })
 
     it('has no accessibility violations while loading', async () => {

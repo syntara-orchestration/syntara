@@ -5,14 +5,16 @@ import { axe } from 'vitest-axe'
 
 import { settingsClient } from '../../../client'
 import { useFileStorageStatus } from '../../../hooks/useFileStorageStatus'
+import { WORKFLOW_ENGINE_DEFAULTS_QUERY_KEY } from '../../builder/hooks/useWorkflowEngineDefaults'
 
 import Settings from './Settings'
 import { useAllSettings } from './useAllSettings'
 import { useSettingsPermissions } from './useSettingsPermissions'
 
-const { mockSetLocation, mockLocation } = vi.hoisted(() => ({
+const { mockSetLocation, mockLocation, mockInvalidateQueries } = vi.hoisted(() => ({
   mockSetLocation: vi.fn(),
   mockLocation: { value: '/system-administration/settings/context_manager' },
+  mockInvalidateQueries: vi.fn(() => Promise.resolve()),
 }))
 
 const mockMutate = vi.fn()
@@ -20,6 +22,13 @@ const mockShowSuccess = vi.fn()
 const mockShowError = vi.fn()
 const mockShowWarning = vi.fn()
 
+vi.mock('@tanstack/react-query', async () => {
+  const actual = await vi.importActual('@tanstack/react-query')
+  return {
+    ...actual,
+    useQueryClient: () => ({ invalidateQueries: mockInvalidateQueries }),
+  }
+})
 vi.mock('@tanstack/react-router', async () => {
   const actual = await vi.importActual('@tanstack/react-router')
   const { MockLink } = await import('../../../test/setup')
@@ -211,6 +220,14 @@ describe('Settings', () => {
     expect(screen.queryByRole('link', { name: 'Configuration' })).not.toBeInTheDocument()
   })
 
+  it('does not render breadcrumbs when a category tab is selected', () => {
+    mockLocation.value = '/system-administration/settings/application'
+    mockQueries()
+    render(<Settings />)
+
+    expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument()
+  })
+
   it('navigates to the correct URL when a tab is clicked', async () => {
     const user = userEvent.setup()
     mockQueries()
@@ -284,6 +301,7 @@ describe('Settings', () => {
       expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) })
     )
     expect(mockShowSuccess).not.toHaveBeenCalled()
+    expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: WORKFLOW_ENGINE_DEFAULTS_QUERY_KEY })
     expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled()
   })
 

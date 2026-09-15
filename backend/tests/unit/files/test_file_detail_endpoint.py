@@ -24,6 +24,7 @@ def _make_metadata(
         file_path="orchestrator-abc-test.pdf",
         status=file_status,
         conversion_error=conversion_error,
+        project_id=uuid4(),
     )
 
 
@@ -41,10 +42,12 @@ class TestFileDetailEndpoint:
             size_bytes=524288,
             file_path="/storage/orchestrator-abc-report.pdf",
             status=FileStatus.CONVERTED,
+            project_id=uuid4(),
         )
 
         mock_file_manager = Mock()
         mock_file_manager.get_file_metadata = AsyncMock(return_value=metadata)
+        mock_file_manager.is_project_deleted = AsyncMock(return_value=False)
         mock_db = AsyncMock()
 
         response = await get_file_details(
@@ -59,6 +62,7 @@ class TestFileDetailEndpoint:
         assert response.size_bytes == 524288
         assert response.status == FileStatus.CONVERTED
         assert response.conversion_error is None
+        assert response.is_project_deleted is False
 
     @pytest.mark.asyncio
     async def test_get_file_details_not_found(self) -> None:
@@ -88,10 +92,12 @@ class TestFileDetailEndpoint:
             file_path="/storage/orchestrator-abc-bad.docx",
             status=FileStatus.CONVERSION_FAILED,
             conversion_error="The file appears to be corrupted",
+            project_id=uuid4(),
         )
 
         mock_file_manager = Mock()
         mock_file_manager.get_file_metadata = AsyncMock(return_value=metadata)
+        mock_file_manager.is_project_deleted = AsyncMock(return_value=False)
         mock_db = AsyncMock()
 
         response = await get_file_details(
@@ -114,10 +120,12 @@ class TestFileDetailEndpoint:
             size_bytes=2048,
             file_path="/storage/orchestrator-abc-uploading.pdf",
             status=FileStatus.PENDING_CONVERSION,
+            project_id=uuid4(),
         )
 
         mock_file_manager = Mock()
         mock_file_manager.get_file_metadata = AsyncMock(return_value=metadata)
+        mock_file_manager.is_project_deleted = AsyncMock(return_value=False)
         mock_db = AsyncMock()
 
         response = await get_file_details(

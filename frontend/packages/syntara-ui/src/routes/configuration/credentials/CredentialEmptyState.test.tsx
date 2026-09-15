@@ -32,4 +32,11 @@ describe('CredentialEmptyState', () => {
 
     expect(onCreateCredential).toHaveBeenCalledOnce()
   })
+
+  it('does not render create button when onCreateCredential is omitted', () => {
+    render(<CredentialEmptyState />)
+
+    expect(screen.getByText('No credentials yet')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Create credential' })).not.toBeInTheDocument()
+  })
 })

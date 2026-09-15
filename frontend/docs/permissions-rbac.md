@@ -47,30 +47,30 @@ Generates standard tooltip copy for disabled actions:
 
 Each page area has a dedicated `use*Permissions` hook that aggregates multiple `useCanI` calls and provides `tooltips` for disabled actions.
 
-| Hook                             | File                                                                        | Permissions checked                                                                                                       |
-| -------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `useWorkflowPermissions`         | `routes/workflows/useWorkflowPermissions.ts`                                | create via `check_any_project` when no project selected; update/delete/run use `resourceProject` or system-scoped `can_i` |
-| `useCredentialPermissions`       | `routes/configuration/credentials/useCredentialPermissions.ts`              | `credential:create`, `credential:update`, `credential:delete`                                                             |
-| `useBuilderPermissions`          | `routes/builder/useBuilderPermissions.ts`                                   | create/update/delete/run with `resourceProject`; new workflows use `check_any_project` for create                         |
-| `useCredentialDetailPermissions` | `routes/configuration/credentials/useCredentialDetailPermissions.ts`        | `workflow:read`                                                                                                           |
-| `useSettingsPermissions`         | `routes/configuration/settings/useSettingsPermissions.ts`                   | `setting:read`, `setting:write`                                                                                           |
-| `useAccessManagementPermissions` | `routes/access-management/useAccessManagementPermissions.ts`                | Hub + tabs: `can_i` (+ `check_any_project` for project/assignments/SA); Roles/Policies system-only                        |
-| `useUserPermissions`             | `routes/access-management/useUserPermissions.ts`                            | `user:create`, `user:update`, `user:delete`, `admin:revocation:execute`                                                   |
-| `useGroupPermissions`            | `routes/access-management/useGroupPermissions.ts`                           | `group:create`, `group:update`, `group:delete`, `group:manage-members`                                                    |
-| `useProjectPermissions`          | `routes/access-management/useProjectPermissions.ts`                         | `project:create` (hub); update/delete require concrete `resourceProject` per row                                          |
-| `useServiceAccountPermissions`   | `routes/access-management/service-accounts/useServiceAccountPermissions.ts` | create via `check_any_project` on hub; update/delete/rotate require concrete `resourceProject`                            |
-| `useRolePermissions`             | `routes/access/useRolePermissions.ts`                                       | `role:create`, `role:update`, `role:delete`                                                                               |
-| `useAssignmentPermissions`       | `routes/access/useAssignmentPermissions.ts`                                 | `role-assignment:assign`, `role-assignment:revoke`                                                                        |
-| `useIdentityProviderPermissions` | `routes/access-management/authentication/useIdentityProviderPermissions.ts` | `identity-provider:create/update/delete/test`, `admin:revocation:execute`                                                 |
-| `useUserIdentityPermissions`     | `routes/access-management/users/useUserIdentityPermissions.ts`              | `user_identity:attach`, `user_identity:detach`                                                                            |
-| `useUserDetailPermissions`       | `routes/access-management/users/useUserDetailPermissions.ts`                | `user:read`, `group:read`, `user_identity:read`, `role-assignment:read`                                                   |
-| `useGroupDetailPermissions`      | `routes/access-management/groups/useGroupDetailPermissions.ts`              | `group:read`, `role-assignment:read`                                                                                      |
-| `useProjectDetailPermissions`    | `routes/access-management/projects/useProjectDetailPermissions.ts`          | `role-assignment:read`                                                                                                    |
-| `useApprovalPermissions`         | `routes/approvals/useApprovalPermissions.ts`                                | `approval:read`, `approval:decide`                                                                                        |
-| `useApprovalDecideProjects`      | `routes/approvals/useApprovalDecideProjects.ts`                             | `approval:decide` (via `what_can_i`, project-scoped)                                                                      |
-| `useCanDecideApproval`           | `routes/approvals/useCanDecideApproval.ts`                                  | Checks if user can decide specific approval (approver list + group membership)                                            |
-| `useApprovalDecideUsers`         | `routes/builder/node-forms/useApprovalDecideUsers.ts`                       | `approval:decide` (via `who_can`, all authorized users)                                                                   |
-| `useApprovalDecideGroups`        | `routes/builder/node-forms/useApprovalDecideGroups.ts`                      | All groups (MVP: no filtering, see hook docs for limitations)                                                             |
+| Hook                             | File                                                                        | Permissions checked                                                                                                                                                                                                                   |
+| -------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `useWorkflowPermissions`         | `routes/workflows/useWorkflowPermissions.ts`                                | create via `check_any_project` when no project selected; update/delete/run use `resourceProject` or system-scoped `can_i`                                                                                                             |
+| `useCredentialPermissions`       | `routes/configuration/credentials/useCredentialPermissions.ts`              | create via `check_any_project` when no project selected; update/delete use `resourceProject` or system-scoped `can_i`. Detail page passes `enabled: false` until `project_id` is known. Per-row `resourceProject` in list table body. |
+| `useBuilderPermissions`          | `routes/builder/useBuilderPermissions.ts`                                   | create/update/delete/run with `resourceProject`; new workflows use `check_any_project` for create                                                                                                                                     |
+| `useCredentialDetailPermissions` | `routes/configuration/credentials/useCredentialDetailPermissions.ts`        | `workflow:read`                                                                                                                                                                                                                       |
+| `useSettingsPermissions`         | `routes/configuration/settings/useSettingsPermissions.ts`                   | `setting:read`, `setting:write`                                                                                                                                                                                                       |
+| `useAccessManagementPermissions` | `routes/access-management/useAccessManagementPermissions.ts`                | Hub + tabs: `can_i` (+ `check_any_project` for project/assignments/SA); Roles/Policies system-only                                                                                                                                    |
+| `useUserPermissions`             | `routes/access-management/useUserPermissions.ts`                            | `user:create`, `user:update`, `user:delete`, `admin:revocation:execute`                                                                                                                                                               |
+| `useGroupPermissions`            | `routes/access-management/useGroupPermissions.ts`                           | `group:create`, `group:update`, `group:delete`, `group:manage-members`                                                                                                                                                                |
+| `useProjectPermissions`          | `routes/access-management/useProjectPermissions.ts`                         | `project:create` (hub); update/delete require concrete `resourceProject` per row                                                                                                                                                      |
+| `useServiceAccountPermissions`   | `routes/access-management/service-accounts/useServiceAccountPermissions.ts` | create via `check_any_project` on hub; update/delete/rotate require concrete `resourceProject`                                                                                                                                        |
+| `useRolePermissions`             | `routes/access/useRolePermissions.ts`                                       | `role:create`, `role:update`, `role:delete`                                                                                                                                                                                           |
+| `useAssignmentPermissions`       | `routes/access/useAssignmentPermissions.ts`                                 | `role-assignment:assign`, `role-assignment:revoke`                                                                                                                                                                                    |
+| `useIdentityProviderPermissions` | `routes/access-management/authentication/useIdentityProviderPermissions.ts` | `identity-provider:create/update/delete/test`, `admin:revocation:execute`                                                                                                                                                             |
+| `useUserIdentityPermissions`     | `routes/access-management/users/useUserIdentityPermissions.ts`              | `user_identity:attach`, `user_identity:detach`                                                                                                                                                                                        |
+| `useUserDetailPermissions`       | `routes/access-management/users/useUserDetailPermissions.ts`                | `user:read`, `group:read`, `user_identity:read`, `role-assignment:read`                                                                                                                                                               |
+| `useGroupDetailPermissions`      | `routes/access-management/groups/useGroupDetailPermissions.ts`              | `group:read`, `role-assignment:read`                                                                                                                                                                                                  |
+| `useProjectDetailPermissions`    | `routes/access-management/projects/useProjectDetailPermissions.ts`          | `workflow:read`, `role-assignment:read` (project-scoped)                                                                                                                                                                              |
+| `useApprovalPermissions`         | `routes/approvals/useApprovalPermissions.ts`                                | `approval:read`, `approval:decide`                                                                                                                                                                                                    |
+| `useApprovalDecideProjects`      | `routes/approvals/useApprovalDecideProjects.ts`                             | `approval:decide` (via `what_can_i`, project-scoped)                                                                                                                                                                                  |
+| `useCanDecideApproval`           | `routes/approvals/useCanDecideApproval.ts`                                  | Checks if user can decide specific approval (approver list + group membership)                                                                                                                                                        |
+| `useApprovalDecideUsers`         | `routes/builder/node-forms/useApprovalDecideUsers.ts`                       | `approval:decide` (via `who_can`, all authorized users)                                                                                                                                                                               |
+| `useApprovalDecideGroups`        | `routes/builder/node-forms/useApprovalDecideGroups.ts`                      | All groups (MVP: no filtering, see hook docs for limitations)                                                                                                                                                                         |
 
 ## UI Gating Components
 
@@ -88,14 +88,14 @@ Wraps an action button/control. When `isDisabled` is true, renders a PF `Tooltip
 
 ### `ProtectedRoute` — `components/ProtectedRoute.tsx`
 
-Route guard that checks a single permission via `useCanI`. Shows a spinner while checking, `EmptyStateAccessDenied` when denied, and renders children when allowed. Used for create/edit routes.
+Route guard that checks a single permission via `useCanI`. Shows a spinner while checking, `SynEmptyStateAccessDenied` when denied, and renders children when allowed. Used for create/edit routes.
 
-### `EmptyStateAccessDenied` — `components/EmptyStateAccessDenied.tsx`
+### `SynEmptyStateAccessDenied` — `components/states/SynEmptyStateAccessDenied.tsx`
 
 Page-level access denied state. Two usage patterns:
 
 1. **Via `ProtectedRoute`** — for create/edit routes, set `routePermission` in `navigationItems.tsx` and `ProtectedRoute` handles the rest.
-2. **Inline in page components** — for pages that need custom loading/layout around the access-denied state (e.g. `AccessManagement.tsx`, `Authentication.tsx`, `Settings.tsx`, `EditGroupMapping.tsx`). Check permissions with `useCanI` and render `EmptyStateAccessDenied` directly when denied.
+2. **Inline in page components** — for pages that need custom loading/layout around the access-denied state (e.g. `AccessManagement.tsx`, `Authentication.tsx`, `Settings.tsx`, `EditGroupMapping.tsx`). Check permissions with `useCanI` and render `SynEmptyStateAccessDenied` directly when denied.
 
 Prefer `ProtectedRoute` (pattern 1) for simple route guards. Use inline rendering (pattern 2) when the page has surrounding chrome (breadcrumbs, tabs, layout) that should still render around the access-denied state.
 
@@ -121,7 +121,7 @@ Set on `TNavigationItem` in `navigationItems.tsx`. The nav item is visible if th
 
 ### `routePermission` (single, route guard)
 
-Set on `TNavigationItem` for create/edit routes. Wraps the route component in `ProtectedRoute`, blocking access with `EmptyStateAccessDenied` if the permission check fails.
+Set on `TNavigationItem` for create/edit routes. Wraps the route component in `ProtectedRoute`, blocking access with `SynEmptyStateAccessDenied` if the permission check fails.
 
 ```tsx
 {
@@ -133,11 +133,11 @@ Set on `TNavigationItem` for create/edit routes. Wraps the route component in `P
 
 ## Three-Tier UX Model
 
-| Permission level       | Navigation                       | Page content                           | Actions                                                       |
-| ---------------------- | -------------------------------- | -------------------------------------- | ------------------------------------------------------------- |
-| **No read permission** | Hidden via `requiredPermissions` | `EmptyStateAccessDenied` on direct URL | None                                                          |
-| **Read only**          | Visible                          | Controls rendered read-only            | Action buttons disabled with tooltips (`DisabledWithTooltip`) |
-| **Read + write**       | Visible                          | All controls editable                  | Full CRUD                                                     |
+| Permission level       | Navigation                       | Page content                              | Actions                                                       |
+| ---------------------- | -------------------------------- | ----------------------------------------- | ------------------------------------------------------------- |
+| **No read permission** | Hidden via `requiredPermissions` | `SynEmptyStateAccessDenied` on direct URL | None                                                          |
+| **Read only**          | Visible                          | Controls rendered read-only               | Action buttons disabled with tooltips (`DisabledWithTooltip`) |
+| **Read + write**       | Visible                          | All controls editable                     | Full CRUD                                                     |
 
 **When to hide vs disable**: Disable action buttons with tooltips in list/detail views so users know the action exists but is restricted. Hide Save/Reset buttons entirely in settings-style forms where read-only mode is the norm.
 
@@ -245,7 +245,7 @@ Backend defines `policy:create`, `policy:update`, `policy:delete`. The UI curren
 | Gap                          | Permission       | Pattern to follow                     |
 | ---------------------------- | ---------------- | ------------------------------------- |
 | Executions list page guard   | `execution:read` | Add `requiredPermissions` to nav item |
-| Execution detail route guard | `execution:read` | `EmptyStateAccessDenied` on 403       |
+| Execution detail route guard | `execution:read` | `SynEmptyStateAccessDenied` on 403    |
 | Future rerun action          | `execution:run`  | `DisabledWithTooltip`                 |
 
 **Note**: Approval permission gating is complete for UI components (list page, nav item, decision actions) with comprehensive unit tests. E2E test coverage in `e2e/permission-gating.spec.ts` for the viewer/auditor/user roles is recommended as a follow-up to verify end-to-end permission flows.

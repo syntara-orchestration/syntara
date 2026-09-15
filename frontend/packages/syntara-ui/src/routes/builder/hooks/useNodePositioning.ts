@@ -8,6 +8,8 @@ import type { FlowPosition } from '../types'
 import { LOOP_BODY_SPACING } from '../utils/layoutConstants'
 import type { EdgeType } from '../utils/workflowToGraph'
 
+import { useLoopGroupPositionSync } from './useLoopGroupPositionSync'
+
 type UseNodePositioningParams = {
   nodes: NodeType[]
   edges: EdgeType[]
@@ -85,6 +87,7 @@ function positionLoopBodyNode(
   if (!newlyAddedNodeIdsRef.current.has(node.id) || !node.measured || !loopBodyNodeMap.has(node.id)) {
     return node
   }
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- safe: loopBodyNodeMap.has(node.id) is checked in the early-return guard above (line 85)
   const loopNodeId = loopBodyNodeMap.get(node.id)!
   const loopPos = loopPositions.get(loopNodeId)
   if (!loopPos) return node
@@ -213,13 +216,12 @@ function positionStandardNodes(ctx: StandardPositioningContext) {
   const padding = 50
   const viewportX = (-viewport.x + viewportWidth - 350 - padding) / viewport.zoom
   const viewportY = (-viewport.y + padding) / viewport.zoom
-  const useDesired = ctx.desiredPosition != null
   const firstNodeId = nodesToPosition[0]?.id
 
   const positionsToApply: Record<string, { x: number; y: number }> = {}
   for (const node of nodesToPosition) {
-    if (useDesired && node.id === firstNodeId) {
-      positionsToApply[node.id] = positionWithCenterAt(ctx.desiredPosition!, node.measured?.height ?? 0)
+    if (ctx.desiredPosition != null && node.id === firstNodeId) {
+      positionsToApply[node.id] = positionWithCenterAt(ctx.desiredPosition, node.measured?.height ?? 0)
     } else {
       positionsToApply[node.id] = { x: viewportX, y: viewportY }
     }
@@ -243,7 +245,7 @@ function positionStandardNodes(ctx: StandardPositioningContext) {
   }
   ctx.updateNodePositions(storePositions, { skipTracking: true, markDirty: false })
 
-  if (useDesired && firstNodeId) {
+  if (ctx.desiredPosition != null && firstNodeId) {
     ctx.onClearDesiredPosition?.()
   }
 }
@@ -281,6 +283,7 @@ export function useNodePositioning({
   desiredPosition,
   onClearDesiredPosition,
 }: UseNodePositioningParams) {
+  useLoopGroupPositionSync({ nodes, edges, isInitialized, updateNodePositions })
   const loopPositionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {

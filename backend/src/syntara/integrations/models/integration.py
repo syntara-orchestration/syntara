@@ -114,7 +114,7 @@ class Integration(NamedResource, UserOwnedResource, table=True):
     management_credential_id: UUID | None = Field(
         default=None,
         foreign_key="credentials.id",
-        ondelete="SET NULL",
+        ondelete="RESTRICT",
         description="Optional credential for admin operations (validation, tool/model discovery)",
     )
 
@@ -160,6 +160,19 @@ class Integration(NamedResource, UserOwnedResource, table=True):
         sa_type=DateTime(timezone=True),  # type: ignore[call-overload]
     )
 
+    # Validation/refresh are background-worker writes, not user edits; don't bump updated_at for them.
+    __updated_at_exempt_fields__: ClassVar[frozenset[str]] = frozenset(
+        {
+            "validation_status",
+            "validation_error",
+            "last_validated_at",
+            "refresh_status",
+            "refresh_error",
+            "last_refreshed_at",
+            "last_successful_refresh_at",
+        }
+    )
+
     __filterable_fields__: ClassVar[list[str]] = [
         *NamedResource.__filterable_fields__,
         *UserOwnedResource.__filterable_fields__,
@@ -176,6 +189,7 @@ class Integration(NamedResource, UserOwnedResource, table=True):
         "integration_type",
         "validation_status",
         "enabled",
+        "last_validated_at",
     ]
 
     __table_args__ = (

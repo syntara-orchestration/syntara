@@ -155,7 +155,7 @@ describe('LoopNodeForm', () => {
       renderWithHeader(<LoopNodeForm onSubmit={mockOnSubmit} initialData={initialData} />)
 
       expect(screen.getByPlaceholderText(/Enter activity name/i)).toHaveValue('Existing Loop')
-      expect(screen.getByPlaceholderText(/input.item_list/i)).toHaveValue('${myItems}')
+      expect(screen.getByPlaceholderText(/trigger.item_list/i)).toHaveValue('${myItems}')
       expect(screen.getByPlaceholderText(/^item$/i)).toHaveValue('elem')
       expect(screen.getByPlaceholderText(/^index$/i)).toHaveValue('idx')
     })
@@ -216,7 +216,7 @@ describe('LoopNodeForm', () => {
       renderWithHeader(<LoopNodeForm onSubmit={mockOnSubmit} initialData={{ type: 'forEach' }} />)
 
       await user.type(screen.getByPlaceholderText(/Enter activity name/i), 'Bounded ForEach')
-      await user.type(screen.getByPlaceholderText(/input.item_list/i), 'myItems')
+      await user.type(screen.getByPlaceholderText(/trigger.item_list/i), 'myItems')
       await user.type(screen.getByRole('spinbutton', { name: /Max iterations/i }), '100')
 
       fireEvent.submit(screen.getByTestId('loop-node-form'))
@@ -238,7 +238,7 @@ describe('LoopNodeForm', () => {
       renderWithHeader(<LoopNodeForm onSubmit={mockOnSubmit} initialData={{ type: 'forEach' }} />)
 
       await user.type(screen.getByPlaceholderText(/Enter activity name/i), 'Test Loop')
-      await user.type(screen.getByPlaceholderText(/input.item_list/i), 'myArray')
+      await user.type(screen.getByPlaceholderText(/trigger.item_list/i), 'myArray')
       await user.clear(screen.getByPlaceholderText(/^item$/i))
       await user.type(screen.getByPlaceholderText(/^item$/i), 'element')
       await user.clear(screen.getByPlaceholderText(/^index$/i))
@@ -264,7 +264,7 @@ describe('LoopNodeForm', () => {
       renderWithHeader(<LoopNodeForm onSubmit={mockOnSubmit} initialData={{ type: 'forEach' }} />)
 
       await user.type(screen.getByPlaceholderText(/Enter activity name/i), 'Another Loop')
-      await user.type(screen.getByPlaceholderText(/input.item_list/i), 'items')
+      await user.type(screen.getByPlaceholderText(/trigger.item_list/i), 'items')
 
       fireEvent.submit(screen.getByTestId('loop-node-form'))
 
@@ -280,7 +280,7 @@ describe('LoopNodeForm', () => {
       renderWithHeader(<LoopNodeForm onSubmit={mockOnSubmit} initialData={{ type: 'forEach' }} />)
 
       await user.type(screen.getByPlaceholderText(/Enter activity name/i), 'Clean Loop')
-      await user.type(screen.getByPlaceholderText(/input.item_list/i), 'cleanItems')
+      await user.type(screen.getByPlaceholderText(/trigger.item_list/i), 'cleanItems')
 
       fireEvent.submit(screen.getByTestId('loop-node-form'))
 

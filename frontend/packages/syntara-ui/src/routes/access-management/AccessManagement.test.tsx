@@ -142,7 +142,7 @@ describe('AccessManagement', () => {
   it('defaults to Users tab', async () => {
     await renderAndSettle(<AccessManagement />)
 
-    expect(screen.getByText('No users')).toBeInTheDocument()
+    expect(screen.getByText('No users yet')).toBeInTheDocument()
   })
 
   it('replaces bare /system-administration/access-management with the Users tab URL', async () => {
@@ -154,25 +154,24 @@ describe('AccessManagement', () => {
     })
   })
 
-  it('renders breadcrumbs on all tabs including Users', async () => {
+  it('does not render breadcrumbs on the Users hub tab', async () => {
     await renderAndSettle(<AccessManagement />)
 
-    expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument()
   })
 
-  it('renders breadcrumbs on non-default hub tabs', async () => {
+  it('does not include the tab name in breadcrumbs on non-default hub tabs', async () => {
     routerTestState.pathname = AppRoute.AccessManagement.Groups
     await renderAndSettle(<AccessManagement />)
 
-    expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Access management' })).toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument()
   })
 
   it('defaults to first tab when location does not match any tab path', async () => {
     routerTestState.pathname = '/access-management/unknown-path'
     await renderAndSettle(<AccessManagement />)
 
-    expect(screen.getByText('No users')).toBeInTheDocument()
+    expect(screen.getByText('No users yet')).toBeInTheDocument()
   })
 
   it('navigates to Groups tab when clicked', async () => {
@@ -181,7 +180,7 @@ describe('AccessManagement', () => {
 
     await user.click(screen.getByRole('tab', { name: 'Groups' }))
 
-    // NxListPanelTabs uses useNavigate (via useUrlTab) for tab navigation
+    // SynListPanelTabs uses useNavigate (via useUrlTab) for tab navigation
     expect(routerTestState.navigate).toHaveBeenCalledWith({ to: AppRoute.AccessManagement.Groups })
   })
 
@@ -338,7 +337,7 @@ describe('AccessManagement', () => {
     await renderAndSettle(<AccessManagement />)
 
     await waitFor(() => {
-      // NxUrlTabs redirects via navigate({ to, replace: true }) when the active tab is hidden
+      // SynUrlTabs redirects via navigate({ to, replace: true }) when the active tab is hidden
       expect(routerTestState.navigate).toHaveBeenCalledWith({ to: AppRoute.AccessManagement.Users, replace: true })
     })
   })

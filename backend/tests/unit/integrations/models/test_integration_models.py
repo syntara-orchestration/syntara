@@ -467,4 +467,5 @@ class TestIntegrationSortableFields:
             "integration_type",
             "validation_status",
             "enabled",
+            "last_validated_at",
         ]

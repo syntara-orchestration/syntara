@@ -116,13 +116,14 @@ function NavDropdownItem({
       id={`nav-${item.path.replaceAll('/', '-')}`}
       className={styles.navFlyoutItem}
       flyout={
-        <Menu containsFlyout isNavFlyout onSelect={onMenuSelect}>
+        <Menu containsFlyout isNavFlyout onSelect={onMenuSelect} className={styles.flyoutMenu}>
           <MenuList>
             {enabledChildren.map((child) => (
               <MenuItem
                 key={child.path}
                 icon={child.icon}
                 itemId={child.path}
+                className={styles.flyoutMenuItem}
                 onClick={(e: React.MouseEvent) => e.preventDefault()}
               >
                 {child.label}
@@ -214,6 +215,7 @@ function UserMenuDropdown() {
       variant="plain"
       icon={<RhUiProfileFillIcon />}
       isDocked
+      className={styles.dockedAction}
       aria-label="User menu"
       onClick={() => setIsOpen(!isOpen)}
       onMouseEnter={() => setIsOpen(true)}
@@ -268,13 +270,13 @@ export function AppDockedNav() {
   const navItemRefs = useMemo(() => createNavItemRefs(visibleItems), [visibleItems])
 
   const colorSchemeToggleLabel = colorScheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
-  const isExpanded = isDockTextExpanded || isDockExpanded
-  const showTooltips = !isExpanded
+  const isDockShowingLabels = isDockTextExpanded || isDockExpanded
+  const showTooltips = !isDockShowingLabels
 
   /* v8 ignore start -- phantom branches from compiled JSX props, ternaries, and map callbacks */
   return (
     <CompassDockMain {...(isMobile && !isDockExpanded && { inert: true })}>
-      <Masthead id="docked-masthead" variant="docked">
+      <Masthead id="docked-masthead" variant="docked" className={styles.dockedMasthead}>
         <MastheadMain>
           <MastheadToggle>
             <Button
@@ -283,11 +285,11 @@ export function AppDockedNav() {
               isHamburger
               onClick={onToggleDock}
               aria-label="Global navigation"
-              isExpanded={isDockTextExpanded}
+              isExpanded={isDockShowingLabels}
             />
           </MastheadToggle>
-          <MastheadBrand className={!isExpanded ? styles.collapsedBrand : undefined}>
-            {isExpanded ? (
+          <MastheadBrand className={!isDockShowingLabels ? styles.collapsedBrand : undefined}>
+            {isDockShowingLabels ? (
               <MastheadLogo component={(props) => <Link {...props} to="/" />} aria-label="Home">
                 <img
                   src={colorScheme === 'dark' ? brand.logoExpandedDark : brand.logoExpandedLight}
@@ -300,7 +302,7 @@ export function AppDockedNav() {
               <MastheadLogo
                 component={(props) => <Link {...props} to="/" />}
                 aria-label="Home"
-                className="pf-m-compact"
+                className={`pf-m-compact ${styles.compactLogo}`}
               >
                 <img
                   src={brand.logoCollapsed}
@@ -323,6 +325,7 @@ export function AppDockedNav() {
                   }
                   variant="docked"
                   aria-label="Main navigation"
+                  className={!isDockShowingLabels ? styles.iconDockNav : undefined}
                 >
                   <NavList>
                     {visibleItems.flatMap((item) => {
@@ -334,7 +337,7 @@ export function AppDockedNav() {
                       if (hasDropdownChildren(item)) {
                         return [
                           separator,
-                          isExpanded ? (
+                          isDockShowingLabels ? (
                             <NavExpandableItem
                               key={item.path}
                               item={item}
@@ -394,6 +397,7 @@ export function AppDockedNav() {
                   <Button
                     variant="plain"
                     isDocked
+                    className={styles.dockedAction}
                     icon={colorScheme === 'dark' ? <RhUiDarkModeIcon /> : <RhUiLightModeIcon />}
                     aria-label={colorSchemeToggleLabel}
                     ref={colorSchemeRef}
@@ -406,6 +410,7 @@ export function AppDockedNav() {
                   <Button
                     variant="plain"
                     isDocked
+                    className={styles.dockedAction}
                     icon={<RhUiQuestionMarkCircleIcon />}
                     aria-label="Documentation (opens in a new tab)"
                     ref={helpRef}

@@ -14,7 +14,7 @@ import asyncio
 import copy
 from collections.abc import Generator
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -102,6 +102,35 @@ class TestGetSkippedNodesQuery:
         assert isinstance(wf.get_skipped_nodes(), list)
 
 
+class TestGetDetachedNodesQuery:
+    """Test the get_detached_nodes query method.
+
+    Detached nodes are branch nodes that were in-flight when a converge ANY
+    strategy fired.  They should be reported as CANCELLED, not SKIPPED.
+    """
+
+    def test_returns_empty_list_when_no_detached(self) -> None:
+        wf = _make_workflow()
+        assert wf.get_detached_nodes() == []
+
+    def test_returns_all_detached_node_ids(self) -> None:
+        wf = _make_workflow()
+        wf._detached_nodes = {"node_b", "node_c"}
+        assert sorted(wf.get_detached_nodes()) == ["node_b", "node_c"]
+
+    def test_returns_list_not_set(self) -> None:
+        wf = _make_workflow()
+        wf._detached_nodes = {"node_b"}
+        assert isinstance(wf.get_detached_nodes(), list)
+
+    def test_does_not_include_skipped_nodes(self) -> None:
+        """Detached and skipped nodes are disjoint — different mechanisms."""
+        wf = _make_workflow(skipped_nodes={"node_a"})
+        wf._detached_nodes = {"node_b"}
+        assert wf.get_detached_nodes() == ["node_b"]
+        assert wf.get_skipped_nodes() == ["node_a"]
+
+
 # ---------------------------------------------------------------------------
 # Tests: get_activity_input query
 # ---------------------------------------------------------------------------
@@ -150,6 +179,35 @@ class TestGetActivityOutputQuery:
         wf = _make_workflow()
         wf.resolver.set_namespace("trigger", {"url": "http://example.com"})
         assert wf.get_activity_output("trigger") == {"url": "http://example.com"}
+
+
+# ---------------------------------------------------------------------------
+# Tests: get_activity_output_when_ready update handler
+# ---------------------------------------------------------------------------
+
+
+class TestGetActivityOutputWhenReady:
+    """Test the get_activity_output_when_ready update handler."""
+
+    @pytest.fixture(autouse=True)
+    def _patch_wait_condition(self, _mock_temporal_workflow: MagicMock) -> None:
+        _mock_temporal_workflow.wait_condition = AsyncMock()
+
+    @pytest.mark.asyncio
+    async def test_returns_output_when_namespace_exists(self) -> None:
+        wf = _make_workflow()
+        wf.resolver.set_namespace("node_a", {"status": "ok", "result": 42})
+        output = await wf.get_activity_output_when_ready("node_a")
+        assert output == {"status": "ok", "result": 42}
+
+    @pytest.mark.asyncio
+    async def test_scrubs_credentials_in_output(self) -> None:
+        wf = _make_workflow()
+        wf.resolver.set_namespace("node_a", {"result": "ok", "bearer_token": "secret"})
+        output = await wf.get_activity_output_when_ready("node_a")
+        assert output is not None
+        assert output["bearer_token"] == REDACTED
+        assert output["result"] == "ok"
 
 
 # --- _determine_output_port ---
@@ -258,6 +316,21 @@ class TestForEachLoop:
         assert "loop_1" in wf.loop_iteration_results
         assert wf.loop_iteration_results["loop_1"]["body_node.status"] == ["ok"]
         assert wf.loop_iteration_results["loop_1"]["body_node.value"] == [42]
+
+    def test_clear_loop_body_resets_nested_loop_state(self) -> None:
+        """Nested loop state is reset so inner loops re-initialize on the next outer iteration."""
+        wf = _make_workflow()
+        wf.loop_body_map["inner_loop"] = "outer_loop"
+        wf.loop_body_map["body_node"] = "inner_loop"
+        wf.loop_state["inner_loop"] = ForEachLoopState(items=["x"], current_index=0)
+        wf.loop_iteration_results["inner_loop"] = {"body_node.output": ["v1"]}
+        wf.resolver.set_namespace("inner_loop", {"status": "completed"})
+
+        wf._clear_loop_body("outer_loop")
+
+        assert "inner_loop" not in wf.loop_body_map
+        assert "inner_loop" not in wf.loop_state
+        assert "inner_loop" not in wf.loop_iteration_results
 
     def test_loop_body_complete_returns_false_when_incomplete(self) -> None:
         wf = _make_workflow()

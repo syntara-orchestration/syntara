@@ -7,7 +7,7 @@ new RetrieverService framework.
 
 from collections.abc import Callable
 from contextlib import AbstractContextManager
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID, uuid4
 
 import pytest
@@ -17,7 +17,7 @@ from syntara.agent_orchestrator.context_manager import (
     ContextPackage,
 )
 from syntara.agent_orchestrator.context_manager.retriever_service.services import get_retriever_service
-from syntara.agent_orchestrator.models import LLMCredentialConfig
+from syntara.agent_orchestrator.models import InvocationStatus, LLMCredentialConfig
 from syntara.core.database.session import get_db
 from syntara.core.models import User
 from tests.fixtures.settings import FakeSettingsCache
@@ -471,3 +471,102 @@ class TestContextManagerPlanner:
 
         with pytest.raises(Exception, match=r"ensure this value is less than or equal to|validation error"):
             ContextPackage(grounding_score=1.1)
+
+
+class TestContextManagerPlannerCancellation:
+    """Test cancellation detection in _check_cancellation."""
+
+    @pytest.fixture(autouse=True)
+    def _mock_runtime_settings(  # type: ignore[misc]
+        self, override_runtime_settings: Callable[..., AbstractContextManager[FakeSettingsCache]]
+    ) -> None:
+        """Auto-mock get_runtime_settings for all planner tests."""
+        with override_runtime_settings():
+            yield
+
+    @pytest.mark.asyncio
+    async def test_check_cancellation_detects_redis_key(self, mock_session_factory, mock_compressor) -> None:
+        """Test that cancellation is detected via Redis key without hitting the DB."""
+        from syntara.agent_orchestrator.audit.context_planning import ContextPlanningPhase
+        from syntara.agent_orchestrator.exceptions import InvocationCancelledError
+
+        planner = ContextManagerPlanner(
+            session_factory=mock_session_factory,
+            compressor_service_factory=lambda: mock_compressor,
+        )
+
+        mock_client = AsyncMock()
+        mock_client.key_exists.return_value = True
+
+        with patch("syntara.agent_orchestrator.context_manager.planner.StreamClient") as mock_cls:
+            mock_cls.return_value.__aenter__.return_value = mock_client
+
+            with pytest.raises(InvocationCancelledError):
+                await planner._check_cancellation(
+                    session_id="test-session",
+                    invocation_id=uuid4(),
+                    phase=ContextPlanningPhase.RETRIEVAL,
+                )
+
+    @pytest.mark.asyncio
+    async def test_check_cancellation_falls_back_to_db(self, mock_session_factory, mock_compressor) -> None:
+        """Test that cancellation falls back to DB when Redis is unavailable."""
+        from redis.exceptions import ConnectionError as RedisConnectionError
+
+        from syntara.agent_orchestrator.audit.context_planning import ContextPlanningPhase
+        from syntara.agent_orchestrator.exceptions import InvocationCancelledError
+        from syntara.agent_orchestrator.models import Invocation
+
+        planner = ContextManagerPlanner(
+            session_factory=mock_session_factory,
+            compressor_service_factory=lambda: mock_compressor,
+        )
+
+        mock_invocation = MagicMock(spec=Invocation)
+        mock_invocation.status = InvocationStatus.CANCELLED
+
+        with (
+            patch("syntara.agent_orchestrator.context_manager.planner.StreamClient") as mock_cls,
+            patch.object(planner, "get_async_session_context") as mock_session_ctx,
+        ):
+            mock_cls.return_value.__aenter__.side_effect = RedisConnectionError("down")
+
+            mock_session = AsyncMock()
+            mock_session.get.return_value = mock_invocation
+            mock_session_ctx.return_value.__aenter__.return_value = mock_session
+
+            with pytest.raises(InvocationCancelledError):
+                await planner._check_cancellation(
+                    session_id="test-session",
+                    invocation_id=uuid4(),
+                    phase=ContextPlanningPhase.RETRIEVAL,
+                )
+
+    @pytest.mark.asyncio
+    async def test_check_cancellation_skips_db_when_redis_confirms(self, mock_session_factory, mock_compressor) -> None:
+        """Test that DB is not queried when Redis already confirms cancellation."""
+        from syntara.agent_orchestrator.audit.context_planning import ContextPlanningPhase
+        from syntara.agent_orchestrator.exceptions import InvocationCancelledError
+
+        planner = ContextManagerPlanner(
+            session_factory=mock_session_factory,
+            compressor_service_factory=lambda: mock_compressor,
+        )
+
+        mock_client = AsyncMock()
+        mock_client.key_exists.return_value = True
+
+        with (
+            patch("syntara.agent_orchestrator.context_manager.planner.StreamClient") as mock_cls,
+            patch.object(planner, "get_async_session_context") as mock_session_ctx,
+        ):
+            mock_cls.return_value.__aenter__.return_value = mock_client
+
+            with pytest.raises(InvocationCancelledError):
+                await planner._check_cancellation(
+                    session_id="test-session",
+                    invocation_id=uuid4(),
+                    phase=ContextPlanningPhase.RETRIEVAL,
+                )
+
+            mock_session_ctx.assert_not_called()

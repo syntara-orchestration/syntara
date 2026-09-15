@@ -57,7 +57,10 @@ def approval_already_requested_handler(request: Request, exc: "ApprovalAlreadyRe
         status_code=status.HTTP_409_CONFLICT,
         problem_type=PROBLEM_TYPES["resource_conflict"],
         title="Approval Already Requested",
-        detail="An approval request already exists for this execution and approval node",
+        detail=(
+            "An approval request already exists for this execution and approval node "
+            f"'{exc.approval_node_id}' with loop_iteration_path {list(exc.loop_iteration_path)}"
+        ),
         code="APPROVAL_ALREADY_REQUESTED",
         retryable=False,
         instance=str(request.url),

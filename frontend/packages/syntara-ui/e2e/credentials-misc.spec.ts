@@ -25,6 +25,7 @@ import {
   navigateToCredentialDetail,
   selectCredentialType,
 } from './helpers/credentials'
+import { pfWidget } from './helpers/patternfly'
 import {
   buildUniqueName,
   clickAddConnectedStep,
@@ -70,7 +71,7 @@ test.describe('Credential Workflows Tab', () => {
 
       await retryButton.click()
 
-      const emptyState = app.getByText('No workflows using this credential')
+      const emptyState = app.getByRole('heading', { name: 'No workflows yet' })
       const table = app.getByRole('grid', { name: 'Workflows using this credential' })
       await expect(emptyState.or(table)).toBeVisible({ timeout: 10_000 })
     } finally {
@@ -224,10 +225,9 @@ test.describe('Alert Notifications', () => {
     await modal.getByRole('textbox', { name: 'Token' }).fill('test-token')
     await modal.getByRole('button', { name: 'Create credential' }).click()
 
-    // The error may appear as a PF alert (role="alert") or as form-level error text
-    const errorAlert = app.getByRole('alert').filter({ hasText: /error|fail/i })
-    const dangerAlert = app.locator('[class*="pf-m-danger"]').filter({ hasText: /error|fail/i })
-    await expect(errorAlert.or(dangerAlert)).toBeVisible({ timeout: 10_000 })
+    // PF6 toast Alert is aria-live only — no role="alert" (see waitForUIReady).
+    const errorAlert = pfWidget(app, 'Alert').filter({ hasText: /error|fail/i })
+    await expect(errorAlert).toBeVisible({ timeout: 10_000 })
 
     await app.unroute('**/api/v1/credentials')
   })
@@ -251,11 +251,11 @@ test.describe('Dynamic Field Renderer — Help Text', () => {
       .waitFor({ state: 'visible', timeout: 5_000 })
       .then(() => true)
       .catch(() => false)
-    test.skip(!hasHelpText, 'Credential type does not have help_text configured on this backend')
+    expect(hasHelpText, 'Credential type does not have help_text configured on this backend').toBeTruthy()
 
     await tokenHelpButton.click()
-    // Help popover should appear — PF6 renders it as a popover with a body
-    await expect(app.locator('.pf-v6-c-popover__body')).toBeVisible({ timeout: 5_000 })
+    // Exact name — the create modal's accessible name also contains "Token help".
+    await expect(app.getByRole('dialog', { name: 'Token help', exact: true })).toBeVisible({ timeout: 5_000 })
 
     await selectCredentialType(modal, 'HTTP Basic Auth')
 

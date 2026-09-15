@@ -7,7 +7,7 @@
  * - Tooltips show the correct "finish editing" message when disabled
  */
 
-import { test, expect } from './fixtures'
+import { type Page, test, expect } from './fixtures'
 import {
   buildUniqueName,
   closeNodeEditorPanel,
@@ -17,7 +17,7 @@ import {
 } from './helpers/workflows'
 
 /** Reset layout and fit view so all nodes are in the viewport (required in CI). */
-async function layoutCanvas(app: import('@playwright/test').Page) {
+async function layoutCanvas(app: Page) {
   const layoutButton = app.getByRole('button', { name: 'Reset layout', exact: true })
   if ((await layoutButton.count()) > 0) {
     await layoutButton.click()
@@ -30,7 +30,7 @@ async function layoutCanvas(app: import('@playwright/test').Page) {
 }
 
 /** Click a React Flow node by its visible text label to open its editor. */
-async function clickNode(app: import('@playwright/test').Page, nodeText: string) {
+async function clickNode(app: Page, nodeText: string) {
   await layoutCanvas(app)
   const node = app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: nodeText })
   await expect(node).toBeVisible({ timeout: 5_000 })

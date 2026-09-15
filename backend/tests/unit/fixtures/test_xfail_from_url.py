@@ -2,9 +2,19 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 
-from tests.fixtures.xfail_from_url import _matches, _parse_xfail_entries
+from tests.fixtures.xfail_from_url import (
+    _matches,
+    _parse_xfail_entries,
+    pytest_collection_modifyitems,
+    pytest_report_header,
+)
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class TestParseXfailEntries:
@@ -87,3 +97,121 @@ class TestMatches:
     )
     def test_various_non_matches(self, nodeid: str, pattern: str) -> None:
         assert _matches(nodeid, pattern) is False
+
+
+class TestMatchesParametrized:
+    """A pattern that lists the base node-id must match parametrized instances.
+
+    Mirrors pytest's own node-id selection semantics, where
+    ``test_foo.py::test_bar`` selects every ``test_bar[...]`` variant. Without
+    this, a flaky parametrized test quarantined by its base id is *not* marked
+    xfail and fails the suite (the reported bug).
+    """
+
+    @pytest.mark.parametrize(
+        ("nodeid", "pattern"),
+        [
+            # base function id must match a single parametrization
+            ("tests/unit/test_foo.py::test_bar[case-1]", "tests/unit/test_foo.py::test_bar"),
+            # ... and match regardless of which parametrization it is
+            ("tests/unit/test_foo.py::test_bar[case-2]", "tests/unit/test_foo.py::test_bar"),
+            # base id with a class-scoped parametrized method
+            ("tests/unit/test_foo.py::TestC::test_m[a-b]", "tests/unit/test_foo.py::TestC::test_m"),
+            # a class base id must match its (non-parametrized) methods
+            ("tests/unit/test_foo.py::TestC::test_m", "tests/unit/test_foo.py::TestC"),
+            # a class base id must match its parametrized methods
+            ("tests/unit/test_foo.py::TestC::test_m[a-b]", "tests/unit/test_foo.py::TestC"),
+            # an exact parametrized id still matches itself
+            ("tests/unit/test_foo.py::test_bar[case-1]", "tests/unit/test_foo.py::test_bar[case-1]"),
+        ],
+    )
+    def test_base_id_matches_parametrized_instances(self, nodeid: str, pattern: str) -> None:
+        assert _matches(nodeid, pattern) is True
+
+    @pytest.mark.parametrize(
+        ("nodeid", "pattern"),
+        [
+            # a base id must not match a different function sharing a prefix
+            ("tests/unit/test_foo.py::test_bar_extended", "tests/unit/test_foo.py::test_bar"),
+            # ... nor a differently-named parametrized function sharing a prefix
+            ("tests/unit/test_foo.py::test_bard[x]", "tests/unit/test_foo.py::test_bar"),
+            # a class base id must not match a differently-named class sharing a prefix
+            ("tests/unit/test_foo.py::TestCandidate::test_m", "tests/unit/test_foo.py::TestC"),
+        ],
+    )
+    def test_base_id_does_not_over_match(self, nodeid: str, pattern: str) -> None:
+        assert _matches(nodeid, pattern) is False
+
+
+class _FakeItem:
+    """Minimal stand-in for a collected pytest item."""
+
+    def __init__(self, nodeid: str) -> None:
+        self.nodeid = nodeid
+        self.markers: list[pytest.MarkDecorator] = []
+
+    def add_marker(self, marker: pytest.MarkDecorator) -> None:
+        self.markers.append(marker)
+
+
+class _FakeConfig:
+    def __init__(self, source: str | None) -> None:
+        self._source = source
+        self.stash = pytest.Stash()
+
+    def getoption(self, name: str) -> str | None:
+        assert name == "--xfail-from-url"
+        return self._source
+
+
+class TestCollectionModifyItems:
+    """End-to-end: the collection hook marks the right items xfail.
+
+    This is the behavior the bug report is about — a quarantined test must not
+    fail the suite. Here we assert the hook actually attaches an xfail marker to
+    the matching items (including a parametrized instance listed by base id).
+    """
+
+    def test_parametrized_instance_marked_by_base_id(self, tmp_path: Path) -> None:
+        md = tmp_path / "backend.md"
+        md.write_text("# tests/unit/test_foo.py::test_bar\nflaky under load\n")
+
+        param_item = _FakeItem("tests/unit/test_foo.py::test_bar[case-1]")
+        unrelated_item = _FakeItem("tests/unit/test_foo.py::test_other")
+        items = [param_item, unrelated_item]
+
+        pytest_collection_modifyitems(_FakeConfig(str(md)), items)  # type: ignore[arg-type]
+
+        assert len(param_item.markers) == 1
+        assert param_item.markers[0].name == "xfail"
+        assert "flaky under load" in param_item.markers[0].kwargs["reason"]
+        assert unrelated_item.markers == []
+
+    def test_no_source_is_a_noop(self) -> None:
+        item = _FakeItem("tests/unit/test_foo.py::test_bar[case-1]")
+        items = [item]
+        pytest_collection_modifyitems(_FakeConfig(None), items)  # type: ignore[arg-type]
+        assert item.markers == []
+
+
+class TestReportHeader:
+    """The active xfail rules are surfaced at the start of the run."""
+
+    def test_header_lists_every_rule(self, tmp_path: Path) -> None:
+        md = tmp_path / "backend.md"
+        md.write_text(
+            "# tests/unit/test_foo.py::test_bar\nflaky under load\n\n# tests/integration/\ninfra flaky\n",
+        )
+
+        header = pytest_report_header(_FakeConfig(str(md)))  # type: ignore[arg-type]
+
+        assert header is not None
+        joined = "\n".join(header)
+        assert "2 rule(s)" in joined
+        assert "tests/unit/test_foo.py::test_bar" in joined
+        assert "flaky under load" in joined
+        assert "tests/integration/" in joined
+        assert "infra flaky" in joined
+
+    def test_header_is_absent_without_source(self) -> None:
+        assert pytest_report_header(_FakeConfig(None)) is None  # type: ignore[arg-type]

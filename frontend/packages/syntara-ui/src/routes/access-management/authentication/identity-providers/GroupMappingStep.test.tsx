@@ -31,12 +31,12 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
 })
 
-const mockNexusGroups = [
+const mockMappedGroups = [
   { id: 'g1', name: 'admin' },
   { id: 'g2', name: 'users' },
 ]
 
-const mockAllGroups = mockNexusGroups.map((g) => ({
+const mockAllGroups = mockMappedGroups.map((g) => ({
   ...g,
   description: null,
   is_builtin: false,
@@ -83,7 +83,7 @@ describe('GroupMappingStep', () => {
     })
 
     vi.mocked(usersClient.useQuery).mockReturnValue({
-      data: { resources: mockNexusGroups },
+      data: { resources: mockMappedGroups },
       isPending: false,
       isError: false,
       error: null,
@@ -261,7 +261,7 @@ describe('GroupMappingStep', () => {
 
       // Simulate the popup writing claims to localStorage (picked up by polling)
       const claims = { groups: ['admin', 'users'] }
-      localStorage.setItem('nexus-test-signin', JSON.stringify({ type: 'test-signin', nonce: TEST_NONCE, claims }))
+      localStorage.setItem('syntara-test-signin', JSON.stringify({ type: 'test-signin', nonce: TEST_NONCE, claims }))
 
       // Should show success alert with discovered groups
       expect(await screen.findByRole('heading', { name: /groups discovered/i })).toBeInTheDocument()
@@ -284,7 +284,7 @@ describe('GroupMappingStep', () => {
 
       // Simulate the popup writing claims with no groups
       const claims = { roles: ['admin'] } // no 'groups' key
-      localStorage.setItem('nexus-test-signin', JSON.stringify({ type: 'test-signin', nonce: TEST_NONCE, claims }))
+      localStorage.setItem('syntara-test-signin', JSON.stringify({ type: 'test-signin', nonce: TEST_NONCE, claims }))
 
       expect(await screen.findByRole('heading', { name: /no groups found/i })).toBeInTheDocument()
     })
@@ -334,7 +334,7 @@ describe('GroupMappingStep', () => {
       await user.click(screen.getByRole('button', { name: /discover groups/i }))
 
       const storageEvent = new StorageEvent('storage', {
-        key: 'nexus-test-signin',
+        key: 'syntara-test-signin',
         newValue: 'not-valid-json',
       })
       act(() => {

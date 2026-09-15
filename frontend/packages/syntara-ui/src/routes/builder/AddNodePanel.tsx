@@ -2,7 +2,7 @@ import { Button, Flex, FlexItem, Icon, Stack, StackItem, Title, TitleSizes } fro
 import { RhUiCloseIcon, RhUiArrowLeftIcon, RhUiAddSquareIcon } from '@patternfly/react-icons'
 import { useMemo, useState, type ReactNode } from 'react'
 
-import { NxPanel } from '../../components/layout/NxPanel'
+import { SynPanel } from '../../components/layout/SynPanel'
 
 import { NodeTypeOptionsList } from './NodeTypeOptionsList'
 import { NodeRegistry } from './registry/NodeRegistry'
@@ -116,7 +116,7 @@ export function AddNodePanel(props: AddNodePanelProps) {
     isShowingSubtypeList && selectedNode ? (selectedNode.selectionTitle ?? 'Select a node') : 'Add step'
 
   return (
-    <NxPanel
+    <SynPanel
       hasNoPadding
       isFullHeight
       isGlass={false}
@@ -166,6 +166,6 @@ export function AddNodePanel(props: AddNodePanelProps) {
           </Stack>
         </StackItem>
       </Stack>
-    </NxPanel>
+    </SynPanel>
   )
 }

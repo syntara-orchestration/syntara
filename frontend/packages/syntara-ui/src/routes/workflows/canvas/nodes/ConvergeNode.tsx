@@ -2,15 +2,15 @@ import { Flex } from '@patternfly/react-core'
 import { ActivityTypeEnum, type ConvergeActivity } from '@syntara/contracts'
 import { type Node, type NodeProps } from '@xyflow/react'
 
-import { NxDetail } from '../../../../components/details/NxDetail'
-import { NxDetailList } from '../../../../components/details/NxDetailList'
+import { SynDetail } from '../../../../components/details/SynDetail'
+import { SynDetailList } from '../../../../components/details/SynDetailList'
+import { NodeBody } from '../../../../components/nodes/NodeBody'
+import { NodeComponent } from '../../../../components/nodes/NodeComponent'
 import { RegistryNodeId } from '../../../../constants'
 import type { ActivityStatus } from '../../execution/types'
 import { getNodeTypeColor } from '../nodeTypeColors'
 import { semanticZoomActivityTitle } from '../semanticZoom'
 
-import { NodeBody } from './common/NodeBody'
-import { NodeComponent } from './common/NodeComponent'
 import { StandardNodeHeader } from './common/StandardNodeHeader'
 import { MenuNodeType, useNodeMenuActions } from './hooks/useNodeMenuActions'
 import { nodeMetadata } from './nodeMetadata'
@@ -69,9 +69,9 @@ export function ConvergeNodeComponent(props: NodeProps<ConvergeNode>) {
       />
       <Flex justifyContent={{ default: 'justifyContentFlexStart' }} style={{ overflow: 'hidden' }}>
         <NodeBody>
-          <NxDetailList data-testid="converge-node-details">
-            <NxDetail label="Type">{strategyLabel}</NxDetail>
-          </NxDetailList>
+          <SynDetailList data-testid="converge-node-details">
+            <SynDetail label="Type">{strategyLabel}</SynDetail>
+          </SynDetailList>
         </NodeBody>
       </Flex>
     </NodeComponent>

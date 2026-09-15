@@ -232,7 +232,10 @@ describe('GroupFormModal Component', () => {
       await user.clear(nameInput)
       await user.type(nameInput, 'Updated Admins')
 
-      await user.click(screen.getByText('Save'))
+      // Query by role rather than by the button's text: the text lives in a nested span
+      // (PatternFly wraps button labels), and happy-dom's implicit-submit handling only
+      // fires for a click whose target is the submit button element itself.
+      await user.click(screen.getByRole('button', { name: 'Save' }))
 
       await waitFor(() => {
         expect(mockUpdateMutate).toHaveBeenCalled()
@@ -280,7 +283,10 @@ describe('GroupFormModal Component', () => {
       await user.clear(nameInput)
       await user.type(nameInput, 'Updated Admins')
 
-      await user.click(screen.getByText('Save'))
+      // Query by role rather than by the button's text: the text lives in a nested span
+      // (PatternFly wraps button labels), and happy-dom's implicit-submit handling only
+      // fires for a click whose target is the submit button element itself.
+      await user.click(screen.getByRole('button', { name: 'Save' }))
 
       await waitFor(() => {
         expect(mockUpdateMutate).toHaveBeenCalled()

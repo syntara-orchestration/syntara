@@ -8,8 +8,8 @@ export default {
     messages: {
       missingTitle:
         'Page components must render a <title> element for the browser tab. ' +
-        'Use: <NxPageTitle segments={["Page Name"]} />. ' +
-        'Import NxPageTitle from src/components/NxPageTitle.',
+        'Use: <SynPageTitle segments={["Page Name"]} />. ' +
+        'Import SynPageTitle from src/components/SynPageTitle.',
     },
     schema: [],
   },
@@ -18,16 +18,19 @@ export default {
     let hasDefaultExport = false
     return {
       JSXOpeningElement(node) {
-        if (node.name.type === 'JSXIdentifier' && (node.name.name === 'title' || node.name.name === 'NxPageTitle')) {
+        if (node.name.type === 'JSXIdentifier' && (node.name.name === 'title' || node.name.name === 'SynPageTitle')) {
           hasTitleElement = true
         }
       },
       ExportDefaultDeclaration() {
         hasDefaultExport = true
       },
-      'Program:exit'() {
+      'Program:exit'(node) {
         if (hasDefaultExport && !hasTitleElement) {
-          context.report({ node: context.sourceCode.ast, messageId: 'missingTitle' })
+          // Report on the first statement (not Program) so file-level
+          // /* eslint-disable */ directives still apply after ESLint 10's
+          // Program.range spans the entire source text.
+          context.report({ node: node.body[0] ?? node, messageId: 'missingTitle' })
         }
       },
     }

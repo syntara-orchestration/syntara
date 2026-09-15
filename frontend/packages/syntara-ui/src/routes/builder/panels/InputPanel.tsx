@@ -15,8 +15,8 @@ import {
 import { RhUiAddIcon, RhUiCloseIcon } from '@patternfly/react-icons'
 import { useMemo, useState } from 'react'
 
-import { NxPageBody } from '../../../components/layout/NxPage'
-import { NxPanel } from '../../../components/layout/NxPanel'
+import { SynPageBody } from '../../../components/layout/SynPage'
+import { SynPanel } from '../../../components/layout/SynPanel'
 import { useMockDataStore } from '../../../stores/useMockDataStore'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import { selectActivities, selectTriggers } from '../../../stores/workflowStoreSelectors'
@@ -342,7 +342,7 @@ export function InputPanel({
   }
 
   return (
-    <NxPanel
+    <SynPanel
       variant="raised"
       isFullHeight
       className={styles.panelContainer}
@@ -401,7 +401,7 @@ export function InputPanel({
         )}
         {hasUpstream && (
           <StackItem isFilled className={styles.filledMinHeight}>
-            <NxPageBody className={styles.scrollableContent}>
+            <SynPageBody className={styles.scrollableContent}>
               {effectiveUpstream.map((upstreamNode) => {
                 const isExpanded = expandedSections[upstreamNode.id] ?? false
                 const hasPinnedMock = hasInputMock(nodeId, upstreamNode.id)
@@ -445,10 +445,10 @@ export function InputPanel({
               >
                 <VariablesAndContextTree workflowMetadata={workflowMetadata} />
               </ExpandableSection>
-            </NxPageBody>
+            </SynPageBody>
           </StackItem>
         )}
       </Stack>
-    </NxPanel>
+    </SynPanel>
   )
 }

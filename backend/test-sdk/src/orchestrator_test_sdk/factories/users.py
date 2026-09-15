@@ -29,6 +29,7 @@ class UserFactory(Protocol):
         email: str | None = None,
         first_name: str | None = None,
         password: str | None = None,
+        group_names: list[str] | None = None,
     ) -> tuple[UUID, str, str]: ...
 
 
@@ -44,18 +45,20 @@ def create_user() -> Generator[UserFactory, None, None]:
         email: str | None = None,
         first_name: str | None = None,
         password: str | None = None,
+        group_names: list[str] | None = None,
     ) -> tuple[UUID, str, str]:
         prefix = prefix or "test"
         name = user_name or unique_name(f"e2e-rbac-{prefix}")
         password = password or generate_test_password()
-        resp = api.users.create(
-            body=UserCreate(
-                username=name,
-                email=email or f"{name}@example.com",
-                first_name=first_name or f"RBAC Test {prefix}",
-                password=password,
-            ),
+        body = UserCreate(
+            username=name,
+            email=email or f"{name}@example.com",
+            first_name=first_name or f"RBAC Test {prefix}",
+            password=password,
         )
+        if group_names is not None:
+            body.group_names = group_names
+        resp = api.users.create(body=body)
         user = resp.assert_and_get()
         user_id = UUID(str(user.id))
         created.append((api, user_id))

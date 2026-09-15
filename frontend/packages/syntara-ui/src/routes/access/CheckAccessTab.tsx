@@ -1,7 +1,7 @@
 import { Content, ContentVariants, StackItem } from '@patternfly/react-core'
 
-import { NxPageBody } from '../../components/layout/NxPage'
-import { NxPanelContentStack } from '../../components/layout/NxPanelContentStack'
+import { SynPageBody } from '../../components/layout/SynPage'
+import { SynPanelContentStack } from '../../components/layout/SynPanelContentStack'
 import { useQueryState } from '../../components/states/useQueryState'
 import { detachPromise } from '../../utils/detachPromise'
 
@@ -17,7 +17,7 @@ export function CheckAccessTab() {
   )
 
   return (
-    <NxPanelContentStack>
+    <SynPanelContentStack>
       <StackItem>
         <Content component={ContentVariants.p} style={{ marginBottom: 'var(--pf-t--global--spacer--md)' }}>
           Look up which users and groups have access to a specific resource and what actions they can perform on it. Use
@@ -25,11 +25,11 @@ export function CheckAccessTab() {
         </Content>
       </StackItem>
 
-      <NxPageBody style={{ overflow: 'auto' }}>
+      <SynPageBody style={{ overflow: 'auto' }}>
         {resourceActionsQueryState ?? (
           <WhoCanView resourceTypes={resourceTypes} actionsByResource={actionsByResource} />
         )}
-      </NxPageBody>
-    </NxPanelContentStack>
+      </SynPageBody>
+    </SynPanelContentStack>
   )
 }

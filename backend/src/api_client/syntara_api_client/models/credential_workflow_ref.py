@@ -22,6 +22,7 @@ class CredentialWorkflowRef:
         id (UUID):
         name (str):
         created_by (None | str | Unset | UUID): Username or UUID of the workflow creator
+        created_at (datetime.datetime | None | Unset): Timestamp when the workflow was created
         description (None | str | Unset):
         last_execution_at (datetime.datetime | None | Unset): Timestamp of the most recent execution
         last_execution_status (None | str | Unset): Status of the most recent execution
@@ -31,6 +32,7 @@ class CredentialWorkflowRef:
     id: UUID
     name: str
     created_by: None | str | Unset | UUID = UNSET
+    created_at: datetime.datetime | None | Unset = UNSET
     description: None | str | Unset = UNSET
     last_execution_at: datetime.datetime | None | Unset = UNSET
     last_execution_status: None | str | Unset = UNSET
@@ -49,6 +51,14 @@ class CredentialWorkflowRef:
             created_by = str(self.created_by)
         else:
             created_by = self.created_by
+
+        created_at: None | str | Unset
+        if isinstance(self.created_at, Unset):
+            created_at = UNSET
+        elif isinstance(self.created_at, datetime.datetime):
+            created_at = self.created_at.isoformat()
+        else:
+            created_at = self.created_at
 
         description: None | str | Unset
         if isinstance(self.description, Unset):
@@ -84,6 +94,8 @@ class CredentialWorkflowRef:
         )
         if created_by is not UNSET:
             field_dict["created_by"] = created_by
+        if created_at is not UNSET:
+            field_dict["created_at"] = created_at
         if description is not UNSET:
             field_dict["description"] = description
         if last_execution_at is not UNSET:
@@ -118,6 +130,23 @@ class CredentialWorkflowRef:
             return cast(None | str | Unset | UUID, data)
 
         created_by = _parse_created_by(d.pop("created_by", UNSET))
+
+        def _parse_created_at(data: object) -> datetime.datetime | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, str):
+                    raise TypeError()
+                created_at_type_0 = isoparse(data)
+
+                return created_at_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(datetime.datetime | None | Unset, data)
+
+        created_at = _parse_created_at(d.pop("created_at", UNSET))
 
         def _parse_description(data: object) -> None | str | Unset:
             if data is None:
@@ -160,6 +189,7 @@ class CredentialWorkflowRef:
             id=id,
             name=name,
             created_by=created_by,
+            created_at=created_at,
             description=description,
             last_execution_at=last_execution_at,
             last_execution_status=last_execution_status,

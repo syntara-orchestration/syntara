@@ -86,29 +86,58 @@ def _parse_xfail_entries(content: str) -> list[tuple[str, str]]:
 def _matches(nodeid: str, pattern: str) -> bool:
     """Check whether *nodeid* matches *pattern*.
 
-    A pattern is treated as a prefix when it looks like a directory or file
-    path (no ``::``), and as an exact match otherwise.
+    A pattern without ``::`` is treated as a directory/file prefix.
+
+    A pattern with ``::`` mirrors pytest's own node-id selection: the base id
+    of a test also selects its parametrizations and (for a class base id) its
+    methods. So ``test_foo.py::test_bar`` matches ``test_foo.py::test_bar`` and
+    ``test_foo.py::test_bar[case-1]``, and ``test_foo.py::TestC`` matches
+    ``test_foo.py::TestC::test_m[a-b]``. Without this, a flaky parametrized
+    test quarantined by its base id would not be marked xfail and would fail
+    the suite.
     """
     if "::" in pattern:
-        return nodeid == pattern
+        # ``pattern[`` = parametrized instance; ``pattern::`` = class/module
+        # base id selecting its sub-items.
+        return nodeid == pattern or nodeid.startswith((f"{pattern}[", f"{pattern}::"))
     return nodeid.startswith(pattern)
 
 
-def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+# Cache the parsed entries on the session config so the file is fetched once and
+# shared between pytest_report_header and pytest_collection_modifyitems.
+_ENTRIES_KEY: pytest.StashKey[list[tuple[str, str]]] = pytest.StashKey()
+
+
+def _get_entries(config: pytest.Config) -> list[tuple[str, str]]:
+    """Load and cache the parsed xfail entries for this session (fail-open to [])."""
+    if _ENTRIES_KEY in config.stash:
+        return config.stash[_ENTRIES_KEY]
+
     source: str | None = config.getoption("--xfail-from-url")
-    if not source:
-        return
-    content = _load_xfail_file(source)
-    if content is None:
-        return
+    entries: list[tuple[str, str]] = []
+    if source:
+        content = _load_xfail_file(source)
+        if content is not None:
+            entries = _parse_xfail_entries(content)
+    config.stash[_ENTRIES_KEY] = entries
+    return entries
 
-    entries = _parse_xfail_entries(content)
+
+def pytest_report_header(config: pytest.Config) -> list[str] | None:
+    """Print the active xfail rules at the start of the run."""
+    entries = _get_entries(config)
     if not entries:
-        logger.info("url_xfail: no patterns found in file")
-        return
+        return None
+    source = config.getoption("--xfail-from-url")
+    lines = [f"url xfail: {len(entries)} rule(s) from {source}"]
+    lines += [f"  {pattern} — {reason}" for pattern, reason in entries]
+    return lines
 
-    patterns = [e[0] for e in entries]
-    logger.info("url_xfail: loaded patterns", count=len(entries), patterns=patterns)
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    entries = _get_entries(config)
+    if not entries:
+        return
 
     matched = 0
     for item in items:
@@ -118,4 +147,4 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
                 matched += 1
                 break
 
-    logger.info("url_xfail: marked tests", matched=matched, total=len(items))
+    logger.info("url_xfail: marked tests", matched=matched, total=len(items), patterns=[e[0] for e in entries])

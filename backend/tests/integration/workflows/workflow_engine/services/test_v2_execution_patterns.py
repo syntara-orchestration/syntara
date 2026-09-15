@@ -443,6 +443,78 @@ class TestConvergeStrategies:
         assert "join" in result["completed_activities"]
         assert "final" in result["completed_activities"]
 
+    async def test_converge_any_off_section_node_does_not_cause_engine_error(
+        self, temporal_env: WorkflowEnvironment
+    ) -> None:
+        """Converge ANY must not crash the engine when a predecessor has off-section successors.
+
+        This is an invalid graph shape (per AAP-87746) that will be rejected by future validation.
+        The engine must handle it gracefully today.
+
+        In Temporal's time-skipping environment both branches complete before the converge
+        evaluates, so branch_b is already resolved and side_action is scheduled normally.
+        The bounded-BFS fix (which prevents premature skip propagation when branch_b is
+        un-scheduled) is verified by the unit tests; this test is a smoke-test that the
+        engine produces a clean completion and does not error.
+
+        Graph:
+            trigger -> branch_a -> join (ANY n=1) -> final
+                    -> branch_b -> join
+                       branch_b -> side_action   (off-section: not on any path to join)
+        """
+        result = await _run_workflow(
+            temporal_env,
+            "v2-converge-any-off-section",
+            {
+                "schema_version": "2.0.0",
+                "triggers": [_manual_trigger()],
+                "nodes": [
+                    {
+                        "id": "branch_a",
+                        "type": "script",
+                        "parameters": {"language": "bash", "code": "echo A"},
+                    },
+                    {
+                        "id": "branch_b",
+                        "type": "script",
+                        "parameters": {"language": "bash", "code": "echo B"},
+                    },
+                    {
+                        "id": "join",
+                        "type": "converge",
+                        "parameters": {"strategy": "any", "n_required": 1},
+                    },
+                    {
+                        "id": "side_action",
+                        "type": "script",
+                        "parameters": {"language": "bash", "code": "echo side"},
+                    },
+                    {
+                        "id": "final",
+                        "type": "script",
+                        "parameters": {"language": "bash", "code": "echo done"},
+                    },
+                ],
+                "edges": [
+                    {"from": "trigger", "to": "branch_a"},
+                    {"from": "trigger", "to": "branch_b"},
+                    {"from": "branch_a", "to": "join"},
+                    {"from": "branch_b", "to": "join"},
+                    {"from": "branch_b", "to": "side_action"},
+                    {"from": "join", "to": "final"},
+                ],
+            },
+        )
+
+        # Main converge path must complete. side_action may or may not run depending
+        # on whether branch_b completes before or after converge fires — that race is
+        # timing-dependent and not what this test verifies. The engine must not crash
+        # and must not report side_action as failed regardless of outcome.
+        assert result["status"] == "completed"
+        assert "join" in result["completed_activities"]
+        assert "final" in result["completed_activities"]
+        assert "side_action" not in result.get("failed_activities", {})
+
 
 @pytest.mark.integration
 @pytest.mark.asyncio

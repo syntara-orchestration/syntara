@@ -11,13 +11,13 @@ type IdentityProviderUpdate = IdentityProvidersAPI.components['schemas']['Identi
 export type GroupMappingEntry = {
   key: string
   idpGroupValue: string
-  nexusGroupId: string
+  mappedGroupId: string
 }
 
 /** Form/API row shape without react-hook-form field-array id */
-export type GroupMappingFormEntry = Pick<GroupMappingEntry, 'idpGroupValue' | 'nexusGroupId'>
+export type GroupMappingFormEntry = Pick<GroupMappingEntry, 'idpGroupValue' | 'mappedGroupId'>
 
-export type NexusGroup = {
+export type MappedGroup = {
   id?: string
   name?: string
   description?: string | null
@@ -76,7 +76,7 @@ export function toFormEntries(config: GroupMappingConfig | null | undefined): Gr
   return config.group_mapping_entries.map((e) => ({
     key: nextKey(),
     idpGroupValue: e.idp_group_value,
-    nexusGroupId: e.mapped_group_id,
+    mappedGroupId: e.mapped_group_id,
   }))
 }
 
@@ -94,8 +94,8 @@ export function buildSavePayload(
       redirect_uri: providerConfig.redirect_uri ?? '',
       group_jmespath_expression: expression,
       group_mapping_entries: entries
-        .filter((e) => e.idpGroupValue && e.nexusGroupId)
-        .map((e) => ({ idp_group_value: e.idpGroupValue, mapped_group_id: e.nexusGroupId })),
+        .filter((e) => e.idpGroupValue && e.mappedGroupId)
+        .map((e) => ({ idp_group_value: e.idpGroupValue, mapped_group_id: e.mappedGroupId })),
     },
   }
 }
@@ -104,7 +104,7 @@ export function processDiscoveredGroups(
   claims: Record<string, unknown>,
   expression: string,
   entries: GroupMappingFormEntry[],
-  nexusGroups: NexusGroup[]
+  mappedGroups: MappedGroup[]
 ): { newEntries: GroupMappingFormEntry[]; message: string; variant: 'success' | 'warning' } {
   const groups = searchGroups(claims, expression)
 
@@ -117,9 +117,9 @@ export function processDiscoveredGroups(
     }
   }
 
-  const nexusGroupByName = new Map<string, string>()
-  for (const g of nexusGroups) {
-    if (g.name && g.id) nexusGroupByName.set(g.name, g.id)
+  const mappedGroupByName = new Map<string, string>()
+  for (const g of mappedGroups) {
+    if (g.name && g.id) mappedGroupByName.set(g.name, g.id)
   }
 
   const existingByValue = new Map<string, GroupMappingFormEntry>()
@@ -133,11 +133,11 @@ export function processDiscoveredGroups(
       existingByValue.delete(g)
       return existing
     }
-    return { idpGroupValue: g, nexusGroupId: nexusGroupByName.get(g) ?? '' }
+    return { idpGroupValue: g, mappedGroupId: mappedGroupByName.get(g) ?? '' }
   })
 
   const newEntries = [...discoveredEntries, ...existingByValue.values()]
-  const autoMatched = newEntries.filter((e) => e.nexusGroupId).length
+  const autoMatched = newEntries.filter((e) => e.mappedGroupId).length
   const message =
     autoMatched > 0
       ? `Discovered ${String(groups.length)} group(s). ${String(autoMatched)} matched to groups.`

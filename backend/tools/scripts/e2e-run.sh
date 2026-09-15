@@ -96,7 +96,7 @@ echo "✅ Infrastructure ready"
 
 echo "⏳ Waiting for API server to be ready..."
 TRIES=0
-until curl -sf --cacert .secrets/certs/ca.pem https://localhost:8000/health 2>/dev/null | grep -q '"status":"healthy"'; do
+until curl -sf --cacert .secrets/certs/ca.pem https://localhost:8000/healthz/ready 2>/dev/null | grep -q '"status":"ready"'; do
     sleep 1
     TRIES=$((TRIES + 1))
     if [[ $TRIES -ge 60 ]]; then

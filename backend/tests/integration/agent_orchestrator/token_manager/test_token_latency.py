@@ -4,7 +4,6 @@ Tests that token calculation meets performance targets:
 - p95 latency < 50ms per calculation
 """
 
-import gc
 import statistics
 import time
 
@@ -77,52 +76,42 @@ class TestTokenCalculationLatency:
         assert p95 < 50.0, f"p95 latency {p95:.2f}ms exceeds target of 50ms{diag}"
 
     def test_encoder_caching_effectiveness(self) -> None:
-        """Test that encoder caching reduces latency on repeated calls.
+        """Test that the @lru_cache on _get_encoder means the encoder is created only once.
 
-        Verifies that the @lru_cache decorator on get_encoder() is effective.
+        Uses cache_info() rather than wall-clock timing: sub-microsecond operations
+        are dominated by OS scheduling jitter, making timing-based assertions
+        unreliable in CI environments.
         """
+        from syntara.agent_orchestrator.token_manager.services import _get_encoder
+
         calculator = TokenCalculator()
-        text = "Test text for encoder caching validation " * 10
 
-        # Ensure consistent GC state before measurement to avoid
-        # non-deterministic timing from GC running mid-measurement
-        gc.collect()
+        cache_before = _get_encoder.cache_info()
 
-        # First call (may include encoder initialization)
-        latencies_first: list[float] = []
-        for _ in range(100):
-            start_time = time.perf_counter()
-            calculator.count_tokens(text)
-            end_time = time.perf_counter()
-            latencies_first.append((end_time - start_time) * 1000)
+        # Use 20 distinct texts so _count_tokens_cached misses each time,
+        # exercising _get_encoder on every call and proving it is cached.
+        for i in range(20):
+            calculator.count_tokens(f"unique caching validation text {i} " * 10)
 
-        # GC before second measurement phase for fair comparison
-        gc.collect()
+        cache_after = _get_encoder.cache_info()
 
-        # Subsequent calls (should use cached encoder)
-        latencies_cached: list[float] = []
-        for _ in range(100):
-            start_time = time.perf_counter()
-            calculator.count_tokens(text)
-            end_time = time.perf_counter()
-            latencies_cached.append((end_time - start_time) * 1000)
-
-        mean_first = statistics.mean(latencies_first)
-        mean_cached = statistics.mean(latencies_cached)
-
-        improvement_pct = (mean_first - mean_cached) / mean_first * 100
+        new_misses = cache_after.misses - cache_before.misses
+        new_hits = cache_after.hits - cache_before.hits
 
         logger.info(
-            "Encoder caching performance",
-            mean_first_ms=round(mean_first, 2),
-            mean_cached_ms=round(mean_cached, 2),
-            improvement_pct=round(improvement_pct, 1),
+            "Encoder caching effectiveness",
+            new_misses=new_misses,
+            new_hits=new_hits,
+            total_misses=cache_after.misses,
+            total_hits=cache_after.hits,
         )
 
-        # Both should be fast, but there should be no significant degradation
-        assert mean_cached <= mean_first * 1.1, (
-            f"Caching should not degrade performance "
-            f"(first={mean_first:.2f}ms, cached={mean_cached:.2f}ms, improvement={improvement_pct:.1f}%)"
+        # Encoder should be created at most once (first call) and reused for the rest.
+        assert new_misses <= 1, (
+            f"_get_encoder should be created at most once via lru_cache, but had {new_misses} new misses"
+        )
+        assert new_hits >= 19, (
+            f"_get_encoder should be served from cache for all subsequent calls, but only got {new_hits} new hits"
         )
 
     def test_token_calculation_scales_linearly(self) -> None:

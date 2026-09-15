@@ -491,8 +491,10 @@ E2E_COVERAGE_EXEMPT: set[str] = {
     # Files — E2E needs S3 (); authz path unit-tested
     "files:upload:any",
     "files:download:any",
+    "files:delete:any",
     "files:upload:project",
     "files:download:project",
+    "files:delete:project",
     # Service accounts (system-scoped — unit-tested via test_rego_service_account.py)
     "service_account:create:any",
     "service_account:read:any",

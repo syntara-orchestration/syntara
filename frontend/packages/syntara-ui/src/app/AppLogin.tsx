@@ -23,7 +23,7 @@ import { RhUiErrorIcon } from '@patternfly/react-icons'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { RETURN_TO_KEY, SESSION_EXPIRED_KEY } from '../components/session/sessionTimeoutConstants'
-import { NxLoadingState } from '../components/states/NxLoadingState'
+import { SynLoadingState } from '../components/states/SynLoadingState'
 import { useBrand } from '../providers/brand'
 import { useColorScheme } from '../providers/theme/useColorScheme'
 import { AuthError, useAuthStore, selectIsAuthenticated, selectIsRefreshing } from '../stores/useAuthStore'
@@ -297,7 +297,7 @@ function AppLoginForm() {
   if (!bootstrapDone || isRefreshing || providersLoading) {
     return (
       <Bullseye style={{ height: '100vh' }}>
-        <NxLoadingState />
+        <SynLoadingState />
       </Bullseye>
     )
   }
@@ -320,7 +320,7 @@ function AppLoginForm() {
   // State A: No IDPs — show original login form
   if (!hasProviders) {
     return (
-      <Login header={header}>
+      <Login header={header} className={styles.login}>
         <LoginMainHeader title={`Log in to ${brand.appTitle}`} subtitle="Enter your credentials to continue" />
         <LoginMainBody>
           {sessionExpiredAlert}
@@ -332,7 +332,7 @@ function AppLoginForm() {
 
   // State B/C: IDPs exist
   return (
-    <Login header={header}>
+    <Login header={header} className={styles.login}>
       <LoginMainHeader
         title={`Log in to ${brand.appTitle}`}
         subtitle={`Select your identity provider to access ${brand.appTitle}. Contact your administrator if you need assistance.`}

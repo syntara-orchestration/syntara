@@ -178,4 +178,31 @@ describe('useAutoApprovalDetection', () => {
     expect(fetchForNode).not.toHaveBeenCalled()
     expect(onApprovalDetected).not.toHaveBeenCalled()
   })
+
+  it('re-fetches when a node leaves waiting and enters waiting again', async () => {
+    const fetchForNode = vi.fn().mockResolvedValue(mockApproval)
+    const onApprovalDetected = vi.fn()
+
+    renderHook(() =>
+      useAutoApprovalDetection({
+        executionId: 'exec-1',
+        fetchForNode,
+        onApprovalDetected,
+      })
+    )
+
+    act(() => {
+      testHelpers.setStatus('approval-node-1', 'waiting')
+    })
+    await vi.waitFor(() => expect(onApprovalDetected).toHaveBeenCalledTimes(1))
+
+    act(() => {
+      testHelpers.setStatus('approval-node-1', 'completed')
+    })
+    act(() => {
+      testHelpers.setStatus('approval-node-1', 'waiting')
+    })
+
+    await vi.waitFor(() => expect(fetchForNode).toHaveBeenCalledTimes(2))
+  })
 })

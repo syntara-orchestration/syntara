@@ -10,6 +10,7 @@ from temporalio.exceptions import ApplicationError
 from syntara.workflows.workflow_engine.activities.common import ActivityExecutionError
 from syntara.workflows.workflow_engine.activities.http_request_activity import (
     _add_credential_auth_headers,
+    _resolve_httpx_params,
     execute_http_request_activity,
 )
 
@@ -166,6 +167,52 @@ class TestExecuteHttpRequestActivitySuccess:
         with patch("httpx.AsyncClient.request", new_callable=AsyncMock, return_value=resp) as mock_req:
             await execute_http_request_activity(config, None)
         assert mock_req.call_args.kwargs["params"] == {"page": "1"}
+
+    @pytest.mark.asyncio
+    async def test_empty_query_params_preserves_url_query_string(self) -> None:
+        resp = _mock_response(200, json_body={})
+        config = {
+            **VALID_CONFIG,
+            "url": "https://example.com/get?token=abc123&keep=yes",
+        }
+        with patch("httpx.AsyncClient.request", new_callable=AsyncMock, return_value=resp) as mock_req:
+            await execute_http_request_activity(config, None)
+        assert mock_req.call_args.kwargs["url"] == "https://example.com/get?token=abc123&keep=yes"
+        assert mock_req.call_args.kwargs["params"] is None
+
+    @pytest.mark.asyncio
+    async def test_query_params_merge_with_url_query_string(self) -> None:
+        resp = _mock_response(200, json_body={})
+        config = {
+            **VALID_CONFIG,
+            "url": "https://example.com/api?token=from-url&keep=yes",
+            "query_params": {"token": "from-params", "page": "1"},
+        }
+        with patch("httpx.AsyncClient.request", new_callable=AsyncMock, return_value=resp) as mock_req:
+            await execute_http_request_activity(config, None)
+        assert mock_req.call_args.kwargs["url"] == "https://example.com/api"
+        assert mock_req.call_args.kwargs["params"] == {
+            "token": "from-params",
+            "keep": "yes",
+            "page": "1",
+        }
+
+
+class TestResolveHttpxParams:
+    """Tests for _resolve_httpx_params."""
+
+    def test_empty_params_returns_none(self) -> None:
+        url, params = _resolve_httpx_params("https://example.com/get?a=1", {})
+        assert url == "https://example.com/get?a=1"
+        assert params is None
+
+    def test_merge_prefers_explicit_params(self) -> None:
+        url, params = _resolve_httpx_params(
+            "https://example.com/get?a=url&b=1",
+            {"a": "explicit", "c": "2"},
+        )
+        assert url == "https://example.com/get"
+        assert params == {"a": "explicit", "b": "1", "c": "2"}
 
 
 class TestExecuteHttpRequestActivityFailures:
@@ -328,10 +375,10 @@ class TestSecretUrlCredential:
     """Tests for Secret URL credential type (auth_type='url')."""
 
     @pytest.mark.asyncio
-    async def test_url_from_credential_overrides_config(self) -> None:
+    async def test_url_from_credential_used_when_no_explicit_url(self) -> None:
         resp = _mock_response(200, json_body={"ok": True})
         config = {
-            **VALID_CONFIG,
+            "method": "GET",
             "_resolved_credentials": {
                 "credential_id": "cred-url-1",
                 "extra_vars": {"auth_type": "url", "secret_url": "https://hooks.slack.com/services/T/B/xxx"},
@@ -345,10 +392,22 @@ class TestSecretUrlCredential:
         assert mock_req.call_args.kwargs["url"] == "https://hooks.slack.com/services/T/B/xxx"
 
     @pytest.mark.asyncio
+    async def test_url_credential_conflicts_with_explicit_url(self) -> None:
+        config = {
+            **VALID_CONFIG,
+            "_resolved_credentials": {
+                "credential_id": "cred-url-1",
+                "extra_vars": {"auth_type": "url", "secret_url": "https://hooks.slack.com/services/T/B/xxx"},
+            },
+        }
+        with pytest.raises(ActivityExecutionError, match="Conflict"):
+            await execute_http_request_activity(config, None)
+
+    @pytest.mark.asyncio
     async def test_url_credential_does_not_set_auth_headers(self) -> None:
         resp = _mock_response(200, json_body={})
         config = {
-            **VALID_CONFIG,
+            "method": "GET",
             "_resolved_credentials": {
                 "credential_id": "cred-url-1",
                 "extra_vars": {"auth_type": "url", "secret_url": "https://hooks.slack.com/services/T/B/xxx"},
@@ -366,7 +425,7 @@ class TestSecretUrlCredential:
     @pytest.mark.asyncio
     async def test_url_credential_empty_raises(self) -> None:
         config = {
-            **VALID_CONFIG,
+            "method": "GET",
             "_resolved_credentials": {
                 "credential_id": "cred-url-1",
                 "extra_vars": {"auth_type": "url", "secret_url": ""},
@@ -386,7 +445,7 @@ class TestSecretUrlCredential:
         resp = _mock_response(401)
         secret_url = "https://hooks.slack.com/services/T/B/supersecret"  # noqa: S105
         config = {
-            **VALID_CONFIG,
+            "method": "GET",
             "_resolved_credentials": {
                 "credential_id": "cred-url-1",
                 "extra_vars": {"auth_type": "url", "secret_url": secret_url},
@@ -404,7 +463,7 @@ class TestSecretUrlCredential:
     @pytest.mark.asyncio
     async def test_url_credential_ssrf_private_ip_rejected(self) -> None:
         config = {
-            **VALID_CONFIG,
+            "method": "GET",
             "_resolved_credentials": {
                 "credential_id": "cred-url-1",
                 "extra_vars": {"auth_type": "url", "secret_url": "https://internal.example.com/webhook"},
@@ -419,7 +478,7 @@ class TestSecretUrlCredential:
     @pytest.mark.asyncio
     async def test_url_credential_schemeless_rejected(self) -> None:
         config = {
-            **VALID_CONFIG,
+            "method": "GET",
             "_resolved_credentials": {
                 "credential_id": "cred-url-1",
                 "extra_vars": {"auth_type": "url", "secret_url": "//evil.com/hook"},

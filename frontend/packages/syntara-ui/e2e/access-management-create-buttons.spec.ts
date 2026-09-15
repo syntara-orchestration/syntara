@@ -12,8 +12,7 @@
  * - Roles tab: "Create role" button → dialog title and submit both read "Create role"
  * - Assignments tab: "Add assignment" button → dialog title "Add Assignment"; submit "Add assignment"
  *
- * Note: the Users form page heading uses title case ("Create User") while the submit button
- * uses sentence case ("Create user") — both are intentional per PatternFly casing conventions.
+ * Note: the Users form page heading and submit button both use sentence case ("Create user").
  * The Assignments dialog heading uses title case ("Add Assignment") by existing convention;
  * this area was not modified by this PR.
  *
@@ -33,12 +32,14 @@ let seededRole: SeededRole | null = null
 
 test.beforeAll(async ({ browser }) => {
   const page = await browser.newPage()
-  const token = await getAuthToken(page)
-  if (token) {
+  try {
+    const token = await getAuthToken(page)
+    if (!token) throw new Error('access-management-create-buttons beforeAll: could not obtain auth token')
     const prefix = buildUniqueName('e2e-amb')
     seededRole = await createRoleViaApi(page, { name: `${prefix}-role`, token })
+  } finally {
+    await page.close()
   }
-  await page.close()
 })
 
 test.afterAll(async ({ browser }) => {
@@ -97,7 +98,7 @@ test.describe('Access Management — Create button labels', () => {
     await createButton.click()
 
     await expect(app).toHaveURL(new RegExp(`${ACCESS_URL}/users/create`))
-    await expect(app.getByRole('heading', { name: 'Create User' })).toBeVisible()
+    await expect(app.getByRole('heading', { name: 'Create user' })).toBeVisible()
     await expect(app.getByRole('button', { name: 'Create user' })).toBeVisible()
 
     await app.getByRole('button', { name: 'Cancel' }).click()
@@ -117,7 +118,7 @@ test.describe('Access Management — Create button labels', () => {
           .waitFor({ state: 'visible', timeout: 5000 })
           .then(() => true)
           .catch(() => false)
-        test.skip(!hasButton, `No seed data available; "${label}" button not visible in empty state`)
+        expect(hasButton, `No seed data available; "${label}" button not visible in empty state`).toBeTruthy()
       }
 
       await expect(actionButton).toBeVisible()

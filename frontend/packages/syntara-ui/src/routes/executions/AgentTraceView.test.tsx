@@ -82,7 +82,7 @@ describe('AgentTraceView', () => {
     expect(screen.getByText('Querying Splunk for error logs')).toBeInTheDocument()
   })
 
-  it('renders tool result response via NxDetail', () => {
+  it('renders tool result response via SynDetail', () => {
     render(<AgentTraceView agentTrace={sampleTrace} />)
 
     expect(screen.getByText('Request')).toBeInTheDocument()

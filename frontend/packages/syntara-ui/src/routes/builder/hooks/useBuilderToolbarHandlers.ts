@@ -192,7 +192,7 @@ export function useBuilderToolbarHandlers({
           },
           onError: (error) => {
             showError({
-              title: 'Workflow failed',
+              title: 'Failed to run workflow',
               description: `Failed to start workflow "${workflowName}": ${getErrorMessage(error)}`,
             })
             dispatch({ type: 'SET_CONFIRM_DIALOG', payload: false })
@@ -223,13 +223,13 @@ export function useBuilderToolbarHandlers({
       { params: { path: { workflow_id: workflow.id } } },
       {
         onSuccess: () => {
-          showSuccess({ title: 'Workflow deleted', description: `Successfully deleted workflow "${workflowName}"` })
+          showSuccess({ title: 'Workflow deleted', description: `Workflow "${workflowName}" has been deleted.` })
           dispatch({ type: 'SET_DELETE_DIALOG', payload: false })
           setLocation('/workflows')
         },
         onError: (error) => {
           showError({
-            title: 'Delete failed',
+            title: 'Failed to delete workflow',
             description: `Failed to delete workflow "${workflowName}": ${getErrorMessage(error)}`,
           })
           dispatch({ type: 'SET_DELETE_DIALOG', payload: false })

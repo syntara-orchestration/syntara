@@ -17,7 +17,11 @@ from syntara.agent_orchestrator.audit.invocation_lifecycle import (
     InvocationLifecycleEvent,
     InvocationLifecycleHandler,
 )
-from syntara.agent_orchestrator.exceptions import InvocationCancelledError
+from syntara.agent_orchestrator.exceptions import (
+    InvocationCancelledError,
+    ToolDiscoveryError,
+    ToolSelectionUnavailableError,
+)
 from syntara.agent_orchestrator.executor.invocation_executor import InvocationExecutor
 from syntara.agent_orchestrator.models import Invocation, InvocationStatus
 from syntara.audit.dispatcher import AuditEventDispatcher
@@ -49,7 +53,6 @@ def _make_user(**overrides: object) -> User:
         "id": uuid4(),
         "username": "testuser",
         "email": "test@example.com",
-        "deleted_at": None,
     }
     data = {**defaults, **overrides}
     return User(**data)
@@ -145,7 +148,10 @@ class TestInvocationExecutorLifecycleEvents:
             for p in patches[1:]:
                 stack.enter_context(p)
 
-            await executor.execute_invocation(invocation_id=invocation.id)
+            try:
+                await executor.execute_invocation(invocation_id=invocation.id)
+            except InvocationCancelledError:
+                pass
 
         # Return all emitted events for test-specific assertions
         return [call.args[0] for call in mock_do_emit.call_args_list]
@@ -221,10 +227,8 @@ class TestInvocationExecutorLifecycleEvents:
 
     @pytest.mark.asyncio
     async def test_execute_orchestration_emits_running_and_completed_events_with_deleted_user(self) -> None:
-        """Successful execution with deleted user emits RUNNING and COMPLETED InvocationLifecycleEvents."""
-        user = _make_user()
-        user.deleted_at = datetime.now(UTC)
-        await self._run_successful_execution_lifecycle_test(user=user)
+        """Successful execution with hard-deleted user (not found in DB) emits lifecycle events."""
+        await self._run_successful_execution_lifecycle_test(user=None)
 
     @pytest.mark.asyncio
     async def test_execute_orchestration_emits_running_and_completed_events_with_unknown_user(self) -> None:
@@ -452,8 +456,79 @@ class TestInvocationExecutorLifecycleEvents:
         assert lifecycle_events[1].actor_type == PrincipalType.USER
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("error", "leaked_fragment", "safe_fragment"),
+        [
+            (
+                ToolDiscoveryError("ConnectionError contacting http://tool-manager.internal/v1/tools"),
+                "tool-manager.internal",
+                "Required tools could not be discovered or provisioned.",
+            ),
+            (
+                ToolSelectionUnavailableError("unavailable tool IDs: ['aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee']"),
+                "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+                "None of the requested tools could be provisioned.",
+            ),
+        ],
+    )
+    async def test_fail_invocation_error_message_uses_classified_detail_for_tool_errors(
+        self,
+        error: Exception,
+        leaked_fragment: str,
+        safe_fragment: str,
+    ) -> None:
+        """Discovery/selection failures must not write raw exception text to invocation.error_message."""
+        user = _make_user()
+        invocation = _make_invocation(created_by=user.id)
+
+        mock_orchestration_service = AsyncMock()
+        mock_orchestration_service.execute = AsyncMock(side_effect=error)
+
+        mock_session = AsyncMock()
+
+        def session_get_side_effect(model_class: type, _: object) -> object:
+            if model_class == Invocation:
+                return invocation
+            if model_class == User:
+                return user
+            return None
+
+        mock_session.get.side_effect = session_get_side_effect
+        mock_exec_result = Mock()
+        mock_exec_result.rowcount = 1
+        mock_session.exec = AsyncMock(return_value=mock_exec_result)
+        mock_session.commit = AsyncMock()
+
+        @asynccontextmanager
+        async def mock_session_context() -> AsyncGenerator[AsyncSession, None]:
+            yield mock_session
+
+        executor = InvocationExecutor()
+        fail_invocation = AsyncMock(return_value=True)
+
+        with (
+            patch("syntara.audit.emitter._do_emit_audit_event"),
+            patch.object(executor, "get_async_session_context", side_effect=lambda: mock_session_context()),
+            patch.object(executor, "_init_orchestration", return_value=(mock_orchestration_service, None)),
+            patch.object(executor, "_fail_invocation_if_not_cancelled", fail_invocation),
+            patch(
+                "syntara.agent_orchestrator.executor.invocation_executor.WorkflowSignalClient.send_failure_signal",
+                new_callable=AsyncMock,
+            ),
+        ):
+            await executor.execute_invocation(invocation_id=invocation.id)
+
+        fail_invocation.assert_awaited_once()
+        await_args = fail_invocation.await_args
+        assert await_args is not None
+        error_message = await_args.kwargs["error_message"]
+        assert safe_fragment in error_message
+        assert leaked_fragment not in error_message
+        assert str(error) not in error_message
+
+    @pytest.mark.asyncio
     async def test_handle_execution_error_no_failed_event_when_cancelled(self) -> None:
-        """Exception during cancelled invocation does not emit FAILED event (race condition prevented)."""
+        """Exception during cancelled invocation raises InvocationCancelledError, no FAILED event."""
         execution_id = uuid4()
         user = _make_user()
 
@@ -497,7 +572,6 @@ class TestInvocationExecutorLifecycleEvents:
 
         executor = InvocationExecutor()
 
-        # Mock WorkflowSignalClient to prevent actual signal sending
         with (
             patch("syntara.audit.emitter._do_emit_audit_event") as mock_do_emit,
             patch.object(executor, "get_async_session_context", side_effect=lambda: mock_session_context()),
@@ -505,20 +579,21 @@ class TestInvocationExecutorLifecycleEvents:
             patch(
                 "syntara.agent_orchestrator.executor.invocation_executor.WorkflowSignalClient.send_failure_signal",
                 new_callable=AsyncMock,
-            ),
+            ) as mock_failure_signal,
         ):
-            await executor.execute_invocation(invocation_id=invocation.id)
+            try:
+                await executor.execute_invocation(invocation_id=invocation.id)
+            except InvocationCancelledError:
+                pass
 
         events: list[AuditEvent] = [call.args[0] for call in mock_do_emit.call_args_list]
         lifecycle_events = [e for e in events if e.event_action in ["invocation_running", "invocation_failed"]]
 
-        # Should only have RUNNING event
-        # (no FAILED event because _fail_invocation_status_if_not_cancelled returned False)
+        # Should only have RUNNING event — no FAILED because the row was
+        # already CANCELLED and InvocationCancelledError was raised instead
         assert len(lifecycle_events) == 1
         assert lifecycle_events[0].event_action == "invocation_running"
-        assert lifecycle_events[0].actor_id == user.id
-        assert lifecycle_events[0].actor_username == user.username
-        assert lifecycle_events[0].actor_type == PrincipalType.USER
+        mock_failure_signal.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_invocation_lifecycle_events_includes_context_identifiers(self) -> None:

@@ -1,0 +1,3 @@
+.toggle {
+  max-width: var(--syntara-compact-filter-toggle-max-width, none);
+}

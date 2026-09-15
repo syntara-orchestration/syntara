@@ -26,7 +26,8 @@ class ApprovalDecisionRequest:
 
                 This is a subset of ApprovalRequestStatus representing only the
                 values that can be submitted in decision requests.
-            notes (None | str | Unset): Optional notes explaining the decision
+            notes (None | str | Unset): Optional notes explaining the decision. Accepts either `notes` or `decision_notes`
+                (the key returned in responses) as the request field name.
     """
 
     status: ApprovalDecisionStatus

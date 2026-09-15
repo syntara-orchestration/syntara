@@ -25,7 +25,7 @@ export function useAllProjectRoles(projectId: string | undefined) {
     refetch,
   } = useQuery({
     queryKey: ['all-project-roles', projectId],
-    queryFn: () => fetchAllProjectRoles(projectId!),
+    queryFn: () => fetchAllProjectRoles(projectId ?? ''),
     enabled: !!projectId,
   })
   return { roles, isLoading: isPending, error, refetch }

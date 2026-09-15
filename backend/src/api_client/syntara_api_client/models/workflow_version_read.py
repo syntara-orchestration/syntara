@@ -22,27 +22,22 @@ T = TypeVar("T", bound="WorkflowVersionRead")
 @_attrs_define
 class WorkflowVersionRead:
     """Schema for workflow version response (GET /workflows/{id}/versions/{version}).
-    WorkflowVersion entities are read-only and managed automatically by the system.
 
-    Note: deleted_at and deleted_by are None since soft-deleted versions are excluded from queries.
-
-        Attributes:
-            id (UUID):
-            workflow_id (UUID):
-            version (int):
-            schema_version (str):
-            workflow_definition (WorkflowVersionReadWorkflowDefinition):
-            created_by (UUID):
-            created_at (datetime.datetime):
-            updated_at (datetime.datetime):
-            change_description (None | str | Unset):
-            status (WorkflowVersionReadStatus | Unset):  Default: WorkflowVersionReadStatus.DRAFT.
-            last_published_at (datetime.datetime | None | Unset):
-            last_unpublished_at (datetime.datetime | None | Unset):
-            name (None | str | Unset):
-            created_by_username (None | str | Unset):
-            deleted_at (datetime.datetime | None | Unset):
-            deleted_by (None | Unset | UUID):
+    Attributes:
+        id (UUID):
+        workflow_id (UUID):
+        version (int):
+        schema_version (str):
+        workflow_definition (WorkflowVersionReadWorkflowDefinition):
+        created_by (UUID):
+        created_at (datetime.datetime):
+        updated_at (datetime.datetime):
+        change_description (None | str | Unset):
+        status (WorkflowVersionReadStatus | Unset):  Default: WorkflowVersionReadStatus.DRAFT.
+        last_published_at (datetime.datetime | None | Unset):
+        last_unpublished_at (datetime.datetime | None | Unset):
+        name (None | str | Unset):
+        created_by_username (None | str | Unset):
     """
 
     id: UUID
@@ -59,8 +54,6 @@ class WorkflowVersionRead:
     last_unpublished_at: datetime.datetime | None | Unset = UNSET
     name: None | str | Unset = UNSET
     created_by_username: None | str | Unset = UNSET
-    deleted_at: datetime.datetime | None | Unset = UNSET
-    deleted_by: None | Unset | UUID = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -118,22 +111,6 @@ class WorkflowVersionRead:
         else:
             created_by_username = self.created_by_username
 
-        deleted_at: None | str | Unset
-        if isinstance(self.deleted_at, Unset):
-            deleted_at = UNSET
-        elif isinstance(self.deleted_at, datetime.datetime):
-            deleted_at = self.deleted_at.isoformat()
-        else:
-            deleted_at = self.deleted_at
-
-        deleted_by: None | str | Unset
-        if isinstance(self.deleted_by, Unset):
-            deleted_by = UNSET
-        elif isinstance(self.deleted_by, UUID):
-            deleted_by = str(self.deleted_by)
-        else:
-            deleted_by = self.deleted_by
-
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -160,10 +137,6 @@ class WorkflowVersionRead:
             field_dict["name"] = name
         if created_by_username is not UNSET:
             field_dict["created_by_username"] = created_by_username
-        if deleted_at is not UNSET:
-            field_dict["deleted_at"] = deleted_at
-        if deleted_by is not UNSET:
-            field_dict["deleted_by"] = deleted_by
 
         return field_dict
 
@@ -256,40 +229,6 @@ class WorkflowVersionRead:
 
         created_by_username = _parse_created_by_username(d.pop("created_by_username", UNSET))
 
-        def _parse_deleted_at(data: object) -> datetime.datetime | None | Unset:
-            if data is None:
-                return data
-            if isinstance(data, Unset):
-                return data
-            try:
-                if not isinstance(data, str):
-                    raise TypeError()
-                deleted_at_type_0 = isoparse(data)
-
-                return deleted_at_type_0
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            return cast(datetime.datetime | None | Unset, data)
-
-        deleted_at = _parse_deleted_at(d.pop("deleted_at", UNSET))
-
-        def _parse_deleted_by(data: object) -> None | Unset | UUID:
-            if data is None:
-                return data
-            if isinstance(data, Unset):
-                return data
-            try:
-                if not isinstance(data, str):
-                    raise TypeError()
-                deleted_by_type_0 = UUID(data)
-
-                return deleted_by_type_0
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            return cast(None | Unset | UUID, data)
-
-        deleted_by = _parse_deleted_by(d.pop("deleted_by", UNSET))
-
         workflow_version_read = cls(
             id=id,
             workflow_id=workflow_id,
@@ -305,8 +244,6 @@ class WorkflowVersionRead:
             last_unpublished_at=last_unpublished_at,
             name=name,
             created_by_username=created_by_username,
-            deleted_at=deleted_at,
-            deleted_by=deleted_by,
         )
 
         workflow_version_read.additional_properties = d

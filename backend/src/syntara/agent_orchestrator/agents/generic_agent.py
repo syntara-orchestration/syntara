@@ -26,16 +26,31 @@ from syntara.agent_orchestrator.exceptions import EmptyLLMResponseError
 from syntara.agent_orchestrator.models import GenericAgentResponse
 from syntara.agent_orchestrator.models.agent_state import AgentState
 from syntara.agent_orchestrator.utils.keyword_association import annotate_tools_with_relevance
+from syntara.agent_orchestrator.utils.response_metadata import normalize_response_metadata
 from syntara.audit.dispatcher import AuditEventDispatcher
-from syntara.core.config.base import get_settings
 from syntara.core.utils.retry import retry_with_backoff
 from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.instrumentation import record_llm_call
+from syntara.settings.cache.settings_cache import get_runtime_settings
 
 if TYPE_CHECKING:
     from langchain.messages import AnyMessage
 
 logger = structlog.stdlib.get_logger(__name__)
+
+
+def _default_task_agent_prompt() -> str:
+    """Resolve default for ``agentic.task_agent_system_prompt``.
+
+    Keeps the agent functional before the settings seeder has run.
+    """
+    from syntara.core.config.base import get_settings  # noqa: PLC0415
+
+    return (
+        f"You are an information assistant for the {get_settings().product_name} automation system. "
+        "Answer user questions concisely and accurately. "
+        "Focus on providing helpful, direct answers about tools, services, and capabilities."
+    )
 
 
 class _InvocationContext(NamedTuple):
@@ -186,12 +201,12 @@ class GenericAgent(BaseAgent):
         # Use state["prompt"] which contains the context-enhanced prompt
         # (with retrieved documents) from the orchestrator, rather than
         # state["messages"] which only has the original user input.
+        system_prompt = await get_runtime_settings().get_str(
+            "agentic.task_agent_system_prompt",
+            default=_default_task_agent_prompt(),
+        )
         messages: list[AnyMessage] = [
-            SystemMessage(
-                content=f"You are an information assistant for the {get_settings().product_name} automation system. "
-                "Answer user questions concisely and accurately. "
-                "Focus on providing helpful, direct answers about tools, services, and capabilities."
-            ),
+            SystemMessage(content=system_prompt),
             HumanMessage(content=state["prompt"]),
         ]
         # On re-entry after tool execution, carry forward tool-call history
@@ -250,7 +265,10 @@ class GenericAgent(BaseAgent):
         # Update AgentState
         state["messages"] = [result_message]
         state["llm_token_usage_log"] = token_log
-        response_metadata = result_message.response_metadata
+        response_metadata = normalize_response_metadata(
+            result_message.response_metadata,
+            usage_metadata=getattr(result_message, "usage_metadata", None),
+        )
         response_model: GenericAgentResponse = GenericAgentResponse(content=answer, response_metadata=response_metadata)
 
         state["result"] = response_model.model_dump(by_alias=True)
@@ -274,10 +292,13 @@ class GenericAgent(BaseAgent):
             # include_raw=True so we can read provider usage from the AIMessage
             structured_llm = self.llm.with_structured_output(response_schema, method="json_mode", include_raw=True)
             schema_str = _json.dumps(response_schema, indent=2)
-            product = get_settings().product_name
+            system_prompt = await get_runtime_settings().get_str(
+                "agentic.task_agent_system_prompt",
+                default=_default_task_agent_prompt(),
+            )
             messages = [
                 SystemMessage(
-                    content=f"You are an information assistant for the {product} automation system. "
+                    content=f"{system_prompt}\n\n"
                     "You MUST respond with ONLY a valid JSON object matching this exact schema:\n\n"
                     f"```json\n{schema_str}\n```\n\n"
                     "Use exactly the property names from the schema. "
@@ -366,7 +387,10 @@ class GenericAgent(BaseAgent):
 
         result_dict = GenericAgentResponse(
             content=parsed_output,
-            response_metadata=getattr(raw_message, "response_metadata", None) or {},
+            response_metadata=normalize_response_metadata(
+                getattr(raw_message, "response_metadata", None),
+                usage_metadata=getattr(raw_message, "usage_metadata", None),
+            ),
         ).model_dump(by_alias=True)
         result_dict["structured_output_metadata"] = {"fallback_strategy_used": "native"}
         state["result"] = result_dict

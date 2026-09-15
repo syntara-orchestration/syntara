@@ -47,7 +47,7 @@ The frontend uses **one WebSocket connection per channel**, not a singleton WebS
 
 ### Backend Determines Frontend Pattern
 
-The Nexus backend exposes **separate WebSocket endpoints per channel**:
+The Syntara backend exposes **separate WebSocket endpoints per channel**:
 
 | Backend Endpoint              | Handler                 | Purpose             |
 | ----------------------------- | ----------------------- | ------------------- |
@@ -453,7 +453,7 @@ VITE_WS_URL=wss://api.example.com
 
 We use **multiple connections** rather than a single multiplexed WebSocket because:
 
-- **Backend architecture:** Nexus backend exposes separate endpoints per channel (FastAPI + AsyncAPI pattern)
+- **Backend architecture:** Syntara backend exposes separate endpoints per channel (FastAPI + AsyncAPI pattern)
 - **Schema validation:** Each endpoint validates messages against its own AsyncAPI schema
 - **Isolation:** Channel failures don't affect other channels
 - **Debugging:** Easier to trace issues per-channel in network inspector

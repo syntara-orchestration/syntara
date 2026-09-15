@@ -89,7 +89,7 @@ def syntara_client(syntara_base_url: str) -> AuthenticatedClient:
     base_url = syntara_base_url
 
     try:
-        response = httpx.get(f"{base_url}/health", timeout=5, verify=e2e_ssl_context())
+        response = httpx.get(f"{base_url}/healthz/ready", timeout=5, verify=e2e_ssl_context())
         response.raise_for_status()
     except (httpx.RequestError, httpx.HTTPStatusError) as exc:
         pytest.exit(
@@ -241,6 +241,7 @@ def auditor_client(syntara_base_url: str, syntara_api: SyntaraApiRegistry) -> Au
             email="e2e-auditor@example.com",
             first_name="E2E Auditor",
             password=password,
+            group_names=[],
         ),
     )
     if resp.status_code not in (HTTPStatus.CREATED, HTTPStatus.CONFLICT):

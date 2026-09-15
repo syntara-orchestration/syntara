@@ -1,0 +1,135 @@
+.root {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.panel {
+  box-shadow: none;
+}
+
+.shellStack {
+  height: 100%;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  max-height: 100%;
+  overflow: hidden;
+  width: 100%;
+}
+
+/*
+ * border-radius lives here (overflow:hidden) rather than on .scrollContainer (overflow:auto).
+ * Safari has a known rendering bug where border-radius + overflow:auto on the same element
+ * prevents the content from painting at all, especially with position:sticky inside.
+ *
+ * --syn-scroll-fade-distance is a unitless px value read by useScrollOverflow to compute the
+ * proportional fade ratio. Defined here so it co-locates with the gradient styles it governs.
+ */
+.scrollWrapper {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--pf-t--global--border--radius--medium);
+  --syn-scroll-fade-distance: 120;
+}
+
+/* Gradient overlay hinting at scrollable content below. Opacity is set proportionally by
+   useScrollOverflow via --syn-scroll-fade-opacity (0 = at bottom, 1 = far from bottom).
+   Two background layers: the bottom one masks content by fading to the panel background;
+   the top one darkens using the PF directional shadow token so the hint is visible against
+   the background rather than blending into it. */
+.scrollWrapper::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: var(--pf-t--global--spacer--md);
+  box-shadow: inset var(--pf-t--global--box-shadow--md--top);
+  pointer-events: none;
+  z-index: 1;
+  border-radius: 0 0 var(--pf-t--global--border--radius--medium) var(--pf-t--global--border--radius--medium);
+  opacity: var(--syn-scroll-fade-opacity, 0);
+}
+
+/* Footer present: scroll area doesn't reach the panel bottom, so no bottom rounding at the seam. */
+.scrollWrapperHasFooter,
+.scrollWrapperHasFooter::after {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.scrollContainer {
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
+  width: 100%;
+  position: relative;
+}
+
+.footer {
+  flex: 0 0 auto;
+  width: 100%;
+  border-top: var(--pf-t--global--border--width--divider--default) solid var(--pf-t--global--border--color--default);
+  padding-bottom: var(--pf-t--global--spacer--sm);
+}
+
+.table {
+  width: 100%;
+  --pf-v6-c-table--m-sticky-header--BorderRadius: 0;
+}
+
+/*
+ * Sticky header glass: isPlain sets thead background to transparent so rows show through
+ * while scrolling. Triple-layer the glass color (~87.5% effective opacity).
+ */
+.table thead {
+  background:
+    linear-gradient(
+      var(--pf-t--global--background--color--glass--primary--default),
+      var(--pf-t--global--background--color--glass--primary--default)
+    ),
+    linear-gradient(
+      var(--pf-t--global--background--color--glass--primary--default),
+      var(--pf-t--global--background--color--glass--primary--default)
+    ),
+    linear-gradient(
+      var(--pf-t--global--background--color--glass--primary--default),
+      var(--pf-t--global--background--color--glass--primary--default)
+    );
+  backdrop-filter: var(--pf-t--global--background--filter--glass--blur--primary);
+}
+
+/*
+ * Safari only: PF sticky-header ::before uses inset:0 on a sticky thead; WebKit sizes it to the
+ * scrollport height and covers tbody rows. Chrome/Firefox keep PF ::before/::after (header shadow).
+ */
+@supports (hanging-punctuation: first) and (font: -apple-system-body) and (-webkit-appearance: none) {
+  .table thead::before,
+  .table thead::after {
+    display: none;
+  }
+}
+
+/*
+ * Suppress the last row's bottom border only when scrolled to the very bottom.
+ * useScrollOverflow sets data-at-bottom on .scrollContainer at that point.
+ * The footer's border-top then acts as the sole visual separator.
+ * Targeting .pf-v6-c-table is necessary to beat PF's own specificity.
+ */
+.scrollContainer[data-at-bottom] :global(.pf-v6-c-table tbody:last-of-type > tr:last-child) {
+  border-bottom: 0;
+}
+
+/*
+ * Overrides PatternFly's default (automatic) table layout with fixed layout for better
+ * column sizing in non-expandable tables. Not applied to expandable tables because
+ * PatternFly's expandable row layout relies on the browser's automatic table layout
+ * to correctly size columns and expansion control cells.
+ *
+ * Applied conditionally in SynScrollableTableContainer.tsx via the useFixedLayout prop.
+ */
+.tableFixedLayout {
+  table-layout: fixed;
+}

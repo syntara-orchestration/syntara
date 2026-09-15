@@ -5,21 +5,15 @@
  * to a configured AAP Gateway integration and that job/workflow templates
  * are browsable via the resource pickers.
  */
-import { test, expect } from './fixtures'
+import { type Page, test, expect } from './fixtures'
 import { buildUniqueName, clickAddConnectedStep, startWorkflowWithTrigger } from './helpers/workflows'
 import { isSkipWebServerForPlaywrightTests } from './playwrightWebServerEnv'
 import { deleteIntegrationViaApi } from './seeds/resources'
 import { apiRequest, deleteCredentialViaApi, ensureProject } from './utils/api'
 
 const isRealBackend = isSkipWebServerForPlaywrightTests()
-// Real backend rejects an unresolvable base_url as an SSRF risk; use the compose-allowlisted
-// mcp-server host (override via NEXUS_E2E_INTEGRATION_HOST). Mock mode keeps a readable placeholder.
-const ssrfSafeIntegrationHost = process.env.NEXUS_E2E_INTEGRATION_HOST ?? 'https://mcp-server'
 
-async function createAAPIntegration(
-  app: import('@playwright/test').Page,
-  name: string
-): Promise<{ integrationId: string; credentialId: string }> {
+async function createAAPIntegration(app: Page, name: string): Promise<{ integrationId: string; credentialId: string }> {
   const project = await ensureProject(app)
   if (!project) throw new Error('Could not ensure project')
 
@@ -45,7 +39,7 @@ async function createAAPIntegration(
       integration_type: 'ansible_automation_platform',
       configuration: {
         integration_type: 'ansible_automation_platform',
-        base_url: isRealBackend ? ssrfSafeIntegrationHost : `https://${name}.example.com`,
+        base_url: `https://example.com`,
       },
       management_credential_id: cred.id,
       scope: 'global',

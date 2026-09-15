@@ -65,6 +65,4 @@ def deserialize_workflow_version(
         "created_by": version.created_by,
         "created_at": version.created_at,
         "updated_at": version.updated_at,
-        "deleted_at": version.deleted_at,
-        "deleted_by": version.deleted_by,
     }

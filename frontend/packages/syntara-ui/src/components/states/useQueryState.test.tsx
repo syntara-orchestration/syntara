@@ -49,7 +49,7 @@ describe('useQueryState', () => {
     expect(screen.getByText('Data loaded')).toBeInTheDocument()
   })
 
-  it('renders NxLoadingState when isPending is true', () => {
+  it('renders SynLoadingState when isPending is true', () => {
     render(<TestComponent state={{ error: null, isPending: true }} />)
 
     expect(screen.getByTestId('loading-state')).toBeInTheDocument()

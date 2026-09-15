@@ -176,8 +176,8 @@ All workflows use real, publicly available APIs:
 - **Output mappings**: Extracting specific fields from API responses using JSONPath
 
 ### 3. **Expression Resolution**
-- URL template interpolation: `https://api.github.com/repos/${input.owner}/${input.repo}`
-- Query parameter interpolation: `userId: ${input.user_id}`
+- URL template interpolation: `https://api.github.com/repos/${trigger.owner}/${trigger.repo}`
+- Query parameter interpolation: `userId: ${trigger.user_id}`
 - Activity output chaining: `${fetch_user.output.name}`
 
 ### 4. **Input Validation**

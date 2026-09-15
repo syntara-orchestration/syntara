@@ -265,7 +265,7 @@ export interface components {
       resources: components['schemas']['ServiceAccountRead'][]
       /**
        * Max Lifetime Days
-       * @description Maximum credential lifetime in days (-1 for unlimited)
+       * @description Maximum credential lifetime in days (0 for unlimited)
        * @default 180
        */
       max_lifetime_days?: number
@@ -292,11 +292,6 @@ export interface components {
       project_id: string
       /** Project Name */
       project_name?: string | null
-      /**
-       * Is Project Deleted
-       * @default false
-       */
-      is_project_deleted?: boolean
       /** Last Authenticated At */
       last_authenticated_at?: string | null
       /**
@@ -582,7 +577,7 @@ export interface components {
       total_credentials?: number
       /**
        * Max Lifetime Days
-       * @description Maximum credential lifetime in days (-1 for unlimited)
+       * @description Maximum credential lifetime in days (0 for unlimited)
        * @default 180
        */
       max_lifetime_days?: number

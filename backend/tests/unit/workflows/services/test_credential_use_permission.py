@@ -223,3 +223,113 @@ class TestPublishWorkflowVersionCredentialCheck:  # noqa: D101
             pytest.raises(RuntimeError, match="credential scope check invoked"),
         ):
             await svc.publish_workflow_version(workflow_id, version=1, workflow_definition=inline_def)
+
+
+class TestValidateNoSecretUrlConflicts:  # noqa: D101
+    @staticmethod
+    def _def_with_http_node(
+        *, url: str | None = None, credential_id: str | None = None, node_name: str = "my-http-node"
+    ) -> dict[str, object]:
+        params: dict[str, object] = {"method": "GET"}
+        if url is not None:
+            params["url"] = url
+        if credential_id is not None:
+            params["credential_id"] = credential_id
+        return {
+            "schema_version": "2.0.0",
+            "nodes": [{"id": "n1", "type": "http_request", "name": node_name, "parameters": params}],
+            "edges": [],
+            "triggers": [],
+        }
+
+    @pytest.mark.asyncio
+    async def test_no_http_nodes_returns_early(self) -> None:
+        svc, _ = _make_service()
+        definition: dict[str, object] = {
+            "schema_version": "2.0.0",
+            "nodes": [{"id": "n1", "type": "agentic", "parameters": {}}],
+            "edges": [],
+            "triggers": [],
+        }
+        await svc._validate_no_secret_url_conflicts(definition)
+
+    @pytest.mark.asyncio
+    async def test_http_node_with_url_only_no_error(self) -> None:
+        svc, _ = _make_service()
+        definition = self._def_with_http_node(url="https://example.com/api")
+        await svc._validate_no_secret_url_conflicts(definition)
+
+    @pytest.mark.asyncio
+    async def test_http_node_with_credential_only_no_error(self) -> None:
+        svc, _ = _make_service()
+        definition = self._def_with_http_node(credential_id=str(uuid4()))
+        await svc._validate_no_secret_url_conflicts(definition)
+
+    @pytest.mark.asyncio
+    async def test_secret_url_credential_with_explicit_url_raises(self) -> None:
+        cred_id = uuid4()
+        svc, session = _make_service()
+
+        db_result = MagicMock()
+        db_result.all.return_value = [(cred_id, {"extra_vars": {"auth_type": "url", "secret_url": "{{url}}"}})]
+        session.exec.return_value = db_result
+
+        definition = self._def_with_http_node(
+            url="https://example.com/api", credential_id=str(cred_id), node_name="Send webhook"
+        )
+        with pytest.raises(SafeValueError, match="Send webhook"):
+            await svc._validate_no_secret_url_conflicts(definition)
+
+    @pytest.mark.asyncio
+    async def test_non_url_credential_with_explicit_url_no_error(self) -> None:
+        cred_id = uuid4()
+        svc, session = _make_service()
+
+        db_result = MagicMock()
+        db_result.all.return_value = [(cred_id, {"extra_vars": {"auth_type": "bearer", "bearer_token": "{{token}}"}})]
+        session.exec.return_value = db_result
+
+        definition = self._def_with_http_node(url="https://example.com/api", credential_id=str(cred_id))
+        await svc._validate_no_secret_url_conflicts(definition)
+
+    @pytest.mark.asyncio
+    async def test_multiple_nodes_only_conflicting_one_raises(self) -> None:
+        clean_cred, bad_cred = uuid4(), uuid4()
+        svc, session = _make_service()
+
+        db_result = MagicMock()
+        db_result.all.return_value = [
+            (clean_cred, {"extra_vars": {"auth_type": "bearer"}}),
+            (bad_cred, {"extra_vars": {"auth_type": "url", "secret_url": "{{url}}"}}),
+        ]
+        session.exec.return_value = db_result
+
+        definition: dict[str, object] = {
+            "schema_version": "2.0.0",
+            "nodes": [
+                {
+                    "id": "n1",
+                    "type": "http_request",
+                    "name": "API call",
+                    "parameters": {
+                        "method": "GET",
+                        "url": "https://api.example.com",
+                        "credential_id": str(clean_cred),
+                    },
+                },
+                {
+                    "id": "n2",
+                    "type": "http_request",
+                    "name": "Slack hook",
+                    "parameters": {
+                        "method": "POST",
+                        "url": "https://slack.com/hook",
+                        "credential_id": str(bad_cred),
+                    },
+                },
+            ],
+            "edges": [],
+            "triggers": [],
+        }
+        with pytest.raises(SafeValueError, match="Slack hook"):
+            await svc._validate_no_secret_url_conflicts(definition)

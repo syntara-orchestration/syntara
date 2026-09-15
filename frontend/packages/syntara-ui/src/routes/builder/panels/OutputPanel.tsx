@@ -12,7 +12,7 @@ import {
 import { RhUiAddIcon, RhUiCloseIcon } from '@patternfly/react-icons'
 import { useMemo, useState } from 'react'
 
-import { NxPanel } from '../../../components/layout/NxPanel'
+import { SynPanel } from '../../../components/layout/SynPanel'
 import { useMockDataStore } from '../../../stores/useMockDataStore'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import { selectActivities } from '../../../stores/workflowStoreSelectors'
@@ -109,7 +109,7 @@ export function OutputPanel({ outputData, nodeId }: Readonly<OutputPanelProps>) 
   }
 
   return (
-    <NxPanel
+    <SynPanel
       variant="raised"
       isFullHeight
       className={styles.panelContainer}
@@ -181,6 +181,6 @@ export function OutputPanel({ outputData, nodeId }: Readonly<OutputPanelProps>) 
           </EmptyState>
         )}
       </Stack>
-    </NxPanel>
+    </SynPanel>
   )
 }

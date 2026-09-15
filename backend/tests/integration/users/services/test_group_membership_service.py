@@ -1083,10 +1083,10 @@ async def test_sync_idp_groups_overlapping_group_between_providers(
 
 
 @pytest.mark.asyncio
-async def test_sync_idp_groups_empty_desired_removes_all_idp_groups(
+async def test_sync_idp_groups_deny_clears_only_authenticating_provider(
     test_db_session: AsyncSession, test_user: User
 ) -> None:
-    """When the token resolves no groups, all IdP-managed memberships should be removed."""
+    """When the token resolves no groups, only the authenticating provider's IdP-managed memberships are removed."""
     provider_a = await _create_identity_provider(test_db_session, "empty-idp-a", test_user)
     provider_b = await _create_identity_provider(test_db_session, "empty-idp-b", test_user)
     member = await _create_test_user(test_db_session, "empty-user", "empty@example.com")
@@ -1124,14 +1124,14 @@ async def test_sync_idp_groups_empty_desired_removes_all_idp_groups(
     await test_db_session.commit()
     assert await _get_user_group_ids(test_db_session, member.id) == {group_a.id, manual_group.id}
 
-    # Provider B has no mapping entries — sync_idp_groups returns False,
-    # but _apply_group_membership_diff is called with empty desired set first.
-    # Simulate this directly: call sync with a token that matches nothing.
+    # Provider B has mapping entries but token matches nothing — deny path
+    # triggers provider-scoped clear (only provider B's groups removed).
     await _create_mapping_entry(test_db_session, provider_b.id, "nonexistent-role", group_a.id)
     result = await sync_idp_groups(test_db_session, member, identity_b, {"groups": ["no-match"]}, config_b)
     await test_db_session.commit()
 
     assert result is False
-    # All IdP-managed groups removed, manual group preserved
-    assert await _get_user_group_ids(test_db_session, member.id) == {manual_group.id}
-    assert await _get_all_user_idp_tracking_rows(test_db_session, member.id) == set()
+    # Provider-scoped deny: only provider B's groups cleared; provider A's group_a persists
+    assert await _get_user_group_ids(test_db_session, member.id) == {group_a.id, manual_group.id}
+    assert await _get_user_idp_group_ids(test_db_session, member.id, provider_a.id) == {group_a.id}
+    assert await _get_user_idp_group_ids(test_db_session, member.id, provider_b.id) == set()

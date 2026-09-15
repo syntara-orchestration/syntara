@@ -265,40 +265,17 @@ The groups field includes a help popover with the message: "If a selected group 
 
 ### Fallback Decision
 
-```typescript
-<FormGroup label="Fallback decision" fieldId="approval-fallback-decision">
-  <Controller
-    control={control}
-    name="fallback_decision"
-    render={({ field }) => (
-      <FormSelect
-        id="approval-fallback-decision"
-        aria-label="Fallback decision"
-        value={field.value ?? 'reject'}
-        onChange={(_event, value) => field.onChange(value)}
-        isDisabled={isVersionView}
-      >
-        <FormSelectOption value="reject" label="Reject (default)" />
-        <FormSelectOption value="approve" label="Approve" />
-      </FormSelect>
-    )}
-  />
-  <HelperText>
-    <HelperTextItem>
-      Determines the routing path when the approval cannot complete (decision window expired or send failure).
-      Only takes effect when "Continue on failure" is enabled in the Settings tab.
-    </HelperTextItem>
-  </HelperText>
-</FormGroup>
-```
+Implemented in `FallbackDecisionField`. The dropdown is coupled to **effective continue on failure**, resolved the same way the engine does: node `settings.continue_on_failure` → admin `workflow_engine.continue_on_failure` → `false`.
 
 **Default**: `'reject'`
 
 **Behavior**:
 
-- If decision window expires or the approval request cannot be delivered, the workflow uses the fallback decision
-- Requires `settings.continue_on_failure` to be enabled for the fallback to take effect
-- Without `continue_on_failure`, the activity fails instead of proceeding with the fallback
+- If the decision window expires or the approval request cannot be delivered, the workflow uses the fallback decision
+- Requires effective continue on failure to be on; otherwise the activity fails and fallback is ignored
+- When effective continue on failure is off, the dropdown is disabled, warning helper text explains why, and an **Enable continue on failure** link sets `settings.continue_on_failure: true`
+- Warning copy differs for system default (stop) vs an explicit node-level stop
+- The enable link and disabled-state tooltip are hidden in version (read-only) view
 
 ### Decision Window
 
@@ -463,14 +440,14 @@ export function ApprovalStatusBadges(props: Readonly<{ status?: ApprovalStatus |
   const capitalizedStatus = props.status.charAt(0).toUpperCase() + props.status.slice(1)
 
   return (
-    <NxLabel variant="outline" status={statusMap[props.status]} icon={<IconComponent />}>
+    <SynLabel variant="outline" status={statusMap[props.status]} icon={<IconComponent />}>
       {capitalizedStatus}
-    </NxLabel>
+    </SynLabel>
   )
 }
 ```
 
-**Uses `NxLabel` for system-generated status indicators** (per `.claude/skills/frontend-coding-standards/SKILL.md` §12).
+**Uses `SynLabel` for system-generated status indicators** (per `.claude/skills/frontend-coding-standards/SKILL.md` §12).
 
 ## Builder Approval Handling (Execution Context)
 
@@ -513,7 +490,7 @@ The builder also handles approval interactions when viewing a live or recent exe
 - **Permission-filtered approver lists** via `useApprovalDecideUsers(projectId)`
 - **System defaults** fetched via `useWorkflowEngineDefaults()` for decision window
 - **Settings tab** with `supportsTimeout: false` (decision window replaces activity timeout)
-- **Status badges** use `NxLabel` with `variant="outline"` and status-specific icons
+- **Status badges** use `SynLabel` with `variant="outline"` and status-specific icons
 
 ## Related Documentation
 

@@ -1,7 +1,7 @@
 import { Flex, FlexItem, Label, Stack, Title } from '@patternfly/react-core'
 import { useState } from 'react'
 
-import { NxPanel } from '../../../components/layout/NxPanel'
+import { SynPanel } from '../../../components/layout/SynPanel'
 
 import { InlineMockEditor } from './InlineMockEditor'
 import styles from './panels.module.css'
@@ -29,7 +29,7 @@ export function MockDataEditor({ predecessorName, initialJson, onPin, onCancel }
   }
 
   return (
-    <NxPanel
+    <SynPanel
       variant="raised"
       isFullHeight
       className={styles.panelContainer}
@@ -57,6 +57,6 @@ export function MockDataEditor({ predecessorName, initialJson, onPin, onCancel }
           jsonError={jsonError}
         />
       </Stack>
-    </NxPanel>
+    </SynPanel>
   )
 }

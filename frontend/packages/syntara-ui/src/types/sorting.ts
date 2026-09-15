@@ -50,7 +50,7 @@ export type SortableColumn = {
 /**
  * API query parameters for list endpoints that support sorting.
  *
- * Matches the Nexus API convention where `sort` is a single string:
+ * Matches the Syntara API convention where `sort` is a single string:
  * - `field` for ascending
  * - `-field` for descending
  *

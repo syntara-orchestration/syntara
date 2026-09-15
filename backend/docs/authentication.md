@@ -873,9 +873,11 @@ When a user authenticates via OIDC, Syntara determines which groups they belong 
 
 Both modes respect the **JMESPath expression** configured on the provider. The expression is evaluated first to extract group values from the token claims, and only the extracted values are used for mapping. This means admins can use JMESPath to filter which groups are considered — for example, `groups[?starts_with(@, 'syntara-')]` would only extract groups prefixed with `syntara-`, ignoring all others in the token.
 
-**JMESPath validation**: Expressions are validated at configuration time — saving an invalid expression (e.g., `[[[bad`) returns a 422 error. If a valid expression fails at runtime (e.g., unexpected token claim structure), the group sync is aborted and login is denied rather than silently removing the user's groups.
+**JMESPath validation**: Expressions are validated at configuration time — saving an invalid expression (e.g., `[[[bad`) returns a 422 error. If a valid expression fails at runtime (e.g., unexpected token claim structure), the behavior depends on the provider configuration:
+- **No fallback** (`allow_all_authenticated` disabled, no AAP role mapping): the user's stale IdP-managed groups from this provider are cleared, and login is denied. Groups from other providers or manual assignments are not affected.
+- **Fallback enabled** (`allow_all_authenticated` or AAP role mapping): claim-based groups are skipped (none are granted from the failed extraction), but login may still proceed via the fallback path. The user retains only fallback groups (e.g., the built-in `users` group) from this login — any previously mapped groups are cleared by the session-scoped sync.
 
-**Scalar claim mismatch**: If the JMESPath expression uses a wildcard projection (e.g., `groups[*]`) but the IdP sends the claim as a bare string instead of an array (e.g., `"groups": "admin"` instead of `"groups": ["admin"]`), login is denied with an error. The error log message instructs the administrator to either fix the IdP to send an array or remove the trailing `[*]` from the expression. This strict behavior avoids silently guessing the intended interpretation of the expression.
+**Scalar claim mismatch**: If the JMESPath expression uses a wildcard projection (e.g., `groups[*]`) but the IdP sends the claim as a bare string instead of an array (e.g., `"groups": "admin"` instead of `"groups": ["admin"]`), the extraction fails and the same runtime-failure behavior above applies. The error log message instructs the administrator to either fix the IdP to send an array or remove the trailing `[*]` from the expression.
 
 #### Push-Button AAP Setup
 

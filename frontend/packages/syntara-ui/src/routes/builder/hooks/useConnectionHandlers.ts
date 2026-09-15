@@ -69,7 +69,8 @@ export function useConnectionHandlers({
         const visited = new Set<string>()
 
         while (queue.length > 0) {
-          const nodeId = queue.shift()!
+          const nodeId = queue[0]
+          queue.shift()
           if (visited.has(nodeId)) continue
           visited.add(nodeId)
           loopBodyNodeIds.add(nodeId)

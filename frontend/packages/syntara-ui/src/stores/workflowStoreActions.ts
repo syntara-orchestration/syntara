@@ -13,6 +13,8 @@ export function resetAll() {
     nodePositions: {},
     _positionsUserModified: false,
     isDirty: false,
+    _undoBaselineMatchesSave: true,
+    _nonTemporalDirty: false,
     validationErrorCount: 0,
   })
   useWorkflowStore.temporal.getState().clear()

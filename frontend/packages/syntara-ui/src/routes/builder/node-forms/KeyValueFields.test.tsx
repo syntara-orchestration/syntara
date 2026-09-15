@@ -45,7 +45,7 @@ describe('KeyValueFields', () => {
       <KeyValueFields
         entries={[
           { id: 'h1', key: 'Accept', value: 'application/json' },
-          { id: 'h2', key: 'User-Agent', value: 'Nexus' },
+          { id: 'h2', key: 'User-Agent', value: 'Syntara' },
         ]}
         onChange={handleChange}
       />
@@ -56,7 +56,7 @@ describe('KeyValueFields', () => {
 
     expect(handleChange).toHaveBeenCalledWith([
       { id: 'h1', key: 'AcceptX', value: 'application/json' },
-      { id: 'h2', key: 'User-Agent', value: 'Nexus' },
+      { id: 'h2', key: 'User-Agent', value: 'Syntara' },
     ])
   })
 
@@ -77,7 +77,7 @@ describe('KeyValueFields', () => {
       <KeyValueFields
         entries={[
           { id: 'h1', key: 'Accept', value: 'application/json' },
-          { id: 'h2', key: 'User-Agent', value: 'Nexus' },
+          { id: 'h2', key: 'User-Agent', value: 'Syntara' },
         ]}
         onChange={handleChange}
       />
@@ -88,7 +88,7 @@ describe('KeyValueFields', () => {
 
     expect(handleChange).toHaveBeenCalledWith([
       { id: 'h1', key: 'Accept', value: 'application/json' },
-      { id: 'h2', key: 'User-Agent', value: 'Nexus!' },
+      { id: 'h2', key: 'User-Agent', value: 'Syntara!' },
     ])
   })
 
@@ -99,7 +99,7 @@ describe('KeyValueFields', () => {
       <KeyValueFields
         entries={[
           { id: 'h1', key: 'Accept', value: 'application/json' },
-          { id: 'h2', key: 'User-Agent', value: 'Nexus' },
+          { id: 'h2', key: 'User-Agent', value: 'Syntara' },
         ]}
         onChange={handleChange}
       />
@@ -108,7 +108,7 @@ describe('KeyValueFields', () => {
     const removeButtons = screen.getAllByRole('button', { name: /Remove header/i })
     await user.click(removeButtons[0])
 
-    expect(handleChange).toHaveBeenCalledWith([{ id: 'h2', key: 'User-Agent', value: 'Nexus' }])
+    expect(handleChange).toHaveBeenCalledWith([{ id: 'h2', key: 'User-Agent', value: 'Syntara' }])
   })
 
   it('renders existing entries', () => {

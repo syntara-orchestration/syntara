@@ -4,8 +4,9 @@ Tests verify the business logic for webhook trigger management:
 path lookup, sync from workflow definitions, and cascade delete.
 """
 
+from collections.abc import Generator
 from typing import Any
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, patch
 from uuid import UUID, uuid4
 
 import pytest
@@ -182,11 +183,11 @@ class TestGetByWebhookPath:
 
     @pytest.mark.asyncio
     async def test_raises_not_found_when_workflow_deleted(self) -> None:
-        """Trigger for a soft-deleted workflow should return not-found.
+        """Trigger for a deleted workflow should return not-found.
 
-        The query joins on the Workflow table and filters on
-        Workflow.deleted_at IS NULL, so a trigger whose parent workflow
-        is soft-deleted will not be returned.
+        Since workflows use hard delete, the webhook trigger's CASCADE FK
+        will have already removed this row — but the service should still
+        handle the not-found case gracefully.
         """
         mock_session = AsyncMock(spec=AsyncSession)
 
@@ -268,6 +269,16 @@ class TestVerifyServiceAccountAuthorization:
 class TestSyncWebhookTriggers:
     """Test suite for sync_webhook_triggers."""
 
+    @pytest.fixture(autouse=True)
+    def _skip_sa_binding_sync(self) -> Generator[None]:
+        """Patch SA binding sync — these tests focus on trigger create/update/delete, not SA bindings."""
+        with patch.object(
+            WebhookTriggerService,
+            "_sync_trigger_sa_bindings",
+            new_callable=AsyncMock,
+        ):
+            yield
+
     @pytest.mark.asyncio
     async def test_creates_new_trigger(self) -> None:
         """Test that a new trigger is created for a webhook node not in the DB."""
@@ -285,7 +296,7 @@ class TestSyncWebhookTriggers:
                 {
                     "id": "trigger-1",
                     "type": "webhook_trigger",
-                    "parameters": {"webhook_path": "new-hook"},
+                    "parameters": {"webhook_path": "new-hook", "authorized_service_account_ids": [str(uuid4())]},
                 }
             ]
         )
@@ -298,6 +309,34 @@ class TestSyncWebhookTriggers:
         mock_session.add.assert_called_once()
 
     @pytest.mark.asyncio
+    async def test_creates_trigger_with_empty_service_accounts(self) -> None:
+        """Draft/import definitions may have an empty authorized_service_account_ids list."""
+        mock_session = AsyncMock(spec=AsyncSession)
+        mock_result = Mock()
+        mock_result.all.return_value = []
+        mock_session.exec = AsyncMock(return_value=mock_result)
+        mock_session.flush = AsyncMock()
+
+        service = _make_service(session=mock_session)
+
+        workflow_id = uuid4()
+        definition = _make_workflow_definition(
+            triggers=[
+                {
+                    "id": "trigger-1",
+                    "type": "webhook_trigger",
+                    "parameters": {"webhook_path": "import-hook", "authorized_service_account_ids": []},
+                }
+            ]
+        )
+
+        results = await service.sync_webhook_triggers(workflow_id, definition)
+
+        assert len(results) == 1
+        assert results[0].webhook_path == "import-hook"
+        mock_session.add.assert_called_once()
+
+    @pytest.mark.asyncio
     async def test_updates_existing_trigger(self) -> None:
         """Test that an existing trigger is updated when the node still exists."""
         existing = _make_trigger(
@@ -306,12 +345,9 @@ class TestSyncWebhookTriggers:
         )
 
         mock_session = AsyncMock(spec=AsyncSession)
-        # First exec: existing triggers lookup; second exec: SA binding lookup
         existing_result = Mock()
         existing_result.all.return_value = [existing]
-        sa_result = Mock()
-        sa_result.all.return_value = []
-        mock_session.exec = AsyncMock(side_effect=[existing_result, sa_result])
+        mock_session.exec = AsyncMock(return_value=existing_result)
         mock_session.flush = AsyncMock()
 
         service = _make_service(session=mock_session)
@@ -321,7 +357,7 @@ class TestSyncWebhookTriggers:
                 {
                     "id": "trigger-1",
                     "type": "webhook_trigger",
-                    "parameters": {"webhook_path": "new-path"},
+                    "parameters": {"webhook_path": "new-path", "authorized_service_account_ids": [str(uuid4())]},
                 }
             ]
         )
@@ -379,12 +415,12 @@ class TestSyncWebhookTriggers:
                 {
                     "id": "trigger-1",
                     "type": "webhook_trigger",
-                    "parameters": {"webhook_path": "duplicate-path"},
+                    "parameters": {"webhook_path": "duplicate-path", "authorized_service_account_ids": [str(uuid4())]},
                 },
                 {
                     "id": "trigger-2",
                     "type": "webhook_trigger",
-                    "parameters": {"webhook_path": "innocent-path"},
+                    "parameters": {"webhook_path": "innocent-path", "authorized_service_account_ids": [str(uuid4())]},
                 },
             ]
         )
@@ -420,7 +456,7 @@ class TestSyncWebhookTriggers:
                 {
                     "id": "trigger-1",
                     "type": "webhook_trigger",
-                    "parameters": {"webhook_path": "some-path"},
+                    "parameters": {"webhook_path": "some-path", "authorized_service_account_ids": [str(uuid4())]},
                 }
             ]
         )
@@ -503,7 +539,7 @@ class TestSyncWebhookTriggers:
                 {
                     "id": "trigger-1",
                     "type": "webhook_trigger",
-                    "parameters": {"webhook_path": "test"},
+                    "parameters": {"webhook_path": "test", "authorized_service_account_ids": [str(uuid4())]},
                 }
             ]
         )
@@ -521,14 +557,9 @@ class TestSyncWebhookTriggers:
         )
 
         mock_session = AsyncMock(spec=AsyncSession)
-        # First exec: existing triggers; then two SA binding lookups (one per trigger)
         existing_result = Mock()
         existing_result.all.return_value = [existing]
-        sa_result1 = Mock()
-        sa_result1.all.return_value = []
-        sa_result2 = Mock()
-        sa_result2.all.return_value = []
-        mock_session.exec = AsyncMock(side_effect=[existing_result, sa_result1, sa_result2])
+        mock_session.exec = AsyncMock(return_value=existing_result)
         mock_session.flush = AsyncMock()
 
         service = _make_service(session=mock_session)
@@ -538,12 +569,12 @@ class TestSyncWebhookTriggers:
                 {
                     "id": "trigger-1",
                     "type": "webhook_trigger",
-                    "parameters": {"webhook_path": "updated-path"},
+                    "parameters": {"webhook_path": "updated-path", "authorized_service_account_ids": [str(uuid4())]},
                 },
                 {
                     "id": "trigger-2",
                     "type": "webhook_trigger",
-                    "parameters": {"webhook_path": "brand-new"},
+                    "parameters": {"webhook_path": "brand-new", "authorized_service_account_ids": [str(uuid4())]},
                 },
             ]
         )
@@ -569,7 +600,11 @@ class TestSyncWebhookTriggers:
                 {
                     "id": "trigger-1",
                     "type": "webhook_trigger",
-                    "parameters": {"webhook_path": "with-schema", "input_schema": schema},
+                    "parameters": {
+                        "webhook_path": "with-schema",
+                        "input_schema": schema,
+                        "authorized_service_account_ids": [str(uuid4())],
+                    },
                 }
             ]
         )
@@ -620,7 +655,7 @@ class TestSyncWebhookTriggers:
                 {
                     "id": "trigger-1",
                     "type": "webhook_trigger",
-                    "parameters": {"webhook_path": ""},
+                    "parameters": {"webhook_path": "", "authorized_service_account_ids": [str(uuid4())]},
                 }
             ]
         )
@@ -646,7 +681,7 @@ class TestSyncWebhookTriggers:
                 {
                     "id": "trigger-1",
                     "type": "webhook_trigger",
-                    "parameters": {"webhook_path": "-invalid-path-"},
+                    "parameters": {"webhook_path": "-invalid-path-", "authorized_service_account_ids": [str(uuid4())]},
                 }
             ]
         )
@@ -680,6 +715,7 @@ class TestSyncWebhookTriggers:
                                 "data": {"$ref": "http://internal/schema"},
                             },
                         },
+                        "authorized_service_account_ids": [str(uuid4())],
                     },
                 }
             ]
@@ -707,7 +743,7 @@ class TestSyncWebhookTriggers:
                 {
                     "id": "eda-1",
                     "type": "eda_trigger",
-                    "parameters": {"webhook_path": "jira-updates"},
+                    "parameters": {"webhook_path": "jira-updates", "authorized_service_account_ids": [str(uuid4())]},
                 }
             ]
         )
@@ -739,7 +775,11 @@ class TestSyncWebhookTriggers:
                 {
                     "id": "eda-1",
                     "type": "eda_trigger",
-                    "parameters": {"webhook_path": "with-schema", "input_schema": schema},
+                    "parameters": {
+                        "webhook_path": "with-schema",
+                        "input_schema": schema,
+                        "authorized_service_account_ids": [str(uuid4())],
+                    },
                 }
             ]
         )
@@ -776,6 +816,7 @@ class TestSyncWebhookTriggers:
                                 "data": {"type": "string", "pattern": "(a+)+$"},
                             },
                         },
+                        "authorized_service_account_ids": [str(uuid4())],
                     },
                 }
             ]
@@ -803,12 +844,12 @@ class TestSyncWebhookTriggers:
                 {
                     "id": "wh-1",
                     "type": "webhook_trigger",
-                    "parameters": {"webhook_path": "generic-hook"},
+                    "parameters": {"webhook_path": "generic-hook", "authorized_service_account_ids": [str(uuid4())]},
                 },
                 {
                     "id": "eda-1",
                     "type": "eda_trigger",
-                    "parameters": {"webhook_path": "eda-hook"},
+                    "parameters": {"webhook_path": "eda-hook", "authorized_service_account_ids": [str(uuid4())]},
                 },
             ]
         )
@@ -822,6 +863,114 @@ class TestSyncWebhookTriggers:
         assert len(results) == 1
         assert results[0].webhook_path == "eda-hook"
         assert results[0].trigger_type == NodeType.EDA_TRIGGER
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "parameters",
+        [
+            {"webhook_path": "no-sa-import"},
+            {"webhook_path": "no-sa-import", "authorized_service_account_ids": []},
+        ],
+        ids=["missing", "empty"],
+    )
+    async def test_unpublished_missing_or_empty_sa_ids_creates_disabled_trigger(
+        self, parameters: dict[str, object]
+    ) -> None:
+        """Unpublished sync accepts a webhook with omitted or empty SA ids."""
+        mock_session = AsyncMock(spec=AsyncSession)
+        mock_result = Mock()
+        mock_result.all.return_value = []
+        mock_session.exec = AsyncMock(return_value=mock_result)
+        mock_session.flush = AsyncMock()
+
+        service = _make_service(session=mock_session)
+
+        definition = _make_workflow_definition(
+            triggers=[
+                {
+                    "id": "webhook_trigger_1",
+                    "type": "webhook_trigger",
+                    "parameters": parameters,
+                }
+            ]
+        )
+
+        results = await service.sync_webhook_triggers(uuid4(), definition, is_enabled=False)
+
+        assert len(results) == 1
+        assert results[0].webhook_path == "no-sa-import"
+        assert results[0].is_enabled is False
+        mock_session.add.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_unpublished_missing_sa_ids_creates_disabled_eda_trigger(self) -> None:
+        """Unpublished EDA sync accepts a trigger with only webhook_path."""
+        mock_session = AsyncMock(spec=AsyncSession)
+        mock_result = Mock()
+        mock_result.all.return_value = []
+        mock_session.exec = AsyncMock(return_value=mock_result)
+        mock_session.flush = AsyncMock()
+
+        service = _make_service(session=mock_session)
+
+        definition = _make_workflow_definition(
+            triggers=[
+                {
+                    "id": "eda_trigger_1",
+                    "type": "eda_trigger",
+                    "parameters": {"webhook_path": "no-sa-import"},
+                }
+            ]
+        )
+
+        results = await service.sync_webhook_triggers(
+            uuid4(),
+            definition,
+            is_enabled=False,
+            trigger_type=NodeType.EDA_TRIGGER,
+        )
+
+        assert len(results) == 1
+        assert results[0].webhook_path == "no-sa-import"
+        assert results[0].is_enabled is False
+        assert results[0].trigger_type == NodeType.EDA_TRIGGER
+        mock_session.add.assert_called_once()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "parameters",
+        [
+            {"webhook_path": "no-sa-import"},
+            {"webhook_path": "no-sa-import", "authorized_service_account_ids": []},
+        ],
+        ids=["missing", "empty"],
+    )
+    async def test_enabled_missing_or_empty_sa_ids_syncs_without_error(self, parameters: dict[str, object]) -> None:
+        """Re-syncing a legacy definition with no SA ids on enable must not raise."""
+        mock_session = AsyncMock(spec=AsyncSession)
+        mock_result = Mock()
+        mock_result.all.return_value = []
+        mock_session.exec = AsyncMock(return_value=mock_result)
+        mock_session.flush = AsyncMock()
+
+        service = _make_service(session=mock_session)
+
+        definition = _make_workflow_definition(
+            triggers=[
+                {
+                    "id": "webhook_trigger_1",
+                    "type": "webhook_trigger",
+                    "parameters": parameters,
+                }
+            ]
+        )
+
+        results = await service.sync_webhook_triggers(uuid4(), definition)
+
+        assert len(results) == 1
+        assert results[0].webhook_path == "no-sa-import"
+        assert results[0].is_enabled is True
+        mock_session.add.assert_called_once()
 
 
 # ============================================================================

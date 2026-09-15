@@ -1,17 +1,18 @@
-import { Content, ContentVariants, EmptyState, EmptyStateBody, Label, StackItem, Title } from '@patternfly/react-core'
-import { RhUiCubesFillIcon, RhUiKeyIcon } from '@patternfly/react-icons'
+import { Content, ContentVariants, EmptyState, EmptyStateBody, StackItem, Title } from '@patternfly/react-core'
+import { PlusCircleIcon, RhUiKeyIcon } from '@patternfly/react-icons'
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import { useCallback, useState } from 'react'
 
 import { AppRoute } from '../../../app/AppRoute'
 import { flexCenteredBothAxes } from '../../../app/flexCenteredBothAxes'
 import { FilterBar } from '../../../components/filters/FilterBar'
-import { NxPanelContentStack } from '../../../components/layout/NxPanelContentStack'
-import { NxLink } from '../../../components/NxLink'
-import { NxEmptyStateFilter } from '../../../components/states/NxEmptyStateFilter'
+import { SynLabel } from '../../../components/labels/SynLabel'
+import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
+import { SynEmptyStateFilter } from '../../../components/states/SynEmptyStateFilter'
+import { SynLink } from '../../../components/SynLink'
 import { DateCell } from '../../../components/table/DateCell'
-import { NxScrollableTableContainer } from '../../../components/table/NxScrollableTableContainer'
 import type { PaginationFooterProps } from '../../../components/table/PaginationFooter'
+import { SynScrollableTableContainer } from '../../../components/table/SynScrollableTableContainer'
 import { useTableSort } from '../../../hooks/useTableSort'
 import type { FilterFieldDefinition } from '../../../types/filters'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../../types/filters'
@@ -76,7 +77,7 @@ export function SelectUserStep({
   const showSelectionUi = users.length > 0 || hasActiveFilters
 
   return (
-    <NxPanelContentStack>
+    <SynPanelContentStack>
       {showSelectionUi && (
         <>
           <StackItem>
@@ -104,7 +105,7 @@ export function SelectUserStep({
       )}
       {!showSelectionUi && (
         <StackItem isFilled style={flexCenteredBothAxes}>
-          <EmptyState headingLevel="h4" titleText="No users yet" icon={RhUiCubesFillIcon} variant="sm">
+          <EmptyState headingLevel="h4" titleText="No users yet" icon={PlusCircleIcon} variant="sm">
             <EmptyStateBody>
               There must be at least one other user before you can transfer a federated identity.
             </EmptyStateBody>
@@ -113,11 +114,11 @@ export function SelectUserStep({
       )}
       {users.length === 0 && hasActiveFilters && (
         <StackItem isFilled style={flexCenteredBothAxes}>
-          <NxEmptyStateFilter clearAllFilters={usersFilter.clearAllFilters} />
+          <SynEmptyStateFilter clearAllFilters={usersFilter.clearAllFilters} />
         </StackItem>
       )}
       {users.length > 0 && (
-        <NxScrollableTableContainer caption="Select a user" footer={footerProps} useFixedLayout={false}>
+        <SynScrollableTableContainer caption="Select a user" footer={footerProps} useFixedLayout={false}>
           <Thead>
             <Tr>
               <Th screenReaderText="Select" className="pf-v6-c-table__check" />
@@ -140,25 +141,25 @@ export function SelectUserStep({
                     }}
                   />
                   <Td dataLabel="Username">
-                    <NxLink to={getUserDetailPath(user.id)} onClick={(e) => e.stopPropagation()}>
+                    <SynLink to={getUserDetailPath(user.id)} onClick={(e) => e.stopPropagation()}>
                       {user.username}
-                    </NxLink>
+                    </SynLink>
                   </Td>
                   <Td dataLabel="Email">{user.email}</Td>
                   <Td dataLabel="Authentication">
                     {(user.auth_sources ?? [AUTH_SOURCE_LOCAL]).map((source) => (
-                      <Label key={source} isCompact color={source === AUTH_SOURCE_LOCAL ? 'grey' : 'blue'}>
+                      <SynLabel key={source} color={source === AUTH_SOURCE_LOCAL ? 'grey' : 'blue'}>
                         {source}
-                      </Label>
+                      </SynLabel>
                     ))}
                   </Td>
                 </Tr>
               )
             })}
           </Tbody>
-        </NxScrollableTableContainer>
+        </SynScrollableTableContainer>
       )}
-    </NxPanelContentStack>
+    </SynPanelContentStack>
   )
 }
 
@@ -190,7 +191,7 @@ export function SelectIdentityStep({
   const showSelectionUi = identities.length > 0 || hasActiveFilters
 
   return (
-    <NxPanelContentStack>
+    <SynPanelContentStack>
       {showSelectionUi && (
         <>
           <StackItem>
@@ -222,18 +223,18 @@ export function SelectIdentityStep({
       )}
       {identities.length === 0 && hasActiveFilters && (
         <StackItem isFilled style={flexCenteredBothAxes}>
-          <NxEmptyStateFilter clearAllFilters={identitiesFilter.clearAllFilters} />
+          <SynEmptyStateFilter clearAllFilters={identitiesFilter.clearAllFilters} />
         </StackItem>
       )}
       {!showSelectionUi && (
         <StackItem isFilled style={flexCenteredBothAxes}>
-          <EmptyState headingLevel="h4" titleText="No identities" icon={RhUiKeyIcon} variant="sm">
+          <EmptyState headingLevel="h4" titleText="No identities yet" icon={RhUiKeyIcon} variant="sm">
             <EmptyStateBody>This user has no federated identities to attach.</EmptyStateBody>
           </EmptyState>
         </StackItem>
       )}
       {identities.length > 0 && (
-        <NxScrollableTableContainer
+        <SynScrollableTableContainer
           caption="Select an identity"
           useFixedLayout={false}
           footer={{
@@ -273,7 +274,7 @@ export function SelectIdentityStep({
                     }}
                   />
                   <Td dataLabel="Provider">
-                    <NxLink
+                    <SynLink
                       to={AppRoute.SystemAdministration.Authentication.IdentityProviderDetail.replace(
                         ':providerId',
                         identity.identity_provider_id
@@ -281,7 +282,7 @@ export function SelectIdentityStep({
                       onClick={(e) => e.stopPropagation()}
                     >
                       {identity.provider_name}
-                    </NxLink>
+                    </SynLink>
                   </Td>
                   <Td dataLabel="Subject">{identity.subject}</Td>
                   <Td dataLabel="Linked">
@@ -291,8 +292,8 @@ export function SelectIdentityStep({
               )
             })}
           </Tbody>
-        </NxScrollableTableContainer>
+        </SynScrollableTableContainer>
       )}
-    </NxPanelContentStack>
+    </SynPanelContentStack>
   )
 }

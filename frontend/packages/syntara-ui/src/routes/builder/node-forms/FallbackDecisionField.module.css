@@ -1,0 +1,13 @@
+.disabledToggleWrap {
+  border: none;
+  padding: 0;
+  margin: 0;
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+.disabledToggleWrap :global(.pf-v6-c-menu-toggle) {
+  pointer-events: none;
+  width: 100%;
+}

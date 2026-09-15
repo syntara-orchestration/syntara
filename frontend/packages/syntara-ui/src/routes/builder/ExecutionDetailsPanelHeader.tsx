@@ -17,7 +17,7 @@ import type { ExecutionsAPI } from '@syntara/contracts'
 import type React from 'react'
 
 import { ApprovalPendingBadge } from '../../components/labels/ApprovalPendingBadge'
-import { NxPanel } from '../../components/layout/NxPanel'
+import { SynPanel } from '../../components/layout/SynPanel'
 import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 
 import { StatusLabel } from './ExecutionStatus'
@@ -142,7 +142,7 @@ export function NoSelectionState() {
 
 export function LoadingErrorState({ queryState }: Readonly<{ queryState: React.ReactNode }>) {
   return (
-    <NxPanel
+    <SynPanel
       style={{
         height: '100%',
         maxHeight: '100%',
@@ -162,6 +162,6 @@ export function LoadingErrorState({ queryState }: Readonly<{ queryState: React.R
           {queryState}
         </StackItem>
       </Stack>
-    </NxPanel>
+    </SynPanel>
   )
 }

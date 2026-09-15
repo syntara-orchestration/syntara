@@ -7,7 +7,7 @@ import { useTestSignIn } from './useTestSignIn'
 
 vi.mock('../../../../utils/generateUUID', () => ({ generateUUID: vi.fn() }))
 
-const RESULT_STORAGE_KEY = 'nexus-test-signin'
+const RESULT_STORAGE_KEY = 'syntara-test-signin'
 
 describe('useTestSignIn', () => {
   beforeEach(() => {
@@ -44,7 +44,7 @@ describe('useTestSignIn', () => {
       'width=600,height=700'
     )
     expect(result.current.isListening).toBe(true)
-    expect(localStorage.getItem('nexus-test-signin-nonce')).toBe('test-nonce-123')
+    expect(localStorage.getItem('syntara-test-signin-nonce')).toBe('test-nonce-123')
   })
 
   it('polls localStorage and calls onResult when result appears', async () => {

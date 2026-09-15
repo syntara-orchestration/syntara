@@ -1,17 +1,18 @@
 import { ActionGroup, Alert, Button, Stack, StackItem, Tab } from '@patternfly/react-core'
+import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { AppRoute } from '../../../app/AppRoute'
-import { breadcrumbsSettingsCategory, breadcrumbsSettingsPage } from '../../../app/breadcrumbBuilders'
+import { breadcrumbsSettingsPage } from '../../../app/breadcrumbBuilders'
 import { settingsClient } from '../../../client'
-import { EmptyStateAccessDenied } from '../../../components/EmptyStateAccessDenied'
-import { NxPage, NxPageBody } from '../../../components/layout/NxPage'
-import { NxPageHeader } from '../../../components/layout/NxPageHeader'
-import { NxPanel } from '../../../components/layout/NxPanel'
-import { NxPageTitle } from '../../../components/NxPageTitle'
+import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
+import { SynPageHeader } from '../../../components/layout/SynPageHeader'
+import { SynPanel } from '../../../components/layout/SynPanel'
+import { SynEmptyStateAccessDenied } from '../../../components/states/SynEmptyStateAccessDenied'
 import { useQueryState } from '../../../components/states/useQueryState'
-import { NxUrlTabs } from '../../../components/tabs/NxUrlTabs'
+import { SynPageTitle } from '../../../components/SynPageTitle'
+import { SynUrlTabs } from '../../../components/tabs/SynUrlTabs'
 import { useDirtyFormGuard } from '../../../hooks/useDirtyFormGuard'
 import {
   FILE_STORAGE_UNAVAILABLE_MESSAGE,
@@ -24,6 +25,7 @@ import { useAlerts } from '../../../providers/alerts'
 import { getErrorCode, isForbiddenError } from '../../../utils/apiErrors'
 import { detachPromise } from '../../../utils/detachPromise'
 import { useDocLink } from '../../../utils/docs/useDocLink'
+import { WORKFLOW_ENGINE_DEFAULTS_QUERY_KEY } from '../../builder/hooks/useWorkflowEngineDefaults'
 
 import { SettingsCategoryTab } from './SettingsCategoryTab'
 import { useAllSettings } from './useAllSettings'
@@ -54,6 +56,7 @@ function FileStorageAlert() {
 
 export default function Settings() {
   const settingsDocLink = useDocLink('settings')
+  const queryClient = useQueryClient()
   const [edits, setEdits] = useState<Map<string, unknown>>(new Map())
   const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set())
   const { showError } = useAlerts()
@@ -105,20 +108,13 @@ export default function Settings() {
     return Math.max(idx, 0)
   }, [activeSlug, categories])
 
-  const settingsBreadcrumbs = useMemo(() => {
-    const category = categories[activeIndex]
-    if (category && activeIndex > 0) {
-      return breadcrumbsSettingsCategory(category.name)
-    }
-    return breadcrumbsSettingsPage()
-  }, [categories, activeIndex])
-
   const settingsByCategory = useMemo(() => {
     const grouped = new Map<string, (typeof allSettings)[number][]>()
     for (const setting of allSettings) {
       const cat = setting.category
       if (!grouped.has(cat)) grouped.set(cat, [])
-      grouped.get(cat)!.push(setting)
+      const bucket = grouped.get(cat)
+      if (bucket) bucket.push(setting)
     }
     return grouped
   }, [allSettings])
@@ -160,6 +156,7 @@ export default function Settings() {
         onSuccess: () => {
           setEdits(new Map())
           detachPromise(refetchSettings())
+          detachPromise(queryClient.invalidateQueries({ queryKey: WORKFLOW_ENGINE_DEFAULTS_QUERY_KEY }))
         },
         onError: (err) => {
           if (getErrorCode(err) === 'SETTING_VERSION_CONFLICT') {
@@ -168,6 +165,7 @@ export default function Settings() {
               description: 'Settings were modified by another user. The page has been refreshed.',
             })
             detachPromise(refetchSettings())
+            detachPromise(queryClient.invalidateQueries({ queryKey: WORKFLOW_ENGINE_DEFAULTS_QUERY_KEY }))
             setEdits(new Map())
           } else {
             handleMutationError({ title: 'Save failed' })(err)
@@ -175,7 +173,7 @@ export default function Settings() {
         },
       }
     )
-  }, [edits, allSettings, bulkUpdate, showError, handleMutationError, refetchSettings])
+  }, [edits, allSettings, bulkUpdate, showError, handleMutationError, refetchSettings, queryClient])
 
   const hasChanges = edits.size > 0
   const hasValidationErrors = validationErrors.size > 0
@@ -189,38 +187,38 @@ export default function Settings() {
 
   if (!canRead || isForbidden) {
     return (
-      <NxPage>
-        <NxPageTitle segments={['Settings']} />
-        <NxPageHeader title="Settings" docLink={settingsDocLink} breadcrumbs={breadcrumbsSettingsPage()} />
+      <SynPage>
+        <SynPageTitle segments={['Settings']} />
+        <SynPageHeader title="Settings" docLink={settingsDocLink} breadcrumbs={breadcrumbsSettingsPage()} />
         <StackItem isFilled>
-          <NxPanel isFullHeight>
-            <EmptyStateAccessDenied description="You don't have permission to view settings. Contact your administrator to request the auditor or admin role." />
-          </NxPanel>
+          <SynPanel isFullHeight>
+            <SynEmptyStateAccessDenied description="You don't have permission to view settings. Contact your administrator to request the auditor or admin role." />
+          </SynPanel>
         </StackItem>
-      </NxPage>
+      </SynPage>
     )
   }
 
   const errorOrLoadingState = categoriesState ?? settingsState
   if (errorOrLoadingState) {
     return (
-      <NxPage>
-        <NxPageTitle segments={['Settings']} />
-        <NxPageHeader title="Settings" docLink={settingsDocLink} breadcrumbs={breadcrumbsSettingsPage()} />
-        <NxPageBody>
-          <NxPanel isFullHeight>{errorOrLoadingState}</NxPanel>
-        </NxPageBody>
-      </NxPage>
+      <SynPage>
+        <SynPageTitle segments={['Settings']} />
+        <SynPageHeader title="Settings" docLink={settingsDocLink} breadcrumbs={breadcrumbsSettingsPage()} />
+        <SynPageBody>
+          <SynPanel isFullHeight>{errorOrLoadingState}</SynPanel>
+        </SynPageBody>
+      </SynPage>
     )
   }
 
   return (
-    <NxPage>
-      <NxPageTitle segments={['Settings']} />
-      <NxPageHeader title="Settings" docLink={settingsDocLink} breadcrumbs={settingsBreadcrumbs} />
-      <NxPageBody>
+    <SynPage>
+      <SynPageTitle segments={['Settings']} />
+      <SynPageHeader title="Settings" docLink={settingsDocLink} breadcrumbs={breadcrumbsSettingsPage()} />
+      <SynPageBody>
         <FileStorageAlert />
-        <NxPanel
+        <SynPanel
           isFullHeight
           panelMainBodyProps={{ style: { flex: 1, minHeight: 0 } }}
           footer={
@@ -240,7 +238,7 @@ export default function Settings() {
         >
           <Stack hasGutter style={{ flex: 1, minHeight: 0, height: '100%' }}>
             <StackItem>
-              <NxUrlTabs
+              <SynUrlTabs
                 basePath={basePath}
                 defaultTab={defaultCategory}
                 validTabs={validTabs}
@@ -249,9 +247,9 @@ export default function Settings() {
                 {categories.map((cat) => (
                   <Tab key={cat.slug} eventKey={cat.slug} title={cat.name} />
                 ))}
-              </NxUrlTabs>
+              </SynUrlTabs>
             </StackItem>
-            <NxPageBody style={{ overflow: 'auto', padding: 'var(--pf-t--global--spacer--md)' }}>
+            <SynPageBody style={{ overflow: 'auto', padding: 'var(--pf-t--global--spacer--md)' }}>
               {categories[activeIndex] && (
                 <SettingsCategoryTab
                   settings={settingsByCategory.get(categories[activeIndex].slug) ?? []}
@@ -262,10 +260,10 @@ export default function Settings() {
                   readOnly={!canWrite}
                 />
               )}
-            </NxPageBody>
+            </SynPageBody>
           </Stack>
-        </NxPanel>
-      </NxPageBody>
-    </NxPage>
+        </SynPanel>
+      </SynPageBody>
+    </SynPage>
   )
 }

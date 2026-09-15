@@ -1,10 +1,14 @@
-"""Shared AAP Controller authentication resolution.
+"""Shared AAP Controller connection types and env-var auth resolution.
 
-Resolves AAP auth from environment variables:
-  APP_AAP_BASE_URL, APP_AAP_TOKEN, APP_AAP_USERNAME, APP_AAP_PASSWORD, APP_AAP_VERIFY_SSL
+``AAPConnection`` is the resolved connection used by the AAP proxy and by
+AAP job-template activities.
 
-Used by both the AAP proxy service (BFF endpoints) and the AAP job template
-activity (workflow execution) when no credential is injected at runtime.
+``resolve_aap_connection`` reads environment variables
+(``APP_AAP_BASE_URL``, ``APP_AAP_TOKEN``, ``APP_AAP_USERNAME``,
+``APP_AAP_PASSWORD``, ``APP_AAP_VERIFY_SSL``). The BFF proxy no longer uses
+this path — it resolves URL and auth from the AAP integration and credential.
+Env-var resolution remains for workflow execution when no credential is
+injected at runtime.
 """
 
 from __future__ import annotations
@@ -62,6 +66,10 @@ def _get_basic_auth_from_settings(settings: Settings) -> httpx.BasicAuth | None:
 
 def resolve_aap_connection(settings: Settings) -> AAPConnection:
     """Resolve AAP connection from environment settings.
+
+    Used by workflow execution when no Orchestrator credential is injected.
+    The BFF proxy (``/proxies/aap/*``) does not call this — it resolves
+    from the AAP integration and credential instead.
 
     Args:
         settings: Application settings.

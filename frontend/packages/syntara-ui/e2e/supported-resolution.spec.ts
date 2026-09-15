@@ -10,11 +10,10 @@
  * - chromium runs on mock API (PR) and real-backend (E2E) CI
  * - Firefox and WebKit run via playwright.config when the mock API webServer is used (PR CI)
  */
-import type { Page } from '@playwright/test'
-
 import { AppRoute } from '../src/app/AppRoute'
 import { MIN_SUPPORTED_VIEWPORT, REACT_FLOW_VIEWPORT_EMPTY_STATE } from '../src/constants/viewport'
 
+import { type Page } from './fixtures'
 import { test, expect, toAppUrl } from './fixtures'
 import { isSkipWebServerForPlaywrightTests } from './playwrightWebServerEnv'
 
@@ -42,12 +41,13 @@ async function openFirstExecutionDetail(page: Page): Promise<string | null> {
     return null
   }
 
-  const runLink = table.getByRole('link').filter({ has: page.locator('code') })
-  if ((await runLink.count()) === 0) {
+  const runLinks = table.getByRole('link').filter({ has: page.locator('code') })
+  const runLinkElements = await runLinks.all()
+  if (runLinkElements.length === 0) {
     return null
   }
 
-  await runLink.nth(0).click()
+  await runLinkElements[0].click()
   await expect(page).toHaveURL(/\/executions\/[^/]+$/)
   const executionId = new URL(page.url()).pathname.split('/').pop() ?? ''
   return executionId.length > 0 ? executionId : null

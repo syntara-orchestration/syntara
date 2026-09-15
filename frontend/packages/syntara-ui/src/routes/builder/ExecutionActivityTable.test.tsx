@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import { axe } from 'vitest-axe'
 
 import type { ActivityState } from '../workflows/execution/types'
 
@@ -201,8 +202,19 @@ describe('ExecutionActivityTable', () => {
       expect(screen.getByRole('columnheader', { name: 'Ended' })).toBeInTheDocument()
       expect(screen.getByRole('columnheader', { name: 'Elapsed time' })).toBeInTheDocument()
       expect(screen.getByRole('columnheader', { name: 'Status' })).toBeInTheDocument()
+      expect(screen.getByRole('grid', { name: 'Activity states' })).toHaveClass('pf-m-compact')
       // Type column was removed — activities execute in chronological order
       expect(screen.queryByRole('columnheader', { name: 'Type' })).not.toBeInTheDocument()
+    })
+
+    it('has no accessibility violations', async () => {
+      const { container } = renderTable({
+        states: new Map([state('task-1', { status: 'completed', startedAt: T0, completedAt: T2 })]),
+        order: [{ id: 'task-1', name: 'Task' }],
+      })
+
+      const results = await axe(container)
+      expect(results).toHaveNoViolations()
     })
   })
 })

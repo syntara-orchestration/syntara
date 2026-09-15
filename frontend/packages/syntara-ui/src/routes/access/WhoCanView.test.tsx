@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type React from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
@@ -175,6 +175,7 @@ describe('WhoCanView', () => {
 
     expect(screen.getByText('alice')).toBeInTheDocument()
     expect(screen.getByText('bob')).toBeInTheDocument()
+    expect(screen.getByRole('grid', { name: 'Users with access' })).toHaveClass('pf-m-striped')
   })
 
   it('links usernames to user detail pages', () => {
@@ -275,6 +276,22 @@ describe('WhoCanView', () => {
     expect(results).toHaveNoViolations()
   })
 
+  it('has no accessibility violations when results are shown', async () => {
+    mockMutationState({
+      isSuccess: true,
+      data: {
+        resources: [
+          { id: 'u1', username: 'alice' },
+          { id: 'u2', username: 'bob' },
+        ],
+      },
+    })
+
+    const { container } = render(<WhoCanView {...sampleResourceActions} />, { wrapper })
+    const results = await axe(container)
+    expect(results).toHaveNoViolations()
+  })
+
   describe('Results display', () => {
     it('shows user count in footer', () => {
       mockMutationState({
@@ -290,6 +307,7 @@ describe('WhoCanView', () => {
       render(<WhoCanView {...sampleResourceActions} />, { wrapper })
 
       expect(screen.getByText('2 users')).toBeInTheDocument()
+      expect(within(screen.getByTestId('scrollable-table-container-root')).getByText('2 users')).toBeInTheDocument()
     })
 
     it('shows singular "user" for one result', () => {
@@ -334,6 +352,9 @@ describe('WhoCanView', () => {
 
       expect(screen.getByRole('button', { name: 'Next page' })).toBeEnabled()
       expect(screen.getByRole('button', { name: 'Previous page' })).toBeDisabled()
+      expect(
+        within(screen.getByTestId('scrollable-table-container-root')).getByRole('button', { name: 'Next page' })
+      ).toBeInTheDocument()
     })
 
     it('does not show pagination buttons when no cursor', () => {

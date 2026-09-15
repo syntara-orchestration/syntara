@@ -47,6 +47,7 @@ function renderButton(props?: Partial<React.ComponentProps<typeof RetryExecution
     executionId: 'exec-123',
     workflowId: 'wf-1',
     workflowVersionId: 'wfv-1',
+    projectId: 'project-1',
     ...props,
   }
   return render(
@@ -92,6 +93,12 @@ describe('RetryExecutionButton', () => {
     await user.click(confirmButtons[confirmButtons.length - 1])
 
     expect(mockMutate).toHaveBeenCalled()
+  })
+
+  it('passes resourceProject to useCanI when projectId is provided', () => {
+    renderButton({ projectId: 'proj-42' })
+
+    expect(useCanI).toHaveBeenCalledWith('run', 'execution', { resourceProject: 'proj-42' })
   })
 
   it('is aria-disabled when user lacks execution:run permission', () => {

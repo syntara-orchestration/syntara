@@ -57,11 +57,14 @@ export function AddMemberModal({
   const availableUsers = useMemo(() => {
     return allUsers
       .filter((u) => !existingMemberIds.includes(u.id))
-      .map((u) => ({
-        value: u.id,
-        label: u.username,
-        description: userDisplayName(u) || undefined,
-      }))
+      .map((u) => {
+        const displayName = userDisplayName(u)
+        return {
+          value: u.id,
+          label: u.username,
+          description: displayName === u.username ? undefined : displayName,
+        }
+      })
   }, [allUsers, existingMemberIds])
 
   const { mutate: addMember, isPending } = accessClient.useMutation('post', '/groups/{group_id}/members')

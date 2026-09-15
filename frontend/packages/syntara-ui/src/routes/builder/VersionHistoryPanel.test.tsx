@@ -28,8 +28,6 @@ function createMockVersion(overrides: Record<string, unknown> = {}): WorkflowVer
     change_description: 'Initial version',
     status: 'draft',
     name: null,
-    deleted_at: null,
-    deleted_by: null,
     ...overrides,
   } as unknown as WorkflowVersion
 }

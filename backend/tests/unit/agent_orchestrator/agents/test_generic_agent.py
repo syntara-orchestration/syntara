@@ -3,6 +3,8 @@
 Tests the GenericAgent implementation using LangGraph node execution.
 """
 
+from __future__ import annotations
+
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock, patch
 from uuid import uuid4
@@ -20,7 +22,11 @@ from syntara.agent_orchestrator.exceptions import (
 from syntara.audit.emitter import AuditActorContext
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+    from contextlib import AbstractContextManager
+
     from syntara.agent_orchestrator.models.agent_state import AgentState
+    from tests.fixtures.settings import FakeSettingsCache
 
 
 class TestGenericAgentLLMIntegration:
@@ -95,6 +101,52 @@ class TestGenericAgentLLMIntegration:
         result = response["result"]
         assert result is not None
         assert result["type"] == "answer"
+
+    @pytest.mark.asyncio
+    async def test_persists_collapsed_finish_reason_from_chunk_merge(self) -> None:
+        """LangChain stream-merge doubling must not leak into Task Agent output (AAP-87759)."""
+        mock_llm = Mock()
+        mock_llm_with_tools = AsyncMock()
+        mock_llm_with_tools.ainvoke.return_value = AIMessage(
+            content="The hackathon is going great.",
+            response_metadata={
+                "finish_reason": "stopstop",
+                "model_name": "anthropic/claude-opus-4.6anthropic/claude-opus-4.6",
+                "token_usage": {"prompt_tokens": 24, "completion_tokens": 16, "total_tokens": 40},
+            },
+            usage_metadata={"input_tokens": 12, "output_tokens": 8, "total_tokens": 20},
+        )
+        mock_llm.bind_tools.return_value = mock_llm_with_tools
+        mock_llm.model_name = "anthropic/claude-opus-4.6"
+
+        agent = GenericAgent(llm=mock_llm, available_tools=[])
+        state: AgentState = {
+            "prompt": "Classify sentiment",
+            "original_prompt": "Classify sentiment",
+            "session_id": "test-session",
+            "invocation_id": uuid4(),
+            "actor_context": AuditActorContext(),
+            "context_package": None,
+            "current_agent": "generic_agent",
+            "messages": [HumanMessage("test")],
+            "result": None,
+            "metadata": None,
+            "llm_token_usage_log": [],
+        }
+
+        response = await agent.execute_as_node(state)
+
+        result = response["result"]
+        assert result is not None
+        meta = result.get("response_metadata") or result.get("metadata")
+        assert meta is not None
+        assert meta["finish_reason"] == "stop"
+        assert meta["model_name"] == "anthropic/claude-opus-4.6"
+        assert meta["token_usage"] == {
+            "prompt_tokens": 12,
+            "completion_tokens": 8,
+            "total_tokens": 20,
+        }
 
     @pytest.mark.asyncio
     async def test_generic_agent_raises_configuration_error_for_invalid_api_key(
@@ -396,6 +448,81 @@ class TestGenericAgentPromptEngineering:
         mock_llm_with_tools.ainvoke.assert_called_once()
         call_args = mock_llm_with_tools.ainvoke.call_args
         assert call_args is not None
+
+    @pytest.mark.asyncio
+    async def test_custom_system_prompt_sent_to_llm(
+        self,
+        override_runtime_settings: Callable[..., AbstractContextManager[FakeSettingsCache]],
+    ) -> None:
+        """Test that a custom system prompt from runtime settings is sent to the LLM."""
+        from langchain_core.messages import SystemMessage
+
+        custom_prompt = "You are a task execution agent. Invoke tools to complete requests."
+
+        mock_llm = Mock()
+        mock_llm_with_tools = AsyncMock()
+        mock_llm_with_tools.ainvoke.return_value = AIMessage(content="Done", response_metadata={})
+        mock_llm.bind_tools.return_value = mock_llm_with_tools
+        mock_llm.model_name = "test-model"
+
+        agent = GenericAgent(llm=mock_llm, available_tools=[])
+        state: AgentState = {
+            "prompt": "deploy the app",
+            "original_prompt": "deploy the app",
+            "session_id": "test-session",
+            "invocation_id": uuid4(),
+            "actor_context": AuditActorContext(),
+            "context_package": None,
+            "current_agent": "generic_agent",
+            "messages": [HumanMessage("deploy the app")],
+            "result": None,
+            "metadata": None,
+            "llm_token_usage_log": [],
+        }
+
+        with override_runtime_settings({"agentic.task_agent_system_prompt": custom_prompt}):
+            await agent.execute_as_node(state)
+
+        messages_sent = mock_llm_with_tools.ainvoke.call_args[0][0]
+        system_messages = [m for m in messages_sent if isinstance(m, SystemMessage)]
+        assert len(system_messages) == 1
+        assert system_messages[0].content == custom_prompt
+
+    @pytest.mark.asyncio
+    async def test_default_system_prompt_resolves_product_name(self) -> None:
+        """Default system prompt must contain the resolved product name, not the raw placeholder."""
+        from langchain_core.messages import SystemMessage
+
+        from syntara.core.config.base import get_settings
+
+        mock_llm = Mock()
+        mock_llm_with_tools = AsyncMock()
+        mock_llm_with_tools.ainvoke.return_value = AIMessage(content="Done", response_metadata={})
+        mock_llm.bind_tools.return_value = mock_llm_with_tools
+        mock_llm.model_name = "test-model"
+
+        agent = GenericAgent(llm=mock_llm, available_tools=[])
+        state: AgentState = {
+            "prompt": "hello",
+            "original_prompt": "hello",
+            "session_id": "test-session",
+            "invocation_id": uuid4(),
+            "actor_context": AuditActorContext(),
+            "context_package": None,
+            "current_agent": "generic_agent",
+            "messages": [HumanMessage("hello")],
+            "result": None,
+            "metadata": None,
+            "llm_token_usage_log": [],
+        }
+
+        await agent.execute_as_node(state)
+
+        messages_sent = mock_llm_with_tools.ainvoke.call_args[0][0]
+        system_messages = [m for m in messages_sent if isinstance(m, SystemMessage)]
+        assert len(system_messages) == 1
+        assert get_settings().product_name in system_messages[0].content
+        assert "{product_name}" not in system_messages[0].content
 
     @pytest.mark.asyncio
     async def test_generic_agent_raises_on_empty_llm_response(self) -> None:

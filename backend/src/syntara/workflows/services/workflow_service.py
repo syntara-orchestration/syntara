@@ -4,6 +4,7 @@ This service encapsulates workflow-related business logic, separating it from
 HTTP/API concerns in the FastAPI endpoints.
 """
 
+import asyncio
 import threading
 from collections.abc import Iterable
 from datetime import UTC, datetime
@@ -12,7 +13,7 @@ from uuid import UUID, uuid4
 
 import structlog
 from sqlalchemy.exc import IntegrityError
-from sqlmodel import func, select
+from sqlmodel import col, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.audit.dispatcher import AuditEventDispatcher
@@ -20,11 +21,14 @@ from syntara.authz.engine import AllowedProjectsResult, AuthzRequest, authorize
 from syntara.authz.evaluator import AuthzEvaluator
 from syntara.authz.exceptions import AuthorizationDeniedError
 from syntara.authz.models import Project
+from syntara.core.database.session import AsyncSessionLocal
 from syntara.core.exceptions import SafeValueError, assert_project_id_unchanged
 from syntara.core.models import User
 from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin
+from syntara.credentials.lib.auth_types import AUTH_TYPE_URL
 from syntara.credentials.models.credential import Credential
+from syntara.credentials.models.credential_type import CredentialType
 from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.types import ComponentLabel, MetricType
 from syntara.workflows.audit.workflow_lifecycle import WorkflowAction, WorkflowLifecycleEvent
@@ -39,6 +43,7 @@ from syntara.workflows.exceptions import (
     BuiltinWorkflowDeleteError,
     BuiltinWorkflowModifyError,
     ScheduledTriggerSyncError,
+    WorkflowHasActiveExecutionsError,
     WorkflowNameConflictError,
     WorkflowNotFoundError,
     WorkflowNotPublishedError,
@@ -47,6 +52,7 @@ from syntara.workflows.exceptions import (
     WorkflowVersionNotFoundError,
 )
 from syntara.workflows.models import Workflow, WorkflowListResponse, WorkflowRead, WorkflowVersion
+from syntara.workflows.models.execution import TERMINAL_EXECUTION_STATUSES, Execution
 from syntara.workflows.models.validation_finding import (
     ValidationCategory,
     ValidationFinding,
@@ -58,13 +64,37 @@ from syntara.workflows.models.workflow_publish_event import PublishAction, Workf
 from syntara.workflows.services.scheduled_trigger_service import ScheduledTriggerService
 from syntara.workflows.services.webhook_trigger_service import WEBHOOK_TRIGGER_TYPES, WebhookTriggerService
 from syntara.workflows.services.workflow_diff import generate_change_summary
-from syntara.workflows.validators import validate_workflow_references, workflow_validator
+from syntara.workflows.validators import (
+    get_system_continue_on_failure,
+    validate_workflow_references,
+    workflow_validator,
+)
 
 if TYPE_CHECKING:
     from syntara.workflows.models import WorkflowVersionListResponse
     from syntara.workflows.utils.serialization import VersionPublishTimestamps
 
 logger = structlog.stdlib.get_logger(__name__)
+
+# Strong refs so the event loop does not GC detached schedule-delete tasks.
+_pending_schedule_delete_tasks: set[asyncio.Task[None]] = set()
+_SCHEDULE_DELETE_TASK_PREFIX = "delete-scheduled-triggers-"
+
+
+def _on_schedule_delete_done(task: asyncio.Task[None]) -> None:
+    """Drop the strong ref and log failures the coroutine did not swallow."""
+    _pending_schedule_delete_tasks.discard(task)
+    if task.cancelled():
+        return
+    exc = task.exception()
+    if exc is None:
+        return
+    logger.warning(
+        "Best-effort scheduled trigger deletion failed — reconciliation worker will clean up orphans",
+        error=str(exc),
+        exc_info=(type(exc), exc, exc.__traceback__),
+    )
+
 
 # Running counters for workflow creation success rate (FR-010).
 _workflow_creation_counts: list[int] = [0, 0]  # [successes, total]
@@ -158,7 +188,6 @@ class WorkflowService(BaseService):
             select(WorkflowVersion).filter(
                 WorkflowVersion.workflow_id == workflow_id,  # type: ignore[arg-type]
                 WorkflowVersion.version == version,  # type: ignore[arg-type]
-                WorkflowVersion.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
         return result.one_or_none()
@@ -236,7 +265,7 @@ class WorkflowService(BaseService):
         """Create/update Temporal Schedules for scheduled trigger nodes.
 
         Only called on publish.  Unpublish and delete use
-        ``_delete_scheduled_triggers`` for best-effort cleanup; the
+        ``_schedule_trigger_deletion`` for best-effort cleanup; the
         schedule reconciliation worker handles any orphans that remain
         when Temporal is unreachable.
         """
@@ -247,19 +276,94 @@ class WorkflowService(BaseService):
         )
 
     @staticmethod
+    def _schedule_trigger_deletion(workflow_id: UUID) -> asyncio.Task[None] | None:
+        """Start Temporal schedule deletion without holding the HTTP request.
+
+        Must not use ``asyncio.timeout`` on this work: cancelling an
+        in-flight ``Client.connect`` can still interrupt cleanup.
+        Connect no longer holds ``_client_lock``, but the HTTP handler
+        must not wait on or cancel the task. Must not use Starlette
+        ``BackgroundTasks`` either: those keep the ASGI connection open
+        until they finish, which is the nginx 504 (AAP-87692).
+
+        The task is allowed to outlive the request. The schedule
+        reconciliation worker is the backstop if the process dies first.
+        """
+        try:
+            task = asyncio.create_task(
+                WorkflowService._delete_scheduled_triggers(workflow_id),
+                name=f"{_SCHEDULE_DELETE_TASK_PREFIX}{workflow_id}",
+            )
+        except RuntimeError:
+            logger.warning(
+                "Could not start scheduled trigger deletion — reconciliation worker will clean up orphans",
+                workflow_id=str(workflow_id),
+                exc_info=True,
+            )
+            return None
+        _pending_schedule_delete_tasks.add(task)
+        task.add_done_callback(_on_schedule_delete_done)
+        return task
+
+    @staticmethod
+    async def _workflow_is_published(workflow_id: UUID) -> bool:
+        """Return True when detached cleanup must not delete Temporal schedules.
+
+        Opens a new session so this can run after the request session is
+        closed. If the workflow was republished before cleanup ran, schedules
+        must be kept. DB errors fail closed (skip delete) so a transient read
+        failure cannot wipe a republish; the reconciler removes orphans.
+        """
+        try:
+            async with AsyncSessionLocal() as session:
+                workflow = await session.get(Workflow, workflow_id)
+        except Exception:  # noqa: BLE001
+            logger.warning(
+                "Could not read workflow state before schedule deletion — skipping cleanup",
+                workflow_id=str(workflow_id),
+                exc_info=True,
+            )
+            return True
+        return workflow is not None and workflow.published_version_id is not None
+
+    @staticmethod
     async def _delete_scheduled_triggers(workflow_id: UUID) -> None:
         """Best-effort deletion of Temporal Schedules for a workflow.
 
-        Swallows errors so the caller (unpublish / delete) always succeeds.
-        The schedule reconciliation worker will clean up any orphans that
-        remain when Temporal is unreachable.
+        Swallows errors so a detached unpublish/delete task cannot fail
+        the already-committed database change. Skips deletion when a later
+        publish won the race. Re-checks after connect; list/delete re-check
+        via ``should_abort`` so a republish during those calls keeps the
+        new schedules. The schedule reconciliation worker will clean up
+        any orphans that remain when Temporal is unreachable or the
+        process dies before this task finishes.
         """
         try:
+            if await WorkflowService._workflow_is_published(workflow_id):
+                logger.info(
+                    "Skipping scheduled trigger deletion because the workflow is published",
+                    workflow_id=str(workflow_id),
+                )
+                return
             scheduled_service = ScheduledTriggerService()
+            # Wait for connect first. A slow Temporal handshake is the
+            # republish window; re-check before listing/deleting schedules.
+            await scheduled_service.get_client()
+            if await WorkflowService._workflow_is_published(workflow_id):
+                logger.info(
+                    "Skipping scheduled trigger deletion because the workflow is published",
+                    workflow_id=str(workflow_id),
+                )
+                return
+
+            async def _abort_if_republished() -> bool:
+                return await WorkflowService._workflow_is_published(workflow_id)
+
             await scheduled_service.delete_triggers_for_workflow(
                 workflow_id=str(workflow_id),
+                should_abort=_abort_if_republished,
             )
-        except ScheduledTriggerSyncError:
+        except Exception:  # noqa: BLE001
             logger.warning(
                 "Best-effort scheduled trigger deletion failed — reconciliation worker will clean up orphans",
                 workflow_id=str(workflow_id),
@@ -354,9 +458,7 @@ class WorkflowService(BaseService):
         if not new_credentials:
             return
 
-        proj_result = await self.session.exec(
-            select(Project.name).where(Project.id == project_id, Project.deleted_at.is_(None))  # type: ignore[union-attr]
-        )
+        proj_result = await self.session.exec(select(Project.name).where(Project.id == project_id))
         project_name = proj_result.first() or ""
 
         for cred_id in new_credentials:
@@ -376,6 +478,44 @@ class WorkflowService(BaseService):
             if not authz_result.allowed:
                 msg = "Not authorized to use one or more credentials in this workflow"
                 raise AuthorizationDeniedError(msg)
+
+    async def _validate_no_secret_url_conflicts(
+        self,
+        workflow_definition: dict[str, Any],
+    ) -> None:
+        """Reject HTTP request nodes that have both an explicit URL and a Secret URL credential.
+
+        A Secret URL credential provides the request destination; an explicit
+        ``parameters.url`` on the same node creates an ambiguous configuration
+        where the credential silently wins and the activity record advertises
+        the wrong host.
+        """
+        suspect: dict[str, str] = {}
+        for node in workflow_definition.get("nodes", []):
+            if node.get("type") != "http_request":
+                continue
+            params = node.get("parameters", {})
+            if params.get("url") and params.get("credential_id"):
+                suspect[params["credential_id"]] = node.get("name") or node.get("id", "unknown")
+
+        if not suspect:
+            return
+
+        stmt = (
+            select(Credential.id, CredentialType.injectors)
+            .join(CredentialType, Credential.credential_type_id == CredentialType.id)  # type: ignore[arg-type]
+            .where(Credential.id.in_(list(suspect.keys())))  # type: ignore[attr-defined]
+        )
+        result = await self.session.exec(stmt)
+        for cred_id, injectors in result.all():
+            extra_vars = (injectors or {}).get("extra_vars", {})
+            if extra_vars.get("auth_type") == AUTH_TYPE_URL:
+                node_name = suspect[str(cred_id)]
+                msg = (
+                    f"Node '{node_name}' has both an explicit URL and a Secret URL credential. "
+                    "Remove the URL from node parameters or use a different credential type."
+                )
+                raise SafeValueError(msg)
 
     def _is_duplicate_name_error(self, e: IntegrityError) -> bool:
         """Check if IntegrityError is due to duplicate workflow name.
@@ -423,6 +563,8 @@ class WorkflowService(BaseService):
         labels: dict[str, Any],
         workflow_definition: dict[str, Any],
         project_id: UUID,
+        *,
+        is_import: bool = False,
     ) -> tuple[Workflow, WorkflowVersion, ValidationResult]:
         """Create a new V2 workflow with initial version.
 
@@ -432,6 +574,9 @@ class WorkflowService(BaseService):
             labels: Optional key-value labels
             workflow_definition: V2 workflow definition as dict (triggers + nodes + edges)
             project_id: Project to assign workflow to
+            is_import: When True, missing LLM models and webhook/EDA service
+                accounts are cleared with warnings instead of raising errors
+                (allows import of workflows from other instances)
 
         Returns:
             Tuple of (created workflow, initial version, validation result)
@@ -442,12 +587,16 @@ class WorkflowService(BaseService):
         """
         recorder = get_metrics_recorder()
         component = ComponentLabel.WORKFLOW_ENGINE
+        system_cof = await get_system_continue_on_failure()
 
         with recorder.time(
             MetricType.WORKFLOW_VALIDATION_DURATION,
             labels={"component": component.value, "operation": "create"},
         ):
-            result = workflow_validator.collect_findings(workflow_definition)
+            result = workflow_validator.collect_findings(
+                workflow_definition,
+                system_continue_on_failure=system_cof,
+            )
 
         has_validation_issues = _has_validation_issues(result)
         if has_validation_issues:
@@ -471,7 +620,10 @@ class WorkflowService(BaseService):
             raise BuiltinProtectionError(msg)
 
         await self._validate_credential_project_scope(workflow_definition, project_id)
-        ref_findings = await validate_workflow_references(self.session, workflow_definition, project_id)
+        await self._validate_no_secret_url_conflicts(workflow_definition)
+        ref_findings = await validate_workflow_references(
+            self.session, workflow_definition, project_id, is_import=is_import
+        )
         if ref_findings:
             result = ValidationResult.from_findings([*result.findings, *ref_findings])
             has_validation_issues = True
@@ -713,7 +865,6 @@ class WorkflowService(BaseService):
             select(Workflow)
             .filter(
                 Workflow.id == workflow_id,  # type: ignore[arg-type]
-                Workflow.deleted_at.is_(None),  # type: ignore[union-attr]
             )
             .with_for_update()
         )
@@ -742,7 +893,6 @@ class WorkflowService(BaseService):
             .filter(
                 WorkflowVersion.workflow_id == workflow.id,  # type: ignore[arg-type]
                 WorkflowVersion.version.in_([workflow.current_version, expected_version]),  # type: ignore[attr-defined]
-                WorkflowVersion.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
         rows = result.all()
@@ -771,12 +921,16 @@ class WorkflowService(BaseService):
     async def _get_webhook_sync_definition(
         self, workflow_id: UUID, workflow: Workflow, fallback_definition: dict[str, Any]
     ) -> dict[str, Any]:
-        """Determine the workflow definition to sync to webhook triggers."""
+        """Determine the workflow definition to sync to webhook triggers.
+
+        When the workflow is currently published, returns the published version's definition
+        rather than the new draft being saved. This preserves live webhook behaviour during
+        saves so that in-flight requests are not affected by an unfinished draft.
+        """
         if workflow.published_version_id is not None:
             pub_result = await self.session.exec(
                 select(WorkflowVersion).filter(
                     WorkflowVersion.id == workflow.published_version_id,  # type: ignore[arg-type]
-                    WorkflowVersion.deleted_at.is_(None),  # type: ignore[union-attr]
                 )
             )
             published_ver = pub_result.one_or_none()
@@ -805,7 +959,6 @@ class WorkflowService(BaseService):
         result = await self.session.exec(
             select(Workflow).filter(
                 Workflow.id == workflow_id,  # type: ignore[arg-type]
-                Workflow.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
         workflow = result.one_or_none()
@@ -837,7 +990,6 @@ class WorkflowService(BaseService):
             select(WorkflowVersion).filter(
                 WorkflowVersion.workflow_id == workflow_id,  # type: ignore[arg-type]
                 WorkflowVersion.version == workflow.current_version,  # type: ignore[arg-type]
-                WorkflowVersion.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
         current_version = version_result.one_or_none()
@@ -990,12 +1142,16 @@ class WorkflowService(BaseService):
 
         """
         recorder = get_metrics_recorder()
+        system_cof = await get_system_continue_on_failure()
 
         with recorder.time(
             MetricType.WORKFLOW_VALIDATION_DURATION,
             labels={"component": ComponentLabel.WORKFLOW_ENGINE.value, "operation": "version_update"},
         ):
-            result = workflow_validator.collect_findings(workflow_definition)
+            result = workflow_validator.collect_findings(
+                workflow_definition,
+                system_continue_on_failure=system_cof,
+            )
 
         workflow.has_validation_issues = _has_validation_issues(result)
         if workflow.has_validation_issues:
@@ -1015,6 +1171,7 @@ class WorkflowService(BaseService):
                 if prev_version and prev_version.workflow_definition:
                     previous_cred_ids = self._extract_credential_ids(prev_version.workflow_definition)
             await self._validate_credential_project_scope(workflow_definition, workflow.project_id, previous_cred_ids)
+            await self._validate_no_secret_url_conflicts(workflow_definition)
             ref_findings = await validate_workflow_references(self.session, workflow_definition, workflow.project_id)
             if ref_findings:
                 result = ValidationResult.from_findings([*result.findings, *ref_findings])
@@ -1180,7 +1337,11 @@ class WorkflowService(BaseService):
             )
 
         definition = target_version.workflow_definition
-        result = workflow_validator.collect_findings(definition)
+        system_cof = await get_system_continue_on_failure()
+        result = workflow_validator.collect_findings(
+            definition,
+            system_continue_on_failure=system_cof,
+        )
         if len(definition.get("nodes", [])) == 0:
             result = ValidationResult.from_findings(
                 [
@@ -1205,6 +1366,7 @@ class WorkflowService(BaseService):
             await self._validate_credential_project_scope(
                 workflow_definition, workflow.project_id, previous_credential_ids=None
             )
+            await self._validate_no_secret_url_conflicts(workflow_definition)
             stale_tool_findings = await validate_workflow_references(
                 self.session, workflow_definition, workflow.project_id
             )
@@ -1356,7 +1518,7 @@ class WorkflowService(BaseService):
             )
         )
 
-        await self._delete_scheduled_triggers(workflow.id)
+        self._schedule_trigger_deletion(workflow.id)
 
         return workflow
 
@@ -1467,13 +1629,17 @@ class WorkflowService(BaseService):
         return workflow, new_version
 
     async def delete_workflow(self, workflow_id: UUID) -> None:
-        """Soft delete a workflow.
+        """Hard-delete a workflow and cascade-delete its versions and executions.
+
+        Versions and executions are cascade-deleted via DB FK (ondelete=CASCADE).
 
         Args:
             workflow_id: UUID of workflow to delete
 
         Raises:
             WorkflowNotFoundError: If workflow not found
+            BuiltinWorkflowDeleteError: If workflow is a built-in
+            WorkflowHasActiveExecutionsError: If workflow has non-terminal executions
 
         """
         workflow = await self.get_workflow_by_id(workflow_id)
@@ -1481,12 +1647,39 @@ class WorkflowService(BaseService):
         if workflow.is_builtin:
             raise BuiltinWorkflowDeleteError(workflow.name)
 
-        # Delete associated webhook triggers before soft-deleting the workflow
+        non_terminal_count = await self.session.scalar(
+            select(func.count())
+            .select_from(Execution)
+            .where(
+                Execution.workflow_id == workflow_id,
+                col(Execution.status).not_in(TERMINAL_EXECUTION_STATUSES),
+            )
+        )
+        if non_terminal_count:
+            raise WorkflowHasActiveExecutionsError(non_terminal_count, workflow_id=workflow_id)
+
+        # Explicit cleanup retained so trigger deletion is logged individually
+        # (delete_triggers_for_workflow logs each removal); DB CASCADE would also
+        # remove these rows, but silently.
         webhook_service = WebhookTriggerService(self.session, self.user)
         await webhook_service.delete_triggers_for_workflow(workflow_id)
 
-        # Soft delete
-        workflow.soft_delete(self.user.id)
+        # Clean up ApprovalRequests (soft reference, no FK — CASCADE won't handle these)
+        from sqlalchemy import delete as sa_delete  # noqa: PLC0415
+
+        from syntara.approvals.models.approval_request import ApprovalRequest  # noqa: PLC0415
+
+        exec_ids_subq = select(Execution.id).where(Execution.workflow_id == workflow_id).scalar_subquery()
+        await self.session.exec(sa_delete(ApprovalRequest).where(col(ApprovalRequest.execution_id).in_(exec_ids_subq)))
+
+        # Break self-referential FK before delete
+        # (constraint: is_enabled must be False when published_version_id is NULL)
+        workflow.published_version_id = None
+        workflow.is_enabled = False
+        await self.session.flush()
+
+        # Hard delete — versions and executions cascade via DB FK
+        await self.session.delete(workflow)
         try:
             await self.session.commit()
         except Exception as exc:
@@ -1506,4 +1699,4 @@ class WorkflowService(BaseService):
             project_id=workflow.project_id,
         )
 
-        await self._delete_scheduled_triggers(workflow_id)
+        self._schedule_trigger_deletion(workflow_id)

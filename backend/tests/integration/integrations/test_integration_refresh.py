@@ -17,12 +17,13 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from syntara.core.models import User
 from syntara.integrations.adapters.protocol import DiscoveredTool, DiscoveredToolParameter, DiscoverResult
 from syntara.integrations.models.integration import (
+    Integration,
     IntegrationCreate,
     IntegrationRefreshStatus,
     IntegrationType,
 )
 from syntara.integrations.services.integration_service import IntegrationService
-from syntara.tool_manager.models.tool import Tool, ToolStatus
+from syntara.tool_manager.models.tool import Tool, ToolParameter, ToolStatus
 
 BASE_URL = "/api/v1/integrations"
 
@@ -220,6 +221,104 @@ class TestIntegrationRefreshContract:
         # The surviving tool stays AVAILABLE and enabled.
         assert tools["alpha"].enabled is True
         assert tools["alpha"].status == ToolStatus.AVAILABLE
+
+    async def test_refresh_dedupes_duplicate_tool_names(
+        self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User
+    ) -> None:
+        """A server advertising the same tool name twice is deduped, not 500'd.
+
+        Two DiscoveredTools with the same name used to produce two Tool rows
+        sharing a namespaced_name, tripping uq_tools_namespaced_name at flush
+        and returning 500. The first occurrence must win and the refresh must
+        succeed.
+        """
+        integration_id = await _create_mcp_integration(test_db_session, test_user, "refresh-dup")
+
+        discover_result = DiscoverResult(
+            success=True,
+            checked_at=datetime.now(UTC),
+            discovered_tools=[
+                _fake_discovered_tool("dup", with_params=True),
+                _fake_discovered_tool("dup"),
+                _fake_discovered_tool("unique"),
+            ],
+        )
+
+        with patch(MCP_DISCOVER_PATCH, new=AsyncMock(return_value=discover_result)):
+            response = await auth_client.post(f"{BASE_URL}/{integration_id}/refresh")
+
+        assert response.status_code == 200
+        data = response.json()
+        # Only two distinct tools synced despite three discovered entries.
+        assert data["synced_count"] == 2
+
+        tools = (await test_db_session.exec(select(Tool).where(Tool.integration_id == UUID(integration_id)))).all()
+        assert {t.name for t in tools} == {"dup", "unique"}
+        assert len([t for t in tools if t.name == "dup"]) == 1
+
+        dup_tool = next(t for t in tools if t.name == "dup")
+        params = (await test_db_session.exec(select(ToolParameter).where(ToolParameter.tool_id == dup_tool.id))).all()
+        assert len(params) == 1
+        assert params[0].name == "query"
+        assert params[0].type == "string"
+        assert params[0].required is True
+
+        # Integration is left healthy, not wedged in REFRESHING.
+        get_resp = await auth_client.get(f"{BASE_URL}/{integration_id}")
+        assert get_resp.json()["refresh_status"] == IntegrationRefreshStatus.AVAILABLE.value
+
+    async def test_refresh_persists_error_when_sync_raises(
+        self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User
+    ) -> None:
+        """A DB failure during sync leaves a persisted ERROR, not an endless spinner.
+
+        _persist_refresh_error reused the session whose transaction the failure
+        had already aborted, raising PendingRollbackError so the ERROR state
+        was never written — the integration stayed refresh_status=REFRESHING
+        with refresh_error=null. Here we force a genuine UniqueViolationError
+        at flush by pre-seeding a Tool whose namespaced_name collides with a
+        newly discovered tool.
+        """
+        integration_id = await _create_mcp_integration(test_db_session, test_user, "refresh-wedge")
+        integration = await test_db_session.get(Integration, UUID(integration_id))
+        assert integration is not None
+
+        # Pre-seed a row that collides on namespaced_name but not on name, so the
+        # discovered "collide" tool is treated as new and its INSERT violates
+        # uq_tools_namespaced_name at flush — aborting the transaction.
+        colliding_namespaced = f"{integration.name}::collide"
+        test_db_session.add(
+            Tool(
+                integration_id=UUID(integration_id),
+                name="__ghost__",
+                namespaced_name=colliding_namespaced,
+                description="pre-existing colliding row",
+                enabled=True,
+                status=ToolStatus.AVAILABLE,
+                created_by=test_user.id,
+                updated_by=test_user.id,
+            )
+        )
+        await test_db_session.commit()
+
+        discover_result = DiscoverResult(
+            success=True,
+            checked_at=datetime.now(UTC),
+            discovered_tools=[_fake_discovered_tool("collide")],
+        )
+
+        with patch(MCP_DISCOVER_PATCH, new=AsyncMock(return_value=discover_result)):
+            response = await auth_client.post(f"{BASE_URL}/{integration_id}/refresh")
+
+        # The refresh fails (409 for IntegrityError), but the failure must be recorded.
+        assert response.status_code == 409
+
+        test_db_session.expire_all()
+        refreshed = await test_db_session.get(Integration, UUID(integration_id))
+        assert refreshed is not None
+        assert refreshed.refresh_status == IntegrationRefreshStatus.ERROR
+        assert refreshed.refresh_error is not None
+        assert refreshed.last_refreshed_at is not None
 
     async def test_refresh_refreshed_at_is_iso_timestamp(
         self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User

@@ -20,7 +20,7 @@ from uuid import UUID
 
 import pytest
 from orchestrator_test_sdk.e2e import unique_name
-from orchestrator_test_sdk.e2e.helpers import create_and_run_workflow, poll_for_pending_approval
+from orchestrator_test_sdk.e2e.helpers import _retry_api_call, create_and_run_workflow, poll_for_pending_approval
 from syntara_api_client.api import SyntaraApiRegistry
 from syntara_api_client.models import (
     ExecutionCreate,
@@ -124,8 +124,8 @@ class TestWorkflowExecution:
 
         for _ in range(max_polls):
             # Query execution status
-            current_execution = syntara_api.executions.get(
-                execution_id=UUID(str(execution_id)), include="activities"
+            current_execution = _retry_api_call(
+                lambda: syntara_api.executions.get(execution_id=UUID(str(execution_id)), include="activities")
             ).assert_and_get()
 
             # Track observed states
@@ -230,8 +230,8 @@ class TestWorkflowExecution:
 
         for _ in range(max_polls):
             # Step 3: GET execution status with activities included
-            current_execution = syntara_api.executions.get(
-                execution_id=UUID(str(execution_id)), include="activities"
+            current_execution = _retry_api_call(
+                lambda: syntara_api.executions.get(execution_id=UUID(str(execution_id)), include="activities")
             ).assert_and_get()
 
             # Check if completed
@@ -381,7 +381,9 @@ class TestWorkflowExecution:
 
         for exec_id in execution_ids:
             for _poll in range(max_polls):
-                execution = syntara_api.executions.get(execution_id=UUID(str(exec_id))).assert_and_get()
+                execution = _retry_api_call(
+                    lambda eid=exec_id: syntara_api.executions.get(execution_id=UUID(str(eid)))
+                ).assert_and_get()
                 if str(execution.status) in terminal_states:
                     break
                 time.sleep(poll_interval)
@@ -799,6 +801,7 @@ class TestNodeFailurePropagation:
                     {"from": "node_b", "to": "node_c"},
                 ],
             },
+            timeout=45,
         )
 
         # Overall execution must fail.
@@ -859,6 +862,7 @@ class TestNodeFailurePropagation:
                     {"from": "node_b", "to": "node_c"},
                 ],
             },
+            timeout=45,
         )
 
         assert result.status == ExecutionStatus.FAILED, f"Expected 'failed', got '{result.status}'"
@@ -916,6 +920,7 @@ class TestNodeFailurePropagation:
                     {"from": "branch_fail", "to": "join"},
                 ],
             },
+            timeout=45,
         )
 
         # The workflow as a whole fails because one branch failed.
@@ -925,10 +930,12 @@ class TestNodeFailurePropagation:
 
         activities = {a.activity_id: a for a in (result.activities or [])}
 
-        # The healthy branch must have completed.
+        # The healthy branch must not be skipped. If it finished before the
+        # converge failed it is completed; if it was still in flight it is
+        # detached and reported as cancelled (AAP-90400).
         assert activities.get("branch_ok") is not None
-        assert activities["branch_ok"].status == "completed", (
-            f"branch_ok should complete independently of branch_fail, got {activities['branch_ok'].status}"
+        assert activities["branch_ok"].status in ("completed", "cancelled"), (
+            f"branch_ok should complete or be detached, got {activities['branch_ok'].status}"
         )
 
         # The failing branch must be marked failed.

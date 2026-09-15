@@ -14,6 +14,12 @@ _catalog_defaults: dict[str, int] = {
     if s.key.startswith("workflow_engine.") and isinstance(s.default_value, int)
 }
 
+_catalog_bool_defaults: dict[str, bool] = {
+    s.key: bool(s.default_value)
+    for s in SETTINGS_CATALOG
+    if s.key.startswith("workflow_engine.") and isinstance(s.default_value, bool)
+}
+
 
 @pytest.fixture(autouse=True)
 def _mock_runtime_settings() -> Generator[None, None, None]:
@@ -29,6 +35,7 @@ def _mock_runtime_settings() -> Generator[None, None, None]:
 
     mock_cache = AsyncMock(spec=SettingsCache)
     mock_cache.get_int.side_effect = lambda key, **_kw: _catalog_defaults.get(key, 0)
+    mock_cache.get_bool.side_effect = lambda key, **_kw: _catalog_bool_defaults.get(key, False)
 
     set_runtime_settings(mock_cache)
     yield

@@ -30,7 +30,7 @@ export function buildPermissionRow(a: RoleAssignmentRead): PermissionRow {
     roleDescription: a.role_description ?? null,
     rolePolicies: a.role_policies ?? [],
     scopeType: isProject ? 'project' : 'system',
-    scopeName: isProject ? (a.project_name ?? a.project_id!) : 'System',
+    scopeName: a.project_id != null ? (a.project_name ?? a.project_id) : 'System',
     projectId: a.project_id ?? undefined,
     sourceEndpoint: isProject ? 'project-role-assignments' : 'role-assignments',
   }

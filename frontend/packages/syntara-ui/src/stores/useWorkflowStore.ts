@@ -28,13 +28,9 @@ export type UseWorkflowStoreBound = UseBoundStore<
   Mutate<StoreApi<WorkflowStore>, [['temporal', StoreApi<TemporalState<WorkflowUndoPartialize>>]]>
 >
 
-// ============================================================================
-// Zustand Store (with undo/redo via zundo temporal middleware)
-// ============================================================================
-
 const HISTORY_LIMIT = 50
-
 const TEMPORAL_BATCH_SAFETY_MS = 2000
+const CLEAN_UNDO_STATE = { isDirty: false, _undoBaselineMatchesSave: true, _nonTemporalDirty: false } as const
 
 /**
  * Pause temporal tracking so that the node mutation AND the subsequent
@@ -72,7 +68,7 @@ export const useWorkflowStore: UseWorkflowStoreBound = create<WorkflowStore>()(
       _temporalBatchPending: false,
       _preserveHistoryOnLayout: false,
       _positionsUserModified: false,
-      isDirty: false,
+      ...CLEAN_UNDO_STATE,
       validationErrorCount: 0,
 
       setValidationErrorCount: (count) => set({ validationErrorCount: count }),
@@ -84,14 +80,12 @@ export const useWorkflowStore: UseWorkflowStoreBound = create<WorkflowStore>()(
           workflowVersion: state.workflowVersion + 1,
           nodePositions: {},
           _positionsUserModified: false,
-          isDirty: false,
+          ...CLEAN_UNDO_STATE,
           validationErrorCount: 0,
         }))
         useWorkflowStore.temporal.getState().clear()
       },
 
-      // Atomic operation to set both workflow and edges in a single update
-      // This prevents race conditions where BuilderFlow renders with workflow but no edges
       loadWorkflowWithEdges: (workflow, edges, nodePositions, projectId) => {
         set((state) => ({
           currentWorkflow: workflow,
@@ -101,7 +95,7 @@ export const useWorkflowStore: UseWorkflowStoreBound = create<WorkflowStore>()(
           nodePositions: nodePositions ?? {},
           _positionsUserModified: nodePositions != null && Object.keys(nodePositions).length > 0,
           _preserveHistoryOnLayout: false,
-          isDirty: false,
+          ...CLEAN_UNDO_STATE,
           validationErrorCount: 0,
         }))
         useWorkflowStore.temporal.getState().clear()
@@ -125,11 +119,11 @@ export const useWorkflowStore: UseWorkflowStoreBound = create<WorkflowStore>()(
       },
 
       markClean: () => {
-        set({ isDirty: false })
+        set({ isDirty: false, _undoBaselineMatchesSave: false, _nonTemporalDirty: false })
       },
 
       markDirty: () => {
-        set({ isDirty: true })
+        set({ isDirty: true, _nonTemporalDirty: true })
       },
 
       updateWorkflow: (updater) => {
@@ -168,16 +162,10 @@ export const useWorkflowStore: UseWorkflowStoreBound = create<WorkflowStore>()(
           const triggers = [...state.currentWorkflow.triggers]
           const deletedTrigger = triggers[index]
 
-          // Guard: if index is out of bounds, return unchanged state
           if (!deletedTrigger) return state
-
           triggers.splice(index, 1)
 
-          // Get the real ID of the deleted trigger (e.g., "activity_fb2060fd_...")
-          // Edges use real trigger IDs, not display IDs like "trigger-0"
           const deletedTriggerRealId = (deletedTrigger as { id?: string }).id
-
-          // Filter out edges that reference the deleted trigger by its real ID
           const edges = deletedTriggerRealId
             ? state.edges.filter((edge) => edge.source !== deletedTriggerRealId && edge.target !== deletedTriggerRealId)
             : state.edges
