@@ -17,7 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validat
 from pydantic.functional_validators import ModelWrapValidatorHandler
 
 from syntara.aap.models.responses import AAPJobType as AAPJobType  # noqa: PLC0414
-from syntara.core.constants import WebhookLimits
+from syntara.core.constants import FieldLimits, WebhookLimits
 from syntara.core.exceptions import SafeValueError
 from syntara.workflows.json_schema_validation import validate_json_schema_definition
 from syntara.workflows.utils.iso8601_interval import parse_iso8601_repeating_interval
@@ -33,43 +33,57 @@ TEMPLATE_PATTERN = re.compile(r"\$\{[^}]+\}")
 # Used to normalize CSS before security validation to prevent bypasses via \75rl( etc.
 _CSS_UNICODE_ESCAPE = re.compile(r"\\([0-9a-fA-F]{1,6})\s?")
 
+# CSS identity escape pattern: \ followed by any non-hex-digit, non-newline character
+# Resolves to that character (backslash dropped). Prevents bypasses via u\rl(, @\import, etc.
+_CSS_IDENTITY_ESCAPE = re.compile(r"\\([^0-9a-fA-F\r\n])")
+
+# CSS comment pattern: /* ... */ (DOTALL to match across newlines)
+# Prevents bypasses via behavior/**/: url(x.htc), url/**/(http://evil.com), etc.
+_CSS_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
+
 # Maximum valid Unicode codepoint (U+10FFFF per CSS and Unicode specs)
 _MAX_UNICODE_CODEPOINT = 0x10FFFF
 
 _CONFIG_VALIDATION_FAILED = "Config validation failed"
 
 
-def _normalize_css_unicode_escapes(css: str) -> str:
-    r"""Normalize CSS Unicode escape sequences to their character equivalents.
+def _normalize_css(css: str) -> str:
+    r"""Normalize CSS to prevent security check bypasses.
 
-    Converts escape sequences like \75rl( to url(, \40import to @import, etc.
-    This prevents bypassing security checks via Unicode escapes.
+    Performs three normalization steps:
+    1. Strips CSS comments (/* ... */) to prevent bypasses like behavior/**/: url(x.htc)
+    2. Normalizes numeric hex escapes: \XX or \XXXXXX (1-6 hex digits, optional trailing space)
+       Example: \75rl( → url(, \40import → @import
+    3. Normalizes identity escapes: \ followed by any non-hex-digit, non-newline character
+       Example: u\rl( → url(, @\import → @import
 
-    Follows CSS spec: 1-6 hex digits, optional trailing space.
-    Codepoints above U+10FFFF are replaced with U+FFFD per CSS spec.
+    This prevents bypassing security checks via comments, numeric escapes, and identity escapes.
+
+    Follows CSS spec for escape sequences. Numeric codepoints above U+10FFFF
+    are replaced with U+FFFD per CSS spec.
 
     Args:
-        css: Raw CSS string that may contain Unicode escapes.
+        css: Raw CSS string that may contain comments and/or CSS escapes.
 
     Returns:
-        CSS with all Unicode escapes converted to their character equivalents.
-
-    Example:
-        >>> _normalize_css_unicode_escapes("\75 rl(http://evil.com)")
-        'url(http://evil.com)'
-        >>> _normalize_css_unicode_escapes("\40import url(bad.css)")
-        '@import url(bad.css)'
+        CSS with comments stripped and all escape sequences converted to their character equivalents.'
 
     """
 
-    def replace_escape(match: re.Match[str]) -> str:
+    def replace_numeric_escape(match: re.Match[str]) -> str:
         codepoint = int(match.group(1), 16)
         # CSS spec: codepoints above U+10FFFF are invalid, replaced with U+FFFD
         if codepoint > _MAX_UNICODE_CODEPOINT:
             return "�"
         return chr(codepoint)
 
-    return _CSS_UNICODE_ESCAPE.sub(replace_escape, css)
+    # Strip CSS comments (/* ... */)
+    css = _CSS_COMMENT.sub("", css)
+    # Normalize numeric hex escapes (\75 → u)
+    css = _CSS_UNICODE_ESCAPE.sub(replace_numeric_escape, css)
+    # Normalize identity escapes (\r → r)
+    css = _CSS_IDENTITY_ESCAPE.sub(r"\1", css)
+    return css
 
 
 def validate_tool_selection_coherence(
@@ -926,16 +940,24 @@ class FormPromptNodeParameters(BaseModel):
         description="What happens when the prompt is not answered in time: fail the workflow, "
         "or route to the 'fallback' output port.",
     )
-    submit_label: str | None = Field(default=None, max_length=64, description="Submit button label.")
-    success_message: str | None = Field(default=None, max_length=500, description="Shown after submission.")
+    submit_label: str | None = Field(
+        default=None,
+        max_length=FieldLimits.FORM_SUBMIT_LABEL_MAX_LENGTH,
+        description="Submit button label.",
+    )
+    success_message: str | None = Field(
+        default=None,
+        max_length=FieldLimits.FORM_SUCCESS_MESSAGE_MAX_LENGTH,
+        description="Shown after submission.",
+    )
     timezone: str | None = Field(
         default=None,
-        max_length=64,
+        max_length=FieldLimits.FORM_TIMEZONE_MAX_LENGTH,
         description="IANA timezone for interpreting date/datetime field values in the form.",
     )
     css_override: str | None = Field(
         default=None,
-        max_length=10000,
+        max_length=FieldLimits.FORM_CSS_OVERRIDE_MAX_LENGTH,
         description="Custom CSS applied to the form view.",
     )
 
@@ -966,9 +988,8 @@ class FormPromptNodeParameters(BaseModel):
         if v is None:
             return v
 
-        # Normalize Unicode escapes before validation to prevent bypasses via \75rl(, \40import, etc.
-        # This converts escape sequences to their character equivalents per CSS spec.
-        normalized = _normalize_css_unicode_escapes(v)
+        # Normalize CSS before validation to prevent bypasses
+        normalized = _normalize_css(v)
         normalized_lower = normalized.lower()
 
         # Reject url() - can exfiltrate data via background-image, etc.
@@ -982,6 +1003,8 @@ class FormPromptNodeParameters(BaseModel):
             raise SafeValueError(msg)
 
         # Reject attribute selectors - can exfiltrate form values character by character
+        # NOTE: Over-blocks legitimate bracket uses in string literals (e.g., content: "[Required]").
+        # Accepted trade-off: over-blocking is safe; parsing strings would be complex and error-prone.
         if "[" in normalized and "]" in normalized:
             msg = "CSS override cannot contain attribute selectors - they enable data exfiltration"
             raise SafeValueError(msg)

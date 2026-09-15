@@ -618,3 +618,68 @@ class TestFormPromptNodeParameters:
         # \\62 = 'b' - space terminates the escape sequence
         with pytest.raises(ValidationError, match="behavior:"):
             FormPromptNodeParameters(input_schema={"type": "object"}, css_override="\\62 ehavior: none;")
+
+    def test_css_override_identity_escape_url_rejected(self) -> None:
+        """css_override with identity-escaped url() is rejected (bypass attempt)."""
+        # u\\rl( uses identity escape \\r → r (r is not a hex digit)
+        with pytest.raises(ValidationError, match="url\\(\\)"):
+            FormPromptNodeParameters(
+                input_schema={"type": "object"}, css_override="background: u\\rl(http://evil.com);"
+            )
+
+    def test_css_override_identity_escape_import_rejected(self) -> None:
+        """css_override with identity-escaped @import is rejected (bypass attempt)."""
+        # @\\import uses identity escape \\i → i (i is not a hex digit)
+        with pytest.raises(ValidationError, match="@import"):
+            FormPromptNodeParameters(input_schema={"type": "object"}, css_override="@\\import 'evil.css';")
+
+    def test_css_override_identity_escape_attribute_selector_rejected(self) -> None:
+        """css_override with identity-escaped attribute selectors is rejected (bypass attempt)."""
+        # \\[ and \\] use identity escapes ([ and ] are not hex digits)
+        with pytest.raises(ValidationError, match="attribute selectors"):
+            FormPromptNodeParameters(
+                input_schema={"type": "object"}, css_override="input\\[value^='a'\\] { background: red; }"
+            )
+
+    def test_css_override_identity_escape_expression_rejected(self) -> None:
+        """css_override with identity-escaped expression() is rejected (bypass attempt)."""
+        # expre\\ssion( uses identity escape \\s → s (s is not a hex digit)
+        with pytest.raises(ValidationError, match="expression\\(\\)"):
+            FormPromptNodeParameters(
+                input_schema={"type": "object"}, css_override="width: expre\\ssion(1+1);"
+            )
+
+    def test_css_override_identity_escape_behavior_rejected(self) -> None:
+        """css_override with identity-escaped behavior: is rejected (bypass attempt)."""
+        # \\behavior: uses identity escape \\b → b, though b is hex digit 'b'
+        # Use be\\havior: where \\h → h (h is not a hex digit)
+        with pytest.raises(ValidationError, match="behavior:"):
+            FormPromptNodeParameters(input_schema={"type": "object"}, css_override="be\\havior: none;")
+
+    def test_css_override_comment_injection_url_rejected(self) -> None:
+        """css_override with comment-injected url() is rejected (bypass attempt)."""
+        # url/**/( uses CSS comment to bypass literal "url(" check
+        with pytest.raises(ValidationError, match="url\\(\\)"):
+            FormPromptNodeParameters(
+                input_schema={"type": "object"}, css_override="background: url/**/(http://evil.com);"
+            )
+
+    def test_css_override_comment_injection_import_rejected(self) -> None:
+        """css_override with comment-injected @import is rejected (bypass attempt)."""
+        # @/**/import uses CSS comment to bypass literal "@import" check
+        with pytest.raises(ValidationError, match="@import"):
+            FormPromptNodeParameters(input_schema={"type": "object"}, css_override="@/**/import 'evil.css';")
+
+    def test_css_override_comment_injection_expression_rejected(self) -> None:
+        """css_override with comment-injected expression() is rejected (bypass attempt)."""
+        # expression/**/( uses CSS comment to bypass literal "expression(" check
+        with pytest.raises(ValidationError, match="expression\\(\\)"):
+            FormPromptNodeParameters(
+                input_schema={"type": "object"}, css_override="width: expression/**/(1+1);"
+            )
+
+    def test_css_override_comment_injection_behavior_rejected(self) -> None:
+        """css_override with comment-injected behavior: is rejected (bypass attempt)."""
+        # behavior/**/: uses CSS comment between property and colon
+        with pytest.raises(ValidationError, match="behavior:"):
+            FormPromptNodeParameters(input_schema={"type": "object"}, css_override="behavior/**/: none;")
