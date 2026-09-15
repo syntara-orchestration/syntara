@@ -73,7 +73,11 @@ repos:
     hooks:
       - id: frontend-prettier
         name: 'frontend: prettier format'
-        entry: npx --prefix frontend prettier --write --
+        # pre-commit runs hooks from the repo root, and Prettier only looks for
+        # .prettierignore in its cwd. Point it at frontend/.prettierignore
+        # explicitly so ignored paths (e.g. *.yaml, which mirror backend files)
+        # are skipped exactly as when running `npm run format` from frontend/.
+        entry: npx --prefix frontend prettier --ignore-path frontend/.prettierignore --write --
         language: system
         pass_filenames: true
         files: ^frontend/.*\.(ts|tsx|js|jsx|json|yml|yaml|md|css)$
