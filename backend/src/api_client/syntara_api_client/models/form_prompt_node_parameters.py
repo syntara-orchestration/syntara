@@ -20,7 +20,7 @@ class FormPromptNodeParameters:
     """Parameters for form prompt nodes.
 
     Attributes:
-        input_schema (FormPromptNodeParametersInputSchema): JSON Schema describing the form fields to collect.
+        form_definition (FormPromptNodeParametersInputSchema): JSON Schema describing the form fields to collect.
         message (None | str | Unset): Message shown above the form. Supports ${...} template expressions.
         responder_users (list[str] | None | Unset): Usernames allowed to respond. Empty/omitted = any user with
             form_prompt:submit.
@@ -37,7 +37,7 @@ class FormPromptNodeParameters:
         css_override (None | str | Unset): Custom CSS applied to the form view.
     """
 
-    input_schema: FormPromptNodeParametersInputSchema
+    form_definition: FormPromptNodeParametersInputSchema
     message: None | str | Unset = UNSET
     responder_users: list[str] | None | Unset = UNSET
     responder_groups: list[str] | None | Unset = UNSET
@@ -49,7 +49,7 @@ class FormPromptNodeParameters:
     css_override: None | str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
-        input_schema = self.input_schema.to_dict()
+        form_definition = self.form_definition.to_dict()
 
         message: None | str | Unset
         if isinstance(self.message, Unset):
@@ -113,7 +113,7 @@ class FormPromptNodeParameters:
 
         field_dict.update(
             {
-                "input_schema": input_schema,
+                "form_definition": form_definition,
             }
         )
         if message is not UNSET:
@@ -142,7 +142,7 @@ class FormPromptNodeParameters:
         from ..models.form_prompt_node_parameters_input_schema import FormPromptNodeParametersInputSchema
 
         d = dict(src_dict)
-        input_schema = FormPromptNodeParametersInputSchema.from_dict(d.pop("input_schema"))
+        form_definition = FormPromptNodeParametersInputSchema.from_dict(d.pop("form_definition"))
 
         def _parse_message(data: object) -> None | str | Unset:
             if data is None:
@@ -240,7 +240,7 @@ class FormPromptNodeParameters:
         css_override = _parse_css_override(d.pop("css_override", UNSET))
 
         form_prompt_node_parameters = cls(
-            input_schema=input_schema,
+            form_definition=form_definition,
             message=message,
             responder_users=responder_users,
             responder_groups=responder_groups,
