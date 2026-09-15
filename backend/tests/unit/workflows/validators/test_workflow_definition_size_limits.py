@@ -145,3 +145,23 @@ class TestNonListGuards:
         defn["edges"] = bad_value
         with pytest.raises(SafeValueError):
             validator.validate_workflow_definition(defn)
+
+    @pytest.mark.parametrize("bad_value", NON_LIST_VALUES)
+    def test_non_list_nodes_collect_findings_does_not_crash(
+        self, validator: WorkflowValidator, bad_value: object
+    ) -> None:
+        defn = _valid_definition()
+        defn["nodes"] = bad_value
+        result = validator.collect_findings(defn)
+        errors = [f for f in result.findings if f.severity == ValidationSeverity.error]
+        assert errors, "expected at least one error finding for malformed nodes"
+
+    @pytest.mark.parametrize("bad_value", NON_LIST_VALUES)
+    def test_non_list_edges_collect_findings_does_not_crash(
+        self, validator: WorkflowValidator, bad_value: object
+    ) -> None:
+        defn = _valid_definition()
+        defn["edges"] = bad_value
+        result = validator.collect_findings(defn)
+        errors = [f for f in result.findings if f.severity == ValidationSeverity.error]
+        assert errors, "expected at least one error finding for malformed edges"

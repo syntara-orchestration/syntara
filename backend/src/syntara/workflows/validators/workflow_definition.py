@@ -650,6 +650,8 @@ class WorkflowValidator:
             return limit_findings
 
         findings.extend(self._collect_schema_findings(workflow_definition))
+        if any(f.severity == ValidationSeverity.error for f in findings):
+            return findings
 
         node_ids = _extract_node_ids(workflow_definition)
         if node_ids:
