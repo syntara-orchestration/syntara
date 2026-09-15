@@ -92,6 +92,49 @@ describe('useDockStateProvider', () => {
     expect(result.current.isDockExpanded).toBe(false)
   })
 
+  it('onNavToggle tracks expandable group state and widens dock in icon-only mode', () => {
+    const { result } = renderHook(() => useDockStateProvider())
+
+    act(() =>
+      result.current.onNavToggle({} as React.MouseEvent<HTMLButtonElement>, {
+        groupId: 'nav-expandable-configuration',
+        isExpanded: true,
+      })
+    )
+
+    expect(result.current.isNavGroupExpanded('nav-expandable-configuration')).toBe(true)
+    expect(result.current.isDockExpandableExpanded).toBe(true)
+
+    act(() =>
+      result.current.onNavToggle({} as React.MouseEvent<HTMLButtonElement>, {
+        groupId: 'nav-expandable-configuration',
+        isExpanded: false,
+      })
+    )
+
+    expect(result.current.isNavGroupExpanded('nav-expandable-configuration')).toBe(false)
+  })
+
+  it('onNavSelect collapses nav groups and dock states', () => {
+    const { result } = renderHook(() => useDockStateProvider())
+
+    act(() =>
+      result.current.onNavToggle({} as React.MouseEvent<HTMLButtonElement>, {
+        groupId: 'nav-expandable-configuration',
+        isExpanded: true,
+      })
+    )
+    act(() => result.current.onToggleDock())
+    act(() => result.current.onMobileToggle())
+
+    act(() => result.current.onNavSelect())
+
+    expect(result.current.isNavGroupExpanded('nav-expandable-configuration')).toBe(false)
+    expect(result.current.isDockExpandableExpanded).toBe(false)
+    expect(result.current.isDockTextExpanded).toBe(false)
+    expect(result.current.isDockExpanded).toBe(false)
+  })
+
   it('onMobileToggle toggles isDockExpanded', () => {
     const { result } = renderHook(() => useDockStateProvider())
 
@@ -269,6 +312,7 @@ describe('useDockState', () => {
       mobileToggleRef: createRef(),
       onToggleDock: vi.fn(),
       onMobileToggle: vi.fn(),
+      isNavGroupExpanded: () => false,
       onNavToggle: vi.fn(),
       onNavSelect: vi.fn(),
     }

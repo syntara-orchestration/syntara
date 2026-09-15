@@ -8,6 +8,7 @@ export type DockState = {
   isMobile: boolean
   dockedToggleRef: React.RefObject<HTMLButtonElement | null>
   mobileToggleRef: React.RefObject<HTMLButtonElement | null>
+  isNavGroupExpanded: (groupId: string) => boolean
   onToggleDock: () => void
   onMobileToggle: () => void
   onNavToggle: (
@@ -90,6 +91,7 @@ export function useDockStateProvider(): DockState {
   const [isDockExpanded, setIsDockExpanded] = useState(initialDockState.isDockExpanded)
   const [isDockTextExpanded, setIsDockTextExpanded] = useState(initialDockState.isDockTextExpanded)
   const [isDockExpandableExpanded, setIsDockExpandableExpanded] = useState(false)
+  const [navGroupExpanded, setNavGroupExpanded] = useState<Record<string, boolean>>({})
   const [isMobile, setIsMobile] = useState(initialDockState.isMobile)
   const dockedToggleRef = useRef<HTMLButtonElement>(null)
   const mobileToggleRef = useRef<HTMLButtonElement>(null)
@@ -180,13 +182,28 @@ export function useDockStateProvider(): DockState {
     }
   }, [isMobile, isDockTextExpanded, isDockExpandableExpanded])
 
-  const onNavToggle: DockState['onNavToggle'] = useCallback(() => {
-    if (!isMobile && !isDockExpandableExpanded && !isDockTextExpanded) {
-      setIsDockExpandableExpanded(true)
-    }
-  }, [isMobile, isDockExpandableExpanded, isDockTextExpanded])
+  const isNavGroupExpanded = useCallback((groupId: string) => navGroupExpanded[groupId] ?? false, [navGroupExpanded])
+
+  const onNavToggle: DockState['onNavToggle'] = useCallback(
+    (_event, result) => {
+      const groupId = String(result.groupId)
+      setNavGroupExpanded((prev) => ({ ...prev, [groupId]: result.isExpanded }))
+
+      if (!isMobile) {
+        if (!isDockExpandableExpanded && !isDockTextExpanded) {
+          setIsDockExpandableExpanded(true)
+        }
+
+        if (!isDockTextExpanded) {
+          setIsDockTextExpanded(false)
+        }
+      }
+    },
+    [isMobile, isDockExpandableExpanded, isDockTextExpanded]
+  )
 
   const onNavSelect = useCallback(() => {
+    setNavGroupExpanded({})
     setIsDockExpandableExpanded(false)
     setIsDockTextExpanded(false)
     setIsDockExpanded(false)
@@ -200,6 +217,7 @@ export function useDockStateProvider(): DockState {
       isMobile,
       dockedToggleRef,
       mobileToggleRef,
+      isNavGroupExpanded,
       onToggleDock,
       onMobileToggle,
       onNavToggle,
@@ -210,6 +228,7 @@ export function useDockStateProvider(): DockState {
       isDockTextExpanded,
       isDockExpandableExpanded,
       isMobile,
+      isNavGroupExpanded,
       onToggleDock,
       onMobileToggle,
       onNavToggle,

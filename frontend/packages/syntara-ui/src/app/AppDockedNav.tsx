@@ -31,7 +31,7 @@ import {
   RhUiQuestionMarkCircleIcon,
 } from '@patternfly/react-icons'
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 
 import { authClient } from '../client'
 import { useAlerts } from '../providers/alerts'
@@ -42,7 +42,6 @@ import { getErrorMessage } from '../utils/apiErrors'
 import { detachPromise } from '../utils/detachPromise'
 import { useDocLink } from '../utils/docs/useDocLink'
 
-import styles from './AppDockedNav.module.css'
 import { AppRoute } from './AppRoute'
 import type { TNavigationItem } from './navigationItems'
 import { useDockState } from './useDockState'
@@ -92,9 +91,14 @@ function openExternalDoc(url: string) {
   globalThis.open(url, '_blank', 'noopener,noreferrer')
 }
 
+function getNavGroupId(itemPath: string): string {
+  return `nav-expandable-${itemPath.replaceAll('/', '-')}`
+}
+
 function NavExpandableItem({
   item,
   isActive,
+  isExpanded,
   isMobile,
   buttonRef,
   location,
@@ -102,19 +106,23 @@ function NavExpandableItem({
 }: Readonly<{
   item: TNavigationItem
   isActive: boolean
+  isExpanded: boolean
   isMobile: boolean
   buttonRef?: React.RefObject<HTMLButtonElement | null>
   location: string
   requestNavigation: (path: string) => void
 }>) {
   const enabledChildren = item.children ?? []
+  const groupId = getNavGroupId(item.path)
 
   /* v8 ignore start -- phantom branches from compiled JSX props and map callback */
   return (
     <NavExpandable
       title={item.label}
       icon={item.icon}
+      groupId={groupId}
       hasExpandableIcon={!isMobile}
+      isExpanded={isExpanded}
       isActive={isActive}
       id={`nav-${item.path.replaceAll('/', '-')}`}
       buttonProps={buttonRef ? { ref: buttonRef } : undefined}
@@ -125,6 +133,7 @@ function NavExpandableItem({
           key={child.path}
           preventDefault
           id={`nav-${child.path.replaceAll('/', '-')}`}
+          groupId={groupId}
           itemId={child.path}
           href={child.path}
           isActive={location.startsWith(child.path)}
@@ -139,53 +148,15 @@ function NavExpandableItem({
   /* v8 ignore stop */
 }
 
-const USER_MENU_FLYOUT_CLOSE_DELAY_MS = 100
-
 function UserMenuDropdown() {
   const [isOpen, setIsOpen] = useState(false)
-  const closeTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
   const navigate = useNavigate()
   const logout = useAuthStore((s) => s.logout)
   const { showAlert } = useAlerts()
   const { data: currentUser } = authClient.useQuery('get', '/auth/me')
 
-  const cancelScheduledClose = () => {
-    if (closeTimerRef.current) {
-      clearTimeout(closeTimerRef.current)
-      closeTimerRef.current = undefined
-    }
-  }
-
-  const handleOpenChange = useCallback((open: boolean) => {
-    if (closeTimerRef.current) {
-      clearTimeout(closeTimerRef.current)
-      closeTimerRef.current = undefined
-    }
-    setIsOpen(open)
-  }, [])
-
-  const scheduleClose = () => {
-    cancelScheduledClose()
-    closeTimerRef.current = setTimeout(() => handleOpenChange(false), USER_MENU_FLYOUT_CLOSE_DELAY_MS)
-  }
-
-  useEffect(() => () => cancelScheduledClose(), [])
-
-  useEffect(() => {
-    if (!isOpen) return
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      event.preventDefault()
-      handleOpenChange(false)
-    }
-
-    document.addEventListener('keydown', handleEscape)
-    return () => document.removeEventListener('keydown', handleEscape)
-  }, [handleOpenChange, isOpen])
-
   const handleLogoutClick = () => {
-    handleOpenChange(false)
+    setIsOpen(false)
     detachPromise(logout(), {
       onReject: (error: unknown) => {
         showAlert({
@@ -207,9 +178,8 @@ function UserMenuDropdown() {
       icon={<RhUiProfileFillIcon />}
       isDocked
       aria-label="User menu"
-      onClick={() => handleOpenChange(!isOpen)}
-      onMouseEnter={() => handleOpenChange(true)}
-      onMouseLeave={scheduleClose}
+      onClick={() => setIsOpen(!isOpen)}
+      onMouseEnter={() => setIsOpen(true)}
     >
       {currentUser?.username ?? 'User'}
     </MenuToggle>
@@ -218,30 +188,21 @@ function UserMenuDropdown() {
   return (
     <Dropdown
       isOpen={isOpen}
-      onOpenChange={handleOpenChange}
+      onOpenChange={setIsOpen}
       toggle={toggle}
-      containsFlyout
-      isNavFlyout
-      className={styles.flyoutMenu}
-      popperProps={{
-        placement: 'right-start',
-        preventOverflow: true,
-        onPopperMouseEnter: cancelScheduledClose,
-        onPopperMouseLeave: scheduleClose,
-      }}
+      popperProps={{ position: 'right', preventOverflow: true }}
     >
       <DropdownList>
         <DropdownItem
           key="profile"
-          className={styles.flyoutMenuItem}
           onClick={() => {
-            handleOpenChange(false)
             detachPromise(navigate({ to: AppRoute.MyProfile.Root }))
+            setIsOpen(false)
           }}
         >
           My Profile
         </DropdownItem>
-        <DropdownItem key="logout" className={styles.flyoutMenuItem} onClick={handleLogoutClick}>
+        <DropdownItem key="logout" onClick={handleLogoutClick}>
           Logout
         </DropdownItem>
       </DropdownList>
@@ -263,6 +224,7 @@ export function AppDockedNav() {
     isMobile,
     dockedToggleRef,
     onToggleDock,
+    isNavGroupExpanded,
     onNavToggle,
     onNavSelect,
   } = useDockState()
@@ -345,6 +307,7 @@ export function AppDockedNav() {
                             key={item.path}
                             item={item}
                             isActive={isActive}
+                            isExpanded={isNavGroupExpanded(getNavGroupId(item.path))}
                             isMobile={isMobile}
                             buttonRef={expandableRefs[item.path]}
                             location={location}
