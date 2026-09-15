@@ -299,7 +299,19 @@ jobs:
         working-directory: backend
 
       - name: Check OpenAPI breaking changes against devel
-        run: make check-openapi-breaking-pre-commit
+        run: |
+          set +e
+          make check-openapi-breaking-pre-commit
+          EXIT_CODE=$?
+          set -e
+
+          # If targeting a feature/* branch, pass with warning instead of failing
+          if [[ "${{ github.base_ref }}" == feature/* ]] && [ $EXIT_CODE -ne 0 ]; then
+            echo "::warning::OpenAPI breaking changes detected, but allowing for feature branch target. This check would fail when merging to devel/early-access."
+            exit 0
+          fi
+
+          exit $EXIT_CODE
         working-directory: backend
         env:
           OPENAPI_PR_LABELS: ${{ github.event_name == 'pull_request' && toJSON(github.event.pull_request.labels.*.name) || '' }}
