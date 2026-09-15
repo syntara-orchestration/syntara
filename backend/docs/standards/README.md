@@ -45,7 +45,7 @@ These existing documents define core standards and should be consulted first:
 |------|-----------------|
 | `pyproject.toml` | Ruff rules (ALL), mypy strict mode, pytest config, coverage thresholds, Vulture config |
 | `.pre-commit-config.yaml` | Formatting, type checking, conventional commits, YAML, requirements sync |
-| `.github/workflows/ci.yml` | CI gates: pre-commit, dead code check, cycle detection, tests (3.12 + 3.13), migration checks, coverage, E2E |
+| `.github/workflows/ci.yml` | CI gates: pre-commit, dead code check, cycle detection, tests (3.12 + 3.13 + 3.14), migration checks, coverage, E2E |
 | `sonar-project.properties` | SonarCloud code quality scanning |
 | `renovate.json` | Automated dependency updates (weekly, in-range-only) |
 

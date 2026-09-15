@@ -234,7 +234,7 @@ describe('FlatApprovalsTableBody', () => {
               makeApproval({
                 status: 'approved',
                 decided_at: '2026-07-15T14:30:00Z',
-                decided_by: { id: 'user-2', name: 'reviewer' },
+                decided_by: { id: 'user-2', name: 'reviewer', type: 'user' },
               }),
             ]}
           />

@@ -111,6 +111,8 @@ function validateCronFormat(cron: string | undefined, ctx: z.RefinementCtx) {
   }
 }
 
+export const AUTHORIZED_SERVICE_ACCOUNT_REQUIRED_MESSAGE = 'At least one authorized service account is required'
+
 export const triggerFormSchema = triggerFormSchemaBase.superRefine((data, ctx) => {
   if (data.triggerType === TriggerTypeEnum.MANUAL_TRIGGER || WEBHOOK_TRIGGER_TYPES.has(data.triggerType)) {
     validateInputSchemaJson(data.inputSchema, ctx)
@@ -145,7 +147,7 @@ export const triggerFormSchema = triggerFormSchemaBase.superRefine((data, ctx) =
     if (!data.authorizedServiceAccountIds?.length) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'At least one authorized service account is required',
+        message: AUTHORIZED_SERVICE_ACCOUNT_REQUIRED_MESSAGE,
         path: ['authorizedServiceAccountIds'],
       })
     }
