@@ -360,5 +360,5 @@ The `what_can_i` authorization endpoint returns project **names**, not IDs. The 
 
 - [Approval Builder Integration](./approval-builder-integration.md) — Form configuration and workflow store integration
 - [Approval Execution Integration](./approval-execution-integration.md) — Review view and decision submission during execution
-- [Approval Overview](../../../backend/docs/approvals/approval-overview.md) — Backend approval system architecture
-- [Approval Authorization Model](../../../backend/docs/approvals/approval-authorization-model.md) — Two-tier authorization (RBAC + approver lists)
+- [Approval Overview](../../backend/approvals/approval-overview.md) — Backend approval system architecture
+- [Approval Authorization Model](../../backend/approvals/approval-authorization-model.md) — Two-tier authorization (RBAC + approver lists)

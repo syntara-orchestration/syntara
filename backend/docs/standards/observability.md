@@ -180,7 +180,7 @@ Domain events are plain dataclasses — no base class needed. They carry only th
 
 ### 2. Create an Audit Handler (optional — only if you need audit log entries)
 
-This step is only required if you want to produce structured audit log entries (persisted to the database). Skip this step if you only need telemetry (Segment events). See [Audit Framework](/docs/audit.md) for full details.
+This step is only required if you want to produce structured audit log entries (persisted to the database). Skip this step if you only need telemetry (Segment events). See [Audit Framework](../audit.md) for full details.
 
 Create a handler in the same `audit/` package. It maps the domain event to a normalized `AuditEvent`:
 
