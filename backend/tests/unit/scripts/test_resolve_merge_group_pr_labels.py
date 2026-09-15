@@ -31,39 +31,95 @@ def test_split_repository_rejects_invalid_repository(repository: str) -> None:
         resolve_labels.split_repository(repository)
 
 
-def test_fetch_labels_requests_only_the_parsed_pull_request(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize(
+    ("base_ref", "expected_branch"),
+    [("refs/heads/devel", "devel"), ("early-access", "early-access")],
+)
+def test_merge_queue_branch_normalizes_base_ref(base_ref: str, expected_branch: str) -> None:
+    assert resolve_labels.merge_queue_branch(base_ref) == expected_branch
+
+
+@pytest.mark.parametrize("base_ref", ["", "/devel", "devel/"])
+def test_merge_queue_branch_rejects_invalid_base_ref(base_ref: str) -> None:
+    with pytest.raises(ValueError, match="MERGE_GROUP_BASE_REF"):
+        resolve_labels.merge_queue_branch(base_ref)
+
+
+def test_fetch_merge_group_labels_requests_current_and_preceding_entries(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: dict[str, list[str]] = {}
 
     def fake_run(command: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
         captured["command"] = command
-        return subprocess.CompletedProcess(command, 0, '["breaking-change-approved","api"]', "")
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            '{"data":{"repository":{"mergeQueue":{"entries":{"nodes":['
+            '{"position":1,"pullRequest":{"number":505,"labels":{"nodes":[{"name":"breaking-change-approved"}]}}},'
+            '{"position":2,"pullRequest":{"number":506,"labels":{"nodes":[{"name":"api"}]}}},'
+            '{"position":3,"pullRequest":{"number":507,"labels":{"nodes":[{"name":"unrelated"}]}}}'
+            "]}}}}}",
+            "",
+        )
 
     monkeypatch.setattr(resolve_labels.subprocess, "run", fake_run)
 
-    assert resolve_labels.fetch_labels("syntara-orchestration", "syntara", 506) == ["breaking-change-approved", "api"]
-    assert captured["command"] == [
+    assert resolve_labels.fetch_merge_group_labels("syntara-orchestration", "syntara", "devel", 506) == [
+        "breaking-change-approved",
+        "api",
+    ]
+    assert captured["command"][:10] == [
         "gh",
         "api",
-        "repos/syntara-orchestration/syntara/pulls/506",
-        "--jq",
-        "[.labels[].name]",
+        "graphql",
+        "-F",
+        "owner=syntara-orchestration",
+        "-F",
+        "repo=syntara",
+        "-F",
+        "branch=devel",
+        "-f",
     ]
 
 
-def test_fetch_labels_allows_an_empty_label_list(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_fetch_merge_group_labels_allows_an_empty_label_list(monkeypatch: pytest.MonkeyPatch) -> None:
     def fake_run(command: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
-        return subprocess.CompletedProcess(command, 0, "[]", "")
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            '{"data":{"repository":{"mergeQueue":{"entries":{"nodes":[{"position":1,"pullRequest":{"number":506,"labels":{"nodes":[]}}}]}}}}}',
+            "",
+        )
 
     monkeypatch.setattr(resolve_labels.subprocess, "run", fake_run)
 
-    assert resolve_labels.fetch_labels("syntara-orchestration", "syntara", 506) == []
+    assert resolve_labels.fetch_merge_group_labels("syntara-orchestration", "syntara", "devel", 506) == []
+
+
+def test_fetch_merge_group_labels_includes_the_current_entry_approval(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_run(command: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            '{"data":{"repository":{"mergeQueue":{"entries":{"nodes":['
+            '{"position":1,"pullRequest":{"number":505,"labels":{"nodes":[{"name":"api"}]}}},'
+            '{"position":2,"pullRequest":{"number":506,"labels":{"nodes":[{"name":"breaking-change-approved"}]}}}'
+            "]}}}}}",
+            "",
+        )
+
+    monkeypatch.setattr(resolve_labels.subprocess, "run", fake_run)
+
+    assert resolve_labels.fetch_merge_group_labels("syntara-orchestration", "syntara", "devel", 506) == [
+        "api",
+        "breaking-change-approved",
+    ]
 
 
 @pytest.mark.parametrize(
     ("returncode", "stdout", "stderr", "error"),
     [
         (1, "", "not found", "failed to fetch"),
-        (0, "not JSON", "", "invalid label JSON"),
+        (0, "not JSON", "", "invalid merge-queue JSON"),
         (0, '{"name": "api"}', "", "invalid shape"),
     ],
 )
@@ -76,16 +132,17 @@ def test_fetch_labels_rejects_failed_or_invalid_responses(
     monkeypatch.setattr(resolve_labels.subprocess, "run", fake_run)
 
     with pytest.raises((RuntimeError, ValueError), match=error):
-        resolve_labels.fetch_labels("syntara-orchestration", "syntara", 506)
+        resolve_labels.fetch_merge_group_labels("syntara-orchestration", "syntara", "devel", 506)
 
 
 def test_main_writes_compact_json_labels_to_github_output(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     output = tmp_path / "github-output"
     monkeypatch.setenv("GH_TOKEN", "test-token")
     monkeypatch.setenv("MERGE_GROUP_HEAD_REF", "gh-readonly-queue/devel/pr-506-bdd2ce3")
+    monkeypatch.setenv("MERGE_GROUP_BASE_REF", "refs/heads/devel")
     monkeypatch.setenv("GITHUB_REPOSITORY", "syntara-orchestration/syntara")
     monkeypatch.setenv("GITHUB_OUTPUT", str(output))
-    monkeypatch.setattr(resolve_labels, "fetch_labels", lambda *_args: ["api", "$(not-executed)"])
+    monkeypatch.setattr(resolve_labels, "fetch_merge_group_labels", lambda *_args: ["api", "$(not-executed)"])
 
     assert resolve_labels.main() == 0
     assert output.read_text() == 'labels=["api","$(not-executed)"]\n'
@@ -93,7 +150,7 @@ def test_main_writes_compact_json_labels_to_github_output(monkeypatch: pytest.Mo
 
 @pytest.mark.parametrize(
     "missing_environment",
-    ["GH_TOKEN", "MERGE_GROUP_HEAD_REF", "GITHUB_REPOSITORY", "GITHUB_OUTPUT"],
+    ["GH_TOKEN", "MERGE_GROUP_HEAD_REF", "MERGE_GROUP_BASE_REF", "GITHUB_REPOSITORY", "GITHUB_OUTPUT"],
 )
 def test_main_fails_closed_when_required_environment_is_missing(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, missing_environment: str
@@ -102,6 +159,7 @@ def test_main_fails_closed_when_required_environment_is_missing(
     environment = {
         "GH_TOKEN": "test-token",
         "MERGE_GROUP_HEAD_REF": "gh-readonly-queue/devel/pr-506-bdd2ce3",
+        "MERGE_GROUP_BASE_REF": "refs/heads/devel",
         "GITHUB_REPOSITORY": "syntara-orchestration/syntara",
         "GITHUB_OUTPUT": str(output),
     }

@@ -318,6 +318,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           MERGE_GROUP_HEAD_REF: ${{ github.event.merge_group.head_ref }}
+          MERGE_GROUP_BASE_REF: ${{ github.event.merge_group.base_ref }}
         run: ./scripts/openapi/resolve-merge-group-pr-labels.py
         working-directory: backend
 

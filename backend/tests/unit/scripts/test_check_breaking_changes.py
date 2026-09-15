@@ -1378,6 +1378,7 @@ class TestLabelInjectionSafety:
         workflow = (REPO_ROOT / ".github" / "workflows" / "ci-backend.yml").read_text()
 
         assert "MERGE_GROUP_HEAD_REF: ${{ github.event.merge_group.head_ref }}" in workflow
+        assert "MERGE_GROUP_BASE_REF: ${{ github.event.merge_group.base_ref }}" in workflow
         assert "./scripts/openapi/resolve-merge-group-pr-labels.py" in workflow
         assert "OPENAPI_PR_LABELS: ${{ steps.merge-group-pr.outputs.labels }}" in workflow
         assert "MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha || '' }}" in workflow
