@@ -282,7 +282,7 @@ describe('IntegrationForm', () => {
     await user.click(screen.getByTestId('select-credential'))
     await user.click(screen.getByRole('button', { name: 'Next' }))
 
-    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save integration' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument()
   })
 
@@ -303,7 +303,7 @@ describe('IntegrationForm', () => {
     await user.click(screen.getByRole('button', { name: 'Next' }))
     await user.click(screen.getByTestId('select-credential'))
     await user.click(screen.getByRole('button', { name: 'Next' }))
-    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await user.click(screen.getByRole('button', { name: 'Save integration' }))
 
     await waitFor(() => {
       expect(mockMutateAsync).toHaveBeenCalled()
@@ -409,7 +409,7 @@ describe('IntegrationForm', () => {
       await advanceAapToStep2(user)
       await user.click(screen.getByTestId('select-credential'))
 
-      expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Save integration' })).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument()
     })
 
@@ -421,7 +421,7 @@ describe('IntegrationForm', () => {
 
       await advanceAapToStep2(user)
       await user.click(screen.getByTestId('select-credential'))
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save integration' }))
 
       await waitFor(() => {
         expect(createAsyncMutate).toHaveBeenCalledWith(
@@ -445,7 +445,7 @@ describe('IntegrationForm', () => {
 
       await advanceAapToStep2(user)
 
-      expect(screen.getByRole('button', { name: 'Save' })).toHaveAttribute('aria-disabled', 'true')
+      expect(screen.getByRole('button', { name: 'Save integration' })).toHaveAttribute('aria-disabled', 'true')
     })
 
     it('shows validation error alert when saving with cleared fields', async () => {
@@ -462,7 +462,7 @@ describe('IntegrationForm', () => {
       await user.clear(aapUrlInput)
 
       await user.click(screen.getByRole('button', { name: /Connection credential/i }))
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save integration' }))
 
       await waitFor(() => {
         expect(screen.getByText('Unable to save integration')).toBeInTheDocument()
@@ -752,7 +752,7 @@ describe('IntegrationForm', () => {
       })
 
       await user.click(screen.getByRole('button', { name: 'Next' }))
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save integration' }))
 
       await waitFor(() => {
         expect(createAsyncMutate).toHaveBeenCalledWith(
@@ -828,7 +828,7 @@ describe('IntegrationForm', () => {
       await user.clear(urlInput)
 
       await user.click(screen.getByRole('button', { name: /Enable tools/i }))
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save integration' }))
 
       await waitFor(() => {
         expect(screen.getByText('Unable to save integration')).toBeInTheDocument()

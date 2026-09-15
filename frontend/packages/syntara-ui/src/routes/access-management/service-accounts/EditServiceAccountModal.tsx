@@ -164,7 +164,7 @@ function EditServiceAccountForm({ serviceAccount, onClose, onSuccess }: Readonly
           isDisabled={isPending}
           isLoading={isPending}
         >
-          Save
+          Save service account
         </Button>
         <Button variant="link" onClick={onClose} isDisabled={isPending}>
           Cancel

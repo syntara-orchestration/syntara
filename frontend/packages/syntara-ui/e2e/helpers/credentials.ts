@@ -130,7 +130,7 @@ export async function waitForDisableDialogReady(dialog: Locator, credentialName?
   if (credentialName) {
     await expect(dialog.getByText(new RegExp(credentialName))).toBeVisible()
   }
-  await expect(dialog.getByRole('button', { name: 'Disable' })).toBeEnabled()
+  await expect(dialog.getByRole('button', { name: 'Disable credential' })).toBeEnabled()
 }
 
 /** Per-attempt budget for landing the Enabled switch click. */
@@ -202,7 +202,7 @@ export async function disableCredentialFromRow(app: Page, row: Locator): Promise
   const dialog = await openDisableDialogFromRow(app, row)
 
   const patchDone = app.waitForResponse(isCredentialPatchResponse, { timeout: CREDENTIAL_PATCH_TIMEOUT })
-  await dialog.getByRole('button', { name: 'Disable' }).click()
+  await dialog.getByRole('button', { name: 'Disable credential' }).click()
 
   const response = await patchDone
   expect(response.ok(), `PATCH /credentials returned ${response.status()}`).toBe(true)

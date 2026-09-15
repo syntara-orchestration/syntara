@@ -36,7 +36,7 @@ function DetachConfirmModal({
       onClose={onCancel}
       onConfirm={onConfirm}
       title="Disconnect identity?"
-      confirmLabel="Disconnect"
+      confirmLabel="Disconnect identity"
       confirmVariant="danger"
       titleIconVariant="warning"
       confirmLoading={isDetaching}
@@ -94,7 +94,7 @@ export function IdentityDialogs({
         onClose={onCloseConvert}
         onConfirm={onConfirmConvert}
         title="Link identity provider?"
-        confirmLabel="Convert and link"
+        confirmLabel="Convert and link identity"
         confirmVariant="danger"
         titleIconVariant="warning"
         destructiveAcknowledgement={{
@@ -188,7 +188,7 @@ export function IdentityActionsKebab(props: Readonly<IdentityKebabProps>) {
               }
         }
       >
-        Disconnect
+        Disconnect identity
       </DropdownItem>
     )
   } else {
@@ -208,7 +208,7 @@ export function IdentityActionsKebab(props: Readonly<IdentityKebabProps>) {
         tooltipProps={!isSelf ? { content: 'Only the user can connect their own identity' } : undefined}
         onClick={isSelf ? handleConnect : undefined}
       >
-        Connect
+        Connect identity
       </DropdownItem>
     )
   }

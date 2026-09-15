@@ -61,7 +61,7 @@ test('user creates and saves a multi-node workflow', async ({ app }) => {
       await row.getByRole('button', { name: /Actions|Kebab toggle/i }).click({ force: true })
       await app.getByRole('menuitem', { name: 'Delete workflow' }).click()
       await app.getByRole('checkbox', { name: /I understand this workflow/i }).check()
-      await app.getByRole('button', { name: 'Delete' }).click()
+      await app.getByRole('button', { name: 'Delete workflow' }).click()
     }
   }
 })
@@ -100,7 +100,7 @@ test('user edits an existing workflow and changes persist', async ({ app }) => {
         await row.getByRole('button', { name: /Actions|Kebab toggle/i }).click({ force: true })
         await app.getByRole('menuitem', { name: 'Delete workflow' }).click()
         await app.getByRole('checkbox', { name: /I understand this workflow/i }).check()
-        await app.getByRole('button', { name: 'Delete' }).click()
+        await app.getByRole('button', { name: 'Delete workflow' }).click()
       }
     }
   }

@@ -320,7 +320,7 @@ describe('GroupMembersPanel', () => {
       await user.click(removeItem)
 
       // Confirm removal
-      const removeButton = screen.getByRole('button', { name: 'Remove' })
+      const removeButton = screen.getByRole('button', { name: 'Remove member' })
       await user.click(removeButton)
 
       await waitFor(() => {
@@ -490,7 +490,7 @@ describe('GroupMembersPanel', () => {
       const removeItem = await screen.findByText('Remove member')
       await user.click(removeItem)
 
-      const removeButton = screen.getByRole('button', { name: 'Remove' })
+      const removeButton = screen.getByRole('button', { name: 'Remove member' })
       await user.click(removeButton)
 
       await waitFor(() => {
@@ -520,7 +520,7 @@ describe('GroupMembersPanel', () => {
       const removeItem = await screen.findByText('Remove member')
       await user.click(removeItem)
 
-      const removeButton = screen.getByRole('button', { name: 'Remove' })
+      const removeButton = screen.getByRole('button', { name: 'Remove member' })
       await user.click(removeButton)
 
       await waitFor(() => {

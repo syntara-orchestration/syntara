@@ -566,7 +566,7 @@ describe('CredentialDetail', () => {
 
     const dialog = screen.getByRole('dialog')
     await user.click(within(dialog).getByRole('checkbox'))
-    await user.click(within(dialog).getByRole('button', { name: 'Delete' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Delete credential' }))
 
     expect(mockMutate).toHaveBeenCalled()
     expect(mockNavigate).toHaveBeenCalledWith(expect.objectContaining({ to: '/configuration/credentials' }))
@@ -591,7 +591,7 @@ describe('CredentialDetail', () => {
 
     const dialog = screen.getByRole('dialog')
     await user.click(within(dialog).getByRole('checkbox'))
-    await user.click(within(dialog).getByRole('button', { name: 'Delete' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Delete credential' }))
 
     expect(mockMutate).toHaveBeenCalled()
     expect(mockNavigate).not.toHaveBeenCalled()
@@ -661,7 +661,7 @@ describe('CredentialDetail', () => {
     render(<CredentialDetail />, { wrapper })
 
     expect(screen.getByText('Disable credential?')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Disable' }))
+    await user.click(screen.getByRole('button', { name: 'Disable credential' }))
 
     expect(mockMutate).toHaveBeenCalledWith(
       { params: { path: { credential_id: '1' } }, body: { enabled: false } },
@@ -679,7 +679,7 @@ describe('CredentialDetail', () => {
     const user = userEvent.setup()
     render(<CredentialDetail />, { wrapper })
 
-    await user.click(screen.getByRole('button', { name: 'Disable' }))
+    await user.click(screen.getByRole('button', { name: 'Disable credential' }))
     expect(mockMutate).toHaveBeenCalled()
   })
 
@@ -695,7 +695,7 @@ describe('CredentialDetail', () => {
     const user = userEvent.setup()
     render(<CredentialDetail />, { wrapper })
 
-    await user.click(screen.getByRole('button', { name: 'Disable' }))
+    await user.click(screen.getByRole('button', { name: 'Disable credential' }))
     expect(mockMutate).toHaveBeenCalled()
   })
 

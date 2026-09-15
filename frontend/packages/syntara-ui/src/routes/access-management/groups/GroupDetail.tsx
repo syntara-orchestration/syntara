@@ -337,7 +337,7 @@ export function GroupDetail() {
           onClose={deleteDialog.close}
           onConfirm={() => handleDelete(deleteDialog.item)}
           title="Delete group?"
-          confirmLabel="Delete"
+          confirmLabel="Delete group"
           confirmVariant="danger"
           titleIconVariant="warning"
           destructiveAcknowledgement={{

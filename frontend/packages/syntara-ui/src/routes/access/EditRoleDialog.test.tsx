@@ -140,7 +140,7 @@ describe('EditRoleDialog', () => {
 
     it('renders Save button', () => {
       renderDialog()
-      expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Save role' })).toBeInTheDocument()
     })
 
     it('renders Cancel button', () => {
@@ -174,7 +174,7 @@ describe('EditRoleDialog', () => {
 
       const nameInput = screen.getByRole('textbox', { name: /role name/i })
       await user.clear(nameInput)
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save role' }))
 
       await waitFor(() => {
         expect(screen.getByText('Name is required')).toBeInTheDocument()
@@ -193,7 +193,7 @@ describe('EditRoleDialog', () => {
       await user.clear(descInput)
       await user.type(descInput, 'Updated description')
 
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save role' }))
 
       await waitFor(() => {
         expect(mockMutate).toHaveBeenCalled()
@@ -214,7 +214,7 @@ describe('EditRoleDialog', () => {
       const user = userEvent.setup()
       renderDialog()
 
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save role' }))
 
       await waitFor(() => {
         expect(mockMutate).toHaveBeenCalled()
@@ -235,7 +235,7 @@ describe('EditRoleDialog', () => {
       const user = userEvent.setup()
       renderDialog()
 
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save role' }))
 
       await waitFor(() => {
         expect(mockMutate).toHaveBeenCalled()
@@ -257,7 +257,7 @@ describe('EditRoleDialog', () => {
       const descInput = screen.getByRole('textbox', { name: /role description/i })
       await user.clear(descInput)
 
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save role' }))
 
       await waitFor(() => {
         expect(mockMutate).toHaveBeenCalled()
