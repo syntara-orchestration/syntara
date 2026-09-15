@@ -328,5 +328,6 @@ class TestFormPromptValidationErrorPath:
             ],
             "edges": [],
         }
+        workflow_validator = WorkflowValidator()
         with pytest.raises(SafeValueError):
-            WorkflowValidator().validate_workflow_definition(workflow_def)
+            workflow_validator.validate_workflow_definition(workflow_def)
