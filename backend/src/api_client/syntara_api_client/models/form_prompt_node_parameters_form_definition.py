@@ -6,11 +6,11 @@ from typing import Any, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-T = TypeVar("T", bound="FormPromptNodeParametersInputSchema")
+T = TypeVar("T", bound="FormPromptNodeParametersFormDefinition")
 
 
 @_attrs_define
-class FormPromptNodeParametersInputSchema:
+class FormPromptNodeParametersFormDefinition:
     """JSON Schema describing the form fields to collect."""
 
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
@@ -24,10 +24,10 @@ class FormPromptNodeParametersInputSchema:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        form_prompt_node_parameters_input_schema = cls()
+        form_prompt_node_parameters_form_definition = cls()
 
-        form_prompt_node_parameters_input_schema.additional_properties = d
-        return form_prompt_node_parameters_input_schema
+        form_prompt_node_parameters_form_definition.additional_properties = d
+        return form_prompt_node_parameters_form_definition
 
     @property
     def additional_keys(self) -> list[str]:

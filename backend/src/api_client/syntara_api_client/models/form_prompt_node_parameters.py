@@ -9,7 +9,7 @@ from ..models.form_prompt_node_parameters_fallback_behavior import FormPromptNod
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
-    from ..models.form_prompt_node_parameters_input_schema import FormPromptNodeParametersInputSchema
+    from ..models.form_prompt_node_parameters_form_definition import FormPromptNodeParametersFormDefinition
 
 
 T = TypeVar("T", bound="FormPromptNodeParameters")
@@ -20,7 +20,7 @@ class FormPromptNodeParameters:
     """Parameters for form prompt nodes.
 
     Attributes:
-        form_definition (FormPromptNodeParametersInputSchema): JSON Schema describing the form fields to collect.
+        form_definition (FormPromptNodeParametersFormDefinition): JSON Schema describing the form fields to collect.
         message (None | str | Unset): Message shown above the form. Supports ${...} template expressions.
         responder_users (list[str] | None | Unset): Usernames allowed to respond. Empty/omitted = any user with
             form_prompt:submit.
@@ -37,7 +37,7 @@ class FormPromptNodeParameters:
         css_override (None | str | Unset): Custom CSS applied to the form view.
     """
 
-    form_definition: FormPromptNodeParametersInputSchema
+    form_definition: FormPromptNodeParametersFormDefinition
     message: None | str | Unset = UNSET
     responder_users: list[str] | None | Unset = UNSET
     responder_groups: list[str] | None | Unset = UNSET
@@ -139,10 +139,10 @@ class FormPromptNodeParameters:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.form_prompt_node_parameters_input_schema import FormPromptNodeParametersInputSchema
+        from ..models.form_prompt_node_parameters_form_definition import FormPromptNodeParametersFormDefinition
 
         d = dict(src_dict)
-        form_definition = FormPromptNodeParametersInputSchema.from_dict(d.pop("form_definition"))
+        form_definition = FormPromptNodeParametersFormDefinition.from_dict(d.pop("form_definition"))
 
         def _parse_message(data: object) -> None | str | Unset:
             if data is None:

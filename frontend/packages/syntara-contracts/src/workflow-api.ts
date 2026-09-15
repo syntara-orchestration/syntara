@@ -1860,7 +1860,7 @@ export interface components {
        */
       message?: string | null
       /**
-       * Input Schema
+       * Form Definition
        * @description JSON Schema describing the form fields to collect.
        */
       form_definition: {

@@ -144,7 +144,7 @@ __all__ = (
     "FormPromptNodeOutputsType0",
     "FormPromptNodeParameters",
     "FormPromptNodeParametersFallbackBehavior",
-    "FormPromptNodeParametersInputSchema",
+    "FormPromptNodeParametersFormDefinition",
     "GlobalRevocationTimestampRead",
     "GroupCreate",
     "GroupDirectoryEntry",
