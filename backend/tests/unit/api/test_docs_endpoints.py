@@ -390,6 +390,7 @@ class TestProductionAppWiring:
             assert main_module.app.title == "Automation Orchestrator API"
             assert main_module.app.openapi()["info"]["title"] == "Automation Orchestrator API"
         finally:
+            monkeypatch.delenv("APP_PRODUCT_NAME", raising=False)
             monkeypatch.setenv("APP_ENABLE_API_DOCS", "false")
             get_settings.cache_clear()
             importlib.reload(main_module)
