@@ -3,7 +3,14 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
+import { WORKFLOW_IMPORT_FILE_TOO_LARGE_MESSAGE } from '../../utils/downloadWorkflowExport'
+
 import { ImportWorkflowDialog } from './ImportWorkflowDialog'
+import {
+  IMPORT_DEFAULT_ERROR_MESSAGE,
+  IMPORT_INVALID_FORMAT_MESSAGE,
+  IMPORT_NAME_CONFLICT_MESSAGE,
+} from './importWorkflowErrors'
 
 const mockShowAlert = vi.fn()
 const mockShowError = vi.fn()
@@ -245,7 +252,7 @@ describe('ImportWorkflowDialog', () => {
     expect(mockPost).not.toHaveBeenCalled()
   })
 
-  it('shows API error via alert', async () => {
+  it('shows friendly default message for unknown API errors', async () => {
     const user = userEvent.setup()
     mockPost.mockResolvedValue({ error: { detail: 'Duplicate name' } })
 
@@ -265,12 +272,70 @@ describe('ImportWorkflowDialog', () => {
     await waitFor(() => {
       expect(mockShowError).toHaveBeenCalledWith({
         title: 'Import failed',
-        description: 'Duplicate name',
+        description: IMPORT_DEFAULT_ERROR_MESSAGE,
       })
     })
   })
 
-  it('shows file validation error inline', async () => {
+  it('shows friendly message when API returns a name conflict', async () => {
+    const user = userEvent.setup()
+    mockPost.mockResolvedValue({
+      error: {
+        code: 'WORKFLOW_NAME_CONFLICT',
+        detail: 'Workflow with name "Test" already exists in this project',
+      },
+    })
+
+    const validContent = JSON.stringify({
+      triggers: [{ id: 't1', type: 'webhook' }],
+      nodes: [{ id: 'n1', type: 'action' }],
+      edges: [{ from: 't1', to: 'n1' }],
+    })
+
+    render(<ImportWorkflowDialog {...defaultProps} />)
+
+    await user.upload(getFileInput(), new File([validContent], 'wf.json', { type: 'application/json' }))
+    await user.type(screen.getByLabelText(/Workflow name/i), 'Test')
+    await user.click(screen.getByRole('button', { name: /^Import$/i }))
+
+    await waitFor(() => {
+      expect(mockShowError).toHaveBeenCalledWith({
+        title: 'Import failed',
+        description: IMPORT_NAME_CONFLICT_MESSAGE,
+      })
+    })
+  })
+
+  it('shows friendly message when API returns an invalid definition', async () => {
+    const user = userEvent.setup()
+    mockPost.mockResolvedValue({
+      error: {
+        code: 'WORKFLOW_DEFINITION_INVALID',
+        detail: 'The workflow definition failed validation',
+      },
+    })
+
+    const validContent = JSON.stringify({
+      triggers: [{ id: 't1', type: 'webhook' }],
+      nodes: [{ id: 'n1', type: 'action' }],
+      edges: [{ from: 't1', to: 'n1' }],
+    })
+
+    render(<ImportWorkflowDialog {...defaultProps} />)
+
+    await user.upload(getFileInput(), new File([validContent], 'wf.json', { type: 'application/json' }))
+    await user.type(screen.getByLabelText(/Workflow name/i), 'Test WF')
+    await user.click(screen.getByRole('button', { name: /^Import$/i }))
+
+    await waitFor(() => {
+      expect(mockShowError).toHaveBeenCalledWith({
+        title: 'Import failed',
+        description: IMPORT_INVALID_FORMAT_MESSAGE,
+      })
+    })
+  })
+
+  it('shows file validation error inline with actionable parse details', async () => {
     const user = userEvent.setup()
 
     render(<ImportWorkflowDialog {...defaultProps} />)
@@ -283,6 +348,48 @@ describe('ImportWorkflowDialog', () => {
     await waitFor(() => {
       expect(screen.getByText(/Unexpected token/i)).toBeInTheDocument()
     })
+  })
+
+  it('shows file size error inline when the uploaded file is too large', async () => {
+    const user = userEvent.setup()
+
+    render(<ImportWorkflowDialog {...defaultProps} />)
+
+    const oversizedContent = 'x'.repeat(11 * 1024 * 1024)
+    const file = new File([oversizedContent], 'large.json', { type: 'application/json' })
+    await user.upload(getFileInput(), file)
+    await user.type(screen.getByLabelText(/Workflow name/i), 'Test')
+    await user.click(screen.getByRole('button', { name: /^Import$/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(WORKFLOW_IMPORT_FILE_TOO_LARGE_MESSAGE)).toBeInTheDocument()
+    })
+    expect(mockPost).not.toHaveBeenCalled()
+  })
+
+  it('shows default import error when the API request throws', async () => {
+    const user = userEvent.setup()
+    mockPost.mockRejectedValue(new Error('Network request failed'))
+
+    const validContent = JSON.stringify({
+      triggers: [{ id: 't1', type: 'webhook' }],
+      nodes: [{ id: 'n1', type: 'action' }],
+      edges: [{ from: 't1', to: 'n1' }],
+    })
+
+    render(<ImportWorkflowDialog {...defaultProps} />)
+
+    await user.upload(getFileInput(), new File([validContent], 'wf.json', { type: 'application/json' }))
+    await user.type(screen.getByLabelText(/Workflow name/i), 'Test WF')
+    await user.click(screen.getByRole('button', { name: /^Import$/i }))
+
+    await waitFor(() => {
+      expect(mockShowError).toHaveBeenCalledWith({
+        title: 'Import failed',
+        description: IMPORT_DEFAULT_ERROR_MESSAGE,
+      })
+    })
+    expect(screen.queryByText(IMPORT_INVALID_FORMAT_MESSAGE)).not.toBeInTheDocument()
   })
 
   it('registers onProjectSelect callback for clearing validation errors', () => {
@@ -411,7 +518,7 @@ describe('ImportWorkflowDialog', () => {
     expect(hasActionLink).toBe(true)
   })
 
-  it('shows import error when API returns a validation warning', async () => {
+  it('shows default import error when API returns an unmapped warning code', async () => {
     const user = userEvent.setup()
     mockPost.mockResolvedValue({ error: { code: 'WORKFLOW_DEFINITION_WARNINGS', detail: 'has warnings' } })
 
@@ -430,7 +537,7 @@ describe('ImportWorkflowDialog', () => {
       expect(mockShowError).toHaveBeenCalledWith(
         expect.objectContaining({
           title: 'Import failed',
-          description: 'has warnings',
+          description: IMPORT_DEFAULT_ERROR_MESSAGE,
         })
       )
     })

@@ -23,10 +23,14 @@ import { Controller, useForm } from 'react-hook-form'
 import { workflowFetchClient } from '../../client'
 import { useProjectSelector } from '../../hooks/useProjectSelector'
 import { useAlerts } from '../../providers/alerts'
-import { getErrorMessage } from '../../utils/apiErrors'
 import { detachPromise } from '../../utils/detachPromise'
-import { parseWorkflowFile, validateFileSize } from '../../utils/downloadWorkflowExport'
+import {
+  MAX_WORKFLOW_IMPORT_FILE_SIZE_BYTES,
+  WORKFLOW_IMPORT_FILE_TOO_LARGE_MESSAGE,
+  parseWorkflowFile,
+} from '../../utils/downloadWorkflowExport'
 
+import { getImportWorkflowApiErrorMessage, getImportWorkflowFileErrorMessage } from './importWorkflowErrors'
 import { importWorkflowSchema } from './importWorkflowSchema'
 import type { ImportWorkflowFormData } from './importWorkflowSchema'
 
@@ -143,14 +147,27 @@ export function ImportWorkflowDialog({ isOpen, onClose, onSuccess }: ImportWorkf
     setIsSaving(true)
     setFileError(null)
 
+    // handleImportClick validates file presence before invoking handleSubmit
+    if (!file) return
+
+    if (file.size > MAX_WORKFLOW_IMPORT_FILE_SIZE_BYTES) {
+      setFileError(WORKFLOW_IMPORT_FILE_TOO_LARGE_MESSAGE)
+      setIsSaving(false)
+      return
+    }
+
+    let fullDefinition: V2WorkflowDefinition
     try {
-      // handleImportClick validates file presence before invoking handleSubmit
-      if (!file) return
-      validateFileSize(file)
       const content = await file.text()
       const parsed = parseWorkflowFile(content, file.name)
-      const fullDefinition = buildFullDefinition(parsed, data.name)
+      fullDefinition = buildFullDefinition(parsed, data.name)
+    } catch (err: unknown) {
+      setFileError(getImportWorkflowFileErrorMessage(err))
+      setIsSaving(false)
+      return
+    }
 
+    try {
       const { data: result, error } = await workflowFetchClient.POST('/workflows', {
         body: {
           name: data.name,
@@ -161,7 +178,7 @@ export function ImportWorkflowDialog({ isOpen, onClose, onSuccess }: ImportWorkf
       })
 
       if (error) {
-        showError({ title: 'Import failed', description: getErrorMessage(error) })
+        showError({ title: 'Import failed', description: getImportWorkflowApiErrorMessage(error) })
         return
       }
 
@@ -172,8 +189,7 @@ export function ImportWorkflowDialog({ isOpen, onClose, onSuccess }: ImportWorkf
         result?.validation_result?.findings
       )
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to parse file'
-      setFileError(message)
+      showError({ title: 'Import failed', description: getImportWorkflowApiErrorMessage(err) })
     } finally {
       setIsSaving(false)
     }

@@ -30,6 +30,7 @@ import { SynErrorState } from '../../components/states/SynErrorState'
 import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 import { useElapsedTime } from '../../hooks/useElapsedTime'
 import { extractAAPJobUrl, isAAPNodeType } from '../../utils/aapJobUrl'
+import { capitalize } from '../../utils/capitalize'
 import { formatElapsedTime } from '../../utils/dateUtils'
 import { detachPromise } from '../../utils/detachPromise'
 import { highlightTextLines } from '../../utils/highlightText'
@@ -174,7 +175,7 @@ function ApprovalAuditSection({ audit }: Readonly<{ audit: ApprovalAudit }>) {
           <StackItem className={styles.auditLabel}>Decision</StackItem>
           <StackItem>
             <SynLabel variant="outline" status={status} icon={IconComponent ? <IconComponent /> : undefined}>
-              {audit.decision.charAt(0).toUpperCase() + audit.decision.slice(1)}
+              {capitalize(audit.decision)}
             </SynLabel>
           </StackItem>
         </Stack>

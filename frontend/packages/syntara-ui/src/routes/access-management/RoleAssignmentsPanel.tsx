@@ -19,8 +19,10 @@ import { SynLoadingState } from '../../components/states/SynLoadingState'
 import type { KebabAction } from '../../components/SynKebabMenu'
 import { SynKebabMenu } from '../../components/SynKebabMenu'
 import { LinkCell } from '../../components/table/LinkCell'
+import type { PaginationFooterProps } from '../../components/table/PaginationFooter'
 import { SynScrollableTableContainer } from '../../components/table/SynScrollableTableContainer'
 import { invalidateAuthzCaches } from '../../hooks/invalidateAuthzCaches'
+import { useClientPagination } from '../../hooks/useClientPagination'
 import { useColumnSortState } from '../../hooks/useColumnSortState'
 import { useExpandableRowIds } from '../../hooks/useExpandableRowIds'
 import { useFilterState } from '../../hooks/useFilterState'
@@ -74,14 +76,9 @@ function getAssignmentActions(
 
 function RoleAssignmentsTable({
   paginatedRows,
-  sortedRows,
-  page,
-  perPage,
+  footer,
   getSortParams,
   onUnassign,
-  onPrev,
-  onNext,
-  onPerPageChange,
   permissions,
   visibleColumns,
   expandedRows,
@@ -90,14 +87,9 @@ function RoleAssignmentsTable({
   onCollapseAll,
 }: Readonly<{
   paginatedRows: RoleAssignmentRow[]
-  sortedRows: RoleAssignmentRow[]
-  page: number
-  perPage: number
+  footer: PaginationFooterProps
   getSortParams: (columnIndex: number) => ThProps['sort']
   onUnassign: (row: RoleAssignmentRow) => void
-  onPrev: () => void
-  onNext: () => void
-  onPerPageChange: (perPage: number) => void
   permissions: ReturnType<typeof useAssignmentPermissions>
   visibleColumns: ColumnDefinition[]
   expandedRows: Set<string>
@@ -110,19 +102,7 @@ function RoleAssignmentsTable({
   const expandableColumnCount = visibleColumns.length + 2
 
   return (
-    <SynScrollableTableContainer
-      caption="Role assignments table"
-      isExpandable
-      footer={{
-        page,
-        perPage,
-        total: sortedRows.length,
-        hasNext: page * perPage < sortedRows.length,
-        onPrev,
-        onNext,
-        onPerPageChange,
-      }}
-    >
+    <SynScrollableTableContainer caption="Role assignments table" isExpandable footer={footer}>
       <Thead>
         <Tr>
           <Th
@@ -221,14 +201,9 @@ function TableContent({
   clearAllFilters,
   resetPage,
   paginatedRows,
-  sortedRows,
-  page,
-  perPage,
+  footer,
   getSortParams,
   onUnassign,
-  onPrev,
-  onNext,
-  onPerPageChange,
   permissions,
   visibleColumns,
   expandedRows,
@@ -243,14 +218,9 @@ function TableContent({
   clearAllFilters: () => void
   resetPage: () => void
   paginatedRows: RoleAssignmentRow[]
-  sortedRows: RoleAssignmentRow[]
-  page: number
-  perPage: number
+  footer: PaginationFooterProps
   getSortParams: (columnIndex: number) => ThProps['sort']
   onUnassign: (row: RoleAssignmentRow) => void
-  onPrev: () => void
-  onNext: () => void
-  onPerPageChange: (perPage: number) => void
   permissions: ReturnType<typeof useAssignmentPermissions>
   visibleColumns: ColumnDefinition[]
   expandedRows: Set<string>
@@ -286,14 +256,9 @@ function TableContent({
   return (
     <RoleAssignmentsTable
       paginatedRows={paginatedRows}
-      sortedRows={sortedRows}
-      page={page}
-      perPage={perPage}
+      footer={footer}
       getSortParams={getSortParams}
       onUnassign={onUnassign}
-      onPrev={onPrev}
-      onNext={onNext}
-      onPerPageChange={onPerPageChange}
       permissions={permissions}
       visibleColumns={visibleColumns}
       expandedRows={expandedRows}
@@ -334,9 +299,8 @@ export function RoleAssignmentsPanel({
   const openAssignIfAllowed = assignmentPermissions.canAssign ? () => setAssignModalOpen(true) : undefined
   const [rowToUnassign, setRowToUnassign] = useState<RoleAssignmentRow | null>(null)
   const { filters, setAllFilters, clearAllFilters } = useFilterState()
-  const { activeSortIndex, sortDirection, getSortParams } = useColumnSortState(sortMaps.sortFieldByColumn)
-  const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(20)
+  const { paginate, getFooterProps, resetPage } = useClientPagination()
+  const { activeSortIndex, sortDirection, getSortParams } = useColumnSortState(sortMaps.sortFieldByColumn, resetPage)
   const { showAlert } = useAlerts()
 
   const { rows, queryForbidden, activeQuery, isLoading, deleteAssignment, refetch } = useRoleAssignmentData(
@@ -352,12 +316,7 @@ export function RoleAssignmentsPanel({
 
   const handleFilterChange = (newFilters: FilterConfig[]) => {
     setAllFilters(newFilters)
-    setPage(1)
-  }
-
-  const handlePerPageChange = (newPerPage: number) => {
-    setPerPage(newPerPage)
-    setPage(1)
+    resetPage()
   }
 
   const filteredRows = useMemo(() => applyRoleAssignmentFilters(rows, filters), [rows, filters])
@@ -367,10 +326,8 @@ export function RoleAssignmentsPanel({
     [filteredRows, activeSortIndex, sortDirection, sortMaps]
   )
 
-  const paginatedRows = useMemo(() => {
-    const start = (page - 1) * perPage
-    return sortedRows.slice(start, start + perPage)
-  }, [sortedRows, page, perPage])
+  const paginatedRows = useMemo(() => paginate(sortedRows), [sortedRows, paginate])
+  const tableFooter = useMemo(() => getFooterProps(sortedRows.length), [getFooterProps, sortedRows.length])
 
   const paginatedRowIds = useMemo(() => paginatedRows.map((row) => row.id), [paginatedRows])
   const { expandedRows, allRowsExpanded, handleToggleRow, handleCollapseAll } = useExpandableRowIds(paginatedRowIds)
@@ -447,7 +404,7 @@ export function RoleAssignmentsPanel({
                 showClearAll={true}
                 clearAllFilters={() => {
                   clearAllFilters()
-                  setPage(1)
+                  resetPage()
                 }}
               />
             </FlexItem>
@@ -475,16 +432,11 @@ export function RoleAssignmentsPanel({
           principalType={principalType}
           openAssignIfAllowed={openAssignIfAllowed}
           clearAllFilters={clearAllFilters}
-          resetPage={() => setPage(1)}
+          resetPage={resetPage}
           paginatedRows={paginatedRows}
-          sortedRows={sortedRows}
-          page={page}
-          perPage={perPage}
+          footer={tableFooter}
           getSortParams={getSortParams}
           onUnassign={setRowToUnassign}
-          onPrev={() => setPage((p) => Math.max(1, p - 1))}
-          onNext={() => setPage((p) => p + 1)}
-          onPerPageChange={handlePerPageChange}
           permissions={assignmentPermissions}
           visibleColumns={visibleColumns}
           expandedRows={expandedRows}

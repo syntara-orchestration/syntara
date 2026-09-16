@@ -1155,6 +1155,8 @@ components:
         - orphaned_node
         - converge_configuration
         - approval_configuration
+        - definition_limits
+
     ValidationFinding:
       type: object
       title: ValidationFinding

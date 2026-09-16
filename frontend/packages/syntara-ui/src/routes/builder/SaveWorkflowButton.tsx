@@ -2,8 +2,9 @@ import { Button, Icon, Timestamp, Tooltip } from '@patternfly/react-core'
 import { RhUiSaveFillIcon } from '@patternfly/react-icons'
 import type { ReactNode } from 'react'
 
-import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { toDisplayDate } from '../../utils/dateUtils'
+
+import styles from './SaveWorkflowButton.module.css'
 
 type SaveWorkflowButtonProps = Readonly<{
   isPending: boolean
@@ -30,7 +31,10 @@ export function SaveWorkflowButton({
   const lastSavedDate = toDisplayDate(lastSavedAt)
   const lastSavedText = lastSavedDate ? (
     <>
-      Last saved <Timestamp date={lastSavedDate} dateFormat="medium" timeFormat="medium" />
+      Last saved:{' '}
+      <span className={styles.lastSavedTooltip}>
+        <Timestamp date={lastSavedDate} dateFormat="medium" timeFormat="medium" />
+      </span>
     </>
   ) : null
 
@@ -70,16 +74,9 @@ export function SaveWorkflowButton({
     </Button>
   )
 
-  if (isDisabled) {
-    return (
-      <DisabledWithTooltip isDisabled content={disabledTooltip} position="bottom">
-        {button}
-      </DisabledWithTooltip>
-    )
-  }
-
+  // Keep a single Tooltip wrapper so pending/clean transitions do not remount the button tree.
   return (
-    <Tooltip content={enabledTooltip} position="bottom" enableFlip={false}>
+    <Tooltip content={isDisabled ? disabledTooltip : enabledTooltip} position="bottom" enableFlip={false}>
       {button}
     </Tooltip>
   )

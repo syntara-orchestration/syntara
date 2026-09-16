@@ -11,11 +11,10 @@
  */
 import { test, expect, toAppUrl } from './fixtures'
 import { filterCredentialByName, goToCredentialsList } from './helpers/credentials'
+import { USER_DETAIL_HREF_PATTERN } from './helpers/userLinks'
 import { buildUniqueName } from './helpers/workflows'
 import { createCredentialSeed, deleteCredentialViaApi, type SeededCredential } from './seeds/resources'
 import { getAuthToken } from './utils/api'
-
-const USER_DETAIL_HREF_PATTERN = /^\/system-administration\/access-management\/users\/[a-f0-9-]+$/
 
 let seededCred: SeededCredential | null = null
 let credName: string

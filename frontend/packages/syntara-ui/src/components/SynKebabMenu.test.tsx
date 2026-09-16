@@ -73,6 +73,18 @@ describe('SynKebabMenu', () => {
     expect(screen.getByRole('menuitem', { name: 'Edit' })).toBeInTheDocument()
   })
 
+  it('calls onOpenChange when the menu opens and closes', async () => {
+    const user = userEvent.setup()
+    const onOpenChange = vi.fn()
+    render(<SynKebabMenu actions={buildActions()} aria-label="Row actions" onOpenChange={onOpenChange} />)
+
+    await user.click(screen.getByRole('button', { name: 'Row actions' }))
+    expect(onOpenChange).toHaveBeenCalledWith(true)
+
+    await user.keyboard('{Escape}')
+    expect(onOpenChange).toHaveBeenCalledWith(false)
+  })
+
   it('removes danger styling from aria-disabled items', async () => {
     const user = userEvent.setup()
     const actions: KebabAction[] = [
