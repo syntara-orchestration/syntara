@@ -19,6 +19,9 @@ from pydantic.functional_validators import ModelWrapValidatorHandler
 from syntara.aap.models.responses import AAPJobType as AAPJobType  # noqa: PLC0414
 from syntara.core.constants import FieldLimits, WebhookLimits
 from syntara.core.exceptions import SafeValueError
+from syntara.core.utils.security import validate_css_security
+from syntara.forms.models.form_fields import FormDefinition
+from syntara.forms.validators.form_definition import validate_form_definition
 from syntara.workflows.json_schema_validation import validate_json_schema_definition
 from syntara.workflows.utils.iso8601_interval import parse_iso8601_repeating_interval
 from syntara.workflows.utils.output_mapping import apply_output_mapping
@@ -29,60 +32,7 @@ logger = structlog.stdlib.get_logger(__name__)
 # Template expression pattern - matches ${...} expressions
 TEMPLATE_PATTERN = re.compile(r"\$\{[^}]+\}")
 
-# CSS Unicode escape pattern: \XX or \XXXXXX (1-6 hex digits, optional trailing space)
-# Used to normalize CSS before security validation to prevent bypasses via \75rl( etc.
-_CSS_UNICODE_ESCAPE = re.compile(r"\\([0-9a-fA-F]{1,6})\s?")
-
-# CSS identity escape pattern: \ followed by any non-hex-digit, non-newline character
-# Resolves to that character (backslash dropped). Prevents bypasses via u\rl(, @\import, etc.
-_CSS_IDENTITY_ESCAPE = re.compile(r"\\([^0-9a-fA-F\r\n])")
-
-# CSS comment pattern: /* ... */ (DOTALL to match across newlines)
-# Prevents bypasses via behavior/**/: url(x.htc), url/**/(http://evil.com), etc.
-_CSS_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
-
-# Maximum valid Unicode codepoint (U+10FFFF per CSS and Unicode specs)
-_MAX_UNICODE_CODEPOINT = 0x10FFFF
-
 _CONFIG_VALIDATION_FAILED = "Config validation failed"
-
-
-def _normalize_css(css: str) -> str:
-    r"""Normalize CSS to prevent security check bypasses.
-
-    Performs three normalization steps:
-    1. Strips CSS comments (/* ... */) to prevent bypasses like behavior/**/: url(x.htc)
-    2. Normalizes numeric hex escapes: \XX or \XXXXXX (1-6 hex digits, optional trailing space)
-       Example: \75rl( → url(, \40import → @import
-    3. Normalizes identity escapes: \ followed by any non-hex-digit, non-newline character
-       Example: u\rl( → url(, @\import → @import
-
-    This prevents bypassing security checks via comments, numeric escapes, and identity escapes.
-
-    Follows CSS spec for escape sequences. Numeric codepoints above U+10FFFF
-    are replaced with U+FFFD per CSS spec.
-
-    Args:
-        css: Raw CSS string that may contain comments and/or CSS escapes.
-
-    Returns:
-        CSS with comments stripped and all escape sequences converted to their character equivalents.'
-
-    """
-
-    def replace_numeric_escape(match: re.Match[str]) -> str:
-        codepoint = int(match.group(1), 16)
-        # CSS spec: codepoints above U+10FFFF are invalid, replaced with U+FFFD
-        if codepoint > _MAX_UNICODE_CODEPOINT:
-            return "�"
-        return chr(codepoint)
-
-    # Strip CSS comments (/* ... */)
-    css = _CSS_COMMENT.sub("", css)
-    # Normalize numeric hex escapes (\75 → u)
-    css = _CSS_UNICODE_ESCAPE.sub(replace_numeric_escape, css)
-    # Normalize identity escapes (\r → r)
-    return _CSS_IDENTITY_ESCAPE.sub(r"\1", css)
 
 
 def validate_tool_selection_coherence(
@@ -960,6 +910,13 @@ class FormPromptNodeParameters(BaseModel):
         description="Custom CSS applied to the form view.",
     )
 
+    @field_validator("form_definition")
+    @classmethod
+    def validate_form_defaults(cls, v: FormDefinition) -> FormDefinition:
+        """Validate that field defaults are valid for their field types."""
+        validate_form_definition(v, form_id=None)
+        return v
+
     @field_validator("timezone")
     @classmethod
     def validate_timezone(cls, v: str | None) -> str | None:
@@ -978,36 +935,10 @@ class FormPromptNodeParameters(BaseModel):
         if v is None:
             return v
 
-        # Normalize CSS before validation to prevent bypasses
-        normalized = _normalize_css(v)
-        normalized_lower = normalized.lower()
-
-        # Reject url() - can exfiltrate data via background-image, etc.
-        if "url(" in normalized_lower:
-            msg = "CSS override cannot contain url() - it enables data exfiltration"
-            raise SafeValueError(msg)
-
-        # Reject @import - can load external stylesheets
-        if "@import" in normalized_lower:
-            msg = "CSS override cannot contain @import - it enables loading external resources"
-            raise SafeValueError(msg)
-
-        # Reject attribute selectors - can exfiltrate form values character by character
-        # NOTE: Over-blocks legitimate bracket uses in string literals (e.g., content: "[Required]").
-        # Accepted trade-off: over-blocking is safe; parsing strings would be complex and error-prone.
-        if "[" in normalized and "]" in normalized:
-            msg = "CSS override cannot contain attribute selectors - they enable data exfiltration"
-            raise SafeValueError(msg)
-
-        # Reject expression() - old IE code execution vector
-        if "expression(" in normalized_lower:
-            msg = "CSS override cannot contain expression() - it enables code execution"
-            raise SafeValueError(msg)
-
-        # Reject behavior: - old IE code execution vector
-        if "behavior:" in normalized_lower:
-            msg = "CSS override cannot contain behavior: - it enables code execution"
-            raise SafeValueError(msg)
+        try:
+            validate_css_security(v)
+        except ValueError as exc:
+            raise SafeValueError(str(exc)) from exc
 
         return v
 
