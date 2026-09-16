@@ -10,8 +10,12 @@ import pytest
 from pydantic import ValidationError
 
 from syntara.core.constants import FieldLimits
-from syntara.forms.models import FormPrompt, FormPromptStatus
+from syntara.forms.models.api_models import FormPromptStatus
+from syntara.forms.models.form_fields import FormDefinition, TextField
+from syntara.forms.models.form_prompt import FormPrompt
 from tests.unit.fixtures.form import create_test_form_prompt
+
+_FORM_DEFINITION = FormDefinition(fields=[TextField(type="text", value_name="reason", label="Reason")])
 
 
 class TestFormPromptValidation:
@@ -28,7 +32,7 @@ class TestFormPromptValidation:
                 project_id=uuid4(),
                 prompt_node_id="test",
                 name="",  # Empty name should fail min_length validation
-                input_schema={"type": "object"},
+                form_definition=_FORM_DEFINITION,
             )
 
         # Test empty prompt_node_id
@@ -38,7 +42,7 @@ class TestFormPromptValidation:
                 project_id=uuid4(),
                 prompt_node_id="",  # Empty prompt_node_id should fail
                 name="Test",
-                input_schema={"type": "object"},
+                form_definition=_FORM_DEFINITION,
             )
 
     def test_string_field_length_limits(self) -> None:
@@ -53,7 +57,7 @@ class TestFormPromptValidation:
                 project_id=uuid4(),
                 prompt_node_id="test",
                 name=long_name,
-                input_schema={"type": "object"},
+                form_definition=_FORM_DEFINITION,
             )
 
         # Test prompt_node_id length limit (max NAME_MAX_LENGTH)
@@ -64,7 +68,7 @@ class TestFormPromptValidation:
                 project_id=uuid4(),
                 prompt_node_id=long_node_id,
                 name="Test",
-                input_schema={"type": "object"},
+                form_definition=_FORM_DEFINITION,
             )
 
         # Test message length limit (max DESCRIPTION_MAX_LENGTH)
@@ -76,7 +80,7 @@ class TestFormPromptValidation:
                 prompt_node_id="test",
                 name="Test",
                 message=long_message,
-                input_schema={"type": "object"},
+                form_definition=_FORM_DEFINITION,
             )
 
     def test_optional_fields(self) -> None:

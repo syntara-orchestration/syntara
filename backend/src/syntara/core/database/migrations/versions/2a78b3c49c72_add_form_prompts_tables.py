@@ -53,7 +53,6 @@ def upgrade() -> None:
         sa.Column(
             "form_definition",
             postgresql.JSONB(astext_type=sa.Text()),
-            server_default=sa.text("'{}'::jsonb"),
             nullable=False,
         ),
         sa.Column("submit_label", sa.String(length=FieldLimits.FORM_SUBMIT_LABEL_MAX_LENGTH), nullable=True),

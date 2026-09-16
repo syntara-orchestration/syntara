@@ -9,7 +9,8 @@ from uuid import UUID
 
 from syntara.core.exception_registry import fastapi_exception
 from syntara.core.exceptions import SyntaraError
-from syntara.forms.models import FormPromptStatus
+from syntara.forms.models.api_models import FormPromptStatus
+from syntara.forms.models.form_errors import FormFieldError
 
 
 class FormError(SyntaraError):
@@ -80,3 +81,42 @@ class FormPromptAlreadyRequestedError(FormError):
             f"{execution_id}, prompt node '{prompt_node_id}', "
             f"loop_iteration_path={self.loop_iteration_path}"
         )
+
+
+class FormDefinitionError(FormError):
+    """Raised when a form definition is invalid. Carries structured per-field errors."""
+
+    def __init__(self, errors: list[FormFieldError], form_id: str | None = None) -> None:
+        """Initialize with field-level errors.
+
+        Args:
+            errors: List of per-field definition errors
+            form_id: Optional form/node identifier for context
+
+        """
+        self.errors = errors
+        self.form_id = form_id
+        error_summary = f"{len(errors)} invalid field definition(s)"
+        if form_id:
+            error_summary = f"{form_id}: {error_summary}"
+        super().__init__(error_summary)
+
+
+@fastapi_exception(handler="syntara.forms.error_handlers.form_data_validation_error_handler")
+class FormDataValidationError(FormError):
+    """Raised when submitted form data fails validation. Carries structured per-field errors."""
+
+    def __init__(self, errors: list[FormFieldError], form_id: str | None = None) -> None:
+        """Initialize with field-level errors.
+
+        Args:
+            errors: List of field validation errors
+            form_id: Optional form/node identifier for context
+
+        """
+        self.errors = errors
+        self.form_id = form_id
+        error_summary = f"{len(errors)} validation error(s)"
+        if form_id:
+            error_summary = f"{form_id}: {error_summary}"
+        super().__init__(error_summary)
