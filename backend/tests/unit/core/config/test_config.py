@@ -335,6 +335,13 @@ class TestServerSettings:
         settings = Settings(_env_file=None)
         assert settings.otel_service_name == "automation-orchestrator"
 
+    def test_explicit_default_otel_service_name_is_preserved(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """An explicit OTEL service name matching the default is not derived over."""
+        monkeypatch.setenv("APP_PRODUCT_NAME", "Automation Orchestrator")
+        monkeypatch.setenv("APP_OTEL_SERVICE_NAME", "syntara")
+        settings = Settings(_env_file=None)
+        assert settings.otel_service_name == "syntara"
+
     def test_server_settings_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test server settings can be configured via environment."""
         monkeypatch.setenv("APP_SERVER_HOST", "127.0.0.1")
