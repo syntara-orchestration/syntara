@@ -1,4 +1,4 @@
-"""Form field models — pure pydantic + stdlib for Temporal sandbox compatibility."""
+"""Form field models — pydantic models with no runtime imports beyond core."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, ConfigDict, Discriminator, Field, model_validator
 
 from syntara.core.constants import FieldLimits
+from syntara.core.exceptions import SafeValueError
 
 FIELD_NAME_PATTERN = r"^[a-zA-Z_][a-zA-Z0-9_]*$"
 
@@ -146,7 +147,7 @@ def _check_multi_select_defaults(value_name: str, defaults: list[Any], valid_val
     """Check multi-select defaults are scalars drawn from the option list.
 
     Raises:
-        ValueError: If any default is non-scalar or absent from the options
+        SafeValueError: If any default is non-scalar or absent from the options
 
     """
     # default is list[Any], so entries may be unhashable. Testing membership
@@ -160,12 +161,12 @@ def _check_multi_select_defaults(value_name: str, defaults: list[Any], valid_val
             f"Field '{value_name}': default values must be scalars "
             f"(str, int, float, or bool), got {', '.join(types_found)}"
         )
-        raise ValueError(msg)
+        raise SafeValueError(msg)
 
     invalid_defaults = [v for v in defaults if v not in valid_values]
     if invalid_defaults:
         msg = f"Field '{value_name}': default values {invalid_defaults} are not in the option list"
-        raise ValueError(msg)
+        raise SafeValueError(msg)
 
 
 class FormDefinition(BaseModel):
@@ -182,7 +183,7 @@ class FormDefinition(BaseModel):
         duplicates = {name for name in names if names.count(name) > 1}
         if duplicates:
             msg = f"Duplicate field names are not allowed: {', '.join(sorted(duplicates))}"
-            raise ValueError(msg)
+            raise SafeValueError(msg)
         return self
 
     @model_validator(mode="after")
@@ -203,5 +204,5 @@ class FormDefinition(BaseModel):
                     _check_multi_select_defaults(field.value_name, defaults, valid_values)
             elif field.default is not None and field.default not in valid_values:
                 msg = f"Field '{field.value_name}': default value '{field.default}' is not in the option list"
-                raise ValueError(msg)
+                raise SafeValueError(msg)
         return self
