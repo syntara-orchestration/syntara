@@ -131,7 +131,7 @@ class BaseFormPrompt(BaseResource, table=False):
         default=None,
         max_length=FieldLimits.FORM_TIMEZONE_MAX_LENGTH,
         sa_type=String(FieldLimits.FORM_TIMEZONE_MAX_LENGTH),  # type: ignore[call-overload]
-        description="IANA timezone name for interpreting date/datetime field values (longest ~40 chars)",
+        description="IANA timezone name for interpreting date/datetime field values",
     )
 
     css_override: str | None = Field(
