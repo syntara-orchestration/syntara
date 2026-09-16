@@ -115,6 +115,74 @@ def test_fetch_merge_group_labels_includes_the_current_entry_approval(monkeypatc
     ]
 
 
+def test_fetch_merge_group_labels_retries_transient_gh_failures(monkeypatch: pytest.MonkeyPatch) -> None:
+    command: list[str] = []
+    calls: list[list[str]] = []
+    responses = iter(
+        [
+            subprocess.CompletedProcess(command, 1, "", "HTTP 503: Service Unavailable"),
+            subprocess.CompletedProcess(
+                command,
+                0,
+                '{"data":{"repository":{"mergeQueue":{"entries":{"nodes":['
+                '{"position":1,"pullRequest":{"number":506,"labels":{"nodes":[]}}}'
+                "]}}}}}",
+                "",
+            ),
+        ]
+    )
+    sleeps: list[int] = []
+
+    def fake_run(run_command: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append(run_command)
+        return next(responses)
+
+    monkeypatch.setattr(resolve_labels.subprocess, "run", fake_run)
+    monkeypatch.setattr(resolve_labels.time, "sleep", sleeps.append)
+
+    assert resolve_labels.fetch_merge_group_labels("syntara-orchestration", "syntara", "devel", 506) == []
+    assert len(calls) == 2
+    assert sleeps == [1]
+
+
+def test_fetch_merge_group_labels_does_not_retry_permanent_gh_failures(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = 0
+    sleeps: list[int] = []
+
+    def fake_run(command: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        nonlocal calls
+        calls += 1
+        return subprocess.CompletedProcess(command, 1, "", "HTTP 401: Bad credentials")
+
+    monkeypatch.setattr(resolve_labels.subprocess, "run", fake_run)
+    monkeypatch.setattr(resolve_labels.time, "sleep", sleeps.append)
+
+    with pytest.raises(RuntimeError, match="failed to fetch"):
+        resolve_labels.fetch_merge_group_labels("syntara-orchestration", "syntara", "devel", 506)
+
+    assert calls == 1
+    assert sleeps == []
+
+
+def test_fetch_merge_group_labels_stops_after_bounded_transient_retries(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = 0
+    sleeps: list[int] = []
+
+    def fake_run(command: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        nonlocal calls
+        calls += 1
+        return subprocess.CompletedProcess(command, 1, "", "HTTP 503: Service Unavailable")
+
+    monkeypatch.setattr(resolve_labels.subprocess, "run", fake_run)
+    monkeypatch.setattr(resolve_labels.time, "sleep", sleeps.append)
+
+    with pytest.raises(RuntimeError, match="failed to fetch"):
+        resolve_labels.fetch_merge_group_labels("syntara-orchestration", "syntara", "devel", 506)
+
+    assert calls == 3
+    assert sleeps == [1, 2]
+
+
 @pytest.mark.parametrize(
     ("returncode", "stdout", "stderr", "error"),
     [

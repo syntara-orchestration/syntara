@@ -14,9 +14,15 @@ import os
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 MERGE_GROUP_PR_REF_PATTERN = re.compile(r"(?:^|/)pr-(\d+)-[^/]+$")
+TRANSIENT_GH_API_ERROR_PATTERN = re.compile(
+    r"\b(?:HTTP\s+(?:429|500|502|503|504)|(?:secondary )?rate limit|temporarily unavailable|timeout|connection (?:reset|refused))\b",
+    re.IGNORECASE,
+)
+GH_API_RETRY_DELAYS_SECONDS = (1, 2)
 
 
 def extract_pr_number(head_ref: str) -> int:
@@ -46,6 +52,24 @@ def merge_queue_branch(base_ref: str) -> str:
     return branch
 
 
+def is_transient_gh_api_error(result: subprocess.CompletedProcess[str]) -> bool:
+    """Return whether a failed gh invocation can safely be retried."""
+    detail = f"{result.stderr}\n{result.stdout}"
+    return bool(TRANSIENT_GH_API_ERROR_PATTERN.search(detail))
+
+
+def run_gh_api(command: list[str]) -> subprocess.CompletedProcess[str]:
+    """Run a read-only gh API command with bounded retries for transient failures."""
+    for delay in (*GH_API_RETRY_DELAYS_SECONDS, None):
+        result = subprocess.run(  # noqa: S603 - executable is fixed and arguments are passed as a list
+            command, capture_output=True, text=True, check=False
+        )
+        if result.returncode == 0 or delay is None or not is_transient_gh_api_error(result):
+            return result
+        time.sleep(delay)
+    return result
+
+
 def fetch_merge_group_labels(owner: str, repository: str, branch: str, pull_number: int) -> list[str]:
     """Fetch labels for the current and preceding merge-queue entries."""
     command = [
@@ -69,9 +93,7 @@ def fetch_merge_group_labels(owner: str, repository: str, branch: str, pull_numb
         "}",
     ]
     try:
-        result = subprocess.run(  # noqa: S603 - executable is fixed and arguments are passed as a list
-            command, capture_output=True, text=True, check=False
-        )
+        result = run_gh_api(command)
     except FileNotFoundError as exc:
         message = "gh CLI is not installed"
         raise RuntimeError(message) from exc
@@ -100,14 +122,20 @@ def fetch_merge_group_labels(owner: str, repository: str, branch: str, pull_numb
         message = f"gh returned merge-queue entries with an invalid shape for PR #{pull_number}"
         raise ValueError(message)
 
-    current_positions = [entry.get("position") for entry in entries if entry.get("pullRequest", {}).get("number") == pull_number]
+    current_positions = [
+        entry.get("position") for entry in entries if entry.get("pullRequest", {}).get("number") == pull_number
+    ]
     if len(current_positions) != 1 or not isinstance(current_positions[0], int):
         message = f"could not find queued PR #{pull_number} in the {branch} merge queue"
         raise ValueError(message)
 
     labels: list[str] = []
     for entry in entries:
-        if not isinstance(entry, dict) or not isinstance(entry.get("position"), int) or entry["position"] > current_positions[0]:
+        if (
+            not isinstance(entry, dict)
+            or not isinstance(entry.get("position"), int)
+            or entry["position"] > current_positions[0]
+        ):
             continue
         pull_request = entry.get("pullRequest")
         if not isinstance(pull_request, dict):
@@ -115,7 +143,9 @@ def fetch_merge_group_labels(owner: str, repository: str, branch: str, pull_numb
             raise ValueError(message)
         labels_connection = pull_request.get("labels")
         label_nodes = labels_connection.get("nodes") if isinstance(labels_connection, dict) else None
-        if not isinstance(label_nodes, list) or not all(isinstance(label, dict) and isinstance(label.get("name"), str) for label in label_nodes):
+        if not isinstance(label_nodes, list) or not all(
+            isinstance(label, dict) and isinstance(label.get("name"), str) for label in label_nodes
+        ):
             message = f"gh returned labels with an invalid shape for PR #{pull_number}"
             raise ValueError(message)
         labels.extend(label["name"] for label in label_nodes)
