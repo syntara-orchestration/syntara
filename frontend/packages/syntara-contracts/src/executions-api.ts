@@ -1122,6 +1122,306 @@ export interface components {
       [key: string]: unknown
     }
     /**
+     * TextField
+     * @description Text field.
+     */
+    TextField: {
+      /** Value Name */
+      value_name: string
+      /** Label */
+      label: string
+      /** Placeholder */
+      placeholder?: string | null
+      /** Help Text */
+      help_text?: string | null
+      /**
+       * Required
+       * @default false
+       */
+      required?: boolean
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'text'
+      /** Default */
+      default?: string | null
+    }
+    /**
+     * TextAreaField
+     * @description Text area field.
+     */
+    TextAreaField: {
+      /** Value Name */
+      value_name: string
+      /** Label */
+      label: string
+      /** Placeholder */
+      placeholder?: string | null
+      /** Help Text */
+      help_text?: string | null
+      /**
+       * Required
+       * @default false
+       */
+      required?: boolean
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'textarea'
+      /** Default */
+      default?: string | null
+    }
+    /**
+     * MaskedTextField
+     * @description Masked text field.
+     */
+    MaskedTextField: {
+      /** Value Name */
+      value_name: string
+      /** Label */
+      label: string
+      /** Placeholder */
+      placeholder?: string | null
+      /** Help Text */
+      help_text?: string | null
+      /**
+       * Required
+       * @default false
+       */
+      required?: boolean
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'masked_text'
+      /** Default */
+      default?: string | null
+    }
+    /**
+     * EmailField
+     * @description Email field.
+     */
+    EmailField: {
+      /** Value Name */
+      value_name: string
+      /** Label */
+      label: string
+      /** Placeholder */
+      placeholder?: string | null
+      /** Help Text */
+      help_text?: string | null
+      /**
+       * Required
+       * @default false
+       */
+      required?: boolean
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'email'
+      /** Default */
+      default?: string | null
+    }
+    /**
+     * NumberField
+     * @description Numeric field supporting int or float.
+     */
+    NumberField: {
+      /** Value Name */
+      value_name: string
+      /** Label */
+      label: string
+      /** Placeholder */
+      placeholder?: string | null
+      /** Help Text */
+      help_text?: string | null
+      /**
+       * Required
+       * @default false
+       */
+      required?: boolean
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'number'
+      /** Default */
+      default?: number | null
+    }
+    /**
+     * CheckboxField
+     * @description Boolean checkbox field.
+     */
+    CheckboxField: {
+      /** Value Name */
+      value_name: string
+      /** Label */
+      label: string
+      /** Placeholder */
+      placeholder?: string | null
+      /** Help Text */
+      help_text?: string | null
+      /**
+       * Required
+       * @description When true the checkbox must be checked to submit, for example a terms of service or acknowledgment. An unchecked required checkbox fails with error code 'must_be_checked'.
+       * @default false
+       */
+      required?: boolean
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'checkbox'
+      /**
+       * Default
+       * @default false
+       */
+      default?: boolean
+    }
+    /**
+     * DateField
+     * @description Date field.
+     */
+    DateField: {
+      /** Value Name */
+      value_name: string
+      /** Label */
+      label: string
+      /** Placeholder */
+      placeholder?: string | null
+      /** Help Text */
+      help_text?: string | null
+      /**
+       * Required
+       * @default false
+       */
+      required?: boolean
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'date'
+      /** Default */
+      default?: string | null
+    }
+    /**
+     * StaticOption
+     * @description A single static option for dropdown or multi-select.
+     */
+    StaticOption: {
+      /** Display Label */
+      display_label: string
+      /** Value */
+      value: string | number | boolean
+    }
+    /**
+     * StaticOptions
+     * @description Static option list for dropdown or multi-select.
+     */
+    StaticOptions: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      source: 'static'
+      /** Values */
+      values: components['schemas']['StaticOption'][]
+    }
+    /**
+     * DynamicOptions
+     * @description Dynamic option list resolved from upstream node output.
+     */
+    DynamicOptions: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      source: 'dynamic'
+      /** Expression */
+      expression: string
+      /** Value Key */
+      value_key?: string | null
+      /** Label Key */
+      label_key?: string | null
+    }
+    /**
+     * DropdownField
+     * @description Dropdown field.
+     */
+    DropdownField: {
+      /** Value Name */
+      value_name: string
+      /** Label */
+      label: string
+      /** Placeholder */
+      placeholder?: string | null
+      /** Help Text */
+      help_text?: string | null
+      /**
+       * Required
+       * @default false
+       */
+      required?: boolean
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'dropdown'
+      /** Options */
+      options: components['schemas']['StaticOptions'] | components['schemas']['DynamicOptions']
+      /** Default */
+      default?: string | number | boolean | null
+    }
+    /**
+     * MultiSelectField
+     * @description Multi-select field.
+     */
+    MultiSelectField: {
+      /** Value Name */
+      value_name: string
+      /** Label */
+      label: string
+      /** Placeholder */
+      placeholder?: string | null
+      /** Help Text */
+      help_text?: string | null
+      /**
+       * Required
+       * @default false
+       */
+      required?: boolean
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'multi_select'
+      /** Options */
+      options: components['schemas']['StaticOptions'] | components['schemas']['DynamicOptions']
+      /** Default */
+      default?: unknown[] | null
+    }
+    /**
+     * FormDefinition
+     * @description Complete form definition with fields and metadata.
+     */
+    FormDefinition: {
+      /** Fields */
+      fields: (
+        | components['schemas']['TextField']
+        | components['schemas']['TextAreaField']
+        | components['schemas']['MaskedTextField']
+        | components['schemas']['EmailField']
+        | components['schemas']['NumberField']
+        | components['schemas']['CheckboxField']
+        | components['schemas']['DateField']
+        | components['schemas']['DropdownField']
+        | components['schemas']['MultiSelectField']
+      )[]
+    }
+    /**
      * FormPromptNodeParameters
      * @description Parameters for form prompt nodes.
      */
@@ -1131,13 +1431,8 @@ export interface components {
        * @description Message shown above the form. Supports ${...} template expressions.
        */
       message?: string | null
-      /**
-       * Form Definition
-       * @description JSON Schema describing the form fields to collect.
-       */
-      form_definition: {
-        [key: string]: unknown
-      }
+      /** @description Form definition describing the fields shown to responders. */
+      form_definition: components['schemas']['FormDefinition']
       /**
        * Responder Users
        * @description Usernames allowed to respond. Empty/omitted = any user with form_prompt:submit.

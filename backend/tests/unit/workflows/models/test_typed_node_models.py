@@ -516,7 +516,9 @@ class TestFormPromptNodeParameters:
 
     def test_template_in_message(self) -> None:
         """Template expressions survive in message."""
-        p = FormPromptNodeParameters(form_definition=self._minimal_form_definition(), message="User: ${trigger.username}")
+        p = FormPromptNodeParameters(
+            form_definition=self._minimal_form_definition(), message="User: ${trigger.username}"
+        )
         assert p.message == "User: ${trigger.username}"
 
     def test_invalid_timezone_rejected(self) -> None:
@@ -552,13 +554,16 @@ class TestFormPromptNodeParameters:
         """css_override containing url() is rejected (data exfiltration risk)."""
         with pytest.raises(ValidationError, match="url\\(\\)"):
             FormPromptNodeParameters(
-                form_definition=self._minimal_form_definition(), css_override=".form { background: url(http://evil.com); }"
+                form_definition=self._minimal_form_definition(),
+                css_override=".form { background: url(http://evil.com); }",
             )
 
     def test_css_override_with_import_rejected(self) -> None:
         """css_override containing @import is rejected."""
         with pytest.raises(ValidationError, match="@import"):
-            FormPromptNodeParameters(form_definition=self._minimal_form_definition(), css_override="@import url(evil.css);")
+            FormPromptNodeParameters(
+                form_definition=self._minimal_form_definition(), css_override="@import url(evil.css);"
+            )
 
     def test_css_override_with_attribute_selector_rejected(self) -> None:
         """css_override containing attribute selectors is rejected (data exfiltration risk)."""
@@ -570,12 +575,16 @@ class TestFormPromptNodeParameters:
     def test_css_override_with_expression_rejected(self) -> None:
         """css_override containing expression() is rejected (IE code execution)."""
         with pytest.raises(ValidationError, match="expression\\(\\)"):
-            FormPromptNodeParameters(form_definition=self._minimal_form_definition(), css_override="width: expression(alert(1));")
+            FormPromptNodeParameters(
+                form_definition=self._minimal_form_definition(), css_override="width: expression(alert(1));"
+            )
 
     def test_css_override_with_behavior_rejected(self) -> None:
         """css_override containing behavior: is rejected (IE code execution)."""
         with pytest.raises(ValidationError, match="behavior:"):
-            FormPromptNodeParameters(form_definition=self._minimal_form_definition(), css_override="behavior: url(evil.htc);")
+            FormPromptNodeParameters(
+                form_definition=self._minimal_form_definition(), css_override="behavior: url(evil.htc);"
+            )
 
     def test_css_override_safe_css_accepted(self) -> None:
         """Safe CSS without dangerous patterns is accepted."""
@@ -598,27 +607,34 @@ class TestFormPromptNodeParameters:
         """css_override with Unicode-escaped @import is rejected (bypass attempt)."""
         # \\40 = '@' - spells "@import"
         with pytest.raises(ValidationError, match="@import"):
-            FormPromptNodeParameters(form_definition=self._minimal_form_definition(), css_override="\\40import 'evil.css';")
+            FormPromptNodeParameters(
+                form_definition=self._minimal_form_definition(), css_override="\\40import 'evil.css';"
+            )
 
     def test_css_override_unicode_escape_attribute_selector_rejected(self) -> None:
         """css_override with Unicode-escaped attribute selectors is rejected (bypass attempt)."""
         # \\5b = '[', \\5d = ']' - spells attribute selector
         with pytest.raises(ValidationError, match="attribute selectors"):
             FormPromptNodeParameters(
-                form_definition=self._minimal_form_definition(), css_override="input\\5bvalue^='a'\\5d { background: red; }"
+                form_definition=self._minimal_form_definition(),
+                css_override="input\\5bvalue^='a'\\5d { background: red; }",
             )
 
     def test_css_override_unicode_escape_expression_rejected(self) -> None:
         """css_override with Unicode-escaped expression() is rejected (bypass attempt)."""
         # \\65 = 'e' - spells "expression"
         with pytest.raises(ValidationError, match="expression\\(\\)"):
-            FormPromptNodeParameters(form_definition=self._minimal_form_definition(), css_override="width: \\65xpression(1+1);")
+            FormPromptNodeParameters(
+                form_definition=self._minimal_form_definition(), css_override="width: \\65xpression(1+1);"
+            )
 
     def test_css_override_unicode_escape_behavior_rejected(self) -> None:
         """css_override with Unicode-escaped behavior: is rejected (bypass attempt)."""
         # \\62 = 'b' - space terminates the escape sequence
         with pytest.raises(ValidationError, match="behavior:"):
-            FormPromptNodeParameters(form_definition=self._minimal_form_definition(), css_override="\\62 ehavior: none;")
+            FormPromptNodeParameters(
+                form_definition=self._minimal_form_definition(), css_override="\\62 ehavior: none;"
+            )
 
     def test_css_override_identity_escape_url_rejected(self) -> None:
         """css_override with identity-escaped url() is rejected (bypass attempt)."""
@@ -632,21 +648,26 @@ class TestFormPromptNodeParameters:
         """css_override with identity-escaped @import is rejected (bypass attempt)."""
         # @\\import uses identity escape \\i → i (i is not a hex digit)
         with pytest.raises(ValidationError, match="@import"):
-            FormPromptNodeParameters(form_definition=self._minimal_form_definition(), css_override="@\\import 'evil.css';")
+            FormPromptNodeParameters(
+                form_definition=self._minimal_form_definition(), css_override="@\\import 'evil.css';"
+            )
 
     def test_css_override_identity_escape_attribute_selector_rejected(self) -> None:
         """css_override with identity-escaped attribute selectors is rejected (bypass attempt)."""
         # \\[ and \\] use identity escapes ([ and ] are not hex digits)
         with pytest.raises(ValidationError, match="attribute selectors"):
             FormPromptNodeParameters(
-                form_definition=self._minimal_form_definition(), css_override="input\\[value^='a'\\] { background: red; }"
+                form_definition=self._minimal_form_definition(),
+                css_override="input\\[value^='a'\\] { background: red; }",
             )
 
     def test_css_override_identity_escape_expression_rejected(self) -> None:
         """css_override with identity-escaped expression() is rejected (bypass attempt)."""
         # expre\\ssion( uses identity escape \\s → s (s is not a hex digit)
         with pytest.raises(ValidationError, match="expression\\(\\)"):
-            FormPromptNodeParameters(form_definition=self._minimal_form_definition(), css_override="width: expre\\ssion(1+1);")
+            FormPromptNodeParameters(
+                form_definition=self._minimal_form_definition(), css_override="width: expre\\ssion(1+1);"
+            )
 
     def test_css_override_identity_escape_behavior_rejected(self) -> None:
         """css_override with identity-escaped behavior: is rejected (bypass attempt)."""
@@ -667,16 +688,22 @@ class TestFormPromptNodeParameters:
         """css_override with comment-injected @import is rejected (bypass attempt)."""
         # @/**/import uses CSS comment to bypass literal "@import" check
         with pytest.raises(ValidationError, match="@import"):
-            FormPromptNodeParameters(form_definition=self._minimal_form_definition(), css_override="@/**/import 'evil.css';")
+            FormPromptNodeParameters(
+                form_definition=self._minimal_form_definition(), css_override="@/**/import 'evil.css';"
+            )
 
     def test_css_override_comment_injection_expression_rejected(self) -> None:
         """css_override with comment-injected expression() is rejected (bypass attempt)."""
         # expression/**/( uses CSS comment to bypass literal "expression(" check
         with pytest.raises(ValidationError, match="expression\\(\\)"):
-            FormPromptNodeParameters(form_definition=self._minimal_form_definition(), css_override="width: expression/**/(1+1);")
+            FormPromptNodeParameters(
+                form_definition=self._minimal_form_definition(), css_override="width: expression/**/(1+1);"
+            )
 
     def test_css_override_comment_injection_behavior_rejected(self) -> None:
         """css_override with comment-injected behavior: is rejected (bypass attempt)."""
         # behavior/**/: uses CSS comment between property and colon
         with pytest.raises(ValidationError, match="behavior:"):
-            FormPromptNodeParameters(form_definition=self._minimal_form_definition(), css_override="behavior/**/: none;")
+            FormPromptNodeParameters(
+                form_definition=self._minimal_form_definition(), css_override="behavior/**/: none;"
+            )

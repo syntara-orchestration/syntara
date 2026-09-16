@@ -1,0 +1,537 @@
+---
+openapi: 3.1.0
+info:
+  title: Forms API
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    FormDefinition:
+      type: object
+      title: FormDefinition
+      description: Complete form definition with fields and metadata.
+      additionalProperties: false
+      required:
+        - fields
+      properties:
+        fields:
+          type: array
+          title: Fields
+          minItems: 1
+          maxItems: 100
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/TextField'
+              - $ref: '#/components/schemas/TextAreaField'
+              - $ref: '#/components/schemas/MaskedTextField'
+              - $ref: '#/components/schemas/EmailField'
+              - $ref: '#/components/schemas/NumberField'
+              - $ref: '#/components/schemas/CheckboxField'
+              - $ref: '#/components/schemas/DateField'
+              - $ref: '#/components/schemas/DropdownField'
+              - $ref: '#/components/schemas/MultiSelectField'
+            discriminator:
+              propertyName: type
+              mapping:
+                text: '#/components/schemas/TextField'
+                textarea: '#/components/schemas/TextAreaField'
+                masked_text: '#/components/schemas/MaskedTextField'
+                email: '#/components/schemas/EmailField'
+                number: '#/components/schemas/NumberField'
+                checkbox: '#/components/schemas/CheckboxField'
+                date: '#/components/schemas/DateField'
+                dropdown: '#/components/schemas/DropdownField'
+                multi_select: '#/components/schemas/MultiSelectField'
+
+    TextField:
+      type: object
+      title: TextField
+      description: Text field.
+      additionalProperties: false
+      required:
+        - value_name
+        - label
+        - type
+      properties:
+        value_name:
+          type: string
+          title: Value Name
+          maxLength: 64
+          pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
+        label:
+          type: string
+          title: Label
+          minLength: 1
+          maxLength: 200
+        placeholder:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Placeholder
+        help_text:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Help Text
+        required:
+          type: boolean
+          title: Required
+          default: false
+        type:
+          type: string
+          const: text
+          title: Type
+        default:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Default
+
+    TextAreaField:
+      type: object
+      title: TextAreaField
+      description: Text area field.
+      additionalProperties: false
+      required:
+        - value_name
+        - label
+        - type
+      properties:
+        value_name:
+          type: string
+          title: Value Name
+          maxLength: 64
+          pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
+        label:
+          type: string
+          title: Label
+          minLength: 1
+          maxLength: 200
+        placeholder:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Placeholder
+        help_text:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Help Text
+        required:
+          type: boolean
+          title: Required
+          default: false
+        type:
+          type: string
+          const: textarea
+          title: Type
+        default:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Default
+
+    MaskedTextField:
+      type: object
+      title: MaskedTextField
+      description: Masked text field.
+      additionalProperties: false
+      required:
+        - value_name
+        - label
+        - type
+      properties:
+        value_name:
+          type: string
+          title: Value Name
+          maxLength: 64
+          pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
+        label:
+          type: string
+          title: Label
+          minLength: 1
+          maxLength: 200
+        placeholder:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Placeholder
+        help_text:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Help Text
+        required:
+          type: boolean
+          title: Required
+          default: false
+        type:
+          type: string
+          const: masked_text
+          title: Type
+        default:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Default
+
+    EmailField:
+      type: object
+      title: EmailField
+      description: Email field.
+      additionalProperties: false
+      required:
+        - value_name
+        - label
+        - type
+      properties:
+        value_name:
+          type: string
+          title: Value Name
+          maxLength: 64
+          pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
+        label:
+          type: string
+          title: Label
+          minLength: 1
+          maxLength: 200
+        placeholder:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Placeholder
+        help_text:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Help Text
+        required:
+          type: boolean
+          title: Required
+          default: false
+        type:
+          type: string
+          const: email
+          title: Type
+        default:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Default
+
+    NumberField:
+      type: object
+      title: NumberField
+      description: Numeric field supporting int or float.
+      additionalProperties: false
+      required:
+        - value_name
+        - label
+        - type
+      properties:
+        value_name:
+          type: string
+          title: Value Name
+          maxLength: 64
+          pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
+        label:
+          type: string
+          title: Label
+          minLength: 1
+          maxLength: 200
+        placeholder:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Placeholder
+        help_text:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Help Text
+        required:
+          type: boolean
+          title: Required
+          default: false
+        type:
+          type: string
+          const: number
+          title: Type
+        default:
+          anyOf:
+            - type: number
+            - type: integer
+            - type: 'null'
+          title: Default
+
+    CheckboxField:
+      type: object
+      title: CheckboxField
+      description: Boolean checkbox field.
+      additionalProperties: false
+      required:
+        - value_name
+        - label
+        - type
+      properties:
+        value_name:
+          type: string
+          title: Value Name
+          maxLength: 64
+          pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
+        label:
+          type: string
+          title: Label
+          minLength: 1
+          maxLength: 200
+        placeholder:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Placeholder
+        help_text:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Help Text
+        required:
+          type: boolean
+          title: Required
+          default: false
+          description: When true the checkbox must be checked to submit, for example a terms of service or acknowledgment. An unchecked required checkbox fails with error code 'must_be_checked'.
+        type:
+          type: string
+          const: checkbox
+          title: Type
+        default:
+          type: boolean
+          title: Default
+          default: false
+
+    DateField:
+      type: object
+      title: DateField
+      description: Date field.
+      additionalProperties: false
+      required:
+        - value_name
+        - label
+        - type
+      properties:
+        value_name:
+          type: string
+          title: Value Name
+          maxLength: 64
+          pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
+        label:
+          type: string
+          title: Label
+          minLength: 1
+          maxLength: 200
+        placeholder:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Placeholder
+        help_text:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Help Text
+        required:
+          type: boolean
+          title: Required
+          default: false
+        type:
+          type: string
+          const: date
+          title: Type
+        default:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Default
+
+    DropdownField:
+      type: object
+      title: DropdownField
+      description: Dropdown field.
+      additionalProperties: false
+      required:
+        - value_name
+        - label
+        - type
+        - options
+      properties:
+        value_name:
+          type: string
+          title: Value Name
+          maxLength: 64
+          pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
+        label:
+          type: string
+          title: Label
+          minLength: 1
+          maxLength: 200
+        placeholder:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Placeholder
+        help_text:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Help Text
+        required:
+          type: boolean
+          title: Required
+          default: false
+        type:
+          type: string
+          const: dropdown
+          title: Type
+        options:
+          title: Options
+          oneOf:
+            - $ref: '#/components/schemas/StaticOptions'
+            - $ref: '#/components/schemas/DynamicOptions'
+          discriminator:
+            propertyName: source
+            mapping:
+              static: '#/components/schemas/StaticOptions'
+              dynamic: '#/components/schemas/DynamicOptions'
+        default:
+          anyOf:
+            - type: string
+            - type: integer
+            - type: number
+            - type: boolean
+            - type: 'null'
+          title: Default
+
+    MultiSelectField:
+      type: object
+      title: MultiSelectField
+      description: Multi-select field.
+      additionalProperties: false
+      required:
+        - value_name
+        - label
+        - type
+        - options
+      properties:
+        value_name:
+          type: string
+          title: Value Name
+          maxLength: 64
+          pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
+        label:
+          type: string
+          title: Label
+          minLength: 1
+          maxLength: 200
+        placeholder:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Placeholder
+        help_text:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Help Text
+        required:
+          type: boolean
+          title: Required
+          default: false
+        type:
+          type: string
+          const: multi_select
+          title: Type
+        options:
+          title: Options
+          oneOf:
+            - $ref: '#/components/schemas/StaticOptions'
+            - $ref: '#/components/schemas/DynamicOptions'
+          discriminator:
+            propertyName: source
+            mapping:
+              static: '#/components/schemas/StaticOptions'
+              dynamic: '#/components/schemas/DynamicOptions'
+        default:
+          anyOf:
+            - type: array
+              items: {}
+            - type: 'null'
+          title: Default
+
+    StaticOptions:
+      type: object
+      title: StaticOptions
+      description: Static option list for dropdown or multi-select.
+      additionalProperties: false
+      required:
+        - source
+        - values
+      properties:
+        source:
+          type: string
+          const: static
+          title: Source
+        values:
+          type: array
+          title: Values
+          minItems: 1
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/StaticOption'
+
+    StaticOption:
+      type: object
+      title: StaticOption
+      description: A single static option for dropdown or multi-select.
+      additionalProperties: false
+      required:
+        - display_label
+        - value
+      properties:
+        display_label:
+          type: string
+          title: Display Label
+          minLength: 1
+          maxLength: 200
+        value:
+          anyOf:
+            - type: string
+            - type: integer
+            - type: number
+            - type: boolean
+          title: Value
+
+    DynamicOptions:
+      type: object
+      title: DynamicOptions
+      description: Dynamic option list resolved from upstream node output.
+      additionalProperties: false
+      required:
+        - source
+        - expression
+      properties:
+        source:
+          type: string
+          const: dynamic
+          title: Source
+        expression:
+          type: string
+          title: Expression
+        value_key:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Value Key
+        label_key:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Label Key

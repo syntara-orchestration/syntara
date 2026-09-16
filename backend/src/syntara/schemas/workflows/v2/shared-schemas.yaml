@@ -2188,10 +2188,8 @@ components:
           title: Message
           description: Message shown above the form. Supports ${...} template expressions.
         form_definition:
-          additionalProperties: true
-          type: object
-          title: Form Definition
-          description: JSON Schema describing the form fields to collect.
+          $ref: ../../forms/openapi.yaml#/components/schemas/FormDefinition
+          description: Form definition describing the fields shown to responders.
         responder_users:
           anyOf:
             - items:
