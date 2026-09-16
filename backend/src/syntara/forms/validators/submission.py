@@ -97,7 +97,7 @@ def validate_form_submission(
 
         # Step 5: Coerce to correct type
         try:
-            coerced = _coerce_field(field, raw)
+            coerced = coerce_field(field, raw)
         except (TypeError, ValueError) as exc:
             errors.append(
                 FormFieldError(
@@ -160,7 +160,7 @@ def _is_empty(value: Any) -> bool:  # noqa: ANN401
     return value in ("", [], None)
 
 
-def _coerce_field(field: FormField, raw: Any) -> Any:  # noqa: ANN401
+def coerce_field(field: FormField, raw: Any) -> Any:  # noqa: ANN401
     """Coerce raw submitted value to the field's expected type.
 
     Args:
@@ -463,7 +463,7 @@ def _coerce_multi_select(raw: Any) -> list[str | int | float | bool]:  # noqa: A
     return [_coerce_option_value(raw)]
 
 
-# Dispatch for _coerce_field, keyed on the exact field class. FormField is a
+# Dispatch for coerce_field, keyed on the exact field class. FormField is a
 # closed discriminated union whose members all derive from FormFieldBase
 # directly, so there are no subclass relationships to order around and an exact
 # type lookup is unambiguous. Every member must appear here; the parity test in

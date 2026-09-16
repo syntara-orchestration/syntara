@@ -66,8 +66,8 @@ class CheckboxField(FormFieldBase):
     required: bool = Field(
         default=False,
         description=(
-            "When true the checkbox must be checked to submit, rather than merely "
-            "being present (the terms-of-service pattern). An unchecked required "
+            "When true the checkbox must be checked to submit, for example "
+            "a terms of service or acknowledgment. An unchecked required "
             "checkbox fails with error code 'must_be_checked'."
         ),
     )
@@ -142,6 +142,32 @@ FormField = Annotated[
 ]
 
 
+def _check_multi_select_defaults(value_name: str, defaults: list[Any], valid_values: set[Any]) -> None:
+    """Check multi-select defaults are scalars drawn from the option list.
+
+    Raises:
+        ValueError: If any default is non-scalar or absent from the options
+
+    """
+    # default is list[Any], so entries may be unhashable. Testing membership
+    # against the option set would raise a bare TypeError out of the calling
+    # validator - a 500 on an API payload - rather than a clean
+    # ValidationError, so screen them first.
+    non_scalar = [v for v in defaults if not isinstance(v, (str, int, float, bool))]
+    if non_scalar:
+        types_found = sorted({type(v).__name__ for v in non_scalar})
+        msg = (
+            f"Field '{value_name}': default values must be scalars "
+            f"(str, int, float, or bool), got {', '.join(types_found)}"
+        )
+        raise ValueError(msg)
+
+    invalid_defaults = [v for v in defaults if v not in valid_values]
+    if invalid_defaults:
+        msg = f"Field '{value_name}': default values {invalid_defaults} are not in the option list"
+        raise ValueError(msg)
+
+
 class FormDefinition(BaseModel):
     """Complete form definition with fields and metadata."""
 
@@ -163,25 +189,19 @@ class FormDefinition(BaseModel):
     def _default_in_static_options(self) -> FormDefinition:
         """Ensure static dropdown/multi-select defaults are in the option list."""
         for field in self.fields:
-            if (
-                isinstance(field, (DropdownField, MultiSelectField))
-                and isinstance(field.options, StaticOptions)
-                and field.default is not None
-            ):
-                valid_values = {opt.value for opt in field.options.values}
+            if not isinstance(field, (DropdownField, MultiSelectField)) or not isinstance(field.options, StaticOptions):
+                continue
 
-                # For multi-select, check each value in the list
-                if isinstance(field, MultiSelectField):
-                    if not isinstance(field.default, list):
-                        continue  # Will be caught by type validation
-                    invalid_defaults = [v for v in field.default if v not in valid_values]
-                    if invalid_defaults:
-                        msg = (
-                            f"Field '{field.value_name}': default values {invalid_defaults} are not in the option list"
-                        )
-                        raise ValueError(msg)
-                # For dropdown, check the single value
-                elif field.default not in valid_values:
-                    msg = f"Field '{field.value_name}': default value '{field.default}' is not in the option list"
-                    raise ValueError(msg)
+            valid_values = {opt.value for opt in field.options.values}
+
+            # Bind to a local after narrowing the field type: the checkers track
+            # `defaults is not None` on a local, but disagree about the type of
+            # `field.default` across the two branches of the union.
+            if isinstance(field, MultiSelectField):
+                defaults = field.default
+                if defaults is not None:
+                    _check_multi_select_defaults(field.value_name, defaults, valid_values)
+            elif field.default is not None and field.default not in valid_values:
+                msg = f"Field '{field.value_name}': default value '{field.default}' is not in the option list"
+                raise ValueError(msg)
         return self

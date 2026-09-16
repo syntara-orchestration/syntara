@@ -16,7 +16,7 @@ _STATIC_OPTIONS: dict[str, Any] = {
     ],
 }
 
-# Every field type that _coerce_field routes through _coerce_string.
+# Every field type that coerce_field routes through _coerce_string.
 # "email" is excluded: it adds a format check on top (see TestEmailField).
 _STRING_FIELD_TYPES = ["text", "textarea", "masked_text"]
 
@@ -212,7 +212,7 @@ class TestCoercion:
     def test_string_family_accepted(self, field_type: str) -> None:
         """Every field type routed through _coerce_string accepts a string.
 
-        Pins the isinstance dispatch tuple in _coerce_field: narrowing it would
+        Pins the isinstance dispatch tuple in coerce_field: narrowing it would
         drop a type into the "Unknown field type" branch, which this catches.
         """
         cleaned = validate_form_submission(_form(_field(field_type, "name")), {"name": "bob"})

@@ -10,13 +10,29 @@ class FormFieldError:
     """A single form field validation error.
 
     Carries structured per-field error information for client-side rendering.
+
+    Codes produced when submitting form:
+
+    - ``required`` - no value supplied for a required field
+    - ``type`` - value is the wrong Python type
+    - ``invalid_format`` - invalid format of data
+    - ``not_in_options`` - value is absent from a static option list
+    - ``must_be_checked`` - a required checkbox was not ticked
+    - ``unknown_field`` - submitted key is not defined in the form
+
+    Codes produced when creating form definition:
+
+    - ``invalid_default`` - a field default the submission coercer would reject
+
+    Attributes:
+        field: Field name from the descriptor
+        label: Display label from the descriptor
+        code: One of the codes above
+        message: User-facing error message
+
     """
 
-    field: str  # Field name from the descriptor
-    label: str  # Display label from the descriptor
-    # Error code: "required" | "type" | "invalid_format" | "unknown_field"
-    #           | "not_in_options" | "must_be_checked"
-    # "type" is the wrong Python type; "invalid_format" is the right type with
-    # bad content (e.g. a string that is not a valid email address).
+    field: str
+    label: str
     code: str
-    message: str  # User-facing error message
+    message: str
