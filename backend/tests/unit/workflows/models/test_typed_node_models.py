@@ -9,6 +9,7 @@ from typing import Any, ClassVar
 import pytest
 from pydantic import ValidationError
 
+from syntara.forms.models.form_fields import FormDefinition
 from syntara.workflows.models.workflow_definition import (
     WorkflowDefinition,
 )
@@ -431,10 +432,27 @@ class TestSwitchCaseConditionValidation:
 class TestFormPromptNodeParameters:
     """Tests for FormPromptNodeParameters validation."""
 
+    @staticmethod
+    def _minimal_form_definition() -> dict[str, Any]:
+        """Return a minimal valid FormDefinition structure."""
+        return {
+            "fields": [
+                {
+                    "type": "text",
+                    "value_name": "reason",
+                    "label": "Reason",
+                    "required": False,
+                }
+            ]
+        }
+
     def test_minimal_valid(self) -> None:
         """Minimal valid config with form_definition only."""
-        p = FormPromptNodeParameters(form_definition={"type": "object"})
-        assert p.form_definition == {"type": "object"}
+        form_def = self._minimal_form_definition()
+        p = FormPromptNodeParameters(form_definition=form_def)
+        assert isinstance(p.form_definition, FormDefinition)
+        assert len(p.form_definition.fields) == 1
+        assert p.form_definition.fields[0].value_name == "reason"
         assert p.message is None
         assert p.fallback_behavior == "fail"
 
@@ -442,7 +460,7 @@ class TestFormPromptNodeParameters:
         """All fields populated."""
         p = FormPromptNodeParameters(
             message="Please fill out the form",
-            form_definition={"type": "object", "properties": {"name": {"type": "string"}}},
+            form_definition=self._minimal_form_definition(),
             responder_users=["alice", "bob"],
             responder_groups=["team-a"],
             response_window=3600,
@@ -461,71 +479,54 @@ class TestFormPromptNodeParameters:
         with pytest.raises(ValidationError):
             FormPromptNodeParameters()  # type: ignore[call-arg]
 
-    def test_form_definition_with_ref_rejected(self) -> None:
-        """form_definition containing $ref is rejected (SSRF guard)."""
-        with pytest.raises(ValidationError):
-            FormPromptNodeParameters(form_definition={"$ref": "http://evil.com/schema"})
-
-    def test_form_definition_with_nested_quantifier_rejected(self) -> None:
-        """form_definition with ReDoS pattern is rejected."""
-        with pytest.raises(ValidationError):
-            FormPromptNodeParameters(
-                form_definition={"type": "object", "properties": {"field": {"type": "string", "pattern": "(a+)+$"}}}
-            )
-
-    def test_invalid_form_definition(self) -> None:
-        """Structurally invalid JSON Schema is rejected."""
-        with pytest.raises(ValidationError):
-            FormPromptNodeParameters(form_definition={"type": "invalid_type"})
-
     def test_response_window_zero_rejected(self) -> None:
         """response_window=0 violates ge=1."""
         with pytest.raises(ValidationError):
-            FormPromptNodeParameters(form_definition={"type": "object"}, response_window=0)
+            FormPromptNodeParameters(form_definition=self._minimal_form_definition(), response_window=0)
 
     def test_response_window_negative_rejected(self) -> None:
         """Negative response_window is rejected."""
         with pytest.raises(ValidationError):
-            FormPromptNodeParameters(form_definition={"type": "object"}, response_window=-1)
+            FormPromptNodeParameters(form_definition=self._minimal_form_definition(), response_window=-1)
 
     def test_responder_users_max_100(self) -> None:
         """responder_users max 100 entries."""
         with pytest.raises(ValidationError):
-            FormPromptNodeParameters(form_definition={"type": "object"}, responder_users=["user"] * 101)
+            FormPromptNodeParameters(form_definition=self._minimal_form_definition(), responder_users=["user"] * 101)
 
     def test_responder_groups_max_50(self) -> None:
         """responder_groups max 50 entries."""
         with pytest.raises(ValidationError):
-            FormPromptNodeParameters(form_definition={"type": "object"}, responder_groups=["group"] * 51)
+            FormPromptNodeParameters(form_definition=self._minimal_form_definition(), responder_groups=["group"] * 51)
 
     def test_message_max_2000(self) -> None:
         """Message max 2000 chars."""
         with pytest.raises(ValidationError):
-            FormPromptNodeParameters(form_definition={"type": "object"}, message="x" * 2001)
+            FormPromptNodeParameters(form_definition=self._minimal_form_definition(), message="x" * 2001)
 
     def test_invalid_fallback_behavior(self) -> None:
         """Invalid fallback_behavior value rejected."""
         with pytest.raises(ValidationError):
-            FormPromptNodeParameters(form_definition={"type": "object"}, fallback_behavior="continue")  # type: ignore[arg-type]
+            FormPromptNodeParameters(form_definition=self._minimal_form_definition(), fallback_behavior="continue")  # type: ignore[arg-type]
 
     def test_unknown_parameter_rejected(self) -> None:
         """extra='forbid' rejects unknown keys."""
         with pytest.raises(ValidationError):
-            FormPromptNodeParameters(form_definition={"type": "object"}, unknown_field="value")  # type: ignore[call-arg]
+            FormPromptNodeParameters(form_definition=self._minimal_form_definition(), unknown_field="value")  # type: ignore[call-arg]
 
     def test_template_in_message(self) -> None:
         """Template expressions survive in message."""
-        p = FormPromptNodeParameters(form_definition={"type": "object"}, message="User: ${trigger.username}")
+        p = FormPromptNodeParameters(form_definition=self._minimal_form_definition(), message="User: ${trigger.username}")
         assert p.message == "User: ${trigger.username}"
 
     def test_invalid_timezone_rejected(self) -> None:
         """Invalid timezone is rejected."""
         with pytest.raises(ValidationError):
-            FormPromptNodeParameters(form_definition={"type": "object"}, timezone="Not/A/Timezone")
+            FormPromptNodeParameters(form_definition=self._minimal_form_definition(), timezone="Not/A/Timezone")
 
     def test_valid_timezone_accepted(self) -> None:
         """Valid IANA timezone is accepted."""
-        p = FormPromptNodeParameters(form_definition={"type": "object"}, timezone="America/New_York")
+        p = FormPromptNodeParameters(form_definition=self._minimal_form_definition(), timezone="America/New_York")
         assert p.timezone == "America/New_York"
 
     def test_discriminated_union(self) -> None:
@@ -539,7 +540,7 @@ class TestFormPromptNodeParameters:
                     {
                         "id": "form_node",
                         "type": "form_prompt",
-                        "parameters": {"form_definition": {"type": "object"}},
+                        "parameters": {"form_definition": self._minimal_form_definition()},
                     }
                 ],
                 "edges": [],
@@ -551,35 +552,35 @@ class TestFormPromptNodeParameters:
         """css_override containing url() is rejected (data exfiltration risk)."""
         with pytest.raises(ValidationError, match="url\\(\\)"):
             FormPromptNodeParameters(
-                form_definition={"type": "object"}, css_override=".form { background: url(http://evil.com); }"
+                form_definition=self._minimal_form_definition(), css_override=".form { background: url(http://evil.com); }"
             )
 
     def test_css_override_with_import_rejected(self) -> None:
         """css_override containing @import is rejected."""
         with pytest.raises(ValidationError, match="@import"):
-            FormPromptNodeParameters(form_definition={"type": "object"}, css_override="@import url(evil.css);")
+            FormPromptNodeParameters(form_definition=self._minimal_form_definition(), css_override="@import url(evil.css);")
 
     def test_css_override_with_attribute_selector_rejected(self) -> None:
         """css_override containing attribute selectors is rejected (data exfiltration risk)."""
         with pytest.raises(ValidationError, match="attribute selectors"):
             FormPromptNodeParameters(
-                form_definition={"type": "object"}, css_override="input[value^='a'] { background: red; }"
+                form_definition=self._minimal_form_definition(), css_override="input[value^='a'] { background: red; }"
             )
 
     def test_css_override_with_expression_rejected(self) -> None:
         """css_override containing expression() is rejected (IE code execution)."""
         with pytest.raises(ValidationError, match="expression\\(\\)"):
-            FormPromptNodeParameters(form_definition={"type": "object"}, css_override="width: expression(alert(1));")
+            FormPromptNodeParameters(form_definition=self._minimal_form_definition(), css_override="width: expression(alert(1));")
 
     def test_css_override_with_behavior_rejected(self) -> None:
         """css_override containing behavior: is rejected (IE code execution)."""
         with pytest.raises(ValidationError, match="behavior:"):
-            FormPromptNodeParameters(form_definition={"type": "object"}, css_override="behavior: url(evil.htc);")
+            FormPromptNodeParameters(form_definition=self._minimal_form_definition(), css_override="behavior: url(evil.htc);")
 
     def test_css_override_safe_css_accepted(self) -> None:
         """Safe CSS without dangerous patterns is accepted."""
         p = FormPromptNodeParameters(
-            form_definition={"type": "object"},
+            form_definition=self._minimal_form_definition(),
             css_override=".form { color: blue; font-size: 14px; margin: 10px; }",
         )
         assert p.css_override is not None
@@ -590,92 +591,92 @@ class TestFormPromptNodeParameters:
         # \\75 = 'u', \\72 = 'r', \\6c = 'l' - spells "url"
         with pytest.raises(ValidationError, match="url\\(\\)"):
             FormPromptNodeParameters(
-                form_definition={"type": "object"}, css_override="background: \\75rl(http://evil.com);"
+                form_definition=self._minimal_form_definition(), css_override="background: \\75rl(http://evil.com);"
             )
 
     def test_css_override_unicode_escape_import_rejected(self) -> None:
         """css_override with Unicode-escaped @import is rejected (bypass attempt)."""
         # \\40 = '@' - spells "@import"
         with pytest.raises(ValidationError, match="@import"):
-            FormPromptNodeParameters(form_definition={"type": "object"}, css_override="\\40import 'evil.css';")
+            FormPromptNodeParameters(form_definition=self._minimal_form_definition(), css_override="\\40import 'evil.css';")
 
     def test_css_override_unicode_escape_attribute_selector_rejected(self) -> None:
         """css_override with Unicode-escaped attribute selectors is rejected (bypass attempt)."""
         # \\5b = '[', \\5d = ']' - spells attribute selector
         with pytest.raises(ValidationError, match="attribute selectors"):
             FormPromptNodeParameters(
-                form_definition={"type": "object"}, css_override="input\\5bvalue^='a'\\5d { background: red; }"
+                form_definition=self._minimal_form_definition(), css_override="input\\5bvalue^='a'\\5d { background: red; }"
             )
 
     def test_css_override_unicode_escape_expression_rejected(self) -> None:
         """css_override with Unicode-escaped expression() is rejected (bypass attempt)."""
         # \\65 = 'e' - spells "expression"
         with pytest.raises(ValidationError, match="expression\\(\\)"):
-            FormPromptNodeParameters(form_definition={"type": "object"}, css_override="width: \\65xpression(1+1);")
+            FormPromptNodeParameters(form_definition=self._minimal_form_definition(), css_override="width: \\65xpression(1+1);")
 
     def test_css_override_unicode_escape_behavior_rejected(self) -> None:
         """css_override with Unicode-escaped behavior: is rejected (bypass attempt)."""
         # \\62 = 'b' - space terminates the escape sequence
         with pytest.raises(ValidationError, match="behavior:"):
-            FormPromptNodeParameters(form_definition={"type": "object"}, css_override="\\62 ehavior: none;")
+            FormPromptNodeParameters(form_definition=self._minimal_form_definition(), css_override="\\62 ehavior: none;")
 
     def test_css_override_identity_escape_url_rejected(self) -> None:
         """css_override with identity-escaped url() is rejected (bypass attempt)."""
         # u\\rl( uses identity escape \\r → r (r is not a hex digit)
         with pytest.raises(ValidationError, match="url\\(\\)"):
             FormPromptNodeParameters(
-                form_definition={"type": "object"}, css_override="background: u\\rl(http://evil.com);"
+                form_definition=self._minimal_form_definition(), css_override="background: u\\rl(http://evil.com);"
             )
 
     def test_css_override_identity_escape_import_rejected(self) -> None:
         """css_override with identity-escaped @import is rejected (bypass attempt)."""
         # @\\import uses identity escape \\i → i (i is not a hex digit)
         with pytest.raises(ValidationError, match="@import"):
-            FormPromptNodeParameters(form_definition={"type": "object"}, css_override="@\\import 'evil.css';")
+            FormPromptNodeParameters(form_definition=self._minimal_form_definition(), css_override="@\\import 'evil.css';")
 
     def test_css_override_identity_escape_attribute_selector_rejected(self) -> None:
         """css_override with identity-escaped attribute selectors is rejected (bypass attempt)."""
         # \\[ and \\] use identity escapes ([ and ] are not hex digits)
         with pytest.raises(ValidationError, match="attribute selectors"):
             FormPromptNodeParameters(
-                form_definition={"type": "object"}, css_override="input\\[value^='a'\\] { background: red; }"
+                form_definition=self._minimal_form_definition(), css_override="input\\[value^='a'\\] { background: red; }"
             )
 
     def test_css_override_identity_escape_expression_rejected(self) -> None:
         """css_override with identity-escaped expression() is rejected (bypass attempt)."""
         # expre\\ssion( uses identity escape \\s → s (s is not a hex digit)
         with pytest.raises(ValidationError, match="expression\\(\\)"):
-            FormPromptNodeParameters(form_definition={"type": "object"}, css_override="width: expre\\ssion(1+1);")
+            FormPromptNodeParameters(form_definition=self._minimal_form_definition(), css_override="width: expre\\ssion(1+1);")
 
     def test_css_override_identity_escape_behavior_rejected(self) -> None:
         """css_override with identity-escaped behavior: is rejected (bypass attempt)."""
         # \\behavior: uses identity escape \\b → b, though b is hex digit 'b'
         # Use be\\havior: where \\h → h (h is not a hex digit)
         with pytest.raises(ValidationError, match="behavior:"):
-            FormPromptNodeParameters(form_definition={"type": "object"}, css_override="be\\havior: none;")
+            FormPromptNodeParameters(form_definition=self._minimal_form_definition(), css_override="be\\havior: none;")
 
     def test_css_override_comment_injection_url_rejected(self) -> None:
         """css_override with comment-injected url() is rejected (bypass attempt)."""
         # url/**/( uses CSS comment to bypass literal "url(" check
         with pytest.raises(ValidationError, match="url\\(\\)"):
             FormPromptNodeParameters(
-                form_definition={"type": "object"}, css_override="background: url/**/(http://evil.com);"
+                form_definition=self._minimal_form_definition(), css_override="background: url/**/(http://evil.com);"
             )
 
     def test_css_override_comment_injection_import_rejected(self) -> None:
         """css_override with comment-injected @import is rejected (bypass attempt)."""
         # @/**/import uses CSS comment to bypass literal "@import" check
         with pytest.raises(ValidationError, match="@import"):
-            FormPromptNodeParameters(form_definition={"type": "object"}, css_override="@/**/import 'evil.css';")
+            FormPromptNodeParameters(form_definition=self._minimal_form_definition(), css_override="@/**/import 'evil.css';")
 
     def test_css_override_comment_injection_expression_rejected(self) -> None:
         """css_override with comment-injected expression() is rejected (bypass attempt)."""
         # expression/**/( uses CSS comment to bypass literal "expression(" check
         with pytest.raises(ValidationError, match="expression\\(\\)"):
-            FormPromptNodeParameters(form_definition={"type": "object"}, css_override="width: expression/**/(1+1);")
+            FormPromptNodeParameters(form_definition=self._minimal_form_definition(), css_override="width: expression/**/(1+1);")
 
     def test_css_override_comment_injection_behavior_rejected(self) -> None:
         """css_override with comment-injected behavior: is rejected (bypass attempt)."""
         # behavior/**/: uses CSS comment between property and colon
         with pytest.raises(ValidationError, match="behavior:"):
-            FormPromptNodeParameters(form_definition={"type": "object"}, css_override="behavior/**/: none;")
+            FormPromptNodeParameters(form_definition=self._minimal_form_definition(), css_override="behavior/**/: none;")

@@ -865,8 +865,8 @@ class FormPromptNodeParameters(BaseModel):
         max_length=2000,
         description="Message shown above the form. Supports ${...} template expressions.",
     )
-    form_definition: dict[str, Any] = Field(
-        description="JSON Schema describing the form fields to collect.",
+    form_definition: FormDefinition = Field(
+        description="Form definition describing the fields shown to responders.",
     )
     responder_users: list[str] | None = Field(
         default=None,
@@ -910,7 +910,7 @@ class FormPromptNodeParameters(BaseModel):
         description="Custom CSS applied to the form view.",
     )
 
-    @field_validator("form_definition")
+    @field_validator("form_definition", mode="after")
     @classmethod
     def validate_form_defaults(cls, v: FormDefinition) -> FormDefinition:
         """Validate that field defaults are valid for their field types."""
