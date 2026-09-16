@@ -126,7 +126,7 @@ CI accepts the override when the PR has the `breaking-change-approved` label, bu
 4. After a lead applies the label to a failed PR, the OpenAPI Breaking Changes workflow re-runs on `labeled` / `unlabeled`. Re-run **(Backend) Check OpenAPI Breaking Changes** if that required check still shows the pre-label failure.
 5. Make **Breaking Change Label Guard** a required status check so an unauthorized label cannot merge during the window before the OpenAPI job re-runs.
 
-GitHub has no native per-label permission; the label guard is the enforcement point. The contributor handbook for this process is in [CONTRIBUTING.md](../../CONTRIBUTING.md#breaking-change-override-process).
+GitHub has no native per-label permission; the label guard is the enforcement point. The contributor handbook for this process is in [CONTRIBUTING.md](https://github.com/syntara-orchestration/syntara/blob/devel/CONTRIBUTING.md#breaking-change-override-process).
 
 ## CI Checks
 

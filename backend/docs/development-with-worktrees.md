@@ -290,5 +290,5 @@ When using Claude Code inside a worktree, you may see this warning:
 ## Additional Resources
 
 - [Git Worktree Documentation](https://git-scm.com/docs/git-worktree)
-- [Syntara Development Guide](../README.md)
+- [Syntara Development Guide](https://github.com/syntara-orchestration/syntara/blob/devel/backend/README.md)
 - [Podman Compose Documentation](https://github.com/containers/podman-compose)
