@@ -9,11 +9,7 @@ import { SynConfirmationDialog } from '../../components/dialogs/SynConfirmationD
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { IconLabel } from '../../components/IconLabel'
 import { SynLabel } from '../../components/labels/SynLabel'
-import {
-  SynListPanelTable,
-  SynListPanelToolbar,
-  SynListPanelView,
-} from '../../components/panels/list/SynListPanel'
+import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../components/panels/list/SynListPanel'
 import { SynEmptyStateFilter } from '../../components/states/SynEmptyStateFilter'
 import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 import type { KebabAction } from '../../components/SynKebabMenu'
@@ -279,16 +275,29 @@ export function RoleAssignmentsPanel({
   const showToolbar = rows.length > 0 || hasActiveFilters || queryForbidden
   const isEmpty = rows.length === 0 && !queryForbidden
 
+  const emptyStateSharedProps = {
+    title: 'No role assignments yet',
+    buttonText: 'Assign role',
+    addData: openAssignIfAllowed,
+  } as const
+  const normalEmptyState = (
+    <SynEmptyStateNoData
+      {...emptyStateSharedProps}
+      description={`No roles have been assigned to this ${principalTypeLabel[principalType]}.`}
+    />
+  )
+  const forbiddenEmptyState = (
+    <SynEmptyStateNoData
+      {...emptyStateSharedProps}
+      description={`No project-scoped roles have been assigned to this ${principalTypeLabel[principalType]}.`}
+    />
+  )
+
   const listBody =
     filteredRows.length === 0 ? (
       <StackItem isFilled>
-        {rows.length === 0 ? (
-          <SynEmptyStateNoData
-            title="No role assignments yet"
-            description={`No project-scoped roles have been assigned to this ${principalTypeLabel[principalType]}.`}
-            buttonText="Assign role"
-            addData={openAssignIfAllowed}
-          />
+        {queryForbidden ? (
+          forbiddenEmptyState
         ) : (
           <SynEmptyStateFilter clearAllFilters={handleClearAllFiltersWithReset} />
         )}
@@ -321,14 +330,7 @@ export function RoleAssignmentsPanel({
         isEmpty={isEmpty}
         hasActiveFilters={hasActiveFilters}
         onClearAllFilters={handleClearAllFiltersWithReset}
-        noDataState={
-          <SynEmptyStateNoData
-            title="No role assignments yet"
-            description={`No roles have been assigned to this ${principalTypeLabel[principalType]}.`}
-            buttonText="Assign role"
-            addData={openAssignIfAllowed}
-          />
-        }
+        noDataState={normalEmptyState}
         toolbar={
           showToolbar ? (
             <>
