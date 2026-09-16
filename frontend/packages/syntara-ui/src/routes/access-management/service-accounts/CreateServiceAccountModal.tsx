@@ -324,7 +324,7 @@ function CreateServiceAccountFormPhase({
             >
               {({ field }) => (
                 <ProjectSelect
-                  value={field.value}
+                  value={field.value as string}
                   onChange={field.onChange}
                   onBlur={field.onBlur}
                   projects={projectOptions}

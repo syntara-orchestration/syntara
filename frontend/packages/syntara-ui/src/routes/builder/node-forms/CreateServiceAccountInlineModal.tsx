@@ -175,7 +175,11 @@ function CreateFormBody({ projectOptions }: CreateFormBodyProps) {
     <>
       <SynFormField name="project_id" label="Project" fieldId="sa-inline-project" isRequired>
         {({ field }) => (
-          <InlineProjectSelect value={field.value} onChange={field.onChange} projectOptions={projectOptions} />
+          <InlineProjectSelect
+            value={field.value as string}
+            onChange={field.onChange}
+            projectOptions={projectOptions}
+          />
         )}
       </SynFormField>
       <SynTextField
