@@ -417,6 +417,13 @@ describe('RoleAssignmentsPanel', () => {
       render(<RoleAssignmentsPanel principalType="user" principalId="u1" />, { wrapper })
       expect(screen.getByRole('button', { name: 'Assign role' })).toBeInTheDocument()
     })
+
+    it('renders "Assign role" inside the filter toolbar (AAP-85108)', () => {
+      render(<RoleAssignmentsPanel principalType="service_account" principalId="sa-1" />, { wrapper })
+
+      const filterToolbar = screen.getByRole('search', { name: 'Filters' })
+      expect(within(filterToolbar).getByRole('button', { name: 'Assign role' })).toBeInTheDocument()
+    })
   })
 
   describe('Expandable rows', () => {

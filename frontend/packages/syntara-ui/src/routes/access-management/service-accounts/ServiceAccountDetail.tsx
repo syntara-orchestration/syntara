@@ -299,6 +299,8 @@ export function ServiceAccountDetail() {
               principalType={RolePrincipalType.SERVICE_ACCOUNT}
               principalId={serviceAccount.id}
               hiddenColumns={['scope']}
+              tabKey="assignments"
+              tabLabel="Assignments"
             />
           )}
         </SynListPanel>
