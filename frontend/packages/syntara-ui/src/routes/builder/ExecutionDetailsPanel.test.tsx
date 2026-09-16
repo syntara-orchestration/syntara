@@ -68,7 +68,12 @@ const EXECUTION = {
 }
 
 vi.mock('../../client', () => ({
-  executionsClient: { useQuery: vi.fn(() => EXECUTION) },
+  executionsClient: {
+    useQuery: vi.fn(() => ({
+      ...EXECUTION,
+      refetch: vi.fn(),
+    })),
+  },
   authMiddleware: { onRequest: vi.fn() },
   interfaceTagMiddleware: { onRequest: vi.fn() },
 }))
@@ -297,14 +302,31 @@ describe('ExecutionDetailsPanel', () => {
       expect(screen.getByText('Process data')).toBeInTheDocument()
     })
 
-    it('switches to Details mode showing no-selection state', async () => {
+    it('selects the first activity by default when switching to Details mode', async () => {
       const user = userEvent.setup()
       renderPanel(WORKFLOW_DEF)
 
       await user.click(screen.getByRole('tab', { name: 'Details' }))
 
       expect(screen.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true')
-      expect(screen.getByText(/Select a step/)).toBeInTheDocument()
+      expect(screen.queryByText(/Select a step/)).not.toBeInTheDocument()
+      expect(screen.getAllByText('Process data').length).toBeGreaterThanOrEqual(1)
+    })
+
+    it('keeps the selected activity when switching between Overview and Details tabs', async () => {
+      const user = userEvent.setup()
+      renderPanel(WORKFLOW_DEF)
+
+      await user.click(screen.getByRole('tab', { name: 'Details' }))
+
+      const activityList = screen.getByRole('grid', { name: 'Activity list' })
+      await user.click(within(activityList).getByText('Send notification'))
+
+      await user.click(screen.getByRole('tab', { name: 'Overview' }))
+      await user.click(screen.getByRole('tab', { name: 'Details' }))
+
+      expect(screen.getAllByText('Send notification').length).toBeGreaterThanOrEqual(1)
+      expect(screen.queryByText(/Select a step/)).not.toBeInTheDocument()
     })
 
     it('switches back to Overview mode', async () => {
@@ -372,8 +394,9 @@ describe('ExecutionDetailsPanel', () => {
 
       await user.click(screen.getByRole('tab', { name: 'Details' }))
 
-      expect(screen.getByText('Process data')).toBeInTheDocument()
-      expect(screen.queryByText('Send notification')).not.toBeInTheDocument()
+      const activityList = screen.getByRole('grid', { name: 'Activity list' })
+      expect(within(activityList).getByText('Process data')).toBeInTheDocument()
+      expect(within(activityList).queryByText('Send notification')).not.toBeInTheDocument()
     })
   })
 

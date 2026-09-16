@@ -32,6 +32,7 @@ import type { KebabAction } from '../../../components/SynKebabMenu'
 import { SynKebabMenu } from '../../../components/SynKebabMenu'
 import { LinkCell } from '../../../components/table/LinkCell'
 import { SynScrollableTableContainer } from '../../../components/table/SynScrollableTableContainer'
+import { useClientPagination } from '../../../hooks/useClientPagination'
 import { useFilterState } from '../../../hooks/useFilterState'
 import { useSynForm } from '../../../hooks/useSynForm'
 import { useAlerts } from '../../../providers/alerts'
@@ -262,17 +263,12 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
   const [groupToRemove, setGroupToRemove] = useState<GroupInfo | null>(null)
   const { filters, setAllFilters, clearAllFilters } = useFilterState()
   const groupPermissions = useGroupPermissions()
-  const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(20)
+  const { paginate, getFooterProps, resetPage } = useClientPagination()
   const { showAlert } = useAlerts()
 
   const handleFilterChange = (newFilters: typeof filters) => {
     setAllFilters(newFilters)
-    setPage(1)
-  }
-  const handlePerPageChange = (newPerPage: number) => {
-    setPerPage(newPerPage)
-    setPage(1)
+    resetPage()
   }
   const query = accessClient.useQuery('get', '/users/{user_id}/groups', {
     params: { path: { user_id: userId } },
@@ -282,10 +278,7 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
 
   const filteredGroups = useMemo(() => applyGroupFilters(groups, filters), [groups, filters])
 
-  const paginatedGroups = useMemo(() => {
-    const start = (page - 1) * perPage
-    return filteredGroups.slice(start, start + perPage)
-  }, [filteredGroups, page, perPage])
+  const paginatedGroups = useMemo(() => paginate(filteredGroups), [filteredGroups, paginate])
 
   const { mutate: removeMember } = accessClient.useMutation('delete', '/groups/{group_id}/members/{user_id}')
   const handleRemove = () =>
@@ -337,7 +330,7 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
                 showClearAll={true}
                 clearAllFilters={() => {
                   clearAllFilters()
-                  setPage(1)
+                  resetPage()
                 }}
               />
             </FlexItem>
@@ -364,23 +357,12 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
             <SynEmptyStateFilter
               clearAllFilters={() => {
                 clearAllFilters()
-                setPage(1)
+                resetPage()
               }}
             />
           </SynPageBody>
         ) : (
-          <SynScrollableTableContainer
-            caption="User groups table"
-            footer={{
-              page,
-              perPage,
-              total: filteredGroups.length,
-              hasNext: page * perPage < filteredGroups.length,
-              onPrev: () => setPage((p) => Math.max(1, p - 1)),
-              onNext: () => setPage((p) => p + 1),
-              onPerPageChange: handlePerPageChange,
-            }}
-          >
+          <SynScrollableTableContainer caption="User groups table" footer={getFooterProps(filteredGroups.length)}>
             <Thead>
               <Tr>
                 <Th>Name</Th>
