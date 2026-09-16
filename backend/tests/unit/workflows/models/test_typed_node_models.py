@@ -9,7 +9,7 @@ from typing import Any, ClassVar
 import pytest
 from pydantic import ValidationError
 
-from syntara.forms.models.form_fields import FormDefinition
+from syntara.forms.models.form_fields import FormDefinition, TextField
 from syntara.workflows.models.workflow_definition import (
     WorkflowDefinition,
 )
@@ -433,18 +433,18 @@ class TestFormPromptNodeParameters:
     """Tests for FormPromptNodeParameters validation."""
 
     @staticmethod
-    def _minimal_form_definition() -> dict[str, Any]:
-        """Return a minimal valid FormDefinition structure."""
-        return {
-            "fields": [
-                {
-                    "type": "text",
-                    "value_name": "reason",
-                    "label": "Reason",
-                    "required": False,
-                }
+    def _minimal_form_definition() -> FormDefinition:
+        """Return a minimal valid FormDefinition."""
+        return FormDefinition(
+            fields=[
+                TextField(
+                    type="text",
+                    value_name="reason",
+                    label="Reason",
+                    required=False,
+                )
             ]
-        }
+        )
 
     def test_minimal_valid(self) -> None:
         """Minimal valid config with form_definition only."""

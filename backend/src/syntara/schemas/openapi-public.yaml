@@ -36497,41 +36497,8 @@ components:
           title: Message
           description: Message shown above the form. Supports ${...} template expressions.
         form_definition:
-          type: object
-          title: FormDefinition
-          description: Complete form definition with fields and metadata.
-          additionalProperties: false
-          required:
-            - fields
-          properties:
-            fields:
-              type: array
-              title: Fields
-              minItems: 1
-              maxItems: 100
-              items:
-                oneOf:
-                  - $ref: '#/components/schemas/TextField'
-                  - $ref: '#/components/schemas/TextAreaField'
-                  - $ref: '#/components/schemas/MaskedTextField'
-                  - $ref: '#/components/schemas/EmailField'
-                  - $ref: '#/components/schemas/NumberField'
-                  - $ref: '#/components/schemas/CheckboxField'
-                  - $ref: '#/components/schemas/DateField'
-                  - $ref: '#/components/schemas/DropdownField'
-                  - $ref: '#/components/schemas/MultiSelectField'
-                discriminator:
-                  propertyName: type
-                  mapping:
-                    text: '#/components/schemas/TextField'
-                    textarea: '#/components/schemas/TextAreaField'
-                    masked_text: '#/components/schemas/MaskedTextField'
-                    email: '#/components/schemas/EmailField'
-                    number: '#/components/schemas/NumberField'
-                    checkbox: '#/components/schemas/CheckboxField'
-                    date: '#/components/schemas/DateField'
-                    dropdown: '#/components/schemas/DropdownField'
-                    multi_select: '#/components/schemas/MultiSelectField'
+          $ref: '#/components/schemas/FormDefinition'
+          description: Form definition describing the fields shown to responders.
         responder_users:
           anyOf:
             - items:

@@ -2188,7 +2188,7 @@ components:
           title: Message
           description: Message shown above the form. Supports ${...} template expressions.
         form_definition:
-          $ref: ../../forms/openapi.yaml#/components/schemas/FormDefinition
+          $ref: '#/components/schemas/FormDefinition'
           description: Form definition describing the fields shown to responders.
         responder_users:
           anyOf:
