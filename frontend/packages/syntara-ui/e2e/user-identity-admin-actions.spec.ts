@@ -108,7 +108,7 @@ test.describe('User Detail — Admin Identity Actions (UI-25, UI-26)', () => {
   })
 
   /**
-   * UI-25b: Cancel link navigates back to user's identities tab.
+   * UI-25b: Cancel button navigates back to user's identities tab.
    */
   test('wizard cancel returns to identities tab (UI-25b)', async ({ app }) => {
     await mockUserIdentities(app, NON_BUILTIN_USER_ID)
@@ -123,7 +123,7 @@ test.describe('User Detail — Admin Identity Actions (UI-25, UI-26)', () => {
       timeout: 15_000,
     })
 
-    await app.getByRole('link', { name: 'Cancel' }).click()
+    await app.getByRole('button', { name: 'Cancel' }).click()
 
     await expect(app).toHaveURL(new RegExp(`${NON_BUILTIN_USER_ID}/identities`))
   })
