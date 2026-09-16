@@ -21,7 +21,7 @@
   "devDependencies": {
     "@types/node": "22.13.0",
     "msw": "2.8.5",
-    "prettier": "3.8.4",
+    "prettier": "3.9.6",
     "tsx": "4.19.2",
     "typescript": "5.7.3",
     "vitest": "3.1.2"
