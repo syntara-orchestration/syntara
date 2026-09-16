@@ -5,9 +5,6 @@ import {
   ClipboardCopy,
   Form,
   FormGroup,
-  FormHelperText,
-  HelperText,
-  HelperTextItem,
   MenuToggle,
   Modal,
   ModalBody,
@@ -17,7 +14,7 @@ import {
   SelectOption,
   TextInput,
 } from '@patternfly/react-core'
-import { RhUiAddIcon, RhUiErrorIcon } from '@patternfly/react-icons'
+import { RhUiAddIcon } from '@patternfly/react-icons'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { SynForm } from '../../../components/forms/SynForm'
@@ -135,34 +132,6 @@ function InlineProjectSelect({
         ))}
       </SelectList>
     </SynSelect>
-  )
-}
-
-export function ProjectField({
-  value,
-  onChange,
-  error,
-  projectOptions,
-}: Readonly<{
-  value: string
-  onChange: (val: string) => void
-  error?: string
-  projectOptions: ReadonlyArray<{ id: string; name: string }>
-}>) {
-  return (
-    <FormGroup label="Project" fieldId="sa-inline-project" isRequired>
-      <InlineProjectSelect value={value} onChange={onChange} projectOptions={projectOptions} />
-
-      {error && (
-        <FormHelperText>
-          <HelperText>
-            <HelperTextItem icon={<RhUiErrorIcon />} variant="error">
-              {error}
-            </HelperTextItem>
-          </HelperText>
-        </FormHelperText>
-      )}
-    </FormGroup>
   )
 }
 

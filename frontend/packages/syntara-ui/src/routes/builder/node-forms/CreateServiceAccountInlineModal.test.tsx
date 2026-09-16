@@ -11,7 +11,6 @@ import { useCredentialExpirationDate } from '../../access-management/service-acc
 import {
   CreateServiceAccountInlineModal,
   CredentialRevealBody,
-  ProjectField,
   ProjectSelectToggle,
 } from './CreateServiceAccountInlineModal'
 import { useCreateServiceAccountInline } from './useCreateServiceAccountInline'
@@ -306,47 +305,6 @@ describe('ProjectSelectToggle', () => {
 
     await user.click(screen.getByText('Select'))
     expect(onToggle).toHaveBeenCalled()
-  })
-})
-
-describe('ProjectField', () => {
-  const projects = [
-    { id: PROJECT_UUID, name: 'Default' },
-    { id: '00000000-0000-0000-0000-000000000002', name: 'Production' },
-  ]
-
-  it('renders with placeholder when no value', () => {
-    render(<ProjectField value="" onChange={vi.fn()} projectOptions={projects} />)
-
-    expect(screen.getByText('Select a project')).toBeInTheDocument()
-  })
-
-  it('renders selected project name', () => {
-    render(<ProjectField value={PROJECT_UUID} onChange={vi.fn()} projectOptions={projects} />)
-
-    expect(screen.getByText('Default')).toBeInTheDocument()
-  })
-
-  it('shows error message when error is provided', () => {
-    render(<ProjectField value="" onChange={vi.fn()} error="Project is required" projectOptions={projects} />)
-
-    expect(screen.getByText('Project is required')).toBeInTheDocument()
-  })
-
-  it('calls onChange when option is selected', async () => {
-    const onChange = vi.fn()
-    const user = userEvent.setup()
-    render(<ProjectField value="" onChange={onChange} projectOptions={projects} />)
-
-    await user.click(screen.getByText('Select a project'))
-    await user.click(screen.getByText('Production'))
-
-    expect(onChange).toHaveBeenCalledWith('00000000-0000-0000-0000-000000000002')
-  })
-
-  it('has no accessibility violations', async () => {
-    const { container } = render(<ProjectField value="" onChange={vi.fn()} projectOptions={projects} />)
-    expect(await axe(container)).toHaveNoViolations()
   })
 })
 
