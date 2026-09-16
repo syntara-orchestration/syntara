@@ -548,6 +548,31 @@ components:
               format: uuid
             - type: 'null'
           title: Retried From Execution Id
+        source_execution_id:
+          anyOf:
+            - type: string
+              format: uuid
+            - type: 'null'
+          title: Source Execution Id
+          description: ID of the source execution this was restarted from
+        failed_node_ids:
+          type: array
+          items:
+            type: string
+          title: Failed Node Ids
+          description: Failure points selected for restart (node IDs)
+        triggered_by:
+          anyOf:
+            - type: string
+              format: uuid
+            - type: 'null'
+          title: Triggered By
+          description: ID of the user who triggered the restart
+        restart_count:
+          type: integer
+          title: Restart Count
+          description: Restart generation (0 = original run)
+          default: 0
         trigger_type:
           anyOf:
             - type: string
@@ -1013,6 +1038,63 @@ components:
           type: string
           title: Trigger Node Id
           description: Trigger node ID to start from
+
+    RestartValidateRequest:
+      type: object
+      title: RestartValidateRequest
+      description: Request body for POST /executions/{id}/validate-restart.
+      properties:
+        failure_point_ids:
+          type: array
+          items:
+            type: string
+          title: Failure Point Ids
+          description: Failure points to restart from (node IDs from the source execution)
+
+    RestartRequest:
+      type: object
+      title: RestartRequest
+      description: Request body for POST /executions/{id}/restart.
+      properties:
+        failure_point_ids:
+          type: array
+          items:
+            type: string
+          title: Failure Point Ids
+          description: >-
+            Failure points to restart from (node IDs from the source execution).
+            A subset may be passed when multiple parallel branches failed;
+            unselected branches are skipped.
+
+    RestartValidationResponse:
+      type: object
+      title: RestartValidationResponse
+      description: Pre-restart validation verdict (POST /executions/{id}/validate-restart).
+      required:
+        - eligible
+      properties:
+        eligible:
+          type: boolean
+          title: Eligible
+          description: Whether the restart is allowed to proceed
+        reason:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Reason
+          description: Rejection reason when eligible is false, null otherwise
+        failure_point_ids:
+          type: array
+          items:
+            type: string
+          title: Failure Point Ids
+          description: Normalized failure points validated
+        changed_node_ids:
+          type: array
+          items:
+            type: string
+          title: Changed Node Ids
+          description: Upstream nodes whose definition changed (empty when eligible)
 
     # WebSocket-specific schemas
     WebSocketMessage:

@@ -88,6 +88,46 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/executions/{execution_id}/validate-restart': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Validate restart
+     * @description Validate that an execution can be restarted from the given failure points. Checks execution state, failure-point eligibility, and the version-mismatch guard. Returns a pass/fail verdict without mutating any state.
+     */
+    post: operations['validate_restart']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/executions/{execution_id}/restart': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Restart execution
+     * @description Restart a failed execution from the given failure points. Independently repeats all validation checks, then creates a new execution linked to the source and triggers a Temporal run carrying restart context.
+     */
+    post: operations['restart_execution']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/executions/{execution_id}/activities': {
     parameters: {
       query?: never
@@ -222,6 +262,27 @@ export interface components {
       } | null
       /** Retried From Execution Id */
       retried_from_execution_id?: string | null
+      /**
+       * Source Execution Id
+       * @description ID of the source execution this was restarted from
+       */
+      source_execution_id?: string | null
+      /**
+       * Failed Node Ids
+       * @description Failure points selected for restart (node IDs)
+       */
+      failed_node_ids?: string[]
+      /**
+       * Triggered By
+       * @description ID of the user who triggered the restart
+       */
+      triggered_by?: string | null
+      /**
+       * Restart Count
+       * @description Restart generation (0 = original run)
+       * @default 0
+       */
+      restart_count?: number
       /**
        * Trigger Type
        * @description Trigger node type (manual_trigger, scheduled_trigger, webhook_trigger, eda_trigger)
@@ -492,6 +553,54 @@ export interface components {
        * @default false
        */
       use_published?: boolean
+    }
+    /**
+     * RestartValidateRequest
+     * @description Request body for POST /executions/{id}/validate-restart.
+     */
+    RestartValidateRequest: {
+      /**
+       * Failure Point Ids
+       * @description Failure points to restart from (node IDs from the source execution)
+       */
+      failure_point_ids?: string[]
+    }
+    /**
+     * RestartRequest
+     * @description Request body for POST /executions/{id}/restart.
+     */
+    RestartRequest: {
+      /**
+       * Failure Point Ids
+       * @description Failure points to restart from (node IDs from the source execution). A subset may be passed when multiple parallel branches failed; unselected branches are skipped.
+       */
+      failure_point_ids?: string[]
+    }
+    /**
+     * RestartValidationResponse
+     * @description Pre-restart validation verdict (POST /executions/{id}/validate-restart).
+     */
+    RestartValidationResponse: {
+      /**
+       * Eligible
+       * @description Whether the restart is allowed to proceed
+       */
+      eligible: boolean
+      /**
+       * Reason
+       * @description Rejection reason when eligible is false, null otherwise
+       */
+      reason?: string | null
+      /**
+       * Failure Point Ids
+       * @description Normalized failure points validated
+       */
+      failure_point_ids?: string[]
+      /**
+       * Changed Node Ids
+       * @description Upstream nodes whose definition changed (empty when eligible)
+       */
+      changed_node_ids?: string[]
     }
     /**
      * TestExecutionCreate
@@ -2130,6 +2239,74 @@ export interface operations {
     requestBody?: never
     responses: {
       /** @description New execution created from retry */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ExecutionRead']
+        }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
+      422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
+  validate_restart: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        execution_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RestartValidateRequest']
+      }
+    }
+    responses: {
+      /** @description Restart validation verdict */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['RestartValidationResponse']
+        }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
+      422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
+  restart_execution: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        execution_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RestartRequest']
+      }
+    }
+    responses: {
+      /** @description New execution created from restart */
       201: {
         headers: {
           [name: string]: unknown

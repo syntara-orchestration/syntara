@@ -227,6 +227,35 @@ class Execution(UserOwnedResource, table=True):
         description="ID of the execution this was retried from (null if not a retry)",
     )
 
+    # Restart lineage (AAP-92820: restart from failure point)
+    source_execution_id: UUID | None = Field(
+        default=None,
+        foreign_key="executions.id",
+        nullable=True,
+        ondelete="SET NULL",
+        index=True,
+        description="ID of the source execution this was restarted from (null if not a restart)",
+    )
+
+    failed_node_ids: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSONB, nullable=False, server_default=text("'[]'::jsonb")),
+        description="Failure points selected for restart (node IDs from the source execution)",
+    )
+
+    triggered_by: UUID | None = Field(
+        default=None,
+        nullable=True,
+        description="ID of the user who triggered the restart",
+    )
+
+    restart_count: int = Field(
+        default=0,
+        nullable=False,
+        sa_column_kwargs={"server_default": text("0")},
+        description="Restart generation (0 = original run, source restart_count + 1 for restarts)",
+    )
+
     # Telemetry: trigger type and interface
     trigger_type: str | None = Field(
         default=None,
@@ -413,6 +442,40 @@ class TestExecutionCreate(SQLModel):
         return self
 
 
+class RestartValidateRequest(SQLModel):
+    """Request body for POST /executions/{id}/validate-restart."""
+
+    __test__ = False  # Prevent pytest from collecting this as a test class
+
+    failure_point_ids: list[str] = Field(
+        default_factory=list,
+        description="Failure points to restart from (node IDs from the source execution)",
+    )
+
+
+class RestartRequest(SQLModel):
+    """Request body for POST /executions/{id}/restart."""
+
+    __test__ = False  # Prevent pytest from collecting this as a test class
+
+    failure_point_ids: list[str] = Field(
+        default_factory=list,
+        description="Failure points to restart from (node IDs from the source execution). "
+        "A subset may be passed when multiple parallel branches failed; unselected branches are skipped.",
+    )
+
+
+class RestartValidationResponse(SQLModel):
+    """Pre-restart validation verdict (POST /executions/{id}/validate-restart)."""
+
+    eligible: bool = Field(description="Whether the restart is allowed to proceed")
+    reason: str | None = Field(default=None, description="Rejection reason when eligible is false, null otherwise")
+    failure_point_ids: list[str] = Field(default_factory=list, description="Normalized failure points validated")
+    changed_node_ids: list[str] = Field(
+        default_factory=list, description="Upstream nodes whose definition changed (empty when eligible)"
+    )
+
+
 class CurrentActivity(SQLModel):
     """Currently executing activity information."""
 
@@ -475,6 +538,14 @@ class ExecutionRead(UserReferenceFieldsMixin, SQLModel):
     mode: ExecutionMode = ExecutionMode.STANDARD
     execution_metadata: dict[str, Any] | None = None
     retried_from_execution_id: UUID | None = None
+    source_execution_id: UUID | None = Field(
+        default=None, description="ID of the source execution this was restarted from"
+    )
+    failed_node_ids: list[str] = Field(
+        default_factory=list, description="Failure points selected for restart (node IDs)"
+    )
+    triggered_by: UUID | None = Field(default=None, description="ID of the user who triggered the restart")
+    restart_count: int = Field(default=0, description="Restart generation (0 = original run)")
     trigger_type: str | None = Field(
         default=None,
         description="Trigger node type (manual_trigger, scheduled_trigger, webhook_trigger, eda_trigger)",
