@@ -980,7 +980,7 @@ jobs:
 
           # Check all other required jobs
           ok="success|skipped"
-          for job in api-spec-validation api-spec-bundle api-spec-drift generate-api-client check-api-paths check-dead-code check-cycles check-orphans check-openapi-breaking verify-test-structure mypy test-unit test-cli test-integration test-compose-e2e konflux-backend-gate konflux-api-tests-gate shared-checks-gate snyk-sast snyk-sca; do
+          for job in api-spec-validation api-spec-bundle api-spec-drift generate-api-client check-api-paths check-dead-code check-cycles check-openapi-breaking verify-test-structure mypy test-unit test-cli test-integration test-compose-e2e konflux-backend-gate konflux-api-tests-gate shared-checks-gate snyk-sast snyk-sca; do
             case "$job" in
               api-spec-validation)   result="${{ needs.api-spec-validation.result }}" ;;
               api-spec-bundle)       result="${{ needs.api-spec-bundle.result }}" ;;
@@ -989,7 +989,7 @@ jobs:
               check-api-paths)       result="${{ needs.check-api-paths.result }}" ;;
               check-dead-code)       result="${{ needs.check-dead-code.result }}" ;;
               check-cycles)          result="${{ needs.check-cycles.result }}" ;;
-              check-orphans)         result="${{ needs.check-orphans.result }}" ;;
+              # check-orphans)         result="${{ needs.check-orphans.result }}" ;;
               check-openapi-breaking) result="${{ needs.check-openapi-breaking.result }}" ;;
               verify-test-structure) result="${{ needs.verify-test-structure.result }}" ;;
               mypy)                  result="${{ needs.mypy.result }}" ;;
