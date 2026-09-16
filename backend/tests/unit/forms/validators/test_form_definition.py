@@ -39,7 +39,7 @@ class TestValidDefinitions:
 
     def test_no_defaults_passes(self) -> None:
         """A form whose fields have no defaults is trivially valid."""
-        assert validate_form_definition(_form(_field("text", "name"), _field("email", "contact"))) is None
+        validate_form_definition(_form(_field("text", "name"), _field("email", "contact")))
 
     @pytest.mark.parametrize(
         ("field_type", "default"),
@@ -56,7 +56,7 @@ class TestValidDefinitions:
     )
     def test_valid_defaults_pass(self, field_type: str, default: Any) -> None:  # noqa: ANN401
         """A default the submission coercer accepts is a valid default."""
-        assert validate_form_definition(_form(_field(field_type, "x", default=default))) is None
+        validate_form_definition(_form(_field(field_type, "x", default=default)))
 
     def test_valid_option_defaults_pass(self) -> None:
         """Dropdown and multi-select defaults drawn from the option list pass."""
@@ -65,7 +65,7 @@ class TestValidDefinitions:
             _field("multi_select", "picks", options=_STATIC_OPTIONS, default=["a", "b"]),
         )
 
-        assert validate_form_definition(form) is None
+        validate_form_definition(form)
 
 
 class TestInvalidDefaults:
