@@ -42,6 +42,7 @@ import { appBaseUrl, expect, test, toAppUrl, type Page } from './fixtures'
 import { WCAG_TAGS } from './fixtures/accessibility'
 import { isSkipWebServerForPlaywrightTests } from './playwrightWebServerEnv'
 import { loginPages, pages, type PageEntry } from './visual-regression/page-registry'
+import { stabilizeReactFlowViewport } from './visual-regression/stabilizeViewport'
 
 const AUDIT_TIMEOUT_MS = 900_000
 
@@ -57,7 +58,6 @@ async function waitForPageReady(page: Page): Promise<void> {
 async function auditPage(page: Page, entry: PageEntry): Promise<A11yPageReport> {
   await page.goto(toAppUrl(entry.path))
 
-  let loadError: string | undefined
   try {
     await entry.waitFor(page)
 
@@ -66,12 +66,21 @@ async function auditPage(page: Page, entry: PageEntry): Promise<A11yPageReport> 
     }
 
     await waitForPageReady(page)
+    await stabilizeReactFlowViewport(page)
   } catch (error) {
-    loadError = error instanceof Error ? error.message : String(error)
+    const loadError = error instanceof Error ? error.message : String(error)
+    return {
+      section: entry.section,
+      name: entry.name,
+      path: entry.path,
+      violationCount: 0,
+      violations: [],
+      loadError,
+    }
   }
 
   const axeResults = await new AxeBuilder({ page }).withTags([...WCAG_TAGS]).analyze()
-  return buildPageReport(entry, axeResults, loadError)
+  return buildPageReport(entry, axeResults)
 }
 
 async function attachPageReport(
