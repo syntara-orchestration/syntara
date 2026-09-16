@@ -6,7 +6,7 @@ import pytest
 
 from syntara.forms.exceptions import FormDefinitionError
 from syntara.forms.models.form_fields import FormDefinition
-from syntara.forms.validators.definition import validate_form_definition
+from syntara.forms.validators.form_definition import validate_form_definition
 
 _STATIC_OPTIONS: dict[str, Any] = {
     "source": "static",
