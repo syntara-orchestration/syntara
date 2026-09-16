@@ -267,6 +267,7 @@ export function UserFormFields({
         isRequired
         isDisabled={isBuiltinUser}
         labelHelp={userHelp.username}
+        autoComplete="off"
       />
       <SynTextField
         name="first_name"

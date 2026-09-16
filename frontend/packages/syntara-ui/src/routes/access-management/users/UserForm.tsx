@@ -2,7 +2,6 @@ import { ActionGroup, Alert, Button, Form, Stack, StackItem } from '@patternfly/
 import { RhUiAddIcon } from '@patternfly/react-icons'
 import { useNavigate } from '@tanstack/react-router'
 import type { BaseSyntheticEvent, ReactNode } from 'react'
-import { useEffect } from 'react'
 
 import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsCreateUser, breadcrumbsEditUser, breadcrumbsUserFormLoading } from '../../../app/breadcrumbBuilders'
@@ -170,7 +169,8 @@ export function UserForm({ mode }: Readonly<UserFormProps>) {
   const schema = isEdit ? userFormSchema : userCreateSchema
   const form = useSynForm({
     schema,
-    defaultValues: DEFAULT_VALUES,
+    defaultValues: formValues ?? DEFAULT_VALUES,
+    values: isEdit && formValues ? formValues : undefined,
   })
   const {
     handleSubmit,
@@ -179,12 +179,6 @@ export function UserForm({ mode }: Readonly<UserFormProps>) {
     reset,
     watch,
   } = form
-
-  useEffect(() => {
-    if (isEdit && formValues) {
-      reset(formValues)
-    }
-  }, [isEdit, formValues, reset])
 
   const navigateBack = () => detachPromise(navigate({ to: AppRoute.AccessManagement.Users }))
 
