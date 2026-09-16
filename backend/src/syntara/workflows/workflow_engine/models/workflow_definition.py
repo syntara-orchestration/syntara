@@ -960,15 +960,6 @@ class FormPromptNodeParameters(BaseModel):
         description="Custom CSS applied to the form view.",
     )
 
-    @field_validator("form_definition")
-    @classmethod
-    def validate_schema(cls, v: dict[str, Any]) -> dict[str, Any]:
-        """Validate JSON Schema structure and security."""
-        # Structural Draft-07 validity, $ref rejection (SSRF), ReDoS pattern guard.
-        # TO-DO - add field-type catalogue validation on the same hook.
-        validate_json_schema_definition(v)
-        return v
-
     @field_validator("timezone")
     @classmethod
     def validate_timezone(cls, v: str | None) -> str | None:
