@@ -235,8 +235,6 @@ export default function Workflows() {
     projectPermissions,
   })
 
-  })
-
   const hasQueryError = !!workflowsQuery.error
   const isInitialWorkflowsLoad = workflowsQuery.isLoading
   return (
