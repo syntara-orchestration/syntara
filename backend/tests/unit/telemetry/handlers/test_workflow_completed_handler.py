@@ -6,6 +6,7 @@ from uuid import uuid4
 from syntara.telemetry.events.workflow_execution import WorkflowExecutionCompletedEvent
 from syntara.telemetry.handlers.workflow_completed import WorkflowCompletedTelemetryHandler
 from syntara.workflows.audit.execution_completed import WorkflowCompletedEvent
+from syntara.workflows.models.execution import ExecutionMode
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, WorkflowTerminalStatus
 
 
@@ -37,7 +38,7 @@ class TestWorkflowCompletedTelemetryHandler:
         registry.send_event.assert_called_once()
         event = registry.send_event.call_args[0][0]
         assert isinstance(event, WorkflowExecutionCompletedEvent)
-        assert event.workflow_execution_id == str(execution_id)
+        assert event.workflow_execution_id == execution_id
         assert event.status == WorkflowTerminalStatus.COMPLETED
         assert event.duration_ms == 5000
         assert event.node_count == 3
@@ -45,6 +46,38 @@ class TestWorkflowCompletedTelemetryHandler:
         assert event.error_type is None
         assert event.entitlement_id == "ent-test-123"
         assert event.request_id == request_id
+
+    @patch("syntara.telemetry.handlers.workflow_completed.get_telemetry_registry")
+    def test_passes_workflow_metrics_fields_through(self, mock_get_registry: MagicMock) -> None:
+        """AAP-92215: workflow_id, mode, workflow_version, used_published, is_retry."""
+        registry = MagicMock()
+        registry.is_initialized.return_value = True
+        registry.entitlement_id = "ent"
+        mock_get_registry.return_value = registry
+
+        workflow_id = uuid4()
+        domain_event = WorkflowCompletedEvent(
+            execution_id=uuid4(),
+            workflow_id=workflow_id,
+            status=WorkflowTerminalStatus.FAILED,
+            duration_ms=42,
+            node_count=1,
+            error_count=1,
+            error_type="WorkflowTimedOut",
+            mode=ExecutionMode.STANDARD,
+            workflow_version=9,
+            used_published=True,
+            is_retry=True,
+        )
+        WorkflowCompletedTelemetryHandler().handle(domain_event)
+
+        event = registry.send_event.call_args[0][0]
+        assert event.workflow_id == workflow_id
+        assert event.mode == ExecutionMode.STANDARD
+        assert event.workflow_version == 9
+        assert event.used_published is True
+        assert event.is_retry is True
+        assert event.error_type == "WorkflowTimedOut"
 
     @patch("syntara.telemetry.handlers.workflow_completed.get_telemetry_registry")
     def test_emits_failed_event_with_error_type(self, mock_get_registry: MagicMock) -> None:

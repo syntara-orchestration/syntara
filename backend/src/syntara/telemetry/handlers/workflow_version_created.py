@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 import structlog
 
 from syntara.audit.handler import AuditEventHandler
-from syntara.telemetry.client import get_telemetry_registry
+from syntara.telemetry.client import get_telemetry_registry, hash_user_id
 from syntara.telemetry.events.workflow_version import (
     WorkflowVersionCreatedEvent as WorkflowVersionCreatedTelemetryEvent,
 )
@@ -33,10 +33,12 @@ class WorkflowVersionCreatedTelemetryHandler(AuditEventHandler[WorkflowVersionCr
             if not registry.is_initialized():
                 return None
 
+            user_id_hash = hash_user_id(registry.installation_salt, event.user_id) if event.user_id else None
             registry.send_event(
                 WorkflowVersionCreatedTelemetryEvent(
-                    workflow_id=str(event.workflow_id),
+                    workflow_id=event.workflow_id,
                     version=event.version,
+                    user_id_hash=user_id_hash,
                     entitlement_id=registry.entitlement_id,
                 )
             )

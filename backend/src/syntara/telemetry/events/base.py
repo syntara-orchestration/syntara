@@ -65,6 +65,11 @@ class BaseTelemetryEvent(SQLModel):
     def to_segment_event(self) -> dict[str, object]:
         """Convert to Segment Track API format.
 
+        Serialization to JSON-native types (e.g. ``UUID`` -> ``str``,
+        enums -> their values) happens here at the single emission boundary via
+        ``model_dump(mode="json")``, so event models can keep native types
+        (``UUID``, ``ExecutionMode``, ...) everywhere upstream.
+
         ``container_image_version`` is added to ``properties`` (rather than the
         Segment context dict) so that it reaches Amplitude for build filtering.
 
@@ -72,7 +77,7 @@ class BaseTelemetryEvent(SQLModel):
             Dictionary with event name and properties for Segment Track API.
 
         """
-        properties = self.model_dump()
+        properties = self.model_dump(mode="json")
         properties["container_image_version"] = _get_container_image_version()
         return {
             "event": self._get_event_name(),

@@ -49,9 +49,9 @@ Both systems follow the fire-and-forget principle: observability code MUST NEVER
 - Telemetry handlers - Located in `src/syntara/telemetry/handlers/`, auto-discovered at startup
 
 **Events collected:**
-- Workflow execution (start, completion with status/duration/error)
-- Activity execution (type, status, duration, error type)
-- Workflow version operations (created, restored, published, unpublished, exported)
+- Workflow execution (start, completion with status/duration/error, `workflow_id`, `mode`, `workflow_version`, `used_published`, `is_retry`)
+- Activity execution (type, status, duration, error type, `workflow_id`, `mode`)
+- Workflow version operations (created, restored, published, unpublished, exported; save/publish carry `user_id_hash`, publish carries `published_version_id`)
 - API calls (endpoint, method, status, response time, payload size)
 
 **Configuration:**

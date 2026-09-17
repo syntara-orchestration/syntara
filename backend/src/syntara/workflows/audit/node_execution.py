@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from uuid import UUID
 
+    from syntara.workflows.models.execution import ExecutionMode
     from syntara.workflows.workflow_engine.models.workflow_definition import (
         ActivityTerminalStatus,
         NodeType,
@@ -25,6 +26,8 @@ class NodeExecutedEvent:
     node_type: NodeType
     node_def: dict[str, Any]
     status: ActivityTerminalStatus
+    workflow_id: UUID | None = None
+    mode: ExecutionMode | None = None
     duration_ms: int | None = None
     error_type: str | None = None
     request_id: UUID | None = field(default=None, repr=False)

@@ -146,6 +146,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         error_type: str | None = None,
         new_version_created: bool = False,
         change_summary: dict[str, Any] | None = None,
+        user_id: UUID | None = None,
     ) -> None:
         AuditEventDispatcher.dispatch(
             WorkflowLifecycleEvent(
@@ -164,6 +165,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                     workflow_name=workflow_name,
                     version=version,
                     change_summary=change_summary,
+                    user_id=user_id,
                 )
             )
 
@@ -714,6 +716,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             version=version.version,
             project_id=workflow.project_id,
             new_version_created=True,
+            user_id=self.user.id,
         )
 
         return workflow, version, result
@@ -1319,6 +1322,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             project_id=workflow.project_id,
             new_version_created=new_version is not None,
             change_summary=change_summary,
+            user_id=self.user.id,
         )
 
         return workflow, current_version, validation_result
@@ -1441,6 +1445,8 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                     version=target_version.version,
                     workflow_name=workflow.name,
                     project_id=workflow.project_id,
+                    published_version_id=target_version.id,
+                    user_id=self.user.id,
                     error_type=type(exc).__name__,
                 )
             )
@@ -1473,6 +1479,8 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                 version=target_version.version,
                 workflow_name=workflow.name,
                 project_id=workflow.project_id,
+                published_version_id=target_version.id,
+                user_id=self.user.id,
             )
         )
 
@@ -1640,6 +1648,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             project_id=workflow.project_id,
             new_version_created=True,
             change_summary=restore_change_summary,
+            user_id=self.user.id,
         )
         AuditEventDispatcher.dispatch(
             WorkflowVersionRestoredEvent(
