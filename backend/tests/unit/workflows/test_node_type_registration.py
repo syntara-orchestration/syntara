@@ -140,7 +140,18 @@ class TestTypedNodeUnionParity:
                     {
                         "id": "n",
                         "type": "form_prompt",
-                        "parameters": {"form_definition": {"type": "object"}},
+                        "parameters": {
+                            "form_definition": {
+                                "fields": [
+                                    {
+                                        "type": "text",
+                                        "value_name": "field1",
+                                        "label": "Field 1",
+                                        "required": False,
+                                    }
+                                ]
+                            }
+                        },
                     }
                 ],
                 "edges": [],

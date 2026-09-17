@@ -740,12 +740,20 @@ class TestNodeSettingsValidation:
                     "parameters": {
                         "message": "Please fill out the form",
                         "form_definition": {
-                            "type": "object",
-                            "properties": {
-                                "field1": {"type": "string"},
-                                "field2": {"type": "number"},
-                            },
-                            "required": ["field1"],
+                            "fields": [
+                                {
+                                    "type": "text",
+                                    "value_name": "field1",
+                                    "label": "Field 1",
+                                    "required": True,
+                                },
+                                {
+                                    "type": "number",
+                                    "value_name": "field2",
+                                    "label": "Field 2",
+                                    "required": False,
+                                },
+                            ]
                         },
                         "responder_users": ["alice", "bob"],
                         "responder_groups": ["team-a"],
@@ -780,7 +788,9 @@ class TestNodeSettingsValidation:
         assert serialized["nodes"][0]["type"] == "form_prompt"
         params = serialized["nodes"][0]["parameters"]
         assert params["message"] == "Please fill out the form"
-        assert params["form_definition"]["properties"]["field1"]["type"] == "string"
+        assert len(params["form_definition"]["fields"]) == 2
+        assert params["form_definition"]["fields"][0]["value_name"] == "field1"
+        assert params["form_definition"]["fields"][0]["type"] == "text"
         assert params["responder_users"] == ["alice", "bob"]
         assert params["response_window"] == 3600
         assert params["fallback_behavior"] == "fallback"
