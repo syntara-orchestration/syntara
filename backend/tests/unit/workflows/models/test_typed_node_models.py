@@ -432,6 +432,10 @@ class TestSwitchCaseConditionValidation:
 class TestFormPromptNodeParameters:
     """Tests for FormPromptNodeParameters validation."""
 
+    def setup_method(self) -> None:
+        """Set up test fixtures."""
+        self.form_def = self._minimal_form_definition()
+
     @staticmethod
     def _minimal_form_definition() -> FormDefinition:
         """Return a minimal valid FormDefinition."""
@@ -448,8 +452,7 @@ class TestFormPromptNodeParameters:
 
     def test_minimal_valid(self) -> None:
         """Minimal valid config with form_definition only."""
-        form_def = self._minimal_form_definition()
-        p = FormPromptNodeParameters(form_definition=form_def)
+        p = FormPromptNodeParameters(form_definition=self.form_def)
         assert isinstance(p.form_definition, FormDefinition)
         assert len(p.form_definition.fields) == 1
         assert p.form_definition.fields[0].value_name == "reason"
