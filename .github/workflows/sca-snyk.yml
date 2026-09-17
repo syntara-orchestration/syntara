@@ -51,7 +51,7 @@ jobs:
             echo "has_snyk_token=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
         id: filter
         with:
@@ -78,7 +78,7 @@ jobs:
     steps:
       # Checkout code to scan
       - name: Checkout code to scan
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           path: scan
 
@@ -115,7 +115,7 @@ jobs:
       - name: Checkout base branch
         # Only scan base branch for pull requests and merge queue (not for push/schedule)
         if: github.event.pull_request != null || github.event.merge_group != null
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ github.event.pull_request.base.ref || github.event.merge_group.base_ref }}
           path: base
@@ -241,7 +241,7 @@ jobs:
     steps:
       # Checkout code to scan
       - name: Checkout code to scan
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           path: scan
 
@@ -272,7 +272,7 @@ jobs:
       - name: Checkout base branch
         # Only scan base branch for pull requests and merge queue (not for push/schedule)
         if: github.event.pull_request != null || github.event.merge_group != null
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ github.event.pull_request.base.ref || github.event.merge_group.base_ref }}
           path: base
