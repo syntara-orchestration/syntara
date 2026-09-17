@@ -862,7 +862,7 @@ class FormPromptNodeParameters(BaseModel):
 
     message: str | None = Field(
         default=None,
-        max_length=2000,
+        max_length=FieldLimits.DESCRIPTION_MAX_LENGTH,
         description="Message shown above the form. Supports ${...} template expressions.",
     )
     form_definition: FormDefinition = Field(
