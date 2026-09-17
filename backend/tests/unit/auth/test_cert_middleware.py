@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 
 import pytest
 
+from syntara.api.constants import EXCLUDED_PATHS
 from syntara.auth.cert_middleware import (
     CertificateValidationError,
     ClientCertAuthMiddleware,
@@ -247,11 +248,12 @@ class TestClientCertAuthMiddleware:
 
     @pytest.mark.usefixtures("_tls_enabled")
     @pytest.mark.asyncio
-    async def test_health_route_bypassed(self) -> None:
-        """Health routes skip cert processing entirely."""
+    @pytest.mark.parametrize("path", sorted(EXCLUDED_PATHS))
+    async def test_excluded_route_bypassed(self, path: str) -> None:
+        """Excluded routes, including both healthz probes, skip cert processing entirely."""
         app = AsyncMock()
         middleware = ClientCertAuthMiddleware(app)
-        scope = _make_scope(path="/health")
+        scope = _make_scope(path=path)
 
         await middleware(scope, AsyncMock(), AsyncMock())
 

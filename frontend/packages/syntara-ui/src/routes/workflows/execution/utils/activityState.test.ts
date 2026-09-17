@@ -11,6 +11,7 @@ import type { ActivityState, JsonPatchOperation } from '../types'
 import {
   parseActivityPath,
   parseCompositeKey,
+  latestActivityStateForCanvasNode,
   applyOperation,
   applyJsonPatch,
   buildActivityStateMap,
@@ -671,6 +672,25 @@ describe('parseCompositeKey', () => {
 
   it('does not split on hash without iter- prefix', () => {
     expect(parseCompositeKey('node#other')).toEqual({ baseId: 'node#other' })
+  })
+})
+
+describe('latestActivityStateForCanvasNode', () => {
+  it('returns the bare canvas record when there are no composite keys', () => {
+    const canvas = { activityId: 'node-1', status: 'waiting' } as ActivityState
+    const states = new Map<string, ActivityState>([['node-1', canvas]])
+    expect(latestActivityStateForCanvasNode(states, 'node-1')).toBe(canvas)
+  })
+
+  it('prefers the highest #iter-N over a completed canvas record', () => {
+    const canvas = { activityId: 'node-1', status: 'completed' } as ActivityState
+    const iter3 = { activityId: 'node-1#iter-3', status: 'waiting', iteration: 3 } as ActivityState
+    const states = new Map<string, ActivityState>([
+      ['node-1', canvas],
+      ['node-1#iter-0', { activityId: 'node-1#iter-0', status: 'completed', iteration: 0 }],
+      ['node-1#iter-3', iter3],
+    ])
+    expect(latestActivityStateForCanvasNode(states, 'node-1')).toBe(iter3)
   })
 })
 

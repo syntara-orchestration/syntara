@@ -11,25 +11,25 @@
  */
 
 import AxeBuilder from '@axe-core/playwright'
-import { type Page } from '@playwright/test'
 
+import { type Page } from './fixtures'
 import { test, expect } from './fixtures'
 import { WCAG_TAGS } from './fixtures/accessibility'
 import { triggerVerifyWorkflow, VALIDATE_ROUTE } from './helpers/workflow-verify'
 import {
-  buildUniqueName,
-  createBasicWorkflowViaApi,
-  openWorkflowInBuilder,
-  createWorkflowWithTrigger,
   addScriptNode,
   addScriptNodeUnconnected,
+  buildUniqueName,
+  clickSaveAndWait,
+  createBasicWorkflowViaApi,
+  createWorkflowWithTrigger,
   deleteWorkflow,
+  openWorkflowInBuilder,
 } from './helpers/workflows'
 import { deleteWorkflowViaApi } from './utils/api'
 
 const VERIFY_BANNER_TIMEOUT = 20_000
 const ERROR_BADGE_TIMEOUT = 5_000
-const SAVE_URL_TIMEOUT = 15_000
 
 function getWorkflowIdFromUrl(app: Page): string {
   const id = app.url().match(/workflow-builder\/([^/?]+)/)?.[1]
@@ -52,10 +52,14 @@ async function mockValidateEndpoint(app: Page, options: MockValidateOptions = {}
     ...warnings.map((w) => ({ ...w, severity: 'warning', category: 'schema_violation' })),
   ]
   const is_valid = valid && errors.length === 0
-  // Wait for any in-flight requests to settle before setting up the route mock.
-  // Without this, a pending validation request from save/load can race with the
-  // mock, causing the real response to overwrite the mocked error state.
-  await app.waitForLoadState('networkidle')
+  // Drain an in-flight validate from save/load before installing the mock, or a
+  // live response can overwrite mocked error state. Do not use networkidle —
+  // WebSockets keep the network busy (E2E lint). Wait for the canvas, then for
+  // a validate response if one is already in flight.
+  await expect(app.locator('.react-flow')).toBeVisible()
+  await app
+    .waitForResponse((response) => response.url().includes('/api/v1/workflows/validate'), { timeout: 3_000 })
+    .catch(() => undefined)
   await app.route(VALIDATE_ROUTE, (route) =>
     route.fulfill({
       status: 200,
@@ -120,7 +124,7 @@ test.describe('Verify button in toolbar', () => {
 
       await triggerVerifyWorkflow(app)
 
-      await expect(app.getByText('Workflow definition is valid')).toBeVisible({ timeout: VERIFY_BANNER_TIMEOUT })
+      await expect(app.getByText('Workflow verified')).toBeVisible({ timeout: VERIFY_BANNER_TIMEOUT })
     } finally {
       await app.unroute(VALIDATE_ROUTE)
       await deleteWorkflow(app, workflowName)
@@ -337,8 +341,7 @@ test.describe('Variable reference validation', () => {
     try {
       await addScriptNode(app, 'Ref step', 'echo ${nonexistent_node.result}')
 
-      await app.getByRole('button', { name: 'Save' }).click()
-      await expect(app).toHaveURL(/workflow-builder\/.+/, { timeout: SAVE_URL_TIMEOUT })
+      await clickSaveAndWait(app)
 
       await triggerVerifyWorkflow(app)
 
@@ -368,8 +371,7 @@ test.describe('Variable reference validation', () => {
 
       await addScriptNodeUnconnected(app, 'Isolated step', `echo \${${upstreamNodeId}.result}`)
 
-      await app.getByRole('button', { name: 'Save' }).click()
-      await expect(app).toHaveURL(/workflow-builder\/.+/, { timeout: SAVE_URL_TIMEOUT })
+      await clickSaveAndWait(app)
 
       await triggerVerifyWorkflow(app)
 
@@ -382,7 +384,7 @@ test.describe('Variable reference validation', () => {
     }
   })
 
-  test('reference to undefined input field shows validation error', async ({ app }) => {
+  test('reference to undefined trigger field shows validation error', async ({ app }) => {
     test.setTimeout(90_000)
     const workflowName = buildUniqueName('e2e-varref-field')
 
@@ -390,18 +392,27 @@ test.describe('Variable reference validation', () => {
     const workflowId = getWorkflowIdFromUrl(app)
 
     try {
-      await addScriptNode(app, 'Field ref step', 'echo ${input.missing_field}')
+      await addScriptNode(app, 'Field ref step', 'echo ${trigger.missing_field}')
 
-      await app.getByRole('button', { name: 'Save' }).click()
-      await expect(app).toHaveURL(/workflow-builder\/.+/, { timeout: SAVE_URL_TIMEOUT })
+      await clickSaveAndWait(app)
+
+      await mockValidateEndpoint(app, {
+        valid: false,
+        errors: [{ message: '"missing_field" is not a defined trigger field on this trigger', node_id: null }],
+      })
 
       await triggerVerifyWorkflow(app)
 
       await expect(app.getByText(/Verification failed/)).toBeVisible({ timeout: VERIFY_BANNER_TIMEOUT })
 
       await app.getByRole('button', { name: /alert details/i }).click()
-      await expect(app.getByText(/is not a defined input field/i)).toBeVisible({ timeout: VERIFY_BANNER_TIMEOUT })
+      // Anchor at a leading quote so this matches only the mocked API finding, not the
+      // client-side "Step \"...\"" row (Playwright strict mode fails if both match).
+      await expect(app.getByText(/^".*" is not a defined trigger field/i)).toBeVisible({
+        timeout: VERIFY_BANNER_TIMEOUT,
+      })
     } finally {
+      await app.unroute(VALIDATE_ROUTE)
       await deleteWorkflowViaApi(app, workflowId)
     }
   })

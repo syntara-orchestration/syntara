@@ -7,9 +7,9 @@ import { WorkflowSidepanel } from './WorkflowSidepanel'
 
 type WorkflowWithVersion = WorkflowAPI.components['schemas']['WorkflowReadWithVersion']
 
-// Mock NxCodeBlock component
-vi.mock('../../components/details/NxCodeBlock', () => ({
-  NxCodeBlock: ({ jsonObject }: { jsonObject: unknown }) => (
+// Mock SynCodeBlock component
+vi.mock('../../components/details/SynCodeBlock', () => ({
+  SynCodeBlock: ({ jsonObject }: { jsonObject: unknown }) => (
     <pre data-testid="code-block">{JSON.stringify(jsonObject)}</pre>
   ),
 }))

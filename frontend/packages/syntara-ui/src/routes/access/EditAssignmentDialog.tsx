@@ -21,6 +21,7 @@ import { z } from 'zod'
 import { invalidateAuthzCaches } from '../../hooks/invalidateAuthzCaches'
 import { useFormMutationErrorHandler } from '../../hooks/useFormMutationErrorHandler'
 import { useAlerts } from '../../providers/alerts'
+import { detachPromise } from '../../utils/detachPromise'
 import { buildAssignmentBody } from '../access-management/RoleAssignmentTypes'
 
 import { accessClient } from './accessClient'
@@ -128,6 +129,7 @@ export function EditAssignmentDialog({ row, displayName, onClose, onSuccess }: R
 
       showSuccess({ title: 'Assignment updated', description: `Updated role for ${displayName}` })
       invalidateAuthzCaches(queryClient)
+      detachPromise(queryClient.invalidateQueries({ queryKey: ['role-assignments'] }))
       onSuccess()
       onClose()
     } catch (error) {

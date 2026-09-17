@@ -4,7 +4,10 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
+import { expectPageTitle } from '../../test/pageTitle'
+
 import { BuilderWorkflowPageHeader, type BuilderWorkflowPageHeaderProps } from './BuilderWorkflowPageHeader'
+import styles from './BuilderWorkflowPageHeader.module.css'
 
 const mockWorkflowStoreState = vi.hoisted(() => ({
   isDirty: false,
@@ -87,13 +90,15 @@ describe('BuilderWorkflowPageHeader', () => {
     handleSaveWorkflow: vi.fn().mockResolvedValue(true),
     onPublish: vi.fn(),
     onUnpublish: vi.fn(),
+    onDuplicate: vi.fn(),
     onPendingImport: vi.fn(),
     builderPermissions: {
       canEdit: true,
+      canCreate: true,
       canRun: true,
       canDelete: true,
       isLoading: false,
-      tooltips: { edit: '', save: '', publish: '', unpublish: '', run: '', delete: '' },
+      tooltips: { edit: '', save: '', publish: '', unpublish: '', run: '', delete: '', create: '' },
     },
   }
 
@@ -143,6 +148,41 @@ describe('BuilderWorkflowPageHeader', () => {
 
     expect(screen.getByRole('button', { name: 'Review approval' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Back to editor' })).toBeInTheDocument()
+  })
+
+  it('keeps the workflow name field visible next to the edit control', () => {
+    render(<BuilderWorkflowPageHeader {...baseProps} workflowName="Deploy app" />)
+
+    const nameInput = screen.getByRole('textbox', { name: 'Workflow name' })
+    expect(nameInput).toBeVisible()
+    expect(nameInput).toHaveValue('Deploy app')
+    expect(screen.getByRole('button', { name: 'Apply details' })).toBeInTheDocument()
+  })
+
+  it('still shows the workflow name when the title row includes project and status controls', () => {
+    render(
+      <BuilderWorkflowPageHeader
+        {...baseProps}
+        isNew={false}
+        workflow={{ id: 'wf-1' }}
+        publishedVersionId={null}
+        workflowName="Deploy app"
+      />
+    )
+
+    const nameInput = screen.getByRole('textbox', { name: 'Workflow name' })
+    expect(nameInput).toBeVisible()
+    expect(nameInput).toHaveValue('Deploy app')
+    expect(screen.getByText('Draft')).toBeInTheDocument()
+
+    const nameSlot = screen.getByTestId('builder-workflow-name')
+    expect(nameSlot).toHaveClass(styles.workflowName)
+    expect(screen.getByTestId('builder-title-slot')).toHaveClass('pf-m-wrap')
+
+    const computed = window.getComputedStyle(nameSlot)
+    expect(computed.minWidth).toBe('16ch')
+    expect(computed.maxWidth).toBe('24ch')
+    expect(computed.flexShrink).toBe('1')
   })
 
   it('updates workflow name and marks dirty on change', async () => {
@@ -219,6 +259,7 @@ describe('BuilderWorkflowPageHeader', () => {
           onBackToEditor={vi.fn()}
           executionId="exec-123"
           executionStatus="running"
+          projectId="proj-1"
         />
       </QueryClientProvider>
     )
@@ -239,6 +280,7 @@ describe('BuilderWorkflowPageHeader', () => {
           onBackToEditor={vi.fn()}
           executionId="exec-123"
           executionStatus="running"
+          projectId="proj-1"
           hasApprovalPending
           onReviewApproval={vi.fn()}
         />
@@ -262,6 +304,7 @@ describe('BuilderWorkflowPageHeader', () => {
           onBackToEditor={vi.fn()}
           executionId="exec-456"
           executionStatus="pending"
+          projectId="proj-1"
         />
       </QueryClientProvider>
     )
@@ -734,5 +777,23 @@ describe('BuilderWorkflowPageHeader', () => {
     )
 
     expect(screen.queryByRole('button', { name: 'Cancel run' })).not.toBeInTheDocument()
+  })
+
+  it('prepends dirty indicator to page title when isDirty is true', () => {
+    render(<BuilderWorkflowPageHeader {...baseProps} isDirty={true} isNew={false} workflowName="my-workflow" />)
+
+    expectPageTitle(['● my-workflow', 'Workflows'])
+  })
+
+  it('does not prepend dirty indicator to page title when isDirty is false', () => {
+    render(<BuilderWorkflowPageHeader {...baseProps} isDirty={false} isNew={false} workflowName="my-workflow" />)
+
+    expectPageTitle(['my-workflow', 'Workflows'])
+  })
+
+  it('prepends dirty indicator to new workflow page title when isDirty is true', () => {
+    render(<BuilderWorkflowPageHeader {...baseProps} isDirty={true} isNew={true} />)
+
+    expectPageTitle(['● New Workflow', 'Workflows'])
   })
 })

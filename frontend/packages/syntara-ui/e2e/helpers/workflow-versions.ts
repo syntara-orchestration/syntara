@@ -1,5 +1,4 @@
-import type { Page } from '@playwright/test'
-
+import { type Page } from '../fixtures'
 import { apiRequest, ensureProject } from '../utils/api'
 
 export async function createWorkflowViaApi(page: Page, name: string): Promise<{ id: string; name: string }> {

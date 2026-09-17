@@ -13,7 +13,7 @@ import {
 import { ActivityTypeEnum, type ExecutionsAPI } from '@syntara/contracts'
 import type React from 'react'
 
-import { NxLabel } from '../../components/labels/NxLabel'
+import { SynLabel } from '../../components/labels/SynLabel'
 
 import { activityStatusDisplayLabels, executionStatusDisplayLabels } from './executionStatusConstants'
 
@@ -44,9 +44,9 @@ export function StatusLabel({ status }: Readonly<{ status: ExecutionStatus }>) {
   const IconComponent = statusIcons[status]
 
   return (
-    <NxLabel variant="outline" status={statusMap[status]} icon={<IconComponent />}>
+    <SynLabel variant="outline" status={statusMap[status]} icon={<IconComponent />}>
       {executionStatusDisplayLabels[status]}
-    </NxLabel>
+    </SynLabel>
   )
 }
 
@@ -75,9 +75,9 @@ const activityStatusIcons: Record<ActivityStatus, React.ComponentType<{ classNam
 export function ActivityStatusLabel({ status, nodeType }: Readonly<{ status: ActivityStatus; nodeType?: string }>) {
   if (nodeType === ActivityTypeEnum.WAIT && status === 'waiting') {
     return (
-      <NxLabel variant="outline" status="custom" icon={<RhUiSyncIcon />}>
+      <SynLabel variant="outline" status="custom" icon={<RhUiSyncIcon />}>
         Running
-      </NxLabel>
+      </SynLabel>
     )
   }
 
@@ -86,8 +86,8 @@ export function ActivityStatusLabel({ status, nodeType }: Readonly<{ status: Act
   const displayLabel = activityStatusDisplayLabels[status] ?? status.charAt(0).toUpperCase() + status.slice(1)
 
   return (
-    <NxLabel variant="outline" status={variant} icon={<IconComponent />}>
+    <SynLabel variant="outline" status={variant} icon={<IconComponent />}>
       {displayLabel}
-    </NxLabel>
+    </SynLabel>
   )
 }

@@ -14,6 +14,8 @@ When this skill is invoked, follow the wizard below. Use `AskUserQuestion` to ga
 
 ## CRITICAL: Password Security
 
+This block stays in the public tree on purpose: it teaches agents how to **use** a secret without **displaying** it. Never put the password value in this file.
+
 The admin password (`SYNTARA_E2E_PASSWORD`) is a secret. It must never appear in logs, tool output, or conversation text.
 
 **Rules:**
@@ -43,7 +45,7 @@ REPO_ROOT=$(git rev-parse --show-toplevel)
 | UI project path | `$REPO_ROOT/frontend/packages/syntara-ui` | `ls $REPO_ROOT/frontend/packages/syntara-ui/playwright.config.ts` |
 | Admin password path | `$REPO_ROOT/backend/.secrets/admin-password` | `test -f $REPO_ROOT/backend/.secrets/admin-password` |
 | CA cert path | `$REPO_ROOT/backend/.secrets/certs/ca.pem` | `test -f $REPO_ROOT/backend/.secrets/certs/ca.pem` |
-| Backend URL | `https://localhost:8000` | `curl -sf --cacert $REPO_ROOT/backend/.secrets/certs/ca.pem https://localhost:8000/health` |
+| Backend URL | `https://localhost:8000` | `curl -sf --cacert $REPO_ROOT/backend/.secrets/certs/ca.pem https://localhost:8000/healthz/ready` |
 | Frontend URL | `http://localhost:5173` | `curl -sf http://localhost:5173 -o /dev/null` |
 
 Use the results to inform the wizard — if a check fails, mention it in the question so the user knows something needs attention.
@@ -53,7 +55,7 @@ Use the results to inform the wizard — if a check fails, mention it in the que
 Present a single `AskUserQuestion` with these questions:
 
 1. **Mode** — "Run against real backend or mock API?"
-   - **Real backend (Recommended)** — Tests against live Nexus API, database, and auth. Requires backend + frontend to be running.
+   - **Real backend (Recommended)** — Tests against live Syntara API, database, and auth. Requires backend + frontend to be running.
    - **Mock API** — Self-contained, Playwright auto-starts mock API + UI. No services needed.
 
 2. **What to run** — "Which tests?"
@@ -100,7 +102,7 @@ Before running, verify the environment is ready. For real backend mode, the skil
 test -f $REPO_ROOT/backend/.secrets/admin-password && echo "OK: password file found" || echo "FAIL: password file not found — run: make -C backend secrets"
 
 # 2. Backend is responding
-curl -sf --cacert $REPO_ROOT/backend/.secrets/certs/ca.pem https://localhost:8000/health -o /dev/null && echo "OK: backend responding" || echo "FAIL: backend not responding — run: make run-all"
+curl -sf --cacert $REPO_ROOT/backend/.secrets/certs/ca.pem https://localhost:8000/healthz/ready -o /dev/null && echo "OK: backend responding" || echo "FAIL: backend not responding — run: make run-all"
 
 # 3. Frontend is responding — start it if not
 curl -sf http://localhost:5173 -o /dev/null && echo "OK: frontend responding"
@@ -233,15 +235,24 @@ npx playwright test e2e/workflows.spec.ts
 # By name pattern
 npx playwright test --grep "user creates a workflow"
 
-# PR-check suite
+# @pr-check suite — fast, critical-path subset (intended quick gate; not yet used by CI automatically)
 npx playwright test --grep @pr-check
 
-# Exclude a pattern
-npx playwright test --grep-invert "visual-regression"
+# Exclude visual-regression (they require npm run e2e:visual-regression, not the default runner)
+npx playwright test --grep-invert @local-only
 
 # Show trace from a failed run
 npx playwright show-trace test-results/*/trace.zip
 ```
+
+### Test suite tags summary
+
+| Tag | Select with | Purpose |
+|---|---|---|
+| `@pr-check` | `--grep @pr-check` | Fast critical-path subset for quick local validation |
+| `@local-only` | `--grep-invert @local-only` | Visual regression tests; excluded from all CI automatically |
+
+See `.claude/skills/frontend-playwright-e2e/SKILL.md` → **Test Suite Tags** for the full rules on when to apply each tag.
 
 ### Troubleshooting
 

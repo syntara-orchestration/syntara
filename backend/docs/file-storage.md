@@ -197,8 +197,8 @@ The storage status endpoint (`GET /api/v1/files/storage_status`) reports a `stat
 
 Object storage is deliberately **absent** from the readiness probe (`GET /healthz/ready`). It is not a
 hard dependency — an unconfigured or degraded S3 backend only disables file uploads while the rest of
-the API serves normally — so it must never take a replica out of rotation. The deprecated `GET /health`
-still reports it as `checks.file_storage` until that endpoint is removed.
+the API serves normally — so it must never take a replica out of rotation. Its status is reported by
+`GET /api/v1/files/storage_status` instead.
 
 ### Startup Validation
 

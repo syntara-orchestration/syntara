@@ -22,9 +22,9 @@ import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { IntegrationsAPI } from '@syntara/contracts'
 import { useMemo, useState } from 'react'
 
-import { NxPanelContentStack } from '../../../../components/layout/NxPanelContentStack'
-import { NxEmptyStateNoData } from '../../../../components/states/NxEmptyStateNoData'
-import { NxScrollableTableContainer } from '../../../../components/table/NxScrollableTableContainer'
+import { SynPanelContentStack } from '../../../../components/layout/SynPanelContentStack'
+import { SynEmptyStateNoData } from '../../../../components/states/SynEmptyStateNoData'
+import { SynScrollableTableContainer } from '../../../../components/table/SynScrollableTableContainer'
 
 import styles from './WizardSteps.module.css'
 
@@ -122,7 +122,7 @@ function EnableToolsStep({
 
   if (tools.length === 0) {
     return (
-      <NxEmptyStateNoData
+      <SynEmptyStateNoData
         title="No tools found"
         description="The connection was successful, but no tools were found on this server."
       />
@@ -130,7 +130,7 @@ function EnableToolsStep({
   }
 
   return (
-    <NxPanelContentStack className={styles.stepContainerMinWidth}>
+    <SynPanelContentStack className={styles.stepContainerMinWidth}>
       <StackItem>
         <Toolbar>
           <ToolbarContent>
@@ -147,7 +147,7 @@ function EnableToolsStep({
         </Toolbar>
       </StackItem>
 
-      <NxScrollableTableContainer caption="Enable tools">
+      <SynScrollableTableContainer caption="Enable tools">
         <colgroup>
           <col className={styles.checkboxCol} />
           <col />
@@ -184,8 +184,8 @@ function EnableToolsStep({
             </Tr>
           ))}
         </Tbody>
-      </NxScrollableTableContainer>
-    </NxPanelContentStack>
+      </SynScrollableTableContainer>
+    </SynPanelContentStack>
   )
 }
 

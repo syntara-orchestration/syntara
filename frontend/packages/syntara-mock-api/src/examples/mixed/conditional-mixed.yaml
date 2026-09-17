@@ -21,7 +21,7 @@ nodes:
 
   - id: python_branch
     type: script
-    condition: ${input.use_python} == true
+    condition: ${trigger.use_python} == true
     parameters:
       language: python
       code: |
@@ -29,7 +29,7 @@ nodes:
 
   - id: api_branch
     type: http_request
-    condition: ${input.use_python} == false
+    condition: ${trigger.use_python} == false
     parameters:
       method: GET
       url: http://test-api.example.com/api/data

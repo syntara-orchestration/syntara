@@ -13,6 +13,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy.exc import IntegrityError
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.authz.exceptions import BuiltinProtectionError
@@ -38,6 +39,8 @@ from syntara.workflows.models.validation_finding import (
     ValidationResult,
     ValidationSeverity,
 )
+from syntara.workflows.models.webhook_trigger import WebhookTrigger
+from syntara.workflows.models.webhook_trigger_service_account import WebhookTriggerServiceAccount
 from syntara.workflows.services.workflow_service import WorkflowConvertResourceMixin, WorkflowService
 
 
@@ -108,7 +111,6 @@ class TestWorkflowServiceBase:
         is_builtin: bool = False,
         created_at: datetime | None = None,
         updated_at: datetime | None = None,
-        deleted_at: datetime | None = None,
     ) -> Workflow:
         """Create a test Workflow object."""
         now = datetime.now(UTC)
@@ -125,7 +127,6 @@ class TestWorkflowServiceBase:
             published_version_id=None,  # Set after version is created when is_enabled
             created_at=created_at or now,
             updated_at=updated_at or now,
-            deleted_at=deleted_at,
         )
 
     def _create_test_workflow_version(
@@ -138,7 +139,6 @@ class TestWorkflowServiceBase:
         created_by: UUID | None = None,
         change_description: str = "Initial version",
         created_at: datetime | None = None,
-        deleted_at: datetime | None = None,
     ) -> WorkflowVersion:
         """Create a test WorkflowVersion object."""
         return WorkflowVersion(
@@ -150,7 +150,6 @@ class TestWorkflowServiceBase:
             created_by=created_by or uuid4(),
             change_description=change_description,
             created_at=created_at or datetime.now(UTC),
-            deleted_at=deleted_at,
         )
 
     def _create_minimal_workflow_definition(self) -> dict[str, Any]:
@@ -511,6 +510,57 @@ class TestWorkflowServiceCreateWorkflow(TestWorkflowServiceBase):
 
             assert workflow.has_validation_issues is False
 
+    @pytest.mark.asyncio
+    async def test_create_workflow_import_skips_foreign_webhook_service_account_bindings(
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+    ) -> None:
+        """Import with stale webhook SA UUID succeeds with warnings and strips the ID."""
+        service = WorkflowService(test_db_session, test_user)
+        foreign_sa_id = str(uuid4())
+        path = f"import-sa-{uuid4().hex[:8]}"
+        workflow_definition = self._create_workflow_definition()
+        workflow_definition["triggers"] = [
+            {
+                "id": "snow_trigger",
+                "type": "webhook_trigger",
+                "parameters": {
+                    "webhook_path": path,
+                    "authorized_service_account_ids": [foreign_sa_id],
+                },
+            }
+        ]
+        workflow_definition["edges"] = [{"from": "snow_trigger", "to": "task1"}]
+
+        with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
+            workflow, version, val_result = await service.create_workflow(
+                name=f"import-webhook-sa-{uuid4().hex[:8]}",
+                description=None,
+                labels={},
+                workflow_definition=workflow_definition,
+                project_id=test_project_id,
+                is_import=True,
+            )
+
+        assert workflow.has_validation_issues is True
+        assert val_result.warning_count >= 1
+        assert any("service account(s)" in finding.message for finding in val_result.findings)
+        stored_params = version.workflow_definition["triggers"][0]["parameters"]
+        assert stored_params["authorized_service_account_ids"] == []
+
+        trigger_result = await test_db_session.exec(
+            select(WebhookTrigger).where(WebhookTrigger.workflow_id == workflow.id)
+        )
+        triggers = trigger_result.all()
+        assert len(triggers) == 1
+        assert triggers[0].webhook_path == path
+
+        binding_result = await test_db_session.exec(
+            select(WebhookTriggerServiceAccount).where(
+                WebhookTriggerServiceAccount.webhook_trigger_id == triggers[0].id
+            )
+        )
+        assert binding_result.all() == []
+
 
 class TestWorkflowServiceGetWorkflow(TestWorkflowServiceBase):
     """Test get workflow functionality."""
@@ -826,10 +876,9 @@ class TestWorkflowServiceDeleteWorkflow(TestWorkflowServiceBase):
 
         await service.delete_workflow(workflow.id)
 
-        # Verify workflow is soft deleted
-        await test_db_session.refresh(workflow)
-        assert workflow.deleted_at is not None
-        assert workflow.deleted_by == test_user.id
+        # Verify workflow is hard deleted
+        result = await test_db_session.get(Workflow, workflow.id)
+        assert result is None
 
     @pytest.mark.asyncio
     async def test_delete_workflow_not_found(self, test_db_session: AsyncSession, test_user: User) -> None:
@@ -2386,8 +2435,7 @@ class TestBuiltinWorkflowGuards(TestWorkflowServiceBase):
         await service.delete_workflow(workflow.id)
 
         result = await test_db_session.get(Workflow, workflow.id)
-        assert result is not None
-        assert result.deleted_at is not None
+        assert result is None
 
     @pytest.mark.asyncio
     async def test_update_builtin_workflow_raises(

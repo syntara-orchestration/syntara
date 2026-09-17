@@ -86,6 +86,7 @@ class TestDecideApprovalContract:
             approval_id=approvals[0].id,
             decided_by=ANY,
             decided_at=ANY,
+            temporal_activity_id=ANY,
             decision_notes="This change looks good to deploy to production.",
         )
 
@@ -134,7 +135,53 @@ class TestDecideApprovalContract:
             approval_id=approvals[0].id,
             decided_by=ANY,
             decided_at=ANY,
+            temporal_activity_id=ANY,
             decision_notes="This change needs more testing before deployment.",
+        )
+
+    @pytest.mark.asyncio
+    async def test_decide_approval_accepts_decision_notes_alias(
+        self,
+        auth_client: AsyncClient,
+        approvals_factory: ApprovalsFactory,
+        executions_factory: ExecutionsFactory,
+    ) -> None:
+        """Regression for AAP-87655: request accepts the ``decision_notes`` alias.
+
+        Consumers that model their request on the response schema send
+        ``decision_notes``. Previously this key was silently dropped; it must now
+        populate the notes field, be stored, echoed in the response, and forwarded
+        on the workflow signal.
+        """
+        # Arrange
+        executions = await executions_factory.create_executions(count=1)
+        approvals = await approvals_factory.create_pending_approvals(count=1, execution_id=executions[0].id)
+        approval_id = str(approvals[0].id)
+
+        # Act - submit using the response-shaped `decision_notes` key
+        with patch("syntara.approvals.services.approval_service.WorkflowApiClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client_class.return_value.__aenter__.return_value = mock_client
+            mock_client.send_approval_signal = AsyncMock()
+
+            decision_payload = {"status": "approved", "decision_notes": "Approved via alias key"}
+            response = await auth_client.patch(f"/api/v1/approvals/{approval_id}", json=decision_payload)
+
+        # Assert - value is not silently dropped
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "approved"
+        assert data["decision_notes"] == "Approved via alias key"
+
+        mock_client.send_approval_signal.assert_called_once_with(
+            execution_id=approvals[0].execution_id,
+            approval_node_id=approvals[0].approval_node_id,
+            decision="approved",
+            approval_id=approvals[0].id,
+            decided_by=ANY,
+            decided_at=ANY,
+            temporal_activity_id=ANY,
+            decision_notes="Approved via alias key",
         )
 
     @pytest.mark.asyncio
@@ -173,6 +220,7 @@ class TestDecideApprovalContract:
                 approval_id=approvals[0].id,
                 decided_by=ANY,
                 decided_at=ANY,
+                temporal_activity_id=ANY,
                 decision_notes=None,
             )
 
@@ -199,6 +247,7 @@ class TestDecideApprovalContract:
                 approval_id=approvals[1].id,
                 decided_by=ANY,
                 decided_at=ANY,
+                temporal_activity_id=ANY,
                 decision_notes=None,
             )
 
@@ -436,6 +485,7 @@ class TestDecideApprovalContract:
                 approval_id=approvals[0].id,
                 decided_by=ANY,
                 decided_at=ANY,
+                temporal_activity_id=ANY,
                 decision_notes=normal_notes,
             )
 
@@ -465,6 +515,7 @@ class TestDecideApprovalContract:
                 approval_id=long_approvals[0].id,
                 decided_by=ANY,
                 decided_at=ANY,
+                temporal_activity_id=ANY,
                 decision_notes=acceptable_long_notes,
             )
 

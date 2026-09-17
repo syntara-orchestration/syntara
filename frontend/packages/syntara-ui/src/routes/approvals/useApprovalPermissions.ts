@@ -27,7 +27,7 @@ import { useApprovalDecideProjects } from './useApprovalDecideProjects'
  * const permissions = useApprovalPermissions(approval.project_id)
  *
  * if (permissions.isChecking) return <Spinner />
- * if (!permissions.canRead) return <EmptyStateAccessDenied />
+ * if (!permissions.canRead) return <SynEmptyStateAccessDenied />
  *
  * <DisabledWithTooltip isDisabled={!permissions.canDecide} content={permissions.tooltips.decide}>
  *   <Button isAriaDisabled={!permissions.canDecide} onClick={permissions.canDecide ? handleDecide : undefined}>

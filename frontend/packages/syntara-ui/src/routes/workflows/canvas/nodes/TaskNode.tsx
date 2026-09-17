@@ -1,15 +1,15 @@
 import { ExecutorTypeEnum, type TaskActivity } from '@syntara/contracts'
 import { type Node, type NodeProps } from '@xyflow/react'
 
-import { NxDetailList } from '../../../../components/details/NxDetailList'
+import { SynDetailList } from '../../../../components/details/SynDetailList'
+import { NodeBody } from '../../../../components/nodes/NodeBody'
+import { NodeComponent } from '../../../../components/nodes/NodeComponent'
 import { FlowNodeType } from '../../../../constants'
 import type { ActivityStatus } from '../../execution/types'
 import { getNodeTypeColor } from '../nodeTypeColors'
 
 import { renderCondition, renderJson, renderText } from './common/detailRenderers'
 import { detectTaskNodeType, type TaskActivityWithMetadata } from './common/detectTaskNodeType'
-import { NodeBody } from './common/NodeBody'
-import { NodeComponent } from './common/NodeComponent'
 import { StandardNodeHeader } from './common/StandardNodeHeader'
 import { useCredentialName } from './hooks/useCredentialName'
 import { MenuNodeType, useNodeMenuActions } from './hooks/useNodeMenuActions'
@@ -149,7 +149,7 @@ export function TaskActivityDetails(
         menuActions={props.menuActions}
       />
       <NodeBody>
-        <NxDetailList>
+        <SynDetailList>
           {renderCondition(dataWithMetadata.condition)}
           {taskExecutor === ExecutorTypeEnum.SCRIPT && (
             <>{renderText('Language', (config as { language: string }).language)}</>
@@ -174,7 +174,7 @@ export function TaskActivityDetails(
             <AgenticNodeDetails config={config as AgenticConfig} toolsText={toolsText} />
           )}
           {taskExecutor !== ExecutorTypeEnum.SCRIPT && renderJson(props.data, props.showJson)}
-        </NxDetailList>
+        </SynDetailList>
       </NodeBody>
     </>
   )

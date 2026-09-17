@@ -317,6 +317,56 @@ async def test_publish_xadd_does_not_retry_non_pool_connection_error() -> None:
     mock_sleep.assert_not_awaited()  # no backoff sleep
 
 
+async def test_set_key_retries_on_pool_exhaustion_then_succeeds() -> None:
+    """SETEX is idempotent so set_key retries on MaxConnectionsError."""
+    mock_client = AsyncMock()
+    mock_client.setex = AsyncMock(
+        side_effect=[
+            MaxConnectionsError("Too many connections"),
+            None,
+        ]
+    )
+
+    with (
+        patch("syntara.core.cache.base.redis.Redis", return_value=mock_client),
+        patch("syntara.core.cache.base.asyncio.sleep", new=AsyncMock()),
+    ):
+        async with StreamClient() as client:
+            await client.set_key("test:key", "1", 300)
+
+    assert mock_client.setex.await_count == 2
+
+
+async def test_set_key_raises_after_exhausting_retries() -> None:
+    """set_key raises RedisConnectionError after all retries fail."""
+    mock_client = AsyncMock()
+    mock_client.setex = AsyncMock(side_effect=MaxConnectionsError("Too many connections"))
+
+    with (
+        patch("syntara.core.cache.base.redis.Redis", return_value=mock_client),
+        patch("syntara.core.cache.base.asyncio.sleep", new=AsyncMock()),
+    ):
+        async with StreamClient() as client:
+            with pytest.raises(RedisConnectionError, match="Too many connections"):
+                await client.set_key("test:key", "1", 300)
+
+    assert mock_client.setex.await_count == 4
+
+
+async def test_set_key_wraps_os_error_as_redis_connection_error() -> None:
+    """OSError during SETEX is wrapped as RedisConnectionError."""
+    mock_client = AsyncMock()
+    mock_client.setex = AsyncMock(side_effect=OSError("Network unreachable"))
+
+    with (
+        patch("syntara.core.cache.base.redis.Redis", return_value=mock_client),
+        patch("syntara.core.cache.base.asyncio.sleep", new=AsyncMock()),
+    ):
+        async with StreamClient() as client:
+            with pytest.raises(RedisConnectionError, match="Network"):
+                await client.set_key("test:key", "1", 300)
+
+
 async def test_events_connection_error_propagates() -> None:
     """Test that connection errors during read are propagated."""
     mock_client = AsyncMock()

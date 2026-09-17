@@ -10,7 +10,7 @@ import { createDefaultGroup, createDefaultCondition } from '../../utils/expressi
 import { parseExpression } from '../../utils/expressions/parser'
 import { serializeExpression } from '../../utils/expressions/serializer'
 import type { Expression, ExpressionNode, ExpressionGroup as ExpressionGroupType } from '../../utils/expressions/types'
-import { NxSelect } from '../NxSelect'
+import { SynSelect } from '../SynSelect'
 
 import { ExpressionGroup } from './ExpressionGroup'
 import { ExpressionRawEditor } from './ExpressionRawEditor'
@@ -253,7 +253,7 @@ export function ExpressionBuilderCore(props: ExpressionBuilderCoreProps) {
       role="group"
     >
       <StackItem>
-        <NxSelect
+        <SynSelect
           isOpen={isModeOpen}
           onSelect={handleModeSelect}
           onOpenChange={setIsModeOpen}
@@ -264,7 +264,7 @@ export function ExpressionBuilderCore(props: ExpressionBuilderCoreProps) {
             <SelectOption value="visual">Visual expression builder</SelectOption>
             <SelectOption value="raw">Custom expression</SelectOption>
           </SelectList>
-        </NxSelect>
+        </SynSelect>
       </StackItem>
 
       <StackItem>

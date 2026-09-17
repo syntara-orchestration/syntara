@@ -139,7 +139,7 @@ test.describe('Cancel Execution', () => {
     await expect(cancelButton).toBeVisible()
     await cancelButton.click()
 
-    await expect(app.getByText('Execution cancellation requested')).toBeVisible({ timeout: 10_000 })
+    await expect(app.getByText('Run cancellation requested')).toBeVisible({ timeout: 10_000 })
 
     // Cancellation is async — poll by reloading until status updates
     await expect(async () => {

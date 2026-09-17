@@ -11,10 +11,10 @@ import {
 import { Panel, useReactFlow } from '@xyflow/react'
 import React, { useCallback, useRef, useState } from 'react'
 
-import { NxPanel } from '../../../components/layout/NxPanel'
+import { SynPanel } from '../../../components/layout/SynPanel'
+import { NodeExpandedAllContext } from '../../../components/nodes/NodeExpandedAllContext'
 
 import { CanvasLegend } from './CanvasLegend'
-import { NodeExpandedAllContext } from './nodes/common/NodeExpandedAllContext'
 
 const LEGEND_REGION_ID = 'workflow-canvas-legend'
 
@@ -97,7 +97,7 @@ export function CanvasControls(
 
   return (
     <Panel position="bottom-left">
-      <NxPanel isPill variant="raised" hasNoPadding style={{ padding: 'var(--pf-t--global--spacer--xs)' }}>
+      <SynPanel isPill variant="raised" hasNoPadding style={{ padding: 'var(--pf-t--global--spacer--xs)' }}>
         <Flex gap={{ default: 'gapNone' }}>
           <CanvasLegendPopoverBlock />
           <FlexItem>
@@ -183,7 +183,7 @@ export function CanvasControls(
             </>
           )}
         </Flex>
-      </NxPanel>
+      </SynPanel>
     </Panel>
   )
 }

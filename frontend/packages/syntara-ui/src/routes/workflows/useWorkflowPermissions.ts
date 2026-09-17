@@ -11,6 +11,7 @@ type WorkflowPermissions = {
   isLoading: boolean
   tooltips: {
     create: string
+    duplicate: string
     update: string
     delete: string
     run: string
@@ -59,6 +60,7 @@ export function useWorkflowPermissions(options?: UseWorkflowPermissionsOptions):
       isLoading: isCheckingCreate || isCheckingUpdate || isCheckingDelete || isCheckingRun,
       tooltips: {
         create: permissionTooltip('create a workflow', `${resourceType}:create`),
+        duplicate: permissionTooltip('duplicate this workflow', `${resourceType}:create`),
         update: permissionTooltip('edit this workflow', `${resourceType}:update`),
         delete: permissionTooltip('delete this workflow', `${resourceType}:delete`),
         run: permissionTooltip('run this workflow', 'execution:run'),

@@ -1,10 +1,10 @@
 ---
 openapi: 3.1.0
 info:
-  title: Syntara Shared API Resources
+  title: Orchestrator Shared API Resources
   version: 1.0.0
   description: |
-    Shared OpenAPI schemas, Pydantic models, and utility functions for all Syntara API resources.
+    Shared OpenAPI schemas, Pydantic models, and utility functions for all Orchestrator API resources.
 
     This specification defines:
     - Base resource schemas (BaseResource, NamedResource, SoftDeletableResource, UserOwnedResource, Resource)

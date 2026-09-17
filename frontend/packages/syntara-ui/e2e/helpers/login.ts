@@ -1,6 +1,4 @@
-import { type Page } from '@playwright/test'
-
-import { expect, appBaseUrl } from '../fixtures'
+import { expect, appBaseUrl, type Page } from '../fixtures'
 
 import { APP_TITLE } from './appTitle'
 

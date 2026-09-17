@@ -8,5 +8,5 @@
 }
 
 .dimmed {
-  opacity: var(--nexus-disabled-opacity);
+  opacity: var(--syntara-disabled-opacity);
 }

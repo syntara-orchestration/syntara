@@ -91,9 +91,8 @@ class TestAgenticActivityPartialOutput:
                     project_id=project_id,
                 )
 
-            assert mock_heartbeat.call_count == 2
-            mock_heartbeat.assert_any_call({HEARTBEAT_STOP_MONITOR: True})
-            mock_heartbeat.assert_any_call(
+            assert mock_heartbeat.call_count == 1
+            mock_heartbeat.assert_called_once_with(
                 {
                     HEARTBEAT_STOP_MONITOR: True,
                     HEARTBEAT_PARTIAL_OUTPUT_KEY: {"invocation_id": "inv-test-abc"},
@@ -140,4 +139,4 @@ class TestAgenticActivityPartialOutput:
                     project_id=project_id,
                 )
 
-        assert call_order == ["heartbeat", "invoke", "heartbeat"]
+        assert call_order == ["invoke", "heartbeat"]

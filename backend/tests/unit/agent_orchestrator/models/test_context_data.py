@@ -276,6 +276,16 @@ class TestInvocationContextData:
         assert dumped["activity_id"] == "act-789"
         assert dumped["activity_name"] == "process_data"
 
+    def test_timeout_seconds_parsed_from_raw_dict(self) -> None:
+        """Validates timeout_seconds=120 from raw dict."""
+        ctx = InvocationContextData.model_validate({"timeout_seconds": 120})
+        assert ctx.timeout_seconds == 120
+
+    def test_timeout_seconds_defaults_to_none(self) -> None:
+        """Defaults to None when not provided."""
+        ctx = InvocationContextData.model_validate({})
+        assert ctx.timeout_seconds is None
+
     def test_workflow_execution_context_fields_optional(self) -> None:
         """Workflow/execution context fields are optional and default to None."""
         ctx = InvocationContextData.model_validate({"agent": "test"})

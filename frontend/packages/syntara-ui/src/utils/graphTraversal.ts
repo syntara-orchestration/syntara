@@ -46,7 +46,8 @@ export function getAncestorNodes(
   const nodeMap = new Map(allNodes.map((n) => [n.id, n]))
 
   while (queue.length > 0) {
-    const current = queue.shift()!
+    const current = queue[0]
+    queue.shift()
     const sources = parentMap.get(current)
     if (!sources) continue
     for (const parentInfo of sources) {

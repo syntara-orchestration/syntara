@@ -130,7 +130,7 @@ describe('Authentication', () => {
     setupEmptyProviders()
     render(<Authentication />, { wrapper })
 
-    expect(screen.getByText('No identity providers configured')).toBeInTheDocument()
+    expect(screen.getByText('No identity providers configured yet')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Add OIDC provider/ })).toBeInTheDocument()
   })
 
@@ -208,7 +208,7 @@ describe('Authentication', () => {
       expect(screen.getByRole('heading', { level: 1, name: 'Identity Providers' })).toBeInTheDocument()
       expect(screen.getByText('Access denied')).toBeInTheDocument()
       expect(screen.getByText(/You don't have permission to view identity providers/)).toBeInTheDocument()
-      expect(screen.queryByText('No identity providers configured')).not.toBeInTheDocument()
+      expect(screen.queryByText('No identity providers configured yet')).not.toBeInTheDocument()
     })
 
     it('has no accessibility violations in access denied state', async () => {
@@ -228,7 +228,7 @@ describe('Authentication', () => {
 
       expect(screen.getByRole('heading', { level: 1, name: 'Identity Providers' })).toBeInTheDocument()
       expect(screen.queryByText('Access denied')).not.toBeInTheDocument()
-      expect(screen.queryByText('No identity providers configured')).not.toBeInTheDocument()
+      expect(screen.queryByText('No identity providers configured yet')).not.toBeInTheDocument()
     })
 
     it('has no accessibility violations while loading', async () => {

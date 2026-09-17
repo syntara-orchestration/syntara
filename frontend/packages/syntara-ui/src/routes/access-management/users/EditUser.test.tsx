@@ -102,7 +102,7 @@ describe('EditUser', () => {
     setupSuccessMocks()
     render(<EditUser />, { wrapper })
 
-    expect(screen.getByRole('heading', { name: 'Edit User' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Edit John Doe' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
   })
 

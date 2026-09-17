@@ -20,3 +20,7 @@
 .workflowLink {
   padding-left: 0;
 }
+
+.message {
+  white-space: pre-wrap;
+}

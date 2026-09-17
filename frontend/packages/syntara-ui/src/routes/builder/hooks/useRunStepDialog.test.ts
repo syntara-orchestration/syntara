@@ -70,8 +70,12 @@ vi.mock('../../../utils/graphTraversal', () => ({
 // Helpers
 // ---------------------------------------------------------------------------
 
-function renderRunStepDialog(handleSaveWorkflow = vi.fn().mockResolvedValue(true), isTerminalStatus = false) {
-  return renderHook(({ isTerminal }) => useRunStepDialog(handleSaveWorkflow, isTerminal), {
+function renderRunStepDialog(
+  handleSaveWorkflow = vi.fn().mockResolvedValue(true),
+  isTerminalStatus = false,
+  isNodeEditorOpen = false
+) {
+  return renderHook(({ isTerminal }) => useRunStepDialog(handleSaveWorkflow, isTerminal, isNodeEditorOpen), {
     initialProps: { isTerminal: isTerminalStatus },
   })
 }
@@ -151,7 +155,21 @@ describe('useRunStepDialog', () => {
       expect(mockDialogOpen).not.toHaveBeenCalled()
     })
 
-    it('saves workflow if dirty before opening dialog', async () => {
+    it('saves before opening dialog when node editor is open', async () => {
+      mockGetNode.mockReturnValue({ id: 'node-1', data: { name: 'Step' } })
+      const handleSaveWorkflow = vi.fn().mockResolvedValue(true)
+
+      const { result } = renderRunStepDialog(handleSaveWorkflow, false, true)
+
+      await act(async () => {
+        await result.current.handleRunStep('node-1')
+      })
+
+      expect(handleSaveWorkflow).toHaveBeenCalledTimes(1)
+      expect(mockDialogOpen).toHaveBeenCalled()
+    })
+
+    it('saves before opening dialog when workflow is dirty', async () => {
       mockWorkflowStoreState.isDirty = true
       mockGetNode.mockReturnValue({ id: 'node-1', data: { name: 'Step' } })
       const handleSaveWorkflow = vi.fn().mockResolvedValue(true)
@@ -166,23 +184,7 @@ describe('useRunStepDialog', () => {
       expect(mockDialogOpen).toHaveBeenCalled()
     })
 
-    it('returns early if workflow is dirty and save fails', async () => {
-      mockWorkflowStoreState.isDirty = true
-      mockGetNode.mockReturnValue({ id: 'node-1', data: { name: 'Step' } })
-      const handleSaveWorkflow = vi.fn().mockResolvedValue(false)
-
-      const { result } = renderRunStepDialog(handleSaveWorkflow)
-
-      await act(async () => {
-        await result.current.handleRunStep('node-1')
-      })
-
-      expect(handleSaveWorkflow).toHaveBeenCalledTimes(1)
-      expect(mockDialogOpen).not.toHaveBeenCalled()
-    })
-
-    it('does not save workflow if not dirty', async () => {
-      mockWorkflowStoreState.isDirty = false
+    it('skips save when workflow is clean and node editor is closed', async () => {
       mockGetNode.mockReturnValue({ id: 'node-1', data: { name: 'Step' } })
       const handleSaveWorkflow = vi.fn().mockResolvedValue(true)
 
@@ -196,34 +198,19 @@ describe('useRunStepDialog', () => {
       expect(mockDialogOpen).toHaveBeenCalled()
     })
 
-    it('submits active node form before checking isDirty', async () => {
-      const mockRequestSubmit = vi.fn()
-      const mockForm = { requestSubmit: mockRequestSubmit } as unknown as HTMLFormElement
-      vi.spyOn(document, 'querySelector').mockReturnValue(mockForm)
+    it('does not open dialog when save fails', async () => {
+      mockWorkflowStoreState.isDirty = true
       mockGetNode.mockReturnValue({ id: 'node-1', data: { name: 'Step' } })
+      const handleSaveWorkflow = vi.fn().mockResolvedValue(false)
 
-      const { result } = renderRunStepDialog()
+      const { result } = renderRunStepDialog(handleSaveWorkflow)
 
       await act(async () => {
         await result.current.handleRunStep('node-1')
       })
 
-      expect(mockRequestSubmit).toHaveBeenCalledTimes(1)
-      vi.restoreAllMocks()
-    })
-
-    it('skips form submit when no step editor form is in the DOM', async () => {
-      vi.spyOn(document, 'querySelector').mockReturnValue(null)
-      mockGetNode.mockReturnValue({ id: 'node-1', data: { name: 'Step' } })
-
-      const { result } = renderRunStepDialog()
-
-      await act(async () => {
-        await result.current.handleRunStep('node-1')
-      })
-
-      expect(mockDialogOpen).toHaveBeenCalled()
-      vi.restoreAllMocks()
+      expect(handleSaveWorkflow).toHaveBeenCalledTimes(1)
+      expect(mockDialogOpen).not.toHaveBeenCalled()
     })
 
     it('passes edges and nodes to getAncestorNodes', async () => {

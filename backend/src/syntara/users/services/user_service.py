@@ -43,6 +43,8 @@ from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin
 from syntara.identity_providers.models.identity_provider import IdentityProvider
 
+DEFAULT_LOCAL_USERS_GROUP_NAME = "users"
+
 
 class _Sentinel(Enum):
     UNSET = "UNSET"
@@ -136,10 +138,57 @@ class UsersService(BaseService):
                 raise UserEmailConflictError(email or "") from e
             raise
 
+    async def _flush_user_with_duplicate_check(self, username: str, email: str | None = None) -> None:
+        """Flush pending user insert with duplicate error handling.
+
+        Used by create_user so user row + memberships can be committed atomically.
+        """
+        try:
+            await self.session.flush()
+        except IntegrityError as e:
+            await self.session.rollback()
+            if self._is_duplicate_username_error(e):
+                raise UserUsernameConflictError(username) from e
+            if self._is_duplicate_email_error(e):
+                raise UserEmailConflictError(email or "") from e
+            raise
+
+    async def _get_or_create_default_users_group(self) -> Group:
+        """Return active default users group, creating it if missing."""
+        default_group = Group(
+            id=uuid4(),
+            name=DEFAULT_LOCAL_USERS_GROUP_NAME,
+            description="Default group for local users.",
+            created_by=self.user.id,
+            is_builtin=True,
+            labels={},
+        )
+        try:
+            async with self.session.begin_nested():
+                self.session.add(default_group)
+                await self.session.flush()
+        except IntegrityError as e:
+            if not self._is_duplicate_name_error(e):
+                raise
+            default_group_result = await self.session.exec(
+                select(Group).where(
+                    col(Group.name) == DEFAULT_LOCAL_USERS_GROUP_NAME,
+                )
+            )
+            existing_default_group = default_group_result.one_or_none()
+            if existing_default_group is None:
+                msg = (
+                    f"Default local group '{DEFAULT_LOCAL_USERS_GROUP_NAME}' "
+                    "was created concurrently but could not be reloaded"
+                )
+                raise RuntimeError(msg) from e
+            return existing_default_group
+        return default_group
+
     async def create_user(
         self,
         username: str,
-        first_name: str,
+        first_name: str | None,
         password: str,
         *,
         last_name: str | None = None,
@@ -151,12 +200,12 @@ class UsersService(BaseService):
 
         Args:
             username: Unique username
-            first_name: User's first name
+            first_name: User's first name (optional; stored as empty string when omitted)
             password: Plaintext password (will be hashed)
             last_name: User's last name (optional)
             email: Email address (optional)
             is_enabled: Account activation status
-            group_names: Groups to assign. None = use setting default, [] = no groups.
+            group_names: Groups to assign. None defaults to ['users'], [] means no explicit groups.
 
         Returns:
             Created user
@@ -171,26 +220,33 @@ class UsersService(BaseService):
             id=uuid4(),
             username=username,
             email=email.lower() if email else None,
-            first_name=first_name,
+            first_name=first_name or "",
             last_name=last_name,
             password_hash=hash_password(password),
             is_enabled=is_enabled,
         )
 
         self.session.add(user)
-        await self._commit_with_duplicate_check(username, email=user.email)
-        await self.session.refresh(user)
+        await self._flush_user_with_duplicate_check(username, email=user.email)
 
         explicit = group_names is not None
-        resolved_names = list(group_names) if group_names is not None else []
+        resolved_names = list(group_names) if group_names is not None else [DEFAULT_LOCAL_USERS_GROUP_NAME]
 
         # Always include the authenticated group
         if AUTHENTICATED_GROUP_NAME not in resolved_names:
             resolved_names.append(AUTHENTICATED_GROUP_NAME)
 
-        result = await self.session.exec(select(Group).where(col(Group.name).in_(resolved_names)))
+        result = await self.session.exec(
+            select(Group).where(
+                col(Group.name).in_(resolved_names),
+            )
+        )
         groups = list(result.all())
         found_names = {g.name for g in groups}
+        if not explicit and DEFAULT_LOCAL_USERS_GROUP_NAME not in found_names:
+            default_group = await self._get_or_create_default_users_group()
+            groups.append(default_group)
+            found_names.add(DEFAULT_LOCAL_USERS_GROUP_NAME)
         if AUTHENTICATED_GROUP_NAME not in found_names:
             msg = f"Required built-in group '{AUTHENTICATED_GROUP_NAME}' is missing from the database"
             raise RuntimeError(msg)
@@ -202,19 +258,28 @@ class UsersService(BaseService):
             await self.session.exec(
                 sa_insert(user_groups).values([{"user_id": user.id, "group_id": g.id} for g in groups])
             )
-            await self.session.commit()
-            for group in groups:
-                AuditEventDispatcher.dispatch(
-                    GroupMembershipEvent(
-                        user_id=user.id,
-                        username=user.username,
-                        group_id=group.id,
-                        group_name=group.name,
-                        action="added",
-                    ),
-                )
+        await self.session.commit()
+        await self.session.refresh(user)
+        for group in groups:
+            AuditEventDispatcher.dispatch(
+                GroupMembershipEvent(
+                    user_id=user.id,
+                    username=user.username,
+                    group_id=group.id,
+                    group_name=group.name,
+                    action="added",
+                ),
+            )
 
         return user
+
+    @staticmethod
+    def _is_duplicate_name_error(e: IntegrityError) -> bool:
+        """Check if IntegrityError is due to duplicate group name."""
+        error_str = str(e).lower()
+        duplicate_key_violation = "duplicate key value violates unique constraint" in error_str
+        duplicate_groups_name = "groups.name" in error_str or "key (name)" in error_str
+        return "ix_groups_name_unique" in error_str or (duplicate_key_violation and duplicate_groups_name)
 
     async def list_users_cursor(
         self,
@@ -395,20 +460,46 @@ class UsersService(BaseService):
         return target_user
 
     async def delete_user(self, user_id: UUID) -> None:
-        """Soft delete a user.
+        """Hard-delete a user and clean up linked resources.
+
+        Deletes non-builtin role assignments, then removes the user row.
+        DB CASCADE handles: user_groups, user_idp_groups, user_identities,
+        refresh_sessions, approval_approver_users, user_token_configs.
+        token_usage_records.user_id is SET NULL so install-wide spend is kept.
+        groups.created_by is SET NULL so groups outlive their creator.
+
+        Ownership FKs (created_by / updated_by) point at principals.id, not
+        users.id, so workflows, projects, credentials, and executions survive.
+
+        The principals row is left intact to preserve created_by/updated_by
+        FK integrity on other tables.
 
         Args:
             user_id: UUID of user to delete
 
         Raises:
             UserNotFoundError: If user not found
+            AdminDeleteError: If user is a builtin admin
+            AdminDisableNoOtherAdminsError: If deletion would leave no admins
 
         """
         user = await self.get_user_by_id(user_id)
         if user.is_builtin:
             raise AdminDeleteError
         await self._ensure_other_admins_exist(exclude_user_id=user_id)
-        user.soft_delete(self.user.id)
+
+        from sqlalchemy import delete as sa_delete  # noqa: PLC0415
+
+        from syntara.authz.models.assignments import RoleAssignment  # noqa: PLC0415
+
+        await self.session.exec(
+            sa_delete(RoleAssignment).where(
+                col(RoleAssignment.principal_id) == user_id,
+                col(RoleAssignment.is_builtin) == False,  # noqa: E712
+            )
+        )
+
+        await self.session.delete(user)
         await self.session.commit()
 
     @staticmethod
@@ -494,7 +585,6 @@ class UsersService(BaseService):
             .where(
                 col(Group.name) == "admins",
                 col(Group.is_builtin).is_(True),
-                User.deleted_at.is_(None),  # type: ignore[union-attr]
                 col(User.is_enabled).is_(True),
             )
         )

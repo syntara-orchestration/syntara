@@ -3,7 +3,9 @@ import { EdgeHandleEnum, type SwitchActivity, type SwitchConfig } from '@syntara
 import { type Node, type NodeProps } from '@xyflow/react'
 import { useEffect, useRef, useState } from 'react'
 
-import { NxDetailList } from '../../../../components/details/NxDetailList'
+import { SynDetailList } from '../../../../components/details/SynDetailList'
+import { NodeBody } from '../../../../components/nodes/NodeBody'
+import { NodeComponent } from '../../../../components/nodes/NodeComponent'
 import { RegistryNodeId } from '../../../../constants'
 import { buildSwitchCasePort } from '../../../builder/utils/switchCaseHelpers'
 import type { ActivityStatus } from '../../execution/types'
@@ -12,8 +14,6 @@ import { semanticZoomActivityTitle } from '../semanticZoom'
 
 import { BranchHandle, BranchHandles } from './common/BranchHandle'
 import { renderJson, renderOutputs } from './common/detailRenderers'
-import { NodeBody } from './common/NodeBody'
-import { NodeComponent } from './common/NodeComponent'
 import { StandardNodeHeader } from './common/StandardNodeHeader'
 import { MenuNodeType, useNodeMenuActions } from './hooks/useNodeMenuActions'
 import { nodeMetadata } from './nodeMetadata'
@@ -134,10 +134,10 @@ function SwitchNodeDetails(props: {
       <Flex justifyContent={{ default: 'justifyContentFlexEnd' }} gap={{ default: 'gapNone' }}>
         <FlexItem grow={{ default: 'grow' }} className={styles.nodeBodyWrapper}>
           <NodeBody>
-            <NxDetailList>
+            <SynDetailList>
               {renderOutputs(props.switchActivity.outputs)}
               {renderJson(props.switchActivity, props.showJson, 'Full Definition')}
-            </NxDetailList>
+            </SynDetailList>
           </NodeBody>
         </FlexItem>
         <div className={styles.branchHandlesWrapper}>{props.children}</div>

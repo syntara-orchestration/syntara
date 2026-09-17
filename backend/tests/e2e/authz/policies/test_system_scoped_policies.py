@@ -74,7 +74,7 @@ class TestSystemScopedPolicyDenied:
         if case.skip_denied:
             pytest.skip("List endpoint returns built-in items to all authenticated users")
 
-        user_id, username, password = create_user(admin_api, "sys-d")
+        user_id, username, password = create_user(admin_api, "sys-d", group_names=[])
         project_id, _ = create_project(admin_api, "sys-d")
 
         if case.prereqs:

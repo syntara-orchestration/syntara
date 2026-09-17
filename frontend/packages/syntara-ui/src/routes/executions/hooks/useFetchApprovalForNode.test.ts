@@ -79,6 +79,21 @@ describe('useFetchApprovalForNode', () => {
     expect(fetchedApproval).toBeNull()
   })
 
+  it('matches a loop-iteration approval_node_id to the canvas node', async () => {
+    mockRefetch.mockResolvedValue({
+      data: { resources: [{ ...mockApproval, approval_node_id: 'node-abc_iter_1' }, mockApprovalOther] },
+    })
+
+    const { result } = renderHook(() => useFetchApprovalForNode('exec-1'))
+
+    let fetchedApproval: unknown
+    await act(async () => {
+      fetchedApproval = await result.current.fetchForNode('node-abc')
+    })
+
+    expect(fetchedApproval).toMatchObject({ approval_node_id: 'node-abc_iter_1' })
+  })
+
   it('returns null when no approvals exist', async () => {
     mockRefetch.mockResolvedValue({
       data: { resources: [] },

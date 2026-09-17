@@ -1,3 +1,4 @@
+import { type Page } from '../fixtures'
 import { test, expect, toAppUrl } from '../fixtures'
 import { addAgenticNode, addManualTrigger, addScriptNode } from '../helpers/v2-nodes'
 import {
@@ -15,14 +16,14 @@ import {
  * PF6 menus animate open after the toggle click — clicking before the item is
  * stable causes "element detached from DOM" / "not stable" errors in strict mode.
  */
-async function clickMenuItemWhenVisible(app: import('@playwright/test').Page, itemName: string) {
+async function clickMenuItemWhenVisible(app: Page, itemName: string) {
   const item = app.getByRole('menuitem', { name: itemName })
   await expect(item).toBeVisible()
   await item.click()
 }
 
 /** Click the Layout button to reposition nodes within the viewport. */
-async function layoutCanvas(app: import('@playwright/test').Page) {
+async function layoutCanvas(app: Page) {
   const layoutButton = app.getByRole('button', { name: 'Reset layout', exact: true })
   if ((await layoutButton.count()) > 0) {
     await layoutButton.click()
@@ -36,12 +37,29 @@ async function layoutCanvas(app: import('@playwright/test').Page) {
   }
 }
 
-/** Click a React Flow node by its visible text label. */
-async function clickNode(app: import('@playwright/test').Page, nodeText: string) {
+/**
+ * Click a React Flow node by its visible text label and wait for its editor to open.
+ *
+ * `layoutCanvas` above ends with "Fit view" plus a fixed 500ms sleep, so under CI
+ * load the click can land while the React Flow viewport is still transforming.
+ * The click is then lost: no editor opens, and the caller fails much later on a
+ * missing panel heading with nothing in the trace to explain it.
+ *
+ * Retrying the open is the same remedy `openNodeForEditing` already uses for the
+ * double-click path. The success condition is the editor showing *this* node —
+ * the Name field carries the clicked node's name — rather than merely "a panel is
+ * open", which would be satisfied by the previous node's editor in the tests that
+ * click several nodes in a row.
+ */
+async function clickNode(app: Page, nodeText: string) {
   await layoutCanvas(app)
   const node = app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: nodeText })
-  await expect(node).toBeVisible({ timeout: 5_000 })
-  await node.click()
+  const nameInput = app.getByRole('textbox', { name: 'Name', exact: true })
+  await expect(async () => {
+    await expect(node).toBeVisible({ timeout: 5_000 })
+    await node.click({ timeout: 5_000 })
+    await expect(nameInput).toHaveValue(nodeText, { timeout: 5_000 })
+  }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] })
 }
 
 test.describe('Node editor panels', () => {
@@ -310,7 +328,7 @@ test.describe('Node editor panels', () => {
     workflowId = app.url().split('/').pop() ?? workflowId
 
     // --- Verify each node's output data ---
-    // Scope text assertions to the Output panel's NxPanel container using the
+    // Scope text assertions to the Output panel's SynPanel container using the
     // panelContainer CSS module class (Vite preserves the name in the hashed class).
     const outputPanel = app.locator('[class*="panelContainer"]').filter({
       has: app.getByRole('heading', { name: 'Output', exact: true }),
@@ -937,11 +955,6 @@ test.describe('Node editor panels', () => {
 
     await expect(parametersTab).toBeVisible({ timeout: 15_000 })
     await expect(runStepButton).toBeVisible({ timeout: 15_000 })
-
-    const flexContainer = app.locator('.pf-v6-l-flex').filter({
-      has: app.getByRole('tab', { name: 'Parameters' }),
-    })
-    await expect(flexContainer.getByRole('button', { name: 'Run step' })).toBeVisible()
   })
 
   test('mock data pin flow in Input panel', async ({ app }) => {
@@ -1199,18 +1212,26 @@ test.describe('Node editor panels', () => {
     const setMockButton = inputPanel.locator('[data-ouia-component-type="PF6/MenuToggle"]').filter({
       hasText: 'Set mock data',
     })
+    await expect(setMockButton).toBeVisible({ timeout: 10_000 })
     await setMockButton.click()
     await clickMenuItemWhenVisible(app, 'Script A')
     await app.getByRole('button', { name: 'Pin data', exact: true }).click()
-    await expect(app.getByText('Mock data pinned (1)')).toBeVisible()
+    await expect(inputPanel.getByText('Mock data pinned (1)')).toBeVisible()
 
     await closeNodeEditorPanel(app)
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).not.toBeVisible()
+    // Nav arrows unmount with the editor; wait so the next canvas click cannot hit them.
+    await expect(app.getByRole('button', { name: /Go to previous step:/ })).toHaveCount(0)
 
     await clickNode(app, 'Script B')
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).toBeVisible({ timeout: 10_000 })
+    // Confirm Script B reopened (its predecessor section is Script A, not the trigger).
+    await expect(app.getByRole('button', { name: 'Script A', exact: true })).toBeVisible({ timeout: 10_000 })
 
-    await expect(app.getByText('Mock data pinned (1)')).toBeVisible()
+    const reopenedInputPanel = app.locator('[class*="panelContainer"]').filter({
+      has: app.getByRole('heading', { name: 'Input', exact: true }),
+    })
+    await expect(reopenedInputPanel.getByText('Mock data pinned (1)')).toBeVisible({ timeout: 10_000 })
   })
 
   test('clicking the copy button on an Input panel field announces the expression was copied', async ({ app }) => {

@@ -36,11 +36,15 @@ vi.mock('./useApprovalDecideGroups', () => ({
   useApprovalDecideGroups: mockUseApprovalDecideGroups,
 }))
 
-vi.mock('../hooks/useWorkflowEngineDefaults', () => ({
-  useWorkflowEngineDefaults: () => ({
-    defaults: { timeoutSeconds: { approval: 86400 } },
+const { mockUseWorkflowEngineDefaults } = vi.hoisted(() => ({
+  mockUseWorkflowEngineDefaults: vi.fn(() => ({
+    defaults: { timeoutSeconds: { approval: 86400 }, continueOnFailure: false },
     isLoading: false,
-  }),
+  })),
+}))
+
+vi.mock('../hooks/useWorkflowEngineDefaults', () => ({
+  useWorkflowEngineDefaults: mockUseWorkflowEngineDefaults,
 }))
 
 describe('ApprovalNodeForm', () => {
@@ -48,6 +52,10 @@ describe('ApprovalNodeForm', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    mockUseWorkflowEngineDefaults.mockReturnValue({
+      defaults: { timeoutSeconds: { approval: 86400 }, continueOnFailure: false },
+      isLoading: false,
+    })
   })
 
   describe('Rendering', () => {
@@ -532,7 +540,7 @@ describe('ApprovalNodeForm', () => {
       expect(await screen.findByText('Project required')).toBeInTheDocument()
       const results = await axe(container, {
         rules: {
-          // This is a known limitation of testing PF Tabs in JSDOM - the components work correctly in real browsers
+          // This is a known limitation of testing PF Tabs in happy-dom - the components work correctly in real browsers
           'aria-valid-attr-value': { enabled: false },
         },
       })
@@ -684,6 +692,28 @@ describe('ApprovalNodeForm', () => {
     })
   })
 
+  describe('Fallback decision coupling', () => {
+    it('disables fallback decision when continue on failure is effectively off', () => {
+      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} />)
+
+      expect(screen.getByRole('button', { name: 'Fallback decision' })).toBeDisabled()
+      expect(
+        screen.getByText('On failure behavior is System default (stop on failure), so this fallback will not be used.')
+      ).toBeInTheDocument()
+    })
+
+    it('enables fallback decision after Enable continue on failure is clicked', async () => {
+      const user = userEvent.setup()
+      renderWithHeader(<ApprovalNodeForm onSubmit={mockOnSubmit} />)
+
+      await user.click(screen.getByRole('button', { name: 'Enable continue on failure' }))
+
+      expect(screen.getByRole('button', { name: 'Fallback decision' })).toBeEnabled()
+      await user.click(screen.getByRole('tab', { name: 'Settings' }))
+      expect(screen.getByRole('button', { name: 'On failure behavior' })).toHaveTextContent('Continue on failure')
+    })
+  })
+
   describe('retry policy visibility', () => {
     it('hides retry policy for approval nodes', async () => {
       const user = userEvent.setup()
@@ -701,8 +731,8 @@ describe('ApprovalNodeForm', () => {
       expect(await screen.findByText('Approver users')).toBeInTheDocument()
       const results = await axe(container, {
         rules: {
-          // PatternFly Tabs generates aria-controls pointing to tab panels that exist but axe can't find them in JSDOM
-          // This is a known limitation of testing PF Tabs in JSDOM - the components work correctly in real browsers
+          // PatternFly Tabs generates aria-controls pointing to tab panels that exist but axe can't find them in happy-dom
+          // This is a known limitation of testing PF Tabs in happy-dom - the components work correctly in real browsers
           'aria-valid-attr-value': { enabled: false },
         },
       })
@@ -741,7 +771,7 @@ describe('ApprovalNodeForm', () => {
 
       const results = await axe(container, {
         rules: {
-          // This is a known limitation of testing PF Tabs in JSDOM - the components work correctly in real browsers
+          // This is a known limitation of testing PF Tabs in happy-dom - the components work correctly in real browsers
           'aria-valid-attr-value': { enabled: false },
         },
       })

@@ -45,7 +45,7 @@ export type ValidationResult = {
  * Additional context passed to validation rules that need workflow-level data.
  */
 export type ValidationContext = {
-  /** Trigger nodes — their parameters.input_schema defines valid ${input.*} references */
+  /** Trigger nodes — their parameters.input_schema defines valid ${trigger.*} references */
   triggers?: Activity[]
 }
 

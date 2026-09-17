@@ -12,9 +12,31 @@ import {
   transformWorkflowsToOptions,
 } from './executionFilters'
 
+type WorkflowListResponse = {
+  data?: { resources?: Array<{ id?: string | null; name?: string | null }> }
+}
+
+const { mockGet } = vi.hoisted(() => ({
+  mockGet: vi.fn<(...args: unknown[]) => Promise<WorkflowListResponse>>(),
+}))
+
+vi.mock('../../client', () => ({
+  workflowFetchClient: {
+    GET: (...args: unknown[]) => mockGet(...args),
+  },
+}))
+
 describe('executionFilters', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockGet.mockResolvedValue({
+      data: {
+        resources: [
+          { id: 'wf-in-project', name: 'In Project Workflow' },
+          { id: 'wf-other', name: 'Other Workflow' },
+        ],
+      },
+    })
   })
 
   describe('getExecutionWorkflowFilterDefinition', () => {
@@ -48,33 +70,74 @@ describe('executionFilters', () => {
     it('asyncOptions is an async function', () => {
       const definition = getExecutionWorkflowFilterDefinition()
 
-      // Verify it's an async function
       expect(definition.asyncOptions).toBeInstanceOf(Function)
       expect(definition.asyncOptions!('test')).toBeInstanceOf(Promise)
     })
 
-    it('asyncOptions handles search parameter correctly', async () => {
-      // We can't easily mock openapi-fetch, but we can test the function behavior
-      // by verifying it returns a promise and handles the searchValue parameter
+    it('asyncOptions queries workflows with name search when no project is selected', async () => {
       const definition = getExecutionWorkflowFilterDefinition()
 
-      // Test with search value
-      const resultWithSearch = definition.asyncOptions!('test-search')
-      expect(resultWithSearch).toBeInstanceOf(Promise)
+      const options = await definition.asyncOptions!('deploy')
 
-      // Test with empty search value
-      const resultWithoutSearch = definition.asyncOptions!('')
-      expect(resultWithoutSearch).toBeInstanceOf(Promise)
+      expect(mockGet).toHaveBeenCalledWith('/workflows', {
+        params: {
+          query: {
+            limit: 50,
+            'name[contains]': 'deploy',
+          },
+        },
+      })
+      expect(options).toEqual([
+        { value: 'wf-in-project', label: 'In Project Workflow' },
+        { value: 'wf-other', label: 'Other Workflow' },
+      ])
+    })
 
-      // Test with whitespace-only search value
-      const resultWithWhitespace = definition.asyncOptions!('   ')
-      expect(resultWithWhitespace).toBeInstanceOf(Promise)
+    it('asyncOptions scopes the typeahead query to the selected project', async () => {
+      const definition = getExecutionWorkflowFilterDefinition('project-123')
 
-      // All should resolve to arrays (even if empty due to network issues in test)
-      const [r1, r2, r3] = await Promise.all([resultWithSearch, resultWithoutSearch, resultWithWhitespace])
-      expect(Array.isArray(r1)).toBe(true)
-      expect(Array.isArray(r2)).toBe(true)
-      expect(Array.isArray(r3)).toBe(true)
+      await definition.asyncOptions!('deploy')
+
+      expect(mockGet).toHaveBeenCalledWith('/workflows', {
+        params: {
+          query: {
+            limit: 50,
+            'name[contains]': 'deploy',
+            project_id: 'project-123',
+          },
+        },
+      })
+    })
+
+    it('asyncOptions omits name[contains] for empty or whitespace search', async () => {
+      const definition = getExecutionWorkflowFilterDefinition('project-123')
+
+      await definition.asyncOptions!('')
+      await definition.asyncOptions!('   ')
+
+      expect(mockGet).toHaveBeenNthCalledWith(1, '/workflows', {
+        params: {
+          query: {
+            limit: 50,
+            project_id: 'project-123',
+          },
+        },
+      })
+      expect(mockGet).toHaveBeenNthCalledWith(2, '/workflows', {
+        params: {
+          query: {
+            limit: 50,
+            project_id: 'project-123',
+          },
+        },
+      })
+    })
+
+    it('asyncOptions returns an empty list when the workflows request fails', async () => {
+      mockGet.mockRejectedValueOnce(new Error('network error'))
+      const definition = getExecutionWorkflowFilterDefinition('project-123')
+
+      await expect(definition.asyncOptions!('deploy')).resolves.toEqual([])
     })
   })
 

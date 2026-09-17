@@ -34,11 +34,11 @@ vi.mock('../../providers/alerts/AlertContext', () => ({
   }),
 }))
 
-function renderButton(executionId = 'exec-123') {
+function renderButton(executionId = 'exec-123', projectId = 'project-1') {
   const queryClient = new QueryClient()
   return render(
     <QueryClientProvider client={queryClient}>
-      <CancelExecutionButton executionId={executionId} />
+      <CancelExecutionButton executionId={executionId} projectId={projectId} />
     </QueryClientProvider>
   )
 }
@@ -87,6 +87,12 @@ describe('CancelExecutionButton', () => {
 
     const button = screen.getByRole('button', { name: /Cancel/ })
     expect(button).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('passes resourceProject to useCanI when projectId is provided', () => {
+    renderButton('exec-123', 'proj-42')
+
+    expect(useCanI).toHaveBeenCalledWith('run', 'execution', { resourceProject: 'proj-42' })
   })
 
   it('is aria-disabled when user lacks execution:run permission', () => {

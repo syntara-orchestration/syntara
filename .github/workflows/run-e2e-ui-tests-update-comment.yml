@@ -1,0 +1,85 @@
+---
+name: "/run-e2e-ui-tests Post Results"
+
+# Watches for ci-frontend.yml workflow_dispatch completions and posts
+# a follow-up comment with results on the PR.
+#
+# SECURITY NOTE: This workflow uses workflow_run, which runs in the base
+# repository context. This usage is safe because:
+# 1. We never check out any code from the PR or triggering workflow
+# 2. We never execute any code from the PR
+# 3. We only read workflow metadata (conclusion, run ID, inputs)
+# 4. We only post a follow-up comment with status information
+# 5. All data comes from GitHub's workflow_run event, not PR-controlled sources
+#
+# The workflow_run trigger is necessary to watch for workflow completions.
+# There is no alternative trigger that provides this functionality.
+on:
+  workflow_run:
+    workflows:
+      - CI Frontend
+    types:
+      - completed
+
+permissions:
+  actions: read
+  pull-requests: write
+
+jobs:
+  post-results:
+    name: Post E2E Results
+    runs-on: ubuntu-latest
+    # Only update comments for manually dispatched E2E runs, not regular CI,
+    # scheduled runs, or merge-queue runs.
+    if: github.event.workflow_run.event == 'workflow_dispatch'
+    steps:
+      - name: Find PR from workflow inputs
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          # This data comes from GitHub's workflow_run event, not from PR code.
+          # The pr_number was passed as an input when ci-frontend.yml was dispatched.
+          PR_NUMBER=$(gh api "repos/$REPO/actions/runs/${{ github.event.workflow_run.id }}" \
+            --jq '.inputs.pr_number // empty')
+
+          if [ -z "$PR_NUMBER" ]; then
+            echo "No PR number found in workflow inputs, this might be a scheduled run"
+            exit 0
+          fi
+
+          echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Post results comment
+        if: steps.pr.outputs.number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        run: |
+          # Build the status message based on conclusion
+          case "$CONCLUSION" in
+            success)
+              STATUS_EMOJI="✅"
+              STATUS_TEXT="completed successfully"
+              ;;
+            failure)
+              STATUS_EMOJI="❌"
+              STATUS_TEXT="failed"
+              ;;
+            cancelled)
+              STATUS_EMOJI="⚠️"
+              STATUS_TEXT="was cancelled"
+              ;;
+            *)
+              STATUS_EMOJI="⚠️"
+              STATUS_TEXT="completed with status: $CONCLUSION"
+              ;;
+          esac
+
+          # Post a new comment with results
+          gh pr comment "$PR_NUMBER" --repo "$REPO" \
+            --body "$STATUS_EMOJI E2E UI tests $STATUS_TEXT: [View results]($RUN_URL)"

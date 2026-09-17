@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { DRAG_TYPE_FIELD } from '../utils/dragTypes'
@@ -128,6 +128,84 @@ describe('InputSchemaView', () => {
 
     expect(setDataCalls[1][0]).toBe('text/plain')
     expect(setDataCalls[1][1]).toBe('${fetch_order.address.city}')
+  })
+
+  it('renders nested output for UUID-derived activity ids without crashing', () => {
+    const data = {
+      result: {
+        content: {
+          exists: false,
+        },
+      },
+      headers: {
+        '@type': 'VirtualMachine',
+      },
+    }
+    render(<InputSchemaView data={data} nodeId="activity_923ab1e1_3a31_40b7_b7a0_52c8ab5daddc" />)
+
+    expect(screen.getByText(/exists/)).toBeInTheDocument()
+    expect(screen.getByText('false')).toBeInTheDocument()
+    expect(screen.getByText(/@type/)).toBeInTheDocument()
+  })
+
+  it('renders dotted JSON keys without crashing when expressions cannot be built', () => {
+    const data = {
+      result: {
+        'content.exists': true,
+      },
+    }
+    render(<InputSchemaView data={data} nodeId="activity_923ab1e1_3a31_40b7_b7a0_52c8ab5daddc" />)
+
+    expect(screen.getByText(/content\.exists/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Copy expression/i })).not.toBeInTheDocument()
+  })
+
+  it('does not allow dragging fields that cannot be expressed', () => {
+    const data = {
+      result: {
+        'content.exists': true,
+      },
+    }
+    render(<InputSchemaView data={data} nodeId="activity_923ab1e1_3a31_40b7_b7a0_52c8ab5daddc" />)
+
+    const leaf = screen.getByText(/content\.exists/)
+    // eslint-disable-next-line testing-library/no-node-access -- assert draggable lives on ancestor wrapper
+    const dragContainer = leaf.closest('[draggable="false"]')
+    expect(dragContainer).toBeInTheDocument()
+
+    const setData = vi.fn()
+    fireEvent.dragStart(dragContainer!, {
+      dataTransfer: { setData, effectAllowed: '' },
+    })
+
+    expect(setData).not.toHaveBeenCalled()
+  })
+
+  it('renders schema for a loop-iteration composite activity id', () => {
+    const data = { name: 'Alice' }
+    render(<InputSchemaView data={data} nodeId="approval2#iter-5" />)
+
+    expect(screen.getByText('T name')).toBeInTheDocument()
+    expect(screen.getByRole('tree', { name: 'Input schema' })).toBeInTheDocument()
+  })
+
+  it('uses the canvas node ID in drag data for loop-iteration composite keys', () => {
+    const data = { name: 'Alice' }
+    render(<InputSchemaView data={data} nodeId="approval2#iter-5" />)
+
+    const setDataCalls: Array<[string, string]> = []
+    const dataTransfer = {
+      setData: (format: string, value: string) => {
+        setDataCalls.push([format, value])
+      },
+      effectAllowed: '',
+    }
+
+    fireEvent.dragStart(screen.getByText('T name'), { dataTransfer })
+
+    const parsed = JSON.parse(setDataCalls[0][1]) as { type: string; nodeId: string; fieldPath: string[] }
+    expect(parsed.nodeId).toBe('approval2')
+    expect(setDataCalls[1][1]).toBe('${approval2.name}')
   })
 
   it('has no accessibility violations', async () => {

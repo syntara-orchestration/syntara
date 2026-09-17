@@ -623,6 +623,27 @@ SETTINGS_CATALOG: list[SettingDefinition] = [
         ),
         helper_text="0 = no limit (provider default).",
     ),
+    SettingDefinition(
+        key="agentic.task_agent_system_prompt",
+        name="Task agent system prompt",
+        category=SettingCategory.AI_LLM,
+        value_type=SettingValueType.STRING,
+        default_value=(
+            "You are an information assistant for the {product_name} automation system. "
+            "Answer user questions concisely and accurately. "
+            "Focus on providing helpful, direct answers about tools, services, and capabilities."
+        ),
+        description=(
+            "System prompt prepended to every task agent LLM call. Controls "
+            "the agent's persona and behavioral framing. Cannot be blank."
+        ),
+        helper_text=(
+            "Customizes how task agents introduce themselves to the LLM. "
+            "Maximum 2000 characters. For structured output requests, "
+            "JSON schema instructions are appended after this prompt."
+        ),
+        validation_schema={"pattern": "\\S[\\s\\S]{0,1999}"},
+    ),
     # Workflow Execution — Timeouts
     SettingDefinition(
         key="workflow_engine.max_loop_iterations",
@@ -1008,5 +1029,22 @@ SETTINGS_CATALOG: list[SettingDefinition] = [
         ),
         helper_text="Range: 1-86400 seconds. Default: 60 seconds.",
         validation_schema={"min": 1, "max": 86400},
+    ),
+    # Service accounts — credential lifetime
+    SettingDefinition(
+        key="service_accounts.credential_max_lifetime_days",
+        name="Credential maximum lifetime (days)",
+        category=SettingCategory.AUTHENTICATION,
+        value_type=SettingValueType.INTEGER,
+        default_value=180,
+        description=(
+            "Caps how long service account credentials remain valid. When set to a "
+            "positive number, any credential created or renewed is forced to expire "
+            "within that many days. Set to 0 for no expiry (credentials never expire). "
+            "Existing credentials keep their current expiry until they are renewed."
+        ),
+        helper_text="Days until credentials expire (0 = never). Max 730. Default 180.",
+        requires_restart=False,
+        validation_schema={"min": 0, "max": 730},
     ),
 ]

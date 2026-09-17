@@ -9,8 +9,7 @@
  * the session boundary and are served to the next user.
  */
 
-import { type Page } from '@playwright/test'
-
+import { type Page } from './fixtures'
 import { test, expect, toAppUrl } from './fixtures'
 import { APP_TITLE } from './helpers/appTitle'
 import { buildUniqueName } from './helpers/workflows'

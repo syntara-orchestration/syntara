@@ -24,6 +24,7 @@ export type FileUploadItemProps = {
   onDownload?: () => void
   onCancelDownload?: () => void
   isDownloading?: boolean
+  isDeleting?: boolean
   className?: string
   removeButtonAriaLabel?: string
   downloadButtonAriaLabel?: string
@@ -47,11 +48,35 @@ function getProgressVariant(isError: boolean, isSuccess: boolean) {
   return undefined
 }
 
+function getFileUploadItemActionVisibility({
+  onDownload,
+  onCancelDownload,
+  onRemove,
+  isSuccess,
+  isDownloading,
+  isDeleting,
+}: {
+  onDownload?: () => void
+  onCancelDownload?: () => void
+  onRemove?: () => void
+  isSuccess: boolean
+  isDownloading: boolean
+  isDeleting: boolean
+}) {
+  // Hide download while a delete is in progress (delete occupies that action slot).
+  const showDownload = Boolean(onDownload) && isSuccess && !isDeleting
+  const showCancelDownload = showDownload && isDownloading && Boolean(onCancelDownload)
+  // Hide delete while a download is in progress (download occupies that action slot).
+  const showRemove = Boolean(onRemove) && !isDownloading
+  return { showDownload, showCancelDownload, showRemove }
+}
+
 type FileUploadItemActionsProps = Readonly<{
   showDownload: boolean
   showCancelDownload: boolean
   showRemove: boolean
   isDownloading: boolean
+  isDeleting: boolean
   onDownload?: () => void
   onCancelDownload?: () => void
   onRemove?: () => void
@@ -65,6 +90,7 @@ function FileUploadItemActions({
   showCancelDownload,
   showRemove,
   isDownloading,
+  isDeleting,
   onDownload,
   onCancelDownload,
   onRemove,
@@ -85,7 +111,7 @@ function FileUploadItemActions({
               onClick={onDownload}
               size="sm"
               isLoading={isDownloading}
-              isDisabled={isDownloading}
+              isDisabled={isDownloading || isDeleting}
             >
               <RhUiDownloadIcon />
             </Button>
@@ -100,7 +126,14 @@ function FileUploadItemActions({
         )}
         {showRemove && (
           <FlexItem>
-            <Button variant="plain" aria-label={removeButtonAriaLabel} onClick={onRemove} size="sm">
+            <Button
+              variant="plain"
+              aria-label={removeButtonAriaLabel}
+              onClick={onRemove}
+              size="sm"
+              isLoading={isDeleting}
+              isDisabled={isDeleting}
+            >
               <RhUiTrashIcon />
             </Button>
           </FlexItem>
@@ -121,6 +154,7 @@ export function FileUploadItem({
   onDownload,
   onCancelDownload,
   isDownloading = false,
+  isDeleting = false,
   className,
   removeButtonAriaLabel = 'Remove file',
   downloadButtonAriaLabel = 'Download file',
@@ -130,10 +164,14 @@ export function FileUploadItem({
   const isError = status === 'error'
   const isSuccess = status === 'success'
   const fileExtension = getFileExtension(file.name)
-  const showDownload = Boolean(onDownload) && isSuccess
-  const showCancelDownload = showDownload && isDownloading && Boolean(onCancelDownload)
-  // Hide delete while a download is in progress (download occupies that action slot).
-  const showRemove = Boolean(onRemove) && !isDownloading
+  const { showDownload, showCancelDownload, showRemove } = getFileUploadItemActionVisibility({
+    onDownload,
+    onCancelDownload,
+    onRemove,
+    isSuccess,
+    isDownloading,
+    isDeleting,
+  })
   const showProgress = progress !== undefined && status !== 'pending'
   const itemClassName = className ? `${styles.item} ${className}` : styles.item
 
@@ -160,6 +198,7 @@ export function FileUploadItem({
           showCancelDownload={showCancelDownload}
           showRemove={showRemove}
           isDownloading={isDownloading}
+          isDeleting={isDeleting}
           onDownload={onDownload}
           onCancelDownload={onCancelDownload}
           onRemove={onRemove}

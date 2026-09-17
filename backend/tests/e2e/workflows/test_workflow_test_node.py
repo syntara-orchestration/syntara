@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from orchestrator_test_sdk.e2e import unique_name
-from orchestrator_test_sdk.e2e.helpers import connected_definition, poll_execution_until_complete
+from orchestrator_test_sdk.e2e.helpers import _retry_api_call, connected_definition, poll_execution_until_complete
 from syntara_api_client.models.publish_version_request import PublishVersionRequest
 from syntara_api_client.models.test_execution_create import TestExecutionCreate
 from syntara_api_client.models.test_execution_create_pre_resolved_nodes import TestExecutionCreatePreResolvedNodes
@@ -90,13 +90,15 @@ class TestWorkflowTestNode:
                 },
             }
         )
-        response = syntara_api.workflows.test_node(
-            workflow_id=workflow.id,
-            body=TestExecutionCreate(
-                target_node_id="node_b",
-                pre_resolved_nodes=pre_resolved,
-                trigger_node_id="trigger_manual",
-            ),
+        response = _retry_api_call(
+            lambda: syntara_api.workflows.test_node(
+                workflow_id=workflow.id,
+                body=TestExecutionCreate(
+                    target_node_id="node_b",
+                    pre_resolved_nodes=pre_resolved,
+                    trigger_node_id="trigger_manual",
+                ),
+            )
         )
 
         execution = response.assert_and_get()
@@ -156,28 +158,32 @@ class TestTestExecutionWithConditionNode:
             )
         )
 
-        publish_resp = syntara_api.workflows.publish_version(
-            workflow_id=workflow.id,
-            version=workflow.current_version,
-            body=PublishVersionRequest(name="for-testing"),
+        publish_resp = _retry_api_call(
+            lambda: syntara_api.workflows.publish_version(
+                workflow_id=workflow.id,
+                version=workflow.current_version,
+                body=PublishVersionRequest(name="for-testing"),
+            )
         )
         assert publish_resp.status_code == HTTPStatus.OK
 
-        test_resp = syntara_api.workflows.test_node(
-            workflow_id=workflow.id,
-            body=TestExecutionCreate.from_dict(
-                {
-                    "target_node_id": "action_node",
-                    "pre_resolved_nodes": {
-                        "condition_node": {
-                            "output": {"result": "mocked-condition-pass"},
-                            "control": {"next_port": "true"},
+        test_resp = _retry_api_call(
+            lambda: syntara_api.workflows.test_node(
+                workflow_id=workflow.id,
+                body=TestExecutionCreate.from_dict(
+                    {
+                        "target_node_id": "action_node",
+                        "pre_resolved_nodes": {
+                            "condition_node": {
+                                "output": {"result": "mocked-condition-pass"},
+                                "control": {"next_port": "true"},
+                            },
                         },
-                    },
-                    "trigger_inputs": {"test_key": "test_value"},
-                    "trigger_node_id": "trigger",
-                }
-            ),
+                        "trigger_inputs": {"test_key": "test_value"},
+                        "trigger_node_id": "trigger",
+                    }
+                ),
+            )
         )
 
         assert test_resp.status_code == HTTPStatus.CREATED, (

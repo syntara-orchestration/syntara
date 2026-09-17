@@ -358,7 +358,7 @@ app.add_middleware(MetricsMiddleware, recorder=metrics_recorder)
 
 **Excluded paths:**
 - `/metrics` (avoid self-instrumentation loops)
-- `/health`, `/healthz/live`, `/healthz/ready` (high-volume, low-signal)
+- `/healthz/live`, `/healthz/ready` (high-volume, low-signal)
 
 ### Interface Tagging (API vs UI)
 
@@ -561,7 +561,7 @@ When adding a new component:
 
 **Enforced by tooling:**
 
-- `MetricsMiddleware` automatically instruments all HTTP endpoints (except `/metrics`, `/health`, `/healthz/*`)
+- `MetricsMiddleware` automatically instruments all HTTP endpoints (except `/metrics`, `/healthz/*`)
 - `TelemetryMiddleware` automatically captures API call telemetry
 - `AuditEventDispatcher` enforces fire-and-forget (never raises, logs failures)
 - `discover_handlers()` auto-discovers and registers handlers at startup

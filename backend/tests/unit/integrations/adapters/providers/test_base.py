@@ -54,3 +54,8 @@ class TestLLMProviderBaseDefaults:
     def test_next_page_params_empty_dict(self) -> None:
         provider = _ConcreteProvider()
         assert provider.next_page_params({}) is None
+
+    def test_credential_confirmation_path_default_none(self) -> None:
+        provider = _ConcreteProvider()
+        assert provider.credential_confirmation_path is None
+        assert provider.build_credential_confirmation_url("https://api.example.com/v1") is None

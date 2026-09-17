@@ -1,4 +1,5 @@
 import { FormGroup, FormSection, StackItem, TextInput } from '@patternfly/react-core'
+import type { ReactElement } from 'react'
 import { useFormContext } from 'react-hook-form'
 
 import type { AAPWorkflowTemplateDetail } from '../../../hooks/useAAPBrowser'
@@ -8,6 +9,7 @@ import { AAPLabelsField } from './AAPLabelsField'
 import { ExtraVariablesField, TagInputField } from './AAPPromptFields'
 import { AAPResourceSelectField } from './AAPResourceSelectField'
 import type { AAPWorkflowTemplateFormData } from './aapWorkflowTemplateSchema'
+import { nodeHelp } from './shared/nodeFieldHelp'
 
 type AAPWorkflowTemplatePromptFieldsProps = Readonly<{
   templateDetail: AAPWorkflowTemplateDetail | undefined
@@ -26,15 +28,17 @@ function TextInputField({
   label,
   fieldId,
   name,
+  labelHelp,
 }: Readonly<{
   label: string
   fieldId: string
   name: keyof AAPWorkflowTemplateFormData
+  labelHelp?: ReactElement
 }>) {
   const { register } = useFormContext<AAPWorkflowTemplateFormData>()
   return (
     <StackItem>
-      <FormGroup label={label} fieldId={fieldId}>
+      <FormGroup label={label} labelHelp={labelHelp} fieldId={fieldId}>
         <TextInput {...register(name)} id={fieldId} type="text" />
       </FormGroup>
     </StackItem>
@@ -92,6 +96,7 @@ export function AAPWorkflowTemplatePromptFields(props: AAPWorkflowTemplatePrompt
             }
             placeholderText={inventoryDefaultName ? `${inventoryDefaultName} (default)` : 'No default inventory'}
             onSearchChange={onSearchInventories}
+            labelHelp={nodeHelp.aapInventory}
           />
         )}
 
@@ -104,13 +109,21 @@ export function AAPWorkflowTemplatePromptFields(props: AAPWorkflowTemplatePrompt
             helperText="Select or create labels for the workflow"
             placeholderText="Select or create labels"
             onSearchChange={onSearchLabels}
+            labelHelp={nodeHelp.aapLabels}
           />
         )}
 
-        {templateDetail.ask_limit_on_launch && <TextInputField label="Limit" fieldId="aap-wf-limit" name="limit" />}
+        {templateDetail.ask_limit_on_launch && (
+          <TextInputField label="Limit" fieldId="aap-wf-limit" name="limit" labelHelp={nodeHelp.aapLimit} />
+        )}
 
         {templateDetail.ask_scm_branch_on_launch && (
-          <TextInputField label="Source control branch" fieldId="aap-wf-scmBranch" name="scm_branch" />
+          <TextInputField
+            label="Source control branch"
+            fieldId="aap-wf-scmBranch"
+            name="scm_branch"
+            labelHelp={nodeHelp.aapScmBranch}
+          />
         )}
 
         {templateDetail.ask_tags_on_launch && (
@@ -120,6 +133,7 @@ export function AAPWorkflowTemplatePromptFields(props: AAPWorkflowTemplatePrompt
             name="tags"
             placeholder="tag1"
             helperText="Type a tag and press Enter or comma to add"
+            labelHelp={nodeHelp.aapWfTags}
           />
         )}
 
@@ -130,6 +144,7 @@ export function AAPWorkflowTemplatePromptFields(props: AAPWorkflowTemplatePrompt
             name="skip_tags"
             placeholder="tag1"
             helperText="Type a tag and press Enter or comma to add"
+            labelHelp={nodeHelp.aapWfSkipTags}
           />
         )}
 

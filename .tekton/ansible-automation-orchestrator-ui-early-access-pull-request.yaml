@@ -30,16 +30,16 @@ spec:
   - name: image-expires-after
     value: 5d
   - name: dockerfile
-    value: frontend/packages/syntara-ui/Containerfile.konflux
+    value: frontend/packages/syntara-ui/Containerfile
   - name: path-context
     value: frontend
   - name: build-args
     value:
       - DESCRIPTION_LABEL=Syntara UI
       - REDHAT_COMPONENT=ansible-automation-orchestrator-ui-container
-      - IMAGE_NAME=ansible-automation-platform/ansible-automation-orchestrator-ui-rhel9
+      - IMAGE_NAME=ansible-automation-platform/automation-orchestrator-ui-rhel9
       - MAINTAINER=Ansible Automation Platform Productization Team
-      - DOWNSTREAM_OVERRIDE=quay.io/redhat-user-workloads/nexus-tenant/ansible-automation-platform/automation-orchestrator-downstream-override@sha256:2c388549b6eb79f56a83468f60f821319ed48602fbd5b609f3af1508cb7e918c
+      - DOWNSTREAM_OVERRIDE=quay.io/redhat-user-workloads/nexus-tenant/ansible-automation-platform/automation-orchestrator-downstream-override:latest@sha256:ac1435042d17b14a95aaf13fddf9a6c2ead1990b921157287a7aabc44b1466c0
       - BRANDING=true
   - name: build-platforms
     value:
@@ -54,7 +54,7 @@ spec:
       - name: name
         value: container
       - name: bundle
-        value: quay.io/aap-ci/tekton-catalog/pipeline/build/container:0.2@sha256:401c54b0f4afcdb48e423de491a96a5d2155f4a781f8d7922097542b4ee7d6a7
+        value: quay.io/aap-ci/tekton-catalog/pipeline/build/container:0.2@sha256:85e23e713364af6bed2c0e1c69cb2a49845e64d30cd7dd7ca32341d992cc1449
       - name: kind
         value: pipeline
       - name: secret

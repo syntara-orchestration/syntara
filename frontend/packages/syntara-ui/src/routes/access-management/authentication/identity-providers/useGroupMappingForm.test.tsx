@@ -410,7 +410,7 @@ describe('useGroupMappingEditForm', () => {
     expect(result.current.panel.rawClaims).toContain('"groups"')
   })
 
-  it('reports matched group count after discovery when groups align with Nexus names', () => {
+  it('reports matched group count after discovery when groups align with Syntara names', () => {
     vi.mocked(useAllGroups).mockReturnValue({
       groups: [
         { id: MOCK_GROUP_ID, name: 'admin', is_builtin: false, created_at: '2026-01-01', updated_at: '2026-01-01' },
@@ -482,7 +482,7 @@ describe('useGroupMappingEditForm', () => {
       await result.current.panel.onGroupCreated()
     })
 
-    expect(result.current.form.getValues('entries.0.nexusGroupId')).toBe(MOCK_NEW_GROUP_ID)
+    expect(result.current.form.getValues('entries.0.mappedGroupId')).toBe(MOCK_NEW_GROUP_ID)
     expect(result.current.panel.createGroupForIndex).toBeNull()
   })
 
@@ -515,7 +515,7 @@ describe('useGroupMappingEditForm', () => {
     expect(result.current.form.getValues('entries')).toHaveLength(entryCountBeforeAdd + 1)
     expect(result.current.form.getValues(`entries.${entryCountBeforeAdd}`)).toEqual({
       idpGroupValue: '',
-      nexusGroupId: '',
+      mappedGroupId: '',
     })
   })
 
@@ -575,11 +575,11 @@ describe('useGroupMappingEditForm', () => {
       await result.current.panel.onGroupCreated()
     })
 
-    expect(result.current.form.getValues('entries.0.nexusGroupId')).toBe('')
+    expect(result.current.form.getValues('entries.0.mappedGroupId')).toBe('')
     expect(result.current.panel.createGroupForIndex).toBeNull()
   })
 
-  it('filters the built-in authenticated group from nexus group options', () => {
+  it('filters the built-in authenticated group from mapped group options', () => {
     vi.mocked(useAllGroups).mockReturnValue({
       groups: [
         { id: MOCK_GROUP_ID, name: 'admin', is_builtin: false, created_at: '2026-01-01', updated_at: '2026-01-01' },
@@ -608,7 +608,7 @@ describe('useGroupMappingEditForm', () => {
       { wrapper }
     )
 
-    expect(result.current.panel.nexusGroups.map((group) => group.name)).toEqual(['admin'])
+    expect(result.current.panel.mappedGroups.map((group) => group.name)).toEqual(['admin'])
   })
 
   it('invokes mutation error handler when save fails', async () => {
@@ -673,7 +673,7 @@ describe('useGroupMappingEditForm', () => {
       await result.current.panel.onGroupCreated()
     })
 
-    expect(result.current.form.getValues('entries.0.nexusGroupId')).toBe('')
+    expect(result.current.form.getValues('entries.0.mappedGroupId')).toBe('')
   })
 
   it('clears create-group modal when group creation completes without an active row', async () => {

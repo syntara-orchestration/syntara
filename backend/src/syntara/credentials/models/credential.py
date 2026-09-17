@@ -95,6 +95,9 @@ class Credential(NamedResource, UserOwnedResource, table=True):
         "updated_by",
     ]
 
+    # Encrypted inputs are stored off-row via SecretService.
+    __external_change_fields__: ClassVar[frozenset[str]] = frozenset({"inputs"})
+
 
 class CredentialCreate(SQLModel):
     """Schema for creating a new credential."""
@@ -172,6 +175,7 @@ class CredentialWorkflowRef(SQLModel):
     name: str
     description: str | None = None
     created_by: str | UUID | None = Field(default=None, description="Username or UUID of the workflow creator")
+    created_at: datetime | None = Field(default=None, description="Timestamp when the workflow was created")
     node_names: list[str] = Field(default_factory=list, description="Names of nodes using this credential")
     last_execution_at: datetime | None = Field(default=None, description="Timestamp of the most recent execution")
     last_execution_status: str | None = Field(default=None, description="Status of the most recent execution")

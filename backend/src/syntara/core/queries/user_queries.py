@@ -14,7 +14,7 @@ from syntara.core.models import User
 
 
 async def get_user_by_id(session: AsyncSession, user_id: UUID) -> User:
-    """Get a user by ID, excluding soft-deleted users.
+    """Get a user by ID.
 
     Args:
         session: Database session
@@ -24,13 +24,12 @@ async def get_user_by_id(session: AsyncSession, user_id: UUID) -> User:
         User instance
 
     Raises:
-        UserNotFoundError: If user not found or deleted
+        UserNotFoundError: If user not found
 
     """
     result = await session.exec(
         select(User).filter(
             User.id == user_id,  # type: ignore[arg-type]
-            User.deleted_at.is_(None),  # type: ignore[union-attr]
         )
     )
     user = result.one_or_none()

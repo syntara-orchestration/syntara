@@ -14,20 +14,12 @@ vi.mock('../../../hooks/useAAPBrowser', () => ({
     mockUseAAPBrowser(...args) as ReturnType<typeof import('../../../hooks/useAAPBrowser').useAAPBrowser>,
 }))
 
-// Mock credentials client for CredentialSelector
+// Mock credentials client for CredentialSelector (only /credential_types now — the
+// credentials list comes from useAllCredentials, mocked separately below)
 vi.mock('../../../client', () => ({
   credentialsClient: {
     useQuery: vi.fn(() => ({
-      data: {
-        resources: [
-          {
-            id: 'test-credential-id',
-            name: 'Test AAP Credential',
-            credential_type: 'ansible-automation-platform',
-            description: 'Test credential for AAP',
-          },
-        ],
-      },
+      data: { resources: [] },
       isPending: false,
       isError: false,
       refetch: vi.fn(),
@@ -49,6 +41,25 @@ vi.mock('../../../client', () => ({
   },
   authMiddleware: { onRequest: vi.fn() },
   interfaceTagMiddleware: { onRequest: vi.fn() },
+}))
+
+// CredentialSelector fetches its credential list via this hook (see useAllCredentials.test.tsx
+// for its own pagination coverage) — mocking it keeps these form tests synchronous.
+vi.mock('../components/useAllCredentials', () => ({
+  useAllCredentials: vi.fn(() => ({
+    credentials: [
+      {
+        id: 'test-credential-id',
+        name: 'Test AAP Credential',
+        credential_type_id: 'type-aap',
+        description: 'Test credential for AAP',
+        project_id: 'proj-1',
+      },
+    ],
+    isLoading: false,
+    error: null,
+    refetch: vi.fn(),
+  })),
 }))
 
 // Mock useIntegrationPermissions to avoid async act() warnings from permission queries
@@ -92,9 +103,9 @@ vi.mock('../components/ExpandableCodeEditor', () => ({
   ),
 }))
 
-import { credentialsClient } from '../../../client'
 import type { AAPJobTemplateDetail } from '../../../hooks/useAAPBrowser'
 import { submitForm } from '../../../test/submit-form'
+import { useAllCredentials } from '../components/useAllCredentials'
 
 import { AAPJobTemplateForm as AAPNodeForm } from './AAPJobTemplateForm'
 import { renderWithHeader } from './test-utils/renderWithHeader'
@@ -194,21 +205,20 @@ describe('AAPNodeForm', () => {
     // Set default mock implementation (can be overridden in nested describe blocks)
     mockUseAAPBrowser.mockReturnValue(createMockAAPBrowser(defaultTemplateDetail))
 
-    // Reset credentials client to default mock
-    vi.mocked(credentialsClient.useQuery).mockReturnValue({
-      data: {
-        resources: [
-          {
-            id: 'test-credential-id',
-            name: 'Test AAP Credential',
-            credential_type: 'ansible-automation-platform',
-            description: 'Test credential for AAP',
-          },
-        ],
-      },
-      isPending: false,
-      isError: false,
-      refetch: vi.fn(),
+    // Reset the credentials list to the default mock (a single AAP-compatible credential)
+    vi.mocked(useAllCredentials).mockReturnValue({
+      credentials: [
+        {
+          id: 'test-credential-id',
+          name: 'Test AAP Credential',
+          credential_type_id: 'type-aap',
+          description: 'Test credential for AAP',
+          project_id: 'proj-1',
+        },
+      ],
+      isLoading: false,
+      error: null,
+      refetch: vi.fn() as unknown as ReturnType<typeof useAllCredentials>['refetch'],
     })
   })
 
@@ -280,8 +290,8 @@ describe('AAPNodeForm', () => {
 
   it('passes projectId to CredentialSelector', async () => {
     const user = userEvent.setup()
-    const useQueryMock = vi.mocked(credentialsClient.useQuery)
-    useQueryMock.mockClear()
+    const useAllCredentialsMock = vi.mocked(useAllCredentials)
+    useAllCredentialsMock.mockClear()
 
     renderWithHeader(
       <AAPNodeForm
@@ -296,11 +306,7 @@ describe('AAPNodeForm', () => {
     // Open credential picker via "Set up connection" button
     await user.click(screen.getByText(/Set up connection/i))
 
-    const hasProjectIdCall = useQueryMock.mock.calls.some((call) => {
-      const params = (call[2] as unknown as { params?: { query?: Record<string, unknown> } })?.params?.query
-      return params?.project_id === 'project-456'
-    })
-    expect(hasProjectIdCall).toBe(true)
+    expect(useAllCredentialsMock).toHaveBeenCalledWith({ projectId: 'project-456' })
   })
 
   it('renders prompt on launch fields based on template detail flags', () => {
@@ -538,6 +544,133 @@ describe('AAPNodeForm', () => {
           })
         )
       })
+    })
+  })
+
+  describe('Use input variables', () => {
+    it('toggles use input variables switch', async () => {
+      const user = userEvent.setup()
+      renderWithHeader(<AAPNodeForm onSubmit={mockOnSubmit} onCancel={vi.fn()} />)
+
+      const inputVarsSwitch = screen.getByRole('switch', { name: 'Use input variables' })
+      expect(inputVarsSwitch).not.toBeChecked()
+
+      await user.click(inputVarsSwitch)
+
+      expect(inputVarsSwitch).toBeChecked()
+    })
+
+    it('shows extra_vars expression field when use input variables is enabled', async () => {
+      const user = userEvent.setup()
+      renderWithHeader(<AAPNodeForm onSubmit={mockOnSubmit} onCancel={vi.fn()} />)
+
+      await user.click(screen.getByRole('switch', { name: 'Use input variables' }))
+
+      expect(screen.getByPlaceholderText('{"key": "value"} or drag expression')).toBeInTheDocument()
+    })
+
+    it('enables the toggle and shows extra_vars when loading saved extra_vars expressions', () => {
+      const savedExtraVars = '{"app_version": "${inputs.version}"}'
+      renderWithHeader(
+        <AAPNodeForm
+          onSubmit={mockOnSubmit}
+          onCancel={vi.fn()}
+          initialData={{
+            name: 'Deploy with vars',
+            organization_name: 'Default',
+            job_template_name: 'Deploy App',
+            extra_vars: savedExtraVars,
+          }}
+        />
+      )
+
+      expect(screen.getByRole('switch', { name: 'Use input variables' })).toBeChecked()
+      expect(screen.getByPlaceholderText('{"key": "value"} or drag expression')).toHaveValue(savedExtraVars)
+    })
+
+    it('enables the toggle when loading saved extra_vars with pretty-printed expressions', () => {
+      const savedExtraVars = JSON.stringify({ app_version: '${inputs.version}' }, null, 2)
+      renderWithHeader(
+        <AAPNodeForm
+          onSubmit={mockOnSubmit}
+          onCancel={vi.fn()}
+          initialData={{
+            extra_vars: savedExtraVars,
+          }}
+        />
+      )
+
+      expect(screen.getByRole('switch', { name: 'Use input variables' })).toBeChecked()
+      expect(screen.getByPlaceholderText('{"key": "value"} or drag expression')).toBeVisible()
+    })
+
+    it('enables the toggle from tags expressions', () => {
+      renderWithHeader(
+        <AAPNodeForm
+          onSubmit={mockOnSubmit}
+          onCancel={vi.fn()}
+          initialData={{
+            tags: '${inputs.tags}',
+          }}
+        />
+      )
+
+      expect(screen.getByRole('switch', { name: 'Use input variables' })).toBeChecked()
+      expect(screen.getByPlaceholderText('tags or drag expression')).toHaveValue('${inputs.tags}')
+    })
+
+    it('enables the toggle from skip_tags expressions', () => {
+      renderWithHeader(
+        <AAPNodeForm
+          onSubmit={mockOnSubmit}
+          onCancel={vi.fn()}
+          initialData={{
+            skip_tags: '${inputs.skip_tags}',
+          }}
+        />
+      )
+
+      expect(screen.getByRole('switch', { name: 'Use input variables' })).toBeChecked()
+      expect(screen.getByPlaceholderText('skip tags or drag expression')).toHaveValue('${inputs.skip_tags}')
+    })
+
+    it('persists use_input_variables when the toggle is on without expressions', async () => {
+      const user = userEvent.setup()
+      renderWithHeader(<AAPNodeForm onSubmit={mockOnSubmit} onCancel={vi.fn()} />)
+
+      await user.click(screen.getByRole('switch', { name: 'Use input variables' }))
+      await submitForm()
+
+      await waitFor(() => {
+        expect(mockOnSubmit).toHaveBeenCalledWith(expect.objectContaining({ use_input_variables: true }))
+      })
+    })
+
+    it('enables the toggle from persisted use_input_variables without expressions', () => {
+      renderWithHeader(
+        <AAPNodeForm onSubmit={mockOnSubmit} onCancel={vi.fn()} initialData={{ use_input_variables: true }} />
+      )
+
+      expect(screen.getByRole('switch', { name: 'Use input variables' })).toBeChecked()
+      expect(screen.getByPlaceholderText('{"key": "value"} or drag expression')).toBeVisible()
+    })
+
+    it('does not enable the toggle for extra_vars without expressions', () => {
+      renderWithHeader(
+        <AAPNodeForm
+          onSubmit={mockOnSubmit}
+          onCancel={vi.fn()}
+          initialData={{
+            organization_name: 'Default',
+            job_template_name: 'Deploy App',
+            job_template_id: 10,
+            extra_vars: '{"key": "value"}',
+          }}
+        />
+      )
+
+      expect(screen.getByRole('switch', { name: 'Use input variables' })).not.toBeChecked()
+      expect(screen.queryByPlaceholderText('{"key": "value"} or drag expression')).not.toBeInTheDocument()
     })
   })
 })

@@ -37,22 +37,7 @@ Our error handling implementation now returns:
 
 **Issue:** Schema missing `409` status code for name conflicts during updates.
 
-### 2. Invocations API (`/invocations/openapi.yaml`)
-
-#### POST /invocations (Create Invocation)
-**Schema Documents:**
-- `400`: Bad Request - Validation or file processing error
-- `401`: Unauthorized
-- `500`: Internal Server Error
-- `503`: Service Unavailable - LLM provider not configured
-
-**Current Implementation:**
-- `400`: File validation errors (`FileValidationError`) ✅ **MATCHES**
-- `503`: LLM configuration errors ✅ **MATCHES**
-
-**Status:** ✅ **SCHEMAS MATCH IMPLEMENTATION**
-
-### 3. Files API (`/files/openapi.yaml`)
+### 2. Files API (`/files/openapi.yaml`)
 
 #### POST /files (Upload Files)
 **Schema Documents:**
@@ -66,7 +51,7 @@ Our error handling implementation now returns:
 
 **Status:** ✅ **SCHEMAS MATCH IMPLEMENTATION**
 
-### 4. Tool Manager API (`/tool_manager/openapi.yaml`)
+### 3. Tool Manager API (`/tool_manager/openapi.yaml`)
 
 #### POST /tool_providers (Register Tool Provider)
 **Schema Documents:**
@@ -80,7 +65,7 @@ Our error handling implementation now returns:
 
 **Issue:** Schema missing `409` status code for duplicate provider names.
 
-### 5. Executions API (`/executions_openapi.yaml`)
+### 4. Executions API (`/executions_openapi.yaml`)
 
 #### POST /executions (Create Execution)
 **Schema Documents:**

@@ -8,7 +8,6 @@ import * as ExecutionsAPI from './executions-api.js'
 import * as FilesAPI from './files-api.js'
 import * as IdentityProvidersAPI from './identity-providers-api.js'
 import * as IntegrationsAPI from './integrations-api.js'
-import * as InvocationsAPI from './invocations-api.js'
 import * as PoliciesAPI from './policies-api.js'
 import * as ProjectsAPI from './projects-api.js'
 import * as RoleAssignmentsAPI from './role-assignments-api.js'
@@ -30,7 +29,6 @@ export {
   FilesAPI,
   IdentityProvidersAPI,
   IntegrationsAPI,
-  InvocationsAPI,
   PoliciesAPI,
   ProjectsAPI,
   RoleAssignmentsAPI,

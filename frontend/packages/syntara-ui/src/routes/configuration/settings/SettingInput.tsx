@@ -18,7 +18,7 @@ import type { SettingsAPI } from '@syntara/contracts'
 import React, { useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
 
-import { NxSelect } from '../../../components/NxSelect'
+import { SynSelect } from '../../../components/SynSelect'
 
 type RuntimeSetting = SettingsAPI.components['schemas']['RuntimeSettingRead']
 
@@ -174,7 +174,7 @@ function AllowedValuesSelect({
 }) {
   const [isOpen, setIsOpen] = useState(false)
   return (
-    <NxSelect
+    <SynSelect
       id={id}
       isOpen={isOpen}
       selected={value || undefined}
@@ -203,7 +203,7 @@ function AllowedValuesSelect({
           </SelectOption>
         ))}
       </SelectList>
-    </NxSelect>
+    </SynSelect>
   )
 }
 

@@ -38,8 +38,8 @@ class OIDCConfigurationUpdate:
             (omit to keep existing)
         claim_mapping (None | OIDCClaimMapping | Unset): OIDC claim mapping (omit to keep existing)
         group_jmespath_expression (None | str | Unset): JMESPath expression for group extraction (omit to keep existing)
-        group_mapping_entries (list[OIDCGroupMappingEntry] | None | Unset): IdP-to-Syntara group mapping entries (omit
-            to keep existing)
+        group_mapping_entries (list[OIDCGroupMappingEntry] | None | Unset): IdP-to-Orchestrator group mapping entries
+            (omit to keep existing)
         allow_all_authenticated (bool | None | Unset): Allow all users from this IdP to log in regardless of group
             mapping results (omit to keep existing)
         aap_role_mapping_enabled (bool | None | Unset): Map Ansible Automation Platform aap_system_role claim to built-

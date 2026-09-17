@@ -59,7 +59,7 @@ describe('useNodeMenuActions', () => {
       const { result } = renderHook(() => useNodeMenuActions({ nodeId: 'task-1', nodeType: MenuNodeType.ACTIVITY }))
 
       expect(result.current).toHaveLength(1)
-      expect(result.current[0].label).toBe('Delete')
+      expect(result.current[0].label).toBe('Delete step')
       expect(result.current[0].variant).toBe('danger')
     })
 
@@ -69,7 +69,7 @@ describe('useNodeMenuActions', () => {
       )
 
       expect(result.current).toHaveLength(1)
-      expect(result.current[0].label).toBe('Delete')
+      expect(result.current[0].label).toBe('Delete step')
     })
 
     it('calls deleteElements with correct node id for activity node', () => {
@@ -127,7 +127,15 @@ describe('useNodeMenuActions', () => {
       })
 
       const labels = result.current.map((a) => a.label)
-      expect(labels).toEqual(['View step details', 'Run step', 'Disable', 'Duplicate', 'Replace', 'Delete'])
+      expect(labels).toEqual([
+        'View step details',
+        'Run step',
+        'Disable step',
+        'Duplicate step',
+        'Replace step',
+        '',
+        'Delete step',
+      ])
     })
 
     it('calls onViewDetails with the node id', () => {
@@ -193,13 +201,26 @@ describe('useNodeMenuActions', () => {
       expect(last.variant).toBe('danger')
     })
 
-    it('delete is the last action with no separator', () => {
+    it('inserts a separator before delete when other actions exist', () => {
       const { result } = renderHook(() => useNodeMenuActions({ nodeId: 'task-1', nodeType: MenuNodeType.ACTIVITY }), {
         wrapper: withNodeActions(defaultNodeActions),
       })
 
       const actions = result.current
-      expect(actions.every((a) => !a.separator)).toBe(true)
+      const deleteIndex = actions.findIndex((a) => a.id === 'delete')
+      expect(actions[deleteIndex - 1]?.separator).toBe(true)
+      expect(actions[deleteIndex]?.variant).toBe('danger')
+    })
+
+    it('includes an icon on every non-separator action', () => {
+      const { result } = renderHook(() => useNodeMenuActions({ nodeId: 'task-1', nodeType: MenuNodeType.ACTIVITY }), {
+        wrapper: withNodeActions(defaultNodeActions),
+      })
+
+      for (const action of result.current) {
+        if (action.separator) continue
+        expect(action.icon).toBeDefined()
+      }
     })
   })
 
@@ -227,7 +248,7 @@ describe('useNodeMenuActions', () => {
       )
 
       const labels = result.current.map((a) => a.label)
-      expect(labels).toEqual(['Replace', 'Delete'])
+      expect(labels).toEqual(['Replace step', '', 'Delete step'])
     })
 
     it('does not include view details, run step, duplicate, or disable for control flow nodes', () => {
@@ -245,24 +266,24 @@ describe('useNodeMenuActions', () => {
   })
 
   describe('disable toggle', () => {
-    it('shows "Disable" label when node is not disabled', () => {
+    it('shows "Disable step" label when node is not disabled', () => {
       const { result } = renderHook(
         () => useNodeMenuActions({ nodeId: 'task-1', nodeType: MenuNodeType.ACTIVITY, disabled: false }),
         { wrapper: withNodeActions(defaultNodeActions) }
       )
 
       const toggle = result.current.find((a) => a.id === 'toggle-disabled')
-      expect(toggle?.label).toBe('Disable')
+      expect(toggle?.label).toBe('Disable step')
     })
 
-    it('shows "Enable" label when node is disabled', () => {
+    it('shows "Enable step" label when node is disabled', () => {
       const { result } = renderHook(
         () => useNodeMenuActions({ nodeId: 'task-1', nodeType: MenuNodeType.ACTIVITY, disabled: true }),
         { wrapper: withNodeActions(defaultNodeActions) }
       )
 
       const toggle = result.current.find((a) => a.id === 'toggle-disabled')
-      expect(toggle?.label).toBe('Enable')
+      expect(toggle?.label).toBe('Enable step')
     })
 
     it('calls onToggleDisabled with node id when clicked', () => {
@@ -291,10 +312,11 @@ describe('useNodeMenuActions', () => {
         })
       )
 
-      // Without context: custom action, delete (no separator)
-      expect(result.current).toHaveLength(2)
+      // Without context: custom action, separator, delete
+      expect(result.current).toHaveLength(3)
       expect(result.current[0].label).toBe('Custom')
-      expect(result.current[1].label).toBe('Delete')
+      expect(result.current[1].separator).toBe(true)
+      expect(result.current[2].label).toBe('Delete step')
     })
 
     it('calls additional action onClick when clicked', () => {
@@ -340,7 +362,7 @@ describe('useNodeMenuActions', () => {
       )
 
       expect(result.current).toHaveLength(1)
-      expect(result.current[0].label).toBe('Delete')
+      expect(result.current[0].label).toBe('Delete step')
     })
 
     it('handles multiple additional actions', () => {
@@ -354,12 +376,13 @@ describe('useNodeMenuActions', () => {
         useNodeMenuActions({ nodeId: 'task-1', nodeType: MenuNodeType.ACTIVITY, additionalActions: actions })
       )
 
-      // Should have: 3 custom actions, delete (no separator)
-      expect(result.current).toHaveLength(4)
+      // Should have: 3 custom actions, separator, delete
+      expect(result.current).toHaveLength(5)
       expect(result.current[0].label).toBe('Action 1')
       expect(result.current[1].label).toBe('Action 2')
       expect(result.current[2].label).toBe('Action 3')
-      expect(result.current[3].label).toBe('Delete')
+      expect(result.current[3].separator).toBe(true)
+      expect(result.current[4].label).toBe('Delete step')
     })
   })
 })

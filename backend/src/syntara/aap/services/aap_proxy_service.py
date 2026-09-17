@@ -2,6 +2,13 @@
 
 Handles auth resolution, request forwarding, and response shaping for
 the UI's cascading resource dropdowns.
+
+Connection resolution:
+- ``integration_id`` selects the AAP Gateway (URL/TLS). If omitted, the unique
+  visible enabled AAP integration is used. If more than one is visible, the
+  caller must pass ``integration_id``.
+- ``credential_id`` selects an Orchestrator AAP credential (owner check). If omitted,
+  the selected integration's management credential is used.
 """
 
 from __future__ import annotations
@@ -12,10 +19,13 @@ from uuid import UUID
 import httpx
 import structlog
 from pydantic import BaseModel
-from sqlmodel import select
+from sqlmodel import col, select
 
 from syntara.aap.auth import AAPConnection
-from syntara.aap.credential_resolver import resolve_aap_connection_from_credential
+from syntara.aap.credential_resolver import (
+    resolve_aap_connection_from_credential,
+    resolve_aap_connection_from_management_credential,
+)
 from syntara.aap.exceptions import AAPAuthenticationError, AAPConnectionError, AAPNotConfiguredError, AAPUpstreamError
 from syntara.aap.models.responses import (
     AAPCredential,
@@ -32,13 +42,9 @@ from syntara.aap.models.responses import (
 )
 from syntara.core.lib.tls_utils import build_integration_httpx_verify
 from syntara.integrations.lib.url_validation import validate_integration_configuration_no_ssrf
-from syntara.integrations.models.integration import (
-    Integration,
-    IntegrationProjectAssignment,
-    IntegrationScope,
-    IntegrationType,
-)
+from syntara.integrations.models.integration import Integration, IntegrationType
 from syntara.integrations.models.integration_configuration import AAPConfiguration
+from syntara.integrations.services.integration_service import IntegrationService
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -47,7 +53,9 @@ if TYPE_CHECKING:
 
     from syntara.aap.models.queries import AAPBaseQuery, AAPResourceQuery
     from syntara.authz.engine import AllowedProjectsResult
+    from syntara.authz.evaluator import AuthzEvaluator
     from syntara.core.config.base import Settings
+    from syntara.core.models import User
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -101,11 +109,15 @@ class AAPProxyService:
         self,
         settings: Settings,
         session: AsyncSession,
+        evaluator: AuthzEvaluator,
+        user: User,
         allowed_projects: AllowedProjectsResult | None = None,
     ) -> None:
         """Initialize with injected dependencies."""
         self._settings = settings
         self._session = session
+        self._evaluator = evaluator
+        self._user = user
         self._allowed_projects = allowed_projects
         # Lazily created per-connection client to avoid repeated TCP/TLS setup
         # within the same request (e.g., org resolution + resource list).
@@ -128,14 +140,13 @@ class AAPProxyService:
         resource_path: str,
         mapper: Callable[[dict[str, Any]], T],
         query: AAPResourceQuery,
-        user_id: UUID | None = None,
     ) -> AAPListResponse[T]:
         """List templates generically for job_templates and workflow_job_templates.
 
         Reduces code duplication between list_job_templates and list_workflow_job_templates.
         """
         connection = await self._resolve_connection(
-            credential_id=query.credential_id, user_id=user_id, integration_id=query.integration_id
+            credential_id=query.credential_id, integration_id=query.integration_id
         )
         params = self._build_params(search=query.search, page_size=query.page_size)
 
@@ -158,16 +169,13 @@ class AAPProxyService:
         model_class: type[T],
         url_path: str,
         credential_id: str | None = None,
-        user_id: UUID | None = None,
         integration_id: UUID | str | None = None,
     ) -> T:
         """Get template detail generically for job_templates and workflow_job_templates.
 
         Reduces code duplication between get_job_template and get_workflow_job_template.
         """
-        connection = await self._resolve_connection(
-            credential_id=credential_id, user_id=user_id, integration_id=integration_id
-        )
+        connection = await self._resolve_connection(credential_id=credential_id, integration_id=integration_id)
         data = await self._proxy_get(connection, f"{_AAP_API_PREFIX}/{resource_path}/{template_id}/", {})
         detail = model_class.model_validate(data)
         # Only set detail.url if aap_public_url is explicitly configured (avoid leaking internal addresses)
@@ -184,34 +192,28 @@ class AAPProxyService:
     # Public service methods
     # ------------------------------------------------------------------
 
-    async def list_organizations(
-        self, query: AAPBaseQuery, user_id: UUID | None = None
-    ) -> AAPListResponse[AAPOrganization]:
+    async def list_organizations(self, query: AAPBaseQuery) -> AAPListResponse[AAPOrganization]:
         """List AAP organizations."""
         connection = await self._resolve_connection(
-            credential_id=query.credential_id, user_id=user_id, integration_id=query.integration_id
+            credential_id=query.credential_id, integration_id=query.integration_id
         )
         params = self._build_params(search=query.search, page_size=query.page_size)
         data = await self._proxy_get(connection, f"{_AAP_API_PREFIX}/organizations/", params)
         results = _safe_map(data, lambda r: AAPOrganization(id=r["id"], name=r["name"]))
         return AAPListResponse(count=data.get("count", len(results)), results=results)
 
-    async def list_job_templates(
-        self, query: AAPResourceQuery, user_id: UUID | None = None
-    ) -> AAPListResponse[AAPJobTemplate]:
+    async def list_job_templates(self, query: AAPResourceQuery) -> AAPListResponse[AAPJobTemplate]:
         """List AAP job templates, optionally filtered by organization."""
         return await self._list_templates(
             "job_templates",
             lambda r: AAPJobTemplate(id=r["id"], name=r["name"], description=r.get("description")),
             query,
-            user_id,
         )
 
     async def get_job_template(
         self,
         job_template_id: int,
         credential_id: str | None = None,
-        user_id: UUID | None = None,
         integration_id: UUID | str | None = None,
     ) -> AAPJobTemplateDetail:
         """Get AAP job template details including prompt-on-launch flags."""
@@ -221,26 +223,21 @@ class AAPProxyService:
             AAPJobTemplateDetail,
             "job-template",
             credential_id,
-            user_id,
             integration_id,
         )
 
-    async def list_workflow_job_templates(
-        self, query: AAPResourceQuery, user_id: UUID | None = None
-    ) -> AAPListResponse[AAPWorkflowJobTemplate]:
+    async def list_workflow_job_templates(self, query: AAPResourceQuery) -> AAPListResponse[AAPWorkflowJobTemplate]:
         """List AAP workflow job templates, optionally filtered by organization."""
         return await self._list_templates(
             "workflow_job_templates",
             lambda r: AAPWorkflowJobTemplate(id=r["id"], name=r["name"], description=r.get("description")),
             query,
-            user_id,
         )
 
     async def get_workflow_job_template(
         self,
         workflow_job_template_id: int,
         credential_id: str | None = None,
-        user_id: UUID | None = None,
         integration_id: UUID | str | None = None,
     ) -> AAPWorkflowJobTemplateDetail:
         """Get AAP workflow job template details including prompt-on-launch flags."""
@@ -250,16 +247,13 @@ class AAPProxyService:
             AAPWorkflowJobTemplateDetail,
             "workflow-job-template",
             credential_id,
-            user_id,
             integration_id,
         )
 
-    async def list_inventories(
-        self, query: AAPResourceQuery, user_id: UUID | None = None
-    ) -> AAPListResponse[AAPInventory]:
+    async def list_inventories(self, query: AAPResourceQuery) -> AAPListResponse[AAPInventory]:
         """List AAP inventories, optionally filtered by organization."""
         connection = await self._resolve_connection(
-            credential_id=query.credential_id, user_id=user_id, integration_id=query.integration_id
+            credential_id=query.credential_id, integration_id=query.integration_id
         )
         params = self._build_params(search=query.search, page_size=query.page_size)
 
@@ -275,12 +269,10 @@ class AAPProxyService:
         results = _safe_map(data, lambda r: AAPInventory(id=r["id"], name=r["name"], description=r.get("description")))
         return AAPListResponse(count=data.get("count", len(results)), results=results)
 
-    async def list_execution_environments(
-        self, query: AAPResourceQuery, user_id: UUID | None = None
-    ) -> AAPListResponse[AAPExecutionEnvironment]:
+    async def list_execution_environments(self, query: AAPResourceQuery) -> AAPListResponse[AAPExecutionEnvironment]:
         """List AAP execution environments belonging to the selected org or having no org."""
         connection = await self._resolve_connection(
-            credential_id=query.credential_id, user_id=user_id, integration_id=query.integration_id
+            credential_id=query.credential_id, integration_id=query.integration_id
         )
         params = self._build_params(search=query.search, page_size=query.page_size)
 
@@ -299,34 +291,30 @@ class AAPProxyService:
         )
         return AAPListResponse(count=data.get("count", len(results)), results=results)
 
-    async def list_credentials(
-        self, query: AAPBaseQuery, user_id: UUID | None = None
-    ) -> AAPListResponse[AAPCredential]:
+    async def list_credentials(self, query: AAPBaseQuery) -> AAPListResponse[AAPCredential]:
         """List AAP credentials (not organization-scoped)."""
         connection = await self._resolve_connection(
-            credential_id=query.credential_id, user_id=user_id, integration_id=query.integration_id
+            credential_id=query.credential_id, integration_id=query.integration_id
         )
         params = self._build_params(search=query.search, page_size=query.page_size)
         data = await self._proxy_get(connection, f"{_AAP_API_PREFIX}/credentials/", params)
         results = _safe_map(data, lambda r: AAPCredential(id=r["id"], name=r["name"]))
         return AAPListResponse(count=data.get("count", len(results)), results=results)
 
-    async def list_instance_groups(
-        self, query: AAPBaseQuery, user_id: UUID | None = None
-    ) -> AAPListResponse[AAPInstanceGroup]:
+    async def list_instance_groups(self, query: AAPBaseQuery) -> AAPListResponse[AAPInstanceGroup]:
         """List AAP instance groups (not organization-scoped)."""
         connection = await self._resolve_connection(
-            credential_id=query.credential_id, user_id=user_id, integration_id=query.integration_id
+            credential_id=query.credential_id, integration_id=query.integration_id
         )
         params = self._build_params(search=query.search, page_size=query.page_size)
         data = await self._proxy_get(connection, f"{_AAP_API_PREFIX}/instance_groups/", params)
         results = _safe_map(data, lambda r: AAPInstanceGroup(id=r["id"], name=r["name"]))
         return AAPListResponse(count=data.get("count", len(results)), results=results)
 
-    async def list_labels(self, query: AAPBaseQuery, user_id: UUID | None = None) -> AAPListResponse[AAPLabel]:
+    async def list_labels(self, query: AAPBaseQuery) -> AAPListResponse[AAPLabel]:
         """List AAP labels."""
         connection = await self._resolve_connection(
-            credential_id=query.credential_id, user_id=user_id, integration_id=query.integration_id
+            credential_id=query.credential_id, integration_id=query.integration_id
         )
         params = self._build_params(search=query.search, page_size=query.page_size)
         data = await self._proxy_get(connection, f"{_AAP_API_PREFIX}/labels/", params)
@@ -343,17 +331,20 @@ class AAPProxyService:
     async def _resolve_connection(
         self,
         credential_id: UUID | str | None = None,
-        user_id: UUID | None = None,
         integration_id: UUID | str | None = None,
     ) -> AAPConnection:
         """Resolve AAP connection from an integration and credential.
 
-        Both integration_id and credential_id are required. The integration
-        provides the AAP Gateway URL while the credential supplies authentication.
+        ``integration_id`` and ``credential_id`` are optional. When omitted, the
+        proxy uses the unique visible enabled AAP integration and its
+        management credential. ``validation_status`` is not considered.
+
+        When the caller supplies ``credential_id``, ``credential:use`` RBAC is
+        enforced against ``self._user``. Omitted ``credential_id`` uses the
+        integration's management credential after visibility has been enforced.
 
         Args:
             credential_id: Syntara credential ID for AAP authentication.
-            user_id: User ID for authorization check.
             integration_id: AAP Gateway integration ID for connection URL resolution.
 
         Returns:
@@ -362,49 +353,75 @@ class AAPProxyService:
         Raises:
             AAPNotConfiguredError: Integration/credential not found, disabled, or IDs missing.
             AAPAuthenticationError: Credential decryption failed or user not authorized.
-            ValueError: user_id not provided.
 
         """
-        if not integration_id:
-            msg = "integration_id is required for AAP connection resolution"
-            raise AAPNotConfiguredError(msg)
-        if not credential_id:
-            msg = "credential_id is required for AAP connection resolution"
-            raise AAPNotConfiguredError(msg)
-        if user_id is None:
-            msg = "user_id is required when credential_id is provided (authorization check cannot be bypassed)"
-            raise ValueError(msg)
+        integration = await self._resolve_aap_integration(integration_id)
         return await self._resolve_connection_from_integration(
-            integration_id=integration_id, credential_id=credential_id, user_id=user_id
+            integration=integration,
+            credential_id=credential_id,
         )
 
     async def _enforce_integration_visibility(self, integration: Integration) -> None:
         """Raise AAPNotConfiguredError if the caller cannot see the integration.
 
-        GLOBAL integrations are visible to everyone. PROJECT-scoped integrations
-        require the caller to have access to at least one assigned project.
+        Delegates to ``IntegrationService.resolve_visible_integration_ids`` so
+        proxy defaulting and ``GET /integrations`` share the same GLOBAL /
+        project-assignment rules.
         """
-        if self._allowed_projects is None or self._allowed_projects.all_projects:
+        if self._allowed_projects is None:
             return
-        if integration.scope == IntegrationScope.GLOBAL:
-            return
-        stmt = select(IntegrationProjectAssignment.project_id).where(
-            IntegrationProjectAssignment.integration_id == integration.id,
-        )
-        result = await self._session.exec(stmt)
-        assigned_project_ids = set(result.all())
-        user_project_ids = set(self._allowed_projects.project_ids)
-        if not assigned_project_ids & user_project_ids:
+        visible_ids = await IntegrationService.resolve_visible_integration_ids(self._session, self._allowed_projects)
+        if visible_ids is not None and integration.id not in set(visible_ids):
             msg = f"Integration {integration.id} not found"
             raise AAPNotConfiguredError(msg)
 
-    async def _resolve_connection_from_integration(
-        self,
-        integration_id: UUID | str,
-        credential_id: UUID | str,
-        user_id: UUID,
-    ) -> AAPConnection:
-        """Resolve AAP connection URL from an integration, with auth from a credential."""
+    async def _list_visible_aap_integrations(self) -> list[Integration]:
+        """Return enabled AAP integrations the caller is allowed to see."""
+        stmt = select(Integration).where(
+            Integration.integration_type == IntegrationType.ANSIBLE_AUTOMATION_PLATFORM,
+            col(Integration.enabled).is_(True),
+        )
+        if self._allowed_projects is not None:
+            visible_ids = await IntegrationService.resolve_visible_integration_ids(
+                self._session, self._allowed_projects
+            )
+            if visible_ids is not None:
+                if not visible_ids:
+                    return []
+                stmt = stmt.where(col(Integration.id).in_(visible_ids))
+        result = await self._session.exec(stmt)
+        return list(result.all())
+
+    @staticmethod
+    def _select_default_aap_integration(integrations: list[Integration]) -> Integration:
+        """Pick the unique visible enabled AAP integration when integration_id is omitted.
+
+        Uniqueness is exactly one visible enabled integration, matching the
+        public API contract. ``validation_status`` is not a tie-break.
+        """
+        if not integrations:
+            msg = "No enabled AAP Controller integration is configured"
+            raise AAPNotConfiguredError(msg)
+        if len(integrations) > 1:
+            msg = "Multiple AAP Controller integrations are configured; pass integration_id to select one"
+            raise AAPNotConfiguredError(msg)
+        return integrations[0]
+
+    async def _resolve_aap_integration(self, integration_id: UUID | str | None) -> Integration:
+        """Load the requested AAP integration, or the unique visible default."""
+        if integration_id:
+            return await self._load_aap_integration(integration_id)
+        candidates = await self._list_visible_aap_integrations()
+        integration = self._select_default_aap_integration(candidates)
+        logger.info(
+            "AAP proxy using default integration",
+            integration_id=str(integration.id),
+            integration_name=integration.name,
+        )
+        return integration
+
+    async def _load_aap_integration(self, integration_id: UUID | str) -> Integration:
+        """Fetch an AAP integration by ID and enforce type, enabled, and visibility."""
         parsed_id: UUID
         if isinstance(integration_id, str):
             try:
@@ -434,12 +451,19 @@ class AAPProxyService:
             msg = f"Integration '{integration.name}' is disabled"
             raise AAPNotConfiguredError(msg)
 
+        await self._enforce_integration_visibility(integration)
+        return integration
+
+    async def _resolve_connection_from_integration(
+        self,
+        integration: Integration,
+        credential_id: UUID | str | None,
+    ) -> AAPConnection:
+        """Resolve AAP connection URL from an integration, with auth from a credential."""
         config = integration.configuration
         if not isinstance(config, AAPConfiguration):
-            msg = f"Integration {parsed_id} has invalid configuration type"
+            msg = f"Integration {integration.id} has invalid configuration type"
             raise AAPNotConfiguredError(msg)
-
-        await self._enforce_integration_visibility(integration)
 
         # Re-run the integration SSRF policy at request time: the stored base_url may have
         # been re-pointed to a private/metadata address (DNS rebinding) since write time.
@@ -452,14 +476,32 @@ class AAPProxyService:
         base_url = config.base_url.rstrip("/")
         verify_ssl = not config.insecure_skip_tls_verify
 
-        logger.debug(
-            "Resolving AAP auth from credential with integration URL",
-            integration_id=str(parsed_id),
-            credential_id=str(credential_id),
-        )
-        cred_connection = await resolve_aap_connection_from_credential(
-            session=self._session, credential_id=credential_id, user_id=user_id
-        )
+        if credential_id:
+            logger.debug(
+                "Resolving AAP auth from credential with integration URL",
+                integration_id=str(integration.id),
+                credential_id=str(credential_id),
+            )
+            cred_connection = await resolve_aap_connection_from_credential(
+                session=self._session,
+                credential_id=credential_id,
+                user_id=self._user.id,
+                evaluator=self._evaluator,
+                user_labels=self._user.labels,
+                user_metadata=self._user.authz_metadata,
+            )
+        else:
+            logger.info(
+                "AAP proxy using integration management credential",
+                integration_id=str(integration.id),
+                credential_id=str(integration.management_credential_id)
+                if integration.management_credential_id
+                else None,
+            )
+            cred_connection = await resolve_aap_connection_from_management_credential(
+                session=self._session,
+                integration=integration,
+            )
         return AAPConnection(
             base_url=base_url,
             headers=cred_connection.headers,

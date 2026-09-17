@@ -9,7 +9,7 @@ import { useAuthStore } from '../../stores/useAuthStore'
  *
  * SECURITY NOTE: This is a UX-only check to disable UI controls. The backend
  * ALWAYS validates authorization and returns 403 for unauthorized users.
- * See nexus/approvals/services/approval_service.py:_is_user_authorized_approver()
+ * See syntara/approvals/services/approval_service.py:_is_user_authorized_approver()
  *
  * Authorization logic:
  * 1. If no approvers configured (both lists empty), any user with approval:decide permission can approve

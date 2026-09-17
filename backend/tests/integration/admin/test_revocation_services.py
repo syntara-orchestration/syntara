@@ -152,8 +152,7 @@ class TestFindUserByUsername:
         user_factory,
     ) -> None:
         user = await user_factory(username="deleteduser", email="deleted@test.com")
-        user.deleted_at = datetime.now(UTC)
-        test_db_session.add(user)
+        await test_db_session.delete(user)
         await test_db_session.commit()
 
         result = await find_user_by_username(test_db_session, "deleteduser")

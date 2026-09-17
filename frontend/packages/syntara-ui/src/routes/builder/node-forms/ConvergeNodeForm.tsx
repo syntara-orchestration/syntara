@@ -18,7 +18,7 @@ import { RhUiErrorIcon } from '@patternfly/react-icons'
 import React, { type ReactNode, use, useEffect, useMemo, useState } from 'react'
 import { Controller, FormProvider, useForm, useFormContext, useWatch } from 'react-hook-form'
 
-import { NxSelect } from '../../../components/NxSelect'
+import { SynSelect } from '../../../components/SynSelect'
 import { NodeEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useNodeEditorAutoSubmit'
 import { useWorkflowEngineDefaults } from '../hooks/useWorkflowEngineDefaults'
 import { formatDuration } from '../utils/timeUtils'
@@ -57,7 +57,7 @@ function ContinueWhenSelect({
   const [isOpen, setIsOpen] = useState(false)
   const selectedLabel = CONTINUE_WHEN_CRITERIA_OPTIONS.find((o) => o.value === value)?.label
   return (
-    <NxSelect
+    <SynSelect
       id="converge-strategy"
       isOpen={isOpen}
       selected={value || undefined}
@@ -88,7 +88,7 @@ function ContinueWhenSelect({
           </SelectOption>
         ))}
       </SelectList>
-    </NxSelect>
+    </SynSelect>
   )
 }
 

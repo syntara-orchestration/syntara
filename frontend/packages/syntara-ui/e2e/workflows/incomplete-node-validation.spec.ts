@@ -15,7 +15,13 @@
 import { test, expect, toAppUrl, type Page } from '../fixtures'
 import { addManualTrigger, openAddNodePanel } from '../helpers/v2-nodes'
 import { triggerVerifyWorkflow } from '../helpers/workflow-verify'
-import { buildUniqueName, selectProjectIfRequired, closeNodeEditorPanel, addNodePanel } from '../helpers/workflows'
+import {
+  addNodePanel,
+  buildUniqueName,
+  clickSaveAndWait,
+  closeNodeEditorPanel,
+  selectProjectIfRequired,
+} from '../helpers/workflows'
 import { ensureProject, apiRequest } from '../utils/api'
 
 const VERIFY_BANNER_TIMEOUT = 20_000
@@ -70,8 +76,7 @@ test.describe('UI-32: Workflow Verification — Missing Required Configuration',
       // Save and capture the workflow ID for reliable API-based cleanup
       await selectProjectIfRequired(app)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
-      await app.getByRole('button', { name: 'Save', exact: true }).click()
-      await expect(app).toHaveURL(/workflow-builder\/.+/, { timeout: 15_000 })
+      await clickSaveAndWait(app)
       workflowId = app.url().match(/workflow-builder\/([a-f0-9-]{36})/)?.[1]
 
       // Verification is a separate action from save — trigger it via the kebab menu.

@@ -21,6 +21,7 @@ from syntara_api_client.models import (
 from syntara_api_client.models.approval_request_status import ApprovalRequestStatus
 from syntara_api_client.models.execution_status import ExecutionStatus
 from syntara_api_client.models.workflow_definition import WorkflowDefinition
+from syntara_api_client.types import UnexpectedResponseException
 
 if TYPE_CHECKING:
     from syntara_api_client.api import SyntaraApiRegistry
@@ -55,6 +56,15 @@ TERMINAL_STATUSES = {
     ExecutionStatus.CANCELLED,
 }
 
+# Activity-level terminal statuses as plain strings, mirroring ActivityStatus in the app.
+# Inlined to avoid importing from syntara app source (see TERMINAL_EXECUTION_STATUSES above).
+TERMINAL_ACTIVITY_STATUSES: frozenset[str] = frozenset({"completed", "failed", "skipped", "cancelled"})
+
+# After an execution reaches a terminal state, its activity_execution rows may still be
+# syncing from Temporal (e.g. an agentic node briefly reported as "running"). Wait up to
+# this many seconds for every present activity to also reach a terminal state.
+ACTIVITY_SETTLE_TIMEOUT = 15
+
 
 def _retry_api_call(fn, *, retries: int = API_RETRIES, delay: float = API_RETRY_DELAY):  # noqa: ANN202
     """Retry an API call on transient failures (connection errors, server disconnects, 500s)."""
@@ -75,10 +85,26 @@ def _retry_api_call(fn, *, retries: int = API_RETRIES, delay: float = API_RETRY_
     raise last_exc  # type: ignore[misc]
 
 
+def _activities_settled(execution: ExecutionRead) -> bool:
+    """True when every present activity has reached a terminal status.
+
+    The execution-level status can flip to terminal a moment before the
+    activity_execution rows finish syncing from Temporal, transiently leaving an
+    activity (e.g. an agentic node) reported as "running". Absent activities
+    (skipped branches with no row yet) are not waited on.
+    """
+    return all(getattr(a.status, "value", a.status) in TERMINAL_ACTIVITY_STATUSES for a in (execution.activities or []))
+
+
 def poll_execution(
     api: SyntaraApiRegistry, exec_id: str, timeout: int = POLL_TIMEOUT, interval: int = POLL_INTERVAL
 ) -> ExecutionRead:
-    """Poll until execution reaches a terminal state, returning the final ExecutionRead."""
+    """Poll until execution reaches a terminal state, returning the final ExecutionRead.
+
+    Once the execution is terminal, waits up to ``ACTIVITY_SETTLE_TIMEOUT`` additional
+    seconds for every present activity row to also reach a terminal status, so callers
+    don't observe an activity still marked "running" after the execution has completed.
+    """
     elapsed = 0
     while elapsed < timeout:
         time.sleep(interval)
@@ -86,6 +112,12 @@ def poll_execution(
         response = _retry_api_call(lambda: api.executions.get(execution_id=UUID(exec_id), include="activities"))
         execution: ExecutionRead = response.assert_and_get()
         if execution.status in TERMINAL_STATUSES:
+            settle_elapsed = 0
+            while not _activities_settled(execution) and settle_elapsed < ACTIVITY_SETTLE_TIMEOUT:
+                time.sleep(interval)
+                settle_elapsed += interval
+                response = _retry_api_call(lambda: api.executions.get(execution_id=UUID(exec_id), include="activities"))
+                execution = response.assert_and_get()
             return execution
     pytest.fail(f"Execution {exec_id} did not finish within {timeout}s")
 
@@ -125,7 +157,13 @@ def wait_for_agentic_activity(
     max_polls: int = 30,
     poll_interval: int = 1,
 ) -> None:
-    """Poll until the agentic activity appears in a non-complete state."""
+    """Poll until the agentic activity is running and ready for a signal.
+
+    Agentic nodes stay in ``running`` while blocked on the completion
+    callback — they never reach ``waiting`` (that status is only for
+    approval and wait nodes).  ``pending`` is too early: the Temporal
+    workflow may not have started yet.
+    """
     for _ in range(max_polls):
         exec_state = _retry_api_call(lambda: api.executions.get(execution_id=execution_id, include="activities"))
         execution: ExecutionRead = exec_state.assert_and_get()
@@ -138,12 +176,12 @@ def wait_for_agentic_activity(
 
         activities_by_id = {a.activity_id: a for a in (execution.activities or [])}
         activity = activities_by_id.get(activity_id)
-        if activity and activity.status in {"pending", "running", "waiting"}:
+        if activity and activity.status in {"running", "waiting"}:
             return
 
         time.sleep(poll_interval)
 
-    pytest.fail(f"Agentic activity '{activity_id}' did not enter waiting state within {max_polls * poll_interval}s")
+    pytest.fail(f"Agentic activity '{activity_id}' did not reach running state within {max_polls * poll_interval}s")
 
 
 def create_and_run_workflow(
@@ -294,18 +332,44 @@ def poll_execution_until_complete(
     Returns:
         ExecutionRead with final terminal state (completed, failed, cancelled, or completed_with_errors)
 
+    Once the execution is terminal, waits up to ``ACTIVITY_SETTLE_TIMEOUT`` additional
+    seconds for every present activity row to also reach a terminal status, so callers
+    don't observe an activity still marked "running" after the execution has completed
+    (mirrors ``poll_execution``).
+
     Raises:
         AssertionError: If execution does not reach terminal state within timeout
 
     """
     for _ in range(max_polls):
-        execution = syntara_api.executions.get(
-            execution_id=execution_id,
-            include="activities",
-        ).assert_and_get()
+        try:
+            execution = syntara_api.executions.get(
+                execution_id=execution_id,
+                include="activities",
+            ).assert_and_get()
+        except UnexpectedResponseException as exc:
+            # Transient gateway/server errors — treat as "not done yet" and keep polling
+            if exc.status_code in (502, 503, 504):
+                time.sleep(poll_interval)
+                continue
+            raise
 
         status = str(execution.status)
         if status in TERMINAL_EXECUTION_STATUSES:
+            settle_elapsed = 0
+            while not _activities_settled(execution) and settle_elapsed < ACTIVITY_SETTLE_TIMEOUT:
+                time.sleep(poll_interval)
+                settle_elapsed += poll_interval
+                try:
+                    execution = syntara_api.executions.get(
+                        execution_id=execution_id,
+                        include="activities",
+                    ).assert_and_get()
+                except UnexpectedResponseException as exc:
+                    # Transient gateway/server errors — treat as "not settled yet" and keep polling
+                    if exc.status_code in (502, 503, 504):
+                        continue
+                    raise
             return execution
 
         time.sleep(poll_interval)
@@ -331,22 +395,18 @@ if _parsed.scheme not in ("http", "https") or not any(h in (_parsed.hostname or 
     HTTPBIN_URL = "https://httpbin.org"
 
 
-_httpbin_cached: bool | None = None
-
-
 def httpbin_available() -> bool:
-    """Check if httpbin is reachable. Cache the result for the session."""
-    global _httpbin_cached  # noqa: PLW0603
-    if _httpbin_cached is None:
-        try:
-            urllib.request.urlopen(f"{HTTPBIN_URL}/status/200", timeout=5)  # noqa: S310
-            _httpbin_cached = True
-        except Exception:
-            _httpbin_cached = False
-    return _httpbin_cached
+    """Check if httpbin is reachable (uncached — always makes a fresh network request)."""
+    try:
+        urllib.request.urlopen(f"{HTTPBIN_URL}/status/200", timeout=5)  # noqa: S310
+    except Exception:
+        return False
+    else:
+        return True
 
 
-requires_httpbin = pytest.mark.skipif(
-    not httpbin_available(),
-    reason=f"httpbin not reachable at {HTTPBIN_URL}. Set HTTPBIN_URL to override.",
-)
+# Plain mark — runtime skip is handled by the pytest_runtest_setup hook in
+# tests/e2e/conftest.py, which calls httpbin_available() just before the test
+# body runs.  Using a collection-time skipif caused tests to be collected (not
+# skipped) when httpbin was up at import time but went down before execution.
+requires_httpbin = pytest.mark.requires_httpbin

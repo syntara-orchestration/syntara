@@ -1,0 +1,8 @@
+/**
+ * Filled flex child under `SynPage`’s `Stack`: default `min-height: auto` blocks nested
+ * `height: 100%` / scroll regions from shrinking; `0` opts into correct flex behavior.
+ * See `SynPanel` JSDoc — avoid `overflow: hidden` here (clips raised `box-shadow`).
+ */
+.main {
+  min-height: 0;
+}

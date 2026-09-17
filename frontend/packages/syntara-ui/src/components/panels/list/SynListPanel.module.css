@@ -1,0 +1,22 @@
+/* Makes the tabpanel wrapper invisible to flex layout while preserving ARIA semantics. */
+.tabPanelContents {
+  display: contents;
+}
+
+.toolbarFieldset {
+  display: block;
+  border: none;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+
+.toolbarDisabled {
+  opacity: var(--syntara-disabled-opacity);
+  cursor: not-allowed;
+}
+
+/** We don't want baked-in padding in this component - instead it's handled by the parent Stack to apply space between StackItem components */
+.toolbar {
+  --pf-v6-c-toolbar--PaddingBlockEnd: 0;
+}

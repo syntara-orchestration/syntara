@@ -25,9 +25,7 @@ import { Controller, useForm } from 'react-hook-form'
 
 import { tanstackRouter } from '../../../app/tanstackRouter'
 import { FormFieldError } from '../../../components/FormFieldError'
-import { LONG_SELECT_MAX_MENU_HEIGHT, longSelectMenuPopperProps } from '../../../components/longSelectMenu'
-import longSelectMenuStyles from '../../../components/longSelectMenu.module.css'
-import { NxSelect } from '../../../components/NxSelect'
+import { SynSelect } from '../../../components/SynSelect'
 import { useFormMutationErrorHandler } from '../../../hooks/useFormMutationErrorHandler'
 import { useAlerts } from '../../../providers/alerts'
 import { formatExpirationDate } from '../../../utils/dateUtils'
@@ -91,7 +89,7 @@ function ProjectSelect({
   const selectedLabel = projects.find((p) => p.id === value)?.name ?? 'Select a project'
 
   return (
-    <NxSelect
+    <SynSelect
       id="sa-project"
       aria-label="Project"
       isOpen={isOpen}
@@ -101,10 +99,6 @@ function ProjectSelect({
         setIsOpen(false)
       }}
       selected={value}
-      isScrollable
-      maxMenuHeight={LONG_SELECT_MAX_MENU_HEIGHT}
-      popperProps={longSelectMenuPopperProps}
-      className={longSelectMenuStyles.containScroll}
       toggle={(ref) => (
         <ProjectSelectToggle
           toggleRef={ref}
@@ -123,7 +117,7 @@ function ProjectSelect({
           </SelectOption>
         ))}
       </SelectList>
-    </NxSelect>
+    </SynSelect>
   )
 }
 

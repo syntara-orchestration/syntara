@@ -223,7 +223,7 @@ Let's add a console.log to understand the data flow:
 
 **Try also** (optional):
 
-- Change the page title in `Workflows.tsx` (look for `NxPageHeader`)
+- Change the page title in `Workflows.tsx` (look for `SynPageHeader`)
 - Add a `console.log` in `BuilderContent.tsx` inside the `useEffect` that loads the workflow
 
 ### 4. Read the workflow builder section below
@@ -380,7 +380,7 @@ flowchart LR
 Each `TNavigationItem` in `navigationItems.tsx` supports two permission fields:
 
 - `requiredPermissions` (array of `{ action, resourceType }`, OR logic): controls navigation visibility. The item is hidden if the user lacks ALL listed permissions. Consumed by `useFilteredNavigationItems`.
-- `routePermission` (single `{ action, resourceType }`): wraps the route component in `ProtectedRoute`, which shows `EmptyStateAccessDenied` when the permission check fails. Used for create/edit routes.
+- `routePermission` (single `{ action, resourceType }`): wraps the route component in `ProtectedRoute`, which shows `SynEmptyStateAccessDenied` when the permission check fails. Used for create/edit routes.
 
 See [`docs/permissions-rbac.md`](permissions-rbac.md) for the full permission gating architecture.
 
@@ -404,7 +404,7 @@ const { workflowId } = useParams()
 
 **Page breadcrumbs (location hierarchy):**
 
-- [`NxPageHeader`](packages/syntara-ui/src/components/layout/NxPageHeader.tsx) accepts a required string `title` (default `h1`), optional `breadcrumbs` (PatternFly `Breadcrumb` above the title when there are at least two items), optional `toolbar` for actions (laid out right-aligned via an internal spacer—callers should not add their own `FlexItem grow`), optional `projectSelector` and other title-row slots (`titleLeading`, `titleAddons`), and `titleSlot` for rare full-width custom title rows (e.g. the workflow builder).
+- [`SynPageHeader`](packages/syntara-ui/src/components/layout/SynPageHeader.tsx) accepts a required string `title` (default `h1`), optional `breadcrumbs` (PatternFly `Breadcrumb` above the title when there are at least two items), optional `toolbar` for actions (laid out right-aligned via an internal spacer—callers should not add their own `FlexItem grow`), optional `projectSelector` and other title-row slots (`titleLeading`, `titleAddons`), and `titleSlot` for rare full-width custom title rows (e.g. the workflow builder).
 - Trails are built with helpers in [`breadcrumbBuilders.ts`](packages/syntara-ui/src/app/breadcrumbBuilders.ts); links use `href` values from [`AppRoute.tsx`](packages/syntara-ui/src/app/AppRoute.tsx).
 - **Visibility**: nothing is rendered unless there are **at least two** items. The **last** item omits `href` and represents the current page (including tab-specific labels on detail views).
 - **Default tab**: On entity detail routes where the URL without a trailing segment is the same as the default tab (e.g. `…/projects/:id` and `…/projects/:id/details` both mean “Details”), the trail ends at the **entity name** so the parent link is not redundant with the current page.
@@ -625,7 +625,7 @@ The builder edits nodes + edges directly in the Zustand store. On save, `buildWo
 | `utils/buildNestedStructure.ts`                   | Legacy wrapper (identity function in v2 — returns activities as-is)                                                      |
 | `utils/validation/`                               | Validation rules                                                                                                         |
 
-Floating canvas surfaces (controls, step legend, steps on the canvas, undo/redo) use [`NxPanel`](../packages/syntara-ui/src/components/layout/NxPanel.tsx) so they stay readable under the glass theme: compact overlays use `variant="raised"`; large flat panels (for example the step editor shell) use `opaqueFloatingFill` instead of raised chrome.
+Floating canvas surfaces (controls, step legend, steps on the canvas, undo/redo) use [`SynPanel`](../packages/syntara-ui/src/components/layout/SynPanel.tsx) so they stay readable under the glass theme: compact overlays use `variant="raised"`; large flat panels (for example the step editor shell) use `opaqueFloatingFill` instead of raised chrome.
 
 ### Builder internals (advanced): registry, edges, and graph semantics
 
@@ -995,7 +995,7 @@ Builder adds extra types like `placeholder` for drop targets.
 **Visual coding (builder canvas):**
 
 - **Type-colored top bar + icon**: `routes/workflows/canvas/nodeTypeColors.ts` (`getNodeTypeColor`, `NODE_TYPE_COLORS`) maps node / executor types to PatternFly non-status tokens. `NodeComponent` accepts optional `topBarColor` for a 4px top border; when a node is **selected**, the full brand border replaces the top bar (same as nodes without a type bar). Icons use the same token via `renderNodeIcon(..., color)`.
-- **Semantic zoom (Topology-style LOD)**: When the React Flow viewport `zoom` is at or below `SEMANTIC_ZOOM_MAX_SCALE` (defined in `semanticZoom.ts`), `NodeComponent` renders a compact horizontal block filled with the same accent as `topBarColor`, with a PatternFly `Tooltip` showing **title** (heading weight) and **type** (`semanticZoomSummary` from each node). For performance, LOD logic lives in **`useSemanticZoom`** (`nodes/hooks/useSemanticZoom.ts`): a **`useStore`** selector typed with **`ReactFlowState`** reads `transform[2]` (zoom) and returns a boolean so nodes re-render only when crossing the threshold—not on every pan/zoom frame like **`useViewport`** would (see [React Flow `useStore`](https://reactflow.dev/api-reference/hooks/use-store)). The primary title uses **`semanticZoomActivityTitle`** (trimmed name, else a stable fallback): structural nodes use **`Untitled ${metadata.label}`**; task-shaped nodes use **`Untitled task`** with the executor label on the second line. Tooltip copy uses **`--pf-t--global--text--color--inverse`** for both lines so it stays readable on PatternFly’s inverse tooltip surface (see `NodeSemanticZoomBody.tsx`). Branching nodes pass **`semanticZoomBranchSources`** so multiple source handles stay on the **same bar height** with **no branch labels** (handles on the right edge; `SemanticZoomBranchSourceHandles.tsx`). `useUpdateNodeInternals` runs when toggling so edge anchors stay correct. New semantic-zoom UI should include **`vitest-axe`** coverage per the **Accessibility Testing** section in `CLAUDE.md`.
+- **Semantic zoom (Topology-style LOD)**: When the React Flow viewport `zoom` is at or below `SEMANTIC_ZOOM_MAX_SCALE` (defined in `semanticZoom.ts`), `NodeComponent` renders a compact horizontal block filled with the same accent as `topBarColor`, with a PatternFly `Tooltip` showing **title** (heading weight) and **type** (`semanticZoomSummary` from each node). For performance, LOD logic lives in **`useSemanticZoom`** (`nodes/hooks/useSemanticZoom.ts`): a **`useStore`** selector typed with **`ReactFlowState`** reads `transform[2]` (zoom) and returns a boolean so nodes re-render only when crossing the threshold—not on every pan/zoom frame like **`useViewport`** would (see [React Flow `useStore`](https://reactflow.dev/api-reference/hooks/use-store)). The primary title uses **`semanticZoomActivityTitle`** (trimmed name, else a stable fallback): structural nodes use **`Untitled ${metadata.label}`**; task-shaped nodes use **`Untitled task`** with the executor label on the second line. Tooltip copy uses **`--pf-t--global--text--color--inverse`** for both lines so it stays readable on PatternFly’s inverse tooltip surface (see `NodeSemanticZoomBody.tsx`). Branching nodes pass **`semanticZoomBranchSources`** so multiple source handles stay on the **same bar height** with **no branch labels** (handles on the right edge; `SemanticZoomBranchSourceHandles.tsx`). `useUpdateNodeInternals` runs when toggling so edge anchors stay correct. New semantic-zoom UI should include **`vitest-axe`** coverage per the **Accessibility Testing** section in `AGENTS.md`.
 - **Add step panel**: `getAddNodePanelColor` uses registry ids; builder registry ids are centralized in `src/constants/registryNodeIds.ts` (`RegistryNodeId`, `RegistryNodeIdUnion`).
 - **Approval branches**: `BranchHandle` and `EdgePath` / `DefaultEdge` / `ButtonEdge` color approved vs rejected handles and edges using success/danger tokens.
 
@@ -1129,9 +1129,9 @@ queryClient.invalidateQueries({ queryKey: ['get', '/workflows'] })
 
 1. Define `FilterFieldDefinition[]` in a colocated `*Filters.ts` / `*FilterDefinitions.ts`
 2. Use `useCursorPagination` for filters + cursor + `queryParams`
-3. Render `FilterBar` (or `NxListPanelToolbar`) with those definitions
+3. Render `FilterBar` (or `SynListPanelToolbar`) with those definitions
 4. Pass `queryParams` into the typed client's `useQuery`
-5. Use `NxEmptyStateFilter` when filters are active and the list is empty
+5. Use `SynEmptyStateFilter` when filters are active and the list is empty
 
 See [API Filtering Architecture](#api-filtering-architecture) and [`docs/user-guides/filtering.md`](./user-guides/filtering.md).
 
@@ -1165,7 +1165,7 @@ flowchart LR
 
 **Location:** `packages/syntara-ui/src/components/filters/FilterBar.tsx`  
 **Barrel:** `packages/syntara-ui/src/components/filters/index.ts`  
-**List layout wrapper:** `NxListPanelToolbar` in `packages/syntara-ui/src/components/panels/list/NxListPanel.tsx`
+**List layout wrapper:** `SynListPanelToolbar` in `packages/syntara-ui/src/components/panels/list/SynListPanel.tsx`
 
 ```typescript
 export type FilterBarProps = {
@@ -1312,7 +1312,7 @@ const query = workflowClient.useQuery('get', '/workflows', {
 // <Th sort={getSortParams('name')}>Name</Th>
 ```
 
-Wire `filters` / `handleFilterChange` / `handleClearAllFilters` into `FilterBar` or `NxListPanelToolbar`. Use `NxEmptyStateFilter` when filters are active but the list is empty.
+Wire `filters` / `handleFilterChange` / `handleClearAllFilters` into `FilterBar` or `SynListPanelToolbar`. Use `SynEmptyStateFilter` when filters are active but the list is empty.
 
 ### Keyword search default behavior
 
@@ -1386,7 +1386,7 @@ Examples:
 2. Prefer `daterange` in the UI; the `date` enum value has no dedicated control in current FilterBar usage.
 3. Confirm the backend supports the operator you choose (`in`, AND date ranges, etc.) — some endpoints do not.
 4. Put scoped params like `project_id` in `useCursorPagination({ extraParams })`, not as fake filters.
-5. Filter chips / system badges use `NxLabel` (not raw PatternFly `Label`).
+5. Filter chips / system badges use `SynLabel` (not raw PatternFly `Label`).
 
 ---
 
@@ -1396,17 +1396,17 @@ React 19 natively hoists `<title>` elements rendered anywhere in the component t
 
 ### Pattern
 
-Every top-level page component renders `<title>` as the first child of `<NxPage>`:
+Every top-level page component renders `<title>` as the first child of `<SynPage>`:
 
 ```tsx
 import { toPageTitle } from '../../utils/toPageTitle'
 
 export default function Workflows() {
   return (
-    <NxPage>
+    <SynPage>
       <title>{toPageTitle(['Workflows'])}</title>
-      <NxPageHeader title="Workflows" ... />
-    </NxPage>
+      <SynPageHeader title="Workflows" ... />
+    </SynPage>
   )
 }
 ```
@@ -1415,14 +1415,14 @@ export default function Workflows() {
 
 - Accepts an array of `string | null | undefined` segments (narrow → broad order)
 - Filters out falsy/blank values; trims remaining segments
-- Joins with `|` and appends the app title (from `VITE_APP_TITLE`, falls back to `'Nexus'`)
+- Joins with `|` and appends the app title (from `VITE_APP_TITLE`, falls back to `'Syntara'`)
 - Returns bare app title when all segments are empty
 
 Examples:
 
-- `toPageTitle(['Workflows'])` → `'Workflows | Nexus'`
-- `toPageTitle(['admin', 'Users'])` → `'admin | Users | Nexus'`
-- `toPageTitle([undefined])` → `'Nexus'`
+- `toPageTitle(['Workflows'])` → `'Workflows | Syntara'`
+- `toPageTitle(['admin', 'Users'])` → `'admin | Users | Syntara'`
+- `toPageTitle([undefined])` → `'Syntara'`
 
 ### Dynamic pages
 
@@ -1446,4 +1446,4 @@ Detail pages use the entity name from API data as the first segment, falling bac
 | [`docs/websocket-architecture.md`](./websocket-architecture.md)           | WebSocket infrastructure, hooks, and real-time patterns      |
 | [`docs/user-guides/filtering.md`](./user-guides/filtering.md)             | How to use search and filters in the UI; shareable URLs      |
 | [`docs/TEST_HELPERS_FILTER_TESTING.md`](./TEST_HELPERS_FILTER_TESTING.md) | Unit-test helpers for filter URL assertions                  |
-| [`CLAUDE.md`](../CLAUDE.md)                                               | Quick reference for AI assistants and developers             |
+| [`AGENTS.md`](../AGENTS.md)                                               | Quick reference for AI assistants and developers             |

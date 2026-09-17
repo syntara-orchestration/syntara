@@ -90,7 +90,7 @@ def sync_detailed(
 ) -> Response[Any | ErrorData]:
     """Delete workflow
 
-     Soft delete a workflow.
+     Permanently delete a workflow and cascade-delete all its versions and executions.
 
     Args:
         workflow_id (UUID):
@@ -121,7 +121,7 @@ def sync(
 ) -> Any | ErrorData | None:
     """Delete workflow
 
-     Soft delete a workflow.
+     Permanently delete a workflow and cascade-delete all its versions and executions.
 
     Args:
         workflow_id (UUID):
@@ -147,7 +147,7 @@ async def asyncio_detailed(
 ) -> Response[Any | ErrorData]:
     """Delete workflow
 
-     Soft delete a workflow.
+     Permanently delete a workflow and cascade-delete all its versions and executions.
 
     Args:
         workflow_id (UUID):
@@ -176,7 +176,7 @@ async def asyncio(
 ) -> Any | ErrorData | None:
     """Delete workflow
 
-     Soft delete a workflow.
+     Permanently delete a workflow and cascade-delete all its versions and executions.
 
     Args:
         workflow_id (UUID):

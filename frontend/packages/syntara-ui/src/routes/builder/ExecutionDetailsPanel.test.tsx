@@ -379,7 +379,7 @@ describe('ExecutionDetailsPanel', () => {
 
   describe('accessibility (view mode toggle)', () => {
     // PatternFly Tabs generates aria-controls with random IDs that don't match
-    // rendered panel IDs in jsdom — a known upstream issue, not an application bug.
+    // rendered panel IDs in happy-dom — a known upstream issue, not an application bug.
     const axeTabRules = { rules: { 'aria-valid-attr-value': { enabled: false } } }
 
     it('has no violations in default state', async () => {

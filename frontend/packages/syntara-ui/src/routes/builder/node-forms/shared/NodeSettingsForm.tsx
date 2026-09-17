@@ -14,7 +14,7 @@ import {
 import { useState } from 'react'
 import { Controller, useFormContext, useWatch } from 'react-hook-form'
 
-import { NxSelect } from '../../../../components/NxSelect'
+import { SynSelect } from '../../../../components/SynSelect'
 import type { TimeoutNodeType } from '../../hooks/useWorkflowEngineDefaults'
 import { useWorkflowEngineDefaults } from '../../hooks/useWorkflowEngineDefaults'
 import { useIsVersionView } from '../../VersionViewContext'
@@ -114,7 +114,7 @@ function ContinueOnFailureSection({
       <Stack hasGutter>
         <StackItem>
           <FormGroup label="On failure behavior" labelHelp={nodeHelp.onFailureBehavior} fieldId="node-settings-cof">
-            <NxSelect
+            <SynSelect
               id="node-settings-cof"
               isOpen={isOpen}
               selected={selected}
@@ -141,7 +141,7 @@ function ContinueOnFailureSection({
                   </SelectOption>
                 ))}
               </SelectList>
-            </NxSelect>
+            </SynSelect>
           </FormGroup>
         </StackItem>
         {continueOnFailureHelp && (

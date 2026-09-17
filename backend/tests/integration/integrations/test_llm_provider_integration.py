@@ -11,7 +11,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from httpx import AsyncClient
-from sqlmodel import select
+from sqlmodel import select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.core.models import User
@@ -328,20 +328,34 @@ class TestLLMProviderCredentialResolution:
     async def test_validate_with_deleted_credential(
         self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User
     ) -> None:
-        """Integration whose credential was deleted after creation fails on validate."""
+        """Integration whose credential was deleted after creation fails on validate.
+
+        credentials.management_credential_id is ON DELETE RESTRICT, so a
+        credential can no longer be hard-deleted while an integration
+        references it. To simulate "the credential is gone" for this
+        validate-path test, detach the reference first (a direct FK
+        null-out, bypassing the app-level guard that would normally reject
+        this for a credential-required type like llm_provider) and only
+        then delete the now-unreferenced credential row.
+        """
         integration_id = await _create_llm_integration(test_db_session, test_user, "llm-cred-del")
 
-        # Delete the credential out from under the integration
         from syntara.integrations.models.integration import Integration
 
         integration = (
             await test_db_session.exec(select(Integration).where(Integration.id == UUID(integration_id)))
         ).one()
         cred_id = integration.management_credential_id
+        await test_db_session.execute(
+            update(Integration)
+            .where(Integration.id == UUID(integration_id))  # type: ignore[arg-type]
+            .values(management_credential_id=None)
+        )
+        await test_db_session.flush()
         credential = await test_db_session.get(Credential, cred_id)
         if credential:
             await test_db_session.delete(credential)
-            await test_db_session.commit()
+        await test_db_session.commit()
 
         response = await auth_client.post(f"{BASE_URL}/{integration_id}/validate")
         assert response.status_code in (404, 422, 500)
@@ -349,7 +363,11 @@ class TestLLMProviderCredentialResolution:
     async def test_refresh_with_deleted_credential(
         self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User
     ) -> None:
-        """Integration whose credential was deleted after creation fails on refresh."""
+        """Integration whose credential was deleted after creation fails on refresh.
+
+        See test_validate_with_deleted_credential above for why the
+        reference is nulled directly before deleting the credential row.
+        """
         integration_id = await _create_llm_integration(test_db_session, test_user, "llm-ref-cred-del")
 
         from syntara.integrations.models.integration import Integration
@@ -358,10 +376,16 @@ class TestLLMProviderCredentialResolution:
             await test_db_session.exec(select(Integration).where(Integration.id == UUID(integration_id)))
         ).one()
         cred_id = integration.management_credential_id
+        await test_db_session.execute(
+            update(Integration)
+            .where(Integration.id == UUID(integration_id))  # type: ignore[arg-type]
+            .values(management_credential_id=None)
+        )
+        await test_db_session.flush()
         credential = await test_db_session.get(Credential, cred_id)
         if credential:
             await test_db_session.delete(credential)
-            await test_db_session.commit()
+        await test_db_session.commit()
 
         response = await auth_client.post(f"{BASE_URL}/{integration_id}/refresh")
         assert response.status_code in (404, 422, 500)

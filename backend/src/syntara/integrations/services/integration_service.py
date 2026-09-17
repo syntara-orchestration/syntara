@@ -648,8 +648,10 @@ class IntegrationService(BaseService):
         for field in data.model_fields_set:
             setattr(integration, field, getattr(data, field))
 
+        if not self.has_pending_user_changes(integration):
+            return await self._to_read_with_counts(integration)
+
         integration.updated_by = self.user.id
-        integration.updated_at = datetime.now(UTC)
 
         try:
             await self.session.flush()
@@ -790,6 +792,12 @@ class IntegrationService(BaseService):
             integration_id=str(integration_id),
             error_type=type(exc).__name__,
         )
+        # The triggering exception may have left the session in a failed
+        # transaction (e.g. an IntegrityError raised by flush). Roll back before
+        # issuing new statements, otherwise the SELECT in _get_or_raise raises
+        # PendingRollbackError and the ERROR state is never persisted, leaving
+        # the integration wedged in refresh_status=REFRESHING with a null error.
+        await self.session.rollback()
         integration = await self._get_or_raise(integration_id, for_update=True)
         integration.refresh_status = IntegrationRefreshStatus.ERROR
         integration.refresh_error = f"Unexpected error during refresh: {type(exc).__name__}"
@@ -866,6 +874,7 @@ class IntegrationService(BaseService):
                 integration_id=str(integration_id),
                 error_type=type(exc).__name__,
             )
+            await self.session.rollback()
             integration = await self._get_or_raise(integration_id, for_update=True)
             integration.validation_status = IntegrationStatus.ERROR
             integration.validation_error = f"Unexpected error during validation: {type(exc).__name__}"
@@ -1112,6 +1121,17 @@ class IntegrationService(BaseService):
         pending_params: list[tuple[Tool, list[ToolParameter]]] = []
 
         for tool_meta in discovered_tools:
+            if tool_meta.name in found_names:
+                # A malformed server can advertise the same tool name twice.
+                # Deduping (first occurrence wins) keeps the refresh working;
+                # without this, two rows share a namespaced_name and the flush
+                # below raises a UniqueViolationError on uq_tools_namespaced_name.
+                logger.warning(
+                    "Skipping duplicate tool name in discovery result",
+                    integration_id=str(integration.id),
+                    tool_name=tool_meta.name,
+                )
+                continue
             found_names.add(tool_meta.name)
             namespaced = f"{integration.name}::{tool_meta.name}"
             logger.debug(
@@ -1129,8 +1149,6 @@ class IntegrationService(BaseService):
                 existing.status = ToolStatus.AVAILABLE
                 existing.last_refreshed_at = datetime.now(UTC)
                 existing.refresh_error = None
-                existing.updated_by = self.user.id
-                existing.updated_at = datetime.now(UTC)
                 pending_params.append((existing, parameters))
                 updated_count += 1
             else:
@@ -1177,8 +1195,6 @@ class IntegrationService(BaseService):
                     tool_name=name,
                 )
                 tool.status = ToolStatus.MISSING
-                tool.updated_by = self.user.id
-                tool.updated_at = datetime.now(UTC)
                 missing_count += 1
 
         return synced_count, updated_count, missing_count
@@ -1294,7 +1310,6 @@ class IntegrationService(BaseService):
                 existing.name = model_meta.name
                 existing.description = model_meta.description
                 existing.last_refreshed_at = now
-                existing.updated_at = now
                 existing.profile = profile
                 if default_model_id is not None:
                     existing.is_default = model_meta.id == default_model_id

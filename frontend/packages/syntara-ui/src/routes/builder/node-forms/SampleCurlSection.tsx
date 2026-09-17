@@ -2,7 +2,7 @@ import { ExpandableSection, StackItem } from '@patternfly/react-core'
 import { useMemo, useState } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form'
 
-import { NxCodeBlock } from '../../../components/details/NxCodeBlock'
+import { SynCodeBlock } from '../../../components/details/SynCodeBlock'
 
 import { generateSampleBody } from './simpleSchemaUtils'
 import type { TriggerFormData } from './triggerFormSchema'
@@ -31,9 +31,9 @@ export function SampleCurlSection({ url }: Readonly<SampleCurlSectionProps>) {
   return (
     <StackItem>
       <ExpandableSection toggleText="Sample request" isExpanded={expanded} onToggle={(_event, val) => setExpanded(val)}>
-        <NxCodeBlock enableCopy noMaxHeight>
+        <SynCodeBlock enableCopy noMaxHeight>
           {curlCommand}
-        </NxCodeBlock>
+        </SynCodeBlock>
       </ExpandableSection>
     </StackItem>
   )

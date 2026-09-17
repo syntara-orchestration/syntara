@@ -110,9 +110,6 @@ npx openapi-typescript /path/to/syntara/src/syntara/schemas/workflows/executions
 npx openapi-typescript /path/to/syntara/src/syntara/schemas/workflows/activity_types_openapi.yaml \
   --output ./src/activity-types-api.ts --default-non-nullable false
 
-npx openapi-typescript /path/to/syntara/src/syntara/schemas/invocations/openapi.yaml \
-  --output ./src/invocations-api.ts --default-non-nullable false
-
 npx openapi-typescript /path/to/syntara/src/syntara/schemas/metrics/openapi.yaml \
   --output ./src/metrics-api.ts --default-non-nullable false
 
@@ -156,7 +153,6 @@ This will:
 | `tool-manager.ts`               | `schemas/tool_manager/openapi.yaml`             | Tool and provider management         |
 | `files-api.ts`                  | `schemas/files/openapi.yaml`                    | File upload and management           |
 | `approvals-api.ts`              | `schemas/approvals/openapi.yaml`                | Approval requests                    |
-| `invocations-api.ts`            | `schemas/invocations/openapi.yaml`              | Invocations                          |
 | `metrics-api.ts`                | `schemas/metrics/openapi.yaml`                  | Metrics                              |
 | `settings-api.ts`               | `schemas/settings/openapi.yaml`                 | Runtime settings                     |
 | `auth-api.ts`                   | `schemas/auth/openapi.yaml`                     | Authentication                       |
@@ -276,7 +272,7 @@ The Playwright config sets `ignoreHTTPSErrors` to `true` in real-backend mode (w
 - Follow AAA pattern (Arrange-Act-Assert)
 - Mock external dependencies with `vi.fn()` and `vi.mock()`
 - All new/modified code must meet **80% coverage** (lines, statements, functions, branches)
-- Use `*.test.tsx` for jsdom unit tests, `*.spec.ts` under `packages/syntara-ui/e2e/` for Playwright E2E tests
+- Use `*.test.tsx` for happy-dom unit tests, `*.spec.ts` under `packages/syntara-ui/e2e/` for Playwright E2E tests
 - **E2E tests** run against mock API by default, real backend supported — See [packages/syntara-ui/TESTING.md](packages/syntara-ui/TESTING.md) for setup
 - **Visual regression** — every route is screenshotted and compared against baselines in CI. New routes must be added to the page registry. See [packages/syntara-ui/VISUAL_REGRESSION.md](packages/syntara-ui/VISUAL_REGRESSION.md)
 

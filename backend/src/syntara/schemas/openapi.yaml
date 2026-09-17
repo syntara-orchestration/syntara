@@ -10,8 +10,8 @@
 # =============================================================================
 openapi: 3.1.0
 info:
-  title: Syntara API
-  version: 1.0.0
+  title: Orchestrator API
+  version: 1.1.1
   description: A distributed multi-agent workflow orchestration system
 servers:
   - url: /api/v1
@@ -43,8 +43,6 @@ tags:
     description: Integration management
   - name: Internal Metrics
     description: Internal metrics store for usage tracking and KPI reporting
-  - name: Invocation
-    description: Agent invocation operations
   - name: Projects
     description: Project CRUD and project-scoped resource operations
   - name: Service Accounts
@@ -107,8 +105,8 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
-            If provided, the credential is decrypted and used instead of environment variables.
+            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
           name: integration_id
@@ -121,7 +119,8 @@ paths:
             title: Integration Id
           description: |
             Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-            When provided, the integration's configured URL is used instead of environment variables.
+            If omitted, the unique visible enabled AAP integration is used.
+            Required when more than one AAP integration is visible.
       responses:
         '200':
           description: Successful Response
@@ -268,8 +267,8 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
-            If provided, the credential is decrypted and used instead of environment variables.
+            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
           name: integration_id
@@ -282,7 +281,8 @@ paths:
             title: Integration Id
           description: |
             Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-            When provided, the integration's configured URL is used instead of environment variables.
+            If omitted, the unique visible enabled AAP integration is used.
+            Required when more than one AAP integration is visible.
         - in: query
           name: organization
           required: false
@@ -445,8 +445,8 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
-            If provided, the credential is decrypted and used instead of environment variables.
+            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
           name: integration_id
@@ -459,7 +459,8 @@ paths:
             title: Integration Id
           description: |
             Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-            When provided, the integration's configured URL is used instead of environment variables.
+            If omitted, the unique visible enabled AAP integration is used.
+            Required when more than one AAP integration is visible.
       responses:
         '200':
           description: Successful Response
@@ -606,8 +607,8 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
-            If provided, the credential is decrypted and used instead of environment variables.
+            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
           name: integration_id
@@ -620,7 +621,8 @@ paths:
             title: Integration Id
           description: |
             Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-            When provided, the integration's configured URL is used instead of environment variables.
+            If omitted, the unique visible enabled AAP integration is used.
+            Required when more than one AAP integration is visible.
         - in: query
           name: organization
           required: false
@@ -783,8 +785,8 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
-            If provided, the credential is decrypted and used instead of environment variables.
+            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
           name: integration_id
@@ -797,7 +799,8 @@ paths:
             title: Integration Id
           description: |
             Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-            When provided, the integration's configured URL is used instead of environment variables.
+            If omitted, the unique visible enabled AAP integration is used.
+            Required when more than one AAP integration is visible.
       responses:
         '200':
           description: Successful Response
@@ -944,8 +947,8 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
-            If provided, the credential is decrypted and used instead of environment variables.
+            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
           name: integration_id
@@ -958,7 +961,8 @@ paths:
             title: Integration Id
           description: |
             Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-            When provided, the integration's configured URL is used instead of environment variables.
+            If omitted, the unique visible enabled AAP integration is used.
+            Required when more than one AAP integration is visible.
         - in: query
           name: organization
           required: false
@@ -1114,8 +1118,8 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
-            If provided, the credential is decrypted and used instead of environment variables.
+            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
           name: integration_id
@@ -1128,7 +1132,8 @@ paths:
             title: Integration Id
           description: |
             Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-            When provided, the integration's configured URL is used instead of environment variables.
+            If omitted, the unique visible enabled AAP integration is used.
+            Required when more than one AAP integration is visible.
         - in: query
           name: organization
           required: false
@@ -1284,8 +1289,8 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
-            If provided, the credential is decrypted and used instead of environment variables.
+            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
           name: integration_id
@@ -1298,7 +1303,8 @@ paths:
             title: Integration Id
           description: |
             Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-            When provided, the integration's configured URL is used instead of environment variables.
+            If omitted, the unique visible enabled AAP integration is used.
+            Required when more than one AAP integration is visible.
       responses:
         '200':
           description: Successful Response
@@ -1445,8 +1451,8 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
-            If provided, the credential is decrypted and used instead of environment variables.
+            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
           name: integration_id
@@ -1459,7 +1465,8 @@ paths:
             title: Integration Id
           description: |
             Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-            When provided, the integration's configured URL is used instead of environment variables.
+            If omitted, the unique visible enabled AAP integration is used.
+            Required when more than one AAP integration is visible.
       responses:
         '200':
           description: Successful Response
@@ -1605,8 +1612,8 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
-            If provided, the credential is decrypted and used instead of environment variables.
+            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
           name: integration_id
@@ -1619,7 +1626,8 @@ paths:
             title: Integration Id
           description: |
             Optional Ansible Automation Platform Gateway integration ID for connection URL resolution.
-            When provided, the integration's configured URL is used instead of environment variables.
+            If omitted, the unique visible enabled AAP integration is used.
+            Required when more than one AAP integration is visible.
       responses:
         '200':
           description: Successful Response
@@ -8685,6 +8693,127 @@ paths:
                 retryable: true
       security:
         - bearerAuth: []
+    delete:
+      summary: Delete file
+      description: Permanently delete a file and its stored content. After a project is soft-deleted, project-scoped files:delete cannot authorize orphan cleanup (the project no longer resolves). Only system-scope files:delete can remove an orphan, and only when the caller already knows the file UUID.
+      operationId: delete_file
+      tags:
+        - Files
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: File Id
+          description: UUID of the file to delete
+      x-app-permission:
+        resource: files
+        action: delete
+      responses:
+        '204':
+          description: File deleted successfully
+        '400':
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/bad-request
+                title: Bad Request
+                detail: The request was malformed or contained invalid parameters
+                code: BAD_REQUEST
+                retryable: false
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/unauthorized
+                title: Unauthorized
+                detail: Authentication is required to access this resource
+                code: UNAUTHORIZED
+                retryable: false
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/forbidden
+                title: Forbidden
+                detail: You do not have permission to access this resource
+                code: FORBIDDEN
+                retryable: false
+        '404':
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/not-found
+                title: Resource Not Found
+                detail: No resource exists with the provided identifier
+                code: NOT_FOUND
+                retryable: false
+                instance: /api/v1/workflows
+        '409':
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/conflict
+                title: Conflict
+                detail: The request conflicts with the current state of the resource
+                code: CONFLICT
+                retryable: false
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/validation-error
+                title: Validation Error
+                detail: Field 'name' must be between 1 and 255 characters
+                code: VALIDATION_ERROR
+                retryable: false
+                instance: /api/v1/workflows
+        '429':
+          description: Too Many Requests
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/rate-limited
+                title: Too Many Requests
+                detail: Rate limit exceeded. Try again in 60 seconds.
+                code: RATE_LIMITED
+                retryable: true
+        '500':
+          description: Internal Server Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/internal-error
+                title: Internal Server Error
+                detail: An unexpected error occurred
+                code: INTERNAL_ERROR
+                retryable: true
+      security:
+        - bearerAuth: []
   /files/{file_id}/download:
     get:
       summary: Download file
@@ -12661,11 +12790,11 @@ paths:
         - Internal Metrics
       summary: Metrics store KPIs
       description: |-
-        Return a computed KPI dashboard covering all Syntara components.
+        Return a computed KPI dashboard covering all Orchestrator components.
 
-        Maps metrics to the KPIs defined in the Syntara KPI documents:
-        - Syntara Key Performance Indicators (KPIs)
-        - Syntara LLM/Agent Performance KPIs
+        Maps metrics to the KPIs defined in the Orchestrator KPI documents:
+        - Orchestrator Key Performance Indicators (KPIs)
+        - Orchestrator LLM/Agent Performance KPIs
       operationId: get_internal_metrics_kpis
       responses:
         '200':
@@ -13019,870 +13148,6 @@ paths:
       x-app-permission:
         resource: null
         action: null
-  /invocations:
-    post:
-      summary: Create invocation (async)
-      description: Accept async agent invocation request and return invocation ID immediately.
-      operationId: create_invocation
-      tags:
-        - Invocation
-      x-app-permission:
-        resource: invocation
-        action: create
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/InvocationCreateRequest'
-            examples:
-              workflowGeneration:
-                summary: Workflow generation request
-                value:
-                  prompt: Create a workflow to deploy app to production
-                  sessionId: session-001
-      responses:
-        '202':
-          description: Invocation accepted
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Invocation'
-              examples:
-                invocationAccepted:
-                  summary: Invocation accepted
-                  value:
-                    id: 550e8400-e29b-41d4-a716-446655440000
-                    prompt: Create a workflow to deploy app
-                    session_id: session-001
-                    status: running
-        '400':
-          description: Bad Request
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/bad-request
-                title: Bad Request
-                detail: The request was malformed or contained invalid parameters
-                code: BAD_REQUEST
-                retryable: false
-        '401':
-          description: Unauthorized
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/unauthorized
-                title: Unauthorized
-                detail: Authentication is required to access this resource
-                code: UNAUTHORIZED
-                retryable: false
-        '403':
-          description: Forbidden
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/forbidden
-                title: Forbidden
-                detail: You do not have permission to access this resource
-                code: FORBIDDEN
-                retryable: false
-        '404':
-          description: Not Found
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/not-found
-                title: Resource Not Found
-                detail: No resource exists with the provided identifier
-                code: NOT_FOUND
-                retryable: false
-                instance: /api/v1/workflows
-        '409':
-          description: Conflict
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/conflict
-                title: Conflict
-                detail: The request conflicts with the current state of the resource
-                code: CONFLICT
-                retryable: false
-        '422':
-          description: Validation Error
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/validation-error
-                title: Validation Error
-                detail: Field 'name' must be between 1 and 255 characters
-                code: VALIDATION_ERROR
-                retryable: false
-                instance: /api/v1/workflows
-        '500':
-          description: Internal Server Error
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/internal-error
-                title: Internal Server Error
-                detail: An unexpected error occurred
-                code: INTERNAL_ERROR
-                retryable: true
-        '429':
-          description: Too Many Requests
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/rate-limited
-                title: Too Many Requests
-                detail: Rate limit exceeded. Try again in 60 seconds.
-                code: RATE_LIMITED
-                retryable: true
-      security:
-        - bearerAuth: []
-    get:
-      summary: List invocations
-      description: List invocations with cursor-based pagination and filtering
-      operationId: list_invocations
-      tags:
-        - Invocation
-      x-app-permission:
-        resource: invocation
-        action: read
-      parameters:
-        - name: limit
-          in: query
-          required: false
-          schema:
-            type: integer
-            exclusiveMinimum: 0
-            maximum: 100
-            default: 20
-            description: Maximum number of results per page
-            title: Limit
-          description: Maximum number of results per page
-        - name: cursor
-          in: query
-          required: false
-          schema:
-            anyOf:
-              - type: string
-              - type: 'null'
-            description: Pagination cursor from previous response
-            title: Cursor
-          description: Pagination cursor from previous response
-        - name: sort
-          in: query
-          required: false
-          schema:
-            anyOf:
-              - type: string
-                pattern: ^-?[a-z][a-z0-9_]*$
-              - type: 'null'
-            description: Sort parameter (e.g., 'name', '-created_at')
-            title: Sort
-          description: Sort parameter (e.g., 'name', '-created_at')
-        - name: include_total
-          in: query
-          required: false
-          schema:
-            type: boolean
-            default: false
-            description: Include total count in response (expensive)
-            title: Include Total
-          description: Include total count in response (expensive)
-        - name: status
-          in: query
-          required: false
-          schema:
-            anyOf:
-              - $ref: '#/components/schemas/InvocationStatus'
-              - type: 'null'
-            title: Status
-          description: Filter invocations by status (running, paused, cancelled, completed, failed)
-        - name: created_by
-          in: query
-          required: false
-          schema:
-            anyOf:
-              - type: string
-                format: uuid
-              - type: 'null'
-            title: Created By
-          description: Filter by creator UUID
-        - name: session_id
-          in: query
-          required: false
-          schema:
-            anyOf:
-              - type: string
-              - type: 'null'
-            title: Session Id
-          description: Filter by session ID
-        - name: prompt
-          in: query
-          required: false
-          schema:
-            anyOf:
-              - type: string
-              - type: 'null'
-            title: Prompt
-          description: Filter by prompt text (substring match)
-      responses:
-        '200':
-          description: List of invocations
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/InvocationListResponse'
-              examples:
-                paginatedList:
-                  summary: Paginated invocation list
-                  value:
-                    resources:
-                      - id: 550e8400-e29b-41d4-a716-446655440000
-                        prompt: Deploy app to production
-                        session_id: session-001
-                        status: running
-        '400':
-          description: Bad Request
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/bad-request
-                title: Bad Request
-                detail: The request was malformed or contained invalid parameters
-                code: BAD_REQUEST
-                retryable: false
-        '401':
-          description: Unauthorized
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/unauthorized
-                title: Unauthorized
-                detail: Authentication is required to access this resource
-                code: UNAUTHORIZED
-                retryable: false
-        '403':
-          description: Forbidden
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/forbidden
-                title: Forbidden
-                detail: You do not have permission to access this resource
-                code: FORBIDDEN
-                retryable: false
-        '404':
-          description: Not Found
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/not-found
-                title: Resource Not Found
-                detail: No resource exists with the provided identifier
-                code: NOT_FOUND
-                retryable: false
-                instance: /api/v1/workflows
-        '409':
-          description: Conflict
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/conflict
-                title: Conflict
-                detail: The request conflicts with the current state of the resource
-                code: CONFLICT
-                retryable: false
-        '422':
-          description: Validation Error
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/validation-error
-                title: Validation Error
-                detail: Field 'name' must be between 1 and 255 characters
-                code: VALIDATION_ERROR
-                retryable: false
-                instance: /api/v1/workflows
-        '500':
-          description: Internal Server Error
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/internal-error
-                title: Internal Server Error
-                detail: An unexpected error occurred
-                code: INTERNAL_ERROR
-                retryable: true
-        '429':
-          description: Too Many Requests
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/rate-limited
-                title: Too Many Requests
-                detail: Rate limit exceeded. Try again in 60 seconds.
-                code: RATE_LIMITED
-                retryable: true
-      security:
-        - bearerAuth: []
-  /invocations/chat:
-    post:
-      summary: Create invocation with file uploads (async)
-      description: Accept async agent invocation request with optional file uploads via multipart/form-data.
-      operationId: create_invocation_chat
-      tags:
-        - Invocation
-      x-app-permission:
-        resource: invocation
-        action: create
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/InvocationRequestWithFile'
-      responses:
-        '202':
-          description: Invocation accepted
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Invocation'
-        '400':
-          description: Bad Request
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/bad-request
-                title: Bad Request
-                detail: The request was malformed or contained invalid parameters
-                code: BAD_REQUEST
-                retryable: false
-        '401':
-          description: Unauthorized
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/unauthorized
-                title: Unauthorized
-                detail: Authentication is required to access this resource
-                code: UNAUTHORIZED
-                retryable: false
-        '403':
-          description: Forbidden
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/forbidden
-                title: Forbidden
-                detail: You do not have permission to access this resource
-                code: FORBIDDEN
-                retryable: false
-        '404':
-          description: Not Found
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/not-found
-                title: Resource Not Found
-                detail: No resource exists with the provided identifier
-                code: NOT_FOUND
-                retryable: false
-                instance: /api/v1/workflows
-        '409':
-          description: Conflict
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/conflict
-                title: Conflict
-                detail: The request conflicts with the current state of the resource
-                code: CONFLICT
-                retryable: false
-        '422':
-          description: Validation Error
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/validation-error
-                title: Validation Error
-                detail: Field 'name' must be between 1 and 255 characters
-                code: VALIDATION_ERROR
-                retryable: false
-                instance: /api/v1/workflows
-        '500':
-          description: Internal Server Error
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/internal-error
-                title: Internal Server Error
-                detail: An unexpected error occurred
-                code: INTERNAL_ERROR
-                retryable: true
-        '429':
-          description: Too Many Requests
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/rate-limited
-                title: Too Many Requests
-                detail: Rate limit exceeded. Try again in 60 seconds.
-                code: RATE_LIMITED
-                retryable: true
-      security:
-        - bearerAuth: []
-  /invocations/{invocation_id}:
-    get:
-      summary: Get invocation details (testing/debug)
-      description: 'Retrieve full invocation details including the result. NOTE: This endpoint is for testing and debugging. Production systems should use WebSockets for real-time results.'
-      operationId: get_invocation
-      tags:
-        - Invocation
-      x-app-permission:
-        resource: invocation
-        action: read
-      parameters:
-        - name: invocation_id
-          in: path
-          required: true
-          description: UUID of the invocation to retrieve
-          schema:
-            type: string
-            title: Invocation Id
-      responses:
-        '200':
-          description: Invocation details
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Invocation'
-              examples:
-                completedInvocation:
-                  summary: Completed invocation
-                  value:
-                    id: 550e8400-e29b-41d4-a716-446655440000
-                    prompt: What deployment tools are available?
-                    session_id: test-session-123
-                    status: completed
-        '400':
-          description: Bad Request
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/bad-request
-                title: Bad Request
-                detail: The request was malformed or contained invalid parameters
-                code: BAD_REQUEST
-                retryable: false
-        '401':
-          description: Unauthorized
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/unauthorized
-                title: Unauthorized
-                detail: Authentication is required to access this resource
-                code: UNAUTHORIZED
-                retryable: false
-        '403':
-          description: Forbidden
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/forbidden
-                title: Forbidden
-                detail: You do not have permission to access this resource
-                code: FORBIDDEN
-                retryable: false
-        '404':
-          description: Not Found
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/not-found
-                title: Resource Not Found
-                detail: No resource exists with the provided identifier
-                code: NOT_FOUND
-                retryable: false
-                instance: /api/v1/workflows
-        '409':
-          description: Conflict
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/conflict
-                title: Conflict
-                detail: The request conflicts with the current state of the resource
-                code: CONFLICT
-                retryable: false
-        '422':
-          description: Validation Error
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/validation-error
-                title: Validation Error
-                detail: Field 'name' must be between 1 and 255 characters
-                code: VALIDATION_ERROR
-                retryable: false
-                instance: /api/v1/workflows
-        '500':
-          description: Internal Server Error
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/internal-error
-                title: Internal Server Error
-                detail: An unexpected error occurred
-                code: INTERNAL_ERROR
-                retryable: true
-        '429':
-          description: Too Many Requests
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/rate-limited
-                title: Too Many Requests
-                detail: Rate limit exceeded. Try again in 60 seconds.
-                code: RATE_LIMITED
-                retryable: true
-      security:
-        - bearerAuth: []
-  /invocations/{invocation_id}/trace:
-    get:
-      summary: Get invocation trace
-      description: Retrieve the agent execution trace for a completed invocation, including reasoning steps, tool calls, and tool results.
-      operationId: get_invocation_trace
-      tags:
-        - Invocation
-      x-app-permission:
-        resource: invocation
-        action: read
-      parameters:
-        - name: invocation_id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-            title: Invocation Id
-      responses:
-        '200':
-          description: Agent execution trace
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/InvocationTraceRead'
-        '400':
-          description: Bad Request
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/bad-request
-                title: Bad Request
-                detail: The request was malformed or contained invalid parameters
-                code: BAD_REQUEST
-                retryable: false
-        '401':
-          description: Unauthorized
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/unauthorized
-                title: Unauthorized
-                detail: Authentication is required to access this resource
-                code: UNAUTHORIZED
-                retryable: false
-        '403':
-          description: Forbidden
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/forbidden
-                title: Forbidden
-                detail: You do not have permission to access this resource
-                code: FORBIDDEN
-                retryable: false
-        '404':
-          description: Not Found
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/not-found
-                title: Resource Not Found
-                detail: No resource exists with the provided identifier
-                code: NOT_FOUND
-                retryable: false
-                instance: /api/v1/workflows
-        '409':
-          description: Conflict
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/conflict
-                title: Conflict
-                detail: The request conflicts with the current state of the resource
-                code: CONFLICT
-                retryable: false
-        '422':
-          description: Validation Error
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/validation-error
-                title: Validation Error
-                detail: Field 'name' must be between 1 and 255 characters
-                code: VALIDATION_ERROR
-                retryable: false
-                instance: /api/v1/workflows
-        '429':
-          description: Too Many Requests
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/rate-limited
-                title: Too Many Requests
-                detail: Rate limit exceeded. Try again in 60 seconds.
-                code: RATE_LIMITED
-                retryable: true
-        '500':
-          description: Internal Server Error
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/internal-error
-                title: Internal Server Error
-                detail: An unexpected error occurred
-                code: INTERNAL_ERROR
-                retryable: true
-      security:
-        - bearerAuth: []
-  /invocations/{invocation_id}/cancel:
-    post:
-      summary: Cancel invocation
-      description: Cancel a running or pending invocation.
-      operationId: cancel_invocation
-      tags:
-        - Invocation
-      x-app-permission:
-        resource: invocation
-        action: cancel
-      parameters:
-        - name: invocation_id
-          in: path
-          required: true
-          description: UUID of the invocation to cancel
-          schema:
-            type: string
-            title: Invocation Id
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/InvocationCancelRequest'
-            examples:
-              default_reason:
-                summary: Default cancellation reason
-                value:
-                  reason: User cancelled
-      responses:
-        '200':
-          description: Cancellation result
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/InvocationCancelResponse'
-              examples:
-                success:
-                  summary: Successful cancellation
-                  value:
-                    success: true
-                    message: Invocation 550e8400-e29b-41d4-a716-446655440000 cancelled successfully
-        '400':
-          description: Bad Request
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/bad-request
-                title: Bad Request
-                detail: The request was malformed or contained invalid parameters
-                code: BAD_REQUEST
-                retryable: false
-        '401':
-          description: Unauthorized
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/unauthorized
-                title: Unauthorized
-                detail: Authentication is required to access this resource
-                code: UNAUTHORIZED
-                retryable: false
-        '403':
-          description: Forbidden
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/forbidden
-                title: Forbidden
-                detail: You do not have permission to access this resource
-                code: FORBIDDEN
-                retryable: false
-        '404':
-          description: Not Found
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/not-found
-                title: Resource Not Found
-                detail: No resource exists with the provided identifier
-                code: NOT_FOUND
-                retryable: false
-                instance: /api/v1/workflows
-        '409':
-          description: Conflict
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/conflict
-                title: Conflict
-                detail: The request conflicts with the current state of the resource
-                code: CONFLICT
-                retryable: false
-        '422':
-          description: Validation Error
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/validation-error
-                title: Validation Error
-                detail: Field 'name' must be between 1 and 255 characters
-                code: VALIDATION_ERROR
-                retryable: false
-                instance: /api/v1/workflows
-        '500':
-          description: Internal Server Error
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/internal-error
-                title: Internal Server Error
-                detail: An unexpected error occurred
-                code: INTERNAL_ERROR
-                retryable: true
-        '429':
-          description: Too Many Requests
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/rate-limited
-                title: Too Many Requests
-                detail: Rate limit exceeded. Try again in 60 seconds.
-                code: RATE_LIMITED
-                retryable: true
-      security:
-        - bearerAuth: []
   /projects:
     post:
       summary: Create project
@@ -14586,7 +13851,7 @@ paths:
         - bearerAuth: []
     delete:
       summary: Delete project
-      description: 'Delete a project (soft-delete). Requires: project:delete permission scoped to this project.'
+      description: 'Delete a project (hard-delete). Requires: project:delete permission scoped to this project.'
       operationId: delete_project
       x-app-permission:
         resource: project
@@ -26606,7 +25871,7 @@ paths:
                 retryable: true
     delete:
       summary: Delete workflow
-      description: Soft delete a workflow.
+      description: Permanently delete a workflow and cascade-delete all its versions and executions.
       operationId: delete_workflow
       tags:
         - Workflows
@@ -28797,14 +28062,27 @@ components:
           type: string
           maxLength: 255
           minLength: 1
-          description: Activity ID from workflow definition
+          description: Canvas node ID from the workflow definition
           title: Approval Node Id
+        loop_iteration_path:
+          type: array
+          items:
+            type: integer
+          description: Enclosing-loop indices, outermost first (empty when not inside a loop)
+          title: Loop Iteration Path
         name:
           type: string
           maxLength: 255
           minLength: 1
           description: Human-readable name for the approval request
           title: Name
+        prompt:
+          anyOf:
+            - type: string
+              maxLength: 2000
+            - type: 'null'
+          description: Resolved guidance message from the approval node, shown to approvers
+          title: Prompt
         status:
           $ref: '#/components/schemas/ApprovalRequestStatus'
           default: pending
@@ -28944,13 +28222,33 @@ components:
         approval_node_id:
           type: string
           title: Approval Node Id
-          description: Activity ID from workflow definition
+          description: Canvas node ID from the workflow definition
         name:
           type: string
           maxLength: 255
           minLength: 1
           title: Name
           description: Display name for the approval request
+        prompt:
+          anyOf:
+            - type: string
+              maxLength: 2000
+            - type: 'null'
+          title: Prompt
+          description: Resolved guidance message from the approval node, shown to approvers
+        loop_iteration_path:
+          type: array
+          items:
+            type: integer
+          title: Loop Iteration Path
+          description: Enclosing-loop indices, outermost first (empty when not inside a loop)
+        temporal_activity_id:
+          anyOf:
+            - type: string
+              maxLength: 255
+            - type: 'null'
+          title: Temporal Activity Id
+          description: Temporal activity ID to signal on decide (defaults to approval_node_id)
         timeout_at:
           anyOf:
             - type: string
@@ -29094,7 +28392,7 @@ components:
               maxLength: 2000
             - type: 'null'
           title: Notes
-          description: Optional notes explaining the decision
+          description: Optional notes explaining the decision. Accepts either `notes` or `decision_notes` (the key returned in responses) as the request field name.
     BatchApprovalDecisionStatus:
       type: string
       title: BatchApprovalDecisionStatus
@@ -29129,7 +28427,7 @@ components:
               maxLength: 2000
             - type: 'null'
           title: Notes
-          description: Optional notes explaining the decision
+          description: Optional notes explaining the decision. Accepts either `notes` or `decision_notes` (the key returned in responses) as the request field name.
     BatchApprovalRequest:
       type: object
       title: BatchApprovalRequest
@@ -30681,6 +29979,13 @@ components:
             - type: 'null'
           description: Username or UUID of the workflow creator
           title: Created By
+        created_at:
+          anyOf:
+            - format: date-time
+              type: string
+            - type: 'null'
+          description: Timestamp when the workflow was created
+          title: Created At
         description:
           anyOf:
             - type: string
@@ -30826,6 +30131,12 @@ components:
         status:
           $ref: '#/components/schemas/FileStatus'
           description: Processing status (pending_conversion)
+        is_project_deleted:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+          description: True when the owning project has been soft-deleted; the file is retained as an orphan. Null when not computed (e.g. upload response).
+          title: Is Project Deleted
     FileDetailResponse:
       type: object
       title: FileDetailResponse
@@ -30836,6 +30147,7 @@ components:
         - size_bytes
         - mime_type
         - status
+        - is_project_deleted
       properties:
         file_id:
           type: string
@@ -30873,6 +30185,10 @@ components:
           description: Error message if conversion failed
           examples:
             - null
+        is_project_deleted:
+          type: boolean
+          title: Is Project Deleted
+          description: True when the owning project has been soft-deleted; the file is retained as an orphan. Project-scoped files:delete cannot remove orphans after soft-delete; only system-scope files:delete with a known file UUID can.
     FilesMetadataResponse:
       type: object
       title: FilesMetadataResponse
@@ -30905,7 +30221,7 @@ components:
     OIDCClaimMapping:
       type: object
       title: OIDCClaimMapping
-      description: Maps Syntara user fields to IdP-specific OIDC claim names.
+      description: Maps Orchestrator user fields to IdP-specific OIDC claim names.
       additionalProperties: false
       properties:
         subject:
@@ -30932,7 +30248,7 @@ components:
       type: object
       title: OIDCGroupMappingEntry
       description: |-
-        API-facing schema for a single IdP-to-Syntara group mapping entry.
+        API-facing schema for a single IdP-to-Orchestrator group mapping entry.
 
         Used in API requests/responses. Actual storage is in the
         ``idp_group_mapping_entries`` table.
@@ -31069,7 +30385,7 @@ components:
           items:
             $ref: '#/components/schemas/OIDCGroupMappingEntry'
           title: Group Mapping Entries
-          description: IdP-to-Syntara group mapping entries
+          description: IdP-to-Orchestrator group mapping entries
         allow_all_authenticated:
           type: boolean
           default: false
@@ -31197,7 +30513,7 @@ components:
           items:
             $ref: '#/components/schemas/OIDCGroupMappingEntry'
           title: Group Mapping Entries
-          description: IdP-to-Syntara group mapping entries
+          description: IdP-to-Orchestrator group mapping entries
         allow_all_authenticated:
           type: boolean
           default: false
@@ -31337,7 +30653,7 @@ components:
                 $ref: '#/components/schemas/OIDCGroupMappingEntry'
             - type: 'null'
           title: Group Mapping Entries
-          description: IdP-to-Syntara group mapping entries (omit to keep existing)
+          description: IdP-to-Orchestrator group mapping entries (omit to keep existing)
         allow_all_authenticated:
           anyOf:
             - type: boolean
@@ -33044,7 +32360,7 @@ components:
       required:
         - component
       title: ComponentKPISummary
-      description: KPI summary for a single Syntara component.
+      description: KPI summary for a single Orchestrator component.
     KPIDashboard:
       properties:
         generated_at:
@@ -33062,7 +32378,7 @@ components:
       required:
         - generated_at
       title: KPIDashboard
-      description: Full KPI dashboard covering all Syntara components.
+      description: Full KPI dashboard covering all Orchestrator components.
     MetricRecord:
       description: |-
         Lightweight in-memory metric data point.
@@ -33129,6 +32445,7 @@ components:
         - workflow_serialization_duration_ms
         - workflow_validation_duration_ms
         - temporal_queue_depth
+        - active_workflows
         - activity_execution_success_rate
         - workflow_start_latency_ms
         - workflow_completion_rate
@@ -33148,7 +32465,7 @@ components:
         - opa_request_duration_ms
       title: MetricType
       description: |-
-        Categories of metrics recorded by Syntara.
+        Categories of metrics recorded by Orchestrator.
 
         Each value corresponds to a specific measurable quantity exposed via the
         metrics REST API and (where applicable) Prometheus endpoint.
@@ -33298,317 +32615,6 @@ components:
         - sum
       title: PercentileStats
       description: Percentile breakdown for a collection of values.
-    InvocationStatus:
-      type: string
-      title: InvocationStatus
-      description: Status enum for invocation lifecycle.
-      enum:
-        - created
-        - running
-        - paused
-        - cancelled
-        - completed
-        - failed
-    Invocation:
-      title: Invocation
-      additionalProperties: false
-      description: SQLModel for async workflow invocations.
-      properties:
-        id:
-          type: string
-          format: uuid
-          readOnly: true
-          title: Resource ID
-          description: Unique identifier for the resource
-          example: 550e8400-e29b-41d4-a716-446655440000
-        created_at:
-          type: string
-          format: date-time
-          readOnly: true
-          title: Created At
-          description: Timestamp when resource was created
-          example: '2025-10-09T12:00:00Z'
-        updated_at:
-          type: string
-          format: date-time
-          readOnly: true
-          title: Updated At
-          description: Timestamp when resource was last updated
-          example: '2025-10-09T12:30:00Z'
-        labels:
-          type: object
-          default: {}
-          title: Labels
-          description: Key-value pairs for resource labeling and filtering
-          additionalProperties:
-            type: string
-          example:
-            environment: production
-            region: us-east-1
-            team: platform
-        created_by:
-          type: string
-          format: uuid
-          readOnly: true
-          title: Created By
-          description: User (or automation) that created the resource
-          example: 770e8400-e29b-41d4-a716-446655440000
-        updated_by:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
-          readOnly: true
-          title: Updated By
-          description: User (or automation) that last updated the resource
-          example: 880e8400-e29b-41d4-a716-446655440000
-        project_id:
-          type: string
-          format: uuid
-          title: Project Id
-          description: Project namespace for resource isolation
-        prompt:
-          type: string
-          minLength: 1
-          maxLength: 10000
-          title: Prompt
-          description: Natural language user request
-        session_id:
-          type: string
-          minLength: 1
-          maxLength: 255
-          title: Session Id
-          description: Session identifier for multi-tenant isolation
-        status:
-          $ref: '#/components/schemas/InvocationStatus'
-          default: created
-          description: Current invocation status
-        model_name:
-          title: Model Name
-          description: LLM model name used for the invocation
-          anyOf:
-            - type: string
-              maxLength: 255
-            - type: 'null'
-        started_at:
-          title: Started At
-          description: Timestamp when workflow execution started
-          anyOf:
-            - type: string
-              format: date-time
-            - type: 'null'
-        completed_at:
-          title: Completed At
-          description: Timestamp when workflow completed
-          anyOf:
-            - type: string
-              format: date-time
-            - type: 'null'
-        context_data:
-          type: object
-          title: Context Data
-          description: Additional context for the request, including file_ids array if files uploaded
-          additionalProperties: true
-        result:
-          title: Result
-          description: Workflow result data
-          anyOf:
-            - type: object
-              additionalProperties: true
-            - type: 'null'
-        error_message:
-          title: Error Message
-          description: Error message if invocation failed
-          anyOf:
-            - type: string
-            - type: 'null'
-        checkpoint_data:
-          title: Checkpoint Data
-          description: Checkpoint data for pause/resume
-          anyOf:
-            - type: object
-              additionalProperties: true
-            - type: 'null'
-        trace_events:
-          title: Trace Events
-          description: Persisted agent trace steps (reasoning, tool calls, tool results, final answer)
-          anyOf:
-            - type: array
-              items:
-                type: object
-                additionalProperties: true
-            - type: 'null'
-      required:
-        - created_by
-        - project_id
-        - prompt
-        - session_id
-      type: object
-    InvocationRequestWithFile:
-      type: object
-      title: InvocationRequestWithFile
-      description: Multipart form body for POST /invocations/chat (file upload path).
-      required:
-        - project_id
-      properties:
-        prompt:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Prompt
-        session_id:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Session Id
-        context_data:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Context Data
-        files:
-          anyOf:
-            - items:
-                contentMediaType: application/octet-stream
-                type: string
-              type: array
-            - type: 'null'
-          title: Files
-        project_id:
-          type: string
-          title: Project Id
-    InvocationListResponse:
-      title: InvocationListResponse
-      description: Paginated list response for invocations.
-      properties:
-        next:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Next
-          description: Cursor for next page of results
-        prev:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Prev
-          description: Cursor for previous page of results
-        total:
-          anyOf:
-            - minimum: 0.0
-              type: integer
-            - type: 'null'
-          title: Total
-          description: Total count of resources (only when include_total=true)
-        resources:
-          type: array
-          title: Resources
-          description: Array of resources in current page
-          maxItems: 100
-          items:
-            $ref: '#/components/schemas/Invocation'
-      required:
-        - resources
-      type: object
-      examples:
-        - next: eyJpZCI6InV1aWQifQ
-          total: 150
-        - next: eyJpZCI6Im5leHQifQ
-          prev: eyJpZCI6InByZXYifQ
-    InvocationCreateRequest:
-      type: object
-      title: InvocationCreateRequest
-      description: |-
-        Request schema for creating a new invocation.
-
-        Supports multiple field name formats:
-        - snake_case (API contract): session_id, context_data
-        - camelCase (backward compatibility): sessionId, contextData
-
-        Note: created_by is automatically set from authenticated user context.
-      required:
-        - prompt
-        - sessionId
-        - projectId
-      properties:
-        prompt:
-          type: string
-          minLength: 1
-          maxLength: 10000
-          title: Prompt
-          description: Natural language request describing desired automation task
-        sessionId:
-          type: string
-          title: Sessionid
-          description: Session identifier for grouping related invocations
-        contextData:
-          type: object
-          title: Contextdata
-          description: Optional additional context for the request. Use 'file_ids' (array of UUID strings) to reference uploaded files.
-          additionalProperties: true
-        projectId:
-          type: string
-          format: uuid
-          title: Projectid
-          description: Project to associate this invocation with
-    InvocationCancelRequest:
-      type: object
-      title: InvocationCancelRequest
-      description: |-
-        Request schema for cancelling an invocation.
-
-        Supports multiple field name formats:
-        - camelCase (API contract): reason
-        - snake_case (internal): reason
-      properties:
-        reason:
-          type: string
-          maxLength: 500
-          default: User cancelled
-          title: Reason
-          description: Optional reason for cancellation
-    InvocationCancelResponse:
-      type: object
-      title: InvocationCancelResponse
-      description: |-
-        Response schema for invocation cancellation.
-
-        Indicates whether the cancellation was successful or failed.
-      required:
-        - success
-        - message
-      properties:
-        success:
-          type: boolean
-          title: Success
-          description: True if cancellation was successful, False otherwise
-        message:
-          type: string
-          title: Message
-          description: Human-readable message describing the cancellation result
-    InvocationTraceRead:
-      description: Read schema for agent execution trace.
-      type: object
-      required:
-        - invocation_id
-        - status
-      properties:
-        invocation_id:
-          type: string
-          format: uuid
-          title: Invocation Id
-          description: Invocation UUID
-        status:
-          $ref: '#/components/schemas/InvocationStatus'
-          description: Current invocation status
-        agent_trace:
-          anyOf:
-            - additionalProperties: true
-              type: object
-            - type: 'null'
-          description: Agent execution trace with model, tokens, duration, and steps
-          title: Agent Trace
-      title: InvocationTraceRead
     ProjectCreate:
       type: object
       title: ProjectCreate
@@ -33943,7 +32949,7 @@ components:
           type: integer
           title: Max Lifetime Days
           default: 180
-          description: Maximum credential lifetime in days (-1 for unlimited)
+          description: Maximum credential lifetime in days (0 for unlimited)
       type: object
       required:
         - resources
@@ -33979,10 +32985,6 @@ components:
             - type: string
             - type: 'null'
           title: Project Name
-        is_project_deleted:
-          type: boolean
-          title: Is Project Deleted
-          default: false
         last_authenticated_at:
           anyOf:
             - type: string
@@ -34368,7 +33370,7 @@ components:
           type: integer
           title: Max Lifetime Days
           default: 180
-          description: Maximum credential lifetime in days (-1 for unlimited)
+          description: Maximum credential lifetime in days (0 for unlimited)
       type: object
       required:
         - resources
@@ -34738,7 +33740,6 @@ components:
         Excludes auto-generated fields: id, created_at, updated_at, last_login, preferences.
       required:
         - username
-        - first_name
         - password
       properties:
         username:
@@ -34756,9 +33757,10 @@ components:
           description: Email address
           title: Email
         first_name:
-          type: string
-          minLength: 1
-          maxLength: 255
+          anyOf:
+            - type: string
+              maxLength: 255
+            - type: 'null'
           description: User's first name
           title: First Name
         last_name:
@@ -35731,18 +34733,6 @@ components:
             $ref: '#/components/schemas/CurrentActivity'
           title: Current Activities
           description: Currently executing activities
-        deleted_at:
-          anyOf:
-            - type: string
-              format: date-time
-            - type: 'null'
-          title: Deleted At
-        deleted_by:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
-          title: Deleted By
         workflow_definition:
           anyOf:
             - $ref: '#/components/schemas/WorkflowDefinition'
@@ -36177,7 +35167,6 @@ components:
         Schema for workflow response (GET /workflows/{id}).
 
         Includes all fields from the database table model.
-        Note: deleted_at and deleted_by are None since soft-deleted workflows are excluded from queries.
       required:
         - name
         - id
@@ -36251,18 +35240,6 @@ components:
           type: string
           format: date-time
           title: Updated At
-        deleted_at:
-          anyOf:
-            - type: string
-              format: date-time
-            - type: 'null'
-          title: Deleted At
-        deleted_by:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
-          title: Deleted By
         validation_result:
           anyOf:
             - $ref: '#/components/schemas/ValidationResult'
@@ -36349,18 +35326,6 @@ components:
           type: string
           format: date-time
           title: Updated At
-        deleted_at:
-          anyOf:
-            - type: string
-              format: date-time
-            - type: 'null'
-          title: Deleted At
-        deleted_by:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
-          title: Deleted By
         validation_result:
           anyOf:
             - $ref: '#/components/schemas/ValidationResult'
@@ -36447,18 +35412,6 @@ components:
           type: string
           format: date-time
           title: Updated At
-        deleted_at:
-          anyOf:
-            - type: string
-              format: date-time
-            - type: 'null'
-          title: Deleted At
-        deleted_by:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
-          title: Deleted By
         validation_result:
           anyOf:
             - $ref: '#/components/schemas/ValidationResult'
@@ -36475,11 +35428,7 @@ components:
     WorkflowVersionRead:
       type: object
       title: WorkflowVersionRead
-      description: |-
-        Schema for workflow version response (GET /workflows/{id}/versions/{version}).
-        WorkflowVersion entities are read-only and managed automatically by the system.
-
-        Note: deleted_at and deleted_by are None since soft-deleted versions are excluded from queries.
+      description: Schema for workflow version response (GET /workflows/{id}/versions/{version}).
       required:
         - id
         - workflow_id
@@ -36555,18 +35504,6 @@ components:
           type: string
           format: date-time
           title: Updated At
-        deleted_at:
-          anyOf:
-            - type: string
-              format: date-time
-            - type: 'null'
-          title: Deleted At
-        deleted_by:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
-          title: Deleted By
     PublishVersionRequest:
       type: object
       title: PublishVersionRequest
@@ -36701,6 +35638,11 @@ components:
           format: uuid
           title: Project Id
           description: Project to assign workflow to
+        is_import:
+          type: boolean
+          title: Is Import
+          description: When true, unavailable LLM models are cleared with warnings instead of rejecting the request, and webhook/EDA authorized service accounts that are missing in the target project are removed from the definition and not bound. Use when importing workflows from other instances.
+          default: false
     WorkflowUpdate:
       type: object
       title: WorkflowUpdate
@@ -36855,7 +35797,7 @@ components:
         - edges
       title: WorkflowDefinition
       description: |-
-        JSON Schema for graph-based workflow definitions in the Syntara Workflow Engine v2.
+        JSON Schema for graph-based workflow definitions in the Orchestrator Workflow Engine v2.
 
         Attributes:
             schema_version: Schema version that this workflow definition conforms to
@@ -37451,7 +36393,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Syntara credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
+          description: Orchestrator credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
         integration_id:
           anyOf:
             - type: string
@@ -37606,7 +36548,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Syntara credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
+          description: Orchestrator credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
         integration_id:
           anyOf:
             - type: string
@@ -37727,7 +36669,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Syntara credential UUID for authentication or Secret URL.
+          description: Orchestrator credential UUID for authentication or Secret URL.
       type: object
       required:
         - method
@@ -37755,7 +36697,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Syntara credential UUID for LLM provider authentication
+          description: Orchestrator credential UUID for LLM provider authentication
         file_ids:
           items:
             type: string
@@ -37809,7 +36751,7 @@ components:
         credential_id:
           type: string
           title: Credential Id
-          description: Syntara credential UUID for execution calls (distinct from management credential)
+          description: Orchestrator credential UUID for execution calls (distinct from management credential)
       type: object
       required:
         - integration_id
@@ -37839,12 +36781,6 @@ components:
           type: object
           title: Environment
           description: Environment variables
-        credential_id:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Credential Id
-          description: Syntara credential UUID for credential scrubbing
       type: object
       required:
         - language
@@ -37858,7 +36794,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Syntara credential UUID
+          description: Orchestrator credential UUID
         approver_users:
           anyOf:
             - items:

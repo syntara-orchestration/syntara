@@ -12,7 +12,7 @@ const claimMappingSchema = z.object({
 
 const groupMappingEntrySchema = z.object({
   idpGroupValue: z.string().min(1, 'IdP group value is required'),
-  nexusGroupId: z.string().uuid('Must be a valid group ID'),
+  mappedGroupId: z.string().uuid('Must be a valid group ID'),
 })
 
 const groupMappingSchema = z

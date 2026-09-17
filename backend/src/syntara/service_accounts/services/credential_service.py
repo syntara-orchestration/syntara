@@ -9,7 +9,6 @@ from sqlmodel import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.auth.passwords import hash_password
-from syntara.core.config.base import get_settings
 from syntara.core.models import User
 from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin
@@ -31,6 +30,7 @@ from syntara.service_accounts.models.service_account_credential import (
     ServiceAccountCredentialStatus,
     ServiceAccountCredentialType,
 )
+from syntara.settings.cache.settings_cache import get_runtime_settings
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -75,15 +75,15 @@ class ServiceAccountCredentialService(BaseService):
             raise ServiceAccountCredentialLimitError(str(service_account_id), MAX_CREDENTIALS_PER_SA)
 
     @staticmethod
-    def _resolve_expires_at(requested: datetime | None) -> datetime | None:
+    async def _resolve_expires_at(requested: datetime | None) -> datetime | None:
         if requested is not None and requested <= datetime.now(tz=UTC):
             msg = "expires_at must be in the future"
             raise CredentialExpirationInPastError(msg)
 
-        settings = get_settings()
-        max_days = settings.sa_credential_max_lifetime_days
+        max_days = await get_runtime_settings().get_int("service_accounts.credential_max_lifetime_days")
 
-        if max_days == -1:
+        # 0 means unlimited (no maximum), consistent with rate_limiting.requests_per_window.
+        if max_days == 0:
             return requested
 
         max_expiry = datetime.now(tz=UTC) + timedelta(days=max_days)
@@ -112,7 +112,7 @@ class ServiceAccountCredentialService(BaseService):
         """
         await self._check_credential_limit(service_account_id)
 
-        resolved_expires_at = self._resolve_expires_at(expires_at)
+        resolved_expires_at = await self._resolve_expires_at(expires_at)
         identifier, plaintext_secret, hashed = self._generate_credential(credential_type)
 
         credential = ServiceAccountCredential(
@@ -183,7 +183,7 @@ class ServiceAccountCredentialService(BaseService):
 
         _, plaintext_secret, hashed = self._generate_credential(credential.credential_type)
         credential.hashed_secret = hashed
-        credential.expires_at = self._resolve_expires_at(None)
+        credential.expires_at = await self._resolve_expires_at(None)
 
         credential.update_by_user(self.user.id)
 
@@ -279,8 +279,9 @@ class ServiceAccountCredentialService(BaseService):
             ServiceAccountCredential,
             service_account_id=service_account_id,
         )
-        settings = get_settings()
-        response.max_lifetime_days = settings.sa_credential_max_lifetime_days
+        response.max_lifetime_days = await get_runtime_settings().get_int(
+            "service_accounts.credential_max_lifetime_days"
+        )
         return response
 
     def to_read(self, credential: ServiceAccountCredential) -> ServiceAccountCredentialRead:

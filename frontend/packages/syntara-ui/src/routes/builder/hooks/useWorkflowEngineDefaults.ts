@@ -25,7 +25,8 @@ export type WorkflowEngineDefaults = {
   maxLoopIterations: number | null
 }
 
-const QUERY_KEY = ['workflow-engine-defaults']
+/** Query key for workflow engine defaults. Invalidate after admin settings change. */
+export const WORKFLOW_ENGINE_DEFAULTS_QUERY_KEY = ['workflow-engine-defaults'] as const
 
 async function fetchWorkflowEngineDefaults(): Promise<WorkflowEngineDefaults> {
   const allSettings = await fetchAllPages<RuntimeSettingRead>((cursor) =>
@@ -70,9 +71,10 @@ async function fetchWorkflowEngineDefaults(): Promise<WorkflowEngineDefaults> {
 
 export function useWorkflowEngineDefaults() {
   const { data, isPending } = useQuery({
-    queryKey: QUERY_KEY,
+    queryKey: WORKFLOW_ENGINE_DEFAULTS_QUERY_KEY,
     queryFn: fetchWorkflowEngineDefaults,
-    staleTime: 5 * 60 * 1000,
+    // Keep defaults in sync with admin settings (fallback decision, timeouts).
+    staleTime: 0,
   })
   return { defaults: data ?? null, isLoading: isPending }
 }

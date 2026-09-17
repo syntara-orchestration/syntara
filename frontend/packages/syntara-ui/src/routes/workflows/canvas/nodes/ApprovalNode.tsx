@@ -2,15 +2,15 @@ import { Flex, FlexItem } from '@patternfly/react-core'
 import { ActivityTypeEnum, type ApprovalActivity as ApprovalNodeType } from '@syntara/contracts'
 import { type Node, type NodeProps } from '@xyflow/react'
 
-import { NxDetailList } from '../../../../components/details/NxDetailList'
+import { SynDetailList } from '../../../../components/details/SynDetailList'
+import { NodeBody } from '../../../../components/nodes/NodeBody'
+import { NodeComponent } from '../../../../components/nodes/NodeComponent'
 import type { ActivityStatus } from '../../execution/types'
 import { getNodeTypeColor } from '../nodeTypeColors'
 import { semanticZoomActivityTitle } from '../semanticZoom'
 
 import { BranchHandle, BranchHandles } from './common/BranchHandle'
 import { renderText } from './common/detailRenderers'
-import { NodeBody } from './common/NodeBody'
-import { NodeComponent } from './common/NodeComponent'
 import { StandardNodeHeader } from './common/StandardNodeHeader'
 import { MenuNodeType, useNodeMenuActions } from './hooks/useNodeMenuActions'
 import { nodeMetadata } from './nodeMetadata'
@@ -77,7 +77,7 @@ export function ApprovalNodeComponent(props: NodeProps<ApprovalNode>) {
           <FlexItem grow={{ default: 'grow' }} style={{ minWidth: 0 }}>
             <NodeBody>
               {approvalConfig.approver_timeout != null && (
-                <NxDetailList>{renderText('Timeout', `${approvalConfig.approver_timeout}s`)}</NxDetailList>
+                <SynDetailList>{renderText('Timeout', `${approvalConfig.approver_timeout}s`)}</SynDetailList>
               )}
             </NodeBody>
           </FlexItem>

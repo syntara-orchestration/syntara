@@ -5,12 +5,12 @@ import '@xyflow/react/dist/style.css'
 import { useMemo } from 'react'
 
 import { executionsClient, workflowClient } from '../../client'
-import { NxPage, NxPageBody } from '../../components/layout/NxPage'
-import { NxPageHeader } from '../../components/layout/NxPageHeader'
-import { NxPanel } from '../../components/layout/NxPanel'
-import { NxPageTitle } from '../../components/NxPageTitle'
-import { NxErrorState } from '../../components/states/NxErrorState'
-import { NxLoadingState } from '../../components/states/NxLoadingState'
+import { SynPage, SynPageBody } from '../../components/layout/SynPage'
+import { SynPageHeader } from '../../components/layout/SynPageHeader'
+import { SynPanel } from '../../components/layout/SynPanel'
+import { SynErrorState } from '../../components/states/SynErrorState'
+import { SynLoadingState } from '../../components/states/SynLoadingState'
+import { SynPageTitle } from '../../components/SynPageTitle'
 
 import { BuilderContent } from './BuilderContent'
 import type { ExecutionCopyData } from './hooks/useExecutionCopyToEditor'
@@ -76,15 +76,15 @@ export default function BuilderEdit() {
 
   if (error) {
     return (
-      <NxPage>
-        <NxPageTitle segments={['Error loading workflow', 'Workflows']} />
-        <NxPageHeader title="Error loading workflow" />
-        <NxPageBody>
-          <NxPanel isFullHeight>
-            <NxErrorState title="Error loading workflow" message={error} />
-          </NxPanel>
-        </NxPageBody>
-      </NxPage>
+      <SynPage>
+        <SynPageTitle segments={['Error loading workflow', 'Workflows']} />
+        <SynPageHeader title="Error loading workflow" />
+        <SynPageBody>
+          <SynPanel isFullHeight>
+            <SynErrorState title="Error loading workflow" message={error} />
+          </SynPanel>
+        </SynPageBody>
+      </SynPage>
     )
   }
 
@@ -92,15 +92,15 @@ export default function BuilderEdit() {
   // isLoading = true only on first fetch, isPending = true on both initial and refetch
   if (isLoading) {
     return (
-      <NxPage>
-        <NxPageTitle segments={['Loading workflow', 'Workflows']} />
-        <NxPageHeader title="Loading workflow" />
-        <NxPageBody>
-          <NxPanel isFullHeight>
-            <NxLoadingState />
-          </NxPanel>
-        </NxPageBody>
-      </NxPage>
+      <SynPage>
+        <SynPageTitle segments={['Loading workflow', 'Workflows']} />
+        <SynPageHeader title="Loading workflow" />
+        <SynPageBody>
+          <SynPanel isFullHeight>
+            <SynLoadingState />
+          </SynPanel>
+        </SynPageBody>
+      </SynPage>
     )
   }
 

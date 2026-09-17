@@ -147,13 +147,13 @@ Images under `docs/user-guides/images/` were taken from the frontend visual-regr
 2. Refresh the copies in `docs/user-guides/images/` if the toolbar/empty-state appearance changed.
 3. Prefer short screen recordings (GIF/WebM) in PR descriptions for apply → chip → clear flows.
 
-Live filter toolbar examples also appear in Storybook under list panel stories (`NxListPanel`).
+Live filter toolbar examples also appear in Storybook under list panel stories (`SynListPanel`).
 
 ---
 
 ## For developers
 
 - Architecture and component APIs: [API Filtering Architecture](../architecture.md#api-filtering-architecture)
-- Adding filters to a new list page: [CLAUDE.md — How do I add filters to a list page?](../../CLAUDE.md#how-do-i-add-filters-to-a-list-page)
+- Adding filters to a new list page: [AGENTS.md — How do I add filters to a list page?](../../AGENTS.md#how-do-i-add-filters-to-a-list-page)
 - Coding standards: `.claude/skills/frontend-coding-standards/SKILL.md` (`useCursorPagination`)
 - Unit tests: [Filter test helpers](../TEST_HELPERS_FILTER_TESTING.md)

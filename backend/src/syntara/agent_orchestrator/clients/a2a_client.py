@@ -10,8 +10,8 @@ class A2AClient(ABC):
     """Abstract base class for A2A protocol client.
 
     This interface will be used to communicate with distributed agent services
-    via the A2A protocol. Currently mocked for NEXUS-002-1, will be implemented
-    in NEXUS-002-4 when agent services are added.
+    via the A2A protocol. Currently mocked. Will be implemented when agent
+    services are added.
     """
 
     @abstractmethod
@@ -50,11 +50,11 @@ class A2AClient(ABC):
 
 
 class MockA2AClient(A2AClient):
-    """Mock implementation of A2A client for NEXUS-002-1.
+    """Mock implementation of A2A client.
 
     This mock allows the API layer to be implemented with the correct abstractions
     while agent services are not yet deployed. Will be replaced with real
-    httpx-based implementation in NEXUS-002-4.
+    httpx-based implementation.
     """
 
     async def execute_task(

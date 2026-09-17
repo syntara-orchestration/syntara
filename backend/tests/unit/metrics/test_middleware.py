@@ -503,7 +503,8 @@ class TestMetricsMiddlewareExclusions:
         assert len(results) == 0
 
     @pytest.mark.asyncio
-    async def test_excluded_path_strips_auth_failure_header(self, recorder: MetricsRecorder) -> None:
+    @pytest.mark.parametrize("path", sorted(EXCLUDED_PATHS))
+    async def test_excluded_path_strips_auth_failure_header(self, path: str, recorder: MetricsRecorder) -> None:
         """X-Auth-Failure-Type header is stripped even on excluded paths."""
         captured_headers: list[tuple[bytes, bytes]] = []
 
@@ -525,14 +526,15 @@ class TestMetricsMiddlewareExclusions:
                 captured_headers.extend(message.get("headers", []))
 
         middleware = MetricsMiddleware(auth_failure_app, recorder=recorder)  # type: ignore[arg-type]
-        await middleware(_make_scope(path="/health"), AsyncMock(), capturing_send)
+        await middleware(_make_scope(path=path), AsyncMock(), capturing_send)
 
         header_names = [name for name, _ in captured_headers]
         assert b"x-auth-failure-type" not in header_names
         assert b"content-type" in header_names
 
     @pytest.mark.asyncio
-    async def test_excluded_paths_still_pass_to_app(self, recorder: MetricsRecorder) -> None:
+    @pytest.mark.parametrize("path", sorted(EXCLUDED_PATHS))
+    async def test_excluded_paths_still_pass_to_app(self, path: str, recorder: MetricsRecorder) -> None:
         """Excluded paths are still forwarded to the underlying app."""
         call_count = 0
 
@@ -541,7 +543,7 @@ class TestMetricsMiddlewareExclusions:
             call_count += 1
 
         middleware = MetricsMiddleware(counting_app, recorder=recorder)  # type: ignore[arg-type]
-        await middleware(_make_scope(path="/health"), AsyncMock(), AsyncMock())
+        await middleware(_make_scope(path=path), AsyncMock(), AsyncMock())
 
         assert call_count == 1
 

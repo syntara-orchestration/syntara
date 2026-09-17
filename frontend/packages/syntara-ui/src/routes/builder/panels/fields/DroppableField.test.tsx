@@ -28,7 +28,7 @@ describe('DroppableField', () => {
     fireEvent.drop(input, {
       dataTransfer: {
         getData: (type: string) => {
-          if (type === 'application/json') return '{"type":"nexus/input-field"}'
+          if (type === 'application/json') return '{"type":"syntara/input-field"}'
           if (type === 'text/plain') return '${node1.output}'
           return ''
         },
@@ -89,7 +89,7 @@ describe('DroppableField', () => {
     fireEvent.drop(input, {
       dataTransfer: {
         getData: (type: string) => {
-          if (type === 'application/json') return '{"type":"nexus/input-field"}'
+          if (type === 'application/json') return '{"type":"syntara/input-field"}'
           if (type === 'text/plain') return '${node1.output}'
           return ''
         },

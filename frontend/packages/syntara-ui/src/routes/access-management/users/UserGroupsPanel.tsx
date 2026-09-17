@@ -8,7 +8,6 @@ import {
   FormHelperText,
   HelperText,
   HelperTextItem,
-  Label,
   Modal,
   ModalBody,
   ModalFooter,
@@ -17,24 +16,26 @@ import {
   Truncate,
 } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiTrashIcon } from '@patternfly/react-icons'
-import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
-import type { IAction } from '@patternfly/react-table'
+import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { Group } from '@syntara/contracts'
 import { useMemo, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { z } from 'zod'
 
-import { NxConfirmationDialog } from '../../../components/dialogs/NxConfirmationDialog'
+import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { FilterBar } from '../../../components/filters'
 import { IconLabel } from '../../../components/IconLabel'
-import { NxPageBody } from '../../../components/layout/NxPage'
-import { NxPanelContentStack } from '../../../components/layout/NxPanelContentStack'
-import { NxEmptyStateFilter } from '../../../components/states/NxEmptyStateFilter'
-import { NxEmptyStateNoData } from '../../../components/states/NxEmptyStateNoData'
+import { SynLabel } from '../../../components/labels/SynLabel'
+import { SynPageBody } from '../../../components/layout/SynPage'
+import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
+import { SynEmptyStateFilter } from '../../../components/states/SynEmptyStateFilter'
+import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import { useQueryState } from '../../../components/states/useQueryState'
+import type { KebabAction } from '../../../components/SynKebabMenu'
+import { SynKebabMenu } from '../../../components/SynKebabMenu'
 import { LinkCell } from '../../../components/table/LinkCell'
-import { NxScrollableTableContainer } from '../../../components/table/NxScrollableTableContainer'
+import { SynScrollableTableContainer } from '../../../components/table/SynScrollableTableContainer'
 import { useFilterState } from '../../../hooks/useFilterState'
 import { useFormMutationErrorHandler } from '../../../hooks/useFormMutationErrorHandler'
 import { useAlerts } from '../../../providers/alerts'
@@ -214,11 +215,13 @@ function getGroupActions(
   group: Group,
   onRemove: (g: GroupInfo) => void,
   permissions: ReturnType<typeof useGroupPermissions>
-): IAction[] {
+): KebabAction[] {
   if (group.name === BUILTIN_AUTHENTICATED_GROUP_NAME) return []
   return [
     {
-      title: <IconLabel icon={<RhUiTrashIcon />}>Remove</IconLabel>,
+      key: 'remove',
+      title: <IconLabel icon={<RhUiTrashIcon />}>Remove from group</IconLabel>,
+      isDanger: true,
       isAriaDisabled: !permissions.canManageMembers,
       tooltipProps: permissions.canManageMembers ? undefined : { content: permissions.tooltips.manageMembers },
       onClick: permissions.canManageMembers ? () => onRemove({ id: group.id, name: group.name }) : undefined,
@@ -244,7 +247,7 @@ function removeMemberFromGroup(opts: {
       onSuccess: () => {
         opts.showAlert({
           title: 'Removed from group',
-          description: `User has been removed from group "${opts.groupToRemove!.name}".`,
+          description: `User has been removed from group "${opts.groupToRemove?.name ?? ''}".`,
           variant: 'success',
           autoDismiss: true,
         })
@@ -313,8 +316,8 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
   if (groups.length === 0) {
     return (
       <>
-        <NxEmptyStateNoData
-          title="No groups"
+        <SynEmptyStateNoData
+          title="No groups yet"
           description="This user is not a member of any groups."
           buttonText="Add to group"
           addData={groupPermissions.canManageMembers ? () => setAddModalOpen(true) : undefined}
@@ -332,7 +335,7 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
 
   return (
     <>
-      <NxPanelContentStack>
+      <SynPanelContentStack>
         <StackItem>
           <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapMd' }}>
             <FlexItem grow={{ default: 'grow' }}>
@@ -366,16 +369,16 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
         </StackItem>
 
         {filteredGroups.length === 0 ? (
-          <NxPageBody isCentered>
-            <NxEmptyStateFilter
+          <SynPageBody isCentered>
+            <SynEmptyStateFilter
               clearAllFilters={() => {
                 clearAllFilters()
                 setPage(1)
               }}
             />
-          </NxPageBody>
+          </SynPageBody>
         ) : (
-          <NxScrollableTableContainer
+          <SynScrollableTableContainer
             caption="User groups table"
             footer={{
               page,
@@ -409,9 +412,7 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
                     {group.name === BUILTIN_AUTHENTICATED_GROUP_NAME && (
                       <>
                         {' '}
-                        <Label isCompact color="grey">
-                          All users
-                        </Label>
+                        <SynLabel color="grey">All users</SynLabel>
                       </>
                     )}
                   </Td>
@@ -423,15 +424,18 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
                   </Td>
                   <Td isActionCell>
                     {group.name !== BUILTIN_AUTHENTICATED_GROUP_NAME && (
-                      <ActionsColumn items={getGroupActions(group as Group, setGroupToRemove, groupPermissions)} />
+                      <SynKebabMenu
+                        actions={getGroupActions(group as Group, setGroupToRemove, groupPermissions)}
+                        aria-label={`Actions for ${group.name}`}
+                      />
                     )}
                   </Td>
                 </Tr>
               ))}
             </Tbody>
-          </NxScrollableTableContainer>
+          </SynScrollableTableContainer>
         )}
-      </NxPanelContentStack>
+      </SynPanelContentStack>
 
       <AddToGroupModal
         userId={userId}
@@ -441,7 +445,7 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
         existingGroupIds={groups.flatMap((g) => (g.id ? [g.id] : []))}
       />
 
-      <NxConfirmationDialog
+      <SynConfirmationDialog
         isOpen={!!groupToRemove}
         onClose={() => setGroupToRemove(null)}
         onConfirm={handleRemove}
@@ -452,7 +456,7 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
       >
         This removes the user from group <strong>{groupToRemove?.name}</strong>. They will lose any permissions granted
         through this group membership.
-      </NxConfirmationDialog>
+      </SynConfirmationDialog>
     </>
   )
 }

@@ -53,6 +53,7 @@ _COMPONENT_METRIC_MAP: dict[MetricType, tuple[str, str, tuple[str, ...]]] = {
     MetricType.WORKFLOW_VALIDATION_DURATION: ("workflow_validation_duration_seconds", "histogram", ()),
     # Temporal Worker
     MetricType.TEMPORAL_QUEUE_DEPTH: ("temporal_queue_depth", "gauge", ("task_queue",)),
+    MetricType.ACTIVE_WORKFLOWS: ("active_workflows", "gauge", ()),
     MetricType.ACTIVITY_EXECUTION_SUCCESS_RATE: ("activity_execution_success_rate", "gauge", ()),
     # Execution Service
     MetricType.WORKFLOW_START_LATENCY: ("workflow_start_latency_seconds", "histogram", ()),
@@ -274,6 +275,22 @@ class MetricsRecorder:
             labels=labels,
         )
 
+    def _get_active_workflows_from_gauge(self) -> int:
+        """Read the current active_workflows value from the Prometheus gauge.
+
+        The poller sets this via ``record(MetricType.ACTIVE_WORKFLOWS, ...)``
+        which routes through ``_dispatch_component`` → ``.labels(...).set()``.
+        Before the first poll the gauge has no samples, so we return 0.
+        """
+        try:
+            gauge = self._prometheus.active_workflows.labels(component=ComponentLabel.TEMPORAL_WORKER.value)
+            # prometheus_client has no public API for reading a gauge value;
+            # _value is a private ValueClass. The except guard handles library changes.
+            return int(gauge._value.get())  # noqa: SLF001
+        except Exception:  # noqa: BLE001
+            logger.debug("active_workflows_gauge_read_failed", exc_info=True)
+            return 0
+
     def get_summary(self) -> MetricsSummary:
         """Build a point-in-time summary of internal counters."""
         now = datetime.now(UTC)
@@ -286,7 +303,7 @@ class MetricsRecorder:
             cache_misses=counters_snapshot.get("cache_misses", 0),
             llm_calls=counters_snapshot.get("llm_calls", 0),
             total_workflows=counters_snapshot.get("total_workflows", 0),
-            active_workflows=counters_snapshot.get("active_workflows", 0),
+            active_workflows=self._get_active_workflows_from_gauge(),
             active_llm_requests=counters_snapshot.get("active_llm_requests", 0),
             db_transactions=counters_snapshot.get("db_transactions", 0),
             period_start=now - self._store.retention,

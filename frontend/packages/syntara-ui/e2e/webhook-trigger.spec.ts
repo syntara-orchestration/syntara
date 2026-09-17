@@ -19,24 +19,26 @@ import { addWebhookTrigger } from './helpers/v2-nodes'
 import {
   buildUniqueName,
   clickAddConnectedStep,
+  clickSaveAndWait,
   closeNodeEditorPanel,
   deleteWorkflow,
   fillCodeEditor,
   selectProjectIfRequired,
 } from './helpers/workflows'
-import { ensureProject } from './utils/api'
+import { createServiceAccountViaApi, deleteServiceAccountViaApi, ensureProject } from './utils/api'
 
 test.describe('Webhook Trigger', () => {
   test.skip('user creates a workflow with webhook trigger and saves it', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-webhook')
     const webhookPath = 'jira-updates'
 
-    await ensureProject(app)
+    const project = await ensureProject(app)
+    const sa = await createServiceAccountViaApi(app, buildUniqueName('sa-webhook'))
     await app.goto(toAppUrl('/workflow-builder/new'))
 
     try {
       // Add webhook trigger
-      await addWebhookTrigger(app, 'Jira Webhook', webhookPath)
+      await addWebhookTrigger(app, 'Jira Webhook', webhookPath, sa.name)
 
       // Add a connected script action
       const panel = await clickAddConnectedStep(app)
@@ -48,10 +50,14 @@ test.describe('Webhook Trigger', () => {
       await closeNodeEditorPanel(app)
 
       // Save workflow (select project right before save)
-      await selectProjectIfRequired(app)
+      // Pin the workflow to the service account's own project. `ensureProject`
+      // puts the account in `default`, but an unnamed `selectProjectIfRequired`
+      // picks whichever project the dropdown lists first — and the backend
+      // rejects the save with "Service account(s) not found in this project"
+      // whenever those differ. The weak URL guard used to hide that 422.
+      await selectProjectIfRequired(app, project?.name)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
-      await app.getByRole('button', { name: 'Save' }).click()
-      await expect(app).toHaveURL(/workflow-builder\/.+/)
+      await clickSaveAndWait(app)
 
       // Verify workflow appears in list
       await app.goto(toAppUrl('/workflows'))
@@ -71,6 +77,7 @@ test.describe('Webhook Trigger', () => {
       await expect(triggerNode).toBeVisible({ timeout: 5_000 })
     } finally {
       await deleteWorkflow(app, workflowName)
+      await deleteServiceAccountViaApi(app, sa.id)
     }
   })
 
@@ -95,18 +102,37 @@ test.describe('Webhook Trigger', () => {
   })
 
   test('webhook form allows creation without path', async ({ app }) => {
-    await app.goto(toAppUrl('/workflow-builder/new'))
+    const sa = await createServiceAccountViaApi(app, buildUniqueName('sa-webhook'))
 
-    await expect(app.getByRole('heading', { name: /select a trigger node/i })).toBeVisible({ timeout: 10_000 })
-    await app.getByRole('button', { name: 'Webhook trigger', exact: true }).click()
+    try {
+      await app.goto(toAppUrl('/workflow-builder/new'))
 
-    // Clear the auto-generated path — trigger fields are optional by design
-    await app.getByRole('textbox', { name: 'Webhook path' }).clear()
-    await app.getByRole('button', { name: 'Create' }).click()
+      await expect(app.getByRole('heading', { name: /select a trigger node/i })).toBeVisible({ timeout: 10_000 })
+      await app.getByRole('button', { name: 'Webhook trigger', exact: true }).click()
 
-    // Trigger is created and appears on the canvas (form closes)
-    await expect(app.getByRole('button', { name: 'Create' })).not.toBeAttached({ timeout: 10_000 })
-    await expect(app.getByText('Webhook')).toBeVisible()
+      // Clear the auto-generated path — trigger fields are optional by design
+      await app.getByRole('textbox', { name: 'Webhook path' }).clear()
+
+      // Select a service account (required). Filter by text to distinguish the SA toggle
+      // from the FormLabelWithHelp icon button (both match /authorized service accounts/i).
+      // The filter also implicitly waits for the loading spinner to clear.
+      const saToggle = app
+        .getByRole('button', { name: /authorized service accounts/i })
+        .filter({ hasText: /select service accounts/i })
+      await expect(saToggle).toBeVisible({ timeout: 30_000 })
+      await saToggle.click()
+      // PF v6 SelectOption with hasCheckbox renders <li role="menuitem">, NOT role="option".
+      await app.getByRole('listbox').getByRole('menuitem').filter({ hasText: sa.name }).click()
+      await app.keyboard.press('Escape')
+
+      await app.getByRole('button', { name: 'Create' }).click()
+
+      // Trigger is created and appears on the canvas (form closes)
+      await expect(app.getByRole('button', { name: 'Create' })).not.toBeAttached({ timeout: 10_000 })
+      await expect(app.getByText('Webhook')).toBeVisible()
+    } finally {
+      await deleteServiceAccountViaApi(app, sa.id)
+    }
   })
 
   test('webhook form validates invalid path characters', async ({ app }) => {
@@ -130,12 +156,13 @@ test.describe('Webhook Trigger', () => {
   test('webhook form normalizes path on submit', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-webhook-norm')
 
-    await ensureProject(app)
+    const project = await ensureProject(app)
+    const sa = await createServiceAccountViaApi(app, buildUniqueName('sa-webhook'))
     await app.goto(toAppUrl('/workflow-builder/new'))
 
     try {
       // Add webhook trigger with leading slash and mixed case
-      await addWebhookTrigger(app, 'Normalized Webhook', '/Jira-Updates')
+      await addWebhookTrigger(app, 'Normalized Webhook', '/Jira-Updates', sa.name)
 
       // Add a connected script action so workflow can be saved
       const panel = await clickAddConnectedStep(app)
@@ -147,10 +174,14 @@ test.describe('Webhook Trigger', () => {
       await closeNodeEditorPanel(app)
 
       // Save and verify canvas shows normalized path (lowercase, no leading slash)
-      await selectProjectIfRequired(app)
+      // Pin the workflow to the service account's own project. `ensureProject`
+      // puts the account in `default`, but an unnamed `selectProjectIfRequired`
+      // picks whichever project the dropdown lists first — and the backend
+      // rejects the save with "Service account(s) not found in this project"
+      // whenever those differ. The weak URL guard used to hide that 422.
+      await selectProjectIfRequired(app, project?.name)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
-      await app.getByRole('button', { name: 'Save' }).click()
-      await expect(app).toHaveURL(/workflow-builder\/.+/)
+      await clickSaveAndWait(app)
 
       const triggerNode = app
         .locator('[role="group"][aria-roledescription="node"]')
@@ -158,6 +189,7 @@ test.describe('Webhook Trigger', () => {
       await expect(triggerNode).toBeVisible({ timeout: 5_000 })
     } finally {
       await deleteWorkflow(app, workflowName)
+      await deleteServiceAccountViaApi(app, sa.id)
     }
   })
 
@@ -165,12 +197,13 @@ test.describe('Webhook Trigger', () => {
     const workflowName = buildUniqueName('e2e-webhook-canvas')
     const webhookPath = 'api-v2-events'
 
-    await ensureProject(app)
+    const project = await ensureProject(app)
+    const sa = await createServiceAccountViaApi(app, buildUniqueName('sa-webhook'))
     await app.goto(toAppUrl('/workflow-builder/new'))
 
     try {
       // Add webhook trigger
-      await addWebhookTrigger(app, 'Events Webhook', webhookPath)
+      await addWebhookTrigger(app, 'Events Webhook', webhookPath, sa.name)
 
       // Add a connected action so workflow can be saved
       const panel = await clickAddConnectedStep(app)
@@ -182,10 +215,14 @@ test.describe('Webhook Trigger', () => {
       await closeNodeEditorPanel(app)
 
       // Save workflow
-      await selectProjectIfRequired(app)
+      // Pin the workflow to the service account's own project. `ensureProject`
+      // puts the account in `default`, but an unnamed `selectProjectIfRequired`
+      // picks whichever project the dropdown lists first — and the backend
+      // rejects the save with "Service account(s) not found in this project"
+      // whenever those differ. The weak URL guard used to hide that 422.
+      await selectProjectIfRequired(app, project?.name)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
-      await app.getByRole('button', { name: 'Save' }).click()
-      await expect(app).toHaveURL(/workflow-builder\/.+/)
+      await clickSaveAndWait(app)
 
       // Verify trigger node on canvas shows webhook path detail
       const triggerNode = app
@@ -198,6 +235,7 @@ test.describe('Webhook Trigger', () => {
       await expect(app.getByRole('heading', { name: 'Output', exact: true })).toBeVisible({ timeout: 10_000 })
     } finally {
       await deleteWorkflow(app, workflowName)
+      await deleteServiceAccountViaApi(app, sa.id)
     }
   })
 })

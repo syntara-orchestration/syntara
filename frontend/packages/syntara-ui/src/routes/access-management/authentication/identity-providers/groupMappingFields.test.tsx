@@ -4,10 +4,10 @@ import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { IdpGroupValueInput, MappingRow, NexusGroupMappingSelect } from './groupMappingFields'
-import type { GroupMappingEntry, NexusGroup } from './groupMappingUtils'
+import { IdpGroupValueInput, MappingRow, MappedGroupMappingSelect } from './groupMappingFields'
+import type { GroupMappingEntry, MappedGroup } from './groupMappingUtils'
 
-const mockNexusGroups: NexusGroup[] = [
+const mockMappedGroups: MappedGroup[] = [
   { id: 'g1', name: 'admin', description: 'Administrators' },
   { id: 'g2', name: 'users', description: 'Regular users' },
   { id: 'g3', name: 'developers', description: 'Development team' },
@@ -75,36 +75,36 @@ describe('IdpGroupValueInput', () => {
   })
 })
 
-describe('NexusGroupMappingSelect', () => {
+describe('MappedGroupMappingSelect', () => {
   const defaultEntry: GroupMappingEntry = {
     key: 'k1',
     idpGroupValue: 'idp-admin',
-    nexusGroupId: '',
+    mappedGroupId: '',
   }
 
   const defaultProps = {
     entry: defaultEntry,
-    nexusGroups: mockNexusGroups,
+    mappedGroups: mockMappedGroups,
     onChange: vi.fn(),
     onCreateGroup: vi.fn(),
   }
 
   it('renders typeahead select with placeholder', () => {
-    render(<NexusGroupMappingSelect {...defaultProps} />)
+    render(<MappedGroupMappingSelect {...defaultProps} />)
 
     expect(screen.getByPlaceholderText('Select a group...')).toBeInTheDocument()
   })
 
   it('displays selected group name', () => {
-    const entry = { ...defaultEntry, nexusGroupId: 'g1' }
-    render(<NexusGroupMappingSelect {...defaultProps} entry={entry} />)
+    const entry = { ...defaultEntry, mappedGroupId: 'g1' }
+    render(<MappedGroupMappingSelect {...defaultProps} entry={entry} />)
 
     expect(screen.getByDisplayValue('admin')).toBeInTheDocument()
   })
 
   it('opens dropdown when clicked', async () => {
     const user = userEvent.setup()
-    render(<NexusGroupMappingSelect {...defaultProps} />)
+    render(<MappedGroupMappingSelect {...defaultProps} />)
 
     await user.click(screen.getByPlaceholderText('Select a group...'))
 
@@ -115,7 +115,7 @@ describe('NexusGroupMappingSelect', () => {
 
   it('filters groups by name when typing', async () => {
     const user = userEvent.setup()
-    render(<NexusGroupMappingSelect {...defaultProps} />)
+    render(<MappedGroupMappingSelect {...defaultProps} />)
 
     await user.click(screen.getByPlaceholderText('Select a group...'))
     await user.type(screen.getByPlaceholderText('Select a group...'), 'dev')
@@ -127,7 +127,7 @@ describe('NexusGroupMappingSelect', () => {
 
   it('shows "no match" message when filter has no results', async () => {
     const user = userEvent.setup()
-    render(<NexusGroupMappingSelect {...defaultProps} />)
+    render(<MappedGroupMappingSelect {...defaultProps} />)
 
     await user.click(screen.getByPlaceholderText('Select a group...'))
     await user.type(screen.getByPlaceholderText('Select a group...'), 'zzz-no-match')
@@ -138,17 +138,17 @@ describe('NexusGroupMappingSelect', () => {
   it('calls onChange when a group is selected', async () => {
     const onChange = vi.fn()
     const user = userEvent.setup()
-    render(<NexusGroupMappingSelect {...defaultProps} onChange={onChange} />)
+    render(<MappedGroupMappingSelect {...defaultProps} onChange={onChange} />)
 
     await user.click(screen.getByPlaceholderText('Select a group...'))
     await user.click(screen.getByRole('option', { name: /admin/i }))
 
-    expect(onChange).toHaveBeenCalledWith({ ...defaultEntry, nexusGroupId: 'g1' })
+    expect(onChange).toHaveBeenCalledWith({ ...defaultEntry, mappedGroupId: 'g1' })
   })
 
   it('displays "Create new group" option', async () => {
     const user = userEvent.setup()
-    render(<NexusGroupMappingSelect {...defaultProps} />)
+    render(<MappedGroupMappingSelect {...defaultProps} />)
 
     await user.click(screen.getByPlaceholderText('Select a group...'))
 
@@ -158,7 +158,7 @@ describe('NexusGroupMappingSelect', () => {
   it('calls onCreateGroup when "Create new group" is clicked', async () => {
     const onCreateGroup = vi.fn()
     const user = userEvent.setup()
-    render(<NexusGroupMappingSelect {...defaultProps} onCreateGroup={onCreateGroup} />)
+    render(<MappedGroupMappingSelect {...defaultProps} onCreateGroup={onCreateGroup} />)
 
     await user.click(screen.getByPlaceholderText('Select a group...'))
     await user.click(screen.getByRole('option', { name: /create new group/i }))
@@ -167,8 +167,8 @@ describe('NexusGroupMappingSelect', () => {
   })
 
   it('shows danger status when validation fails', () => {
-    const entry = { ...defaultEntry, idpGroupValue: 'admin' } // has IdP value but no Nexus group
-    render(<NexusGroupMappingSelect {...defaultProps} entry={entry} showValidation />)
+    const entry = { ...defaultEntry, idpGroupValue: 'admin' } // has IdP value but no Syntara group
+    render(<MappedGroupMappingSelect {...defaultProps} entry={entry} showValidation />)
 
     const filterInput = screen.getByPlaceholderText('Select a group...')
     // Traverse to our wrapper (data-group-mapping-invalid), not PatternFly layout classes
@@ -177,20 +177,20 @@ describe('NexusGroupMappingSelect', () => {
   })
 
   it('is disabled when isReadOnly is true', () => {
-    render(<NexusGroupMappingSelect {...defaultProps} isReadOnly />)
+    render(<MappedGroupMappingSelect {...defaultProps} isReadOnly />)
 
     expect(screen.getByPlaceholderText('Select a group...')).toBeDisabled()
   })
 
   it('has no accessibility violations', async () => {
-    const { container } = render(<NexusGroupMappingSelect {...defaultProps} />)
+    const { container } = render(<MappedGroupMappingSelect {...defaultProps} />)
     const results = await axe(container)
     expect(results).toHaveNoViolations()
   })
 
   it('has no accessibility violations when open', async () => {
     const user = userEvent.setup()
-    const { container } = render(<NexusGroupMappingSelect {...defaultProps} />)
+    const { container } = render(<MappedGroupMappingSelect {...defaultProps} />)
 
     await user.click(screen.getByPlaceholderText('Select a group...'))
 
@@ -203,15 +203,15 @@ describe('MappingRow', () => {
   const defaultEntry: GroupMappingEntry = {
     key: 'k1',
     idpGroupValue: 'idp-admin',
-    nexusGroupId: 'g1',
+    mappedGroupId: 'g1',
   }
 
   const defaultProps = {
     entry: defaultEntry,
     index: 0,
-    nexusGroups: mockNexusGroups,
+    mappedGroups: mockMappedGroups,
     onIdpGroupValueChange: vi.fn(),
-    onNexusGroupIdChange: vi.fn(),
+    onMappedGroupIdChange: vi.fn(),
     onRemove: vi.fn(),
     onCreateGroup: vi.fn(),
   }
@@ -254,7 +254,7 @@ describe('MappingRow', () => {
                 {...defaultProps}
                 entry={entry}
                 onIdpGroupValueChange={(_index, value) => setEntry((prev) => ({ ...prev, idpGroupValue: value }))}
-                onNexusGroupIdChange={(_index, nexusGroupId) => setEntry((prev) => ({ ...prev, nexusGroupId }))}
+                onMappedGroupIdChange={(_index, mappedGroupId) => setEntry((prev) => ({ ...prev, mappedGroupId }))}
               />
             </tbody>
           </table>
@@ -351,7 +351,7 @@ describe('MappingRow', () => {
       expect(screen.getByText('admin')).toBeInTheDocument()
     })
 
-    it('links Nexus group names to group detail pages', () => {
+    it('links Syntara group names to group detail pages', () => {
       render(
         <table>
           <tbody>
@@ -395,7 +395,7 @@ describe('MappingRow', () => {
     })
 
     it('displays em dash for empty values', () => {
-      const emptyEntry: GroupMappingEntry = { key: 'k2', idpGroupValue: '', nexusGroupId: '' }
+      const emptyEntry: GroupMappingEntry = { key: 'k2', idpGroupValue: '', mappedGroupId: '' }
       render(
         <table>
           <tbody>
@@ -422,8 +422,8 @@ describe('MappingRow', () => {
   })
 
   describe('Validation states', () => {
-    it('shows validation error when IdP has value but no Nexus group', () => {
-      const incompleteEntry = { ...defaultEntry, nexusGroupId: '' }
+    it('shows validation error when IdP has value but no Syntara group', () => {
+      const incompleteEntry = { ...defaultEntry, mappedGroupId: '' }
       render(
         <table>
           <tbody>

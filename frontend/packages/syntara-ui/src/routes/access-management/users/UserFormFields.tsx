@@ -21,8 +21,8 @@ import { type ReactElement, type Ref, useCallback, useMemo, useRef, useState } f
 import type { Control, ControllerFieldState, ControllerRenderProps } from 'react-hook-form'
 import { Controller } from 'react-hook-form'
 
-import { NxLabel } from '../../../components/labels/NxLabel'
-import { NxSelect } from '../../../components/NxSelect'
+import { SynLabel } from '../../../components/labels/SynLabel'
+import { SynSelect } from '../../../components/SynSelect'
 import { useAllGroups } from '../../access/useAllGroups'
 import { excludeAuthenticatedGroup } from '../adminConstants'
 import { PASSWORD_CHARACTER_CLASSES_MESSAGE, PASSWORD_MIN_LENGTH_MESSAGE } from '../passwordComplexity'
@@ -163,9 +163,9 @@ function GroupMultiSelect({
           {selected.length > 0 && (
             <LabelGroup>
               {selected.map((name) => (
-                <NxLabel key={name} color="blue" onClose={(e) => handleRemoveGroup(e, name)}>
+                <SynLabel key={name} color="blue" onClose={(e) => handleRemoveGroup(e, name)}>
                   {name}
-                </NxLabel>
+                </SynLabel>
               ))}
             </LabelGroup>
           )}
@@ -187,7 +187,7 @@ function GroupMultiSelect({
   }, [])
 
   return (
-    <NxSelect
+    <SynSelect
       id="user-groups-select"
       aria-label="Select groups"
       isOpen={isOpen}
@@ -216,7 +216,7 @@ function GroupMultiSelect({
             </SelectOption>
           ))}
       </SelectList>
-    </NxSelect>
+    </SynSelect>
   )
 }
 
