@@ -7,7 +7,7 @@ Node-type permissioning extends the ANSTRAT-1900 Rego engine with **system-scope
 ## Adding a new node type
 
 1. Register the type in [`node_type_catalog.json`](../../src/syntara/schemas/workflows/v2/catalog/node_type_catalog.json).
-2. Built-in deny-template policies are generated at import time in [`workflow_node_type_policies.py`](../../src/syntara/authz/workflow_node_type_policies.py) — no manual Rego per type.
+2. Built-in deny-template policies are generated at import time in [`workflow_node_type_policies.py`](../../src/syntara/authz/workflow_node_type_policies.py) — no manual Rego per type. Each template's built-in name is `{node_type}:{action}:deny` (for example `script:read:deny`).
 3. Run `make -C backend test-unit` and confirm `test_node_type_permissions` policy counts include the new type (16 types × 3 actions today).
 4. Wire the workflow engine / UI node registry as documented in the workflow-engine handbook.
 

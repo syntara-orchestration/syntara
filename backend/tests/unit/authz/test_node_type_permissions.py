@@ -21,6 +21,12 @@ def test_generated_policy_count() -> None:
     assert all(p.resource == "workflow_node_type" for p in WORKFLOW_NODE_TYPE_POLICIES)
 
 
+def test_node_type_policy_names_use_deny_suffix() -> None:
+    script_read = next(p for p in WORKFLOW_NODE_TYPE_POLICIES if p.name == "script:read:deny")
+    assert script_read.action == "read"
+    assert script_read.node_type_label is not None
+
+
 def test_iter_definition_node_types_includes_nodes_and_triggers() -> None:
     definition = {
         "nodes": [{"id": "n1", "type": "script"}],

@@ -1,8 +1,8 @@
-/** Built-in deny-template policy names use this prefix (see backend workflow_node_type_policies). */
-export const WORKFLOW_NODE_TYPE_POLICY_PREFIX = 'workflow_node_type:'
+/** Matches built-in deny-template names: `{node_type}:{read|write|execute}:deny`. */
+const NODE_TYPE_DENY_POLICY_NAME = /^[^:]+:(read|write|execute):deny$/
 
 export function selectedNodeTypeDenyPolicies(policyNames: readonly string[]): string[] {
-  return policyNames.filter((name) => name.startsWith(WORKFLOW_NODE_TYPE_POLICY_PREFIX))
+  return policyNames.filter((name) => NODE_TYPE_DENY_POLICY_NAME.test(name))
 }
 
 export const NODE_TYPE_POLICY_SYSTEM_SCOPE_MESSAGE =

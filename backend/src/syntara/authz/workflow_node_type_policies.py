@@ -11,7 +11,7 @@ from syntara.authz.workflow_node_type_catalog import (
 
 
 def _node_type_policy_name(node_type: str, action: str) -> str:
-    return f"{WORKFLOW_NODE_TYPE_RESOURCE}:{node_type}:{action}:any"
+    return f"{node_type}:{action}:deny"
 
 
 def generate_workflow_node_type_policies() -> list[PolicyInfo]:
