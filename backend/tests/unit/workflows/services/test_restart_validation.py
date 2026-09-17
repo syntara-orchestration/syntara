@@ -104,6 +104,14 @@ def _make_activity(name: str) -> Mock:
     return activity
 
 
+def _make_completed_activity(name: str, output: dict | None = None) -> Mock:
+    activity = Mock()
+    activity.activity_name = name
+    activity.status = ActivityStatus.COMPLETED
+    activity.output_data = output if output is not None else {"result": "ok"}
+    return activity
+
+
 def _make_version(version: int, nodes: list | None = None) -> Mock:
     record = Mock()
     record.version = version
@@ -133,6 +141,7 @@ async def test_validate_restart_rejects_non_restartable_state() -> None:
     session = _mock_session(
         (execution, "one"),
         ([_make_activity("step_2")], "all"),
+        ([], "all"),
         (_make_version(1), "one"),
         (workflow, "one"),
         (_make_version(1), "one"),
@@ -150,6 +159,7 @@ async def test_validate_restart_rejects_unknown_failure_point() -> None:
     session = _mock_session(
         (execution, "one"),
         ([_make_activity("step_2")], "all"),
+        ([], "all"),
         (_make_version(1), "one"),
         (workflow, "one"),
         (_make_version(1), "one"),
@@ -167,6 +177,7 @@ async def test_validate_restart_passes_clean_path() -> None:
     session = _mock_session(
         (execution, "one"),
         ([_make_activity("step_2")], "all"),
+        ([_make_completed_activity("step_1")], "all"),
         (_make_version(1), "one"),
         (workflow, "one"),
         (_make_version(2), "one"),
@@ -188,6 +199,7 @@ async def test_validate_restart_rejects_upstream_change() -> None:
     session = _mock_session(
         (execution, "one"),
         ([_make_activity("step_2#iter-1")], "all"),
+        ([], "all"),
         (_make_version(1), "one"),
         (workflow, "one"),
         (_make_version(2, nodes=changed), "one"),
@@ -195,4 +207,60 @@ async def test_validate_restart_rejects_upstream_change() -> None:
     verdict = await validate_restart(session, execution.id, ["step_2"])
     assert verdict.eligible is False
     assert verdict.changed_node_ids == ["step_1"]
+    assert "step_1" in (verdict.reason or "")
+
+
+@pytest.mark.asyncio
+async def test_validate_restart_rejects_inserted_upstream_node() -> None:
+    """A node inserted on the upstream path in the current version rejects."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    workflow = _make_workflow(2)
+    execution.workflow_id = workflow.id
+    gate = {"id": "step_1b", "type": "script", "parameters": {"code": "echo gate"}}
+    current_nodes = [NODES[0], gate, NODES[1], NODES[2]]
+    current_edges = [
+        {"from": "trigger_1", "to": "step_1"},
+        {"from": "step_1", "to": "step_1b"},
+        {"from": "step_1b", "to": "step_2"},
+        {"from": "step_2", "to": "step_3"},
+    ]
+    current_version = _make_version(2, nodes=current_nodes)
+    current_version.workflow_definition["edges"] = current_edges
+    session = _mock_session(
+        (execution, "one"),
+        ([_make_activity("step_2")], "all"),
+        ([], "all"),
+        (_make_version(1), "one"),
+        (workflow, "one"),
+        (current_version, "one"),
+    )
+    verdict = await validate_restart(session, execution.id, ["step_2"])
+    assert verdict.eligible is False
+    assert verdict.changed_node_ids == ["step_1b"]
+    assert "step_1b" in (verdict.reason or "")
+
+
+@pytest.mark.asyncio
+async def test_validate_restart_rejects_sanitized_upstream_output() -> None:
+    """Persisted [REDACTED] output upstream rejects; downstream markers are ignored."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    workflow = _make_workflow(2)
+    execution.workflow_id = workflow.id
+    session = _mock_session(
+        (execution, "one"),
+        ([_make_activity("step_2")], "all"),
+        (
+            [
+                _make_completed_activity("step_1", {"token": "[REDACTED]"}),
+                _make_completed_activity("step_3", {"note": "[REDACTED]"}),
+            ],
+            "all",
+        ),
+        (_make_version(1), "one"),
+        (workflow, "one"),
+        (_make_version(2), "one"),
+    )
+    verdict = await validate_restart(session, execution.id, ["step_2"])
+    assert verdict.eligible is False
+    assert verdict.sanitized_node_ids == ["step_1"]
     assert "step_1" in (verdict.reason or "")

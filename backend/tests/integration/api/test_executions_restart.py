@@ -133,6 +133,51 @@ async def _add_failed_activity(session: AsyncSession, execution: Execution, node
     await session.commit()
 
 
+async def _add_completed_activity(
+    session: AsyncSession, execution: Execution, node_id: str, output: dict | None = None
+) -> None:
+    """Record a completed activity with stored output for a node."""
+    session.add(
+        ActivityExecution(
+            execution_id=execution.id,
+            activity_name=node_id,
+            node_type=NodeType.SCRIPT,
+            temporal_activity_id=f"temporal-activity-{uuid.uuid4()}",
+            status=ActivityStatus.COMPLETED,
+            output_data=output if output is not None else {"result": "ok"},
+        )
+    )
+    await session.commit()
+
+
+async def _save_new_version(
+    session: AsyncSession, workflow: Workflow, user: User, nodes: list[dict], edges: list[dict] | None = None
+) -> None:
+    """Save a new current version with the given nodes (snapshot stays behind)."""
+    test_db_user_id = user.id
+    session.add(
+        WorkflowVersion(
+            workflow_id=workflow.id,
+            version=workflow.current_version + 1,
+            schema_version="2.0.0",
+            workflow_definition={
+                "schema_version": "2.0.0",
+                "name": workflow.name,
+                "triggers": [
+                    {"id": "trigger_manual", "name": "Manual trigger", "type": "manual_trigger", "parameters": {}}
+                ],
+                "nodes": nodes,
+                "edges": edges if edges is not None else GRAPH_EDGES,
+            },
+            created_by=test_db_user_id,
+            updated_by=test_db_user_id,
+        )
+    )
+    workflow.current_version += 1
+    session.add(workflow)
+    await session.commit()
+
+
 async def _eligible_execution(session: AsyncSession, workflow: Workflow, user: User) -> Execution:
     """Execution eligible for restart: FAILED + failed step_2 + matching definition."""
     await _set_version_definition(session, workflow, GRAPH_NODES)
@@ -200,26 +245,7 @@ class TestValidateRestart:
         changed = [
             dict(node, parameters={"code": "exit 0"}) if node["id"] == "step_1" else node for node in GRAPH_NODES
         ]
-        new_version = WorkflowVersion(
-            workflow_id=test_workflow.id,
-            version=test_workflow.current_version + 1,
-            schema_version="2.0.0",
-            workflow_definition={
-                "schema_version": "2.0.0",
-                "name": test_workflow.name,
-                "triggers": [
-                    {"id": "trigger_manual", "name": "Manual trigger", "type": "manual_trigger", "parameters": {}}
-                ],
-                "nodes": changed,
-                "edges": GRAPH_EDGES,
-            },
-            created_by=test_user.id,
-            updated_by=test_user.id,
-        )
-        test_db_session.add(new_version)
-        test_workflow.current_version += 1
-        test_db_session.add(test_workflow)
-        await test_db_session.commit()
+        await _save_new_version(test_db_session, test_workflow, test_user, changed)
 
         response = await auth_client.post(
             f"/api/v1/executions/{execution.id}/validate-restart",
@@ -230,6 +256,47 @@ class TestValidateRestart:
         data = response.json()
         assert data["eligible"] is False
         assert data["changed_node_ids"] == ["step_1"]
+
+    async def test_validate_rejects_inserted_upstream_node(
+        self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
+    ) -> None:
+        execution = await _eligible_execution(test_db_session, test_workflow, test_user)
+        gate = {"id": "step_1b", "name": "gate", "type": "script", "parameters": {"code": "echo gate"}}
+        gate_edges = [
+            {"from": "trigger_manual", "to": "step_1"},
+            {"from": "step_1", "to": "step_1b"},
+            {"from": "step_1b", "to": "step_2"},
+            {"from": "step_2", "to": "step_3"},
+        ]
+        await _save_new_version(
+            test_db_session, test_workflow, test_user, [GRAPH_NODES[0], gate, *GRAPH_NODES[1:]], gate_edges
+        )
+
+        response = await auth_client.post(
+            f"/api/v1/executions/{execution.id}/validate-restart",
+            json={"failure_point_ids": ["step_2"]},
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["eligible"] is False
+        assert data["changed_node_ids"] == ["step_1b"]
+
+    async def test_validate_rejects_sanitized_upstream_output(
+        self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
+    ) -> None:
+        execution = await _eligible_execution(test_db_session, test_workflow, test_user)
+        await _add_completed_activity(test_db_session, execution, "step_1", {"token": "[REDACTED]"})
+
+        response = await auth_client.post(
+            f"/api/v1/executions/{execution.id}/validate-restart",
+            json={"failure_point_ids": ["step_2"]},
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["eligible"] is False
+        assert data["sanitized_node_ids"] == ["step_1"]
 
     async def test_validate_missing_execution_returns_404(self, auth_client: AsyncClient) -> None:
         response = await auth_client.post(

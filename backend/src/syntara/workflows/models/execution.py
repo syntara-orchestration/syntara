@@ -474,6 +474,10 @@ class RestartValidationResponse(SQLModel):
     changed_node_ids: list[str] = Field(
         default_factory=list, description="Upstream nodes whose definition changed (empty when eligible)"
     )
+    sanitized_node_ids: list[str] = Field(
+        default_factory=list,
+        description="Upstream nodes with sanitized stored outputs that downstream nodes consume",
+    )
 
 
 class CurrentActivity(SQLModel):

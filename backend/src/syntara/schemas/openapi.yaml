@@ -35446,6 +35446,12 @@ components:
             type: string
           title: Changed Node Ids
           description: Upstream nodes whose definition changed (empty when eligible)
+        sanitized_node_ids:
+          type: array
+          items:
+            type: string
+          title: Sanitized Node Ids
+          description: Upstream nodes with sanitized stored outputs that downstream nodes consume
     TestExecutionCreate:
       type: object
       title: TestExecutionCreate

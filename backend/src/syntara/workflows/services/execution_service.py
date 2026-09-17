@@ -1284,6 +1284,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             reason=validation.reason,
             failure_point_ids=validation.failure_point_ids,
             changed_node_ids=validation.changed_node_ids,
+            sanitized_node_ids=validation.sanitized_node_ids,
         )
 
     async def restart_execution(self, execution_id: UUID, failure_point_ids: list[str]) -> ExecutionRead:

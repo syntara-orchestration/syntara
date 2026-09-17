@@ -601,6 +601,11 @@ export interface components {
        * @description Upstream nodes whose definition changed (empty when eligible)
        */
       changed_node_ids?: string[]
+      /**
+       * Sanitized Node Ids
+       * @description Upstream nodes with sanitized stored outputs that downstream nodes consume
+       */
+      sanitized_node_ids?: string[]
     }
     /**
      * TestExecutionCreate
