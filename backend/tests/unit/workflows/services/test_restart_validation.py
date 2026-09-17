@@ -287,6 +287,18 @@ async def test_validate_restart_rejects_sanitized_upstream_output() -> None:
 
 
 @pytest.mark.asyncio
+async def test_template_reference_forms() -> None:
+    """Field, whole-namespace (any position), and indexed refs match; prefixes do not."""
+    from syntara.workflows.services.restart_validation import _template_reference
+
+    assert _template_reference("${step_1.output}", "step_1") is True
+    assert _template_reference("prefix ${step_1} suffix", "step_1") is True
+    assert _template_reference({"nested": ["${step_1.items[0]}"]}, "step_1") is True
+    assert _template_reference("${step_10.output}", "step_1") is False
+    assert _template_reference("no refs here", "step_1") is False
+
+
+@pytest.mark.asyncio
 async def test_validate_restart_flags_rewired_into_path_node() -> None:
     """A snapshot node rewired into the upstream path counts as inserted."""
     execution = _make_execution(ExecutionStatus.FAILED)

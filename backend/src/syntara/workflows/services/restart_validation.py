@@ -45,6 +45,7 @@ from syntara.workflows.models.activity_execution import ActivityExecution, Activ
 from syntara.workflows.models.execution import Execution, ExecutionStatus
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_version import WorkflowVersion
+from syntara.workflows.utils.namespace_resolver import TEMPLATE_PATTERN
 from syntara.workflows.workflow_engine.utils.credential_scrubber import REDACTED
 
 if TYPE_CHECKING:
@@ -192,12 +193,18 @@ def _contains_redacted(value: Any) -> bool:  # noqa: ANN401
 def _template_reference(value: Any, target_id: str) -> bool:  # noqa: ANN401
     """Whether a parameter value references another node's namespace.
 
-    Matches whole-namespace (``${step_1}``) and field (``${step_1.output}``)
-    template references, mirroring ``TEMPLATE_PATTERN`` in namespace_resolver.
+    Uses the real ``TEMPLATE_PATTERN`` from namespace_resolver, so every
+    reference the engine would substitute is detected — field refs
+    (``${step_1.output}``) and whole-namespace refs (``${step_1}``) in any
+    position. Head-segment equality avoids prefix collisions (``step_1`` never
+    matches ``step_10``).
     """
-    prefix = "${" + target_id
     if isinstance(value, str):
-        return value.startswith(prefix + "}") or (prefix + ".") in value
+        for match in TEMPLATE_PATTERN.finditer(value):
+            head = match.group(1).strip().split(".", 1)[0].split("[", 1)[0]
+            if head == target_id:
+                return True
+        return False
     if isinstance(value, dict):
         return any(_template_reference(item, target_id) for item in value.values())
     if isinstance(value, list):
