@@ -242,25 +242,79 @@ async def test_validate_restart_rejects_inserted_upstream_node() -> None:
 
 @pytest.mark.asyncio
 async def test_validate_restart_rejects_sanitized_upstream_output() -> None:
-    """Persisted [REDACTED] output upstream rejects; downstream markers are ignored."""
+    """Persisted [REDACTED] output referenced downstream rejects; unreferenced markers pass."""
     execution = _make_execution(ExecutionStatus.FAILED)
     workflow = _make_workflow(2)
     execution.workflow_id = workflow.id
-    session = _mock_session(
-        (execution, "one"),
-        ([_make_activity("step_2")], "all"),
-        (
+    ref_nodes = [
+        dict(n, parameters={**n.get("parameters", {}), "input_ref": "${step_1.token}"}) if n["id"] == "step_2" else n
+        for n in NODES
+    ]
+
+    def _session_for(outputs: list) -> Mock:
+        snapshot = _make_version(1, nodes=ref_nodes)
+        current = _make_version(2, nodes=ref_nodes)
+        return _mock_session(
+            (execution, "one"),
+            ([_make_activity("step_2")], "all"),
+            (outputs, "all"),
+            (snapshot, "one"),
+            (workflow, "one"),
+            (current, "one"),
+        )
+
+    verdict = await validate_restart(
+        _session_for(
             [
                 _make_completed_activity("step_1", {"token": "[REDACTED]"}),
                 _make_completed_activity("step_3", {"note": "[REDACTED]"}),
-            ],
-            "all",
+            ]
         ),
-        (_make_version(1), "one"),
-        (workflow, "one"),
-        (_make_version(2), "one"),
+        execution.id,
+        ["step_2"],
     )
-    verdict = await validate_restart(session, execution.id, ["step_2"])
     assert verdict.eligible is False
     assert verdict.sanitized_node_ids == ["step_1"]
     assert "step_1" in (verdict.reason or "")
+
+    clean = await validate_restart(
+        _session_for([_make_completed_activity("step_1", {"token": "abc123"})]),
+        execution.id,
+        ["step_2"],
+    )
+    assert clean.eligible is True
+    assert clean.sanitized_node_ids == []
+
+
+@pytest.mark.asyncio
+async def test_validate_restart_flags_rewired_into_path_node() -> None:
+    """A snapshot node rewired into the upstream path counts as inserted."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    workflow = _make_workflow(2)
+    execution.workflow_id = workflow.id
+    sidecar = {"id": "sidecar", "type": "script", "parameters": {"code": "echo side"}}
+    snapshot_version = _make_version(1, nodes=[*NODES, sidecar])
+    snapshot_version.workflow_definition["edges"] = [*EDGES]
+    current_nodes = [n for n in NODES if n["id"] != "step_1"] + [
+        {"id": "step_1", "type": "script", "parameters": {"code": "echo hi"}},
+        sidecar,
+    ]
+    current_edges = [
+        {"from": "trigger_1", "to": "sidecar"},
+        {"from": "sidecar", "to": "step_1"},
+        {"from": "step_1", "to": "step_2"},
+        {"from": "step_2", "to": "step_3"},
+    ]
+    current_version = _make_version(2, nodes=current_nodes)
+    current_version.workflow_definition["edges"] = current_edges
+    session = _mock_session(
+        (execution, "one"),
+        ([_make_activity("step_2")], "all"),
+        ([], "all"),
+        (snapshot_version, "one"),
+        (workflow, "one"),
+        (current_version, "one"),
+    )
+    verdict = await validate_restart(session, execution.id, ["step_2"])
+    assert verdict.eligible is False
+    assert verdict.changed_node_ids == ["sidecar"]

@@ -287,6 +287,24 @@ class TestValidateRestart:
     ) -> None:
         execution = await _eligible_execution(test_db_session, test_workflow, test_user)
         await _add_completed_activity(test_db_session, execution, "step_1", {"token": "[REDACTED]"})
+        # step_2 really consumed step_1's output: reference it in this version's parameters.
+        result = await test_db_session.exec(
+            select(WorkflowVersion).where(
+                WorkflowVersion.workflow_id == test_workflow.id,
+                WorkflowVersion.version == test_workflow.current_version,
+            )
+        )
+        version = result.one()
+        definition = dict(version.workflow_definition)
+        definition["nodes"] = [
+            dict(node, parameters={**node.get("parameters", {}), "input_ref": "${step_1.token}"})
+            if node.get("id") == "step_2"
+            else node
+            for node in definition.get("nodes", [])
+        ]
+        version.workflow_definition = definition
+        test_db_session.add(version)
+        await test_db_session.commit()
 
         response = await auth_client.post(
             f"/api/v1/executions/{execution.id}/validate-restart",

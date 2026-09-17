@@ -189,6 +189,35 @@ def _contains_redacted(value: Any) -> bool:  # noqa: ANN401
     return False
 
 
+def _template_reference(value: Any, target_id: str) -> bool:  # noqa: ANN401
+    """Whether a parameter value references another node's namespace.
+
+    Matches whole-namespace (``${step_1}``) and field (``${step_1.output}``)
+    template references, mirroring ``TEMPLATE_PATTERN`` in namespace_resolver.
+    """
+    prefix = "${" + target_id
+    if isinstance(value, str):
+        return value.startswith(prefix + "}") or (prefix + ".") in value
+    if isinstance(value, dict):
+        return any(_template_reference(item, target_id) for item in value.values())
+    if isinstance(value, list):
+        return any(_template_reference(item, target_id) for item in value)
+    return False
+
+
+def _is_referenced_downstream(definition: dict[str, Any], target_id: str) -> bool:
+    """Whether any other node references the target's outputs in its parameters.
+
+    Any textual reference must come from downstream (references flow forward in
+    an acyclic graph), so this precisely scopes the sanitized-output guard to
+    nodes whose redacted data would actually be consumed.
+    """
+    return any(
+        node.get("id") != target_id and _template_reference(node.get("parameters", {}), target_id)
+        for node in definition_nodes(definition)
+    )
+
+
 def _version_reason(
     normalized: list[str],
     snapshot: WorkflowVersion | None,
@@ -208,12 +237,14 @@ def _version_reason(
         return f"not nodes in the executed workflow version: {', '.join(missing)}", [], []
     snapshot_upstream = collect_upstream_node_ids(snapshot_def, normalized)
     current_upstream = collect_upstream_node_ids(current_def, normalized)
-    inserted = sorted(node_id for node_id in current_upstream if node_id not in snapshot_ids)
+    inserted = sorted(current_upstream - snapshot_upstream)
     changed = sorted(set(diff_upstream_nodes(snapshot_def, current_def, snapshot_upstream)) | set(inserted))
     sanitized = sorted(
         node_id
         for node_id in snapshot_upstream
-        if node_id in completed_outputs and _contains_redacted(completed_outputs[node_id])
+        if node_id in completed_outputs
+        and _contains_redacted(completed_outputs[node_id])
+        and _is_referenced_downstream(current_def, node_id)
     )
     parts = []
     if changed:
@@ -223,7 +254,7 @@ def _version_reason(
         )
     if sanitized:
         parts.append(
-            "upstream nodes have sanitized outputs that downstream nodes consume "
+            "upstream nodes have sanitized outputs referenced by downstream nodes "
             f"({', '.join(sanitized)}); restarting would inject redacted data"
         )
     if parts:
