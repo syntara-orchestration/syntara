@@ -28,6 +28,7 @@ class FieldLimits:
 
     # List length limits
     APPROVER_LIST_MAX_LENGTH = 1000
+    FORM_OPTIONS_MAX_LENGTH = 500
 
     # Pagination limits
     MAX_ITEMS_PER_PAGE = 100
