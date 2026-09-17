@@ -2349,6 +2349,11 @@ export interface components {
       started_at?: string | null
       /** Completed At */
       completed_at?: string | null
+      /**
+       * Replayed
+       * @description Whether this activity reused output from a previous run (true) or executed fresh (false); null for pre-feature rows, treated as fresh
+       */
+      replayed?: boolean | null
     }
   }
   responses: {

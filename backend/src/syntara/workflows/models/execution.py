@@ -498,6 +498,11 @@ class ActivityData(SQLModel):
     started_at: datetime | None = None
     completed_at: datetime | None = None
     iteration: int | None = None
+    replayed: bool | None = Field(
+        default=None,
+        description="Whether this activity reused output from a previous run (true) "
+        "or executed fresh (false); null for pre-feature rows, treated as fresh",
+    )
 
 
 class ExecutionRead(UserReferenceFieldsMixin, SQLModel):

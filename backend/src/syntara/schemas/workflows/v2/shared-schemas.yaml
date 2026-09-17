@@ -422,6 +422,12 @@ components:
               format: date-time
             - type: 'null'
           title: Completed At
+        replayed:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+          title: Replayed
+          description: Whether this activity reused output from a previous run (true) or executed fresh (false); null for pre-feature rows, treated as fresh
 
     ExecutionRead:
       type: object
@@ -706,6 +712,12 @@ components:
                 - type: 'null'
               description: Iteration number if activity is within a loop (0-indexed)
               title: Iteration
+            replayed:
+              anyOf:
+                - type: boolean
+                - type: 'null'
+              description: Whether this activity reused output from a previous run (true) or executed fresh (false); null for pre-feature rows, treated as fresh
+              title: Replayed
 
     ExecutionStatus:
       type: string
