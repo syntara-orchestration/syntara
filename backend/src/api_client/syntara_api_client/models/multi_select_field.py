@@ -157,7 +157,7 @@ class MultiSelectField:
             try:
                 if not isinstance(data, list):
                     raise TypeError()
-                default_type_0 = data
+                default_type_0 = cast(list[Any], data)
 
                 return default_type_0
             except (TypeError, ValueError, AttributeError, KeyError):
