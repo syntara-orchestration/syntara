@@ -37,7 +37,7 @@ class TestWorkflowExecutionErrorTelemetryHandler:
         registry.send_event.assert_called_once()
         event = registry.send_event.call_args[0][0]
         assert isinstance(event, WorkflowErrorEvent)
-        assert event.workflow_execution_id == str(EXECUTION_ID)
+        assert event.workflow_execution_id == EXECUTION_ID
         assert event.timed_out_component == TimedOutComponent.ACTIVITY
         assert event.configured_timeout_seconds == 30.0
         assert event.elapsed_time_ms == 30500
@@ -67,7 +67,7 @@ class TestWorkflowExecutionErrorTelemetryHandler:
         registry.send_event.assert_called_once()
         event = registry.send_event.call_args[0][0]
         assert isinstance(event, WorkflowErrorEvent)
-        assert event.workflow_execution_id == str(EXECUTION_ID)
+        assert event.workflow_execution_id == EXECUTION_ID
         assert event.timed_out_component == TimedOutComponent.WORKFLOW
         assert event.configured_timeout_seconds == 3600.0
         assert event.elapsed_time_ms == 3600000
