@@ -12,18 +12,31 @@ nodes:
     type: form_prompt
     parameters:
       message: "Please provide deployment details to continue"
-      input_schema:
-        type: object
-        properties:
-          environment:
-            type: string
-            enum: [dev, staging, production]
-          version:
-            type: string
-            pattern: "^v[0-9]+\\.[0-9]+\\.[0-9]+$"
-          confirmation:
-            type: boolean
-        required: [environment, version, confirmation]
+      form_definition:
+        fields:
+          - type: dropdown
+            value_name: environment
+            label: Environment
+            required: true
+            options:
+              source: static
+              values:
+                - display_label: Development
+                  value: dev
+                - display_label: Staging
+                  value: staging
+                - display_label: Production
+                  value: production
+          - type: text
+            value_name: version
+            label: Version
+            required: true
+            placeholder: "v1.0.0"
+            help_text: "Version must match pattern: v#.#.#"
+          - type: checkbox
+            value_name: confirmation
+            label: I confirm this deployment
+            required: true
       responder_users:
         - alice
         - bob

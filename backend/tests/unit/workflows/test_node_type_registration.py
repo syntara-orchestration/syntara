@@ -129,47 +129,48 @@ class TestNodeOutputModelsParity:
 class TestTypedNodeUnionParity:
     """Every executor/control type can be parsed through WorkflowDefinition."""
 
-    def test_form_prompt_in_union(self) -> None:
-        """form_prompt type parses through the discriminated union."""
-        wf = WorkflowDefinition.model_validate(
-            {
-                "schema_version": "2.0.0",
-                "name": "test",
-                "triggers": [{"id": "t", "type": "manual_trigger", "parameters": {}}],
-                "nodes": [
-                    {
-                        "id": "n",
-                        "type": "form_prompt",
-                        "parameters": {
-                            "form_definition": {
-                                "fields": [
-                                    {
-                                        "type": "text",
-                                        "value_name": "field1",
-                                        "label": "Field 1",
-                                        "required": False,
-                                    }
-                                ]
-                            }
-                        },
-                    }
-                ],
-                "edges": [],
-            }
-        )
-        assert wf.nodes[0].type == "form_prompt"
-
     @pytest.mark.parametrize(
         ("node_type", "params"),
         [
+            # Executors
             ("script", {"language": "bash", "code": "echo 1"}),
             ("http_request", {"method": "GET", "url": "https://example.com"}),
+            ("aap_job_template", {"job_template_id": 1}),
+            ("aap_workflow_job_template", {"workflow_job_template_id": 1}),
+            ("agentic", {"prompt": "test prompt"}),
             ("approval", {}),
+            (
+                "form_prompt",
+                {
+                    "form_definition": {
+                        "fields": [
+                            {
+                                "type": "text",
+                                "value_name": "field1",
+                                "label": "Field 1",
+                                "required": False,
+                            }
+                        ]
+                    }
+                },
+            ),
+            # Control flow
             ("condition", {"condition": "1 == 1"}),
+            (
+                "switch",
+                {
+                    "cases": [
+                        {"port": "case_0", "label": "Case 1", "condition": "1 == 1"},
+                    ]
+                },
+            ),
+            ("converge", {}),
+            ("loop", {"type": "for_each", "items": "${trigger.list}"}),
+            ("wait", {"duration": 60}),
         ],
     )
-    def test_sample_types_parse(self, node_type: str, params: dict[str, Any]) -> None:
-        """Sample of other types parse correctly (spot check)."""
+    def test_all_executor_control_types_parse(self, node_type: str, params: dict[str, Any]) -> None:
+        """All executor/control types parse through the discriminated union."""
         wf = WorkflowDefinition.model_validate(
             {
                 "schema_version": "2.0.0",
