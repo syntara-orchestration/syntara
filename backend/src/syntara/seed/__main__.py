@@ -5,7 +5,23 @@ Usage::
     uv run python -m syntara.seed              # required seeders only
     uv run python -m syntara.seed --all        # include optional (dev) seeders
     uv run python -m syntara.seed --only settings credentials
+    uv run python -m syntara.seed --only builtin_workflows --strict
     uv run python -m syntara.seed --list       # show registered seeders
+
+Operational contract
+--------------------
+Seeders must be **idempotent** and re-runs must be **safe to run
+concurrently**: once the initial seed has populated the database, the command
+may be executed again at any time and from several processes at once
+(deployment hooks, pod init containers, replicas starting together) and must
+converge to the same state without creating duplicates or failing on rows
+that already exist. In particular ``--only builtin_workflows`` is expected to
+be re-run after the initial seed, from a process that can reach Temporal, to
+create the Temporal Schedules for built-in scheduled workflows. When Temporal
+is unreachable that step logs a warning and the command still exits 0 by
+default; pass ``--strict`` on runs that are expected to reach Temporal so a
+failed sync exits non-zero instead.
+Changes to seeders must preserve these guarantees.
 """
 
 from __future__ import annotations
@@ -39,6 +55,15 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Run only the named seeders (plus their dependencies)",
     )
     parser.add_argument(
+        "--strict",
+        action="store_true",
+        default=False,
+        help=(
+            "Exit non-zero when the Temporal Schedules for built-in scheduled workflows "
+            "cannot be synced (default: log a warning and continue)"
+        ),
+    )
+    parser.add_argument(
         "--list",
         action="store_true",
         default=False,
@@ -66,6 +91,7 @@ async def _main(args: argparse.Namespace) -> None:
         AsyncSessionLocal,
         include_optional=args.all,
         only=args.only,
+        strict=args.strict,
     )
 
     await stop_audit_subsystems()
