@@ -50,6 +50,7 @@ function renderDialogs(overrides: Partial<React.ComponentProps<typeof BuilderDia
     dispatch: vi.fn(),
     handleRunWorkflow: vi.fn(),
     handleDeleteWorkflow: vi.fn(),
+    isDeleting: false,
     triggerName: 'Manual Trigger',
     runStepDialog: {
       isOpen: false,
@@ -143,6 +144,14 @@ describe('BuilderDialogs', () => {
     expect(screen.getByText('Test Workflow')).toBeInTheDocument()
   })
 
+  it('disables delete dialog actions while delete mutation is pending', () => {
+    renderDialogs({ deleteDialogOpen: true, isDeleting: true })
+
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByRole('button', { name: /Delete/ })).toBeDisabled()
+    expect(within(dialog).getByRole('button', { name: 'Cancel' })).toBeDisabled()
+  })
+
   it('calls handleRunWorkflow when run modal is confirmed (with input schema)', async () => {
     const user = userEvent.setup()
     const handleRunWorkflow = vi.fn()
@@ -168,6 +177,7 @@ describe('BuilderDialogs', () => {
       dispatch: vi.fn(),
       handleRunWorkflow: vi.fn(),
       handleDeleteWorkflow: vi.fn(),
+      isDeleting: false,
       triggerName: 'Manual Trigger',
       triggerInputSchema: { type: 'object', properties: { name: { type: 'string' } } },
       runStepDialog: {
