@@ -42,7 +42,11 @@ from syntara.workflows.exceptions import (
     WorkflowNotPublishedError,
 )
 from syntara.workflows.json_schema_validation import apply_schema_defaults
-from syntara.workflows.models.activity_execution import ActivityExecution, ActivityExecutionListResponse
+from syntara.workflows.models.activity_execution import (
+    ActivityExecution,
+    ActivityExecutionListResponse,
+    ActivityStatus,
+)
 from syntara.workflows.models.execution import (
     TERMINAL_EXECUTION_STATUSES,
     ActivityData,
@@ -176,6 +180,7 @@ class ExecutionsConvertResourceMixin(ConvertResourceMixin):
                         started_at=activity.started_at,
                         completed_at=activity.completed_at,
                         iteration=activity.iteration,
+                        replayed=activity.replayed,
                     )
                     for activity in resource.activities
                 ]
@@ -383,6 +388,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         failed_node_ids: list[str] | None = None,
         triggered_by: UUID | None = None,
         restart_count: int = 0,
+        pre_resolved_outputs: dict[str, dict[str, Any]] | None = None,
     ) -> ExecutionRead:
         """Start a Temporal workflow and persist the execution record.
 
@@ -444,6 +450,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
                     workflow_metadata=workflow_metadata,
                     execution_id=pre_generated_execution_id,
                     is_builtin=workflow.is_builtin,
+                    pre_resolved_outputs=pre_resolved_outputs,
                 )
             temporal_workflow_id = temporal_result.temporal_workflow_id
             execution_id = UUID(temporal_result.execution_id)
@@ -1338,6 +1345,23 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             raise ExecutionNotRestartableError(execution_id, "source execution has no trigger_node_id recorded")
         trigger_node_id, _ = resolve_trigger_node(current_version.workflow_definition, source.trigger_node_id)
 
+        # Transport for output injection (AAP-92821): map source COMPLETED nodes
+        # to the pre-resolved channel the engine already honors. Failed and
+        # downstream nodes are never included; the engine classifies at dispatch
+        # which entries to consume. Control-flow routing (condition/switch ports)
+        # is re-evaluated by the engine at runtime — control is therefore None here.
+        completed = (
+            await self.session.exec(
+                select(ActivityExecution).where(
+                    ActivityExecution.execution_id == source.id,
+                    ActivityExecution.status == ActivityStatus.COMPLETED,
+                )
+            )
+        ).all()
+        pre_resolved_outputs = {
+            activity.activity_name: {"output": activity.output_data or {}, "control": None} for activity in completed
+        }
+
         logger.info(
             "Restarting execution",
             source_execution_id=execution_id,
@@ -1360,4 +1384,5 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             failed_node_ids=validation.failure_point_ids,
             triggered_by=self.user.id,
             restart_count=source.restart_count + 1,
+            pre_resolved_outputs=pre_resolved_outputs or None,
         )

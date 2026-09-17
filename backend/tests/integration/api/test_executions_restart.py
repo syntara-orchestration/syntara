@@ -346,6 +346,7 @@ class TestRestartExecution:
         mock_temporal_service: Mock,
     ) -> None:
         execution = await _eligible_execution(test_db_session, test_workflow, test_user)
+        await _add_completed_activity(test_db_session, execution, "step_1", {"result": "ok-1"})
 
         response = await auth_client.post(
             f"/api/v1/executions/{execution.id}/restart-from-failure",
@@ -371,6 +372,9 @@ class TestRestartExecution:
         _, kwargs = mock_temporal_service.start_workflow.call_args
         assert kwargs["workflow_metadata"]["restart"]["restart_from_execution_id"] == str(execution.id)
         assert kwargs["workflow_metadata"]["restart"]["failure_point_ids"] == ["step_2"]
+        pre_resolved = kwargs["pre_resolved_outputs"]
+        assert pre_resolved["step_1"] == {"output": {"result": "ok-1"}, "control": None}
+        assert "step_2" not in pre_resolved
 
     async def test_restart_rejected_state_returns_409(
         self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
