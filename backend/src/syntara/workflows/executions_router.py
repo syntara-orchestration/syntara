@@ -305,9 +305,9 @@ async def retry_execution(
 
 
 @router.post(
-    "/{execution_id}/validate-restart",
-    operation_id="validate_restart",
-    summary="Validate restart",
+    "/{execution_id}/validate-restart-from-failure",
+    operation_id="validate_restart_from_failure",
+    summary="Validate restart from failure",
     description="Validate that an execution can be restarted from the given failure points. "
     "Checks execution state, failure-point eligibility, and the version-mismatch guard. "
     "Returns a pass/fail verdict without mutating any state.",
@@ -315,20 +315,20 @@ async def retry_execution(
     response_description="Restart validation verdict",
     dependencies=[Depends(_exec_perm_run)],
 )
-async def validate_restart(
+async def validate_restart_from_failure(
     execution_id: UUID,
     body: RestartValidateRequest,
     service: Annotated[ExecutionService, Depends(get_execution_service)],
 ) -> RestartValidationResponse:
     """Validate a restart from failure points without mutating state."""
     logger.info("Validating restart", execution_id=execution_id)
-    return await service.validate_restart_execution(execution_id, body.failure_point_ids)
+    return await service.validate_restart_from_failure(execution_id, body.failure_point_ids)
 
 
 @router.post(
-    "/{execution_id}/restart",
-    operation_id="restart_execution",
-    summary="Restart execution",
+    "/{execution_id}/restart-from-failure",
+    operation_id="restart_from_failure",
+    summary="Restart from failure",
     description="Restart a failed execution from the given failure points. "
     "Independently repeats all validation checks, then creates a new execution "
     "linked to the source and triggers a Temporal run carrying restart context.",
@@ -337,14 +337,14 @@ async def validate_restart(
     response_description="New execution created from restart",
     dependencies=[Depends(_exec_perm_run)],
 )
-async def restart_execution(
+async def restart_from_failure(
     execution_id: UUID,
     body: RestartRequest,
     service: Annotated[ExecutionService, Depends(get_execution_service)],
 ) -> ExecutionRead:
     """Restart a failed execution from failure points."""
     logger.info("Restarting execution", execution_id=execution_id)
-    return await service.restart_execution(execution_id, body.failure_point_ids)
+    return await service.restart_from_failure(execution_id, body.failure_point_ids)
 
 
 @router.get(

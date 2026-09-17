@@ -1042,7 +1042,7 @@ components:
     RestartValidateRequest:
       type: object
       title: RestartValidateRequest
-      description: Request body for POST /executions/{id}/validate-restart.
+      description: Request body for POST /executions/{id}/validate-restart-from-failure.
       properties:
         failure_point_ids:
           type: array
@@ -1054,7 +1054,7 @@ components:
     RestartRequest:
       type: object
       title: RestartRequest
-      description: Request body for POST /executions/{id}/restart.
+      description: Request body for POST /executions/{id}/restart-from-failure.
       properties:
         failure_point_ids:
           type: array
@@ -1069,7 +1069,7 @@ components:
     RestartValidationResponse:
       type: object
       title: RestartValidationResponse
-      description: Pre-restart validation verdict (POST /executions/{id}/validate-restart).
+      description: Pre-restart validation verdict (POST /executions/{id}/validate-restart-from-failure).
       required:
         - eligible
       properties:

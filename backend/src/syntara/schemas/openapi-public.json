@@ -35249,11 +35249,11 @@
         }
       }
     },
-    "/executions/{execution_id}/validate-restart": {
+    "/executions/{execution_id}/validate-restart-from-failure": {
       "post": {
-        "summary": "Validate restart",
+        "summary": "Validate restart from failure",
         "description": "Validate that an execution can be restarted from the given failure points. Checks execution state, failure-point eligibility, and the version-mismatch guard. Returns a pass/fail verdict without mutating any state.",
-        "operationId": "validate_restart",
+        "operationId": "validate_restart_from_failure",
         "tags": [
           "Executions"
         ],
@@ -35440,11 +35440,11 @@
         }
       }
     },
-    "/executions/{execution_id}/restart": {
+    "/executions/{execution_id}/restart-from-failure": {
       "post": {
-        "summary": "Restart execution",
+        "summary": "Restart from failure",
         "description": "Restart a failed execution from the given failure points. Independently repeats all validation checks, then creates a new execution linked to the source and triggers a Temporal run carrying restart context.",
-        "operationId": "restart_execution",
+        "operationId": "restart_from_failure",
         "tags": [
           "Executions"
         ],
@@ -50552,7 +50552,7 @@
       "RestartValidateRequest": {
         "type": "object",
         "title": "RestartValidateRequest",
-        "description": "Request body for POST /executions/{id}/validate-restart.",
+        "description": "Request body for POST /executions/{id}/validate-restart-from-failure.",
         "properties": {
           "failure_point_ids": {
             "type": "array",
@@ -50567,7 +50567,7 @@
       "RestartRequest": {
         "type": "object",
         "title": "RestartRequest",
-        "description": "Request body for POST /executions/{id}/restart.",
+        "description": "Request body for POST /executions/{id}/restart-from-failure.",
         "properties": {
           "failure_point_ids": {
             "type": "array",
@@ -50582,7 +50582,7 @@
       "RestartValidationResponse": {
         "type": "object",
         "title": "RestartValidationResponse",
-        "description": "Pre-restart validation verdict (POST /executions/{id}/validate-restart).",
+        "description": "Pre-restart validation verdict (POST /executions/{id}/validate-restart-from-failure).",
         "required": [
           "eligible"
         ],

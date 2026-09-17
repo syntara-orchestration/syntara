@@ -88,7 +88,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/executions/{execution_id}/validate-restart': {
+  '/executions/{execution_id}/validate-restart-from-failure': {
     parameters: {
       query?: never
       header?: never
@@ -98,17 +98,17 @@ export interface paths {
     get?: never
     put?: never
     /**
-     * Validate restart
+     * Validate restart from failure
      * @description Validate that an execution can be restarted from the given failure points. Checks execution state, failure-point eligibility, and the version-mismatch guard. Returns a pass/fail verdict without mutating any state.
      */
-    post: operations['validate_restart']
+    post: operations['validate_restart_from_failure']
     delete?: never
     options?: never
     head?: never
     patch?: never
     trace?: never
   }
-  '/executions/{execution_id}/restart': {
+  '/executions/{execution_id}/restart-from-failure': {
     parameters: {
       query?: never
       header?: never
@@ -118,10 +118,10 @@ export interface paths {
     get?: never
     put?: never
     /**
-     * Restart execution
+     * Restart from failure
      * @description Restart a failed execution from the given failure points. Independently repeats all validation checks, then creates a new execution linked to the source and triggers a Temporal run carrying restart context.
      */
-    post: operations['restart_execution']
+    post: operations['restart_from_failure']
     delete?: never
     options?: never
     head?: never
@@ -556,7 +556,7 @@ export interface components {
     }
     /**
      * RestartValidateRequest
-     * @description Request body for POST /executions/{id}/validate-restart.
+     * @description Request body for POST /executions/{id}/validate-restart-from-failure.
      */
     RestartValidateRequest: {
       /**
@@ -567,7 +567,7 @@ export interface components {
     }
     /**
      * RestartRequest
-     * @description Request body for POST /executions/{id}/restart.
+     * @description Request body for POST /executions/{id}/restart-from-failure.
      */
     RestartRequest: {
       /**
@@ -578,7 +578,7 @@ export interface components {
     }
     /**
      * RestartValidationResponse
-     * @description Pre-restart validation verdict (POST /executions/{id}/validate-restart).
+     * @description Pre-restart validation verdict (POST /executions/{id}/validate-restart-from-failure).
      */
     RestartValidationResponse: {
       /**
@@ -2262,7 +2262,7 @@ export interface operations {
       500: components['responses']['InternalServerError']
     }
   }
-  validate_restart: {
+  validate_restart_from_failure: {
     parameters: {
       query?: never
       header?: never
@@ -2296,7 +2296,7 @@ export interface operations {
       500: components['responses']['InternalServerError']
     }
   }
-  restart_execution: {
+  restart_from_failure: {
     parameters: {
       query?: never
       header?: never

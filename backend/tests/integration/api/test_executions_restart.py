@@ -1,4 +1,4 @@
-"""Integration tests for POST /api/v1/executions/{id}/validate-restart and /restart (AAP-92820)."""
+"""Integration tests for restart-from-failure endpoints (AAP-92820)."""
 
 import uuid
 from collections.abc import Generator
@@ -188,7 +188,7 @@ async def _eligible_execution(session: AsyncSession, workflow: Workflow, user: U
 
 @pytest.mark.asyncio
 class TestValidateRestart:
-    """Integration tests for POST /executions/{execution_id}/validate-restart."""
+    """Integration tests for POST /executions/{execution_id}/validate-restart-from-failure."""
 
     async def test_validate_pass(
         self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
@@ -196,7 +196,7 @@ class TestValidateRestart:
         execution = await _eligible_execution(test_db_session, test_workflow, test_user)
 
         response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/validate-restart",
+            f"/api/v1/executions/{execution.id}/validate-restart-from-failure",
             json={"failure_point_ids": ["step_2"]},
         )
 
@@ -215,7 +215,7 @@ class TestValidateRestart:
         await test_db_session.commit()
 
         response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/validate-restart",
+            f"/api/v1/executions/{execution.id}/validate-restart-from-failure",
             json={"failure_point_ids": ["step_2"]},
         )
 
@@ -230,7 +230,7 @@ class TestValidateRestart:
         execution = await _eligible_execution(test_db_session, test_workflow, test_user)
 
         response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/validate-restart",
+            f"/api/v1/executions/{execution.id}/validate-restart-from-failure",
             json={"failure_point_ids": ["step_3"]},
         )
 
@@ -248,7 +248,7 @@ class TestValidateRestart:
         await _save_new_version(test_db_session, test_workflow, test_user, changed)
 
         response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/validate-restart",
+            f"/api/v1/executions/{execution.id}/validate-restart-from-failure",
             json={"failure_point_ids": ["step_2"]},
         )
 
@@ -273,7 +273,7 @@ class TestValidateRestart:
         )
 
         response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/validate-restart",
+            f"/api/v1/executions/{execution.id}/validate-restart-from-failure",
             json={"failure_point_ids": ["step_2"]},
         )
 
@@ -307,7 +307,7 @@ class TestValidateRestart:
         await test_db_session.commit()
 
         response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/validate-restart",
+            f"/api/v1/executions/{execution.id}/validate-restart-from-failure",
             json={"failure_point_ids": ["step_2"]},
         )
 
@@ -318,7 +318,7 @@ class TestValidateRestart:
 
     async def test_validate_missing_execution_returns_404(self, auth_client: AsyncClient) -> None:
         response = await auth_client.post(
-            f"/api/v1/executions/{uuid.uuid4()}/validate-restart",
+            f"/api/v1/executions/{uuid.uuid4()}/validate-restart-from-failure",
             json={"failure_point_ids": ["step_2"]},
         )
 
@@ -335,7 +335,7 @@ class TestValidateRestart:
 
 @pytest.mark.asyncio
 class TestRestartExecution:
-    """Integration tests for POST /executions/{execution_id}/restart."""
+    """Integration tests for POST /executions/{execution_id}/restart-from-failure."""
 
     async def test_restart_success(
         self,
@@ -348,7 +348,7 @@ class TestRestartExecution:
         execution = await _eligible_execution(test_db_session, test_workflow, test_user)
 
         response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/restart",
+            f"/api/v1/executions/{execution.id}/restart-from-failure",
             json={"failure_point_ids": ["step_2"]},
         )
 
@@ -381,7 +381,7 @@ class TestRestartExecution:
         await test_db_session.commit()
 
         response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/restart",
+            f"/api/v1/executions/{execution.id}/restart-from-failure",
             json={"failure_point_ids": ["step_2"]},
         )
 
@@ -398,7 +398,7 @@ class TestRestartExecution:
 
     async def test_restart_missing_execution_returns_404(self, auth_client: AsyncClient) -> None:
         response = await auth_client.post(
-            f"/api/v1/executions/{uuid.uuid4()}/restart",
+            f"/api/v1/executions/{uuid.uuid4()}/restart-from-failure",
             json={"failure_point_ids": ["step_2"]},
         )
 

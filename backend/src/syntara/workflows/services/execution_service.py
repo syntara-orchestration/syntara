@@ -58,7 +58,7 @@ from syntara.workflows.models.execution import (
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 from syntara.workflows.models.workflow_version import WorkflowVersion
-from syntara.workflows.services.restart_validation import validate_restart
+from syntara.workflows.services.restart_validation import validate_restart_from_failure
 from syntara.workflows.utils.workflow_metadata import build_workflow_metadata, resolve_user_display_name
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType, resolve_trigger_node
 from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
@@ -386,7 +386,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
     ) -> ExecutionRead:
         """Start a Temporal workflow and persist the execution record.
 
-        Shared by create_execution, retry_execution, and restart_execution to
+        Shared by create_execution, retry_execution, and restart_from_failure to
         avoid duplication. Starts Temporal first, then creates the DB record.
         On DB commit failure, attempts to cancel the orphaned Temporal workflow.
         """
@@ -1259,7 +1259,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             retried_from_execution_id=original.id,
         )
 
-    async def validate_restart_execution(
+    async def validate_restart_from_failure(
         self, execution_id: UUID, failure_point_ids: list[str]
     ) -> RestartValidationResponse:
         """Validate a restart without mutating any state (AAP-92820).
@@ -1272,7 +1272,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             ExecutionNotFoundError: If the source execution is gone.
 
         """
-        validation = await validate_restart(self.session, execution_id, failure_point_ids)
+        validation = await validate_restart_from_failure(self.session, execution_id, failure_point_ids)
         logger.info(
             "Restart validation",
             execution_id=execution_id,
@@ -1287,7 +1287,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             sanitized_node_ids=validation.sanitized_node_ids,
         )
 
-    async def restart_execution(self, execution_id: UUID, failure_point_ids: list[str]) -> ExecutionRead:
+    async def restart_from_failure(self, execution_id: UUID, failure_point_ids: list[str]) -> ExecutionRead:
         """Restart an execution from failure points (AAP-92820).
 
         Independently repeats the full validation chain before doing any work
@@ -1310,7 +1310,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             ExecutionNotRestartableError: If validation rejects the restart
 
         """
-        validation = await self.validate_restart_execution(execution_id, failure_point_ids)
+        validation = await self.validate_restart_from_failure(execution_id, failure_point_ids)
         if not validation.eligible:
             raise ExecutionNotRestartableError(execution_id, validation.reason or "restart validation failed")
 

@@ -443,7 +443,7 @@ class TestExecutionCreate(SQLModel):
 
 
 class RestartValidateRequest(SQLModel):
-    """Request body for POST /executions/{id}/validate-restart."""
+    """Request body for POST /executions/{id}/validate-restart-from-failure."""
 
     __test__ = False  # Prevent pytest from collecting this as a test class
 
@@ -454,7 +454,7 @@ class RestartValidateRequest(SQLModel):
 
 
 class RestartRequest(SQLModel):
-    """Request body for POST /executions/{id}/restart."""
+    """Request body for POST /executions/{id}/restart-from-failure."""
 
     __test__ = False  # Prevent pytest from collecting this as a test class
 
@@ -466,7 +466,7 @@ class RestartRequest(SQLModel):
 
 
 class RestartValidationResponse(SQLModel):
-    """Pre-restart validation verdict (POST /executions/{id}/validate-restart)."""
+    """Pre-restart validation verdict (POST /executions/{id}/validate-restart-from-failure)."""
 
     eligible: bool = Field(description="Whether the restart is allowed to proceed")
     reason: str | None = Field(default=None, description="Rejection reason when eligible is false, null otherwise")

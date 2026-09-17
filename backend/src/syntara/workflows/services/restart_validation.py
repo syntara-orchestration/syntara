@@ -1,7 +1,7 @@
 """Pre-restart validation for restart-from-failure (AAP-92820).
 
-Shared by ``POST /executions/{id}/validate-restart`` (pure verdict, no state
-mutation) and ``POST /executions/{id}/restart`` (re-validates independently
+Shared by ``POST /executions/{id}/validate-restart-from-failure`` (pure verdict,
+no state mutation) and ``POST /executions/{id}/restart-from-failure`` (re-validates independently
 before doing any work, so the restart endpoint is safe to call directly).
 
 Validation is a chain of checks:
@@ -262,7 +262,7 @@ def _version_reason(
     return None, [], []
 
 
-async def validate_restart(
+async def validate_restart_from_failure(
     session: AsyncSession,
     execution_id: UUID,
     failure_point_ids: list[str],

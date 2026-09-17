@@ -14,7 +14,7 @@ from syntara.workflows.services.restart_validation import (
     collect_upstream_node_ids,
     diff_upstream_nodes,
     strip_iteration_suffix,
-    validate_restart,
+    validate_restart_from_failure,
 )
 
 TRIGGERS = [{"id": "trigger_1", "type": "manual_trigger", "parameters": {}}]
@@ -130,7 +130,7 @@ def _make_workflow(version: int) -> Mock:
 async def test_validate_restart_missing_execution() -> None:
     session = _mock_session((None, "one"))
     with pytest.raises(ExecutionNotFoundError):
-        await validate_restart(session, uuid4(), ["step_2"])
+        await validate_restart_from_failure(session, uuid4(), ["step_2"])
 
 
 @pytest.mark.asyncio
@@ -146,7 +146,7 @@ async def test_validate_restart_rejects_non_restartable_state() -> None:
         (workflow, "one"),
         (_make_version(1), "one"),
     )
-    verdict = await validate_restart(session, execution.id, ["step_2"])
+    verdict = await validate_restart_from_failure(session, execution.id, ["step_2"])
     assert verdict.eligible is False
     assert "completed" in (verdict.reason or "")
 
@@ -164,7 +164,7 @@ async def test_validate_restart_rejects_unknown_failure_point() -> None:
         (workflow, "one"),
         (_make_version(1), "one"),
     )
-    verdict = await validate_restart(session, execution.id, ["nope"])
+    verdict = await validate_restart_from_failure(session, execution.id, ["nope"])
     assert verdict.eligible is False
     assert "nope" in (verdict.reason or "")
 
@@ -182,7 +182,7 @@ async def test_validate_restart_passes_clean_path() -> None:
         (workflow, "one"),
         (_make_version(2), "one"),
     )
-    verdict = await validate_restart(session, execution.id, ["step_2"])
+    verdict = await validate_restart_from_failure(session, execution.id, ["step_2"])
     assert verdict.eligible is True
     assert verdict.reason is None
     assert verdict.failure_point_ids == ["step_2"]
@@ -204,7 +204,7 @@ async def test_validate_restart_rejects_upstream_change() -> None:
         (workflow, "one"),
         (_make_version(2, nodes=changed), "one"),
     )
-    verdict = await validate_restart(session, execution.id, ["step_2"])
+    verdict = await validate_restart_from_failure(session, execution.id, ["step_2"])
     assert verdict.eligible is False
     assert verdict.changed_node_ids == ["step_1"]
     assert "step_1" in (verdict.reason or "")
@@ -234,7 +234,7 @@ async def test_validate_restart_rejects_inserted_upstream_node() -> None:
         (workflow, "one"),
         (current_version, "one"),
     )
-    verdict = await validate_restart(session, execution.id, ["step_2"])
+    verdict = await validate_restart_from_failure(session, execution.id, ["step_2"])
     assert verdict.eligible is False
     assert verdict.changed_node_ids == ["step_1b"]
     assert "step_1b" in (verdict.reason or "")
@@ -263,7 +263,7 @@ async def test_validate_restart_rejects_sanitized_upstream_output() -> None:
             (current, "one"),
         )
 
-    verdict = await validate_restart(
+    verdict = await validate_restart_from_failure(
         _session_for(
             [
                 _make_completed_activity("step_1", {"token": "[REDACTED]"}),
@@ -277,7 +277,7 @@ async def test_validate_restart_rejects_sanitized_upstream_output() -> None:
     assert verdict.sanitized_node_ids == ["step_1"]
     assert "step_1" in (verdict.reason or "")
 
-    clean = await validate_restart(
+    clean = await validate_restart_from_failure(
         _session_for([_make_completed_activity("step_1", {"token": "abc123"})]),
         execution.id,
         ["step_2"],
@@ -315,6 +315,6 @@ async def test_validate_restart_flags_rewired_into_path_node() -> None:
         (workflow, "one"),
         (current_version, "one"),
     )
-    verdict = await validate_restart(session, execution.id, ["step_2"])
+    verdict = await validate_restart_from_failure(session, execution.id, ["step_2"])
     assert verdict.eligible is False
     assert verdict.changed_node_ids == ["sidecar"]
