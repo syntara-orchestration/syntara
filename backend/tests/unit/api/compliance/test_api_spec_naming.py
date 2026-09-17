@@ -1,4 +1,4 @@
-"""Ensure the OpenAPI spec uses "Automation Orchestrator", not "Syntara" or bare "Orchestrator"."""
+"""Ensure static OpenAPI specs use the upstream "Syntara" product name."""
 
 from __future__ import annotations
 
@@ -35,38 +35,41 @@ def _collect_strings(obj: dict[str, object] | list[object] | str | object, path:
     return results
 
 
-class TestNoSyntaraInSpec:
-    """Verify the API spec uses Automation Orchestrator, not Syntara."""
+class TestStaticSpecNaming:
+    """Verify static API specs retain the upstream product name."""
 
-    def test_title_uses_automation_orchestrator(self, runtime_spec: dict[str, Any]) -> None:
-        """The spec title must use Automation Orchestrator, not Syntara."""
+    def test_title_uses_syntara(self, runtime_spec: dict[str, Any]) -> None:
+        """The static spec title must use Syntara."""
         title = runtime_spec.get("info", {}).get("title", "")
-        assert "Syntara" not in title, f"Spec title contains 'Syntara': {title}"
-        assert "Automation Orchestrator" in title, f"Spec title missing 'Automation Orchestrator': {title}"
+        assert title == "Syntara API", f"Spec title must be 'Syntara API': {title}"
 
-    def test_no_syntara_in_spec(self, runtime_spec: dict[str, Any]) -> None:
-        """No string value in the spec should contain 'Syntara'."""
+    def test_no_downstream_product_name_in_spec(self, runtime_spec: dict[str, Any]) -> None:
+        """Static specs must not contain the downstream product name."""
         spec_text = json.dumps(runtime_spec)
-        if "Syntara" not in spec_text:
+        if "Automation Orchestrator" not in spec_text:
             return
-        violations = [f"{path}: {value}" for path, value in _collect_strings(runtime_spec) if "Syntara" in value]
-        assert violations == [], "Project name 'Syntara' found in API spec:\n" + "\n".join(f"  {v}" for v in violations)
+        violations = [
+            f"{path}: {value}" for path, value in _collect_strings(runtime_spec) if "Automation Orchestrator" in value
+        ]
+        assert violations == [], "Downstream product name found in API spec:\n" + "\n".join(
+            f"  {v}" for v in violations
+        )
 
 
-class TestNoSyntaraInJsonSchemas:
-    """Verify static JSON schema files use Automation Orchestrator, not Syntara."""
+class TestStaticJsonSchemaNaming:
+    """Verify static JSON schema files retain the upstream product name."""
 
-    def test_no_syntara_in_json_schemas(self) -> None:
-        """No JSON schema file should contain 'Syntara'."""
+    def test_no_downstream_product_name_in_json_schemas(self) -> None:
+        """No JSON schema file should contain the downstream product name."""
         violations = []
         for path in sorted(_SCHEMAS_DIR.rglob("*.schema.json")):
             content = path.read_text(encoding="utf-8")
-            if "Syntara" in content:
+            if "Automation Orchestrator" in content:
                 data = json.loads(content)
                 rel = path.relative_to(_SCHEMAS_DIR)
                 for json_path, value in _collect_strings(data):
-                    if "Syntara" in value:
+                    if "Automation Orchestrator" in value:
                         violations.append(f"{rel}{json_path}: {value}")
-        assert violations == [], "Project name 'Syntara' found in JSON schema files:\n" + "\n".join(
+        assert violations == [], "Downstream product name found in JSON schema files:\n" + "\n".join(
             f"  {v}" for v in violations
         )

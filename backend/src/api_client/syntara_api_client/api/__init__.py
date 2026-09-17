@@ -1,4 +1,4 @@
-"""Automation Orchestrator API Registry - auto-generated from OpenAPI spec."""
+"""Syntara API Registry - auto-generated from OpenAPI spec."""
 
 from __future__ import annotations
 

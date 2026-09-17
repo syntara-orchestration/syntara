@@ -92,11 +92,11 @@ def sync_detailed(
 ) -> Response[ErrorData | KPIDashboard]:
     """Metrics store KPIs
 
-     Return a computed KPI dashboard covering all Automation Orchestrator components.
+     Return a computed KPI dashboard covering all Syntara components.
 
-    Maps metrics to the KPIs defined in the Automation Orchestrator KPI documents:
-    - Automation Orchestrator Key Performance Indicators (KPIs)
-    - Automation Orchestrator LLM/Agent Performance KPIs
+    Maps metrics to the KPIs defined in the Syntara KPI documents:
+    - Syntara Key Performance Indicators (KPIs)
+    - Syntara LLM/Agent Performance KPIs
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -121,11 +121,11 @@ def sync(
 ) -> ErrorData | KPIDashboard | None:
     """Metrics store KPIs
 
-     Return a computed KPI dashboard covering all Automation Orchestrator components.
+     Return a computed KPI dashboard covering all Syntara components.
 
-    Maps metrics to the KPIs defined in the Automation Orchestrator KPI documents:
-    - Automation Orchestrator Key Performance Indicators (KPIs)
-    - Automation Orchestrator LLM/Agent Performance KPIs
+    Maps metrics to the KPIs defined in the Syntara KPI documents:
+    - Syntara Key Performance Indicators (KPIs)
+    - Syntara LLM/Agent Performance KPIs
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -146,11 +146,11 @@ async def asyncio_detailed(
 ) -> Response[ErrorData | KPIDashboard]:
     """Metrics store KPIs
 
-     Return a computed KPI dashboard covering all Automation Orchestrator components.
+     Return a computed KPI dashboard covering all Syntara components.
 
-    Maps metrics to the KPIs defined in the Automation Orchestrator KPI documents:
-    - Automation Orchestrator Key Performance Indicators (KPIs)
-    - Automation Orchestrator LLM/Agent Performance KPIs
+    Maps metrics to the KPIs defined in the Syntara KPI documents:
+    - Syntara Key Performance Indicators (KPIs)
+    - Syntara LLM/Agent Performance KPIs
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -173,11 +173,11 @@ async def asyncio(
 ) -> ErrorData | KPIDashboard | None:
     """Metrics store KPIs
 
-     Return a computed KPI dashboard covering all Automation Orchestrator components.
+     Return a computed KPI dashboard covering all Syntara components.
 
-    Maps metrics to the KPIs defined in the Automation Orchestrator KPI documents:
-    - Automation Orchestrator Key Performance Indicators (KPIs)
-    - Automation Orchestrator LLM/Agent Performance KPIs
+    Maps metrics to the KPIs defined in the Syntara KPI documents:
+    - Syntara Key Performance Indicators (KPIs)
+    - Syntara LLM/Agent Performance KPIs
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

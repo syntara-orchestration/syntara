@@ -1,10 +1,10 @@
 ---
 openapi: 3.1.0
 info:
-  title: Automation Orchestrator Authorization Query API
+  title: Syntara Authorization Query API
   version: 1.0.0
   description: |
-    Authorization debug and query endpoints for the Automation Orchestrator platform.
+    Authorization debug and query endpoints for the Syntara platform.
 
     Provides three query patterns for inspecting authorization decisions:
     - **Can I?** - Check if the current user can perform a specific action
