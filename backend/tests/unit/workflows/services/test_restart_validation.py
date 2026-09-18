@@ -299,6 +299,91 @@ async def test_template_reference_forms() -> None:
 
 
 @pytest.mark.asyncio
+async def test_validate_restart_ignores_sanitized_unread_on_restart_path() -> None:
+    """A redacted output referenced only by an already-completed node does not block."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    workflow = _make_workflow(1)
+    execution.workflow_id = workflow.id
+    step_0 = {"id": "step_0", "type": "script", "parameters": {"input_ref": "${step_1.token}"}}
+    nodes = [step_0, *NODES]
+    edges = [{"from": "trigger_1", "to": "step_0"}, {"from": "step_0", "to": "step_1"}, *EDGES[1:]]
+    version = _make_version(1, nodes=nodes)
+    version.workflow_definition["edges"] = edges
+    session = _mock_session(
+        (execution, "one"),
+        ([_make_activity("step_2")], "all"),
+        ([_make_completed_activity("step_0"), _make_completed_activity("step_1", {"token": "[REDACTED]"})], "all"),
+        (version, "one"),
+        (workflow, "one"),
+        (version, "one"),
+    )
+    verdict = await validate_restart_from_failure(session, execution.id, ["step_2"])
+    assert verdict.eligible is True
+    assert verdict.sanitized_node_ids == []
+
+
+def _converge_definition() -> dict:
+    branch_a = {"id": "step_a", "type": "script", "parameters": {"code": "exit 1"}}
+    branch_b = {"id": "step_b", "type": "script", "parameters": {"code": "echo ok"}}
+    conv = {"id": "conv_1", "type": "converge", "parameters": {}}
+    after = {"id": "step_3", "type": "script", "parameters": {"code": "echo done"}}
+    return {
+        "triggers": TRIGGERS,
+        "nodes": [branch_a, branch_b, conv, after],
+        "edges": [
+            {"from": "trigger_1", "to": "step_a"},
+            {"from": "trigger_1", "to": "step_b"},
+            {"from": "step_a", "to": "conv_1"},
+            {"from": "step_b", "to": "conv_1"},
+            {"from": "conv_1", "to": "step_3"},
+        ],
+    }
+
+
+def _converge_session(execution: Mock, workflow: Mock, converge_status: str) -> Mock:
+    definition = _converge_definition()
+    snapshot = _make_version(1)
+    snapshot.workflow_definition = definition
+    current = _make_version(1)
+    current.workflow_definition = definition
+    completed = [_make_completed_activity("step_b")]
+    if converge_status == "completed":
+        completed.append(_make_completed_activity("conv_1"))
+        failed = [_make_activity("step_a")]
+    else:
+        failed = [_make_activity("step_a"), _make_activity("conv_1")]
+    return _mock_session(
+        (execution, "one"),
+        (failed, "all"),
+        (completed, "all"),
+        (snapshot, "one"),
+        (workflow, "one"),
+        (current, "one"),
+    )
+
+
+@pytest.mark.asyncio
+async def test_validate_restart_rejects_failure_under_completed_converge() -> None:
+    execution = _make_execution(ExecutionStatus.FAILED)
+    workflow = _make_workflow(1)
+    execution.workflow_id = workflow.id
+    session = _converge_session(execution, workflow, "completed")
+    verdict = await validate_restart_from_failure(session, execution.id, ["step_a"])
+    assert verdict.eligible is False
+    assert "conv_1" in (verdict.reason or "")
+
+
+@pytest.mark.asyncio
+async def test_validate_restart_allows_failure_under_failed_converge() -> None:
+    execution = _make_execution(ExecutionStatus.FAILED)
+    workflow = _make_workflow(1)
+    execution.workflow_id = workflow.id
+    session = _converge_session(execution, workflow, "failed")
+    verdict = await validate_restart_from_failure(session, execution.id, ["step_a"])
+    assert verdict.eligible is True
+
+
+@pytest.mark.asyncio
 async def test_validate_restart_flags_rewired_into_path_node() -> None:
     """A snapshot node rewired into the upstream path counts as inserted."""
     execution = _make_execution(ExecutionStatus.FAILED)

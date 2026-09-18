@@ -62,7 +62,9 @@ def mock_temporal_service(session_app) -> Generator[Mock, None, None]:
     session_app.dependency_overrides.pop(get_temporal_execution_service, None)
 
 
-async def _set_version_definition(session: AsyncSession, workflow: Workflow, nodes: list[dict]) -> WorkflowVersion:
+async def _set_version_definition(
+    session: AsyncSession, workflow: Workflow, nodes: list[dict], edges: list[dict] | None = None
+) -> WorkflowVersion:
     """Point the workflow's current version at a small graph definition."""
     result = await session.exec(
         select(WorkflowVersion).where(
@@ -76,7 +78,7 @@ async def _set_version_definition(session: AsyncSession, workflow: Workflow, nod
         "name": workflow.name,
         "triggers": [{"id": "trigger_manual", "name": "Manual trigger", "type": "manual_trigger", "parameters": {}}],
         "nodes": nodes,
-        "edges": GRAPH_EDGES,
+        "edges": edges if edges is not None else GRAPH_EDGES,
     }
     session.add(version)
     await session.commit()
@@ -134,20 +136,60 @@ async def _add_failed_activity(session: AsyncSession, execution: Execution, node
 
 
 async def _add_completed_activity(
-    session: AsyncSession, execution: Execution, node_id: str, output: dict | None = None
+    session: AsyncSession,
+    execution: Execution,
+    node_id: str,
+    output: dict | None = None,
+    node_type: NodeType = NodeType.SCRIPT,
 ) -> None:
     """Record a completed activity with stored output for a node."""
     session.add(
         ActivityExecution(
             execution_id=execution.id,
             activity_name=node_id,
-            node_type=NodeType.SCRIPT,
+            node_type=node_type,
             temporal_activity_id=f"temporal-activity-{uuid.uuid4()}",
             status=ActivityStatus.COMPLETED,
             output_data=output if output is not None else {"result": "ok"},
         )
     )
     await session.commit()
+
+
+CONVERGE_NODES = [
+    {"id": "step_a", "name": "branch-a", "type": "script", "parameters": {"code": "exit 1"}},
+    {"id": "step_b", "name": "branch-b", "type": "script", "parameters": {"code": "echo ok"}},
+    {"id": "conv_1", "name": "join", "type": "converge", "parameters": {}},
+    {"id": "step_3", "name": "after", "type": "script", "parameters": {"code": "echo done"}},
+]
+CONVERGE_EDGES = [
+    {"from": "trigger_manual", "to": "step_a"},
+    {"from": "trigger_manual", "to": "step_b"},
+    {"from": "step_a", "to": "conv_1"},
+    {"from": "step_b", "to": "conv_1"},
+    {"from": "conv_1", "to": "step_3"},
+]
+
+
+async def _converge_execution(
+    session: AsyncSession, workflow: Workflow, user: User, converge_status: ActivityStatus
+) -> Execution:
+    """Execution with a failed branch; converge completed or failed."""
+    await _set_version_definition(session, workflow, CONVERGE_NODES, CONVERGE_EDGES)
+    execution = await _create_execution(session, workflow, user)
+    await _add_failed_activity(session, execution, "step_a")
+    await _add_completed_activity(session, execution, "step_b")
+    session.add(
+        ActivityExecution(
+            execution_id=execution.id,
+            activity_name="conv_1",
+            node_type=NodeType.CONVERGE,
+            temporal_activity_id=f"temporal-activity-{uuid.uuid4()}",
+            status=converge_status,
+        )
+    )
+    await session.commit()
+    return execution
 
 
 async def _save_new_version(
@@ -315,6 +357,34 @@ class TestValidateRestart:
         data = response.json()
         assert data["eligible"] is False
         assert data["sanitized_node_ids"] == ["step_1"]
+
+    async def test_validate_rejects_failure_under_completed_converge(
+        self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
+    ) -> None:
+        execution = await _converge_execution(test_db_session, test_workflow, test_user, ActivityStatus.COMPLETED)
+
+        response = await auth_client.post(
+            f"/api/v1/executions/{execution.id}/validate-restart-from-failure",
+            json={"failure_point_ids": ["step_a"]},
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["eligible"] is False
+        assert "conv_1" in data["reason"]
+
+    async def test_validate_allows_failure_under_failed_converge(
+        self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
+    ) -> None:
+        execution = await _converge_execution(test_db_session, test_workflow, test_user, ActivityStatus.FAILED)
+
+        response = await auth_client.post(
+            f"/api/v1/executions/{execution.id}/validate-restart-from-failure",
+            json={"failure_point_ids": ["step_a"]},
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()["eligible"] is True
 
     async def test_validate_missing_execution_returns_404(self, auth_client: AsyncClient) -> None:
         response = await auth_client.post(

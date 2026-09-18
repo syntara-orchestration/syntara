@@ -126,6 +126,34 @@ def collect_upstream_node_ids(
     return upstream
 
 
+def collect_downstream_node_ids(
+    definition: dict[str, Any],
+    failure_point_ids: list[str],
+) -> set[str]:
+    """Return failure points plus every successor downstream (inclusive).
+
+    The restart re-executes exactly this set (for the selected points), so
+    only references originating here can consume injected outputs.
+    """
+    nodes = definition_nodes(definition)
+    edges = definition.get("edges", []) or []
+    successors: dict[str, set[str]] = {node["id"]: set() for node in nodes if "id" in node}
+    for edge in edges:
+        src, dst = edge.get("from"), edge.get("to")
+        if src is not None and dst is not None:
+            successors.setdefault(src, set()).add(dst)
+
+    downstream: set[str] = set()
+    stack = list(failure_point_ids)
+    while stack:
+        node_id = stack.pop()
+        if node_id in downstream:
+            continue
+        downstream.add(node_id)
+        stack.extend(successors.get(node_id, ()))
+    return downstream
+
+
 def canonical_node(node: dict[str, Any]) -> dict[str, Any]:
     """Structural projection of a definition node for the mismatch diff."""
     return {key: value for key, value in node.items() if key not in COSMETIC_NODE_FIELDS}
@@ -212,17 +240,72 @@ def _template_reference(value: Any, target_id: str) -> bool:  # noqa: ANN401
     return False
 
 
-def _is_referenced_downstream(definition: dict[str, Any], target_id: str) -> bool:
-    """Whether any other node references the target's outputs in its parameters.
+def _is_referenced_on_restart_path(definition: dict[str, Any], target_id: str, restart_path: set[str]) -> bool:
+    """Whether a node on the restart path references the target's outputs.
 
-    Any textual reference must come from downstream (references flow forward in
-    an acyclic graph), so this precisely scopes the sanitized-output guard to
-    nodes whose redacted data would actually be consumed.
+    Only references from nodes that will actually re-execute (the selected
+    failure points plus their downstream) can consume injected data. References
+    from already-completed upstream nodes or skipped (unselected) branches are
+    harmless and must not block the restart.
     """
     return any(
-        node.get("id") != target_id and _template_reference(node.get("parameters", {}), target_id)
+        node.get("id") != target_id
+        and node.get("id") in restart_path
+        and _template_reference(node.get("parameters", {}), target_id)
         for node in definition_nodes(definition)
     )
+
+
+def _nearest_downstream_converge(
+    successors: dict[str, set[str]],
+    by_id: dict[str, dict[str, Any]],
+    node_id: str,
+) -> str | None:
+    """Nearest converge-type node fed by the given node, or None if there isn't one."""
+    seen: set[str] = set()
+    stack = list(successors.get(node_id, ()))
+    while stack:
+        current = stack.pop()
+        if current in seen:
+            continue
+        seen.add(current)
+        node = by_id.get(current)
+        if node is not None and node.get("type") == "converge":
+            return current
+        stack.extend(successors.get(current, ()))
+    return None
+
+
+def _converge_reason(
+    snapshot_def: dict[str, Any],
+    normalized: list[str],
+    completed_ids: set[str],
+) -> str | None:
+    """Rejection reason when failure points feed an already-completed converge.
+
+    A completed converge met its threshold without these branches, so the
+    workflow already moved past them — restarting them is moot. A FAILED
+    converge (threshold unmet) keeps its branch failures as valid candidates.
+    """
+    nodes = definition_nodes(snapshot_def)
+    by_id = {node["id"]: node for node in nodes if "id" in node}
+    successors: dict[str, set[str]] = {node_id: set() for node_id in by_id}
+    for edge in snapshot_def.get("edges", []) or []:
+        src, dst = edge.get("from"), edge.get("to")
+        if src is not None and dst is not None:
+            successors.setdefault(src, set()).add(dst)
+    mooted = [
+        f"{point} (converge {converge} already completed)"
+        for point in normalized
+        if (converge := _nearest_downstream_converge(successors, by_id, point)) is not None
+        and converge in completed_ids
+    ]
+    if mooted:
+        return (
+            "failure points feed an already-completed converge node "
+            f"({', '.join(mooted)}); the workflow already moved past these branches"
+        )
+    return None
 
 
 def _version_reason(
@@ -246,12 +329,13 @@ def _version_reason(
     current_upstream = collect_upstream_node_ids(current_def, normalized)
     inserted = sorted(current_upstream - snapshot_upstream)
     changed = sorted(set(diff_upstream_nodes(snapshot_def, current_def, snapshot_upstream)) | set(inserted))
+    restart_path = collect_downstream_node_ids(current_def, normalized)
     sanitized = sorted(
         node_id
         for node_id in snapshot_upstream
         if node_id in completed_outputs
         and _contains_redacted(completed_outputs[node_id])
-        and _is_referenced_downstream(current_def, node_id)
+        and _is_referenced_on_restart_path(current_def, node_id, restart_path)
     )
     parts = []
     if changed:
@@ -310,6 +394,7 @@ async def validate_restart_from_failure(
         )
     ).all()
     completed_outputs = {strip_iteration_suffix(activity.activity_name): activity.output_data for activity in completed}
+    completed_ids = set(completed_outputs)
 
     snapshot_result = await session.exec(
         select(WorkflowVersion).where(WorkflowVersion.id == source.workflow_version_id)
@@ -330,7 +415,13 @@ async def validate_restart_from_failure(
     current = current_result.one_or_none()
 
     version_reason, changed, sanitized = _version_reason(normalized, snapshot, current, completed_outputs)
-    reason = _state_reason(source) or _selection_reason(normalized, failed_ids) or version_reason
+    snapshot_def_for_converge = (snapshot.workflow_definition or {}) if snapshot is not None else {}
+    reason = (
+        _state_reason(source)
+        or _selection_reason(normalized, failed_ids)
+        or _converge_reason(snapshot_def_for_converge, normalized, completed_ids)
+        or version_reason
+    )
 
     snapshot_def = (snapshot.workflow_definition or {}) if snapshot is not None else {}
     snapshot_version = snapshot.version if snapshot is not None else None
