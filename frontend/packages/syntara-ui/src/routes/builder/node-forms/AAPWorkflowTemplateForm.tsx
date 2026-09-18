@@ -1,16 +1,17 @@
-import { FormGroup, Stack, StackItem, Switch } from '@patternfly/react-core'
+import { Stack, StackItem, Switch } from '@patternfly/react-core'
 import type { ReactNode } from 'react'
-import { use, useEffect, useMemo, useRef, useState } from 'react'
+import { use, useEffect, useMemo, useRef } from 'react'
 import { FormProvider, useForm, useFormContext, useWatch } from 'react-hook-form'
 
+import { SynFormField } from '../../../components/forms/SynFormField'
 import { useAAPBrowser } from '../../../hooks/useAAPBrowser'
 import { detachPromise } from '../../../utils/detachPromise'
 import { AAPIntegrationSection } from '../components/AAPIntegrationSection'
 import type { ExpandableCodeEditorHandle } from '../components/ExpandableCodeEditor'
 import { NodeEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useNodeEditorAutoSubmit'
+import { hasExpressionValue } from '../utils/aapHelpers'
 import { useIsVersionView } from '../VersionViewContext'
 
-import { isExpression } from './aapFormHelpers'
 import { AAPWorkflowTemplatePromptFields } from './AAPWorkflowTemplatePromptFields'
 import { AAPWorkflowTemplateResourcePickers } from './AAPWorkflowTemplateResourcePickers'
 import { aapWorkflowTemplateSchema, type AAPWorkflowTemplateFormData } from './aapWorkflowTemplateSchema'
@@ -51,15 +52,7 @@ function AAPFormFields({
   const isVersionView = useIsVersionView()
   const { register } = useFormContext<AAPWorkflowTemplateFormData>()
 
-  // Auto-detect expression mode from initial data
-  const hasExpressionInInitialData =
-    isExpression(initialData?.organization_name) ||
-    isExpression(initialData?.workflow_job_template_name) ||
-    isExpression(initialData?.inventory_name) ||
-    isExpression(initialData?.limit) ||
-    isExpression(initialData?.scm_branch)
-
-  const [expressionMode, setExpressionMode] = useState(hasExpressionInInitialData)
+  const expressionMode = Boolean(useWatch({ name: 'use_input_variables' }))
 
   const browser = useAAPBrowser(
     selectedCredentialId,
@@ -86,15 +79,23 @@ function AAPFormFields({
   const parametersContent = (
     <Stack hasGutter>
       <StackItem>
-        <FormGroup label="Use input variables" labelHelp={nodeHelp.aapUseExpressions} fieldId="aap-wf-expression-mode">
-          <Switch
-            id="aap-wf-expression-mode"
-            aria-label="Use input variables"
-            isChecked={expressionMode}
-            onChange={(_e, checked) => setExpressionMode(checked)}
-            isDisabled={isVersionView}
-          />
-        </FormGroup>
+        <SynFormField<AAPWorkflowTemplateFormData, 'use_input_variables'>
+          name="use_input_variables"
+          label="Use input variables"
+          labelHelp={nodeHelp.aapUseExpressions}
+          fieldId="aap-wf-expression-mode"
+          hideFooter
+        >
+          {({ field }) => (
+            <Switch
+              id="aap-wf-expression-mode"
+              aria-label="Use input variables"
+              isChecked={Boolean(field.value)}
+              onChange={(_e, checked) => field.onChange(checked)}
+              isDisabled={isVersionView}
+            />
+          )}
+        </SynFormField>
       </StackItem>
 
       <StackItem>
@@ -217,6 +218,8 @@ function AAPFormFields({
 export function AAPWorkflowTemplateForm(props: Readonly<AAPWorkflowTemplateFormProps>) {
   const extraVarsEditorRef = useRef<ExpandableCodeEditorHandle>(null)
 
+  const { initialData } = props
+
   const defaultValues: AAPWorkflowTemplateFormData = {
     name: '',
     credential_id: undefined,
@@ -232,7 +235,19 @@ export function AAPWorkflowTemplateForm(props: Readonly<AAPWorkflowTemplateFormP
     skip_tags: '',
     labels: [],
     settings: {},
-    ...props.initialData,
+    ...initialData,
+    use_input_variables:
+      initialData?.use_input_variables === true ||
+      hasExpressionValue(
+        initialData?.organization_name,
+        initialData?.workflow_job_template_name,
+        initialData?.inventory_name,
+        initialData?.limit,
+        initialData?.scm_branch,
+        initialData?.tags,
+        initialData?.skip_tags,
+        initialData?.extra_vars
+      ),
   }
 
   const methods = useForm<AAPWorkflowTemplateFormData>({

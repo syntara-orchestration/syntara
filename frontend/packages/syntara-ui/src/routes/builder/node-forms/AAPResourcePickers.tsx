@@ -1,7 +1,7 @@
-import { FormGroup, FormHelperText, HelperText, HelperTextItem, StackItem } from '@patternfly/react-core'
-import { RhUiErrorIcon } from '@patternfly/react-icons'
-import { Controller, useFormContext } from 'react-hook-form'
+import { Button, FormHelperText, HelperText, HelperTextItem, StackItem } from '@patternfly/react-core'
+import { useFormContext } from 'react-hook-form'
 
+import { SynFormField } from '../../../components/forms/SynFormField'
 import type { useAAPBrowser } from '../../../hooks/useAAPBrowser'
 import { isValidAAPTemplateURL } from '../../../utils/urlValidation'
 
@@ -15,13 +15,7 @@ type AAPResourcePickersProps = {
 }
 
 export function AAPResourcePickers({ browser }: AAPResourcePickersProps) {
-  const {
-    control,
-    setValue,
-    reset,
-    getValues,
-    formState: { errors },
-  } = useFormContext<AAPJobTemplateFormData>()
+  const { setValue, reset, getValues } = useFormContext<AAPJobTemplateFormData>()
 
   const {
     organizations,
@@ -74,99 +68,84 @@ export function AAPResourcePickers({ browser }: AAPResourcePickersProps) {
 
   return (
     <>
-      {/* Authentication credential selector moved to AAPNodeForm (renders in both expression and normal mode) */}
-
-      {/* Organization */}
       <StackItem>
-        <FormGroup label="Organization" labelHelp={nodeHelp.aapOrganization} isRequired fieldId="aap-organization">
-          <Controller
-            control={control}
-            name="organization_name"
-            render={({ field }) => (
-              <AAPTypeaheadSelect
-                id="aap-organization"
-                ariaLabel="Organization"
-                options={orgOptions}
-                selected={field.value ?? ''}
-                onChange={(value) => {
-                  field.onChange(value)
-                  selectOrganization(value)
-                  // Clear downstream selections and all prompt-on-launch overrides
-                  setValue('job_template_name', '')
-                  setValue('job_template_id', undefined)
-                  clearPromptOverrides()
-                }}
-                onSearchChange={searchOrganizations}
-                placeholder="Select an organization"
-                isLoading={loadingOrgs}
-                hasError={!!errors.organization_name}
-              />
-            )}
-          />
-          <FormHelperText>
-            <HelperText>
-              {errors.organization_name ? (
-                <HelperTextItem icon={<RhUiErrorIcon />} variant="error">
-                  {errors.organization_name.message}
-                </HelperTextItem>
-              ) : (
-                <HelperTextItem>AAP organization to browse resources from</HelperTextItem>
-              )}
-            </HelperText>
-          </FormHelperText>
-        </FormGroup>
+        <SynFormField<AAPJobTemplateFormData, 'organization_name'>
+          name="organization_name"
+          label="Organization"
+          labelHelp={nodeHelp.aapOrganization}
+          isRequired
+          fieldId="aap-organization"
+          hint="AAP organization to browse resources from"
+        >
+          {({ field, fieldState }) => (
+            <AAPTypeaheadSelect
+              id="aap-organization"
+              ariaLabel="Organization"
+              options={orgOptions}
+              selected={field.value ?? ''}
+              onChange={(value) => {
+                field.onChange(value)
+                selectOrganization(value)
+                setValue('job_template_name', '')
+                setValue('job_template_id', undefined)
+                clearPromptOverrides()
+              }}
+              onSearchChange={searchOrganizations}
+              placeholder="Select an organization"
+              isLoading={loadingOrgs}
+              hasError={!!fieldState.error}
+            />
+          )}
+        </SynFormField>
       </StackItem>
 
-      {/* Job Template */}
       <StackItem>
-        <FormGroup label="Job template" labelHelp={nodeHelp.aapJobTemplate} isRequired fieldId="aap-jobTemplate">
-          <Controller
-            control={control}
-            name="job_template_name"
-            render={({ field }) => (
-              <AAPTypeaheadSelect
-                id="aap-jobTemplate"
-                ariaLabel="Job template"
-                options={templateOptions}
-                selected={field.value ?? ''}
-                onChange={(value) => {
-                  field.onChange(value)
-                  const selected = jobTemplates.find((t) => t.name === value)
-                  setValue('job_template_id', selected?.id)
-                  selectJobTemplate(selected?.id)
-                  // Clear all prompt-on-launch overrides when template changes
-                  clearPromptOverrides()
-                }}
-                onSearchChange={searchJobTemplates}
-                placeholder="Select a job template"
-                isLoading={loadingTemplates}
-                hasError={!!errors.job_template_name}
-              />
-            )}
-          />
+        <SynFormField<AAPJobTemplateFormData, 'job_template_name'>
+          name="job_template_name"
+          label="Job template"
+          labelHelp={nodeHelp.aapJobTemplate}
+          isRequired
+          fieldId="aap-jobTemplate"
+          hint="AAP job template to launch"
+        >
+          {({ field, fieldState }) => (
+            <AAPTypeaheadSelect
+              id="aap-jobTemplate"
+              ariaLabel="Job template"
+              options={templateOptions}
+              selected={field.value ?? ''}
+              onChange={(value) => {
+                field.onChange(value)
+                const selected = jobTemplates.find((t) => t.name === value)
+                setValue('job_template_id', selected?.id)
+                selectJobTemplate(selected?.id)
+                clearPromptOverrides()
+              }}
+              onSearchChange={searchJobTemplates}
+              placeholder="Select a job template"
+              isLoading={loadingTemplates}
+              hasError={!!fieldState.error}
+            />
+          )}
+        </SynFormField>
+        {browser.templateDetail?.url && isValidAAPTemplateURL(browser.templateDetail.url) && (
           <FormHelperText>
             <HelperText>
-              {errors.job_template_name ? (
-                <HelperTextItem icon={<RhUiErrorIcon />} variant="error">
-                  {errors.job_template_name.message}
-                </HelperTextItem>
-              ) : (
-                <HelperTextItem>AAP job template to launch</HelperTextItem>
-              )}
+              <HelperTextItem>
+                <Button
+                  variant="link"
+                  component="a"
+                  href={browser.templateDetail.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  isInline
+                >
+                  View job template in AAP
+                </Button>
+              </HelperTextItem>
             </HelperText>
           </FormHelperText>
-          {browser.templateDetail?.url && isValidAAPTemplateURL(browser.templateDetail.url) && (
-            <FormHelperText>
-              <HelperText>
-                <HelperTextItem>
-                  <a href={browser.templateDetail.url} target="_blank" rel="noopener noreferrer">
-                    View job template in AAP
-                  </a>
-                </HelperTextItem>
-              </HelperText>
-            </FormHelperText>
-          )}
-        </FormGroup>
+        )}
       </StackItem>
 
       <AAPErrorAlert error={browserError} onRetry={retryAll} />

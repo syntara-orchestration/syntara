@@ -1,13 +1,13 @@
-import { FormGroup, FormHelperText, HelperText, HelperTextItem, TextInput } from '@patternfly/react-core'
 import type { ReactElement } from 'react'
 import type { FieldValues, Path } from 'react-hook-form'
-import { useFormContext } from 'react-hook-form'
 
-import { DroppableField } from '../panels/fields/DroppableField'
+import { SynExpressionField } from '../../../components/forms/SynExpressionField'
 import { useIsVersionView } from '../VersionViewContext'
 
 import type { AAPJobTemplateFormData } from './aapJobTemplateSchema'
 import type { AAPWorkflowTemplateFormData } from './aapWorkflowTemplateSchema'
+
+const EXPRESSION_HINT = 'Enter a value or drag an expression from the Input panel'
 
 /**
  * Generic expression text field with drag-and-drop support.
@@ -31,24 +31,18 @@ function GenericExpressionTextField<T extends FieldValues>({
   labelHelp,
 }: GenericExpressionTextFieldProps<T>) {
   const isVersionView = useIsVersionView()
-  const { register, getValues, setValue } = useFormContext<T>()
+
   return (
-    <FormGroup label={label} labelHelp={labelHelp} isRequired={isRequired} fieldId={id}>
-      <DroppableField
-        onDropText={(text) => {
-          const current = getValues(name)
-          // Type assertion needed for generic Path<T> with string concatenation
-          setValue(name, (((current as string) ?? '') + text) as T[Path<T>])
-        }}
-      >
-        <TextInput {...register(name)} id={id} type="text" placeholder={placeholder} isDisabled={isVersionView} />
-      </DroppableField>
-      <FormHelperText>
-        <HelperText>
-          <HelperTextItem>Enter a value or drag an expression from the Input panel</HelperTextItem>
-        </HelperText>
-      </FormHelperText>
-    </FormGroup>
+    <SynExpressionField
+      name={name}
+      fieldId={id}
+      label={label}
+      placeholder={placeholder}
+      isRequired={isRequired}
+      labelHelp={labelHelp}
+      hint={EXPRESSION_HINT}
+      isDisabled={isVersionView}
+    />
   )
 }
 

@@ -37,6 +37,8 @@ export const aapWorkflowTemplateSchema = z
     skip_tags: z.string().optional(),
     labels: z.array(z.string()).optional(),
     settings: nodeSettingsSchema.optional(),
+    // Local UI mode: persisted in node parameters so reopen restores the toggle
+    use_input_variables: z.boolean().optional(),
   })
   .superRefine((data, ctx) => {
     validateExtraVars(data.extra_vars, ctx)
