@@ -131,6 +131,22 @@ def _nodes_by_id(definition: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return mapping
 
 
+def _triggers_by_id(definition: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    mapping: dict[str, dict[str, Any]] = {}
+    for trigger in definition.get("triggers") or []:
+        if isinstance(trigger, dict) and trigger.get("id") is not None:
+            mapping[str(trigger["id"])] = trigger
+    return mapping
+
+
+def _item_ids(items: list[Any]) -> set[str]:
+    ids: set[str] = set()
+    for item in items:
+        if isinstance(item, dict) and item.get("id") is not None:
+            ids.add(str(item["id"]))
+    return ids
+
+
 async def is_node_type_action_allowed(
     db: AsyncSession,
     evaluator: AuthzEvaluator,
@@ -231,47 +247,89 @@ async def filter_workflow_definition_for_user(
     return filtered
 
 
+def _removal_permission_errors(
+    previous_items: dict[str, dict[str, Any]],
+    current_ids: set[str],
+    permissions: dict[str, NodeTypeAccess],
+    *,
+    kind: str,
+) -> list[str]:
+    errors: list[str] = []
+    for item_id, item in previous_items.items():
+        if item_id in current_ids:
+            continue
+        item_type = str(item.get("type", ""))
+        access = permissions.get(item_type)
+        if access is None or not access.read or not access.write:
+            errors.append(f"{kind} '{item_id}' ({item_type}) cannot be removed with your permissions")
+    return errors
+
+
+def _restore_read_denied_items(
+    items: list[Any],
+    previous_items: dict[str, dict[str, Any]],
+    permissions: dict[str, NodeTypeAccess],
+    *,
+    kind: str,
+    previous_definition: dict[str, Any] | None,
+) -> tuple[list[Any], list[str]]:
+    """Restore prior bodies for read-denied items; collect add errors for new ones."""
+    errors: list[str] = []
+    restored: list[Any] = []
+    for item in items:
+        if not isinstance(item, dict):
+            restored.append(item)
+            continue
+        item_type = str(item.get("type", ""))
+        item_id = str(item.get("id", item_type))
+        access = permissions.get(item_type)
+        if access is None:
+            restored.append(item)
+            continue
+        if not access.read:
+            if previous_definition is not None and item_id in previous_items:
+                restored.append(copy.deepcopy(previous_items[item_id]))
+            else:
+                errors.append(f"{kind} '{item_id}' uses type '{item_type}' which you are not allowed to read")
+                restored.append(item)
+            continue
+        if not access.write:
+            if previous_definition is None or item_id not in previous_items:
+                errors.append(f"{kind} '{item_id}' ({item_type}) cannot be added with your permissions")
+            elif previous_items[item_id] != item:
+                errors.append(f"{kind} '{item_id}' ({item_type}) is read-only for your account")
+        restored.append(item)
+    return restored, errors
+
+
 def _node_permission_errors(
     nodes: list[Any],
     permissions: dict[str, NodeTypeAccess],
     previous_nodes: dict[str, dict[str, Any]],
     previous_definition: dict[str, Any] | None,
-) -> list[str]:
-    errors: list[str] = []
-    for node in nodes:
-        if not isinstance(node, dict):
-            continue
-        node_type = str(node.get("type", ""))
-        node_id = str(node.get("id", node_type))
-        access = permissions.get(node_type)
-        if access is None:
-            continue
-        if not access.read:
-            errors.append(f"Node '{node_id}' uses type '{node_type}' which you are not allowed to read")
-            continue
-        if not access.write:
-            if previous_definition is None or node_id not in previous_nodes:
-                errors.append(f"Node '{node_id}' ({node_type}) cannot be added with your permissions")
-            elif previous_nodes[node_id] != node:
-                errors.append(f"Node '{node_id}' ({node_type}) is read-only for your account")
-    return errors
+) -> tuple[list[Any], list[str]]:
+    return _restore_read_denied_items(
+        nodes,
+        previous_nodes,
+        permissions,
+        kind="Node",
+        previous_definition=previous_definition,
+    )
 
 
-def _trigger_permission_errors(triggers: list[Any], permissions: dict[str, NodeTypeAccess]) -> list[str]:
-    errors: list[str] = []
-    for trigger in triggers:
-        if not isinstance(trigger, dict):
-            continue
-        trigger_type = str(trigger.get("type", ""))
-        trigger_id = str(trigger.get("id", trigger_type))
-        access = permissions.get(trigger_type)
-        if access is None:
-            continue
-        if not access.read:
-            errors.append(f"Trigger '{trigger_id}' uses type '{trigger_type}' which you are not allowed to read")
-        elif not access.write:
-            errors.append(f"Trigger '{trigger_id}' ({trigger_type}) is read-only for your account")
-    return errors
+def _trigger_permission_errors(
+    triggers: list[Any],
+    permissions: dict[str, NodeTypeAccess],
+    previous_triggers: dict[str, dict[str, Any]],
+    previous_definition: dict[str, Any] | None,
+) -> tuple[list[Any], list[str]]:
+    return _restore_read_denied_items(
+        triggers,
+        previous_triggers,
+        permissions,
+        kind="Trigger",
+        previous_definition=previous_definition,
+    )
 
 
 async def validate_workflow_definition_node_permissions(
@@ -283,20 +341,58 @@ async def validate_workflow_definition_node_permissions(
     workflow_definition: dict[str, Any],
     previous_definition: dict[str, Any] | None = None,
 ) -> list[str]:
-    """Return human-readable errors when the user violates node-type permissions."""
+    """Return human-readable errors when the user violates node-type permissions.
+
+    Mutates *workflow_definition* in place to restore full prior bodies for any
+    read-denied nodes/triggers that remain (so redacted stubs are not persisted).
+    """
+    node_types = iter_definition_node_types(workflow_definition)
+    if previous_definition:
+        node_types |= iter_definition_node_types(previous_definition)
+
     permissions = await resolve_node_type_permissions(
         db,
         evaluator,
         user,
         project_id=project_id,
-        node_types=iter_definition_node_types(workflow_definition),
+        node_types=node_types,
     )
     previous_nodes = _nodes_by_id(previous_definition) if previous_definition else {}
-    errors = _node_permission_errors(
-        workflow_definition.get("nodes") or [],
+    previous_triggers = _triggers_by_id(previous_definition) if previous_definition else {}
+
+    submitted_nodes = list(workflow_definition.get("nodes") or [])
+    submitted_triggers = list(workflow_definition.get("triggers") or [])
+
+    errors = _removal_permission_errors(
+        previous_nodes,
+        _item_ids(submitted_nodes),
+        permissions,
+        kind="Node",
+    )
+    errors.extend(
+        _removal_permission_errors(
+            previous_triggers,
+            _item_ids(submitted_triggers),
+            permissions,
+            kind="Trigger",
+        )
+    )
+
+    restored_nodes, node_errors = _node_permission_errors(
+        submitted_nodes,
         permissions,
         previous_nodes,
         previous_definition,
     )
-    errors.extend(_trigger_permission_errors(workflow_definition.get("triggers") or [], permissions))
+    restored_triggers, trigger_errors = _trigger_permission_errors(
+        submitted_triggers,
+        permissions,
+        previous_triggers,
+        previous_definition,
+    )
+    errors.extend(node_errors)
+    errors.extend(trigger_errors)
+
+    workflow_definition["nodes"] = restored_nodes
+    workflow_definition["triggers"] = restored_triggers
     return errors

@@ -31,6 +31,8 @@ type UseCanvasInteractionsParams = {
   selectedActivityId?: string | null
   setNodes: React.Dispatch<React.SetStateAction<NodeType[]>>
   setEdges: React.Dispatch<React.SetStateAction<EdgeType[]>>
+  /** When false, ignore remove changes for that node (node-type write deny). */
+  canDeleteNodeId?: (nodeId: string) => boolean
 }
 
 type UseCanvasInteractionsResult = {
@@ -55,6 +57,7 @@ export function useCanvasInteractions({
   selectedActivityId,
   setNodes,
   setEdges,
+  canDeleteNodeId,
 }: UseCanvasInteractionsParams): UseCanvasInteractionsResult {
   const [pendingEdge, setPendingEdge] = useState<PendingEdge | null>(null)
 
@@ -72,14 +75,17 @@ export function useCanvasInteractions({
 
   const onNodesChange = useCallback(
     (changes: NodeChange<NodeType>[]) => {
-      const filtered = isReadOnly
+      let filtered = isReadOnly
         ? changes.filter(
             (change) => change.type === 'dimensions' || change.type === 'position' || change.type === 'select'
           )
         : changes
+      if (canDeleteNodeId) {
+        filtered = filtered.filter((change) => change.type !== 'remove' || canDeleteNodeId(change.id))
+      }
       setNodes((currentNodes) => applyNodeChanges(filtered, currentNodes))
     },
-    [isReadOnly, setNodes]
+    [isReadOnly, setNodes, canDeleteNodeId]
   )
 
   const onEdgesChange = useCallback(

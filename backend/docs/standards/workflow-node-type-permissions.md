@@ -20,6 +20,12 @@ Node-type permissioning extends the ANSTRAT-1900 Rego engine with **system-scope
 | API redaction / save validation | `workflows/services/workflow_service.py` |
 | Advisory checks | `POST /authz/can_i` (`resource_type=workflow_node_type`), `POST /authz/can_i_node_types` |
 
+## Design-time save rules
+
+- **Add** or **delete** a node/trigger of type T requires both **read** and **write** on T (in addition to workflow update).
+- **Read deny** redacts node bodies on GET/export. On save, unchanged read-denied nodes that remain in the definition are **restored** from the previous version so redacted stubs are never persisted; removing them requires both read and write.
+- New nodes of a read-denied or write-denied type are rejected; removing either denied type is also rejected.
+
 ## Runtime execute (deferred)
 
 Execute permission checks in the Temporal workflow engine are tracked separately from design-time delivery. See [`workflow-node-type-permissions-ac6-deferred.md`](workflow-node-type-permissions-ac6-deferred.md).

@@ -102,11 +102,11 @@ export function AddNodePanel(props: AddNodePanelProps) {
   const nodeTypeIds = useMemo(() => nodeTypes.map((node) => node.id), [nodeTypes])
   const { permissions } = useNodeTypePermissions(props.projectId, nodeTypeIds)
   const visibleNodeTypes = useMemo(
-    () => nodeTypes.filter((node) => permissions[node.id]?.read !== false),
+    () => nodeTypes.filter((node) => permissions[node.id]?.read === true),
     [nodeTypes, permissions]
   )
   const writeDisabledIds = useMemo(
-    () => new Set(nodeTypeIds.filter((id) => permissions[id]?.write === false)),
+    () => new Set(nodeTypeIds.filter((id) => permissions[id]?.write !== true)),
     [nodeTypeIds, permissions]
   )
 

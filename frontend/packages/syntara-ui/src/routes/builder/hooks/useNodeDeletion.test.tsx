@@ -1,6 +1,8 @@
+import { EdgeHandleEnum } from '@syntara/contracts'
 import { renderHook, act } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 
+import { FlowNodeType } from '../../../constants'
 import type { NodeType } from '../../workflows/canvas/nodes/NodeType'
 import type { EdgeConnection } from '../types/edge'
 
@@ -243,6 +245,60 @@ describe('useNodeDeletion', () => {
         triggerIndices: [0],
       })
     )
+  })
+
+  it('skips deletion when canDeleteNodeId returns false', () => {
+    const onError = vi.fn()
+    const { result } = renderHook(() =>
+      useNodeDeletion({
+        nodes: [{ id: 'node-1', type: 'task' }] as NodeType[],
+        edges: [],
+        setNodes: mockSetNodes,
+        setEdges: mockSetEdges,
+        isDeletingRef: mockIsDeletingRef,
+        onError,
+        canDeleteNodeId: () => false,
+      })
+    )
+
+    act(() => {
+      result.current.onNodesDelete([{ id: 'node-1', type: 'task' }] as NodeType[])
+    })
+
+    expect(mockBatchRemoveNodesAndEdges).not.toHaveBeenCalled()
+    expect(onError).toHaveBeenCalledWith('One or more steps cannot be removed with your node-type permissions.')
+  })
+
+  it('blocks loop deletion when a cascaded node is denied', () => {
+    const onError = vi.fn()
+    const nodes = [
+      { id: 'loop-1', type: FlowNodeType.LOOP },
+      { id: 'body-1', type: 'task' },
+    ] as NodeType[]
+    const edges = [
+      { id: 'loop-body', source: 'loop-1', target: 'body-1', sourceHandle: EdgeHandleEnum.LOOP },
+      { id: 'loop-back', source: 'body-1', target: 'loop-1', targetHandle: EdgeHandleEnum.END },
+    ] as EdgeConnection[]
+
+    const { result } = renderHook(() =>
+      useNodeDeletion({
+        nodes,
+        edges,
+        setNodes: mockSetNodes,
+        setEdges: mockSetEdges,
+        isDeletingRef: mockIsDeletingRef,
+        onError,
+        canDeleteNodeId: (nodeId) => nodeId !== 'body-1',
+      })
+    )
+
+    act(() => {
+      result.current.onNodesDelete([nodes[0]])
+    })
+
+    expect(mockBatchRemoveNodesAndEdges).not.toHaveBeenCalled()
+    expect(mockIsDeletingRef.current).toBe(false)
+    expect(onError).toHaveBeenCalledWith('One or more steps cannot be removed with your node-type permissions.')
   })
 
   it('notifies parent of deleted nodes', () => {

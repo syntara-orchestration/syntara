@@ -18,6 +18,8 @@ export type UseBuilderFlowInteractionHandlersOptions = {
   sourceHandle: string | null | undefined
   targetHandle: string | null | undefined
   onRunStep: (nodeId: string) => void
+  /** When false, duplicate is blocked (node-type write deny). */
+  canWriteNodeId?: (nodeId: string) => boolean
 }
 
 /**
@@ -32,6 +34,7 @@ export function useBuilderFlowInteractionHandlers({
   sourceHandle,
   targetHandle,
   onRunStep,
+  canWriteNodeId,
 }: UseBuilderFlowInteractionHandlersOptions) {
   const handleNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node<NodeType['data']>) => {
@@ -114,6 +117,9 @@ export function useBuilderFlowInteractionHandlers({
 
   const handleDuplicateNode = useCallback(
     (nodeId: string) => {
+      if (canWriteNodeId && !canWriteNodeId(nodeId)) {
+        return
+      }
       const node = reactFlowInstance.getNode(nodeId)
       dispatch({ type: 'CLOSE_NODE_EDITOR' })
       if (node) {
@@ -127,7 +133,7 @@ export function useBuilderFlowInteractionHandlers({
       }
       duplicateActivity(nodeId)
     },
-    [dispatch, reactFlowInstance, duplicateActivity]
+    [dispatch, reactFlowInstance, duplicateActivity, canWriteNodeId]
   )
 
   const handleToggleDisabled = useCallback((nodeId: string) => {

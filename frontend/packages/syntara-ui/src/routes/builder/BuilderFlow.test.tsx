@@ -17,6 +17,7 @@ function resetStoreState() {
     nodePositions: {} as Record<string, { x: number; y: number }>,
     triggers: [] as Array<Record<string, unknown>>,
     activities: [] as Array<Record<string, unknown>>,
+    projectId: null as string | null,
   }
   temporalState = { pause: vi.fn(), clear: vi.fn(), resume: vi.fn() }
 }
@@ -112,6 +113,13 @@ vi.mock('./hooks/useConnectionHandlers', () => ({
 }))
 vi.mock('./hooks/useNodeDeletion', () => ({
   useNodeDeletion: () => ({ onNodesDelete: vi.fn() }),
+}))
+
+vi.mock('./useNodeTypePermissions', () => ({
+  useNodeTypePermissions: () => ({
+    permissions: {},
+    isLoading: false,
+  }),
 }))
 
 const mockUpdateNodePositions = vi.fn()

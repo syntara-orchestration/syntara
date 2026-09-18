@@ -1,5 +1,5 @@
 import { useReactFlow } from '@xyflow/react'
-import { useCallback, useRef } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 
 import {
   useWorkflowStore,
@@ -22,6 +22,8 @@ import { usePositionEventHandlers } from './hooks/usePositionEventHandlers'
 import { useWorkflowGraphInit } from './hooks/useWorkflowGraphInit'
 import { useWorkflowInitialization } from './hooks/useWorkflowInitialization'
 import type { BuilderFlowProps } from './types'
+import { canModifyNodeType, useNodeTypePermissions } from './useNodeTypePermissions'
+import { resolveWorkflowNodeTypeId } from './utils/resolveWorkflowNodeTypeId'
 
 export function BuilderFlow(props: BuilderFlowProps) {
   const {
@@ -50,9 +52,33 @@ export function BuilderFlow(props: BuilderFlowProps) {
   const storedEdges = useWorkflowStore(selectEdges)
   const triggers = useWorkflowStore(selectTriggers)
   const activities = useWorkflowStore(selectActivities)
+  const projectId = useWorkflowStore((state) => state.projectId)
   const activityStates = useExecutionStore((state) => state.activityStates)
   const reactFlowInstance = useReactFlow()
   const containerRef = useRef<HTMLDivElement>(null)
+
+  const nodeTypeIds = useMemo(() => {
+    const types = new Set<string>()
+    for (const activity of activities ?? []) {
+      if (activity.type) types.add(String(activity.type))
+    }
+    for (const trigger of triggers ?? []) {
+      if (trigger.type) types.add(String(trigger.type))
+    }
+    return [...types]
+  }, [activities, triggers])
+
+  const { permissions } = useNodeTypePermissions(projectId ?? undefined, nodeTypeIds)
+  const canDeleteNodeId = useCallback(
+    (nodeId: string) => {
+      const nodeTypeId = resolveWorkflowNodeTypeId(nodeId)
+      if (!nodeTypeId) {
+        return false
+      }
+      return canModifyNodeType(permissions[nodeTypeId])
+    },
+    [permissions]
+  )
 
   const {
     isExecutionView,
@@ -118,6 +144,7 @@ export function BuilderFlow(props: BuilderFlowProps) {
     selectedActivityId,
     setNodes,
     setEdges,
+    canDeleteNodeId,
   })
 
   const { onConnect, onConnectStart, onConnectEnd } = useConnectionHandlers({
@@ -168,6 +195,7 @@ export function BuilderFlow(props: BuilderFlowProps) {
     callbacks: {
       onAddNodeFromEdge,
       onNodesDeleted,
+      canDeleteNodeId,
     },
     refs: {
       containerRef,

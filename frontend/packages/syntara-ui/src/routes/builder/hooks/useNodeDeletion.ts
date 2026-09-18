@@ -150,6 +150,8 @@ type UseNodeDeletionParams = {
   onAddNodeFromEdge?: (sourceNodeId: string, nodeType?: string, activityId?: string, sourceHandle?: string) => void
   onNodesDeleted?: (nodeIds: string[]) => void
   onError?: (message: string) => void
+  /** When false, the node is kept (node-type read or write deny). Defaults to allowing delete. */
+  canDeleteNodeId?: (nodeId: string) => boolean
 }
 
 export function useNodeDeletion({
@@ -161,11 +163,17 @@ export function useNodeDeletion({
   onAddNodeFromEdge,
   onNodesDeleted,
   onError,
+  canDeleteNodeId,
 }: UseNodeDeletionParams) {
   const { batchRemoveNodesAndEdges } = useWorkflowStoreActions()
 
   const onNodesDelete: OnNodesDelete = useCallback(
     (deletedNodes) => {
+      if (canDeleteNodeId && deletedNodes.some((node) => !canDeleteNodeId(node.id))) {
+        onError?.('One or more steps cannot be removed with your node-type permissions.')
+        return
+      }
+
       isDeletingRef.current = true
       const deletedNodeIds = new Set(deletedNodes.map((n) => n.id))
 
@@ -263,6 +271,12 @@ export function useNodeDeletion({
             loopBodyNodes.forEach((nodeId) => deletedNodeIds.add(nodeId))
           }
         })
+
+        if (canDeleteNodeId && Array.from(deletedNodeIds).some((nodeId) => !canDeleteNodeId(nodeId))) {
+          isDeletingRef.current = false
+          onError?.('One or more steps cannot be removed with your node-type permissions.')
+          return
+        }
 
         // Compute all derived data BEFORE any state mutations (transaction-like approach)
         const placeholderIdsToRemove = new Set(Array.from(deletedNodeIds).map((id) => `placeholder-${id}`))
@@ -376,6 +390,7 @@ export function useNodeDeletion({
       onAddNodeFromEdge,
       onNodesDeleted,
       onError,
+      canDeleteNodeId,
       isDeletingRef,
     ]
   )

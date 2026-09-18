@@ -70,6 +70,7 @@ export type BuilderFlowCallbacks = {
     desiredPosition?: { x: number; y: number }
   ) => void
   onNodesDeleted?: (deletedNodeIds: string[]) => void
+  canDeleteNodeId?: (nodeId: string) => boolean
 }
 
 export type BuilderFlowCanvasRefs = {
@@ -114,7 +115,7 @@ export function useBuilderFlowSideEffects({
     newNodeDesiredPosition,
     onClearDesiredPosition,
   } = panel
-  const { onAddNodeFromEdge, onNodesDeleted } = callbacks
+  const { onAddNodeFromEdge, onNodesDeleted, canDeleteNodeId } = callbacks
   const { containerRef, reactFlowInstance } = refs
 
   const { showError } = useAlerts()
@@ -149,6 +150,7 @@ export function useBuilderFlowSideEffects({
     onAddNodeFromEdge,
     onNodesDeleted,
     onError: (message) => showError({ title: message }),
+    canDeleteNodeId,
   })
 
   useNodePositioning({

@@ -9,11 +9,25 @@ import { MenuNodeType, useNodeMenuActions } from './useNodeMenuActions'
 
 // Mock useReactFlow
 const mockDeleteElements = vi.fn()
+const mockUseNodeTypePermissions = vi.hoisted(() => vi.fn())
 vi.mock('@xyflow/react', () => ({
   useReactFlow: () => ({
     deleteElements: mockDeleteElements,
   }),
   useUpdateNodeInternals: () => vi.fn(),
+}))
+
+vi.mock('../../../../../routes/builder/useNodeTypePermissions', () => ({
+  useNodeTypePermissions: (...args: unknown[]) =>
+    mockUseNodeTypePermissions(...args) as {
+      permissions: Record<string, { read: boolean; write: boolean; execute: boolean }>
+      isLoading: boolean
+    },
+  canModifyNodeType: (permission: { read?: boolean; write?: boolean } | undefined) =>
+    permission?.read === true && permission.write === true,
+}))
+vi.mock('../../../../../routes/builder/utils/resolveWorkflowNodeTypeId', () => ({
+  resolveWorkflowNodeTypeId: () => 'script',
 }))
 
 // Mock alerts
@@ -51,7 +65,11 @@ describe('useNodeMenuActions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockDeleteElements.mockResolvedValue(undefined)
-    useWorkflowStore.setState({ currentWorkflow: null, workflowVersion: 0, edges: [] })
+    mockUseNodeTypePermissions.mockReturnValue({
+      permissions: new Proxy({}, { get: () => ({ read: true, write: true, execute: true }) }),
+      isLoading: false,
+    })
+    useWorkflowStore.setState({ currentWorkflow: null, projectId: 'project-1', workflowVersion: 0, edges: [] })
   })
 
   describe('without NodeActionsContext (outside builder)', () => {
@@ -384,5 +402,19 @@ describe('useNodeMenuActions', () => {
       expect(result.current[3].separator).toBe(true)
       expect(result.current[4].label).toBe('Delete step')
     })
+  })
+
+  it.each([
+    { read: false, write: true, execute: true },
+    { read: true, write: false, execute: true },
+  ])('does not expose delete when access is denied: %j', (scriptPermission) => {
+    mockUseNodeTypePermissions.mockReturnValue({
+      permissions: { script: scriptPermission },
+      isLoading: false,
+    })
+
+    const { result } = renderHook(() => useNodeMenuActions({ nodeId: 'task-1', nodeType: MenuNodeType.ACTIVITY }))
+
+    expect(result.current.find((action) => action.id === 'delete')).toBeUndefined()
   })
 })

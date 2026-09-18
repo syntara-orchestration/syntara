@@ -4,9 +4,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { AddNodePanel, AddNodePanelHeader } from './AddNodePanel'
 
-const { mockNodeRegistryGetAll, mockNodeRegistryGet } = vi.hoisted(() => ({
+const { mockNodeRegistryGetAll, mockNodeRegistryGet, mockUseNodeTypePermissions } = vi.hoisted(() => ({
   mockNodeRegistryGetAll: vi.fn(),
   mockNodeRegistryGet: vi.fn(),
+  mockUseNodeTypePermissions: vi.fn(() => ({
+    permissions: {
+      action: { read: true, write: true, execute: true },
+      trigger: { read: true, write: true, execute: true },
+      'trigger-manual': { read: true, write: true, execute: true },
+    },
+    isLoading: false,
+  })),
 }))
 
 vi.mock('./registry/NodeRegistry', () => ({
@@ -17,10 +25,7 @@ vi.mock('./registry/NodeRegistry', () => ({
 }))
 
 vi.mock('./useNodeTypePermissions', () => ({
-  useNodeTypePermissions: () => ({
-    permissions: {},
-    isLoading: false,
-  }),
+  useNodeTypePermissions: () => mockUseNodeTypePermissions(),
 }))
 
 const mockNodeTypes = [
@@ -174,6 +179,14 @@ describe('AddNodePanel Component', () => {
     vi.clearAllMocks()
     mockNodeRegistryGetAll.mockReturnValue(mockNodeTypes as never[])
     mockNodeRegistryGet.mockImplementation((id: string) => mockNodeTypes.find((node) => node.id === id) as never)
+    mockUseNodeTypePermissions.mockReturnValue({
+      permissions: {
+        action: { read: true, write: true, execute: true },
+        trigger: { read: true, write: true, execute: true },
+        'trigger-manual': { read: true, write: true, execute: true },
+      },
+      isLoading: false,
+    })
   })
 
   it('renders the panel with title and close button', () => {
@@ -241,5 +254,37 @@ describe('AddNodePanel Component', () => {
 
     expect(screen.queryByRole('button', { name: 'Trigger' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Action' })).toBeInTheDocument()
+  })
+
+  it('does not select a write-denied node type', async () => {
+    mockUseNodeTypePermissions.mockReturnValue({
+      permissions: {
+        action: { read: true, write: false, execute: true },
+        trigger: { read: true, write: true, execute: true },
+        'trigger-manual': { read: true, write: true, execute: true },
+      },
+      isLoading: false,
+    })
+    const user = userEvent.setup()
+    render(<AddNodePanel onClose={mockOnClose} onSelectNode={mockOnSelectNode} projectId="project-1" />)
+
+    await user.click(screen.getByRole('button', { name: 'Action' }))
+
+    expect(mockOnSelectNode).not.toHaveBeenCalled()
+  })
+
+  it('hides read-denied node types from the palette', () => {
+    mockUseNodeTypePermissions.mockReturnValue({
+      permissions: {
+        action: { read: false, write: false, execute: false },
+        trigger: { read: true, write: true, execute: true },
+        'trigger-manual': { read: true, write: true, execute: true },
+      },
+      isLoading: false,
+    })
+    render(<AddNodePanel onClose={mockOnClose} onSelectNode={mockOnSelectNode} projectId="project-1" />)
+
+    expect(screen.queryByRole('button', { name: 'Action' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Trigger' })).toBeInTheDocument()
   })
 })

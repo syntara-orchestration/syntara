@@ -88,7 +88,12 @@ vi.mock('./useBuilderPermissions', () => ({
 
 vi.mock('./useNodeTypePermissions', () => ({
   useNodeTypePermissions: () => ({
-    permissions: {},
+    permissions: new Proxy(
+      {},
+      {
+        get: () => ({ read: true, write: true, execute: true }),
+      }
+    ),
     isLoading: false,
   }),
 }))

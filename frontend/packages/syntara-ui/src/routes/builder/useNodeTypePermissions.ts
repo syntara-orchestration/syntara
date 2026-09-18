@@ -3,12 +3,18 @@ import { useQuery } from '@tanstack/react-query'
 import { accessFetchClient } from '../access/accessClient'
 
 export type NodeTypePermissionMap = Record<string, { read: boolean; write: boolean; execute: boolean }>
+export type NodeTypePermission = NodeTypePermissionMap[string]
 
 type CanINodeTypesResponse = {
   results: Array<{ node_type: string; allowed: boolean }>
 }
 
 const EMPTY: NodeTypePermissionMap = {}
+const DENIED = { read: false, write: false, execute: false } as const
+
+export function canModifyNodeType(permission: NodeTypePermission | undefined): boolean {
+  return permission?.read === true && permission.write === true
+}
 
 function buildPermissionMap(
   nodeTypes: string[],
@@ -19,7 +25,7 @@ function buildPermissionMap(
   const map: NodeTypePermissionMap = {}
   for (const nodeType of nodeTypes) {
     const allowed = allowedByType.get(nodeType) ?? false
-    const existing = map[nodeType] ?? { read: true, write: true, execute: true }
+    const existing = map[nodeType] ?? { ...DENIED }
     map[nodeType] = {
       ...existing,
       [action]: allowed,
@@ -44,13 +50,14 @@ async function fetchNodeTypeAction(
     },
   })
   if (error || !data) {
-    return Object.fromEntries(nodeTypes.map((id) => [id, { read: false, write: false, execute: false }]))
+    return Object.fromEntries(nodeTypes.map((id) => [id, { ...DENIED }]))
   }
   return buildPermissionMap(nodeTypes, action, data.results)
 }
 
 /**
  * Batch-resolves workflow node-type read/write/execute for the builder palette and inspector.
+ * Fail closed: missing or loading entries are treated as denied.
  */
 export function useNodeTypePermissions(projectId: string | undefined, nodeTypeIds: string[]) {
   const sortedIds = [...nodeTypeIds].sort()
@@ -88,12 +95,12 @@ export function useNodeTypePermissions(projectId: string | undefined, nodeTypeId
   })
 
   const permissions: NodeTypePermissionMap = {}
-  const loading = readQuery.isLoading || writeQuery.isLoading || executeQuery.isLoading
+  const loading = enabled && (readQuery.isLoading || writeQuery.isLoading || executeQuery.isLoading)
   for (const id of sortedIds) {
     permissions[id] = {
-      read: readQuery.data?.[id]?.read ?? loading,
-      write: writeQuery.data?.[id]?.write ?? loading,
-      execute: executeQuery.data?.[id]?.execute ?? loading,
+      read: loading ? false : (readQuery.data?.[id]?.read ?? false),
+      write: loading ? false : (writeQuery.data?.[id]?.write ?? false),
+      execute: loading ? false : (executeQuery.data?.[id]?.execute ?? false),
     }
   }
 

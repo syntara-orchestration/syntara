@@ -8,5 +8,6 @@ import { detachPromise } from '../utils/detachPromise'
  */
 export function invalidateAuthzCaches(queryClient: QueryClient): void {
   detachPromise(queryClient.invalidateQueries({ queryKey: ['authz', 'can_i'] }))
+  detachPromise(queryClient.invalidateQueries({ queryKey: ['authz', 'can_i_node_types'] }))
   detachPromise(queryClient.invalidateQueries({ queryKey: ['all-permissions'] }))
 }

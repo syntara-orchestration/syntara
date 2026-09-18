@@ -13,6 +13,9 @@ import { createElement, useCallback, type ReactNode } from 'react'
 import { type MenuNodeTypeUnion, MenuNodeType } from '../../../../../constants'
 import { useAlerts } from '../../../../../providers/alerts'
 import { useNodeActions } from '../../../../../routes/builder/NodeActionsContext'
+import { canModifyNodeType, useNodeTypePermissions } from '../../../../../routes/builder/useNodeTypePermissions'
+import { resolveWorkflowNodeTypeId } from '../../../../../routes/builder/utils/resolveWorkflowNodeTypeId'
+import { useWorkflowStore } from '../../../../../stores/useWorkflowStore'
 import { getErrorMessage } from '../../../../../utils/apiErrors'
 import { detachPromise } from '../../../../../utils/detachPromise'
 import { resolveFlowNodeId } from '../../../../../utils/triggerNodeIds'
@@ -144,15 +147,29 @@ export function useNodeMenuActions(options: UseNodeMenuActionsOptions): NodeMenu
   const { deleteElements } = useReactFlow()
   const { showError } = useAlerts()
   const nodeActions = useNodeActions()
+  const projectId = useWorkflowStore((state) => state.projectId)
+  const flowNodeId = resolveFlowNodeId({ nodeId, nodeType, triggerIndex })
+  const catalogTypeId = resolveWorkflowNodeTypeId(flowNodeId)
+  const { permissions, isLoading: nodePermLoading } = useNodeTypePermissions(
+    projectId ?? undefined,
+    catalogTypeId ? [catalogTypeId] : []
+  )
+  const canDeleteNode = !catalogTypeId ? false : !nodePermLoading && canModifyNodeType(permissions[catalogTypeId])
 
   const handleDelete = useCallback(() => {
+    if (!canDeleteNode) {
+      showError({
+        title: 'Cannot delete step',
+        description: 'This step cannot be removed with your node-type permissions.',
+      })
+      return
+    }
     // Use React Flow's deleteElements to trigger proper cleanup via onNodesDelete
     // This ensures edges are removed and ButtonEdges are recreated correctly
-    const flowNodeId = resolveFlowNodeId({ nodeId, nodeType, triggerIndex })
     detachPromise(deleteElements({ nodes: [{ id: flowNodeId }] }), {
       onReject: (error: unknown) => showError({ title: 'Could not delete step', description: getErrorMessage(error) }),
     })
-  }, [nodeType, nodeId, triggerIndex, deleteElements, showError])
+  }, [canDeleteNode, flowNodeId, deleteElements, showError])
 
   const handleViewDetails = useCallback(() => {
     nodeActions?.onViewDetails(nodeId)
@@ -163,8 +180,11 @@ export function useNodeMenuActions(options: UseNodeMenuActionsOptions): NodeMenu
   }, [nodeActions, nodeId])
 
   const handleDuplicate = useCallback(() => {
+    if (!canDeleteNode) {
+      return
+    }
     nodeActions?.onDuplicate(nodeId)
-  }, [nodeActions, nodeId])
+  }, [nodeActions, nodeId, canDeleteNode])
 
   const handleReplace = useCallback(() => {
     nodeActions?.onReplace(nodeId)
@@ -189,8 +209,17 @@ export function useNodeMenuActions(options: UseNodeMenuActionsOptions): NodeMenu
         onToggleDisabled: handleToggleDisabled,
         onDuplicate: handleDuplicate,
         onReplace: handleReplace,
+      }).filter((action) => {
+        if (!canDeleteNode && (action.id === 'duplicate' || action.id === 'replace')) {
+          return false
+        }
+        return true
       })
     : []
+
+  if (!canDeleteNode) {
+    return [...builderActions, ...additionalActions]
+  }
 
   return appendDeleteAction([...builderActions, ...additionalActions], deleteAction)
 }
