@@ -10,6 +10,7 @@ import type { ProjectRead } from '../access/types'
 import type { ProjectRowActionCallbacks } from './projectRowActions'
 import type { WorkflowRowActionCallbacks } from './workflowRowActions'
 import { FlatWorkflowsTableBody, GroupedWorkflowsTableBody } from './WorkflowsTableBody'
+import { workflowStateColumnInfo } from './workflowStateColumnInfo'
 
 type Workflow = WorkflowAPI.components['schemas']['WorkflowRead']
 
@@ -105,7 +106,9 @@ export function WorkflowsListView({
               <Th sort={getSortParams('name')}>Name</Th>
               <Th sort={getSortParams('created_at')}>Created at</Th>
               <Th sort={getSortParams('updated_at')}>Updated at</Th>
-              <Th sort={getSortParams('is_enabled')}>State</Th>
+              <Th sort={getSortParams('is_enabled')} info={workflowStateColumnInfo}>
+                State
+              </Th>
               {showRowActions && <Th screenReaderText="Actions" />}
             </Tr>
           </Thead>

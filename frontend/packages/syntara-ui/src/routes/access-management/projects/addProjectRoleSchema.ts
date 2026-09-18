@@ -1,5 +1,8 @@
 import { z } from 'zod'
 
+/** Inline hint shown under the role name field before validation errors */
+export const PROJECT_ROLE_NAME_HINT = 'Lowercase alphanumeric with hyphens (e.g. my-custom-role)'
+
 export const addProjectRoleSchema = z.object({
   name: z
     .string()

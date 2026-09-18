@@ -7,6 +7,8 @@ import {
   createWorkflowWithBranchesForConverge,
   expectConvergeNodeConfig,
   openConvergeFormOnNewWorkflow,
+  openConvergeNodeForEditing,
+  openConvergeNodeParameters,
 } from './helpers/v2-nodes-converge'
 import { cancelAndCloseEditor, getWorkflowPayload } from './helpers/workflow-payload'
 import {
@@ -106,7 +108,7 @@ test.describe('Converge Node - E2E Tests', () => {
         await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/)
 
         await openWorkflowInBuilder(app, wfName)
-        await app.getByText('Converge All').click()
+        await openConvergeNodeForEditing(app, 'Converge All')
 
         await expect(app.getByRole('button', { name: 'Continue when criteria', exact: true })).toContainText(
           'All branches reach this step'
@@ -143,7 +145,7 @@ test.describe('Converge Node - E2E Tests', () => {
         await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/)
 
         await openWorkflowInBuilder(app, wfName)
-        await app.getByText('Converge Any').click()
+        await openConvergeNodeForEditing(app, 'Converge Any')
 
         await app.getByRole('button', { name: 'Continue when criteria', exact: true }).click()
         await app.getByRole('option', { name: 'All branches reach this step' }).click()
@@ -203,7 +205,7 @@ test.describe('Converge Node - E2E Tests', () => {
         await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/)
 
         await openWorkflowInBuilder(app, wfName)
-        await app.getByText('Converge Any').click()
+        await openConvergeNodeForEditing(app, 'Converge Any')
 
         const requiredPathCountInput = app.getByRole('spinbutton', {
           name: /Required number of branches before continuing/i,
@@ -239,7 +241,7 @@ test.describe('Converge Node - E2E Tests', () => {
         await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/)
 
         await openWorkflowInBuilder(app, wfName)
-        await app.getByText('Converge All').click()
+        await openConvergeNodeForEditing(app, 'Converge All')
 
         await app.getByRole('button', { name: 'Continue when criteria', exact: true }).click()
         await app.getByRole('option', { name: 'Any branches reach this step' }).click()
@@ -286,8 +288,8 @@ test.describe('Converge Node - E2E Tests', () => {
 
         await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/)
         await openWorkflowInBuilder(app, wfName)
+        await openConvergeNodeForEditing(app, 'Converge Any Persist')
 
-        await app.getByText('Converge Any Persist').click()
         await expect(app.getByRole('button', { name: 'Continue when criteria', exact: true })).toContainText(
           'Any branches reach this step'
         )
@@ -348,10 +350,8 @@ test.describe('Converge Node - E2E Tests', () => {
         await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/)
 
         await openWorkflowInBuilder(app, wfName)
-        await app.getByText('Converge Timeout').click()
+        await openConvergeNodeParameters(app, 'Converge Timeout')
 
-        // Wait for edit panel to be ready
-        await expect(app.getByRole('tab', { name: 'Parameters' })).toBeVisible()
         await expect(app.getByText('Wait duration')).toBeVisible()
 
         await expect(app.getByLabel(/Minutes/i)).toHaveValue('5')
@@ -388,9 +388,7 @@ test.describe('Converge Node - E2E Tests', () => {
 
         await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/)
         await openWorkflowInBuilder(app, wfName)
-
-        await app.getByText('Converge Wait Edit').click()
-        await expect(app.getByRole('tab', { name: 'Parameters' })).toBeVisible()
+        await openConvergeNodeParameters(app, 'Converge Wait Edit')
 
         await expect(app.getByLabel(/Minutes/i)).toHaveValue('10')
       } finally {
@@ -428,8 +426,7 @@ test.describe('Converge Node - E2E Tests', () => {
 
         await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/)
         await openWorkflowInBuilder(app, wfName)
-
-        await app.getByText('Converge Complex Timeout').click()
+        await openConvergeNodeParameters(app, 'Converge Complex Timeout')
 
         await expect(app.getByLabel(/Seconds/i)).toHaveValue('45')
         await expect(app.getByLabel(/Minutes/i)).toHaveValue('30')

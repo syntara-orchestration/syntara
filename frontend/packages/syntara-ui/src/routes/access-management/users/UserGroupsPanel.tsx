@@ -1,13 +1,8 @@
-import { zodResolver } from '@hookform/resolvers/zod'
 import {
   Button,
   Flex,
   FlexItem,
   Form,
-  FormGroup,
-  FormHelperText,
-  HelperText,
-  HelperTextItem,
   Modal,
   ModalBody,
   ModalFooter,
@@ -18,13 +13,14 @@ import {
 import { RhUiAddIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { Group } from '@syntara/contracts'
-import { useMemo, useState } from 'react'
-import { Controller, useForm } from 'react-hook-form'
+import { useEffect, useMemo, useState } from 'react'
 import { z } from 'zod'
 
 import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { FilterBar } from '../../../components/filters'
+import { SynForm } from '../../../components/forms/SynForm'
+import { SynFormField } from '../../../components/forms/SynFormField'
 import { IconLabel } from '../../../components/IconLabel'
 import { SynLabel } from '../../../components/labels/SynLabel'
 import { SynPageBody } from '../../../components/layout/SynPage'
@@ -38,7 +34,7 @@ import { LinkCell } from '../../../components/table/LinkCell'
 import { SynScrollableTableContainer } from '../../../components/table/SynScrollableTableContainer'
 import { useClientPagination } from '../../../hooks/useClientPagination'
 import { useFilterState } from '../../../hooks/useFilterState'
-import { useFormMutationErrorHandler } from '../../../hooks/useFormMutationErrorHandler'
+import { useSynForm } from '../../../hooks/useSynForm'
 import { useAlerts } from '../../../providers/alerts'
 import type { FilterFieldDefinition } from '../../../types/filters'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../../types/filters'
@@ -102,12 +98,18 @@ function AddToGroupModal({
 }>) {
   const { showSuccess } = useAlerts()
 
-  const { handleSubmit, control, reset, setError } = useForm<AddToGroupFormData>({
-    resolver: zodResolver(addToGroupSchema, undefined, { mode: 'sync' }),
+  const form = useSynForm({
+    schema: addToGroupSchema,
     defaultValues: { groupId: '' },
+    onClose,
   })
+  const { handleSubmit, handleError, handleClose, reset } = form
 
-  const handleError = useFormMutationErrorHandler<AddToGroupFormData>(setError)
+  useEffect(() => {
+    if (isOpen) {
+      reset({ groupId: '' })
+    }
+  }, [isOpen, reset])
 
   const { groups: allGroupsForPicker } = useAllGroups()
 
@@ -122,11 +124,6 @@ function AddToGroupModal({
   }, [allGroupsForPicker, existingGroupIds])
 
   const { mutate: addMember, isPending } = accessClient.useMutation('post', '/groups/{group_id}/members')
-
-  const handleClose = () => {
-    reset()
-    onClose()
-  }
 
   const onFormSubmit = (data: AddToGroupFormData) => {
     const group = availableGroups.find((g) => g.value === data.groupId)
@@ -154,32 +151,26 @@ function AddToGroupModal({
       <ModalHeader title="Add to group" />
       <ModalBody>
         <Form id="add-to-group-form" onSubmit={handleSubmit(onFormSubmit)}>
-          <FormGroup label="Group" fieldId="add-to-group-select" isRequired>
-            <Controller
+          <SynForm form={form}>
+            <SynFormField<AddToGroupFormData, 'groupId'>
               name="groupId"
-              control={control}
-              render={({ field, fieldState }) => (
-                <>
-                  <TypeaheadSelect
-                    id="add-to-group-select"
-                    ariaLabel="Select a group"
-                    options={availableGroups}
-                    selected={field.value}
-                    onChange={field.onChange}
-                    placeholder="Search for a group..."
-                    hasError={!!fieldState.error}
-                  />
-                  {fieldState.error && (
-                    <FormHelperText>
-                      <HelperText>
-                        <HelperTextItem variant="error">{fieldState.error.message}</HelperTextItem>
-                      </HelperText>
-                    </FormHelperText>
-                  )}
-                </>
+              label="Group"
+              fieldId="add-to-group-select"
+              isRequired
+            >
+              {({ field, fieldState }) => (
+                <TypeaheadSelect
+                  id="add-to-group-select"
+                  ariaLabel="Select a group"
+                  options={availableGroups}
+                  selected={field.value}
+                  onChange={field.onChange}
+                  placeholder="Search for a group..."
+                  hasError={!!fieldState.error}
+                />
               )}
-            />
-          </FormGroup>
+            </SynFormField>
+          </SynForm>
         </Form>
       </ModalBody>
       <ModalFooter>

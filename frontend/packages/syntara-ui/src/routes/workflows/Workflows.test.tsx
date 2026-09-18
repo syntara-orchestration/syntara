@@ -2799,10 +2799,14 @@ describe('Workflows Component', () => {
     it('renders sortable headers for name, created, updated, and state', () => {
       render(<Workflows />, { wrapper })
 
-      for (const name of [/Name/i, /Created at/i, /Updated at/i, /^State$/i]) {
+      for (const name of [/Name/i, /Created at/i, /Updated at/i]) {
         const header = screen.getByRole('columnheader', { name })
         expect(within(header).getByRole('button')).toBeInTheDocument()
       }
+
+      const stateHeader = screen.getByRole('columnheader', { name: /State/i })
+      expect(within(stateHeader).getByRole('button', { name: 'State' })).toBeInTheDocument()
+      expect(within(stateHeader).getByRole('button', { name: 'Workflow state help' })).toBeInTheDocument()
 
       const actionsHeader = screen.getByRole('columnheader', { name: 'Actions' })
       expect(within(actionsHeader).queryByRole('button')).not.toBeInTheDocument()
@@ -2824,8 +2828,8 @@ describe('Workflows Component', () => {
       const user = userEvent.setup()
       render(<Workflows />, { wrapper })
 
-      const stateHeader = screen.getByRole('columnheader', { name: /^State$/i })
-      await user.click(within(stateHeader).getByRole('button'))
+      const stateHeader = screen.getByRole('columnheader', { name: /State/i })
+      await user.click(within(stateHeader).getByRole('button', { name: 'State' }))
 
       await waitFor(() => {
         assertUrlParam(mockSetSearchParams, 'sort', 'is_enabled')

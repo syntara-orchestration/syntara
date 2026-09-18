@@ -1,21 +1,10 @@
-import { zodResolver } from '@hookform/resolvers/zod'
-import {
-  Button,
-  Form,
-  FormGroup,
-  FormHelperText,
-  HelperText,
-  HelperTextItem,
-  Modal,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
-} from '@patternfly/react-core'
-import { useMemo } from 'react'
-import { Controller, useForm } from 'react-hook-form'
+import { Button, Form, Modal, ModalBody, ModalFooter, ModalHeader } from '@patternfly/react-core'
+import { useEffect, useMemo } from 'react'
 import { z } from 'zod'
 
-import { useFormMutationErrorHandler } from '../../../hooks/useFormMutationErrorHandler'
+import { SynForm } from '../../../components/forms/SynForm'
+import { SynFormField } from '../../../components/forms/SynFormField'
+import { useSynForm } from '../../../hooks/useSynForm'
 import { useAlerts } from '../../../providers/alerts'
 import { accessClient } from '../../access/accessClient'
 import { TypeaheadSelect } from '../../access/TypeaheadSelect'
@@ -45,12 +34,18 @@ export function AddMemberModal({
 }: Readonly<AddMemberModalProps>) {
   const { showSuccess } = useAlerts()
 
-  const { handleSubmit, control, reset, setError } = useForm<AddMemberFormData>({
-    resolver: zodResolver(addMemberSchema, undefined, { mode: 'sync' }),
+  const form = useSynForm({
+    schema: addMemberSchema,
     defaultValues: { userId: '' },
+    onClose,
   })
+  const { handleSubmit, handleError, handleClose, reset } = form
 
-  const handleError = useFormMutationErrorHandler<AddMemberFormData>(setError)
+  useEffect(() => {
+    if (isOpen) {
+      reset({ userId: '' })
+    }
+  }, [isOpen, reset])
 
   const { users: allUsers } = useAllUsers()
 
@@ -68,11 +63,6 @@ export function AddMemberModal({
   }, [allUsers, existingMemberIds])
 
   const { mutate: addMember, isPending } = accessClient.useMutation('post', '/groups/{group_id}/members')
-
-  const handleClose = () => {
-    reset()
-    onClose()
-  }
 
   const onSubmit = (data: AddMemberFormData) => {
     const user = availableUsers.find((u) => u.value === data.userId)
@@ -100,32 +90,21 @@ export function AddMemberModal({
       <ModalHeader title="Add member" />
       <ModalBody>
         <Form id="add-member-form" onSubmit={handleSubmit(onSubmit)}>
-          <FormGroup label="User" fieldId="add-member-user" isRequired>
-            <Controller
-              name="userId"
-              control={control}
-              render={({ field, fieldState }) => (
-                <>
-                  <TypeaheadSelect
-                    id="add-member-user"
-                    ariaLabel="Select a user"
-                    options={availableUsers}
-                    selected={field.value}
-                    onChange={field.onChange}
-                    placeholder="Search for a user..."
-                    hasError={!!fieldState.error}
-                  />
-                  {fieldState.error && (
-                    <FormHelperText>
-                      <HelperText>
-                        <HelperTextItem variant="error">{fieldState.error.message}</HelperTextItem>
-                      </HelperText>
-                    </FormHelperText>
-                  )}
-                </>
+          <SynForm form={form}>
+            <SynFormField<AddMemberFormData, 'userId'> name="userId" label="User" fieldId="add-member-user" isRequired>
+              {({ field, fieldState }) => (
+                <TypeaheadSelect
+                  id="add-member-user"
+                  ariaLabel="Select a user"
+                  options={availableUsers}
+                  selected={field.value}
+                  onChange={field.onChange}
+                  placeholder="Search for a user..."
+                  hasError={!!fieldState.error}
+                />
               )}
-            />
-          </FormGroup>
+            </SynFormField>
+          </SynForm>
         </Form>
       </ModalBody>
       <ModalFooter>

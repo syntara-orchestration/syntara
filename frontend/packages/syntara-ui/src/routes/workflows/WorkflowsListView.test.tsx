@@ -5,6 +5,11 @@ import { axe } from 'vitest-axe'
 
 import type { WorkflowsListViewProps } from './WorkflowsListView'
 import { WorkflowsListView } from './WorkflowsListView'
+import {
+  WORKFLOW_STATE_DRAFT_HELP,
+  WORKFLOW_STATE_PUBLISHED_HELP,
+  WORKFLOW_STATE_UNPUBLISHED_CHANGES_HELP,
+} from './workflowStateColumnHelpText'
 
 vi.mock('./WorkflowsTableBody', () => ({
   FlatWorkflowsTableBody: () => <tbody />,
@@ -99,6 +104,19 @@ describe('WorkflowsListView', () => {
       render(<WorkflowsListView {...defaultProps} sortedWorkflows={mockWorkflows} />)
       expect(screen.getByRole('columnheader', { name: 'Name' })).toBeInTheDocument()
       expect(screen.getByRole('columnheader', { name: 'Created at' })).toBeInTheDocument()
+      expect(screen.getByRole('columnheader', { name: /State/i })).toBeInTheDocument()
+    })
+
+    it('shows workflow state help in the State column header popover', async () => {
+      const user = userEvent.setup()
+      render(<WorkflowsListView {...defaultProps} sortedWorkflows={mockWorkflows} />)
+
+      await user.click(screen.getByRole('button', { name: 'Workflow state help' }))
+
+      expect(screen.getByRole('dialog')).toHaveTextContent('Workflow state')
+      expect(screen.getByRole('dialog')).toHaveTextContent(WORKFLOW_STATE_DRAFT_HELP)
+      expect(screen.getByRole('dialog')).toHaveTextContent(WORKFLOW_STATE_PUBLISHED_HELP)
+      expect(screen.getByRole('dialog')).toHaveTextContent(WORKFLOW_STATE_UNPUBLISHED_CHANGES_HELP)
     })
 
     it('applies sort props to sortable columns and not to actions', () => {
