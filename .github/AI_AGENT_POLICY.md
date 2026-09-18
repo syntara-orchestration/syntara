@@ -26,6 +26,7 @@ There is **no hook-based enforcement** in upstream. The replacement is
 | --- | --- |
 | `CLAUDE.md`, `AGENTS.md`, and component `CLAUDE.md` / `AGENTS.md` | On-demand agent instructions |
 | `.claude/skills/**` | Skill documents maintainers choose to ship |
+| `.claude/skill-triggers.json` | Advisory trigger phrases for skills (not executable hooks) |
 | `.claude/commands/**` (when present) | Slash-command prompts as markdown |
 
 Skills and commands are documentation loaded by the agent. They are **not**
@@ -117,6 +118,7 @@ files below.
 | `frontend-pr-review` / `frontend-review-pr` | Review checklist |
 | `frontend-build-ui-feature` | Feature wizard (tracker-neutral) |
 | `frontend-library-references` | Public `llms.txt` URLs |
+| `a11y-audit` | AI-assisted WCAG audits beyond axe-core (keyboard, media matrix, semantics, bug filing) |
 | `backend-fix-api-spec-drift` | Public OpenAPI workflow |
 
 If a consumer vendors these files, re-copy from this repository after merge.
