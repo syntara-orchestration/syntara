@@ -1,8 +1,9 @@
-import { FormGroup, Stack, StackItem, Switch } from '@patternfly/react-core'
+import { Stack, StackItem, Switch } from '@patternfly/react-core'
 import type { ReactNode } from 'react'
 import { use, useEffect, useMemo, useRef, useState } from 'react'
 import { FormProvider, useForm, useFormContext, useWatch } from 'react-hook-form'
 
+import { SynFormField } from '../../../components/forms/SynFormField'
 import { useAAPBrowser } from '../../../hooks/useAAPBrowser'
 import { detachPromise } from '../../../utils/detachPromise'
 import { AAPIntegrationSection } from '../components/AAPIntegrationSection'
@@ -50,7 +51,7 @@ function AAPFormFields({
   projectId?: string
 }>) {
   const isVersionView = useIsVersionView()
-  const { register, setValue, getValues } = useFormContext<AAPJobTemplateFormData>()
+  const { register, getValues, setValue } = useFormContext<AAPJobTemplateFormData>()
 
   const expressionMode = Boolean(useWatch({ name: 'use_input_variables' }))
 
@@ -99,17 +100,23 @@ function AAPFormFields({
   const parametersContent = (
     <Stack hasGutter>
       <StackItem>
-        <FormGroup label="Use input variables" labelHelp={nodeHelp.aapUseExpressions} fieldId="aap-expression-mode">
-          <Switch
-            id="aap-expression-mode"
-            aria-label="Use input variables"
-            isChecked={expressionMode}
-            onChange={(_e, checked) =>
-              setValue('use_input_variables', checked, { shouldDirty: true, shouldValidate: true })
-            }
-            isDisabled={isVersionView}
-          />
-        </FormGroup>
+        <SynFormField<AAPJobTemplateFormData, 'use_input_variables'>
+          name="use_input_variables"
+          label="Use input variables"
+          labelHelp={nodeHelp.aapUseExpressions}
+          fieldId="aap-expression-mode"
+          hideFooter
+        >
+          {({ field }) => (
+            <Switch
+              id="aap-expression-mode"
+              aria-label="Use input variables"
+              isChecked={Boolean(field.value)}
+              onChange={(_e, checked) => field.onChange(checked)}
+              isDisabled={isVersionView}
+            />
+          )}
+        </SynFormField>
       </StackItem>
 
       <StackItem>
