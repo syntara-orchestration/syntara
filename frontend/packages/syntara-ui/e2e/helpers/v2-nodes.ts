@@ -566,6 +566,26 @@ export async function addSwitchNodeWithCases(page: Page, name: string, cases: Sw
   await closeNodeEditorPanel(page)
 }
 
+/**
+ * Open a saved switch node on the canvas for editing.
+ *
+ * Retries layout + click while the editor hydrates. Under CI load the click can
+ * land during a React Flow viewport transform and be lost, so callers must not
+ * use a bare `getByText(nodeName).click()`.
+ */
+export async function openSwitchNodeForEditing(page: Page, nodeName: string) {
+  await triggerLayout(page)
+  const node = page.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: nodeName })
+  const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
+  const pathOneName = page.getByLabel('Path 1 name')
+  await expect(async () => {
+    await expect(node).toBeVisible({ timeout: 5_000 })
+    await node.click({ timeout: 5_000 })
+    await expect(nameInput).toHaveValue(nodeName, { timeout: 5_000 })
+    await expect(pathOneName).toBeVisible({ timeout: 5_000 })
+  }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] })
+}
+
 // ---------------------------------------------------------------------------
 // Schedule trigger
 // ---------------------------------------------------------------------------

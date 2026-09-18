@@ -17,7 +17,12 @@
  */
 
 import { test, expect, toAppUrl } from './fixtures'
-import { addManualTrigger, addSwitchNodeWithCases, openAddNodePanel } from './helpers/v2-nodes'
+import {
+  addManualTrigger,
+  addSwitchNodeWithCases,
+  openAddNodePanel,
+  openSwitchNodeForEditing,
+} from './helpers/v2-nodes'
 import { cancelAndCloseEditor, getWorkflowPayload, type WorkflowNode } from './helpers/workflow-payload'
 import {
   addNodePanel,
@@ -370,10 +375,8 @@ test.describe('Switch Node — UI-15', () => {
         // Reload the workflow in the builder
         await openWorkflowInBuilder(app, wfName)
 
-        // Click the switch node to reopen its form
-        await app.getByText('Persisted Switch').click()
+        await openSwitchNodeForEditing(app, 'Persisted Switch')
 
-        // Saved path labels must be visible
         await expect(app.getByRole('tab', { name: 'Parameters' })).toBeVisible()
         await expect(app.getByLabel('Path 1 name')).toHaveValue('Production')
         await expect(app.getByLabel('Path 2 name')).toHaveValue('Staging')
@@ -403,10 +406,8 @@ test.describe('Switch Node — UI-15', () => {
         await app.getByRole('button', { name: 'Save', exact: true }).click()
         await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/)
 
-        // Reopen and edit the label of path 1
         await openWorkflowInBuilder(app, wfName)
-        await app.getByText('Edit Me').click()
-        await expect(app.getByLabel('Path 1 name')).toBeVisible()
+        await openSwitchNodeForEditing(app, 'Edit Me')
         await app.getByLabel('Path 1 name').fill('Updated Path A')
         await app.getByRole('button', { name: 'Update', exact: true }).click()
 
