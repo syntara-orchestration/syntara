@@ -169,6 +169,47 @@ class TestPublishSnapshot:
             message_data = call_args[0][1]
             assert message_data["execution"]["activities"] == []
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("status", "error_details", "expected_error"),
+        [
+            (ExecutionStatus.FAILED, "node_b: KeyError: nonexistent_field", "node_b: KeyError: nonexistent_field"),
+            (
+                ExecutionStatus.COMPLETED_WITH_ERRORS,
+                "node_bad: KeyError: nonexistent_field",
+                "node_bad: KeyError: nonexistent_field",
+            ),
+            (ExecutionStatus.COMPLETED, None, None),
+            (ExecutionStatus.RUNNING, None, None),
+        ],
+    )
+    async def test_snapshot_error_mirrors_error_details_only_for_failure_statuses(
+        self,
+        execution_with_activities: Execution,
+        mock_stream_client: AsyncMock,
+        status: ExecutionStatus,
+        error_details: str | None,
+        expected_error: str | None,
+    ) -> None:
+        """WS snapshot `error` mirrors ExecutionRead's rule: set for FAILED/COMPLETED_WITH_ERRORS, else null.
+
+        Regression guard for the snapshot path bypassing ExecutionsConvertResourceMixin
+        (it serializes the raw Execution model directly) and therefore needing its own
+        `error` derivation kept in sync with the REST response.
+        """
+        publisher = ActivityUpdatePublisher()
+        execution_with_activities.status = status
+        execution_with_activities.error_details = error_details
+
+        with mock_patch(
+            "syntara.workflows.services.activity_update_publisher.StreamClient", return_value=mock_stream_client
+        ):
+            await publisher.publish_snapshot(execution_with_activities, snapshot_type="final_snapshot")
+
+            message_data = mock_stream_client.publish.call_args[0][1]
+            assert message_data["execution"]["error"] == expected_error
+            assert message_data["execution"]["error_details"] == error_details
+
 
 class TestPublishActivityPatch:
     """Tests for publish_activity_patch method."""
