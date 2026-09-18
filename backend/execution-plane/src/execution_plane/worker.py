@@ -38,7 +38,17 @@ async def _process_item(item: WorkItem, store: WorkStore, completion_callback: C
         await store.set_result(item, activity_result, WorkItemStatus.COMPLETED)
         logger.info("Script executed successfully", work_item_id=wi_id)
     except ScriptExecutionError as e:
-        await store.set_result(item, {"error": str(e), "error_type": "ScriptExecutionError"}, WorkItemStatus.FAILED)
+        await store.set_result(
+            item,
+            {
+                "error": str(e),
+                "error_type": "ScriptExecutionError",
+                "exit_code": e.exit_code,
+                "stdout": e.stdout,
+                "stderr": e.stderr,
+            },
+            WorkItemStatus.FAILED,
+        )
         logger.warning("Script execution failed", work_item_id=wi_id, error=str(e))
     except Exception as e:
         await store.set_result(item, {"error": str(e), "error_type": type(e).__name__}, WorkItemStatus.FAILED)
