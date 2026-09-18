@@ -30,17 +30,44 @@ Prefer **`browser_snapshot`** (accessibility tree) over screenshots when decidin
 - User asks for keyboard audit, skip link check, heading hierarchy, or "beyond axe" review
 - Completing an accessibility audit story (file one Jira bug per violation)
 
-Load `.claude/skills/frontend-testing-guidelines/SKILL.md` for unit-test axe patterns and `.claude/skills/frontend-playwright-e2e/SKILL.md` for E2E axe setup.
+Load `.claude/skills/frontend-testing-guidelines/SKILL.md` for unit-test axe patterns and `.claude/skills/frontend-playwright-e2e/SKILL.md` for targeted E2E axe setup.
 
 ---
 
 ## Phase 0 — Scope and baseline
 
+### 0.1 Full-app axe baseline (page registry)
+
+When auditing broadly (or before a manual pass on many surfaces), run the **report-only registry sweep** first:
+
+```bash
+# from frontend/ or packages/syntara-ui/
+npm run e2e:a11y-audit
+```
+
+This runs `e2e/a11y-audit.spec.ts`, which scans every entry in `e2e/visual-regression/page-registry.ts` with axe-core (WCAG 2.x A/AA). Details live in `frontend/packages/syntara-ui/TESTING.md` (Accessibility audit section).
+
+| Property | Value |
+| --- | --- |
+| **Output** | `packages/syntara-ui/test-results/a11y-audit-report.json` plus per-page JSON in the Playwright report |
+| **Stdout** | `A11y audit summary` with page/violation counts |
+| **Mode** | Report-only — tests always pass; CI is not gated on the backlog yet |
+| **Opt-in** | Excluded from default `npm run e2e`; run via `e2e:a11y-audit` only |
+| **Environment** | Mock API seed data required (`@local-only`; skipped in real-backend E2E) |
+
+Each violation in the JSON includes `ruleId`, `impact`, `description`, `helpUrl`, `wcagTags`, and DOM `targets` — use these when filing Jira bugs (Phase 4).
+
+**Registry sweep limits:** static page loads only. It does not open modals, exercise wizards, or traverse keyboard flows. Treat it as the automated floor; Phases 1–3 still apply per surface (especially overlays and multi-step flows not captured at load time).
+
+### 0.2 Targeted axe baseline
+
+For a single route, modal, or component under review:
+
 1. **Identify surfaces** — route(s), modals, menus, wizards, and states (empty, error, loading, success).
 2. **Start the app** — `make dev` or `npm run start:ui` (mock API is fine for most UI audits).
-3. **Automated baseline** — run axe on the surface:
-   - E2E: `@axe-core/playwright` with `wcag2a`, `wcag2aa`, `wcag21aa` tags (see `frontend-playwright-e2e` skill).
-   - Component: `vitest-axe` `toHaveNoViolations()` for isolated widgets.
+3. **Run axe** on the surface:
+   - **E2E / Browser MCP:** `@axe-core/playwright` with `wcag2a`, `wcag2aa`, `wcag21aa` tags (see `frontend-playwright-e2e` skill). Scope with `.include()` after opening dialogs/menus.
+   - **Unit:** `vitest-axe` `toHaveNoViolations()` for isolated widgets.
 4. **Record baseline violations** separately from manual findings; do not treat a clean axe run as "pass."
 
 Document: URL, viewport, theme (light/dark), and whether mock or real backend.
@@ -161,6 +188,22 @@ Use **`browser_snapshot`** and DOM inspection (CDP / DevTools) — not guessed m
 
 File **one Jira bug per distinct violation** (not one umbrella ticket per page). Link related bugs in description if helpful.
 
+### Triage registry report (`a11y-audit-report.json`)
+
+After `npm run e2e:a11y-audit`:
+
+1. Open `packages/syntara-ui/test-results/a11y-audit-report.json`.
+2. For each page with `violationCount > 0`, file **one bug per violation** (not one bug per page).
+3. Copy from the report into the Jira template:
+   - **Summary:** `a11y: [ruleId] on [section/name] — [short description]`
+   - **WCAG Reference:** join `wcagTags` (e.g. `wcag2aa`, `wcag21aa`) to the SC cited in `helpUrl` / axe docs
+   - **Steps to Reproduce:** `Navigate to [path]` from the page entry
+   - **Actual Behavior:** `description`, `targets`, and `failureSummary` from the matching node
+   - **Impact / Priority:** map axe `impact` using the table below (axe `critical`/`serious`/`moderate`/`minor` align with Jira impact labels)
+4. Skip or note `loadError` pages separately — fix load/navigation before treating axe results as authoritative.
+
+Manual findings from Phases 1–3 use the same template when axe did not report the issue.
+
 ### Bug description template
 
 ```markdown
@@ -214,11 +257,12 @@ Prefix summary with **`a11y:`** for discoverability.
 
 Before marking an audit complete:
 
-- [ ] axe baseline recorded (violations listed or confirmed none)
+- [ ] Registry axe baseline run (`npm run e2e:a11y-audit`) or targeted axe recorded for the scope
+- [ ] `a11y-audit-report.json` triaged (or equivalent per-page axe notes for a narrow audit)
 - [ ] Keyboard path exercised for primary flow and all overlays
 - [ ] Viewport/media matrix spot-checked (mobile, 200% zoom, reduced motion, forced colors)
 - [ ] Headings, landmarks, and names/roles reviewed via snapshot or tree dump
-- [ ] Each manual finding filed as its own Jira bug with impact → priority
+- [ ] Each finding (report + manual) filed as its own Jira bug with impact → priority
 - [ ] No findings dismissed solely because axe did not report them
 
 ---
@@ -227,7 +271,8 @@ Before marking an audit complete:
 
 | Do not | Do instead |
 | --- | --- |
-| Rely on axe alone | Run this skill's manual phases |
+| Rely on axe alone | Run registry sweep **and** this skill's manual phases |
+| Run registry sweep for modals/wizards only | Open overlays and re-scan (Phase 0.2) or use Browser MCP |
 | Use unvetted accessibility MCP scanners | Browser MCP + axe-core + Lighthouse |
 | File one mega-bug per page | One bug per violation with WCAG SC |
 | Disable axe rules to "pass" | Fix the component; document upstream PF issues separately |
