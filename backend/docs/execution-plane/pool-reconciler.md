@@ -16,7 +16,7 @@ an ExecutionTarget, not a Worker Pool. The ticket name is unchanged.
 The design the ExecutionTarget Reconciler implementation must follow. It
 covers the Cluster / ExecutionTarget model, the nested enumeration of
 registered clusters then targets, the selector model, matching algorithm,
-default routing, multi-match strategy, no-match error propagation, Worker
+default routing, multiple matches, no-match error propagation, Worker
 Manager resolution, and the extension points for health-based and
 policy-based filtering.
 
@@ -30,9 +30,8 @@ The Work Scheduler claims a work item from the Work Store, then asks the
 ExecutionTarget Reconciler where that work should run. The reconciler reads
 registered Clusters, then the ExecutionTargets on each Cluster, matches the
 work item's selector labels against that configuration, and returns a
-structured result: the **full ranked set** of eligible ExecutionTargets plus
-a single `selected_target` (the highest-ranked entry) for callers that want
-one.
+structured result: the **set of eligible ExecutionTargets**. It does not
+order that set or pick a winner.
 
 For MVP, eligibility is selector matching plus ExecutionTarget lifecycle
 state (only active targets are eligible). Health-based exclusion
@@ -85,7 +84,7 @@ always:
 1. Enumerates registered Clusters (optionally filtered by a cluster affinity
    selector on the work item).
 2. For each remaining Cluster, enumerates that Cluster's ExecutionTargets.
-3. Filters and ranks those ExecutionTargets.
+3. Filters those ExecutionTargets.
 
 Cluster Registry persistence and the foreign key are owned by
 [AAP-92716](https://redhat.atlassian.net/browse/AAP-92716). This story
@@ -123,7 +122,9 @@ follows.
 ```
 Work Scheduler
   → PlacementResolver.resolve(requirements)
-       → ExecutionTargetReconciler.resolve(...)  # pure, serializable result
+       → ExecutionTargetReconciler.resolve(...)  # eligible set, no pick
+  → scheduler chooses (cluster, target) from available_targets
+  → PlacementResolver.worker_manager_for(cluster)
        → WorkerManagerRegistry.get(backend)     # local instances only
   → worker_manager.dispatch(work_item, target_context)
 ```
@@ -134,9 +135,11 @@ Manager objects are not serializable and would make the reconciler unusable
 if the registries are remote.
 
 `PlacementResolver` is a thin local facade used by the scheduler. It calls
-the reconciler, looks up a locally registered Worker Manager by the selected
-target's Cluster `backend_type`, and returns both. The scheduler receives
-something it can call directly without knowing the backend type.
+the reconciler, then looks up a locally registered Worker Manager by a
+Cluster `backend_type` **after** the scheduler has chosen an ExecutionTarget
+from the eligible set. The scheduler receives something it can call
+directly without knowing the backend type. It does not inherit a preferred
+target from the reconciler.
 
 This is the co-located resolver option from AAP-92721, split so the
 reconciler remains a pure query (as in the conceptual Execution Plane
@@ -211,7 +214,6 @@ class ExecutionTargetReconciler:
         clusters: ClusterRegistry,
         targets: ExecutionTargetRegistry,
         filters: Sequence[EligibilityFilter],
-        strategy: SelectionStrategy,
     ) -> None: ...
 
     async def resolve(self, requirements: WorkRequirements) -> ReconcileResult: ...
@@ -227,11 +229,10 @@ Algorithm:
 4. Run the filter chain on each ExecutionTarget; partition into available /
    ineligible
 5. If `requirements.selectors` is empty, apply default routing on the
-   lifecycle-eligible set, then the selection strategy
-6. Otherwise rank by selector match, then append each considered Cluster's
-   default ExecutionTarget if it is not already in the available set
-   (cold-start fallback)
-7. Set `outcome` and `selected_target` (the first entry of the ranked list)
+   lifecycle-eligible set
+6. Otherwise keep only selector-matching ExecutionTargets
+7. Set `outcome` from whether `available_targets` is empty. Do not sort or
+   select among the available set.
 
 No I/O besides the two registries. No mutation of work items, Clusters, or
 ExecutionTargets.
@@ -277,11 +278,12 @@ When `requirements.selectors` is empty:
    are the only default candidates.
 4. Otherwise every lifecycle-eligible ExecutionTarget is a candidate (MVP:
    usually one namespace on the local Cluster).
-5. Apply the multi-match strategy to produce `selected_target`.
 
-When selectors are present, matching ExecutionTargets are ranked first. Each
-considered Cluster's default ExecutionTarget is still appended if missing, so
-the Work Scheduler can fall back to a cold start after warmer targets fail.
+When selectors are present, only ExecutionTargets that match **all** requested
+keys are eligible. Non-matching cluster defaults are **not** mixed into that
+set. Cold-start fallback is a Work Scheduler concern (AAP-92722): it may
+retry with empty selectors, or otherwise choose a cluster default after
+claim/provision fails.
 
 If no lifecycle-eligible ExecutionTarget exists on any considered Cluster,
 the outcome is `NO_MATCHING_TARGETS`.
@@ -306,24 +308,20 @@ Only ExecutionTargets in lifecycle **`active`** with `enabled=True`, on an
 When AAP-92724 lands, a health filter may refine `degraded` (for example
 allow it with reduced capacity). Until then, degraded is ineligible.
 
-## Multi-match strategy
+## Multiple matches
 
-The reconciler returns the **full ranked set** of eligible ExecutionTargets
-plus a single `selected_target` (highest rank) for callers that want one.
+Selector matching is boolean: an ExecutionTarget either satisfies every
+requested key or it does not. Extra labels do not make a target more
+eligible. The reconciler therefore **does not order** `available_targets`
+and **does not pick** a `selected_target`.
 
-MVP strategy:
+All eligible ExecutionTargets are equivalent from this component's point of
+view. Name sort, least-loaded, round-robin, and try-order on claim failure
+belong to the Work Scheduler (AAP-92722) or later Resource Monitor data
+(AAP-92724). None of those policies belong here for MVP.
 
-1. Rank by **best selector match** (more matching constraint keys first).
-2. Tie-break with a **stable sort by ExecutionTarget name**.
-3. Cluster default ExecutionTargets that were added only as cold-start
-   fallback rank last among that Cluster's candidates.
-
-Least-loaded needs Resource Monitor data. Round-robin needs scheduler-side
-state. Neither belongs in this component for MVP.
-
-The Work Scheduler (AAP-92722) should walk `available_targets` in rank order
-if provision or claim fails on `selected_target`. The reconciler does not
-perform that fallback.
+Callers must treat `available_targets` as a set. List order in the result
+is unspecified.
 
 A future health filter (AAP-92724) may mark an ExecutionTarget
 `IneligibilityReason.CAPACITY_EXHAUSTED`. That reason is not produced in
@@ -357,14 +355,14 @@ class IneligibleTarget:
 class ReconcileResult:
     available_targets: list[tuple[ClusterSnapshot, ExecutionTargetSnapshot]]
     ineligible_targets: list[IneligibleTarget]
-    selected_target: tuple[ClusterSnapshot, ExecutionTargetSnapshot] | None
     outcome: ResolveOutcome
 ```
 
-`available_targets` is ranked. `selected_target` is `available_targets[0]`
-when the list is non-empty. Each entry keeps the Cluster alongside the
-ExecutionTarget so the scheduler and Worker Manager know which API server
-and which namespace to use.
+`available_targets` is an unordered set of equally eligible
+`(Cluster, ExecutionTarget)` pairs (a list only because it is easy to
+serialize). Each entry keeps the Cluster alongside the ExecutionTarget so
+the scheduler and Worker Manager know which API server and which namespace
+to use.
 
 `outcome` is `MATCHED` when `available_targets` is non-empty, otherwise
 `NO_MATCHING_TARGETS`. It does not encode why targets were rejected; that is
@@ -372,7 +370,7 @@ and which namespace to use.
 
 | Outcome | Meaning | Scheduler action |
 |---|---|---|
-| `MATCHED` | At least one ExecutionTarget is eligible now | Proceed with the selected (or next) target |
+| `MATCHED` | At least one ExecutionTarget is eligible now | Choose any available target; retry others on claim/provision failure |
 | `NO_MATCHING_TARGETS` | No ExecutionTarget is eligible now | If any ineligible reason is `CAPACITY_EXHAUSTED`, keep the work queued (scaling may help). Otherwise fail; scaling will not help. |
 
 ### Ineligibility reasons
@@ -448,14 +446,16 @@ class PlacementResolver:
         worker_managers: WorkerManagerRegistry,
     ) -> None: ...
 
-    async def resolve(self, requirements: WorkRequirements) -> Placement: ...
+    async def resolve(self, requirements: WorkRequirements) -> ReconcileResult: ...
+
+    def worker_manager_for(self, cluster: ClusterSnapshot) -> WorkerManager: ...
 ```
 
-On `MATCHED`, `Placement` is
-`(selected_target, cluster, worker_manager, target_context)`.
-`target_context` includes the Kubernetes namespace. On
-`NO_MATCHING_TARGETS`, the facade returns the `ReconcileResult` only; the
-scheduler decides (including whether `CAPACITY_EXHAUSTED` means re-queue).
+`resolve()` returns the `ReconcileResult` only. On `MATCHED`, the scheduler
+chooses a `(cluster, target)` from `available_targets`, then calls
+`worker_manager_for(cluster)` to get a `WorkerManager`. `target_context`
+includes the Kubernetes namespace. On `NO_MATCHING_TARGETS`, the scheduler
+decides (including whether `CAPACITY_EXHAUSTED` means re-queue).
 
 The Worker Manager is looked up from the Cluster's `backend_type`, not from
 the ExecutionTarget. Namespaces on the same Cluster share a backend.
@@ -486,11 +486,14 @@ sequenceDiagram
         R->>TR: list_by_cluster(cluster.id)
         TR-->>R: ExecutionTargetSnapshot[]
     end
-    Note over R: Lifecycle + selector filters<br/>Default routing if selectors empty<br/>Rank by match, then name
-    R-->>PR: ReconcileResult (MATCHED, target A on cluster C)
+    Note over R: Lifecycle + selector filters<br/>Default routing if selectors empty<br/>No ordering or selection
+    R-->>PR: ReconcileResult (MATCHED, available_targets)
+    PR-->>S: ReconcileResult
+    S->>S: choose (cluster C, target A)
+    S->>PR: worker_manager_for(cluster C)
     PR->>WM: get(cluster C.backend_type)
     WM-->>PR: WorkerManager
-    PR-->>S: Placement(target A, cluster C, WorkerManager)
+    PR-->>S: WorkerManager
     S->>S: WorkerManager.dispatch(work_item, target_context)
 ```
 
@@ -501,7 +504,6 @@ sequenceDiagram
     participant S as Work Scheduler
     participant R as ExecutionTargetReconciler
     participant F as Filter chain
-    participant St as SelectionStrategy
 
     S->>R: resolve(selectors, workload_type)
 
@@ -512,17 +514,15 @@ sequenceDiagram
     loop each remaining Cluster
         Note over R: list_by_cluster(cluster.id)
         alt selectors empty
-            Note over R: Default routing on active targets<br/>(prefer execution-plane/default=true)
+            Note over R: Default routing on active targets<br/>(execution-plane/default=true if any)
         else selectors present
-            Note over R: Exact AND match against target labels<br/>Append cluster default as cold-start fallback
+            Note over R: Exact AND match against target labels
         end
         R->>F: evaluate each ExecutionTarget
         F-->>R: available / ineligible(+reason)
     end
 
-    R->>St: rank available_targets
-    St-->>R: selected_target
-    R-->>S: ReconcileResult
+    R-->>S: ReconcileResult (unordered available_targets)
 ```
 
 ## Package layout
@@ -533,11 +533,10 @@ Syntara `BaseService` (this is not an HTTP domain service).
 ```
 backend/execution-plane/src/execution_plane/execution_target_reconciler/
   types.py          # WorkRequirements, ClusterSnapshot, ExecutionTargetSnapshot, ReconcileResult, ...
-  protocols.py      # ClusterRegistry, ExecutionTargetRegistry, EligibilityFilter, SelectionStrategy
+  protocols.py      # ClusterRegistry, ExecutionTargetRegistry, EligibilityFilter
   exceptions.py
   matching.py       # exact-AND selector match
   filters.py        # Lifecycle, Selector, no-op Health/Policy
-  strategy.py       # rank by match, then stable name sort
   reconciler.py
   placement.py      # PlacementResolver + WorkerManagerRegistry
   adapters.py       # implicit single-Cluster adapter until AAP-92716
@@ -573,8 +572,10 @@ do not re-export from `__init__.py`.
 - **AAP-92715 / AAP-92720 (Work Store / Work Executor):** if selectors are
   persisted on `WorkItem`, map them into `WorkRequirements`; do not couple
   the reconciler to the row type.
-- **AAP-92722 (Work Scheduler):** consume `PlacementResolver`; walk
-  `available_targets` on provision failure. On `NO_MATCHING_TARGETS`,
-  re-queue if any ineligible reason is `CAPACITY_EXHAUSTED`; otherwise fail.
+- **AAP-92722 (Work Scheduler):** consume `PlacementResolver`; choose among
+  `available_targets` (no order is implied). On claim/provision failure, try
+  another available target or fall back to a cluster default. On
+  `NO_MATCHING_TARGETS`, re-queue if any ineligible reason is
+  `CAPACITY_EXHAUSTED`; otherwise fail.
 - **AAP-92724 / AAP-92726:** replace the no-op health and policy filters
   without changing `ExecutionTargetReconciler.resolve`.
