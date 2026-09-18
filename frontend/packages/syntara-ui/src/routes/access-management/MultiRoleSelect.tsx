@@ -22,6 +22,8 @@ export type RoleOption = {
   description: string | null
 }
 
+const ROLES_LISTBOX_ID = 'multi-role-select-listbox'
+
 function renderSelectOptions(options: RoleOption[], filterValue: string, hasMore?: boolean, isLoading?: boolean) {
   if (isLoading) {
     return <SelectOption isDisabled>Loading...</SelectOption>
@@ -123,6 +125,10 @@ export function MultiRoleSelect({
           placeholder={selected.length === 0 ? 'Search for roles...' : ''}
           autoComplete="off"
           innerRef={inputRef}
+          role="combobox"
+          isExpanded={isOpen}
+          aria-controls={ROLES_LISTBOX_ID}
+          inputProps={{ 'aria-autocomplete': 'list' }}
         >
           {selectedLabels.length > 0 && (
             <LabelGroup>
@@ -179,7 +185,7 @@ export function MultiRoleSelect({
       onSelect={handleSelect}
       toggle={toggle}
     >
-      <SelectList className={styles.rolesList}>
+      <SelectList id={ROLES_LISTBOX_ID} className={styles.rolesList}>
         {renderSelectOptions(filteredOptions, filterValue, hasMore, isLoading)}
       </SelectList>
     </SynSelect>
