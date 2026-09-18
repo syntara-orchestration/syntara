@@ -19,6 +19,7 @@ from syntara.core.models.user_reference import UserReference
 from syntara.core.utils.sqlmodel import DiscriminatedJSONB, postgres_enum_column
 from syntara.forms.models.api_models import (
     FormPromptStatus,
+    FormPromptSummary,
     ResponderGroupSummary,
     ResponderUserSummary,
 )
@@ -273,5 +274,9 @@ class FormPromptRead(BaseFormPrompt, table=False):
 # ============================================================================
 
 
-class FormPromptListResponse(ResourcesResponse[FormPromptRead]):
-    """Paginated list response for form prompts."""
+class FormPromptListResponse(ResourcesResponse[FormPromptSummary]):
+    """Paginated list response for form prompts.
+
+    Uses FormPromptSummary (8 documented fields) for internal workflow engine endpoints.
+    AAP-91889 will add user-facing list endpoints using FormPromptRead.
+    """

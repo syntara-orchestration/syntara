@@ -37,6 +37,8 @@ tags:
     description: Encrypted credential management
   - name: Files
     description: File upload and management operations for agent context
+  - name: Form Prompts
+    description: Form prompt management for workflow human-in-the-loop gates
   - name: Identity Providers
     description: Identity provider registration and management
   - name: Integrations
@@ -8841,6 +8843,384 @@ paths:
               schema:
                 type: string
                 contentMediaType: application/octet-stream
+        '400':
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/bad-request
+                title: Bad Request
+                detail: The request was malformed or contained invalid parameters
+                code: BAD_REQUEST
+                retryable: false
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/unauthorized
+                title: Unauthorized
+                detail: Authentication is required to access this resource
+                code: UNAUTHORIZED
+                retryable: false
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/forbidden
+                title: Forbidden
+                detail: You do not have permission to access this resource
+                code: FORBIDDEN
+                retryable: false
+        '404':
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/not-found
+                title: Resource Not Found
+                detail: No resource exists with the provided identifier
+                code: NOT_FOUND
+                retryable: false
+                instance: /api/v1/workflows
+        '409':
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/conflict
+                title: Conflict
+                detail: The request conflicts with the current state of the resource
+                code: CONFLICT
+                retryable: false
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/validation-error
+                title: Validation Error
+                detail: Field 'name' must be between 1 and 255 characters
+                code: VALIDATION_ERROR
+                retryable: false
+                instance: /api/v1/workflows
+        '500':
+          description: Internal Server Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/internal-error
+                title: Internal Server Error
+                detail: An unexpected error occurred
+                code: INTERNAL_ERROR
+                retryable: true
+        '429':
+          description: Too Many Requests
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/rate-limited
+                title: Too Many Requests
+                detail: Rate limit exceeded. Try again in 60 seconds.
+                code: RATE_LIMITED
+                retryable: true
+      security:
+        - bearerAuth: []
+  /form_prompts:
+    get:
+      summary: List form prompts
+      description: List form prompts filtered by execution ID. Internal endpoint for expire/cancel activities.
+      operationId: list_form_prompts
+      tags:
+        - Form Prompts
+      x-app-permission:
+        resource: form_prompt
+        action: read
+      parameters:
+        - name: execution_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Execution Id
+        - name: status
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - $ref: '#/components/schemas/FormPromptStatus'
+              - type: 'null'
+            title: Status
+      responses:
+        '200':
+          description: List of form prompts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FormPromptListResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/bad-request
+                title: Bad Request
+                detail: The request was malformed or contained invalid parameters
+                code: BAD_REQUEST
+                retryable: false
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/unauthorized
+                title: Unauthorized
+                detail: Authentication is required to access this resource
+                code: UNAUTHORIZED
+                retryable: false
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/forbidden
+                title: Forbidden
+                detail: You do not have permission to access this resource
+                code: FORBIDDEN
+                retryable: false
+        '404':
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/not-found
+                title: Resource Not Found
+                detail: No resource exists with the provided identifier
+                code: NOT_FOUND
+                retryable: false
+                instance: /api/v1/workflows
+        '409':
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/conflict
+                title: Conflict
+                detail: The request conflicts with the current state of the resource
+                code: CONFLICT
+                retryable: false
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/validation-error
+                title: Validation Error
+                detail: Field 'name' must be between 1 and 255 characters
+                code: VALIDATION_ERROR
+                retryable: false
+                instance: /api/v1/workflows
+        '500':
+          description: Internal Server Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/internal-error
+                title: Internal Server Error
+                detail: An unexpected error occurred
+                code: INTERNAL_ERROR
+                retryable: true
+        '429':
+          description: Too Many Requests
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/rate-limited
+                title: Too Many Requests
+                detail: Rate limit exceeded. Try again in 60 seconds.
+                code: RATE_LIMITED
+                retryable: true
+      security:
+        - bearerAuth: []
+    post:
+      summary: Create form prompt
+      description: Create a new form prompt. Internal service-to-service endpoint for workflow engine.
+      operationId: create_form_prompt
+      tags:
+        - Form Prompts
+      x-app-permission:
+        resource: form_prompt
+        action: create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FormPromptCreateRequest'
+      responses:
+        '201':
+          description: Form prompt created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FormPromptSummary'
+        '400':
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/bad-request
+                title: Bad Request
+                detail: The request was malformed or contained invalid parameters
+                code: BAD_REQUEST
+                retryable: false
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/unauthorized
+                title: Unauthorized
+                detail: Authentication is required to access this resource
+                code: UNAUTHORIZED
+                retryable: false
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/forbidden
+                title: Forbidden
+                detail: You do not have permission to access this resource
+                code: FORBIDDEN
+                retryable: false
+        '404':
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/not-found
+                title: Resource Not Found
+                detail: No resource exists with the provided identifier
+                code: NOT_FOUND
+                retryable: false
+                instance: /api/v1/workflows
+        '409':
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/conflict
+                title: Conflict
+                detail: The request conflicts with the current state of the resource
+                code: CONFLICT
+                retryable: false
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/validation-error
+                title: Validation Error
+                detail: Field 'name' must be between 1 and 255 characters
+                code: VALIDATION_ERROR
+                retryable: false
+                instance: /api/v1/workflows
+        '429':
+          description: Too Many Requests
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/rate-limited
+                title: Too Many Requests
+                detail: Rate limit exceeded. Try again in 60 seconds.
+                code: RATE_LIMITED
+                retryable: true
+        '500':
+          description: Internal Server Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/internal-error
+                title: Internal Server Error
+                detail: An unexpected error occurred
+                code: INTERNAL_ERROR
+                retryable: true
+      security:
+        - bearerAuth: []
+  /form_prompts/batch:
+    post:
+      summary: Batch update form prompt statuses
+      description: Batch update form prompt statuses. Internal endpoint for expire/cancel activities.
+      operationId: batch_update_form_prompts
+      tags:
+        - Form Prompts
+      x-app-permission:
+        resource: form_prompt
+        action: create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchFormPromptRequest'
+      responses:
+        '200':
+          description: Batch update results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchUpdateResponse'
         '400':
           description: Bad Request
           content:
@@ -30735,6 +31115,326 @@ components:
             - type: string
             - type: 'null'
           title: Label Key
+    FormPromptSummary:
+      type: object
+      title: FormPromptSummary
+      description: |-
+        Minimal form prompt response for internal workflow engine endpoints.
+
+        Contains only the 8 documented fields used by expire/cancel activities
+        and workflow lifecycle management. Does not expose user-submitted form data
+        or rendering configuration fields (those will appear in FormPromptRead for
+        user-facing endpoints in AAP-91889).
+      required:
+        - id
+        - execution_id
+        - project_id
+        - prompt_node_id
+        - name
+        - status
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+          description: Form prompt unique identifier
+        execution_id:
+          type: string
+          format: uuid
+          title: Execution Id
+          description: Parent workflow execution ID
+        project_id:
+          type: string
+          format: uuid
+          title: Project Id
+          description: Project ID (denormalized from execution)
+        prompt_node_id:
+          type: string
+          title: Prompt Node Id
+          description: Canvas node ID from the workflow definition
+        name:
+          type: string
+          title: Name
+          description: Display name for the form prompt
+        status:
+          $ref: '#/components/schemas/FormPromptStatus'
+          description: Current prompt status
+        loop_iteration_path:
+          type: array
+          title: Loop Iteration Path
+          description: Enclosing-loop indices, outermost first
+          items:
+            type: integer
+        temporal_activity_id:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Temporal Activity Id
+          description: Temporal activity ID for async completion
+    FormPromptListResponse:
+      type: object
+      title: FormPromptListResponse
+      description: |-
+        Paginated list response for form prompts.
+
+        Uses FormPromptSummary (8 documented fields) for internal workflow engine endpoints.
+        AAP-91889 will add user-facing list endpoints using FormPromptRead.
+      required:
+        - resources
+      properties:
+        next:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Next
+          description: Cursor for next page of results
+        prev:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Prev
+          description: Cursor for previous page of results
+        total:
+          anyOf:
+            - type: integer
+              minimum: 0.0
+            - type: 'null'
+          title: Total
+          description: Total count of resources (only when include_total=true)
+        resources:
+          type: array
+          maxItems: 100
+          title: Resources
+          description: Array of resources in current page
+          items:
+            $ref: '#/components/schemas/FormPromptSummary'
+      examples:
+        - next: eyJpZCI6InV1aWQifQ
+          total: 150
+        - next: eyJpZCI6Im5leHQifQ
+          prev: eyJpZCI6InByZXYifQ
+    FormPromptStatus:
+      type: string
+      title: FormPromptStatus
+      description: Form prompt status enumeration.
+      enum:
+        - pending
+        - submitted
+        - expired
+        - cancelled
+    FormPromptCreateRequest:
+      type: object
+      title: FormPromptCreateRequest
+      description: |-
+        Request payload for creating a form prompt.
+
+        This is an internal schema used by the Workflows component.
+      required:
+        - execution_id
+        - project_id
+        - prompt_node_id
+        - name
+        - form_definition
+      properties:
+        execution_id:
+          type: string
+          format: uuid
+          title: Execution Id
+          description: Parent workflow execution ID
+        project_id:
+          type: string
+          format: uuid
+          title: Project Id
+          description: Project ID (denormalized from execution)
+        prompt_node_id:
+          type: string
+          title: Prompt Node Id
+          description: Canvas node ID from the workflow definition
+        name:
+          type: string
+          maxLength: 255
+          minLength: 1
+          title: Name
+          description: Display name for the form prompt
+        message:
+          anyOf:
+            - type: string
+              maxLength: 2000
+            - type: 'null'
+          title: Message
+          description: Resolved message shown above the form
+        loop_iteration_path:
+          type: array
+          title: Loop Iteration Path
+          description: Enclosing-loop indices, outermost first (empty when not inside a loop)
+          items:
+            type: integer
+        temporal_activity_id:
+          anyOf:
+            - type: string
+              maxLength: 255
+            - type: 'null'
+          title: Temporal Activity Id
+          description: Temporal activity ID to signal on submit (defaults to prompt_node_id)
+        timeout_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          title: Timeout At
+          description: When this prompt expires (null = no timeout)
+        form_definition:
+          $ref: '#/components/schemas/FormDefinition'
+          description: Form schema defining fields to collect
+        submit_label:
+          anyOf:
+            - type: string
+              maxLength: 64
+            - type: 'null'
+          title: Submit Label
+          description: Submit button label
+        success_message:
+          anyOf:
+            - type: string
+              maxLength: 500
+            - type: 'null'
+          title: Success Message
+          description: Success message after submit
+        timezone:
+          anyOf:
+            - type: string
+              maxLength: 64
+            - type: 'null'
+          title: Timezone
+          description: IANA timezone for date fields
+        css_override:
+          anyOf:
+            - type: string
+              maxLength: 10000
+            - type: 'null'
+          title: Css Override
+          description: Custom CSS for form rendering
+        responder_user_ids:
+          anyOf:
+            - type: array
+              maxItems: 1000
+              items:
+                type: string
+                format: uuid
+            - type: 'null'
+          title: Responder User Ids
+          description: User IDs who can respond (null = any user with form_prompt:submit permission)
+        responder_group_ids:
+          anyOf:
+            - type: array
+              maxItems: 1000
+              items:
+                type: string
+                format: uuid
+            - type: 'null'
+          title: Responder Group Ids
+          description: Group IDs whose members can respond
+    BatchFormPromptStatus:
+      type: string
+      title: BatchFormPromptStatus
+      description: |-
+        Status values that can be submitted in batch form prompt updates.
+
+        This is a system-actionable subset of FormPromptStatus.
+      enum:
+        - expired
+        - cancelled
+    BatchFormPromptUpdate:
+      type: object
+      title: BatchFormPromptUpdate
+      description: Single update within a batch form prompt request.
+      required:
+        - prompt_id
+        - status
+      properties:
+        prompt_id:
+          type: string
+          format: uuid
+          title: Prompt Id
+          description: ID of the form prompt
+        status:
+          $ref: '#/components/schemas/BatchFormPromptStatus'
+          description: Status to set
+        notes:
+          anyOf:
+            - type: string
+              maxLength: 2000
+            - type: 'null'
+          title: Notes
+          description: Optional notes explaining the status change
+    BatchFormPromptRequest:
+      type: object
+      title: BatchFormPromptRequest
+      description: Request payload for batch updating form prompt statuses.
+      required:
+        - updates
+      properties:
+        updates:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/BatchFormPromptUpdate'
+          title: Updates
+          description: List of form prompt status updates to apply
+    BatchUpdateResult:
+      type: object
+      title: BatchUpdateResult
+      description: Single result within a batch update response.
+      required:
+        - prompt_id
+        - success
+      properties:
+        prompt_id:
+          type: string
+          title: Prompt Id
+          description: ID of the form prompt
+        success:
+          type: boolean
+          title: Success
+          description: Whether the update succeeded
+        message:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Message
+          description: Success message if applicable
+        error:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Error
+          description: Error message if update failed
+    BatchUpdateResponse:
+      type: object
+      title: BatchUpdateResponse
+      description: Response payload for batch form prompt updates.
+      required:
+        - results
+        - total_success
+        - total_failed
+      properties:
+        results:
+          type: array
+          title: Results
+          description: Individual update results
+          items:
+            $ref: '#/components/schemas/BatchUpdateResult'
+        total_success:
+          type: integer
+          minimum: 0.0
+          title: Total Success
+          description: Count of successful updates
+        total_failed:
+          type: integer
+          minimum: 0.0
+          title: Total Failed
+          description: Count of failed updates
     OIDCClaimMapping:
       type: object
       title: OIDCClaimMapping
