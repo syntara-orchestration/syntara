@@ -26,7 +26,11 @@ export const VISUAL_REGRESSION_CLOCK = '2026-06-15T10:00:00Z'
 export default defineConfig({
   globalSetup: './e2e/global-setup.ts',
   testDir: './e2e',
-  testIgnore: [...(useWebServer ? [] : ['**/visual-regression/**']), '**/credential-types.spec.ts'],
+  testIgnore: [
+    ...(useWebServer ? [] : ['**/visual-regression/**']),
+    '**/credential-types.spec.ts',
+    ...(process.env.SYNTARA_E2E_A11Y_AUDIT ? [] : ['**/a11y-audit.spec.ts']),
+  ],
   fullyParallel: true,
   workers: process.env.CI ? 3 : undefined,
   retries: process.env.CI ? 1 : 0,
