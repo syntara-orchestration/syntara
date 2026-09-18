@@ -139,7 +139,8 @@ orchestrator-cli = { path = "src/cli", editable = true }
 orchestrator-test-sdk = { path = "test-sdk", editable = true }
 
 [project.scripts]
-orchestrator-admin = "syntara.orchestrator_admin:app"
+automation-orchestrator-admin = "syntara.orchestrator_admin:app"
+ao-admin = "syntara.orchestrator_admin:app"
 
 [project.urls]
 Homepage = "https://github.com/syntara-orchestration/syntara"

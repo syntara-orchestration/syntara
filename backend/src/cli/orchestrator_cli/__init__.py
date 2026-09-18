@@ -1,4 +1,4 @@
-"""Dynamic CLI for the Orchestrator API — built at runtime from the OpenAPI spec."""
+"""Dynamic CLI for the Automation Orchestrator API — built at runtime from the OpenAPI spec."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ with phase("startup.create_app"):
     app = typer.Typer(
         name="orchestrator",
         help=(
-            "Orchestrator API command-line client.\n\n"
+            "Automation Orchestrator API command-line client.\n\n"
             "Set APP_CLI_BENCHMARK=1 to print per-phase execution timings to stderr "
             "for a single invocation."
         ),
@@ -41,7 +41,7 @@ def main(
         None,
         "--base-url",
         envvar="APP_CLI_URL",
-        help="Orchestrator base URL (e.g. http://localhost:8000).",
+        help="Automation Orchestrator base URL (e.g. http://localhost:8000).",
     ),
     token: str | None = typer.Option(
         None,
@@ -50,7 +50,7 @@ def main(
         help="API bearer token.",
     ),
 ) -> None:
-    """Orchestrator API command-line client."""
+    """Automation Orchestrator API command-line client."""
     with phase("startup.main_callback"):
         ctx.ensure_object(dict)
         resolved_url = (base_url or "http://localhost:8000").rstrip("/")

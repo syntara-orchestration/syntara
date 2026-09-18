@@ -1,4 +1,4 @@
-"""Unit tests for the orchestrator-admin CLI enable-user and reset-password commands."""
+"""Unit tests for the automation-orchestrator-admin CLI enable-user and reset-password commands."""
 
 import re
 from io import StringIO
@@ -136,7 +136,7 @@ class TestGetActor:
 
     def test_falls_back_on_os_error(self) -> None:
         with patch("syntara.orchestrator_admin.__main__.os.getlogin", side_effect=OSError("no tty")):
-            assert _get_actor() == "orchestrator-admin"
+            assert _get_actor() == "automation-orchestrator-admin"
 
 
 # ---------------------------------------------------------------------------
@@ -167,7 +167,7 @@ class TestEnableUser:
             patch("syntara.auth.session.create_session_store", return_value=mock_store),
             patch("syntara.audit.dispatcher.AuditEventDispatcher") as mock_dispatcher,
         ):
-            await _enable_user_async(username="alice", actor="orchestrator-admin")
+            await _enable_user_async(username="alice", actor="automation-orchestrator-admin")
 
         assert mock_user.is_enabled is True
         mock_store.revoke_all_for_user.assert_called_once_with(mock_user.id)
@@ -176,7 +176,7 @@ class TestEnableUser:
 
         event = mock_dispatcher.dispatch.call_args[0][0]
         assert event.target_username == mock_user.username
-        assert event.actor_username == "orchestrator-admin"
+        assert event.actor_username == "automation-orchestrator-admin"
         assert event.sessions_revoked == 2
 
     @pytest.mark.asyncio
@@ -199,7 +199,7 @@ class TestEnableUser:
             patch("syntara.auth.session.create_session_store", return_value=mock_store),
             patch("syntara.audit.dispatcher.AuditEventDispatcher") as mock_dispatcher,
         ):
-            await _enable_user_async(username="alice", actor="orchestrator-admin")
+            await _enable_user_async(username="alice", actor="automation-orchestrator-admin")
 
         assert mock_user.is_enabled is True
         mock_dispatcher.dispatch.assert_called_once()
@@ -217,7 +217,7 @@ class TestEnableUser:
             ),
             pytest.raises(typer.Exit) as exc_info,
         ):
-            await _enable_user_async(username="nonexistent", actor="orchestrator-admin")
+            await _enable_user_async(username="nonexistent", actor="automation-orchestrator-admin")
 
         assert exc_info.value.exit_code == 1
 
@@ -235,7 +235,7 @@ class TestEnableUser:
             ),
             pytest.raises(typer.Exit) as exc_info,
         ):
-            await _enable_user_async(username="alice", actor="orchestrator-admin")
+            await _enable_user_async(username="alice", actor="automation-orchestrator-admin")
 
         assert exc_info.value.exit_code == 0
 
@@ -294,7 +294,11 @@ class TestResetPassword:
             patch("syntara.auth.passwords.hash_password", return_value="$argon2id$hashed") as mock_hash,
             patch("syntara.audit.dispatcher.AuditEventDispatcher") as mock_dispatcher,
         ):
-            await _reset_password_async(username="alice", new_password="newpassword123", actor="orchestrator-admin")  # noqa: S106
+            await _reset_password_async(
+                username="alice",
+                new_password="newpassword123",  # noqa: S106
+                actor="automation-orchestrator-admin",
+            )
 
         mock_hash.assert_called_once_with("newpassword123")
         assert mock_user.password_hash == "$argon2id$hashed"  # noqa: S105
@@ -304,7 +308,7 @@ class TestResetPassword:
 
         event = mock_dispatcher.dispatch.call_args[0][0]
         assert event.target_username == mock_user.username
-        assert event.actor_username == "orchestrator-admin"
+        assert event.actor_username == "automation-orchestrator-admin"
         assert event.sessions_revoked == 3
 
     @pytest.mark.asyncio
@@ -323,7 +327,7 @@ class TestResetPassword:
             await _reset_password_async(
                 username="nonexistent",
                 new_password="newpassword123",  # noqa: S106
-                actor="orchestrator-admin",
+                actor="automation-orchestrator-admin",
             )
 
         assert exc_info.value.exit_code == 1
@@ -342,7 +346,11 @@ class TestResetPassword:
             ),
             pytest.raises(typer.Exit) as exc_info,
         ):
-            await _reset_password_async(username="alice", new_password="newpassword123", actor="orchestrator-admin")  # noqa: S106
+            await _reset_password_async(
+                username="alice",
+                new_password="newpassword123",  # noqa: S106
+                actor="automation-orchestrator-admin",
+            )
 
         assert exc_info.value.exit_code == 1
 
@@ -622,3 +630,23 @@ class TestTyperCommands:
         assert result.exit_code == 0
         assert "enable-user" in plain
         assert "reset-password" in plain
+
+    def test_help_uses_product_name(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Admin CLI help text reflects APP_PRODUCT_NAME at import time."""
+        import importlib
+
+        import syntara.orchestrator_admin.__main__ as admin_main
+
+        monkeypatch.setenv("APP_PRODUCT_NAME", "Automation Orchestrator")
+        # _product_name is captured at module import; reload to pick up the new env value.
+        importlib.reload(admin_main)
+        try:
+            from typer.testing import CliRunner
+
+            runner = CliRunner()
+            result = runner.invoke(admin_main.app, ["--help"])
+            plain = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
+            assert "Automation Orchestrator" in plain
+        finally:
+            # Restore the module to its default state so other tests are unaffected.
+            importlib.reload(admin_main)
