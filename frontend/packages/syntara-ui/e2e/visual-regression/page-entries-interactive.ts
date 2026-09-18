@@ -721,7 +721,7 @@ export const workflowDialogPages: CanvasPageEntry[] = [
       await page.getByRole('button', { name: /Import workflow/i }).click()
       const dialog = page.getByRole('dialog')
       await expect(dialog).toBeVisible()
-      await expect(dialog.getByRole('button', { name: /Import/i })).toBeVisible()
+      await expect(dialog.getByRole('button', { name: /Import workflow/i })).toBeVisible()
     },
   },
 ]

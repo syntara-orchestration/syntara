@@ -292,7 +292,7 @@ describe('ImportWorkflowDialog', () => {
 
     await user.upload(getFileUploadInput(), new File([validContent], 'wf.json', { type: 'application/json' }))
     await user.type(screen.getByLabelText(/Workflow name/i), 'Test')
-    await user.click(screen.getByRole('button', { name: /^Import$/i }))
+    await user.click(screen.getByRole('button', { name: /^Import workflow$/i }))
 
     await waitFor(() => {
       expect(mockShowError).toHaveBeenCalledWith({
@@ -321,7 +321,7 @@ describe('ImportWorkflowDialog', () => {
 
     await user.upload(getFileUploadInput(), new File([validContent], 'wf.json', { type: 'application/json' }))
     await user.type(screen.getByLabelText(/Workflow name/i), 'Test WF')
-    await user.click(screen.getByRole('button', { name: /^Import$/i }))
+    await user.click(screen.getByRole('button', { name: /^Import workflow$/i }))
 
     await waitFor(() => {
       expect(mockShowError).toHaveBeenCalledWith({
@@ -355,7 +355,7 @@ describe('ImportWorkflowDialog', () => {
     const file = new File([oversizedContent], 'large.json', { type: 'application/json' })
     await user.upload(getFileUploadInput(), file)
     await user.type(screen.getByLabelText(/Workflow name/i), 'Test')
-    await user.click(screen.getByRole('button', { name: /^Import$/i }))
+    await user.click(screen.getByRole('button', { name: /^Import workflow$/i }))
 
     await waitFor(() => {
       expect(screen.getByText(WORKFLOW_IMPORT_FILE_TOO_LARGE_MESSAGE)).toBeInTheDocument()
@@ -377,7 +377,7 @@ describe('ImportWorkflowDialog', () => {
 
     await user.upload(getFileUploadInput(), new File([validContent], 'wf.json', { type: 'application/json' }))
     await user.type(screen.getByLabelText(/Workflow name/i), 'Test WF')
-    await user.click(screen.getByRole('button', { name: /^Import$/i }))
+    await user.click(screen.getByRole('button', { name: /^Import workflow$/i }))
 
     await waitFor(() => {
       expect(mockShowError).toHaveBeenCalledWith({
