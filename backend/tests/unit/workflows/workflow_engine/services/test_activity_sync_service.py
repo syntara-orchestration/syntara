@@ -4750,6 +4750,10 @@ class TestInitializeMonitoringWorkflowLookup:
         workflow_result = Mock()
         workflow_result.one_or_none.return_value = workflow
 
+        # Mock workflow version number query result (telemetry: workflow_version)
+        version_number_result = Mock()
+        version_number_result.one_or_none.return_value = 1
+
         # Mock workflow version query result (for activity definitions)
         wf_version_result = Mock()
         wf_version_result.one_or_none.return_value = Mock(workflow_definition={"nodes": activity_defs or []})
@@ -4763,13 +4767,14 @@ class TestInitializeMonitoringWorkflowLookup:
         terminal_result.all.return_value = []
 
         mock_session = AsyncMock()
-        # Order: execution query, workflow query, workflow_version query,
-        # activity creation check query, activity index map query,
-        # terminal activity IDs query
+        # Order: execution query, workflow query, workflow version number query,
+        # workflow_version (definitions) query, activity creation check query,
+        # activity index map query, terminal activity IDs query
         mock_session.exec = AsyncMock(
             side_effect=[
                 exec_result,
                 workflow_result,
+                version_number_result,
                 wf_version_result,
                 Mock(one_or_none=Mock(return_value=None)),
                 activity_result,

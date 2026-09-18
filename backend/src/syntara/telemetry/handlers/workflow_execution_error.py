@@ -33,7 +33,7 @@ class WorkflowExecutionErrorTelemetryHandler(AuditEventHandler[WorkflowExecution
 
             registry.send_event(
                 WorkflowErrorEvent(
-                    workflow_execution_id=str(event.execution_id),
+                    workflow_execution_id=event.execution_id,
                     timed_out_component=event.timed_out_component,
                     configured_timeout_seconds=event.configured_timeout_seconds,
                     elapsed_time_ms=event.elapsed_time_ms,

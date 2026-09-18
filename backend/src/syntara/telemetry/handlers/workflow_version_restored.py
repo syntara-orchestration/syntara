@@ -35,7 +35,7 @@ class WorkflowVersionRestoredTelemetryHandler(AuditEventHandler[WorkflowVersionR
 
             registry.send_event(
                 WorkflowVersionRestoredTelemetryEvent(
-                    workflow_id=str(event.workflow_id),
+                    workflow_id=event.workflow_id,
                     restored_from_version=event.restored_from_version,
                     new_version=event.new_version,
                     entitlement_id=registry.entitlement_id,

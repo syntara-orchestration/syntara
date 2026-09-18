@@ -35,10 +35,12 @@ class NodeExecutedTelemetryHandler(AuditEventHandler[NodeExecutedEvent]):
 
             registry.send_event(
                 _builder.build_event(
-                    execution_id=str(event.execution_id),
+                    execution_id=event.execution_id,
+                    workflow_id=event.workflow_id,
                     node_type=event.node_type,
                     node_def=event.node_def,
                     status=event.status,
+                    mode=event.mode,
                     duration_ms=event.duration_ms,
                     error_type=event.error_type,
                     entitlement_id=registry.entitlement_id,

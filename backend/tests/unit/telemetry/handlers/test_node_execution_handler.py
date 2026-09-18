@@ -6,6 +6,7 @@ from uuid import uuid4
 from syntara.telemetry.events.node_execution import NodeExecutionEvent
 from syntara.telemetry.handlers.node_execution import NodeExecutedTelemetryHandler
 from syntara.workflows.audit.node_execution import NodeExecutedEvent as NodeExecutedDomainEvent
+from syntara.workflows.models.execution import ExecutionMode
 from syntara.workflows.workflow_engine.models.workflow_definition import (
     ActivityTerminalStatus,
     NodeType,
@@ -39,12 +40,35 @@ class TestNodeExecutedTelemetryHandler:
         registry.send_event.assert_called_once()
         event = registry.send_event.call_args[0][0]
         assert isinstance(event, NodeExecutionEvent)
-        assert event.workflow_execution_id == str(execution_id)
+        assert event.workflow_execution_id == execution_id
         assert event.node_type == NodeType.SCRIPT
         assert event.status == ActivityTerminalStatus.COMPLETED
         assert event.duration_ms == 1500
         assert event.entitlement_id == "ent-test-789"
         assert event.request_id == request_id
+
+    @patch("syntara.telemetry.handlers.node_execution.get_telemetry_registry")
+    def test_passes_workflow_id_and_mode(self, mock_get_registry: MagicMock) -> None:
+        """AAP-92215: node telemetry carries workflow_id and mode."""
+        registry = MagicMock()
+        registry.is_initialized.return_value = True
+        registry.entitlement_id = "ent"
+        mock_get_registry.return_value = registry
+
+        workflow_id = uuid4()
+        domain_event = NodeExecutedDomainEvent(
+            execution_id=uuid4(),
+            workflow_id=workflow_id,
+            node_type=NodeType.SCRIPT,
+            node_def=SAMPLE_NODE_DEF,
+            status=ActivityTerminalStatus.COMPLETED,
+            mode=ExecutionMode.STANDARD,
+        )
+        NodeExecutedTelemetryHandler().handle(domain_event)
+
+        event = registry.send_event.call_args[0][0]
+        assert event.workflow_id == workflow_id
+        assert event.mode == ExecutionMode.STANDARD
 
     @patch("syntara.telemetry.handlers.node_execution.get_telemetry_registry")
     def test_emits_failed_event_with_error_type(self, mock_get_registry: MagicMock) -> None:
