@@ -19,7 +19,7 @@ export function useEdgeHover() {
     }
   }, [])
 
-  const handleEdgeMouseEnter = () => {
+  const handleMouseEnter = () => {
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current)
       hoverTimeoutRef.current = null
@@ -28,36 +28,20 @@ export function useEdgeHover() {
     setIsEdgeHovered(true)
   }
 
-  const handleEdgeMouseLeave = () => {
+  const handleMouseLeave = () => {
     setIsEdgeHovered(false)
     hoverTimeoutRef.current = setTimeout(() => {
       setIsHovered(false)
-    }, 200) // Delay to allow moving to button
-  }
-
-  const handleButtonMouseEnter = () => {
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current)
-      hoverTimeoutRef.current = null
-    }
-    setIsHovered(true)
-    setIsEdgeHovered(true)
-  }
-
-  const handleButtonMouseLeave = () => {
-    setIsEdgeHovered(false)
-    hoverTimeoutRef.current = setTimeout(() => {
-      setIsHovered(false)
-    }, 200)
+    }, 200) // Delay to allow moving between edge and buttons
   }
 
   return {
     isHovered,
     isEdgeHovered,
-    handleEdgeMouseEnter,
-    handleEdgeMouseLeave,
-    handleButtonMouseEnter,
-    handleButtonMouseLeave,
+    handleEdgeMouseEnter: handleMouseEnter,
+    handleEdgeMouseLeave: handleMouseLeave,
+    handleButtonMouseEnter: handleMouseEnter,
+    handleButtonMouseLeave: handleMouseLeave,
   }
 }
 
