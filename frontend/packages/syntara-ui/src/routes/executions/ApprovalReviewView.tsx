@@ -31,7 +31,11 @@ import { ApprovalSummaryList } from '../approvals/ApprovalSummaryList'
 import { useApprovalPermissions } from '../approvals/useApprovalPermissions'
 import { useCanDecideApproval } from '../approvals/useCanDecideApproval'
 
-import { approvalDecisionSchema, type ApprovalDecisionFormData } from './approvalDecisionSchema'
+import {
+  approvalDecisionSchema,
+  APPROVAL_NOTES_MAX_LENGTH,
+  type ApprovalDecisionFormData,
+} from './approvalDecisionSchema'
 import { ApprovalReadOnlyView } from './ApprovalReadOnlyView'
 
 type NextStep = { id: string; name: string; type: string; parameters?: Record<string, unknown> }
@@ -245,6 +249,7 @@ export function ApprovalReviewView({ approval, activityNameMap, onClose }: Appro
                 label="Notes"
                 fieldId="approval-notes"
                 placeholder="Explain the reason for your decision..."
+                maxLength={APPROVAL_NOTES_MAX_LENGTH}
               />
             </SynForm>
           </Form>

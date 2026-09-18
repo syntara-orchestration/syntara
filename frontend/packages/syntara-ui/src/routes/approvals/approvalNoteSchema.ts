@@ -1,15 +1,14 @@
 import { z } from 'zod'
 
-import { approvalDecisionSchema } from '../executions/approvalDecisionSchema'
+import { approvalDecisionSchema, APPROVAL_NOTES_MAX_LENGTH } from '../executions/approvalDecisionSchema'
 
 export const approvalNotesOnlySchema = approvalDecisionSchema.pick({ notes: true })
 
 export type ApprovalNotesOnlyFormData = z.infer<typeof approvalNotesOnlySchema>
 
-export const BULK_APPROVAL_NOTE_MAX_LENGTH = 1000
-
+/** Same limit as single approval decisions (approvals API OpenAPI `maxLength: 2000`). */
 export const bulkApprovalNoteSchema = z.object({
-  note: z.string().max(BULK_APPROVAL_NOTE_MAX_LENGTH),
+  note: z.string().max(APPROVAL_NOTES_MAX_LENGTH),
 })
 
 export type BulkApprovalNoteFormData = z.infer<typeof bulkApprovalNoteSchema>

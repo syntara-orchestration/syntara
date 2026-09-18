@@ -18,12 +18,9 @@ import { useEffect } from 'react'
 import { SynForm } from '../../components/forms/SynForm'
 import { SynTextAreaField } from '../../components/forms/SynTextAreaField'
 import { useSynForm } from '../../hooks/useSynForm'
+import { APPROVAL_NOTES_MAX_LENGTH } from '../executions/approvalDecisionSchema'
 
-import {
-  BULK_APPROVAL_NOTE_MAX_LENGTH,
-  bulkApprovalNoteSchema,
-  type BulkApprovalNoteFormData,
-} from './approvalNoteSchema'
+import { bulkApprovalNoteSchema, type BulkApprovalNoteFormData } from './approvalNoteSchema'
 
 type BulkDecision = 'approve' | 'reject'
 
@@ -138,7 +135,7 @@ function BulkDecisionDialog({
                   fieldId={config.noteFieldId}
                   placeholder={config.notePlaceholder}
                   rows={3}
-                  maxLength={BULK_APPROVAL_NOTE_MAX_LENGTH}
+                  maxLength={APPROVAL_NOTES_MAX_LENGTH}
                 />
               </SynForm>
             </Form>
@@ -163,14 +160,10 @@ function BulkDecisionDialog({
   )
 }
 
-export type BulkApproveDialogProps = BulkDecisionDialogBaseProps
-
-export function BulkApproveDialog(props: Readonly<BulkApproveDialogProps>) {
+export function BulkApproveDialog(props: Readonly<BulkDecisionDialogBaseProps>) {
   return <BulkDecisionDialog decision="approve" {...props} />
 }
 
-export type BulkRejectDialogProps = BulkDecisionDialogBaseProps
-
-export function BulkRejectDialog(props: Readonly<BulkRejectDialogProps>) {
+export function BulkRejectDialog(props: Readonly<BulkDecisionDialogBaseProps>) {
   return <BulkDecisionDialog decision="reject" {...props} />
 }
