@@ -1,7 +1,7 @@
-import { FormGroup, FormSection, StackItem, TextInput } from '@patternfly/react-core'
+import { FormSection, StackItem } from '@patternfly/react-core'
 import type { ReactElement } from 'react'
-import { useFormContext } from 'react-hook-form'
 
+import { SynTextField } from '../../../components/forms/SynTextField'
 import type { AAPWorkflowTemplateDetail } from '../../../hooks/useAAPBrowser'
 import type { ExpandableCodeEditorHandle } from '../components/ExpandableCodeEditor'
 
@@ -23,7 +23,6 @@ type AAPWorkflowTemplatePromptFieldsProps = Readonly<{
   extraVarsEditorRef?: React.RefObject<ExpandableCodeEditorHandle | null>
 }>
 
-// Simple text input field for workflow template forms
 function TextInputField({
   label,
   fieldId,
@@ -35,12 +34,14 @@ function TextInputField({
   name: keyof AAPWorkflowTemplateFormData
   labelHelp?: ReactElement
 }>) {
-  const { register } = useFormContext<AAPWorkflowTemplateFormData>()
   return (
     <StackItem>
-      <FormGroup label={label} labelHelp={labelHelp} fieldId={fieldId}>
-        <TextInput {...register(name)} id={fieldId} type="text" />
-      </FormGroup>
+      <SynTextField<AAPWorkflowTemplateFormData, typeof name>
+        name={name}
+        label={label}
+        fieldId={fieldId}
+        labelHelp={labelHelp}
+      />
     </StackItem>
   )
 }
@@ -82,7 +83,7 @@ export function AAPWorkflowTemplatePromptFields(props: AAPWorkflowTemplatePrompt
     <StackItem>
       <FormSection title="Prompt on launch" titleElement="h3">
         {templateDetail.ask_inventory_on_launch && (
-          <AAPResourceSelectField
+          <AAPResourceSelectField<AAPWorkflowTemplateFormData>
             label="Inventory"
             fieldId="aap-wf-inventory"
             nameField="inventory_name"

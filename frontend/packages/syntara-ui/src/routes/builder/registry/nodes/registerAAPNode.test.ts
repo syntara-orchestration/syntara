@@ -136,6 +136,38 @@ describe('registerAAPNode', () => {
     expect(mockAddActivity).toHaveBeenCalled()
   })
 
+  it('creates expression-mode workflow activity when use_input_variables is true without a template', () => {
+    const mockAddActivity = vi.fn()
+    vi.mocked(useWorkflowStore.getState).mockReturnValue({
+      addActivity: mockAddActivity,
+    } as never)
+
+    registerAAPNode()
+    const registration = NodeRegistry.get(RegistryNodeId.AAP_EXECUTION)
+    const onSuccess = vi.fn()
+    const onError = vi.fn()
+
+    registration?.onSubmit(
+      {
+        name: 'Test AAP Workflow',
+        use_input_variables: true,
+        organization_name: '',
+        workflow_job_template_name: '',
+        workflow_job_template_id: undefined,
+      },
+      onSuccess,
+      onError,
+      RegistryNodeId.AAP_WORKFLOW_TEMPLATE
+    )
+
+    expect(onError).not.toHaveBeenCalled()
+    expect(onSuccess).toHaveBeenCalledWith(expect.any(String))
+    expect(mockAddActivity).toHaveBeenCalled()
+    const activity = mockAddActivity.mock.calls[0]?.[0] as { parameters?: Record<string, unknown> }
+    expect(activity.parameters).not.toHaveProperty('workflow_job_template_id')
+    expect(activity.parameters?.use_input_variables).toBe(true)
+  })
+
   it('creates expression-mode activity when use_input_variables is true without a job template', () => {
     const mockAddActivity = vi.fn()
     vi.mocked(useWorkflowStore.getState).mockReturnValue({

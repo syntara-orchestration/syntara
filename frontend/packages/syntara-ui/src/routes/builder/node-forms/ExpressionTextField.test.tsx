@@ -100,6 +100,25 @@ describe('ExpressionTextField', () => {
 
       expect(screen.getByText('Enter a value or drag an expression from the Input panel')).toBeInTheDocument()
     })
+
+    it('does not show syntax validation for plain text values', async () => {
+      const user = userEvent.setup()
+      render(
+        <TestWrapper>
+          <ExpressionTextField
+            name="organization_name"
+            id="test-field"
+            label="Organization"
+            placeholder="Enter organization name"
+          />
+        </TestWrapper>
+      )
+
+      const input = screen.getByLabelText('Organization')
+      await user.type(input, 'Default')
+
+      expect(screen.queryByText('Invalid syntax')).not.toBeInTheDocument()
+    })
   })
 
   describe('User Input', () => {
