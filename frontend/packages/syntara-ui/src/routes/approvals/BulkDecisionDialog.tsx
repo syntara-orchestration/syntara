@@ -163,14 +163,10 @@ function BulkDecisionDialog({
   )
 }
 
-export type BulkApproveDialogProps = BulkDecisionDialogBaseProps
-
-export function BulkApproveDialog(props: Readonly<BulkApproveDialogProps>) {
+export function BulkApproveDialog(props: Readonly<BulkDecisionDialogBaseProps>) {
   return <BulkDecisionDialog decision="approve" {...props} />
 }
 
-export type BulkRejectDialogProps = BulkDecisionDialogBaseProps
-
-export function BulkRejectDialog(props: Readonly<BulkRejectDialogProps>) {
+export function BulkRejectDialog(props: Readonly<BulkDecisionDialogBaseProps>) {
   return <BulkDecisionDialog decision="reject" {...props} />
 }
