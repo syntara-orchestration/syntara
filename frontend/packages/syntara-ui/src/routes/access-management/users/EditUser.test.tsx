@@ -103,7 +103,7 @@ describe('EditUser', () => {
     render(<EditUser />, { wrapper })
 
     expect(screen.getByRole('heading', { name: 'Edit John Doe' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save user' })).toBeInTheDocument()
   })
 
   it('does not render the status toggle on the edit form', () => {

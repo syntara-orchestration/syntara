@@ -9,6 +9,7 @@ import {
   SelectList,
   SelectOption,
 } from '@patternfly/react-core'
+import { RhUiAddIcon } from '@patternfly/react-icons'
 import { useQueryClient } from '@tanstack/react-query'
 import { type Ref, useCallback, useMemo, useState } from 'react'
 import { useWatch } from 'react-hook-form'
@@ -303,8 +304,15 @@ export function AssignRoleModal({
         </Form>
       </ModalBody>
       <ModalFooter>
-        <Button variant="primary" type="submit" form="assign-role-form" isDisabled={isPending} isLoading={isPending}>
-          Assign {roleIds.length > 0 ? `(${String(roleIds.length)})` : ''}
+        <Button
+          variant="primary"
+          type="submit"
+          form="assign-role-form"
+          isDisabled={isPending}
+          isLoading={isPending}
+          icon={<RhUiAddIcon />}
+        >
+          {roleIds.length > 1 ? `Assign roles (${String(roleIds.length)})` : 'Assign role'}
         </Button>
         <Button variant="link" onClick={handleClose} isDisabled={isPending}>
           Cancel

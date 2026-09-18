@@ -1,4 +1,5 @@
 import { Button, Form, Modal, ModalBody, ModalFooter, ModalHeader } from '@patternfly/react-core'
+import { RhUiAddIcon } from '@patternfly/react-icons'
 import { useMemo, useState } from 'react'
 import { useWatch } from 'react-hook-form'
 
@@ -397,8 +398,9 @@ export function AssignProjectRoleModal({
           form="assign-project-role-form"
           isDisabled={isPending}
           isLoading={isPending}
+          icon={<RhUiAddIcon />}
         >
-          Assign
+          Assign role
         </Button>
         <Button variant="link" onClick={handleClose} isDisabled={isPending}>
           Cancel

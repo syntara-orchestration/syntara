@@ -154,7 +154,7 @@ test.describe('Switch Node — UI-15', () => {
         )
         await selectProjectIfRequired(app)
         await app.getByPlaceholder('Workflow name').fill(wfName)
-        await app.getByRole('button', { name: 'Save', exact: true }).click()
+        await app.getByRole('button', { name: 'Save workflow' }).click()
         const saveRequest = await saveRequestPromise
 
         await expect(app.getByText('Route by status')).toBeVisible()
@@ -187,7 +187,7 @@ test.describe('Switch Node — UI-15', () => {
         )
         await selectProjectIfRequired(app)
         await app.getByPlaceholder('Workflow name').fill(wfName)
-        await app.getByRole('button', { name: 'Save', exact: true }).click()
+        await app.getByRole('button', { name: 'Save workflow' }).click()
         const saveRequest = await saveRequestPromise
 
         const payload = getWorkflowPayload(saveRequest)
@@ -218,7 +218,7 @@ test.describe('Switch Node — UI-15', () => {
         )
         await selectProjectIfRequired(app)
         await app.getByPlaceholder('Workflow name').fill(wfName)
-        await app.getByRole('button', { name: 'Save', exact: true }).click()
+        await app.getByRole('button', { name: 'Save workflow' }).click()
         const saveRequest = await saveRequestPromise
 
         const payload = getWorkflowPayload(saveRequest)
@@ -250,7 +250,7 @@ test.describe('Switch Node — UI-15', () => {
         )
         await selectProjectIfRequired(app)
         await app.getByPlaceholder('Workflow name').fill(wfName)
-        await app.getByRole('button', { name: 'Save', exact: true }).click()
+        await app.getByRole('button', { name: 'Save workflow' }).click()
         const saveRequest = await saveRequestPromise
 
         const payload = getWorkflowPayload(saveRequest)
@@ -369,7 +369,7 @@ test.describe('Switch Node — UI-15', () => {
 
         await selectProjectIfRequired(app)
         await app.getByPlaceholder('Workflow name').fill(wfName)
-        await app.getByRole('button', { name: 'Save', exact: true }).click()
+        await app.getByRole('button', { name: 'Save workflow' }).click()
         await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/)
 
         // Reload the workflow in the builder
@@ -403,7 +403,7 @@ test.describe('Switch Node — UI-15', () => {
 
         await selectProjectIfRequired(app)
         await app.getByPlaceholder('Workflow name').fill(wfName)
-        await app.getByRole('button', { name: 'Save', exact: true }).click()
+        await app.getByRole('button', { name: 'Save workflow' }).click()
         await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/)
 
         await openWorkflowInBuilder(app, wfName)
@@ -414,7 +414,7 @@ test.describe('Switch Node — UI-15', () => {
         const saveRequestPromise = app.waitForRequest(
           (req) => req.url().includes('/workflows') && req.method() === 'PATCH'
         )
-        await app.getByRole('button', { name: 'Save', exact: true }).click()
+        await app.getByRole('button', { name: 'Save workflow' }).click()
         const saveRequest = await saveRequestPromise
 
         const payload = getWorkflowPayload(saveRequest)
@@ -447,7 +447,7 @@ test.describe('Switch Node — UI-15', () => {
 
         await selectProjectIfRequired(app)
         await app.getByPlaceholder('Workflow name').fill(wfName)
-        await app.getByRole('button', { name: 'Save', exact: true }).click()
+        await app.getByRole('button', { name: 'Save workflow' }).click()
         await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/)
 
         // Node appears on the React Flow canvas
@@ -471,7 +471,7 @@ test.describe('Switch Node — UI-15', () => {
 
         await selectProjectIfRequired(app)
         await app.getByPlaceholder('Workflow name').fill(wfName)
-        await app.getByRole('button', { name: 'Save', exact: true }).click()
+        await app.getByRole('button', { name: 'Save workflow' }).click()
         await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/)
 
         // Click the node to open the editor

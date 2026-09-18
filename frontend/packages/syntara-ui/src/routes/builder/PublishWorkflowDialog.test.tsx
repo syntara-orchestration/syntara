@@ -54,7 +54,7 @@ describe('PublishWorkflowDialog', () => {
     await user.clear(nameInput)
     await user.type(nameInput, 'v1.0')
     await user.type(screen.getByLabelText('Description'), 'Initial release')
-    await user.click(screen.getByRole('button', { name: 'Publish' }))
+    await user.click(screen.getByRole('button', { name: 'Publish workflow' }))
 
     expect(onPublish).toHaveBeenCalledWith('v1.0', 'Initial release')
   })
@@ -64,7 +64,7 @@ describe('PublishWorkflowDialog', () => {
     const onPublish = vi.fn()
     render(<PublishWorkflowDialog {...defaultProps} onPublish={onPublish} />)
 
-    await user.click(screen.getByRole('button', { name: 'Publish' }))
+    await user.click(screen.getByRole('button', { name: 'Publish workflow' }))
 
     expect(onPublish).toHaveBeenCalledWith(expect.stringMatching(/\w+ \d+, \d{4}/) as unknown, undefined)
   })
@@ -97,7 +97,7 @@ describe('PublishWorkflowDialog', () => {
 
     const nameInput = screen.getByLabelText('Version name')
     await user.clear(nameInput)
-    await user.click(screen.getByRole('button', { name: 'Publish' }))
+    await user.click(screen.getByRole('button', { name: 'Publish workflow' }))
 
     expect(defaultProps.onPublish).not.toHaveBeenCalled()
     expect(screen.getByText('Version name is required')).toBeInTheDocument()
@@ -110,7 +110,7 @@ describe('PublishWorkflowDialog', () => {
     const descInput = screen.getByLabelText('Description')
     await user.click(descInput)
     await user.paste('x'.repeat(1001))
-    await user.click(screen.getByRole('button', { name: 'Publish' }))
+    await user.click(screen.getByRole('button', { name: 'Publish workflow' }))
 
     expect(defaultProps.onPublish).not.toHaveBeenCalled()
     expect(screen.getByText('Description must be 1000 characters or fewer')).toBeInTheDocument()

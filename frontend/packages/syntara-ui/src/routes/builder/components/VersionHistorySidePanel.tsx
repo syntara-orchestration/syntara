@@ -72,7 +72,7 @@ export function VersionHistorySidePanel({ sidePanel, isNodeEditorOpen, editPermi
           onClose={sidePanel.restoreDialog.onClose}
           onConfirm={sidePanel.restoreDialog.onConfirm}
           title={sidePanel.restoreDialog.title}
-          confirmLabel="Restore"
+          confirmLabel="Restore version"
           titleIconVariant="warning"
           confirmLoading={sidePanel.restoreDialog.isLoading}
         >

@@ -1,4 +1,5 @@
 import { Button, Form, Modal, ModalBody, ModalFooter, ModalHeader } from '@patternfly/react-core'
+import { RhUiAddIcon } from '@patternfly/react-icons'
 import { useEffect, useMemo } from 'react'
 import { z } from 'zod'
 
@@ -108,8 +109,15 @@ export function AddMemberModal({
         </Form>
       </ModalBody>
       <ModalFooter>
-        <Button variant="primary" type="submit" form="add-member-form" isDisabled={isPending} isLoading={isPending}>
-          Add
+        <Button
+          variant="primary"
+          type="submit"
+          form="add-member-form"
+          isDisabled={isPending}
+          isLoading={isPending}
+          icon={<RhUiAddIcon />}
+        >
+          Add member
         </Button>
         <Button variant="link" onClick={handleClose} isDisabled={isPending}>
           Cancel

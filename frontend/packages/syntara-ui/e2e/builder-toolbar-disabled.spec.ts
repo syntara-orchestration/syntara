@@ -29,7 +29,7 @@ test.describe('builder toolbar disabled while editing', () => {
       await app.getByPlaceholder('Workflow name').fill(`${workflowName}-dirty`)
 
       // Verify Save is initially enabled (aria-disabled=false or absent)
-      const saveBtn = app.getByRole('button', { name: 'Save', exact: true })
+      const saveBtn = app.getByRole('button', { name: 'Save workflow' })
       await expect(saveBtn).not.toHaveAttribute('aria-disabled', 'true')
 
       await openNodeForEditing(app, 'Toolbar test action')
@@ -70,7 +70,7 @@ test.describe('builder toolbar disabled while editing', () => {
       const cancelBtn = app.getByRole('button', { name: 'Cancel without saving' })
       await expect(cancelBtn).toBeVisible({ timeout: 10_000 })
 
-      const saveBtn = app.getByRole('button', { name: 'Save', exact: true })
+      const saveBtn = app.getByRole('button', { name: 'Save workflow' })
       await expect(saveBtn).toHaveAttribute('aria-disabled', 'true')
 
       // PF tooltips can lag behind hover under CI load — retry hover until visible.

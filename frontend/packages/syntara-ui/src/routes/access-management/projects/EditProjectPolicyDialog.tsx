@@ -104,7 +104,7 @@ export function EditProjectPolicyDialog({
           isDisabled={isPending}
           isLoading={isPending}
         >
-          Save
+          Save policy
         </Button>
         <Button variant="link" onClick={handleClose} isDisabled={isPending}>
           Cancel

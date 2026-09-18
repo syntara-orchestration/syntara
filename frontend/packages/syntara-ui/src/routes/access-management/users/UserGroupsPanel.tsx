@@ -174,8 +174,15 @@ function AddToGroupModal({
         </Form>
       </ModalBody>
       <ModalFooter>
-        <Button variant="primary" type="submit" form="add-to-group-form" isDisabled={isPending} isLoading={isPending}>
-          Add
+        <Button
+          variant="primary"
+          type="submit"
+          form="add-to-group-form"
+          isDisabled={isPending}
+          isLoading={isPending}
+          icon={<RhUiAddIcon />}
+        >
+          Add to group
         </Button>
         <Button variant="link" onClick={handleClose} isDisabled={isPending}>
           Cancel
@@ -423,7 +430,7 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
         onClose={() => setGroupToRemove(null)}
         onConfirm={handleRemove}
         title="Remove from group?"
-        confirmLabel="Remove"
+        confirmLabel="Remove from group"
         confirmVariant="danger"
         titleIconVariant="warning"
       >

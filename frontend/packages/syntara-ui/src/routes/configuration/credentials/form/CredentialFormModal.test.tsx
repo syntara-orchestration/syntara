@@ -238,7 +238,7 @@ describe('CredentialFormModal', () => {
 
   it('shows save button in edit mode', () => {
     render(<CredentialFormModal isOpen onClose={vi.fn()} credentialToEdit={mockCredential} />, { wrapper })
-    expect(screen.getByRole('button', { name: 'Save changes' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save credential' })).toBeInTheDocument()
   })
 
   it('calls onClose when cancel is clicked', async () => {
@@ -322,7 +322,7 @@ describe('CredentialFormModal', () => {
 
     await user.clear(screen.getByDisplayValue('My Token'))
     await user.type(screen.getByLabelText('Credential name'), 'Updated Token')
-    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    await user.click(screen.getByRole('button', { name: 'Save credential' }))
 
     await waitFor(() => expect(mockMutate).toHaveBeenCalled())
   })

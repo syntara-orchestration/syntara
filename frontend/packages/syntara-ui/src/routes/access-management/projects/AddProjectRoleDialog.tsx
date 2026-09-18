@@ -1,4 +1,5 @@
 import { Button, Form, Modal, ModalBody, ModalFooter, ModalHeader } from '@patternfly/react-core'
+import { RhUiAddIcon } from '@patternfly/react-icons'
 
 import { SynForm } from '../../../components/forms/SynForm'
 import { SynFormField } from '../../../components/forms/SynFormField'
@@ -95,8 +96,9 @@ export function AddProjectRoleDialog({ projectId, onClose, onSuccess }: Readonly
           type="submit"
           isDisabled={isPending}
           isLoading={isPending}
+          icon={<RhUiAddIcon />}
         >
-          Add
+          Add role
         </Button>
         <Button variant="link" onClick={handleClose} isDisabled={isPending}>
           Cancel

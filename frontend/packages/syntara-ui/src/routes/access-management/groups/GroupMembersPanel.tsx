@@ -270,7 +270,7 @@ export function GroupMembersPanel({ groupId, onMembershipChange }: Readonly<Grou
         onClose={() => setMemberToRemove(null)}
         onConfirm={handleRemove}
         title="Remove member?"
-        confirmLabel="Remove"
+        confirmLabel="Remove member"
         confirmVariant="danger"
         titleIconVariant="warning"
       >

@@ -267,7 +267,7 @@ describe('ServiceAccountsTab', () => {
       expect(screen.getByText('Disable service account?')).toBeInTheDocument()
     })
 
-    await user.click(screen.getByRole('button', { name: 'Disable' }))
+    await user.click(screen.getByRole('button', { name: 'Disable service account' }))
     expect(mockDisableMutate).toHaveBeenCalled()
   })
 
@@ -320,7 +320,7 @@ describe('ServiceAccountsTab', () => {
 
     const ackCheckbox = screen.getByRole('checkbox', { name: /i understand/i })
     await user.click(ackCheckbox)
-    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: 'Delete service account' }))
     expect(mockDeleteMutate).toHaveBeenCalled()
   })
 

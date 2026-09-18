@@ -224,7 +224,7 @@ describe('AssignProjectRoleModal', () => {
 
   it('renders the modal header', () => {
     renderModal()
-    expect(screen.getByText('Assign role')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Assign role' })).toBeInTheDocument()
   })
 
   it('renders principal type, user, and role form fields', () => {
@@ -265,7 +265,7 @@ describe('AssignProjectRoleModal', () => {
     const user = userEvent.setup()
     renderModal()
 
-    const assignButton = screen.getByRole('button', { name: 'Assign' })
+    const assignButton = screen.getByRole('button', { name: 'Assign role' })
     expect(assignButton).toBeEnabled()
 
     await user.click(assignButton)
@@ -296,10 +296,10 @@ describe('AssignProjectRoleModal', () => {
     await user.click(roleOption)
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Assign' })).not.toBeDisabled()
+      expect(screen.getByRole('button', { name: 'Assign role' })).not.toBeDisabled()
     })
 
-    await user.click(screen.getByRole('button', { name: 'Assign' }))
+    await user.click(screen.getByRole('button', { name: 'Assign role' }))
 
     await waitFor(() => {
       expect(mockMutate).toHaveBeenCalled()
@@ -390,10 +390,10 @@ describe('AssignProjectRoleModal', () => {
     await user.click(roleOption)
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Assign' })).not.toBeDisabled()
+      expect(screen.getByRole('button', { name: 'Assign role' })).not.toBeDisabled()
     })
 
-    await user.click(screen.getByRole('button', { name: 'Assign' }))
+    await user.click(screen.getByRole('button', { name: 'Assign role' }))
 
     await waitFor(() => {
       expect(mockMutate).toHaveBeenCalled()
@@ -433,10 +433,10 @@ describe('AssignProjectRoleModal', () => {
     await user.click(roleOption)
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Assign' })).not.toBeDisabled()
+      expect(screen.getByRole('button', { name: 'Assign role' })).not.toBeDisabled()
     })
 
-    await user.click(screen.getByRole('button', { name: 'Assign' }))
+    await user.click(screen.getByRole('button', { name: 'Assign role' }))
 
     await waitFor(() => {
       expect(mockMutate).toHaveBeenCalled()
