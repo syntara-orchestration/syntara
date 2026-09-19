@@ -945,7 +945,7 @@ expect(results.violations).toEqual([])
 
 **Note on axe-core limitations:** axe-core catches approximately 30% of real WCAG violations automatically. The rest — keyboard navigation flow, screen reader announcement quality, cognitive accessibility, color contrast in simulated DOM environments — requires manual testing. Automated scans are a floor, not a ceiling.
 
-**Full-app registry sweep:** `npm run e2e:a11y-audit` (report-only; see `e2e/a11y-audit.spec.ts` and `TESTING.md`). For keyboard, viewport/media, semantic checks, and Jira filing beyond the JSON report, follow `.claude/skills/a11y-audit.md`.
+**Full-app registry sweep:** `npm run e2e:a11y-audit` (report-only; see `e2e/a11y-audit.spec.ts` and `TESTING.md`). For keyboard, viewport/media, semantic checks, and bug filing beyond the JSON report, follow `.claude/skills/a11y-audit/SKILL.md`.
 
 ---
 
