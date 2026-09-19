@@ -1,7 +1,8 @@
 ---
+name: a11y-audit
 description: >-
   AI-assisted accessibility audit methodology beyond axe-core: keyboard navigation,
-  viewport/media matrix, semantic structure, and Jira bug filing. Use for a11y audits,
+  viewport/media matrix, semantic structure, and issue-tracker bug filing. Use for a11y audits,
   WCAG reviews, or when the user asks to check keyboard/focus/landmarks/reading order.
 user-invocable: true
 ---
@@ -28,7 +29,7 @@ Prefer **`browser_snapshot`** (accessibility tree) over screenshots when decidin
 - Auditing a page, flow, modal, or nav region before filing bugs
 - Reviewing a PR that touches interactive UI, focus, landmarks, or routing
 - User asks for keyboard audit, skip link check, heading hierarchy, or "beyond axe" review
-- Completing an accessibility audit story (file one Jira bug per violation)
+- Completing an accessibility audit story (file one bug per violation)
 
 Load `.claude/skills/frontend-testing-guidelines/SKILL.md` for unit-test axe patterns and `.claude/skills/frontend-playwright-e2e/SKILL.md` for targeted E2E axe setup.
 
@@ -55,7 +56,7 @@ This runs `e2e/a11y-audit.spec.ts`, which scans every entry in `e2e/visual-regre
 | **Opt-in** | Excluded from default `npm run e2e`; run via `e2e:a11y-audit` only |
 | **Environment** | Mock API seed data required (`@local-only`; skipped in real-backend E2E) |
 
-Each violation in the JSON includes `ruleId`, `impact`, `description`, `helpUrl`, `wcagTags`, and DOM `targets` — use these when filing Jira bugs (Phase 4).
+Each violation in the JSON includes `ruleId`, `impact`, `description`, `helpUrl`, `wcagTags`, and DOM `targets` — use these when filing bugs (Phase 4).
 
 **Registry sweep limits:** static page loads only. It does not open modals, exercise wizards, or traverse keyboard flows. Treat it as the automated floor; Phases 1–3 still apply per surface (especially overlays and multi-step flows not captured at load time).
 
@@ -186,7 +187,7 @@ Use **`browser_snapshot`** and DOM inspection (CDP / DevTools) — not guessed m
 
 ## Phase 4 — Report and file bugs
 
-File **one Jira bug per distinct violation** (not one umbrella ticket per page). Link related bugs in description if helpful.
+File **one issue per distinct violation** (not one umbrella ticket per page). Link related issues in description if helpful.
 
 ### Triage registry report (`a11y-audit-report.json`)
 
@@ -194,12 +195,12 @@ After `npm run e2e:a11y-audit`:
 
 1. Open `packages/syntara-ui/test-results/a11y-audit-report.json`.
 2. For each page with `violationCount > 0`, file **one bug per violation** (not one bug per page).
-3. Copy from the report into the Jira template:
+3. Copy from the report into the bug template:
    - **Summary:** `a11y: [ruleId] on [section/name] — [short description]`
    - **WCAG Reference:** join `wcagTags` (e.g. `wcag2aa`, `wcag21aa`) to the SC cited in `helpUrl` / axe docs
    - **Steps to Reproduce:** `Navigate to [path]` from the page entry
    - **Actual Behavior:** `description`, `targets`, and `failureSummary` from the matching node
-   - **Impact / Priority:** map axe `impact` using the table below (axe `critical`/`serious`/`moderate`/`minor` align with Jira impact labels)
+   - **Impact / Priority:** map axe `impact` using the table below (axe `critical`/`serious`/`moderate`/`minor` align with common impact labels)
 4. Skip or note `loadError` pages separately — fix load/navigation before treating axe results as authoritative.
 
 Manual findings from Phases 1–3 use the same template when axe did not report the issue.
@@ -227,29 +228,27 @@ SC x.x.x — [Name] (WCAG 2.1 Level A/AA)
 [Critical | Serious | Moderate | Minor] — [one sentence on who is blocked and how]
 
 ## Priority Rationale
-[Impact level] → [Jira priority] (per audit priority mapping below)
+[Impact level] → [tracker priority] (per audit priority mapping below)
 ```
 
 ### Impact → priority mapping
 
-From the Nexus accessibility audit epic (axe impact levels when applicable):
+Map axe impact levels when applicable (adapt priority names to your tracker):
 
-| Impact | Jira priority | Notes |
+| Impact | Suggested priority | Notes |
 | --- | --- | --- |
 | **Critical** | **P1** (Urgent) | Blocks task completion for assistive technology or keyboard users |
 | **Serious** | **P2** (Major) | Major barrier; workaround painful or unknown |
 | **Moderate** | **P3** (Normal) | Degraded experience; workaround exists |
 | **Minor** | **P4** (Minor) / backlog | Nuisance; low user impact |
 
-Examples aligned with filed audit bugs:
+Examples:
 
 - Keyboard focus lost to `<body>` after route change → **Serious → P2**
 - Missing `aria-haspopup="menu"` on menu button → **Moderate → P3**
 - Missing skip link (landmarks present but no skip control) → **Minor → P4** when landmarks exist; **Serious → P2** when keyboard users must tab through entire nav on every page
 
-Set **components** to Automation Orchestrator, labels **`nexus-a11y`**, **`automation-orchestrator-ui`** when filing in AAP.
-
-Prefix summary with **`a11y:`** for discoverability.
+Apply team tracker conventions (components, labels, priority field names) from local agent config when available (for example `CLAUDE.local.md`). Prefix summary with **`a11y:`** for discoverability.
 
 ---
 
@@ -262,7 +261,7 @@ Before marking an audit complete:
 - [ ] Keyboard path exercised for primary flow and all overlays
 - [ ] Viewport/media matrix spot-checked (mobile, 200% zoom, reduced motion, forced colors)
 - [ ] Headings, landmarks, and names/roles reviewed via snapshot or tree dump
-- [ ] Each finding (report + manual) filed as its own Jira bug with impact → priority
+- [ ] Each finding (report + manual) filed as its own bug with impact → priority
 - [ ] No findings dismissed solely because axe did not report them
 
 ---
