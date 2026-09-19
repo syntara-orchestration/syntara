@@ -1,0 +1,22 @@
+{
+  "$comment": "Advisory skill trigger map for human and agent readers. Not wired to executable hooks — see .github/AI_AGENT_POLICY.md.",
+  "skills": [
+    {
+      "id": "a11y-audit",
+      "path": ".claude/skills/a11y-audit/SKILL.md",
+      "userInvocable": "/a11y-audit",
+      "triggers": [
+        "accessibility audit",
+        "a11y audit",
+        "keyboard audit",
+        "audit keyboard navigation",
+        "check skip link",
+        "heading hierarchy",
+        "landmark audit",
+        "beyond axe",
+        "WCAG audit",
+        "file a11y bugs"
+      ]
+    }
+  ]
+}
