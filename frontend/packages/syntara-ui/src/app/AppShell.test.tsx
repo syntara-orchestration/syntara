@@ -30,6 +30,12 @@ vi.mock('./AppMobileMasthead', () => ({
   AppMobileMasthead: () => <div data-testid="mobile-masthead" />,
 }))
 
+vi.mock('../components/command-palette/CommandPaletteProvider', () => ({
+  CommandPaletteProvider: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="command-palette-provider">{children}</div>
+  ),
+}))
+
 vi.mock('./useDockState', () => ({
   DockStateContext: { Provider: ({ children }: { children: React.ReactNode }) => children },
   useDockStateProvider: () => ({
