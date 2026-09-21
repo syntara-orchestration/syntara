@@ -20,6 +20,10 @@ default routing, multiple matches, no-match error propagation, Worker
 Manager resolution, and the extension points for health-based and
 policy-based filtering.
 
+What labels *are for*, who writes them, and how they differ from AO
+resource tags is in [labels.md](labels.md). This document only specifies
+how the reconciler matches an already-resolved selector map.
+
 It does not implement the Work Scheduler, Cluster Registry, ExecutionTarget
 Registry, Resource Monitor, or Isolation Policy. Those stories consume or
 replace the interfaces defined here.
@@ -597,7 +601,11 @@ do not re-export from `__init__.py`.
   adapter can be deleted when the real registries land.
 - **AAP-92715 / AAP-92720 (Work Store / Work Executor):** if selectors are
   persisted on `WorkItem`, map them into `WorkRequirements`; do not couple
-  the reconciler to the row type.
+  the reconciler to the row type. AO must resolve Project / Workflow /
+  Node / profile into that map — [labels.md](labels.md).
+- **Labels / selectors:** [labels.md](labels.md) is the contract for
+  purpose, provenance (natural vs user), and the AO / EP boundary. Do not
+  overload labels with lifecycle, health, or live resource state.
 - **AAP-92722 (Work Scheduler):** consume `PlacementResolver`; choose among
   `available_targets` (no order is implied). On claim/provision failure, try
   another available target or fall back to a cluster default. On
