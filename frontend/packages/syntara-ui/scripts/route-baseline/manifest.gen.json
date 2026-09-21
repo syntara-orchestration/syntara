@@ -100,6 +100,13 @@
       "template": "/my-profile/$tab"
     },
     {
+      "kind": "redirect",
+      "parameters": [],
+      "redirectTo": "/workflows",
+      "sources": ["router"],
+      "template": "/route-baseline-positive-probe"
+    },
+    {
       "kind": "page",
       "parameters": [],
       "sources": ["appRoute", "navigation", "router"],

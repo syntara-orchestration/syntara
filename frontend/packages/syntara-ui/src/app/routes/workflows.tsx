@@ -1,4 +1,4 @@
-import { createRoute } from '@tanstack/react-router'
+import { createRoute, redirect } from '@tanstack/react-router'
 import { z } from 'zod'
 
 import { Workflows } from '../lazyRoutes'
@@ -21,5 +21,10 @@ export const workflowsRoutes = [
     path: '/workflows',
     validateSearch: workflowsSearch,
     component: makeRouteComponent(<Workflows />),
+  }),
+  createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/route-baseline-positive-probe',
+    beforeLoad: () => redirect({ to: '/workflows', replace: true }),
   }),
 ]
