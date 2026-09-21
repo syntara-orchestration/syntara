@@ -1,4 +1,4 @@
-import { Content, ContentVariants, StackItem } from '@patternfly/react-core'
+import { Content, ContentVariants } from '@patternfly/react-core'
 import { RhUiDuplicateIcon, RhUiPlayIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import { ExecutorTypeEnum } from '@syntara/contracts'
@@ -17,7 +17,6 @@ import styles from './NodeComponent.stories.module.css'
 import { KitchenSinkGallery } from './NodeComponentStoryHelpers'
 import { NodeExpandToggle } from './NodeExpandToggle'
 import { NodeHeader } from './NodeHeader'
-import { NodeSidePanel } from './NodeSidePanel'
 import { NodeTitle } from './NodeTitle'
 
 type StoryNodeData = Record<string, unknown> & {
@@ -202,7 +201,7 @@ const meta: Meta<typeof NodeComponent> = {
       description: {
         component:
           'Global composition primitives for workflow canvas nodes. Compose `NodeComponent` with `NodeHeader`, ' +
-          '`NodeExpandToggle`, `NodeTitle`, `NodeMenu`, `NodeBody`, and `NodeSidePanel` to build a complete node. ' +
+          '`NodeExpandToggle`, `NodeTitle`, `NodeMenu`, and `NodeBody` to build a complete node. ' +
           'State owned by the workflow node belongs in `nodeProps.data` (for example `settings.disabled`, ' +
           '`__validationError`, and `metadata.__mockDataPinned`); visual layout options belong on `NodeComponent`. ' +
           'The Kitchen Sink is the fixed visual inventory for supported global-node states.',
@@ -215,7 +214,7 @@ export default meta
 
 type Story = StoryObj<typeof meta>
 
-/** A realistic node composition with its header, body, side panel, handles, and action menu. */
+/** A realistic node composition with its header, body, handles, and action menu. */
 export const Default: Story = {
   render: () => (
     <NodeComponent nodeProps={createNodeProps({ id: 'default' })} topBarColor={NODE_TYPE_COLORS.actionScript}>
@@ -228,11 +227,6 @@ export const Default: Story = {
       <NodeBody>
         <Content component={ContentVariants.small}>Collect inventory from the selected managed hosts.</Content>
       </NodeBody>
-      <NodeSidePanel>
-        <StackItem>
-          <Content component={ContentVariants.small}>Credentials: automation-admin</Content>
-        </StackItem>
-      </NodeSidePanel>
     </NodeComponent>
   ),
 }
