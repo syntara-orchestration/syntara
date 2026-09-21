@@ -30,11 +30,12 @@ def _make_service(*, raise_integrity_error: bool = False) -> tuple[FormPromptSer
 
     if raise_integrity_error:
         # Simulate uniqueness constraint violation
+        orig_error = Exception('duplicate key value violates unique constraint "uix_execution_prompt_node_path"')
         session.flush = AsyncMock(
             side_effect=IntegrityError(
                 'duplicate key value violates unique constraint "uix_execution_prompt_node_path"',
                 params=None,
-                orig=None,
+                orig=orig_error,
             )
         )
     else:
