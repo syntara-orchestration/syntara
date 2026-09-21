@@ -3,7 +3,52 @@
  * Do not make direct changes to the file.
  */
 
-export type paths = Record<string, never>
+export interface paths {
+  '/form_prompts': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * List form prompts
+     * @description List form prompts filtered by execution ID. Internal endpoint for expire/cancel activities.
+     */
+    get: operations['list_form_prompts']
+    put?: never
+    /**
+     * Create form prompt
+     * @description Create a new form prompt. Internal service-to-service endpoint for workflow engine.
+     */
+    post: operations['create_form_prompt']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/form_prompts/batch': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Batch update form prompt statuses
+     * @description Batch update form prompt statuses. Internal endpoint for expire/cancel activities.
+     */
+    post: operations['batch_update_form_prompts']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+}
 export type webhooks = Record<string, never>
 export interface components {
   schemas: {
@@ -307,12 +352,582 @@ export interface components {
       /** Label Key */
       label_key?: string | null
     }
+    /**
+     * FormPromptSummary
+     * @description Minimal form prompt response for internal workflow engine endpoints.
+     *
+     *     Contains only the 8 documented fields used by expire/cancel activities
+     *     and workflow lifecycle management. Does not expose user-submitted form data
+     *     or rendering configuration fields (those will appear in FormPromptRead for
+     *     user-facing endpoints in AAP-91889).
+     */
+    FormPromptSummary: {
+      /**
+       * Id
+       * Format: uuid
+       * @description Form prompt unique identifier
+       */
+      id: string
+      /**
+       * Execution Id
+       * Format: uuid
+       * @description Parent workflow execution ID
+       */
+      execution_id: string
+      /**
+       * Project Id
+       * Format: uuid
+       * @description Project ID (denormalized from execution)
+       */
+      project_id: string
+      /**
+       * Prompt Node Id
+       * @description Canvas node ID from the workflow definition
+       */
+      prompt_node_id: string
+      /**
+       * Name
+       * @description Display name for the form prompt
+       */
+      name: string
+      /** @description Current prompt status */
+      status: components['schemas']['FormPromptStatus']
+      /**
+       * Loop Iteration Path
+       * @description Enclosing-loop indices, outermost first
+       */
+      loop_iteration_path?: number[]
+      /**
+       * Temporal Activity Id
+       * @description Temporal activity ID for async completion
+       */
+      temporal_activity_id?: string | null
+    }
+    /**
+     * FormPromptListResponse
+     * @description Paginated list response for form prompts.
+     *
+     *     Uses FormPromptSummary (8 documented fields) for internal workflow engine endpoints.
+     *     AAP-91889 will add user-facing list endpoints using FormPromptRead.
+     * @example {
+     *       "next": "eyJpZCI6InV1aWQifQ",
+     *       "total": 150
+     *     }
+     * @example {
+     *       "next": "eyJpZCI6Im5leHQifQ",
+     *       "prev": "eyJpZCI6InByZXYifQ"
+     *     }
+     */
+    FormPromptListResponse: {
+      /**
+       * Next
+       * @description Cursor for next page of results
+       */
+      next?: string | null
+      /**
+       * Prev
+       * @description Cursor for previous page of results
+       */
+      prev?: string | null
+      /**
+       * Total
+       * @description Total count of resources (only when include_total=true)
+       */
+      total?: number | null
+      /**
+       * Resources
+       * @description Array of resources in current page
+       */
+      resources: components['schemas']['FormPromptSummary'][]
+    }
+    /**
+     * FormPromptStatus
+     * @description Form prompt status enumeration.
+     * @enum {string}
+     */
+    FormPromptStatus: 'pending' | 'submitted' | 'expired' | 'cancelled'
+    /**
+     * FormPromptCreateRequest
+     * @description Request payload for creating a form prompt.
+     *
+     *     This is an internal schema used by the Workflows component.
+     */
+    FormPromptCreateRequest: {
+      /**
+       * Execution Id
+       * Format: uuid
+       * @description Parent workflow execution ID
+       */
+      execution_id: string
+      /**
+       * Project Id
+       * Format: uuid
+       * @description Project ID (denormalized from execution)
+       */
+      project_id: string
+      /**
+       * Prompt Node Id
+       * @description Canvas node ID from the workflow definition
+       */
+      prompt_node_id: string
+      /**
+       * Name
+       * @description Display name for the form prompt
+       */
+      name: string
+      /**
+       * Message
+       * @description Resolved message shown above the form
+       */
+      message?: string | null
+      /**
+       * Loop Iteration Path
+       * @description Enclosing-loop indices, outermost first (empty when not inside a loop)
+       */
+      loop_iteration_path?: number[]
+      /**
+       * Temporal Activity Id
+       * @description Temporal activity ID to signal on submit (defaults to prompt_node_id)
+       */
+      temporal_activity_id?: string | null
+      /**
+       * Timeout At
+       * @description When this prompt expires (null = no timeout)
+       */
+      timeout_at?: string | null
+      /** @description Form schema defining fields to collect */
+      form_definition: components['schemas']['FormDefinition']
+      /**
+       * Submit Label
+       * @description Submit button label
+       */
+      submit_label?: string | null
+      /**
+       * Success Message
+       * @description Success message after submit
+       */
+      success_message?: string | null
+      /**
+       * Timezone
+       * @description IANA timezone for date fields
+       */
+      timezone?: string | null
+      /**
+       * Css Override
+       * @description Custom CSS for form rendering
+       */
+      css_override?: string | null
+      /**
+       * Responder User Ids
+       * @description User IDs who can respond (null = any user with form_prompt:submit permission)
+       */
+      responder_user_ids?: string[] | null
+      /**
+       * Responder Group Ids
+       * @description Group IDs whose members can respond
+       */
+      responder_group_ids?: string[] | null
+    }
+    /**
+     * BatchFormPromptStatus
+     * @description Status values that can be submitted in batch form prompt updates.
+     *
+     *     This is a system-actionable subset of FormPromptStatus.
+     * @enum {string}
+     */
+    BatchFormPromptStatus: 'expired' | 'cancelled'
+    /**
+     * BatchFormPromptUpdate
+     * @description Single update within a batch form prompt request.
+     */
+    BatchFormPromptUpdate: {
+      /**
+       * Prompt Id
+       * Format: uuid
+       * @description ID of the form prompt
+       */
+      prompt_id: string
+      /** @description Status to set */
+      status: components['schemas']['BatchFormPromptStatus']
+      /**
+       * Notes
+       * @description Optional notes explaining the status change
+       */
+      notes?: string | null
+    }
+    /**
+     * BatchFormPromptRequest
+     * @description Request payload for batch updating form prompt statuses.
+     */
+    BatchFormPromptRequest: {
+      /**
+       * Updates
+       * @description List of form prompt status updates to apply
+       */
+      updates: components['schemas']['BatchFormPromptUpdate'][]
+    }
+    /**
+     * BatchUpdateResult
+     * @description Single result within a batch update response.
+     */
+    BatchUpdateResult: {
+      /**
+       * Prompt Id
+       * @description ID of the form prompt
+       */
+      prompt_id: string
+      /**
+       * Success
+       * @description Whether the update succeeded
+       */
+      success: boolean
+      /**
+       * Message
+       * @description Success message if applicable
+       */
+      message?: string | null
+      /**
+       * Error
+       * @description Error message if update failed
+       */
+      error?: string | null
+    }
+    /**
+     * BatchUpdateResponse
+     * @description Response payload for batch form prompt updates.
+     */
+    BatchUpdateResponse: {
+      /**
+       * Results
+       * @description Individual update results
+       */
+      results: components['schemas']['BatchUpdateResult'][]
+      /**
+       * Total Success
+       * @description Count of successful updates
+       */
+      total_success: number
+      /**
+       * Total Failed
+       * @description Count of failed updates
+       */
+      total_failed: number
+    }
+    /**
+     * ErrorData
+     * @description RFC 9457 Problem Details format for error event data.
+     *     This model is used for streaming error events and follows the RFC 9457 Problem Details specification. It provides machine-readable and human-readable error information with consistent structure.
+     *     Attributes:
+     *         type: URI reference identifying the problem type
+     *         title: Short, human-readable summary of the problem
+     *         detail: Human-readable explanation specific to this occurrence
+     *         code: Machine-readable error code for programmatic handling
+     *         retryable: Whether this error can be retried by creating a new invocation
+     *         instance: Optional URI reference identifying the specific occurrence
+     * @example {
+     *       "type": "https://api.example.com/errors/llm-error",
+     *       "title": "LLM Rate Limit Exceeded",
+     *       "detail": "OpenRouter API rate limit exceeded. Please try again in a few moments.",
+     *       "code": "RATE_LIMIT_EXCEEDED",
+     *       "retryable": true,
+     *       "instance": "/invocations/550e8400-e29b-41d4-a716-446655440000"
+     *     }
+     * @example {
+     *       "type": "https://api.example.com/errors/timeout-error",
+     *       "title": "Streaming Timeout",
+     *       "detail": "LLM streaming timed out after 30 seconds",
+     *       "code": "STREAM_TIMEOUT",
+     *       "retryable": true,
+     *       "instance": "/invocations/550e8400-e29b-41d4-a716-446655440000"
+     *     }
+     */
+    ErrorData: {
+      /**
+       * Type
+       * @description URI reference identifying the problem type
+       * @example https://api.example.com/errors/llm-error
+       */
+      type: string
+      /**
+       * Title
+       * @description Short, human-readable summary of the problem
+       * @example LLM Service Unavailable
+       */
+      title: string
+      /**
+       * Detail
+       * @description Human-readable explanation specific to this occurrence
+       * @example OpenRouter API returned error: rate limit exceeded. Please try again in a few moments.
+       */
+      detail: string
+      /**
+       * Code
+       * @description Machine-readable error code for programmatic handling
+       * @example RATE_LIMIT_EXCEEDED
+       */
+      code: string
+      /**
+       * Retryable
+       * @description Whether this error can be retried by creating a new invocation
+       * @example true
+       */
+      retryable: boolean
+      /**
+       * Instance
+       * @description Optional URI reference identifying the specific occurrence
+       * @example /invocations/550e8400-e29b-41d4-a716-446655440000
+       */
+      instance?: string | null
+    }
   }
-  responses: never
+  responses: {
+    /** @description Bad Request */
+    BadRequestError: {
+      headers: {
+        [name: string]: unknown
+      }
+      content: {
+        /**
+         * @example {
+         *       "type": "https://api.example.com/errors/bad-request",
+         *       "title": "Bad Request",
+         *       "detail": "The request was malformed or contained invalid parameters",
+         *       "code": "BAD_REQUEST",
+         *       "retryable": false
+         *     }
+         */
+        'application/problem+json': components['schemas']['ErrorData']
+      }
+    }
+    /** @description Unauthorized */
+    UnauthorizedError: {
+      headers: {
+        [name: string]: unknown
+      }
+      content: {
+        /**
+         * @example {
+         *       "type": "https://api.example.com/errors/unauthorized",
+         *       "title": "Unauthorized",
+         *       "detail": "Authentication is required to access this resource",
+         *       "code": "UNAUTHORIZED",
+         *       "retryable": false
+         *     }
+         */
+        'application/problem+json': components['schemas']['ErrorData']
+      }
+    }
+    /** @description Forbidden */
+    ForbiddenError: {
+      headers: {
+        [name: string]: unknown
+      }
+      content: {
+        /**
+         * @example {
+         *       "type": "https://api.example.com/errors/forbidden",
+         *       "title": "Forbidden",
+         *       "detail": "You do not have permission to access this resource",
+         *       "code": "FORBIDDEN",
+         *       "retryable": false
+         *     }
+         */
+        'application/problem+json': components['schemas']['ErrorData']
+      }
+    }
+    /** @description Not Found */
+    NotFoundError: {
+      headers: {
+        [name: string]: unknown
+      }
+      content: {
+        /**
+         * @example {
+         *       "type": "https://api.example.com/errors/not-found",
+         *       "title": "Resource Not Found",
+         *       "detail": "No resource exists with the provided identifier",
+         *       "code": "NOT_FOUND",
+         *       "retryable": false,
+         *       "instance": "/api/v1/workflows"
+         *     }
+         */
+        'application/problem+json': components['schemas']['ErrorData']
+      }
+    }
+    /** @description Conflict */
+    ConflictError: {
+      headers: {
+        [name: string]: unknown
+      }
+      content: {
+        /**
+         * @example {
+         *       "type": "https://api.example.com/errors/conflict",
+         *       "title": "Conflict",
+         *       "detail": "The request conflicts with the current state of the resource",
+         *       "code": "CONFLICT",
+         *       "retryable": false
+         *     }
+         */
+        'application/problem+json': components['schemas']['ErrorData']
+      }
+    }
+    /** @description Validation Error */
+    ValidationError: {
+      headers: {
+        [name: string]: unknown
+      }
+      content: {
+        /**
+         * @example {
+         *       "type": "https://api.example.com/errors/validation-error",
+         *       "title": "Validation Error",
+         *       "detail": "Field 'name' must be between 1 and 255 characters",
+         *       "code": "VALIDATION_ERROR",
+         *       "retryable": false,
+         *       "instance": "/api/v1/workflows"
+         *     }
+         */
+        'application/problem+json': components['schemas']['ErrorData']
+      }
+    }
+    /** @description Too Many Requests */
+    RateLimitError: {
+      headers: {
+        [name: string]: unknown
+      }
+      content: {
+        /**
+         * @example {
+         *       "type": "https://api.example.com/errors/rate-limited",
+         *       "title": "Too Many Requests",
+         *       "detail": "Rate limit exceeded. Try again in 60 seconds.",
+         *       "code": "RATE_LIMITED",
+         *       "retryable": true
+         *     }
+         */
+        'application/problem+json': components['schemas']['ErrorData']
+      }
+    }
+    /** @description Internal Server Error */
+    InternalServerError: {
+      headers: {
+        [name: string]: unknown
+      }
+      content: {
+        /**
+         * @example {
+         *       "type": "https://api.example.com/errors/internal-error",
+         *       "title": "Internal Server Error",
+         *       "detail": "An unexpected error occurred",
+         *       "code": "INTERNAL_ERROR",
+         *       "retryable": true
+         *     }
+         */
+        'application/problem+json': components['schemas']['ErrorData']
+      }
+    }
+  }
   parameters: never
   requestBodies: never
   headers: never
   pathItems: never
 }
 export type $defs = Record<string, never>
-export type operations = Record<string, never>
+export interface operations {
+  list_form_prompts: {
+    parameters: {
+      query: {
+        execution_id: string
+        status?: components['schemas']['FormPromptStatus'] | null
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description List of form prompts */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['FormPromptListResponse']
+        }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
+      422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
+  create_form_prompt: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['FormPromptCreateRequest']
+      }
+    }
+    responses: {
+      /** @description Form prompt created */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['FormPromptSummary']
+        }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
+      422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
+  batch_update_form_prompts: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['BatchFormPromptRequest']
+      }
+    }
+    responses: {
+      /** @description Batch update results */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['BatchUpdateResponse']
+        }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
+      422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
+}
