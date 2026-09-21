@@ -105,7 +105,7 @@ describe('VersionHistoryPanel', () => {
     const user = userEvent.setup()
     render(<VersionHistoryPanel {...defaultProps} />)
 
-    await user.click(screen.getByRole('button', { name: 'Collapse version history' }))
+    await user.click(screen.getByRole('button', { name: 'Close version history' }))
 
     expect(defaultProps.onClose).toHaveBeenCalledTimes(1)
   })

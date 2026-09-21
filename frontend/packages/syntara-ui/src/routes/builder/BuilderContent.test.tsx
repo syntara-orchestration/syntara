@@ -3116,7 +3116,7 @@ describe('BuilderContent', () => {
       })
 
       const user = userEvent.setup()
-      await user.click(screen.getByRole('button', { name: 'Collapse version history' }))
+      await user.click(screen.getByRole('button', { name: 'Close version history' }))
 
       await waitFor(() => {
         expect(screen.queryByRole('heading', { level: 2, name: 'Version history' })).not.toBeInTheDocument()
