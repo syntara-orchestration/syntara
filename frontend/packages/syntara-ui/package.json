@@ -6,6 +6,7 @@
   "scripts": {
     "clean": "rm -rf dist node_modules",
     "start": "concurrently -n app,sb 'vite --open' 'npm run storybook' -c auto",
+    "start:e2e": "vite --strictPort",
     "build": "vite build",
     "preview": "vite preview",
     "test": "concurrently npm:lint npm:tsc npm:vitest",
@@ -17,12 +18,15 @@
     "e2e:pr-check": "playwright test --grep @pr-check",
     "e2e:exclude-pr-check": "playwright test --grep-invert @pr-check",
     "e2e:ui": "playwright test --ui",
+    "e2e:a11y-audit": "SYNTARA_E2E_A11Y_AUDIT=1 playwright test e2e/a11y-audit --workers=1",
     "vitest": "vitest run",
     "tsc": "concurrently --raw -n app,node,storybook,e2e \"tsc --noEmit -p tsconfig.app.json\" \"tsc --noEmit -p tsconfig.node.json\" \"tsc --noEmit -p tsconfig.storybook.json\" \"tsc --noEmit -p tsconfig.e2e.json\"",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "knip": "knip",
     "knip:exports": "knip --include files,exports,duplicates,enumMembers,namespaceMembers",
+    "route-baseline:check": "tsx scripts/route-baseline/check-route-baseline.ts",
+    "route-baseline:update": "tsx scripts/route-baseline/update-route-baseline.ts",
     "storybook": "storybook dev -p 5174 --exact-port --ci --disable-telemetry",
     "storybook:build": "storybook build --disable-telemetry"
   },

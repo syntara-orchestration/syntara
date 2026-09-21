@@ -5,7 +5,7 @@ SQLModel Pattern 1 (separate models with table=False for API operations).
 """
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, ClassVar, Literal
+from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Literal
 from uuid import UUID
 
 from pydantic import ConfigDict
@@ -14,8 +14,10 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, Index, Relationship, SQLModel
 
 from syntara.core.constants import FieldLimits
+from syntara.core.jsonb_limits import WorkflowDefinitionValidator
 from syntara.core.models.base import UserOwnedResource
 from syntara.core.models.pagination import ResourcesResponse
+from syntara.core.models.user_reference import UserReference, UserReferenceFieldsMixin
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 
 if TYPE_CHECKING:
@@ -140,10 +142,14 @@ class WorkflowVersion(UserOwnedResource, table=True):
 # ============================================================================
 
 
-class WorkflowVersionRead(SQLModel):
+class WorkflowVersionRead(UserReferenceFieldsMixin, SQLModel):
     """Schema for workflow version response (GET /workflows/{id}/versions/{version})."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)  # type: ignore[assignment]
+
+    # Versions record who authored them but are never themselves updated, so the
+    # audit pair does not apply -- only created_by carries a reference here.
+    USER_REFERENCE_FIELDS: ClassVar[tuple[str, ...]] = ("created_by",)
 
     id: UUID
     workflow_id: UUID
@@ -155,8 +161,7 @@ class WorkflowVersionRead(SQLModel):
     status: Literal["draft", "published", "previously_published"] = "draft"
     last_published_at: datetime | None = None
     last_unpublished_at: datetime | None = None
-    created_by: UUID
-    created_by_username: str | None = None
+    created_by: UserReference | UUID | str | None = Field(default=None, description="User who created the version")
     created_at: datetime
     updated_at: datetime
 
@@ -177,7 +182,7 @@ class PublishVersionRequest(SQLModel):
 
     name: str | None = Field(None, max_length=255, description="Optional name for this version")
     change_description: str | None = Field(None, max_length=1024, description="Description of changes in this version")
-    workflow_definition: WorkflowDefinition | dict[str, Any] | None = Field(
+    workflow_definition: Annotated[WorkflowDefinition | dict[str, Any] | None, WorkflowDefinitionValidator] = Field(
         None, description="Optional workflow definition to publish directly (skips separate save step)"
     )
     expected_version: int | None = Field(

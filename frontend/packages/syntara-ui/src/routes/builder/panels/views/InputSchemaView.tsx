@@ -2,7 +2,7 @@ import { Button, Label, TreeView, type TreeViewDataItem } from '@patternfly/reac
 import { RhUiExternalLinkIcon } from '@patternfly/react-icons'
 import { useCallback, useMemo } from 'react'
 
-import { buildExpression, canvasNodeIdForExpression } from '../../../../utils/expressions/templateBuilder'
+import { canvasNodeIdForExpression, tryBuildExpression } from '../../../../utils/expressions/templateBuilder'
 import { highlightText } from '../../../../utils/highlightText'
 import { CopyExpressionAction, DraggableTreeLeaf } from '../components/DraggableTreeLeaf'
 import { DRAG_TYPE_FIELD, type FieldDragData } from '../utils/dragTypes'
@@ -39,12 +39,10 @@ function buildTreeData(
       }
     }
 
-    const pathKey = currentPath.join('.')
-
     // Special case: iteration_results keys are already fully-qualified paths (e.g., "node_id.field")
     // Use them directly instead of prepending the current node ID
     const isIterationResultKey = parentPath.at(-1) === 'iteration_results'
-    const expression = isIterationResultKey ? `\${${key}}` : buildExpression({ nodeId, fieldPath: currentPath })
+    const expression = isIterationResultKey ? `\${${key}}` : tryBuildExpression({ nodeId, fieldPath: currentPath })
 
     return {
       id: toTreeItemId([nodeId, ...currentPath]),
@@ -54,7 +52,8 @@ function buildTreeData(
           value={value}
           typeLabel={typeLabel}
           nodeId={nodeId}
-          pathKey={pathKey}
+          fieldPath={currentPath}
+          expression={expression}
           searchTerm={searchTerm}
         />
       ),
@@ -73,7 +72,7 @@ function buildTreeData(
               <RhUiExternalLinkIcon />
             </Button>
           )}
-          <CopyExpressionAction expressionText={expression} />
+          {expression && <CopyExpressionAction expressionText={expression} />}
         </>
       ),
       hasBadge: false,
@@ -86,16 +85,18 @@ type LeafNodeProps = {
   value: unknown
   typeLabel: string
   nodeId: string
-  pathKey: string
+  fieldPath: string[]
+  expression: string | null
   searchTerm?: string
 }
 
-function LeafNode({ fieldKey, value, typeLabel, nodeId, pathKey, searchTerm }: Readonly<LeafNodeProps>) {
-  const fieldPath = useMemo(() => pathKey.split('.'), [pathKey])
-  const expression = useMemo(() => buildExpression({ nodeId, fieldPath }), [nodeId, fieldPath])
-
+function LeafNode({ fieldKey, value, typeLabel, nodeId, fieldPath, expression, searchTerm }: Readonly<LeafNodeProps>) {
   const handleDragStart = useCallback(
     (e: React.DragEvent) => {
+      if (!expression) {
+        e.preventDefault()
+        return
+      }
       const data: FieldDragData = {
         type: DRAG_TYPE_FIELD,
         nodeId,
@@ -115,6 +116,7 @@ function LeafNode({ fieldKey, value, typeLabel, nodeId, pathKey, searchTerm }: R
     <DraggableTreeLeaf
       label={searchTerm ? highlightText(label, searchTerm) : label}
       secondaryText={searchTerm ? highlightText(secondary, searchTerm) : secondary}
+      draggable={expression != null}
       onDragStart={handleDragStart}
     />
   )

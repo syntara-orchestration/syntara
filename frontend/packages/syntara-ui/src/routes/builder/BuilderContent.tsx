@@ -207,7 +207,10 @@ export function BuilderContent(props: BuilderContentProps) {
     '/workflows/{workflow_id}'
   )
   const { mutate: executeWorkflow } = executionsClient.useMutation('post', '/executions')
-  const { mutate: deleteWorkflow } = workflowClient.useMutation('delete', '/workflows/{workflow_id}')
+  const { mutate: deleteWorkflow, isPending: isDeleting } = workflowClient.useMutation(
+    'delete',
+    '/workflows/{workflow_id}'
+  )
   const workflowMetadata = useWorkflowMetadata(workflow)
   const currentVersion = workflow?.current_version ?? workflow?.version?.version
 
@@ -561,6 +564,7 @@ export function BuilderContent(props: BuilderContentProps) {
     dispatch,
     handleRunWorkflow,
     handleDeleteWorkflow,
+    isDeleting,
     runStepDialog,
     lastRunStepNodeIdRef,
     pendingImport,

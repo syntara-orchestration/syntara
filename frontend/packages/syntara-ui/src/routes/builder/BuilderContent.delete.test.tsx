@@ -86,7 +86,7 @@ describe('BuilderContent - Delete Workflow', () => {
     is_enabled: true,
     created_at: '2023-01-01T00:00:00Z',
     updated_at: '2023-01-02T00:00:00Z',
-    created_by: 'user-1',
+    created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1', type: 'user' },
     current_version: 1,
     version: {
       workflow_definition: {
@@ -249,7 +249,7 @@ describe('BuilderContent - Delete Workflow', () => {
         name: /I understand this workflow will be deleted and any in-progress runs will stop immediately/,
       })
     )
-    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: 'Delete workflow' }))
 
     // Verify deletion and navigation
     await waitFor(() => {
@@ -295,7 +295,7 @@ describe('BuilderContent - Delete Workflow', () => {
         name: /I understand this workflow will be deleted and any in-progress runs will stop immediately/,
       })
     )
-    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: 'Delete workflow' }))
 
     // Verify error alert
     await waitFor(() => {

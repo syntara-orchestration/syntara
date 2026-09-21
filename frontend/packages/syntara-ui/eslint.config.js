@@ -342,8 +342,6 @@ export default tseslint.config(
             '**/components/table/DateCell.tsx',
             '**/components/table/ExecutionTimestamp.tsx',
             '**/components/table/UserTimestamp.tsx',
-            // Composes "Last saved <Timestamp>" inline inside a Tooltip's ReactNode content —
-            // no canonical wrapper fits a bare inline timestamp fragment like this.
             '**/routes/builder/SaveWorkflowButton.tsx',
           ],
         },

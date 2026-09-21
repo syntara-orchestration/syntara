@@ -24,6 +24,7 @@ import { AppRoute } from '../../app/AppRoute'
 import { SynCodeBlock } from '../../components/details/SynCodeBlock'
 import { SynPanel } from '../../components/layout/SynPanel'
 import { DateCell } from '../../components/table/DateCell'
+import { capitalize } from '../../utils/capitalize'
 import { detachPromise } from '../../utils/detachPromise'
 
 import { buildPolicyDefinitionJson } from './policyUtils'
@@ -129,9 +130,7 @@ export function PolicyDetailSidebar({ policy, onClose, projectName }: Readonly<P
           <DescriptionList isCompact>
             <DescriptionListGroup>
               <DescriptionListTerm>Scope</DescriptionListTerm>
-              <DescriptionListDescription>
-                {(policy.scope ?? 'any').charAt(0).toUpperCase() + (policy.scope ?? 'any').slice(1)}
-              </DescriptionListDescription>
+              <DescriptionListDescription>{capitalize(policy.scope ?? 'any')}</DescriptionListDescription>
             </DescriptionListGroup>
             {policy.project_id && (
               <DescriptionListGroup>

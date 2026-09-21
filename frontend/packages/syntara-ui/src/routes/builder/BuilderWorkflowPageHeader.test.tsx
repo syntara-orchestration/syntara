@@ -596,7 +596,7 @@ describe('BuilderWorkflowPageHeader', () => {
     await screen.findByText('Publish workflow?')
 
     // Submit the form
-    const submitButton = screen.getByRole('button', { name: 'Publish' })
+    const submitButton = screen.getByRole('button', { name: 'Publish workflow' })
     await user.click(submitButton)
 
     // onPublish should have been called

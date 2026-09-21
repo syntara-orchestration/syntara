@@ -5,7 +5,7 @@ SQLModel Pattern 1 (separate models with table=False for API operations).
 """
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Annotated, Any, ClassVar
 from uuid import UUID
 
 from pydantic import ConfigDict
@@ -13,9 +13,11 @@ from sqlalchemy import UniqueConstraint
 from sqlmodel import CheckConstraint, Field, Index, Relationship, SQLModel, text
 
 from syntara.core.constants import FieldLimits
+from syntara.core.jsonb_limits import LabelsField, OptionalLabelsField, WorkflowDefinitionValidator
 from syntara.core.models.base.named import NamedResource
 from syntara.core.models.base.user_owned import UserOwnedResource
 from syntara.core.models.pagination import ResourcesResponse
+from syntara.core.models.user_reference import UserReference, UserReferenceFieldsMixin
 from syntara.workflows.models.validation_finding import ValidationResult
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 
@@ -176,7 +178,7 @@ class WorkflowBase(SQLModel):
     description: str | None = Field(
         None, max_length=FieldLimits.DESCRIPTION_MAX_LENGTH, description="Workflow description"
     )
-    labels: dict[str, Any] = Field(default_factory=dict, description="Workflow labels")
+    labels: LabelsField = Field(default_factory=dict, description="Workflow labels")
 
 
 class WorkflowCreate(WorkflowBase):
@@ -187,7 +189,9 @@ class WorkflowCreate(WorkflowBase):
     on failure, the raw dict falls through to the service-level validator.
     """
 
-    workflow_definition: WorkflowDefinition | dict[str, Any] = Field(..., description="Workflow definition object")
+    workflow_definition: Annotated[WorkflowDefinition | dict[str, Any], WorkflowDefinitionValidator] = Field(
+        ..., description="Workflow definition object"
+    )
     project_id: UUID = Field(..., description="Project to assign workflow to")
     is_import: bool = Field(
         default=False,
@@ -214,8 +218,8 @@ class WorkflowUpdate(SQLModel):
     description: str | None = Field(
         None, max_length=FieldLimits.DESCRIPTION_MAX_LENGTH, description="Update workflow description"
     )
-    labels: dict[str, Any] | None = Field(None, description="Update workflow labels")
-    workflow_definition: WorkflowDefinition | dict[str, Any] | None = Field(
+    labels: OptionalLabelsField = Field(None, description="Update workflow labels")
+    workflow_definition: Annotated[WorkflowDefinition | dict[str, Any] | None, WorkflowDefinitionValidator] = Field(
         None, description="New workflow definition (auto-creates version)"
     )
     change_description: str | None = Field(None, description="Description of changes for version history")
@@ -225,7 +229,7 @@ class WorkflowUpdate(SQLModel):
     )
 
 
-class WorkflowRead(WorkflowBase):
+class WorkflowRead(UserReferenceFieldsMixin, WorkflowBase):
     """Schema for workflow response (GET /workflows/{id}).
 
     Includes all fields from the database table model.
@@ -247,7 +251,10 @@ class WorkflowRead(WorkflowBase):
     )
     published_version_id: UUID | None = None
     published_version_number: int | None = None
-    created_by: UUID
+    created_by: UserReference | UUID | str | None = Field(default=None, description="User who created the workflow")
+    updated_by: UserReference | UUID | str | None = Field(
+        default=None, description="User who last modified the workflow"
+    )
     project_id: UUID
     created_at: datetime
     updated_at: datetime
