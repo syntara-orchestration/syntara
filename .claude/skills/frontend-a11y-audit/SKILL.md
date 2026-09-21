@@ -1,15 +1,15 @@
 ---
-name: a11y-audit
+name: frontend-a11y-audit
 description: >-
-  AI-assisted accessibility audit methodology beyond axe-core: keyboard navigation,
-  viewport/media matrix, semantic structure, and issue-tracker bug filing. Use for a11y audits,
+  AI-assisted accessibility audit methodology: axe-core baseline plus keyboard navigation,
+  viewport/media matrix, semantic structure, and issue-tracker draft templates. Use for a11y audits,
   WCAG reviews, or when the user asks to check keyboard/focus/landmarks/reading order.
 user-invocable: true
 ---
 
 # Accessibility audit (AI-assisted)
 
-Codifies manual and AI-assisted checks that **axe-core alone cannot catch**. axe-core finds roughly 30% of real WCAG issues; this skill covers the rest using trusted tools already in the repo and agent session.
+Codifies a phased accessibility audit. **Phase 0** establishes an axe-core automated baseline (registry sweep or targeted scan). **Phases 1–3** cover keyboard, viewport/media, and semantic checks that automated rules miss. axe-core finds roughly 30% of real WCAG issues; Phases 1–3 address the rest using trusted tools already in the repo and agent session.
 
 **Do not** use third-party accessibility MCP servers (for example `mcp-accessibility-scanner`). Heuristics from those tools are reflected here, but execution uses only the tools listed below.
 
@@ -24,12 +24,16 @@ Codifies manual and AI-assisted checks that **axe-core alone cannot catch**. axe
 
 Prefer **`browser_snapshot`** (accessibility tree) over screenshots when deciding whether a finding is real.
 
+## WCAG reference data
+
+When citing success criteria, use the machine-readable catalog at [WCAG 2.2 JSON](https://www.w3.org/WAI/WCAG22/wcag.json). Each entry includes `num`, `title`, `level`, `versions`, and `url` for the normative guidance.
+
 ## When to run this skill
 
-- Auditing a page, flow, modal, or nav region before filing bugs
+- Auditing a page, flow, modal, or nav region before drafting bugs
 - Reviewing a PR that touches interactive UI, focus, landmarks, or routing
 - User asks for keyboard audit, skip link check, heading hierarchy, or "beyond axe" review
-- Completing an accessibility audit story (file one bug per violation)
+- Completing an accessibility audit story (draft one bug per violation for user review)
 
 Load `.claude/skills/frontend-testing-guidelines/SKILL.md` for unit-test axe patterns and `.claude/skills/frontend-playwright-e2e/SKILL.md` for targeted E2E axe setup.
 
@@ -56,7 +60,7 @@ This runs `e2e/a11y-audit.spec.ts`, which scans every entry in `e2e/visual-regre
 | **Opt-in** | Excluded from default `npm run e2e`; run via `e2e:a11y-audit` only |
 | **Environment** | Mock API seed data required (`@local-only`; skipped in real-backend E2E) |
 
-Each violation in the JSON includes `ruleId`, `impact`, `description`, `helpUrl`, `wcagTags`, and DOM `targets` — use these when filing bugs (Phase 4).
+Each violation in the JSON includes `ruleId`, `impact`, `description`, `helpUrl`, `wcagTags`, and DOM `targets` — use these when drafting bugs (Phase 4).
 
 **Registry sweep limits:** static page loads only. It does not open modals, exercise wizards, or traverse keyboard flows. Treat it as the automated floor; Phases 1–3 still apply per surface (especially overlays and multi-step flows not captured at load time).
 
@@ -102,6 +106,10 @@ Exercise the surface **without a mouse**. Use Browser MCP or Playwright `page.ke
 - Inert content or off-screen elements receive focus
 
 ### 1.2 Skip links and bypass blocks (SC 2.4.1)
+
+> **Known gap (Syntara today):** the app does not yet expose a skip-to-main link on full chrome pages. Record this as a finding when auditing, but do not treat it as an automatic audit failure unless the user asked for strict SC 2.4.1 compliance.
+
+When skip links are expected or present:
 
 - First Tab stop should expose **Skip to main content** (or equivalent) on full chrome pages.
 - Activating the skip link moves focus into `main` (target needs `tabindex="-1"` or focusable content).
@@ -159,7 +167,7 @@ Use **`browser_snapshot`** and DOM inspection (CDP / DevTools) — not guessed m
 ### 3.2 Landmarks (SC 1.3.6, 2.4.1)
 
 - **`banner`**, **`navigation`**, **`main`**, **`search`** (if present) are top-level and unique where required.
-- **`contentinfo`** is not nested inside **`main`** (common PatternFly wizard footer issue).
+- Prefer top-level **`contentinfo`** landmarks (sibling of **`main`**, not nested). Per [ARIA in HTML](https://www.w3.org/TR/html-aria/), a `<footer>` inside `main` is `role=generic`, not `contentinfo`; flag explicit `role="contentinfo"` nested in another landmark as a best-practice issue (axe `landmark-contentinfo-is-top-level`), not a WCAG failure.
 - Page has exactly one primary **`main`**.
 
 ### 3.3 Names, roles, values (SC 4.1.2)
@@ -185,19 +193,21 @@ Use **`browser_snapshot`** and DOM inspection (CDP / DevTools) — not guessed m
 
 ---
 
-## Phase 4 — Report and file bugs
+## Phase 4 — Report and draft bugs
 
-File **one issue per distinct violation** (not one umbrella ticket per page). Link related issues in description if helpful.
+**Do not create tracker issues without explicit user approval.** Draft findings using the templates below and present them to the user for review first. Only file issues when the user confirms (or explicitly asks you to file).
+
+Draft **one issue per distinct violation** (not one umbrella ticket per page). Link related issues in description if helpful.
 
 ### Triage registry report (`a11y-audit-report.json`)
 
 After `npm run e2e:a11y-audit`:
 
 1. Open `packages/syntara-ui/test-results/a11y-audit-report.json`.
-2. For each page with `violationCount > 0`, file **one bug per violation** (not one bug per page).
+2. For each page with `violationCount > 0`, draft **one bug per violation** (not one bug per page).
 3. Copy from the report into the bug template:
    - **Summary:** `a11y: [ruleId] on [section/name] — [short description]`
-   - **WCAG Reference:** join `wcagTags` (e.g. `wcag2aa`, `wcag21aa`) to the SC cited in `helpUrl` / axe docs
+   - **WCAG Reference:** join `wcagTags` (e.g. `wcag2aa`, `wcag21aa`) to the SC cited in `helpUrl` / axe docs; cross-check [WCAG 2.2 JSON](https://www.w3.org/WAI/WCAG22/wcag.json)
    - **Steps to Reproduce:** `Navigate to [path]` from the page entry
    - **Actual Behavior:** `description`, `targets`, and `failureSummary` from the matching node
    - **Impact / Priority:** map axe `impact` using the table below (axe `critical`/`serious`/`moderate`/`minor` align with common impact labels)
@@ -261,7 +271,7 @@ Before marking an audit complete:
 - [ ] Keyboard path exercised for primary flow and all overlays
 - [ ] Viewport/media matrix spot-checked (mobile, 200% zoom, reduced motion, forced colors)
 - [ ] Headings, landmarks, and names/roles reviewed via snapshot or tree dump
-- [ ] Each finding (report + manual) filed as its own bug with impact → priority
+- [ ] Each finding (report + manual) drafted as its own bug with impact → priority; user approved before filing
 - [ ] No findings dismissed solely because axe did not report them
 
 ---
@@ -274,5 +284,6 @@ Before marking an audit complete:
 | Run registry sweep for modals/wizards only | Open overlays and re-scan (Phase 0.2) or use Browser MCP |
 | Use unvetted accessibility MCP scanners | Browser MCP + axe-core + Lighthouse |
 | File one mega-bug per page | One bug per violation with WCAG SC |
+| File tracker issues without user approval | Draft bugs and wait for explicit confirmation |
 | Disable axe rules to "pass" | Fix the component; document upstream PF issues separately |
 | Guess locators or roles | `browser_snapshot` first, then interact |

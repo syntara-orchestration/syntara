@@ -241,7 +241,7 @@ npx playwright test --grep @pr-check
 # Exclude visual-regression (they require npm run e2e:visual-regression, not the default runner)
 npx playwright test --grep-invert @local-only
 
-# Full-app accessibility audit (report-only; mock API; see a11y-audit skill)
+# Full-app accessibility audit (report-only; mock API; see frontend-a11y-audit skill)
 npm run e2e:a11y-audit
 
 # Show trace from a failed run
