@@ -604,10 +604,13 @@ export interface MockServiceAccount {
   status: ServiceAccountStatus
   project_id: string
   project_name: string | null
-  is_project_deleted: boolean
   last_authenticated_at: string | null
-  created_by: string
-  updated_by: string | null
+  created_by: { id: string; name: string; type: 'user' | 'service_account' | 'service' | 'system' | 'deleted_user' }
+  updated_by: {
+    id: string
+    name: string
+    type: 'user' | 'service_account' | 'service' | 'system' | 'deleted_user'
+  } | null
   created_at: string
   updated_at: string
   labels: Record<string, string>
@@ -621,9 +624,8 @@ export const mockServiceAccounts: MockServiceAccount[] = [
     status: 'active',
     project_id: 'p-001',
     project_name: 'default',
-    is_project_deleted: false,
     last_authenticated_at: mockDate.hoursAgo2,
-    created_by: 'u-001',
+    created_by: { id: 'u-001', name: 'alice', type: 'user' as const },
     updated_by: null,
     created_at: '2024-03-01T10:00:00.000Z',
     updated_at: '2024-03-01T10:00:00.000Z',
@@ -636,9 +638,8 @@ export const mockServiceAccounts: MockServiceAccount[] = [
     status: 'active',
     project_id: 'p-001',
     project_name: 'default',
-    is_project_deleted: false,
     last_authenticated_at: mockDate.minutesAgo30,
-    created_by: 'u-001',
+    created_by: { id: 'u-001', name: 'alice', type: 'user' as const },
     updated_by: null,
     created_at: '2024-03-15T14:00:00.000Z',
     updated_at: '2024-03-15T14:00:00.000Z',
@@ -651,10 +652,9 @@ export const mockServiceAccounts: MockServiceAccount[] = [
     status: 'disabled',
     project_id: 'p-002',
     project_name: 'alice-sandbox',
-    is_project_deleted: false,
     last_authenticated_at: mockDate.daysAgo5,
-    created_by: 'u-002',
-    updated_by: 'u-001',
+    created_by: { id: 'u-002', name: 'bob', type: 'user' as const },
+    updated_by: { id: 'u-001', name: 'alice', type: 'user' as const },
     created_at: '2024-02-20T09:00:00.000Z',
     updated_at: mockDate.daysAgo3,
     labels: {},
@@ -666,9 +666,8 @@ export const mockServiceAccounts: MockServiceAccount[] = [
     status: 'active',
     project_id: 'p-002',
     project_name: 'alice-sandbox',
-    is_project_deleted: false,
     last_authenticated_at: null,
-    created_by: 'u-001',
+    created_by: { id: 'u-001', name: 'alice', type: 'user' as const },
     updated_by: null,
     created_at: mockDate.daysAgo1,
     updated_at: mockDate.daysAgo1,
@@ -677,13 +676,12 @@ export const mockServiceAccounts: MockServiceAccount[] = [
   {
     id: 'sa-005',
     name: 'legacy-sync',
-    description: 'Sync agent from a project that has been removed',
+    description: 'Legacy inventory sync agent',
     status: 'disabled',
-    project_id: 'p-deleted-001',
-    project_name: 'retired-infra',
-    is_project_deleted: true,
+    project_id: 'p-002',
+    project_name: 'alice-sandbox',
     last_authenticated_at: mockDate.daysAgo5,
-    created_by: 'u-002',
+    created_by: { id: 'u-002', name: 'bob', type: 'user' as const },
     updated_by: null,
     created_at: '2024-01-10T08:00:00.000Z',
     updated_at: '2024-01-10T08:00:00.000Z',
@@ -705,8 +703,12 @@ export interface MockServiceAccountCredential {
   expires_at: string | null
   last_used_at: string | null
   old_secret_valid_until?: string | null
-  created_by: string
-  updated_by: string | null
+  created_by: { id: string; name: string; type: 'user' | 'service_account' | 'service' | 'system' | 'deleted_user' }
+  updated_by: {
+    id: string
+    name: string
+    type: 'user' | 'service_account' | 'service' | 'system' | 'deleted_user'
+  } | null
   created_at: string
   updated_at: string
 }
@@ -722,7 +724,7 @@ export const mockServiceAccountCredentials: MockServiceAccountCredential[] = [
     expires_at: null,
     last_used_at: mockDate.hoursAgo2,
     old_secret_valid_until: mockDate.hoursFromNow2,
-    created_by: 'u-001',
+    created_by: { id: 'u-001', name: 'alice', type: 'user' as const },
     updated_by: null,
     created_at: '2024-03-01T10:00:00.000Z',
     updated_at: '2024-03-01T10:00:00.000Z',
@@ -736,8 +738,8 @@ export const mockServiceAccountCredentials: MockServiceAccountCredential[] = [
     grace_period_seconds: 3600,
     expires_at: mockDate.daysAgo1,
     last_used_at: mockDate.daysAgo5,
-    created_by: 'u-001',
-    updated_by: 'u-001',
+    created_by: { id: 'u-001', name: 'alice', type: 'user' as const },
+    updated_by: { id: 'u-001', name: 'alice', type: 'user' as const },
     created_at: '2024-02-15T08:00:00.000Z',
     updated_at: mockDate.daysAgo3,
   },
@@ -750,7 +752,7 @@ export const mockServiceAccountCredentials: MockServiceAccountCredential[] = [
     grace_period_seconds: 7200,
     expires_at: null,
     last_used_at: mockDate.minutesAgo30,
-    created_by: 'u-001',
+    created_by: { id: 'u-001', name: 'alice', type: 'user' as const },
     updated_by: null,
     created_at: '2024-03-15T14:00:00.000Z',
     updated_at: '2024-03-15T14:00:00.000Z',

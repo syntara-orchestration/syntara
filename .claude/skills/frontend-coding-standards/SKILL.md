@@ -338,7 +338,7 @@ export function MyListPage() {
         onClose={deleteDialog.close}
         onConfirm={() => handleDelete(deleteDialog.item)}
         title="Delete item"
-        confirmLabel="Delete"
+        confirmLabel="Delete item"
         confirmVariant="danger"
       >
         Are you sure?
@@ -798,7 +798,7 @@ Requires `titleIconVariant="warning"` + `destructiveAcknowledgement` checkbox. T
   onClose={onClose}
   onConfirm={handleDelete}
   title="Delete workflow?"
-  confirmLabel="Delete"
+  confirmLabel="Delete workflow"
   confirmVariant="danger"
   titleIconVariant="warning"
   destructiveAcknowledgement={{
@@ -883,6 +883,19 @@ const {
   defaultSort, // optional — URL-synced sort merged into queryParams
   columns, // optional — PatternFly getSortParams / handleSort
 })
+```
+
+### Client-side (in-memory) pagination
+
+For tables that load a full dataset then filter/sort locally, use `useClientPagination` — not `useCursorPagination` and not hand-rolled `page` / `perPage` / `slice` state.
+
+```typescript
+const { paginate, getFooterProps, resetPage } = useClientPagination()
+
+const pageRows = useMemo(() => paginate(sortedRows), [sortedRows, paginate])
+
+// resetPage() when filters or sort change
+<SynScrollableTableContainer footer={getFooterProps(sortedRows.length)} />
 ```
 
 ---

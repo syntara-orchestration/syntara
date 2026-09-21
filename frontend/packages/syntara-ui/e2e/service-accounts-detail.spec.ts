@@ -70,7 +70,7 @@ test.describe('UI-5: Service Account Detail — View and Edit', () => {
     await nameInput.fill(newName)
     await modal.getByRole('textbox', { name: 'Description', exact: true }).fill('Updated description')
 
-    await modal.getByRole('button', { name: 'Save' }).click()
+    await modal.getByRole('button', { name: 'Save service account' }).click()
 
     await expect(app.getByText('Service account updated')).toBeVisible()
     await expect(app.getByRole('heading', { level: 1, name: newName })).toBeVisible()
@@ -101,7 +101,7 @@ test.describe('UI-6: Service Account Detail — Disable/Enable Toggle', () => {
       const dialog = app.getByRole('dialog')
       await expect(dialog.getByText('Disable service account?')).toBeVisible()
       await expect(dialog.getByText(sa.name)).toBeVisible()
-      await dialog.getByRole('button', { name: 'Disable' }).click()
+      await dialog.getByRole('button', { name: 'Disable service account' }).click()
 
       await expect(toggle).not.toBeChecked({ timeout: 10_000 })
 
@@ -129,7 +129,7 @@ test.describe('UI-7: Service Account Detail — Delete with Confirmation', () =>
       await expect(dialog.getByText('Delete service account?')).toBeVisible()
       await expect(dialog.getByText(sa.name)).toBeVisible()
 
-      const deleteButton = dialog.getByRole('button', { name: 'Delete' })
+      const deleteButton = dialog.getByRole('button', { name: 'Delete service account' })
       await expect(deleteButton).toBeDisabled()
 
       await dialog
@@ -162,7 +162,7 @@ test.describe('UI-7: Service Account Detail — Delete with Confirmation', () =>
       })
       .check()
 
-    await dialog.getByRole('button', { name: 'Delete' }).click()
+    await dialog.getByRole('button', { name: 'Delete service account' }).click()
 
     // Redirect only fires on successful deletion (onSuccess callback)
     await app.waitForURL(/\/service-accounts$/)

@@ -16,6 +16,7 @@ from syntara.credentials.lib.preseed import GA_CREDENTIAL_TYPES, preseed_credent
 from syntara.credentials.models.credential_type import CredentialType
 from syntara.workflows.models import Workflow, WorkflowVersion
 from syntara.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
+from tests.helpers.user_reference import assert_user_reference
 
 
 @pytest.fixture
@@ -272,6 +273,110 @@ class TestUpdateCredential:
         assert "id" in body["updated_by"]
         assert "name" in body["updated_by"]
 
+    @pytest.mark.asyncio
+    async def test_patch_updates_updated_at(
+        self, auth_client: AsyncClient, bearer_type: CredentialType, test_project_id: str
+    ) -> None:
+        create_resp = await auth_client.post(
+            "/api/v1/credentials",
+            json={
+                "name": "Timestamp Test",
+                "credential_type_id": str(bearer_type.id),
+                "project_id": test_project_id,
+                "inputs": {"token": "abc"},
+            },
+        )
+        assert create_resp.status_code == 201
+        created = create_resp.json()
+
+        update_resp = await auth_client.patch(
+            f"/api/v1/credentials/{created['id']}",
+            json={"description": "patched"},
+        )
+        assert update_resp.status_code == 200
+        updated = update_resp.json()
+        assert updated["description"] == "patched"
+        assert updated["updated_at"] > created["updated_at"]
+
+    @pytest.mark.asyncio
+    async def test_patch_inputs_updates_updated_at(
+        self, auth_client: AsyncClient, bearer_type: CredentialType, test_project_id: str, test_user: User
+    ) -> None:
+        """Rotating secret inputs must bump updated_at even when updated_by is unchanged."""
+        create_resp = await auth_client.post(
+            "/api/v1/credentials",
+            json={
+                "name": "Inputs Timestamp Test",
+                "credential_type_id": str(bearer_type.id),
+                "project_id": test_project_id,
+                "inputs": {"token": "original-token"},
+            },
+        )
+        assert create_resp.status_code == 201
+        created = create_resp.json()
+
+        update_resp = await auth_client.patch(
+            f"/api/v1/credentials/{created['id']}",
+            json={"inputs": {"token": "rotated-token"}},
+        )
+        assert update_resp.status_code == 200
+        updated = update_resp.json()
+        assert updated["updated_by"]["id"] == str(test_user.id)
+        assert updated["updated_at"] > created["updated_at"]
+
+    @pytest.mark.asyncio
+    async def test_patch_same_inputs_does_not_update_audit_metadata(
+        self, auth_client: AsyncClient, bearer_type: CredentialType, test_project_id: str, test_user: User
+    ) -> None:
+        """Resubmitting unchanged secret inputs must not bump updated_at or updated_by."""
+        create_resp = await auth_client.post(
+            "/api/v1/credentials",
+            json={
+                "name": "Noop Inputs Test",
+                "credential_type_id": str(bearer_type.id),
+                "project_id": test_project_id,
+                "inputs": {"token": "same-token"},
+            },
+        )
+        assert create_resp.status_code == 201
+        created = create_resp.json()
+
+        update_resp = await auth_client.patch(
+            f"/api/v1/credentials/{created['id']}",
+            json={"inputs": {"token": "same-token"}},
+        )
+        assert update_resp.status_code == 200
+        updated = update_resp.json()
+        assert updated["updated_at"] == created["updated_at"]
+        assert updated["updated_by"]["id"] == str(test_user.id)
+
+    @pytest.mark.asyncio
+    async def test_patch_same_description_does_not_update_audit_metadata(
+        self, auth_client: AsyncClient, bearer_type: CredentialType, test_project_id: str, test_user: User
+    ) -> None:
+        """Resubmitting an unchanged description must not bump updated_at."""
+        create_resp = await auth_client.post(
+            "/api/v1/credentials",
+            json={
+                "name": "Noop Description Test",
+                "credential_type_id": str(bearer_type.id),
+                "project_id": test_project_id,
+                "inputs": {"token": "abc"},
+                "description": "unchanged",
+            },
+        )
+        assert create_resp.status_code == 201
+        created = create_resp.json()
+
+        update_resp = await auth_client.patch(
+            f"/api/v1/credentials/{created['id']}",
+            json={"description": "unchanged"},
+        )
+        assert update_resp.status_code == 200
+        updated = update_resp.json()
+        assert updated["updated_at"] == created["updated_at"]
+        assert updated["updated_by"]["id"] == str(test_user.id)
+
 
 class TestUserReferenceFields:
     """Verify created_by/updated_by return UserReference objects."""
@@ -294,9 +399,9 @@ class TestUserReferenceFields:
         body = resp.json()
 
         assert body["created_by"]["id"] == str(test_user.id)
-        assert body["created_by"]["name"] == test_user.username
+        assert body["created_by"]["name"] == test_user.display_name
         assert body["updated_by"]["id"] == str(test_user.id)
-        assert body["updated_by"]["name"] == test_user.username
+        assert body["updated_by"]["name"] == test_user.display_name
 
     @pytest.mark.asyncio
     async def test_get_returns_user_reference(
@@ -319,7 +424,7 @@ class TestUserReferenceFields:
         body = get_resp.json()
 
         assert body["created_by"]["id"] == str(test_user.id)
-        assert body["created_by"]["name"] == test_user.username
+        assert body["created_by"]["name"] == test_user.display_name
 
     @pytest.mark.asyncio
     async def test_list_returns_user_references(
@@ -341,7 +446,7 @@ class TestUserReferenceFields:
         for resource in resp.json()["resources"]:
             assert isinstance(resource["created_by"], dict)
             assert resource["created_by"]["id"] == str(test_user.id)
-            assert resource["created_by"]["name"] == test_user.username
+            assert resource["created_by"]["name"] == test_user.display_name
 
     @pytest.mark.asyncio
     async def test_update_returns_user_reference(
@@ -367,7 +472,7 @@ class TestUserReferenceFields:
         body = update_resp.json()
 
         assert body["updated_by"]["id"] == str(test_user.id)
-        assert body["updated_by"]["name"] == test_user.username
+        assert body["updated_by"]["name"] == test_user.display_name
 
 
 class TestDeleteCredential:
@@ -501,6 +606,7 @@ class TestCredentialWorkflows:
         assert workflows[0]["name"] == workflow.name
         assert workflows[0]["node_names"] == ["Fetch Data"]
         assert workflows[0]["created_at"] is not None
+        assert_user_reference(workflows[0]["created_by"], test_user)
 
     @pytest.mark.asyncio
     async def test_workflows_returns_multiple_node_names(

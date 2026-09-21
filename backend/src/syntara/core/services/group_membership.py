@@ -54,7 +54,6 @@ class GroupMembershipService:
             .join(user_groups, Group.id == user_groups.c.group_id)  # type: ignore[arg-type]
             .where(user_groups.c.user_id == user_id)
             .where(Group.name.in_(group_names))  # type: ignore[attr-defined]
-            .where(Group.deleted_at.is_(None))  # type: ignore[union-attr]
         )
         result = await self.session.execute(stmt)
         groups = result.scalars().all()
@@ -88,7 +87,6 @@ class GroupMembershipService:
             .join(user_groups, Group.id == user_groups.c.group_id)  # type: ignore[arg-type]
             .where(user_groups.c.user_id == user_id)
             .where(Group.id.in_(group_ids))  # type: ignore[attr-defined]
-            .where(Group.deleted_at.is_(None))  # type: ignore[union-attr]
         )
         result = await self.session.execute(stmt)
         groups = result.scalars().all()

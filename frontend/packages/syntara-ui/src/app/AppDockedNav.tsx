@@ -34,7 +34,7 @@ import {
   RhUiQuestionMarkCircleIcon,
 } from '@patternfly/react-icons'
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
-import { use, useMemo, useRef, useState } from 'react'
+import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { authClient } from '../client'
 import { useAlerts } from '../providers/alerts'
@@ -186,15 +186,53 @@ function NavExpandableItem({
   /* v8 ignore stop */
 }
 
+const USER_MENU_FLYOUT_CLOSE_DELAY_MS = 100
+
 function UserMenuDropdown() {
   const [isOpen, setIsOpen] = useState(false)
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
   const navigate = useNavigate()
   const logout = useAuthStore((s) => s.logout)
   const { showAlert } = useAlerts()
   const { data: currentUser } = authClient.useQuery('get', '/auth/me')
 
+  const cancelScheduledClose = () => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current)
+      closeTimerRef.current = undefined
+    }
+  }
+
+  const handleOpenChange = useCallback((open: boolean) => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current)
+      closeTimerRef.current = undefined
+    }
+    setIsOpen(open)
+  }, [])
+
+  const scheduleClose = () => {
+    cancelScheduledClose()
+    closeTimerRef.current = setTimeout(() => handleOpenChange(false), USER_MENU_FLYOUT_CLOSE_DELAY_MS)
+  }
+
+  useEffect(() => () => cancelScheduledClose(), [])
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      handleOpenChange(false)
+    }
+
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [handleOpenChange, isOpen])
+
   const handleLogoutClick = () => {
-    setIsOpen(false)
+    handleOpenChange(false)
     detachPromise(logout(), {
       onReject: (error: unknown) => {
         showAlert({
@@ -217,8 +255,9 @@ function UserMenuDropdown() {
       isDocked
       className={styles.dockedAction}
       aria-label="User menu"
-      onClick={() => setIsOpen(!isOpen)}
-      onMouseEnter={() => setIsOpen(true)}
+      onClick={() => handleOpenChange(!isOpen)}
+      onMouseEnter={() => handleOpenChange(true)}
+      onMouseLeave={scheduleClose}
     >
       {currentUser?.username ?? 'User'}
     </MenuToggle>
@@ -227,21 +266,30 @@ function UserMenuDropdown() {
   return (
     <Dropdown
       isOpen={isOpen}
-      onOpenChange={setIsOpen}
+      onOpenChange={handleOpenChange}
       toggle={toggle}
-      popperProps={{ position: 'right', preventOverflow: true }}
+      containsFlyout
+      isNavFlyout
+      className={styles.flyoutMenu}
+      popperProps={{
+        placement: 'right-start',
+        preventOverflow: true,
+        onPopperMouseEnter: cancelScheduledClose,
+        onPopperMouseLeave: scheduleClose,
+      }}
     >
       <DropdownList>
         <DropdownItem
           key="profile"
+          className={styles.flyoutMenuItem}
           onClick={() => {
+            handleOpenChange(false)
             detachPromise(navigate({ to: AppRoute.MyProfile.Root }))
-            setIsOpen(false)
           }}
         >
           My Profile
         </DropdownItem>
-        <DropdownItem key="logout" onClick={handleLogoutClick}>
+        <DropdownItem key="logout" className={styles.flyoutMenuItem} onClick={handleLogoutClick}>
           Logout
         </DropdownItem>
       </DropdownList>
@@ -270,8 +318,8 @@ export function AppDockedNav() {
   const navItemRefs = useMemo(() => createNavItemRefs(visibleItems), [visibleItems])
 
   const colorSchemeToggleLabel = colorScheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
-  const isExpanded = isDockTextExpanded || isDockExpanded
-  const showTooltips = !isExpanded
+  const isDockShowingLabels = isDockTextExpanded || isDockExpanded
+  const showTooltips = !isDockShowingLabels
 
   /* v8 ignore start -- phantom branches from compiled JSX props, ternaries, and map callbacks */
   return (
@@ -285,11 +333,11 @@ export function AppDockedNav() {
               isHamburger
               onClick={onToggleDock}
               aria-label="Global navigation"
-              isExpanded={isDockTextExpanded}
+              isExpanded={isDockShowingLabels}
             />
           </MastheadToggle>
-          <MastheadBrand className={!isExpanded ? styles.collapsedBrand : undefined}>
-            {isExpanded ? (
+          <MastheadBrand className={!isDockShowingLabels ? styles.collapsedBrand : undefined}>
+            {isDockShowingLabels ? (
               <MastheadLogo component={(props) => <Link {...props} to="/" />} aria-label="Home">
                 <img
                   src={colorScheme === 'dark' ? brand.logoExpandedDark : brand.logoExpandedLight}
@@ -325,7 +373,7 @@ export function AppDockedNav() {
                   }
                   variant="docked"
                   aria-label="Main navigation"
-                  className={!isDockTextExpanded ? styles.iconDockNav : undefined}
+                  className={!isDockShowingLabels ? styles.iconDockNav : undefined}
                 >
                   <NavList>
                     {visibleItems.flatMap((item) => {
@@ -337,7 +385,7 @@ export function AppDockedNav() {
                       if (hasDropdownChildren(item)) {
                         return [
                           separator,
-                          isExpanded ? (
+                          isDockShowingLabels ? (
                             <NavExpandableItem
                               key={item.path}
                               item={item}

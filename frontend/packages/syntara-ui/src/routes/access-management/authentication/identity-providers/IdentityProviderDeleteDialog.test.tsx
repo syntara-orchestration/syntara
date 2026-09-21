@@ -31,7 +31,7 @@ describe('IdentityProviderDeleteDialog', () => {
     render(<IdentityProviderDeleteDialog isOpen providerName="Okta" onClose={onClose} onConfirm={onConfirm} />)
 
     const dialog = screen.getByRole('dialog')
-    const deleteButton = within(dialog).getByRole('button', { name: 'Delete' })
+    const deleteButton = within(dialog).getByRole('button', { name: 'Delete identity provider' })
 
     expect(deleteButton).toBeDisabled()
 

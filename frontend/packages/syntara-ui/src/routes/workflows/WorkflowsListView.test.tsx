@@ -5,6 +5,11 @@ import { axe } from 'vitest-axe'
 
 import type { WorkflowsListViewProps } from './WorkflowsListView'
 import { WorkflowsListView } from './WorkflowsListView'
+import {
+  WORKFLOW_STATE_DRAFT_HELP,
+  WORKFLOW_STATE_PUBLISHED_HELP,
+  WORKFLOW_STATE_UNPUBLISHED_CHANGES_HELP,
+} from './workflowStateColumnHelpText'
 
 vi.mock('./WorkflowsTableBody', () => ({
   FlatWorkflowsTableBody: () => <tbody />,
@@ -27,7 +32,17 @@ const defaultProps: WorkflowsListViewProps = {
   groupedWorkflows: null,
   collapsedProjects: new Set(),
   onToggleProject: vi.fn(),
-  getRowActions: vi.fn().mockReturnValue([]),
+  isWorkflowProjectBuiltin: vi.fn(() => false),
+  rowActionCallbacks: {
+    navigate: vi.fn() as never,
+    onRun: vi.fn(),
+    onDuplicate: vi.fn(),
+    onExport: vi.fn(),
+    onPublish: vi.fn(),
+    onUnpublish: vi.fn(),
+    onDelete: vi.fn(),
+    isDuplicating: false,
+  },
 }
 
 describe('WorkflowsListView', () => {
@@ -89,6 +104,19 @@ describe('WorkflowsListView', () => {
       render(<WorkflowsListView {...defaultProps} sortedWorkflows={mockWorkflows} />)
       expect(screen.getByRole('columnheader', { name: 'Name' })).toBeInTheDocument()
       expect(screen.getByRole('columnheader', { name: 'Created at' })).toBeInTheDocument()
+      expect(screen.getByRole('columnheader', { name: /State/i })).toBeInTheDocument()
+    })
+
+    it('shows workflow state help in the State column header popover', async () => {
+      const user = userEvent.setup()
+      render(<WorkflowsListView {...defaultProps} sortedWorkflows={mockWorkflows} />)
+
+      await user.click(screen.getByRole('button', { name: 'Workflow state help' }))
+
+      expect(screen.getByRole('dialog')).toHaveTextContent('Workflow state')
+      expect(screen.getByRole('dialog')).toHaveTextContent(WORKFLOW_STATE_DRAFT_HELP)
+      expect(screen.getByRole('dialog')).toHaveTextContent(WORKFLOW_STATE_PUBLISHED_HELP)
+      expect(screen.getByRole('dialog')).toHaveTextContent(WORKFLOW_STATE_UNPUBLISHED_CHANGES_HELP)
     })
 
     it('applies sort props to sortable columns and not to actions', () => {
@@ -114,6 +142,12 @@ describe('WorkflowsListView', () => {
 
       const actionsHeader = screen.getByRole('columnheader', { name: 'Actions' })
       expect(within(actionsHeader).queryByRole('button')).not.toBeInTheDocument()
+    })
+
+    it('omits the actions column when showRowActions is false', () => {
+      render(<WorkflowsListView {...defaultProps} sortedWorkflows={mockWorkflows} showRowActions={false} />)
+
+      expect(screen.queryByRole('columnheader', { name: 'Actions' })).not.toBeInTheDocument()
     })
 
     it('does not render the no-data empty state when workflows are present', () => {

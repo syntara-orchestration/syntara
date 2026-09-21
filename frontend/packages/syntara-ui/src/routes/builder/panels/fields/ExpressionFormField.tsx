@@ -1,14 +1,8 @@
-import { FormGroup, HelperText, HelperTextItem, TextInput } from '@patternfly/react-core'
-import { useCallback, useState } from 'react'
+import { FormGroup } from '@patternfly/react-core'
+import { useState } from 'react'
 
-import { buildContextExpression, buildExpression } from '../../../../utils/expressions/templateBuilder'
-import {
-  DRAG_TYPE_CONTEXT,
-  DRAG_TYPE_FIELD,
-  DROP_TARGET_OUTLINE,
-  EXPRESSION_FIELD_PLACEHOLDER,
-  isDragData,
-} from '../utils/dragTypes'
+import { EXPRESSION_FIELD_PLACEHOLDER } from '../../../../components/expressions/expressionFieldDrag'
+import { ExpressionFieldInput } from '../../../../components/forms/ExpressionFieldInput'
 
 type ExpressionFormFieldProps = {
   id: string
@@ -20,28 +14,7 @@ type ExpressionFormFieldProps = {
   error?: string
 }
 
-function validateExpressionSyntax(value: string): string | null {
-  if (!value.includes('${')) return null
-  if (value.includes('${}')) return 'Invalid syntax'
-
-  // Extract all matched ${...} expressions and check bracket balance
-  const expressionPattern = /\$\{([^}]*)\}/g
-  let match: RegExpExecArray | null = expressionPattern.exec(value)
-  while (match !== null) {
-    const body = match[1]
-    const openBrackets = (body.match(/\[/g) ?? []).length
-    const closeBrackets = (body.match(/\]/g) ?? []).length
-    if (openBrackets !== closeBrackets) return 'Invalid syntax'
-    match = expressionPattern.exec(value)
-  }
-
-  // Check for unpaired ${ (opening without a matching close)
-  const withoutMatched = value.replace(/\$\{[^}]*\}/g, '')
-  if (withoutMatched.includes('${')) return 'Invalid syntax'
-
-  return null
-}
-
+/** Builder expression field using shared {@link ExpressionFieldInput} for drag/drop and syntax validation. */
 function ExpressionFormField({
   id,
   label,
@@ -52,47 +25,6 @@ function ExpressionFormField({
   error,
 }: Readonly<ExpressionFormFieldProps>) {
   const [isDropTarget, setIsDropTarget] = useState(false)
-  const syntaxError = validateExpressionSyntax(value)
-  const displayError = error ?? syntaxError
-  const hasError = Boolean(displayError)
-
-  const handleChange = useCallback(
-    (_event: React.FormEvent<HTMLInputElement>, newValue: string) => {
-      onChange(newValue)
-    },
-    [onChange]
-  )
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDropTarget(true)
-  }, [])
-
-  const handleDragLeave = useCallback(() => {
-    setIsDropTarget(false)
-  }, [])
-
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault()
-      setIsDropTarget(false)
-      const raw = e.dataTransfer.getData('application/json')
-      if (!raw) return
-      let data: unknown
-      try {
-        data = JSON.parse(raw)
-      } catch {
-        return
-      }
-      if (!isDragData(data)) return
-      if (data.type === DRAG_TYPE_FIELD) {
-        onChange((value ?? '') + buildExpression({ nodeId: data.nodeId, fieldPath: data.fieldPath }))
-      } else if (data.type === DRAG_TYPE_CONTEXT) {
-        onChange((value ?? '') + buildContextExpression(data.contextPath))
-      }
-    },
-    [onChange, value]
-  )
 
   return (
     <FormGroup
@@ -101,22 +33,15 @@ function ExpressionFormField({
       fieldId={id}
       data-drop-target={isDropTarget ? 'active' : 'inactive'}
     >
-      <TextInput
+      {/* Uses FormFieldError (with icon) via ExpressionFieldInput for SynForm field parity. */}
+      <ExpressionFieldInput
         id={id}
         value={value}
-        onChange={handleChange}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
+        onChange={onChange}
         placeholder={placeholder}
-        validated={hasError ? 'error' : 'default'}
-        style={isDropTarget ? DROP_TARGET_OUTLINE : undefined}
+        externalError={error}
+        onDropTargetChange={setIsDropTarget}
       />
-      {displayError && (
-        <HelperText>
-          <HelperTextItem variant="error">{displayError}</HelperTextItem>
-        </HelperText>
-      )}
     </FormGroup>
   )
 }

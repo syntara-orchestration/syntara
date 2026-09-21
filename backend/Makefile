@@ -753,7 +753,7 @@ typecheck: ## Run type checking only with mypy
 .PHONY: typecheck-pyrefly
 typecheck-pyrefly: ## Run type checking with pyrefly (~3s, used in pre-commit)
 	@echo "🔍 Running type checking (pyrefly)..."
-	uv run --with pyrefly pyrefly check
+	uv run pyrefly check
 	@echo "✅ Type checking completed"
 
 .PHONY: check-migrations
@@ -802,14 +802,14 @@ check-openapi-breaking: ## Check OpenAPI spec for breaking changes against devel
 	fi
 	@PR_LABELS_TEXT="$${PR_LABELS:-$${OPENAPI_PR_LABELS:-}}"; \
 	if [ -n "$$PR_LABELS_TEXT" ]; then \
-		./scripts/openapi/check-breaking-changes.py \
+		uv run ./scripts/openapi/check-breaking-changes.py \
 			--base $(OPENAPI_BASE_REF) \
 			--head HEAD \
 			--format text \
 			--fallback-spec-path backend/src/syntara/schemas/openapi.yaml \
 			--pr-labels "$$PR_LABELS_TEXT"; \
 	else \
-		./scripts/openapi/check-breaking-changes.py \
+		uv run ./scripts/openapi/check-breaking-changes.py \
 			--base $(OPENAPI_BASE_REF) \
 			--head HEAD \
 			--format text \
@@ -818,7 +818,7 @@ check-openapi-breaking: ## Check OpenAPI spec for breaking changes against devel
 	@echo "Checking public OpenAPI spec for breaking changes..."
 	@PR_LABELS_TEXT="$${PR_LABELS:-$${OPENAPI_PR_LABELS:-}}"; \
 	if [ -n "$$PR_LABELS_TEXT" ]; then \
-		./scripts/openapi/check-breaking-changes.py \
+		uv run ./scripts/openapi/check-breaking-changes.py \
 			--base $(OPENAPI_BASE_REF) \
 			--head HEAD \
 			--format text \
@@ -826,7 +826,7 @@ check-openapi-breaking: ## Check OpenAPI spec for breaking changes against devel
 			--fallback-spec-path backend/src/syntara/schemas/openapi-public.yaml \
 			--pr-labels "$$PR_LABELS_TEXT"; \
 	else \
-		./scripts/openapi/check-breaking-changes.py \
+		uv run ./scripts/openapi/check-breaking-changes.py \
 			--base $(OPENAPI_BASE_REF) \
 			--head HEAD \
 			--format text \
@@ -855,7 +855,7 @@ check-openapi-breaking-pre-commit: ## Pre-commit: breaking changes when openapi.
 .PHONY: check-openapi-contracts
 check-openapi-contracts: ## Check if frontend contracts are regenerated for OpenAPI changes
 	@echo "Checking if frontend contracts are up to date..."
-	@./scripts/openapi/check-contract-regeneration.py \
+	@uv run ./scripts/openapi/check-contract-regeneration.py \
 		--changed-files-from $(OPENAPI_BASE_REF) \
 		--format text
 

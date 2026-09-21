@@ -11,6 +11,7 @@ import { SynPage } from '../../components/layout/SynPage'
 import { SynPanel } from '../../components/layout/SynPanel'
 import { SynPanelStack, SynPanelStackItem } from '../../components/layout/SynPanelStack'
 import { SynReactFlowViewportGuard } from '../../components/layout/SynReactFlowViewportGuard'
+import { NodeExpandedAllContext } from '../../components/nodes/NodeExpandedAllContext'
 import { useSearchParams } from '../../hooks/routing/useSearchParams'
 import { useCursorPagination } from '../../hooks/useCursorPagination'
 import { useProjectSelector } from '../../hooks/useProjectSelector'
@@ -20,7 +21,6 @@ import { getErrorMessage } from '../../utils/apiErrors'
 import { detachPromise } from '../../utils/detachPromise'
 import { ApprovalSidePanel } from '../executions/ApprovalSidePanel'
 import { transformExecutionStatusFilter } from '../executions/executionFilters'
-import { NodeExpandedAllContext } from '../workflows/canvas/nodes/common/NodeExpandedAllContext'
 
 import styles from './BuilderContent.module.css'
 import { BuilderFlow } from './BuilderFlow'
@@ -207,7 +207,10 @@ export function BuilderContent(props: BuilderContentProps) {
     '/workflows/{workflow_id}'
   )
   const { mutate: executeWorkflow } = executionsClient.useMutation('post', '/executions')
-  const { mutate: deleteWorkflow } = workflowClient.useMutation('delete', '/workflows/{workflow_id}')
+  const { mutate: deleteWorkflow, isPending: isDeleting } = workflowClient.useMutation(
+    'delete',
+    '/workflows/{workflow_id}'
+  )
   const workflowMetadata = useWorkflowMetadata(workflow)
   const currentVersion = workflow?.current_version ?? workflow?.version?.version
 
@@ -561,6 +564,7 @@ export function BuilderContent(props: BuilderContentProps) {
     dispatch,
     handleRunWorkflow,
     handleDeleteWorkflow,
+    isDeleting,
     runStepDialog,
     lastRunStepNodeIdRef,
     pendingImport,

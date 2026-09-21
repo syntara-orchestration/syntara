@@ -10,7 +10,7 @@ import random
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from typing import Any, Literal
+from typing import Any, Literal, cast
 from uuid import UUID
 
 import structlog
@@ -25,7 +25,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from temporalio.api.enums.v1 import EventType, PendingActivityState
 from temporalio.api.history.v1 import HistoryEvent
 from temporalio.client import Client, WorkflowHandle, WorkflowHistoryEventFilterType
-from temporalio.exceptions import TemporalError
+from temporalio.exceptions import ApplicationError, TemporalError
+from temporalio.service import RPCError, RPCStatusCode
 
 from syntara.audit.context_managers import actor_context
 from syntara.audit.dispatcher import AuditEventDispatcher
@@ -62,12 +63,6 @@ PRE_RESOLVED_ACTIVITY_ID_PREFIX = "pre-resolved-"
 
 
 logger = structlog.stdlib.get_logger(__name__)
-
-# Retry parameters for querying activity output after Temporal marks an activity as
-# completed but before the workflow loop stores the result in the resolver namespace.
-# Uses exponential backoff: 100ms, 200ms, 400ms, 800ms, 1600ms (total ~3.1s).
-_OUTPUT_QUERY_MAX_RETRIES = 5
-_OUTPUT_QUERY_BASE_DELAY_MS = 100
 
 # Temporal defers ACTIVITY_TASK_STARTED events until the activity completes,
 # so the sync service never sees RUNNING status for in-flight activities.
@@ -760,7 +755,7 @@ class ActivitySyncService:
                     SyntheticPartialOutput(
                         activity_id=activity_id,
                         scheduled_event_id=scheduled_event_id,
-                        partial_output=partial_output,
+                        partial_output=self._scrub_data(partial_output) or {},
                     )
                 )
             return True
@@ -1647,7 +1642,7 @@ class ActivitySyncService:
                 logger.exception(
                     "Error updating execution status from workflow completion event", execution_id=metadata.execution_id
                 )
-                # Don't raise - monitoring should continue
+                raise
 
     def _update_non_terminal_activities_on_cancel(
         self,
@@ -1810,6 +1805,50 @@ class ActivitySyncService:
         """Merge heartbeat partial output with workflow-queried output."""
         return {**initial, **queried} if initial else queried
 
+    async def _fetch_completed_activity_output(
+        self,
+        handle: WorkflowHandle[Any, Any],
+        activity_id: str,
+    ) -> dict[str, Any] | None:
+        """Resolve output for a completed activity when the initial query returned None."""
+        try:
+            return cast(
+                "dict[str, Any] | None",
+                await handle.execute_update("get_activity_output_when_ready", activity_id),
+            )
+        except RPCError as e:
+            if e.status == RPCStatusCode.NOT_FOUND:
+                # Workflow already completed — the update was rejected because
+                # the server has already recorded the final state.  This means
+                # set_namespace() has run (completion requires it), so a query
+                # against the completed workflow's final state is guaranteed to
+                # return the output.
+                try:
+                    return cast(
+                        "dict[str, Any] | None",
+                        await handle.query("get_activity_output", activity_id),
+                    )
+                except (TemporalError, ValueError) as query_err:
+                    logger.warning(
+                        "Could not query activity data",
+                        activity_id=activity_id,
+                        error=str(query_err),
+                    )
+                    raise
+            logger.warning(
+                "Workflow update for activity output failed",
+                activity_id=activity_id,
+                error=str(e),
+            )
+            return None
+        except ApplicationError as e:
+            logger.warning(
+                "Workflow update for activity output timed out",
+                activity_id=activity_id,
+                error=str(e),
+            )
+            return None
+
     async def _query_activity_io(
         self,
         handle: WorkflowHandle[Any, Any],
@@ -1819,9 +1858,13 @@ class ActivitySyncService:
     ) -> tuple[dict[str, Any], dict[str, Any] | None]:
         """Query workflow for activity input and output data.
 
-        Queries ``get_activity_input`` and ``get_activity_output`` from the workflow.
-        Handles the retry loop for the race condition where Temporal marks an
-        activity as completed before the workflow loop stores the result.
+        Queries ``get_activity_input`` and ``get_activity_output`` from the
+        workflow.  For completed activities whose output is not yet available
+        (race where Temporal emits ACTIVITY_TASK_COMPLETED before the workflow
+        stores the result), falls back to the ``get_activity_output_when_ready``
+        workflow update which blocks until the resolver namespace is populated.
+        The query-first approach ensures this works even after the workflow has
+        completed (updates cannot target completed workflows).
 
         Args:
             handle: Temporal workflow handle for queries
@@ -1830,7 +1873,11 @@ class ActivitySyncService:
             initial_output_data: Pre-existing output data (e.g. from heartbeat partial output)
 
         Returns:
-            Tuple of (input_data, output_data)
+            Tuple of (input_data, output_data).
+
+        Raises:
+            TemporalError: When the workflow query fails (worker unreachable, rejected, etc.).
+            ValueError: When query arguments are invalid.
 
         """
         input_data: dict[str, Any] = {}
@@ -1839,46 +1886,15 @@ class ActivitySyncService:
         try:
             input_data = await handle.query("get_activity_input", activity_id) or {}
             queried_output = await handle.query("get_activity_output", activity_id)
-            if queried_output is not None:
-                output_data = self._merge_output(initial_output_data, queried_output)
-
-            # Race condition mitigation: If activity is completed but output is None,
-            # retry the query. This handles the case where Temporal emits the
-            # ACTIVITY_TASK_COMPLETED event before the workflow's async loop
-            # stores the result in the resolver namespace.
-
-            # (e.g., workflow signal after output is stored).
-            if activity_data["status"] == ActivityStatus.COMPLETED and queried_output is None:
-                max_retries = _OUTPUT_QUERY_MAX_RETRIES
-                for retry in range(max_retries):
-                    delay_ms = _OUTPUT_QUERY_BASE_DELAY_MS * (2**retry)
-                    logger.debug(
-                        "Activity completed but output is None, retrying query",
-                        activity_id=activity_id,
-                        retry=retry + 1,
-                        max_retries=max_retries,
-                        delay_ms=delay_ms,
-                    )
-                    await asyncio.sleep(delay_ms / 1000.0)
-                    queried_output = await handle.query("get_activity_output", activity_id)
-                    if queried_output is not None:
-                        output_data = self._merge_output(initial_output_data, queried_output)
-                        logger.debug(
-                            "Successfully retrieved output on retry",
-                            activity_id=activity_id,
-                            retry=retry + 1,
-                        )
-                        break
-                else:
-                    # All retries exhausted, log warning
-                    logger.warning(
-                        "Activity completed but output still None after retries",
-                        activity_id=activity_id,
-                        max_retries=max_retries,
-                    )
-
         except (TemporalError, ValueError) as e:
-            logger.debug("Could not query activity data", activity_id=activity_id, error=str(e))
+            logger.warning("Could not query activity data", activity_id=activity_id, error=str(e))
+            raise
+
+        if queried_output is None and activity_data["status"] == ActivityStatus.COMPLETED:
+            queried_output = await self._fetch_completed_activity_output(handle, activity_id)
+
+        if queried_output is not None:
+            output_data = self._merge_output(initial_output_data, queried_output)
 
         return input_data, output_data
 
@@ -2125,13 +2141,7 @@ class ActivitySyncService:
         if existing.status in TERMINAL_ACTIVITY_STATUSES and not loop_control_iterating and not is_new:
             return None
 
-        # Query workflow for input/output data.
-        # For running activities, partial output from heartbeat may
-        # already be in the update dict — preserve it if the workflow
-        # query returns None (output not stored until completion).
-        input_data, output_data = await self._query_activity_io(
-            handle, activity_id, activity_data, activity_data.get("output_data")
-        )
+        input_data, output_data = await self._resolve_activity_io(handle, activity_id, activity_data, existing)
 
         # Loop control nodes: keep the node "running" between iterations so the UI
         # doesn't flash completed→pending on every cycle.  The final iteration
@@ -2156,11 +2166,57 @@ class ActivitySyncService:
         old_values = self._update_activity_record(
             existing,
             activity_data,
-            self._scrub_data(input_data),
-            self._scrub_data(output_data),
+            input_data,
+            output_data,
             is_loop_control=is_loop_control,
         )
         return existing, old_values, is_new
+
+    @staticmethod
+    def _io_after_query_failure(
+        existing: ActivityExecution,
+        activity_data: dict[str, Any],
+    ) -> tuple[dict[str, Any], dict[str, Any] | None]:
+        """Return input/output safe to persist when a Temporal query failed."""
+        input_data = existing.input_data or {}
+        event_output = activity_data.get("output_data")
+        if event_output is not None:
+            output_data: dict[str, Any] | None = event_output | (existing.output_data or {})
+        else:
+            output_data = existing.output_data
+        return input_data, output_data
+
+    async def _resolve_activity_io(
+        self,
+        handle: WorkflowHandle[Any, Any],
+        activity_id: str,
+        activity_data: dict[str, Any],
+        existing: ActivityExecution,
+    ) -> tuple[dict[str, Any], Any]:
+        """Resolve input/output data for an activity, avoiding a per-event query storm.
+
+        Querying Temporal on every event of a loop workflow (~600 events) replays
+        history each time and exhausts the DB pool. To avoid that while keeping the
+        UI's input panel populated mid-run:
+        - Terminal statuses: full query (input + final output, with the retry loop).
+        - First non-terminal event (input not yet stored): query once for input only;
+          output stays whatever the event carried (e.g. heartbeat partial output).
+        - Subsequent non-terminal events: no query — reuse the stored input.
+        """
+        if activity_data.get("status") in TERMINAL_ACTIVITY_STATUSES:
+            try:
+                return await self._query_activity_io(
+                    handle, activity_id, activity_data, activity_data.get("output_data")
+                )
+            except (TemporalError, ValueError):
+                return self._io_after_query_failure(existing, activity_data)
+        if not existing.input_data:
+            try:
+                input_data, _ = await self._query_activity_io(handle, activity_id, activity_data, None)
+                return input_data, activity_data.get("output_data")
+            except (TemporalError, ValueError):
+                return self._io_after_query_failure(existing, activity_data)
+        return existing.input_data, activity_data.get("output_data")
 
     @staticmethod
     def _get_or_create_iteration_record(

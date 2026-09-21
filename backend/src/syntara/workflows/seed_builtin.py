@@ -179,7 +179,6 @@ async def seed_builtin_workflows(session: AsyncSession) -> None:
     result = await session.exec(
         select(User).where(
             User.username == "admin",
-            User.deleted_at.is_(None),  # type: ignore[union-attr]
         )
     )
     user = result.first()

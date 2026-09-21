@@ -4,7 +4,12 @@ from typing import Any
 
 import pytest
 
-from syntara.workflows.workflow_engine.unified_eval import MAX_AST_DEPTH, safe_eval_with_namespace
+from syntara.workflows.workflow_engine.unified_eval import (
+    MAX_AST_DEPTH,
+    MAX_REGEX_PATTERN_LENGTH,
+    MAX_REGEX_SUBJECT_LENGTH,
+    safe_eval_with_namespace,
+)
 
 
 class TestBasicEvaluation:
@@ -379,9 +384,9 @@ class TestErrorMessages:
         assert "namespace" not in error_msg.lower()
 
     def test_unsupported_operation_error_message(self) -> None:
-        """Function calls are not supported."""
-        with pytest.raises(TypeError, match="Unsupported expression type"):
-            safe_eval_with_namespace("len(${items})", {"items": [1, 2, 3]})
+        """Arbitrary function calls are not supported."""
+        with pytest.raises(TypeError, match="Unsupported function"):
+            safe_eval_with_namespace("print(${items})", {"items": [1, 2, 3]})
 
 
 class TestRealWorldScenarios:
@@ -699,3 +704,366 @@ class TestExceptionHandlingFix:
         # This raises IndexError in unified_eval, should propagate as ValueError
         with pytest.raises((IndexError, ValueError)):
             safe_eval_with_namespace("${items[10]} == 1", namespace)
+
+
+class TestVisualBuilderOperators:
+    """Word operators from the visual expression builder must evaluate at runtime."""
+
+    def test_exists_true_when_path_present(self) -> None:
+        assert safe_eval_with_namespace("${node.status} exists", {"node": {"status": "ok"}}) is True
+
+    def test_exists_false_when_nested_key_missing(self) -> None:
+        assert safe_eval_with_namespace("${node.status} exists", {"node": {}}) is False
+
+    def test_exists_false_when_root_missing(self) -> None:
+        assert safe_eval_with_namespace("${node.status} exists", {}) is False
+
+    def test_exists_false_when_value_is_none(self) -> None:
+        assert safe_eval_with_namespace("${node.status} exists", {"node": {"status": None}}) is False
+
+    def test_not_exists(self) -> None:
+        assert safe_eval_with_namespace("not (${node.status} exists)", {"node": {}}) is True
+
+    def test_is_empty_string(self) -> None:
+        assert safe_eval_with_namespace("${text} isEmpty", {"text": ""}) is True
+        assert safe_eval_with_namespace("${text} isEmpty", {"text": "hi"}) is False
+
+    def test_is_empty_list(self) -> None:
+        assert safe_eval_with_namespace("${items} isEmpty", {"items": []}) is True
+        assert safe_eval_with_namespace("${items} isEmpty", {"items": [1]}) is False
+
+    def test_is_empty_dict(self) -> None:
+        assert safe_eval_with_namespace("${data} isEmpty", {"data": {}}) is True
+        assert safe_eval_with_namespace("${data} isEmpty", {"data": {"a": 1}}) is False
+
+    def test_is_empty_rejects_zero_false_and_none(self) -> None:
+        with pytest.raises(TypeError, match="isEmpty is not supported"):
+            safe_eval_with_namespace("${count} isEmpty", {"count": 0})
+        with pytest.raises(TypeError, match="isEmpty is not supported"):
+            safe_eval_with_namespace("${flag} isEmpty", {"flag": False})
+        with pytest.raises(TypeError, match="isEmpty is not supported"):
+            safe_eval_with_namespace("${val} isEmpty", {"val": None})
+
+    def test_exists_subscript_path(self) -> None:
+        assert safe_eval_with_namespace("${data[0]} exists", {"data": ["x"]}) is True
+        assert safe_eval_with_namespace("${data[0]} exists", {"data": []}) is False
+
+    def test_exists_nested_subscript_path(self) -> None:
+        assert safe_eval_with_namespace("${data[0].name} exists", {"data": [{"name": "svc"}]}) is True
+        assert safe_eval_with_namespace("${data[0].name} exists", {"data": [{}]}) is False
+        assert safe_eval_with_namespace("${data[0].name} exists", {"data": []}) is False
+        assert safe_eval_with_namespace("${data[0].name} exists", {"data": [{"other": "value"}]}) is False
+        assert safe_eval_with_namespace("${data[0].name} exists", {"data": [{"name": None}]}) is False
+        users = {
+            "users": [
+                {"id": 1, "profile": {"name": "Alice"}},
+                {"id": 2, "profile": {"name": "Bob"}},
+            ]
+        }
+        assert safe_eval_with_namespace("${users[0].profile.name} exists", users) is True
+        assert safe_eval_with_namespace("${users[2].profile.name} exists", users) is False
+
+    def test_exists_negative_index(self) -> None:
+        assert safe_eval_with_namespace("${items[-1]} exists", {"items": [1, 2]}) is True
+
+    def test_starts_with_rejects_non_string(self) -> None:
+        with pytest.raises(TypeError, match="requires a string value"):
+            safe_eval_with_namespace('${count} startsWith "4"', {"count": 42})
+        with pytest.raises(TypeError, match="requires a string value"):
+            safe_eval_with_namespace('${val} startsWith "x"', {"val": None})
+
+    def test_ends_with_rejects_non_string(self) -> None:
+        with pytest.raises(TypeError, match="requires a string value"):
+            safe_eval_with_namespace('${count} endsWith "2"', {"count": 42})
+
+    def test_starts_with(self) -> None:
+        assert safe_eval_with_namespace('${username} startsWith "user_"', {"username": "user_abc"}) is True
+        assert safe_eval_with_namespace('${username} startsWith "user_"', {"username": "admin"}) is False
+
+    def test_ends_with(self) -> None:
+        assert safe_eval_with_namespace('${filename} endsWith ".txt"', {"filename": "notes.txt"}) is True
+        assert safe_eval_with_namespace('${filename} endsWith ".txt"', {"filename": "notes.md"}) is False
+
+    def test_matches_regex(self) -> None:
+        assert safe_eval_with_namespace('${code} matches "^[A-Z]{3}$"', {"code": "ABC"}) is True
+        assert safe_eval_with_namespace('${code} matches "^[A-Z]{3}$"', {"code": "ab"}) is False
+
+    def test_invalid_matches_pattern_raises(self) -> None:
+        with pytest.raises(ValueError, match="Invalid matches pattern"):
+            safe_eval_with_namespace('${code} matches "["', {"code": "A"})
+
+    def test_matches_rejects_non_string_value(self) -> None:
+        with pytest.raises(TypeError, match="requires a string value"):
+            safe_eval_with_namespace('${count} matches "^4"', {"count": 42})
+
+    def test_invalid_matches_pattern_is_truncated_in_error(self) -> None:
+        long_pattern = "[" + ("a" * 200)
+        with pytest.raises(ValueError, match="Invalid matches pattern") as exc_info:
+            safe_eval_with_namespace(f'${{code}} matches "{long_pattern}"', {"code": "A"})
+        message = str(exc_info.value)
+        assert "..." in message
+        assert long_pattern not in message
+
+    def test_length_equal_to(self) -> None:
+        assert safe_eval_with_namespace("${tags} lengthEqualTo 2", {"tags": ["a", "b"]}) is True
+        assert safe_eval_with_namespace("${tags} lengthEqualTo 2", {"tags": ["a"]}) is False
+
+    def test_length_greater_than(self) -> None:
+        assert safe_eval_with_namespace("${tags} lengthGreaterThan 1", {"tags": ["a", "b"]}) is True
+
+    def test_length_less_than(self) -> None:
+        assert safe_eval_with_namespace("${tags} lengthLessThan 2", {"tags": ["a"]}) is True
+
+    def test_contains_word_form(self) -> None:
+        assert safe_eval_with_namespace('${message} contains "Hello"', {"message": "Hello world"}) is True
+
+    def test_combined_with_and(self) -> None:
+        namespace = {"node": {"status": "ok", "name": "svc-1"}}
+        expr = '${node.status} exists and ${node.name} startsWith "svc"'
+        assert safe_eval_with_namespace(expr, namespace) is True
+
+    def test_len_builtin_allowed(self) -> None:
+        assert safe_eval_with_namespace("len(${items}) == 3", {"items": [1, 2, 3]}) is True
+
+    def test_disallowed_method_rejected(self) -> None:
+        with pytest.raises(TypeError, match="Unsupported method"):
+            safe_eval_with_namespace('${name}.replace("a", "b") == "x"', {"name": "a"})
+
+    def test_disallowed_function_rejected(self) -> None:
+        with pytest.raises(TypeError, match="Unsupported function"):
+            safe_eval_with_namespace("open(${path})", {"path": "file.txt"})
+
+    def test_keyword_args_rejected(self) -> None:
+        with pytest.raises(ValueError, match="Keyword and starred arguments"):
+            safe_eval_with_namespace("len(${items}, default=0)", {"items": [1]})
+
+    def test_negated_operators_as_saved_by_serializer(self) -> None:
+        """Backend serialization wraps negation as ``not (<expr>)``."""
+        assert safe_eval_with_namespace("not (${data.optional} exists)", {"data": {}}) is True
+        assert safe_eval_with_namespace("not (${results} isEmpty)", {"results": [1]}) is True
+        assert safe_eval_with_namespace('not (${username} startsWith "user_")', {"username": "admin"}) is True
+        assert safe_eval_with_namespace("not (${items} lengthEqualTo 0)", {"items": [1]}) is True
+
+    def test_exists_bare_name_without_template(self) -> None:
+        assert safe_eval_with_namespace("status exists", {"status": "ok"}) is True
+        assert safe_eval_with_namespace("status exists", {}) is False
+
+    def test_exists_dict_string_key(self) -> None:
+        assert safe_eval_with_namespace("${data['key']} exists", {"data": {"key": "v"}}) is True
+        assert safe_eval_with_namespace("${data['key']} exists", {"data": {}}) is False
+
+    def test_exists_false_on_lookup_type_errors(self) -> None:
+        assert safe_eval_with_namespace("${count.foo} exists", {"count": 5}) is False
+        assert safe_eval_with_namespace("${count[0]} exists", {"count": 5}) is False
+        assert safe_eval_with_namespace("${items['a']} exists", {"items": [1]}) is False
+        assert safe_eval_with_namespace("${items[-99]} exists", {"items": [1, 2]}) is False
+        assert safe_eval_with_namespace("${items[-'x']} exists", {"items": [1]}) is False
+
+    def test_exists_empty_and_invalid_paths(self) -> None:
+        assert safe_eval_with_namespace("__exists__('')", {}) is False
+        assert safe_eval_with_namespace("${data[} exists", {"data": [1]}) is False
+
+    def test_exists_rejects_unsupported_path_nodes(self) -> None:
+        with pytest.raises(TypeError, match="exists does not support"):
+            safe_eval_with_namespace("${len(items)} exists", {"items": [1]})
+        with pytest.raises(TypeError, match="exists does not support"):
+            safe_eval_with_namespace("${a == b} exists", {"a": 1, "b": 1})
+        with pytest.raises(TypeError, match="exists does not support"):
+            safe_eval_with_namespace("${items[+1]} exists", {"items": [1, 2]})
+
+    def test_exists_call_requires_single_string_path(self) -> None:
+        with pytest.raises(ValueError, match="__exists__ requires a single string path"):
+            safe_eval_with_namespace("__exists__(1)", {})
+        with pytest.raises(ValueError, match="__exists__ requires a single string path"):
+            safe_eval_with_namespace("__exists__('a', 'b')", {})
+
+    def test_is_empty_rejects_tuple(self) -> None:
+        with pytest.raises(TypeError, match="isEmpty is not supported"):
+            safe_eval_with_namespace("${items} isEmpty", {"items": ()})
+
+    def test_is_empty_wrong_arity(self) -> None:
+        with pytest.raises(ValueError, match="__is_empty__ takes exactly one argument"):
+            safe_eval_with_namespace("__is_empty__()", {})
+        with pytest.raises(ValueError, match="__is_empty__ takes exactly one argument"):
+            safe_eval_with_namespace("__is_empty__(a, b)", {"a": "", "b": ""})
+
+    def test_starts_with_requires_string_argument(self) -> None:
+        with pytest.raises(TypeError, match="requires a single string argument"):
+            safe_eval_with_namespace("${name} startsWith 1", {"name": "abc"})
+        with pytest.raises(TypeError, match="requires a single string argument"):
+            safe_eval_with_namespace("name.startswith()", {"name": "abc"})
+
+    def test_ends_with_requires_string_argument(self) -> None:
+        with pytest.raises(TypeError, match="requires a single string argument"):
+            safe_eval_with_namespace("${name} endsWith 1", {"name": "abc"})
+
+    def test_len_wrong_arity_and_type(self) -> None:
+        with pytest.raises(ValueError, match="len\\(\\) takes exactly one argument"):
+            safe_eval_with_namespace("len()", {})
+        with pytest.raises(ValueError, match="len\\(\\) takes exactly one argument"):
+            safe_eval_with_namespace("len(a, b)", {"a": [1], "b": [2]})
+        with pytest.raises(TypeError, match="len\\(\\) not supported"):
+            safe_eval_with_namespace("${count} lengthEqualTo 1", {"count": 5})
+
+    def test_starred_args_rejected(self) -> None:
+        with pytest.raises(ValueError, match="Keyword and starred arguments"):
+            safe_eval_with_namespace("len(*items)", {"items": [[1, 2]]})
+
+    def test_call_func_must_be_name_or_attribute(self) -> None:
+        with pytest.raises(TypeError, match="Unsupported expression type"):
+            safe_eval_with_namespace("funcs[0]()", {"funcs": [len]})
+
+    def test_matches_pattern_must_be_string(self) -> None:
+        with pytest.raises(ValueError, match="matches pattern must be a string literal"):
+            safe_eval_with_namespace("${code} matches 123", {"code": "123"})
+
+    def test_matches_pattern_too_long(self) -> None:
+        long_pattern = "a" * (MAX_REGEX_PATTERN_LENGTH + 1)
+        with pytest.raises(ValueError, match="matches pattern too long"):
+            safe_eval_with_namespace(f'${{code}} matches "{long_pattern}"', {"code": "a"})
+
+    def test_matches_rejects_templated_pattern(self) -> None:
+        with pytest.raises(ValueError, match="matches pattern must be a string literal"):
+            safe_eval_with_namespace("${code} matches ${pattern}", {"code": "ABC", "pattern": "^[A-Z]{3}$"})
+
+    def test_re_search_rejects_namespace_pattern(self) -> None:
+        with pytest.raises(ValueError, match="matches pattern must be a string literal"):
+            safe_eval_with_namespace("__re_search__(pattern, code)", {"pattern": "^A", "code": "A"})
+
+    def test_matches_rejects_nested_quantifier(self) -> None:
+        with pytest.raises(ValueError, match="Potentially unsafe matches pattern"):
+            safe_eval_with_namespace('${code} matches "(a+)+$"', {"code": "aaa"})
+
+    def test_matches_subject_too_long(self) -> None:
+        too_long = "a" * (MAX_REGEX_SUBJECT_LENGTH + 1)
+        with pytest.raises(ValueError, match="matches subject too long"):
+            safe_eval_with_namespace('${code} matches "a"', {"code": too_long})
+
+    def test_matches_timeout_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import subprocess
+
+        def _timeout(*_args: object, **_kwargs: object) -> None:
+            raise subprocess.TimeoutExpired(cmd="python", timeout=1)
+
+        monkeypatch.setattr(
+            "syntara.workflows.workflow_engine.unified_eval.subprocess.run",
+            _timeout,
+        )
+        with pytest.raises(ValueError, match="matches timed out"):
+            safe_eval_with_namespace('${code} matches "a"', {"code": "a"})
+
+    def test_matches_worker_failure_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from types import SimpleNamespace
+
+        monkeypatch.setattr(
+            "syntara.workflows.workflow_engine.unified_eval.subprocess.run",
+            lambda *_args, **_kwargs: SimpleNamespace(returncode=1, stdout=""),
+        )
+        with pytest.raises(ValueError, match="matches failed"):
+            safe_eval_with_namespace('${code} matches "a"', {"code": "a"})
+
+    def test_re_search_wrong_arity(self) -> None:
+        with pytest.raises(ValueError, match="__re_search__ takes exactly two arguments"):
+            safe_eval_with_namespace("__re_search__('a')", {})
+        with pytest.raises(ValueError, match="__re_search__ takes exactly two arguments"):
+            safe_eval_with_namespace("__re_search__('a', 'b', 'c')", {})
+
+    def test_contains_word_form_on_list(self) -> None:
+        assert safe_eval_with_namespace("${items} contains 2", {"items": [1, 2, 3]}) is True
+        assert safe_eval_with_namespace("${items} contains 9", {"items": [1, 2, 3]}) is False
+
+
+# (keyword, literal containing that keyword in non-operator position).
+#
+# Python keywords the frontend normalizer rewrites, listed in its module header
+# (frontend/packages/syntara-ui/src/utils/expressions/normalizer.ts:1-13) and
+# covered by normalizer.test.ts "preserves strings with ... inside".
+PYTHON_KEYWORD_LITERALS = [
+    ("and", "bread and butter"),
+    ("or", "yes or no"),
+    ("not", "not sure"),
+    ("in", "log in"),
+]
+
+# The nine visual-builder word operators, in the order they are declared in
+# frontend/packages/syntara-ui/src/utils/expressions/operators.ts WORD_OPERATORS.
+# These are the operators offered in the node's operator dropdown (OPERATOR_GROUPS
+# String / Existence / Length groups) and the ones _translate_custom_operators
+# rewrites. The Comparison group is symbolic (==, >, <, >=, <=) and has no
+# rewrite rule, so it is not represented here.
+WORD_OPERATOR_LITERALS = [
+    ("startsWith", "name startsWith 5"),
+    ("endsWith", "name endsWith 7"),
+    ("matches", "value matches 3"),
+    ("contains", "list contains 5"),
+    ("exists", "Resource already exists in target"),
+    ("isEmpty", "field isEmpty here"),
+    ("lengthEqualTo", "items lengthEqualTo 2"),
+    ("lengthGreaterThan", "count lengthGreaterThan 1"),
+    ("lengthLessThan", "count lengthLessThan 9"),
+]
+
+
+class TestKeywordInsideStringLiteral:
+    """An operator keyword inside a quoted string literal must stay literal text.
+
+    In the visual builder the operator is chosen from a dropdown (OPERATOR_GROUPS
+    in operators.ts) and only the comparison value is free text, so a keyword
+    appearing inside quotes in a stored condition is always user data, never an
+    operator.
+
+    The frontend upholds this by tokenizing before rewriting (normalizer.ts
+    imports tokenize/detokenize, so a STRING token cannot be modified) and pins it
+    with tests. The backend's `_translate_custom_operators` instead runs `re.sub`
+    over the raw expression string with no notion of quoting, before `ast.parse`.
+
+    Both quoting styles are exercised because they fail differently. The visual
+    builder emits double quotes (`quoteValueIfNeeded` in serializer.ts), where the
+    injected rewrite still parses and the comparison silently returns the wrong
+    branch. Raw-mode and imported definitions can carry single quotes, where the
+    `__exists__('...')` rewrite unbalances the literal and raises instead.
+    """
+
+    @pytest.mark.parametrize(
+        ("keyword", "literal"),
+        PYTHON_KEYWORD_LITERALS,
+        ids=[keyword for keyword, _ in PYTHON_KEYWORD_LITERALS],
+    )
+    @pytest.mark.parametrize("quote", ['"', "'"])
+    def test_python_keyword_inside_literal_is_preserved(self, keyword: str, literal: str, quote: str) -> None:
+        """Control: keywords the backend never rewrites are unaffected by quoting."""
+        expression = f"${{text}} == {quote}{literal}{quote}"
+        assert safe_eval_with_namespace(expression, {"text": literal}) is True, keyword
+
+    @pytest.mark.parametrize(
+        ("operator", "literal"),
+        WORD_OPERATOR_LITERALS,
+        ids=[operator for operator, _ in WORD_OPERATOR_LITERALS],
+    )
+    @pytest.mark.parametrize("quote", ['"', "'"])
+    def test_word_operator_inside_literal_is_preserved(self, operator: str, literal: str, quote: str) -> None:
+        """Reproducer: same invariant, one case per WORD_OPERATORS entry."""
+        expression = f"${{text}} == {quote}{literal}{quote}"
+        assert safe_eval_with_namespace(expression, {"text": literal}) is True, operator
+
+    def test_builder_emitted_condition_matches_its_own_value(self) -> None:
+        """The exact stored condition the visual builder writes for a typed value.
+
+        `quoteValueIfNeeded` (serializer.ts) wraps a free-text value in double
+        quotes, escaping only backslash and double-quote, so this is what a user
+        who typed the value into the Value field gets. It evaluates to the wrong
+        branch with no error raised.
+        """
+        value = "Resource already exists in target"
+        expression = f'${{step_1.output}} == "{value}"'
+        assert safe_eval_with_namespace(expression, {"step_1": {"output": value}}) is True
+
+    def test_single_quoted_exists_literal_does_not_raise(self) -> None:
+        """Same literal single-quoted, as raw mode or an imported definition stores it.
+
+        `_exists_repl` injects single quotes around the extracted path, which
+        unbalances a single-quoted literal and fails the parse.
+        """
+        value = "Resource already exists in target"
+        expression = f"${{step_1.output}} == '{value}'"
+        assert safe_eval_with_namespace(expression, {"step_1": {"output": value}}) is True

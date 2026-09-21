@@ -258,7 +258,7 @@ describe('AssignRoleModal', () => {
       await user.click(screen.getByRole('option', { name: /admin-role/i }))
 
       // The Assign button should now show count
-      expect(screen.getByRole('button', { name: /Assign \(1\)/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /Assign role/i })).toBeInTheDocument()
 
       // Switch scope to Project
       await user.click(screen.getByRole('button', { name: 'System' }))
@@ -266,7 +266,7 @@ describe('AssignRoleModal', () => {
 
       // After scope change, selected roles should be cleared — button text goes back to just "Assign"
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /^Assign\s*$/i })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /^Assign role$/i })).toBeInTheDocument()
       })
     })
   })
@@ -334,7 +334,7 @@ describe('AssignRoleModal', () => {
       await user.click(screen.getByPlaceholderText('Search for roles...'))
       await user.click(screen.getByRole('option', { name: /admin-role/i }))
 
-      expect(screen.getByRole('button', { name: /Assign \(1\)/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /Assign role/i })).toBeInTheDocument()
     })
   })
 
@@ -365,7 +365,7 @@ describe('AssignRoleModal', () => {
       await user.click(screen.getByPlaceholderText('Search for roles...'))
       await user.click(screen.getByRole('option', { name: /project-admin/i }))
 
-      await user.click(screen.getByRole('button', { name: /Assign \(1\)/i }))
+      await user.click(screen.getByRole('button', { name: /Assign role/i }))
 
       await waitFor(() => {
         expect(screen.getByText('Project is required')).toBeInTheDocument()
@@ -405,7 +405,7 @@ describe('AssignRoleModal', () => {
       await user.click(screen.getByRole('option', { name: /admin-role/i }))
 
       // Submit
-      await user.click(screen.getByRole('button', { name: /Assign \(1\)/i }))
+      await user.click(screen.getByRole('button', { name: /Assign role/i }))
 
       await waitFor(() => {
         expect(mockMutateAsync).toHaveBeenCalledWith({
@@ -430,7 +430,7 @@ describe('AssignRoleModal', () => {
       await user.click(screen.getByPlaceholderText('Search for roles...'))
       await user.click(screen.getByRole('option', { name: /admin-role/i }))
 
-      await user.click(screen.getByRole('button', { name: /Assign \(1\)/i }))
+      await user.click(screen.getByRole('button', { name: /Assign role/i }))
 
       await waitFor(() => {
         expect(mockMutateAsync).toHaveBeenCalledWith({
@@ -464,7 +464,7 @@ describe('AssignRoleModal', () => {
       await user.click(screen.getByRole('option', { name: /project-admin/i }))
 
       // Submit
-      await user.click(screen.getByRole('button', { name: /Assign \(1\)/i }))
+      await user.click(screen.getByRole('button', { name: /Assign role/i }))
 
       await waitFor(() => {
         expect(mockMutateAsync).toHaveBeenCalledWith({
@@ -496,7 +496,7 @@ describe('AssignRoleModal', () => {
       await user.click(screen.getByPlaceholderText('Search for roles...'))
       await user.click(screen.getByRole('option', { name: /project-admin/i }))
 
-      await user.click(screen.getByRole('button', { name: /Assign \(1\)/i }))
+      await user.click(screen.getByRole('button', { name: /Assign role/i }))
 
       await waitFor(() => {
         expect(mockMutateAsync).toHaveBeenCalledWith({
@@ -534,7 +534,7 @@ describe('AssignRoleModal', () => {
       await user.click(screen.getByPlaceholderText('Search for roles...'))
       await user.click(screen.getByRole('option', { name: /project-admin/i }))
 
-      const submitButton = screen.getByRole('button', { name: /Assign \(1\)/i })
+      const submitButton = screen.getByRole('button', { name: /Assign role/i })
       expect(submitButton).toBeEnabled()
       await user.click(submitButton)
       expect(mockMutateAsync).not.toHaveBeenCalled()
@@ -551,7 +551,7 @@ describe('AssignRoleModal', () => {
       await user.click(screen.getByRole('option', { name: /admin-role/i }))
 
       // Submit
-      await user.click(screen.getByRole('button', { name: /Assign \(1\)/i }))
+      await user.click(screen.getByRole('button', { name: /Assign role/i }))
 
       // Should show singular success alert
       await waitFor(() => {
@@ -573,7 +573,7 @@ describe('AssignRoleModal', () => {
       await user.click(screen.getByRole('option', { name: /admin-role/i }))
 
       // Submit
-      await user.click(screen.getByRole('button', { name: /Assign \(1\)/i }))
+      await user.click(screen.getByRole('button', { name: /Assign role/i }))
 
       // The alert should appear via AlertProvider
       await waitFor(() => {
@@ -634,7 +634,7 @@ describe('AssignRoleModal', () => {
       await user.click(screen.getByRole('option', { name: /project-admin/i }))
 
       // Submit
-      await user.click(screen.getByRole('button', { name: /Assign \(1\)/i }))
+      await user.click(screen.getByRole('button', { name: /Assign role/i }))
 
       await waitFor(() => {
         expect(mockMutateAsync).toHaveBeenCalledWith({

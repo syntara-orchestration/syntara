@@ -1,0 +1,5 @@
+/* PF Timestamp uses its own color token, which does not inherit tooltip text color. */
+.lastSavedTooltip :global(.pf-v6-c-timestamp) {
+  --pf-v6-c-timestamp--Color: var(--pf-v6-c-tooltip__content--Color);
+  display: inline;
+}

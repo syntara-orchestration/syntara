@@ -28,6 +28,7 @@ import {
   closeNodeEditorPanel,
   fillCodeEditor,
   openNodeForEditing,
+  triggerLayout,
 } from './workflows'
 
 export { ensureLlmCredential, createLlmIntegration, deleteLlmIntegration, selectLlmCredential }
@@ -155,13 +156,17 @@ export async function addHttpRequestNode(page: Page, name: string, url = 'https:
  * Add a Task Agent node (v2 type: "agentic").
  * Caller must call `createLlmIntegration()` before using this helper
  * so the model dropdown has selectable options.
+ *
+ * Pass `integrationName` (the unique name from `createLlmIntegration`) so the
+ * model picker waits for that integration's options instead of racing a
+ * two-second timeout against a stale or empty dropdown.
  */
-export async function addAgenticNode(page: Page, name: string, prompt = 'Analyze the data') {
+export async function addAgenticNode(page: Page, name: string, prompt = 'Analyze the data', integrationName?: string) {
   const { name: credName } = await ensureLlmCredential(page)
   await openAddNodePanel(page)
   await selectDirectNodeType(page, 'Task Agent')
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
-  await selectLlmCredential(page, credName)
+  await selectLlmCredential(page, credName, integrationName)
   await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill(prompt)
   await page.getByRole('button', { name: 'Create', exact: true }).click()
   await closeNodeEditorPanel(page)
@@ -262,45 +267,14 @@ export async function addApprovalNode(page: Page, name: string) {
  * Add an approval node with a script node on the "approved" branch.
  * This creates a valid workflow that can be saved.
  * The "rejected" branch is optional per validation rules.
+ *
+ * Uses `addScriptOnHandle` (layout + fit-view retries) instead of `getByText`
+ * on the canvas label — React Flow semantic zoom hides node text once the
+ * graph is large enough that fit-view drops below SEMANTIC_ZOOM_MAX_SCALE.
  */
 export async function addApprovalNodeWithBranch(page: Page, name: string) {
   await addApprovalNode(page, name)
-
-  // Add a node on the "approved" branch to satisfy validation
-  // The "rejected" branch is optional
-
-  // Wait for approval node to be fully rendered before interacting with its edges
-  await expect(page.getByText(name)).toBeVisible({ timeout: 5000 })
-
-  // Click layout to position nodes and make button edges visible
-  const layoutButton = page.getByRole('button', { name: 'Layout' })
-  if ((await layoutButton.count()) > 0) {
-    await layoutButton.click()
-  }
-
-  // The approval node creates TWO button edges (to placeholders):
-  // 1. One with data-testid="add-node-button-approved"
-  // 2. One with data-testid="add-node-button-rejected"
-  //
-  // We need to click the "approved" button to add a node on the approved branch.
-
-  const approvedButton = page.getByTestId('add-node-button-approved')
-  await expect(approvedButton).toBeVisible({ timeout: 5000 })
-  await approvedButton.click({ force: true })
-
-  await expect(addNodePanel(page)).toHaveCount(1)
-
-  await selectCategoryAndType(page, 'Action', 'Script')
-
-  // Wait for the form to be fully loaded before filling
-  const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
-  await expect(nameInput).toBeVisible({ timeout: 10000 })
-  await expect(nameInput).toBeEditable({ timeout: 5000 })
-
-  await nameInput.fill(`${name} - approved action`)
-  await fillCodeEditor(page, { value: 'print("approved")' })
-  await page.getByRole('button', { name: 'Create', exact: true }).click()
-  await closeNodeEditorPanel(page)
+  await addScriptOnHandle(page, 'approved', `${name} - approved action`, 'print("approved")')
 }
 
 // ---------------------------------------------------------------------------
@@ -405,7 +379,10 @@ export async function addConditionNodeWithBranch(page: Page, name: string, expre
 export async function addScriptOnHandle(page: Page, handle: string, name: string, code: string) {
   await openAddNodePanel(page, handle)
   await selectCategoryAndType(page, 'Action', 'Script')
-  await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
+  const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
+  await expect(nameInput).toBeVisible({ timeout: 10_000 })
+  await expect(nameInput).toBeEditable({ timeout: 5_000 })
+  await nameInput.fill(name)
   await fillCodeEditor(page, { value: code })
   await page.getByRole('button', { name: 'Create', exact: true }).click()
   await closeNodeEditorPanel(page)
@@ -534,39 +511,50 @@ export async function addSwitchNodeWithCases(page: Page, name: string, cases: Sw
   // The form defaults to 2 cases. Fill the visible ones first.
   const defaultCaseCount = 2
 
-  for (let i = 0; i < Math.min(cases.length, defaultCaseCount); i++) {
+  /**
+   * Fill one case, and do not return until the form has actually taken the value.
+   *
+   * The inputs are `react-hook-form` `Controller` fields, and "Add path" calls
+   * `useFieldArray`'s `append`, which snapshots the current form state. A `fill`
+   * whose `onChange` has not reached that state yet is therefore dropped by the
+   * very next `append` — silently, and only for the case filled immediately
+   * before it. That is exactly the shape of the CI failure: in the three-case
+   * test, case index 1 arrived at the API as `""` while 0 and 2 were correct,
+   * because 0 and 2 have other interactions after them and 1 does not.
+   *
+   * Asserting the value back closes the window: these are controlled inputs, so
+   * the DOM only reads back the new value once React has re-rendered from form
+   * state — if the change had not been committed, the re-render would have reset
+   * the field.
+   */
+  const fillCase = async (i: number) => {
     // ExpressionBuilder uses a PatternFly MenuToggle — click to open, then select option
     await page
       .getByLabel(/Expression editor mode/i)
       .nth(i)
       .click()
     await page.getByRole('option', { name: 'Custom expression', exact: true }).click()
-    await page
-      .getByLabel(/Raw expression/i)
-      .nth(i)
-      .fill(cases[i].condition)
-    const label0 = cases[i].label
-    if (label0) {
-      await page.getByLabel(`Path ${i + 1} name`).fill(label0)
+
+    const rawExpression = page.getByLabel(/Raw expression/i).nth(i)
+    await rawExpression.fill(cases[i].condition)
+    await expect(rawExpression).toHaveValue(cases[i].condition)
+
+    const label = cases[i].label
+    if (label) {
+      const labelInput = page.getByLabel(`Path ${i + 1} name`)
+      await labelInput.fill(label)
+      await expect(labelInput).toHaveValue(label)
     }
+  }
+
+  for (let i = 0; i < Math.min(cases.length, defaultCaseCount); i++) {
+    await fillCase(i)
   }
 
   // Add extra cases beyond the default 2
   for (let i = defaultCaseCount; i < cases.length; i++) {
     await page.getByRole('button', { name: 'Add path' }).click()
-    await page
-      .getByLabel(/Expression editor mode/i)
-      .nth(i)
-      .click()
-    await page.getByRole('option', { name: 'Custom expression', exact: true }).click()
-    await page
-      .getByLabel(/Raw expression/i)
-      .nth(i)
-      .fill(cases[i].condition)
-    const labelN = cases[i].label
-    if (labelN) {
-      await page.getByLabel(`Path ${i + 1} name`).fill(labelN)
-    }
+    await fillCase(i)
   }
 
   // Remove surplus default cases (working from the last index downward to avoid re-indexing)
@@ -576,6 +564,32 @@ export async function addSwitchNodeWithCases(page: Page, name: string, cases: Sw
 
   await page.getByRole('button', { name: 'Create', exact: true }).click()
   await closeNodeEditorPanel(page)
+}
+
+/**
+ * Open a saved canvas node for editing and wait until a type-specific editor field is ready.
+ *
+ * Retries layout + click while the editor hydrates. Under CI load the click can
+ * land during a React Flow viewport transform and be lost, so callers must not
+ * use a bare `getByText(nodeName).click()`.
+ */
+async function openSavedNodeForEditing(page: Page, nodeName: string, editorReady: (p: Page) => Promise<void>) {
+  await triggerLayout(page)
+  const node = page.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: nodeName })
+  const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
+  await expect(async () => {
+    await expect(node).toBeVisible({ timeout: 5_000 })
+    await node.click({ timeout: 5_000 })
+    await expect(nameInput).toHaveValue(nodeName, { timeout: 5_000 })
+    await editorReady(page)
+  }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] })
+}
+
+/** Open a saved switch node on the canvas for editing. */
+export async function openSwitchNodeForEditing(page: Page, nodeName: string) {
+  await openSavedNodeForEditing(page, nodeName, async (p) => {
+    await expect(p.getByLabel('Path 1 name')).toBeVisible({ timeout: 5_000 })
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -648,4 +662,11 @@ export async function addScheduleTrigger(page: Page, name: string, config?: Sche
 
   await page.getByRole('button', { name: 'Create', exact: true }).click()
   await closeNodeEditorPanel(page)
+}
+
+/** Open a saved schedule trigger on the canvas for editing. */
+export async function openScheduleTriggerForEditing(page: Page, nodeName: string) {
+  await openSavedNodeForEditing(page, nodeName, async (p) => {
+    await expect(p.getByLabel('Schedule expression', { exact: true })).toBeVisible({ timeout: 5_000 })
+  })
 }

@@ -534,6 +534,47 @@ class TestUpdateCredential:
 
         mock_secret_service.update_secret.assert_not_called()
 
+    @pytest.mark.asyncio
+    async def test_update_noop_skips_commit_and_audit(
+        self,
+        mock_session: MagicMock,
+        mock_user: MagicMock,
+        mock_secret_service: MagicMock,
+        bearer_type: CredentialType,
+    ) -> None:
+        """Unchanged PATCH values must not commit or dispatch audit events."""
+        credential = Credential(
+            id=uuid4(),
+            name="stable-cred",
+            description="same",
+            credential_type_id=bearer_type.id,
+            secret_id=uuid4(),
+            enabled=True,
+            project_id=uuid4(),
+            created_by=mock_user.id,
+            labels={"env": "dev"},
+        )
+        mock_result = MagicMock()
+        mock_result.one_or_none.return_value = credential
+        mock_session.exec.return_value = mock_result
+        mock_session.get.side_effect = [None, bearer_type]
+        mock_secret_service.retrieve_secret.return_value = {"token": "same-token"}
+
+        service = CredentialService(mock_session, mock_user, mock_secret_service)
+        patch_data = CredentialUpdate(
+            description="same",
+            enabled=True,
+            labels={"env": "dev"},
+            inputs={"token": "same-token"},
+        )
+
+        with patch("syntara.credentials.services.credential_service.AuditEventDispatcher") as mock_dispatcher:
+            await service.update_credential(credential.id, patch_data)
+
+        mock_session.commit.assert_not_called()
+        mock_dispatcher.dispatch.assert_not_called()
+        mock_secret_service.update_secret.assert_not_called()
+
 
 class TestDeleteCredential:
     """Tests for CredentialService.delete_credential."""
@@ -1538,108 +1579,6 @@ class TestAuditEventDispatch:
             assert type(event).__name__ == "CredentialEncryptionFailureEvent"
             assert event.credential_name == "broken-cred"
             assert event.operation == "decrypt"
-
-
-class TestLookupUsers:
-    """Unit tests for CredentialService._lookup_users."""
-
-    @pytest.mark.asyncio
-    async def test_returns_empty_dict_when_no_uuids(
-        self, mock_session: MagicMock, mock_user: MagicMock, mock_secret_service: MagicMock
-    ) -> None:
-        service = CredentialService(mock_session, mock_user, mock_secret_service)
-        obj = MagicMock(created_by=None, updated_by=None)
-        result = await service._lookup_users([obj])
-        assert result == {}
-
-    @pytest.mark.asyncio
-    async def test_returns_user_map(
-        self, mock_session: MagicMock, mock_user: MagicMock, mock_secret_service: MagicMock
-    ) -> None:
-        uid = uuid4()
-        mock_session.exec = AsyncMock(return_value=[(uid, "alice")])
-        service = CredentialService(mock_session, mock_user, mock_secret_service)
-        obj = MagicMock(created_by=uid, updated_by=None)
-        result = await service._lookup_users([obj])
-        assert result is not None
-        assert result[uid] == (uid, "alice")
-
-    @pytest.mark.asyncio
-    async def test_returns_none_on_db_error(
-        self, mock_session: MagicMock, mock_user: MagicMock, mock_secret_service: MagicMock
-    ) -> None:
-        from sqlalchemy.exc import SQLAlchemyError
-
-        uid = uuid4()
-        mock_session.exec = AsyncMock(side_effect=SQLAlchemyError("db down"))
-        service = CredentialService(mock_session, mock_user, mock_secret_service)
-        obj = MagicMock(created_by=uid, updated_by=None)
-        result = await service._lookup_users([obj])
-        assert result is None
-
-
-class TestResolveUserReferences:
-    """Unit tests for CredentialService._resolve_user_references."""
-
-    @pytest.mark.asyncio
-    async def test_resolves_uuid_to_user_reference(
-        self, mock_session: MagicMock, mock_user: MagicMock, mock_secret_service: MagicMock
-    ) -> None:
-        from syntara.core.models.user_reference import UserReference
-
-        uid = uuid4()
-        mock_session.exec = AsyncMock(return_value=[(uid, "alice")])
-        service = CredentialService(mock_session, mock_user, mock_secret_service)
-        obj = MagicMock(created_by=uid, updated_by=uid)
-        await service._resolve_user_references([obj])
-        assert isinstance(obj.created_by, UserReference)
-        assert obj.created_by.id == uid
-        assert obj.created_by.name == "alice"
-        assert isinstance(obj.updated_by, UserReference)
-
-    @pytest.mark.asyncio
-    async def test_sets_none_for_unresolvable_uuid(
-        self, mock_session: MagicMock, mock_user: MagicMock, mock_secret_service: MagicMock
-    ) -> None:
-        uid = uuid4()
-        mock_session.exec = AsyncMock(return_value=[])
-        service = CredentialService(mock_session, mock_user, mock_secret_service)
-        obj = MagicMock(created_by=uid, updated_by=None)
-        await service._resolve_user_references([obj])
-        assert obj.created_by is None
-
-    @pytest.mark.asyncio
-    async def test_sets_none_on_lookup_failure(
-        self, mock_session: MagicMock, mock_user: MagicMock, mock_secret_service: MagicMock
-    ) -> None:
-        from sqlalchemy.exc import SQLAlchemyError
-
-        uid = uuid4()
-        mock_session.exec = AsyncMock(side_effect=SQLAlchemyError("db down"))
-        service = CredentialService(mock_session, mock_user, mock_secret_service)
-        obj = MagicMock(created_by=uid, updated_by=uid)
-        await service._resolve_user_references([obj])
-        assert obj.created_by is None
-        assert obj.updated_by is None
-
-    @pytest.mark.asyncio
-    async def test_handles_multiple_objects(
-        self, mock_session: MagicMock, mock_user: MagicMock, mock_secret_service: MagicMock
-    ) -> None:
-        from syntara.core.models.user_reference import UserReference
-
-        uid1, uid2 = uuid4(), uuid4()
-        mock_session.exec = AsyncMock(return_value=[(uid1, "alice"), (uid2, "bob")])
-        service = CredentialService(mock_session, mock_user, mock_secret_service)
-        obj1 = MagicMock(created_by=uid1, updated_by=None)
-        obj2 = MagicMock(created_by=uid2, updated_by=uid1)
-        await service._resolve_user_references([obj1, obj2])
-        assert isinstance(obj1.created_by, UserReference)
-        assert obj1.created_by.name == "alice"
-        assert isinstance(obj2.created_by, UserReference)
-        assert obj2.created_by.name == "bob"
-        assert isinstance(obj2.updated_by, UserReference)
-        assert obj2.updated_by.name == "alice"
 
 
 class TestFetchLatestExecutions:

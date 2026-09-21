@@ -1,22 +1,24 @@
-import type { Meta, StoryObj } from '@storybook/react-vite'
-
-import { createTestRouter } from '../test/createTestRouter'
+import type { Meta, StoryObj } from '@storybook/tanstack-react'
+import { createRootRoute, createRoute } from '@tanstack/react-router'
 
 import { SynLink } from './SynLink'
 
-const Router = createTestRouter('/')
+// Wildcard route allows target paths like /workflows to match without router errors
+const rootRoute = createRootRoute()
+const mockRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '$',
+})
 
 const meta: Meta<typeof SynLink> = {
   component: SynLink,
   tags: ['autodocs'],
-  decorators: [
-    (Story) => (
-      <Router>
-        <Story />
-      </Router>
-    ),
-  ],
   parameters: {
+    tanstack: {
+      router: {
+        route: mockRoute,
+      },
+    },
     docs: {
       description: {
         component:

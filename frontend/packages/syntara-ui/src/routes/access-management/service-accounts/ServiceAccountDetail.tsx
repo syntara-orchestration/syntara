@@ -1,4 +1,4 @@
-import { Button, DescriptionList, Switch, Tab, TabTitleText, Tooltip } from '@patternfly/react-core'
+import { Button, DescriptionList, Switch, Tab, TabTitleText } from '@patternfly/react-core'
 import { RhUiCheckCircleIcon, RhUiEditIcon, RhUiMinusCircleIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import { useNavigate, useParams } from '@tanstack/react-router'
 import { useCallback } from 'react'
@@ -44,23 +44,10 @@ function DetailsTab({ serviceAccount }: Readonly<{ serviceAccount: ServiceAccoun
     <DescriptionList isHorizontal>
       <SynDetail label="Name">{serviceAccount.name}</SynDetail>
       <SynDetail label="Owning project">
-        {serviceAccount.project_name && !serviceAccount.is_project_deleted ? (
+        {serviceAccount.project_name ? (
           <SynLink to={getProjectDetailPath(serviceAccount.project_id)}>{serviceAccount.project_name}</SynLink>
         ) : (
-          <>
-            {serviceAccount.project_name ?? serviceAccount.project_id}
-            {serviceAccount.is_project_deleted && (
-              <>
-                {' '}
-                <Tooltip content="The owning project for this service account has been deleted">
-                  {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
-                  <span tabIndex={0}>
-                    <SynLabel color="grey">Deleted</SynLabel>
-                  </span>
-                </Tooltip>
-              </>
-            )}
-          </>
+          serviceAccount.project_id
         )}
       </SynDetail>
       <SynDetail label="Description">{serviceAccount.description}</SynDetail>
@@ -312,6 +299,8 @@ export function ServiceAccountDetail() {
               principalType={RolePrincipalType.SERVICE_ACCOUNT}
               principalId={serviceAccount.id}
               hiddenColumns={['scope']}
+              tabKey="assignments"
+              tabLabel="Assignments"
             />
           )}
         </SynListPanel>
@@ -331,7 +320,7 @@ export function ServiceAccountDetail() {
         onClose={deleteDialog.close}
         onConfirm={() => handleDelete(undefined)}
         title="Delete service account?"
-        confirmLabel="Delete"
+        confirmLabel="Delete service account"
         confirmVariant="danger"
         titleIconVariant="warning"
         destructiveAcknowledgement={{
@@ -347,7 +336,7 @@ export function ServiceAccountDetail() {
         onClose={disableDialog.close}
         onConfirm={handleDisable}
         title="Disable service account?"
-        confirmLabel="Disable"
+        confirmLabel="Disable service account"
         confirmVariant="primary"
       >
         You are about to disable the service account <strong>{serviceAccount.name}</strong>. You can re-enable the

@@ -10,6 +10,8 @@ from uuid import UUID, uuid4
 
 import pytest
 from temporalio.api.enums.v1 import EventType
+from temporalio.client import WorkflowExecutionStatus, WorkflowQueryRejectedError
+from temporalio.service import RPCError, RPCStatusCode
 
 from syntara.core.exceptions import SafeValueError
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
@@ -1567,6 +1569,28 @@ class TestExecutionStatusUpdates:
         assert execution.completed_at == created_at + datetime.resolution
         mock_session.commit.assert_awaited_once()
 
+    @pytest.mark.asyncio
+    async def test_update_execution_status_from_event_reraises_db_error(self) -> None:
+        """DB errors during terminal-event processing must propagate so the retry loop can handle them."""
+        from sqlalchemy.exc import TimeoutError as SATimeoutError
+
+        metadata = create_test_metadata(execution_id=self.execution_id)
+        event = self._create_workflow_event(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED, event_id=99)
+        # Patch completed event attrs so _extract_execution_status_from_event works
+        attrs = Mock()
+        attrs.result = None
+        event.workflow_execution_completed_event_attributes = attrs
+
+        mock_session = Mock()
+        mock_session.exec = AsyncMock(side_effect=SATimeoutError("QueuePool limit reached"))
+        mock_session.rollback = AsyncMock()
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+        self.mock_session_factory.return_value = mock_session
+
+        with pytest.raises(SATimeoutError):
+            await self.service._update_execution_status_from_event(metadata, event)
+
 
 class TestAgenticActivityFinalizationOnWorkflowCompletion:
     """Test that RUNNING agentic activities are finalized when the workflow completes."""
@@ -1766,7 +1790,7 @@ class TestActivitySyncTerminalCleanup:
         input_data: dict[str, Any] | None = None,
         output_data: dict[str, Any] | None = None,
     ) -> AsyncMock:
-        """Create a mock workflow handle that returns given data for queries."""
+        """Create a mock workflow handle that returns given data for queries and updates."""
         handle = AsyncMock()
 
         async def mock_query(query_name: str, activity_id: str) -> dict[str, object] | None:
@@ -1777,6 +1801,13 @@ class TestActivitySyncTerminalCleanup:
             return None
 
         handle.query = AsyncMock(side_effect=mock_query)
+
+        async def mock_update(update_name: str, activity_id: str) -> dict[str, object] | None:
+            if update_name == "get_activity_output_when_ready":
+                return output_data
+            return None
+
+        handle.execute_update = AsyncMock(side_effect=mock_update)
         return handle
 
     @pytest.mark.asyncio
@@ -1961,7 +1992,7 @@ class TestLoopIterationSync:
         input_data: dict[str, Any] | None = None,
         output_data: dict[str, Any] | None = None,
     ) -> AsyncMock:
-        """Create a mock workflow handle that returns given data for queries."""
+        """Create a mock workflow handle that returns given data for queries and updates."""
         handle = AsyncMock()
 
         async def mock_query(query_name: str, activity_id: str) -> dict[str, object] | None:
@@ -1972,6 +2003,13 @@ class TestLoopIterationSync:
             return None
 
         handle.query = AsyncMock(side_effect=mock_query)
+
+        async def mock_update(update_name: str, activity_id: str) -> dict[str, object] | None:
+            if update_name == "get_activity_output_when_ready":
+                return output_data
+            return None
+
+        handle.execute_update = AsyncMock(side_effect=mock_update)
         return handle
 
     @pytest.mark.asyncio
@@ -2892,18 +2930,23 @@ class TestSyncNodesToTerminalStatus:
 
 
 class TestInputDataCredentialScrubbing(TestActivitySyncTerminalCleanup):
-    """Verify input_data is scrubbed before writing to ActivityExecution (AAP-74431)."""
+    """Verify pre-scrubbed input_data flows through to ActivityExecution (AAP-74431).
+
+    Credential scrubbing happens in the workflow's query handler (get_activity_input)
+    before data reaches the sync service. These tests verify the already-scrubbed
+    data is persisted correctly.
+    """
 
     @pytest.mark.asyncio
-    async def test_credential_fields_scrubbed_before_persistence(self) -> None:
-        """Input data containing credential fields should be redacted before DB write."""
+    async def test_scrubbed_credential_fields_persisted(self) -> None:
+        """Pre-scrubbed input data from the workflow query should be persisted as-is."""
         from syntara.workflows.workflow_engine.utils.credential_scrubber import REDACTED
 
         activity = self._create_mock_activity_execution(activity_name="approval-node")
         self._mock_session_with_activities([activity])
 
         handle = self._create_mock_handle(
-            input_data={"url": "http://example.com", "bearer_token": "sk-secret-123"},
+            input_data={"url": "http://example.com", "bearer_token": REDACTED},
             output_data={"status": "ok"},
         )
 
@@ -3290,6 +3333,38 @@ class TestScheduleDescribeProbe:
 
         assert queue.empty()
         mock_handle.describe.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_partial_output_is_scrubbed_at_source(self) -> None:
+        """Partial output containing credential fields should be scrubbed before entering the queue."""
+        from syntara.workflows.workflow_engine.utils.credential_scrubber import REDACTED
+
+        pa = self._make_started_pa_with_heartbeat(
+            partial_output={"job_id": 42, "bearer_token": "sk-secret-123"},
+        )
+        mock_desc = Mock()
+        mock_desc.raw_description.pending_activities = [pa]
+        mock_handle = AsyncMock()
+        mock_handle.describe.return_value = mock_desc
+
+        queue: asyncio.Queue[Any] = asyncio.Queue()
+
+        with patch(
+            "syntara.workflows.workflow_engine.services.activity_sync_service.asyncio.sleep",
+            new_callable=AsyncMock,
+        ):
+            await self.service._schedule_describe_probe(
+                handle=mock_handle,
+                queue=queue,
+                activity_id="my-activity",
+                scheduled_event_id=5,
+            )
+
+        _ = await queue.get()  # SyntheticActivityStarted
+        item2 = await queue.get()
+        assert isinstance(item2, SyntheticPartialOutput)
+        assert item2.partial_output["job_id"] == 42
+        assert item2.partial_output["bearer_token"] == REDACTED
 
 
 class TestExtractHeartbeatData:
@@ -4063,6 +4138,41 @@ class TestRunMonitorLoop:
 
         assert result is False
         mock_cancel.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_returns_false_when_terminal_event_update_fails_transiently(self) -> None:
+        """DB error inside _update_execution_status_from_event causes _run_monitor_loop to return False.
+
+        The real _update_execution_status_from_event runs (not mocked). Before the fix it swallowed
+        the exception and returned normally, so _run_monitor_loop returned True. After the fix it
+        re-raises, which is caught by the SATimeoutError handler and returns False.
+        """
+        from sqlalchemy.exc import TimeoutError as SATimeoutError
+        from temporalio.api.history.v1 import HistoryEvent
+
+        event = Mock(spec=HistoryEvent)
+        event.event_type = EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED
+        event.event_id = 99
+
+        mock_session = Mock()
+        mock_session.exec = AsyncMock(side_effect=SATimeoutError("QueuePool limit reached"))
+        mock_session.rollback = AsyncMock()
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+        self.service.session_factory = Mock(return_value=mock_session)
+
+        with (
+            patch.object(self.service, "_history_event_producer", side_effect=_make_mock_producer(event)),
+            patch.object(self.service, "_sync_activities_to_db", new_callable=AsyncMock),
+            patch.object(self.service, "_sync_failed_nodes", new_callable=AsyncMock, return_value={}),
+            patch.object(self.service, "_sync_skipped_nodes", new_callable=AsyncMock),
+            patch.object(self.service, "_sync_detached_nodes", new_callable=AsyncMock),
+        ):
+            result = await self.service._run_monitor_loop(self.handle, self.metadata, self.execution_id)
+
+        assert result is False
+        # The event id must NOT be advanced past the failed COMPLETED event (re-playing it on retry is the fix)
+        assert self.metadata.last_processed_event_id != 99
 
 
 class TestMonitorExecutionRetry:
@@ -5278,25 +5388,554 @@ class TestQueryActivityIoOutputMerge:
         assert output_data == {"invocation_id": "abc-123"}
 
     @pytest.mark.asyncio
-    async def test_merge_on_retry_path(self) -> None:
+    async def test_completed_query_returns_output_skips_update(self) -> None:
+        """When query returns output for a completed activity, no update is needed."""
+        mock_handle = AsyncMock()
+        mock_handle.query.side_effect = [
+            {"param": "value"},
+            {"status": "completed", "output": "result"},
+        ]
+        initial_partial = {"job_id": 42}
+        activity_data: dict[str, Any] = {"status": ActivityStatus.COMPLETED}
+
+        _, output_data = await self.service._query_activity_io(
+            mock_handle, "my-activity", activity_data, initial_partial
+        )
+
+        mock_handle.execute_update.assert_not_awaited()
+        assert output_data is not None
+        assert output_data["job_id"] == 42
+        assert output_data["status"] == "completed"
+        assert output_data["output"] == "result"
+
+    @pytest.mark.asyncio
+    async def test_completed_query_none_falls_back_to_update(self) -> None:
+        """When query returns None for a completed activity, fall back to update."""
+        mock_handle = AsyncMock()
+        mock_handle.query.side_effect = [
+            {},
+            None,
+        ]
+        mock_handle.execute_update.return_value = {"status": "completed", "output": "result"}
+        initial_partial = {"job_id": 42}
+        activity_data: dict[str, Any] = {"status": ActivityStatus.COMPLETED}
+
+        _, output_data = await self.service._query_activity_io(
+            mock_handle, "my-activity", activity_data, initial_partial
+        )
+
+        mock_handle.execute_update.assert_awaited_once_with("get_activity_output_when_ready", "my-activity")
+        assert output_data is not None
+        assert output_data["job_id"] == 42
+        assert output_data["status"] == "completed"
+        assert output_data["output"] == "result"
+
+    @pytest.mark.asyncio
+    async def test_completed_update_fails_workflow_done_retries_query(self) -> None:
+        """When update fails with NOT_FOUND (workflow completed), retry query immediately."""
+        from temporalio.service import RPCError, RPCStatusCode
+
         mock_handle = AsyncMock()
         mock_handle.query.side_effect = [
             {},
             None,
             {"status": "completed", "output": "result"},
         ]
+        mock_handle.execute_update.side_effect = RPCError(
+            "workflow execution not found",
+            RPCStatusCode.NOT_FOUND,
+            b"",
+        )
         initial_partial = {"job_id": 42}
         activity_data: dict[str, Any] = {"status": ActivityStatus.COMPLETED}
 
-        with patch(
-            "syntara.workflows.workflow_engine.services.activity_sync_service.asyncio.sleep",
-            new_callable=AsyncMock,
-        ):
-            _, output_data = await self.service._query_activity_io(
-                mock_handle, "my-activity", activity_data, initial_partial
-            )
+        _, output_data = await self.service._query_activity_io(
+            mock_handle, "my-activity", activity_data, initial_partial
+        )
 
         assert output_data is not None
         assert output_data["job_id"] == 42
         assert output_data["status"] == "completed"
         assert output_data["output"] == "result"
+        assert mock_handle.query.await_count == 3
+
+    @pytest.mark.asyncio
+    async def test_completed_update_fails_non_not_found_propagates(self) -> None:
+        """When update fails with a non-NOT_FOUND RPCError, it propagates to the outer handler."""
+        from temporalio.service import RPCError, RPCStatusCode
+
+        mock_handle = AsyncMock()
+        mock_handle.query.side_effect = [
+            {},
+            None,
+        ]
+        mock_handle.execute_update.side_effect = RPCError(
+            "internal server error",
+            RPCStatusCode.INTERNAL,
+            b"",
+        )
+        activity_data: dict[str, Any] = {"status": ActivityStatus.COMPLETED}
+
+        _, output_data = await self.service._query_activity_io(mock_handle, "my-activity", activity_data, None)
+
+        assert output_data is None
+
+    @pytest.mark.asyncio
+    async def test_completed_update_timeout_returns_partial(self) -> None:
+        """When wait_condition times out (30s), output falls back to initial_output_data."""
+        from temporalio.exceptions import ApplicationError
+
+        mock_handle = AsyncMock()
+        mock_handle.query.side_effect = [
+            {},
+            None,
+        ]
+        mock_handle.execute_update.side_effect = ApplicationError("timed out")
+        initial_partial = {"job_id": 42}
+        activity_data: dict[str, Any] = {"status": ActivityStatus.COMPLETED}
+
+        _, output_data = await self.service._query_activity_io(
+            mock_handle, "my-activity", activity_data, initial_partial
+        )
+
+        assert output_data == {"job_id": 42}
+
+    @pytest.mark.asyncio
+    async def test_completed_retry_query_returns_none(self) -> None:
+        """When workflow completed but retry query still returns None, falls back to partial."""
+        from temporalio.service import RPCError, RPCStatusCode
+
+        mock_handle = AsyncMock()
+        mock_handle.query.side_effect = [
+            {},
+            None,
+            None,
+        ]
+        mock_handle.execute_update.side_effect = RPCError(
+            "workflow execution not found",
+            RPCStatusCode.NOT_FOUND,
+            b"",
+        )
+        initial_partial = {"job_id": 42}
+        activity_data: dict[str, Any] = {"status": ActivityStatus.COMPLETED}
+
+        _, output_data = await self.service._query_activity_io(
+            mock_handle, "my-activity", activity_data, initial_partial
+        )
+
+        assert output_data == {"job_id": 42}
+
+
+class TestNonTerminalIoQuerySkip:
+    """_query_activity_io must not be called for non-terminal activity status updates."""
+
+    def setup_method(self) -> None:
+        self.mock_session_factory = Mock()
+        self.service = ActivitySyncService(Mock(), self.mock_session_factory)
+        self.execution_id = uuid4()
+
+    def _build_activity_data(self, status: ActivityStatus) -> dict[str, Any]:
+        return {
+            "activity_id": "script_1",
+            "activity_name": "script_1",
+            "_is_loop_iteration": False,
+            "_is_loop_control": False,
+            "status": status,
+            "started_at": None,
+            "completed_at": None,
+            "error_details": None,
+            "retry_count": 0,
+            "iteration": None,
+            "scheduled_at": datetime(2025, 1, 20, 10, 0, 0, tzinfo=UTC),
+            "configured_timeout_seconds": None,
+        }
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "status",
+        [ActivityStatus.PENDING, ActivityStatus.RUNNING, ActivityStatus.WAITING, ActivityStatus.RETRYING],
+    )
+    async def test_query_activity_io_skipped_for_non_terminal_with_input_already_stored(
+        self, status: ActivityStatus
+    ) -> None:
+        """No Temporal query on subsequent non-terminal events once input is stored (query-storm guard)."""
+        existing = Mock(spec=ActivityExecution)
+        existing.activity_name = "script_1"
+        existing.status = ActivityStatus.RUNNING  # already past first event
+        existing.node_type = NodeType.SCRIPT
+        existing.started_at = None
+        existing.completed_at = None
+        existing.input_data = {"host": "server-1"}  # input already fetched on the first event
+        existing.output_data = None
+        existing.error_details = None
+        existing.retry_count = 0
+        existing.iteration = None
+        existing.updated_at = datetime(2025, 1, 20, 10, 0, 0, tzinfo=UTC)
+
+        metadata = create_test_metadata(execution_id=self.execution_id)
+        session = Mock()
+
+        with patch.object(self.service, "_query_activity_io", new_callable=AsyncMock) as mock_query:
+            result = await self.service._process_single_activity_sync(
+                metadata,
+                Mock(),  # handle — should not be used
+                self._build_activity_data(status),
+                {"script_1": existing},
+                session,
+            )
+
+        mock_query.assert_not_called()
+        assert result is not None
+        activity, _old_values, _is_new = result
+        assert activity.status == status
+        assert activity.input_data == {"host": "server-1"}  # preserved, not blanked
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "status",
+        [ActivityStatus.PENDING, ActivityStatus.RUNNING, ActivityStatus.WAITING, ActivityStatus.RETRYING],
+    )
+    async def test_query_activity_io_fetches_input_once_on_first_non_terminal_event(
+        self, status: ActivityStatus
+    ) -> None:
+        """First non-terminal event fetches input once so the UI input panel is populated mid-run."""
+        existing = Mock(spec=ActivityExecution)
+        existing.activity_name = "script_1"
+        existing.status = ActivityStatus.PENDING  # initial DB status, input not yet stored
+        existing.node_type = NodeType.SCRIPT
+        existing.started_at = None
+        existing.completed_at = None
+        existing.input_data = {}  # empty → first event
+        existing.output_data = None
+        existing.error_details = None
+        existing.retry_count = 0
+        existing.iteration = None
+        existing.updated_at = datetime(2025, 1, 20, 10, 0, 0, tzinfo=UTC)
+
+        metadata = create_test_metadata(execution_id=self.execution_id)
+        session = Mock()
+
+        with patch.object(
+            self.service,
+            "_query_activity_io",
+            new_callable=AsyncMock,
+            return_value=({"host": "server-1"}, None),
+        ) as mock_query:
+            result = await self.service._process_single_activity_sync(
+                metadata,
+                Mock(),
+                self._build_activity_data(status),
+                {"script_1": existing},
+                session,
+            )
+
+        mock_query.assert_called_once()
+        assert result is not None
+        activity, _old_values, _is_new = result
+        assert activity.status == status
+        assert activity.input_data == {"host": "server-1"}
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "status",
+        [ActivityStatus.COMPLETED, ActivityStatus.FAILED, ActivityStatus.CANCELLED],
+    )
+    async def test_query_activity_io_called_for_terminal(self, status: ActivityStatus) -> None:
+        """Temporal I/O query IS made for terminal status updates."""
+        existing = Mock(spec=ActivityExecution)
+        existing.activity_name = "script_1"
+        existing.status = ActivityStatus.RUNNING  # pre-terminal DB status
+        existing.node_type = NodeType.SCRIPT
+        existing.started_at = datetime(2025, 1, 20, 10, 0, 0, tzinfo=UTC)
+        existing.completed_at = None
+        existing.input_data = {}
+        existing.output_data = None
+        existing.error_details = None
+        existing.retry_count = 0
+        existing.iteration = None
+        existing.updated_at = datetime(2025, 1, 20, 10, 0, 0, tzinfo=UTC)
+
+        activity_data = self._build_activity_data(status)
+        if status == ActivityStatus.FAILED:
+            activity_data["error_details"] = "Script failed"
+        if status == ActivityStatus.CANCELLED:
+            activity_data["error_details"] = "Activity was canceled"
+        activity_data["completed_at"] = datetime(2025, 1, 20, 10, 5, 0, tzinfo=UTC)
+
+        metadata = create_test_metadata(execution_id=self.execution_id)
+        session = Mock()
+
+        with patch.object(
+            self.service,
+            "_query_activity_io",
+            new_callable=AsyncMock,
+            return_value=({"input": "data"}, {"output": "data"}),
+        ) as mock_query:
+            result = await self.service._process_single_activity_sync(
+                metadata,
+                Mock(),
+                activity_data,
+                {"script_1": existing},
+                session,
+            )
+
+        mock_query.assert_called_once()
+        assert result is not None
+
+
+class TestQueryActivityIoQueryFailure:
+    """A failed Temporal query must be distinguishable from an empty answer."""
+
+    def setup_method(self) -> None:
+        self.service = ActivitySyncService(Mock(), Mock())
+
+    @pytest.mark.asyncio
+    async def test_rpc_error_is_reraised(self) -> None:
+        mock_handle = AsyncMock()
+        mock_handle.query.side_effect = RPCError(
+            "worker unreachable", status=RPCStatusCode.UNAVAILABLE, raw_grpc_status=b""
+        )
+        activity_data: dict[str, Any] = {"status": ActivityStatus.RUNNING}
+
+        with pytest.raises(RPCError):
+            await self.service._query_activity_io(
+                mock_handle, "my-activity", activity_data, {"invocation_id": "abc-123"}
+            )
+
+    @pytest.mark.asyncio
+    async def test_workflow_query_rejected_error_is_reraised(self) -> None:
+        mock_handle = AsyncMock()
+        mock_handle.query.side_effect = WorkflowQueryRejectedError(WorkflowExecutionStatus.COMPLETED)
+        activity_data: dict[str, Any] = {"status": ActivityStatus.COMPLETED}
+
+        with pytest.raises(WorkflowQueryRejectedError):
+            await self.service._query_activity_io(mock_handle, "my-activity", activity_data, None)
+
+    @pytest.mark.asyncio
+    async def test_value_error_is_reraised(self) -> None:
+        mock_handle = AsyncMock()
+        mock_handle.query.side_effect = ValueError("query args mismatch")
+        activity_data: dict[str, Any] = {"status": ActivityStatus.RUNNING}
+
+        with pytest.raises(ValueError, match="query args mismatch"):
+            await self.service._query_activity_io(mock_handle, "my-activity", activity_data, None)
+
+    @pytest.mark.asyncio
+    async def test_query_failure_is_logged_at_warning_not_debug(self) -> None:
+        mock_handle = AsyncMock()
+        mock_handle.query.side_effect = RPCError(
+            "worker unreachable", status=RPCStatusCode.UNAVAILABLE, raw_grpc_status=b""
+        )
+        activity_data: dict[str, Any] = {"status": ActivityStatus.RUNNING}
+
+        with patch("syntara.workflows.workflow_engine.services.activity_sync_service.logger") as mock_logger:
+            with pytest.raises(RPCError):
+                await self.service._query_activity_io(mock_handle, "my-activity", activity_data, None)
+
+        mock_logger.warning.assert_called_once()
+        mock_logger.debug.assert_not_called()
+
+
+class TestResolveActivityIoOnQueryFailure:
+    """_resolve_activity_io must return safe-to-persist I/O when queries fail."""
+
+    def setup_method(self) -> None:
+        self.service = ActivitySyncService(Mock(), Mock())
+
+    def _existing_activity(self) -> Mock:
+        activity = Mock(spec=ActivityExecution)
+        activity.input_data = {"param": "already-recorded"}
+        activity.output_data = {"result": "already-recorded"}
+        return activity
+
+    @pytest.mark.asyncio
+    async def test_terminal_query_failure_preserves_existing_io(self) -> None:
+        existing = self._existing_activity()
+        activity_data: dict[str, Any] = {"status": ActivityStatus.COMPLETED}
+        mock_handle = AsyncMock()
+        mock_handle.query.side_effect = RPCError(
+            "sticky cache evicted", status=RPCStatusCode.UNAVAILABLE, raw_grpc_status=b""
+        )
+
+        input_data, output_data = await self.service._resolve_activity_io(
+            mock_handle, "my-activity", activity_data, existing
+        )
+
+        assert input_data == {"param": "already-recorded"}
+        assert output_data == {"result": "already-recorded"}
+
+    @pytest.mark.asyncio
+    async def test_first_non_terminal_query_failure_preserves_stored_input(self) -> None:
+        existing = self._existing_activity()
+        existing.input_data = {}
+        existing.output_data = None
+        activity_data: dict[str, Any] = {
+            "status": ActivityStatus.RUNNING,
+            "output_data": {"job_id": 42},
+        }
+        mock_handle = AsyncMock()
+        mock_handle.query.side_effect = RPCError(
+            "worker unreachable", status=RPCStatusCode.UNAVAILABLE, raw_grpc_status=b""
+        )
+
+        input_data, output_data = await self.service._resolve_activity_io(
+            mock_handle, "my-activity", activity_data, existing
+        )
+
+        assert input_data == {}
+        assert output_data == {"job_id": 42}
+
+    def test_io_after_query_failure_applies_event_sourced_output_when_stored_empty(self) -> None:
+        existing = self._existing_activity()
+        existing.output_data = None
+
+        input_data, output_data = ActivitySyncService._io_after_query_failure(
+            existing,
+            {"output_data": {"job_id": 42}},
+        )
+
+        assert input_data == {"param": "already-recorded"}
+        assert output_data == {"job_id": 42}
+
+    def test_io_after_query_failure_merges_heartbeat_without_clobbering_stored_output(self) -> None:
+        existing = self._existing_activity()
+        existing.output_data = {"job_id": 42, "result": "complete"}
+
+        input_data, output_data = ActivitySyncService._io_after_query_failure(
+            existing,
+            {"output_data": {"job_id": 7, "job_url": "https://example.com/jobs/7"}},
+        )
+
+        assert input_data == {"param": "already-recorded"}
+        assert output_data == {
+            "job_id": 42,
+            "job_url": "https://example.com/jobs/7",
+            "result": "complete",
+        }
+
+
+class TestActivitySyncPreservesIoOnQueryFailure:
+    """End-to-end regression: a query failure at terminal transition must not erase recorded I/O."""
+
+    def setup_method(self) -> None:
+        self.execution_id = uuid4()
+        self.mock_session_factory = Mock()
+        self.mock_activity_publisher = AsyncMock()
+        self.service = ActivitySyncService(Mock(), self.mock_session_factory, self.mock_activity_publisher)
+
+    def _create_mock_activity_execution(
+        self,
+        activity_name: str = "script-node",
+        status: ActivityStatus = ActivityStatus.RUNNING,
+        input_data: dict[str, Any] | None = None,
+        output_data: dict[str, Any] | None = None,
+    ) -> Mock:
+        activity = Mock()
+        activity.activity_name = activity_name
+        activity.status = status
+        activity.started_at = datetime.now(UTC)
+        activity.completed_at = None
+        activity.error_details = None
+        activity.retry_count = 0
+        activity.input_data = input_data if input_data is not None else {}
+        activity.output_data = output_data
+        activity.iteration = None
+        activity.updated_at = None
+        return activity
+
+    def _mock_session_with_activities(self, activities: list[Mock]) -> Mock:
+        mock_activity_result = Mock()
+        mock_activity_result.all.return_value = activities
+
+        mock_execution = Mock(spec=Execution)
+        mock_execution.id = self.execution_id
+        mock_execution.last_processed_event_id = 0
+        mock_execution_result = Mock()
+        mock_execution_result.one_or_none.return_value = mock_execution
+
+        mock_session = Mock()
+        mock_session.exec = AsyncMock(side_effect=[mock_activity_result, mock_execution_result])
+        mock_session.commit = AsyncMock()
+        mock_session.rollback = AsyncMock()
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+
+        self.mock_session_factory.return_value = mock_session
+        return mock_session
+
+    @pytest.mark.asyncio
+    async def test_failed_query_at_terminal_transition_preserves_recorded_io(self) -> None:
+        """Recorded I/O survives a query failure at completion."""
+        recorded_input = {"param": "value"}
+        recorded_output = {"result": "already-recorded"}
+        activity = self._create_mock_activity_execution(
+            activity_name="script-node",
+            status=ActivityStatus.RUNNING,
+            input_data=recorded_input,
+            output_data=recorded_output,
+        )
+        self._mock_session_with_activities([activity])
+
+        handle = AsyncMock()
+        handle.query.side_effect = RPCError(
+            "sticky cache evicted", status=RPCStatusCode.UNAVAILABLE, raw_grpc_status=b""
+        )
+
+        metadata = create_test_metadata(
+            execution_id=self.execution_id,
+            activity_index_map={"script-node": 0},
+            pending_activity_updates={
+                10: {
+                    "activity_id": "script-node",
+                    "activity_name": "script-node",
+                    "status": ActivityStatus.COMPLETED,
+                    "started_at": datetime.now(UTC),
+                    "completed_at": datetime.now(UTC),
+                    "error_details": None,
+                    "retry_count": 0,
+                },
+            },
+        )
+
+        await self.service._sync_activities_to_db(metadata, handle)
+
+        assert activity.input_data == recorded_input
+        assert activity.output_data == recorded_output
+        # Status still advances to terminal even though the query failed.
+        assert activity.status == ActivityStatus.COMPLETED
+
+    @pytest.mark.asyncio
+    async def test_failed_query_on_running_activity_still_persists_heartbeat_partial(self) -> None:
+        """Heartbeat partial output is written even when the workflow query fails."""
+        heartbeat_partial = {"job_id": 42, "job_url": "https://example.com/jobs/42"}
+        activity = self._create_mock_activity_execution(
+            activity_name="script-node",
+            status=ActivityStatus.RUNNING,
+            output_data=None,
+        )
+        self._mock_session_with_activities([activity])
+
+        handle = AsyncMock()
+        handle.query.side_effect = RPCError("worker unreachable", status=RPCStatusCode.UNAVAILABLE, raw_grpc_status=b"")
+
+        metadata = create_test_metadata(
+            execution_id=self.execution_id,
+            activity_index_map={"script-node": 0},
+            pending_activity_updates={
+                10: {
+                    "activity_id": "script-node",
+                    "activity_name": "script-node",
+                    "status": ActivityStatus.RUNNING,
+                    "started_at": datetime.now(UTC),
+                    "completed_at": None,
+                    "error_details": None,
+                    "retry_count": 0,
+                    "output_data": heartbeat_partial,
+                },
+            },
+        )
+
+        await self.service._sync_activities_to_db(metadata, handle)
+
+        assert activity.output_data == heartbeat_partial
+        assert activity.status == ActivityStatus.RUNNING

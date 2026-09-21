@@ -75,6 +75,10 @@ jobs:
         run: ./scripts/openapi/install-oasdiff.sh
         working-directory: backend
 
+      - name: Install Python dependencies for check-breaking-changes
+        if: steps.detect.outputs.changed == 'true'
+        run: pip install pyyaml
+
       - name: Check for breaking changes
         if: steps.detect.outputs.changed == 'true'
         id: breaking
