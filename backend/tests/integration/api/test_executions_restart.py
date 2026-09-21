@@ -386,6 +386,58 @@ class TestValidateRestart:
         assert response.status_code == status.HTTP_200_OK
         assert response.json()["eligible"] is True
 
+    async def test_validate_allows_clean_field_despite_marker_elsewhere(
+        self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
+    ) -> None:
+        nodes = [
+            dict(node, parameters={**node.get("parameters", {}), "input_ref": "${step_1.status_code}"})
+            if node.get("id") == "step_2"
+            else node
+            for node in GRAPH_NODES
+        ]
+        await _set_version_definition(test_db_session, test_workflow, nodes)
+        execution = await _create_execution(test_db_session, test_workflow, test_user)
+        await _add_failed_activity(test_db_session, execution, "step_2")
+        await _add_completed_activity(
+            test_db_session, execution, "step_1", {"status_code": 200, "password": "[REDACTED]"}
+        )
+
+        response = await auth_client.post(
+            f"/api/v1/executions/{execution.id}/validate-restart-from-failure",
+            json={"failure_point_ids": ["step_2"]},
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["eligible"] is True
+        assert data["sanitized_node_ids"] == []
+        assert data["truncated_node_ids"] == []
+
+    async def test_validate_rejects_truncated_referenced_field(
+        self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
+    ) -> None:
+        nodes = [
+            dict(node, parameters={**node.get("parameters", {}), "input_ref": "${step_1.stderr}"})
+            if node.get("id") == "step_2"
+            else node
+            for node in GRAPH_NODES
+        ]
+        await _set_version_definition(test_db_session, test_workflow, nodes)
+        execution = await _create_execution(test_db_session, test_workflow, test_user)
+        await _add_failed_activity(test_db_session, execution, "step_2")
+        stderr = "part\n[Output truncated: exceeded 1048576 byte limit (stdout: complete, stderr: truncated)]"
+        await _add_completed_activity(test_db_session, execution, "step_1", {"stdout": "ok", "stderr": stderr})
+
+        response = await auth_client.post(
+            f"/api/v1/executions/{execution.id}/validate-restart-from-failure",
+            json={"failure_point_ids": ["step_2"]},
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["eligible"] is False
+        assert data["truncated_node_ids"] == ["step_1"]
+
     async def test_validate_missing_execution_returns_404(self, auth_client: AsyncClient) -> None:
         response = await auth_client.post(
             f"/api/v1/executions/{uuid.uuid4()}/validate-restart-from-failure",

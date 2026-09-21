@@ -603,9 +603,14 @@ export interface components {
       changed_node_ids?: string[]
       /**
        * Sanitized Node Ids
-       * @description Upstream nodes with sanitized stored outputs that downstream nodes consume
+       * @description Upstream nodes with sanitized stored outputs referenced on the restart path
        */
       sanitized_node_ids?: string[]
+      /**
+       * Truncated Node Ids
+       * @description Upstream nodes with truncated stored outputs referenced on the restart path
+       */
+      truncated_node_ids?: string[]
     }
     /**
      * TestExecutionCreate

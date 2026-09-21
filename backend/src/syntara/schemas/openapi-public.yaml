@@ -34528,7 +34528,13 @@ components:
           items:
             type: string
           title: Sanitized Node Ids
-          description: Upstream nodes with sanitized stored outputs that downstream nodes consume
+          description: Upstream nodes with sanitized stored outputs referenced on the restart path
+        truncated_node_ids:
+          type: array
+          items:
+            type: string
+          title: Truncated Node Ids
+          description: Upstream nodes with truncated stored outputs referenced on the restart path
     TestExecutionCreate:
       type: object
       title: TestExecutionCreate

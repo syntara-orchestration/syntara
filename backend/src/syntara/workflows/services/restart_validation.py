@@ -17,10 +17,14 @@ Validation is a chain of checks:
    downstream-only changes pass. Nodes newly inserted on the upstream path in
    the current definition also reject (walked the same way over the current
    definition).
-4. **Sanitized-output guard** — persisted ``output_data`` is credential-scrubbed
-   on write while the live run consumed raw values. Upstream ``COMPLETED``
-   nodes whose stored outputs carry the scrubber marker reject, since injection
-   would feed downstream nodes redacted data.
+4. **Tainted-output guard** — persisted ``output_data`` is credential-scrubbed
+   on write while the live run consumed raw values, and script outputs may be
+   stream/payload-truncated. Field paths carrying the scrubber marker or a
+   truncation sentinel reject, but only when actually referenced from the
+   restart execution path (selected failure points plus their downstream) —
+   unreferenced taint is harmless. A whole-namespace ``${node}`` reference
+   taints on any marker; payload-truncation markers additionally taint
+   ``stdout``, which is silently trimmed before the notice is appended.
 
 Design decisions (see AAP-92820; revisit if the SDP signs off otherwise):
 
@@ -35,6 +39,7 @@ Design decisions (see AAP-92820; revisit if the SDP signs off otherwise):
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -64,6 +69,14 @@ LOOP_ITERATION_SEP = "#iter-"
 #: Node fields ignored by the version-mismatch diff (purely cosmetic).
 COSMETIC_NODE_FIELDS = frozenset({"position", "label"})
 
+#: Sentinels appended by script-output truncation (see script_activity.py).
+#: Stream truncation caps stdout/stderr independently and always reports into
+#: stderr; payload truncation silently trims stdout first, so its marker taints
+#: both fields.
+STREAM_TRUNCATED_MARKER = "[Output truncated:"
+PAYLOAD_TRUNCATED_MARKER = "[Payload truncated:"
+_STREAM_DETAIL_PATTERN = re.compile(r"\(stdout: (\w+), stderr: (\w+)\)")
+
 
 @dataclass(frozen=True)
 class RestartValidation:
@@ -75,6 +88,7 @@ class RestartValidation:
     upstream_node_ids: list[str] = field(default_factory=list)
     changed_node_ids: list[str] = field(default_factory=list)
     sanitized_node_ids: list[str] = field(default_factory=list)
+    truncated_node_ids: list[str] = field(default_factory=list)
     snapshot_version: int | None = None
     current_version: int | None = None
 
@@ -202,58 +216,95 @@ def _selection_reason(normalized: list[str], failed_ids: set[str]) -> str | None
     return None
 
 
-def _contains_redacted(value: Any) -> bool:  # noqa: ANN401
-    """Whether a persisted value carries the credential-scrubber marker.
+def _redacted_paths(value: Any, prefix: tuple = ()) -> set[tuple]:  # noqa: ANN401
+    """Key paths in a persisted value carrying the credential-scrubber marker.
 
     Stored ``output_data`` is scrubbed on write (see ``get_activity_output``),
     while the live run consumed raw values. Any marker means injection would
-    feed downstream nodes redacted data instead of the originals.
+    feed downstream nodes redacted data instead of the originals. List indices
+    are path segments so ``items[0]`` references resolve precisely.
     """
+    found: set[tuple] = set()
     if isinstance(value, str):
-        return REDACTED in value
-    if isinstance(value, dict):
-        return any(_contains_redacted(item) for item in value.values())
-    if isinstance(value, list):
-        return any(_contains_redacted(item) for item in value)
-    return False
+        if REDACTED in value:
+            found.add(prefix)
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            found |= _redacted_paths(item, (*prefix, key))
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            found |= _redacted_paths(item, (*prefix, index))
+    return found
 
 
-def _template_reference(value: Any, target_id: str) -> bool:  # noqa: ANN401
-    """Whether a parameter value references another node's namespace.
+def _parse_ref_segments(expression: str) -> tuple:
+    """Split a template expression into path segments (names and indices)."""
+    segments: list = []
+    for part in expression.strip().split("."):
+        name, _, _ = part.partition("[")
+        if name:
+            segments.append(name)
+        # Bracket-only parts (e.g. "[0]" after a dot) contribute just the index.
+        segments.extend(int(index) for index in re.findall(r"\[(\d+)\]", part))
+    return tuple(segments)
+
+
+def _all_template_refs(value: Any) -> list[tuple[str, tuple]]:  # noqa: ANN401
+    """Every ``(target node id, field path)`` template reference in a value.
 
     Uses the real ``TEMPLATE_PATTERN`` from namespace_resolver, so every
     reference the engine would substitute is detected — field refs
-    (``${step_1.output}``) and whole-namespace refs (``${step_1}``) in any
-    position. Head-segment equality avoids prefix collisions (``step_1`` never
-    matches ``step_10``).
+    (``${step_1.output}``), indexed refs (``${step_1.items[0]}``), and
+    whole-namespace refs (``${step_1}``, field path ``()``) in any position.
+    Head-segment equality avoids prefix collisions (``step_1`` never matches
+    ``step_10``).
     """
+    found: list[tuple[str, tuple]] = []
     if isinstance(value, str):
         for match in TEMPLATE_PATTERN.finditer(value):
-            head = match.group(1).strip().split(".", 1)[0].split("[", 1)[0]
-            if head == target_id:
-                return True
-        return False
-    if isinstance(value, dict):
-        return any(_template_reference(item, target_id) for item in value.values())
-    if isinstance(value, list):
-        return any(_template_reference(item, target_id) for item in value)
-    return False
+            segments = _parse_ref_segments(match.group(1))
+            if segments and isinstance(segments[0], str):
+                found.append((segments[0], tuple(segments[1:])))
+    elif isinstance(value, dict):
+        for item in value.values():
+            found.extend(_all_template_refs(item))
+    elif isinstance(value, list):
+        for item in value:
+            found.extend(_all_template_refs(item))
+    return found
 
 
-def _is_referenced_on_restart_path(definition: dict[str, Any], target_id: str, restart_path: set[str]) -> bool:
-    """Whether a node on the restart path references the target's outputs.
+def _paths_overlap(first: tuple, second: tuple) -> bool:
+    """Whether two field paths overlap (one is a prefix of the other)."""
+    return first[: len(second)] == second or second[: len(first)] == first
 
-    Only references from nodes that will actually re-execute (the selected
-    failure points plus their downstream) can consume injected data. References
-    from already-completed upstream nodes or skipped (unselected) branches are
-    harmless and must not block the restart.
+
+def _truncation_taints(output: Any) -> set[tuple]:  # noqa: ANN401
+    """Field paths of a stored output tainted by stream/payload truncation.
+
+    Both truncation paths report into ``stderr``. A payload marker additionally
+    taints ``stdout``, which is silently trimmed before the notice is appended.
+    A stream marker names the cut stream(s) in ``(stdout: …, stderr: …)`` detail;
+    unparseable detail taints both (fail-closed).
     """
-    return any(
-        node.get("id") != target_id
-        and node.get("id") in restart_path
-        and _template_reference(node.get("parameters", {}), target_id)
-        for node in definition_nodes(definition)
-    )
+    if not isinstance(output, dict):
+        return set()
+    stderr = output.get("stderr")
+    if not isinstance(stderr, str):
+        return set()
+    if PAYLOAD_TRUNCATED_MARKER in stderr:
+        return {("stderr",), ("stdout",)}
+    if STREAM_TRUNCATED_MARKER in stderr:
+        match = _STREAM_DETAIL_PATTERN.search(stderr)
+        if match is None:
+            return {("stderr",), ("stdout",)}
+        tainted = set()
+        if match.group(1) == "truncated":
+            tainted.add(("stdout",))
+        if match.group(2) == "truncated":
+            tainted.add(("stderr",))
+        return tainted or {("stderr",), ("stdout",)}
+    return set()
 
 
 def _nearest_downstream_converge(
@@ -308,35 +359,69 @@ def _converge_reason(
     return None
 
 
+def _tainted_nodes(
+    snapshot_upstream: set[str],
+    current_def: dict[str, Any],
+    normalized: list[str],
+    completed_outputs: dict[str, Any],
+) -> tuple[list[str], list[str]]:
+    """Sanitized and truncated node ids whose taint is referenced on the restart path.
+
+    Collects template references from nodes that will actually re-execute, then
+    intersects each upstream node's tainted field paths (redacted markers,
+    truncation sentinels) against the referenced paths. Whole-namespace refs
+    match any taint under that node.
+    """
+    restart_path = collect_downstream_node_ids(current_def, normalized)
+    referenced: dict[str, set[tuple]] = {}
+    for node in definition_nodes(current_def):
+        node_id = node.get("id")
+        if node_id is None or node_id not in restart_path:
+            continue
+        for target_id, field_path in _all_template_refs(node.get("parameters", {})):
+            if target_id != node_id:
+                referenced.setdefault(target_id, set()).add(field_path)
+
+    def _flagged(taint_of: Any) -> list[str]:  # noqa: ANN401
+        return sorted(
+            node_id
+            for node_id in snapshot_upstream
+            if node_id in completed_outputs
+            and any(
+                _paths_overlap(tainted, ref)
+                for tainted in taint_of(completed_outputs[node_id])
+                for ref in referenced.get(node_id, set())
+            )
+        )
+
+    return (
+        _flagged(_redacted_paths),
+        _flagged(_truncation_taints),
+    )
+
+
 def _version_reason(
     normalized: list[str],
     snapshot: WorkflowVersion | None,
     current: WorkflowVersion | None,
     completed_outputs: dict[str, Any],
-) -> tuple[str | None, list[str], list[str]]:
-    """Rejection reason, changed nodes, and sanitized nodes for the guards."""
+) -> tuple[str | None, list[str], list[str], list[str]]:
+    """Rejection reason, changed, sanitized, and truncated nodes for the guards."""
     if snapshot is None:
-        return "original workflow version no longer exists", [], []
+        return "original workflow version no longer exists", [], [], []
     if current is None:
-        return "current workflow version no longer exists", [], []
+        return "current workflow version no longer exists", [], [], []
     snapshot_def = snapshot.workflow_definition or {}
     current_def = current.workflow_definition or {}
     snapshot_ids = {node.get("id") for node in definition_nodes(snapshot_def)}
     missing = [point for point in normalized if point not in snapshot_ids]
     if missing:
-        return f"not nodes in the executed workflow version: {', '.join(missing)}", [], []
+        return f"not nodes in the executed workflow version: {', '.join(missing)}", [], [], []
     snapshot_upstream = collect_upstream_node_ids(snapshot_def, normalized)
     current_upstream = collect_upstream_node_ids(current_def, normalized)
     inserted = sorted(current_upstream - snapshot_upstream)
     changed = sorted(set(diff_upstream_nodes(snapshot_def, current_def, snapshot_upstream)) | set(inserted))
-    restart_path = collect_downstream_node_ids(current_def, normalized)
-    sanitized = sorted(
-        node_id
-        for node_id in snapshot_upstream
-        if node_id in completed_outputs
-        and _contains_redacted(completed_outputs[node_id])
-        and _is_referenced_on_restart_path(current_def, node_id, restart_path)
-    )
+    sanitized, truncated = _tainted_nodes(snapshot_upstream, current_def, normalized, completed_outputs)
     parts = []
     if changed:
         parts.append(
@@ -345,12 +430,17 @@ def _version_reason(
         )
     if sanitized:
         parts.append(
-            "upstream nodes have sanitized outputs referenced by downstream nodes "
+            "upstream nodes have sanitized outputs referenced on the restart path "
             f"({', '.join(sanitized)}); restarting would inject redacted data"
         )
+    if truncated:
+        parts.append(
+            "upstream nodes have truncated outputs referenced on the restart path "
+            f"({', '.join(truncated)}); restarting would inject incomplete data"
+        )
     if parts:
-        return "; ".join(parts), changed, sanitized
-    return None, [], []
+        return "; ".join(parts), changed, sanitized, truncated
+    return None, [], [], []
 
 
 async def validate_restart_from_failure(
@@ -414,7 +504,7 @@ async def validate_restart_from_failure(
     )
     current = current_result.one_or_none()
 
-    version_reason, changed, sanitized = _version_reason(normalized, snapshot, current, completed_outputs)
+    version_reason, changed, sanitized, truncated = _version_reason(normalized, snapshot, current, completed_outputs)
     snapshot_def_for_converge = (snapshot.workflow_definition or {}) if snapshot is not None else {}
     reason = (
         _state_reason(source)
@@ -434,6 +524,7 @@ async def validate_restart_from_failure(
             upstream_node_ids=sorted(upstream),
             changed_node_ids=changed,
             sanitized_node_ids=sanitized,
+            truncated_node_ids=truncated,
             snapshot_version=snapshot_version,
             current_version=workflow.current_version,
         )

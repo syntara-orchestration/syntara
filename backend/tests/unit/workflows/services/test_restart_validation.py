@@ -288,14 +288,27 @@ async def test_validate_restart_rejects_sanitized_upstream_output() -> None:
 
 @pytest.mark.asyncio
 async def test_template_reference_forms() -> None:
-    """Field, whole-namespace (any position), and indexed refs match; prefixes do not."""
-    from syntara.workflows.services.restart_validation import _template_reference
+    """Field paths extracted precisely; whole-namespace refs yield empty paths; prefixes safe."""
+    from syntara.workflows.services.restart_validation import _all_template_refs
 
-    assert _template_reference("${step_1.output}", "step_1") is True
-    assert _template_reference("prefix ${step_1} suffix", "step_1") is True
-    assert _template_reference({"nested": ["${step_1.items[0]}"]}, "step_1") is True
-    assert _template_reference("${step_10.output}", "step_1") is False
-    assert _template_reference("no refs here", "step_1") is False
+    assert _all_template_refs("${step_1.output}") == [("step_1", ("output",))]
+    assert _all_template_refs("prefix ${step_1} suffix") == [("step_1", ())]
+    assert _all_template_refs({"nested": ["${step_1.items[0]}"]}) == [("step_1", ("items", 0))]
+    assert _all_template_refs("${step_10.output}") == [("step_10", ("output",))]
+    assert _all_template_refs("no refs here") == []
+
+
+@pytest.mark.asyncio
+async def test_paths_overlap() -> None:
+    """Overlap means one field path is a prefix of the other."""
+    from syntara.workflows.services.restart_validation import _paths_overlap
+
+    assert _paths_overlap(("token",), ("token",)) is True
+    assert _paths_overlap((), ("token",)) is True
+    assert _paths_overlap(("a",), ("a", "b")) is True
+    assert _paths_overlap(("a", "b"), ("a",)) is True
+    assert _paths_overlap(("status_code",), ("password",)) is False
+    assert _paths_overlap(("items", 0), ("items", 1)) is False
 
 
 @pytest.mark.asyncio
@@ -320,6 +333,96 @@ async def test_validate_restart_ignores_sanitized_unread_on_restart_path() -> No
     verdict = await validate_restart_from_failure(session, execution.id, ["step_2"])
     assert verdict.eligible is True
     assert verdict.sanitized_node_ids == []
+
+
+def _nodes_with_refs(refs: dict[str, str]) -> list:
+    """NODES variant with template refs merged into step parameters."""
+    out = []
+    for node in NODES:
+        params = dict(node.get("parameters", {}))
+        if node["id"] in refs:
+            params["input_ref"] = refs[node["id"]]
+        out.append({**node, "parameters": params})
+    return out
+
+
+def _field_session(execution: Mock, workflow: Mock, nodes: list, completed: list) -> Mock:
+    """Mock session with identical snapshot/current definitions and given completed outputs."""
+    version = _make_version(1, nodes=nodes)
+    return _mock_session(
+        (execution, "one"),
+        ([_make_activity("step_2")], "all"),
+        (completed, "all"),
+        (version, "one"),
+        (workflow, "one"),
+        (version, "one"),
+    )
+
+
+@pytest.mark.asyncio
+async def test_validate_restart_allows_clean_field_despite_marker_elsewhere() -> None:
+    """A marker on an unreferenced field does not block a clean-field reference."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    workflow = _make_workflow(1)
+    execution.workflow_id = workflow.id
+    nodes = _nodes_with_refs({"step_2": "${step_1.status_code}"})
+    outputs = [_make_completed_activity("step_1", {"status_code": 200, "password": "[REDACTED]"})]
+    session = _field_session(execution, workflow, nodes, outputs)
+    verdict = await validate_restart_from_failure(session, execution.id, ["step_2"])
+    assert verdict.eligible is True
+    assert verdict.sanitized_node_ids == []
+    assert verdict.truncated_node_ids == []
+
+
+@pytest.mark.asyncio
+async def test_validate_restart_rejects_stream_truncated_referenced_field() -> None:
+    """Stderr cut plus stderr ref rejects; stdout ref with only-stderr cut passes."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    workflow = _make_workflow(1)
+    execution.workflow_id = workflow.id
+    stderr_only = "partial\n[Output truncated: exceeded 1048576 byte limit (stdout: complete, stderr: truncated)]"
+    both_cut = "x\n[Output truncated: exceeded 1048576 byte limit (stdout: truncated, stderr: truncated)]"
+
+    stderr_ref_nodes = _nodes_with_refs({"step_2": "${step_1.stderr}"})
+    outputs = [_make_completed_activity("step_1", {"stdout": "ok", "stderr": stderr_only})]
+    verdict = await validate_restart_from_failure(
+        _field_session(execution, workflow, stderr_ref_nodes, outputs), execution.id, ["step_2"]
+    )
+    assert verdict.eligible is False
+    assert verdict.truncated_node_ids == ["step_1"]
+
+    stdout_ref_nodes = _nodes_with_refs({"step_2": "${step_1.stdout}"})
+    clean = await validate_restart_from_failure(
+        _field_session(execution, workflow, stdout_ref_nodes, outputs), execution.id, ["step_2"]
+    )
+    assert clean.eligible is True
+    assert clean.truncated_node_ids == []
+
+    both_outputs = [_make_completed_activity("step_1", {"stdout": "x", "stderr": both_cut})]
+    both = await validate_restart_from_failure(
+        _field_session(execution, workflow, stdout_ref_nodes, both_outputs), execution.id, ["step_2"]
+    )
+    assert both.eligible is False
+    assert both.truncated_node_ids == ["step_1"]
+
+
+@pytest.mark.asyncio
+async def test_validate_restart_payload_marker_taints_stdout_silently() -> None:
+    """A payload notice in stderr taints stdout too, even without its own marker."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    workflow = _make_workflow(1)
+    execution.workflow_id = workflow.id
+    stderr = (
+        "x\n[Payload truncated: serialized activity result (3000000 bytes) "
+        "exceeded Temporal payload limit (1887436 bytes)]"
+    )
+    nodes = _nodes_with_refs({"step_2": "${step_1.stdout}"})
+    outputs = [_make_completed_activity("step_1", {"stdout": "trimmed", "stderr": stderr})]
+    verdict = await validate_restart_from_failure(
+        _field_session(execution, workflow, nodes, outputs), execution.id, ["step_2"]
+    )
+    assert verdict.eligible is False
+    assert verdict.truncated_node_ids == ["step_1"]
 
 
 def _converge_definition() -> dict:

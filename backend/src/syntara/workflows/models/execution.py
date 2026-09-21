@@ -476,7 +476,11 @@ class RestartValidationResponse(SQLModel):
     )
     sanitized_node_ids: list[str] = Field(
         default_factory=list,
-        description="Upstream nodes with sanitized stored outputs that downstream nodes consume",
+        description="Upstream nodes with sanitized stored outputs referenced on the restart path",
+    )
+    truncated_node_ids: list[str] = Field(
+        default_factory=list,
+        description="Upstream nodes with truncated stored outputs referenced on the restart path",
     )
 
 
