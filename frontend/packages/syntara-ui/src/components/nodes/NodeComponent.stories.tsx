@@ -92,6 +92,7 @@ function NodeStoryCanvas({ children, height = '32rem' }: Readonly<{ children: Re
       <ReactFlow
         defaultViewport={{ x: 0, y: 0, zoom: 1 }}
         fitView={false}
+        style={{ minWidth: 1200 }}
         nodes={[
           {
             id: 'storybook-node',

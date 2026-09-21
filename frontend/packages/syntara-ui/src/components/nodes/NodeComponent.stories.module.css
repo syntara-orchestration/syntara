@@ -1,6 +1,7 @@
 .storyCanvas {
   height: 32rem;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   background: var(--pf-t--global--background--color--secondary--default);
 }
 
