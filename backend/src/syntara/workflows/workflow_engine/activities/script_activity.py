@@ -248,6 +248,12 @@ def _enforce_payload_limit(
     Merges cut fields into the ``TRUNCATED_FIELDS_KEY`` provenance list
     (preserving stream-path flags) so restart validation can read exact
     taint without parsing stderr notices that output mapping may have dropped.
+
+    Applies to every path through this function, including the error path
+    below. Stream-path flags, however, are attached only on the success path:
+    a failed activity raises before they are built, so failed outputs carry
+    payload taint at most (failed nodes re-run rather than inject, so the
+    validation guard never consults them).
     """
     serialized = json.dumps(result_dict)
     payload_size = len(serialized.encode("utf-8"))
@@ -270,7 +276,8 @@ def _enforce_payload_limit(
     stdout_bytes = stdout.encode("utf-8")
     stderr_bytes = stderr.encode("utf-8")
 
-    tainted = set(output.get(constants.TRUNCATED_FIELDS_KEY, []))
+    provenance = output.get(constants.TRUNCATED_FIELDS_KEY, [])
+    tainted = set(p for p in provenance if isinstance(p, str)) if isinstance(provenance, list) else set()
     if len(stdout_bytes) >= trim_needed:
         output["stdout"] = stdout_bytes[: len(stdout_bytes) - trim_needed].decode("utf-8", errors="ignore")
         tainted.update(["stdout", "stdout_json"])

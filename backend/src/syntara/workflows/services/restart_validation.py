@@ -17,14 +17,20 @@ Validation is a chain of checks:
    downstream-only changes pass. Nodes newly inserted on the upstream path in
    the current definition also reject (walked the same way over the current
    definition).
-4. **Tainted-output guard** — persisted ``output_data`` is credential-scrubbed
+4. **Converge-mootness guard** — failure points feeding an already-completed
+   converge node are rejected (the workflow moved past those branches); a
+   failed converge keeps its branch failures as candidates.
+5. **Tainted-output guard** — persisted ``output_data`` is credential-scrubbed
    on write while the live run consumed raw values, and script outputs may be
-   stream/payload-truncated. Field paths carrying the scrubber marker or a
-   truncation sentinel reject, but only when actually referenced from the
-   restart execution path (selected failure points plus their downstream) —
-   unreferenced taint is harmless. A whole-namespace ``${node}`` reference
-   taints on any marker; payload-truncation markers additionally taint
-   ``stdout``, which is silently trimmed before the notice is appended.
+   stream/payload-truncated. Tainted *field paths* (redacted markers,
+   truncation sentinels, or engine-written ``__truncated_fields`` provenance)
+   reject, but only when actually referenced from the restart execution path
+   (selected failure points plus their downstream) — unreferenced taint is
+   harmless. A whole-namespace ``${node}`` reference taints on any marker;
+   payload-truncation markers additionally taint ``stdout``, which is silently
+   trimmed before the notice is appended. Loop iterations are evaluated
+   per-iteration (any tainted iteration taints the node); iteration-suffixed
+   selections are rejected with guidance to select base node ids.
 
 Design decisions (see AAP-92820; revisit if the SDP signs off otherwise):
 
@@ -139,6 +145,44 @@ def collect_upstream_node_ids(
         upstream.add(node_id)
         stack.extend(predecessors.get(node_id, ()))
     return upstream
+
+
+def _normalized_edge(edge: dict[str, Any]) -> tuple | None:
+    """Edge as a comparable tuple, normalizing absent ports to None."""
+    src, dst = edge.get("from"), edge.get("to")
+    if src is None or dst is None:
+        return None
+    return (src, dst, edge.get("from_port"), edge.get("to_port"))
+
+
+def collect_upstream_edges(
+    definition: dict[str, Any],
+    failure_point_ids: list[str],
+) -> set[tuple]:
+    """Upstream edges (normalized) traversed walking back from failure points."""
+    edges = definition.get("edges", []) or []
+    predecessors: dict[str, set[str]] = {}
+    edge_by_pair: dict[tuple[str, str], list[tuple]] = {}
+    for edge in edges:
+        normalized = _normalized_edge(edge)
+        if normalized is None:
+            continue
+        src, dst = normalized[0], normalized[1]
+        predecessors.setdefault(dst, set()).add(src)
+        edge_by_pair.setdefault((src, dst), []).append(normalized)
+
+    seen: set[str] = set()
+    collected: set[tuple] = set()
+    stack = list(failure_point_ids)
+    while stack:
+        node_id = stack.pop()
+        if node_id in seen:
+            continue
+        seen.add(node_id)
+        for src in predecessors.get(node_id, ()):
+            collected.update(edge_by_pair.get((src, node_id), []))
+            stack.append(src)
+    return collected
 
 
 def collect_downstream_node_ids(
@@ -310,34 +354,42 @@ def _sentinel_taints(stderr: Any) -> set[tuple]:  # noqa: ANN401
     if STREAM_TRUNCATED_MARKER in stderr:
         match = _STREAM_DETAIL_PATTERN.search(stderr)
         if match is None:
-            return {("stderr",), ("stdout",)}
+            return {("stderr",), ("stdout",), ("stdout_json",)}
         tainted = set()
         if match.group(1) == "truncated":
-            tainted.add(("stdout",))
+            # stdout_json is parsed from stdout text — cut stdout taints it too.
+            tainted.update([("stdout",), ("stdout_json",)])
         if match.group(2) == "truncated":
             tainted.add(("stderr",))
-        return tainted or {("stderr",), ("stdout",)}
+        return tainted or {("stderr",), ("stdout",), ("stdout_json",)}
     return set()
 
 
-def _nearest_downstream_converge(
+def _nearest_downstream_converges(
     successors: dict[str, set[str]],
     by_id: dict[str, dict[str, Any]],
     node_id: str,
-) -> str | None:
-    """Nearest converge-type node fed by the given node, or None if there isn't one."""
-    seen: set[str] = set()
-    stack = list(successors.get(node_id, ()))
-    while stack:
-        current = stack.pop()
-        if current in seen:
-            continue
-        seen.add(current)
-        node = by_id.get(current)
-        if node is not None and node.get("type") == "converge":
-            return current
-        stack.extend(successors.get(current, ()))
-    return None
+) -> list[str]:
+    """Converge-type nodes at the shortest downstream distance, or empty.
+
+    Breadth-first so the result is the truly nearest tier: a farther completed
+    converge must not shadow a nearer failed one (which still needs the
+    branch). Depth-first first-found would be order-dependent and wrong here.
+    """
+    seen = {node_id}
+    frontier = sorted(successors.get(node_id, ()))
+    while frontier:
+        tier = sorted({node for node in frontier if node not in seen})
+        if not tier:
+            return []
+        converges = [
+            node for node in tier if (entry := by_id.get(node)) is not None and entry.get("type") == "converge"
+        ]
+        if converges:
+            return converges
+        seen.update(tier)
+        frontier = sorted({dst for node in tier for dst in successors.get(node, ())})
+    return []
 
 
 def _converge_reason(
@@ -358,12 +410,11 @@ def _converge_reason(
         src, dst = edge.get("from"), edge.get("to")
         if src is not None and dst is not None:
             successors.setdefault(src, set()).add(dst)
-    mooted = [
-        f"{point} (converge {converge} already completed)"
-        for point in normalized
-        if (converge := _nearest_downstream_converge(successors, by_id, point)) is not None
-        and converge in completed_ids
-    ]
+    mooted: list[str] = []
+    for point in normalized:
+        nearest = _nearest_downstream_converges(successors, by_id, point)
+        if nearest and all(converge in completed_ids for converge in nearest):
+            mooted.extend(f"{point} (converge {converge} already completed)" for converge in nearest)
     if mooted:
         return (
             "failure points feed an already-completed converge node "
@@ -372,20 +423,20 @@ def _converge_reason(
     return None
 
 
-def _tainted_nodes(
-    snapshot_upstream: set[str],
-    current_def: dict[str, Any],
-    normalized: list[str],
-    completed_outputs: dict[str, Any],
-) -> tuple[list[str], list[str]]:
-    """Sanitized and truncated node ids whose taint is referenced on the restart path.
+def _mapped_legacy_taint(output: Any, *, is_script: bool) -> set[tuple]:  # noqa: ANN401
+    """Taint for mapped-only legacy outputs whose stderr was dropped.
 
-    Collects template references from nodes that will actually re-execute, then
-    intersects each upstream node's tainted field paths (redacted markers,
-    truncation sentinels) against the referenced paths. Whole-namespace refs
-    match any taint under that node.
+    Script outputs always carry ``stderr`` unless field selection removed it;
+    without it, a missing sentinel proves nothing, so present fields are
+    treated as unknown. Non-script nodes have no truncation mechanism.
     """
-    restart_path = collect_downstream_node_ids(current_def, normalized)
+    if is_script and isinstance(output, dict) and output and "stderr" not in output:
+        return {(key,) for key in output if isinstance(key, str)}
+    return set()
+
+
+def _restart_path_refs(current_def: dict[str, Any], restart_path: set[str]) -> dict[str, set[tuple]]:
+    """Template references by target, from nodes that will actually re-execute."""
     referenced: dict[str, set[tuple]] = {}
     for node in definition_nodes(current_def):
         node_id = node.get("id")
@@ -394,30 +445,62 @@ def _tainted_nodes(
         for target_id, field_path in _all_template_refs(node.get("parameters", {})):
             if target_id != node_id:
                 referenced.setdefault(target_id, set()).add(field_path)
+    return referenced
 
-    def _flagged(taint_of: Any) -> list[str]:  # noqa: ANN401
-        return sorted(
-            node_id
-            for node_id in snapshot_upstream
-            if node_id in completed_outputs
-            and any(
-                _paths_overlap(tainted, ref)
-                for tainted in taint_of(completed_outputs[node_id])
-                for ref in referenced.get(node_id, set())
-            )
-        )
 
-    return (
-        _flagged(_redacted_paths),
-        _flagged(_truncation_taints),
-    )
+def _tainted_nodes(
+    snapshot_def: dict[str, Any],
+    current_def: dict[str, Any],
+    normalized: list[str],
+    completed_outputs: dict[str, list],
+) -> tuple[list[str], list[str]]:
+    """Sanitized and truncated node ids whose taint is referenced on the restart path.
+
+    Collects template references from nodes that will actually re-execute, then
+    intersects each completed node's tainted field paths (redacted markers,
+    truncation sentinels/provenance) against the referenced paths.
+    Whole-namespace refs match any taint under that node.
+
+    Completed nodes *in* the restart path re-run fresh, so their stored outputs
+    are never injected — only nodes outside it (skipped upstream nodes and
+    completed side branches) can feed tainted data into the rerun.
+    """
+    restart_path = collect_downstream_node_ids(current_def, normalized)
+    referenced = _restart_path_refs(current_def, restart_path)
+    by_id = {node.get("id"): node for node in definition_nodes(snapshot_def) if node.get("id") is not None}
+
+    def _taint(node_id: str) -> tuple[set[tuple], set[tuple]]:
+        redacted: set[tuple] = set()
+        truncated: set[tuple] = set()
+        is_script = by_id.get(node_id, {}).get("type") == "script"
+        for output in completed_outputs.get(node_id, []):
+            for path in _redacted_paths(output):
+                redacted.add(path)
+            truncated |= _truncation_taints(output)
+            truncated |= _mapped_legacy_taint(output, is_script=is_script)
+        return redacted, truncated
+
+    sanitized: list[str] = []
+    truncated: list[str] = []
+    for node_id in completed_outputs:
+        if node_id in restart_path:
+            continue
+        refs = referenced.get(node_id, set())
+        if not refs:
+            continue
+        redacted, truncation = _taint(node_id)
+        if any(_paths_overlap(tainted, ref) for tainted in redacted for ref in refs):
+            sanitized.append(node_id)
+        if any(_paths_overlap(tainted, ref) for tainted in truncation for ref in refs):
+            truncated.append(node_id)
+    return sorted(sanitized), sorted(truncated)
 
 
 def _version_reason(
     normalized: list[str],
     snapshot: WorkflowVersion | None,
     current: WorkflowVersion | None,
-    completed_outputs: dict[str, Any],
+    completed_outputs: dict[str, list],
 ) -> tuple[str | None, list[str], list[str], list[str]]:
     """Rejection reason, changed, sanitized, and truncated nodes for the guards."""
     if snapshot is None:
@@ -433,8 +516,36 @@ def _version_reason(
     snapshot_upstream = collect_upstream_node_ids(snapshot_def, normalized)
     current_upstream = collect_upstream_node_ids(current_def, normalized)
     inserted = sorted(current_upstream - snapshot_upstream)
-    changed = sorted(set(diff_upstream_nodes(snapshot_def, current_def, snapshot_upstream)) | set(inserted))
-    sanitized, truncated = _tainted_nodes(snapshot_upstream, current_def, normalized, completed_outputs)
+    snapshot_edges = collect_upstream_edges(snapshot_def, normalized)
+    current_edges = collect_upstream_edges(current_def, normalized)
+    snapshot_by_id = {node["id"]: node for node in definition_nodes(snapshot_def) if "id" in node}
+    current_by_id = {node["id"]: node for node in definition_nodes(current_def) if "id" in node}
+
+    def _endpoint_unchanged(node_id: str) -> bool:
+        return (
+            node_id in snapshot_by_id
+            and node_id in current_by_id
+            and canonical_node(snapshot_by_id[node_id]) == canonical_node(current_by_id[node_id])
+        )
+
+    # Pure rewiring: same nodes, different upstream edges (e.g. a sidecar
+    # bypassed but still defined). Reported only when no insertion explains the
+    # edge difference — otherwise the incident (but unchanged) endpoints would
+    # drown out the inserted node in the listing.
+    rewired: list[str] = []
+    if not inserted:
+        rewired = sorted(
+            {
+                node_id
+                for edge in snapshot_edges.symmetric_difference(current_edges)
+                for node_id in edge[:2]
+                if _endpoint_unchanged(node_id)
+            }
+        )
+    changed = sorted(
+        set(diff_upstream_nodes(snapshot_def, current_def, snapshot_upstream)) | set(inserted) | set(rewired)
+    )
+    sanitized, truncated = _tainted_nodes(snapshot_def, current_def, normalized, completed_outputs)
     parts = []
     if changed:
         parts.append(
@@ -463,8 +574,9 @@ async def validate_restart_from_failure(
 ) -> RestartValidation:
     """Validate that an execution can be restarted from the given failure points.
 
-    Pure read path: loads the source execution, its failed activities, and the
-    snapshot/current definitions, then runs the three-guard chain. Never mutates
+    Pure read path: loads the source execution, its failed/completed activities,
+    and the snapshot/current definitions, then runs the guard chain (state,
+    selection, converge-mootness, version/structural, taint). Never mutates
     state.
 
     Raises:
@@ -476,6 +588,16 @@ async def validate_restart_from_failure(
     if source is None:
         raise ExecutionNotFoundError(execution_id)
 
+    suffixed = sorted({point.strip() for point in failure_point_ids if point and LOOP_ITERATION_SEP in point.strip()})
+    if suffixed:
+        return RestartValidation(
+            eligible=False,
+            reason=(
+                "loop-iteration failure points are not selectable "
+                f"({', '.join(suffixed)}); select base node ids instead"
+            ),
+            failure_point_ids=sorted({point.strip() for point in failure_point_ids if point and point.strip()}),
+        )
     normalized = sorted({point.strip() for point in failure_point_ids if point and point.strip()})
 
     activities = (
@@ -496,7 +618,12 @@ async def validate_restart_from_failure(
             )
         )
     ).all()
-    completed_outputs = {strip_iteration_suffix(activity.activity_name): activity.output_data for activity in completed}
+    # Per-iteration outputs keyed by base node id: any tainted iteration taints
+    # the node (iteration-level classification is AAP-92821's job; validation
+    # stays fail-closed at base-id granularity rather than last-write-wins).
+    completed_outputs: dict[str, list] = {}
+    for activity in completed:
+        completed_outputs.setdefault(strip_iteration_suffix(activity.activity_name), []).append(activity.output_data)
     completed_ids = set(completed_outputs)
 
     snapshot_result = await session.exec(

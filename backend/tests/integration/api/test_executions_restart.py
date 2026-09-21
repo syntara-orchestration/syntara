@@ -328,7 +328,7 @@ class TestValidateRestart:
         self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
     ) -> None:
         execution = await _eligible_execution(test_db_session, test_workflow, test_user)
-        await _add_completed_activity(test_db_session, execution, "step_1", {"token": "[REDACTED]"})
+        await _add_completed_activity(test_db_session, execution, "step_1", {"token": "[REDACTED]", "stderr": ""})
         # step_2 really consumed step_1's output: reference it in this version's parameters.
         result = await test_db_session.exec(
             select(WorkflowVersion).where(
@@ -399,7 +399,7 @@ class TestValidateRestart:
         execution = await _create_execution(test_db_session, test_workflow, test_user)
         await _add_failed_activity(test_db_session, execution, "step_2")
         await _add_completed_activity(
-            test_db_session, execution, "step_1", {"status_code": 200, "password": "[REDACTED]"}
+            test_db_session, execution, "step_1", {"status_code": 200, "password": "[REDACTED]", "stderr": ""}
         )
 
         response = await auth_client.post(
