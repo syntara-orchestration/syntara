@@ -16,7 +16,10 @@ export type CommandPaletteNavButtonProps = {
  * Docked-nav trigger for the command palette. Accessible name includes the
  * platform shortcut (Ctrl/Cmd+K).
  */
-export function CommandPaletteNavButton({ className, showTooltip = false }: CommandPaletteNavButtonProps) {
+export function CommandPaletteNavButton({
+  className,
+  showTooltip = false,
+}: Readonly<CommandPaletteNavButtonProps>) {
   const { open } = useCommandPalette()
   const searchRef = useRef<HTMLButtonElement>(null)
   const searchButtonLabel = `Search (${commandPaletteShortcutLabel()})`

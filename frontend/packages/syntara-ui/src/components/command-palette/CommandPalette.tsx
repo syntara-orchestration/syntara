@@ -190,7 +190,7 @@ function CommandPaletteBody({ onClose }: PaletteBodyProps) {
  * Spotlight-style finder for pages, workflows, projects, settings, and builder
  * step types. Opened with Ctrl/Cmd+K.
  */
-export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
+export function CommandPalette({ isOpen, onClose }: Readonly<CommandPaletteProps>) {
   return (
     <Modal
       isOpen={isOpen}

@@ -78,7 +78,7 @@ describe('searchCommandPaletteItems', () => {
       item({ id: `page-${index}`, title: `Page ${index}`, showWhenEmpty: true })
     )
 
-    expect(searchCommandPaletteItems(many, '').length).toBe(COMMAND_PALETTE_MAX_RESULTS)
-    expect(searchCommandPaletteItems(many, 'Page').length).toBe(COMMAND_PALETTE_MAX_RESULTS)
+    expect(searchCommandPaletteItems(many, '')).toHaveLength(COMMAND_PALETTE_MAX_RESULTS)
+    expect(searchCommandPaletteItems(many, 'Page')).toHaveLength(COMMAND_PALETTE_MAX_RESULTS)
   })
 })
