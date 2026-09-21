@@ -21,6 +21,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
   }
 })
 
+import { NodeBody } from './NodeBody'
 import { NodeComponent } from './NodeComponent'
 
 function renderWithFlow(ui: ReactElement) {
@@ -225,6 +226,16 @@ describe('NodeComponent validation and interaction', () => {
     )
 
     expect(screen.getByText('Content')).toBeInTheDocument()
+  })
+
+  it('can render its body collapsed initially', () => {
+    renderWithFlow(
+      <NodeComponent nodeProps={baseNodeProps} initiallyExpanded={false}>
+        <NodeBody>Content</NodeBody>
+      </NodeComponent>
+    )
+
+    expect(screen.queryByText('Content')).not.toBeInTheDocument()
   })
 
   it('renders with dashed border style when hasDashedBorder is true', () => {

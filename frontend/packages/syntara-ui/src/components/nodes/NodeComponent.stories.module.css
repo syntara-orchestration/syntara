@@ -1,0 +1,40 @@
+.storyCanvas {
+  min-height: 24rem;
+  padding: var(--pf-t--global--spacer--2xl);
+  overflow: visible;
+  background: var(--pf-t--global--background--color--secondary--default);
+}
+
+.comparisonGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: var(--pf-t--global--spacer--2xl);
+  align-items: start;
+}
+
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: var(--pf-t--global--spacer--2xl);
+  align-items: start;
+}
+
+.gallerySection {
+  display: grid;
+  gap: var(--pf-t--global--spacer--lg);
+}
+
+.nodeExample {
+  display: grid;
+  gap: var(--pf-t--global--spacer--sm);
+  min-width: 0;
+}
+
+.nodeLabel {
+  color: var(--pf-t--global--text--color--subtle);
+}
+
+.semanticZoomCanvas {
+  height: 12rem;
+  background: var(--pf-t--global--background--color--secondary--default);
+}
