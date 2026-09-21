@@ -7,9 +7,9 @@ Note that time skipping is paused while an activity runs, so these tests wait
 out the response window in real time.
 
 When the form_prompt activity times out, the workflow behavior depends on
-fallback_behavior:
-- fallback_behavior="fail": workflow fails after calling expire activity
-- fallback_behavior="fallback": workflow expires the prompt and routes to fallback port
+continue_on_failure setting:
+- continue_on_failure=false (default): workflow fails after calling expire activity
+- continue_on_failure=true: workflow expires the prompt and routes to fallback port
 """
 
 import asyncio
@@ -75,11 +75,11 @@ async def _test_expire_form_prompt_activity(
 
 
 def _create_form_prompt_fail_workflow_yaml(response_window: int = 5) -> dict[str, Any]:
-    """Create workflow with form_prompt that fails on timeout."""
+    """Create workflow with form_prompt that fails on timeout (COF disabled)."""
     workflow_yaml = f"""
 schema_version: "2.0.0"
 name: form-prompt-timeout-fail-test
-description: Integration test for form_prompt timeout with fail behavior
+description: Integration test for form_prompt timeout with COF disabled
 triggers:
 - id: trigger_manual
   type: manual_trigger
@@ -89,9 +89,10 @@ nodes:
   parameters:
     name: Test Form
     response_window: {response_window}
-    fallback_behavior: fail
     form_definition:
       fields: []
+  settings:
+    continue_on_failure: false
 - id: next_step
   type: script
   parameters:
@@ -109,11 +110,11 @@ edges:
 
 
 def _create_form_prompt_fallback_workflow_yaml(response_window: int = 5) -> dict[str, Any]:
-    """Create workflow with form_prompt that routes to fallback on timeout."""
+    """Create workflow with form_prompt that routes to fallback on timeout (COF enabled)."""
     workflow_yaml = f"""
 schema_version: "2.0.0"
 name: form-prompt-timeout-fallback-test
-description: Integration test for form_prompt timeout with fallback behavior
+description: Integration test for form_prompt timeout with COF enabled
 triggers:
 - id: trigger_manual
   type: manual_trigger
@@ -123,9 +124,10 @@ nodes:
   parameters:
     name: Test Form
     response_window: {response_window}
-    fallback_behavior: fallback
     form_definition:
       fields: []
+  settings:
+    continue_on_failure: true
 - id: submitted_step
   type: script
   parameters:
@@ -165,7 +167,7 @@ class TestFormPromptTimeoutIntegration:
     """Integration tests for form_prompt node timeout triggering expiry."""
 
     async def test_timeout_with_fail_behavior_expires_and_fails(self, temporal_env: WorkflowEnvironment) -> None:
-        """When form_prompt times out with fallback_behavior=fail, expire is called and workflow fails."""
+        """When form_prompt times out with COF disabled, expire is called and workflow fails."""
         task_queue = "form-prompt-timeout-fail-queue"
         _expire_calls.clear()
 
@@ -207,7 +209,7 @@ class TestFormPromptTimeoutIntegration:
             assert _expire_calls[0][1] == "form1"
 
     async def test_timeout_with_fallback_behavior_expires_and_routes(self, temporal_env: WorkflowEnvironment) -> None:
-        """When form_prompt times out with fallback_behavior=fallback, expire is called and routes to fallback."""
+        """When form_prompt times out with COF enabled, expire is called and routes to fallback."""
         task_queue = "form-prompt-timeout-fallback-queue"
         _expire_calls.clear()
 
@@ -241,8 +243,8 @@ class TestFormPromptTimeoutIntegration:
             handle = temporal_env.client.get_workflow_handle(result.temporal_workflow_id, run_id=result.temporal_run_id)
             wf_result = await asyncio.wait_for(handle.result(), timeout=_RESULT_TIMEOUT_S)
 
-            # Workflow should complete successfully via fallback port
-            assert wf_result["status"] == "completed"
+            # Workflow completes with errors via fallback port (form1 failed but COF enabled)
+            assert wf_result["status"] == "completed_with_errors"
 
             # Expire activity should have been called for form1
             assert len(_expire_calls) == 1
@@ -251,6 +253,9 @@ class TestFormPromptTimeoutIntegration:
             # Verify the fallback branch ran and the submitted branch did not
             assert "fallback_step" in wf_result["completed_activities"]
             assert "submitted_step" not in wf_result["completed_activities"]
+
+            # Verify form1 is in failed_nodes (timeout with COF enabled)
+            assert "form1" in wf_result["failed_activities"]
 
     async def test_converge_with_detached_form_prompt_expires_remaining(
         self, temporal_env: WorkflowEnvironment
@@ -273,12 +278,13 @@ nodes:
   parameters:
     name: Fast Form
     response_window: 1
-    fallback_behavior: fallback
     form_definition:
       fields:
       - value_name: field1
         type: text
         label: Test Field
+  settings:
+    continue_on_failure: true
 - id: form_slow
   type: form_prompt
   parameters:
@@ -355,13 +361,16 @@ edges:
             handle = temporal_env.client.get_workflow_handle(result.temporal_workflow_id, run_id=result.temporal_run_id)
             wf_result = await asyncio.wait_for(handle.result(), timeout=_RESULT_TIMEOUT_S)
 
-            # Workflow should complete via form_fast fallback
-            assert wf_result["status"] == "completed"
+            # Workflow completes with errors via form_fast fallback (form_fast failed but COF enabled)
+            assert wf_result["status"] == "completed_with_errors"
 
             # Both form_fast and the global expire should have been called
             # form_fast times out first (calls expire for form_fast)
             # then converge completes (calls expire for all remaining = form_slow)
             assert len(_expire_calls) >= 2
+
+            # Verify form_fast is in failed_activities (timeout with COF enabled)
+            assert "form_fast" in wf_result["failed_activities"]
 
     async def test_loop_iteration_form_prompts_get_unique_activity_ids(self, temporal_env: WorkflowEnvironment) -> None:
         """Form prompts inside loops get unique activity IDs per iteration."""
@@ -385,12 +394,13 @@ nodes:
   parameters:
     name: Loop Form
     response_window: 1
-    fallback_behavior: fallback
     form_definition:
       fields:
       - value_name: field1
         type: text
         label: Test Field
+  settings:
+    continue_on_failure: true
 - id: after_form
   type: script
   parameters:
@@ -447,8 +457,8 @@ edges:
             handle = temporal_env.client.get_workflow_handle(result.temporal_workflow_id, run_id=result.temporal_run_id)
             wf_result = await asyncio.wait_for(handle.result(), timeout=_RESULT_TIMEOUT_S)
 
-            # Both loop iterations time out and route through the fallback port
-            assert wf_result["status"] == "completed"
+            # Both loop iterations time out with COF enabled and route through the fallback port
+            assert wf_result["status"] == "completed_with_errors"
 
             # Should have at least 2 expire calls (one per iteration)
             assert len(_expire_calls) >= 2

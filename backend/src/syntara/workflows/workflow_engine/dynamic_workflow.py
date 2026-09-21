@@ -32,8 +32,10 @@ with workflow.unsafe.imports_passed_through():
     from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
     from syntara.workflows.workflow_engine.node_settings_resolver import (
         resolve_continue_on_failure,
+        resolve_decision_window,
         resolve_max_iterations,
         resolve_max_output_bytes,
+        resolve_response_window,
         resolve_retry_policy,
         resolve_timeout,
     )
@@ -324,6 +326,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin, Workflo
             cof = resolve_continue_on_failure(node, self._runtime_settings)
             self._handle_node_failure(completed_node_id, node_error, graph, pending_tasks, continue_on_failure=cof)
             await self._maybe_expire_approval(completed_node_id, node, node_error)
+            await self._maybe_expire_form_prompt(completed_node_id, node, node_error)
             await self._maybe_cancel_agentic_invocation(node, node_error)
             if cof:
                 self._route_failed_node(completed_node_id, node)
@@ -432,7 +435,13 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin, Workflo
         is_timeout = isinstance(error, ActivityError) and isinstance(error.cause, TemporalTimeoutError)
         if is_timeout:
             node = graph.get_node(node_id)
-            timeout_seconds = resolve_timeout(node, self._runtime_settings)
+            # For form_prompt and approval nodes, use response/decision window instead of node timeout
+            if node.type == NodeType.FORM_PROMPT:
+                timeout_seconds = resolve_response_window(node, self._runtime_settings)
+            elif node.type == NodeType.APPROVAL:
+                timeout_seconds = resolve_decision_window(node, self._runtime_settings)
+            else:
+                timeout_seconds = resolve_timeout(node, self._runtime_settings)
             node_name = node.name or node.id
             return build_timeout_error_message(
                 step_name=node_name,
@@ -501,9 +510,8 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin, Workflo
         For approval nodes, validates and applies fallback_decision routing before
         scheduling successors. Raises ApplicationError for invalid fallback_decision.
 
-        For form_prompt nodes with fallback_behavior="fail" that timed out, CoF terminates
-        the branch (no fallback port routing, since fallback_behavior="fail" disallows
-        fallback ports).
+        For form_prompt nodes that timed out, routes to the "fallback" port when COF
+        is enabled.
         """
         if node.type == NodeType.APPROVAL:
             # Apply fallback_decision routing
@@ -517,11 +525,10 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin, Workflo
             await self._schedule_successors(node_id, graph, pending_tasks)
             self._cancel_skipped_pending_tasks(pending_tasks)
         elif node.type == NodeType.FORM_PROMPT:
-            # CoF absorbed a fallback_behavior="fail" timeout. Terminate the branch without scheduling
-            # successors - the user configured "fail on timeout", and while CoF prevents workflow
-            # termination, there's no valid routing destination (submitted requires a response, and
-            # fallback ports are disallowed for fallback_behavior="fail").
-            workflow.logger.info(f"Form prompt {node_id} timed out with CoF enabled - terminating branch")
+            # Form prompt timed out with COF enabled - route to fallback port
+            self.node_control_data[node_id] = {"next_port": "fallback"}
+            await self._schedule_successors(node_id, graph, pending_tasks)
+            self._cancel_skipped_pending_tasks(pending_tasks)
         else:
             # All other node types: schedule successors normally when CoF is enabled
             await self._schedule_successors(node_id, graph, pending_tasks)

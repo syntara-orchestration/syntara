@@ -89,6 +89,20 @@ class WorkflowFormPromptMixin:
         activity_id = form_prompt_temporal_activity_id(node_id, self.loop_body_map, self.node_control_data)
         await self._expire_form_prompts(node_id, activity_id=f"__internal__expire_form_prompt_{activity_id}")
 
+    async def _maybe_expire_form_prompt(
+        self,
+        node_id: str,
+        node: "ActivityNode",
+        error: Exception,
+    ) -> None:
+        """Expire pending form prompts if a form_prompt node timed out."""
+        if (
+            node.type == NodeType.FORM_PROMPT
+            and isinstance(error, ActivityError)
+            and isinstance(error.cause, TemporalTimeoutError)
+        ):
+            await self._expire_form_prompt_requests(node_id)
+
     async def _expire_remaining_form_prompts(self, graph: "WorkflowGraph") -> None:
         """Expire all detached form prompts when workflow completes.
 
@@ -246,61 +260,25 @@ class WorkflowFormPromptMixin:
         Suspends via Temporal async completion until an external response is
         received or the response window expires.
 
-        Timeout behavior:
-        - fallback_behavior="fail": let the timeout propagate, fail the node
-        - fallback_behavior="fallback": expire the prompt, complete with
-          outcome="expired" and route via the "fallback" port
-
+        On timeout, the ActivityError propagates to the orchestrator which handles
+        continue_on_failure routing. If COF is enabled, the orchestrator expires
+        the prompt and routes to the "fallback" port.
         """
         node_id = node.id
         prompt_activity_id = form_prompt_temporal_activity_id(node_id, self.loop_body_map, self.node_control_data)
         args = await self._prepare_form_prompt_args(node, graph, resolved_parameters)
         window = resolve_response_window(node, self._runtime_settings)
-        fallback_behavior = resolved_parameters.get("fallback_behavior", "fail")
 
-        try:
-            result = cast(
-                "dict[str, Any]",
-                await workflow.execute_activity(
-                    ActivityName.FORM_PROMPT,
-                    args=args,
-                    activity_id=prompt_activity_id,
-                    start_to_close_timeout=timedelta(seconds=window + self._TEMPORAL_MARGIN),
-                    retry_policy=resolve_retry_policy(node, self._runtime_settings),
-                ),
-            )
-        except ActivityError as exc:
-            # Timeout handling: expire the prompt, then either fail or route to fallback
-            if not isinstance(exc.cause, TemporalTimeoutError):
-                raise
-
-            # Best-effort expire
-            await self._expire_form_prompt_requests(node_id)
-
-            # Build output for the timeout
-            output = FormPromptOutput(
-                status=ActivityTerminalStatus.COMPLETED,
-                outcome="expired",
-                responded_by="system",
-                responded_at=workflow.now().isoformat(),
-                response_data=None,  # No default values injected
-            ).model_dump(exclude_none=True)
-
-            if fallback_behavior != "fallback":
-                # Expected workflow failure: form expired and fallback_behavior is 'fail'
-                msg = (
-                    f"Form prompt '{node.name or node_id}' expired without a response "
-                    "and On timeout is set to fail the workflow"
-                )
-                raise ApplicationError(
-                    msg,
-                    {"output": output},
-                    type="FormPromptExpiredError",
-                    non_retryable=True,
-                ) from exc
-
-            # Route to fallback port with no response data
-            return {"output": output, "control": {"next_port": "fallback"}}
+        result = cast(
+            "dict[str, Any]",
+            await workflow.execute_activity(
+                ActivityName.FORM_PROMPT,
+                args=args,
+                activity_id=prompt_activity_id,
+                start_to_close_timeout=timedelta(seconds=window + self._TEMPORAL_MARGIN),
+                retry_policy=resolve_retry_policy(node, self._runtime_settings),
+            ),
+        )
 
         # Success path: signal was received
         raw = result.get("output", {})
