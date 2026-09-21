@@ -1097,6 +1097,44 @@ class TestPayloadSizeEnforcement:
         assert "[Payload truncated:" in enforced["output"]["stderr"]
         assert len(enforced["output"]["stdout"]) < 500_000
 
+    def test_provenance_records_stdout_only(self) -> None:
+        """Provenance lists exactly the cut fields (stdout case)."""
+        result = {"output": {"stdout": "x" * 500_000, "stderr": "", "return_code": 0}}
+        enforced = _enforce_payload_limit(result, max_bytes=1000)
+        assert enforced["output"]["__truncated_fields"] == ["stdout", "stdout_json"]
+
+    def test_provenance_records_both_when_stdout_insufficient(self) -> None:
+        """Provenance lists both fields when stderr is also trimmed."""
+        result = {"output": {"stdout": "x" * 100, "stderr": "y" * 500_000, "return_code": 0}}
+        enforced = _enforce_payload_limit(result, max_bytes=1000)
+        assert enforced["output"]["__truncated_fields"] == ["stderr", "stdout", "stdout_json"]
+
+    def test_provenance_merges_stream_flags(self) -> None:
+        """Payload trimming preserves stream-path flags instead of overwriting."""
+        result = {
+            "output": {
+                "stdout": "x" * 500_000,
+                "stderr": "",
+                "return_code": 0,
+                "__truncated_fields": ["stderr"],
+            }
+        }
+        enforced = _enforce_payload_limit(result, max_bytes=1000)
+        assert enforced["output"]["__truncated_fields"] == ["stderr", "stdout", "stdout_json"]
+
+    def test_no_provenance_when_clean(self) -> None:
+        """Untrimmed payloads carry no provenance key."""
+        result = {"output": {"stdout": "hello", "stderr": "", "return_code": 0}}
+        assert "__truncated_fields" not in _enforce_payload_limit(result, max_bytes=1_000_000)["output"]
+
+    def test_stream_truncated_fields(self) -> None:
+        """Stream helper maps cut streams to tainted fields."""
+        from syntara.workflows.workflow_engine.activities.script_activity import _stream_truncated_fields
+
+        assert _stream_truncated_fields(stdout_truncated=True, stderr_truncated=False) == ["stdout", "stdout_json"]
+        assert _stream_truncated_fields(stdout_truncated=False, stderr_truncated=True) == ["stderr"]
+        assert _stream_truncated_fields(stdout_truncated=False, stderr_truncated=False) == []
+
 
 class TestCgroupMemoryLimit:
     """Tests for _get_cgroup_memory_limit."""

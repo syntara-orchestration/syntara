@@ -215,6 +215,17 @@ async def _communicate_limited(
     return stdout_bytes, stderr_bytes, stdout_truncated, stderr_truncated
 
 
+def _stream_truncated_fields(*, stdout_truncated: bool, stderr_truncated: bool) -> list[str]:
+    """Top-level output fields cut by stream truncation (empty when none)."""
+    fields = []
+    if stdout_truncated:
+        # stdout_json is parsed from stdout text — cut stdout taints it too.
+        fields.extend(["stdout", "stdout_json"])
+    if stderr_truncated:
+        fields.append("stderr")
+    return fields
+
+
 def _enforce_payload_limit(
     result_dict: dict[str, Any],
     max_bytes: int = constants.TEMPORAL_PAYLOAD_MAX_BYTES,
@@ -233,6 +244,10 @@ def _enforce_payload_limit(
     truncated payload may be slightly larger than ``max_bytes`` after
     re-serialization. The 10% headroom in TEMPORAL_PAYLOAD_MAX_BYTES absorbs
     this expansion.
+
+    Merges cut fields into the ``TRUNCATED_FIELDS_KEY`` provenance list
+    (preserving stream-path flags) so restart validation can read exact
+    taint without parsing stderr notices that output mapping may have dropped.
     """
     serialized = json.dumps(result_dict)
     payload_size = len(serialized.encode("utf-8"))
@@ -255,14 +270,19 @@ def _enforce_payload_limit(
     stdout_bytes = stdout.encode("utf-8")
     stderr_bytes = stderr.encode("utf-8")
 
+    tainted = set(output.get(constants.TRUNCATED_FIELDS_KEY, []))
     if len(stdout_bytes) >= trim_needed:
         output["stdout"] = stdout_bytes[: len(stdout_bytes) - trim_needed].decode("utf-8", errors="ignore")
+        tainted.update(["stdout", "stdout_json"])
     else:
         trim_needed -= len(stdout_bytes)
         output["stdout"] = ""
         output["stderr"] = stderr_bytes[: max(0, len(stderr_bytes) - trim_needed)].decode("utf-8", errors="ignore")
+        tainted.update(["stdout", "stdout_json", "stderr"])
 
     output["stderr"] = (output.get("stderr") or "") + notice
+    if tainted:
+        output[constants.TRUNCATED_FIELDS_KEY] = sorted(tainted)
     return {**result_dict, "output": output}
 
 
@@ -409,6 +429,9 @@ async def _execute_script_common(
                 f", stderr: {'truncated' if stderr_truncated else 'complete'})]"
             )
             result["stderr"] = result["stderr"] + truncation_notice
+            result[constants.TRUNCATED_FIELDS_KEY] = _stream_truncated_fields(
+                stdout_truncated=stdout_truncated, stderr_truncated=stderr_truncated
+            )
         return result
 
     except (ScriptExecutionError, RuntimeError, SafeValueError):
@@ -534,7 +557,13 @@ async def execute_script_activity(  # noqa: C901
             stderr=result["stderr"],
             stdout_json=result.get("output"),
         )
-        return _enforce_payload_limit({"output": output.dump(output_config)})
+        mapped = output.dump(output_config)
+        # Provenance must survive output mapping: re-attach stream-truncation
+        # flags dropped by field selection so restart validation can read them.
+        # Harmless to downstream consumers (opaque extra key).
+        if constants.TRUNCATED_FIELDS_KEY in result:
+            mapped[constants.TRUNCATED_FIELDS_KEY] = result[constants.TRUNCATED_FIELDS_KEY]
+        return _enforce_payload_limit({"output": mapped})
 
     except ApplicationError:
         raise

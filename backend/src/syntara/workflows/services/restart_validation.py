@@ -51,6 +51,7 @@ from syntara.workflows.models.execution import Execution, ExecutionStatus
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_version import WorkflowVersion
 from syntara.workflows.utils.namespace_resolver import TEMPLATE_PATTERN
+from syntara.workflows.workflow_engine.constants import TRUNCATED_FIELDS_KEY
 from syntara.workflows.workflow_engine.utils.credential_scrubber import REDACTED
 
 if TYPE_CHECKING:
@@ -282,14 +283,26 @@ def _paths_overlap(first: tuple, second: tuple) -> bool:
 def _truncation_taints(output: Any) -> set[tuple]:  # noqa: ANN401
     """Field paths of a stored output tainted by stream/payload truncation.
 
-    Both truncation paths report into ``stderr``. A payload marker additionally
+    Prefers the ``__truncated_fields`` provenance key written at truncation
+    time (survives output mapping, unlike the stderr notice). Falls back to
+    sentinel parsing for rows recorded before provenance existed: both
+    truncation paths report into ``stderr``; a payload marker additionally
     taints ``stdout``, which is silently trimmed before the notice is appended.
-    A stream marker names the cut stream(s) in ``(stdout: …, stderr: …)`` detail;
-    unparseable detail taints both (fail-closed).
+    A stream marker names the cut stream(s) in ``(stdout: …, stderr: …)``
+    detail; unparseable detail taints both (fail-closed).
     """
-    if not isinstance(output, dict):
-        return set()
-    stderr = output.get("stderr")
+    tainted: set[tuple] = set()
+    if isinstance(output, dict):
+        provenance = output.get(TRUNCATED_FIELDS_KEY)
+        if isinstance(provenance, list):
+            tainted = {(field,) for field in provenance if isinstance(field, str)}
+        else:
+            tainted = _sentinel_taints(output.get("stderr"))
+    return tainted
+
+
+def _sentinel_taints(stderr: Any) -> set[tuple]:  # noqa: ANN401
+    """Field paths tainted per legacy stderr truncation sentinels."""
     if not isinstance(stderr, str):
         return set()
     if PAYLOAD_TRUNCATED_MARKER in stderr:

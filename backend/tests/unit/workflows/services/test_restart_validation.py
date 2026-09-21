@@ -425,6 +425,30 @@ async def test_validate_restart_payload_marker_taints_stdout_silently() -> None:
     assert verdict.truncated_node_ids == ["step_1"]
 
 
+@pytest.mark.asyncio
+async def test_validate_restart_prefers_provenance_over_sentinels() -> None:
+    """The __truncated_fields key is authoritative, with no sentinel text needed."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    workflow = _make_workflow(1)
+    execution.workflow_id = workflow.id
+    nodes = _nodes_with_refs({"step_2": "${step_1.stderr}"})
+    outputs = [
+        _make_completed_activity("step_1", {"stdout": "ok", "stderr": "clean", "__truncated_fields": ["stderr"]})
+    ]
+    verdict = await validate_restart_from_failure(
+        _field_session(execution, workflow, nodes, outputs), execution.id, ["step_2"]
+    )
+    assert verdict.eligible is False
+    assert verdict.truncated_node_ids == ["step_1"]
+
+    other_nodes = _nodes_with_refs({"step_2": "${step_1.stdout}"})
+    clean = await validate_restart_from_failure(
+        _field_session(execution, workflow, other_nodes, outputs), execution.id, ["step_2"]
+    )
+    assert clean.eligible is True
+    assert clean.truncated_node_ids == []
+
+
 def _converge_definition() -> dict:
     branch_a = {"id": "step_a", "type": "script", "parameters": {"code": "exit 1"}}
     branch_b = {"id": "step_b", "type": "script", "parameters": {"code": "echo ok"}}
