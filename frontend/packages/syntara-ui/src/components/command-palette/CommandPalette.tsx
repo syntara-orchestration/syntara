@@ -15,13 +15,16 @@ import {
   Truncate,
 } from '@patternfly/react-core'
 import { RhUiSearchIcon } from '@patternfly/react-icons'
+import { useRouterState } from '@tanstack/react-router'
 import { useCallback, useMemo, useState } from 'react'
 
 import { useUnsavedChanges } from '../../app/useUnsavedChanges'
+import { usePendingBuilderNodeAddStore } from '../../routes/builder/pendingBuilderNodeAddStore'
 import { SynLabel } from '../labels/SynLabel'
 
 import styles from './CommandPalette.module.css'
 import type { CommandPaletteItem } from './commandPaletteTypes'
+import { resolveCommandPaletteChoice } from './resolveCommandPaletteChoice'
 import { searchCommandPaletteItems } from './searchCommandPaletteItems'
 import { useCommandPaletteItems } from './useCommandPaletteItems'
 
@@ -87,6 +90,8 @@ function CommandPaletteBody({ onClose }: PaletteBodyProps) {
   const [activeIndex, setActiveIndex] = useState(0)
   const { items, isLoading } = useCommandPaletteItems(true)
   const { requestNavigation } = useUnsavedChanges()
+  const pathname = useRouterState({ select: (state) => state.location.pathname })
+  const queueBuilderAdd = usePendingBuilderNodeAddStore((state) => state.queue)
 
   const results = useMemo(() => searchCommandPaletteItems(items, query), [items, query])
   const clampedIndex = results.length === 0 ? 0 : Math.min(activeIndex, results.length - 1)
@@ -94,10 +99,12 @@ function CommandPaletteBody({ onClose }: PaletteBodyProps) {
 
   const chooseItem = useCallback(
     (item: CommandPaletteItem) => {
+      const choice = resolveCommandPaletteChoice(item, pathname)
       onClose()
-      requestNavigation(item.to)
+      if (choice.builderAdd) queueBuilderAdd(choice.builderAdd)
+      if (choice.navigateTo) requestNavigation(choice.navigateTo)
     },
-    [onClose, requestNavigation]
+    [onClose, pathname, queueBuilderAdd, requestNavigation]
   )
 
   const handleQueryChange = (_event: React.FormEvent<HTMLInputElement>, value: string) => {

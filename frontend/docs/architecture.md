@@ -1135,6 +1135,8 @@ Global search (Ctrl/Cmd+K) lives in `packages/syntara-ui/src/components/command-
 
 Empty-query results only include items with `showWhenEmpty: true` (pages and builder steps). Remote catalogs appear once the user types.
 
+Choosing a **step** while `/workflow-builder/...` is open queues `OPEN_NODE_EDITOR_ADD` on the current canvas (no navigation). Off the builder, the same hit still opens `/workflow-builder/new` and then the add-step editor.
+
 ### Add filters to a list page
 
 1. Define `FilterFieldDefinition[]` in a colocated `*Filters.ts` / `*FilterDefinitions.ts`

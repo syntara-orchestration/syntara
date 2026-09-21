@@ -3,6 +3,9 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
+import { usePendingBuilderNodeAddStore } from '../../routes/builder/pendingBuilderNodeAddStore'
+import { routerTestState } from '../../test/setup'
+
 import { CommandPalette } from './CommandPalette'
 import { COMMAND_PALETTE_CATEGORY, type CommandPaletteItem } from './commandPaletteTypes'
 
@@ -41,6 +44,16 @@ const items: CommandPaletteItem[] = [
     title: 'Action',
     keywords: ['http'],
     to: '/workflow-builder/new',
+    builderAdd: { nodeTypeId: 'action', nodeSubtypeId: null },
+    showWhenEmpty: true,
+  },
+  {
+    id: 'node:trigger:trigger-manual',
+    category: COMMAND_PALETTE_CATEGORY.NODE,
+    categoryLabel: 'Steps',
+    title: 'Manual trigger',
+    to: '/workflow-builder/new',
+    builderAdd: { nodeTypeId: 'trigger', nodeSubtypeId: 'trigger-manual' },
     showWhenEmpty: true,
   },
 ]
@@ -53,6 +66,7 @@ function renderPalette() {
 describe('CommandPalette', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    usePendingBuilderNodeAddStore.getState().clear()
   })
 
   it('has no accessibility violations when open', async () => {
@@ -103,7 +117,28 @@ describe('CommandPalette', () => {
     await user.keyboard('{ArrowDown}{Enter}')
 
     expect(mockRequestNavigation).toHaveBeenCalledWith('/workflow-builder/new')
+    expect(usePendingBuilderNodeAddStore.getState().pending).toEqual({
+      nodeTypeId: 'action',
+      nodeSubtypeId: null,
+    })
     expect(onClose).toHaveBeenCalled()
+  })
+
+  it('adds a step to the open workflow instead of creating a new one', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    routerTestState.pathname = '/workflow-builder/wf-1'
+    mockUseCommandPaletteItems.mockReturnValue({ items, isLoading: false })
+    render(<CommandPalette isOpen onClose={onClose} />)
+
+    await user.click(screen.getByRole('option', { name: 'Steps: Manual trigger' }))
+
+    expect(onClose).toHaveBeenCalled()
+    expect(mockRequestNavigation).not.toHaveBeenCalled()
+    expect(usePendingBuilderNodeAddStore.getState().pending).toEqual({
+      nodeTypeId: 'trigger',
+      nodeSubtypeId: 'trigger-manual',
+    })
   })
 
   it('shows an empty state when nothing matches', async () => {

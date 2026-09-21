@@ -21,6 +21,15 @@ export type CommandPaletteItem = {
   /** In-app route to open. Always a concrete path, never a `:param` template. */
   to: string
   /**
+   * When set, choosing this item adds a builder step. On an open builder
+   * canvas the step is added in place; otherwise the app navigates to a new
+   * workflow and then opens the add-step editor.
+   */
+  builderAdd?: {
+    nodeTypeId: string
+    nodeSubtypeId: string | null
+  }
+  /**
    * When true, the item is listed before the user types. Remote catalogs
    * should leave this unset so empty-query results stay small.
    */

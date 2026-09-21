@@ -99,6 +99,7 @@ function mapNodeType(node: NodeTypeDefinition): CommandPaletteItem[] {
     subtitle: node.description,
     keywords: node.keywords,
     to: AppRoute.WorkflowBuilder.New,
+    builderAdd: { nodeTypeId: node.id, nodeSubtypeId: null },
     showWhenEmpty: true,
   }
 
@@ -110,6 +111,7 @@ function mapNodeType(node: NodeTypeDefinition): CommandPaletteItem[] {
     subtitle: subtype.description ?? node.label,
     keywords: [...(node.keywords ?? []), ...(subtype.keywords ?? []), node.label],
     to: AppRoute.WorkflowBuilder.New,
+    builderAdd: { nodeTypeId: node.id, nodeSubtypeId: subtype.id },
     showWhenEmpty: true,
   }))
 

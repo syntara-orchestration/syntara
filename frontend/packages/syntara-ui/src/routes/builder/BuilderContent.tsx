@@ -33,6 +33,7 @@ import { ExecutionDetailsPanelWrapper } from './components/ExecutionDetailsPanel
 import { NodeEditorOverlay } from './components/NodeEditorOverlay'
 import { UnsavedStepEditorDialog } from './components/UnsavedStepEditorDialog'
 import { VersionHistorySidePanel } from './components/VersionHistorySidePanel'
+import { useApplyPendingBuilderNodeAdd } from './hooks/useApplyPendingBuilderNodeAdd'
 import { useBuilderApproval } from './hooks/useBuilderApproval'
 import { useBuilderConflict } from './hooks/useBuilderConflict'
 import { useBuilderContentQueries } from './hooks/useBuilderContentQueries'
@@ -549,6 +550,11 @@ export function BuilderContent(props: BuilderContentProps) {
   // can_i also accepts UUID (backend resolves to project name).
   const builderProjectId = workflow?.project_id ?? selectedProject?.id ?? stableProjectId
   const builderPermissions = useBuilderPermissions(isNew, currentWorkflow?.is_builtin === true, builderProjectId)
+  useApplyPendingBuilderNodeAdd(dispatch, {
+    canEdit: builderPermissions.canEdit,
+    isLoading: builderPermissions.isLoading,
+    viewingVersion,
+  })
   const triggers = currentWorkflow?.triggers ?? []
   const nodeExpandedAllContextValue = useMemo(
     () => ({ expandAllEvent, collapseAllEvent }),

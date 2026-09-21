@@ -187,6 +187,7 @@ describe('mapNodesToCommandPaletteItems', () => {
         id: 'node:action',
         title: 'Action',
         to: AppRoute.WorkflowBuilder.New,
+        builderAdd: { nodeTypeId: 'action', nodeSubtypeId: null },
         showWhenEmpty: true,
       })
     )
@@ -194,6 +195,7 @@ describe('mapNodesToCommandPaletteItems', () => {
       expect.objectContaining({
         id: 'node:action:action-api',
         title: 'REST API',
+        builderAdd: { nodeTypeId: 'action', nodeSubtypeId: 'action-api' },
       })
     )
     expect(items[1]?.keywords).toEqual(expect.arrayContaining(['http', 'rest', 'Action']))
