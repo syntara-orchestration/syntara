@@ -99,7 +99,7 @@ export interface paths {
     put?: never
     /**
      * Validate restart from failure
-     * @description Validate that an execution can be restarted from the given failure points. Checks execution state, failure-point eligibility, and the version-mismatch guard. Returns a pass/fail verdict without mutating any state.
+     * @description Validate that an execution can be restarted from the given failure points. Checks execution state, failure-point eligibility, converge-mootness, the version-mismatch guard, and the tainted-output guard. Returns a pass/fail verdict without mutating any state.
      */
     post: operations['validate_restart_from_failure']
     delete?: never
