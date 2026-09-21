@@ -46,17 +46,27 @@ owns durable queue state, retry timing, and assignment.
 
 ### Cluster and ExecutionTarget
 
-A **Cluster** is a Kubernetes API server the Execution Plane can talk to —
-for example an OpenShift cluster. An **ExecutionTarget** is a place on that
-cluster where worker pods may run: typically one Kubernetes namespace.
+A **Cluster** is a compute environment the Execution Plane can reach.
+An **ExecutionTarget** is a place on that Cluster where work may run.
+One Cluster can host ExecutionTargets of more than one runtime.
+
+Cluster type and ExecutionTarget type are different axes. They must
+not be collapsed onto one field:
+
+| Object | Field | Example values | Meaning |
+|---|---|---|---|
+| Cluster | `cluster_type` (`ClusterType`) | `openshift`, `rhel` | Host platform we connect to |
+| ExecutionTarget | `backend_type` | `k8s`, `openshell`, `agent_sandbox` | Runtime on that Cluster; selects the Worker Manager |
 
 The relationship is **one Cluster to many ExecutionTargets**:
 
 ```
-Cluster (OpenShift / Kubernetes API)
-  ├── ExecutionTarget  namespace ep-default     (cluster default, cold-start)
-  ├── ExecutionTarget  namespace ep-gpu         (labels: gpu=true)
-  └── ExecutionTarget  namespace ep-isolated    (labels: isolation=high)
+Cluster  cluster_type=openshift
+  ├── ExecutionTarget  ep-default     backend_type=k8s
+  ├── ExecutionTarget  ep-gpu         backend_type=k8s  (labels: gpu=true)
+  └── ExecutionTarget  ep-openshell   backend_type=openshell
+Cluster  cluster_type=rhel
+  └── ExecutionTarget  default        backend_type=agent_sandbox
 ```
 
 ```mermaid
@@ -65,7 +75,7 @@ erDiagram
     Cluster {
         uuid id
         string name
-        string backend_type
+        ClusterType cluster_type
         bool enabled
     }
     ExecutionTarget {
@@ -73,6 +83,7 @@ erDiagram
         uuid cluster_id
         string name
         string namespace
+        string backend_type
         string lifecycle
         bool enabled
     }
@@ -124,8 +135,8 @@ Work Scheduler
   → PlacementResolver.resolve(requirements)
        → ExecutionTargetReconciler.resolve(...)  # eligible set, no pick
   → scheduler chooses target from available_targets
-  → PlacementResolver.worker_manager_for(target.cluster)
-       → WorkerManagerRegistry.get(backend)     # local instances only
+  → PlacementResolver.worker_manager_for(target)
+       → WorkerManagerRegistry.get(target.backend_type)  # local instances only
   → worker_manager.dispatch(work_item, target_context)
 ```
 
@@ -135,11 +146,11 @@ Manager objects are not serializable and would make the reconciler unusable
 if the registries are remote.
 
 `PlacementResolver` is a thin local facade used by the scheduler. It calls
-the reconciler, then looks up a locally registered Worker Manager by a
-Cluster `backend_type` **after** the scheduler has chosen an ExecutionTarget
-from the eligible set. The scheduler receives something it can call
-directly without knowing the backend type. It does not inherit a preferred
-target from the reconciler.
+the reconciler, then looks up a locally registered Worker Manager by the
+ExecutionTarget `backend_type` **after** the scheduler has chosen an
+ExecutionTarget from the eligible set. The scheduler receives something
+it can call directly without knowing the backend type. It does not inherit
+a preferred target from the reconciler.
 
 This is the co-located resolver option from AAP-92721, split so the
 reconciler remains a pure query (as in the conceptual Execution Plane
@@ -169,18 +180,23 @@ persistent Cluster and ExecutionTarget tables. The reconciler depends on
 Protocols and snapshot DTOs, not on those tables' concrete models.
 
 ```python
+class ClusterType(StrEnum):
+    OPENSHIFT = "openshift"
+    RHEL = "rhel"
+
 class ClusterSnapshot:
     id: uuid.UUID
     name: str
     labels: dict[str, str]  # e.g. region, cluster identifier
-    backend_type: str       # e.g. vanilla_k8s, openshell
+    cluster_type: ClusterType
     enabled: bool
 
 class ExecutionTargetSnapshot:
     id: uuid.UUID
     cluster: ClusterSnapshot  # backref; always populated
     name: str
-    namespace: str          # Kubernetes namespace on that Cluster
+    namespace: str          # backend-specific location (e.g. Kubernetes namespace)
+    backend_type: str       # k8s, openshell, agent_sandbox; selects the Worker Manager
     labels: dict[str, str]
     lifecycle: str          # see Lifecycle filter
     enabled: bool
@@ -362,8 +378,9 @@ class ReconcileResult:
 `available_targets` is an unordered set of equally eligible
 ExecutionTargets (a list only because it is easy to serialize). The
 Cluster is not a separate element of the result: it is
-`target.cluster`. Callers that need the API server, backend type, or
-namespace use that backref. There is no `EligibleTarget` wrapper;
+`target.cluster`. Callers that need the Cluster (`cluster_type`,
+connection) use that backref; `backend_type` and location stay on the
+ExecutionTarget. There is no `EligibleTarget` wrapper;
 unlike `IneligibleTarget`, an eligible snapshot has no extra fields.
 The result is not grouped as Cluster → [targets]: eligibility is per
 ExecutionTarget, and grouping would imply a hierarchy the scheduler
@@ -453,21 +470,24 @@ class PlacementResolver:
 
     async def resolve(self, requirements: WorkRequirements) -> ReconcileResult: ...
 
-    def worker_manager_for(self, cluster: ClusterSnapshot) -> WorkerManager: ...
+    def worker_manager_for(self, target: ExecutionTargetSnapshot) -> WorkerManager: ...
 ```
 
 `resolve()` returns the `ReconcileResult` only. On `MATCHED`, the scheduler
 chooses a target from `available_targets`, then calls
-`worker_manager_for(target.cluster)` to get a `WorkerManager`.
-`target_context` includes the Kubernetes namespace. On
-`NO_MATCHING_TARGETS`, the scheduler decides (including whether
-`CAPACITY_EXHAUSTED` means re-queue).
+`worker_manager_for(target)` to get a `WorkerManager`.
+`target_context` includes the ExecutionTarget location (for example a
+Kubernetes namespace). On `NO_MATCHING_TARGETS`, the scheduler decides
+(including whether `CAPACITY_EXHAUSTED` means re-queue).
 
-The Worker Manager is looked up from the Cluster's `backend_type`, not from
-the ExecutionTarget. Namespaces on the same Cluster share a backend.
+The Worker Manager is looked up from the ExecutionTarget's `backend_type`
+(`WorkerManagerK8S`, `WorkerManagerOpenShell`, `WorkerManagerAgentSandbox`,
+and later others), not from the Cluster. Cluster `cluster_type` is only
+the host platform (`openshift`, `rhel`). One OpenShift Cluster can have
+both `k8s` and `openshell` ExecutionTargets; they do not share a Worker
+Manager.
 
-This story does not implement vanilla Kubernetes or OpenShell Worker
-Managers. Registering a test double is enough. Changing
+This story does not implement k8s or OpenShell Worker Managers. Changing
 `WorkerManager.dispatch` to accept target context is documented for
 AAP-92722 / AAP-92421 and is out of scope here.
 
@@ -496,8 +516,8 @@ sequenceDiagram
     R-->>PR: ReconcileResult (MATCHED, available_targets)
     PR-->>S: ReconcileResult
     S->>S: choose target A
-    S->>PR: worker_manager_for(A.cluster)
-    PR->>WM: get(A.cluster.backend_type)
+    S->>PR: worker_manager_for(A)
+    PR->>WM: get(A.backend_type)
     WM-->>PR: WorkerManager
     PR-->>S: WorkerManager
     S->>S: WorkerManager.dispatch(work_item, target_context)
@@ -572,9 +592,9 @@ do not re-export from `__init__.py`.
   foreign key to `ExecutionTarget`. Share `ClusterRegistry` /
   `ClusterSnapshot` and `ExecutionTargetRegistry` /
   `ExecutionTargetSnapshot` field names (cluster: name, labels,
-  backend_type, enabled; target: cluster backref, name, namespace, labels,
-  lifecycle, enabled) so the implicit-cluster adapter can be deleted when
-  the real registries land.
+  cluster_type, enabled; target: cluster backref, name, namespace,
+  backend_type, labels, lifecycle, enabled) so the implicit-cluster
+  adapter can be deleted when the real registries land.
 - **AAP-92715 / AAP-92720 (Work Store / Work Executor):** if selectors are
   persisted on `WorkItem`, map them into `WorkRequirements`; do not couple
   the reconciler to the row type.
