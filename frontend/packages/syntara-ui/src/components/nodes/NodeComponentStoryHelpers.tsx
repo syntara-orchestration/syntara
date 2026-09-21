@@ -106,7 +106,7 @@ const kitchenNodes: KitchenNode[] = [
   {
     label: 'Collapsed content',
     nodeProps: createNodeProps({ id: 'collapsed' }),
-    nodeOptions: { initiallyExpanded: false, topBarColor: NODE_TYPE_COLORS.actionScript },
+    nodeOptions: { topBarColor: NODE_TYPE_COLORS.actionScript },
     title: 'Collapsed task',
     expandable: true,
     body: 'Hidden until expanded.',

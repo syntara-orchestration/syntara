@@ -3,6 +3,7 @@ import { RhUiDuplicateIcon, RhUiPlayIcon, RhUiTrashIcon } from '@patternfly/reac
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import { ExecutorTypeEnum } from '@syntara/contracts'
 import { Position, ReactFlow, ReactFlowProvider, type Node, type NodeProps } from '@xyflow/react'
+import { userEvent } from 'storybook/test'
 
 import { FlowNodeType } from '../../constants'
 import { ACTIVITY_STATUS } from '../../routes/builder/utils/executionState/executionHelpers'
@@ -238,7 +239,7 @@ export const ExecutionStates: Story = {
   ),
 }
 
-/** Stable initial expanded and collapsed states; the toggle remains manually interactive. */
+/** Expanded and collapsed states use the same production expand-toggle interaction. */
 export const CollapsedAndExpanded: Story = {
   render: () => (
     <div className={styles.comparisonGrid}>
@@ -253,11 +254,7 @@ export const CollapsedAndExpanded: Story = {
           </Content>
         </NodeBody>
       </NodeComponent>
-      <NodeComponent
-        nodeProps={createNodeProps({ id: 'collapsed' })}
-        initiallyExpanded={false}
-        topBarColor={NODE_TYPE_COLORS.actionScript}
-      >
+      <NodeComponent nodeProps={createNodeProps({ id: 'collapsed' })} topBarColor={NODE_TYPE_COLORS.actionScript}>
         <NodeHeader>
           <NodeExpandToggle />
           <NodeTitle title="Collapsed node" subTitle="Script task" />
@@ -268,6 +265,10 @@ export const CollapsedAndExpanded: Story = {
       </NodeComponent>
     </div>
   ),
+  play: async ({ canvas }) => {
+    const [, collapsedToggle] = canvas.getAllByRole('button', { name: 'Collapse step details' })
+    if (collapsedToggle) await userEvent.click(collapsedToggle)
+  },
 }
 
 /** The menu begins closed; open it to inspect normal, icon, separated, and danger actions. */
@@ -422,4 +423,8 @@ export const Handles: Story = {
 /** Fixed visual inventory for global-node states. Menus remain closed so no popover obscures adjacent nodes. */
 export const KitchenSink: Story = {
   render: () => <KitchenSinkGallery />,
+  play: async ({ canvas }) => {
+    const [, collapsedToggle] = canvas.getAllByRole('button', { name: 'Collapse step details' })
+    if (collapsedToggle) await userEvent.click(collapsedToggle)
+  },
 }

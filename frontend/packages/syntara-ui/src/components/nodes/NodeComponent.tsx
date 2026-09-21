@@ -111,8 +111,6 @@ export function NodeComponent(props: {
   onClick?: (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => void
   nodeProps: NodeProps
   collapsible?: boolean
-  /** Initial visibility of `NodeBody` when the node is collapsible. Defaults to expanded. */
-  initiallyExpanded?: boolean
   executionState?: ExecutionState
   showExecutionBadge?: boolean
   /** Optional color for the type indicator bar at the top of the node (PatternFly token or CSS color) */
@@ -125,7 +123,7 @@ export function NodeComponent(props: {
   rootTestId?: string
 }) {
   const { expandAllEvent, collapseAllEvent } = React.use(NodeExpandedAllContext)
-  const expandedContext = useState(props.initiallyExpanded ?? true)
+  const expandedContext = useState(true)
   const isCollapsible = props.collapsible ?? true
 
   const hasSemanticZoomSummary = props.semanticZoomSummary !== undefined
