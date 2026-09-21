@@ -77,17 +77,36 @@ function StoryCanvasNodeComponent(props: NodeProps<StoryCanvasNode>) {
 
 const storyCanvasNodeTypes = { storybook: StoryCanvasNodeComponent }
 
-function NodeStoryCanvas({ children }: Readonly<{ children: React.ReactNode }>) {
+type StoryCanvasOptions = {
+  height?: string
+}
+
+type NodeStoryParameters = {
+  storyCanvas?: StoryCanvasOptions
+  withoutStoryCanvas?: boolean
+}
+
+function NodeStoryCanvas({ children, height = '32rem' }: Readonly<{ children: React.ReactNode } & StoryCanvasOptions>) {
   return (
-    <div className={styles.storyCanvas}>
+    <div className={styles.storyCanvas} style={{ height }}>
       <ReactFlow
         defaultViewport={{ x: 0, y: 0, zoom: 1 }}
         fitView={false}
-        nodes={[{ id: 'storybook-node', type: 'storybook', position: { x: 64, y: 64 }, data: { content: children } }]}
+        nodes={[
+          {
+            id: 'storybook-node',
+            type: 'storybook',
+            position: { x: 64, y: 64 },
+            data: { content: children },
+            style: { width: 1200 },
+          },
+        ]}
         nodeTypes={storyCanvasNodeTypes}
-        nodesConnectable
+        nodesConnectable={false}
         nodesDraggable={false}
         panOnDrag={false}
+        panOnScroll={false}
+        preventScrolling={false}
         proOptions={{ hideAttribution: true }}
         zoomOnDoubleClick={false}
         zoomOnPinch={false}
@@ -139,11 +158,14 @@ const meta: Meta<typeof NodeComponent> = {
   component: NodeComponent,
   tags: ['autodocs'],
   decorators: [
-    (Story) => (
-      <NodeStoryCanvas>
+    (Story, context) =>
+      (context.parameters as NodeStoryParameters).withoutStoryCanvas ? (
         <Story />
-      </NodeStoryCanvas>
-    ),
+      ) : (
+        <NodeStoryCanvas height={(context.parameters as NodeStoryParameters).storyCanvas?.height}>
+          <Story />
+        </NodeStoryCanvas>
+      ),
   ],
   parameters: {
     docs: {
@@ -241,6 +263,7 @@ export const DisabledAndValidationError: Story = {
 
 /** Every contract-supported execution status, including a retry count for the retrying state. */
 export const ExecutionStates: Story = {
+  parameters: { storyCanvas: { height: '40rem' } },
   render: () => (
     <div className={styles.gallery}>
       {executionStatuses.map((status) => (
@@ -309,7 +332,7 @@ export const Menu: Story = {
 
 /** Semantic zoom renders the compact node body through a real React Flow viewport at 0.5 zoom. */
 export const SemanticZoom: Story = {
-  decorators: [(Story) => <Story />],
+  parameters: { withoutStoryCanvas: true },
   render: () => {
     const nodes: Node<StoryNodeData>[] = [
       {
@@ -341,10 +364,21 @@ export const SemanticZoom: Story = {
     return (
       <div className={styles.semanticZoomCanvas}>
         <ReactFlow
-          defaultViewport={{ x: 0, y: 0, zoom: 0.5 }}
-          fitView={false}
+          fitView
+          fitViewOptions={{ padding: 0.2 }}
+          minZoom={0.5}
+          maxZoom={0.5}
           nodes={nodes}
           nodeTypes={semanticNodeTypes}
+          nodesConnectable={false}
+          nodesDraggable={false}
+          panOnDrag={false}
+          panOnScroll={false}
+          preventScrolling={false}
+          proOptions={{ hideAttribution: true }}
+          zoomOnDoubleClick={false}
+          zoomOnPinch={false}
+          zoomOnScroll={false}
         />
       </div>
     )
@@ -442,6 +476,7 @@ export const Handles: Story = {
 
 /** Fixed visual inventory for global-node states. Menus remain closed so no popover obscures adjacent nodes. */
 export const KitchenSink: Story = {
+  parameters: { storyCanvas: { height: '80rem' } },
   render: () => <KitchenSinkGallery />,
   play: async ({ canvas }) => {
     const [, collapsedToggle] = canvas.getAllByRole('button', { name: 'Collapse step details' })
