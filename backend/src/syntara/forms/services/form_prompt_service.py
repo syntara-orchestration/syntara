@@ -8,6 +8,7 @@ from uuid import UUID
 
 import structlog
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from syntara.forms.exceptions import FormPromptAlreadyRequestedError
@@ -61,67 +62,68 @@ class FormPromptService:
                 loop_iteration_path) already exists
 
         """
-        # Check for duplicate
-        existing = await self._get_form_prompt(
-            request.execution_id,
-            request.prompt_node_id,
-            request.loop_iteration_path,
-        )
-        if existing is not None:
-            raise FormPromptAlreadyRequestedError(
-                request.execution_id, request.prompt_node_id, request.loop_iteration_path
-            )
-
         # TODO(https://redhat.atlassian.net/browse/AAP-91887): Validate execution reference against project_id
 
-        # Create the prompt
-        form_prompt = FormPrompt(
-            execution_id=request.execution_id,
-            project_id=request.project_id,
-            prompt_node_id=request.prompt_node_id,
-            name=request.name,
-            message=request.message,
-            loop_iteration_path=request.loop_iteration_path,
-            temporal_activity_id=request.temporal_activity_id or request.prompt_node_id,
-            timeout_at=request.timeout_at,
-            form_definition=request.form_definition,
-            submit_label=request.submit_label,
-            success_message=request.success_message,
-            timezone=request.timezone,
-            css_override=request.css_override,
-            status=FormPromptStatus.PENDING,
-        )
-        self.session.add(form_prompt)
-        await self.session.flush()  # Get the ID
+        try:
+            # Create the prompt
+            form_prompt = FormPrompt(
+                execution_id=request.execution_id,
+                project_id=request.project_id,
+                prompt_node_id=request.prompt_node_id,
+                name=request.name,
+                message=request.message,
+                loop_iteration_path=request.loop_iteration_path,
+                temporal_activity_id=request.temporal_activity_id,
+                timeout_at=request.timeout_at,
+                form_definition=request.form_definition,
+                submit_label=request.submit_label,
+                success_message=request.success_message,
+                timezone=request.timezone,
+                css_override=request.css_override,
+                status=FormPromptStatus.PENDING,
+            )
+            self.session.add(form_prompt)
+            await self.session.flush()  # Trigger constraint check
 
-        # Add responder junctions
-        if request.responder_user_ids:
-            for user_id in request.responder_user_ids:
-                responder_user = FormPromptResponderUser(
-                    form_prompt_id=form_prompt.id,
-                    user_id=user_id,
-                )
-                self.session.add(responder_user)
+            # Add responder junctions
+            if request.responder_user_ids:
+                for user_id in request.responder_user_ids:
+                    responder_user = FormPromptResponderUser(
+                        form_prompt_id=form_prompt.id,
+                        user_id=user_id,
+                    )
+                    self.session.add(responder_user)
 
-        if request.responder_group_ids:
-            for group_id in request.responder_group_ids:
-                responder_group = FormPromptResponderGroup(
-                    form_prompt_id=form_prompt.id,
-                    group_id=group_id,
-                )
-                self.session.add(responder_group)
+            if request.responder_group_ids:
+                for group_id in request.responder_group_ids:
+                    responder_group = FormPromptResponderGroup(
+                        form_prompt_id=form_prompt.id,
+                        group_id=group_id,
+                    )
+                    self.session.add(responder_group)
 
-        await self.session.flush()
+            await self.session.flush()
 
-        logger.info(
-            "Created form prompt",
-            prompt_id=form_prompt.id,
-            execution_id=request.execution_id,
-            prompt_node_id=request.prompt_node_id,
-        )
+            logger.info(
+                "Created form prompt",
+                prompt_id=form_prompt.id,
+                execution_id=request.execution_id,
+                prompt_node_id=request.prompt_node_id,
+            )
 
-        # Return summary for internal workflow engine endpoints
-        return FormPromptSummary.model_validate(form_prompt)
+            # Return summary for internal workflow engine endpoints
+            return FormPromptSummary.model_validate(form_prompt)
+
+        except IntegrityError as e:
+            # Check if this is a uniqueness constraint violation
+            if "uix_execution_prompt_node_path" in str(e):
+                raise FormPromptAlreadyRequestedError(
+                    request.execution_id,
+                    request.prompt_node_id,
+                    request.loop_iteration_path,
+                ) from e
+            # Re-raise other integrity errors
+            raise
 
     async def list_by_execution(
         self,
@@ -253,29 +255,3 @@ class FormPromptService:
             total_success=success_count,
             total_failed=failed_count,
         )
-
-    async def _get_form_prompt(
-        self,
-        execution_id: UUID,
-        prompt_node_id: str,
-        loop_iteration_path: list[int],
-    ) -> FormPrompt | None:
-        """Get form prompt by unique key (execution_id, prompt_node_id, loop_iteration_path).
-
-        Args:
-            execution_id: Workflow execution ID
-            prompt_node_id: Canvas node ID
-            loop_iteration_path: Loop iteration path
-
-        Returns:
-            FormPrompt if found, None otherwise
-
-        """
-        query = (
-            select(FormPrompt)
-            .where(FormPrompt.execution_id == execution_id)  # type: ignore[arg-type]
-            .where(FormPrompt.prompt_node_id == prompt_node_id)  # type: ignore[arg-type]
-            .where(FormPrompt.loop_iteration_path == loop_iteration_path)  # type: ignore[arg-type]
-        )
-        result = await self.session.execute(query)
-        return result.scalar_one_or_none()
