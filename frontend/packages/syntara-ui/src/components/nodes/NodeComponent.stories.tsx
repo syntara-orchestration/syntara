@@ -2,8 +2,7 @@ import { Content, ContentVariants } from '@patternfly/react-core'
 import { RhUiDuplicateIcon, RhUiPlayIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import { ExecutorTypeEnum } from '@syntara/contracts'
-import { Background, BackgroundVariant, Position, ReactFlow, type Node, type NodeProps } from '@xyflow/react'
-import { useCallback, useState } from 'react'
+import { ReactFlow, type Node, type NodeProps } from '@xyflow/react'
 import { userEvent } from 'storybook/test'
 
 import { FlowNodeType } from '../../constants'
@@ -13,29 +12,13 @@ import { NODE_TYPE_COLORS } from '../../routes/workflows/canvas/nodeTypeColors'
 
 import { NodeBody } from './NodeBody'
 import { NodeComponent } from './NodeComponent'
+import { createNodeProps, NodeExample, NodeStoryCanvas, type StoryNodeData } from './NodeComponent.stories.helpers'
 import styles from './NodeComponent.stories.module.css'
 import { NodeExpandToggle } from './NodeExpandToggle'
 import { NodeHeader } from './NodeHeader'
 import { NodeTitle } from './NodeTitle'
 
-type StoryNodeData = Record<string, unknown> & {
-  id: string
-  name: string
-  type: string
-  __validationError?: boolean
-  metadata?: { __mockDataPinned?: boolean }
-  settings?: { disabled?: boolean }
-}
-
-type NodePropsOptions = {
-  id: string
-  name?: string
-  selected?: boolean
-  type?: string
-  data?: Partial<StoryNodeData>
-}
-
-const menuActions = [
+const MENU_ACTIONS = [
   { id: 'run', label: 'Run step', onClick: () => undefined, icon: <RhUiPlayIcon /> },
   { id: 'duplicate', label: 'Duplicate', onClick: () => undefined, icon: <RhUiDuplicateIcon /> },
   { id: 'separator', label: '', onClick: () => undefined, separator: true },
@@ -44,117 +27,9 @@ const menuActions = [
 
 const executionStatuses = Object.values(ACTIVITY_STATUS)
 
-function createNodeProps(options: NodePropsOptions): NodeProps {
-  const nodeType = options.type ?? FlowNodeType.TASK
-  const data: StoryNodeData = {
-    id: options.id,
-    name: options.name ?? 'Run inventory synchronization',
-    type: nodeType,
-    ...options.data,
-  }
-
-  return {
-    id: options.id,
-    data,
-    selected: options.selected ?? false,
-    type: nodeType,
-    dragging: false,
-    zIndex: 0,
-    positionAbsoluteX: 0,
-    positionAbsoluteY: 0,
-    isConnectable: true,
-    sourcePosition: Position.Right,
-    targetPosition: Position.Left,
-  } as unknown as NodeProps
-}
-
-type StoryCanvasOptions = {
-  minimumHeight?: number
-}
-
 type NodeStoryParameters = {
-  storyCanvas?: StoryCanvasOptions
+  storyCanvas?: { minimumHeight?: number }
   withoutStoryCanvas?: boolean
-}
-
-type StoryCanvasNode = Node<
-  {
-    content: React.ReactNode
-    onContentResize: (height: number) => void
-  },
-  'storybook'
->
-
-function StoryCanvasNodeComponent(props: NodeProps<StoryCanvasNode>) {
-  const contentRef = useCallback(
-    (element: HTMLDivElement | null) => {
-      if (!element) return
-
-      const reportHeight = () => props.data.onContentResize(element.offsetHeight)
-      const observer = new ResizeObserver(reportHeight)
-
-      reportHeight()
-      observer.observe(element)
-      return () => observer.disconnect()
-    },
-    [props.data]
-  )
-
-  return <div ref={contentRef}>{props.data.content}</div>
-}
-
-const storyCanvasNodeTypes = { storybook: StoryCanvasNodeComponent }
-
-function NodeStoryCanvas({
-  children,
-  minimumHeight = 512,
-}: Readonly<{ children: React.ReactNode } & StoryCanvasOptions>) {
-  const [height, setHeight] = useState(minimumHeight)
-  const onContentResize = useCallback(
-    (contentHeight: number) => setHeight(Math.max(minimumHeight, contentHeight + 128)),
-    [minimumHeight]
-  )
-
-  return (
-    <div className={styles.storyCanvas} style={{ height }}>
-      <ReactFlow
-        defaultViewport={{ x: 0, y: 0, zoom: 1 }}
-        fitView={false}
-        nodes={[
-          {
-            id: 'storybook-node',
-            type: 'storybook',
-            position: { x: 64, y: 64 },
-            data: { content: children, onContentResize },
-            style: { width: 'calc(100% - 9rem)' },
-          },
-        ]}
-        nodeTypes={storyCanvasNodeTypes}
-        nodesConnectable
-        nodesDraggable={false}
-        panOnDrag={false}
-        panOnScroll={false}
-        preventScrolling={false}
-        proOptions={{ hideAttribution: true }}
-        zoomOnDoubleClick={false}
-        zoomOnPinch={false}
-        zoomOnScroll={false}
-      >
-        <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
-      </ReactFlow>
-    </div>
-  )
-}
-
-function NodeExample({ label, children }: Readonly<{ label: string; children: React.ReactNode }>) {
-  return (
-    <div className={styles.nodeExample}>
-      <Content component={ContentVariants.small} className={styles.nodeLabel}>
-        {label}
-      </Content>
-      {children}
-    </div>
-  )
 }
 
 type SemanticZoomFlowNode = Node<StoryNodeData, 'semanticZoom'>
@@ -219,7 +94,7 @@ export const Default: Story = {
     <NodeComponent nodeProps={createNodeProps({ id: 'default' })} topBarColor={NODE_TYPE_COLORS.actionScript}>
       <StandardNodeHeader
         expandable
-        menuActions={menuActions}
+        menuActions={MENU_ACTIONS}
         subtitle="Script task"
         title="Run inventory synchronization"
       />
@@ -239,7 +114,7 @@ export const Selected: Story = {
     >
       <StandardNodeHeader
         expandable
-        menuActions={menuActions}
+        menuActions={MENU_ACTIONS}
         subtitle="Script task"
         title="Run inventory synchronization"
       />
@@ -345,7 +220,7 @@ export const CollapsedAndExpanded: Story = {
 export const Menu: Story = {
   render: () => (
     <NodeComponent nodeProps={createNodeProps({ id: 'menu' })} topBarColor={NODE_TYPE_COLORS.actionScript}>
-      <StandardNodeHeader expandable menuActions={menuActions} subtitle="Script task" title="Node action menu" />
+      <StandardNodeHeader expandable menuActions={MENU_ACTIONS} subtitle="Script task" title="Node action menu" />
       <NodeBody>
         <Content component={ContentVariants.small}>Use the kebab button to open the node actions.</Content>
       </NodeBody>

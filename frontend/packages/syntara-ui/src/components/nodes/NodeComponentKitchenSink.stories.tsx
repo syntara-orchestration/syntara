@@ -2,8 +2,6 @@ import { Content, ContentVariants, Flex, FlexItem, Stack, StackItem, Title, Titl
 import { RhUiDuplicateIcon, RhUiPlayIcon, RhUiTrashIcon, RhUiWarningFillIcon } from '@patternfly/react-icons'
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import { ExecutorTypeEnum } from '@syntara/contracts'
-import { Background, BackgroundVariant, Position, ReactFlow, type Node, type NodeProps } from '@xyflow/react'
-import { useCallback, useState, type ReactNode } from 'react'
 import { userEvent } from 'storybook/test'
 
 import { FlowNodeType } from '../../constants'
@@ -13,116 +11,10 @@ import { NODE_TYPE_COLORS } from '../../routes/workflows/canvas/nodeTypeColors'
 
 import { NodeBody } from './NodeBody'
 import { NodeComponent } from './NodeComponent'
+import { createNodeProps, NodeExample, NodeStoryCanvas } from './NodeComponent.stories.helpers'
 import styles from './NodeComponent.stories.module.css'
 
-type StoryNodeData = Record<string, unknown> & {
-  id: string
-  name: string
-  type: string
-  __validationError?: boolean
-  metadata?: { __mockDataPinned?: boolean }
-  settings?: { disabled?: boolean }
-}
-
-type NodePropsOptions = {
-  id: string
-  name?: string
-  selected?: boolean
-  type?: string
-  data?: Partial<StoryNodeData>
-}
-
-function createNodeProps(options: NodePropsOptions): NodeProps {
-  const nodeType = options.type ?? FlowNodeType.TASK
-  const data: StoryNodeData = {
-    id: options.id,
-    name: options.name ?? 'Run inventory synchronization',
-    type: nodeType,
-    ...options.data,
-  }
-
-  return {
-    id: options.id,
-    data,
-    selected: options.selected ?? false,
-    type: nodeType,
-    dragging: false,
-    zIndex: 0,
-    positionAbsoluteX: 0,
-    positionAbsoluteY: 0,
-    isConnectable: true,
-    sourcePosition: Position.Right,
-    targetPosition: Position.Left,
-  } as unknown as NodeProps
-}
-
-type StoryCanvasNode = Node<{ content: ReactNode; onContentResize: (height: number) => void }, 'storybook'>
-
-function StoryCanvasNodeComponent(props: NodeProps<StoryCanvasNode>) {
-  const contentRef = useCallback(
-    (element: HTMLDivElement | null) => {
-      if (!element) return
-
-      const reportHeight = () => props.data.onContentResize(element.offsetHeight)
-      const observer = new ResizeObserver(reportHeight)
-      reportHeight()
-      observer.observe(element)
-      return () => observer.disconnect()
-    },
-    [props.data]
-  )
-
-  return <div ref={contentRef}>{props.data.content}</div>
-}
-
-const nodeTypes = { storybook: StoryCanvasNodeComponent }
-
-function StoryCanvas({ children }: Readonly<{ children: ReactNode }>) {
-  const [height, setHeight] = useState(1280)
-  const onContentResize = useCallback((contentHeight: number) => setHeight(Math.max(1280, contentHeight + 128)), [])
-
-  return (
-    <div className={styles.storyCanvas} style={{ height }}>
-      <ReactFlow
-        defaultViewport={{ x: 0, y: 0, zoom: 1 }}
-        nodes={[
-          {
-            id: 'storybook-node',
-            type: 'storybook',
-            position: { x: 64, y: 64 },
-            data: { content: children, onContentResize },
-            style: { width: 'calc(100% - 9rem)' },
-          },
-        ]}
-        nodeTypes={nodeTypes}
-        nodesConnectable
-        nodesDraggable={false}
-        panOnDrag={false}
-        panOnScroll={false}
-        preventScrolling={false}
-        proOptions={{ hideAttribution: true }}
-        zoomOnDoubleClick={false}
-        zoomOnPinch={false}
-        zoomOnScroll={false}
-      >
-        <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
-      </ReactFlow>
-    </div>
-  )
-}
-
-function NodeExample({ label, children }: Readonly<{ label: string; children: ReactNode }>) {
-  return (
-    <div className={styles.nodeExample}>
-      <Content component={ContentVariants.small} className={styles.nodeLabel}>
-        {label}
-      </Content>
-      {children}
-    </div>
-  )
-}
-
-const menuActions = [
+const MENU_ACTIONS = [
   { id: 'run', label: 'Run step', onClick: () => undefined, icon: <RhUiPlayIcon /> },
   { id: 'duplicate', label: 'Duplicate', onClick: () => undefined, icon: <RhUiDuplicateIcon /> },
   { id: 'separator', label: '', onClick: () => undefined, separator: true },
@@ -146,7 +38,7 @@ function KitchenSinkInventory() {
             >
               <StandardNodeHeader
                 expandable
-                menuActions={menuActions}
+                menuActions={MENU_ACTIONS}
                 subtitle="Script task"
                 title="Run inventory synchronization"
               />
@@ -255,9 +147,9 @@ const meta: Meta = {
   title: 'components/nodes/NodeComponent',
   decorators: [
     (Story) => (
-      <StoryCanvas>
+      <NodeStoryCanvas minimumHeight={1280}>
         <Story />
-      </StoryCanvas>
+      </NodeStoryCanvas>
     ),
   ],
   parameters: { controls: { disable: true } },
