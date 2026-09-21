@@ -123,8 +123,8 @@ follows.
 Work Scheduler
   → PlacementResolver.resolve(requirements)
        → ExecutionTargetReconciler.resolve(...)  # eligible set, no pick
-  → scheduler chooses (cluster, target) from available_targets
-  → PlacementResolver.worker_manager_for(cluster)
+  → scheduler chooses target from available_targets
+  → PlacementResolver.worker_manager_for(target.cluster)
        → WorkerManagerRegistry.get(backend)     # local instances only
   → worker_manager.dispatch(work_item, target_context)
 ```
@@ -178,7 +178,7 @@ class ClusterSnapshot:
 
 class ExecutionTargetSnapshot:
     id: uuid.UUID
-    cluster_id: uuid.UUID
+    cluster: ClusterSnapshot  # backref; always populated
     name: str
     namespace: str          # Kubernetes namespace on that Cluster
     labels: dict[str, str]
@@ -195,7 +195,9 @@ class ExecutionTargetRegistry(Protocol):
 ```
 
 `list_clusters()` returns registered Clusters. `list_by_cluster()` returns
-that Cluster's ExecutionTargets. The reconciler applies eligibility filters
+that Cluster's ExecutionTargets. Every `ExecutionTargetSnapshot` carries
+its `ClusterSnapshot` (`target.cluster`). Targets of the same Cluster share
+one ClusterSnapshot instance. The reconciler applies eligibility filters
 in process; the registries are not required to pre-filter by selector.
 
 Until AAP-92716 lands Cluster as a first-class row, an adapter may expose a
@@ -349,20 +351,23 @@ class IneligibilityReason(StrEnum):
 
 class IneligibleTarget:
     target: ExecutionTargetSnapshot
-    cluster: ClusterSnapshot
     reason: IneligibilityReason
 
 class ReconcileResult:
-    available_targets: list[tuple[ClusterSnapshot, ExecutionTargetSnapshot]]
+    available_targets: list[ExecutionTargetSnapshot]
     ineligible_targets: list[IneligibleTarget]
     outcome: ResolveOutcome
 ```
 
 `available_targets` is an unordered set of equally eligible
-`(Cluster, ExecutionTarget)` pairs (a list only because it is easy to
-serialize). Each entry keeps the Cluster alongside the ExecutionTarget so
-the scheduler and Worker Manager know which API server and which namespace
-to use.
+ExecutionTargets (a list only because it is easy to serialize). The
+Cluster is not a separate element of the result: it is
+`target.cluster`. Callers that need the API server, backend type, or
+namespace use that backref. There is no `EligibleTarget` wrapper;
+unlike `IneligibleTarget`, an eligible snapshot has no extra fields.
+The result is not grouped as Cluster → [targets]: eligibility is per
+ExecutionTarget, and grouping would imply a hierarchy the scheduler
+does not use.
 
 `outcome` is `MATCHED` when `available_targets` is non-empty, otherwise
 `NO_MATCHING_TARGETS`. It does not encode why targets were rejected; that is
@@ -452,10 +457,11 @@ class PlacementResolver:
 ```
 
 `resolve()` returns the `ReconcileResult` only. On `MATCHED`, the scheduler
-chooses a `(cluster, target)` from `available_targets`, then calls
-`worker_manager_for(cluster)` to get a `WorkerManager`. `target_context`
-includes the Kubernetes namespace. On `NO_MATCHING_TARGETS`, the scheduler
-decides (including whether `CAPACITY_EXHAUSTED` means re-queue).
+chooses a target from `available_targets`, then calls
+`worker_manager_for(target.cluster)` to get a `WorkerManager`.
+`target_context` includes the Kubernetes namespace. On
+`NO_MATCHING_TARGETS`, the scheduler decides (including whether
+`CAPACITY_EXHAUSTED` means re-queue).
 
 The Worker Manager is looked up from the Cluster's `backend_type`, not from
 the ExecutionTarget. Namespaces on the same Cluster share a backend.
@@ -489,9 +495,9 @@ sequenceDiagram
     Note over R: Lifecycle + selector filters<br/>Default routing if selectors empty<br/>No ordering or selection
     R-->>PR: ReconcileResult (MATCHED, available_targets)
     PR-->>S: ReconcileResult
-    S->>S: choose (cluster C, target A)
-    S->>PR: worker_manager_for(cluster C)
-    PR->>WM: get(cluster C.backend_type)
+    S->>S: choose target A
+    S->>PR: worker_manager_for(A.cluster)
+    PR->>WM: get(A.cluster.backend_type)
     WM-->>PR: WorkerManager
     PR-->>S: WorkerManager
     S->>S: WorkerManager.dispatch(work_item, target_context)
@@ -566,7 +572,7 @@ do not re-export from `__init__.py`.
   foreign key to `ExecutionTarget`. Share `ClusterRegistry` /
   `ClusterSnapshot` and `ExecutionTargetRegistry` /
   `ExecutionTargetSnapshot` field names (cluster: name, labels,
-  backend_type, enabled; target: cluster_id, name, namespace, labels,
+  backend_type, enabled; target: cluster backref, name, namespace, labels,
   lifecycle, enabled) so the implicit-cluster adapter can be deleted when
   the real registries land.
 - **AAP-92715 / AAP-92720 (Work Store / Work Executor):** if selectors are
