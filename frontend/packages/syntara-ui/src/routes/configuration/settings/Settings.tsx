@@ -1,6 +1,6 @@
 import { ActionGroup, Alert, Button, Stack, StackItem, Tab } from '@patternfly/react-core'
 import { useQueryClient } from '@tanstack/react-query'
-import { useNavigate, useRouterState } from '@tanstack/react-router'
+import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { AppRoute } from '../../../app/AppRoute'
@@ -20,14 +20,13 @@ import {
   useFileStorageStatus,
 } from '../../../hooks/useFileStorageStatus'
 import { useMutationErrorHandler } from '../../../hooks/useMutationErrorHandler'
-import { useUrlTab } from '../../../hooks/useUrlTab'
 import { useAlerts } from '../../../providers/alerts'
 import { getErrorCode, isForbiddenError } from '../../../utils/apiErrors'
 import { detachPromise } from '../../../utils/detachPromise'
 import { useDocLink } from '../../../utils/docs/useDocLink'
 import { WORKFLOW_ENGINE_DEFAULTS_QUERY_KEY } from '../../builder/hooks/useWorkflowEngineDefaults'
 
-import { SettingsCategoryTab } from './SettingsCategoryTab'
+import { SettingsCategoryTabContext } from './SettingsCategoryTabContext'
 import { useAllSettings } from './useAllSettings'
 import { useSettingsPermissions } from './useSettingsPermissions'
 
@@ -90,7 +89,6 @@ export default function Settings() {
   const categories = useMemo(() => categoriesQuery.data?.resources ?? [], [categoriesQuery.data])
   const validTabs = useMemo(() => categories.map((c) => c.slug), [categories])
   const defaultCategory = categories[0]?.slug ?? ''
-  const [activeSlug] = useUrlTab(basePath, defaultCategory)
   const location = useRouterState({ select: (s) => s.location.pathname })
   const navigate = useNavigate()
 
@@ -102,11 +100,6 @@ export default function Settings() {
       detachPromise(navigate({ to: `${basePath}/${defaultCategory}`, replace: true }))
     }
   }, [defaultCategory, location, navigate])
-
-  const activeIndex = useMemo(() => {
-    const idx = categories.findIndex((c) => c.slug === activeSlug)
-    return Math.max(idx, 0)
-  }, [activeSlug, categories])
 
   const settingsByCategory = useMemo(() => {
     const grouped = new Map<string, (typeof allSettings)[number][]>()
@@ -236,32 +229,32 @@ export default function Settings() {
             ) : undefined
           }
         >
-          <Stack hasGutter style={{ flex: 1, minHeight: 0, height: '100%' }}>
-            <StackItem>
-              <SynUrlTabs
-                basePath={basePath}
-                defaultTab={defaultCategory}
-                validTabs={validTabs}
-                aria-label="Settings categories"
-              >
-                {categories.map((cat) => (
-                  <Tab key={cat.slug} eventKey={cat.slug} title={cat.name} />
-                ))}
-              </SynUrlTabs>
-            </StackItem>
-            <SynPageBody style={{ overflow: 'auto', padding: 'var(--pf-t--global--spacer--md)' }}>
-              {categories[activeIndex] && (
-                <SettingsCategoryTab
-                  settings={settingsByCategory.get(categories[activeIndex].slug) ?? []}
-                  edits={edits}
-                  onChange={handleChange}
-                  onResetField={handleResetField}
-                  onValidationChange={handleValidationChange}
-                  readOnly={!canWrite}
-                />
-              )}
-            </SynPageBody>
-          </Stack>
+          <SettingsCategoryTabContext
+            value={{
+              settingsByCategory,
+              edits,
+              onChange: handleChange,
+              onResetField: handleResetField,
+              onValidationChange: handleValidationChange,
+              readOnly: !canWrite,
+            }}
+          >
+            <Stack hasGutter style={{ flex: 1, minHeight: 0, height: '100%' }}>
+              <StackItem>
+                <SynUrlTabs
+                  basePath={basePath}
+                  defaultTab={defaultCategory}
+                  validTabs={validTabs}
+                  aria-label="Settings categories"
+                  renderPanel={() => <Outlet />}
+                >
+                  {categories.map((cat) => (
+                    <Tab key={cat.slug} eventKey={cat.slug} title={cat.name} />
+                  ))}
+                </SynUrlTabs>
+              </StackItem>
+            </Stack>
+          </SettingsCategoryTabContext>
         </SynPanel>
       </SynPageBody>
     </SynPage>

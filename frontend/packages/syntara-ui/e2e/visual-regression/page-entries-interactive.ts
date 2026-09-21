@@ -990,7 +990,7 @@ export const settingsTabPages: PageEntry[] = [
   {
     section: 'settings',
     name: 'settings-ai-llm-tab',
-    path: AppRoute.SystemAdministration.SettingsTab.replace(':category', 'ai_llm'),
+    path: AppRoute.SystemAdministration.SettingsCategory.replace(':category', 'ai_llm'),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
       await expect(page.getByRole('tab', { name: /AI \/ LLM/i, selected: true })).toBeVisible()
@@ -999,7 +999,7 @@ export const settingsTabPages: PageEntry[] = [
   {
     section: 'settings',
     name: 'settings-system-tab',
-    path: AppRoute.SystemAdministration.SettingsTab.replace(':category', 'system'),
+    path: AppRoute.SystemAdministration.SettingsCategory.replace(':category', 'system'),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
       await expect(page.getByRole('tab', { name: /System/i, selected: true })).toBeVisible()
@@ -1008,7 +1008,7 @@ export const settingsTabPages: PageEntry[] = [
   {
     section: 'settings',
     name: 'settings-authentication-tab',
-    path: AppRoute.SystemAdministration.SettingsTab.replace(':category', 'authentication'),
+    path: AppRoute.SystemAdministration.SettingsCategory.replace(':category', 'authentication'),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
       await expect(page.getByRole('tab', { name: /Authentication/i, selected: true })).toBeVisible()
@@ -1017,7 +1017,7 @@ export const settingsTabPages: PageEntry[] = [
   {
     section: 'settings',
     name: 'settings-workflow-execution-tab',
-    path: AppRoute.SystemAdministration.SettingsTab.replace(':category', 'workflow_execution'),
+    path: AppRoute.SystemAdministration.SettingsCategory.replace(':category', 'workflow_execution'),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
       await expect(page.getByRole('tab', { name: /Workflow Execution/i, selected: true })).toBeVisible()
@@ -1026,7 +1026,7 @@ export const settingsTabPages: PageEntry[] = [
   {
     section: 'settings',
     name: 'settings-context-manager-tab',
-    path: AppRoute.SystemAdministration.SettingsTab.replace(':category', 'context_manager'),
+    path: AppRoute.SystemAdministration.SettingsCategory.replace(':category', 'context_manager'),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
       await expect(page.getByRole('tab', { name: /Context Manager/i, selected: true })).toBeVisible()
@@ -1208,7 +1208,7 @@ export const detailTabPages: PageEntry[] = [
   {
     section: 'settings',
     name: 'settings-application-tab',
-    path: AppRoute.SystemAdministration.SettingsTab.replace(':category', 'application'),
+    path: AppRoute.SystemAdministration.SettingsCategory.replace(':category', 'application'),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
       await expect(page.getByRole('tab', { name: /Application/i, selected: true })).toBeVisible()
