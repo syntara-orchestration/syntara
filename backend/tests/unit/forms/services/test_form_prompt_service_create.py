@@ -5,7 +5,7 @@ duplicate detection, and database operations.
 """
 
 from unittest.mock import AsyncMock, Mock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy.exc import IntegrityError
@@ -61,12 +61,15 @@ class TestFormPromptServiceCreate:
 
         exec_id = uuid4()
         proj_id = uuid4()
+        service, _session = _make_service(existing_prompt=None, execution_project_id=proj_id)
+
         request = FormPromptCreateRequest(
             execution_id=exec_id,
             project_id=proj_id,
             prompt_node_id="form1",
             name="Test Form",
             form_definition=_MINIMAL_FORM_DEFINITION,
+            temporal_activity_id="form1",
         )
 
         result = await service.create(request)
@@ -84,10 +87,11 @@ class TestFormPromptServiceCreate:
 
         request = FormPromptCreateRequest(
             execution_id=uuid4(),
-            project_id=uuid4(),
+            project_id=proj_id,
             prompt_node_id="form1",
             name="Form",
             form_definition=_MINIMAL_FORM_DEFINITION,
+            temporal_activity_id="form1",
         )
 
         await service.create(request)
@@ -109,6 +113,7 @@ class TestFormPromptServiceCreate:
             name="Form",
             form_definition=_MINIMAL_FORM_DEFINITION,
             loop_iteration_path=[],
+            temporal_activity_id="form1",
         )
 
         with pytest.raises(FormPromptAlreadyRequestedError, match="already exists"):
@@ -121,7 +126,7 @@ class TestFormPromptServiceCreate:
 
         request = FormPromptCreateRequest(
             execution_id=uuid4(),
-            project_id=uuid4(),
+            project_id=proj_id,
             prompt_node_id="form1",
             name="Form",
             form_definition=_MINIMAL_FORM_DEFINITION,
@@ -142,11 +147,12 @@ class TestFormPromptServiceCreate:
         user2 = uuid4()
         request = FormPromptCreateRequest(
             execution_id=uuid4(),
-            project_id=uuid4(),
+            project_id=proj_id,
             prompt_node_id="form1",
             name="Form",
             form_definition=_MINIMAL_FORM_DEFINITION,
             responder_user_ids=[user1, user2],
+            temporal_activity_id="form1",
         )
 
         await service.create(request)
@@ -162,11 +168,12 @@ class TestFormPromptServiceCreate:
         group1 = uuid4()
         request = FormPromptCreateRequest(
             execution_id=uuid4(),
-            project_id=uuid4(),
+            project_id=proj_id,
             prompt_node_id="form1",
             name="Form",
             form_definition=_MINIMAL_FORM_DEFINITION,
             responder_group_ids=[group1],
+            temporal_activity_id="form1",
         )
 
         await service.create(request)
@@ -181,11 +188,12 @@ class TestFormPromptServiceCreate:
 
         request = FormPromptCreateRequest(
             execution_id=uuid4(),
-            project_id=uuid4(),
+            project_id=proj_id,
             prompt_node_id="form1",
             name="Form",
             form_definition=_MINIMAL_FORM_DEFINITION,
             loop_iteration_path=[0, 1],
+            temporal_activity_id="form1",
         )
 
         await service.create(request)

@@ -93,7 +93,6 @@ class TestFormPromptValidation:
         prompt.responded_by = None
         prompt.responded_at = None
         prompt.response_data = None
-        prompt.temporal_activity_id = None
 
         # Should not raise validation errors
         prompt.model_dump()

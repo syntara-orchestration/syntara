@@ -45,6 +45,7 @@ def create_test_form_prompt(
         responded_by=responded_by,
         responded_at=responded_at,
         response_data=response_data,
+        temporal_activity_id=prompt_node_id,  # Default to prompt_node_id
     )
 
 

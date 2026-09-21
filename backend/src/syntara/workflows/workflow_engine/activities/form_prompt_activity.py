@@ -229,11 +229,25 @@ async def expire_form_prompts_activity(
     """
     result = await _batch_update_form_prompts(execution_id, "expire", "batch_expire", "expired_count", node_id=node_id)
 
-    # TODO(https://redhat.atlassian.net/browse/AAP-91888): dispatch FormPromptExpiredEvent per record
+    # Dispatch audit events for each expired prompt
     prompt_records = result.pop("_prompt_records", [])
     if prompt_records:
+        from uuid import UUID  # noqa: PLC0415
+
+        from syntara.audit.dispatcher import AuditEventDispatcher  # noqa: PLC0415
+        from syntara.forms.audit.form_prompt import FormPromptExpiredEvent  # noqa: PLC0415
+
+        for record in prompt_records:
+            AuditEventDispatcher.dispatch(
+                FormPromptExpiredEvent(
+                    prompt_id=UUID(record["id"]),
+                    execution_id=UUID(execution_id),
+                    prompt_node_id=record["prompt_node_id"],
+                )
+            )
+
         logger.info(
-            "Expired form prompts",
+            "Expired form prompts and dispatched audit events",
             execution_id=execution_id,
             count=len(prompt_records),
         )

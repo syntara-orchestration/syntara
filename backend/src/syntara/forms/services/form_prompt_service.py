@@ -4,12 +4,14 @@ Minimal internal-facing implementation for workflow engine integration.
 AAP-91889 will extend with full filtering/sorting/enrichment.
 """
 
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
 
 import structlog
-from sqlalchemy import update
+from sqlalchemy import select
+from sqlalchemy import update as sa_update
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 
@@ -18,12 +20,20 @@ if TYPE_CHECKING:
 
     from sqlmodel.ext.asyncio.session import AsyncSession
 
-    from syntara.authz.engine import AllowedProjectsResult
+if TYPE_CHECKING:
     from syntara.core.models import User
 
-from syntara.core.services import BaseService
-from syntara.forms.exceptions import FormPromptAlreadyRequestedError, InvalidResponderReferenceError
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.forms.audit.form_prompt import FormPromptSubmittedEvent
+from syntara.forms.exceptions import (
+    FormPromptAlreadyRequestedError,
+    FormPromptAlreadyRespondedError,
+    FormPromptCancelledError,
+    FormPromptExpiredError,
+    FormPromptNotFoundError,
+)
 from syntara.forms.models.api_models import (
+    TERMINAL_PROMPT_STATUSES,
     BatchFormPromptRequest,
     BatchUpdateResponse,
     BatchUpdateResult,
@@ -34,6 +44,9 @@ from syntara.forms.models.api_models import (
 )
 from syntara.forms.models.form_prompt import FormPrompt, FormPromptListResponse
 from syntara.forms.models.form_prompt_responders import FormPromptResponderGroup, FormPromptResponderUser
+from syntara.forms.validators.submission import validate_form_submission
+from syntara.workflows.exceptions import ExecutionNotFoundError
+from syntara.workflows.models.execution import Execution
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -45,18 +58,19 @@ class FormPromptService(BaseService):
     - create: atomically create form_prompts row + responder junctions
     - list: fetch prompts with pagination and filtering
     - batch_update_status: update prompt statuses (expire/cancel)
+    - submit: validate and persist form submission, send workflow signal
     """
 
     def __init__(
         self,
         session: AsyncSession,
-        user: User,
+        user: "User | None" = None,
     ) -> None:
         """Initialize service with database session and user context.
 
         Args:
             session: SQLAlchemy async session
-            user: User context for authorization
+            user: Current authenticated user (optional for workflow-internal operations)
 
         """
         super().__init__(session, user)
@@ -105,11 +119,9 @@ class FormPromptService(BaseService):
             Created form prompt summary
 
         Raises:
-            FormPromptAlreadyRequestedError: If a prompt for this (execution_id, prompt_node_id,
-                loop_iteration_path) already exists
+            FormPromptAlreadyRequestedError: If a prompt for this already exists
 
         """
-        # TODO(https://redhat.atlassian.net/browse/AAP-91887): Validate execution reference against project_id
 
         try:
             # Create the prompt
@@ -335,3 +347,218 @@ class FormPromptService(BaseService):
             total_success=success_count,
             total_failed=failed_count,
         )
+
+    async def validate_submission(
+        self,
+        prompt_id: UUID,
+        submitted_data: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Validate form submission data against prompt definition.
+
+        Validates both prompt state (must be PENDING and not expired) and
+        form data (required fields, types, options).
+
+        Args:
+            prompt_id: Form prompt ID
+            submitted_data: Raw submitted form data
+
+        Returns:
+            Cleaned and coerced form data ready for workflow namespace
+
+        Raises:
+            FormPromptNotFoundError: If prompt does not exist
+            FormPromptExpiredError: If prompt has expired
+            FormPromptCancelledError: If prompt has been cancelled
+            FormPromptAlreadyRespondedError: If prompt already has a response (SUBMITTED)
+            FormDataValidationError: If form data fails validation (carries field errors)
+
+        """
+        # Fetch the prompt
+        prompt = await self.session.get(FormPrompt, prompt_id)
+        if prompt is None:
+            raise FormPromptNotFoundError(prompt_id)
+
+        # Check prompt state
+        if prompt.status in TERMINAL_PROMPT_STATUSES:
+            if prompt.status == FormPromptStatus.EXPIRED:
+                raise FormPromptExpiredError(prompt_id, prompt.timeout_at)
+            if prompt.status == FormPromptStatus.CANCELLED:
+                raise FormPromptCancelledError(prompt_id)
+            # SUBMITTED - will be caught by the already-responded check in submit endpoint
+
+        # Check if prompt has timed out (even if status is still PENDING)
+        if prompt.timeout_at is not None:
+            now = datetime.now(UTC)
+            if now > prompt.timeout_at:
+                raise FormPromptExpiredError(prompt_id, prompt.timeout_at)
+
+        # Validate form data against definition
+        cleaned_data = validate_form_submission(prompt.form_definition, submitted_data)
+
+        logger.info(
+            "Validated form submission",
+            prompt_id=prompt_id,
+            field_count=len(cleaned_data),
+        )
+
+        return cleaned_data
+
+    async def submit(
+        self,
+        prompt_id: UUID,
+        submitted_data: dict[str, Any],
+    ) -> FormPrompt:
+        """Submit a response to a form prompt.
+
+        Validates the submission, persists it to the database, and sends a signal
+        to the workflow engine to resume the paused workflow.
+
+        Args:
+            prompt_id: Form prompt ID
+            submitted_data: Raw submitted form data
+
+        Returns:
+            Updated form prompt with response data
+
+        Raises:
+            FormPromptNotFoundError: If prompt does not exist
+            FormPromptExpiredError: If prompt has expired
+            FormPromptCancelledError: If prompt has been cancelled
+            FormPromptAlreadyRespondedError: If prompt already has a response
+            FormDataValidationError: If form data fails validation
+
+        """
+        if self.user is None:
+            msg = "User context required for form submission"
+            raise ValueError(msg)
+
+        # Validate submission (includes state checks and data validation)
+        cleaned_data = await self.validate_submission(prompt_id, submitted_data)
+
+        # Get the prompt again for the update (validate_submission already checked it exists)
+        prompt = await self.session.get(FormPrompt, prompt_id)
+        if prompt is None:
+            raise FormPromptNotFoundError(prompt_id)
+
+        responded_at = datetime.now(UTC)
+
+        # SECURITY: Optimistic locking prevents TOCTOU race condition.
+        # UPDATE with WHERE status=PENDING ensures only one concurrent submission succeeds.
+        stmt = (
+            sa_update(FormPrompt)
+            .where(FormPrompt.id == prompt_id)  # type: ignore[arg-type]
+            .where(FormPrompt.status == FormPromptStatus.PENDING)  # type: ignore[arg-type]
+            .values(
+                status=FormPromptStatus.SUBMITTED,
+                response_data=cleaned_data,
+                responded_by=self.user.id,
+                responded_at=responded_at,
+            )
+        )
+        result = await self.session.execute(stmt)
+        rowcount = result.rowcount  # type: ignore[attr-defined]
+
+        if rowcount == 0:
+            # Prompt was submitted by another user between our check and this UPDATE
+            await self.session.rollback()
+            # Re-fetch to get current status for error message
+            prompt = await self.session.get(FormPrompt, prompt_id)
+            if prompt:
+                raise FormPromptAlreadyRespondedError(prompt_id, prompt.status)
+            raise FormPromptNotFoundError(prompt_id)
+
+        await self.session.commit()
+
+        # Refresh to get the updated state
+        await self.session.refresh(prompt)
+
+        # Calculate pause duration for telemetry (AC-9)
+        submitted = responded_at.replace(tzinfo=None)
+        created = prompt.created_at.replace(tzinfo=None)
+        pause_duration_ms = int((submitted - created).total_seconds() * 1000)
+
+        logger.info(
+            "Form prompt submitted",
+            prompt_id=prompt_id,
+            execution_id=prompt.execution_id,
+            responded_by=self.user.id,
+            field_count=len(cleaned_data),
+            pause_duration_ms=pause_duration_ms,
+        )
+
+        # Send signal to workflow engine (best-effort, never blocks the response)
+        signal_error: str | None = None
+        try:
+            from syntara.forms.clients.workflow_client import WorkflowApiClient  # noqa: PLC0415
+
+            async with WorkflowApiClient() as client:
+                await client.send_form_signal(
+                    execution_id=prompt.execution_id,
+                    form_prompt_id=prompt.prompt_node_id,
+                    form_response={
+                        "outcome": "submitted",
+                        "response_data": cleaned_data,
+                        "responded_by": self.user.username,
+                        "responded_at": responded_at.isoformat(),
+                        "prompt_id": str(prompt_id),
+                    },
+                    temporal_activity_id=prompt.temporal_activity_id,
+                )
+        except Exception as e:  # noqa: BLE001
+            signal_error = "Workflow signal delivery failed"
+            logger.warning(
+                "Failed to send form submission signal",
+                prompt_id=prompt_id,
+                execution_id=prompt.execution_id,
+                error=str(e),
+                exc_info=True,
+            )
+
+        # Emit audit event with telemetry data (AC-9)
+        AuditEventDispatcher.dispatch(
+            FormPromptSubmittedEvent(
+                prompt_id=prompt_id,
+                execution_id=prompt.execution_id,
+                prompt_node_id=prompt.prompt_node_id,
+                submitted_by=self.user.id,
+                submitted_at=responded_at,
+                pause_duration_ms=pause_duration_ms,
+                field_count=len(cleaned_data),
+                outcome="submitted",
+                principal_type=self.user.__dict__.get("__principal_type__"),
+            )
+        )
+
+        # Store signal error for the response (not persisted to DB)
+        if signal_error:
+            # Note: This would need a FormPromptRead model with signal_delivery_error field
+            # For now, just log it - the caller can check logs
+            logger.error("Signal delivery failed", prompt_id=prompt_id, error=signal_error)
+
+        return prompt
+
+    async def _get_form_prompt(
+        self,
+        execution_id: UUID,
+        prompt_node_id: str,
+        loop_iteration_path: list[int],
+    ) -> FormPrompt | None:
+        """Get form prompt by unique key (execution_id, prompt_node_id, loop_iteration_path).
+
+        Args:
+            execution_id: Workflow execution ID
+            prompt_node_id: Canvas node ID
+            loop_iteration_path: Loop iteration path
+
+        Returns:
+            FormPrompt if found, None otherwise
+
+        """
+        query = (
+            select(FormPrompt)
+            .where(FormPrompt.execution_id == execution_id)  # type: ignore[arg-type]
+            .where(FormPrompt.prompt_node_id == prompt_node_id)  # type: ignore[arg-type]
+            .where(FormPrompt.loop_iteration_path == loop_iteration_path)  # type: ignore[arg-type]
+        )
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
