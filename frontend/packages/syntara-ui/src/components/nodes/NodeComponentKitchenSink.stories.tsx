@@ -252,7 +252,7 @@ function KitchenSinkInventory() {
 }
 
 const meta: Meta = {
-  title: 'nodes/NodeComponent/Kitchen Sink',
+  title: 'components/nodes/NodeComponent',
   decorators: [
     (Story) => (
       <StoryCanvas>
