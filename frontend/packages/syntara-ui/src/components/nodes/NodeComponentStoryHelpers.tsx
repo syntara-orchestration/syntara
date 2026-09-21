@@ -11,7 +11,6 @@ import { NODE_TYPE_COLORS } from '../../routes/workflows/canvas/nodeTypeColors'
 import { NodeBody } from './NodeBody'
 import { NodeComponent } from './NodeComponent'
 import styles from './NodeComponent.stories.module.css'
-import { NodeSidePanel } from './NodeSidePanel'
 
 type StoryNodeData = Record<string, unknown> & {
   id: string
@@ -31,7 +30,6 @@ type KitchenNode = {
   expandable?: boolean
   menu?: boolean
   body?: React.ReactNode
-  sidePanel?: boolean
 }
 
 const menuActions = [
@@ -82,8 +80,6 @@ const kitchenNodes: KitchenNode[] = [
     subTitle: 'Script task',
     expandable: true,
     menu: true,
-    body: 'Collect inventory from managed hosts.',
-    sidePanel: true,
   },
   {
     label: 'Selected dashed placeholder',
@@ -157,13 +153,6 @@ function KitchenNodeExample({ node }: Readonly<{ node: KitchenNode }>) {
           <NodeBody>
             <Content component={ContentVariants.small}>{node.body}</Content>
           </NodeBody>
-        )}
-        {node.sidePanel && (
-          <NodeSidePanel>
-            <StackItem>
-              <Content component={ContentVariants.small}>Credentials: automation-admin</Content>
-            </StackItem>
-          </NodeSidePanel>
         )}
       </NodeComponent>
     </div>

@@ -3,6 +3,7 @@ import { RhUiDuplicateIcon, RhUiPlayIcon, RhUiTrashIcon } from '@patternfly/reac
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import { ExecutorTypeEnum } from '@syntara/contracts'
 import { Background, BackgroundVariant, Position, ReactFlow, type Node, type NodeProps } from '@xyflow/react'
+import { useCallback, useState } from 'react'
 import { userEvent } from 'storybook/test'
 
 import { FlowNodeType } from '../../constants'
@@ -69,16 +70,36 @@ function createNodeProps(options: NodePropsOptions): NodeProps {
   } as unknown as NodeProps
 }
 
-type StoryCanvasNode = Node<{ content: React.ReactNode }, 'storybook'>
+type StoryCanvasNode = Node<
+  {
+    content: React.ReactNode
+    onContentResize: (height: number) => void
+  },
+  'storybook'
+>
 
 function StoryCanvasNodeComponent(props: NodeProps<StoryCanvasNode>) {
-  return <>{props.data.content}</>
+  const contentRef = useCallback(
+    (element: HTMLDivElement | null) => {
+      if (!element) return
+
+      const reportHeight = () => props.data.onContentResize(element.offsetHeight)
+      const observer = new ResizeObserver(reportHeight)
+
+      reportHeight()
+      observer.observe(element)
+      return () => observer.disconnect()
+    },
+    [props.data]
+  )
+
+  return <div ref={contentRef}>{props.data.content}</div>
 }
 
 const storyCanvasNodeTypes = { storybook: StoryCanvasNodeComponent }
 
 type StoryCanvasOptions = {
-  height?: string
+  minimumHeight?: number
 }
 
 type NodeStoryParameters = {
@@ -86,7 +107,16 @@ type NodeStoryParameters = {
   withoutStoryCanvas?: boolean
 }
 
-function NodeStoryCanvas({ children, height = '32rem' }: Readonly<{ children: React.ReactNode } & StoryCanvasOptions>) {
+function NodeStoryCanvas({
+  children,
+  minimumHeight = 512,
+}: Readonly<{ children: React.ReactNode } & StoryCanvasOptions>) {
+  const [height, setHeight] = useState(minimumHeight)
+  const onContentResize = useCallback(
+    (contentHeight: number) => setHeight(Math.max(minimumHeight, contentHeight + 128)),
+    [minimumHeight]
+  )
+
   return (
     <div className={styles.storyCanvas} style={{ height }}>
       <ReactFlow
@@ -97,12 +127,12 @@ function NodeStoryCanvas({ children, height = '32rem' }: Readonly<{ children: Re
             id: 'storybook-node',
             type: 'storybook',
             position: { x: 64, y: 64 },
-            data: { content: children },
-            style: { width: 'calc(100% - 8rem)' },
+            data: { content: children, onContentResize },
+            style: { width: 'calc(100% - 9rem)' },
           },
         ]}
         nodeTypes={storyCanvasNodeTypes}
-        nodesConnectable={false}
+        nodesConnectable
         nodesDraggable={false}
         panOnDrag={false}
         panOnScroll={false}
@@ -162,7 +192,7 @@ const meta: Meta<typeof NodeComponent> = {
       (context.parameters as NodeStoryParameters).withoutStoryCanvas ? (
         <Story />
       ) : (
-        <NodeStoryCanvas height={(context.parameters as NodeStoryParameters).storyCanvas?.height}>
+        <NodeStoryCanvas minimumHeight={(context.parameters as NodeStoryParameters).storyCanvas?.minimumHeight}>
           <Story />
         </NodeStoryCanvas>
       ),
@@ -263,7 +293,7 @@ export const DisabledAndValidationError: Story = {
 
 /** Every contract-supported execution status, including a retry count for the retrying state. */
 export const ExecutionStates: Story = {
-  parameters: { storyCanvas: { height: '40rem' } },
+  parameters: { storyCanvas: { minimumHeight: 640 } },
   render: () => (
     <div className={styles.gallery}>
       {executionStatuses.map((status) => (
@@ -476,7 +506,7 @@ export const Handles: Story = {
 
 /** Fixed visual inventory for global-node states. Menus remain closed so no popover obscures adjacent nodes. */
 export const KitchenSink: Story = {
-  parameters: { storyCanvas: { height: '100rem' } },
+  parameters: { storyCanvas: { minimumHeight: 1280 } },
   render: () => <KitchenSinkGallery />,
   play: async ({ canvas }) => {
     const [, collapsedToggle] = canvas.getAllByRole('button', { name: 'Collapse step details' })
