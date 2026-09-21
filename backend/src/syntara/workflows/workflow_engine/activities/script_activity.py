@@ -277,7 +277,7 @@ def _enforce_payload_limit(
     stderr_bytes = stderr.encode("utf-8")
 
     provenance = output.get(constants.TRUNCATED_FIELDS_KEY, [])
-    tainted = set(p for p in provenance if isinstance(p, str)) if isinstance(provenance, list) else set()
+    tainted = {p for p in provenance if isinstance(p, str)} if isinstance(provenance, list) else set()
     if len(stdout_bytes) >= trim_needed:
         output["stdout"] = stdout_bytes[: len(stdout_bytes) - trim_needed].decode("utf-8", errors="ignore")
         tainted.update(["stdout", "stdout_json"])

@@ -1265,7 +1265,8 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         """Validate a restart without mutating any state (AAP-92820).
 
         Runs the shared pre-restart validation chain (state guard,
-        failure-point eligibility, version-mismatch guard) and returns the
+        failure-point eligibility, converge-mootness, version-mismatch guard,
+        tainted-output guard) and returns the
         verdict for the UI to surface before the operator commits.
 
         Raises:
