@@ -592,7 +592,7 @@ describe('AIAgentNodeForm', () => {
         isLoading: false,
         isError: isToolsError,
         refetch: refetchTools,
-      } as never)
+      })
 
       vi.mocked(useAllEnabledMcpIntegrations).mockReturnValue({
         integrations,
@@ -735,7 +735,7 @@ describe('AIAgentNodeForm', () => {
         isLoading: false,
         isError: false,
         refetch: vi.fn().mockResolvedValue({}),
-      } as never)
+      })
 
       vi.mocked(useAllEnabledMcpIntegrations).mockReturnValue({
         integrations: [],
