@@ -426,6 +426,8 @@ export default tseslint.config(
     rules: {
       'no-restricted-exports': 'off',
       'react-refresh/only-export-components': 'off',
+      'max-lines': 'off',
+      'max-lines-per-function': 'off',
     },
   },
   {

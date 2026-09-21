@@ -1,5 +1,5 @@
-import { Content, ContentVariants } from '@patternfly/react-core'
-import { RhUiDuplicateIcon, RhUiPlayIcon, RhUiTrashIcon } from '@patternfly/react-icons'
+import { Content, ContentVariants, Flex, FlexItem, Stack, StackItem, Title, TitleSizes } from '@patternfly/react-core'
+import { RhUiDuplicateIcon, RhUiPlayIcon, RhUiTrashIcon, RhUiWarningFillIcon } from '@patternfly/react-icons'
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import { ExecutorTypeEnum } from '@syntara/contracts'
 import { Background, BackgroundVariant, Position, ReactFlow, type Node, type NodeProps } from '@xyflow/react'
@@ -14,7 +14,6 @@ import { NODE_TYPE_COLORS } from '../../routes/workflows/canvas/nodeTypeColors'
 import { NodeBody } from './NodeBody'
 import { NodeComponent } from './NodeComponent'
 import styles from './NodeComponent.stories.module.css'
-import { KitchenSinkGallery } from './NodeComponentStoryHelpers'
 import { NodeExpandToggle } from './NodeExpandToggle'
 import { NodeHeader } from './NodeHeader'
 import { NodeTitle } from './NodeTitle'
@@ -69,6 +68,15 @@ function createNodeProps(options: NodePropsOptions): NodeProps {
   } as unknown as NodeProps
 }
 
+type StoryCanvasOptions = {
+  minimumHeight?: number
+}
+
+type NodeStoryParameters = {
+  storyCanvas?: StoryCanvasOptions
+  withoutStoryCanvas?: boolean
+}
+
 type StoryCanvasNode = Node<
   {
     content: React.ReactNode
@@ -96,15 +104,6 @@ function StoryCanvasNodeComponent(props: NodeProps<StoryCanvasNode>) {
 }
 
 const storyCanvasNodeTypes = { storybook: StoryCanvasNodeComponent }
-
-type StoryCanvasOptions = {
-  minimumHeight?: number
-}
-
-type NodeStoryParameters = {
-  storyCanvas?: StoryCanvasOptions
-  withoutStoryCanvas?: boolean
-}
 
 function NodeStoryCanvas({
   children,
@@ -501,7 +500,128 @@ export const Handles: Story = {
 /** Fixed visual inventory for global-node states. Menus remain closed so no popover obscures adjacent nodes. */
 export const KitchenSink: Story = {
   parameters: { storyCanvas: { minimumHeight: 1280 } },
-  render: () => <KitchenSinkGallery />,
+  render: () => (
+    <Stack hasGutter>
+      <StackItem>
+        <Title headingLevel="h2" size={TitleSizes.lg}>
+          Global node state inventory
+        </Title>
+      </StackItem>
+      <StackItem>
+        <div className={styles.gallery}>
+          <NodeExample label="Full composition">
+            <NodeComponent
+              nodeProps={createNodeProps({ id: 'kitchen-base' })}
+              topBarColor={NODE_TYPE_COLORS.actionScript}
+            >
+              <StandardNodeHeader
+                expandable
+                menuActions={menuActions}
+                subtitle="Script task"
+                title="Run inventory synchronization"
+              />
+            </NodeComponent>
+          </NodeExample>
+          <NodeExample label="Selected dashed placeholder">
+            <NodeComponent
+              nodeProps={createNodeProps({ id: 'kitchen-selected', selected: true, type: FlowNodeType.GENERIC })}
+              hasDashedBorder
+            >
+              <StandardNodeHeader title="Selected placeholder" />
+            </NodeComponent>
+          </NodeExample>
+          <NodeExample label="Disabled validation error with mock data pinned">
+            <NodeComponent
+              nodeProps={createNodeProps({
+                id: 'kitchen-disabled-invalid',
+                data: { settings: { disabled: true }, __validationError: true, metadata: { __mockDataPinned: true } },
+              })}
+              topBarColor={NODE_TYPE_COLORS.logic}
+            >
+              <StandardNodeHeader title="Invalid pinned condition" />
+            </NodeComponent>
+          </NodeExample>
+          <NodeExample label="Collapsed content">
+            <NodeComponent
+              nodeProps={createNodeProps({ id: 'kitchen-collapsed' })}
+              topBarColor={NODE_TYPE_COLORS.actionScript}
+            >
+              <StandardNodeHeader expandable title="Collapsed task" />
+              <NodeBody>
+                <Content component={ContentVariants.small}>Hidden until expanded.</Content>
+              </NodeBody>
+            </NodeComponent>
+          </NodeExample>
+          <NodeExample label="Generic wide node">
+            <NodeComponent
+              nodeProps={createNodeProps({ id: 'kitchen-generic', type: FlowNodeType.GENERIC })}
+              hasDashedBorder
+            >
+              <StandardNodeHeader title="Generic placeholder" />
+            </NodeComponent>
+          </NodeExample>
+          <NodeExample label="Agentic wide task">
+            <NodeComponent
+              nodeProps={createNodeProps({
+                id: 'kitchen-agentic',
+                data: { type: ExecutorTypeEnum.AGENTIC },
+              })}
+              topBarColor={NODE_TYPE_COLORS.actionAgentic}
+            >
+              <StandardNodeHeader title="Agentic task" />
+            </NodeComponent>
+          </NodeExample>
+          <NodeExample label="Reversed start and end handles">
+            <NodeComponent
+              nodeProps={createNodeProps({ id: 'kitchen-handles' })}
+              enableEnd
+              enableStart
+              reverseHandles
+              topBarColor={NODE_TYPE_COLORS.logic}
+            >
+              <StandardNodeHeader title="Branch handles" />
+            </NodeComponent>
+          </NodeExample>
+          <NodeExample label="No source or target handle">
+            <NodeComponent
+              disableSource
+              disableTarget
+              nodeProps={createNodeProps({ id: 'kitchen-no-handles' })}
+              topBarColor={NODE_TYPE_COLORS.logic}
+            >
+              <StandardNodeHeader title="No handles" />
+            </NodeComponent>
+          </NodeExample>
+          <NodeExample label="Subtitle-only title">
+            <NodeComponent nodeProps={createNodeProps({ id: 'kitchen-subtitle' })} topBarColor={NODE_TYPE_COLORS.logic}>
+              <StandardNodeHeader subtitle="Fallback title from subtitle" />
+            </NodeComponent>
+          </NodeExample>
+          {executionStatuses.map((status) => (
+            <NodeExample key={status} label={`${status} execution state`}>
+              <NodeComponent
+                executionState={{ status, retry_count: status === ACTIVITY_STATUS.RETRYING ? 2 : undefined }}
+                nodeProps={createNodeProps({ id: `kitchen-${status}`, name: `${status} task` })}
+                topBarColor={NODE_TYPE_COLORS.actionScript}
+              >
+                <StandardNodeHeader title={`${status} task`} />
+              </NodeComponent>
+            </NodeExample>
+          ))}
+        </div>
+      </StackItem>
+      <StackItem>
+        <Flex gap={{ default: 'gapSm' }}>
+          <FlexItem>
+            <RhUiWarningFillIcon />
+          </FlexItem>
+          <FlexItem>
+            <Content component={ContentVariants.small}>Menus remain closed so the gallery stays readable.</Content>
+          </FlexItem>
+        </Flex>
+      </StackItem>
+    </Stack>
+  ),
   play: async ({ canvas }) => {
     const [, collapsedToggle] = canvas.getAllByRole('button', { name: 'Collapse step details' })
     if (collapsedToggle) await userEvent.click(collapsedToggle)
