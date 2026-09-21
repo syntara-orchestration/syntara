@@ -384,11 +384,21 @@ def _converge_reason(
 def _mapped_legacy_taint(output: Any, *, is_script: bool) -> set[tuple]:  # noqa: ANN401
     """Taint for mapped-only legacy outputs whose stderr was dropped.
 
-    Script outputs always carry ``stderr`` unless field selection removed it;
-    without it, a missing sentinel proves nothing, so present fields are
-    treated as unknown. Non-script nodes have no truncation mechanism.
+    Reserved for rows that predate provenance. When ``__truncated_fields`` is
+    present the writer already recorded authoritative (possibly empty) taint, so
+    this heuristic must not override it — otherwise a proven-clean output whose
+    mapping dropped ``stderr`` would be falsely flagged. Only when the key is
+    absent does a dropped ``stderr`` leave a missing sentinel unprovable, so a
+    script node's present fields are treated as unknown. Non-script nodes have
+    no truncation mechanism.
     """
-    if is_script and isinstance(output, dict) and output and "stderr" not in output:
+    if (
+        is_script
+        and isinstance(output, dict)
+        and output
+        and TRUNCATED_FIELDS_KEY not in output
+        and "stderr" not in output
+    ):
         return {(key,) for key in output if isinstance(key, str)}
     return set()
 

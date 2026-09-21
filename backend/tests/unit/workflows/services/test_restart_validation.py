@@ -721,6 +721,36 @@ async def test_validate_restart_mapped_legacy_output_taints_present_fields() -> 
 
 
 @pytest.mark.asyncio
+async def test_validate_restart_present_provenance_suppresses_legacy_heuristic() -> None:
+    """Explicit provenance is authoritative: a clean field passes even when the mapping dropped stderr."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    workflow = _make_workflow(1)
+    execution.workflow_id = workflow.id
+    nodes = _nodes_with_refs({"step_2": "${step_1.return_code}"})
+    outputs = [_make_completed_activity("step_1", {"return_code": 0, "__truncated_fields": ["stdout", "stdout_json"]})]
+    verdict = await validate_restart_from_failure(
+        _field_session(execution, workflow, nodes, outputs), execution.id, ["step_2"]
+    )
+    assert verdict.eligible is True
+    assert verdict.truncated_node_ids == []
+
+
+@pytest.mark.asyncio
+async def test_validate_restart_clean_mapped_output_without_stderr_passes() -> None:
+    """A clean run mapping stdout to a new field (stderr dropped) carries empty provenance, so it is not flagged."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    workflow = _make_workflow(1)
+    execution.workflow_id = workflow.id
+    nodes = _nodes_with_refs({"step_2": "${step_1.body}"})
+    outputs = [_make_completed_activity("step_1", {"body": "complete", "__truncated_fields": []})]
+    verdict = await validate_restart_from_failure(
+        _field_session(execution, workflow, nodes, outputs), execution.id, ["step_2"]
+    )
+    assert verdict.eligible is True
+    assert verdict.truncated_node_ids == []
+
+
+@pytest.mark.asyncio
 async def test_validate_restart_ignores_taint_on_unrerunnable_types() -> None:
     """Non-script outputs without stderr carry no truncation semantics."""
     execution = _make_execution(ExecutionStatus.FAILED)
