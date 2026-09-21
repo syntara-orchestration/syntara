@@ -1988,9 +1988,9 @@ export { bar } from './bar'
 export { baz } from './baz'
 ```
 
-**Do not create new barrel files anywhere in this package** — in `src/`, `e2e/`, or any other directory. Barrel files cause two problems:
+**Do not create new barrel files in `src/`** — production code that ships to users. Barrel files cause two problems there:
 
-1. They load many modules that a test or the browser may not need. This slows down test runs and page loads.
+1. They load many modules that the browser may not need. This slows down page loads.
 2. They hide where a value actually comes from. It is harder to find the real source file.
 
 Import directly from the file that defines the value:
@@ -2004,6 +2004,6 @@ import { bar } from './bar'
 import { foo, bar } from './index'
 ```
 
-**Enforcement:** `barrel-files/avoid-barrel-files` is set to `warn` in `eslint.config.js`. It fires when a file has more than 3 re-exports and few or no local declarations of its own. This is a warning, not an error, so existing barrel files are not a hard build break. New or changed code must not add a new warning — see the Zero New Warnings Policy in section 8.
+**Enforcement:** `barrel-files/avoid-barrel-files` is set to `warn` in `eslint.config.js`, scoped to `src/**/*.{ts,tsx}` only. It fires when a file has more than 3 re-exports and few or no local declarations of its own. This is a warning, not an error, so existing barrel files are not a hard build break. New or changed `src/` code must not add a new warning — see the Zero New Warnings Policy in section 8.
 
-**If you need to group many related helpers for import convenience** (for example, a large set of e2e test API utilities), do not use a barrel file. Ask the reviewer for the best pattern for that specific case first.
+**This rule does not apply to `e2e/` or other non-production directories.** The tree-shaking, bundle-size, and circular-dependency concerns that motivate this rule are about code shipped to users; they don't apply to test-only helpers, where a grouped re-export can be a reasonable convenience. If you need to group many related helpers for import convenience in `src/`, don't use a barrel file there — ask the reviewer for the best pattern for that specific case first.

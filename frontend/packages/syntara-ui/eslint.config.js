@@ -302,11 +302,6 @@ export default tseslint.config(
       'sonarjs/no-nested-conditional': 'error',
       'max-depth': ['error', 4],
       'max-params': ['error', 5],
-      // Applies to all .ts/.tsx files in this package — a file that only re-exports other
-      // modules is a barrel file. See https://tkdodo.eu/blog/please-stop-using-barrel-files
-      // `warn` (not `error`) so the existing barrel files are not a hard build break; new ones
-      // are blocked by the Zero New Warnings Policy in review.
-      'barrel-files/avoid-barrel-files': 'warn',
       // Limit nested functions/callbacks (e.g. hooks → timeout → setState updater). Complements max-depth
       // and aligns with Sonar-style “deeply nested functions” maintainability rules. Tests disable this.
       'max-nested-callbacks': ['error', 4],
@@ -396,6 +391,18 @@ export default tseslint.config(
     rules: {
       'no-console': 'off',
       'no-restricted-exports': 'off',
+    },
+  },
+  {
+    // Scoped to src/ production code only — this is where the TkDodo concerns (bundle size,
+    // tree-shaking, circular deps) actually apply. Test-only helper directories (e.g. e2e/) are
+    // out of scope, since code there never ships to users and grouped re-exports can be a
+    // reasonable convenience. See https://tkdodo.eu/blog/please-stop-using-barrel-files
+    // `warn` (not `error`) so existing barrel files are not a hard build break; new ones in src/
+    // are blocked by the Zero New Warnings Policy in review.
+    files: ['src/**/*.{ts,tsx}'],
+    rules: {
+      'barrel-files/avoid-barrel-files': 'warn',
     },
   },
   {
