@@ -18,6 +18,7 @@ from temporalio.exceptions import ApplicationError
 
 from syntara.core.config.base import get_settings
 from syntara.core.exceptions import SafeValueError
+from syntara.workflows.utils.template_refs import find_template_refs, paths_overlap
 from syntara.workflows.workflow_engine import constants
 from syntara.workflows.workflow_engine.models.workflow_definition import (
     ActivityName,
@@ -226,6 +227,32 @@ def _stream_truncated_fields(*, stdout_truncated: bool, stderr_truncated: bool) 
     return fields
 
 
+def _translate_stream_taint(stream_tainted: list[str], output_config: dict[str, str] | None) -> list[str]:
+    """Map stream-tainted source fields to mapped destination keys.
+
+    Output mapping renames fields (e.g. ``body: ${result.stdout}``), so the
+    pre-mapping names in ``stream_tainted`` would never intersect downstream
+    references. Each destination whose template references a tainted source
+    field inherits the taint. Unmapped (``None``) output keeps source names;
+    empty mapping persists nothing, so nothing is tainted.
+    """
+    if output_config is None:
+        return list(stream_tainted)
+    if not output_config:
+        # Empty mapping persists nothing, so no tainted field can be consumed.
+        return []
+    stream_paths = {(field,) for field in stream_tainted}
+    tainted_dest = set()
+    for dest_key, template in output_config.items():
+        # Mapping templates resolve against the pre-mapping result namespace.
+        for target, field_path in find_template_refs(template):
+            if target != "result":
+                continue
+            if any(paths_overlap(tainted, field_path) for tainted in stream_paths):
+                tainted_dest.add(dest_key)
+    return sorted(tainted_dest)
+
+
 def _enforce_payload_limit(
     result_dict: dict[str, Any],
     max_bytes: int = constants.TEMPORAL_PAYLOAD_MAX_BYTES,
@@ -288,8 +315,9 @@ def _enforce_payload_limit(
         tainted.update(["stdout", "stdout_json", "stderr"])
 
     output["stderr"] = (output.get("stderr") or "") + notice
-    if tainted:
-        output[constants.TRUNCATED_FIELDS_KEY] = sorted(tainted)
+    # Always emitted (possibly empty): explicit clean provenance lets readers
+    # distinguish new clean outputs from legacy rows that predate the key.
+    output[constants.TRUNCATED_FIELDS_KEY] = sorted(tainted)
     return {**result_dict, "output": output}
 
 
@@ -565,11 +593,13 @@ async def execute_script_activity(  # noqa: C901
             stdout_json=result.get("output"),
         )
         mapped = output.dump(output_config)
-        # Provenance must survive output mapping: re-attach stream-truncation
-        # flags dropped by field selection so restart validation can read them.
-        # Harmless to downstream consumers (opaque extra key).
-        if constants.TRUNCATED_FIELDS_KEY in result:
-            mapped[constants.TRUNCATED_FIELDS_KEY] = result[constants.TRUNCATED_FIELDS_KEY]
+        # Provenance must survive output mapping: translate stream-truncation
+        # flags into mapped destination fields so restart validation can read
+        # them. Always emitted (possibly empty) so explicit clean provenance is
+        # distinguishable from legacy rows that predate it. Harmless to
+        # downstream consumers (opaque extra key).
+        stream_tainted = result.get(constants.TRUNCATED_FIELDS_KEY, [])
+        mapped[constants.TRUNCATED_FIELDS_KEY] = _translate_stream_taint(stream_tainted, output_config)
         return _enforce_payload_limit({"output": mapped})
 
     except ApplicationError:

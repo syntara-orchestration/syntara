@@ -56,7 +56,7 @@ from syntara.workflows.models.activity_execution import ActivityExecution, Activ
 from syntara.workflows.models.execution import Execution, ExecutionStatus
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_version import WorkflowVersion
-from syntara.workflows.utils.namespace_resolver import TEMPLATE_PATTERN
+from syntara.workflows.utils.template_refs import find_template_refs, paths_overlap
 from syntara.workflows.workflow_engine.constants import TRUNCATED_FIELDS_KEY
 from syntara.workflows.workflow_engine.utils.credential_scrubber import REDACTED
 
@@ -282,48 +282,6 @@ def _redacted_paths(value: Any, prefix: tuple = ()) -> set[tuple]:  # noqa: ANN4
     return found
 
 
-def _parse_ref_segments(expression: str) -> tuple:
-    """Split a template expression into path segments (names and indices)."""
-    segments: list = []
-    for part in expression.strip().split("."):
-        name, _, _ = part.partition("[")
-        if name:
-            segments.append(name)
-        # Bracket-only parts (e.g. "[0]" after a dot) contribute just the index.
-        segments.extend(int(index) for index in re.findall(r"\[(\d+)\]", part))
-    return tuple(segments)
-
-
-def _all_template_refs(value: Any) -> list[tuple[str, tuple]]:  # noqa: ANN401
-    """Every ``(target node id, field path)`` template reference in a value.
-
-    Uses the real ``TEMPLATE_PATTERN`` from namespace_resolver, so every
-    reference the engine would substitute is detected — field refs
-    (``${step_1.output}``), indexed refs (``${step_1.items[0]}``), and
-    whole-namespace refs (``${step_1}``, field path ``()``) in any position.
-    Head-segment equality avoids prefix collisions (``step_1`` never matches
-    ``step_10``).
-    """
-    found: list[tuple[str, tuple]] = []
-    if isinstance(value, str):
-        for match in TEMPLATE_PATTERN.finditer(value):
-            segments = _parse_ref_segments(match.group(1))
-            if segments and isinstance(segments[0], str):
-                found.append((segments[0], tuple(segments[1:])))
-    elif isinstance(value, dict):
-        for item in value.values():
-            found.extend(_all_template_refs(item))
-    elif isinstance(value, list):
-        for item in value:
-            found.extend(_all_template_refs(item))
-    return found
-
-
-def _paths_overlap(first: tuple, second: tuple) -> bool:
-    """Whether two field paths overlap (one is a prefix of the other)."""
-    return first[: len(second)] == second or second[: len(first)] == first
-
-
 def _truncation_taints(output: Any) -> set[tuple]:  # noqa: ANN401
     """Field paths of a stored output tainted by stream/payload truncation.
 
@@ -442,7 +400,7 @@ def _restart_path_refs(current_def: dict[str, Any], restart_path: set[str]) -> d
         node_id = node.get("id")
         if node_id is None or node_id not in restart_path:
             continue
-        for target_id, field_path in _all_template_refs(node.get("parameters", {})):
+        for target_id, field_path in find_template_refs(node.get("parameters", {})):
             if target_id != node_id:
                 referenced.setdefault(target_id, set()).add(field_path)
     return referenced
@@ -489,9 +447,9 @@ def _tainted_nodes(
         if not refs:
             continue
         redacted, truncation = _taint(node_id)
-        if any(_paths_overlap(tainted, ref) for tainted in redacted for ref in refs):
+        if any(paths_overlap(tainted, ref) for tainted in redacted for ref in refs):
             sanitized.append(node_id)
-        if any(_paths_overlap(tainted, ref) for tainted in truncation for ref in refs):
+        if any(paths_overlap(tainted, ref) for tainted in truncation for ref in refs):
             truncated.append(node_id)
     return sorted(sanitized), sorted(truncated)
 

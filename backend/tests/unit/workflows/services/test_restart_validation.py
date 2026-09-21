@@ -290,11 +290,12 @@ async def test_validate_restart_rejects_sanitized_upstream_output() -> None:
 @pytest.mark.asyncio
 async def test_template_reference_forms() -> None:
     """Field paths extracted precisely; whole-namespace refs yield empty paths; prefixes safe."""
-    from syntara.workflows.services.restart_validation import _all_template_refs
+    from syntara.workflows.utils.template_refs import find_template_refs as _all_template_refs
 
     assert _all_template_refs("${step_1.output}") == [("step_1", ("output",))]
     assert _all_template_refs("prefix ${step_1} suffix") == [("step_1", ())]
     assert _all_template_refs({"nested": ["${step_1.items[0]}"]}) == [("step_1", ("items", 0))]
+    assert _all_template_refs("${step_1.items.1}") == [("step_1", ("items", 1))]
     assert _all_template_refs("${step_10.output}") == [("step_10", ("output",))]
     assert _all_template_refs("no refs here") == []
 
@@ -302,7 +303,7 @@ async def test_template_reference_forms() -> None:
 @pytest.mark.asyncio
 async def test_paths_overlap() -> None:
     """Overlap means one field path is a prefix of the other."""
-    from syntara.workflows.services.restart_validation import _paths_overlap
+    from syntara.workflows.utils.template_refs import paths_overlap as _paths_overlap
 
     assert _paths_overlap(("token",), ("token",)) is True
     assert _paths_overlap((), ("token",)) is True
@@ -426,6 +427,37 @@ async def test_validate_restart_payload_marker_taints_stdout_silently() -> None:
     )
     assert verdict.eligible is False
     assert verdict.truncated_node_ids == ["step_1"]
+
+
+@pytest.mark.asyncio
+async def test_validate_restart_translated_provenance_rejects() -> None:
+    """Writer-translated provenance (mapped field names) is honored as-is."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    workflow = _make_workflow(1)
+    execution.workflow_id = workflow.id
+    step_2 = {"id": "step_2", "type": "script", "parameters": {"code": "x", "input_ref": "${step_1.body}"}}
+    nodes = [n for n in NODES if n["id"] != "step_2"] + [step_2]
+    outputs = [_make_completed_activity("step_1", {"body": "cut", "__truncated_fields": ["body"]})]
+    verdict = await validate_restart_from_failure(
+        _field_session(execution, workflow, nodes, outputs), execution.id, ["step_2"]
+    )
+    assert verdict.eligible is False
+    assert verdict.truncated_node_ids == ["step_1"]
+
+
+@pytest.mark.asyncio
+async def test_validate_restart_dotted_index_matches_taint() -> None:
+    """Dotted list indices resolve like the runtime (regression: str/int mismatch)."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    workflow = _make_workflow(1)
+    execution.workflow_id = workflow.id
+    nodes = _nodes_with_refs({"step_2": "${step_1.items.1}"})
+    outputs = [_make_completed_activity("step_1", {"items": ["ok", "[REDACTED]"], "stderr": ""})]
+    verdict = await validate_restart_from_failure(
+        _field_session(execution, workflow, nodes, outputs), execution.id, ["step_2"]
+    )
+    assert verdict.eligible is False
+    assert verdict.sanitized_node_ids == ["step_1"]
 
 
 @pytest.mark.asyncio

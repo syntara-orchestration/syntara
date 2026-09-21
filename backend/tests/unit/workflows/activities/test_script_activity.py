@@ -1054,6 +1054,7 @@ class TestOutputLimitIntegration:
         }
         result = await execute_script_activity(input_config, None)
         assert "[Output truncated:" in result["output"]["stderr"]
+        assert result["output"]["__truncated_fields"] == ["stdout", "stdout_json"]
 
     @pytest.mark.asyncio
     async def test_small_output_no_truncation(self) -> None:
@@ -1065,6 +1066,7 @@ class TestOutputLimitIntegration:
         result = await execute_script_activity(input_config, None)
         assert result["output"]["stdout"].strip() == "hello"
         assert "[Output truncated:" not in result["output"]["stderr"]
+        assert result["output"]["__truncated_fields"] == []
 
 
 class TestPayloadSizeEnforcement:
@@ -1122,8 +1124,8 @@ class TestPayloadSizeEnforcement:
         enforced = _enforce_payload_limit(result, max_bytes=1000)
         assert enforced["output"]["__truncated_fields"] == ["stderr", "stdout", "stdout_json"]
 
-    def test_no_provenance_when_clean(self) -> None:
-        """Untrimmed payloads carry no provenance key."""
+    def test_no_provenance_key_when_clean(self) -> None:
+        """Untrimmed payloads are returned unchanged (explicit clean provenance is attached by the caller)."""
         result = {"output": {"stdout": "hello", "stderr": "", "return_code": 0}}
         assert "__truncated_fields" not in _enforce_payload_limit(result, max_bytes=1_000_000)["output"]
 
@@ -1134,6 +1136,17 @@ class TestPayloadSizeEnforcement:
         assert _stream_truncated_fields(stdout_truncated=True, stderr_truncated=False) == ["stdout", "stdout_json"]
         assert _stream_truncated_fields(stdout_truncated=False, stderr_truncated=True) == ["stderr"]
         assert _stream_truncated_fields(stdout_truncated=False, stderr_truncated=False) == []
+
+    def test_translate_stream_taint(self) -> None:
+        """Stream taint translates through renames; unmapped/static/{} stay clean."""
+        from syntara.workflows.workflow_engine.activities.script_activity import _translate_stream_taint
+
+        assert _translate_stream_taint(["stdout", "stdout_json"], None) == ["stdout", "stdout_json"]
+        assert _translate_stream_taint(["stdout", "stdout_json"], {}) == []
+        assert _translate_stream_taint(["stdout", "stdout_json"], {"body": "${result.stdout}"}) == ["body"]
+        assert _translate_stream_taint(["stderr"], {"body": "${result.stdout}"}) == []
+        assert _translate_stream_taint(["stdout"], {"fixed": "static text"}) == []
+        assert _translate_stream_taint([], {"body": "${result.stdout}"}) == []
 
 
 class TestCgroupMemoryLimit:
