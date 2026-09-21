@@ -2,6 +2,7 @@ import type { Preview } from '@storybook/tanstack-react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useEffect, useMemo, type ReactNode } from 'react'
 
+import '@xyflow/react/dist/style.css'
 import '../src/index.css'
 import { type ColorScheme, applyDocumentColorScheme, resolveColorScheme } from '../src/providers/theme/colorScheme'
 import { ColorSchemeProvider } from '../src/providers/theme/ColorSchemeProvider'

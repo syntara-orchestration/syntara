@@ -2,11 +2,12 @@ import { Content, ContentVariants, StackItem } from '@patternfly/react-core'
 import { RhUiDuplicateIcon, RhUiPlayIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import { ExecutorTypeEnum } from '@syntara/contracts'
-import { Position, ReactFlow, ReactFlowProvider, type Node, type NodeProps } from '@xyflow/react'
+import { Background, BackgroundVariant, Position, ReactFlow, type Node, type NodeProps } from '@xyflow/react'
 import { userEvent } from 'storybook/test'
 
 import { FlowNodeType } from '../../constants'
 import { ACTIVITY_STATUS } from '../../routes/builder/utils/executionState/executionHelpers'
+import { StandardNodeHeader } from '../../routes/workflows/canvas/nodes/common/StandardNodeHeader'
 import { NODE_TYPE_COLORS } from '../../routes/workflows/canvas/nodeTypeColors'
 
 import { NodeBody } from './NodeBody'
@@ -15,7 +16,6 @@ import styles from './NodeComponent.stories.module.css'
 import { KitchenSinkGallery } from './NodeComponentStoryHelpers'
 import { NodeExpandToggle } from './NodeExpandToggle'
 import { NodeHeader } from './NodeHeader'
-import { NodeMenu } from './NodeMenu'
 import { NodeSidePanel } from './NodeSidePanel'
 import { NodeTitle } from './NodeTitle'
 
@@ -69,11 +69,33 @@ function createNodeProps(options: NodePropsOptions): NodeProps {
   } as unknown as NodeProps
 }
 
+type StoryCanvasNode = Node<{ content: React.ReactNode }, 'storybook'>
+
+function StoryCanvasNodeComponent(props: NodeProps<StoryCanvasNode>) {
+  return <>{props.data.content}</>
+}
+
+const storyCanvasNodeTypes = { storybook: StoryCanvasNodeComponent }
+
 function NodeStoryCanvas({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <ReactFlowProvider>
-      <div className={styles.storyCanvas}>{children}</div>
-    </ReactFlowProvider>
+    <div className={styles.storyCanvas}>
+      <ReactFlow
+        defaultViewport={{ x: 0, y: 0, zoom: 1 }}
+        fitView={false}
+        nodes={[{ id: 'storybook-node', type: 'storybook', position: { x: 64, y: 64 }, data: { content: children } }]}
+        nodeTypes={storyCanvasNodeTypes}
+        nodesConnectable
+        nodesDraggable={false}
+        panOnDrag={false}
+        proOptions={{ hideAttribution: true }}
+        zoomOnDoubleClick={false}
+        zoomOnPinch={false}
+        zoomOnScroll={false}
+      >
+        <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
+      </ReactFlow>
+    </div>
   )
 }
 
@@ -145,11 +167,12 @@ type Story = StoryObj<typeof meta>
 export const Default: Story = {
   render: () => (
     <NodeComponent nodeProps={createNodeProps({ id: 'default' })} topBarColor={NODE_TYPE_COLORS.actionScript}>
-      <NodeHeader>
-        <NodeExpandToggle />
-        <NodeTitle title="Run inventory synchronization" subTitle="Script task" />
-        <NodeMenu menuActions={menuActions} />
-      </NodeHeader>
+      <StandardNodeHeader
+        expandable
+        menuActions={menuActions}
+        subtitle="Script task"
+        title="Run inventory synchronization"
+      />
       <NodeBody>
         <Content component={ContentVariants.small}>Collect inventory from the selected managed hosts.</Content>
       </NodeBody>
@@ -169,11 +192,12 @@ export const Selected: Story = {
       nodeProps={createNodeProps({ id: 'selected', selected: true })}
       topBarColor={NODE_TYPE_COLORS.actionScript}
     >
-      <NodeHeader>
-        <NodeExpandToggle />
-        <NodeTitle title="Run inventory synchronization" subTitle="Script task" />
-        <NodeMenu menuActions={menuActions} />
-      </NodeHeader>
+      <StandardNodeHeader
+        expandable
+        menuActions={menuActions}
+        subtitle="Script task"
+        title="Run inventory synchronization"
+      />
       <NodeBody>
         <Content component={ContentVariants.small}>
           The selected node keeps its normal type indicator and content.
@@ -275,11 +299,7 @@ export const CollapsedAndExpanded: Story = {
 export const Menu: Story = {
   render: () => (
     <NodeComponent nodeProps={createNodeProps({ id: 'menu' })} topBarColor={NODE_TYPE_COLORS.actionScript}>
-      <NodeHeader>
-        <NodeExpandToggle />
-        <NodeTitle title="Node action menu" subTitle="Script task" />
-        <NodeMenu menuActions={menuActions} />
-      </NodeHeader>
+      <StandardNodeHeader expandable menuActions={menuActions} subtitle="Script task" title="Node action menu" />
       <NodeBody>
         <Content component={ContentVariants.small}>Use the kebab button to open the node actions.</Content>
       </NodeBody>

@@ -1,7 +1,6 @@
 .storyCanvas {
-  min-height: 24rem;
-  padding: var(--pf-t--global--spacer--2xl);
-  overflow: visible;
+  height: 32rem;
+  overflow: hidden;
   background: var(--pf-t--global--background--color--secondary--default);
 }
 

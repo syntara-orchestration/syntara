@@ -5,16 +5,13 @@ import { Position, type NodeProps } from '@xyflow/react'
 
 import { FlowNodeType } from '../../constants'
 import { ACTIVITY_STATUS } from '../../routes/builder/utils/executionState/executionHelpers'
+import { StandardNodeHeader } from '../../routes/workflows/canvas/nodes/common/StandardNodeHeader'
 import { NODE_TYPE_COLORS } from '../../routes/workflows/canvas/nodeTypeColors'
 
 import { NodeBody } from './NodeBody'
 import { NodeComponent } from './NodeComponent'
 import styles from './NodeComponent.stories.module.css'
-import { NodeExpandToggle } from './NodeExpandToggle'
-import { NodeHeader } from './NodeHeader'
-import { NodeMenu } from './NodeMenu'
 import { NodeSidePanel } from './NodeSidePanel'
-import { NodeTitle } from './NodeTitle'
 
 type StoryNodeData = Record<string, unknown> & {
   id: string
@@ -150,11 +147,12 @@ function KitchenNodeExample({ node }: Readonly<{ node: KitchenNode }>) {
         {node.label}
       </Content>
       <NodeComponent nodeProps={node.nodeProps} {...node.nodeOptions}>
-        <NodeHeader>
-          {node.expandable && <NodeExpandToggle />}
-          <NodeTitle title={node.title} subTitle={node.subTitle} />
-          {node.menu && <NodeMenu menuActions={menuActions} />}
-        </NodeHeader>
+        <StandardNodeHeader
+          expandable={node.expandable}
+          menuActions={node.menu ? menuActions : undefined}
+          subtitle={node.subTitle}
+          title={node.title}
+        />
         {node.body && (
           <NodeBody>
             <Content component={ContentVariants.small}>{node.body}</Content>
