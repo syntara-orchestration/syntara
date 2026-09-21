@@ -92,14 +92,13 @@ function NodeStoryCanvas({ children, height = '32rem' }: Readonly<{ children: Re
       <ReactFlow
         defaultViewport={{ x: 0, y: 0, zoom: 1 }}
         fitView={false}
-        style={{ minWidth: 1200 }}
         nodes={[
           {
             id: 'storybook-node',
             type: 'storybook',
             position: { x: 64, y: 64 },
             data: { content: children },
-            style: { width: 1200 },
+            style: { width: 'calc(100% - 8rem)' },
           },
         ]}
         nodeTypes={storyCanvasNodeTypes}
@@ -477,7 +476,7 @@ export const Handles: Story = {
 
 /** Fixed visual inventory for global-node states. Menus remain closed so no popover obscures adjacent nodes. */
 export const KitchenSink: Story = {
-  parameters: { storyCanvas: { height: '80rem' } },
+  parameters: { storyCanvas: { height: '100rem' } },
   render: () => <KitchenSinkGallery />,
   play: async ({ canvas }) => {
     const [, collapsedToggle] = canvas.getAllByRole('button', { name: 'Collapse step details' })
