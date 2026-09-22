@@ -3,7 +3,14 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 
 import { userHelp } from './userFieldHelp'
-import { EMAIL_FEDERATED_EDIT_HELP, EMAIL_HELP, GROUPS_HELP, STATUS_HELP, USERNAME_HELP } from './userFieldHelpText'
+import {
+  EMAIL_CREATE_HELP,
+  EMAIL_FEDERATED_EDIT_HELP,
+  EMAIL_HELP,
+  GROUPS_HELP,
+  STATUS_HELP,
+  USERNAME_HELP,
+} from './userFieldHelpText'
 
 describe('userHelp', () => {
   it('exposes prebuilt help elements for each user form field', async () => {
@@ -12,6 +19,7 @@ describe('userHelp', () => {
       <>
         {userHelp.username}
         {userHelp.email}
+        {userHelp.emailCreate}
         {userHelp.emailFederatedEdit}
         {userHelp.groups}
         {userHelp.status}
@@ -27,6 +35,10 @@ describe('userHelp', () => {
 
     await user.keyboard('{Escape}')
     await user.click(screen.getAllByRole('button', { name: 'More info for Email' })[1])
+    expect(screen.getByText(EMAIL_CREATE_HELP)).toBeInTheDocument()
+
+    await user.keyboard('{Escape}')
+    await user.click(screen.getAllByRole('button', { name: 'More info for Email' })[2])
     expect(screen.getByText(EMAIL_FEDERATED_EDIT_HELP)).toBeInTheDocument()
 
     await user.keyboard('{Escape}')
