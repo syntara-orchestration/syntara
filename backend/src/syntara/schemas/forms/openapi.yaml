@@ -21,7 +21,15 @@ paths:
   /form_prompts:
     get:
       summary: List form prompts
-      description: List form prompts filtered by execution ID. Internal endpoint for expire/cancel activities.
+      description: |-
+        List form prompts with filtering, sorting, and pagination.
+
+        Supports filtering using query parameters with standard operators:
+        - status: Filter by form prompt status (status=pending)
+        - execution_id: Filter by parent execution ID (execution_id=uuid)
+        - prompt_node_id: Filter by node ID (prompt_node_id=form1)
+
+        Uses cursor-based pagination for scalability and consistency.
       operationId: list_form_prompts
       tags:
         - Form Prompts
@@ -29,21 +37,39 @@ paths:
         resource: form_prompt
         action: read
       parameters:
-        - name: execution_id
+        - name: limit
           in: query
-          required: true
+          required: false
           schema:
-            type: string
-            format: uuid
-            title: Execution Id
-        - name: status
+            type: integer
+            maximum: 100
+            exclusiveMinimum: 0
+            default: 20
+            title: Limit
+        - name: cursor
           in: query
           required: false
           schema:
             anyOf:
-              - $ref: "#/components/schemas/FormPromptStatus"
+              - type: string
               - type: 'null'
-            title: Status
+            title: Cursor
+        - name: sort
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+                pattern: ^-?[a-z][a-z0-9_]*$
+              - type: 'null'
+            title: Sort
+        - name: include_total
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+            title: Include Total
       responses:
         "200":
           description: List of form prompts

@@ -7,7 +7,6 @@ AAP-91889 will extend with full filtering/sorting/enrichment.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
-from uuid import UUID
 
 import structlog
 from sqlalchemy import update
@@ -49,8 +48,8 @@ class FormPromptService(BaseService):
 
     def __init__(
         self,
-        session: "AsyncSession",
-        user: "User",
+        session: AsyncSession,
+        user: User,
     ) -> None:
         """Initialize service with database session and user context.
 
@@ -165,10 +164,10 @@ class FormPromptService(BaseService):
         limit: int = 20,
         cursor: str | None = None,
         sort: str | None = None,
-        query_params_items: "Iterable[tuple[str, str]] | None" = None,
+        query_params_items: Iterable[tuple[str, str]] | None = None,
         *,
         include_total: bool = False,
-        allowed_projects: "AllowedProjectsResult | None" = None,
+        allowed_projects: AllowedProjectsResult | None = None,
     ) -> FormPromptListResponse:
         """List form prompts with filtering, sorting, and pagination.
 
@@ -266,8 +265,8 @@ class FormPromptService(BaseService):
 
             stmt = (
                 update(FormPrompt)
-                .where(FormPrompt.id == update_request.prompt_id)
-                .where(FormPrompt.status == current_status)
+                .where(FormPrompt.id == update_request.prompt_id)  # type: ignore[arg-type]
+                .where(FormPrompt.status == current_status)  # type: ignore[arg-type]
                 .values(**update_values)
             )
 

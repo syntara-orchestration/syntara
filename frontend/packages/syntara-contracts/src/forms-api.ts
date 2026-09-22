@@ -13,7 +13,14 @@ export interface paths {
     }
     /**
      * List form prompts
-     * @description List form prompts filtered by execution ID. Internal endpoint for expire/cancel activities.
+     * @description List form prompts with filtering, sorting, and pagination.
+     *
+     *     Supports filtering using query parameters with standard operators:
+     *     - status: Filter by form prompt status (status=pending)
+     *     - execution_id: Filter by parent execution ID (execution_id=uuid)
+     *     - prompt_node_id: Filter by node ID (prompt_node_id=form1)
+     *
+     *     Uses cursor-based pagination for scalability and consistency.
      */
     get: operations['list_form_prompts']
     put?: never
@@ -837,9 +844,11 @@ export type $defs = Record<string, never>
 export interface operations {
   list_form_prompts: {
     parameters: {
-      query: {
-        execution_id: string
-        status?: components['schemas']['FormPromptStatus'] | null
+      query?: {
+        limit?: number
+        cursor?: string | null
+        sort?: string | null
+        include_total?: boolean
       }
       header?: never
       path?: never

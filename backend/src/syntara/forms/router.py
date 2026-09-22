@@ -5,13 +5,13 @@ AAP-91889 will extend with full filtering/sorting/enrichment and user-facing end
 """
 
 from typing import Annotated
-from uuid import UUID
 
 from fastapi import Depends, Request, status
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.auth import get_current_user
-from syntara.authz.dependencies import PermissionChecker, VisibilityFilter, VisibilityResult
+from syntara.authz.dependencies import PermissionChecker, VisibilityFilter
+from syntara.authz.engine import VisibilityResult
 from syntara.core.database.session import get_db
 from syntara.core.models import User
 from syntara.core.models.base.query_params import BaseListParams
@@ -62,7 +62,14 @@ async def create_form_prompt(
     dependencies=[Depends(PermissionChecker("form_prompt", "read"))],
     operation_id="list_form_prompts",
     summary="List form prompts",
-    description="List form prompts filtered by execution ID. Internal endpoint for expire/cancel activities.",
+    description="""List form prompts with filtering, sorting, and pagination.
+
+Supports filtering using query parameters with standard operators:
+- status: Filter by form prompt status (status=pending)
+- execution_id: Filter by parent execution ID (execution_id=uuid)
+- prompt_node_id: Filter by node ID (prompt_node_id=form1)
+
+Uses cursor-based pagination for scalability and consistency.""",
     response_description="List of form prompts",
 )
 async def list_form_prompts(
