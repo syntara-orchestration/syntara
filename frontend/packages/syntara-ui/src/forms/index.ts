@@ -21,6 +21,13 @@ export {
   validateFormDefinitionDefaults,
   validateFormSubmission,
 } from './formSubmissionValidation'
+export { labelToValueName, slugifyLabelToValueNameBase } from './labelToValueName'
+export { formDefinitionToJsonSchema, formDefinitionToJsonSchemaString } from './formDefinitionToJsonSchema'
+export {
+  jsonSchemaStringToFormDefinition,
+  jsonSchemaToFormDefinition,
+  type JsonSchemaToFormDefinitionResult,
+} from './jsonSchemaToFormDefinition'
 export type {
   DynamicOptionsSource,
   FormFieldByType,

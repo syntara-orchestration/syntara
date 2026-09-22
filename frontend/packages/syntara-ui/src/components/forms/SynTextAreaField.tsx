@@ -40,6 +40,8 @@ export type SynTextAreaFieldProps<
   rows?: number
   /** Disables the textarea. */
   isDisabled?: boolean
+  /** Called after the field value changes (user input). */
+  onValueChange?: () => void
 }
 
 /**
@@ -73,6 +75,7 @@ export function SynTextAreaField<
   placeholder,
   rows,
   isDisabled,
+  onValueChange,
 }: Readonly<SynTextAreaFieldProps<TFieldValues, TName>>) {
   const resolvedFieldId = fieldId ?? name
 
@@ -92,7 +95,10 @@ export function SynTextAreaField<
           placeholder={placeholder}
           validated={fieldState.error ? 'error' : 'default'}
           value={field.value ?? ''}
-          onChange={field.onChange}
+          onChange={(_event, value) => {
+            field.onChange(value)
+            onValueChange?.()
+          }}
           onBlur={field.onBlur}
           name={field.name}
           rows={rows}

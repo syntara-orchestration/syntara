@@ -1,0 +1,148 @@
+.designTab :global(.pf-v6-c-form__label-text) {
+  font-weight: var(--pf-t--global--font--weight--body--bold);
+}
+
+.designTab :global(.pf-v6-c-form__group-control) {
+  margin-block-start: var(--pf-t--global--spacer--sm);
+}
+
+.dragging {
+  opacity: 0.6;
+}
+
+.dragOverlay {
+  padding: var(--pf-t--global--spacer--md);
+  background: var(--pf-t--global--background--color--primary--default);
+  border: var(--pf-t--global--border--width--regular) solid var(--pf-t--global--border--color--default);
+  border-radius: var(--pf-t--global--border--radius--medium);
+  box-shadow: var(--pf-t--global--box-shadow--md);
+}
+
+.fieldRow {
+  width: 100%;
+}
+
+.dragHandle {
+  cursor: grab;
+  color: var(--pf-t--global--icon--color--regular);
+  margin-block-start: var(--pf-t--global--spacer--md);
+}
+
+.headerToggle {
+  flex-shrink: 0;
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+.fieldCard {
+  flex-grow: 1;
+}
+
+.fieldCardBody {
+  position: relative;
+}
+
+.headerRow {
+  padding-inline-end: var(--pf-t--global--spacer--2xl);
+}
+
+.headerActions {
+  position: absolute;
+  inset-block-start: var(--pf-t--global--spacer--xs);
+  inset-inline-end: var(--pf-t--global--spacer--xs);
+  z-index: 1;
+}
+
+.headerLabelField {
+  min-width: 0;
+}
+
+.toggleButton {
+  padding-block-start: 0;
+}
+
+.toggleIcon {
+  display: inline-block;
+  min-width: var(--pf-t--global--icon--size--font--body--default);
+  color: var(--pf-t--global--icon--color--regular);
+  transition: transform var(--pf-t--global--motion--duration--icon--default)
+    var(--pf-t--global--motion--timing-function--default);
+  transform: rotate(0);
+}
+
+.toggleButton[aria-expanded='true'] .toggleIcon {
+  transform: rotate(-180deg);
+}
+
+.staticOptionsSection {
+  margin-block-start: var(--pf-t--global--spacer--md);
+}
+
+.staticOptionsHeading {
+  margin-block-end: var(--pf-t--global--spacer--sm);
+  font-weight: var(--pf-t--global--font--weight--body--bold);
+}
+
+.staticOptionsAdd {
+  margin-block-start: var(--pf-t--global--spacer--sm);
+}
+
+.defaultValueCheckboxList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pf-t--global--spacer--md);
+}
+
+.staticOptionRow {
+  width: 100%;
+}
+
+.staticOptionDragHandle {
+  cursor: grab;
+  color: var(--pf-t--global--icon--color--regular);
+  align-self: flex-start;
+  padding-block-start: 0;
+}
+
+.staticOptionDragHandle:active {
+  cursor: grabbing;
+}
+
+.staticOptionFieldsColumn {
+  min-width: 0;
+}
+
+.staticOptionFields {
+  position: relative;
+  width: 100%;
+  padding-inline-end: var(--pf-t--global--spacer--2xl);
+}
+
+.staticOptionFields :global(.pf-v6-c-form-control) {
+  width: 100%;
+}
+
+.staticOptionRemove {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-end: 0;
+  z-index: 1;
+}
+
+.staticOptionDragging {
+  opacity: 0.6;
+}
+
+.optionsDynamicExpression {
+  margin-block-start: var(--pf-t--global--spacer--md);
+}
+
+.staticDefaultPlaceholder {
+  color: var(--pf-t--global--text--color--subtle);
+}
+
+.jsonSchemaImportError {
+  margin-block: var(--pf-t--global--spacer--sm);
+}
