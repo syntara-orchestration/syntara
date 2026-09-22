@@ -432,6 +432,11 @@ E2E_COVERAGE_EXEMPT: set[str] = {
     "policy:read:any",
     "policy:update:any",
     "policy:delete:any",
+    # Workflow node kinds (ANSTRAT-1750) — default allow on `authenticated`;
+    # verdicts covered by tests/unit/authz/test_rego_workflow_node.py and the
+    # save-time / launch-time integration tests under tests/integration/workflows.
+    "workflow_node:write:any",
+    "workflow_node:execute:any",
     # Role assignments (system-level)
     "role-assignment:read:any",
     "role-assignment:assign:any",

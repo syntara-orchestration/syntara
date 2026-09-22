@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://automation.example.com/schemas/workflows/v2/control-nodes/permission_check",
+  "title": "Permission Check Node",
+  "description": "Route on whether the immediately upstream node was denied workflow_node:execute for this run",
+  "parameterSchema": {
+    "type": "object",
+    "description": "Permission check nodes take no configuration; the node they evaluate is the source of their single incoming edge.",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "settingSchema": {
+    "type": "object",
+    "description": "Permission check nodes have no user-configurable settings; the check is a lookup in the launch-time denied set.",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "resultSchema": {
+    "title": "Completed Result",
+    "type": "object",
+    "required": [
+      "status",
+      "allowed",
+      "checked_node_id"
+    ],
+    "properties": {
+      "status": {
+        "type": "string",
+        "const": "completed",
+        "description": "Permission check nodes always complete; they never fail"
+      },
+      "allowed": {
+        "type": "boolean",
+        "description": "True when the upstream node was not denied, routing via the 'allowed' port"
+      },
+      "checked_node_id": {
+        "type": "string",
+        "description": "Id of the upstream node that was evaluated (a permission check always has exactly one)"
+      },
+      "kind": {
+        "type": "string",
+        "description": "Node kind of the denied upstream node (present only when allowed is false)"
+      },
+      "denied_by": {
+        "type": "string",
+        "description": "Name of the policy that denied the upstream node (present only when allowed is false)"
+      }
+    },
+    "additionalProperties": false
+  }
+}

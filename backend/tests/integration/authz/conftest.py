@@ -37,6 +37,7 @@ _TEST_RESOURCE_ACTIONS: dict[str, list[str]] = {
     "setting": ["read", "write"],
     "user": ["create", "delete", "read", "write"],
     "workflow": ["create", "delete", "read", "run", "write"],
+    "workflow_node": ["execute", "write"],
 }
 
 
@@ -55,7 +56,7 @@ def _install_test_resource_actions() -> Generator[None, None, None]:
     )
     _set_registry(
         _TEST_RESOURCE_ACTIONS,
-        project_eligible=frozenset({"workflow", "execution", "project"}),
+        project_eligible=frozenset({"workflow", "execution", "project", "workflow_node"}),
     )
     try:
         yield

@@ -24,6 +24,7 @@ from temporalio.worker import Worker
 
 from syntara.workflows.utils.schedule_parser import build_schedule_execution_workflow_id
 from syntara.workflows.workflow_engine.activities.manual_trigger import manual_trigger
+from syntara.workflows.workflow_engine.activities.node_permissions_activity import NODE_PERMISSION_ACTIVITIES
 from syntara.workflows.workflow_engine.activities.runtime_settings_activity import fetch_workflow_runtime_settings
 from syntara.workflows.workflow_engine.activities.script_activity import execute_script_activity
 from syntara.workflows.workflow_engine.client_interceptor import WorkflowAuthClientInterceptor
@@ -59,6 +60,9 @@ _TEST_ACTIVITIES: list[Callable[..., object]] = [
     manual_trigger,
     execute_script_activity,
     fetch_workflow_runtime_settings,
+    # Node-kind permission activities (ANSTRAT-1750): the engine calls
+    # check_node_kind_enabled before every executor node.
+    *NODE_PERMISSION_ACTIVITIES,
 ]
 
 _SCHEDULE_TEST_ACTIVITIES: list[Callable[..., object]] = list(_TEST_ACTIVITIES)

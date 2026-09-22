@@ -58,7 +58,19 @@ async def session_app(
     mock_evaluator.health = AsyncMock(return_value=True)
     mock_evaluator.start = MagicMock()
     mock_evaluator.stop = AsyncMock()
-    mock_evaluator.evaluate = AsyncMock(return_value={"allow": True})
+    # AuthzEvaluator.evaluate is synchronous: callers that read
+    # app.state.authz_evaluator (e.g. WorkflowService) feed the result straight
+    # into the authz engine, so it must not return a coroutine.
+    mock_evaluator.evaluate = MagicMock(
+        return_value={
+            "allow": True,
+            "deny": False,
+            "matched_policy": "test-allow-all",
+            "denial_reason": "",
+            "denied_by": "",
+            "allowed_projects": ["*"],
+        }
+    )
 
     with (
         patch("syntara.core.database.session.engine", test_db_engine),
@@ -189,7 +201,19 @@ def sync_test_client(
     mock_evaluator.health = AsyncMock(return_value=True)
     mock_evaluator.start = MagicMock()
     mock_evaluator.stop = AsyncMock()
-    mock_evaluator.evaluate = AsyncMock(return_value={"allow": True})
+    # AuthzEvaluator.evaluate is synchronous: callers that read
+    # app.state.authz_evaluator (e.g. WorkflowService) feed the result straight
+    # into the authz engine, so it must not return a coroutine.
+    mock_evaluator.evaluate = MagicMock(
+        return_value={
+            "allow": True,
+            "deny": False,
+            "matched_policy": "test-allow-all",
+            "denial_reason": "",
+            "denied_by": "",
+            "allowed_projects": ["*"],
+        }
+    )
 
     try:
         with (

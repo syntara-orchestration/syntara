@@ -50,3 +50,25 @@ DEFAULT_MAX_OUTPUT_BYTES = 1_048_576
 _TEMPORAL_BLOB_SIZE_ERROR = 2_097_152  # 2 MB
 # 10% headroom covers JSON escaping expansion and protobuf envelope overhead.
 TEMPORAL_PAYLOAD_MAX_BYTES = int(_TEMPORAL_BLOB_SIZE_ERROR * 0.9)
+
+# ---------------------------------------------------------------------------
+# Node-kind permissions (ANSTRAT-1750)
+# ---------------------------------------------------------------------------
+# These live here because the Temporal workflow sandbox needs them: importing
+# them from syntara.workflows.node_launch_checks or node_kind_switch would drag
+# the authz (regopy) and settings-cache stacks into the sandbox and break
+# workflow validation.  The sandbox only ever needs the strings; the evaluator
+# and the settings cache stay on the activity side.
+
+NODE_EXECUTE_DENIED_ERROR_CODE = "node_execute_denied"
+"""Stable error code on a node that was not executed because of a deny policy."""
+
+PERMISSION_CHECK_ALLOWED_PORT = "allowed"
+PERMISSION_CHECK_DENIED_PORT = "denied"
+PERMISSION_CHECK_PORTS: frozenset[str] = frozenset({PERMISSION_CHECK_ALLOWED_PORT, PERMISSION_CHECK_DENIED_PORT})
+"""Output ports of the ``permission_check`` node, mirroring ``condition``'s true/false."""
+
+CHECK_NODE_KIND_ENABLED_ACTIVITY = "check_node_kind_enabled"
+RECORD_NODE_EXECUTE_DENIED_ACTIVITY = "record_node_execute_denied"
+RECOMPUTE_DENIED_NODES_ACTIVITY = "recompute_denied_nodes"
+"""Names of the node-permission activities, dispatched by name from the sandbox."""

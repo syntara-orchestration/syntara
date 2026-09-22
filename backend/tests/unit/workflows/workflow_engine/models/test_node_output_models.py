@@ -434,6 +434,7 @@ class TestNodeOutputModelsRegistry:
         expected_types = {
             NodeType.SCRIPT,
             NodeType.HTTP_REQUEST,
+            NodeType.MCP_TOOL,
             NodeType.AAP_JOB_TEMPLATE,
             NodeType.AAP_WORKFLOW_JOB_TEMPLATE,
             NodeType.AGENTIC,

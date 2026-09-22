@@ -111,6 +111,17 @@
       "since": "2.0.0"
     },
     {
+      "type": "mcp_tool",
+      "name": "MCP Tool",
+      "description": "Invoke a named tool on an MCP server integration",
+      "labels": {
+        "category": "executor"
+      },
+      "schema_ref": "../executors/mcp_tool.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
       "type": "agentic",
       "name": "Task Agent",
       "description": "Execute task agent tasks with asynchronous completion",
@@ -140,6 +151,17 @@
         "category": "executor"
       },
       "schema_ref": "../executors/internal_activity.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
+      "type": "permission_check",
+      "name": "Permission Check",
+      "description": "Route on whether the upstream node was denied execution for this run",
+      "labels": {
+        "category": "control"
+      },
+      "schema_ref": "../control-nodes/permission_check.schema.json",
       "deprecated": false,
       "since": "2.0.0"
     },

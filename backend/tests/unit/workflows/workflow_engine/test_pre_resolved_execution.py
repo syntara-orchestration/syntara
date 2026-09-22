@@ -33,6 +33,8 @@ def mock_temporal_workflow() -> Generator[MagicMock]:
         mock_wf.logger = mock_logger
         mock_wf.info.return_value = MagicMock(workflow_id="test-wf-id")
         mock_wf.execute_activity = AsyncMock()
+        # Node-kind kill-switch pre-check (ANSTRAT-1750) runs as a local activity.
+        mock_wf.execute_local_activity = AsyncMock(return_value=None)
         yield mock_wf
 
 

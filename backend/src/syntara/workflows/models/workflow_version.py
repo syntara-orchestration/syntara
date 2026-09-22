@@ -43,6 +43,7 @@ class WorkflowVersion(UserOwnedResource, table=True):
         workflow_definition: Complete workflow definition as dict (JSONB)
         change_description: Optional description of changes in this version
         name: Optional user-provided label for this version
+        published_by: Principal that last published this version (None if never published)
 
     Relationships:
         workflow: Parent workflow
@@ -101,6 +102,13 @@ class WorkflowVersion(UserOwnedResource, table=True):
         description="Optional user-provided label for this version",
     )
 
+    published_by: UUID | None = Field(
+        default=None,
+        foreign_key="principals.id",
+        index=True,
+        description="Principal that last published this version; triggered runs evaluate node permissions as them",
+    )
+
     # Relationships
     workflow: "Workflow" = Relationship(
         back_populates="versions",
@@ -149,7 +157,7 @@ class WorkflowVersionRead(UserReferenceFieldsMixin, SQLModel):
 
     # Versions record who authored them but are never themselves updated, so the
     # audit pair does not apply -- only created_by carries a reference here.
-    USER_REFERENCE_FIELDS: ClassVar[tuple[str, ...]] = ("created_by",)
+    USER_REFERENCE_FIELDS: ClassVar[tuple[str, ...]] = ("created_by", "published_by")
 
     id: UUID
     workflow_id: UUID
@@ -162,6 +170,10 @@ class WorkflowVersionRead(UserReferenceFieldsMixin, SQLModel):
     last_published_at: datetime | None = None
     last_unpublished_at: datetime | None = None
     created_by: UserReference | UUID | str | None = Field(default=None, description="User who created the version")
+    published_by: UserReference | UUID | str | None = Field(
+        default=None,
+        description="Principal that last published the version; triggered runs evaluate node permissions as them",
+    )
     created_at: datetime
     updated_at: datetime
 

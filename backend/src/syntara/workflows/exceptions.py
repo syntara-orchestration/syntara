@@ -5,11 +5,17 @@ following DRY principle by centralizing exception definitions.
 """
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from syntara.core.exception_registry import fastapi_exception
 from syntara.core.exceptions import SyntaraError
 from syntara.workflows.models.validation_finding import ValidationResult
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from syntara.workflows.node_permissions import NodeKindDenial
 
 
 class WorkflowError(SyntaraError):
@@ -39,6 +45,38 @@ class WorkflowPublishValidationError(WorkflowError):
         """Initialize with the validation result."""
         self.validation_result = validation_result
         super().__init__("Cannot publish workflow with validation errors or warnings")
+
+
+@fastapi_exception(handler="syntara.workflows.error_handlers.node_kind_write_denied_handler")
+class NodeKindWriteDeniedError(WorkflowError):
+    """Raised when a save would introduce node kinds the principal may not write.
+
+    A node kind is "introduced" when it is absent from the latest saved
+    version of the same workflow.  Kinds already present stay editable, so
+    this only fires for kinds the save adds.
+    """
+
+    def __init__(self, denials: "Sequence[NodeKindDenial]") -> None:
+        """Initialize with the denied node kinds."""
+        self.denials = list(denials)
+        kinds = ", ".join(denial.kind for denial in self.denials)
+        super().__init__(f"Not allowed to add workflow nodes of kind: {kinds}")
+
+
+@fastapi_exception(handler="syntara.workflows.error_handlers.node_kind_disabled_handler")
+class NodeKindDisabledError(WorkflowError):
+    """Raised when a definition still contains a node whose kind was disabled platform-wide.
+
+    Disabling a kind is a kill switch, not a permission (F-13): it refuses the
+    save and the launch for everyone, admins included, until the nodes are
+    removed or the kind is re-enabled.
+    """
+
+    def __init__(self, disabled_nodes: "Sequence[tuple[str, str]]") -> None:
+        """Initialize with the offending ``(node_id, kind)`` pairs."""
+        self.disabled_nodes = [{"node_id": node_id, "kind": kind} for node_id, kind in disabled_nodes]
+        detail = ", ".join(f"{node_id} ({kind})" for node_id, kind in disabled_nodes)
+        super().__init__(f"Workflow contains nodes of a disabled kind: {detail}")
 
 
 @fastapi_exception(handler="syntara.workflows.error_handlers.workflow_not_found_handler")
@@ -324,3 +362,36 @@ class ScheduledTriggerSyncError(ScheduledTriggerError):
         self.workflow_id = workflow_id
         self.trigger_count = trigger_count
         super().__init__(f"Scheduled trigger operation failed for workflow {workflow_id}: Temporal is unavailable")
+
+
+# ============================================================================
+# Node Kind Kill Switch Exceptions
+# ============================================================================
+
+
+@fastapi_exception(handler="syntara.workflows.error_handlers.node_kind_not_found_handler")
+class NodeKindNotFoundError(WorkflowError):
+    """Raised when an unknown node kind is addressed by the node-kind API."""
+
+    def __init__(self, kind: str) -> None:
+        """Initialize with the unknown kind."""
+        self.kind = kind
+        super().__init__(f"Unknown node kind '{kind}'")
+
+
+@fastapi_exception(handler="syntara.workflows.error_handlers.node_kind_not_switchable_handler")
+class NodeKindNotSwitchableError(WorkflowError):
+    """Raised when a caller tries to disable a node kind that must always stay on.
+
+    Flow control kinds (condition, converge, loop, switch, wait and the
+    permission check node) route the graph and drive denial handling, so
+    disabling them would break the engine itself.
+    """
+
+    def __init__(self, kind: str, category: str) -> None:
+        """Initialize with the kind and its registry category."""
+        self.kind = kind
+        self.category = category
+        super().__init__(
+            f"Node kind '{kind}' ({category}) cannot be disabled: flow control nodes are required for workflow routing"
+        )

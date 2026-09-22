@@ -10,9 +10,11 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.authz.audit.policy_lifecycle import PolicyLifecycleEvent
+from syntara.authz.deny_eligibility import deny_not_allowed_message, find_ineligible_deny_actions
 from syntara.authz.exceptions import (
     BuiltinProtectionError,
-    DenyEffectNotSupportedError,
+    DenyEffectNotAllowedError,
+    InvalidNodeKindError,
     InvalidResourceActionError,
     PolicyNameConflictError,
     PolicyNotFoundError,
@@ -83,17 +85,28 @@ class PolicyService(BaseService):
             raise InvalidResourceActionError(msg)
 
     @staticmethod
-    def _validate_no_deny_effect(statements: list[dict[str, Any]]) -> None:
-        """Reject deny-effect statements (AAP-74620).
+    def _validate_deny_effect(statements: list[dict[str, Any]]) -> None:
+        """Reject deny-effect statements outside the deny-eligible allowlist (AAP-74620).
 
-        Deny-effect policies are not yet supported. A project-scoped deny
-        can lock out higher-privileged users because deny unconditionally
-        overrides allow in Rego. Re-enable when scoped deny controls are
-        implemented (e.g. admin-only via policy:create-deny permission).
+        Deny unconditionally overrides allow in Rego and there is no
+        superuser, so a deny that could reach ``policy``, ``role`` or
+        ``role-assignment`` would be unrecoverable through the API.  Deny is
+        therefore limited to the resource types in
+        ``DENY_ELIGIBLE_RESOURCE_TYPES``; the Pydantic schema enforces the
+        same rule at the API boundary.
         """
-        if any(s.get("effect") == "deny" for s in statements):
-            msg = "Deny-effect policies are not supported. Use allow-effect policies only."
-            raise DenyEffectNotSupportedError(msg)
+        ineligible = find_ineligible_deny_actions(statements)
+        if ineligible:
+            raise DenyEffectNotAllowedError(deny_not_allowed_message(ineligible))
+
+    @staticmethod
+    def _validate_node_kind_statements(statements: list[dict[str, Any]]) -> None:
+        """Validate the ``kind`` label on ``workflow_node`` statements against the node-kind registry."""
+        from syntara.workflows.node_kinds import validate_node_kind_statements  # noqa: PLC0415
+
+        error = validate_node_kind_statements(statements)
+        if error:
+            raise InvalidNodeKindError(error)
 
     @staticmethod
     def _validate_project_statements(statements: list[dict[str, Any]]) -> None:
@@ -118,8 +131,9 @@ class PolicyService(BaseService):
 
             await assert_project_alive(self.session, project_id)
 
-        self._validate_no_deny_effect(statements)
+        self._validate_deny_effect(statements)
         self._validate_resource_actions(statements)
+        self._validate_node_kind_statements(statements)
         if project_id is not None:
             self._validate_project_statements(statements)
         if is_builtin_policy(name):
@@ -444,8 +458,9 @@ class PolicyService(BaseService):
         if description is not None:
             policy.description = description
         if statements is not None:
-            self._validate_no_deny_effect(statements)
+            self._validate_deny_effect(statements)
             self._validate_resource_actions(statements)
+            self._validate_node_kind_statements(statements)
             if policy.project_id is not None:
                 self._validate_project_statements(statements)
             policy.statements = statements

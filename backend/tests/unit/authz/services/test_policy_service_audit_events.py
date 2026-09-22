@@ -60,7 +60,8 @@ class TestPolicyServiceCreateAuditEvents:
         with (
             patch.object(service, "_check_name_conflict", new_callable=AsyncMock),
             patch.object(PolicyService, "_validate_resource_actions"),
-            patch.object(PolicyService, "_validate_no_deny_effect"),
+            patch.object(PolicyService, "_validate_deny_effect"),
+            patch.object(PolicyService, "_validate_node_kind_statements"),
             patch("syntara.authz.services.policy_service.is_builtin_policy", return_value=False),
         ):
             await service.create_policy(
@@ -113,7 +114,8 @@ class TestPolicyServiceCreateAuditEvents:
         with (
             patch.object(service, "_check_name_conflict", new_callable=AsyncMock),
             patch.object(PolicyService, "_validate_resource_actions"),
-            patch.object(PolicyService, "_validate_no_deny_effect"),
+            patch.object(PolicyService, "_validate_deny_effect"),
+            patch.object(PolicyService, "_validate_node_kind_statements"),
             patch.object(PolicyService, "_validate_project_statements"),
             patch("syntara.authz.services.policy_service.is_builtin_policy", return_value=False),
             patch("syntara.core.queries.project_queries.assert_project_alive", new_callable=AsyncMock),

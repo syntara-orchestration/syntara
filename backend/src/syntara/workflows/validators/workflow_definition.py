@@ -9,7 +9,7 @@ registry retrieve callback and cached for the lifetime of the process.
 import json
 from collections import defaultdict, deque
 from functools import lru_cache
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import jsonschema
 from pydantic import ValidationError
@@ -25,9 +25,13 @@ from syntara.workflows.models.validation_finding import (
     ValidationResult,
     ValidationSeverity,
 )
+from syntara.workflows.node_kind_switch import disabled_nodes_in_definition
 from syntara.workflows.validators.template_expressions import check_template_expressions
 from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType, ScheduledTriggerConfig
+
+if TYPE_CHECKING:
+    from collections.abc import Collection
 
 _SCHEMA_DIR = SCHEMA_DIR / "workflows" / "v2"
 _BASE_URI = "https://automation.example.com/schemas/workflows/v2/"
@@ -190,6 +194,28 @@ def _reachable_from_triggers(workflow_definition: dict[str, Any], trigger_ids: s
         visited.add(node)
         queue.extend(adjacency.get(node, []))
     return visited - trigger_ids
+
+
+def _check_permission_check_node_findings(workflow_definition: dict[str, Any]) -> list[ValidationFinding]:
+    """Return findings for malformed ``permission_check`` nodes.
+
+    The rule itself lives next to the runtime (``node_launch_checks``) so the
+    validator and the engine agree: exactly one incoming edge, outgoing edges
+    only on the ``allowed`` / ``denied`` ports.
+    """
+    # Imported lazily: node_launch_checks pulls the authz engine, which the
+    # validator must not load at import time.
+    from syntara.workflows.node_launch_checks import validate_permission_check_edges  # noqa: PLC0415
+
+    return [
+        ValidationFinding(
+            severity=ValidationSeverity.error,
+            category=ValidationCategory.permission_check_configuration,
+            message=problem,
+            node_id=node_id,
+        )
+        for node_id, problem in validate_permission_check_edges(workflow_definition)
+    ]
 
 
 def _check_converge_node_findings(
@@ -498,6 +524,65 @@ def collect_scheduled_trigger_config_findings(
     return findings
 
 
+def disabled_kind_findings(
+    workflow_definition: dict[str, Any],
+    disabled_kinds: "Collection[str]",
+    *,
+    previous_definition: dict[str, Any] | None = None,
+) -> list[ValidationFinding]:
+    """Report nodes whose kind is switched off platform-wide (ANSTRAT-1750, F-17).
+
+    Every node of a disabled kind produces an ERROR finding, which makes the
+    result invalid and so blocks save and publish.  The rule is lenient: a
+    save that *removes* the last disabled node is allowed, and carries a
+    WARNING finding recording the removal so the version history explains why
+    the definition changed.
+
+    Args:
+        workflow_definition: The definition being validated.
+        disabled_kinds: Currently disabled node kinds (from the
+            ``workflows.disabled_node_kinds`` runtime setting).
+        previous_definition: The latest saved definition of the same workflow,
+            when the caller has it.  Only used to detect a removal; callers
+            that cannot supply it simply get no removal warning.
+
+    Returns:
+        The findings, errors first in caller order.
+
+    """
+    disabled = frozenset(disabled_kinds)
+    if not disabled:
+        return []
+
+    offenders = disabled_nodes_in_definition(workflow_definition, disabled)
+    if offenders:
+        return [
+            ValidationFinding(
+                severity=ValidationSeverity.error,
+                category=ValidationCategory.node_kind_disabled,
+                message=(
+                    f"Node '{node_id}' uses node kind '{kind}', which is disabled on this platform. "
+                    f"Remove the node to save this workflow."
+                ),
+                node_id=node_id,
+            )
+            for node_id, kind in offenders
+        ]
+
+    removed = disabled_nodes_in_definition(previous_definition, disabled)
+    if not removed:
+        return []
+
+    removed_kinds = sorted({kind for _, kind in removed})
+    return [
+        ValidationFinding(
+            severity=ValidationSeverity.warning,
+            category=ValidationCategory.node_kind_disabled,
+            message=(f"This version removes node(s) of disabled node kind(s): {', '.join(removed_kinds)}."),
+        )
+    ]
+
+
 class WorkflowValidator:
     """Validator for V2 workflows and metadata.
 
@@ -604,6 +689,8 @@ class WorkflowValidator:
         workflow_definition: dict[str, Any],
         *,
         system_continue_on_failure: bool = False,
+        disabled_node_kinds: "Collection[str]" = (),
+        previous_definition: dict[str, Any] | None = None,
     ) -> list[ValidationFinding]:
         """Run all validators and return individual findings.
 
@@ -612,6 +699,12 @@ class WorkflowValidator:
             system_continue_on_failure: Admin-level default for continue_on_failure,
                 used to resolve approval fallback_decision warnings when a node
                 inherits the system default.
+            disabled_node_kinds: Node kinds switched off platform-wide, read from
+                the ``workflows.disabled_node_kinds`` runtime setting by the
+                caller (this method is synchronous, like
+                ``system_continue_on_failure``).
+            previous_definition: Latest saved definition of the same workflow,
+                used only to warn that a save removed disabled nodes.
 
         Returns:
             List of ValidationFinding objects, one per issue
@@ -651,6 +744,14 @@ class WorkflowValidator:
 
         findings.extend(self._collect_schema_findings(workflow_definition))
 
+        findings.extend(
+            disabled_kind_findings(
+                workflow_definition,
+                disabled_node_kinds,
+                previous_definition=previous_definition,
+            )
+        )
+
         # Skip graph traversal only when nodes/edges are structurally unusable
         # (not lists), not merely because schema errors exist — both schema
         # violations and structural issues (orphans, cycles) should accumulate.
@@ -665,6 +766,7 @@ class WorkflowValidator:
             findings.extend(_check_cycles_findings(workflow_definition, node_ids))
             findings.extend(_check_orphaned_nodes_findings(workflow_definition, node_ids))
             findings.extend(_check_converge_node_findings(workflow_definition))
+            findings.extend(_check_permission_check_node_findings(workflow_definition))
             findings.extend(
                 _check_approval_node_findings(
                     workflow_definition,
@@ -714,6 +816,8 @@ class WorkflowValidator:
         workflow_definition: dict[str, Any],
         *,
         system_continue_on_failure: bool = False,
+        disabled_node_kinds: "Collection[str]" = (),
+        previous_definition: dict[str, Any] | None = None,
     ) -> ValidationResult:
         """Run all validation checks and return a structured ValidationResult.
 
@@ -722,6 +826,10 @@ class WorkflowValidator:
             system_continue_on_failure: Admin-level default for continue_on_failure,
                 used to resolve approval fallback_decision warnings when a node
                 inherits the system default.
+            disabled_node_kinds: Node kinds switched off platform-wide; resolve
+                with ``get_disabled_node_kinds()`` before calling.
+            previous_definition: Latest saved definition of the same workflow,
+                used only to warn that a save removed disabled nodes.
 
         Returns:
             ValidationResult with individual findings, counts, and validity
@@ -731,6 +839,8 @@ class WorkflowValidator:
             self._collect_findings(
                 workflow_definition,
                 system_continue_on_failure=system_continue_on_failure,
+                disabled_node_kinds=disabled_node_kinds,
+                previous_definition=previous_definition,
             )
         )
 

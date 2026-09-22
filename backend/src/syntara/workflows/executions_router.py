@@ -73,6 +73,7 @@ async def get_temporal_execution_service() -> TemporalExecutionService | None:
 
 
 def get_execution_service(
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
     temporal_service: Annotated[
@@ -86,6 +87,7 @@ def get_execution_service(
     This centralizes ExecutionService creation across all endpoints.
 
     Args:
+        request: FastAPI request, source of the shared authorization evaluator
         db: Database session (injected by FastAPI)
         current_user: Current authenticated user
         temporal_service: Temporal service (injected by FastAPI, may be None)
@@ -94,7 +96,12 @@ def get_execution_service(
         ExecutionService configured with database and optional Temporal integration
 
     """
-    return ExecutionService(db, current_user, temporal_service=temporal_service)
+    return ExecutionService(
+        db,
+        current_user,
+        temporal_service=temporal_service,
+        authz_evaluator=get_authz_evaluator(request),
+    )
 
 
 @router.get(

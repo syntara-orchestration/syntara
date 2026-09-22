@@ -15,6 +15,7 @@ from typing import Any
 
 from syntara.core.config.base import LogLevel
 from syntara.settings.models.runtime_setting import SettingCategory, SettingValueType
+from syntara.workflows.node_kinds import NODE_KINDS, NodeKindCategory
 
 
 @dataclass
@@ -103,6 +104,7 @@ class WorkflowEngineGroup(StrEnum):
     """Group names for workflow_execution settings."""
 
     EXECUTION = "Execution"
+    NODE_KINDS = "Node kinds"
 
 
 class DocumentConversionGroup(StrEnum):
@@ -159,6 +161,25 @@ class MetricsGroup(StrEnum):
     """Group names for metrics settings."""
 
     OBSERVABILITY = "Observability"
+
+
+DISABLED_NODE_KINDS_KEY = "workflows.disabled_node_kinds"
+"""Key of the platform-wide node-kind kill switch.
+
+Duplicated as a literal (rather than imported from
+``syntara.workflows.node_kind_switch``) to keep the catalog free of an import
+cycle through the settings cache.  ``tests/unit/settings`` asserts the two
+stay equal.
+"""
+
+SWITCHABLE_NODE_KINDS: list[str] = sorted(
+    info.kind for info in NODE_KINDS if info.category is not NodeKindCategory.FLOW_CONTROL
+)
+"""Node kinds the kill switch accepts.
+
+Flow-control kinds (including the permission check node) are never
+switchable: disabling them would break routing and denial handling itself.
+"""
 
 
 SETTINGS_CATALOG: list[SettingDefinition] = [
@@ -643,6 +664,27 @@ SETTINGS_CATALOG: list[SettingDefinition] = [
             "JSON schema instructions are appended after this prompt."
         ),
         validation_schema={"pattern": "\\S[\\s\\S]{0,1999}"},
+    ),
+    # Workflow Execution — Node kinds
+    SettingDefinition(
+        key=DISABLED_NODE_KINDS_KEY,
+        name="Disabled node kinds",
+        category=SettingCategory.WORKFLOW_EXECUTION,
+        value_type=SettingValueType.JSON,
+        default_value=[],
+        description=(
+            "Platform-wide kill switch for workflow node kinds. A disabled kind "
+            "disappears from the builder palette, definitions that still contain "
+            "it cannot be saved or published, launches are refused and any node "
+            "of that kind fails at start. Exporting a workflow is never blocked, "
+            "so a definition using a disabled kind can still be retrieved and "
+            "edited to remove it. This is not a permission: it applies to every "
+            "principal, administrators included. Flow control kinds cannot be "
+            "disabled."
+        ),
+        helper_text='JSON array of node kinds, for example ["script", "http_request"]',
+        group=WorkflowEngineGroup.NODE_KINDS,
+        validation_schema={"allowed_items": SWITCHABLE_NODE_KINDS},
     ),
     # Workflow Execution — Timeouts
     SettingDefinition(

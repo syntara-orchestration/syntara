@@ -100,9 +100,38 @@ def check_schema_compatibility(key: str, value_type: SettingValueType, schema: d
             f"allowed_values constraint is only valid for STRING, got {value_type.value.upper()}",
         )
 
+    if "allowed_items" in schema and value_type != SettingValueType.JSON:
+        raise SettingValidationError(
+            key,
+            f"allowed_items constraint is only valid for JSON, got {value_type.value.upper()}",
+        )
+
+
+def _check_allowed_items(key: str, value: Any, allowed: Any) -> None:  # noqa: ANN401
+    """Validate that a JSON list contains only values drawn from ``allowed_items``.
+
+    Used for list-valued JSON settings whose members come from a closed
+    registry (e.g. the disabled workflow node kinds).
+    """
+    if not isinstance(value, list):
+        raise SettingValidationError(key, f"must be a JSON list, got {type(value).__name__}")
+
+    allowed_set = set(allowed)
+    unknown = [item for item in value if item not in allowed_set]
+    if unknown:
+        raise SettingValidationError(
+            key,
+            f"contains unsupported item(s): {', '.join(str(item) for item in unknown)}; "
+            f"allowed: {', '.join(str(item) for item in sorted(allowed_set, key=str))}",
+        )
+
 
 def _check_constraints(key: str, value: Any, schema: dict[str, Any]) -> None:  # noqa: ANN401
-    """Validate the value against min/max/allowed_values/pattern constraints."""
+    """Validate the value against min/max/allowed_values/allowed_items/pattern constraints."""
+    if "allowed_items" in schema:
+        _check_allowed_items(key, value, schema["allowed_items"])
+        return
+
     if "min" in schema and value < schema["min"]:
         raise SettingValidationError(key, f"must be >= {schema['min']}")
 

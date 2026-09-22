@@ -24,6 +24,7 @@ from syntara.authz.resolver import (
     resolve_effective_policies,
     resolve_user_groups,
 )
+from syntara.authz.role_conventions import BUILTIN_POLICIES
 from syntara.authz.seed import seed_authz_data
 from syntara.core.models import User
 from syntara.core.models.group import Group, user_groups
@@ -202,7 +203,14 @@ async def test_resolve_builtin_role_preserves_self_scope(seeded_db: AsyncSession
     assert len(result) >= 1
     self_stmts = [s for s in result if s.get("scope") == "self" and s.get("project") == "my-project"]
     assert len(self_stmts) >= 1
-    widened_stmts = [s for s in result if s.get("scope") == "project" and s.get("project") == "my-project"]
+    # Only policies declared with ``any`` scope may be narrowed to ``project``;
+    # a ``self``-scoped policy must never be widened.
+    any_scoped = {p.name for p in BUILTIN_POLICIES if p.scope == "any"}
+    widened_stmts = [
+        s
+        for s in result
+        if s.get("scope") == "project" and s.get("project") == "my-project" and s.get("name") not in any_scoped
+    ]
     assert len(widened_stmts) == 0
 
 

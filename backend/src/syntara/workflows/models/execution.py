@@ -265,6 +265,12 @@ class Execution(UserOwnedResource, table=True):
         description="Additional metadata for test/debug executions",
     )
 
+    denied_nodes: list[dict[str, Any]] | None = Field(
+        default=None,
+        sa_column=Column(JSONB, nullable=True),
+        description="Nodes the run principal was denied to execute: [{node_id, kind, denied_by}]",
+    )
+
     # Relationships
     workflow: "Workflow" = Relationship(
         back_populates="executions",
@@ -482,6 +488,13 @@ class ExecutionRead(UserReferenceFieldsMixin, SQLModel):
     interface: str | None = Field(
         default=None,
         description="Originating interface (ui or api)",
+    )
+    denied_nodes: list[dict[str, Any]] | None = Field(
+        default=None,
+        description=(
+            "Nodes the run principal was not allowed to execute, as "
+            "[{node_id, kind, denied_by}]. Null when nothing was denied."
+        ),
     )
 
     # Optional: Only populated when ?include=workflow_definition

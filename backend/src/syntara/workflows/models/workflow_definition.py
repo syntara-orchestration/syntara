@@ -20,6 +20,7 @@ from syntara.workflows.workflow_engine.models.workflow_definition import (
     ConvergeNodeParameters,
     DoWhileLoopParameters,
     ForEachLoopParameters,
+    MCPToolExecutorParameters,
     NodeSettingsBase,
     NodeSettingsCof,
     NodeSettingsCofDisabled,
@@ -76,6 +77,14 @@ class HTTPRequestNode(WorkflowNodeBase):
     type: Literal["http_request"]
     parameters: APIExecutorParameters
     settings: NodeSettingsFull | None = None
+
+
+class MCPToolNode(WorkflowNodeBase):
+    """MCP tool executor node."""
+
+    type: Literal["mcp_tool"]
+    parameters: MCPToolExecutorParameters
+    settings: NodeSettingsNoRetry | None = None
 
 
 class AgenticNode(WorkflowNodeBase):
@@ -142,10 +151,24 @@ class WaitNode(WorkflowNodeBase):
     settings: NodeSettingsCofDisabled | None = None
 
 
+class PermissionCheckNode(WorkflowNodeBase):
+    """Permission check control node (ANSTRAT-1750).
+
+    Takes no configuration.  It inspects the node feeding its single incoming
+    edge and routes to the ``allowed`` or ``denied`` output port depending on
+    whether that node was denied ``workflow_node:execute`` for this run.
+    """
+
+    type: Literal["permission_check"]
+    parameters: dict[str, Any] = Field(default_factory=dict, description="No configuration; accepted for uniformity")
+    settings: NodeSettingsBase | None = None
+
+
 _AllNodeTypes = (
     AAPJobTemplateNode
     | AAPWorkflowJobTemplateNode
     | HTTPRequestNode
+    | MCPToolNode
     | AgenticNode
     | ScriptNode
     | ApprovalNode
@@ -154,6 +177,7 @@ _AllNodeTypes = (
     | LoopNode
     | ConvergeNode
     | WaitNode
+    | PermissionCheckNode
 )
 
 WorkflowNode = Annotated[_AllNodeTypes, Discriminator("type")]

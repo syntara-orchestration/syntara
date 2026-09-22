@@ -17,3 +17,7 @@ def init_workflow_runtime(wf: OrchestratorWorkflow) -> None:
     """
     wf._runtime_settings = make_workflow_runtime_settings()
     wf._has_unhandled_failure = False
+    wf._trigger_node_id = ""
+    wf._run_principal_id = ""
+    wf._denied_node_kinds = {}
+    wf._denied_nodes = {}

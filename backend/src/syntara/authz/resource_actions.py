@@ -244,6 +244,15 @@ def build_resource_actions(app: FastAPI) -> dict[str, list[str]]:
     for policy in BUILTIN_POLICIES:
         pairs.add((policy.resource, policy.action))
 
+    # Node kinds have no routes of their own: the workflow definition is a
+    # JSONB blob and a node's kind is an attribute of it.  The declarative
+    # node-kind registry contributes the ``workflow_node`` resource type and
+    # marks it project-eligible so project admins can scope node denies.
+    from syntara.workflows.node_kinds import NODE_RESOURCE_TYPE, node_kind_action_pairs  # noqa: PLC0415
+
+    pairs.update(node_kind_action_pairs())
+    project_eligible.add(NODE_RESOURCE_TYPE)
+
     grouped: dict[str, set[str]] = defaultdict(set)
     for resource_type, action in pairs:
         grouped[resource_type].add(action)

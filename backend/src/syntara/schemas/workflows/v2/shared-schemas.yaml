@@ -371,6 +371,13 @@ components:
           description: User who created the version
           readOnly: true
           title: Created By
+        published_by:
+          anyOf:
+            - $ref: ../../base/shared-resources.openapi.yaml#/components/schemas/UserReference
+            - type: 'null'
+          description: Principal that last published the version; triggered runs evaluate node permissions as them
+          readOnly: true
+          title: Published By
         created_at:
           type: string
           format: date-time
@@ -560,6 +567,17 @@ components:
             - type: 'null'
           description: Originating interface (ui or api)
           title: Interface
+        denied_nodes:
+          anyOf:
+            - type: array
+              items:
+                additionalProperties: true
+                type: object
+            - type: 'null'
+          title: Denied Nodes
+          description: >-
+            Nodes the run principal was not allowed to execute, as
+            [{node_id, kind, denied_by}]. Null when nothing was denied.
         labels:
           additionalProperties: true
           type: object
@@ -698,7 +716,7 @@ components:
       type: string
       title: ActivityStatus
       description: Activity execution status enumeration.
-      enum: [pending, running, waiting, completed, failed, retrying, skipped, cancelled]
+      enum: [pending, running, waiting, completed, failed, retrying, skipped, cancelled, denied]
 
     NodeType:
       type: string
@@ -714,12 +732,14 @@ components:
         - loop
         - switch
         - wait
+        - permission_check
         - aap_job_template
         - aap_workflow_job_template
         - agentic
         - approval
         - http_request
         - internal_activity
+        - mcp_tool
         - script
 
     CurrentActivity:
@@ -1176,6 +1196,7 @@ components:
               - $ref: '#/components/schemas/AAPJobTemplateNode'
               - $ref: '#/components/schemas/AAPWorkflowJobTemplateNode'
               - $ref: '#/components/schemas/HTTPRequestNode'
+              - $ref: '#/components/schemas/MCPToolNode'
               - $ref: '#/components/schemas/AgenticNode'
               - $ref: '#/components/schemas/ScriptNode'
               - $ref: '#/components/schemas/ApprovalNode'
@@ -1184,6 +1205,7 @@ components:
               - $ref: '#/components/schemas/LoopNode'
               - $ref: '#/components/schemas/ConvergeNode'
               - $ref: '#/components/schemas/WaitNode'
+              - $ref: '#/components/schemas/PermissionCheckNode'
             discriminator:
               propertyName: type
               mapping:
@@ -1195,6 +1217,8 @@ components:
                 converge: '#/components/schemas/ConvergeNode'
                 http_request: '#/components/schemas/HTTPRequestNode'
                 loop: '#/components/schemas/LoopNode'
+                mcp_tool: '#/components/schemas/MCPToolNode'
+                permission_check: '#/components/schemas/PermissionCheckNode'
                 script: '#/components/schemas/ScriptNode'
                 switch: '#/components/schemas/SwitchNode'
                 wait: '#/components/schemas/WaitNode'
@@ -1376,6 +1400,58 @@ components:
         - parameters
       title: HTTPRequestNode
       description: HTTP request executor node.
+    MCPToolNode:
+      properties:
+        id:
+          type: string
+          pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
+          title: Id
+          description: Unique identifier for the node within the workflow
+        name:
+          anyOf:
+            - type: string
+              minLength: 1
+            - type: 'null'
+          title: Name
+          description: Human-readable name for the node
+        description:
+          anyOf:
+            - type: string
+              minLength: 1
+            - type: 'null'
+          title: Description
+          description: Human-readable description of the node purpose
+        outputs:
+          anyOf:
+            - additionalProperties:
+                type: string
+              type: object
+            - type: 'null'
+          title: Outputs
+          description: Output extraction mapping
+        position:
+          anyOf:
+            - $ref: '#/components/schemas/NodePosition'
+            - type: 'null'
+          description: Optional UI position hint
+        type:
+          type: string
+          const: mcp_tool
+          title: Type
+        parameters:
+          $ref: '#/components/schemas/MCPToolExecutorParameters'
+        settings:
+          anyOf:
+            - $ref: '#/components/schemas/NodeSettingsNoRetry'
+            - type: 'null'
+      additionalProperties: true
+      type: object
+      required:
+        - id
+        - type
+        - parameters
+      title: MCPToolNode
+      description: MCP tool executor node.
     AgenticNode:
       properties:
         id:
@@ -1800,6 +1876,66 @@ components:
         - parameters
       title: WaitNode
       description: Wait (delay) control node.
+
+    PermissionCheckNode:
+      properties:
+        id:
+          type: string
+          pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
+          title: Id
+          description: Unique identifier for the node within the workflow
+        name:
+          anyOf:
+            - type: string
+              minLength: 1
+            - type: 'null'
+          title: Name
+          description: Human-readable name for the node
+        description:
+          anyOf:
+            - type: string
+              minLength: 1
+            - type: 'null'
+          title: Description
+          description: Human-readable description of the node purpose
+        outputs:
+          anyOf:
+            - additionalProperties:
+                type: string
+              type: object
+            - type: 'null'
+          title: Outputs
+          description: Output extraction mapping
+        position:
+          anyOf:
+            - $ref: '#/components/schemas/NodePosition'
+            - type: 'null'
+          description: Optional UI position hint
+        type:
+          type: string
+          const: permission_check
+          title: Type
+        parameters:
+          additionalProperties: true
+          type: object
+          title: Parameters
+          description: No configuration; accepted for uniformity
+        settings:
+          anyOf:
+            - $ref: '#/components/schemas/NodeSettingsBase'
+            - type: 'null'
+      additionalProperties: true
+      type: object
+      required:
+        - id
+        - type
+      title: PermissionCheckNode
+      description: |-
+        Permission check control node (ANSTRAT-1750).
+
+        Takes no configuration.  It inspects the node feeding its single incoming
+        edge and routes to the ``allowed`` or ``denied`` output port depending on
+        whether that node was denied ``workflow_node:execute`` for this run.
     AAPJobTemplateExecutorParameters:
       properties:
         credential_id:
@@ -2081,6 +2217,36 @@ components:
         - method
       title: APIExecutorParameters
       description: Parameters for API executor (http_request activity).
+    MCPToolExecutorParameters:
+      properties:
+        integration_id:
+          type: string
+          title: Integration Id
+          description: UUID of the mcp_server integration that provides the tool
+        tool_name:
+          type: string
+          minLength: 1
+          title: Tool Name
+          description: Name of the MCP tool to invoke
+        arguments:
+          additionalProperties: true
+          type: object
+          title: Arguments
+          description: Arguments passed to the MCP tool (values support templating)
+        timeout_seconds:
+          anyOf:
+            - type: integer
+              maximum: 600.0
+              minimum: 1.0
+            - type: 'null'
+          title: Timeout Seconds
+          description: Deadline for the tool call in seconds. Defaults to the node's resolved engine timeout and is capped at 600s.
+      type: object
+      required:
+        - integration_id
+        - tool_name
+      title: MCPToolExecutorParameters
+      description: Parameters for MCP tool executor (mcp_tool activity).
     AgenticExecutorParameters:
       properties:
         prompt:

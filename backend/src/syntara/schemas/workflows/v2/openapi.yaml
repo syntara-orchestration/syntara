@@ -1031,6 +1031,8 @@ components:
       $ref: ./shared-schemas.yaml#/components/schemas/AAPWorkflowJobTemplateNode
     HTTPRequestNode:
       $ref: ./shared-schemas.yaml#/components/schemas/HTTPRequestNode
+    MCPToolNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/MCPToolNode
     AgenticNode:
       $ref: ./shared-schemas.yaml#/components/schemas/AgenticNode
     ScriptNode:
@@ -1047,6 +1049,8 @@ components:
       $ref: ./shared-schemas.yaml#/components/schemas/ConvergeNode
     WaitNode:
       $ref: ./shared-schemas.yaml#/components/schemas/WaitNode
+    PermissionCheckNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/PermissionCheckNode
     # Node parameter and settings schemas
     AAPJobTemplateExecutorParameters:
       $ref: ./shared-schemas.yaml#/components/schemas/AAPJobTemplateExecutorParameters
@@ -1054,6 +1058,8 @@ components:
       $ref: ./shared-schemas.yaml#/components/schemas/AAPWorkflowJobTemplateExecutorParameters
     APIExecutorParameters:
       $ref: ./shared-schemas.yaml#/components/schemas/APIExecutorParameters
+    MCPToolExecutorParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/MCPToolExecutorParameters
     AgenticExecutorParameters:
       $ref: ./shared-schemas.yaml#/components/schemas/AgenticExecutorParameters
     IntegrationConnectionConfig:
@@ -1156,6 +1162,8 @@ components:
         - converge_configuration
         - approval_configuration
         - definition_limits
+        - node_kind_disabled
+        - permission_check_configuration
 
     ValidationFinding:
       type: object
