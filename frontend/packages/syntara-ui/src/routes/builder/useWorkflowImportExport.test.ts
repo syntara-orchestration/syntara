@@ -120,13 +120,14 @@ describe('useWorkflowImportExport', () => {
 
       act(() => result.current.handleExport())
 
-      expect(mockBuildDefinition).toHaveBeenCalledWith(
-        'Renamed Workflow',
-        'new description',
-        expect.anything(),
-        expect.anything(),
-        expect.anything()
-      )
+      expect(mockBuildDefinition).toHaveBeenCalledWith({
+        workflowName: 'Renamed Workflow',
+        workflowDescription: 'new description',
+        activities: [],
+        triggers: [],
+        edges: [],
+        nodePositions: undefined,
+      })
       expect(mockDownload).toHaveBeenCalledWith(expect.anything(), 'Renamed Workflow')
     })
 
@@ -145,13 +146,14 @@ describe('useWorkflowImportExport', () => {
 
       act(() => result.current.handleExport())
 
-      expect(mockBuildDefinition).toHaveBeenCalledWith(
-        'workflow',
-        '',
-        expect.anything(),
-        expect.anything(),
-        expect.anything()
-      )
+      expect(mockBuildDefinition).toHaveBeenCalledWith({
+        workflowName: 'workflow',
+        workflowDescription: '',
+        activities: [],
+        triggers: [],
+        edges: [],
+        nodePositions: undefined,
+      })
       expect(mockDownload).toHaveBeenCalledWith(expect.anything(), 'workflow')
     })
 

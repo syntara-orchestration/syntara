@@ -292,7 +292,11 @@ describe('usePublishWorkflow', () => {
       result.current.publish('v1.0')
     })
 
-    expect(mockBuildWorkflowDefinition).toHaveBeenCalledWith('My WF', 'My Desc', [{ id: 'a1' }], [{ id: 't1' }], {
+    expect(mockBuildWorkflowDefinition).toHaveBeenCalledWith({
+      workflowName: 'My WF',
+      workflowDescription: 'My Desc',
+      activities: [{ id: 'a1' }],
+      triggers: [{ id: 't1' }],
       edges: [{ id: 'e1' }],
       nodePositions: { n1: { x: 10, y: 20 } },
     })
