@@ -39,7 +39,6 @@ export type RoleUpdate = RolesAPI.components['schemas']['RoleUpdate']
 
 // ── Project-scoped Policy ───────────────────────────────────────────────
 
-export type ProjectPolicyRead = ProjectsAPI.components['schemas']['PolicyRead']
 export type ProjectPolicyCreate = ProjectsAPI.components['schemas']['ProjectPolicyCreate']
 export type ProjectPolicyUpdate = ProjectsAPI.components['schemas']['PolicyUpdate']
 
