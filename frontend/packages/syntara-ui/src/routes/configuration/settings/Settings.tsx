@@ -27,11 +27,20 @@ import { detachPromise } from '../../../utils/detachPromise'
 import { useDocLink } from '../../../utils/docs/useDocLink'
 import { WORKFLOW_ENGINE_DEFAULTS_QUERY_KEY } from '../../builder/hooks/useWorkflowEngineDefaults'
 
+import { NodeKindsTab } from './nodeKinds/NodeKindsTab'
 import { SettingsCategoryTab } from './SettingsCategoryTab'
 import { useAllSettings } from './useAllSettings'
 import { useSettingsPermissions } from './useSettingsPermissions'
 
 const basePath = AppRoute.SystemAdministration.Settings
+
+/**
+ * Category slug of the node-kind registry tab (ANSTRAT-1750).
+ *
+ * It is not a runtime-setting category: the kill switch lives behind
+ * `GET/PUT /node_kinds`, so the tab is appended to the API-driven category list.
+ */
+const NODE_KINDS_TAB_SLUG = 'node-kinds'
 
 function buildBulkUpdates(
   edits: Map<string, unknown>,
@@ -88,7 +97,7 @@ export default function Settings() {
   )
 
   const categories = useMemo(() => categoriesQuery.data?.resources ?? [], [categoriesQuery.data])
-  const validTabs = useMemo(() => categories.map((c) => c.slug), [categories])
+  const validTabs = useMemo(() => [...categories.map((c) => c.slug), NODE_KINDS_TAB_SLUG], [categories])
   const defaultCategory = categories[0]?.slug ?? ''
   const [activeSlug] = useUrlTab(basePath, defaultCategory)
   const location = useRouterState({ select: (s) => s.location.pathname })
@@ -102,6 +111,8 @@ export default function Settings() {
       detachPromise(navigate({ to: `${basePath}/${defaultCategory}`, replace: true }))
     }
   }, [defaultCategory, location, navigate])
+
+  const isNodeKindsTab = activeSlug === NODE_KINDS_TAB_SLUG
 
   const activeIndex = useMemo(() => {
     const idx = categories.findIndex((c) => c.slug === activeSlug)
@@ -222,7 +233,7 @@ export default function Settings() {
           isFullHeight
           panelMainBodyProps={{ style: { flex: 1, minHeight: 0 } }}
           footer={
-            canWrite ? (
+            canWrite && !isNodeKindsTab ? (
               <ActionGroup>
                 <Button
                   variant="primary"
@@ -247,10 +258,12 @@ export default function Settings() {
                 {categories.map((cat) => (
                   <Tab key={cat.slug} eventKey={cat.slug} title={cat.name} />
                 ))}
+                <Tab key={NODE_KINDS_TAB_SLUG} eventKey={NODE_KINDS_TAB_SLUG} title="Node kinds" />
               </SynUrlTabs>
             </StackItem>
             <SynPageBody style={{ overflow: 'auto', padding: 'var(--pf-t--global--spacer--md)' }}>
-              {categories[activeIndex] && (
+              {isNodeKindsTab && <NodeKindsTab canWrite={canWrite} />}
+              {!isNodeKindsTab && categories[activeIndex] && (
                 <SettingsCategoryTab
                   settings={settingsByCategory.get(categories[activeIndex].slug) ?? []}
                   edits={edits}

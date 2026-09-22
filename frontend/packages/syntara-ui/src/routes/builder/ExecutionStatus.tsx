@@ -1,4 +1,5 @@
 import {
+  RhUiBanIcon,
   RhUiCheckCircleIcon,
   RhUiClockIcon,
   RhUiCloseCircleIcon,
@@ -60,6 +61,7 @@ const activityStatusVariant: Record<ActivityStatus, 'success' | 'danger' | 'warn
   retrying: 'warning',
   skipped: 'custom',
   cancelled: 'custom',
+  denied: 'warning',
 }
 
 const activityStatusIcons: Record<ActivityStatus, React.ComponentType<{ className?: string }>> = {
@@ -71,6 +73,7 @@ const activityStatusIcons: Record<ActivityStatus, React.ComponentType<{ classNam
   retrying: RhUiSyncIcon,
   skipped: RhUiMinusCircleFillIcon,
   cancelled: RhUiStopCircleFillIcon,
+  denied: RhUiBanIcon,
 }
 
 export function ActivityStatusLabel({ status, nodeType }: Readonly<{ status: ActivityStatus; nodeType?: string }>) {

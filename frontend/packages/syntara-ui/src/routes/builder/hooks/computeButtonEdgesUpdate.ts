@@ -72,6 +72,8 @@ const HANDLE_TO_KEY_SET: Record<string, 'conditionKeys' | 'loopKeys' | 'approval
   [EdgeHandleEnum.LOOP]: 'loopKeys',
   [EdgeHandleEnum.APPROVED]: 'approvalKeys',
   [EdgeHandleEnum.REJECTED]: 'approvalKeys',
+  [EdgeHandleEnum.ALLOWED]: 'conditionKeys',
+  [EdgeHandleEnum.DENIED]: 'conditionKeys',
 }
 
 function buildButtonHandleKeySets(existingButtonEdges: EdgeType[]): ButtonHandleKeySets {
@@ -364,7 +366,7 @@ function nodeNeedsButtonEdgeClass(
   if (lookup.regularNodeIds.has(nodeId)) {
     return true
   }
-  if (nodeType === FlowNodeType.CONDITION) {
+  if (nodeType === FlowNodeType.CONDITION || nodeType === FlowNodeType.PERMISSION_CHECK) {
     return lookup.conditionNodeIds.has(nodeId)
   }
   if (nodeType === FlowNodeType.LOOP) {

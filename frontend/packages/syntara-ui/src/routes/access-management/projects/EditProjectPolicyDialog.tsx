@@ -16,6 +16,7 @@ import {
   STATEMENTS_JSON_HINT,
 } from './addProjectPolicySchema'
 import type { AddProjectPolicyFormData } from './addProjectPolicySchema'
+import { NodeKindStatementBuilder } from './NodeKindStatementBuilder'
 
 type EditProjectPolicyDialogProps = {
   projectId: string
@@ -41,7 +42,8 @@ export function EditProjectPolicyDialog({
     },
     onClose,
   })
-  const { handleSubmit, handleError, handleClose } = form
+  const { handleSubmit, handleError, handleClose, setValue, watch } = form
+  const statementsJson = watch('statementsJson')
 
   const { mutate: updatePolicy, isPending } = accessClient.useMutation(
     'put',
@@ -84,6 +86,10 @@ export function EditProjectPolicyDialog({
               hint={PROJECT_POLICY_NAME_HINT}
             />
             <SynTextField name="description" label="Policy description" fieldId="project-policy-description" />
+            <NodeKindStatementBuilder
+              statementsJson={statementsJson}
+              onAppend={(next) => setValue('statementsJson', next, { shouldDirty: true, shouldValidate: true })}
+            />
             <SynTextAreaField
               name="statementsJson"
               label="Policy statements JSON"

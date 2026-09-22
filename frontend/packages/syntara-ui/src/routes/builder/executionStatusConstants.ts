@@ -33,6 +33,7 @@ export const activityStatusDisplayLabels: Record<ActivityStatus, string> = {
   retrying: 'Retrying',
   skipped: 'Skipped',
   cancelled: 'Cancelled',
+  denied: 'Denied',
 }
 
 export const activityStatusColors: Record<ActivityStatus, string> = {
@@ -44,4 +45,5 @@ export const activityStatusColors: Record<ActivityStatus, string> = {
   retrying: statusColors.running,
   skipped: 'var(--pf-t--global--color--nonstatus--gray--default)',
   cancelled: statusColors.cancelled,
+  denied: statusColors.completed_with_errors,
 }

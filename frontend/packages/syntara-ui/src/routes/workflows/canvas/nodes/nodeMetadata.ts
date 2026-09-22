@@ -11,6 +11,8 @@ import {
   RhUiUserCheckIcon,
   RhUiTreeViewIcon,
   RhUiClockIcon,
+  RhUiMcpServerIcon,
+  RhUiSecurityIcon,
   RhUiSettingsIcon,
 } from '@patternfly/react-icons'
 import type { ComponentType } from 'react'
@@ -83,6 +85,11 @@ export const nodeMetadata: Record<string, NodeMetadata> = {
     label: 'Wait',
     expandable: false,
   },
+  permission_check: {
+    icon: RhUiSecurityIcon,
+    label: 'Permission check',
+    expandable: false,
+  },
   /** Canvas Approval node (task executor); separate from `task` so expandable can be false. */
   approval: {
     icon: RhUiUserCheckIcon,
@@ -109,5 +116,6 @@ export const executorMetadata: Record<string, ExecutorDisplayMetadata> = {
   /** Internal key from detectTaskNodeType (agentic + ansible connector prompt), not an API executor string */
   aap: aapJobExecutorDisplay,
   approval: { icon: RhUiUserCheckIcon, label: 'Approval' },
+  mcp_tool: { icon: RhUiMcpServerIcon, label: 'MCP tool' },
   internal_activity: { icon: RhUiSettingsIcon, label: 'System' },
 }

@@ -556,6 +556,11 @@ export interface components {
        */
       readonly created_by?: components['schemas']['UserReference'] | null
       /**
+       * Published By
+       * @description Principal that last published the version; triggered runs evaluate node permissions as them
+       */
+      readonly published_by?: components['schemas']['UserReference'] | null
+      /**
        * Created At
        * Format: date-time
        */
@@ -944,6 +949,15 @@ export interface components {
        * @description Originating interface (ui or api)
        */
       interface?: string | null
+      /**
+       * Denied Nodes
+       * @description Nodes the run principal was not allowed to execute, as [{node_id, kind, denied_by}]. Null when nothing was denied.
+       */
+      denied_nodes?:
+        | {
+            [key: string]: unknown
+          }[]
+        | null
       /** Labels */
       labels?: {
         [key: string]: unknown
@@ -1010,6 +1024,7 @@ export interface components {
         | components['schemas']['AAPJobTemplateNode']
         | components['schemas']['AAPWorkflowJobTemplateNode']
         | components['schemas']['HTTPRequestNode']
+        | components['schemas']['MCPToolNode']
         | components['schemas']['AgenticNode']
         | components['schemas']['ScriptNode']
         | components['schemas']['ApprovalNode']
@@ -1018,6 +1033,7 @@ export interface components {
         | components['schemas']['LoopNode']
         | components['schemas']['ConvergeNode']
         | components['schemas']['WaitNode']
+        | components['schemas']['PermissionCheckNode']
       )[]
       /**
        * Edges
@@ -1141,6 +1157,45 @@ export interface components {
       type: 'http_request'
       parameters: components['schemas']['APIExecutorParameters']
       settings?: components['schemas']['NodeSettingsFull'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
+     * MCPToolNode
+     * @description MCP tool executor node.
+     */
+    MCPToolNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'mcp_tool'
+      parameters: components['schemas']['MCPToolExecutorParameters']
+      settings?: components['schemas']['NodeSettingsNoRetry'] | null
     } & {
       [key: string]: unknown
     }
@@ -1458,6 +1513,55 @@ export interface components {
       [key: string]: unknown
     }
     /**
+     * PermissionCheckNode
+     * @description Permission check control node (ANSTRAT-1750).
+     *
+     *     Takes no configuration.  It inspects the node feeding its single incoming
+     *     edge and routes to the ``allowed`` or ``denied`` output port depending on
+     *     whether that node was denied ``workflow_node:execute`` for this run.
+     */
+    PermissionCheckNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'permission_check'
+      /**
+       * Parameters
+       * @description No configuration; accepted for uniformity
+       */
+      parameters?: {
+        [key: string]: unknown
+      }
+      settings?: components['schemas']['NodeSettingsBase'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
      * AAPJobTemplateExecutorParameters
      * @description Parameters for Ansible Automation Platform Job Template executor.
      *
@@ -1693,6 +1797,34 @@ export interface components {
        * @description Orchestrator credential UUID for authentication or Secret URL.
        */
       credential_id?: string | null
+    }
+    /**
+     * MCPToolExecutorParameters
+     * @description Parameters for MCP tool executor (mcp_tool activity).
+     */
+    MCPToolExecutorParameters: {
+      /**
+       * Integration Id
+       * @description UUID of the mcp_server integration that provides the tool
+       */
+      integration_id: string
+      /**
+       * Tool Name
+       * @description Name of the MCP tool to invoke
+       */
+      tool_name: string
+      /**
+       * Arguments
+       * @description Arguments passed to the MCP tool (values support templating)
+       */
+      arguments?: {
+        [key: string]: unknown
+      }
+      /**
+       * Timeout Seconds
+       * @description Deadline for the tool call in seconds. Defaults to the node's resolved engine timeout and is capped at 600s.
+       */
+      timeout_seconds?: number | null
     }
     /**
      * AgenticExecutorParameters
@@ -2120,6 +2252,8 @@ export interface components {
       | 'converge_configuration'
       | 'approval_configuration'
       | 'definition_limits'
+      | 'node_kind_disabled'
+      | 'permission_check_configuration'
     /**
      * ValidationFinding
      * @description A single structured validation finding.

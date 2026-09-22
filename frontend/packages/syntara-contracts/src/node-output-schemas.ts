@@ -63,6 +63,13 @@ export const NODE_OUTPUT_SCHEMAS: Record<string, OutputFieldDef[]> = {
     { name: 'headers', type: 'object', description: 'Response headers' },
     { name: 'elapsed', type: 'number', description: 'Request duration in seconds' },
   ],
+  mcp_tool: [
+    { name: 'status', type: 'string', description: 'Execution succeeded' },
+    { name: 'tool_name', type: 'string', description: 'Name of the tool that was invoked' },
+    { name: 'integration_id', type: 'string', description: 'UUID of the mcp_server integration that served the call' },
+    { name: 'result', type: 'unknown', description: 'Tool result content returned by the MCP server' },
+    { name: 'is_error', type: 'boolean', description: 'True when the MCP server flagged the tool result as an error' },
+  ],
   agentic: [
     { name: 'status', type: 'string', description: 'Execution succeeded' },
     {
@@ -100,6 +107,29 @@ export const NODE_OUTPUT_SCHEMAS: Record<string, OutputFieldDef[]> = {
     },
   ],
   internal_activity: [{ name: 'status', type: 'string', description: 'Operation result status' }],
+  permission_check: [
+    { name: 'status', type: 'string', description: 'Permission check nodes always complete; they never fail' },
+    {
+      name: 'allowed',
+      type: 'boolean',
+      description: "True when the upstream node was not denied, routing via the 'allowed' port",
+    },
+    {
+      name: 'checked_node_id',
+      type: 'string',
+      description: 'Id of the upstream node that was evaluated (a permission check always has exactly one)',
+    },
+    {
+      name: 'kind',
+      type: 'string',
+      description: 'Node kind of the denied upstream node (present only when allowed is false)',
+    },
+    {
+      name: 'denied_by',
+      type: 'string',
+      description: 'Name of the policy that denied the upstream node (present only when allowed is false)',
+    },
+  ],
   condition: [
     { name: 'status', type: 'string', description: 'Condition evaluated successfully' },
     { name: 'evaluated_result', type: 'boolean', description: 'Result of condition evaluation (true or false)' },

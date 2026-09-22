@@ -22,6 +22,7 @@ import { executions } from './resources/executions'
 import { getExecutionDetail } from './resources/executionDetails'
 import { activityExecutions } from './resources/activityExecutions'
 import { approvals } from './resources/approvals'
+import { disabledNodeKinds, findNodeKind, nodeKindsForCaller, writeDeniedNodeKinds } from './resources/nodeKinds'
 import { settings, settingsCategories } from './resources/settings'
 import { revocationState } from './resources/revocation'
 import { identityProviders, type IdentityProvider } from './resources/identityProviders'
@@ -5537,5 +5538,59 @@ export const handlers = [
       { policy_name: 'project-viewer', effect: 'allow', actions: ['read'], scope: 'project', project: 'production' },
       { policy_name: 'audit-reader', effect: 'allow', actions: ['read'], scope: 'system', project: '' },
     ])
+  }),
+
+  // ==========================================================================
+  // Node kinds (ANSTRAT-1750) — registry listing + platform-wide kill switch
+  // ==========================================================================
+
+  http.get('/api/v1/node_kinds', () =>
+    HttpResponse.json({
+      resources: nodeKindsForCaller(),
+      disabled_kinds: [...disabledNodeKinds],
+    })
+  ),
+
+  http.put('/api/v1/node_kinds/:kind/enabled', async ({ params, request }) => {
+    const { kind } = params as { kind: string }
+    const registryEntry = findNodeKind(kind)
+    if (!registryEntry) {
+      return HttpResponse.json(
+        {
+          type: 'not_found',
+          title: 'Not Found',
+          detail: `Unknown node kind '${kind}'`,
+          code: 'NODE_KIND_NOT_FOUND',
+          retryable: false,
+        },
+        { status: 404 }
+      )
+    }
+    if (!registryEntry.switchable) {
+      return HttpResponse.json(
+        {
+          type: 'validation_error',
+          title: 'Unprocessable Entity',
+          detail: `Node kind '${kind}' cannot be switched off`,
+          code: 'VALIDATION_ERROR',
+          retryable: false,
+        },
+        { status: 422 }
+      )
+    }
+
+    const body = (await request.json()) as { enabled?: boolean }
+    const index = disabledNodeKinds.indexOf(kind)
+    if (body.enabled === false && index === -1) {
+      disabledNodeKinds.push(kind)
+    } else if (body.enabled !== false && index !== -1) {
+      disabledNodeKinds.splice(index, 1)
+    }
+
+    return HttpResponse.json({
+      ...registryEntry,
+      enabled: !disabledNodeKinds.includes(kind),
+      can_write: !writeDeniedNodeKinds.includes(kind),
+    })
   }),
 ]

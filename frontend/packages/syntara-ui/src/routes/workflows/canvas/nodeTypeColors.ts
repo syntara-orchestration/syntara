@@ -18,6 +18,7 @@ export const NODE_TYPE_COLORS = {
   actionHttpRequest: 'var(--pf-t--global--color--nonstatus--purple--200)',
   actionAap: 'var(--pf-t--global--color--nonstatus--gray--100)',
   actionAgentic: 'var(--pf-t--global--color--nonstatus--blue--200)',
+  actionMcpTool: 'var(--pf-t--global--color--nonstatus--teal--200)',
   actionDefault: 'var(--pf-t--global--color--nonstatus--purple--200)',
   generic: 'var(--pf-t--global--color--nonstatus--gray--300)',
 } as const
@@ -40,7 +41,8 @@ export function getNodeTypeColor(nodeType: string, data?: { type?: string }): st
     nodeType === ActivityTypeEnum.LOOP ||
     nodeType === ActivityTypeEnum.CONVERGE ||
     nodeType === ActivityTypeEnum.SWITCH ||
-    nodeType === ActivityTypeEnum.WAIT
+    nodeType === ActivityTypeEnum.WAIT ||
+    nodeType === ActivityTypeEnum.PERMISSION_CHECK
   ) {
     return NODE_TYPE_COLORS.logic
   }
@@ -74,6 +76,9 @@ function getTaskNodeColor(data: TaskActivity | undefined): string {
   if (actualExecutor === ExecutorTypeEnum.AGENTIC) {
     return NODE_TYPE_COLORS.actionAgentic
   }
+  if (actualExecutor === ExecutorTypeEnum.MCP_TOOL) {
+    return NODE_TYPE_COLORS.actionMcpTool
+  }
   return NODE_TYPE_COLORS.actionDefault
 }
 
@@ -92,6 +97,7 @@ const ADD_PANEL_LOGIC_IDS: ReadonlySet<string> = new Set([
   RegistryNodeId.LOGIC_LOOP,
   RegistryNodeId.LOGIC_SWITCH,
   RegistryNodeId.LOGIC_WAIT,
+  RegistryNodeId.LOGIC_PERMISSION_CHECK,
 ])
 
 const ADD_PANEL_ACTION_IDS: ReadonlySet<string> = new Set([
@@ -109,6 +115,7 @@ export function getAddNodePanelColor(registryNodeId: string): string | undefined
   if (ADD_PANEL_TRIGGER_IDS.has(registryNodeId)) return undefined
   if (ADD_PANEL_LOGIC_IDS.has(registryNodeId)) return NODE_TYPE_COLORS.logic
   if (registryNodeId === RegistryNodeId.APPROVAL) return NODE_TYPE_COLORS.approval
+  if (registryNodeId === RegistryNodeId.ACTION_MCP_TOOL) return NODE_TYPE_COLORS.actionMcpTool
   if (ADD_PANEL_ACTION_IDS.has(registryNodeId)) return NODE_TYPE_COLORS.actionScript
   if (registryNodeId === RegistryNodeId.AGENT) return NODE_TYPE_COLORS.actionAgentic
   // AAP category and all AAP subtypes use the same color

@@ -1,5 +1,6 @@
 import { Icon, Spinner } from '@patternfly/react-core'
 import {
+  RhUiBanIcon,
   RhUiCheckCircleFillIcon,
   RhUiClockIcon,
   RhUiEllipsisHorizontalFillIcon,
@@ -21,7 +22,7 @@ type ExecutionStatusBadgeProps = {
   nodeType?: string
 }
 
-type VisualStatus = 'pending' | 'running' | 'waiting' | 'success' | 'error' | 'skipped' | 'cancelled'
+type VisualStatus = 'pending' | 'running' | 'waiting' | 'success' | 'error' | 'skipped' | 'cancelled' | 'denied'
 
 const visualStatusConfig: Record<
   VisualStatus,
@@ -62,6 +63,11 @@ const visualStatusConfig: Record<
     color: activityStatusColors.cancelled,
     node: <RhUiStopCircleFillIcon style={{ color: activityStatusColors.cancelled }} />,
   },
+  denied: {
+    color: activityStatusColors.denied,
+    node: <RhUiBanIcon style={{ color: activityStatusColors.denied }} />,
+    borderStyle: 'dashed',
+  },
 }
 
 function normalizeStatus(status: ActivityStatus, nodeType?: string): { visualStatus: VisualStatus; label: string } {
@@ -85,6 +91,8 @@ function normalizeStatus(status: ActivityStatus, nodeType?: string): { visualSta
       return { visualStatus: 'skipped', label: 'Skipped' }
     case 'cancelled':
       return { visualStatus: 'cancelled', label: 'Cancelled' }
+    case 'denied':
+      return { visualStatus: 'denied', label: 'Denied' }
     default:
       return { visualStatus: 'pending', label: 'Pending' }
   }

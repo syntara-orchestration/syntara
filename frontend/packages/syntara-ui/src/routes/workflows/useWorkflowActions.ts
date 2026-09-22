@@ -4,6 +4,7 @@ import { useCallback } from 'react'
 import { executionsFetchClient, workflowClient } from '../../client'
 import type { useAlerts } from '../../providers/alerts'
 import { getErrorMessage } from '../../utils/apiErrors'
+import { nodeKindWriteDeniedAlert } from '../../utils/nodeKindDenials'
 
 import { resolveWorkflowRunTrigger } from './resolveWorkflowRunTrigger'
 
@@ -113,7 +114,8 @@ export function useWorkflowActions({
             onRefetch()
           },
           onError: (error: unknown) => {
-            showError({ title: 'Failed to publish workflow', description: getErrorMessage(error) })
+            const deniedAlert = nodeKindWriteDeniedAlert(error, 'publish')
+            showError(deniedAlert ?? { title: 'Failed to publish workflow', description: getErrorMessage(error) })
           },
           onSettled: () => {
             onPublishSettled?.()

@@ -9,7 +9,7 @@ const ACTIVITY_STATUS_OPTIONS = Object.entries(activityStatusDisplayLabels).map(
   label,
 }))
 
-const ACTIVITY_NODE_TYPES = ['condition', 'loop', 'converge', 'switch', 'wait'] as const
+const ACTIVITY_NODE_TYPES = ['condition', 'loop', 'converge', 'switch', 'wait', 'permission_check'] as const
 const ACTIVITY_EXECUTOR_TYPES = [
   'script',
   'agentic',
@@ -17,6 +17,7 @@ const ACTIVITY_EXECUTOR_TYPES = [
   'aap_job_template',
   'aap_workflow_job_template',
   'approval',
+  'mcp_tool',
   'internal_activity',
 ] as const
 

@@ -100,7 +100,8 @@ export function useBuilderFlowGraph({
         activity.type !== ActivityTypeEnum.CONDITION &&
         activity.type !== ActivityTypeEnum.LOOP &&
         activity.type !== ActivityTypeEnum.SWITCH &&
-        activity.type !== ActivityTypeEnum.WAIT
+        activity.type !== ActivityTypeEnum.WAIT &&
+        activity.type !== ActivityTypeEnum.PERMISSION_CHECK
       ) {
         return
       }

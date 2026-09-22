@@ -20,6 +20,8 @@ export const BRANCH_HANDLES = [
   EdgeHandleEnum.FALSE,
   EdgeHandleEnum.APPROVED,
   EdgeHandleEnum.REJECTED,
+  EdgeHandleEnum.ALLOWED,
+  EdgeHandleEnum.DENIED,
   EdgeHandleEnum.DONE,
   EdgeHandleEnum.LOOP,
   EdgeHandleEnum.DEFAULT,
@@ -70,6 +72,7 @@ export const ACTIVITY_TYPES = {
   CONVERGE: 'converge',
   APPROVAL: 'approval',
   SWITCH: 'switch',
+  PERMISSION_CHECK: 'permission_check',
 } as const
 
 export type ActivityTypeValue = (typeof ACTIVITY_TYPES)[keyof typeof ACTIVITY_TYPES]
@@ -94,6 +97,7 @@ export const ACTIVITY_STATUS = {
   RETRYING: 'retrying',
   SKIPPED: 'skipped',
   CANCELLED: 'cancelled',
+  DENIED: 'denied',
 } as const
 
 export type ActivityStatusValue = (typeof ACTIVITY_STATUS)[keyof typeof ACTIVITY_STATUS]
@@ -108,6 +112,7 @@ export const TERMINAL_ACTIVITY_STATUSES: readonly ActivityStatusValue[] = [
   ACTIVITY_STATUS.COMPLETED,
   ACTIVITY_STATUS.FAILED,
   ACTIVITY_STATUS.CANCELLED,
+  ACTIVITY_STATUS.DENIED,
 ] as const
 
 /**

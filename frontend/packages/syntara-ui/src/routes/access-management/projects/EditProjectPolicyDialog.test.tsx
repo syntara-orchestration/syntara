@@ -23,6 +23,16 @@ vi.mock('../../../client', () => ({
   interfaceTagMiddleware: { onRequest: vi.fn() },
 }))
 
+// The node-kind statement helper is covered by NodeKindStatementBuilder.test.tsx.
+vi.mock('../../../hooks/useNodeKindsQuery', () => ({
+  useNodeKindsQuery: () => ({
+    query: { isPending: false },
+    nodeKinds: [],
+    nodeKindByKind: new Map(),
+    disabledKinds: new Set<string>(),
+  }),
+}))
+
 const mockMutate = vi.fn()
 
 const mockMutationReturn = {

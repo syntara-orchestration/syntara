@@ -9,8 +9,14 @@ describe('policyStatementSchema', () => {
     expect(policyStatementSchema.safeParse(validStatement).success).toBe(true)
   })
 
-  it('accepts deny effect', () => {
-    expect(policyStatementSchema.safeParse({ ...validStatement, effect: 'deny' }).success).toBe(true)
+  it('accepts deny effect for workflow_node actions', () => {
+    const statement = { ...validStatement, effect: 'deny', actions: ['workflow_node:write'] }
+    expect(policyStatementSchema.safeParse(statement).success).toBe(true)
+  })
+
+  it('rejects deny effect for any other resource type', () => {
+    const result = policyStatementSchema.safeParse({ ...validStatement, effect: 'deny' })
+    expect(result.success).toBe(false)
   })
 
   it('rejects invalid effect', () => {
@@ -124,7 +130,7 @@ describe('addProjectPolicySchema', () => {
     it('accepts multiple valid statements', () => {
       const statementsJson = JSON.stringify([
         { effect: 'allow', actions: ['read'], scope: 'any' },
-        { effect: 'deny', actions: ['write', 'delete'], scope: 'self' },
+        { effect: 'deny', actions: ['workflow_node:write', 'workflow_node:execute'], scope: 'self' },
       ])
       expect(addProjectPolicySchema.safeParse({ ...validData, statementsJson }).success).toBe(true)
     })

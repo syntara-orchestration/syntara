@@ -84,6 +84,13 @@ const MULTI_HANDLE_CONFIGS: Record<string, MultiHandleConfig> = {
       [EdgeHandleEnum.LOOP]: { yOffset: 30 },
     },
   },
+  [FlowNodeType.PERMISSION_CHECK]: {
+    handles: [EdgeHandleEnum.ALLOWED, EdgeHandleEnum.DENIED],
+    handlePositions: {
+      [EdgeHandleEnum.ALLOWED]: { yOffset: -30 },
+      [EdgeHandleEnum.DENIED]: { yOffset: 30 },
+    },
+  },
 }
 
 type RunButtonEdgeMaintenanceWorkArgs = {
@@ -157,10 +164,13 @@ function runButtonEdgeMaintenanceWork({
   const approvalHandlesNeedingButtonEdges: { nodeId: string; handleId: string }[] = []
   const switchHandlesNeedingButtonEdges: { nodeId: string; handleId: string }[] = []
 
+  // permission_check shares the two-branch bookkeeping list with condition: both have
+  // exactly two named source handles, and the lists are keyed by handle id downstream.
   const handleListsByNodeType: Record<string, { nodeId: string; handleId: string }[]> = {
     [FlowNodeType.CONDITION]: conditionHandlesNeedingButtonEdges,
     [FlowNodeType.LOOP]: loopHandlesNeedingButtonEdges,
     [FlowNodeType.APPROVAL]: approvalHandlesNeedingButtonEdges,
+    [FlowNodeType.PERMISSION_CHECK]: conditionHandlesNeedingButtonEdges,
   }
 
   const existingNodeIds = new Set(nodes.map((node) => node.id))

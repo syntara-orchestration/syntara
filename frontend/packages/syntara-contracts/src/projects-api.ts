@@ -1113,6 +1113,8 @@ export interface components {
       | 'converge_configuration'
       | 'approval_configuration'
       | 'definition_limits'
+      | 'node_kind_disabled'
+      | 'permission_check_configuration'
     /**
      * ValidationFinding
      * @description A single structured validation finding.

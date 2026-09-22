@@ -8,6 +8,7 @@ import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 import { SynScrollableTableContainer } from '../../components/table/SynScrollableTableContainer'
 import { extractAAPJobUrl, isAAPNodeType } from '../../utils/aapJobUrl'
 import { formatElapsedTime } from '../../utils/dateUtils'
+import { formatNodeDeniedError } from '../executions/deniedNodes'
 import type { ActivityState } from '../workflows/execution/types'
 import { parseCompositeKey } from '../workflows/execution/utils/activityState'
 
@@ -125,7 +126,7 @@ function ActivityRow({
         <Tr>
           <Td colSpan={columnCount} style={{ paddingTop: 0 }}>
             <Content component={ContentVariants.small} style={ERROR_STYLE}>
-              {state.errorDetails}
+              {formatNodeDeniedError(state.errorDetails) ?? state.errorDetails}
             </Content>
           </Td>
         </Tr>

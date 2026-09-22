@@ -32,6 +32,8 @@ export function getTaskIconDescriptor(taskData: TaskActivity): IconDescriptor {
     iconId = RegistryNodeId.AGENT
   } else if (actualExecutor === ExecutorTypeEnum.HTTP_REQUEST) {
     iconId = RegistryNodeId.ACTION_API
+  } else if (actualExecutor === ExecutorTypeEnum.MCP_TOOL) {
+    iconId = RegistryNodeId.ACTION_MCP_TOOL
   }
   return { icon: executorMeta?.icon, id: iconId }
 }
@@ -78,6 +80,10 @@ export function getCanvasNodeIconDescriptor(
 
   if (node.type === 'wait') {
     return { icon: nodeMetadata.wait.icon, id: RegistryNodeId.LOGIC_WAIT }
+  }
+
+  if (node.type === 'permission_check') {
+    return { icon: nodeMetadata.permission_check.icon, id: RegistryNodeId.LOGIC_PERMISSION_CHECK }
   }
 
   if (node.type === 'task') {

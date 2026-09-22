@@ -8,6 +8,7 @@ import type {
   FilesAPI,
   IdentityProvidersAPI,
   IntegrationsAPI,
+  NodeKindsAPI,
   SettingsAPI,
   ToolManagerAPI,
   UsersAPI,
@@ -129,6 +130,11 @@ const approvalsFetchClient = createFetchClient<ApprovalsAPI.paths>({ baseUrl: '/
 approvalsFetchClient.use(interfaceTagMiddleware)
 approvalsFetchClient.use(authMiddleware)
 export const approvalsClient = createClient(approvalsFetchClient)
+
+const nodeKindsFetchClient = createFetchClient<NodeKindsAPI.paths>({ baseUrl: '/api/v1/' })
+nodeKindsFetchClient.use(interfaceTagMiddleware)
+nodeKindsFetchClient.use(authMiddleware)
+export const nodeKindsClient = createClient(nodeKindsFetchClient)
 
 const settingsFetchClient = createFetchClient<SettingsAPI.paths>({ baseUrl: '/api/v1/' })
 settingsFetchClient.use(interfaceTagMiddleware)

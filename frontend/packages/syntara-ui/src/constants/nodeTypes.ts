@@ -22,6 +22,8 @@ export const FlowNodeType = {
   LOOP: 'loop',
   SWITCH: 'switch',
   WAIT: 'wait',
+  /** Flow-control node that routes on whether the upstream node was allowed to run */
+  PERMISSION_CHECK: 'permission_check',
   /** Placeholder until user picks a real step type */
   GENERIC: 'generic',
   PLACEHOLDER: 'placeholder',
