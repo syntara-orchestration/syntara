@@ -45,8 +45,6 @@ from syntara.forms.models.api_models import (
 from syntara.forms.models.form_prompt import FormPrompt, FormPromptListResponse
 from syntara.forms.models.form_prompt_responders import FormPromptResponderGroup, FormPromptResponderUser
 from syntara.forms.validators.submission import validate_form_submission
-from syntara.workflows.exceptions import ExecutionNotFoundError
-from syntara.workflows.models.execution import Execution
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -122,7 +120,6 @@ class FormPromptService(BaseService):
             FormPromptAlreadyRequestedError: If a prompt for this already exists
 
         """
-
         try:
             # Create the prompt
             form_prompt = FormPrompt(
