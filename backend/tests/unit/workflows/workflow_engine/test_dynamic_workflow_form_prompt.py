@@ -360,7 +360,6 @@ class TestExecuteFormPromptNode:
         ):
             await wf._execute_form_prompt_node(node, graph, {})
 
-
     @pytest.mark.asyncio
     async def test_invalid_outcome_raises(self) -> None:
         """Invalid outcome raises ApplicationError."""
