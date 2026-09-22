@@ -64,6 +64,9 @@ Related to #(issue number)
 
 ## General Checklist
 
+Community PRs should have the `community` label. Please add it, or ask a
+maintainer to add it if you don't have permission to manage labels.
+
 - [ ] Code follows the project's coding conventions
 - [ ] I have updated relevant documentation
 - [ ] No secrets or credentials are included in this PR

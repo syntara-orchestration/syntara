@@ -52,6 +52,9 @@ See [AI_POLICY.md](.github/AI_POLICY.md) for the full policy.
 4. Open a pull request targeting `devel` — the PR template will guide you through the checklist
 5. Link any related issues in the PR description
 
+Community PRs should have the `community` label. Please add it when opening your
+PR, or ask a maintainer to add it if you don't have permission to manage labels.
+
 ## CI Checks
 
 Pull requests to `devel` run **GitHub Actions** and **Konflux**. Both are
