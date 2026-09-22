@@ -268,25 +268,6 @@ git worktree remove worktrees/feature-name
 git worktree remove worktrees/feature-name --force
 ```
 
-### Claude Code Warning: "imports files outside the current working directory"
-
-When using Claude Code inside a worktree, you may see this warning:
-
-```
-⚠️  This project's CLAUDE.md imports files outside the current working directory.
-    Never allow this for third-party repositories.
-```
-
-**This warning is expected and safe to ignore** for the following reasons:
-
-1. **It's your own project**: The warning is a security measure for third-party repositories
-2. **Git worktrees work this way**: In a worktree, the `.git` directory is actually a file pointing to the main repository's `.git/worktrees/` structure
-3. **Files are present locally**: All referenced files (`CLAUDE.md`, `AGENTS.md`, etc.) are actually present in your worktree
-
-**Why it happens**: Git worktrees share the same git object database with the main repository. Claude Code detects this internal structure and warns you as a precaution against malicious third-party repos.
-
-**Action**: You can safely dismiss this warning when working in your own worktrees.
-
 ## Additional Resources
 
 - [Git Worktree Documentation](https://git-scm.com/docs/git-worktree)

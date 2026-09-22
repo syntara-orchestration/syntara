@@ -16,7 +16,7 @@ under `.claude/`; review expectations) is in
 ```bash
 make setup          # First-time bootstrap (install, secrets, services, migrations, seed)
 make dev            # Start backend API (port 8000) + frontend dev server (port 5173)
-make test           # Run all tests
+make test           # Run the default backend and frontend tests
 make lint           # Lint both codebases
 make format         # Format both codebases
 make typecheck      # Type-check both codebases

@@ -4,9 +4,9 @@ user-invocable: false
 ---
 
 <!--
-  SYNC NOTE: A condensed version of this file exists at .cursor/rules/patternfly-ux-design-system.mdc
-  (the Cursor rule). Both files must stay in sync — when updating one, update the other.
-  This file is the comprehensive source of truth. The Cursor rule is the lightweight version.
+  The repository source of truth is this skill. Local editor-specific mirrors
+  (for example Cursor rules under frontend/.cursor/) are private and are not
+  part of the upstream tree; update them only in local overlays if present.
 -->
 
 # Claude Skill: PatternFly UX Design System — Opinionated Implementation
@@ -1352,7 +1352,7 @@ For create/edit forms accessible via direct URL:
 
 **Note:** List/detail pages use in-page empty states or tab filtering -- not route guards. Route guards target mutation form routes only.
 
-See [`frontend/docs/permissions-rbac.md`](frontend/docs/permissions-rbac.md) for the full permission gating architecture.
+See `frontend/docs/permissions-rbac.md` for the full permission gating architecture.
 
 ### Empty-State Actions Must Be Permission-Gated
 
