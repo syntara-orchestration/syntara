@@ -69,8 +69,10 @@ test.describe('Multiple triggers', () => {
       await app.getByRole('menuitem', { name: TRIGGER_NAME }).click()
       const dialog = app.getByRole('dialog')
       await expect(dialog).toBeVisible()
-      // Dialog title confirms the correct workflow is being run
-      await expect(dialog.getByRole('heading', { name: new RegExp(`Run ${workflowName}`) })).toBeVisible()
+      await expect(dialog.getByRole('heading', { name: 'Run workflow?' })).toBeVisible()
+      await expect(
+        dialog.getByText(new RegExp(`You are about to manually run the workflow.*${workflowName}`))
+      ).toBeVisible()
       await dialog.getByRole('button', { name: 'Cancel' }).click()
       await expect(dialog).not.toBeVisible()
     } finally {

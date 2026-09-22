@@ -82,7 +82,7 @@ describe('BuilderDialogs', () => {
   it('renders nothing visible when all dialogs are closed', () => {
     renderDialogs()
 
-    expect(screen.queryByText('Run Test Workflow?')).not.toBeInTheDocument()
+    expect(screen.queryByText('Run workflow?')).not.toBeInTheDocument()
     expect(screen.queryByText('Set mock output data for Manual Trigger')).not.toBeInTheDocument()
     expect(screen.queryByText('Delete workflow?')).not.toBeInTheDocument()
     expect(screen.queryByText('Review approval')).not.toBeInTheDocument()
@@ -91,8 +91,11 @@ describe('BuilderDialogs', () => {
   it('shows the run confirmation dialog when confirmDialogOpen is true', () => {
     renderDialogs({ confirmDialogOpen: true })
 
-    expect(screen.getByText('Run Test Workflow?')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Run now' })).toBeInTheDocument()
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText('Run workflow?')).toBeInTheDocument()
+    expect(within(dialog).getByText(/You are about to manually run the workflow/)).toBeInTheDocument()
+    expect(within(dialog).getByText('Test Workflow')).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Run now' })).toBeInTheDocument()
   })
 
   it('shows the run workflow modal after confirming the run dialog when trigger has input schema', async () => {
@@ -224,7 +227,7 @@ describe('BuilderDialogs', () => {
         </ColorSchemeProvider>
       </QueryClientProvider>
     )
-    expect(screen.getByText('Run Test Workflow?')).toBeInTheDocument()
+    expect(screen.getByText('Run workflow?')).toBeInTheDocument()
   })
 
   it('closes run modal when onClose is called from RunWorkflowModal', async () => {

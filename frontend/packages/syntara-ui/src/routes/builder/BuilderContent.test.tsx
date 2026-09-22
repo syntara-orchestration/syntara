@@ -714,7 +714,7 @@ describe('BuilderContent', () => {
       await user.click(screen.getByRole('button', { name: 'Run' }))
 
       await waitFor(() => {
-        expect(screen.getByText(/Run Test Workflow\?/)).toBeInTheDocument()
+        expect(screen.getByText(/Run workflow\?/)).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Run now' })).toBeInTheDocument()
       })
     })
@@ -727,12 +727,12 @@ describe('BuilderContent', () => {
       })
 
       await user.click(screen.getByRole('button', { name: 'Run' }))
-      await screen.findByText(/Run Test Workflow\?/)
+      await screen.findByText(/Run workflow\?/)
 
       await user.click(screen.getByRole('button', { name: 'Cancel' }))
 
       await waitFor(() => {
-        expect(screen.queryByText(/Run Test Workflow\?/)).not.toBeInTheDocument()
+        expect(screen.queryByText(/Run workflow\?/)).not.toBeInTheDocument()
       })
     })
 
@@ -759,7 +759,7 @@ describe('BuilderContent', () => {
       })
 
       await user.click(screen.getByRole('button', { name: 'Run' }))
-      await screen.findByText(/Run Test Workflow\?/)
+      await screen.findByText(/Run workflow\?/)
       await user.click(screen.getByRole('button', { name: 'Run now' }))
       await screen.findByText(/Set mock output data for/)
       await user.click(screen.getByRole('button', { name: 'Run' }))
@@ -793,7 +793,7 @@ describe('BuilderContent', () => {
       })
 
       await user.click(screen.getByRole('button', { name: 'Run' }))
-      await screen.findByText(/Run Test Workflow\?/)
+      await screen.findByText(/Run workflow\?/)
       await user.click(screen.getByRole('button', { name: 'Run now' }))
       await screen.findByText(/Set mock output data for/)
       await user.click(screen.getByRole('button', { name: 'Run' }))
@@ -811,12 +811,12 @@ describe('BuilderContent', () => {
       })
 
       await user.click(screen.getByRole('button', { name: 'Run' }))
-      await screen.findByText(/Run Test Workflow\?/)
+      await screen.findByText(/Run workflow\?/)
 
       await user.click(screen.getByRole('button', { name: 'Cancel' }))
 
       await waitFor(() => {
-        expect(screen.queryByText(/Run Test Workflow\?/)).not.toBeInTheDocument()
+        expect(screen.queryByText(/Run workflow\?/)).not.toBeInTheDocument()
       })
     })
 
@@ -829,7 +829,7 @@ describe('BuilderContent', () => {
       })
 
       await user.click(screen.getByRole('button', { name: 'Run' }))
-      await screen.findByText(/Run Test Workflow\?/)
+      await screen.findByText(/Run workflow\?/)
       await user.click(screen.getByRole('button', { name: 'Run now' }))
       await screen.findByText(/Set mock output data for/)
 
@@ -2223,7 +2223,7 @@ describe('BuilderContent', () => {
       })
 
       await user.click(screen.getByRole('button', { name: 'Run' }))
-      await screen.findByText(/Run Test Workflow\?/)
+      await screen.findByText(/Run workflow\?/)
       await user.click(screen.getByRole('button', { name: 'Run now' }))
       await screen.findByText(/Set mock output data for/)
       await user.click(screen.getByRole('button', { name: 'Run' }))
@@ -2484,7 +2484,7 @@ describe('BuilderContent', () => {
 
       // Click Run → confirmation dialog → input modal → confirm
       await user.click(screen.getByRole('button', { name: 'Run' }))
-      await screen.findByText(/Run Test Workflow\?/)
+      await screen.findByText(/Run workflow\?/)
       await user.click(screen.getByRole('button', { name: 'Run now' }))
       await screen.findByText(/Set mock output data for/)
       await user.click(screen.getByRole('button', { name: 'Run' }))
