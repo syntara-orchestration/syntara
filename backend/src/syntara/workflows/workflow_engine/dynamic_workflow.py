@@ -35,7 +35,7 @@ with workflow.unsafe.imports_passed_through():
         resolve_decision_window,
         resolve_max_iterations,
         resolve_max_output_bytes,
-        resolve_response_window,
+        resolve_form_prompt_response_window,
         resolve_retry_policy,
         resolve_timeout,
     )
@@ -437,7 +437,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin, Workflo
             node = graph.get_node(node_id)
             # For form_prompt and approval nodes, use response/decision window instead of node timeout
             if node.type == NodeType.FORM_PROMPT:
-                timeout_seconds = resolve_response_window(node, self._runtime_settings)
+                timeout_seconds = resolve_form_prompt_response_window(node, self._runtime_settings)
             elif node.type == NodeType.APPROVAL:
                 timeout_seconds = resolve_decision_window(node, self._runtime_settings)
             else:

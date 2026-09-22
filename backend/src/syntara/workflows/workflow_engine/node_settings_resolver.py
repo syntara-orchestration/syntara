@@ -70,7 +70,7 @@ def resolve_decision_window(node: ActivityNode, runtime_settings: dict[str, Any]
     return int(runtime_settings.get("workflow_engine.approval_decision_window_seconds", 86400))
 
 
-def resolve_response_window(node: ActivityNode, runtime_settings: dict[str, Any]) -> int:
+def resolve_form_prompt_response_window(node: ActivityNode, runtime_settings: dict[str, Any]) -> int:
     """Return the response window (seconds) for a form prompt node.
 
     Resolution: node.parameters.response_window → workflow_engine.form_prompt_response_window_seconds catalog value.

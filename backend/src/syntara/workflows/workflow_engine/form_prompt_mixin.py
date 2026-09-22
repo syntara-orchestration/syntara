@@ -26,7 +26,7 @@ with workflow.unsafe.imports_passed_through():
         NodeType,
     )
     from syntara.workflows.workflow_engine.node_settings_resolver import (
-        resolve_response_window,
+        resolve_form_prompt_response_window,
         resolve_retry_policy,
     )
 
@@ -210,7 +210,7 @@ class WorkflowFormPromptMixin:
         responder_group_ids = resolution_result.get("group_ids")
 
         # Compute timeout_at
-        response_window = resolve_response_window(node, self._runtime_settings)
+        response_window = resolve_form_prompt_response_window(node, self._runtime_settings)
         timeout_at = (workflow.now() + timedelta(seconds=response_window)).isoformat()
 
         # Process message field
@@ -267,7 +267,7 @@ class WorkflowFormPromptMixin:
         node_id = node.id
         prompt_activity_id = form_prompt_temporal_activity_id(node_id, self.loop_body_map, self.node_control_data)
         args = await self._prepare_form_prompt_args(node, graph, resolved_parameters)
-        window = resolve_response_window(node, self._runtime_settings)
+        window = resolve_form_prompt_response_window(node, self._runtime_settings)
 
         result = cast(
             "dict[str, Any]",
