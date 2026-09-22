@@ -75,8 +75,7 @@ async def create_form_prompt_activity(
         responder_group_ids: List of group UUIDs whose members can respond.
         project_id: Project ID for the form prompt (from parent execution).
         loop_iteration_path: Enclosing-loop indices, outermost first (empty if none).
-        temporal_activity_id: Temporal activity ID to signal on submit. Defaults to
-            ``prompt_node_id`` for backward compatibility.
+        temporal_activity_id: Temporal activity ID to signal on submit.
         message: Resolved message shown above the form, or None.
         submit_label: Submit button label, or None.
         success_message: Message shown after successful submission, or None.
@@ -111,7 +110,7 @@ async def create_form_prompt_activity(
         "responder_user_ids": responder_user_ids,
         "responder_group_ids": responder_group_ids,
         "loop_iteration_path": loop_iteration_path or [],
-        "temporal_activity_id": temporal_activity_id or prompt_node_id,
+        "temporal_activity_id": temporal_activity_id,
         "message": message,
         "submit_label": submit_label,
         "success_message": success_message,

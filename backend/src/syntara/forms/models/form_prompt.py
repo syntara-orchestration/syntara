@@ -209,10 +209,9 @@ class FormPrompt(BaseFormPrompt, table=True):
         description="User who submitted the response",
     )
 
-    temporal_activity_id: str | None = Field(
-        default=None,
+    temporal_activity_id: str = Field(
         max_length=FieldLimits.TEMPORAL_ACTIVITY_ID_MAX_LENGTH,
-        sa_type=String(FieldLimits.NAME_MAX_LENGTH),  # type: ignore[call-overload]
+        sa_type=String(FieldLimits.TEMPORAL_ACTIVITY_ID_MAX_LENGTH),  # type: ignore[call-overload]
         description="Temporal activity ID to signal when this prompt is answered",
     )
 

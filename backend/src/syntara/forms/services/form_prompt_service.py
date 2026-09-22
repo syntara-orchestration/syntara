@@ -4,16 +4,15 @@ Minimal internal-facing implementation for workflow engine integration.
 AAP-91889 will extend with full filtering/sorting/enrichment.
 """
 
-from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
 from __future__ import annotations
 
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
+from uuid import UUID
 
 import structlog
-from sqlalchemy import select
-from sqlalchemy import update as sa_update
 from sqlalchemy.exc import IntegrityError
-from sqlmodel import select
+from sqlmodel import select, update
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -24,6 +23,8 @@ if TYPE_CHECKING:
     from syntara.core.models import User
 
 from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.authz.engine import AllowedProjectsResult
+from syntara.core.services.base import BaseService
 from syntara.forms.audit.form_prompt import FormPromptSubmittedEvent
 from syntara.forms.exceptions import (
     FormPromptAlreadyRequestedError,
@@ -31,6 +32,7 @@ from syntara.forms.exceptions import (
     FormPromptCancelledError,
     FormPromptExpiredError,
     FormPromptNotFoundError,
+    InvalidResponderReferenceError,
 )
 from syntara.forms.models.api_models import (
     TERMINAL_PROMPT_STATUSES,
@@ -381,13 +383,6 @@ class FormPromptService(BaseService):
                 raise FormPromptExpiredError(prompt_id, prompt.timeout_at)
             if prompt.status == FormPromptStatus.CANCELLED:
                 raise FormPromptCancelledError(prompt_id)
-            # SUBMITTED - will be caught by the already-responded check in submit endpoint
-
-        # Check if prompt has timed out (even if status is still PENDING)
-        if prompt.timeout_at is not None:
-            now = datetime.now(UTC)
-            if now > prompt.timeout_at:
-                raise FormPromptExpiredError(prompt_id, prompt.timeout_at)
 
         # Validate form data against definition
         cleaned_data = validate_form_submission(prompt.form_definition, submitted_data)
@@ -442,7 +437,7 @@ class FormPromptService(BaseService):
         # SECURITY: Optimistic locking prevents TOCTOU race condition.
         # UPDATE with WHERE status=PENDING ensures only one concurrent submission succeeds.
         stmt = (
-            sa_update(FormPrompt)
+            update(FormPrompt)
             .where(FormPrompt.id == prompt_id)  # type: ignore[arg-type]
             .where(FormPrompt.status == FormPromptStatus.PENDING)  # type: ignore[arg-type]
             .values(
