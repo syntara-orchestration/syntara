@@ -105,7 +105,7 @@ Check whether the changes follow:
 | New `use*.ts` hook without `use*.test.ts(x)`                   | #13 -- every new hook needs a dedicated test file                                                         |
 | `useEffect` + `setState` for derived/computed values           | #14 -- compute during render or use `useMemo`                                                             |
 | `useEffect` + `setValue` watching form fields                  | #15 -- move cascading resets to field's `onChange` handler                                                |
-| `PlusCircleIcon` or non-`RhUi*` icons                          | #17 -- use `RhUiAddIcon`, `RhUiDuplicate`, etc.                                                           |
+| `PlusCircleIcon` or non-`RhUi*` icons                          | #17 -- use `RhUiAddIcon`, `RhUiDuplicateIcon`, etc.                                                       |
 | Inline style objects (`style={{ ... }}`)                       | #18 -- refactor to CSS module classes                                                                     |
 | `let` counter inside `.map()`                                  | #19 -- pre-compute indices immutably                                                                      |
 | `aria-label` on `<div>` (non-interactive)                      | span is ESLint; still flag `aria-label` on generic `<div>` (coding standards §27)                         |
