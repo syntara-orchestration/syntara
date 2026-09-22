@@ -63,13 +63,15 @@ async function isStaleTokenResponse(response: APIResponse): Promise<boolean> {
   }
 }
 
-async function sendApiRequest(
-  app: Page,
-  method: 'get' | 'post' | 'patch' | 'delete',
-  path: string,
-  token: string | null,
+type SendApiRequestOptions = {
+  app: Page
+  method: 'get' | 'post' | 'patch' | 'delete'
+  path: string
+  token: string | null
   data?: unknown
-): Promise<APIResponse> {
+}
+
+async function sendApiRequest({ app, method, path, token, data }: SendApiRequestOptions): Promise<APIResponse> {
   const headers: Record<string, string> = {}
   if (token) headers['Authorization'] = `Bearer ${token}`
 
@@ -103,14 +105,14 @@ export async function apiRequest(
   options?: { data?: unknown; token?: string }
 ) {
   const token = options?.token ?? (await getAuthToken(app))
-  const response = await sendApiRequest(app, method, path, token, options?.data)
+  const response = await sendApiRequest({ app, method, path, token, data: options?.data })
 
   if (!(await isStaleTokenResponse(response))) return response
 
   const refreshed = await getAuthToken(app)
   if (!refreshed || refreshed === token) return response
 
-  return sendApiRequest(app, method, path, refreshed, options?.data)
+  return sendApiRequest({ app, method, path, token: refreshed, data: options?.data })
 }
 
 /**
