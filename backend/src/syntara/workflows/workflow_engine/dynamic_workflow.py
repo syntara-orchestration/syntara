@@ -33,9 +33,9 @@ with workflow.unsafe.imports_passed_through():
     from syntara.workflows.workflow_engine.node_settings_resolver import (
         resolve_continue_on_failure,
         resolve_decision_window,
+        resolve_form_prompt_response_window,
         resolve_max_iterations,
         resolve_max_output_bytes,
-        resolve_form_prompt_response_window,
         resolve_retry_policy,
         resolve_timeout,
     )

@@ -126,12 +126,12 @@ class FormPromptCreateRequest(SQLModel):
     # FK validation: UUIDs must exist in users/groups tables (enforced at service layer)
     responder_user_ids: list[UUID] | None = Field(
         None,
-        max_length=FieldLimits.APPROVER_LIST_MAX_LENGTH,
+        max_length=FieldLimits.RESPONDER_LIST_MAX_LENGTH,
         description="User IDs who can respond (null = any user with form_prompt:submit permission)",
     )
     responder_group_ids: list[UUID] | None = Field(
         None,
-        max_length=FieldLimits.APPROVER_LIST_MAX_LENGTH,
+        max_length=FieldLimits.RESPONDER_LIST_MAX_LENGTH,
         description="Group IDs whose members can respond",
     )
 
