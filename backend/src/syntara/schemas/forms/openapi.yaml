@@ -872,7 +872,7 @@ components:
         temporal_activity_id:
           anyOf:
             - type: string
-              maxLength: 255
+              maxLength: 512
             - type: "null"
           title: Temporal Activity Id
           description: Temporal activity ID to signal on submit (defaults to prompt_node_id)

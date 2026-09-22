@@ -44662,7 +44662,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "maxLength": 255
+                "maxLength": 512
               },
               {
                 "type": "null"
