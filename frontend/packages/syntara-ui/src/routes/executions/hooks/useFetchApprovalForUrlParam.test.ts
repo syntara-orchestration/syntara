@@ -33,7 +33,7 @@ describe('useFetchApprovalForUrlParam', () => {
   it('returns undefined when no approval param in URL', () => {
     vi.mocked(approvalsClient.useQuery).mockReturnValue({
       data: undefined,
-    } as never)
+    })
 
     const { result } = renderHook(() => useFetchApprovalForUrlParam(''), {
       wrapper: makeWrapper(queryClient),
@@ -46,7 +46,7 @@ describe('useFetchApprovalForUrlParam', () => {
     const mockApproval = { id: 'approval-1', name: 'Test' }
     vi.mocked(approvalsClient.useQuery).mockReturnValue({
       data: mockApproval,
-    } as never)
+    })
 
     const { result } = renderHook(() => useFetchApprovalForUrlParam('approval=approval-1'), {
       wrapper: makeWrapper(queryClient),
@@ -64,7 +64,7 @@ describe('useFetchApprovalForUrlParam', () => {
   it('passes enabled=false when no approval param', () => {
     vi.mocked(approvalsClient.useQuery).mockReturnValue({
       data: undefined,
-    } as never)
+    })
 
     renderHook(() => useFetchApprovalForUrlParam('history=open'), {
       wrapper: makeWrapper(queryClient),
@@ -81,7 +81,7 @@ describe('useFetchApprovalForUrlParam', () => {
   it('handles searchParams with question mark prefix', () => {
     vi.mocked(approvalsClient.useQuery).mockReturnValue({
       data: undefined,
-    } as never)
+    })
 
     renderHook(() => useFetchApprovalForUrlParam('?approval=test-id'), {
       wrapper: makeWrapper(queryClient),

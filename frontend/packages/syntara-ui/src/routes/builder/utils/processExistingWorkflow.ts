@@ -56,7 +56,7 @@ export function convertV2Definition(
     if (meta) return { ...a, metadata: meta }
     // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructuring to strip metadata
     const { metadata: _unsanitized, ...rest } = a as Activity & { metadata?: unknown }
-    return rest as Activity
+    return rest
   })
 
   const triggerIdToDisplayId = new Map<string, string>()

@@ -60,7 +60,7 @@ function TestWrapper({ isEdit = false, isFederatedUser = false }: { isEdit?: boo
     <QueryWrapper>
       <FormProvider {...methods}>
         <form>
-          <UserFormFields control={methods.control} isEdit={isEdit} isFederatedUser={isFederatedUser} />
+          <UserFormFields isEdit={isEdit} isFederatedUser={isFederatedUser} />
         </form>
       </FormProvider>
     </QueryWrapper>
@@ -80,7 +80,7 @@ function TestWrapperWithPasswordError() {
     <QueryWrapper>
       <FormProvider {...methods}>
         <form>
-          <UserFormFields control={methods.control} isEdit={false} />
+          <UserFormFields isEdit={false} />
         </form>
       </FormProvider>
     </QueryWrapper>
@@ -91,10 +91,10 @@ describe('UserFormFields', () => {
   it('renders all form fields', () => {
     render(<TestWrapper />)
 
-    expect(screen.getByLabelText('Username')).toBeInTheDocument()
-    expect(screen.getByLabelText('First Name')).toBeInTheDocument()
-    expect(screen.getByLabelText('Last Name')).toBeInTheDocument()
-    expect(screen.getByLabelText('Email')).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Username' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'First Name' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Last Name' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Email' })).toBeInTheDocument()
     expect(screen.getByLabelText('Password')).toBeInTheDocument()
     expect(screen.getByLabelText('Enabled')).toBeInTheDocument()
   })
@@ -102,7 +102,7 @@ describe('UserFormFields', () => {
   it('enables username field in edit mode', () => {
     render(<TestWrapper isEdit />)
 
-    expect(screen.getByLabelText('Username')).toBeEnabled()
+    expect(screen.getByRole('textbox', { name: 'Username' })).toBeEnabled()
   })
 
   it('shows create-mode placeholder for password field', () => {
@@ -143,16 +143,16 @@ describe('UserFormFields', () => {
     const user = userEvent.setup()
     render(<TestWrapper />)
 
-    await user.type(screen.getByLabelText('Username'), 'jdoe')
-    await user.type(screen.getByLabelText('First Name'), 'Jane')
-    await user.type(screen.getByLabelText('Last Name'), 'Doe')
-    await user.type(screen.getByLabelText('Email'), 'jane@example.com')
+    await user.type(screen.getByRole('textbox', { name: 'Username' }), 'jdoe')
+    await user.type(screen.getByRole('textbox', { name: 'First Name' }), 'Jane')
+    await user.type(screen.getByRole('textbox', { name: 'Last Name' }), 'Doe')
+    await user.type(screen.getByRole('textbox', { name: 'Email' }), 'jane@example.com')
     await user.type(screen.getByLabelText('Password', { selector: 'input' }), 'secret123')
 
-    expect(screen.getByLabelText('Username')).toHaveValue('jdoe')
-    expect(screen.getByLabelText('First Name')).toHaveValue('Jane')
-    expect(screen.getByLabelText('Last Name')).toHaveValue('Doe')
-    expect(screen.getByLabelText('Email')).toHaveValue('jane@example.com')
+    expect(screen.getByRole('textbox', { name: 'Username' })).toHaveValue('jdoe')
+    expect(screen.getByRole('textbox', { name: 'First Name' })).toHaveValue('Jane')
+    expect(screen.getByRole('textbox', { name: 'Last Name' })).toHaveValue('Doe')
+    expect(screen.getByRole('textbox', { name: 'Email' })).toHaveValue('jane@example.com')
     expect(screen.getByLabelText('Password', { selector: 'input' })).toHaveValue('secret123')
   })
 

@@ -59,7 +59,7 @@ describe('useNodeMenuActions', () => {
       const { result } = renderHook(() => useNodeMenuActions({ nodeId: 'task-1', nodeType: MenuNodeType.ACTIVITY }))
 
       expect(result.current).toHaveLength(1)
-      expect(result.current[0].label).toBe('Delete step')
+      expect(result.current[0].label).toBe('Delete')
       expect(result.current[0].variant).toBe('danger')
     })
 
@@ -69,7 +69,7 @@ describe('useNodeMenuActions', () => {
       )
 
       expect(result.current).toHaveLength(1)
-      expect(result.current[0].label).toBe('Delete step')
+      expect(result.current[0].label).toBe('Delete')
     })
 
     it('calls deleteElements with correct node id for activity node', () => {
@@ -127,15 +127,7 @@ describe('useNodeMenuActions', () => {
       })
 
       const labels = result.current.map((a) => a.label)
-      expect(labels).toEqual([
-        'View step details',
-        'Run step',
-        'Disable step',
-        'Duplicate step',
-        'Replace step',
-        '',
-        'Delete step',
-      ])
+      expect(labels).toEqual(['View step details', 'Run step', 'Disable', 'Duplicate', 'Replace', '', 'Delete'])
     })
 
     it('calls onViewDetails with the node id', () => {
@@ -248,7 +240,7 @@ describe('useNodeMenuActions', () => {
       )
 
       const labels = result.current.map((a) => a.label)
-      expect(labels).toEqual(['Replace step', '', 'Delete step'])
+      expect(labels).toEqual(['Replace', '', 'Delete'])
     })
 
     it('does not include view details, run step, duplicate, or disable for control flow nodes', () => {
@@ -266,24 +258,24 @@ describe('useNodeMenuActions', () => {
   })
 
   describe('disable toggle', () => {
-    it('shows "Disable step" label when node is not disabled', () => {
+    it('shows "Disable" label when node is not disabled', () => {
       const { result } = renderHook(
         () => useNodeMenuActions({ nodeId: 'task-1', nodeType: MenuNodeType.ACTIVITY, disabled: false }),
         { wrapper: withNodeActions(defaultNodeActions) }
       )
 
       const toggle = result.current.find((a) => a.id === 'toggle-disabled')
-      expect(toggle?.label).toBe('Disable step')
+      expect(toggle?.label).toBe('Disable')
     })
 
-    it('shows "Enable step" label when node is disabled', () => {
+    it('shows "Enable" label when node is disabled', () => {
       const { result } = renderHook(
         () => useNodeMenuActions({ nodeId: 'task-1', nodeType: MenuNodeType.ACTIVITY, disabled: true }),
         { wrapper: withNodeActions(defaultNodeActions) }
       )
 
       const toggle = result.current.find((a) => a.id === 'toggle-disabled')
-      expect(toggle?.label).toBe('Enable step')
+      expect(toggle?.label).toBe('Enable')
     })
 
     it('calls onToggleDisabled with node id when clicked', () => {
@@ -316,7 +308,7 @@ describe('useNodeMenuActions', () => {
       expect(result.current).toHaveLength(3)
       expect(result.current[0].label).toBe('Custom')
       expect(result.current[1].separator).toBe(true)
-      expect(result.current[2].label).toBe('Delete step')
+      expect(result.current[2].label).toBe('Delete')
     })
 
     it('calls additional action onClick when clicked', () => {
@@ -362,7 +354,7 @@ describe('useNodeMenuActions', () => {
       )
 
       expect(result.current).toHaveLength(1)
-      expect(result.current[0].label).toBe('Delete step')
+      expect(result.current[0].label).toBe('Delete')
     })
 
     it('handles multiple additional actions', () => {
@@ -382,7 +374,7 @@ describe('useNodeMenuActions', () => {
       expect(result.current[1].label).toBe('Action 2')
       expect(result.current[2].label).toBe('Action 3')
       expect(result.current[3].separator).toBe(true)
-      expect(result.current[4].label).toBe('Delete step')
+      expect(result.current[4].label).toBe('Delete')
     })
   })
 })

@@ -53,7 +53,7 @@ describe('useWorkflowPermissions', () => {
   })
 
   it('uses check_any_project for create and system-scoped update/delete/run without resourceProject', async () => {
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
 
     const { result } = renderHook(() => useWorkflowPermissions(), { wrapper: createWrapper() })
 
@@ -80,7 +80,7 @@ describe('useWorkflowPermissions', () => {
   })
 
   it('createOnly without resourceProject only checks create via check_any_project', async () => {
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
 
     const { result } = renderHook(() => useWorkflowPermissions({ createOnly: true }), { wrapper: createWrapper() })
 
@@ -99,7 +99,7 @@ describe('useWorkflowPermissions', () => {
   })
 
   it('createOnly with resourceProject only checks create scoped to that project', async () => {
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
 
     const { result } = renderHook(() => useWorkflowPermissions({ resourceProject: 'proj-1', createOnly: true }), {
       wrapper: createWrapper(),
@@ -118,7 +118,7 @@ describe('useWorkflowPermissions', () => {
   })
 
   it('enabled false skips all can_i calls', () => {
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
 
     const { result } = renderHook(() => useWorkflowPermissions({ resourceProject: 'proj-1', enabled: false }), {
       wrapper: createWrapper(),

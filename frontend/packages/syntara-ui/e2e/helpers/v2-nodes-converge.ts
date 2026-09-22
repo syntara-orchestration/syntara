@@ -6,7 +6,34 @@
 import { expect, type Page, toAppUrl } from '../fixtures'
 
 import { addConditionNodeWithBranch, addManualTrigger, openAddNodePanel, selectCategoryAndType } from './v2-nodes'
-import { buildUniqueName, closeNodeEditorPanel } from './workflows'
+import { buildUniqueName, closeNodeEditorPanel, triggerLayout } from './workflows'
+
+const convergeStrategySelect = (page: Page) => page.getByRole('button', { name: 'Continue when criteria', exact: true })
+
+/**
+ * Open a saved converge node for editing on the canvas.
+ *
+ * Retries layout + click while the editor hydrates. Under CI load the click can
+ * land during a React Flow viewport transform and be lost, so callers must not
+ * use a bare `getByText(nodeName).click()`.
+ */
+export async function openConvergeNodeForEditing(page: Page, nodeName: string) {
+  await triggerLayout(page)
+  const node = page.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: nodeName })
+  const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
+  await expect(async () => {
+    await expect(node).toBeVisible({ timeout: 5_000 })
+    await node.click({ timeout: 5_000 })
+    await expect(nameInput).toHaveValue(nodeName, { timeout: 5_000 })
+    await expect(convergeStrategySelect(page)).toBeVisible({ timeout: 5_000 })
+  }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] })
+}
+
+/** Open a saved converge node and wait for the Parameters tab (timeout fields). */
+export async function openConvergeNodeParameters(page: Page, nodeName: string) {
+  await openConvergeNodeForEditing(page, nodeName)
+  await expect(page.getByRole('tab', { name: 'Parameters' })).toBeVisible()
+}
 
 /**
  * Navigate to a new workflow, add trigger + condition, and open the converge form.

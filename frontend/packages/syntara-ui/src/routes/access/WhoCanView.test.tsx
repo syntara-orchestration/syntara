@@ -71,7 +71,7 @@ function mockMutationState(overrides: Record<string, unknown>) {
     variables: undefined,
     isPaused: false,
     ...overrides,
-  } as never)
+  })
 }
 
 describe('WhoCanView', () => {
@@ -82,7 +82,7 @@ describe('WhoCanView', () => {
       data: { resources: [], next: null },
       isPending: false,
       error: null,
-    } as never)
+    })
     vi.mocked(accessFetchClient.GET).mockResolvedValue({ data: { resources: [] } } as never)
     vi.mocked(dynamicFetchClient.GET).mockResolvedValue({ data: { resources: [] } } as never)
     const projectsMockValue = {
@@ -121,7 +121,7 @@ describe('WhoCanView', () => {
       submittedAt: 0,
       variables: undefined,
       isPaused: false,
-    } as never)
+    })
   })
 
   it('renders empty state initially', () => {
@@ -137,13 +137,13 @@ describe('WhoCanView', () => {
     expect(screen.getByText('Resource type')).toBeInTheDocument()
     expect(screen.getByText('Action')).toBeInTheDocument()
     expect(screen.getByText('Resource ID')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Find Users' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Find users' })).toBeInTheDocument()
   })
 
-  it('disables Find Users button when form is incomplete', () => {
+  it('disables Find users button when form is incomplete', () => {
     render(<WhoCanView {...sampleResourceActions} />, { wrapper })
 
-    expect(screen.getByRole('button', { name: 'Find Users' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Find users' })).toBeDisabled()
   })
 
   it('populates action options after resource type is chosen', async () => {
@@ -255,7 +255,7 @@ describe('WhoCanView', () => {
     await user.click(screen.getByPlaceholderText('Select an action'))
     await user.click(screen.getByRole('option', { name: /^read$/i }))
 
-    await user.click(screen.getByRole('button', { name: 'Find Users' }))
+    await user.click(screen.getByRole('button', { name: 'Find users' }))
 
     await waitFor(() => {
       expect(mockMutate).toHaveBeenCalledWith(
@@ -385,7 +385,7 @@ describe('WhoCanView', () => {
       await user.click(screen.getByRole('option', { name: /workflow/i }))
       await user.click(screen.getByPlaceholderText('Select an action'))
       await user.click(screen.getByRole('option', { name: /^read$/i }))
-      await user.click(screen.getByRole('button', { name: 'Find Users' }))
+      await user.click(screen.getByRole('button', { name: 'Find users' }))
 
       await waitFor(() => {
         expect(mockMutate).toHaveBeenCalled()

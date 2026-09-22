@@ -87,7 +87,7 @@ describe('registerLogicNodeSubmit', () => {
         buildLogicStepName({
           logicType: ActivityTypeEnum.CONDITION,
           name: 'My Branch',
-        } as Parameters<typeof buildLogicStepName>[0])
+        })
       ).toBe('My Branch')
     })
 
@@ -96,7 +96,7 @@ describe('registerLogicNodeSubmit', () => {
         buildLogicStepName({
           logicType: ActivityTypeEnum.CONVERGE,
           name: 'Join',
-        } as Parameters<typeof buildLogicStepName>[0])
+        })
       ).toBe('Join')
     })
 
@@ -105,7 +105,7 @@ describe('registerLogicNodeSubmit', () => {
         buildLogicStepName({
           logicType: ActivityTypeEnum.WAIT,
           name: 'Pause',
-        } as Parameters<typeof buildLogicStepName>[0])
+        })
       ).toBe('Pause')
     })
 
@@ -115,14 +115,14 @@ describe('registerLogicNodeSubmit', () => {
           logicType: ActivityTypeEnum.LOOP,
           name: 'Iter',
           type: 'while',
-        } as Parameters<typeof buildLogicStepName>[0])
+        })
       ).toBe('Iter')
     })
   })
 
   describe('submitConditionLogic', () => {
     it('returns true and adds activity when condition missing', () => {
-      expect(submitConditionLogic('id', 'n', { logicType: ActivityTypeEnum.CONDITION, name: 'x' } as never)).toBe(true)
+      expect(submitConditionLogic('id', 'n', { logicType: ActivityTypeEnum.CONDITION, name: 'x' })).toBe(true)
       expect(mockAddActivity).toHaveBeenCalled()
     })
 
@@ -132,7 +132,7 @@ describe('registerLogicNodeSubmit', () => {
           logicType: ActivityTypeEnum.CONDITION,
           name: 'x',
           condition: 'true',
-        } as never)
+        })
       ).toBe(true)
       expect(mockAddActivity).toHaveBeenCalled()
     })
@@ -146,7 +146,7 @@ describe('registerLogicNodeSubmit', () => {
         submitLoopLogic({
           activityId: 'l1',
           name: 'L',
-          data: { logicType: ActivityTypeEnum.LOOP, name: 'L', type: 'invalid' } as never,
+          data: { logicType: ActivityTypeEnum.LOOP, name: 'L', type: 'invalid' },
           generateId: () => 'x',
           onSuccess,
           onError,
@@ -162,7 +162,7 @@ describe('registerLogicNodeSubmit', () => {
         submitLoopLogic({
           activityId: 'l1',
           name: 'L',
-          data: { logicType: ActivityTypeEnum.LOOP, name: 'L', type: 'forEach' } as never,
+          data: { logicType: ActivityTypeEnum.LOOP, name: 'L', type: 'forEach' },
           generateId: () => 'x',
           onSuccess,
           onError: vi.fn(),
@@ -177,7 +177,7 @@ describe('registerLogicNodeSubmit', () => {
         submitLoopLogic({
           activityId: 'l1',
           name: 'L',
-          data: { logicType: ActivityTypeEnum.LOOP, name: 'L', type: 'while' } as never,
+          data: { logicType: ActivityTypeEnum.LOOP, name: 'L', type: 'while' },
           generateId: () => 'x',
           onSuccess,
           onError: vi.fn(),
@@ -197,7 +197,7 @@ describe('registerLogicNodeSubmit', () => {
             name: 'Each',
             type: 'forEach',
             items: 'ctx.items',
-          } as never,
+          },
           generateId: () => 'abc',
           onSuccess,
           onError: vi.fn(),
@@ -218,7 +218,7 @@ describe('registerLogicNodeSubmit', () => {
             name: 'While',
             type: 'while',
             condition: 'true',
-          } as never,
+          },
           generateId: () => 'xyz',
           onSuccess,
           onError: vi.fn(),
@@ -231,7 +231,7 @@ describe('registerLogicNodeSubmit', () => {
 
   describe('submitConvergeLogic', () => {
     it('creates activity even when strategy missing', () => {
-      expect(submitConvergeLogic('c1', 'C', { logicType: ActivityTypeEnum.CONVERGE, name: 'C' } as never)).toBe(true)
+      expect(submitConvergeLogic('c1', 'C', { logicType: ActivityTypeEnum.CONVERGE, name: 'C' })).toBe(true)
       expect(mockAddActivity).toHaveBeenCalled()
     })
 
@@ -275,14 +275,12 @@ describe('registerLogicNodeSubmit', () => {
 
   describe('submitSwitchLogic', () => {
     it('creates activity when cases are missing', () => {
-      expect(submitSwitchLogic('s1', 'S', { logicType: ActivityTypeEnum.SWITCH, name: 'S' } as never)).toBe(true)
+      expect(submitSwitchLogic('s1', 'S', { logicType: ActivityTypeEnum.SWITCH, name: 'S' })).toBe(true)
       expect(mockAddActivity).toHaveBeenCalled()
     })
 
     it('creates activity when cases array is empty', () => {
-      expect(submitSwitchLogic('s1', 'S', { logicType: ActivityTypeEnum.SWITCH, name: 'S', cases: [] } as never)).toBe(
-        true
-      )
+      expect(submitSwitchLogic('s1', 'S', { logicType: ActivityTypeEnum.SWITCH, name: 'S', cases: [] })).toBe(true)
       expect(mockAddActivity).toHaveBeenCalled()
     })
 
@@ -292,7 +290,7 @@ describe('registerLogicNodeSubmit', () => {
           logicType: ActivityTypeEnum.SWITCH,
           name: 'Route',
           cases: [{ caseId: 'c1', condition: '${status} == "approved"' }],
-        } as never)
+        })
       ).toBe(true)
       expect(mockAddActivity).toHaveBeenCalled()
       const activity = mockAddActivity.mock.calls[0][0] as {
@@ -312,7 +310,7 @@ describe('registerLogicNodeSubmit', () => {
             { caseId: 'c1', condition: '${priority} > 7' },
             { caseId: 'c2', condition: 'not(${status} == "rejected")' },
           ],
-        } as never)
+        })
       ).toBe(true)
       expect(mockAddActivity).toHaveBeenCalled()
       const activity = mockAddActivity.mock.calls[0][0] as {
@@ -331,7 +329,7 @@ describe('registerLogicNodeSubmit', () => {
           { caseId: 'c1', label: 'High Priority', condition: '${priority} > 7' },
           { caseId: 'c2', label: 'Low Priority', condition: '${priority} < 3' },
         ],
-      } as never)
+      })
       expect(mockAddActivity).toHaveBeenCalled()
       const activity = mockAddActivity.mock.calls[0][0] as {
         cases: Array<{ port: string; label: string; condition: string }>
@@ -360,7 +358,7 @@ describe('registerLogicNodeSubmit', () => {
       const result = submitWaitLogic('w2', 'Minimal', {
         logicType: ActivityTypeEnum.WAIT,
         name: 'Minimal',
-      } as never)
+      })
 
       expect(result).toBe(true)
       expect(mockAddActivity).toHaveBeenCalled()

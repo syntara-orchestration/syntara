@@ -52,7 +52,7 @@ type ExecutionState = {
 
 function getExecutionState(node: ExecutionNode): ExecutionState | undefined {
   const value = node.data.__executionState
-  if (typeof value === 'object' && value !== null) return value as ExecutionState
+  if (typeof value === 'object' && value !== null) return value
   return undefined
 }
 

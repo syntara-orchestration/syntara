@@ -42,14 +42,13 @@ describe('validateConvergeInputs', () => {
 
     const result = validateConvergeInputs(activities, edges)
     expect(result).toHaveLength(1)
-    expect(result[0]).toMatchObject({
-      severity: 'error',
-      rule: 'converge-inputs',
-      nodeIds: expect.arrayContaining(['J1', 'C1']) as unknown as string[],
-    })
-    expect(result[0].message).toContain('both')
-    expect(result[0].message).toContain('Then')
-    expect(result[0].message).toContain('Else')
+    expect(result[0]?.severity).toBe('error')
+    expect(result[0]?.rule).toBe('converge-inputs')
+    expect(result[0]?.nodeIds).toContain('J1')
+    expect(result[0]?.nodeIds).toContain('C1')
+    expect(result[0]?.message).toContain('both')
+    expect(result[0]?.message).toContain('Then')
+    expect(result[0]?.message).toContain('Else')
   })
 
   it('handles converge with direct connections from condition (no intermediate tasks)', () => {
@@ -89,8 +88,9 @@ describe('validateConvergeInputs', () => {
 
     const result = validateConvergeInputs(activities, edges)
     expect(result).toHaveLength(1)
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    expect(result[0]).toMatchObject({ severity: 'error', nodeIds: expect.arrayContaining(['J1', 'C1']) })
+    expect(result[0]?.severity).toBe('error')
+    expect(result[0]?.nodeIds).toContain('J1')
+    expect(result[0]?.nodeIds).toContain('C1')
   })
 
   it('allows converge with only one branch from a condition', () => {
@@ -139,8 +139,8 @@ describe('validateConvergeInputs', () => {
 
   it('uses condition ID as name when name is missing', () => {
     const activities: Activity[] = [
-      { type: 'condition', id: 'C1', parameters: { condition: 'x > 10' } } as Activity,
-      { type: 'converge', id: 'J1', parameters: { strategy: 'all' } } as Activity,
+      { type: 'condition', id: 'C1', parameters: { condition: 'x > 10' } },
+      { type: 'converge', id: 'J1', parameters: { strategy: 'all' } },
     ]
 
     const edges: EdgeConnection[] = [

@@ -23,7 +23,7 @@ async function assertWorkflowDeleteModal(modal: Locator, workflowName: string) {
   await expect(checkbox).toBeVisible()
   await expect(checkbox).not.toBeChecked()
 
-  const deleteButton = modal.getByRole('button', { name: 'Delete' })
+  const deleteButton = modal.getByRole('button', { name: 'Delete workflow' })
   await expect(deleteButton).toBeDisabled()
 
   await checkbox.click()
@@ -98,7 +98,7 @@ test.describe('destructive modal UX compliance (AAP-72897)', () => {
       await expect(modal.getByText(/cannot be undone/)).toBeVisible()
 
       // Delete button should be disabled before checkbox is checked
-      const deleteButton = modal.getByRole('button', { name: 'Delete' })
+      const deleteButton = modal.getByRole('button', { name: 'Delete integration' })
       await expect(deleteButton).toBeDisabled()
 
       // Checkbox should be present with the acknowledgement text
@@ -210,7 +210,7 @@ test.describe('destructive modal UX compliance (AAP-72897)', () => {
     await expect(modal.getByRole('checkbox')).toHaveCount(0)
 
     // Confirm button should be enabled immediately (no checkbox gate)
-    const confirmButton = modal.getByRole('button', { name: 'Unassign' })
+    const confirmButton = modal.getByRole('button', { name: 'Unassign role' })
     await expect(confirmButton).toBeEnabled()
 
     // Cancel to avoid side effects

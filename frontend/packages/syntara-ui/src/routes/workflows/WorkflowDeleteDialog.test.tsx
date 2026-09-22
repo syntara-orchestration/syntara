@@ -35,7 +35,7 @@ describe('WorkflowDeleteDialog', () => {
     render(<WorkflowDeleteDialog isOpen workflowName="Deploy app" onClose={onClose} onConfirm={onConfirm} />)
 
     const dialog = screen.getByRole('dialog')
-    const deleteButton = within(dialog).getByRole('button', { name: 'Delete' })
+    const deleteButton = within(dialog).getByRole('button', { name: 'Delete workflow' })
 
     expect(deleteButton).toBeDisabled()
 

@@ -47,7 +47,7 @@ describe('useServiceAccountPermissions', () => {
   })
 
   it('hub chrome only checks create with check_any_project', async () => {
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
 
     const { result } = renderHook(() => useServiceAccountPermissions(), { wrapper: createWrapper() })
 
@@ -65,7 +65,7 @@ describe('useServiceAccountPermissions', () => {
   })
 
   it('scopes destructive actions to resourceProject on detail/row screens', async () => {
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
 
     const { result } = renderHook(() => useServiceAccountPermissions({ resourceProject: 'proj-1' }), {
       wrapper: createWrapper(),

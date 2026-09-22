@@ -80,7 +80,7 @@ export async function clickSaveAndWait(
   { timeout = SAVE_RESPONSE_TIMEOUT }: { timeout?: number } = {}
 ): Promise<void> {
   const wasNew = /\/workflow-builder\/new(?:[?#]|$)/.test(page.url())
-  const saveButton = page.getByRole('button', { name: 'Save', exact: true })
+  const saveButton = page.getByRole('button', { name: 'Save workflow' })
 
   await expect(saveButton).toBeEnabled({ timeout: SAVE_CLICK_TIMEOUT })
 

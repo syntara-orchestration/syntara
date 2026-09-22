@@ -163,7 +163,7 @@ test.describe('Group Detail — Member add/remove (typeahead)', () => {
       await selectUserFromAddMemberTypeahead(app, user.username)
 
       const addDialog = app.getByRole('dialog', { name: 'Add member' })
-      const addButton = addDialog.getByRole('button', { name: 'Add', exact: true })
+      const addButton = addDialog.getByRole('button', { name: 'Add member', exact: true })
       await expect(addButton).toBeEnabled()
       await addButton.click()
 
@@ -178,7 +178,7 @@ test.describe('Group Detail — Member add/remove (typeahead)', () => {
 
       const removeDialog = app.getByRole('dialog', { name: /Remove member/ })
       await expect(removeDialog).toBeVisible()
-      await removeDialog.getByRole('button', { name: 'Remove', exact: true }).click()
+      await removeDialog.getByRole('button', { name: 'Remove member' }).click()
 
       await expect(removeDialog).not.toBeVisible({ timeout: 10_000 })
       await expect(app.getByRole('heading', { name: /member removed/i })).toBeVisible({ timeout: 10_000 })

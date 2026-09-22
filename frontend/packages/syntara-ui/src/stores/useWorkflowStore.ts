@@ -373,7 +373,7 @@ export const useWorkflowStore: UseWorkflowStoreBound = create<WorkflowStore>()(
                   ...existingParameters,
                   branches: branchIds,
                 },
-              } as Activity
+              }
             }
           }
 
