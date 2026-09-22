@@ -55,7 +55,9 @@ class WorkflowExecutionCompletedEvent(BaseTelemetryEvent):
         duration_ms: Duration in milliseconds.
         node_count: Total number of nodes executed.
         error_count: Number of nodes that failed.
-        error_type: Categorized error type if workflow failed, null otherwise.
+        error_type: Categorized error type if the workflow failed
+            (``WorkflowTimedOut`` for engine-level timeouts,
+            ``ActivityExecutionError`` for other failures); null otherwise.
         trigger_type: Type of trigger that started the workflow.
         interface: Originating interface (ui or api).
         mode: Execution mode (standard, test, debug).
@@ -73,7 +75,11 @@ class WorkflowExecutionCompletedEvent(BaseTelemetryEvent):
     error_count: int = Field(ge=0, description="Number of nodes that failed")
     error_type: str | None = Field(
         default=None,
-        description="Name of the exception that caused the error, null otherwise",
+        description=(
+            "Categorized error type if the workflow failed "
+            "(`WorkflowTimedOut` for engine-level timeouts, "
+            "`ActivityExecutionError` for other failures); null otherwise"
+        ),
     )
     trigger_type: ActivityName | None = Field(default=None, description="Type of trigger that started the workflow")
     interface: str | None = Field(default=None, description="Originating interface (ui or api)")
