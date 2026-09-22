@@ -97,7 +97,7 @@ class FormPromptCreateRequest(SQLModel):
     )
     message: str | None = Field(
         default=None,
-        max_length=FieldLimits.DESCRIPTION_MAX_LENGTH,
+        max_length=FieldLimits.FORM_MESSAGE_MAX_LENGTH,
         description="Resolved message shown above the form",
     )
     loop_iteration_path: list[int] = Field(
@@ -106,7 +106,7 @@ class FormPromptCreateRequest(SQLModel):
     )
     temporal_activity_id: str | None = Field(
         default=None,
-        max_length=FieldLimits.NAME_MAX_LENGTH,
+        max_length=FieldLimits.TEMPORAL_ACTIVITY_ID_MAX_LENGTH,
         description="Temporal activity ID to signal on submit (defaults to prompt_node_id)",
     )
     timeout_at: datetime | None = Field(None, description="When this prompt expires (null = no timeout)")

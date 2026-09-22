@@ -58,8 +58,8 @@ class BaseFormPrompt(BaseResource, table=False):
 
     message: str | None = Field(
         default=None,
-        max_length=FieldLimits.DESCRIPTION_MAX_LENGTH,
-        sa_type=String(FieldLimits.DESCRIPTION_MAX_LENGTH),  # type: ignore[call-overload]
+        max_length=FieldLimits.FORM_MESSAGE_MAX_LENGTH,
+        sa_type=String(FieldLimits.FORM_MESSAGE_MAX_LENGTH),  # type: ignore[call-overload]
         description="Resolved guidance message shown to responders",
     )
 
@@ -211,7 +211,7 @@ class FormPrompt(BaseFormPrompt, table=True):
 
     temporal_activity_id: str | None = Field(
         default=None,
-        max_length=FieldLimits.NAME_MAX_LENGTH,
+        max_length=FieldLimits.TEMPORAL_ACTIVITY_ID_MAX_LENGTH,
         sa_type=String(FieldLimits.NAME_MAX_LENGTH),  # type: ignore[call-overload]
         description="Temporal activity ID to signal when this prompt is answered",
     )
