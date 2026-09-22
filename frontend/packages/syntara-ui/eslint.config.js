@@ -411,7 +411,7 @@ export default tseslint.config(
     // are substantial implementation files (a 1000+ line Zustand store, node-factory functions,
     // expression defaults) that mostly use `export function`/`export const`, so the rule
     // undercounts their real declarations and misreads a small re-export section as a barrel
-    // file. They are not barrel files. See frontend/docs/tickets/fix-barrel-file-warnings.md.
+    // file. They are not barrel files.
     files: ['src/stores/useWorkflowStore.ts', 'src/stores/workflowFactories.ts', 'src/utils/expressions/defaults.ts'],
     rules: {
       'barrel-files/avoid-barrel-files': 'off',
