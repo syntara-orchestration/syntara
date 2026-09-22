@@ -7,17 +7,19 @@ AAP-91889 will extend with full filtering/sorting/enrichment and user-facing end
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends, status
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import Depends, Request, status
+from sqlmodel.ext.asyncio.session import AsyncSession
 
-from syntara.authz.dependencies import PermissionChecker
+from syntara.auth import get_current_user
+from syntara.authz.dependencies import PermissionChecker, VisibilityFilter, VisibilityResult
 from syntara.core.database.session import get_db
+from syntara.core.models import User
+from syntara.core.models.base.query_params import BaseListParams
 from syntara.core.syntara_router import SyntaraRouter
 from syntara.forms.models.api_models import (
     BatchFormPromptRequest,
     BatchUpdateResponse,
     FormPromptCreateRequest,
-    FormPromptStatus,
     FormPromptSummary,
 )
 from syntara.forms.models.form_prompt import FormPromptListResponse
@@ -28,9 +30,10 @@ router = SyntaraRouter(prefix="/form_prompts", tags=["Form Prompts"])
 
 def get_form_prompt_service(
     session: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
 ) -> FormPromptService:
     """Dependency to get FormPromptService instance."""
-    return FormPromptService(session=session)
+    return FormPromptService(session=session, user=user)
 
 
 # Service-to-service endpoint (Temporal worker creates form prompts).
@@ -63,12 +66,29 @@ async def create_form_prompt(
     response_description="List of form prompts",
 )
 async def list_form_prompts(
-    execution_id: UUID,
+    request: Request,
     service: Annotated[FormPromptService, Depends(get_form_prompt_service)],
-    status: FormPromptStatus | None = None,
+    params: Annotated[BaseListParams, Depends()],
+    visibility: Annotated[VisibilityResult, Depends(VisibilityFilter("form_prompt", "read"))],
 ) -> FormPromptListResponse:
-    """List form prompts for an execution."""
-    return await service.list_by_execution(execution_id=execution_id, status=status)
+    """List form prompts with filtering, sorting, and pagination.
+
+    Supports filtering using query parameters with standard operators:
+    - status: Filter by form prompt status (status=pending)
+    - execution_id: Filter by parent execution ID (execution_id=uuid)
+    - prompt_node_id: Filter by node ID (prompt_node_id=form1)
+
+    Uses cursor-based pagination for scalability and consistency.
+
+    """
+    return await service.list(
+        limit=params.limit,
+        cursor=params.cursor,
+        sort=params.sort,
+        query_params_items=request.query_params.items(),
+        include_total=params.include_total,
+        allowed_projects=visibility.to_allowed_projects(),
+    )
 
 
 # Minimal internal-facing implementation. AAP-91889 will extend with full batch operations.

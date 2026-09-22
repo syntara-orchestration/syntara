@@ -97,6 +97,13 @@ class BaseFormPrompt(BaseResource, table=False):
         ),
     )
 
+    notes: str | None = Field(
+        default=None,
+        max_length=FieldLimits.DESCRIPTION_MAX_LENGTH,
+        sa_type=String(FieldLimits.DESCRIPTION_MAX_LENGTH),  # type: ignore[call-overload]
+        description="Optional notes explaining the last status change (e.g., reason for cancellation)",
+    )
+
     # Timing
     timeout_at: datetime | None = Field(
         default=None,

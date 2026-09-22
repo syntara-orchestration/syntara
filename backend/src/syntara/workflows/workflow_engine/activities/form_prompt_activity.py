@@ -183,19 +183,29 @@ async def _batch_update_form_prompts(
             # Built before the mutating call: if a record is ever missing a required
             # field, fail before anything is changed rather than after.
             prompt_records = [{"id": p["id"], "prompt_node_id": p["prompt_node_id"]} for p in pending]
-            batch_fn = getattr(client, batch_method_name)
-            result = await batch_fn(prompt_ids)
 
-            count = result.get("total_success", 0)
+            # Chunk requests to respect 100-item limit per batch
+            batch_fn = getattr(client, batch_method_name)
+            chunk_size = 100
+            total_success = 0
+            total_failed = 0
+
+            for i in range(0, len(prompt_ids), chunk_size):
+                chunk = prompt_ids[i : i + chunk_size]
+                result = await batch_fn(chunk)
+                total_success += result.get("total_success", 0)
+                total_failed += result.get("total_failed", 0)
+
             logger.info(
                 "Batch %s form prompts completed",
                 operation,
                 execution_id=execution_id,
                 node_id=node_id,
-                success_count=count,
-                failed_count=result.get("total_failed", 0),
+                success_count=total_success,
+                failed_count=total_failed,
+                total_prompts=len(prompt_ids),
             )
-            return {result_key: count, "_prompt_records": prompt_records}
+            return {result_key: total_success, "_prompt_records": prompt_records}
 
     except FormPromptsApiClientError as e:
         logger.warning("Failed to %s form prompts", operation, execution_id=execution_id, error=str(e))

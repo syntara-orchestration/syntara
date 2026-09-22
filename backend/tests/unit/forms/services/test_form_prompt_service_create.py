@@ -27,11 +27,13 @@ def _make_service(*, raise_integrity_error: bool = False) -> tuple[FormPromptSer
     session = Mock(spec=AsyncSession)
 
     session.add = Mock()
+    session.flush = AsyncMock()
+    session.rollback = AsyncMock()
 
     if raise_integrity_error:
         # Simulate uniqueness constraint violation
         orig_error = Exception('duplicate key value violates unique constraint "uix_execution_prompt_node_path"')
-        session.flush = AsyncMock(
+        session.commit = AsyncMock(
             side_effect=IntegrityError(
                 'duplicate key value violates unique constraint "uix_execution_prompt_node_path"',
                 params=None,
@@ -39,9 +41,13 @@ def _make_service(*, raise_integrity_error: bool = False) -> tuple[FormPromptSer
             )
         )
     else:
-        session.flush = AsyncMock()
+        session.commit = AsyncMock()
 
-    svc = FormPromptService(session=session)
+    # Create mock user for BaseService
+    user = Mock()
+    user.id = uuid4()
+
+    svc = FormPromptService(session=session, user=user)
     return svc, session
 
 

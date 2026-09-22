@@ -19,6 +19,7 @@ if TYPE_CHECKING:
         FormPromptCancelledError,
         FormPromptExpiredError,
         FormPromptNotFoundError,
+        InvalidResponderReferenceError,
     )
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -117,6 +118,20 @@ def form_data_validation_error_handler(request: Request, exc: "FormDataValidatio
         title="Form Validation Error",
         detail=detail,
         code="FORM_VALIDATION_ERROR",
+        retryable=False,
+        instance=str(request.url),
+    )
+
+
+def invalid_responder_reference_handler(request: Request, exc: "InvalidResponderReferenceError") -> JSONResponse:
+    """Handle InvalidResponderReferenceError."""
+    logger.error("Invalid responder reference", exc_info=exc)
+    return create_problem_details_response(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        problem_type=PROBLEM_TYPES["validation_error"],
+        title="Invalid Responder Reference",
+        detail=f"The specified {exc.entity_type} ID {exc.entity_id} does not exist",
+        code="INVALID_RESPONDER_REFERENCE",
         retryable=False,
         instance=str(request.url),
     )

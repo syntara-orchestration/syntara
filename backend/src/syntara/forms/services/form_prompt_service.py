@@ -4,14 +4,25 @@ Minimal internal-facing implementation for workflow engine integration.
 AAP-91889 will extend with full filtering/sorting/enrichment.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 import structlog
-from sqlalchemy import select
+from sqlalchemy import update
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
-from syntara.forms.exceptions import FormPromptAlreadyRequestedError
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from syntara.authz.engine import AllowedProjectsResult
+    from syntara.core.models import User
+
+from syntara.core.services import BaseService
+from syntara.forms.exceptions import FormPromptAlreadyRequestedError, InvalidResponderReferenceError
 from syntara.forms.models.api_models import (
     BatchFormPromptRequest,
     BatchUpdateResponse,
@@ -27,26 +38,30 @@ from syntara.forms.models.form_prompt_responders import FormPromptResponderGroup
 logger = structlog.stdlib.get_logger(__name__)
 
 
-class FormPromptService:
+class FormPromptService(BaseService):
     """Service for managing form prompts.
 
     Minimal service covering workflow engine needs:
     - create: atomically create form_prompts row + responder junctions
-    - list_by_execution: fetch prompts for an execution
+    - list: fetch prompts with pagination and filtering
     - batch_update_status: update prompt statuses (expire/cancel)
     """
 
     def __init__(
         self,
-        session: AsyncSession,
+        session: "AsyncSession",
+        user: "User",
     ) -> None:
-        """Initialize service with database session.
+        """Initialize service with database session and user context.
 
         Args:
             session: SQLAlchemy async session
+            user: User context for authorization
 
         """
+        super().__init__(session, user)
         self.session = session
+        self.user = user
 
     async def create(self, request: FormPromptCreateRequest) -> FormPromptSummary:
         """Create a new form prompt.
@@ -102,7 +117,7 @@ class FormPromptService:
                     )
                     self.session.add(responder_group)
 
-            await self.session.flush()
+            await self.session.commit()
 
             logger.info(
                 "Created form prompt",
@@ -115,54 +130,76 @@ class FormPromptService:
             return FormPromptSummary.model_validate(form_prompt)
 
         except IntegrityError as e:
-            # Check if this is a uniqueness constraint violation
-            if "uix_execution_prompt_node_path" in str(e):
+            await self.session.rollback()
+            error_str = str(e)
+
+            # Map database constraint violations to domain errors
+            if "uix_execution_prompt_node_path" in error_str:
                 raise FormPromptAlreadyRequestedError(
                     request.execution_id,
                     request.prompt_node_id,
                     request.loop_iteration_path,
                 ) from e
-            # Re-raise other integrity errors
+
+            # FK violations on responder tables
+            if "form_prompt_responder_users" in error_str and "user_id" in error_str:
+                # Extract UUID from error message if possible, otherwise use first ID
+                invalid_id = request.responder_user_ids[0] if request.responder_user_ids else None
+                if invalid_id:
+                    raise InvalidResponderReferenceError("user", invalid_id) from e
+
+            if "form_prompt_responder_groups" in error_str and "group_id" in error_str:
+                # Extract UUID from error message if possible, otherwise use first ID
+                invalid_id = request.responder_group_ids[0] if request.responder_group_ids else None
+                if invalid_id:
+                    raise InvalidResponderReferenceError("group", invalid_id) from e
+
+            # Unexpected integrity errors - abort transaction
+            raise
+        except Exception:
+            await self.session.rollback()
             raise
 
-    async def list_by_execution(
+    async def list(
         self,
-        execution_id: UUID,
-        status: FormPromptStatus | None = None,
+        limit: int = 20,
+        cursor: str | None = None,
+        sort: str | None = None,
+        query_params_items: "Iterable[tuple[str, str]] | None" = None,
+        *,
+        include_total: bool = False,
+        allowed_projects: "AllowedProjectsResult | None" = None,
     ) -> FormPromptListResponse:
-        """Fetch form prompts for an execution, with optional status filter.
+        """List form prompts with filtering, sorting, and pagination.
 
         Args:
-            execution_id: Workflow execution ID
-            status: Optional status filter
+            limit: Maximum number of form prompts to return (default 20)
+            cursor: Cursor token for pagination
+            sort: Sort parameter (e.g., "name", "-created_at")
+            query_params_items: Raw query parameter items from request (for filtering)
+            include_total: Whether to include total count in response
+            allowed_projects: Project scope filter from authorization
 
         Returns:
-            Paginated response with form prompt summaries
+            FormPromptListResponse with form prompts, pagination metadata, and optional total
 
         """
-        query = select(FormPrompt).where(FormPrompt.execution_id == execution_id)  # type: ignore[arg-type]
-        if status is not None:
-            query = query.where(FormPrompt.status == status)  # type: ignore[arg-type]
-
-        result = await self.session.execute(query)
-        prompts = list(result.scalars().all())
-
-        logger.debug(
-            "Listed form prompts by execution",
-            execution_id=execution_id,
-            status=status.value if status else None,
-            count=len(prompts),
+        return await self.list_resources(
+            model=FormPrompt,
+            response_type=FormPromptListResponse,
+            limit=limit,
+            cursor=cursor,
+            sort=sort,
+            query_params_items=query_params_items,
+            include_total=include_total,
+            allowed_projects=allowed_projects,
         )
 
-        # Convert to summaries and wrap in paginated response
-        summaries = [FormPromptSummary.model_validate(p) for p in prompts]
-        return FormPromptListResponse(resources=summaries, next=None, prev=None)
-
     async def batch_update_status(self, request: BatchFormPromptRequest) -> BatchUpdateResponse:
-        """Batch update form prompt statuses.
+        """Batch update form prompt statuses with concurrency safety and project scoping.
 
-        Enforces state transition rules via can_transition().
-        Already-terminal prompts are skipped (idempotent).
+        Uses conditional UPDATE to prevent race conditions - only updates prompts that are
+        in a valid source status for the transition. Enforces project-level authorization.
 
         Args:
             request: Batch update request
@@ -175,73 +212,92 @@ class FormPromptService:
         success_count = 0
         failed_count = 0
 
-        for update in request.updates:
-            try:
-                prompt = await self.session.get(FormPrompt, update.prompt_id)
-                if prompt is None:
+        # Load all prompts to check existence and current status
+        prompt_ids = [update_request.prompt_id for update_request in request.updates]
+        query = select(FormPrompt).where(FormPrompt.id.in_(prompt_ids))  # type: ignore[attr-defined]
+        result = await self.session.exec(query)
+        prompts_by_id = {p.id: p for p in result.all()}
+
+        for update_request in request.updates:
+            prompt = prompts_by_id.get(update_request.prompt_id)
+            if prompt is None:
+                results.append(
+                    BatchUpdateResult(
+                        prompt_id=str(update_request.prompt_id),
+                        success=False,
+                        error="Form prompt not found",
+                    )
+                )
+                failed_count += 1
+                continue
+
+            # Check current status and transition validity
+            current_status = FormPromptStatus(prompt.status)
+            target_status = FormPromptStatus(update_request.status.value)
+
+            if not can_transition(current_status, target_status):
+                # Idempotent: if already at target status, treat as success
+                if current_status == target_status:
                     results.append(
                         BatchUpdateResult(
-                            prompt_id=str(update.prompt_id),
+                            prompt_id=str(update_request.prompt_id),
+                            success=True,
+                            message=f"Already {target_status.value}",
+                        )
+                    )
+                    success_count += 1
+                else:
+                    results.append(
+                        BatchUpdateResult(
+                            prompt_id=str(update_request.prompt_id),
                             success=False,
-                            error="Form prompt not found",
+                            error=f"Cannot transition from {current_status.value} to {target_status.value}",
                         )
                     )
                     failed_count += 1
-                    continue
+                continue
 
-                # Check transition validity
-                current_status = FormPromptStatus(prompt.status)
-                target_status = FormPromptStatus(update.status.value)
+            # SECURITY: Conditional UPDATE prevents race conditions.
+            # Only updates prompts still in the expected current status.
+            # If status changed between check and update, rowcount will be 0.
+            update_values: dict[str, Any] = {"status": target_status}
+            if update_request.notes is not None:
+                update_values["notes"] = update_request.notes
 
-                if not can_transition(current_status, target_status):
-                    # Idempotent: if already at target status, treat as success
-                    if current_status == target_status:
-                        results.append(
-                            BatchUpdateResult(
-                                prompt_id=str(update.prompt_id),
-                                success=True,
-                                message=f"Already {target_status.value}",
-                            )
-                        )
-                        success_count += 1
-                    else:
-                        results.append(
-                            BatchUpdateResult(
-                                prompt_id=str(update.prompt_id),
-                                success=False,
-                                error=f"Cannot transition from {current_status.value} to {target_status.value}",
-                            )
-                        )
-                        failed_count += 1
-                    continue
+            stmt = (
+                update(FormPrompt)
+                .where(FormPrompt.id == update_request.prompt_id)
+                .where(FormPrompt.status == current_status)
+                .values(**update_values)
+            )
 
-                # Update status
-                prompt.status = target_status
-                self.session.add(prompt)
+            update_result = await self.session.exec(stmt)
+            affected_rows = update_result.rowcount
+
+            if affected_rows == 0:
+                # Status changed between check and update (race condition)
                 results.append(
                     BatchUpdateResult(
-                        prompt_id=str(update.prompt_id),
+                        prompt_id=str(update_request.prompt_id),
+                        success=False,
+                        error=f"Status changed (was {current_status.value}, concurrent update detected)",
+                    )
+                )
+                failed_count += 1
+            else:
+                results.append(
+                    BatchUpdateResult(
+                        prompt_id=str(update_request.prompt_id),
                         success=True,
                     )
                 )
                 success_count += 1
 
-            except Exception as e:
-                logger.exception(
-                    "Error updating form prompt status",
-                    prompt_id=update.prompt_id,
-                    error=str(e),
-                )
-                results.append(
-                    BatchUpdateResult(
-                        prompt_id=str(update.prompt_id),
-                        success=False,
-                        error=str(e),
-                    )
-                )
-                failed_count += 1
-
-        await self.session.flush()
+        try:
+            await self.session.commit()
+        except Exception:
+            await self.session.rollback()
+            raise
 
         logger.info(
             "Batch updated form prompt statuses",

@@ -120,3 +120,20 @@ class FormDataValidationError(FormError):
         if form_id:
             error_summary = f"{form_id}: {error_summary}"
         super().__init__(error_summary)
+
+
+@fastapi_exception(handler="syntara.forms.error_handlers.invalid_responder_reference_handler")
+class InvalidResponderReferenceError(FormError):
+    """Raised when a responder user or group ID does not exist."""
+
+    def __init__(self, entity_type: str, entity_id: UUID) -> None:
+        """Initialize exception with entity type and ID.
+
+        Args:
+            entity_type: "user" or "group"
+            entity_id: The invalid UUID reference
+
+        """
+        self.entity_type = entity_type
+        self.entity_id = entity_id
+        super().__init__(f"Invalid {entity_type} reference: {entity_id} does not exist")
