@@ -457,7 +457,7 @@ class TestFormPromptNodeParameters:
         assert len(p.form_definition.fields) == 1
         assert p.form_definition.fields[0].value_name == "reason"
         assert p.message is None
-        assert p.fallback_behavior == "fail"
+        assert p.fallback_decision is None
 
     def test_fully_populated(self) -> None:
         """All fields populated."""
@@ -467,7 +467,7 @@ class TestFormPromptNodeParameters:
             responder_users=["alice", "bob"],
             responder_groups=["team-a"],
             response_window=3600,
-            fallback_behavior="fallback",
+            fallback_decision="fallback",
             submit_label="Send",
             success_message="Thanks!",
             timezone="America/New_York",
@@ -476,6 +476,7 @@ class TestFormPromptNodeParameters:
         assert p.message == "Please fill out the form"
         assert p.responder_users == ["alice", "bob"]
         assert p.response_window == 3600
+        assert p.fallback_decision == "fallback"
 
     def test_missing_form_definition(self) -> None:
         """form_definition is required."""
@@ -507,10 +508,10 @@ class TestFormPromptNodeParameters:
         with pytest.raises(ValidationError):
             FormPromptNodeParameters(form_definition=self.form_def, message="x" * 2001)
 
-    def test_invalid_fallback_behavior(self) -> None:
-        """Invalid fallback_behavior value rejected."""
+    def test_invalid_fallback_decision(self) -> None:
+        """Invalid fallback_decision value rejected."""
         with pytest.raises(ValidationError):
-            FormPromptNodeParameters(form_definition=self.form_def, fallback_behavior="continue")  # type: ignore[arg-type]
+            FormPromptNodeParameters(form_definition=self.form_def, fallback_decision="invalid")  # type: ignore[arg-type]
 
     def test_unknown_parameter_rejected(self) -> None:
         """extra='forbid' rejects unknown keys."""

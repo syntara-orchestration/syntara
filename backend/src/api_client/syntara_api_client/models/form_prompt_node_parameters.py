@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 
-from ..models.form_prompt_node_parameters_fallback_behavior import FormPromptNodeParametersFallbackBehavior
+from ..models.form_prompt_node_parameters_fallback_decision_type_0 import FormPromptNodeParametersFallbackDecisionType0
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
@@ -28,9 +28,8 @@ class FormPromptNodeParameters:
             with form_prompt:submit.
         response_window (int | None | Unset): Seconds the responder has before the prompt expires. Falls back to
             workflow_engine.form_prompt_response_window_seconds.
-        fallback_behavior (FormPromptNodeParametersFallbackBehavior | Unset): What happens when the prompt is not
-            answered in time: fail the workflow, or route to the 'fallback' output port. Default:
-            FormPromptNodeParametersFallbackBehavior.FAIL.
+        fallback_decision (FormPromptNodeParametersFallbackDecisionType0 | None | Unset): Decision when form prompt
+            times out with continue_on_failure enabled
         submit_label (None | str | Unset): Submit button label.
         success_message (None | str | Unset): Shown after submission.
         timezone (None | str | Unset): IANA timezone for interpreting date/datetime field values in the form.
@@ -42,7 +41,7 @@ class FormPromptNodeParameters:
     responder_users: list[str] | None | Unset = UNSET
     responder_groups: list[str] | None | Unset = UNSET
     response_window: int | None | Unset = UNSET
-    fallback_behavior: FormPromptNodeParametersFallbackBehavior | Unset = FormPromptNodeParametersFallbackBehavior.FAIL
+    fallback_decision: FormPromptNodeParametersFallbackDecisionType0 | None | Unset = UNSET
     submit_label: None | str | Unset = UNSET
     success_message: None | str | Unset = UNSET
     timezone: None | str | Unset = UNSET
@@ -81,9 +80,13 @@ class FormPromptNodeParameters:
         else:
             response_window = self.response_window
 
-        fallback_behavior: str | Unset = UNSET
-        if not isinstance(self.fallback_behavior, Unset):
-            fallback_behavior = self.fallback_behavior.value
+        fallback_decision: None | str | Unset
+        if isinstance(self.fallback_decision, Unset):
+            fallback_decision = UNSET
+        elif isinstance(self.fallback_decision, FormPromptNodeParametersFallbackDecisionType0):
+            fallback_decision = self.fallback_decision.value
+        else:
+            fallback_decision = self.fallback_decision
 
         submit_label: None | str | Unset
         if isinstance(self.submit_label, Unset):
@@ -124,8 +127,8 @@ class FormPromptNodeParameters:
             field_dict["responder_groups"] = responder_groups
         if response_window is not UNSET:
             field_dict["response_window"] = response_window
-        if fallback_behavior is not UNSET:
-            field_dict["fallback_behavior"] = fallback_behavior
+        if fallback_decision is not UNSET:
+            field_dict["fallback_decision"] = fallback_decision
         if submit_label is not UNSET:
             field_dict["submit_label"] = submit_label
         if success_message is not UNSET:
@@ -196,12 +199,22 @@ class FormPromptNodeParameters:
 
         response_window = _parse_response_window(d.pop("response_window", UNSET))
 
-        _fallback_behavior = d.pop("fallback_behavior", UNSET)
-        fallback_behavior: FormPromptNodeParametersFallbackBehavior | Unset
-        if isinstance(_fallback_behavior, Unset):
-            fallback_behavior = UNSET
-        else:
-            fallback_behavior = FormPromptNodeParametersFallbackBehavior(_fallback_behavior)
+        def _parse_fallback_decision(data: object) -> FormPromptNodeParametersFallbackDecisionType0 | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, str):
+                    raise TypeError()
+                fallback_decision_type_0 = FormPromptNodeParametersFallbackDecisionType0(data)
+
+                return fallback_decision_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(FormPromptNodeParametersFallbackDecisionType0 | None | Unset, data)
+
+        fallback_decision = _parse_fallback_decision(d.pop("fallback_decision", UNSET))
 
         def _parse_submit_label(data: object) -> None | str | Unset:
             if data is None:
@@ -245,7 +258,7 @@ class FormPromptNodeParameters:
             responder_users=responder_users,
             responder_groups=responder_groups,
             response_window=response_window,
-            fallback_behavior=fallback_behavior,
+            fallback_decision=fallback_decision,
             submit_label=submit_label,
             success_message=success_message,
             timezone=timezone,

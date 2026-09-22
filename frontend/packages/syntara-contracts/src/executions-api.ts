@@ -1449,12 +1449,10 @@ export interface components {
        */
       response_window?: number | null
       /**
-       * Fallback Behavior
-       * @description What happens when the prompt is not answered in time: fail the workflow, or route to the 'fallback' output port.
-       * @default fail
-       * @enum {string}
+       * Fallback Decision
+       * @description Decision when form prompt times out with continue_on_failure enabled
        */
-      fallback_behavior?: 'fail' | 'fallback'
+      fallback_decision?: ('submit' | 'fallback') | null
       /**
        * Submit Label
        * @description Submit button label.

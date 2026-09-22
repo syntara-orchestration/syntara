@@ -510,8 +510,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin, Workflo
         For approval nodes, validates and applies fallback_decision routing before
         scheduling successors. Raises ApplicationError for invalid fallback_decision.
 
-        For form_prompt nodes that timed out, routes to the "fallback" port when COF
-        is enabled.
+        For form_prompt nodes, validates and applies fallback_decision routing (submitted/fallback).
         """
         if node.type == NodeType.APPROVAL:
             # Apply fallback_decision routing
@@ -525,8 +524,14 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin, Workflo
             await self._schedule_successors(node_id, graph, pending_tasks)
             self._cancel_skipped_pending_tasks(pending_tasks)
         elif node.type == NodeType.FORM_PROMPT:
-            # Form prompt timed out with COF enabled - route to fallback port
-            self.node_control_data[node_id] = {"next_port": "fallback"}
+            # Apply fallback_decision routing
+            resolved = self.node_inputs.get(node_id, node.parameters)
+            fallback = resolved.get("fallback_decision", "fallback")
+            if fallback not in {"submit", "fallback"}:
+                msg = f"Invalid fallback_decision '{fallback}' on node {node_id}: must be 'submit' or 'fallback'"
+                raise ApplicationError(msg, type="ConfigError", non_retryable=True)
+            port = "submitted" if fallback == "submit" else "fallback"
+            self.node_control_data[node_id] = {"next_port": port}
             await self._schedule_successors(node_id, graph, pending_tasks)
             self._cancel_skipped_pending_tasks(pending_tasks)
         else:

@@ -888,10 +888,9 @@ class FormPromptNodeParameters(BaseModel):
         description="Seconds the responder has before the prompt expires. "
         "Falls back to workflow_engine.form_prompt_response_window_seconds.",
     )
-    fallback_behavior: Literal["fail", "fallback"] = Field(
-        default="fail",
-        description="What happens when the prompt is not answered in time: fail the workflow, "
-        "or route to the 'fallback' output port.",
+    fallback_decision: Literal["submit", "fallback"] | None = Field(
+        default=None,
+        description="Decision when form prompt times out with continue_on_failure enabled",
     )
     submit_label: str | None = Field(
         default=None,

@@ -340,8 +340,8 @@ def _check_form_prompt_node_findings(
     Emits:
     - An error when a ``form_prompt`` node has no successor on the ``submitted``
       output port.
-    - An error when a ``fallback`` successor exists but ``fallback_behavior`` is
-      ``fail`` (unreachable branch - configuration mismatch).
+    - An error when a ``fallback`` successor exists but ``continue_on_failure`` is
+      disabled (unreachable branch - configuration mismatch).
     """
     # Check for missing "submitted" port using shared helper
     findings: list[ValidationFinding] = _check_required_output_port(
@@ -369,23 +369,23 @@ def _check_form_prompt_node_findings(
         node_name = node.get("name") or node_id
 
         ports = outgoing_ports.get(node_id, set())
-        params = node.get("parameters", {})
-        fallback_behavior = params.get("fallback_behavior", "fail")
+        settings = node.get("settings", {})
+        continue_on_failure = settings.get("continue_on_failure")
 
-        # Error: fallback port exists but fallback_behavior is "fail" (unreachable branch)
-        if fallback_behavior == "fail" and "fallback" in ports:
+        # Error: fallback port exists but continue_on_failure is False (unreachable branch)
+        if continue_on_failure is False and "fallback" in ports:
             findings.append(
                 ValidationFinding(
                     severity=ValidationSeverity.error,
                     category=ValidationCategory.form_prompt_configuration,
                     message=(
                         f"Form \"{node_name}\" has a 'Fallback' branch connected, "
-                        f"but On timeout is set to fail the workflow. "
+                        f"but Continue on failure is disabled. "
                         f"The fallback branch will never execute. Remove the fallback connection "
-                        f"or change On timeout to 'Route to fallback'."
+                        f"or enable Continue on failure in node settings."
                     ),
                     node_id=node_id,
-                    field_path="parameters.fallback_behavior",
+                    field_path="settings.continue_on_failure",
                 ),
             )
 

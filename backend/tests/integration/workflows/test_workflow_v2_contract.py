@@ -758,7 +758,7 @@ class TestNodeSettingsValidation:
                         "responder_users": ["alice", "bob"],
                         "responder_groups": ["team-a"],
                         "response_window": 3600,
-                        "fallback_behavior": "fallback",
+                        "fallback_decision": "fallback",
                         "submit_label": "Submit",
                         "success_message": "Thanks!",
                         "timezone": "America/New_York",
@@ -793,7 +793,7 @@ class TestNodeSettingsValidation:
         assert params["form_definition"]["fields"][0]["type"] == "text"
         assert params["responder_users"] == ["alice", "bob"]
         assert params["response_window"] == 3600
-        assert params["fallback_behavior"] == "fallback"
+        assert params["fallback_decision"] == "fallback"
         assert params["timezone"] == "America/New_York"
         assert params["css_override"] == ".form { color: blue; }"
 

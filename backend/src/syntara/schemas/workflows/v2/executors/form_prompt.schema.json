@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://automation.example.com/schemas/workflows/v2/executors/form_prompt",
   "title": "Form Node",
-  "description": "Pauses workflow execution and collects structured input from a user. Routes to successors by output port: outgoing edges must set from_port to 'submitted' or 'fallback'. At least one successor on the 'submitted' port is required. The 'fallback' port is taken when the prompt is not answered within the response window and fallback_behavior is 'fallback'. Submitted values are available to downstream nodes as ${<node_id>.response_data.<field>}.",
+  "description": "Pauses workflow execution and collects structured input from a user. Routes to successors by output port: outgoing edges must set from_port to 'submitted' or 'fallback'. At least one successor on the 'submitted' port is required. The 'fallback' port is taken when the prompt times out with continue_on_failure enabled and fallback_decision is 'fallback'. Submitted values are available to downstream nodes as ${<node_id>.response_data.<field>}.",
   "parameterSchema": {
     "type": "object",
     "required": ["form_definition"],
@@ -37,11 +37,10 @@
         "minimum": 1,
         "description": "Seconds the responder has before the prompt expires. Falls back to workflow_engine.form_prompt_response_window_seconds if not specified."
       },
-      "fallback_behavior": {
+      "fallback_decision": {
         "type": "string",
-        "enum": ["fail", "fallback"],
-        "default": "fail",
-        "description": "What happens when the prompt is not answered in time: fail the workflow, or route to the 'fallback' output port."
+        "enum": ["submit", "fallback"],
+        "description": "Decision when form prompt times out with continue_on_failure enabled. Routes to the 'submitted' port if 'submit' or the 'fallback' port if 'fallback'."
       },
       "submit_label": {
         "type": "string",

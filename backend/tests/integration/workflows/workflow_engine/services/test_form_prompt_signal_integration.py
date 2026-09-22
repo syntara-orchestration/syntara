@@ -73,9 +73,9 @@ async def _wait_for_pending_prompt(index: int = 0) -> str:
     raise AssertionError(msg)
 
 
-def _create_form_prompt_workflow_yaml(fallback_behavior: str = "fail") -> dict[str, Any]:
+def _create_form_prompt_workflow_yaml() -> dict[str, Any]:
     """Create workflow with form_prompt for async-completion testing."""
-    workflow_yaml = f"""
+    workflow_yaml = """
 schema_version: "2.0.0"
 name: form-prompt-signal-test
 description: Integration test for form_prompt async completion
@@ -88,7 +88,6 @@ nodes:
   parameters:
     name: Test Form
     response_window: 300
-    fallback_behavior: {fallback_behavior}
     form_definition:
       fields:
       - value_name: email
@@ -188,13 +187,12 @@ class TestFormPromptSignalIntegration:
         """Only 'submitted' may arrive via async completion; 'expired' fails the node.
 
         Expiry is produced by the Temporal activity timeout, not by a response, so an
-        externally delivered "expired" outcome is rejected even when
-        fallback_behavior=fallback.
+        externally delivered "expired" outcome is rejected regardless of node configuration.
         """
         wf_result = await self._run(
             temporal_env,
             task_queue="form-prompt-signal-expire-queue",
-            workflow_def=_create_form_prompt_workflow_yaml(fallback_behavior="fallback"),
+            workflow_def=_create_form_prompt_workflow_yaml(),
             output={
                 "outcome": "expired",
                 "response_data": None,

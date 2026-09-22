@@ -1,9 +1,9 @@
 from enum import Enum
 
 
-class FormPromptNodeParametersFallbackBehavior(str, Enum):
-    FAIL = "fail"
+class FormPromptNodeParametersFallbackDecisionType0(str, Enum):
     FALLBACK = "fallback"
+    SUBMIT = "submit"
 
     def __str__(self) -> str:
         return str(self.value)

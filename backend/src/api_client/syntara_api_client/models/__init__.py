@@ -156,7 +156,7 @@ __all__ = (
     "FormPromptNode",
     "FormPromptNodeOutputsType0",
     "FormPromptNodeParameters",
-    "FormPromptNodeParametersFallbackBehavior",
+    "FormPromptNodeParametersFallbackDecisionType0",
     "FormPromptStatus",
     "FormPromptSummary",
     "GlobalRevocationTimestampRead",

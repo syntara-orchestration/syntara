@@ -229,8 +229,8 @@ class TestFormPromptPortRules:
         assert "missing a connection from the 'Submitted' branch" in errors[0].message
         assert errors[0].node_id == "form"
 
-    def test_fallback_behavior_fallback_without_port(self) -> None:
-        """Allowed: fallback_behavior='fallback' without a fallback port (validation removed)."""
+    def test_cof_enabled_without_fallback_port(self) -> None:
+        """Allowed: COF enabled without a fallback port (will use submitted port on timeout)."""
         workflow_def = {
             "schema_version": "2.0.0",
             "name": "test",
@@ -240,7 +240,8 @@ class TestFormPromptPortRules:
                 {
                     "id": "form",
                     "type": "form_prompt",
-                    "parameters": {"form_definition": {"type": "object"}, "fallback_behavior": "fallback"},
+                    "parameters": {"form_definition": {"type": "object"}},
+                    "settings": {"continue_on_failure": True},
                 },
             ],
             "edges": [
@@ -249,11 +250,11 @@ class TestFormPromptPortRules:
             ],
         }
         result = WorkflowValidator().collect_findings(workflow_def)
-        # This validation was removed - workflow is now valid without fallback port
+        # Valid - can route to submitted port on timeout if fallback_decision is "submit"
         assert result.is_valid
 
-    def test_fallback_port_exists_but_behavior_fail(self) -> None:
-        """Error: fallback port connected but fallback_behavior='fail' (unreachable branch)."""
+    def test_fallback_port_exists_but_cof_disabled(self) -> None:
+        """Error: fallback port connected but COF disabled (unreachable branch)."""
         workflow_def = {
             "schema_version": "2.0.0",
             "name": "test",
@@ -264,7 +265,8 @@ class TestFormPromptPortRules:
                 {
                     "id": "form",
                     "type": "form_prompt",
-                    "parameters": {"form_definition": {"type": "object"}, "fallback_behavior": "fail"},
+                    "parameters": {"form_definition": {"type": "object"}},
+                    "settings": {"continue_on_failure": False},
                 },
             ],
             "edges": [
@@ -282,7 +284,7 @@ class TestFormPromptPortRules:
         assert len(fallback_errors) == 1
         assert "fallback branch will never execute" in fallback_errors[0].message
         assert fallback_errors[0].node_id == "form"
-        assert fallback_errors[0].field_path == "parameters.fallback_behavior"
+        assert fallback_errors[0].field_path == "settings.continue_on_failure"
 
 
 class TestFormPromptNoFalsePositives:

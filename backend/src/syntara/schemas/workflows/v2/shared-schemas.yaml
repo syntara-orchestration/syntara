@@ -2215,14 +2215,15 @@ components:
             - type: 'null'
           title: Response Window
           description: Seconds the responder has before the prompt expires. Falls back to workflow_engine.form_prompt_response_window_seconds.
-        fallback_behavior:
-          type: string
-          enum:
-            - fail
-            - fallback
-          title: Fallback Behavior
-          description: 'What happens when the prompt is not answered in time: fail the workflow, or route to the ''fallback'' output port.'
-          default: fail
+        fallback_decision:
+          anyOf:
+            - type: string
+              enum:
+                - submit
+                - fallback
+            - type: 'null'
+          title: Fallback Decision
+          description: Decision when form prompt times out with continue_on_failure enabled
         submit_label:
           anyOf:
             - type: string

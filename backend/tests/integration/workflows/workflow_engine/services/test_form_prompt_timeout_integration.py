@@ -208,7 +208,7 @@ class TestFormPromptTimeoutIntegration:
             assert len(_expire_calls) == 1
             assert _expire_calls[0][1] == "form1"
 
-    async def test_timeout_with_fallback_behavior_expires_and_routes(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_timeout_with_cof_enabled_expires_and_routes(self, temporal_env: WorkflowEnvironment) -> None:
         """When form_prompt times out with COF enabled, expire is called and routes to fallback."""
         task_queue = "form-prompt-timeout-fallback-queue"
         _expire_calls.clear()

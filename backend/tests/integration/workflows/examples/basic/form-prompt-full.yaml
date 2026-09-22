@@ -43,7 +43,7 @@ nodes:
       responder_groups:
         - team-sre
       response_window: 3600
-      fallback_behavior: fallback
+      fallback_decision: fallback
       submit_label: Deploy
       success_message: Deployment request submitted successfully
       timezone: America/New_York
