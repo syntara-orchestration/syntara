@@ -45,7 +45,7 @@ Skills live in `.claude/skills/` at the repo root, prefixed by workspace:
 - **`frontend-*`** — Frontend-specific skills (coding standards, PR review, PatternFly UX, testing, Playwright E2E, library references, a11y audit)
 - **`backend-*`** — Backend-specific skills (API spec drift detection)
 
-User-invocable skills: `/frontend-review-pr`, `/frontend-build-ui-feature`, `/frontend-a11y-audit`, `/backend-fix-api-spec-drift`. Reference skills (coding standards, testing guidelines, a11y audit methodology, etc.) are loaded automatically by Claude when working on relevant files. Trigger phrases are also listed in `.claude/skill-triggers.json` (advisory only; not executable hooks).
+User-invocable skills: `/frontend-review-pr`, `/frontend-build-ui-feature`, `/frontend-a11y-audit`, `/backend-fix-api-spec-drift`. Reference skills (coding standards, testing guidelines, a11y audit methodology, etc.) are loaded automatically by Claude when working on relevant files. Load triggers are listed in `frontend/AGENTS.md` and component `AGENTS.md` files.
 
 ## Development Workflow
 

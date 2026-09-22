@@ -17,7 +17,8 @@ Codifies a phased accessibility audit. **Phase 0** establishes an axe-core autom
 
 | Tool | Role in this skill |
 | --- | --- |
-| **Browser MCP** (`cursor-ide-browser`: `browser_navigate`, `browser_snapshot`, `browser_click`, `browser_press_key`, `browser_cdp`) | Live keyboard traversal, accessibility tree inspection, focus/activeElement checks, emulated media features |
+| **Playwright MCP** (server `playwright` in `.mcp.json`: `browser_navigate`, `browser_snapshot`, `browser_click`, `browser_press_key`, and related browser tools) | Live keyboard traversal, accessibility tree inspection, focus/activeElement checks |
+| **Chrome DevTools MCP** (server `chrome-devtools` in `.mcp.json`) | CDP emulation (viewport, `prefers-reduced-motion`, forced colors) and deeper DOM/console inspection when Playwright MCP is insufficient |
 | **Playwright** (E2E specs, `@axe-core/playwright`) | Repeatable axe scans, keyboard simulation, viewport sizing, `toMatchAriaSnapshot` |
 | **axe-core** (`vitest-axe` in unit tests, `@axe-core/playwright` in E2E) | Automated WCAG rule sweep (floor, not ceiling) |
 | **Lighthouse** (Chrome DevTools → Lighthouse panel, or `npx lighthouse --only-categories=accessibility`) | Secondary automated pass; useful for contrast and document-level checks |
@@ -50,7 +51,7 @@ When auditing broadly (or before a manual pass on many surfaces), run the **repo
 npm run e2e:a11y-audit
 ```
 
-This runs `e2e/a11y-audit.spec.ts`, which scans every entry in `e2e/visual-regression/page-registry.ts` with axe-core (WCAG 2.x A/AA). Details live in `frontend/packages/syntara-ui/TESTING.md` (Accessibility audit section).
+This runs `e2e/a11y-audit.spec.ts`, which scans every entry in `e2e/visual-regression/page-registry.ts` with axe-core (WCAG 2.x A/AA). Details live in `frontend/packages/syntara-ui/TESTING.md` (**Accessibility audit (report-only)**).
 
 | Property | Value |
 | --- | --- |
@@ -71,7 +72,7 @@ For a single route, modal, or component under review:
 1. **Identify surfaces** — route(s), modals, menus, wizards, and states (empty, error, loading, success).
 2. **Start the app** — `make dev` or `npm run start:ui` (mock API is fine for most UI audits).
 3. **Run axe** on the surface:
-   - **E2E / Browser MCP:** `@axe-core/playwright` with `wcag2a`, `wcag2aa`, `wcag21aa` tags (see `frontend-playwright-e2e` skill). Scope with `.include()` after opening dialogs/menus.
+   - **E2E / Playwright MCP:** `@axe-core/playwright` with `wcag2a`, `wcag2aa`, `wcag21aa` tags (see `frontend-playwright-e2e` skill). Scope with `.include()` after opening dialogs/menus.
    - **Unit:** `vitest-axe` `toHaveNoViolations()` for isolated widgets.
 4. **Record baseline violations** separately from manual findings; do not treat a clean axe run as "pass."
 
@@ -81,7 +82,7 @@ Document: URL, viewport, theme (light/dark), and whether mock or real backend.
 
 ## Phase 1 — Keyboard audit
 
-Exercise the surface **without a mouse**. Use Browser MCP or Playwright `page.keyboard`.
+Exercise the surface **without a mouse**. Use Playwright MCP or Playwright `page.keyboard`.
 
 ### 1.1 Tab order and focus visibility
 
@@ -139,7 +140,7 @@ For each overlay (menu, popover, modal, drawer):
 
 ## Phase 2 — Viewport and media matrix
 
-Run the same keyboard and visual checks under each condition. Use Browser MCP CDP `Emulation.setEmulatedMedia` / viewport commands or Playwright `page.emulateMedia` / `setViewportSize`.
+Run the same keyboard and visual checks under each condition. Use Chrome DevTools MCP (CDP `Emulation.setEmulatedMedia`, viewport) or Playwright `page.emulateMedia` / `setViewportSize`.
 
 | Condition | What to verify |
 | --- | --- |
@@ -281,8 +282,8 @@ Before marking an audit complete:
 | Do not | Do instead |
 | --- | --- |
 | Rely on axe alone | Run registry sweep **and** this skill's manual phases |
-| Run registry sweep for modals/wizards only | Open overlays and re-scan (Phase 0.2) or use Browser MCP |
-| Use unvetted accessibility MCP scanners | Browser MCP + axe-core + Lighthouse |
+| Run registry sweep for modals/wizards only | Open overlays and re-scan (Phase 0.2) or use Playwright MCP |
+| Use unvetted accessibility MCP scanners | Playwright MCP + axe-core + Lighthouse |
 | File one mega-bug per page | One bug per violation with WCAG SC |
 | File tracker issues without user approval | Draft bugs and wait for explicit confirmation |
 | Disable axe rules to "pass" | Fix the component; document upstream PF issues separately |

@@ -6,10 +6,10 @@ This file provides guidance to AI coding assistants when working in the frontend
 
 **Do not load all skills at once** — read each skill file when its trigger condition is met. If a loaded skill tells you to read another skill already loaded in this conversation, skip the re-read.
 
-<!-- NOTE: Executable agent hooks (skill-gate.sh, settings.json) were removed for
-     supply-chain safety and are not allowed upstream. Skills are advisory — read
-     them on-demand per the triggers below and in .claude/skill-triggers.json (also
-     advisory; not hook wiring). See ../.github/AI_AGENT_POLICY.md. -->
+<!-- NOTE: Executable agent hooks (skill-gate.sh, skill-triggers.json, settings.json)
+     were removed for supply-chain safety and are not allowed upstream. Skills are
+     advisory — read them on-demand per the triggers below. See
+     ../.github/AI_AGENT_POLICY.md. -->
 
 | Trigger                                                                             | Skill file to read                                                                        |
 | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |

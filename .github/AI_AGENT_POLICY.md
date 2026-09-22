@@ -26,7 +26,6 @@ There is **no hook-based enforcement** in upstream. The replacement is
 | --- | --- |
 | `CLAUDE.md`, `AGENTS.md`, and component `CLAUDE.md` / `AGENTS.md` | On-demand agent instructions |
 | `.claude/skills/**` | Skill documents maintainers choose to ship |
-| `.claude/skill-triggers.json` | Advisory trigger phrases for skills (not executable hooks) |
 | `.claude/commands/**` (when present) | Slash-command prompts as markdown |
 
 Skills and commands are documentation loaded by the agent. They are **not**
