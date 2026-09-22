@@ -84,7 +84,7 @@ Override ports if needed:
 SYNTARA_E2E_PORT=5174 SYNTARA_E2E_API_PORT=3301 npm run e2e
 ```
 
-**How the runner works:** `npm run e2e` executes `e2e/run-e2e.ts` via `tsx`, which probes for free ports (preferring 4173 / 3300, falling back to OS-assigned ports) and passes them to Playwright as `SYNTARA_E2E_PORT`, `SYNTARA_E2E_API_PORT`, and `SYNTARA_E2E_BASE_URL`. This means stale processes on the default ports are never silently reused — Playwright always starts fresh servers on confirmed-free ports.
+**How the runner works:** `npm run e2e` invokes the package's `playwright test` script. `playwright.config.ts` starts the mock API and UI through Playwright's `webServer` entries, using `SYNTARA_E2E_PORT` (default `4173`) and `SYNTARA_E2E_API_PORT` (default `3300`). Set those variables to override the ports. In local runs, Playwright may reuse existing servers; stop conflicting processes or choose alternate ports when needed.
 
 If you bypass the runner (e.g. `SYNTARA_E2E_SKIP_WEB_SERVER=1`) and manage servers manually, make sure they are configured with `VITE_API_URL=http://localhost:<apiPort>` or API calls will return 404.
 
@@ -1274,4 +1274,4 @@ npm run tsc
 2. **Helpers** — Reusable functions in `frontend/packages/syntara-ui/e2e/helpers/`
 3. **Resource utilities** — `frontend/packages/syntara-ui/e2e/utils/` (if creating API-based setup/teardown)
 4. **Coverage summary** — Brief comment documenting features, edge cases, and known gaps
-5. **Visual regression** — If the PR changes any UI layout or visual appearance, check whether a visual regression snapshot exists. See [`packages/syntara-ui/VISUAL_REGRESSION.md`](../packages/syntara-ui/VISUAL_REGRESSION.md) for the page registry, baseline update workflow, and CI screenshot comparison. Run `npm run e2e:visual-regression` to verify; run with `--update-snapshots` to update baselines.
+5. **Visual regression** — If the PR changes any UI layout or visual appearance, check whether a visual regression snapshot exists. See `frontend/packages/syntara-ui/VISUAL_REGRESSION.md` for the page registry, baseline update workflow, and CI screenshot comparison. Run `npm run e2e:visual-regression` to verify; run with `--update-snapshots` to update baselines.

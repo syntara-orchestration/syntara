@@ -24,7 +24,7 @@ There is **no hook-based enforcement** in upstream. The replacement is
 
 | Allowed upstream | Role |
 | --- | --- |
-| `CLAUDE.md`, `AGENTS.md`, and component `CLAUDE.md` / `AGENTS.md` | On-demand agent instructions |
+| `AGENTS.md` and component `AGENTS.md` | On-demand agent instructions |
 | `.claude/skills/**` | Skill documents maintainers choose to ship |
 | `.claude/commands/**` (when present) | Slash-command prompts as markdown |
 
@@ -53,7 +53,7 @@ Do not force-add ignored agent settings or hooks in a pull request.
 | Path | Ownership / review |
 | --- | --- |
 | This policy (`.github/AI_AGENT_POLICY.md`) | `@syntara-orchestration/syntara-leads` (see [CODEOWNERS](CODEOWNERS)) |
-| Root / component `CLAUDE.md`, `AGENTS.md` | Same reviewers as the area of the change; treat policy-affecting edits as governance |
+| Root / component `AGENTS.md` | Same reviewers as the area of the change; treat policy-affecting edits as governance |
 | `.claude/skills/**` | Owning product team per [CODEOWNERS](CODEOWNERS) (for example UX owns the PatternFly UX skill) |
 | Re-introducing hooks or shipping `settings.json` | **Not permitted** under this policy. Requires an explicit policy revision reviewed by `@syntara-orchestration/syntara-leads` |
 
@@ -125,4 +125,4 @@ Do not edit the vendored copy as the source of truth.
 ## Related contributor docs
 
 - Frontend AI workflow guide: [`frontend/docs/ai-assisted-development.md`](../frontend/docs/ai-assisted-development.md)
-- Root agent entrypoints: [`CLAUDE.md`](../CLAUDE.md), [`AGENTS.md`](../AGENTS.md)
+- Root agent entrypoint: [`AGENTS.md`](../AGENTS.md)

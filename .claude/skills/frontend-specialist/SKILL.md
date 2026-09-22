@@ -106,7 +106,7 @@ Standards for implementing, reviewing, and refactoring frontend code using React
 - [ ] Create/edit routes: set `routePermission` for `ProtectedRoute` guard
 - [ ] New CRUD actions: wrap in `DisabledWithTooltip` with domain permission hook and `permissionTooltip()`
 - [ ] New permission-gated features: add role-aware mock handlers in `handlers.ts` for all 4 roles
-- [ ] See [`frontend/docs/permissions-rbac.md`](../../frontend/docs/permissions-rbac.md) for architecture
+- [ ] See `frontend/docs/permissions-rbac.md` for architecture
 
 ### Documentation Links
 

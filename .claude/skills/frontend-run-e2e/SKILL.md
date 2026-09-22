@@ -83,7 +83,7 @@ Present another `AskUserQuestion` showing the detected defaults and asking the u
 
 2. **Backend URL** — "Backend API URL?"
    - Default: `https://localhost:8000`
-   - If the health check failed in Step 1, warn: "Backend not responding — start it with `make run-all`."
+   - If the health check failed in Step 1, warn: "Backend not responding — start it with `make -C backend run-all`."
 
 3. **Frontend URL** — "Frontend dev server URL?"
    - Default: `http://localhost:5173`
@@ -102,7 +102,7 @@ Before running, verify the environment is ready. For real backend mode, the skil
 test -f $REPO_ROOT/backend/.secrets/admin-password && echo "OK: password file found" || echo "FAIL: password file not found — run: make -C backend secrets"
 
 # 2. Backend is responding
-curl -sf --cacert $REPO_ROOT/backend/.secrets/certs/ca.pem https://localhost:8000/healthz/ready -o /dev/null && echo "OK: backend responding" || echo "FAIL: backend not responding — run: make run-all"
+curl -sf --cacert $REPO_ROOT/backend/.secrets/certs/ca.pem https://localhost:8000/healthz/ready -o /dev/null && echo "OK: backend responding" || echo "FAIL: backend not responding — run: make -C backend run-all"
 
 # 3. Frontend is responding — start it if not
 curl -sf http://localhost:5173 -o /dev/null && echo "OK: frontend responding"
@@ -221,8 +221,8 @@ From the repo root:
 make dev
 
 # Or start individually:
-make services-up              # Infrastructure (DB, Redis, Temporal, OPA)
-make run-all                  # Backend API on https://localhost:8000
+make services-up              # Database, Redis, Temporal, workers, MCP, and supporting services
+make -C backend run-all       # Backend API and all backend services
 cd frontend && VITE_API_URL=https://localhost:8000 npm run start:ui  # Frontend on http://localhost:5173
 ```
 
@@ -263,7 +263,7 @@ See `.claude/skills/frontend-playwright-e2e/SKILL.md` → **Test Suite Tags** fo
 | "Incorrect login credentials" | Password file and database are out of sync | Run `make admin-password` from repo root to sync |
 | Login errors (other) | Wrong password file or unseeded DB | Regenerate: `make -C backend secrets` then `make admin-password` |
 | API 404s in mock mode | UI started without correct VITE_API_URL | Playwright handles this automatically; if manual, use `VITE_API_URL=http://localhost:3300` |
-| Port conflicts | Stale processes | `kill-port 3300 4173` |
+| Port conflicts | A process is already using one of the configured ports | Stop the process using the port, or override it with `SYNTARA_E2E_PORT` / `SYNTARA_E2E_API_PORT` |
 | Visual regression tests skipped | Expected in real backend mode | These only run in mock mode with deterministic data |
 
 ### What works where
