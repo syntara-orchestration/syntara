@@ -1,5 +1,5 @@
 import { Content, ContentVariants, Flex, FlexItem, Stack, StackItem, Title, TitleSizes } from '@patternfly/react-core'
-import { RhUiDuplicateIcon, RhUiPlayIcon, RhUiTrashIcon, RhUiWarningFillIcon } from '@patternfly/react-icons'
+import { RhUiWarningFillIcon } from '@patternfly/react-icons'
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import { ExecutorTypeEnum } from '@syntara/contracts'
 import { userEvent } from 'storybook/test'
@@ -11,17 +11,10 @@ import { NODE_TYPE_COLORS } from '../../routes/workflows/canvas/nodeTypeColors'
 
 import { NodeBody } from './NodeBody'
 import { NodeComponent } from './NodeComponent'
-import { createNodeProps, NodeExample, NodeStoryCanvas } from './NodeComponent.stories.helpers'
+import { createNodeProps, MENU_ACTIONS, NodeExample, NodeStoryCanvas } from './NodeComponent.stories.helpers'
 import styles from './NodeComponent.stories.module.css'
 
-const MENU_ACTIONS = [
-  { id: 'run', label: 'Run step', onClick: () => undefined, icon: <RhUiPlayIcon /> },
-  { id: 'duplicate', label: 'Duplicate', onClick: () => undefined, icon: <RhUiDuplicateIcon /> },
-  { id: 'separator', label: '', onClick: () => undefined, separator: true },
-  { id: 'delete', label: 'Delete', onClick: () => undefined, icon: <RhUiTrashIcon />, variant: 'danger' as const },
-]
-
-function KitchenSinkInventory() {
+function NodeComponentInventory() {
   return (
     <Stack hasGutter>
       <StackItem>
@@ -160,7 +153,7 @@ type Story = StoryObj<typeof meta>
 
 /** Fixed visual inventory for global-node states. Menus remain closed so no popover obscures adjacent nodes. */
 export const Inventory: Story = {
-  render: () => <KitchenSinkInventory />,
+  render: () => <NodeComponentInventory />,
   play: async ({ canvas }) => {
     const [collapsedToggle] = canvas.getAllByRole('button', { name: 'Collapse step details' })
     if (collapsedToggle) await userEvent.click(collapsedToggle)

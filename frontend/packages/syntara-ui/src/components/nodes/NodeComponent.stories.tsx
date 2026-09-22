@@ -1,5 +1,4 @@
 import { Content, ContentVariants } from '@patternfly/react-core'
-import { RhUiDuplicateIcon, RhUiPlayIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import { ExecutorTypeEnum } from '@syntara/contracts'
 import { ReactFlow, type Node, type NodeProps } from '@xyflow/react'
@@ -12,18 +11,17 @@ import { NODE_TYPE_COLORS } from '../../routes/workflows/canvas/nodeTypeColors'
 
 import { NodeBody } from './NodeBody'
 import { NodeComponent } from './NodeComponent'
-import { createNodeProps, NodeExample, NodeStoryCanvas, type StoryNodeData } from './NodeComponent.stories.helpers'
+import {
+  createNodeProps,
+  MENU_ACTIONS,
+  NodeExample,
+  NodeStoryCanvas,
+  type StoryNodeData,
+} from './NodeComponent.stories.helpers'
 import styles from './NodeComponent.stories.module.css'
 import { NodeExpandToggle } from './NodeExpandToggle'
 import { NodeHeader } from './NodeHeader'
 import { NodeTitle } from './NodeTitle'
-
-const MENU_ACTIONS = [
-  { id: 'run', label: 'Run step', onClick: () => undefined, icon: <RhUiPlayIcon /> },
-  { id: 'duplicate', label: 'Duplicate', onClick: () => undefined, icon: <RhUiDuplicateIcon /> },
-  { id: 'separator', label: '', onClick: () => undefined, separator: true },
-  { id: 'delete', label: 'Delete', onClick: () => undefined, icon: <RhUiTrashIcon />, variant: 'danger' as const },
-]
 
 const executionStatuses = Object.values(ACTIVITY_STATUS)
 

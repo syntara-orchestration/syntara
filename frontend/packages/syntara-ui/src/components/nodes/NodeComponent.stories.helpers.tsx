@@ -1,4 +1,5 @@
 import { Content, ContentVariants } from '@patternfly/react-core'
+import { RhUiDuplicateIcon, RhUiPlayIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import type { Node, NodeProps } from '@xyflow/react'
 import { Background, BackgroundVariant, Position, ReactFlow } from '@xyflow/react'
 import { useCallback, useState, type ReactNode } from 'react'
@@ -6,6 +7,14 @@ import { useCallback, useState, type ReactNode } from 'react'
 import { FlowNodeType } from '../../constants'
 
 import styles from './NodeComponent.stories.module.css'
+
+/** Shared inert actions for stories that demonstrate a node header's action menu. */
+export const MENU_ACTIONS = [
+  { id: 'run', label: 'Run step', onClick: () => undefined, icon: <RhUiPlayIcon /> },
+  { id: 'duplicate', label: 'Duplicate', onClick: () => undefined, icon: <RhUiDuplicateIcon /> },
+  { id: 'separator', label: '', onClick: () => undefined, separator: true },
+  { id: 'delete', label: 'Delete', onClick: () => undefined, icon: <RhUiTrashIcon />, variant: 'danger' as const },
+]
 
 /** Minimal workflow data used to render `NodeComponent` states outside a builder canvas. */
 export type StoryNodeData = Record<string, unknown> & {
