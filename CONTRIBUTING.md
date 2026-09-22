@@ -52,8 +52,10 @@ See [AI_POLICY.md](.github/AI_POLICY.md) for the full policy.
 4. Open a pull request targeting `devel` — the PR template will guide you through the checklist
 5. Link any related issues in the PR description
 
-Community PRs should have the `community` label. Please add it when opening your
-PR, or ask a maintainer to add it if you don't have permission to manage labels.
+If your PR addresses a Jira work item, link it in the PR description. PRs that
+don't reference a Jira work item are considered community contributions and
+should have the `community` label. Please add it, or ask a maintainer to add it
+if you don't have permission to manage labels.
 
 ## CI Checks
 

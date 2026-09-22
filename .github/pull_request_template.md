@@ -64,8 +64,10 @@ Related to #(issue number)
 
 ## General Checklist
 
-Community PRs should have the `community` label. Please add it, or ask a
-maintainer to add it if you don't have permission to manage labels.
+If your PR addresses a Jira work item, link it in the PR description. PRs that
+don't reference a Jira work item are considered community contributions and
+should have the `community` label. Please add it, or ask a maintainer to add it
+if you don't have permission to manage labels.
 
 - [ ] Code follows the project's coding conventions
 - [ ] I have updated relevant documentation
