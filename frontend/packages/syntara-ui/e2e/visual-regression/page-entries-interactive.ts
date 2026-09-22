@@ -72,7 +72,7 @@ async function enterBuilderVersionViewHeaderState(page: Page, workflowId: string
   await expect(page.getByText(/Viewing/i)).toBeVisible()
   // Collapse the panel first — version rows also render "Previously published" badges,
   // which makes an unscoped getByText hit multiple elements (strict mode violation).
-  await page.getByRole('button', { name: 'Collapse version history' }).click()
+  await page.getByRole('button', { name: 'Close version history' }).click()
   await expect(page.getByRole('heading', { name: 'Version history', level: 2 })).not.toBeVisible()
   await expect(page.getByText('Previously published', { exact: true })).toBeVisible()
 }

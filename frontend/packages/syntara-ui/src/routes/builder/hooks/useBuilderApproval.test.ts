@@ -75,7 +75,7 @@ function makeNode(type: string, executionStatus?: string): Node<NodeType['data']
       name: 'Test Node',
       __executionState: executionStatus ? { status: executionStatus } : undefined,
     },
-  } as unknown as Node<NodeType['data']>
+  }
 }
 
 describe('useBuilderApproval', () => {
@@ -86,8 +86,8 @@ describe('useBuilderApproval', () => {
     approvalState.pending = null
     queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
 
-    vi.mocked(approvalsClient.useQuery).mockReturnValue({ data: undefined, refetch: mockFetchForNode } as never)
-    vi.mocked(approvalsClient.useMutation).mockReturnValue({ mutate: vi.fn(), isPending: false } as never)
+    vi.mocked(approvalsClient.useQuery).mockReturnValue({ data: undefined, refetch: mockFetchForNode })
+    vi.mocked(approvalsClient.useMutation).mockReturnValue({ mutate: vi.fn(), isPending: false })
   })
 
   it('returns approvalViewOpen as false initially', () => {

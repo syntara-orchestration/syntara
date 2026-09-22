@@ -1,7 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import type { ComponentProps, MouseEvent, ReactNode } from 'react'
-
-type TanStackTo = ComponentProps<typeof Link>['to']
+import type { MouseEvent, ReactNode } from 'react'
 
 type HistoryListItemLinkProps = Readonly<{
   to: string
@@ -45,7 +43,7 @@ export function HistoryListItemLink({
   return (
     <Link
       // TanStack Router expects literal route strings; history hrefs are dynamic
-      to={to as TanStackTo}
+      to={to}
       className={`${pfClass}${selectedClass}${extraClass}`.trim()}
       aria-current={isSelected ? 'page' : undefined}
       aria-label={ariaLabel}

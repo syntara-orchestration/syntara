@@ -193,7 +193,7 @@ describe('IntegrationDetail', () => {
       isError: overrides?.isError ?? false,
       error: overrides?.isError ? new Error('Load failed') : null,
       refetch: mockRefetch,
-    } as never)
+    })
 
     vi.mocked(credentialsClient.useQuery).mockReturnValue({
       data: integration.management_credential_id
@@ -206,7 +206,7 @@ describe('IntegrationDetail', () => {
       isPending: false,
       isError: false,
       error: null,
-    } as never)
+    })
 
     const baseMutationResult = {
       isPending: false,
@@ -614,22 +614,22 @@ describe('IntegrationDetail', () => {
         isError: true,
         error: retryableError,
         refetch: mockRefetch,
-      } as never)
+      })
       vi.mocked(credentialsClient.useQuery).mockReturnValue({
         data: undefined,
         isPending: false,
         isError: false,
         error: null,
-      } as never)
+      })
       vi.mocked(integrationsClient.useMutation).mockReturnValue({
         mutate: mockMutate,
         isPending: false,
-      } as never)
+      })
       vi.mocked(integrationsClient.useMutation).mockReturnValue({
         mutateAsync: vi.fn().mockResolvedValue({}),
         mutate: vi.fn(),
         isPending: false,
-      } as never)
+      })
       mockRefetch.mockResolvedValue({ data: mockIntegration })
       const user = userEvent.setup()
       render(<IntegrationDetail />, { wrapper })
@@ -646,7 +646,7 @@ describe('IntegrationDetail', () => {
       render(<IntegrationDetail />, { wrapper })
 
       expect(mockRegisterDirtyCheck).toHaveBeenCalledOnce()
-      const opts = mockRegisterDirtyCheck.mock.lastCall?.[0] as unknown as Record<string, unknown> | undefined
+      const opts = mockRegisterDirtyCheck.mock.lastCall?.[0]
       expect(opts).toBeDefined()
       expect(typeof opts!.check).toBe('function')
       expect(typeof opts!.saveAndExit).toBe('function')
@@ -1152,7 +1152,7 @@ describe('IntegrationDetail', () => {
     })
 
     it('shows invalid integration error when integrationId is empty', () => {
-      vi.mocked(useParams).mockReturnValue({ integrationId: '' } as never)
+      vi.mocked(useParams).mockReturnValue({ integrationId: '' })
       render(<IntegrationDetail />, { wrapper })
 
       expect(screen.getByText('Invalid integration')).toBeInTheDocument()

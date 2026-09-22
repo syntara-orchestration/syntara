@@ -2,7 +2,7 @@
  * Page registry for visual regression testing.
  *
  * Every implemented route in the app should have an entry here.
- * The baseline enforcement script (`scripts/check-visual-baselines.ts`)
+ * The baseline enforcement script (`scripts/visual-regression/check-visual-baselines.ts`)
  * validates that this registry stays in sync with `AppRoute.tsx`.
  *
  * Entries are organized by section (matching the route directory structure)

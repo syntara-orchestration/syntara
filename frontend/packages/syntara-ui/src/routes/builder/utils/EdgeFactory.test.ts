@@ -141,9 +141,7 @@ describe('EdgeFactory', () => {
 
   describe('addEdge', () => {
     it('adds edge to existing edges array', () => {
-      const existingEdges: EdgeType[] = [
-        { id: 'edge-1', source: 'node-1', target: 'node-2', type: 'default' } as EdgeType,
-      ]
+      const existingEdges: EdgeType[] = [{ id: 'edge-1', source: 'node-1', target: 'node-2', type: 'default' }]
       const newEdge = EdgeFactory.createEdge({
         source: 'node-2',
         target: 'node-3',
@@ -170,9 +168,7 @@ describe('EdgeFactory', () => {
 
   describe('createAndAdd', () => {
     it('creates and adds edge in one operation', () => {
-      const existingEdges: EdgeType[] = [
-        { id: 'edge-1', source: 'node-1', target: 'node-2', type: 'default' } as EdgeType,
-      ]
+      const existingEdges: EdgeType[] = [{ id: 'edge-1', source: 'node-1', target: 'node-2', type: 'default' }]
 
       const result = EdgeFactory.createAndAdd(
         {
@@ -191,8 +187,8 @@ describe('EdgeFactory', () => {
   describe('replaceEdge', () => {
     it('replaces an existing edge', () => {
       const existingEdges: EdgeType[] = [
-        { id: 'edge-1', source: 'node-1', target: 'node-2', type: 'default' } as EdgeType,
-        { id: 'edge-2', source: 'node-2', target: 'node-3', type: 'default' } as EdgeType,
+        { id: 'edge-1', source: 'node-1', target: 'node-2', type: 'default' },
+        { id: 'edge-2', source: 'node-2', target: 'node-3', type: 'default' },
       ]
 
       const result = EdgeFactory.replaceEdge(
@@ -210,9 +206,7 @@ describe('EdgeFactory', () => {
     })
 
     it('handles replacing non-existent edge', () => {
-      const existingEdges: EdgeType[] = [
-        { id: 'edge-1', source: 'node-1', target: 'node-2', type: 'default' } as EdgeType,
-      ]
+      const existingEdges: EdgeType[] = [{ id: 'edge-1', source: 'node-1', target: 'node-2', type: 'default' }]
 
       const result = EdgeFactory.replaceEdge(
         'non-existent',
@@ -230,8 +224,8 @@ describe('EdgeFactory', () => {
   describe('removeButtonEdge', () => {
     it('removes button edge for regular node', () => {
       const edges: EdgeType[] = [
-        { id: 'button-node-1', source: 'node-1', target: 'placeholder-node-1', type: 'buttonEdge' } as EdgeType,
-        { id: 'edge-1', source: 'node-1', target: 'node-2', type: 'default' } as EdgeType,
+        { id: 'button-node-1', source: 'node-1', target: 'placeholder-node-1', type: 'buttonEdge' },
+        { id: 'edge-1', source: 'node-1', target: 'node-2', type: 'default' },
       ]
 
       const result = EdgeFactory.removeButtonEdge('node-1', edges)
@@ -242,15 +236,15 @@ describe('EdgeFactory', () => {
 
     it('removes all button edge variants for a node without specific handle', () => {
       const edges: EdgeType[] = [
-        { id: 'button-condition-1', source: 'condition-1', target: 'placeholder', type: 'buttonEdge' } as EdgeType,
-        { id: 'button-condition-1-true', source: 'condition-1', target: 'placeholder', type: 'buttonEdge' } as EdgeType,
+        { id: 'button-condition-1', source: 'condition-1', target: 'placeholder', type: 'buttonEdge' },
+        { id: 'button-condition-1-true', source: 'condition-1', target: 'placeholder', type: 'buttonEdge' },
         {
           id: 'button-condition-1-false',
           source: 'condition-1',
           target: 'placeholder',
           type: 'buttonEdge',
-        } as EdgeType,
-        { id: 'edge-1', source: 'condition-1', target: 'task-1', type: 'default' } as EdgeType,
+        },
+        { id: 'edge-1', source: 'condition-1', target: 'task-1', type: 'default' },
       ]
 
       const result = EdgeFactory.removeButtonEdge('condition-1', edges)
@@ -261,13 +255,13 @@ describe('EdgeFactory', () => {
 
     it('removes specific true handle button edge', () => {
       const edges: EdgeType[] = [
-        { id: 'button-condition-1-true', source: 'condition-1', target: 'placeholder', type: 'buttonEdge' } as EdgeType,
+        { id: 'button-condition-1-true', source: 'condition-1', target: 'placeholder', type: 'buttonEdge' },
         {
           id: 'button-condition-1-false',
           source: 'condition-1',
           target: 'placeholder',
           type: 'buttonEdge',
-        } as EdgeType,
+        },
       ]
 
       const result = EdgeFactory.removeButtonEdge('condition-1', edges, 'true')
@@ -278,13 +272,13 @@ describe('EdgeFactory', () => {
 
     it('removes specific false handle button edge', () => {
       const edges: EdgeType[] = [
-        { id: 'button-condition-1-true', source: 'condition-1', target: 'placeholder', type: 'buttonEdge' } as EdgeType,
+        { id: 'button-condition-1-true', source: 'condition-1', target: 'placeholder', type: 'buttonEdge' },
         {
           id: 'button-condition-1-false',
           source: 'condition-1',
           target: 'placeholder',
           type: 'buttonEdge',
-        } as EdgeType,
+        },
       ]
 
       const result = EdgeFactory.removeButtonEdge('condition-1', edges, 'false')
@@ -295,8 +289,8 @@ describe('EdgeFactory', () => {
 
     it('removes specific done handle button edge for loop', () => {
       const edges: EdgeType[] = [
-        { id: 'button-loop-1-done', source: 'loop-1', target: 'placeholder', type: 'buttonEdge' } as EdgeType,
-        { id: 'button-loop-1-loop', source: 'loop-1', target: 'placeholder', type: 'buttonEdge' } as EdgeType,
+        { id: 'button-loop-1-done', source: 'loop-1', target: 'placeholder', type: 'buttonEdge' },
+        { id: 'button-loop-1-loop', source: 'loop-1', target: 'placeholder', type: 'buttonEdge' },
       ]
 
       const result = EdgeFactory.removeButtonEdge('loop-1', edges, 'done')
@@ -307,8 +301,8 @@ describe('EdgeFactory', () => {
 
     it('removes specific loop handle button edge for loop', () => {
       const edges: EdgeType[] = [
-        { id: 'button-loop-1-done', source: 'loop-1', target: 'placeholder', type: 'buttonEdge' } as EdgeType,
-        { id: 'button-loop-1-loop', source: 'loop-1', target: 'placeholder', type: 'buttonEdge' } as EdgeType,
+        { id: 'button-loop-1-done', source: 'loop-1', target: 'placeholder', type: 'buttonEdge' },
+        { id: 'button-loop-1-loop', source: 'loop-1', target: 'placeholder', type: 'buttonEdge' },
       ]
 
       const result = EdgeFactory.removeButtonEdge('loop-1', edges, 'loop')
@@ -319,10 +313,10 @@ describe('EdgeFactory', () => {
 
     it('removes all loop button edges when no handle specified', () => {
       const edges: EdgeType[] = [
-        { id: 'button-loop-1', source: 'loop-1', target: 'placeholder', type: 'buttonEdge' } as EdgeType,
-        { id: 'button-loop-1-done', source: 'loop-1', target: 'placeholder', type: 'buttonEdge' } as EdgeType,
-        { id: 'button-loop-1-loop', source: 'loop-1', target: 'placeholder', type: 'buttonEdge' } as EdgeType,
-        { id: 'edge-1', source: 'loop-1', target: 'task-1', type: 'default' } as EdgeType,
+        { id: 'button-loop-1', source: 'loop-1', target: 'placeholder', type: 'buttonEdge' },
+        { id: 'button-loop-1-done', source: 'loop-1', target: 'placeholder', type: 'buttonEdge' },
+        { id: 'button-loop-1-loop', source: 'loop-1', target: 'placeholder', type: 'buttonEdge' },
+        { id: 'edge-1', source: 'loop-1', target: 'task-1', type: 'default' },
       ]
 
       const result = EdgeFactory.removeButtonEdge('loop-1', edges)
@@ -338,13 +332,13 @@ describe('EdgeFactory', () => {
           source: 'approval-1',
           target: 'placeholder',
           type: 'buttonEdge',
-        } as EdgeType,
+        },
         {
           id: 'button-approval-1-rejected',
           source: 'approval-1',
           target: 'placeholder',
           type: 'buttonEdge',
-        } as EdgeType,
+        },
       ]
 
       const result = EdgeFactory.removeButtonEdge('approval-1', edges, 'approved')
@@ -360,13 +354,13 @@ describe('EdgeFactory', () => {
           source: 'approval-1',
           target: 'placeholder',
           type: 'buttonEdge',
-        } as EdgeType,
+        },
         {
           id: 'button-approval-1-rejected',
           source: 'approval-1',
           target: 'placeholder',
           type: 'buttonEdge',
-        } as EdgeType,
+        },
       ]
 
       const result = EdgeFactory.removeButtonEdge('approval-1', edges, 'rejected')
@@ -409,7 +403,7 @@ describe('EdgeFactory', () => {
         source: 'node-1',
         target: 'node-2',
         type: 'default',
-      } as EdgeType
+      }
 
       const result = EdgeFactory.toEdgeConnection(edge)
 
@@ -433,7 +427,7 @@ describe('EdgeFactory', () => {
           sourceHandle: 'source',
           targetHandle: 'target',
           type: 'default',
-        } as EdgeType,
+        },
         {
           id: 'edge-2',
           source: 'node-2',
@@ -441,7 +435,7 @@ describe('EdgeFactory', () => {
           sourceHandle: 'source',
           targetHandle: 'target',
           type: 'default',
-        } as EdgeType,
+        },
       ]
 
       const result = EdgeFactory.toEdgeConnections(edges)

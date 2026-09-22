@@ -125,8 +125,8 @@ function mockQueries(options?: {
     error: options?.error ?? null,
     refetch,
   }
-  vi.mocked(accessClient.useQuery).mockReturnValue(returnValue as never)
-  vi.mocked(workflowClient.useQuery).mockReturnValue(returnValue as never)
+  vi.mocked(accessClient.useQuery).mockReturnValue(returnValue)
+  vi.mocked(workflowClient.useQuery).mockReturnValue(returnValue)
   return refetch
 }
 

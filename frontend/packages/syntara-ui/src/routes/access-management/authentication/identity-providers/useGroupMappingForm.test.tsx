@@ -88,7 +88,7 @@ describe('useGroupMappingFormMetadata', () => {
       error: null,
       isPending: false,
       refetch: vi.fn(),
-    } as never)
+    })
   })
 
   it('reports invalid provider id', () => {
@@ -128,7 +128,7 @@ describe('useGroupMappingFormMetadata', () => {
       error: null,
       isPending: false,
       refetch: vi.fn(),
-    } as never)
+    })
 
     const { result } = renderHook(() => useGroupMappingFormMetadata(VALID_PROVIDER_ID, ''), { wrapper })
 
@@ -145,7 +145,7 @@ describe('useGroupMappingFormMetadata', () => {
       error: { response: { status: 404 } },
       isPending: false,
       refetch: vi.fn(),
-    } as never)
+    })
 
     const { result } = renderHook(() => useGroupMappingFormMetadata(VALID_PROVIDER_ID, ''), { wrapper })
     expect(result.current.isNotFound).toBe(true)
@@ -159,7 +159,7 @@ describe('useGroupMappingFormMetadata', () => {
       error: null,
       isPending: true,
       refetch: vi.fn(),
-    } as never)
+    })
 
     const { result } = renderHook(() => useGroupMappingFormMetadata(VALID_PROVIDER_ID, ''), { wrapper })
     expect(result.current.breadcrumbs.some((item) => item.label === 'Identity provider')).toBe(true)
@@ -187,7 +187,7 @@ describe('useGroupMappingFormMetadata', () => {
       error: null,
       isPending: false,
       refetch: vi.fn(),
-    } as never)
+    })
 
     const { result } = renderHook(() => useGroupMappingFormMetadata(VALID_PROVIDER_ID, ''), { wrapper })
 
@@ -214,7 +214,7 @@ describe('useGroupMappingEditForm', () => {
     vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
       mutate: vi.fn(),
       isPending: false,
-    } as never)
+    })
   })
 
   it('initializes one blank entry when provider has no mappings', async () => {
@@ -241,7 +241,7 @@ describe('useGroupMappingEditForm', () => {
     vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
       mutate: mockMutate,
       isPending: false,
-    } as never)
+    })
 
     const { result } = renderHook(
       () =>
@@ -274,7 +274,7 @@ describe('useGroupMappingEditForm', () => {
     vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
       mutate: mockMutate,
       isPending: false,
-    } as never)
+    })
 
     const { result } = renderHook(
       () =>
@@ -309,7 +309,7 @@ describe('useGroupMappingEditForm', () => {
     vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
       mutate: mockMutate,
       isPending: false,
-    } as never)
+    })
 
     const { result } = renderHook(
       () =>
@@ -618,7 +618,7 @@ describe('useGroupMappingEditForm', () => {
     vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
       mutate: mockMutate,
       isPending: false,
-    } as never)
+    })
 
     const { result } = renderHook(
       () =>

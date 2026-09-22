@@ -69,14 +69,12 @@ describe('NodeEditorOverlay', () => {
     render(
       <NodeEditorOverlay
         {...baseProps}
-        selectedNode={
-          {
-            id: 'task-1',
-            type: 'task',
-            position: { x: 0, y: 0 },
-            data: { id: 'task-1', type: ExecutorTypeEnum.HTTP_REQUEST, name: 'Task' },
-          } as never
-        }
+        selectedNode={{
+          id: 'task-1',
+          type: 'task',
+          position: { x: 0, y: 0 },
+          data: { id: 'task-1', type: ExecutorTypeEnum.HTTP_REQUEST, name: 'Task' },
+        }}
       />
     )
     expect(useDocLinkMock).toHaveBeenCalledWith('restApi')

@@ -108,9 +108,9 @@ function mockQueryReturn(overrides: Record<string, unknown> = {}): ReturnType<ty
 describe('IdentityProviderDetail', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(identityProvidersClient.useMutation).mockReturnValue({ mutate: vi.fn(), isPending: false } as never)
-    vi.mocked(adminClient.useMutation).mockReturnValue({ mutate: vi.fn(), isPending: false } as never)
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+    vi.mocked(identityProvidersClient.useMutation).mockReturnValue({ mutate: vi.fn(), isPending: false })
+    vi.mocked(adminClient.useMutation).mockReturnValue({ mutate: vi.fn(), isPending: false })
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
     vi.mocked(useParams).mockReturnValue({ providerId: VALID_PROVIDER_ID })
     mockIdpPermissions.canCreate = true
     mockIdpPermissions.canUpdate = true
@@ -503,7 +503,7 @@ describe('IdentityProviderDetail', () => {
 
   it('opens disable dialog when toggling an enabled provider', async () => {
     const user = userEvent.setup()
-    vi.mocked(identityProvidersClient.useMutation).mockReturnValue({ mutate: vi.fn(), isPending: false } as never)
+    vi.mocked(identityProvidersClient.useMutation).mockReturnValue({ mutate: vi.fn(), isPending: false })
     vi.mocked(identityProvidersClient.useQuery).mockReturnValue(mockQueryReturn())
 
     render(<IdentityProviderDetail />, { wrapper: createWrapper() })
@@ -517,10 +517,10 @@ describe('IdentityProviderDetail', () => {
   it('calls patchProvider to disable after confirming dialog', async () => {
     const user = userEvent.setup()
     const mockPatch = vi.fn()
-    vi.mocked(identityProvidersClient.useMutation).mockImplementation(((method: string) => {
+    vi.mocked(identityProvidersClient.useMutation).mockImplementation((method: string) => {
       if (method === 'patch') return { mutate: mockPatch, isPending: false }
       return { mutate: vi.fn(), isPending: false }
-    }) as unknown as typeof identityProvidersClient.useMutation)
+    })
     vi.mocked(identityProvidersClient.useQuery).mockReturnValue(mockQueryReturn())
 
     render(<IdentityProviderDetail />, { wrapper: createWrapper() })
@@ -547,10 +547,10 @@ describe('IdentityProviderDetail', () => {
     const mockPatch = vi.fn((_params: unknown, callbacks: MutationCallbacks) => {
       callbacks.onSuccess?.()
     })
-    vi.mocked(identityProvidersClient.useMutation).mockImplementation(((method: string) => {
+    vi.mocked(identityProvidersClient.useMutation).mockImplementation((method: string) => {
       if (method === 'patch') return { mutate: mockPatch, isPending: false }
       return { mutate: vi.fn(), isPending: false }
-    }) as unknown as typeof identityProvidersClient.useMutation)
+    })
     vi.mocked(identityProvidersClient.useQuery).mockReturnValue(mockQueryReturn({ refetch: mockRefetch }))
 
     render(<IdentityProviderDetail />, { wrapper: createWrapper() })
@@ -567,10 +567,10 @@ describe('IdentityProviderDetail', () => {
     const mockPatch = vi.fn((_params: unknown, callbacks: MutationCallbacks) => {
       callbacks.onError?.(new Error('Toggle failed'))
     })
-    vi.mocked(identityProvidersClient.useMutation).mockImplementation(((method: string) => {
+    vi.mocked(identityProvidersClient.useMutation).mockImplementation((method: string) => {
       if (method === 'patch') return { mutate: mockPatch, isPending: false }
       return { mutate: vi.fn(), isPending: false }
-    }) as unknown as typeof identityProvidersClient.useMutation)
+    })
     vi.mocked(identityProvidersClient.useQuery).mockReturnValue(mockQueryReturn())
 
     render(<IdentityProviderDetail />, { wrapper: createWrapper() })
@@ -587,10 +587,10 @@ describe('IdentityProviderDetail', () => {
   it('does not call patchProvider when provider has no id', async () => {
     const user = userEvent.setup()
     const mockPatch = vi.fn()
-    vi.mocked(identityProvidersClient.useMutation).mockImplementation(((method: string) => {
+    vi.mocked(identityProvidersClient.useMutation).mockImplementation((method: string) => {
       if (method === 'patch') return { mutate: mockPatch, isPending: false }
       return { mutate: vi.fn(), isPending: false }
-    }) as unknown as typeof identityProvidersClient.useMutation)
+    })
     vi.mocked(identityProvidersClient.useQuery).mockReturnValue(
       mockQueryReturn({ data: { ...mockProvider, id: undefined } })
     )
@@ -666,7 +666,7 @@ describe('IdentityProviderDetail', () => {
   it('calls revoke mutation when confirming revocation', async () => {
     const user = userEvent.setup()
     const mockRevoke = vi.fn()
-    vi.mocked(adminClient.useMutation).mockReturnValue({ mutate: mockRevoke, isPending: false } as never)
+    vi.mocked(adminClient.useMutation).mockReturnValue({ mutate: mockRevoke, isPending: false })
     vi.mocked(identityProvidersClient.useQuery).mockReturnValue(mockQueryReturn())
 
     render(<IdentityProviderDetail />, { wrapper: createWrapper() })
@@ -682,10 +682,10 @@ describe('IdentityProviderDetail', () => {
   it('calls delete mutation when confirming deletion', async () => {
     const user = userEvent.setup()
     const mockDelete = vi.fn()
-    vi.mocked(identityProvidersClient.useMutation).mockImplementation(((method: string) => {
+    vi.mocked(identityProvidersClient.useMutation).mockImplementation((method: string) => {
       if (method === 'delete') return { mutate: mockDelete, isPending: false }
       return { mutate: vi.fn(), isPending: false }
-    }) as unknown as typeof identityProvidersClient.useMutation)
+    })
     vi.mocked(identityProvidersClient.useQuery).mockReturnValue(mockQueryReturn())
 
     render(<IdentityProviderDetail />, { wrapper: createWrapper() })

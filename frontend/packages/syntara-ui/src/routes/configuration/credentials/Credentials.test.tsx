@@ -230,7 +230,7 @@ describe('Credentials', () => {
       mutate: mockMutate,
       mutateAsync: mockMutateAsync,
       isPending: false,
-    } as never)
+    })
   })
 
   it('has no accessibility violations', async () => {
@@ -653,7 +653,7 @@ describe('Credentials', () => {
   it('renders empty state when no credentials exist (with project selected)', () => {
     mockSelectedProject.current = { id: 'proj-1', name: 'Project Alpha' }
     vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery([]))
-    vi.mocked(credentialsClient.useMutation).mockReturnValue({ mutate: vi.fn(), isPending: false } as never)
+    vi.mocked(credentialsClient.useMutation).mockReturnValue({ mutate: vi.fn(), isPending: false })
     render(<Credentials />, { wrapper })
 
     expect(screen.getByText('No credentials yet')).toBeInTheDocument()
@@ -664,7 +664,7 @@ describe('Credentials', () => {
   it('renders grouped table body when viewing all projects', () => {
     mockSelectedProject.current = null
     vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery(mockCredentials))
-    vi.mocked(credentialsClient.useMutation).mockReturnValue({ mutate: vi.fn(), isPending: false } as never)
+    vi.mocked(credentialsClient.useMutation).mockReturnValue({ mutate: vi.fn(), isPending: false })
     render(<Credentials />, { wrapper })
 
     expect(screen.getByText('Project Alpha')).toBeInTheDocument()
@@ -681,7 +681,7 @@ describe('Credentials', () => {
     const user = userEvent.setup()
     mockSelectedProject.current = null
     vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery(mockCredentials))
-    vi.mocked(credentialsClient.useMutation).mockReturnValue({ mutate: vi.fn(), isPending: false } as never)
+    vi.mocked(credentialsClient.useMutation).mockReturnValue({ mutate: vi.fn(), isPending: false })
     render(<Credentials />, { wrapper })
 
     expect(screen.getByText('GitHub API Token')).toBeInTheDocument()
@@ -697,7 +697,7 @@ describe('Credentials', () => {
     mockSelectedProject.current = null
     const credWithUnknownProject = [{ ...mockCredentials[0], project_id: 'unknown-id' }]
     vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery(credWithUnknownProject))
-    vi.mocked(credentialsClient.useMutation).mockReturnValue({ mutate: vi.fn(), isPending: false } as never)
+    vi.mocked(credentialsClient.useMutation).mockReturnValue({ mutate: vi.fn(), isPending: false })
     render(<Credentials />, { wrapper })
 
     expect(screen.getByText('unknown-id')).toBeInTheDocument()
@@ -706,7 +706,7 @@ describe('Credentials', () => {
   it('renders flat table body when a project is selected', () => {
     mockSelectedProject.current = { id: 'proj-1', name: 'Project Alpha' }
     vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery(mockCredentials))
-    vi.mocked(credentialsClient.useMutation).mockReturnValue({ mutate: vi.fn(), isPending: false } as never)
+    vi.mocked(credentialsClient.useMutation).mockReturnValue({ mutate: vi.fn(), isPending: false })
     render(<Credentials />, { wrapper })
 
     expect(screen.queryByText('Project Alpha')).not.toBeInTheDocument()

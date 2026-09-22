@@ -22,13 +22,13 @@ import {
 } from '@patternfly/react-core'
 import {
   RhUiClockIcon,
+  RhUiCloseIcon,
   RhUiDuplicateIcon,
   RhUiEditIcon,
   RhUiEllipsisVerticalFillIcon,
   RhUiExportIcon,
   RhUiExternalLinkIcon,
   RhUiHistoryIcon,
-  RhUiMinusIcon,
   RhUiPublishIcon,
   RhUiUndoIcon,
 } from '@patternfly/react-icons'
@@ -484,9 +484,9 @@ export function VersionHistoryPanel(props: VersionHistoryPanelProps) {
                 </Stack>
               </FlexItem>
               <FlexItem>
-                <Button variant="plain" onClick={onClose} aria-label="Collapse version history">
+                <Button variant="plain" onClick={onClose} aria-label="Close version history">
                   <Icon>
-                    <RhUiMinusIcon />
+                    <RhUiCloseIcon />
                   </Icon>
                 </Button>
               </FlexItem>

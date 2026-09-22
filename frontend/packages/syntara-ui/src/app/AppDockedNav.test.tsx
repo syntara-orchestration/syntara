@@ -114,7 +114,7 @@ describe('AppDockedNav', () => {
     mockLocation = '/workflows'
     vi.mocked(authClient.useQuery).mockReturnValue({
       data: { id: 'user-1', username: 'testuser' },
-    } as never)
+    })
     mockUseDockState.mockReturnValue({
       isDockExpanded: false,
       isDockTextExpanded: false,
@@ -524,7 +524,7 @@ describe('AppDockedNav', () => {
   })
 
   it('renders user menu as "User" when currentUser is not loaded', () => {
-    vi.mocked(authClient.useQuery).mockReturnValue({ data: undefined } as never)
+    vi.mocked(authClient.useQuery).mockReturnValue({ data: undefined })
     renderDockedNav()
     expect(screen.getByText('User')).toBeInTheDocument()
   })
