@@ -12,10 +12,11 @@ import structlog
 from sqlalchemy import update
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
-from sqlmodel.ext.asyncio.session import AsyncSession
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+
+    from sqlmodel.ext.asyncio.session import AsyncSession
 
     from syntara.authz.engine import AllowedProjectsResult
     from syntara.core.models import User
@@ -61,6 +62,38 @@ class FormPromptService(BaseService):
         super().__init__(session, user)
         self.session = session
         self.user = user
+
+    def _map_fk_error_to_domain_exception(
+        self,
+        error_str: str,
+        request: FormPromptCreateRequest,
+    ) -> InvalidResponderReferenceError | None:
+        """Map foreign key violation to domain exception.
+
+        Args:
+            error_str: String representation of the IntegrityError
+            request: The create request containing responder IDs
+
+        Returns:
+            InvalidResponderReferenceError if FK violation detected, None otherwise
+
+        """
+        # FK violations on responder tables
+        if "form_prompt_responder_users" in error_str and "user_id" in error_str:
+            # Extract UUID from error message if possible, otherwise use first ID
+            invalid_id = request.responder_user_ids[0] if request.responder_user_ids else None
+            if invalid_id:
+                entity_type = "user"
+                return InvalidResponderReferenceError(entity_type, invalid_id)
+
+        if "form_prompt_responder_groups" in error_str and "group_id" in error_str:
+            # Extract UUID from error message if possible, otherwise use first ID
+            invalid_id = request.responder_group_ids[0] if request.responder_group_ids else None
+            if invalid_id:
+                entity_type = "group"
+                return InvalidResponderReferenceError(entity_type, invalid_id)
+
+        return None
 
     async def create(self, request: FormPromptCreateRequest) -> FormPromptSummary:
         """Create a new form prompt.
@@ -140,18 +173,10 @@ class FormPromptService(BaseService):
                     request.loop_iteration_path,
                 ) from e
 
-            # FK violations on responder tables
-            if "form_prompt_responder_users" in error_str and "user_id" in error_str:
-                # Extract UUID from error message if possible, otherwise use first ID
-                invalid_id = request.responder_user_ids[0] if request.responder_user_ids else None
-                if invalid_id:
-                    raise InvalidResponderReferenceError("user", invalid_id) from e
-
-            if "form_prompt_responder_groups" in error_str and "group_id" in error_str:
-                # Extract UUID from error message if possible, otherwise use first ID
-                invalid_id = request.responder_group_ids[0] if request.responder_group_ids else None
-                if invalid_id:
-                    raise InvalidResponderReferenceError("group", invalid_id) from e
+            # Map FK violations to domain exceptions
+            fk_error = self._map_fk_error_to_domain_exception(error_str, request)
+            if fk_error:
+                raise fk_error from e
 
             # Unexpected integrity errors - abort transaction
             raise

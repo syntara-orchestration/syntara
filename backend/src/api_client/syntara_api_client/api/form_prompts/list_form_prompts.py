@@ -1,6 +1,5 @@
 from http import HTTPStatus
 from typing import Any
-from uuid import UUID
 
 import httpx
 
@@ -8,31 +7,38 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.error_data import ErrorData
 from ...models.form_prompt_list_response import FormPromptListResponse
-from ...models.form_prompt_status import FormPromptStatus
 from ...types import UNSET, Response, Unset
 
 
 def _get_kwargs(
     *,
-    execution_id: UUID,
-    status: FormPromptStatus | None | Unset = UNSET,
+    limit: int | Unset = 20,
+    cursor: None | str | Unset = UNSET,
+    sort: None | str | Unset = UNSET,
+    include_total: bool | Unset = False,
     additional_params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
     if isinstance(additional_params, dict):
         params = additional_params
 
-    json_execution_id = str(execution_id)
-    params["execution_id"] = json_execution_id
+    params["limit"] = limit
 
-    json_status: None | str | Unset
-    if isinstance(status, Unset):
-        json_status = UNSET
-    elif isinstance(status, FormPromptStatus):
-        json_status = status.value
+    json_cursor: None | str | Unset
+    if isinstance(cursor, Unset):
+        json_cursor = UNSET
     else:
-        json_status = status
-    params["status"] = json_status
+        json_cursor = cursor
+    params["cursor"] = json_cursor
+
+    json_sort: None | str | Unset
+    if isinstance(sort, Unset):
+        json_sort = UNSET
+    else:
+        json_sort = sort
+    params["sort"] = json_sort
+
+    params["include_total"] = include_total
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -115,17 +121,28 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-    execution_id: UUID,
-    status: FormPromptStatus | None | Unset = UNSET,
+    limit: int | Unset = 20,
+    cursor: None | str | Unset = UNSET,
+    sort: None | str | Unset = UNSET,
+    include_total: bool | Unset = False,
     additional_params: dict[str, Any] | None = None,
 ) -> Response[ErrorData | FormPromptListResponse]:
     """List form prompts
 
-     List form prompts filtered by execution ID. Internal endpoint for expire/cancel activities.
+     List form prompts with filtering, sorting, and pagination.
+
+    Supports filtering using query parameters with standard operators:
+    - status: Filter by form prompt status (status=pending)
+    - execution_id: Filter by parent execution ID (execution_id=uuid)
+    - prompt_node_id: Filter by node ID (prompt_node_id=form1)
+
+    Uses cursor-based pagination for scalability and consistency.
 
     Args:
-        execution_id (UUID):
-        status (FormPromptStatus | None | Unset):
+        limit (int | Unset):  Default: 20.
+        cursor (None | str | Unset):
+        sort (None | str | Unset):
+        include_total (bool | Unset):  Default: False.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -135,7 +152,9 @@ def sync_detailed(
         Response[ErrorData | FormPromptListResponse]
     """
 
-    kwargs = _get_kwargs(execution_id=execution_id, status=status, additional_params=additional_params)
+    kwargs = _get_kwargs(
+        limit=limit, cursor=cursor, sort=sort, include_total=include_total, additional_params=additional_params
+    )
 
     response = client.get_httpx_client().request(
         **kwargs,
@@ -147,16 +166,27 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-    execution_id: UUID,
-    status: FormPromptStatus | None | Unset = UNSET,
+    limit: int | Unset = 20,
+    cursor: None | str | Unset = UNSET,
+    sort: None | str | Unset = UNSET,
+    include_total: bool | Unset = False,
 ) -> ErrorData | FormPromptListResponse | None:
     """List form prompts
 
-     List form prompts filtered by execution ID. Internal endpoint for expire/cancel activities.
+     List form prompts with filtering, sorting, and pagination.
+
+    Supports filtering using query parameters with standard operators:
+    - status: Filter by form prompt status (status=pending)
+    - execution_id: Filter by parent execution ID (execution_id=uuid)
+    - prompt_node_id: Filter by node ID (prompt_node_id=form1)
+
+    Uses cursor-based pagination for scalability and consistency.
 
     Args:
-        execution_id (UUID):
-        status (FormPromptStatus | None | Unset):
+        limit (int | Unset):  Default: 20.
+        cursor (None | str | Unset):
+        sort (None | str | Unset):
+        include_total (bool | Unset):  Default: False.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -168,24 +198,37 @@ def sync(
 
     return sync_detailed(
         client=client,
-        execution_id=execution_id,
-        status=status,
+        limit=limit,
+        cursor=cursor,
+        sort=sort,
+        include_total=include_total,
     ).parsed
 
 
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-    execution_id: UUID,
-    status: FormPromptStatus | None | Unset = UNSET,
+    limit: int | Unset = 20,
+    cursor: None | str | Unset = UNSET,
+    sort: None | str | Unset = UNSET,
+    include_total: bool | Unset = False,
 ) -> Response[ErrorData | FormPromptListResponse]:
     """List form prompts
 
-     List form prompts filtered by execution ID. Internal endpoint for expire/cancel activities.
+     List form prompts with filtering, sorting, and pagination.
+
+    Supports filtering using query parameters with standard operators:
+    - status: Filter by form prompt status (status=pending)
+    - execution_id: Filter by parent execution ID (execution_id=uuid)
+    - prompt_node_id: Filter by node ID (prompt_node_id=form1)
+
+    Uses cursor-based pagination for scalability and consistency.
 
     Args:
-        execution_id (UUID):
-        status (FormPromptStatus | None | Unset):
+        limit (int | Unset):  Default: 20.
+        cursor (None | str | Unset):
+        sort (None | str | Unset):
+        include_total (bool | Unset):  Default: False.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -196,8 +239,10 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        execution_id=execution_id,
-        status=status,
+        limit=limit,
+        cursor=cursor,
+        sort=sort,
+        include_total=include_total,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -208,16 +253,27 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-    execution_id: UUID,
-    status: FormPromptStatus | None | Unset = UNSET,
+    limit: int | Unset = 20,
+    cursor: None | str | Unset = UNSET,
+    sort: None | str | Unset = UNSET,
+    include_total: bool | Unset = False,
 ) -> ErrorData | FormPromptListResponse | None:
     """List form prompts
 
-     List form prompts filtered by execution ID. Internal endpoint for expire/cancel activities.
+     List form prompts with filtering, sorting, and pagination.
+
+    Supports filtering using query parameters with standard operators:
+    - status: Filter by form prompt status (status=pending)
+    - execution_id: Filter by parent execution ID (execution_id=uuid)
+    - prompt_node_id: Filter by node ID (prompt_node_id=form1)
+
+    Uses cursor-based pagination for scalability and consistency.
 
     Args:
-        execution_id (UUID):
-        status (FormPromptStatus | None | Unset):
+        limit (int | Unset):  Default: 20.
+        cursor (None | str | Unset):
+        sort (None | str | Unset):
+        include_total (bool | Unset):  Default: False.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -230,7 +286,9 @@ async def asyncio(
     return (
         await asyncio_detailed(
             client=client,
-            execution_id=execution_id,
-            status=status,
+            limit=limit,
+            cursor=cursor,
+            sort=sort,
+            include_total=include_total,
         )
     ).parsed
