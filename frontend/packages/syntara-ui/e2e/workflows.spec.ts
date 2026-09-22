@@ -68,7 +68,7 @@ test('user searches, views, and deletes a workflow', async ({ app }) => {
     await deleteRow.getByRole('button', { name: /Actions|Kebab toggle/i }).click({ force: true })
     await app.getByRole('menuitem', { name: 'Delete workflow' }).click()
     await app.getByRole('checkbox', { name: /I understand this workflow/i }).check()
-    await app.getByRole('button', { name: 'Delete' }).click()
+    await app.getByRole('button', { name: 'Delete workflow' }).click()
 
     // Assert - Workflow no longer appears
     await app.getByPlaceholder('Filter by name').fill(workflowName)

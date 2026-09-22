@@ -95,7 +95,7 @@ test.describe('Workflow publish/unpublish', () => {
       // Submit the dialog
       const dialog = app.getByRole('dialog')
       await expect(dialog).toBeVisible()
-      await dialog.getByRole('button', { name: 'Publish' }).click()
+      await dialog.getByRole('button', { name: 'Publish workflow' }).click()
 
       // Dialog should close after submit
       await expect(dialog).not.toBeVisible({ timeout: 10_000 })

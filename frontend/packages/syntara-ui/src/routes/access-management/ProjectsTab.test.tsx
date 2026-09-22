@@ -107,7 +107,7 @@ function setupMocks(projects = mockProjects) {
     isError: false,
     error: null,
     refetch: mockRefetch,
-  } as never)
+  })
 
   vi.mocked(accessClient.useMutation).mockReturnValue({
     mutate: vi.fn(),
@@ -126,7 +126,7 @@ function setupMocks(projects = mockProjects) {
     variables: undefined,
     status: 'idle',
     isPaused: false,
-  } as never)
+  })
 }
 
 const DELETE_PROJECT_LABEL = 'Delete project'
@@ -214,7 +214,7 @@ describe('ProjectsTab', () => {
         isError: false,
         error: null,
         refetch: mockRefetch,
-      } as never)
+      })
 
       render(<ProjectsTab />, { wrapper })
 
@@ -229,7 +229,7 @@ describe('ProjectsTab', () => {
         isError: true,
         error: new Error('Failed to load'),
         refetch: mockRefetch,
-      } as never)
+      })
 
       render(<ProjectsTab />, { wrapper })
 
@@ -359,7 +359,7 @@ describe('ProjectsTab', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         mutate: mockDeleteMutate,
         isPending: false,
-      } as never)
+      })
 
       render(<ProjectsTab />, { wrapper })
 
@@ -368,7 +368,7 @@ describe('ProjectsTab', () => {
       const deleteOption = await findDeleteOption()
       await user.click(deleteOption)
 
-      const deleteButton = await screen.findByRole('button', { name: 'Delete' })
+      const deleteButton = await screen.findByRole('button', { name: 'Delete project' })
       expect(deleteButton).toBeDisabled()
 
       const ackCheckbox = screen.getByRole('checkbox')
@@ -386,7 +386,7 @@ describe('ProjectsTab', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         mutate: mockDeleteMutate,
         isPending: false,
-      } as never)
+      })
 
       render(<ProjectsTab />, { wrapper })
 
@@ -396,7 +396,7 @@ describe('ProjectsTab', () => {
       await user.click(deleteOption)
 
       await user.click(screen.getByRole('checkbox'))
-      const deleteButton = await screen.findByRole('button', { name: 'Delete' })
+      const deleteButton = await screen.findByRole('button', { name: 'Delete project' })
       await user.click(deleteButton)
 
       const callbacks = mockDeleteMutate.mock.calls[0][1] as { onSuccess: () => void; onSettled: () => void }
@@ -417,7 +417,7 @@ describe('ProjectsTab', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         mutate: mockDeleteMutate,
         isPending: false,
-      } as never)
+      })
 
       render(<ProjectsTab />, { wrapper })
 
@@ -427,7 +427,7 @@ describe('ProjectsTab', () => {
       await user.click(deleteOption)
 
       await user.click(screen.getByRole('checkbox'))
-      const deleteButton = await screen.findByRole('button', { name: 'Delete' })
+      const deleteButton = await screen.findByRole('button', { name: 'Delete project' })
       await user.click(deleteButton)
 
       const callbacks = mockDeleteMutate.mock.calls[0][1] as {
@@ -505,7 +505,7 @@ describe('ProjectsTab', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         mutate: mockCreateMutate,
         isPending: false,
-      } as never)
+      })
 
       const user = userEvent.setup()
       render(<ProjectsTab />, { wrapper })
@@ -534,7 +534,7 @@ describe('ProjectsTab', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         mutate: mockCreateMutate,
         isPending: false,
-      } as never)
+      })
 
       const user = userEvent.setup()
       render(<ProjectsTab />, { wrapper })

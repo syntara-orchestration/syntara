@@ -1,10 +1,9 @@
-import type { Node, ReactFlowInstance } from '@xyflow/react'
+import type { ReactFlowInstance } from '@xyflow/react'
 import { useCallback, type Dispatch } from 'react'
 
 import { getActivityMetadata, useWorkflowStore } from '../../../stores/useWorkflowStore'
 import { selectTriggers } from '../../../stores/workflowStoreSelectors'
 import { EMPTY_TRIGGERS, toReactFlowNodeId } from '../../../utils/triggerNodeIds'
-import type { NodeType } from '../../workflows/canvas/nodes/NodeType'
 import type { BuilderAction } from '../builderReducer'
 
 export function useNodePanelNavigation(
@@ -21,7 +20,7 @@ export function useNodePanelNavigation(
       const isGeneric = getActivityMetadata(node.data)?.__isGeneric === true
       dispatch({
         type: 'NODE_CLICK',
-        payload: { node: node as Node<NodeType['data']>, isGeneric },
+        payload: { node: node, isGeneric },
       })
     },
     [reactFlowInstance, dispatch, triggers]

@@ -351,7 +351,7 @@ describe('useExecutionApprovalPanel', () => {
   it('handles URL approval not in fetched list (defaults to first approval)', async () => {
     const { useFetchApprovalForUrlParam } = await import('./useFetchApprovalForUrlParam')
     const urlApproval = { ...mockApproval, id: 'url-approval-not-in-list' }
-    vi.mocked(useFetchApprovalForUrlParam).mockReturnValue(urlApproval as Approval)
+    vi.mocked(useFetchApprovalForUrlParam).mockReturnValue(urlApproval)
     mockFetchApprovals.mockResolvedValue([mockApproval]) // URL approval not in the fetched list
 
     const { result } = renderHook(() =>
@@ -437,7 +437,7 @@ describe('useExecutionApprovalPanel', () => {
     renderHook(() => useExecutionApprovalPanel('exec-1', '', makeNodeClick(), undefined))
 
     await act(async () => {
-      capturedCallback!(detectedApproval as Approval)
+      capturedCallback!(detectedApproval)
       await vi.runAllTimersAsync()
     })
 

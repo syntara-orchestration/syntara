@@ -206,7 +206,7 @@ describe('DisableCredentialDialog', () => {
       />
     )
 
-    expect(screen.getByRole('button', { name: 'Disable' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Disable credential' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled()
   })
 
@@ -265,7 +265,7 @@ describe('DisableCredentialDialog', () => {
       />
     )
 
-    await user.click(screen.getByRole('button', { name: 'Disable' }))
+    await user.click(screen.getByRole('button', { name: 'Disable credential' }))
     expect(mockOnConfirm).toHaveBeenCalledTimes(1)
   })
 
@@ -383,7 +383,7 @@ describe('DisableCredentialDialog', () => {
       />
     )
 
-    expect(screen.getByRole('button', { name: 'Disable' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Disable credential' })).toBeEnabled()
   })
 
   it('shows affected integrations list when integrations are affected', () => {
@@ -488,9 +488,9 @@ describe('DeleteCredentialDialog', () => {
       })
     ).toBeInTheDocument()
     // Delete button is disabled until checkbox is checked
-    expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Delete credential' })).toBeDisabled()
     await user.click(screen.getByRole('checkbox'))
-    expect(screen.getByRole('button', { name: 'Delete' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Delete credential' })).toBeEnabled()
   })
 
   it('uses compact dependency summary without names when 4 or more of each type', () => {
@@ -525,7 +525,7 @@ describe('DeleteCredentialDialog', () => {
     render(<DeleteCredentialDialog credential={mockCredential} {...defaultDeleteProps} onConfirm={mockOnConfirm} />)
 
     await user.click(screen.getByRole('checkbox'))
-    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: 'Delete credential' }))
     expect(mockOnConfirm).toHaveBeenCalledTimes(1)
   })
 
@@ -589,11 +589,11 @@ describe('DeleteCredentialDialog', () => {
     render(<DeleteCredentialDialog credential={mockCredential} {...defaultDeleteProps} />)
 
     // Delete button is disabled until checkbox is checked
-    expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Delete credential' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled()
 
     await user.click(screen.getByRole('checkbox'))
-    expect(screen.getByRole('button', { name: 'Delete' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Delete credential' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled()
   })
 
@@ -729,9 +729,9 @@ describe('DeleteCredentialDialog', () => {
     )
 
     // Delete button is disabled until checkbox is checked
-    expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Delete credential' })).toBeDisabled()
     await user.click(screen.getByRole('checkbox'))
-    expect(screen.getByRole('button', { name: 'Delete' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Delete credential' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled()
   })
 

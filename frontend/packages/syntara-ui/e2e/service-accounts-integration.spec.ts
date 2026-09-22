@@ -114,7 +114,7 @@ test.describe('Project Admin — Manage Service Accounts in Own Project', () => 
 
       await nameInput.clear()
       await nameInput.fill(editedName)
-      await modal.getByRole('button', { name: 'Save' }).click()
+      await modal.getByRole('button', { name: 'Save service account' }).click()
 
       // Verify updated heading
       await expect(projectAdminApp.getByText('Service account updated')).toBeVisible()
@@ -150,7 +150,7 @@ test.describe('Project Admin — Manage Service Accounts in Own Project', () => 
 
       const dialog = projectAdminApp.getByRole('dialog')
       await expect(dialog.getByText('Disable service account?')).toBeVisible()
-      await dialog.getByRole('button', { name: 'Disable' }).click()
+      await dialog.getByRole('button', { name: 'Disable service account' }).click()
 
       // Verify the toggle is now unchecked (disabled)
       await expect(toggle).not.toBeChecked({ timeout: 10_000 })

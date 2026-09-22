@@ -109,11 +109,11 @@ describe('GroupMappingFormEditor', () => {
       error: null,
       isFetching: false,
       refetch: vi.fn(),
-    } as never)
+    })
     vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
       mutate: vi.fn(),
       isPending: false,
-    } as never)
+    })
   })
 
   it('uses identityProviderMapping documentation key', async () => {
@@ -133,7 +133,7 @@ describe('GroupMappingFormEditor', () => {
     vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
       mutate: vi.fn(),
       isPending: true,
-    } as never)
+    })
 
     render(<GroupMappingFormEditor metadata={buildMetadata()} openTestSignInRef={createRef()} />, { wrapper })
 

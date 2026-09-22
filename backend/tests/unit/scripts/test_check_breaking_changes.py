@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -1302,24 +1303,58 @@ BACKEND_ROOT = Path(__file__).resolve().parents[3]
 LABEL_GUARD_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "breaking-change-label-guard.yml"
 
 
-class TestAckPathRemoved:
-    """The breaking-change-ack PR-body override must not remain as a bypass."""
+class TestLegacyOverrideRemoved:
+    """The removed PR-body override must not remain a bypass."""
 
-    def test_check_breaking_changes_has_no_pr_body_flag(self):
-        source = Path(check_breaking.__file__).read_text()
-        assert "--pr-body" not in source
-        assert "breaking-change-ack" not in source
+    def test_check_breaking_changes_rejects_the_removed_pr_body_flag(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setattr(sys, "argv", [str(check_breaking.__file__), "--pr-body", "breaking-change-ack"])
 
-    def test_makefile_does_not_pass_pr_body_to_breaking_check(self):
-        makefile = (BACKEND_ROOT / "Makefile").read_text()
-        assert "--pr-body" not in makefile
+        with pytest.raises(SystemExit) as exc_info:
+            check_breaking.main()
 
-    def test_makefile_does_not_eval_untrusted_labels(self):
-        # Untrusted PR label text must not be re-parsed by the shell; the recipe
-        # invokes the checker directly (if/else), never via `eval`.
-        makefile = (BACKEND_ROOT / "Makefile").read_text()
-        assert "eval $$CMD" not in makefile
-        assert "eval $CMD" not in makefile
+        assert exc_info.value.code == 2
+
+    def test_makefile_passes_untrusted_labels_without_shell_evaluation(self, tmp_path: Path):
+        fake_bin = tmp_path / "bin"
+        fake_bin.mkdir()
+        capture = tmp_path / "uv-args.txt"
+        marker = tmp_path / "shell-evaluated"
+        malicious_label = f"$(touch {marker})"
+
+        fake_oasdiff = fake_bin / "oasdiff"
+        fake_oasdiff.write_text("#!/bin/sh\nexit 0\n")
+        fake_oasdiff.chmod(0o755)
+
+        fake_uv = fake_bin / "uv"
+        fake_uv.write_text('#!/bin/sh\nprintf \'<%s>\\n\' "$@" >> "$CAPTURE"\n')
+        fake_uv.chmod(0o755)
+
+        environment = {
+            **os.environ,
+            "PATH": f"{fake_bin}:{os.environ['PATH']}",
+            "CAPTURE": str(capture),
+            "OPENAPI_PR_LABELS": malicious_label,
+        }
+        make_path = shutil.which("make")
+        assert make_path is not None
+        result = subprocess.run(  # noqa: S603 - executable and arguments are fixed test inputs
+            [
+                make_path,
+                "--no-print-directory",
+                "-C",
+                str(BACKEND_ROOT),
+                "check-openapi-breaking",
+                "OPENAPI_BASE_REF=HEAD",
+            ],
+            env=environment,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        assert result.returncode == 0, result.stderr
+        assert not marker.exists()
+        assert malicious_label in capture.read_text()
 
 
 class TestLabelInjectionSafety:
@@ -1333,13 +1368,23 @@ class TestLabelInjectionSafety:
         assert '--pr-labels "$OPENAPI_PR_LABELS"' in workflow
         assert '--pr-labels "${{ steps.labels.outputs.labels }}"' not in workflow
 
-    def test_workflow_emits_labels_as_json_array(self):
-        workflow = (REPO_ROOT / ".github" / "workflows" / "openapi-breaking-changes.yml").read_text()
-        assert "JSON.stringify(labels)" in workflow
-
-    def test_ci_backend_forwards_labels_as_json_array(self):
+    def test_ci_backend_keeps_labels_in_a_shell_safe_environment(self):
         workflow = (REPO_ROOT / ".github" / "workflows" / "ci-backend.yml").read_text()
         assert "toJSON(github.event.pull_request.labels.*.name)" in workflow
+        assert 'labels="$(jq -c . <<< "$PR_LABELS_FROM_EVENT")"' in workflow
+        assert "OPENAPI_PR_LABELS: ${{ steps.pr-labels.outputs.labels }}" in workflow
+
+    def test_ci_backend_wires_merge_group_resolver_labels_to_the_checker(self):
+        workflow = (REPO_ROOT / ".github" / "workflows" / "ci-backend.yml").read_text()
+
+        assert "MERGE_GROUP_HEAD_REF: ${{ github.event.merge_group.head_ref }}" in workflow
+        assert "MERGE_GROUP_BASE_REF: ${{ github.event.merge_group.base_ref }}" in workflow
+        assert "./scripts/openapi/resolve-merge-group-pr-labels.py" in workflow
+        assert "OPENAPI_PR_LABELS: ${{ steps.merge-group-pr.outputs.labels }}" in workflow
+        assert "MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha || '' }}" in workflow
+        assert "MERGE_GROUP_HEAD_SHA: ${{ github.event.merge_group.head_sha || '' }}" in workflow
+        assert 'test "$(git rev-parse HEAD)" = "$MERGE_GROUP_HEAD_SHA"' in workflow
+        assert 'make check-openapi-breaking OPENAPI_BASE_REF="$MERGE_GROUP_BASE_SHA"' in workflow
 
 
 class TestBreakingChangeLabelGuard:

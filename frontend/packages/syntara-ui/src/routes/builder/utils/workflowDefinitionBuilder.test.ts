@@ -124,7 +124,7 @@ describe('buildWorkflowDefinition', () => {
           type: 'script',
           parameters: {},
           inputs: { param1: 'value1', param2: 'value2' },
-        } as Activity & { inputs: Record<string, unknown> },
+        },
       ]
 
       const result = buildWorkflowDefinition('Test', '', activities, [], { edges: [] })
@@ -511,7 +511,7 @@ describe('buildWorkflowDefinition', () => {
           name: 'Process Item',
           parameters: { code: 'print(item)' },
           inputs: { item: '$.current_item' },
-        } as Activity & { inputs: Record<string, unknown> },
+        },
       ]
 
       const edges: EdgeConnection[] = [

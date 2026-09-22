@@ -112,7 +112,7 @@ test.describe('Approval Workflow Creation', () => {
       await expect(workflowNameInput).toBeVisible()
       await workflowNameInput.fill(workflowName)
 
-      const saveWorkflowButton = app.getByRole('button', { name: 'Save' })
+      const saveWorkflowButton = app.getByRole('button', { name: 'Save workflow' })
       await expect(saveWorkflowButton).toBeVisible()
       await saveWorkflowButton.click()
 

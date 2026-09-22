@@ -207,7 +207,7 @@ npx playwright test e2e/visual-regression/page-screenshots
 npx playwright test e2e/visual-regression/page-screenshots --update-snapshots
 
 # Check all routes have baselines
-npm exec tsx -- scripts/check-visual-baselines.ts
+npm exec tsx -- scripts/visual-regression/check-visual-baselines.ts
 ```
 
 Key points:
@@ -216,6 +216,26 @@ Key points:
 - **Linux-only baselines** — CI (Ubuntu) is the source of truth; macOS snapshots are gitignored
 - **New routes** must be added to the page registry with a baseline, or the enforcement script will fail
 - **Frozen clock** — `Date.now()` is fixed for deterministic timestamps across runs
+
+## Accessibility audit (report-only)
+
+Full-page axe-core (WCAG 2.x A/AA) scan across every entry in the visual regression page registry. The spec is **report-only**: tests always pass so CI is not gated on the current violation backlog.
+
+```bash
+# From frontend/ or packages/syntara-ui/
+npm run e2e:a11y-audit
+```
+
+Output:
+
+- Combined JSON report at `test-results/a11y-audit-report.json`
+- Per-page JSON attachments in the Playwright HTML report (`npx playwright show-report`)
+
+Key points:
+
+- **Opt-in only** — excluded from default `npm run e2e` via `testIgnore`; run via `npm run e2e:a11y-audit`
+- **Mock API required** — tagged `@local-only` and skipped in real-backend E2E runs (same seed-data constraint as visual regression)
+- **Page registry** — reuses `e2e/visual-regression/page-registry.ts`; new routes should be added there first
 
 ## Troubleshooting
 

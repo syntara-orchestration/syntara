@@ -165,7 +165,7 @@ describe('AddNodePanel Component', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    mockNodeRegistryGetAll.mockReturnValue(mockNodeTypes as never[])
+    mockNodeRegistryGetAll.mockReturnValue(mockNodeTypes)
     mockNodeRegistryGet.mockImplementation((id: string) => mockNodeTypes.find((node) => node.id === id) as never)
   })
 

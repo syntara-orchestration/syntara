@@ -28,6 +28,7 @@ import {
   closeNodeEditorPanel,
   fillCodeEditor,
   openNodeForEditing,
+  triggerLayout,
 } from './workflows'
 
 export { ensureLlmCredential, createLlmIntegration, deleteLlmIntegration, selectLlmCredential }
@@ -565,6 +566,32 @@ export async function addSwitchNodeWithCases(page: Page, name: string, cases: Sw
   await closeNodeEditorPanel(page)
 }
 
+/**
+ * Open a saved canvas node for editing and wait until a type-specific editor field is ready.
+ *
+ * Retries layout + click while the editor hydrates. Under CI load the click can
+ * land during a React Flow viewport transform and be lost, so callers must not
+ * use a bare `getByText(nodeName).click()`.
+ */
+async function openSavedNodeForEditing(page: Page, nodeName: string, editorReady: (p: Page) => Promise<void>) {
+  await triggerLayout(page)
+  const node = page.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: nodeName })
+  const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
+  await expect(async () => {
+    await expect(node).toBeVisible({ timeout: 5_000 })
+    await node.click({ timeout: 5_000 })
+    await expect(nameInput).toHaveValue(nodeName, { timeout: 5_000 })
+    await editorReady(page)
+  }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] })
+}
+
+/** Open a saved switch node on the canvas for editing. */
+export async function openSwitchNodeForEditing(page: Page, nodeName: string) {
+  await openSavedNodeForEditing(page, nodeName, async (p) => {
+    await expect(p.getByLabel('Path 1 name')).toBeVisible({ timeout: 5_000 })
+  })
+}
+
 // ---------------------------------------------------------------------------
 // Schedule trigger
 // ---------------------------------------------------------------------------
@@ -635,4 +662,11 @@ export async function addScheduleTrigger(page: Page, name: string, config?: Sche
 
   await page.getByRole('button', { name: 'Create', exact: true }).click()
   await closeNodeEditorPanel(page)
+}
+
+/** Open a saved schedule trigger on the canvas for editing. */
+export async function openScheduleTriggerForEditing(page: Page, nodeName: string) {
+  await openSavedNodeForEditing(page, nodeName, async (p) => {
+    await expect(p.getByLabel('Schedule expression', { exact: true })).toBeVisible({ timeout: 5_000 })
+  })
 }

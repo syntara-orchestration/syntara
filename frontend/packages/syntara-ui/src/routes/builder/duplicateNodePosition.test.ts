@@ -13,7 +13,7 @@ function node(id: string, pos: { x: number; y: number }, measured?: { width: num
     position: pos,
     data: {},
     measured: measured ?? { width: DEFAULT_W, height: DEFAULT_H },
-  } as Node
+  }
 }
 
 describe('findDuplicatePosition', () => {

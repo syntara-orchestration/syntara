@@ -198,7 +198,7 @@ function mockSuccessQueries(group = mockGroup, members = mockMembersData, roleAs
   vi.mocked(accessClient.useMutation).mockReturnValue({
     mutate: vi.fn(),
     isPending: false,
-  } as never)
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -211,7 +211,7 @@ describe('GroupDetail', () => {
     routerTestState.navigate.mockClear()
     mockLocationValue = `/system-administration/access-management/groups/${VALID_GROUP_ID}`
     mockUseParams.mockReturnValue({ groupId: VALID_GROUP_ID })
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
     vi.mocked(useGroupPermissions).mockReturnValue({
       canCreate: true,
       canUpdate: true,
