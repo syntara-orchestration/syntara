@@ -283,8 +283,8 @@ below. Empty selectors do not mean "match every label set."
 
 ## Default routing
 
-Every Cluster has a default ExecutionTarget (label
-`execution-plane/default=true`). That target is the cold-start fallback for
+Every Cluster has a default ExecutionTarget (field
+`ExecutionTarget.is_default=True`). That target is the cold-start fallback for
 the Cluster.
 
 When `requirements.selectors` is empty:
@@ -292,7 +292,7 @@ When `requirements.selectors` is empty:
 1. Enumerate Clusters, then ExecutionTargets, as in Resolve.
 2. Consider only ExecutionTargets that pass the lifecycle filter (active and
    enabled) on eligible Clusters.
-3. If any of those targets has label `execution-plane/default=true`, those
+3. If any of those targets has the field `is_default` set `True`, those
    are the only default candidates.
 4. Otherwise every lifecycle-eligible ExecutionTarget is a candidate (MVP:
    usually one namespace on the local Cluster).
@@ -540,7 +540,7 @@ sequenceDiagram
     loop each remaining Cluster
         Note over R: list_by_cluster(cluster.id)
         alt selectors empty
-            Note over R: Default routing on active targets<br/>(execution-plane/default=true if any)
+            Note over R: Default routing on active targets<br/>(is_default is True)
         else selectors present
             Note over R: Exact AND match against target labels
         end
