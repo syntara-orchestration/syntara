@@ -24,7 +24,7 @@ There is **no hook-based enforcement** in upstream. The replacement is
 
 | Allowed upstream | Role |
 | --- | --- |
-| `CLAUDE.md`, `AGENTS.md`, and component `CLAUDE.md` / `AGENTS.md` | On-demand agent instructions |
+| `AGENTS.md` and component `AGENTS.md` | On-demand agent instructions |
 | `.agents/skills/**` | Canonical skill documents maintainers choose to ship |
 | `.claude/skills/**` | Tracked repository symlinks to `.agents/skills/**` for Claude Code |
 | `.claude/commands/**` (when present) | Slash-command prompts as markdown |
@@ -54,8 +54,8 @@ Do not force-add ignored agent settings or hooks in a pull request.
 | Path | Ownership / review |
 | --- | --- |
 | This policy (`.github/AI_AGENT_POLICY.md`) | `@syntara-orchestration/syntara-leads` (see [CODEOWNERS](CODEOWNERS)) |
-| Root / component `CLAUDE.md`, `AGENTS.md` | Same reviewers as the area of the change; treat policy-affecting edits as governance |
-| `.agents/skills/**` and `.claude/skills/**` | Owning product team per [CODEOWNERS]; `.claude/skills/**` links to `.agents/skills/**` |
+| Root / component `AGENTS.md` | Same reviewers as the area of the change; treat policy-affecting edits as governance |
+| `.agents/skills/**` and `.claude/skills/**` | Owning product team per [CODEOWNERS](CODEOWNERS); `.claude/skills/**` links to `.agents/skills/**` |
 | Re-introducing hooks or shipping `settings.json` | **Not permitted** under this policy. Requires an explicit policy revision reviewed by `@syntara-orchestration/syntara-leads` |
 
 ### Review bar for skill and instruction changes
@@ -134,4 +134,4 @@ Do not edit the vendored copy as the source of truth.
 ## Related contributor docs
 
 - Frontend AI workflow guide: [`frontend/docs/ai-assisted-development.md`](../frontend/docs/ai-assisted-development.md)
-- Root agent entrypoints: [`CLAUDE.md`](../CLAUDE.md), [`AGENTS.md`](../AGENTS.md)
+- Root agent entrypoint: [`AGENTS.md`](../AGENTS.md)
