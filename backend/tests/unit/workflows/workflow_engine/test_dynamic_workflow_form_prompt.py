@@ -329,11 +329,11 @@ class TestExecuteFormPromptNode:
         assert result["control"]["next_port"] == "submitted"
 
     @pytest.mark.asyncio
-    async def test_timeout_with_fail_behavior_raises(self) -> None:
-        """Timeout with fallback_behavior=fail raises the timeout error."""
+    async def test_timeout_propagates_to_orchestrator(self) -> None:
+        """Timeout exceptions propagate to orchestrator for COF handling."""
         wf = _make_workflow()
         graph = _build_form_prompt_graph()
-        node = ActivityNode("form1", "form_prompt", {"fallback_behavior": "fail"}, name="Form")
+        node = ActivityNode("form1", "form_prompt", {}, name="Form")
 
         mock_prep_args = AsyncMock(return_value=[])
 
@@ -352,56 +352,14 @@ class TestExecuteFormPromptNode:
         type(activity_error).cause = PropertyMock(return_value=timeout_error)  # type: ignore[method-assign]
 
         mock_execute = AsyncMock(side_effect=activity_error)
-        mock_expire = AsyncMock()
 
         with (
             patch.object(wf, "_prepare_form_prompt_args", mock_prep_args),
             patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute),
-            patch.object(wf, "_expire_form_prompt_requests", mock_expire),
-            pytest.raises(ApplicationError, match=r"Form prompt.*expired"),
+            pytest.raises(ActivityError),
         ):
-            await wf._execute_form_prompt_node(node, graph, {"fallback_behavior": "fail"})
+            await wf._execute_form_prompt_node(node, graph, {})
 
-        # Should still expire the prompt
-        mock_expire.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_timeout_with_fallback_behavior_routes_to_fallback(self) -> None:
-        """Timeout with fallback_behavior=fallback returns outcome=expired and routes to fallback port."""
-        wf = _make_workflow()
-        graph = _build_form_prompt_graph()
-        node = ActivityNode("form1", "form_prompt", {"fallback_behavior": "fallback"}, name="Form")
-
-        mock_prep_args = AsyncMock(return_value=[])
-
-        # Create a real ActivityError with a mocked cause property
-        timeout_error = TemporalTimeoutError("Activity timed out", type=None, last_heartbeat_details=[])
-        activity_error = ActivityError(
-            "Timeout",
-            scheduled_event_id=1,
-            started_event_id=2,
-            identity="test",
-            activity_type="form_prompt",
-            activity_id="form1",
-            retry_state=None,
-        )
-        # Mock the cause property to return our timeout error
-        type(activity_error).cause = PropertyMock(return_value=timeout_error)  # type: ignore[method-assign]
-
-        mock_execute = AsyncMock(side_effect=activity_error)
-        mock_expire = AsyncMock()
-
-        with (
-            patch.object(wf, "_prepare_form_prompt_args", mock_prep_args),
-            patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute),
-            patch.object(wf, "_expire_form_prompt_requests", mock_expire),
-        ):
-            result = await wf._execute_form_prompt_node(node, graph, {"fallback_behavior": "fallback"})
-
-        assert result["output"]["outcome"] == "expired"
-        assert "response_data" not in result["output"]  # excluded when None
-        assert result["control"]["next_port"] == "fallback"
-        mock_expire.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_invalid_outcome_raises(self) -> None:
