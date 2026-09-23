@@ -23,11 +23,12 @@ vi.mock('../../../client', () => ({
   interfaceTagMiddleware: { onRequest: vi.fn() },
 }))
 
-// The node-kind statement helper is covered by NodeKindStatementBuilder.test.tsx.
+const { mockNodeKinds } = vi.hoisted(() => ({ mockNodeKinds: { current: [] as unknown[] } }))
+
 vi.mock('../../../hooks/useNodeKindsQuery', () => ({
   useNodeKindsQuery: () => ({
     query: { isPending: false },
-    nodeKinds: [],
+    nodeKinds: mockNodeKinds.current,
     nodeKindByKind: new Map(),
     disabledKinds: new Set<string>(),
   }),
@@ -80,6 +81,7 @@ describe('EditProjectPolicyDialog', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    mockNodeKinds.current = []
     vi.mocked(accessClient.useMutation).mockReturnValue(mockMutationReturn)
   })
 
@@ -89,6 +91,82 @@ describe('EditProjectPolicyDialog', () => {
       { wrapper }
     )
   }
+
+  function renderCreateDialog() {
+    return render(<EditProjectPolicyDialog projectId="proj-1" onClose={mockOnClose} onSuccess={mockOnSuccess} />, {
+      wrapper,
+    })
+  }
+
+  it('renders create mode with empty fields', () => {
+    renderCreateDialog()
+    expect(screen.getByText('Create policy')).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Policy name' })).toHaveValue('')
+    expect(screen.getByRole('textbox', { name: 'Policy description' })).toHaveValue('')
+    expect(screen.getByRole('textbox', { name: 'Policy statements JSON' })).toHaveValue('[]')
+  })
+
+  it('posts parsed statements and reports create success', async () => {
+    const user = userEvent.setup()
+    renderCreateDialog()
+    await user.type(screen.getByRole('textbox', { name: 'Policy name' }), 'deny-scripts')
+    const statements = '[{"effect":"deny","actions":["workflow_node:execute"],"scope":"project"}]'
+    await user.clear(screen.getByRole('textbox', { name: 'Policy statements JSON' }))
+    await user.click(screen.getByRole('textbox', { name: 'Policy statements JSON' }))
+    await user.paste(statements)
+    await user.click(screen.getByRole('button', { name: 'Create' }))
+
+    await waitFor(() => expect(mockMutate).toHaveBeenCalled())
+    expect(accessClient.useMutation).toHaveBeenCalledWith('post', '/projects/{project_id}/policies')
+    expect(mockMutate.mock.calls[0][0]).toEqual({
+      params: { path: { project_id: 'proj-1' } },
+      body: {
+        name: 'deny-scripts',
+        description: undefined,
+        statements: [{ effect: 'deny', actions: ['workflow_node:execute'], scope: 'project' }],
+      },
+    })
+    const callbacks = mockMutate.mock.calls[0][1] as { onSuccess: () => void }
+    act(() => callbacks.onSuccess())
+    expect(await screen.findByText('Policy created')).toBeInTheDocument()
+    expect(mockOnSuccess).toHaveBeenCalledOnce()
+    expect(mockOnClose).toHaveBeenCalledOnce()
+  })
+
+  it('posts a statement appended by the builder', async () => {
+    mockNodeKinds.current = [
+      {
+        kind: 'script',
+        category: 'action',
+        enabled: true,
+        switchable: true,
+        deniable_actions: ['write', 'execute'],
+        can_write: true,
+        attributes: [],
+      },
+    ]
+    const user = userEvent.setup()
+    renderCreateDialog()
+    await user.type(screen.getByRole('textbox', { name: 'Policy name' }), 'deny-scripts')
+    await user.click(screen.getByRole('button', { name: 'Select a node kind' }))
+    await user.click(await screen.findByRole('option', { name: 'script' }))
+    await user.click(screen.getByRole('button', { name: 'Add node-kind statement' }))
+    await user.click(screen.getByRole('button', { name: 'Create' }))
+
+    await waitFor(() => expect(mockMutate).toHaveBeenCalled())
+    expect(mockMutate.mock.calls[0][0]).toMatchObject({
+      body: {
+        statements: [
+          {
+            effect: 'deny',
+            actions: ['workflow_node:write'],
+            scope: 'project',
+            conditions: { resource_labels: { kind: 'script' } },
+          },
+        ],
+      },
+    })
+  })
 
   it('has no accessibility violations', async () => {
     const { container } = renderDialog()

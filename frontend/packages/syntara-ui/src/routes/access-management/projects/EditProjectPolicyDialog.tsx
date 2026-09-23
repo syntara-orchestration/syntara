@@ -20,7 +20,7 @@ import { NodeKindStatementBuilder } from './NodeKindStatementBuilder'
 
 type EditProjectPolicyDialogProps = {
   projectId: string
-  policy: ProjectPolicyRead
+  policy?: ProjectPolicyRead
   onClose: () => void
   onSuccess: () => void
 }
@@ -32,13 +32,14 @@ export function EditProjectPolicyDialog({
   onSuccess,
 }: Readonly<EditProjectPolicyDialogProps>) {
   const { showSuccess } = useAlerts()
+  const mode = policy ? 'edit' : 'create'
 
   const form = useSynForm({
     schema: addProjectPolicySchema,
     defaultValues: {
-      name: policy.name,
-      description: policy.description ?? '',
-      statementsJson: JSON.stringify(policy.statements ?? [], null, 2),
+      name: policy?.name ?? '',
+      description: policy?.description ?? '',
+      statementsJson: policy ? JSON.stringify(policy.statements ?? [], null, 2) : '[]',
     },
     onClose,
   })
@@ -49,17 +50,39 @@ export function EditProjectPolicyDialog({
     'put',
     '/projects/{project_id}/policies/{policy_id}'
   )
+  const { mutate: createPolicy, isPending: isCreating } = accessClient.useMutation(
+    'post',
+    '/projects/{project_id}/policies'
+  )
 
   const onSubmit = (data: AddProjectPolicyFormData) => {
     const statements = z.array(policyStatementSchema).parse(JSON.parse(data.statementsJson))
+    const body = {
+      name: data.name,
+      description: data.description || undefined,
+      statements,
+    }
+    if (!policy) {
+      createPolicy(
+        {
+          params: { path: { project_id: projectId } },
+          body,
+        },
+        {
+          onSuccess: () => {
+            showSuccess({ title: 'Policy created', description: 'Policy created successfully' })
+            handleClose()
+            onSuccess()
+          },
+          onError: handleError({ title: 'Failed to create policy' }),
+        }
+      )
+      return
+    }
     updatePolicy(
       {
         params: { path: { project_id: projectId, policy_id: policy.id } },
-        body: {
-          name: data.name,
-          description: data.description || undefined,
-          statements,
-        },
+        body,
       },
       {
         onSuccess: () => {
@@ -72,11 +95,14 @@ export function EditProjectPolicyDialog({
     )
   }
 
+  const mutationIsPending = isPending || isCreating
+  const formId = `${mode}-project-policy-form`
+
   return (
     <Modal isOpen onClose={handleClose} variant="medium">
-      <ModalHeader title="Edit Project Policy" />
+      <ModalHeader title={mode === 'create' ? 'Create policy' : 'Edit Project Policy'} />
       <ModalBody>
-        <Form id="edit-project-policy-form" onSubmit={handleSubmit(onSubmit)}>
+        <Form id={formId} onSubmit={handleSubmit(onSubmit)}>
           <SynForm form={form}>
             <SynTextField
               name="name"
@@ -105,14 +131,14 @@ export function EditProjectPolicyDialog({
       <ModalFooter>
         <Button
           variant="primary"
-          form="edit-project-policy-form"
+          form={formId}
           type="submit"
-          isDisabled={isPending}
-          isLoading={isPending}
+          isDisabled={mutationIsPending}
+          isLoading={mutationIsPending}
         >
-          Save policy
+          {mode === 'create' ? 'Create' : 'Save policy'}
         </Button>
-        <Button variant="link" onClick={handleClose} isDisabled={isPending}>
+        <Button variant="link" onClick={handleClose} isDisabled={mutationIsPending}>
           Cancel
         </Button>
       </ModalFooter>
