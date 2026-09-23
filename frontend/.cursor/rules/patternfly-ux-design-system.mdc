@@ -5,7 +5,7 @@ alwaysApply: false
 ---
 
 <!--
-  SYNC NOTE: This is a condensed version of .claude/skills/frontend-patternfly-ux/SKILL.md
+  SYNC NOTE: This is a condensed version of .agents/skills/frontend-patternfly-ux/SKILL.md
   (the comprehensive Claude skill). Both files must stay in sync — when updating one,
   update the other. This file is optimized for Cursor (auto-loaded, lightweight).
   The skill file is the source of truth for full details.
