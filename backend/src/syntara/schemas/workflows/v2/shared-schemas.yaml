@@ -685,16 +685,14 @@ components:
               anyOf:
                 - type: integer
                 - type: 'null'
-              description: Resolved expected duration in seconds, copied from node settings
-                at dispatch time.
+              description: Resolved expected duration in seconds, copied from node settings at dispatch time.
               title: Expected Duration
             stall_alert_at:
               anyOf:
                 - format: date-time
                   type: string
                 - type: 'null'
-              description: Timestamp when stall was first detected by PeriodicWorker. Written
-                once, never cleared.
+              description: Timestamp when stall was first detected by PeriodicWorker. Written once, never cleared.
               title: Stall Alert At
 
     ExecutionStatus:
@@ -2455,8 +2453,7 @@ components:
             - type: integer
               minimum: 1.0
             - type: 'null'
-          description: Expected duration in seconds. Nodes running longer are flagged as
-            stalled.
+          description: Expected duration in seconds. Nodes running longer are flagged as stalled.
           title: Expected Duration
         timeout:
           anyOf:
@@ -2467,8 +2464,7 @@ components:
       additionalProperties: false
       type: object
       title: NodeSettingsNoRetry
-      description: Settings with disabled, continue_on_failure, timeout, and expected_duration
-        (script, agentic, approval).
+      description: Settings with disabled, continue_on_failure, timeout, and expected_duration (script, agentic, approval).
     NodeSettingsFull:
       properties:
         continue_on_failure:
@@ -2486,8 +2482,7 @@ components:
             - type: integer
               minimum: 1.0
             - type: 'null'
-          description: Expected duration in seconds. Nodes running longer are flagged as
-            stalled.
+          description: Expected duration in seconds. Nodes running longer are flagged as stalled.
           title: Expected Duration
         timeout:
           anyOf:
