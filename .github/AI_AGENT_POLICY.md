@@ -1,7 +1,7 @@
 # AI Agent Configuration Policy
 
 This document records the upstream policy for AI coding-agent configuration in
-this repository (Claude Code, Cursor, and similar tools that read project
+this repository (Codex, Claude Code, Cursor, and similar tools that read project
 instruction files). For the policy on AI-assisted **contributions** (disclosure,
 accountability, quality standards), see
 [`AI_POLICY.md`](AI_POLICY.md).
@@ -25,8 +25,8 @@ There is **no hook-based enforcement** in upstream. The replacement is
 | Allowed upstream | Role |
 | --- | --- |
 | `CLAUDE.md`, `AGENTS.md`, and component `CLAUDE.md` / `AGENTS.md` | On-demand agent instructions |
-| `.claude/skills/**` | Skill documents maintainers choose to ship |
-| `.agents/skills/**` | Tracked repository symlinks to the canonical `.claude/skills/**` |
+| `.agents/skills/**` | Canonical skill documents maintainers choose to ship |
+| `.claude/skills/**` | Tracked repository symlinks to `.agents/skills/**` for Claude Code |
 | `.claude/commands/**` (when present) | Slash-command prompts as markdown |
 
 Skills and commands are documentation loaded by the agent. They are **not**
@@ -49,13 +49,13 @@ skills (and commands, when present). In particular the following stay private:
 
 Do not force-add ignored agent settings or hooks in a pull request.
 
-## Who may change `.claude/` and related agent docs
+## Who may change skills and related agent docs
 
 | Path | Ownership / review |
 | --- | --- |
 | This policy (`.github/AI_AGENT_POLICY.md`) | `@syntara-orchestration/syntara-leads` (see [CODEOWNERS](CODEOWNERS)) |
 | Root / component `CLAUDE.md`, `AGENTS.md` | Same reviewers as the area of the change; treat policy-affecting edits as governance |
-| `.claude/skills/**` and `.agents/skills/**` | Owning product team per [CODEOWNERS]; `.agents/skills/**` links to `.claude/skills/**` |
+| `.agents/skills/**` and `.claude/skills/**` | Owning product team per [CODEOWNERS]; `.claude/skills/**` links to `.agents/skills/**` |
 | Re-introducing hooks or shipping `settings.json` | **Not permitted** under this policy. Requires an explicit policy revision reviewed by `@syntara-orchestration/syntara-leads` |
 
 ### Review bar for skill and instruction changes
@@ -71,13 +71,14 @@ Pull requests that change shared agent skills or instruction files should:
 ## Decision: which skills stay in this repository
 
 **This repository is the source of truth for the shared skills under
-`.claude/skills/`.** They stay here so any contributor's agent can load them.
+`.agents/skills/`.** They stay here so any contributor's agent can load them.
 Do not remove them from this tree in favor of a private copy.
 
-Codex discovers repository skills under `.agents/skills/`. Keep tracked relative
-symlinks there, pointing to the canonical `.claude/skills/` directories. Codex
-follows symlinked skill directories, so contributors get the same workflows
-without maintaining duplicate copies. Keep skill content in `.claude/skills/`.
+Codex discovers repository skills under `.agents/skills/`. Claude Code discovers
+project skills under `.claude/skills/`. Keep tracked relative symlinks in
+`.claude/skills/` pointing to the canonical `.agents/skills/` directories.
+Both tools follow symlinked skill directories, so contributors get the same
+workflows without maintaining duplicate copies.
 
 ### The test (apply before adding or expanding a skill)
 
@@ -88,7 +89,7 @@ safe to publish.
 A skill (or a section of a skill) must **stay out of this tree** if it contains
 any of:
 
-| Must not appear in `.claude/skills/` | Examples |
+| Must not appear in `.agents/skills/` | Examples |
 | --- | --- |
 | Secret **values** | Passwords, tokens, API keys, cookie dumps |
 | Org-only infrastructure | Internal hostnames, VPN-only URLs, private CI dashboards |
@@ -101,7 +102,7 @@ any of:
 **Secret values must never appear in a skill.** How to *avoid leaking* a secret
 **must** stay public, so agents working from this repo do not print
 `SYNTARA_E2E_PASSWORD` or `cat` `backend/.secrets/admin-password`. See
-[`.claude/skills/frontend-run-e2e/SKILL.md`](../.claude/skills/frontend-run-e2e/SKILL.md)
+[`.agents/skills/frontend-run-e2e/SKILL.md`](../.agents/skills/frontend-run-e2e/SKILL.md)
 — that CRITICAL block is public on purpose.
 
 Org-specific overlays (issue trackers, private MCP wiring, product doc URLs)
