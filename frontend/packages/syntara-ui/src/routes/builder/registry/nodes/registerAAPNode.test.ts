@@ -14,7 +14,12 @@ vi.mock('../../../../stores/useWorkflowStore', () => ({
     })),
   },
   createAAPJobTemplateActivity: vi.fn(
-    ({ id, name, jobTemplateId, config }: {
+    ({
+      id,
+      name,
+      jobTemplateId,
+      config,
+    }: {
       id: string
       name: string
       jobTemplateId?: number
@@ -30,7 +35,12 @@ vi.mock('../../../../stores/useWorkflowStore', () => ({
     })
   ),
   createAAPWorkflowTemplateActivity: vi.fn(
-    ({ id, name, workflowTemplateId, config }: {
+    ({
+      id,
+      name,
+      workflowTemplateId,
+      config,
+    }: {
       id: string
       name: string
       workflowTemplateId?: number
