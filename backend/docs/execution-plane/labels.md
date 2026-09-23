@@ -181,12 +181,12 @@ never reads Project, Workflow, Node, or Execution Profile rows.
 ```
 AO (author / settings / Extension)
   → resolve one selector map and a container image
-  → WorkItem (selectors + payload.activity.type = image)
+  → WorkItem (selectors + payload.activity.image)
   → ExecutionTarget Reconciler (selectors only)
 ```
 
 AO writes the container image on the work payload as
-`activity.type`. That field is the image reference, not a node-type
+`activity.image`. That field is the image reference, not a node-type
 alias such as `http_request`. AO resolved it from the Extension
 registry ([ANSTRAT-2422](https://redhat.atlassian.net/browse/ANSTRAT-2422))
 or from a user override of that image. EP does not consult the
@@ -237,7 +237,7 @@ Every Cluster has a default ExecutionTarget (`is_default=True`). That
 target is the cold-start fallback for the cluster. One default per
 container image is **not** required; the default is image-agnostic
 cold-start unless we later decide otherwise. The image is
-`payload.activity.type` (already a container image reference), not a
+`payload.activity.image` (already a container image reference), not a
 required selector. See
 [example 00](examples/00-one-workload-default-target.md).
 
@@ -308,7 +308,7 @@ sequenceDiagram
     Admin->>CR: register Cluster (natural + user labels)
     Admin->>TR: register ExecutionTarget labels<br/>(location, default, gpu, …)
     AO->>AO: resolve node / profile / extension<br/>into one selector map and image
-    AO->>WS: WorkItem with selectors and activity.type image
+    AO->>WS: WorkItem with selectors and activity.image
     R->>CR: list clusters
     R->>TR: list targets per cluster
     Note over R: exact AND of work selectors<br/>against Cluster.labels ∪ target.labels
@@ -321,12 +321,12 @@ These are still design choices. They do not block documenting purpose
 or the ExecutionTarget relationship above.
 
 1. **Container image.** AO always puts the resolved image on
-   `payload.activity.type`. The open question is whether that image is
+   `payload.activity.image`. The open question is whether that image is
    *also* a required selector (needed to pick a warm pool) or only a
    payload field (needed to cold-start). A required image selector
    excludes any default ExecutionTarget that does not advertise that
    image. A payload-only image means warm-pool matching needs another
-   mechanism. Leaning: the Worker Manager *runs* `activity.type`;
+   mechanism. Leaning: the Worker Manager *runs* `activity.image`;
    whether the reconciler *matches* on it is separate.
 2. **Natural vs user storage.** One namespaced `labels` map (simpler
    for snapshots) versus two fields merged at match time (clearer
