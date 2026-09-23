@@ -3,6 +3,7 @@ import { test, expect } from './fixtures'
 import { type SeededLlmIntegration, createLlmIntegration, deleteLlmIntegration } from './helpers/llm-helpers'
 import {
   ensureLlmCredential,
+  expectAiAgentIntegrationGroupsVisible,
   openAiAgentModelPicker,
   openAiAgentNodeForEditing,
   openTaskAgentNodeCreateForm,
@@ -97,10 +98,7 @@ test.describe('AI Agent Node @pr-check', () => {
       await openTaskAgentNodeCreateForm(app)
 
       await openAiAgentModelPicker(app)
-      await expect(async () => {
-        await expect(app.getByText(name1, { exact: true })).toBeVisible({ timeout: 5_000 })
-        await expect(app.getByText(name2, { exact: true })).toBeVisible({ timeout: 5_000 })
-      }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] })
+      await expectAiAgentIntegrationGroupsVisible(app, [name1, name2])
 
       await app.keyboard.press('Escape')
     } finally {
@@ -386,8 +384,9 @@ test.describe('AI Agent Node @pr-check', () => {
       await openAiAgentModelPicker(app)
       await app.getByPlaceholder('Select a model').fill(llmName)
 
+      await expectAiAgentIntegrationGroupsVisible(app, [llmName])
+
       await expect(async () => {
-        await expect(app.getByText(llmName, { exact: true })).toBeVisible({ timeout: 5_000 })
         await expect(app.getByText(mcpName, { exact: true })).not.toBeAttached()
         await expect(app.getByRole('option', { name: /Model Alpha/ })).toBeVisible({ timeout: 5_000 })
         await expect(app.getByRole('option', { name: /Model Beta/ })).toBeVisible({ timeout: 5_000 })

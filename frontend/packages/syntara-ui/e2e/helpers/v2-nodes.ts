@@ -697,14 +697,24 @@ export async function openAiAgentNodeForEditing(page: Page, nodeName: string) {
   })
 }
 
-/** Open the model picker; retries while integration options load under CI load. */
+/** Open the model picker (single click — do not toggle again while waiting for options). */
 export async function openAiAgentModelPicker(page: Page) {
   const modelToggle = page.getByRole('button', { name: 'Model', exact: true })
+  await expect(modelToggle).toBeEnabled({ timeout: 15_000 })
+  await modelToggle.click()
+}
+
+/**
+ * Wait until each integration's group title and at least one model option are visible.
+ * Matches `selectLlmCredential` group scoping; polls without re-opening the picker.
+ */
+export async function expectAiAgentIntegrationGroupsVisible(page: Page, integrationNames: string[]) {
   await expect(async () => {
-    await expect(modelToggle).toBeEnabled({ timeout: 5_000 })
-    await modelToggle.click()
-    await expect(page.getByPlaceholder('Select a model').or(page.locator('[role="option"]').first())).toBeVisible({
-      timeout: 5_000,
-    })
-  }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] })
+    for (const name of integrationNames) {
+      const groupTitle = page.getByText(name, { exact: true })
+      await expect(groupTitle).toBeVisible({ timeout: 5_000 })
+      const integrationGroup = groupTitle.locator('xpath=..')
+      await expect(integrationGroup.locator('[role="option"]').first()).toBeVisible({ timeout: 5_000 })
+    }
+  }).toPass({ timeout: 60_000, intervals: [500, 1_000, 2_000] })
 }
