@@ -128,7 +128,6 @@ class TestFormPromptPersistence:
         prompt.response_data = None
         prompt.responded_by = None
         prompt.responded_at = None
-        prompt.temporal_activity_id = None
 
         # Should serialize without errors
         data = prompt.model_dump()
