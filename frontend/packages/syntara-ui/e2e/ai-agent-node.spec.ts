@@ -96,8 +96,8 @@ test.describe('AI Agent Node @pr-check', () => {
       await startWorkflowWithTrigger(app)
       await openTaskAgentNodeCreateForm(app)
 
+      await openAiAgentModelPicker(app)
       await expect(async () => {
-        await openAiAgentModelPicker(app)
         await expect(app.getByText(name1, { exact: true })).toBeVisible({ timeout: 5_000 })
         await expect(app.getByText(name2, { exact: true })).toBeVisible({ timeout: 5_000 })
       }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] })
@@ -379,37 +379,30 @@ test.describe('AI Agent Node @pr-check', () => {
       await openTaskAgentNodeCreateForm(app)
 
       // Model selector should show "Select a model" — no pre-selection
-      await expect(app.getByPlaceholder('Select a model')).toBeVisible()
+      await expect(app.getByPlaceholder('Select a model')).toBeVisible({ timeout: 10_000 })
 
       // Open the dropdown and filter by the LLM integration name so the test
       // doesn't depend on scroll position when many integrations exist
       await openAiAgentModelPicker(app)
       await app.getByPlaceholder('Select a model').fill(llmName)
 
-      // The LLM integration group should be visible; the MCP integration should not
-      await expect(app.getByText(llmName)).toBeVisible({ timeout: 15_000 })
-      await expect(app.getByText(mcpName)).not.toBeAttached()
+      await expect(async () => {
+        await expect(app.getByText(llmName, { exact: true })).toBeVisible({ timeout: 5_000 })
+        await expect(app.getByText(mcpName, { exact: true })).not.toBeAttached()
+        await expect(app.getByRole('option', { name: /Model Alpha/ })).toBeVisible({ timeout: 5_000 })
+        await expect(app.getByRole('option', { name: /Model Beta/ })).toBeVisible({ timeout: 5_000 })
+        await expect(app.getByRole('option', { name: /Model Gamma/ })).not.toBeAttached()
 
-      // Only enabled models (Alpha, Beta) should appear; disabled (Gamma) should not
-      await expect(app.getByRole('option', { name: /Model Alpha/ })).toBeVisible()
-      await expect(app.getByRole('option', { name: /Model Beta/ })).toBeVisible()
-      await expect(app.getByRole('option', { name: /Model Gamma/ })).not.toBeAttached()
+        const groupOptionTexts = await app.getByRole('option').allTextContents()
+        const betaIndex = groupOptionTexts.findIndex((t) => t.includes('Model Beta'))
+        const alphaIndex = groupOptionTexts.findIndex((t) => t.includes('Model Alpha'))
+        expect(betaIndex).toBeLessThan(alphaIndex)
 
-      // Default model (Beta) should be listed before Alpha within its group,
-      // proving sort is by default status, not alphabetical order.
-      // The typeahead filter already narrows to this integration only.
-      const groupOptionTexts = await app.getByRole('option').allTextContents()
-      const betaIndex = groupOptionTexts.findIndex((t) => t.includes('Model Beta'))
-      const alphaIndex = groupOptionTexts.findIndex((t) => t.includes('Model Alpha'))
-      expect(betaIndex).toBeLessThan(alphaIndex)
-
-      // Beta (the default) should have the Default badge
-      const betaOption = app.getByRole('option', { name: /Model Beta/ })
-      await expect(betaOption.getByText('Default')).toBeVisible()
-
-      // Alpha should not have the Default badge
-      const alphaOption = app.getByRole('option', { name: /Model Alpha/ })
-      await expect(alphaOption.getByText('Default')).not.toBeAttached()
+        const betaOption = app.getByRole('option', { name: /Model Beta/ })
+        await expect(betaOption.getByText('Default')).toBeVisible({ timeout: 5_000 })
+        const alphaOption = app.getByRole('option', { name: /Model Alpha/ })
+        await expect(alphaOption.getByText('Default')).not.toBeAttached()
+      }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] })
 
       await app.keyboard.press('Escape')
     } finally {
