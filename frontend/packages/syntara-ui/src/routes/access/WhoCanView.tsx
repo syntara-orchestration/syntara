@@ -294,7 +294,7 @@ export function WhoCanView({ resourceTypes, actionsByResource }: Readonly<Resour
             isDisabled={!resourceType.trim() || !action.trim()}
             isLoading={whoCanMutation.isPending}
           >
-            Find Users
+            Find users
           </Button>
         </Form>
       </FlexItem>

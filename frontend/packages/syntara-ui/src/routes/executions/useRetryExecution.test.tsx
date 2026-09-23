@@ -43,7 +43,7 @@ describe('useRetryExecution', () => {
     vi.mocked(executionsClient.useMutation).mockReturnValue({
       mutate: mockMutate,
       isPending: false,
-    } as never)
+    })
   })
 
   it('calls mutate with the correct execution ID and shows success', () => {
@@ -92,7 +92,7 @@ describe('useRetryExecution', () => {
     vi.mocked(executionsClient.useMutation).mockReturnValue({
       mutate: mockMutate,
       isPending: true,
-    } as never)
+    })
 
     const { Wrapper } = createWrapper()
     const { result } = renderHook(() => useRetryExecution('exec-abc'), { wrapper: Wrapper })

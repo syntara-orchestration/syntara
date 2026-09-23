@@ -76,7 +76,7 @@ flowchart TD
 
 ## Scoped `/update-screenshots` Runs
 
-`/update-screenshots` doesn't always re-render all ~140 pages. `scripts/scope-visual-regression.ts` looks at exactly which files your PR changed and decides how much of the suite actually needs to run.
+`/update-screenshots` doesn't always re-render all ~140 pages. `scripts/visual-regression/scope-visual-regression.ts` looks at exactly which files your PR changed and decides how much of the suite actually needs to run.
 
 `update-visual-baselines.yml` (the workflow behind `/update-screenshots`) checks out `refs/pull/<N>/merge` — GitHub's own precomputed merge of your branch into its base — rather than your raw branch, so baselines are generated from the identical code `ci-frontend.yml` actually renders. That merge commit has two parents (the base branch tip, and your PR's real head), so diffing them gives exactly your PR's changed files, independent of how many commits are on the branch or whether it's been rebased.
 
@@ -97,7 +97,7 @@ The PR comment posted by `/update-screenshots` always states which of these happ
 
 **The weekly cron is the backstop for this heuristic.** It never scopes — it always regenerates and diffs every single page against `devel`, unconditionally. So even if a rule in `scope-visual-regression.ts` is wrong or incomplete and a scoped `/update-screenshots` run misses a page that needed updating, that staleness is caught and surfaced to `uxd-team` on the very next Monday at the latest. No scoping bug in the manual path can cause permanent, undetected drift.
 
-If you add a new top-level route folder under `src/routes/`, consider whether it should get its own entry in the `SCOPE_RULES` table at the top of `scripts/scope-visual-regression.ts` — if you don't, PRs touching that folder will simply always trigger a full run, which is correct-but-slower, never incorrect.
+If you add a new top-level route folder under `src/routes/`, consider whether it should get its own entry in the `SCOPE_RULES` table at the top of `scripts/visual-regression/scope-visual-regression.ts` — if you don't, PRs touching that folder will simply always trigger a full run, which is correct-but-slower, never incorrect.
 
 ## Weekly Baseline Refresh
 
@@ -105,7 +105,7 @@ If you add a new top-level route folder under `src/routes/`, consider whether it
 
 1. Checks out `devel` HEAD and regenerates every screenshot with `--update-snapshots`.
 2. Diffs the regenerated PNGs against what's checked in, then runs
-   `scripts/filter-noisy-baseline-diffs.ts` so only meaningful visual changes
+   `scripts/visual-regression/filter-noisy-baseline-diffs.ts` so only meaningful visual changes
    are kept (AA / 1-pixel noise is restored, and overlay screenshots whose
    **dialog card** is unchanged are restored even when the dimmed list behind
    them moved). The filter decodes with `pngjs`

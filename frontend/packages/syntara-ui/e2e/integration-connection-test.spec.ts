@@ -87,7 +87,7 @@ test.describe('Integration Wizard @pr-check', () => {
 
         // Save the integration — capture the API response to get the ID
         const responsePromise = app.waitForResponse('**/api/v1/integrations')
-        await app.getByRole('button', { name: 'Save' }).click()
+        await app.getByRole('button', { name: 'Save integration' }).click()
         const response = await responsePromise
         expect(response.status()).toBe(201)
 
@@ -177,11 +177,8 @@ test.describe('Integration Wizard @pr-check', () => {
 
     try {
       credentialId = await createLlmCredential(app, credName)
-      // Step 1 — LLM Provider with base_url pointing to a closed port on the allowlisted,
-      // in-network mcp-server host (mirrors the backend e2e). The host is allowlisted so it passes
-      // write-time SSRF validation, while nothing listens on :9999 — TCP RST is immediate so the
-      // backend classifies this as connection_error, not timeout. A loopback address (127.0.0.1)
-      // cannot be used: it is not allowlisted and would be rejected as an SSRF risk before connect.
+      // Step 1 — LLM Provider with Red Hat AI hint, base_url pointing to a port with nothing
+      // listening. TCP RST is immediate so the backend classifies this as connection_error, not timeout.
       await app.goto(toAppUrl('/configuration/integrations/configure'))
       await expect(app.getByRole('heading', { name: 'Integration details', level: 2 })).toBeVisible()
 

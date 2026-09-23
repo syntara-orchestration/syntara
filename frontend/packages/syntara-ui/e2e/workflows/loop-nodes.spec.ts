@@ -235,7 +235,7 @@ test.describe('Loop Node Configuration [UI-16]', () => {
         await testCase.addLoop(app)
         await verifyNodeVisible(app, testCase.loopNodeName)
 
-        await addChildScriptToLoop(app, testCase.scriptName, testCase.scriptCode)
+        await addChildScriptToLoop(app, testCase.scriptName, testCase.scriptCode, testCase.loopNodeName)
         await waitForUIReady(app)
 
         await verifyNodeVisible(app, testCase.loopNodeName)
@@ -260,7 +260,7 @@ test.describe('Loop Node Configuration [UI-16]', () => {
         name: 'Loop header',
         condition: 'true',
       })
-      await addChildScriptToLoop(app, 'Loop body', 'print("body")')
+      await addChildScriptToLoop(app, 'Loop body', 'print("body")', 'Loop header')
       await waitForUIReady(app)
       await triggerLayout(app)
 

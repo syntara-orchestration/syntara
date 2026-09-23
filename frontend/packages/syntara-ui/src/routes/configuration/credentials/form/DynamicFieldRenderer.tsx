@@ -42,6 +42,12 @@ type DynamicFieldRendererProps = {
   error?: string
 }
 
+function toFieldString(value: unknown): string {
+  return value != null && (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean')
+    ? String(value)
+    : ''
+}
+
 function FieldHelperText({ error, helpText }: Readonly<{ error?: string; helpText?: string }>) {
   if (error) {
     return (
@@ -153,7 +159,7 @@ function ChoicesSelect({
 }
 
 function ChoicesField({ field, value, onChange, isRequired, error }: DynamicFieldRendererProps) {
-  const stringValue = value != null ? String(value as string | number | boolean) : ''
+  const stringValue = toFieldString(value)
 
   return (
     <FieldWrapper field={field} isRequired={isRequired} error={error}>
@@ -170,7 +176,7 @@ function ChoicesField({ field, value, onChange, isRequired, error }: DynamicFiel
 }
 
 function MultilineField({ field, value, onChange, isRequired, error }: DynamicFieldRendererProps) {
-  const stringValue = value != null ? String(value as string | number | boolean) : ''
+  const stringValue = toFieldString(value)
   const validated = error ? 'error' : 'default'
 
   return (
@@ -192,7 +198,7 @@ function SecretField({ field, value, onChange, isRequired, isEditMode, error }: 
   const [showSecret, setShowSecret] = useState(false)
   const [secretTouched, setSecretTouched] = useState(false)
 
-  const stringValue = value != null ? String(value as string | number | boolean) : ''
+  const stringValue = toFieldString(value)
   const isEncryptedPlaceholder = isEditMode && !secretTouched && stringValue === ENCRYPTED_SENTINEL
   const displayValue = isEncryptedPlaceholder ? '' : stringValue
   const validated = error ? 'error' : 'default'
@@ -236,7 +242,7 @@ function SecretField({ field, value, onChange, isRequired, isEditMode, error }: 
 }
 
 function PlainTextField({ field, value, onChange, isRequired, error }: DynamicFieldRendererProps) {
-  const stringValue = value != null ? String(value as string | number | boolean) : ''
+  const stringValue = toFieldString(value)
   const validated = error ? 'error' : 'default'
 
   return (

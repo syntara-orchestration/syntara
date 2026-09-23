@@ -359,6 +359,7 @@ Skills are detailed reference guides the agent consults while working. You can a
 | **Frontend Specialist**         | `frontend-specialist/SKILL.md`         | React 19, TypeScript, PatternFly 6, and Vitest implementation standards, pre-submission checklist, quality gates, and implementation workflow                       | Any implementation, review, or refactoring task. Triggered automatically via AGENTS.md.                                                      |
 | **Library References**          | `frontend-library-references/SKILL.md` | `llms.txt` URLs for React, Zod, Zustand, Vitest, Vite, and TanStack Query. Ensures current API docs are used instead of stale training data.                        | Before writing code that uses any of these libraries. Triggered automatically via AGENTS.md.                                                 |
 | **Build UI feature**            | `frontend-build-ui-feature/SKILL.md`   | Guided wizard: asks what to build, then implements using project skills (optionally Playwright E2E)                                                                 | Type `/frontend-build-ui-feature` to walk through a new page or component.                                                                   |
+| **Accessibility audit**         | `frontend-a11y-audit/SKILL.md`         | Registry axe sweep (`npm run e2e:a11y-audit`) plus manual keyboard/media/semantic checks and bug drafting                                                           | Say "run an a11y audit" or type `/frontend-a11y-audit` before drafting accessibility bugs.                                                   |
 
 ### User-invocable skills
 
@@ -369,6 +370,7 @@ Type these in the agent chat. They live under `.claude/skills/` (this repository
 | `/frontend-review-pr`        | Runs the full PR review skill against your current branch                                |
 | `/frontend-build-ui-feature` | Guided wizard: asks what to build, then implements using project skills (optionally E2E) |
 | `/frontend-run-e2e`          | Runs Playwright E2E tests with the project's runner and defaults                         |
+| `/frontend-a11y-audit`       | Registry axe sweep plus manual keyboard, viewport/media, and semantic WCAG checks        |
 
 ### Typical flow for a new feature
 

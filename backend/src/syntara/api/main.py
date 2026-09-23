@@ -63,6 +63,11 @@ from syntara.core.error_handlers import (
 )
 from syntara.core.exception_registry import register_exceptions
 from syntara.core.logging.logging import apply_runtime_log_level, build_uvicorn_logging_config
+from syntara.core.middleware.request_body_size import (
+    BodyTooLargeError,
+    RequestBodySizeMiddleware,
+    body_too_large_exception_handler,
+)
 from syntara.core.models.user import User
 from syntara.core.router_discovery import _get_lock_file_path, discover_and_register_routers, iter_api_routes
 from syntara.core.websocket.manager import get_connection_lifecycle_manager
@@ -428,6 +433,9 @@ app.add_middleware(MetricsMiddleware, recorder=get_metrics_recorder())
 # Register audit middleware.
 app.add_middleware(AuditMiddleware, fastapi_app=app)
 
+# Reject oversized request bodies before handlers buffer or parse JSON/multipart bodies.
+app.add_middleware(RequestBodySizeMiddleware)
+
 # Register mTLS client certificate authentication middleware (outermost).
 # Must be outermost to access the raw uvicorn transport for cert extraction.
 app.add_middleware(ClientCertAuthMiddleware)
@@ -450,6 +458,7 @@ app.add_exception_handler(RequestValidationError, validation_error_handler)  # t
 app.add_exception_handler(IntegrityError, integrity_error_handler)  # type: ignore[arg-type]
 app.add_exception_handler(ValueError, value_error_handler)  # type: ignore[arg-type]
 app.add_exception_handler(HTTPException, core_http_exception_handler)  # type: ignore[arg-type]
+app.add_exception_handler(BodyTooLargeError, body_too_large_exception_handler)  # type: ignore[arg-type]
 app.add_exception_handler(Exception, generic_exception_handler)
 
 # Routers are automatically discovered and registered via router_discovery system

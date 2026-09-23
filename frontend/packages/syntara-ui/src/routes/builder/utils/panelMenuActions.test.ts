@@ -16,7 +16,7 @@ describe('buildPanelMenuActions', () => {
       id: 'task-1',
       type: 'task',
       position: { x: 0, y: 0 },
-      data: { id: 'task-1', type: 'task', name: 'Task' } as never,
+      data: { id: 'task-1', type: 'task', name: 'Task' },
     }
 
     const actions = buildPanelMenuActions(
@@ -40,7 +40,7 @@ describe('buildPanelMenuActions', () => {
       id: 'task-1',
       type: 'task',
       position: { x: 0, y: 0 },
-      data: { id: 'task-1', type: 'task', name: 'Task' } as never,
+      data: { id: 'task-1', type: 'task', name: 'Task' },
     }
 
     const actions = buildPanelMenuActions(

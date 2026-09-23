@@ -117,7 +117,7 @@ describe('ApprovalReviewView', () => {
     vi.mocked(approvalsClient.useMutation).mockReturnValue({
       mutate: mockMutate,
       isPending: false,
-    } as never)
+    })
   })
 
   it('renders approval name, summary list, context, and form', () => {
@@ -253,7 +253,7 @@ describe('ApprovalReviewView', () => {
     vi.mocked(approvalsClient.useMutation).mockReturnValue({
       mutate: mockMutate,
       isPending: true,
-    } as never)
+    })
 
     render(<ApprovalReviewView {...defaultProps} />, { wrapper: createWrapper() })
 

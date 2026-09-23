@@ -5,11 +5,13 @@ import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
+import { SynListPanel } from '../../components/panels/list/SynListPanel'
 import { AlertProvider } from '../../providers/alerts'
 import { searchParamsMock } from '../../test/searchParamsMock'
 import { accessClient } from '../access/accessClient'
 import { useAllProjects, useSelectableProjects } from '../access/useAllProjects'
 import { useAllRoles } from '../access/useAllRoles'
+import { useAssignmentPermissions } from '../access/useAssignmentPermissions'
 
 import { RoleAssignmentsPanel } from './RoleAssignmentsPanel'
 
@@ -37,12 +39,27 @@ vi.mock('../access/useAllProjects', () => ({
 }))
 
 vi.mock('../access/useAssignmentPermissions', () => ({
-  useAssignmentPermissions: () => ({
+  useAssignmentPermissions: vi.fn(() => ({
     canAssign: true,
     canRevoke: true,
     isLoading: false,
     tooltips: { assign: '', revoke: '' },
-  }),
+  })),
+}))
+
+vi.mock('./AssignRoleModal', () => ({
+  AssignRoleModal: ({ isOpen, onClose, onSuccess }: { isOpen: boolean; onClose: () => void; onSuccess: () => void }) =>
+    isOpen ? (
+      <>
+        <span>Assign roles</span>
+        <button type="button" onClick={onSuccess}>
+          Confirm assign
+        </button>
+        <button type="button" onClick={onClose}>
+          Cancel
+        </button>
+      </>
+    ) : null,
 }))
 
 vi.mock('../access/useAlreadyAssignedRoles', () => ({
@@ -237,6 +254,12 @@ describe('RoleAssignmentsPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     searchParamsMock.reset()
+    vi.mocked(useAssignmentPermissions).mockReturnValue({
+      canAssign: true,
+      canRevoke: true,
+      isLoading: false,
+      tooltips: { assign: '', revoke: '' },
+    })
     vi.mocked(useAllRoles).mockReturnValue({ roles: [], isLoading: false, error: null, refetch: vi.fn() })
     const emptyProjectsMock = { projects: [], isLoading: false, error: null, refetch: vi.fn() }
     vi.mocked(useAllProjects).mockReturnValue(emptyProjectsMock)
@@ -416,6 +439,13 @@ describe('RoleAssignmentsPanel', () => {
     it('shows "Assign role" button', () => {
       render(<RoleAssignmentsPanel principalType="user" principalId="u1" />, { wrapper })
       expect(screen.getByRole('button', { name: 'Assign role' })).toBeInTheDocument()
+    })
+
+    it('renders "Assign role" inside the filter toolbar', () => {
+      render(<RoleAssignmentsPanel principalType="service_account" principalId="sa-1" />, { wrapper })
+
+      const filterToolbar = screen.getByRole('search', { name: 'Filters' })
+      expect(within(filterToolbar).getByRole('button', { name: 'Assign role' })).toBeInTheDocument()
     })
   })
 
@@ -674,7 +704,7 @@ describe('RoleAssignmentsPanel', () => {
       await waitFor(() => {
         expect(screen.getByText('Unassign role?')).toBeInTheDocument()
         expect(screen.getByText(/This unassigns the role/)).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: 'Unassign' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Unassign role' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
       })
     })
@@ -714,7 +744,7 @@ describe('RoleAssignmentsPanel', () => {
         expect(screen.getByText('Unassign role?')).toBeInTheDocument()
       })
 
-      await user.click(screen.getByRole('button', { name: 'Unassign' }))
+      await user.click(screen.getByRole('button', { name: 'Unassign role' }))
 
       await waitFor(() => {
         expect(mockDeleteSystemAssignment).toHaveBeenCalledWith(
@@ -759,7 +789,7 @@ describe('RoleAssignmentsPanel', () => {
         expect(screen.getByText('Unassign role?')).toBeInTheDocument()
       })
 
-      await user.click(screen.getByRole('button', { name: 'Unassign' }))
+      await user.click(screen.getByRole('button', { name: 'Unassign role' }))
 
       await waitFor(() => {
         expect(mockDeleteProjectAssignment).toHaveBeenCalledWith(
@@ -787,7 +817,7 @@ describe('RoleAssignmentsPanel', () => {
         expect(screen.getByText('Unassign role?')).toBeInTheDocument()
       })
 
-      await user.click(screen.getByRole('button', { name: 'Unassign' }))
+      await user.click(screen.getByRole('button', { name: 'Unassign role' }))
 
       await waitFor(() => {
         expect(mockDeleteSystemAssignment).toHaveBeenCalled()
@@ -822,7 +852,7 @@ describe('RoleAssignmentsPanel', () => {
         expect(screen.getByText('Unassign role?')).toBeInTheDocument()
       })
 
-      await user.click(screen.getByRole('button', { name: 'Unassign' }))
+      await user.click(screen.getByRole('button', { name: 'Unassign role' }))
 
       await waitFor(() => {
         expect(mockDeleteSystemAssignment).toHaveBeenCalled()
@@ -846,6 +876,37 @@ describe('RoleAssignmentsPanel', () => {
       invalidateSpy.mockRestore()
     })
 
+    it('closes unassign dialog after mutation settles', async () => {
+      const user = userEvent.setup()
+      render(<RoleAssignmentsPanel principalType="user" principalId="u1" />, { wrapper })
+
+      const kebabButtons = screen.getAllByRole('button', { name: /^Actions for / })
+      await user.click(kebabButtons[0])
+
+      const unassignItem = await screen.findByRole('menuitem', { name: /Unassign/i })
+      await user.click(unassignItem)
+
+      await waitFor(() => {
+        expect(screen.getByText('Unassign role?')).toBeInTheDocument()
+      })
+
+      await user.click(screen.getByRole('button', { name: 'Unassign role' }))
+
+      await waitFor(() => {
+        expect(mockDeleteSystemAssignment).toHaveBeenCalled()
+      })
+
+      const callbacks = mockDeleteSystemAssignment.mock.calls[0][1] as {
+        onSettled: () => void
+      }
+
+      await waitFor(() => {
+        callbacks.onSettled()
+      })
+
+      expect(screen.queryByText('Unassign role?')).not.toBeInTheDocument()
+    })
+
     it('shows error alert after failed unassign', async () => {
       const user = userEvent.setup()
       render(<RoleAssignmentsPanel principalType="user" principalId="u1" />, { wrapper })
@@ -860,7 +921,7 @@ describe('RoleAssignmentsPanel', () => {
         expect(screen.getByText('Unassign role?')).toBeInTheDocument()
       })
 
-      await user.click(screen.getByRole('button', { name: 'Unassign' }))
+      await user.click(screen.getByRole('button', { name: 'Unassign role' }))
 
       await waitFor(() => {
         expect(mockDeleteSystemAssignment).toHaveBeenCalled()
@@ -944,7 +1005,7 @@ describe('RoleAssignmentsPanel', () => {
         expect(screen.getByText('Unassign role?')).toBeInTheDocument()
       })
 
-      await user.click(screen.getByRole('button', { name: 'Unassign' }))
+      await user.click(screen.getByRole('button', { name: 'Unassign role' }))
 
       await waitFor(() => {
         expect(mockDeleteProjectAssignment).toHaveBeenCalledWith(
@@ -1056,6 +1117,123 @@ describe('RoleAssignmentsPanel', () => {
       render(<RoleAssignmentsPanel principalType="user" principalId="u1" />, { wrapper })
 
       expect(screen.getByText('Showing project-scoped roles only')).toBeInTheDocument()
+    })
+
+    it('shows project-scoped empty state when query returns 403', () => {
+      vi.mocked(accessClient.useQuery).mockImplementation((_method: string, path: string) => {
+        if (path === '/users/{user_id}/role_assignments') {
+          return {
+            data: undefined,
+            isPending: false,
+            isError: true,
+            error: { status: 403, code: 'AUTHORIZATION_DENIED' },
+            refetch: vi.fn(),
+          } as never
+        }
+        return { data: undefined, isPending: false, isError: false, error: null, refetch: vi.fn() } as never
+      })
+      vi.mocked(accessClient.useMutation).mockReturnValue(mockMutationReturn(vi.fn()))
+
+      render(<RoleAssignmentsPanel principalType="user" principalId="u1" />, { wrapper })
+
+      expect(screen.getByText('No project-scoped roles have been assigned to this user.')).toBeInTheDocument()
+    })
+  })
+
+  describe('SynListPanelView integration', () => {
+    it('retries loading when error retry is clicked', async () => {
+      const user = userEvent.setup()
+      const mockRefetch = vi.fn()
+      vi.mocked(accessClient.useQuery).mockImplementation((_method: string, path: string) => {
+        if (path === '/users/{user_id}/role_assignments') {
+          return {
+            data: undefined,
+            isPending: false,
+            isError: true,
+            error: { status: 500, retryable: true },
+            refetch: mockRefetch,
+          } as never
+        }
+        return { data: undefined, isPending: false, isError: false, error: null, refetch: vi.fn() } as never
+      })
+      vi.mocked(accessClient.useMutation).mockReturnValue(mockMutationReturn(vi.fn()))
+
+      render(<RoleAssignmentsPanel principalType="user" principalId="u1" />, { wrapper })
+
+      await user.click(screen.getByRole('button', { name: 'Retry' }))
+
+      expect(mockRefetch).toHaveBeenCalled()
+    })
+
+    it('shows filter empty state when dataset is empty and filters are active', () => {
+      setupMocks({ userAssignments: [] })
+      searchParamsMock.set(new URLSearchParams('name[contains]=admin'))
+
+      render(<RoleAssignmentsPanel principalType="user" principalId="u1" />, { wrapper })
+
+      expect(screen.getByText('No results found')).toBeInTheDocument()
+    })
+
+    it('refetches assignments after assign modal success', async () => {
+      const user = userEvent.setup()
+      const { mockRefetch } = setupMocks()
+      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries').mockResolvedValue(undefined)
+
+      render(<RoleAssignmentsPanel principalType="user" principalId="u1" />, { wrapper })
+
+      await user.click(screen.getByRole('button', { name: 'Assign role' }))
+      await user.click(screen.getByRole('button', { name: 'Confirm assign' }))
+
+      await waitFor(() => {
+        expect(mockRefetch).toHaveBeenCalled()
+      })
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['authz', 'can_i'] })
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['all-permissions'] })
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['role-assignments', 'user', 'u1'] })
+
+      invalidateSpy.mockRestore()
+    })
+
+    it('renders tabpanel when tabKey and tabLabel are provided inside SynListPanel', () => {
+      render(
+        <SynListPanel>
+          <RoleAssignmentsPanel principalType="user" principalId="u1" tabKey="roles" tabLabel="Assignments" />
+        </SynListPanel>,
+        { wrapper }
+      )
+
+      expect(screen.getByRole('tabpanel', { name: 'Assignments' })).toBeInTheDocument()
+    })
+
+    it('disables assign role action when user lacks assign permission', () => {
+      vi.mocked(useAssignmentPermissions).mockReturnValue({
+        canAssign: false,
+        canRevoke: true,
+        isLoading: false,
+        tooltips: { assign: 'Missing permission', revoke: '' },
+      })
+
+      render(<RoleAssignmentsPanel principalType="user" principalId="u1" />, { wrapper })
+
+      expect(screen.getByRole('button', { name: 'Assign role' })).toHaveAttribute('aria-disabled', 'true')
+    })
+
+    it('disables unassign action when user lacks revoke permission', async () => {
+      const user = userEvent.setup()
+      vi.mocked(useAssignmentPermissions).mockReturnValue({
+        canAssign: true,
+        canRevoke: false,
+        isLoading: false,
+        tooltips: { assign: '', revoke: 'Missing permission' },
+      })
+
+      render(<RoleAssignmentsPanel principalType="user" principalId="u1" />, { wrapper })
+
+      const kebabButtons = screen.getAllByRole('button', { name: /^Actions for / })
+      await user.click(kebabButtons[0])
+
+      const unassignItem = await screen.findByRole('menuitem', { name: /Unassign/i })
+      expect(unassignItem).toHaveAttribute('aria-disabled', 'true')
     })
   })
 })

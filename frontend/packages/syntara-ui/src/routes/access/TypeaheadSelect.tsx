@@ -151,6 +151,7 @@ export function TypeaheadSelect({
     >
       <TextInputGroup isPlain isDisabled={isDisabled}>
         <TextInputGroupMain
+          inputId={id}
           value={isOpen ? filterValue : selectedLabel}
           onChange={(_e, val) => {
             handleFilterChange(val)
@@ -194,7 +195,6 @@ export function TypeaheadSelect({
 
   return (
     <SynSelect
-      id={id}
       aria-label={ariaLabel}
       isOpen={isOpen}
       onOpenChange={handleOpenChange}

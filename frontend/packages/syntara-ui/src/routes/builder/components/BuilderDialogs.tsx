@@ -45,6 +45,7 @@ type BuilderDialogsProps = Readonly<{
   dispatch: Dispatch<BuilderAction>
   handleRunWorkflow: (inputData?: Record<string, unknown>, triggerNodeId?: string) => void
   handleDeleteWorkflow: () => void
+  isDeleting: boolean
   triggerName: string
   triggerNodeId?: string
   triggerInputSchema?: Record<string, unknown>
@@ -143,6 +144,7 @@ export function BuilderDialogs({
   dispatch,
   handleRunWorkflow,
   handleDeleteWorkflow,
+  isDeleting,
   triggerName,
   triggerNodeId,
   triggerInputSchema,
@@ -215,6 +217,7 @@ export function BuilderDialogs({
         workflowName={workflowName}
         onClose={() => dispatch({ type: 'SET_DELETE_DIALOG', payload: false })}
         onConfirm={handleDeleteWorkflow}
+        confirmLoading={isDeleting}
         aria-labelledby="delete-workflow-modal-title"
         aria-describedby="delete-workflow-modal-body"
       />

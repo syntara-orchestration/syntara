@@ -750,7 +750,7 @@ describe('getAncestorNodes', () => {
           },
           type: options.type || 'task',
           position: { x: 0, y: 0 },
-        } as Node
+        }
       }
 
       describe('Control Flow Node Type Detection', () => {
