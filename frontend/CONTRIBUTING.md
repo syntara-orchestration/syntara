@@ -8,7 +8,7 @@ All pull requests must pass the `(Frontend) Required Checks` CI gate before merg
 
 ## AI-Assisted Development
 
-This project ships with AI agent skills (in `.claude/skills/`) that handle the repetitive parts of the development workflow — implementing features, reviewing code, and writing tests — while enforcing the project's standards automatically. These skills work with Claude Code, Cursor, or any tool that reads the skill files.
+This project ships with AI agent skills (canonical files in `.agents/skills/`; Claude Code symlinks in `.claude/skills/`) that handle the repetitive parts of the development workflow — implementing features, reviewing code, and writing tests — while enforcing the project's standards automatically. These skills work with Codex, Claude Code, Cursor, or any tool that reads the skill files.
 
 **New contributors should read [`docs/ai-assisted-development.md`](docs/ai-assisted-development.md) before writing any code.** It explains:
 

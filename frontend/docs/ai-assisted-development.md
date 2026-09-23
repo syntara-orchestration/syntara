@@ -1,6 +1,6 @@
 # AI-Assisted Development Workflow
 
-Use AI agents (Claude Code, Cursor, or any tool that reads `.claude/skills/`) to implement, review, and test UI features. The agent handles React, PatternFly, and project conventions.
+Use AI agents such as Codex, Claude Code, or Cursor to implement, review, and test UI features. Canonical skill files live under `.agents/skills/`; `.claude/skills/` contains tracked symlinks for Claude Code. The agent handles React, PatternFly, and project conventions.
 
 **You provide:** the API endpoint, what the page should do, and optionally a mockup screenshot.
 **The agent handles:** component selection, TypeScript types, form validation, tests, and design tokens.
@@ -145,7 +145,7 @@ Use for: new pages, list views, dialogs, forms, hooks, or refactors.
 
 Tell the agent: "Plan this feature before writing any code." It finds a similar existing page, asks clarifying questions, and writes a plan for your approval before generating code.
 
-**Always follow existing codebase patterns and standards.** The coding standards skill ([`.claude/skills/frontend-coding-standards/SKILL.md`](../../.claude/skills/frontend-coding-standards/SKILL.md)) and UX design system skill ([`.claude/skills/frontend-patternfly-ux/SKILL.md`](../../.claude/skills/frontend-patternfly-ux/SKILL.md)) are the authoritative guidelines — match what already exists in the codebase rather than inventing new patterns.
+**Always follow existing codebase patterns and standards.** The coding standards skill ([`.agents/skills/frontend-coding-standards/SKILL.md`](../../.agents/skills/frontend-coding-standards/SKILL.md)) and UX design system skill ([`.agents/skills/frontend-patternfly-ux/SKILL.md`](../../.agents/skills/frontend-patternfly-ux/SKILL.md)) are the authoritative guidelines — match what already exists in the codebase rather than inventing new patterns.
 
 ### Prompt template
 
@@ -273,7 +273,7 @@ I am building [what]. Verify my implementation matches the design system.
 [PASTE SCREENSHOT]
 ```
 
-The full set of UX rules (table variants, form thresholds, modal sizes, alert casing, spacing tokens) lives in [`.claude/skills/frontend-patternfly-ux/SKILL.md`](../../.claude/skills/frontend-patternfly-ux/SKILL.md). The agent reads it automatically.
+The full set of UX rules (table variants, form thresholds, modal sizes, alert casing, spacing tokens) lives in [`.agents/skills/frontend-patternfly-ux/SKILL.md`](../../.agents/skills/frontend-patternfly-ux/SKILL.md). The agent reads it automatically.
 
 ---
 
@@ -345,9 +345,9 @@ Shortest path from "I need to build this page" to an open PR:
 
 ## 11. Skills & Commands Reference
 
-### Skills (`.claude/skills/`)
+### Skills (`.agents/skills/`)
 
-Skills are detailed reference guides the agent consults while working. You can also ask the agent to use a specific skill by name.
+Skills are detailed reference guides the agent consults while working. You can also ask the agent to use a specific skill by name. Claude Code discovers them through the `.claude/skills/` symlinks.
 
 | Skill                           | File                                   | What it does                                                                                                                                                        | When to use it                                                                                                                               |
 | ------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -363,7 +363,7 @@ Skills are detailed reference guides the agent consults while working. You can a
 
 ### User-invocable skills
 
-Type these in the agent chat. They live under `.claude/skills/` (this repository does not ship `.claude/commands/`).
+Type these in the agent chat. They live under `.agents/skills/` (this repository does not ship `.claude/commands/`).
 
 | Command                      | What it does                                                                             |
 | ---------------------------- | ---------------------------------------------------------------------------------------- |
@@ -478,7 +478,7 @@ Claude: Here is my plan...
 
 ### File location
 
-The skill lives at [`.claude/skills/frontend-build-ui-feature/SKILL.md`](../../.claude/skills/frontend-build-ui-feature/SKILL.md). It uses `frontend-coding-standards`, `frontend-testing-guidelines`, `frontend-library-references`, `frontend-patternfly-ux`, and optionally `frontend-playwright-e2e`.
+The skill lives at [`.agents/skills/frontend-build-ui-feature/SKILL.md`](../../.agents/skills/frontend-build-ui-feature/SKILL.md). It uses `frontend-coding-standards`, `frontend-testing-guidelines`, `frontend-library-references`, `frontend-patternfly-ux`, and optionally `frontend-playwright-e2e`.
 
 ---
 
@@ -486,13 +486,13 @@ The skill lives at [`.claude/skills/frontend-build-ui-feature/SKILL.md`](../../.
 
 | Topic                       | Document                                                                                                           |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Coding standards            | [`.claude/skills/frontend-coding-standards/SKILL.md`](../../.claude/skills/frontend-coding-standards/SKILL.md)     |
-| Testing standards           | [`.claude/skills/frontend-testing-guidelines/SKILL.md`](../../.claude/skills/frontend-testing-guidelines/SKILL.md) |
-| PR review process           | [`.claude/skills/frontend-pr-review/SKILL.md`](../../.claude/skills/frontend-pr-review/SKILL.md)                   |
-| Playwright E2E              | [`.claude/skills/frontend-playwright-e2e/SKILL.md`](../../.claude/skills/frontend-playwright-e2e/SKILL.md)         |
-| PatternFly UX design system | [`.claude/skills/frontend-patternfly-ux/SKILL.md`](../../.claude/skills/frontend-patternfly-ux/SKILL.md)           |
-| Frontend specialist         | [`.claude/skills/frontend-specialist/SKILL.md`](../../.claude/skills/frontend-specialist/SKILL.md)                 |
-| Library references          | [`.claude/skills/frontend-library-references/SKILL.md`](../../.claude/skills/frontend-library-references/SKILL.md) |
+| Coding standards            | [`.agents/skills/frontend-coding-standards/SKILL.md`](../../.agents/skills/frontend-coding-standards/SKILL.md)     |
+| Testing standards           | [`.agents/skills/frontend-testing-guidelines/SKILL.md`](../../.agents/skills/frontend-testing-guidelines/SKILL.md) |
+| PR review process           | [`.agents/skills/frontend-pr-review/SKILL.md`](../../.agents/skills/frontend-pr-review/SKILL.md)                   |
+| Playwright E2E              | [`.agents/skills/frontend-playwright-e2e/SKILL.md`](../../.agents/skills/frontend-playwright-e2e/SKILL.md)         |
+| PatternFly UX design system | [`.agents/skills/frontend-patternfly-ux/SKILL.md`](../../.agents/skills/frontend-patternfly-ux/SKILL.md)           |
+| Frontend specialist         | [`.agents/skills/frontend-specialist/SKILL.md`](../../.agents/skills/frontend-specialist/SKILL.md)                 |
+| Library references          | [`.agents/skills/frontend-library-references/SKILL.md`](../../.agents/skills/frontend-library-references/SKILL.md) |
 | Architecture overview       | [`architecture.md`](./architecture.md)                                                                             |
 | Error handling              | [`error-handling.md`](./error-handling.md)                                                                         |
 | Contributing                | [`CONTRIBUTING.md`](../CONTRIBUTING.md)                                                                            |

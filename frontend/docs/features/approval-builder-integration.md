@@ -449,7 +449,7 @@ export function ApprovalStatusBadges(props: Readonly<{ status?: ApprovalStatus |
 }
 ```
 
-**Uses `SynLabel` for system-generated status indicators** (per `.claude/skills/frontend-coding-standards/SKILL.md` §12).
+**Uses `SynLabel` for system-generated status indicators** (per `.agents/skills/frontend-coding-standards/SKILL.md` §12).
 
 ## Builder Approval Handling (Execution Context)
 
