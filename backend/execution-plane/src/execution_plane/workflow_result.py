@@ -8,7 +8,8 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from execution_plane.script_executor import TEMPORAL_PAYLOAD_MAX_BYTES, _enforce_payload_limit
+from execution_plane.config import get_script_executor_settings
+from execution_plane.script_executor import _enforce_payload_limit
 
 _TEMPLATE = re.compile(r"\$\{([^}]+)\}")
 _RETRYABLE_HTTP_STATUSES = frozenset({429, 502, 503, 504})
@@ -65,7 +66,7 @@ def _map_output(result: dict[str, Any], output_config: dict[str, str] | None) ->
 
 
 def _ensure_payload_fits(payload: dict[str, Any]) -> dict[str, Any]:
-    if len(json.dumps(payload, ensure_ascii=False).encode()) > TEMPORAL_PAYLOAD_MAX_BYTES:
+    if len(json.dumps(payload, ensure_ascii=False).encode()) > get_script_executor_settings().temporal_payload_max_bytes:
         raise WorkflowResultError("Workflow node output exceeds Temporal payload limit", "OutputTooLarge")
     return payload
 

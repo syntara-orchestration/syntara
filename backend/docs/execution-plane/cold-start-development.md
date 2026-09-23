@@ -91,7 +91,8 @@ integration, start the workers with these environment values:
 export APP_SCRIPT_NODES_ENABLED=true
 export APP_EP_COLD_START_WORKFLOW_NODES=true
 export APP_EP_OPENSHIFT_INTEGRATION_ID='<ID printed by registration script>'
-docker compose -f podman-compose.yml up -d temporal-worker execution-plane-worker
+(cd backend && uv run podman-compose -p syntara -f ../podman-compose.yml \
+  up -d temporal-worker execution-plane-worker)
 ```
 
 The image settings default to the AMD64 HTTP and Python images from the
@@ -171,13 +172,14 @@ To verify the first-class Syntara integration through a real Temporal workflow,
 run the dedicated HTTP → Python fixture after setting the integration ID above:
 
 ```bash
-docker compose -f podman-compose.yml run --rm --no-deps --entrypoint python \
+(cd backend && uv run podman-compose -p syntara -f ../podman-compose.yml \
+  run --rm --no-deps --entrypoint python \
   -e APP_EP_COLD_START_WORKFLOW_NODES=true \
   -e APP_EP_OPENSHIFT_INTEGRATION_ID="$APP_EP_OPENSHIFT_INTEGRATION_ID" \
   -e APP_SCRIPT_NODES_ENABLED=true \
-  -v "$PWD/backend/execution-plane/scripts/verify-workflow-integration.py:/tmp/verify-workflow-integration.py:ro" \
-  -v "$PWD/backend/tests/integration/workflows/examples/ep/openshift-http-script.json:/tmp/openshift-http-script.json:ro" \
-  temporal-worker /tmp/verify-workflow-integration.py /tmp/openshift-http-script.json
+  -v "$PWD/execution-plane/scripts/verify-workflow-integration.py:/tmp/verify-workflow-integration.py:ro" \
+  -v "$PWD/tests/integration/workflows/examples/ep/openshift-http-script.json:/tmp/openshift-http-script.json:ro" \
+  temporal-worker /tmp/verify-workflow-integration.py /tmp/openshift-http-script.json)
 ```
 
 The verifier asserts HTTP 200 and the Python script's computed JSON result,
