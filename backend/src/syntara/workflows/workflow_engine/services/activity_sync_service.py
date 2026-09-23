@@ -2282,6 +2282,7 @@ class ActivitySyncService:
             error_details=None,
             retry_count=0,
             iteration=iteration_num,
+            expected_duration=original.expected_duration,
         )
         session.add(new_activity)
         existing_activities[composite_key] = new_activity
@@ -2812,6 +2813,16 @@ class ActivitySyncService:
                         node_type = NodeType.INTERNAL_ACTIVITY
 
                     # V2 workflows: Create records for all node types (triggers, control, executors)
+                    # Extract expected_duration from node settings if present (per-node override).
+                    # Catalog defaults are resolved at Temporal dispatch time in dynamic_workflow.py.
+                    node_settings = activity_def.get("settings") or {}
+                    raw_expected_duration = node_settings.get("expected_duration")
+                    expected_duration: int | None = (
+                        int(raw_expected_duration)
+                        if raw_expected_duration is not None
+                        else None
+                    )
+
                     new_activity = ActivityExecution(
                         execution_id=execution_id,
                         activity_name=activity_id,
@@ -2825,6 +2836,7 @@ class ActivitySyncService:
                         error_details=None,
                         retry_count=0,
                         iteration=None,
+                        expected_duration=expected_duration,
                     )
                     new_activities.append(new_activity)
 
