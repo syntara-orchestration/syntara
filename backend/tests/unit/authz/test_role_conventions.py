@@ -147,6 +147,17 @@ class TestRolePolicyMapping:  # noqa: D101
         names = builtin_role_policy_names("project-auditor")
         assert not any("credential:use" in n for n in names)
 
+    def test_form_prompt_submit_policy_assignments(self) -> None:
+        admin_policies = builtin_role_policy_names("admin")
+        project_admin_policies = builtin_role_policy_names("project-admin")
+        project_user_policies = builtin_role_policy_names("project-user")
+
+        assert "form_prompt:submit:any" in admin_policies
+        assert "form_prompt:submit:project" in project_admin_policies
+        assert "form_prompt:submit:project" in project_user_policies
+        assert "form_prompt:submit:any" not in builtin_role_policy_names("auditor")
+        assert "form_prompt:submit:project" not in builtin_role_policy_names("project-auditor")
+
     def test_unknown_role_returns_empty(self) -> None:
         names = builtin_role_policy_names("nonexistent")
         assert names == []

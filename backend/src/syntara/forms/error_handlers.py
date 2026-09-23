@@ -3,7 +3,8 @@
 This module provides error handling for form-specific exceptions.
 """
 
-from typing import TYPE_CHECKING
+import json
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from fastapi import Request, status
@@ -112,7 +113,7 @@ def form_data_validation_error_handler(request: Request, exc: "FormDataValidatio
 
     detail = "Form validation failed: " + "; ".join(f"{err.field}: {err.message}" for err in exc.errors)
 
-    return create_problem_details_response(
+    response = create_problem_details_response(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         problem_type=PROBLEM_TYPES["validation_error"],
         title="Form Validation Error",
@@ -120,6 +121,18 @@ def form_data_validation_error_handler(request: Request, exc: "FormDataValidatio
         code="FORM_VALIDATION_ERROR",
         retryable=False,
         instance=str(request.url),
+    )
+    # RFC 9457 permits application-specific extension members. Preserve structured
+    # field errors so clients can map validation failures back to form controls.
+    content: dict[str, Any] = json.loads(bytes(response.body))
+    content["errors"] = [
+        {"field": error.field, "label": error.label, "code": error.code, "message": error.message}
+        for error in exc.errors
+    ]
+    return JSONResponse(
+        status_code=response.status_code,
+        content=content,
+        media_type="application/problem+json",
     )
 
 

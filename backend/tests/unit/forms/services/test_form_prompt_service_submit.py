@@ -18,7 +18,7 @@ from syntara.forms.exceptions import (
     FormPromptNotFoundError,
 )
 from syntara.forms.models.api_models import FormPromptStatus
-from syntara.forms.models.form_prompt import FormPrompt
+from syntara.forms.models.form_prompt import FormPrompt, FormPromptRead
 from syntara.forms.services.form_prompt_service import FormPromptService
 
 # Minimal valid form definition for tests
@@ -37,14 +37,46 @@ def _make_service_with_user(
     user = Mock()
     user.id = uuid4()
     user.username = "testuser"
+    user.display_name = "Test User"
 
-    # Mock session.get for prompt lookups
+    # Mock the eager prompt query and the conditional UPDATE.
+    query_result = Mock()
+    query_result.one_or_none.return_value = prompt
+    update_result = Mock()
+    update_result.rowcount = rowcount
+    if prompt is not None:
+        prompt.project_id = uuid4()
+        prompt.name = "Test form"
+        prompt.labels = {}
+        prompt.response_data = None
+        prompt.responded_by = None
+        prompt.responded_at = None
+        prompt.responder_user_records = []
+        prompt.responder_group_records = []
+        prompt.responder = None  # type: ignore[assignment]
+
+        def dump_prompt(**_kwargs: object) -> dict[str, object]:
+            return {
+                "id": prompt.id,
+                "project_id": prompt.project_id,
+                "name": prompt.name,
+                "execution_id": prompt.execution_id,
+                "prompt_node_id": prompt.prompt_node_id,
+                "form_definition": prompt.form_definition,
+                "status": prompt.status,
+                "created_at": prompt.created_at,
+                "labels": prompt.labels,
+                "response_data": prompt.response_data,
+                "responded_at": prompt.responded_at,
+            }
+
+        prompt.model_dump = Mock(side_effect=dump_prompt)  # type: ignore[method-assign]
+
     session.get = AsyncMock(return_value=prompt)
-
-    # Mock session.exec for the conditional UPDATE statement.
-    mock_result = Mock()
-    mock_result.rowcount = rowcount
-    session.exec = AsyncMock(return_value=mock_result)
+    if prompt is not None and prompt.status == FormPromptStatus.PENDING:
+        session.exec = AsyncMock(side_effect=[query_result, update_result])
+    else:
+        session.exec = AsyncMock(return_value=query_result)
 
     session.commit = AsyncMock()
     session.refresh = AsyncMock()
@@ -73,16 +105,16 @@ class TestFormPromptServiceSubmit:
         responded_prompt.timeout_at = None
 
         service, session, _user = _make_service_with_user(prompt=prompt, rowcount=0)
-        session.get = AsyncMock(side_effect=[prompt, responded_prompt])
+        session.get = AsyncMock(return_value=responded_prompt)
 
         with patch("syntara.forms.services.form_prompt_service.validate_form_submission"):
             with pytest.raises(FormPromptAlreadyRespondedError):
                 await service.submit(prompt_id, {"field1": "test value"})
 
-        session.exec.assert_awaited_once()
+        assert session.exec.await_count == 2
         session.rollback.assert_awaited_once()
         session.commit.assert_not_awaited()
-        assert session.get.await_count == 2
+        session.get.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_submit_success_updates_status(self) -> None:
@@ -112,7 +144,12 @@ class TestFormPromptServiceSubmit:
             mock_client.send_form_signal = AsyncMock()
             mock_client_cls.return_value.__aenter__.return_value = mock_client
 
-            await service.submit(prompt_id, submitted_data)
+            result = await service.submit(prompt_id, submitted_data)
+
+            assert isinstance(result, FormPromptRead)
+            assert result.id == prompt_id
+            assert result.status == FormPromptStatus.SUBMITTED
+            assert result.responded_by is not None
 
             # Should commit the transaction
             session.commit.assert_called_once()
@@ -232,10 +269,12 @@ class TestFormPromptServiceSubmit:
             mock_client_cls.return_value.__aenter__.return_value = mock_client
 
             # Should not raise - graceful degradation
-            await service.submit(prompt_id, submitted_data)
+            result = await service.submit(prompt_id, submitted_data)
 
             # Should still commit the database changes
             session.commit.assert_called_once()
+
+            assert result.signal_delivery_error == "Workflow signal delivery failed"
 
             # Should still emit telemetry
             mock_dispatcher.dispatch.assert_called_once()
@@ -289,11 +328,11 @@ class TestFormPromptServiceSubmit:
 
     @pytest.mark.asyncio
     async def test_submit_already_submitted_raises_error(self) -> None:
-        """A prompt already marked submitted raises FormPromptAlreadyRespondedError."""
+        """A prompt that is already submitted rejects another response."""
         prompt_id = uuid4()
         prompt = Mock(spec=FormPrompt)
         prompt.id = prompt_id
-        prompt.status = FormPromptStatus.SUBMITTED  # Already submitted
+        prompt.status = FormPromptStatus.SUBMITTED
         prompt.timeout_at = None
         prompt.form_definition = _MINIMAL_FORM_DEFINITION
         prompt.execution_id = uuid4()
@@ -305,5 +344,8 @@ class TestFormPromptServiceSubmit:
 
         submitted_data = {"field1": "test value"}
 
-        with pytest.raises(FormPromptAlreadyRespondedError):
-            await service.submit(prompt_id, submitted_data)
+        with patch("syntara.forms.services.form_prompt_service.validate_form_submission") as mock_validate:
+            mock_validate.return_value = submitted_data
+
+            with pytest.raises(FormPromptAlreadyRespondedError):
+                await service.submit(prompt_id, submitted_data)

@@ -55,10 +55,334 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/form_prompts/{form_prompt_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Get form prompt request
+     * @description Get a form prompt by ID, including its form definition and responder configuration.
+     */
+    get: operations['get_form_prompt']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/form_prompts/{form_prompt_id}/submit': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Submit a response to a form prompt
+     * @description Submit a response to a pending form prompt and resume its workflow.
+     */
+    post: operations['submit_form_prompt']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
 }
 export type webhooks = Record<string, never>
 export interface components {
   schemas: {
+    /**
+     * FormPromptRead
+     * @description FormPrompt API response model with typed nested fields.
+     *
+     *     Overrides the JSONB dict fields from BaseFormPrompt with typed models
+     *     so API consumers get proper validation and type safety. Pydantic coerces
+     *     the raw dicts from the database into these typed models during serialization.
+     */
+    FormPromptRead: {
+      /**
+       * Resource ID
+       * Format: uuid
+       * @description Unique identifier for the resource
+       * @example 550e8400-e29b-41d4-a716-446655440000
+       */
+      readonly id?: string
+      /**
+       * Created At
+       * Format: date-time
+       * @description Timestamp when resource was created
+       * @example 2025-10-09T12:00:00Z
+       */
+      readonly created_at?: string
+      /**
+       * Updated At
+       * Format: date-time
+       * @description Timestamp when resource was last updated
+       * @example 2025-10-09T12:30:00Z
+       */
+      readonly updated_at?: string
+      /**
+       * Labels
+       * @description Key-value pairs for resource labeling and filtering
+       * @default {}
+       * @example {
+       *       "environment": "production",
+       *       "region": "us-east-1",
+       *       "team": "platform"
+       *     }
+       */
+      labels?: {
+        [key: string]: string
+      }
+      /**
+       * Project Id
+       * Format: uuid
+       * @description Project this form prompt belongs to
+       */
+      project_id: string
+      /**
+       * Name
+       * @description Human-readable name for the form prompt
+       */
+      name: string
+      /**
+       * Message
+       * @description Resolved guidance message shown to responders
+       */
+      message?: string | null
+      /**
+       * Execution Id
+       * Format: uuid
+       * @description Parent execution ID
+       */
+      execution_id: string
+      /**
+       * Prompt Node Id
+       * @description Canvas node ID from the workflow definition
+       */
+      prompt_node_id: string
+      /**
+       * Loop Iteration Path
+       * @description Enclosing-loop indices, outermost first (empty when not inside a loop)
+       */
+      loop_iteration_path?: number[]
+      /**
+       * @description Current form prompt status
+       * @default pending
+       */
+      status?: components['schemas']['FormPromptStatus']
+      /**
+       * Notes
+       * @description Optional notes explaining the last status change (e.g., reason for cancellation)
+       */
+      notes?: string | null
+      /**
+       * Timeout At
+       * @description When this prompt expires
+       */
+      timeout_at?: string | null
+      /** @description Form definition describing the fields shown to responders */
+      form_definition: components['schemas']['FormDefinition']
+      /**
+       * Submit Label
+       * @description Submit button label shown to the responder
+       */
+      submit_label?: string | null
+      /**
+       * Success Message
+       * @description Message shown after successful form submission
+       */
+      success_message?: string | null
+      /**
+       * Timezone
+       * @description IANA timezone name for interpreting date/datetime field values
+       */
+      timezone?: string | null
+      /**
+       * Css Override
+       * @description Custom CSS applied to the form view
+       */
+      css_override?: string | null
+      /**
+       * Response Data
+       * @description Submitted form values
+       */
+      response_data?: {
+        [key: string]: unknown
+      } | null
+      /**
+       * Responded At
+       * @description When response was submitted
+       */
+      responded_at?: string | null
+      /**
+       * Responder Users
+       * @description Users who can respond to this prompt (empty = any user with permission)
+       */
+      responder_users?: components['schemas']['ResponderUserSummary'][]
+      /**
+       * Responder Groups
+       * @description Groups whose members can respond to this prompt
+       */
+      responder_groups?: components['schemas']['ResponderGroupSummary'][]
+      /** @description User who submitted the response */
+      responded_by?: components['schemas']['UserReference'] | null
+      /**
+       * Signal Delivery Error
+       * @description Error if the workflow signal failed after a response. Only present in the respond response; null on subsequent reads.
+       */
+      signal_delivery_error?: string | null
+    }
+    /**
+     * FormPromptSubmitRequest
+     * @description Request payload for submitting a response to a form prompt.
+     */
+    FormPromptSubmitRequest: {
+      /**
+       * Response Data
+       * @description Submitted form field values, keyed by field name
+       */
+      response_data: {
+        [key: string]: unknown
+      }
+    }
+    /**
+     * ResponderUserSummary
+     * @description Summary of a user authorized to respond to a form prompt.
+     *
+     *     Similar to UserReference but represents a responder rather than the person
+     *     who actually responded. Used in API responses to show who can respond.
+     */
+    ResponderUserSummary: {
+      /**
+       * Id
+       * Format: uuid
+       * @description User's unique identifier
+       */
+      id: string
+      /**
+       * Username
+       * @description User's username
+       */
+      username: string
+    }
+    /**
+     * ResponderGroupSummary
+     * @description Summary of a group whose members are authorized to respond to a form prompt.
+     *
+     *     Represents a group of users who can collectively respond to a prompt.
+     *     Used in API responses to show which groups have response authority.
+     */
+    ResponderGroupSummary: {
+      /**
+       * Id
+       * Format: uuid
+       * @description Group's unique identifier
+       */
+      id: string
+      /**
+       * Name
+       * @description Group's name
+       */
+      name: string
+    }
+    /**
+     * FormDataValidationProblem
+     * @description RFC 9457 form validation problem with per-field error details.
+     * @example {
+     *       "code": "RATE_LIMIT_EXCEEDED",
+     *       "detail": "OpenRouter API rate limit exceeded. Please try again in a few moments.",
+     *       "instance": "/invocations/550e8400-e29b-41d4-a716-446655440000",
+     *       "retryable": true,
+     *       "title": "LLM Rate Limit Exceeded",
+     *       "type": "https://api.example.com/errors/llm-error"
+     *     }
+     * @example {
+     *       "code": "STREAM_TIMEOUT",
+     *       "detail": "LLM streaming timed out after 30 seconds",
+     *       "instance": "/invocations/550e8400-e29b-41d4-a716-446655440000",
+     *       "retryable": true,
+     *       "title": "Streaming Timeout",
+     *       "type": "https://api.example.com/errors/timeout-error"
+     *     }
+     */
+    FormDataValidationProblem: {
+      /**
+       * Type
+       * @description URI reference identifying the problem type
+       * @example https://api.example.com/errors/llm-error
+       */
+      type: string
+      /**
+       * Title
+       * @description Short, human-readable summary of the problem
+       * @example LLM Service Unavailable
+       */
+      title: string
+      /**
+       * Detail
+       * @description Human-readable explanation specific to this occurrence
+       * @example OpenRouter API returned error: rate limit exceeded. Please try again in a few moments.
+       */
+      detail: string
+      /**
+       * Code
+       * @description Machine-readable error code for programmatic handling
+       * @example RATE_LIMIT_EXCEEDED
+       */
+      code: string
+      /**
+       * Retryable
+       * @description Whether this error can be retried by creating a new invocation
+       * @example true
+       */
+      retryable: boolean
+      /**
+       * Instance
+       * @description Optional URI reference identifying the specific occurrence
+       * @example /invocations/550e8400-e29b-41d4-a716-446655440000
+       */
+      instance?: string | null
+      /**
+       * Errors
+       * @description Per-field validation errors
+       */
+      errors: components['schemas']['FormFieldErrorResponse'][]
+    }
+    /**
+     * FormFieldErrorResponse
+     * @description Structured validation error for one submitted form field.
+     */
+    FormFieldErrorResponse: {
+      /**
+       * Field
+       * @description Submitted field name
+       */
+      field: string
+      /**
+       * Label
+       * @description Display label for the field
+       */
+      label: string
+      /**
+       * Code
+       * @description Machine-readable validation error code
+       */
+      code: string
+      /**
+       * Message
+       * @description User-facing validation message
+       */
+      message: string
+    }
     /**
      * FormDefinition
      * @description Complete form definition with fields and metadata.
@@ -686,6 +1010,21 @@ export interface components {
        */
       instance?: string | null
     }
+    /**
+     * UserReference
+     * @description Minimal user identification for embedding in other resources.
+     *     This model captures user identity at the time of an action, providing
+     *     a snapshot that doesn't change even if the user's details are updated later.
+     */
+    UserReference: {
+      /**
+       * Format: uuid
+       * @description User's unique identifier
+       */
+      id: string
+      /** @description User's display name at time of action */
+      name: string
+    }
   }
   responses: {
     /** @description Bad Request */
@@ -935,6 +1274,78 @@ export interface operations {
       404: components['responses']['NotFoundError']
       409: components['responses']['ConflictError']
       422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
+  get_form_prompt: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        form_prompt_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Form prompt request details */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['FormPromptRead']
+        }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
+      422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
+  submit_form_prompt: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        form_prompt_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['FormPromptSubmitRequest']
+      }
+    }
+    responses: {
+      /** @description Updated form prompt with the submitted response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['FormPromptRead']
+        }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
+      /** @description Form field validation failed */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/problem+json': components['schemas']['FormDataValidationProblem']
+        }
+      }
       429: components['responses']['RateLimitError']
       500: components['responses']['InternalServerError']
     }

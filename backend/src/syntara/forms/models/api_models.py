@@ -6,13 +6,14 @@ components for type-safe API operations.
 
 from datetime import datetime
 from enum import Enum
-from typing import ClassVar, Final
+from typing import Any, ClassVar, Final
 from uuid import UUID
 
 from pydantic import ConfigDict, Field, field_validator
 from sqlmodel import SQLModel
 
 from syntara.core.constants import FieldLimits
+from syntara.core.models.error import ErrorData
 from syntara.forms.models.form_fields import FormDefinition
 
 
@@ -141,6 +142,32 @@ class FormPromptCreateRequest(SQLModel):
             msg = "loop_iteration_path entries must be non-negative integers"
             raise ValueError(msg)
         return value
+
+
+class FormPromptSubmitRequest(SQLModel):
+    """Request payload for submitting a response to a form prompt."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)  # type: ignore[assignment]
+
+    response_data: dict[str, Any] = Field(
+        ...,
+        description="Submitted form field values, keyed by field name",
+    )
+
+
+class FormFieldErrorResponse(SQLModel):
+    """Structured validation error for one submitted form field."""
+
+    field: str = Field(..., description="Submitted field name")
+    label: str = Field(..., description="Display label for the field")
+    code: str = Field(..., description="Machine-readable validation error code")
+    message: str = Field(..., description="User-facing validation message")
+
+
+class FormDataValidationProblem(ErrorData):
+    """RFC 9457 form validation problem with per-field error details."""
+
+    errors: list[FormFieldErrorResponse] = Field(..., description="Per-field validation errors")
 
 
 class BatchFormPromptStatus(str, Enum):

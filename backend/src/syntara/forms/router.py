@@ -1,10 +1,7 @@
-"""Forms API router.
-
-Minimal internal-facing implementation for workflow engine integration.
-AAP-91889 will extend with full filtering/sorting/enrichment and user-facing endpoints.
-"""
+"""Forms API router for form prompt management and workflow integration."""
 
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import Depends, Request, status
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -19,13 +16,28 @@ from syntara.core.syntara_router import SyntaraRouter
 from syntara.forms.models.api_models import (
     BatchFormPromptRequest,
     BatchUpdateResponse,
+    FormDataValidationProblem,
     FormPromptCreateRequest,
+    FormPromptSubmitRequest,
     FormPromptSummary,
 )
-from syntara.forms.models.form_prompt import FormPromptListResponse
+from syntara.forms.models.form_prompt import FormPrompt, FormPromptListResponse, FormPromptRead
 from syntara.forms.services.form_prompt_service import FormPromptService
 
 router = SyntaraRouter(prefix="/form_prompts", tags=["Form Prompts"])
+
+_form_prompt_perm_read = PermissionChecker(
+    "form_prompt",
+    "read",
+    resource_model=FormPrompt,
+    resource_id_param="form_prompt_id",
+)
+_form_prompt_perm_submit = PermissionChecker(
+    "form_prompt",
+    "submit",
+    resource_model=FormPrompt,
+    resource_id_param="form_prompt_id",
+)
 
 
 def get_form_prompt_service(
@@ -56,7 +68,6 @@ async def create_form_prompt(
     return await service.create(request)
 
 
-# Minimal internal-facing implementation. AAP-91889 will extend with full filtering/sorting.
 @router.get(
     "",
     dependencies=[Depends(PermissionChecker("form_prompt", "read"))],
@@ -98,7 +109,6 @@ async def list_form_prompts(
     )
 
 
-# Minimal internal-facing implementation. AAP-91889 will extend with full batch operations.
 @router.post(
     "/batch",
     dependencies=[Depends(PermissionChecker("form_prompt", "create"))],
@@ -113,3 +123,36 @@ async def batch_update_form_prompts(
 ) -> BatchUpdateResponse:
     """Batch update form prompt statuses."""
     return await service.batch_update_status(request)
+
+
+@router.get(
+    "/{form_prompt_id}",
+    dependencies=[Depends(_form_prompt_perm_read)],
+    operation_id="get_form_prompt",
+    summary="Get form prompt request",
+    response_description="Form prompt request details",
+)
+async def get_form_prompt(
+    form_prompt_id: UUID,
+    service: Annotated[FormPromptService, Depends(get_form_prompt_service)],
+) -> FormPromptRead:
+    """Get a form prompt by ID, including its form definition and responder configuration."""
+    return await service.get(form_prompt_id)
+
+
+@router.post(
+    "/{form_prompt_id}/submit",
+    dependencies=[Depends(_form_prompt_perm_submit)],
+    operation_id="submit_form_prompt",
+    summary="Submit a response to a form prompt",
+    response_description="Updated form prompt with the submitted response",
+    responses={422: {"model": FormDataValidationProblem, "description": "Form field validation failed"}},
+)
+async def submit_form_prompt(
+    form_prompt_id: UUID,
+    request: FormPromptSubmitRequest,
+    service: Annotated[FormPromptService, Depends(get_form_prompt_service)],
+) -> FormPromptRead:
+    """Submit a response to a pending form prompt and resume its workflow."""
+    # TODO(AAP-91890): https://issues.redhat.com/browse/AAP-91890 — enforce responder membership before submit.
+    return await service.submit(form_prompt_id, request.response_data)

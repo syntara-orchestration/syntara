@@ -74,6 +74,49 @@ class FormPromptService(BaseService):
         """
         super().__init__(session=session, user=user)
 
+    async def _get_form_prompt_record(self, prompt_id: UUID) -> FormPrompt | None:
+        """Fetch a prompt with relationships required by ``FormPromptRead`` eagerly loaded."""
+        query = (
+            select(FormPrompt)
+            .where(FormPrompt.id == prompt_id)
+            .options(
+                selectinload(FormPrompt.responder),  # type: ignore[arg-type]
+                selectinload(FormPrompt.responder_user_records),  # type: ignore[arg-type]
+                selectinload(FormPrompt.responder_group_records),  # type: ignore[arg-type]
+            )
+        )
+        result = await self.session.exec(query)
+        return result.one_or_none()
+
+    @staticmethod
+    def _to_read_model(prompt: FormPrompt, *, signal_delivery_error: str | None = None) -> FormPromptRead:
+        """Convert a prompt with loaded relationships to its API response model."""
+        read = FormPromptRead.model_validate(
+            prompt.model_dump(
+                exclude={
+                    "responded_by",
+                    "responder_user_records",
+                    "responder_group_records",
+                    "responder",
+                    "temporal_activity_id",
+                }
+            )
+        )
+        read.responder_users = [
+            ResponderUserSummary(id=user.id, username=user.username) for user in prompt.responder_user_records
+        ]
+        read.responder_groups = [
+            ResponderGroupSummary(id=group.id, name=group.name) for group in prompt.responder_group_records
+        ]
+        if prompt.responded_by is not None:
+            responder = prompt.responder
+            read.responded_by = UserReference(
+                id=prompt.responded_by,
+                name=responder.display_name if responder is not None else "",
+            )
+        read.signal_delivery_error = signal_delivery_error
+        return read
+
     def _map_fk_error_to_domain_exception(
         self,
         error_str: str,
@@ -250,39 +293,10 @@ class FormPromptService(BaseService):
             FormPromptNotFoundError: If the form prompt does not exist
 
         """
-        query = (
-            select(FormPrompt)
-            .where(FormPrompt.id == prompt_id)
-            .options(
-                selectinload(FormPrompt.responder),  # type: ignore[arg-type]
-                selectinload(FormPrompt.responder_user_records),  # type: ignore[arg-type]
-                selectinload(FormPrompt.responder_group_records),  # type: ignore[arg-type]
-            )
-        )
-        result = await self.session.exec(query)
-        form_prompt = result.one_or_none()
+        form_prompt = await self._get_form_prompt_record(prompt_id)
         if form_prompt is None:
             raise FormPromptNotFoundError(prompt_id)
-
-        read = FormPromptRead.model_validate(
-            form_prompt.model_dump(
-                exclude={"responded_by", "responder_user_records", "responder_group_records", "responder"}
-            )
-        )
-        read.responder_users = [
-            ResponderUserSummary(id=user.id, username=user.username) for user in form_prompt.responder_user_records
-        ]
-        read.responder_groups = [
-            ResponderGroupSummary(id=group.id, name=group.name) for group in form_prompt.responder_group_records
-        ]
-        if form_prompt.responded_by is not None:
-            responder = form_prompt.responder
-            read.responded_by = UserReference(
-                id=form_prompt.responded_by,
-                name=responder.display_name if responder is not None else "",
-            )
-
-        return read
+        return self._to_read_model(form_prompt)
 
     async def batch_update_status(self, request: BatchFormPromptRequest) -> BatchUpdateResponse:
         """Batch update form prompt statuses with concurrency safety and project scoping.
@@ -405,7 +419,7 @@ class FormPromptService(BaseService):
         self,
         prompt_id: UUID,
         submitted_data: dict[str, Any],
-    ) -> FormPrompt:
+    ) -> FormPromptRead:
         """Submit a response to a form prompt.
 
         Validates the submission, persists it to the database, and sends a signal
@@ -416,7 +430,7 @@ class FormPromptService(BaseService):
             submitted_data: Raw submitted form data
 
         Returns:
-            Updated form prompt with response data
+            Updated form prompt read model with response data and signal status
 
         Raises:
             FormPromptNotFoundError: If prompt does not exist
@@ -427,7 +441,7 @@ class FormPromptService(BaseService):
 
         """
         # Load the prompt, validate its state, then validate the submitted fields.
-        prompt = await self.session.get(FormPrompt, prompt_id)
+        prompt = await self._get_form_prompt_record(prompt_id)
         if prompt is None:
             raise FormPromptNotFoundError(prompt_id)
 
@@ -477,7 +491,14 @@ class FormPromptService(BaseService):
         await self.session.commit()
 
         # Refresh to get the updated state
-        await self.session.refresh(prompt)
+        await self.session.refresh(
+            prompt,
+            attribute_names=["status", "response_data", "responded_by", "responded_at"],
+        )
+        prompt.status = FormPromptStatus.SUBMITTED
+        prompt.response_data = cleaned_data
+        prompt.responded_by = self.user.id
+        prompt.responded_at = responded_at
 
         # Calculate wait time for telemetry
         submitted = responded_at.replace(tzinfo=None)
@@ -536,9 +557,11 @@ class FormPromptService(BaseService):
             )
         )
 
-        # Store the error as transient response metadata (not persisted to DB).
+        # Return the eagerly-loaded read model, keeping transient signal status
+        # only on this response.
         if signal_error:
-            prompt.signal_delivery_error = signal_error
             logger.error("Signal delivery failed", prompt_id=prompt_id, error=signal_error)
 
-        return prompt
+        read = self._to_read_model(prompt, signal_delivery_error=signal_error)
+        read.responded_by = UserReference(id=self.user.id, name=self.user.display_name)
+        return read

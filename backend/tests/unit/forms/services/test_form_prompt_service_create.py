@@ -4,6 +4,7 @@ Tests verify form prompt creation logic including validation,
 duplicate detection, and database operations.
 """
 
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 from uuid import UUID, uuid4
 
@@ -20,6 +21,7 @@ from syntara.forms.services.form_prompt_service import FormPromptService
 _MINIMAL_FORM_DEFINITION = {
     "fields": [{"value_name": "field1", "type": "text", "label": "Test Field", "required": False}]
 }
+_TEST_PROJECT_ID = uuid4()
 
 
 def _make_service(*, raise_integrity_error: bool = False) -> tuple[FormPromptService, Mock]:
@@ -29,6 +31,7 @@ def _make_service(*, raise_integrity_error: bool = False) -> tuple[FormPromptSer
     session.add = Mock()
     session.flush = AsyncMock()
     session.rollback = AsyncMock()
+    session.get = AsyncMock(return_value=SimpleNamespace(project_id=_TEST_PROJECT_ID))
 
     if raise_integrity_error:
         # Simulate uniqueness constraint violation
@@ -67,7 +70,7 @@ class TestFormPromptServiceCreate:
         service, _session = _make_service()
 
         exec_id = uuid4()
-        proj_id = uuid4()
+        proj_id = _TEST_PROJECT_ID
         request = FormPromptCreateRequest(
             execution_id=exec_id,
             project_id=proj_id,
@@ -93,7 +96,7 @@ class TestFormPromptServiceCreate:
 
         request = FormPromptCreateRequest(
             execution_id=uuid4(),
-            project_id=uuid4(),
+            project_id=_TEST_PROJECT_ID,
             prompt_node_id="form1",
             name="Form",
             form_definition=_MINIMAL_FORM_DEFINITION,
@@ -114,7 +117,7 @@ class TestFormPromptServiceCreate:
 
         request = FormPromptCreateRequest(
             execution_id=uuid4(),
-            project_id=uuid4(),
+            project_id=_TEST_PROJECT_ID,
             prompt_node_id="form1",
             name="Form",
             form_definition=_MINIMAL_FORM_DEFINITION,
@@ -133,7 +136,7 @@ class TestFormPromptServiceCreate:
 
         request = FormPromptCreateRequest(
             execution_id=uuid4(),
-            project_id=uuid4(),
+            project_id=_TEST_PROJECT_ID,
             prompt_node_id="form1",
             name="Form",
             form_definition=_MINIMAL_FORM_DEFINITION,
@@ -155,7 +158,7 @@ class TestFormPromptServiceCreate:
         user2 = uuid4()
         request = FormPromptCreateRequest(
             execution_id=uuid4(),
-            project_id=uuid4(),
+            project_id=_TEST_PROJECT_ID,
             prompt_node_id="form1",
             name="Form",
             form_definition=_MINIMAL_FORM_DEFINITION,
@@ -177,7 +180,7 @@ class TestFormPromptServiceCreate:
         group1 = uuid4()
         request = FormPromptCreateRequest(
             execution_id=uuid4(),
-            project_id=uuid4(),
+            project_id=_TEST_PROJECT_ID,
             prompt_node_id="form1",
             name="Form",
             form_definition=_MINIMAL_FORM_DEFINITION,
@@ -198,7 +201,7 @@ class TestFormPromptServiceCreate:
 
         request = FormPromptCreateRequest(
             execution_id=uuid4(),
-            project_id=uuid4(),
+            project_id=_TEST_PROJECT_ID,
             prompt_node_id="form1",
             name="Form",
             form_definition=_MINIMAL_FORM_DEFINITION,
