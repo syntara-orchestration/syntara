@@ -16,16 +16,22 @@ from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
 from syntara.core.config.base import get_settings
+from syntara.core.database.session import AsyncSessionLocal
 from syntara.workflows.workflow_engine.activities.common import HEARTBEAT_STOP_MONITOR
 from syntara.workflows.workflow_engine.models.workflow_definition import (
     ActivityName,
     ScriptExecutorParameters,
 )
 
+from .cold_start import resolve_target_id, script_task
+
 
 async def _dispatch_to_te(
     input_config: dict[str, Any],
     output_config: dict[str, str] | None,
+    *,
+    task_definition: dict[str, Any] | None = None,
+    workflow_node_type: str | None = None,
 ) -> None:
     """Write a WorkItem to the execution_plane schema for TE worker pickup.
 
@@ -45,11 +51,21 @@ async def _dispatch_to_te(
     except ValueError:
         work_correlation_id = uuid.uuid4()
 
+    payload: dict[str, Any] = {"input_config": input_config, "output_config": output_config}
+    if task_definition is not None:
+        async with AsyncSessionLocal() as session:
+            target_id = await resolve_target_id(session)
+        payload = {
+            "execution_target_id": str(target_id),
+            "task_definition": task_definition,
+            "workflow_node_type": workflow_node_type,
+            "output_config": output_config,
+        }
     async with WorkStore(settings.database_url.render_as_string(hide_password=False), poolclass=NullPool) as store:
         work_item = await store.dispatch(
             activity_handle=task_token_b64,
             work_correlation_id=work_correlation_id,
-            payload={"input_config": input_config, "output_config": output_config},
+            payload=payload,
         )
     activity.logger.info("Dispatched work item to TE work_item_id=%s", work_item.id)
 
@@ -83,10 +99,19 @@ async def execute_script_activity(
 
     # Validate config before writing the work item to catch bad input early.
     try:
-        ScriptExecutorParameters.model_validate(input_config)
+        config = ScriptExecutorParameters.model_validate(input_config)
     except Exception:  # noqa: BLE001
         msg = "Script activity configuration validation failed"
         raise ApplicationError(msg, type="ConfigError", non_retryable=True) from None
 
-    await _dispatch_to_te(input_config, output_config)
+    settings = get_settings()
+    if settings.ep_cold_start_workflow_nodes:
+        await _dispatch_to_te(
+            input_config,
+            output_config,
+            task_definition=script_task(config, input_config),
+            workflow_node_type="script",
+        )
+    else:
+        await _dispatch_to_te(input_config, output_config)
     activity.raise_complete_async()

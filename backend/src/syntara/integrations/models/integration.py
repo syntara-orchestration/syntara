@@ -37,6 +37,7 @@ class IntegrationType(StrEnum):
     MCP_SERVER = "mcp_server"
     LLM_PROVIDER = "llm_provider"
     ANSIBLE_AUTOMATION_PLATFORM = "ansible_automation_platform"
+    OPENSHIFT = "openshift"
 
 
 class IntegrationStatus(StrEnum):

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import uuid
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -14,8 +15,12 @@ import structlog
 from execution_plane.config import get_ep_settings, to_asyncpg_url
 from execution_plane.models.work_item import WorkItem, WorkItemStatus
 from execution_plane.script_executor import ScriptExecutionError, execute_script
+from execution_plane.services import ExecutionTargetRegistry
 from execution_plane.temporal_client import send_temporal_callback
 from execution_plane.work_store import WorkStore
+from execution_plane.worker_manager import create_worker_manager
+from execution_plane.worker_manager.base import WorkerDispatchError
+from execution_plane.workflow_result import WorkflowResultError, normalize_workflow_result
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -26,16 +31,58 @@ NOTIFY_CHANNEL = "execution_plane_work_items"
 CompletionCallback = Callable[[WorkItem], Awaitable[bool]]
 
 
+async def _execute_cold_start(item: WorkItem, store: WorkStore) -> dict[str, Any]:
+    """Resolve a target and dispatch one cold-start work item."""
+    async with store.read_session() as session:
+        registry = ExecutionTargetRegistry(session)
+        target_id = item.payload.get("execution_target_id")
+        if target_id is not None:
+            try:
+                target = await registry.find_active_by_id(uuid.UUID(str(target_id)))
+            except ValueError as exc:
+                msg = "execution_target_id must be a UUID"
+                raise WorkerDispatchError(msg) from exc
+        else:
+            selector = item.payload.get("target_selector", {})
+            if not isinstance(selector, dict):
+                msg = "target_selector must be an object"
+                raise WorkerDispatchError(msg)
+            target = await registry.find_matching(selector)
+    if target is None:
+        msg = "no active execution target matches the requested labels"
+        raise WorkerDispatchError(msg)
+    await store.mark_dispatched(item.id, target.id)
+    return await create_worker_manager(target).dispatch(item)
+
+
 async def _process_item(item: WorkItem, store: WorkStore, completion_callback: CompletionCallback) -> None:
-    """Execute script, persist result, then send Temporal callback."""
+    """Execute locally or on a cold-start target, persist, then callback."""
     wi_id = str(item.id)
     input_config: dict[str, Any] = item.payload.get("input_config", {})
     output_config: dict[str, str] | None = item.payload.get("output_config")
 
     try:
-        activity_result = await execute_script(input_config, output_config)
+        if "task_definition" in item.payload:
+            activity_result = await _execute_cold_start(item, store)
+            node_type = item.payload.get("workflow_node_type")
+            if node_type is not None:
+                activity_result = normalize_workflow_result(node_type, activity_result, output_config)
+        else:
+            activity_result = await execute_script(input_config, output_config)
         item = await store.set_result(item.id, activity_result, WorkItemStatus.COMPLETED)
-        logger.info("Script executed successfully", work_item_id=wi_id)
+        logger.info("Work item executed successfully", work_item_id=wi_id)
+    except WorkflowResultError as e:
+        item = await store.set_result(
+            item.id,
+            {
+                "error": str(e),
+                "error_type": e.error_type,
+                "non_retryable": e.non_retryable,
+                "details": e.details,
+            },
+            WorkItemStatus.FAILED,
+        )
+        logger.warning("Workflow node failed", work_item_id=wi_id, error_type=e.error_type)
     except ScriptExecutionError as e:
         item = await store.set_result(
             item.id,
@@ -49,6 +96,9 @@ async def _process_item(item: WorkItem, store: WorkStore, completion_callback: C
             WorkItemStatus.FAILED,
         )
         logger.warning("Script execution failed", work_item_id=wi_id, error=str(e))
+    except WorkerDispatchError as e:
+        item = await store.set_result(item.id, {"error": str(e), "error_type": type(e).__name__}, WorkItemStatus.FAILED)
+        logger.warning("Work item execution failed", work_item_id=wi_id, error=str(e))
     except Exception as e:
         item = await store.set_result(
             item.id,
@@ -57,7 +107,7 @@ async def _process_item(item: WorkItem, store: WorkStore, completion_callback: C
         )
         logger.exception("Unexpected error processing work item", work_item_id=wi_id)
 
-    if await completion_callback(item):
+    if item.activity_handle is None or await completion_callback(item):
         await store.mark_signal_delivered(item.id)
 
 
@@ -72,7 +122,7 @@ async def _recover_undelivered(store: WorkStore, completion_callback: Completion
         return
     logger.info("Recovering undelivered Temporal callbacks", count=len(items))
     for item in items:
-        if await completion_callback(item):
+        if item.activity_handle is None or await completion_callback(item):
             await store.mark_signal_delivered(item.id)
 
 

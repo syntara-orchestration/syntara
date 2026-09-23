@@ -8,8 +8,9 @@ any state not reachable through them is not a valid transition.
 from __future__ import annotations
 
 import uuid
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any, AsyncIterator, Self
 
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -54,9 +55,15 @@ class WorkStore:
         """Dispose all pooled database connections owned by this store."""
         await self._engine.dispose()
 
+    @asynccontextmanager
+    async def read_session(self) -> AsyncIterator[AsyncSession]:
+        """Provide a short-lived session for read-only target registry queries."""
+        async with self._session_factory() as session:
+            yield session
+
     async def dispatch(
         self,
-        activity_handle: str,
+        activity_handle: str | None,
         work_correlation_id: uuid.UUID,
         payload: dict[str, Any],
     ) -> WorkItem:
@@ -79,6 +86,20 @@ class WorkStore:
                 await session.rollback()
                 raise
         return item
+
+    async def mark_dispatched(self, item_id: uuid.UUID, execution_target_id: uuid.UUID) -> None:
+        """Bind a claimed item to a target before external provisioning begins."""
+        async with self._session_factory() as session:
+            try:
+                item = await session.get(WorkItem, item_id)
+                if item is None:
+                    raise WorkItemNotFoundError(item_id)
+                item.execution_target_id = execution_target_id
+                item.status = WorkItemStatus.DISPATCHED
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
 
     async def claim_one(self) -> WorkItem | None:
         """Claim the oldest PENDING item for this worker, or return None."""

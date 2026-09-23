@@ -13,6 +13,7 @@ from pydantic import ValidationError
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
+from syntara.core.config.base import get_settings
 from syntara.core.lib.url_validation import validate_url_no_ssrf
 from syntara.credentials.lib.auth_types import AUTH_TYPE_API_KEY, AUTH_TYPE_BASIC, AUTH_TYPE_BEARER, AUTH_TYPE_URL
 from syntara.workflows.workflow_engine import constants
@@ -24,8 +25,27 @@ from syntara.workflows.workflow_engine.models.workflow_definition import (
 from syntara.workflows.workflow_engine.utils.credential_scrubber import ensure_resolved_credentials_dict
 
 from .common import HEARTBEAT_STOP_MONITOR, ActivityExecutionError, is_retryable_http_status
+from .ep.cold_start import http_task
+from .ep.ep_dispatch_activity import _dispatch_to_te
 
 logger = structlog.stdlib.get_logger(__name__)
+
+_COLD_START_HTTP_METHODS = frozenset({"GET", "POST", "PUT", "PATCH", "DELETE"})
+_SENSITIVE_NAMES = ("authorization", "cookie", "token", "secret", "password", "api_key", "api-key")
+
+
+def _can_dispatch_http_to_pod(
+    input_config: dict[str, Any], config: APIExecutorParameters, request_url: str, headers: dict[str, Any]
+) -> bool:
+    """Keep credential-bearing requests out of plaintext Execution Plane WorkItems."""
+    if (
+        config.method.value not in _COLD_START_HTTP_METHODS
+        or config.credential_id
+        or input_config.get("_resolved_credentials")
+    ):
+        return False
+    names = [*headers, *config.query_params, *(name for name, _ in parse_qsl(urlsplit(request_url).query))]
+    return not any(any(secret in name.lower() for secret in _SENSITIVE_NAMES) for name in names)
 
 
 def _resolve_httpx_params(request_url: str, query_params: dict[str, Any]) -> tuple[str, dict[str, Any] | None]:
@@ -170,6 +190,20 @@ async def execute_http_request_activity(
         raise ApplicationError(str(exc), type="SSRFValidationError", non_retryable=True) from None
 
     timeout_seconds = int(input_config.get(constants.ENGINE_TIMEOUT_SECONDS_KEY, 30))
+
+    if get_settings().ep_cold_start_workflow_nodes and _can_dispatch_http_to_pod(
+        input_config, config, request_url, headers
+    ):
+        await _dispatch_to_te(
+            input_config,
+            output_config,
+            task_definition=http_task(
+                config, request_url=request_url, headers=headers, timeout_seconds=timeout_seconds
+            ),
+            workflow_node_type="http_request",
+        )
+        activity.raise_complete_async()
+
     request_url, request_params = _resolve_httpx_params(request_url, config.query_params)
 
     start_time = time.time()

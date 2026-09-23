@@ -45,7 +45,9 @@ class WorkItem(SQLModel, table=True):
 
     # Temporal async completion token. Held by the Task Executor until the terminal event
     # is received from the execution plane.
-    activity_handle: str = Field(sa_column=Column(Text, nullable=False))
+    # Optional for direct /submit callers. Temporal-dispatched work carries a
+    # base64 task token; direct development submissions need no callback.
+    activity_handle: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
 
     status: WorkItemStatus = Field(
         default=WorkItemStatus.PENDING,

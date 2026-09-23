@@ -75,6 +75,37 @@ paths:
       x-app-permission:
         resource: work_item
         action: read
+  /api/execution_plane/v1/submit:
+    post:
+      tags:
+        - Execution Plane
+      summary: Submit a cold-start execution-plane work item
+      description: Queue a JSONL task for execution on a matching registered target.
+      operationId: submit_execution_plane_work_item
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkItemSubmit'
+        required: true
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkItemRead'
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+        - bearerAuth: []
+      x-app-permission:
+        resource: work_item
+        action: create
 components:
   schemas:
     BackendType:
@@ -98,6 +129,14 @@ components:
         endpoint:
           type: string
           title: Endpoint
+        namespace:
+          type: string
+          title: Namespace
+        credential_ref:
+          additionalProperties: true
+          type: object
+          title: Credential Ref
+          default: {}
         status:
           $ref: '#/components/schemas/TargetStatus'
           default: registering
@@ -125,6 +164,7 @@ components:
         - name
         - backend_type
         - endpoint
+        - namespace
         - created_at
       title: ExecutionTarget
       description: A registered compute environment where worker pods run.
@@ -201,7 +241,34 @@ components:
         - msg
         - type
       title: ValidationError
-    WorkItem:
+    WorkItemListResponse:
+      properties:
+        resources:
+          items:
+            $ref: '#/components/schemas/WorkItemRead'
+          type: array
+          title: Resources
+        next:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Next
+        prev:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Prev
+        total:
+          anyOf:
+            - type: integer
+            - type: 'null'
+          title: Total
+      type: object
+      required:
+        - resources
+      title: WorkItemListResponse
+      description: Paginated list response for WorkItem.
+    WorkItemRead:
       properties:
         id:
           type: string
@@ -211,12 +278,8 @@ components:
           type: string
           format: uuid
           title: Work Correlation Id
-        activity_handle:
-          type: string
-          title: Activity Handle
         status:
           $ref: '#/components/schemas/WorkItemStatus'
-          default: pending
         execution_target_id:
           anyOf:
             - type: string
@@ -227,7 +290,6 @@ components:
           additionalProperties: true
           type: object
           title: Payload
-          default: {}
         result:
           anyOf:
             - additionalProperties: true
@@ -258,38 +320,13 @@ components:
           title: Signaled At
       type: object
       required:
+        - id
         - work_correlation_id
-        - activity_handle
+        - status
+        - payload
         - created_at
-      title: WorkItem
-      description: A unit of work written by the Temporal Worker and consumed by the Task Executor.
-    WorkItemListResponse:
-      properties:
-        resources:
-          items:
-            $ref: '#/components/schemas/WorkItem'
-          type: array
-          title: Resources
-        next:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Next
-        prev:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Prev
-        total:
-          anyOf:
-            - type: integer
-            - type: 'null'
-          title: Total
-      type: object
-      required:
-        - resources
-      title: WorkItemListResponse
-      description: Paginated list response for WorkItem.
+      title: WorkItemRead
+      description: Public work-item representation that excludes execution inputs and task tokens.
     WorkItemStatus:
       type: string
       enum:
@@ -301,6 +338,72 @@ components:
         - cancelled
       title: WorkItemStatus
       description: Lifecycle states of a dispatched work item.
+    WorkItemSubmit:
+      properties:
+        work_correlation_id:
+          type: string
+          format: uuid
+          title: Work Correlation Id
+        activity_handle:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Activity Handle
+        target_selector:
+          additionalProperties: true
+          type: object
+          title: Target Selector
+        task_definition:
+          $ref: '#/components/schemas/WorkerTaskDefinition'
+      type: object
+      required:
+        - task_definition
+      title: WorkItemSubmit
+      description: Direct Task Executor submission request.
+    WorkerTaskDefinition:
+      properties:
+        image:
+          type: string
+          maxLength: 512
+          minLength: 1
+          title: Image
+        pod_command:
+          anyOf:
+            - items:
+                type: string
+              type: array
+              maxItems: 32
+              minItems: 1
+            - type: 'null'
+          title: Pod Command
+        command:
+          items:
+            type: string
+          type: array
+          maxItems: 32
+          minItems: 1
+          title: Command
+        input:
+          additionalProperties: true
+          type: object
+          title: Input
+        timeout_seconds:
+          type: integer
+          maximum: 3600.0
+          minimum: 1.0
+          title: Timeout Seconds
+          default: 120
+        image_pull_policy:
+          type: string
+          title: Image Pull Policy
+          default: IfNotPresent
+      type: object
+      required:
+        - image
+        - command
+        - input
+      title: WorkerTaskDefinition
+      description: OCI image and JSONL invocation used for a cold-start worker.
   securitySchemes:
     bearerAuth:
       type: http

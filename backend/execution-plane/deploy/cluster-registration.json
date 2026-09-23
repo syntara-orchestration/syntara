@@ -1,0 +1,18 @@
+{
+  "name": "dev-openshift-cluster",
+  "backend_type": "vanilla_k8s",
+  "endpoint": "https://api.pde-ao-03.cjjv.p3.openshiftapps.com:443",
+  "namespace": "ep-dev-workers",
+  "auth_type": "bearer_token_file",
+  "credential_ref": {
+    "type": "file",
+    "path": "/run/secrets/execution-plane/openshift-token",
+    "verify_ssl": true
+  },
+  "labels": {
+    "environment": "development",
+    "execution-mode": "cold-start",
+    "platform": "openshift"
+  },
+  "status": "active"
+}

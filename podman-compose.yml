@@ -133,6 +133,7 @@ services:
     ports:
       - ${APP_API_PORT:-8000}:8000
     environment:
+      - UV_CACHE_DIR=/tmp/uv-cache
       - APP_DB_HOST=database
       - APP_DB_PORT=5432
       - APP_DB_USER=${APP_DB_USER:-admin}
@@ -240,6 +241,11 @@ services:
       - APP_TEMPORAL_NAMESPACE=default
       - APP_TASK_QUEUE=orchestrator-workflow-queue
       - APP_SCRIPT_NODES_ENABLED=${APP_SCRIPT_NODES_ENABLED:-false}
+      - APP_EP_COLD_START_WORKFLOW_NODES=${APP_EP_COLD_START_WORKFLOW_NODES:-false}
+      - APP_EP_OPENSHIFT_INTEGRATION_ID=${APP_EP_OPENSHIFT_INTEGRATION_ID:-}
+      - APP_EP_HTTP_EXECUTOR_IMAGE=${APP_EP_HTTP_EXECUTOR_IMAGE:-quay.io/ahetheri/http-executor:amd64}
+      - APP_EP_SCRIPT_PYTHON_EXECUTOR_IMAGE=${APP_EP_SCRIPT_PYTHON_EXECUTOR_IMAGE:-quay.io/ahetheri/script-python-executor:amd64}
+      - APP_EP_SCRIPT_BASH_EXECUTOR_IMAGE=${APP_EP_SCRIPT_BASH_EXECUTOR_IMAGE:-}
       - APP_ENV_FILE_PATH=${APP_ENV_FILE_PATH:-.env}
       - APP_FALLBACK_LOG_LEVEL=${APP_FALLBACK_LOG_LEVEL:-INFO}
       - APP_CACHE_HOST=redis
@@ -380,6 +386,7 @@ services:
       target: execution-plane
     image: ${EP_IMAGE:-localhost/execution-plane:latest}
     restart: unless-stopped
+    command: [sh, -c, 'cd execution-plane && alembic upgrade head && exec execution-plane-worker']
     environment:
       # Construct the URL from component vars so it stays in sync with the database service.
       - APP_DATABASE_URL=postgresql+asyncpg://${APP_DB_USER:-admin}:${APP_DB_PASSWORD:-admin}@database:5432/${APP_DB_NAME:-syntara_api}
@@ -395,6 +402,8 @@ services:
       - ./backend/.secrets/certs/ca.pem:/run/secrets/s2s-ca.pem:ro,z
       - ./backend/.secrets/certs/worker.crt:/run/secrets/s2s-cert.crt:ro,z
       - ./backend/.secrets/certs/worker.key:/run/secrets/s2s-cert.key:ro,z
+      # setup-openshift-dev.sh writes a short-lived ServiceAccount token here.
+      - ./backend/.secrets/execution-plane:/run/secrets/execution-plane:ro,z
     depends_on:
       database:
         condition: service_healthy

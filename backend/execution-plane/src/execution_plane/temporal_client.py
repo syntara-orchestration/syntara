@@ -93,6 +93,9 @@ async def send_temporal_callback(item: WorkItem, *, client: Client | None = None
     False if a retryable RPC error occurred — caller should not mark_signal_delivered.
     """
     wi_id = str(item.id)
+    if item.activity_handle is None:
+        logger.info("No Temporal callback requested", work_item_id=wi_id)
+        return True
     if client is None:
         client = await _get_client()
     task_token = base64.b64decode(item.activity_handle)
@@ -105,7 +108,15 @@ async def send_temporal_callback(item: WorkItem, *, client: Client | None = None
             result = item.result or {}
             error_msg = result.get("error", "Script execution failed")
             error_type = result.get("error_type", "ScriptExecutionError")
-            await handle.fail(ApplicationError(error_msg, type=error_type, non_retryable=True))
+            details = result.get("details")
+            await handle.fail(
+                ApplicationError(
+                    error_msg,
+                    *((details,) if isinstance(details, dict) else ()),
+                    type=error_type,
+                    non_retryable=bool(result.get("non_retryable", True)),
+                )
+            )
     except RPCError as e:
         if e.status == RPCStatusCode.NOT_FOUND:
             logger.info("Temporal activity already completed, treating as delivered", work_item_id=wi_id)

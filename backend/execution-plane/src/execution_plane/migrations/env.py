@@ -35,9 +35,11 @@ if config.config_file_name is not None:
 
 target_metadata = SQLModel.metadata
 
-database_url = config.get_main_option("sqlalchemy.url") or os.environ.get("DATABASE_URL")
+database_url = (
+    config.get_main_option("sqlalchemy.url") or os.environ.get("DATABASE_URL") or os.environ.get("APP_DATABASE_URL")
+)
 if not database_url:
-    msg = "DATABASE_URL must be set or sqlalchemy.url provided in alembic.ini"
+    msg = "DATABASE_URL or APP_DATABASE_URL must be set, or sqlalchemy.url provided in alembic.ini"
     raise RuntimeError(msg)
 config.set_main_option("sqlalchemy.url", database_url)
 

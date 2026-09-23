@@ -213,6 +213,7 @@ BUILTIN_POLICIES: list[PolicyInfo] = [
     PolicyInfo("policy", "delete", scope="project", roles=("project-admin",)),
     # execution plane
     PolicyInfo("execution_target", "read", roles=("admin", "auditor")),
+    PolicyInfo("work_item", "create", roles=("admin",)),
     PolicyInfo("work_item", "read", roles=("admin", "auditor")),
     # -- files --
     PolicyInfo("files", "upload", roles=("admin", "user")),
