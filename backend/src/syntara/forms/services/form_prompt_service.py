@@ -24,7 +24,12 @@ if TYPE_CHECKING:
     from syntara.core.models import User
 
 from syntara.audit.dispatcher import AuditEventDispatcher
-from syntara.core.services.base import BaseService
+from syntara.core.services.base import (
+    BaseService,
+    DefaultConvertResourceMixin,
+    DefaultEnrichQueryMixin,
+    DefaultPostProcessingMixin,
+)
 from syntara.forms.audit.form_prompt import FormPromptSubmittedEvent
 from syntara.forms.exceptions import (
     FormPromptAlreadyRequestedError,
@@ -75,8 +80,13 @@ class FormPromptService(BaseService):
         """
         # Skip super().__init__() because BaseService requires non-None user,
         # but FormPromptService needs to support workflow-internal operations without a user.
+        # Manually initialize the required attributes from BaseService.
         self.session = session
         self.user: User | None = user  # type: ignore[assignment]
+        # Initialize mixins required by BaseService.list_resources()
+        self.enrich_query_mixin = DefaultEnrichQueryMixin()
+        self.convert_resource_mixin = DefaultConvertResourceMixin()
+        self.post_processing_mixin = DefaultPostProcessingMixin()
 
     def _map_fk_error_to_domain_exception(
         self,
@@ -465,10 +475,10 @@ class FormPromptService(BaseService):
         # Refresh to get the updated state
         await self.session.refresh(prompt)
 
-        # Calculate pause duration for telemetry (AC-9)
+        # Calculate wait time for telemetry (AC-9)
         submitted = responded_at.replace(tzinfo=None)
         created = prompt.created_at.replace(tzinfo=None)
-        pause_duration_ms = int((submitted - created).total_seconds() * 1000)
+        wait_time_ms = int((submitted - created).total_seconds() * 1000)
 
         logger.info(
             "Form prompt submitted",
@@ -476,7 +486,7 @@ class FormPromptService(BaseService):
             execution_id=prompt.execution_id,
             responded_by=self.user.id,
             field_count=len(cleaned_data),
-            pause_duration_ms=pause_duration_ms,
+            wait_time_ms=wait_time_ms,
         )
 
         # Send signal to workflow engine (best-effort, never blocks the response)
@@ -515,7 +525,7 @@ class FormPromptService(BaseService):
                 prompt_node_id=prompt.prompt_node_id,
                 submitted_by=self.user.id,
                 submitted_at=responded_at,
-                pause_duration_ms=pause_duration_ms,
+                wait_time_ms=wait_time_ms,
                 field_count=len(cleaned_data),
                 outcome="submitted",
                 principal_type=self.user.__dict__.get("__principal_type__"),

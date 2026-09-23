@@ -164,10 +164,10 @@ class TestFormPromptServiceSubmit:
 
             await service.submit(prompt_id, submitted_data)
 
-            # Should dispatch audit event with pause duration
+            # Should dispatch audit event with wait time
             mock_dispatcher.dispatch.assert_called_once()
             event = mock_dispatcher.dispatch.call_args.args[0]
-            assert event.pause_duration_ms >= 45000  # At least 45 seconds
+            assert event.wait_time_ms >= 45000  # At least 45 seconds
             assert event.field_count == 1
             assert event.outcome == "submitted"
 

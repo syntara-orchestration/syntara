@@ -35,7 +35,7 @@ class FormPromptSubmittedTelemetryHandler(AuditEventHandler[FormPromptSubmittedE
                 FormPromptSubmittedTelemetryEvent(
                     workflow_execution_id=str(event.execution_id),
                     prompt_node_id=event.prompt_node_id,
-                    pause_duration_ms=event.pause_duration_ms,
+                    wait_time_ms=event.wait_time_ms,
                     field_count=event.field_count,
                     outcome=event.outcome,
                     entitlement_id=registry.entitlement_id,
@@ -45,7 +45,7 @@ class FormPromptSubmittedTelemetryHandler(AuditEventHandler[FormPromptSubmittedE
                 "Emitted form_prompt_submitted telemetry",
                 execution_id=str(event.execution_id),
                 prompt_node_id=event.prompt_node_id,
-                pause_duration_ms=event.pause_duration_ms,
+                wait_time_ms=event.wait_time_ms,
             )
         except Exception:  # noqa: BLE001
             logger.warning("Failed to emit form_prompt_submitted telemetry (non-fatal)", exc_info=True)

@@ -16,6 +16,6 @@ class FormPromptSubmittedEvent(BaseTelemetryEvent):
 
     workflow_execution_id: str = Field(description="Workflow execution identifier (UUID v4)")
     prompt_node_id: str = Field(description="Activity ID of the form prompt node in the workflow")
-    pause_duration_ms: int = Field(ge=0, description="Milliseconds between prompt creation and submission (AC-9)")
+    wait_time_ms: int = Field(ge=0, description="Milliseconds between prompt creation and submission (AC-9)")
     field_count: int = Field(ge=0, description="Number of fields in the submitted form")
     outcome: str = Field(description="Outcome value sent to workflow (e.g., 'submitted')")

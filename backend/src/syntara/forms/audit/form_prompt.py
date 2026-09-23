@@ -50,7 +50,7 @@ class FormPromptSubmittedEvent:
     prompt_node_id: str
     submitted_by: UUID
     submitted_at: datetime
-    pause_duration_ms: int  # ms between prompt creation and submission
+    wait_time_ms: int  # ms between prompt creation and submission
     field_count: int  # number of fields in the submitted form
     outcome: str = field(default="submitted")  # outcome value sent to workflow
     principal_type: PrincipalType | None = field(default=None)
@@ -96,7 +96,7 @@ class FormPromptSubmittedHandler(AuditEventHandler[FormPromptSubmittedEvent]):
         data = AuditContextData(
             data_type="form-prompt-submitted",
             outcome=event.outcome,
-            pause_duration_ms=event.pause_duration_ms,
+            wait_time_ms=event.wait_time_ms,
             field_count=event.field_count,
         )
 

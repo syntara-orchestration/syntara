@@ -23,15 +23,23 @@ def _form_prompt_payload(
     prompt_node_id: str = "form1",
     name: str = "Test Form",
     form_definition: dict[str, object] | None = None,
+    loop_iteration_path: list[int] | None = None,
 ) -> dict[str, object]:
     """Build a minimal form_prompt creation request payload."""
+    iteration_path = loop_iteration_path or []
+    # Build temporal_activity_id from prompt_node_id and loop_iteration_path
+    temporal_activity_id = prompt_node_id
+    if iteration_path:
+        temporal_activity_id += "".join(f"_iter_{i}" for i in iteration_path)
+
     return {
         "execution_id": str(execution_id),
         "project_id": str(project_id),
         "prompt_node_id": prompt_node_id,
         "name": name,
         "form_definition": form_definition or _MINIMAL_FORM_DEFINITION,
-        "loop_iteration_path": [],
+        "loop_iteration_path": iteration_path,
+        "temporal_activity_id": temporal_activity_id,
     }
 
 
@@ -146,9 +154,7 @@ class TestFormPromptCreateAPI:
     ) -> None:
         """Create form_prompt with loop_iteration_path stores the path."""
         exec_id = uuid4()
-        payload = _form_prompt_payload(exec_id, test_project_id)
-        payload["loop_iteration_path"] = [0, 1]
-        payload["temporal_activity_id"] = "form1_iter_0_iter_1"
+        payload = _form_prompt_payload(exec_id, test_project_id, loop_iteration_path=[0, 1])
 
         response = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
 
