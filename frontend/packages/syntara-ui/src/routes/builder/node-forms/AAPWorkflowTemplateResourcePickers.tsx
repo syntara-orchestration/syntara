@@ -1,7 +1,7 @@
-import { Button, FormGroup, FormHelperText, HelperText, HelperTextItem, StackItem } from '@patternfly/react-core'
-import { RhUiErrorIcon } from '@patternfly/react-icons'
-import { Controller, useFormContext } from 'react-hook-form'
+import { Button, FormHelperText, HelperText, HelperTextItem, StackItem } from '@patternfly/react-core'
+import { useFormContext } from 'react-hook-form'
 
+import { SynFormField } from '../../../components/forms/SynFormField'
 import type { useAAPBrowser } from '../../../hooks/useAAPBrowser'
 import { isValidAAPTemplateURL } from '../../../utils/urlValidation'
 
@@ -15,11 +15,7 @@ type AAPWorkflowTemplateResourcePickersProps = {
 }
 
 export function AAPWorkflowTemplateResourcePickers({ browser }: AAPWorkflowTemplateResourcePickersProps) {
-  const {
-    control,
-    setValue,
-    formState: { errors },
-  } = useFormContext<AAPWorkflowTemplateFormData>()
+  const { setValue } = useFormContext<AAPWorkflowTemplateFormData>()
 
   const {
     organizations,
@@ -36,7 +32,6 @@ export function AAPWorkflowTemplateResourcePickers({ browser }: AAPWorkflowTempl
   } = browser
 
   const orgOptions = organizations.map((org) => ({ value: org.name, label: org.name }))
-  // Extract description safely to avoid error-typed assignments
   const templateOptions = workflowTemplates.map((template) => ({
     value: template.name,
     label: template.name,
@@ -46,119 +41,90 @@ export function AAPWorkflowTemplateResourcePickers({ browser }: AAPWorkflowTempl
         : undefined,
   }))
 
+  const clearPromptOverrides = () => {
+    setValue('inventory_name', '')
+    setValue('inventory_id', undefined)
+    setValue('extra_vars', '')
+    setValue('limit', '')
+    setValue('scm_branch', '')
+    setValue('tags', '')
+    setValue('skip_tags', '')
+    setValue('labels', [])
+  }
+
   return (
     <>
-      {/* Organization */}
       <StackItem>
-        <FormGroup label="Organization" labelHelp={nodeHelp.aapOrganization} isRequired fieldId="aap-wf-organization">
-          <Controller
-            control={control}
-            name="organization_name"
-            render={({ field }) => (
-              <AAPTypeaheadSelect
-                id="aap-wf-organization"
-                ariaLabel="Organization"
-                options={orgOptions}
-                selected={field.value ?? ''}
-                onChange={(value) => {
-                  field.onChange(value)
-                  selectOrganization(value)
-                  // Clear downstream selections
-                  setValue('workflow_job_template_name', '')
-                  setValue('workflow_job_template_id', undefined)
-                  // Clear prompt-on-launch overrides (matches AAPResourcePickers behavior)
-                  setValue('inventory_name', '')
-                  setValue('inventory_id', undefined)
-                  setValue('extra_vars', '')
-                  setValue('limit', '')
-                  setValue('scm_branch', '')
-                  setValue('tags', '')
-                  setValue('skip_tags', '')
-                  setValue('labels', [])
-                }}
-                onSearchChange={searchOrganizations}
-                placeholder="Select an organization"
-                isLoading={loadingOrgs}
-                hasError={!!errors.organization_name}
-              />
-            )}
-          />
-          <FormHelperText>
-            <HelperText>
-              {errors.organization_name ? (
-                <HelperTextItem icon={<RhUiErrorIcon />} variant="error">
-                  {errors.organization_name.message}
-                </HelperTextItem>
-              ) : (
-                <HelperTextItem>AAP organization to browse resources from</HelperTextItem>
-              )}
-            </HelperText>
-          </FormHelperText>
-        </FormGroup>
+        <SynFormField<AAPWorkflowTemplateFormData, 'organization_name'>
+          name="organization_name"
+          label="Organization"
+          labelHelp={nodeHelp.aapOrganization}
+          isRequired
+          fieldId="aap-wf-organization"
+          hint="AAP organization to browse resources from"
+        >
+          {({ field, fieldState }) => (
+            <AAPTypeaheadSelect
+              id="aap-wf-organization"
+              ariaLabel="Organization"
+              options={orgOptions}
+              selected={field.value ?? ''}
+              onChange={(value) => {
+                field.onChange(value)
+                selectOrganization(value)
+                setValue('workflow_job_template_name', '')
+                setValue('workflow_job_template_id', undefined)
+                clearPromptOverrides()
+              }}
+              onSearchChange={searchOrganizations}
+              placeholder="Select an organization"
+              isLoading={loadingOrgs}
+              hasError={!!fieldState.error}
+            />
+          )}
+        </SynFormField>
       </StackItem>
 
-      {/* Workflow Template */}
       <StackItem>
-        <FormGroup
+        <SynFormField<AAPWorkflowTemplateFormData, 'workflow_job_template_name'>
+          name="workflow_job_template_name"
           label="Workflow template"
           labelHelp={nodeHelp.aapWorkflowTemplate}
           isRequired
           fieldId="aap-wf-workflowTemplate"
+          hint="AAP workflow template to launch"
         >
-          <Controller
-            control={control}
-            name="workflow_job_template_name"
-            render={({ field }) => (
-              <AAPTypeaheadSelect
-                id="aap-wf-workflowTemplate"
-                ariaLabel="Workflow template"
-                options={templateOptions}
-                selected={field.value ?? ''}
-                onChange={(value) => {
-                  field.onChange(value)
-                  const selected = workflowTemplates.find((t) => t.name === value)
-                  setValue('workflow_job_template_id', selected?.id)
-                  selectTemplate(selected?.id)
-                  // Clear prompt-on-launch overrides when template changes
-                  setValue('inventory_name', '')
-                  setValue('inventory_id', undefined)
-                  setValue('extra_vars', '')
-                  setValue('limit', '')
-                  setValue('scm_branch', '')
-                  setValue('tags', '')
-                  setValue('skip_tags', '')
-                  setValue('labels', [])
-                }}
-                onSearchChange={searchTemplates}
-                placeholder="Select a workflow template"
-                isLoading={loadingTemplates}
-                hasError={!!errors.workflow_job_template_name}
-              />
-            )}
-          />
+          {({ field, fieldState }) => (
+            <AAPTypeaheadSelect
+              id="aap-wf-workflowTemplate"
+              ariaLabel="Workflow template"
+              options={templateOptions}
+              selected={field.value ?? ''}
+              onChange={(value) => {
+                field.onChange(value)
+                const selected = workflowTemplates.find((t) => t.name === value)
+                setValue('workflow_job_template_id', selected?.id)
+                selectTemplate(selected?.id)
+                clearPromptOverrides()
+              }}
+              onSearchChange={searchTemplates}
+              placeholder="Select a workflow template"
+              isLoading={loadingTemplates}
+              hasError={!!fieldState.error}
+            />
+          )}
+        </SynFormField>
+        {workflowTemplateDetail?.url && isValidAAPTemplateURL(workflowTemplateDetail.url) && (
           <FormHelperText>
             <HelperText>
-              {errors.workflow_job_template_name ? (
-                <HelperTextItem icon={<RhUiErrorIcon />} variant="error">
-                  {errors.workflow_job_template_name.message}
-                </HelperTextItem>
-              ) : (
-                <HelperTextItem>AAP workflow template to launch</HelperTextItem>
-              )}
+              <HelperTextItem>
+                <Button variant="link" component="a" href={workflowTemplateDetail.url} target="_blank" isInline>
+                  View workflow template in AAP
+                </Button>
+              </HelperTextItem>
             </HelperText>
           </FormHelperText>
-          {workflowTemplateDetail?.url && isValidAAPTemplateURL(workflowTemplateDetail.url) && (
-            <FormHelperText>
-              <HelperText>
-                <HelperTextItem>
-                  <Button variant="link" component="a" href={workflowTemplateDetail.url} target="_blank" isInline>
-                    View workflow template in AAP
-                  </Button>
-                </HelperTextItem>
-              </HelperText>
-            </FormHelperText>
-          )}
-        </FormGroup>
+        )}
       </StackItem>
 
       <AAPErrorAlert error={browserError} onRetry={retryAll} />

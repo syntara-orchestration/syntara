@@ -1,8 +1,4 @@
 import {
-  FormGroup,
-  FormHelperText,
-  HelperText,
-  HelperTextItem,
   Label,
   LabelGroup,
   MenuToggle,
@@ -15,8 +11,9 @@ import {
 } from '@patternfly/react-core'
 import type { AAPAPI } from '@syntara/contracts'
 import React, { useEffect, useRef, useState, type ReactElement } from 'react'
-import { Controller, useFormContext } from 'react-hook-form'
+import { useFormContext } from 'react-hook-form'
 
+import { SynFormField } from '../../../components/forms/SynFormField'
 import { SynSelect } from '../../../components/SynSelect'
 import { DEBOUNCE_MS } from '../../../constants/timing'
 
@@ -32,7 +29,7 @@ type AAPDefaultValue = AAPAPI.components['schemas']['AAPSummaryField']
 type AAPResourceMultiSelectFieldProps = {
   readonly label: string
   readonly fieldId: string
-  readonly nameField: 'job_credentials' | 'labels' // Multi-select fields with number[] arrays
+  readonly nameField: 'job_credentials' | 'labels'
   readonly items: readonly AAPResourceItem[]
   readonly isLoading: boolean
   readonly helperText: string
@@ -153,8 +150,6 @@ function MultiSelectContent({
   ariaDescribedBy,
   defaultValues,
 }: MultiSelectContentProps) {
-  // Merge items with defaultValues to ensure selected items always have names
-  // This handles the case where default credentials from the template aren't in the items list yet
   const allItems = React.useMemo(() => {
     if (!defaultValues?.length) return items
 
@@ -256,7 +251,7 @@ export function AAPResourceMultiSelectField({
   onSearchChange,
   labelHelp,
 }: AAPResourceMultiSelectFieldProps) {
-  const { control, setValue } = useFormContext<AAPJobTemplateFormData>()
+  const { setValue } = useFormContext<AAPJobTemplateFormData>()
   const [isOpen, setIsOpen] = useState(false)
   const [filterValue, setFilterValue] = useState('')
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined)
@@ -268,7 +263,6 @@ export function AAPResourceMultiSelectField({
     setFilterValue
   )
 
-  // Debounce the search callback for server-side filtering
   useEffect(() => {
     if (!onSearchChange) return
     debounceRef.current = setTimeout(() => {
@@ -277,54 +271,48 @@ export function AAPResourceMultiSelectField({
     return () => clearTimeout(debounceRef.current)
   }, [filterValue, onSearchChange])
 
-  // Clear debounce on unmount
   useEffect(() => () => clearTimeout(debounceRef.current), [])
 
   const helperTextId = `${fieldId}-helper`
 
   return (
     <StackItem>
-      <FormGroup label={label} labelHelp={labelHelp} fieldId={fieldId}>
-        <Controller
-          control={control}
-          name={nameField}
-          render={({ field }) => {
-            // Type is inferred from schema: number[] | undefined
-            // Ensure selectedIds is always an array (handle legacy single-value data, empty strings, or undefined)
-            let selectedIds: readonly number[] = []
-            if (Array.isArray(field.value)) {
-              selectedIds = field.value as number[]
-            } else if (typeof field.value === 'number') {
-              selectedIds = [field.value]
-            }
+      <SynFormField<AAPJobTemplateFormData, typeof nameField>
+        name={nameField}
+        label={label}
+        labelHelp={labelHelp}
+        fieldId={fieldId}
+        hint={helperText}
+      >
+        {({ field }) => {
+          let selectedIds: readonly number[] = []
+          if (Array.isArray(field.value)) {
+            selectedIds = field.value as number[]
+          } else if (typeof field.value === 'number') {
+            selectedIds = [field.value]
+          }
 
-            return (
-              <MultiSelectContent
-                label={label}
-                items={items}
-                isLoading={isLoading}
-                isOpen={isOpen}
-                selectedIds={selectedIds}
-                placeholder={placeholderText}
-                filterValue={filterValue}
-                onSearchChange={onSearchChange}
-                onSelect={handleSelect(field, selectedIds)}
-                onOpenChange={handleOpenChange}
-                onToggle={handleToggle}
-                onFilterChange={setFilterValue}
-                onFilterClear={() => setFilterValue('')}
-                ariaDescribedBy={helperTextId}
-                defaultValues={defaultValues}
-              />
-            )
-          }}
-        />
-        <FormHelperText>
-          <HelperText id={helperTextId}>
-            <HelperTextItem>{helperText}</HelperTextItem>
-          </HelperText>
-        </FormHelperText>
-      </FormGroup>
+          return (
+            <MultiSelectContent
+              label={label}
+              items={items}
+              isLoading={isLoading}
+              isOpen={isOpen}
+              selectedIds={selectedIds}
+              placeholder={placeholderText}
+              filterValue={filterValue}
+              onSearchChange={onSearchChange}
+              onSelect={handleSelect(field, selectedIds)}
+              onOpenChange={handleOpenChange}
+              onToggle={handleToggle}
+              onFilterChange={setFilterValue}
+              onFilterClear={() => setFilterValue('')}
+              ariaDescribedBy={helperTextId}
+              defaultValues={defaultValues}
+            />
+          )
+        }}
+      </SynFormField>
     </StackItem>
   )
 }

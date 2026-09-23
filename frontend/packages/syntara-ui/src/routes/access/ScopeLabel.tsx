@@ -1,10 +1,9 @@
-import { Button, Flex, FlexItem, LabelGroup, Stack, StackItem } from '@patternfly/react-core'
+import { Flex, FlexItem, LabelGroup, Stack, StackItem } from '@patternfly/react-core'
 import { RhUiLockIcon } from '@patternfly/react-icons'
-import { useNavigate } from '@tanstack/react-router'
 
-import { AppRoute } from '../../app/AppRoute'
 import { SynLabel } from '../../components/labels/SynLabel'
-import { detachPromise } from '../../utils/detachPromise'
+import { LinkCell } from '../../components/table/LinkCell'
+import { getProjectDetailPath } from '../access-management/accessManagementPaths'
 
 import type { PolicyStatement } from './types'
 
@@ -46,25 +45,11 @@ type ProjectLabelProps = {
 }
 
 export function ProjectLabel({ projectId, projectNameMap }: Readonly<ProjectLabelProps>) {
-  const navigate = useNavigate()
   if (!projectId) {
     return <>-</>
   }
 
-  const projectUrl = AppRoute.AccessManagement.ProjectDetail.replace(':projectId', projectId)
-
-  return (
-    <Button
-      variant="link"
-      isInline
-      onClick={(e) => {
-        e.stopPropagation()
-        detachPromise(navigate({ to: projectUrl }))
-      }}
-    >
-      {projectNameMap.get(projectId) ?? projectId}
-    </Button>
-  )
+  return <LinkCell href={getProjectDetailPath(projectId)}>{projectNameMap.get(projectId) ?? projectId}</LinkCell>
 }
 
 type StatementsCellProps = {

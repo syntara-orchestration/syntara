@@ -175,8 +175,14 @@ describe('ProjectsTab', () => {
     it('renders project names as links', () => {
       render(<ProjectsTab />, { wrapper })
 
-      expect(screen.getByRole('button', { name: 'Alpha' })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Beta' })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Alpha' })).toHaveAttribute(
+        'href',
+        '/system-administration/access-management/projects/p1'
+      )
+      expect(screen.getByRole('link', { name: 'Beta' })).toHaveAttribute(
+        'href',
+        '/system-administration/access-management/projects/p2'
+      )
     })
   })
 

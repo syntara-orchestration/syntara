@@ -25,6 +25,17 @@
 
 .filterBarWrapper {
   flex-shrink: 0;
+  padding-bottom: var(--pf-t--global--spacer--xs);
+}
+
+.filterBarWrapperInActivityList {
+  padding-inline: var(--pf-t--global--spacer--md);
+}
+
+.filterBar {
+  --pf-v6-c-toolbar__content--PaddingInlineStart: 0;
+  --pf-v6-c-toolbar__content--PaddingInlineEnd: 0;
+  --pf-v6-c-toolbar__content--JustifyContent: flex-start;
 }
 
 .activityListScrollWrapper {

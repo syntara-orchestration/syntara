@@ -281,6 +281,7 @@ export type AAPWorkflowTemplateConfig = {
   tags?: string
   skip_tags?: string
   labels?: string[] // AAP Controller label names (prompt-on-launch override, supports creating new labels)
+  use_input_variables?: boolean
 }
 
 /**

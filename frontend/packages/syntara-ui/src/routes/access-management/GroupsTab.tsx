@@ -2,10 +2,8 @@ import { Badge, Button, Content, Truncate } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiEditFillIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import { Thead, Tbody, Tr, Th, Td } from '@patternfly/react-table'
 import type { Group } from '@syntara/contracts'
-import { useNavigate } from '@tanstack/react-router'
 import { useMemo } from 'react'
 
-import { AppRoute } from '../../app/AppRoute'
 import { usersClient } from '../../client'
 import { SynConfirmationDialog } from '../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
@@ -14,6 +12,7 @@ import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../
 import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 import { SynKebabMenu, type KebabAction } from '../../components/SynKebabMenu'
 import { DateCell } from '../../components/table/DateCell'
+import { LinkCell } from '../../components/table/LinkCell'
 import { useCursorPagination, useCursorReset } from '../../hooks/useCursorPagination'
 import { useDeleteAction } from '../../hooks/useDeleteAction'
 import { useDialogState } from '../../hooks/useDialogState'
@@ -21,6 +20,7 @@ import { useTableSort } from '../../hooks/useTableSort'
 import type { FilterFieldDefinition } from '../../types/filters'
 import { detachPromise } from '../../utils/detachPromise'
 
+import { getGroupDetailPath } from './accessManagementPaths'
 import { getGroupDescriptionFilterDefinition, getGroupNameFilterDefinition } from './groupFilters'
 import { GroupFormModal } from './GroupFormModal'
 import { useGroupPermissions } from './useGroupPermissions'
@@ -58,7 +58,6 @@ function buildGroupRowActions(
 }
 
 export function GroupsTab() {
-  const navigate = useNavigate()
   const permissions = useGroupPermissions()
   const deleteDialog = useDialogState<Group>()
   const formDialog = useDialogState<Group | null>()
@@ -177,17 +176,9 @@ export function GroupsTab() {
                 {groups.map((group) => (
                   <Tr key={group.id}>
                     <Td dataLabel="Name">
-                      <Button
-                        variant="link"
-                        isInline
-                        onClick={() =>
-                          detachPromise(
-                            navigate({ to: AppRoute.AccessManagement.GroupDetail.replace(':groupId', group.id ?? '') })
-                          )
-                        }
-                      >
+                      <LinkCell href={getGroupDetailPath(group.id ?? '')}>
                         <Truncate content={group.name} />
-                      </Button>
+                      </LinkCell>
                     </Td>
                     <Td dataLabel="Description">
                       <Truncate content={group.description ?? ''} />

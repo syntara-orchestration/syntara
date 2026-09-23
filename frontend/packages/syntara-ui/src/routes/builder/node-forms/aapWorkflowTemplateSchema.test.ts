@@ -105,6 +105,11 @@ describe('aapWorkflowTemplateSchema', () => {
     expect(result.success).toBe(true)
   })
 
+  it('accepts use_input_variables without a workflow template id', () => {
+    const result = aapWorkflowTemplateSchema.safeParse({ name: 'Incomplete Node', use_input_variables: true })
+    expect(result.success).toBe(true)
+  })
+
   it('validates credential_id as optional string', () => {
     const validDataWithCred = {
       name: 'Deploy Workflow',
