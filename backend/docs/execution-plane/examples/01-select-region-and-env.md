@@ -2,8 +2,10 @@
 
 Builds on
 [00-one-workload-default-target.md](00-one-workload-default-target.md).
-The same `http_request` workload now carries placement selectors. EP
-matches them against Cluster and ExecutionTarget **labels** (tags).
+The same workload
+(`activity.type` = `registry.redhat.io/ao/http-request:1.0.0`) now
+carries placement selectors. EP matches them against Cluster and
+ExecutionTarget **labels** (tags).
 
 - Ticket: [AAP-92721](https://redhat.atlassian.net/browse/AAP-92721)
 - Feature: [ANSTRAT-1803](https://redhat.atlassian.net/browse/ANSTRAT-1803)
@@ -39,7 +41,7 @@ eligible only if it also satisfies every selector.
   },
   "payload": {
     "activity": {
-      "type": "http_request",
+      "type": "registry.redhat.io/ao/http-request:1.0.0",
       "params": {
         "url": "https://google.ca"
       }
@@ -52,7 +54,7 @@ eligible only if it also satisfies every selector.
 |---|---|
 | `selectors.region` | Must match a Cluster (or target) label `region=us-east-1`. Region is a fact of the whole Cluster. |
 | `selectors.env` | Must match an ExecutionTarget label `env=production`. That target is a Kubernetes namespace. |
-| `payload.activity.type` | Activity type → container image (unchanged from example 00). |
+| `payload.activity.type` | Container image reference (unchanged from example 00). |
 | `payload.activity.params` | Input passed to the running container. |
 
 ## Registered Clusters
@@ -139,14 +141,14 @@ Effective labels (Cluster ∪ ExecutionTarget):
 2. **Dispatch.** The Work Scheduler picks that target. The Worker
    Manager for `backend_type=k8s` cold-starts a pod in namespace
    `production` on `ocp-us-east-1`.
-3. **Run.** The pod uses the `http_request` image. Container input is
-   `payload.activity.params`.
+3. **Run.** The pod uses `payload.activity.type` as the image.
+   Container input is `payload.activity.params`.
 
 ```text
 WorkItem
   selectors.region=us-east-1   →  Cluster ocp-us-east-1
   selectors.env=production     →  ExecutionTarget ns-production
-  payload.activity.type        →  image
+  payload.activity.type        →  container image
   payload.activity.params      →  container input
 ```
 
@@ -164,7 +166,7 @@ sequenceDiagram
     Note over ETR: AND match against effective labels
     ETR-->>Sch: available = [ns-production on ocp-us-east-1]
     Sch->>WM: dispatch(work, ns-production)
-    WM->>NS: cold-start Pod with http_request image
+    WM->>NS: cold-start Pod from activity.type
 ```
 
 The default ExecutionTarget on `ocp-us-east-1` is not mixed into the

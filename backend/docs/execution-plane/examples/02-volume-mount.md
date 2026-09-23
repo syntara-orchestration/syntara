@@ -28,14 +28,14 @@ to that target, which is therefore where this work runs.
 ## Incoming workload
 
 `selectors` is empty. `payload.volume_mounts` is the mount spec.
-`activity.type` still identifies the image.
+`activity.type` is still the container image.
 
 ```json
 {
   "selectors": {},
   "payload": {
     "activity": {
-      "type": "ansible_playbook",
+      "type": "registry.redhat.io/ao/ansible-playbook:1.0.0",
       "params": {
         "playbook": "site.yml"
       }
@@ -53,7 +53,7 @@ to that target, which is therefore where this work runs.
 | Field | Meaning for EP |
 |---|---|
 | `selectors` | Empty → default routing. No volume-related key. |
-| `payload.activity.type` | Activity type → container image. |
+| `payload.activity.type` | Container image reference. |
 | `payload.activity.params` | Input passed to the running container. |
 | `payload.volume_mounts` | What to attach, and where. Worker Manager only. |
 
@@ -108,15 +108,15 @@ exist on this Cluster. It is not selected: empty selectors do not mean
 2. **Dispatch.** The Work Scheduler picks that target. The Worker
    Manager for `backend_type=k8s` cold-starts a pod in namespace
    `ao-execution`.
-3. **Run.** The pod uses the `ansible_playbook` image. The Worker
-   Manager attaches `playbook-bundle` at `/work/playbooks` from
+3. **Run.** The pod uses `payload.activity.type` as the image. The
+   Worker Manager attaches `playbook-bundle` at `/work/playbooks` from
    `payload.volume_mounts`. Container input is
    `payload.activity.params`.
 
 ```text
 WorkItem
   selectors {}                    →  ep-default (is_default, cold-start)
-  payload.activity.type           →  image
+  payload.activity.type           →  container image
   payload.volume_mounts           →  pod volume spec
   payload.activity.params         →  container input
 ```
@@ -136,7 +136,7 @@ sequenceDiagram
     ETR-->>Sch: available = [ep-default on ocp-us-east-1]
     Sch->>WM: dispatch(work, ep-default)
     Note over WM: payload.volume_mounts → pod spec
-    WM->>NS: cold-start Pod with ansible_playbook image and volume
+    WM->>NS: cold-start Pod from activity.type with volume
 ```
 
 Work that also sent `env=production` (example 01) would land on

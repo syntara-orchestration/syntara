@@ -31,15 +31,16 @@ invariants are in
 ## Incoming workload
 
 AO submits a WorkItem. `selectors` is empty: AO sent no placement
-constraints. `activity.type` identifies the container image (here,
-`http_request`).
+constraints. `activity.type` is the container image AO already
+resolved (here, `registry.redhat.io/ao/http-request:1.0.0`). It is
+not a node-type alias such as `http_request`.
 
 ```json
 {
   "selectors": {},
   "payload": {
     "activity": {
-      "type": "http_request",
+      "type": "registry.redhat.io/ao/http-request:1.0.0",
       "params": {
         "url": "https://google.ca"
       }
@@ -51,14 +52,13 @@ constraints. `activity.type` identifies the container image (here,
 | Field | Meaning for EP |
 |---|---|
 | `selectors` | Placement constraints. Empty → [default routing](../executiontarget-reconciler.md#default-routing). |
-| `payload.activity.type` | Activity type, which maps to a specific image (for example `registry.redhat.io/ao/http-request:1.0.0`). |
+| `payload.activity.type` | Container image reference. AO resolved it from the Extension (or a user override) before submit. EP does not look up an alias. |
 | `payload.activity.params` | Input passed to the running container. |
 
-The image is a fact of the activity type, used by the Worker Manager to
-construct the pod. It is not a required selector in this example. A
-required image selector would exclude any default ExecutionTarget that
-does not advertise that image. The default target is image-agnostic
-cold-start.
+The Worker Manager uses `payload.activity.type` to construct the pod.
+It is not a required selector in this example. A required image
+selector would exclude any default ExecutionTarget that does not
+advertise that image. The default target is image-agnostic cold-start.
 
 ## Registered Cluster
 
@@ -115,13 +115,13 @@ ExecutionTarget labels:
 2. **Dispatch.** The Work Scheduler picks that target. The Worker
    Manager for `backend_type=k8s` cold-starts a pod in namespace
    `ao-execution`.
-3. **Run.** The pod uses the `http_request` image. Container input is
-   `payload.activity.params`.
+3. **Run.** The pod uses `payload.activity.type` as the image.
+   Container input is `payload.activity.params`.
 
 ```text
 WorkItem
   selectors {}                 →  ep-default (is_default)
-  payload.activity.type        →  image
+  payload.activity.type        →  container image
   payload.activity.params      →  container input
 ```
 
@@ -134,12 +134,12 @@ sequenceDiagram
     participant WM as k8s Worker Manager
     participant NS as namespace ao-execution
 
-    AO->>WS: WorkItem { selectors: {}, activity.type: http_request }
+    AO->>WS: WorkItem { selectors: {}, activity.type: image URL }
     Sch->>ETR: resolve(selectors={})
     Note over ETR: empty selectors → default routing
     ETR-->>Sch: available = [ep-default on local-openshift]
     Sch->>WM: dispatch(work, ep-default)
-    WM->>NS: cold-start Pod with http_request image
+    WM->>NS: cold-start Pod from activity.type
 ```
 
 ## Out of scope here
