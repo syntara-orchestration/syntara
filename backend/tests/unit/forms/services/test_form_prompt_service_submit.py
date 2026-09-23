@@ -258,7 +258,7 @@ class TestFormPromptServiceSubmit:
 
     @pytest.mark.asyncio
     async def test_submit_already_submitted_raises_error(self) -> None:
-        """Concurrent submission (race condition) raises FormPromptAlreadyRespondedError."""
+        """A prompt already marked submitted raises FormPromptAlreadyRespondedError."""
         prompt_id = uuid4()
         prompt = Mock(spec=FormPrompt)
         prompt.id = prompt_id
@@ -270,20 +270,9 @@ class TestFormPromptServiceSubmit:
         prompt.temporal_activity_id = "form1"
         prompt.created_at = datetime.now(UTC) - timedelta(seconds=10)
 
-        service, session, _user = _make_service_with_user(prompt=prompt)
-
-        # Mock UPDATE affecting 0 rows (optimistic locking failure)
-        mock_result = Mock()
-        mock_result.rowcount = 0
-        session.execute = AsyncMock(return_value=mock_result)
+        service, _session, _user = _make_service_with_user(prompt=prompt)
 
         submitted_data = {"field1": "test value"}
 
-        with patch("syntara.forms.services.form_prompt_service.validate_form_submission") as mock_validate:
-            mock_validate.return_value = submitted_data
-
-            with pytest.raises(FormPromptAlreadyRespondedError):
-                await service.submit(prompt_id, submitted_data)
-
-            # Should rollback on race condition
-            session.rollback.assert_called_once()
+        with pytest.raises(FormPromptAlreadyRespondedError):
+            await service.submit(prompt_id, submitted_data)

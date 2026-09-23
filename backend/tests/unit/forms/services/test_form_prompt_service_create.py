@@ -5,7 +5,7 @@ duplicate detection, and database operations.
 """
 
 from unittest.mock import AsyncMock, Mock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy.exc import IntegrityError
@@ -51,6 +51,13 @@ def _make_service(*, raise_integrity_error: bool = False) -> tuple[FormPromptSer
     return svc, session
 
 
+def _mock_execution_project(session: Mock, project_id: UUID) -> None:
+    """Configure the mocked execution to match a create request's project."""
+    execution = Mock()
+    execution.project_id = project_id
+    session.get = AsyncMock(return_value=execution)
+
+
 class TestFormPromptServiceCreate:
     """Test FormPromptService.create method."""
 
@@ -70,6 +77,7 @@ class TestFormPromptServiceCreate:
             temporal_activity_id="form1",
         )
 
+        _mock_execution_project(_session, proj_id)
         result = await service.create(request)
 
         assert result.execution_id == exec_id
@@ -92,6 +100,7 @@ class TestFormPromptServiceCreate:
             temporal_activity_id="form1",
         )
 
+        _mock_execution_project(session, request.project_id)
         await service.create(request)
 
         session.add.assert_called_once()
@@ -101,7 +110,7 @@ class TestFormPromptServiceCreate:
     @pytest.mark.asyncio
     async def test_duplicate_raises_form_prompt_already_requested_error(self) -> None:
         """Duplicate (execution_id, prompt_node_id, loop_iteration_path) raises error."""
-        service, _ = _make_service(raise_integrity_error=True)
+        service, session = _make_service(raise_integrity_error=True)
 
         request = FormPromptCreateRequest(
             execution_id=uuid4(),
@@ -113,6 +122,7 @@ class TestFormPromptServiceCreate:
             temporal_activity_id="form1",
         )
 
+        _mock_execution_project(session, request.project_id)
         with pytest.raises(FormPromptAlreadyRequestedError, match="already exists"):
             await service.create(request)
 
@@ -130,6 +140,7 @@ class TestFormPromptServiceCreate:
             temporal_activity_id="form1_iter_0",
         )
 
+        _mock_execution_project(session, request.project_id)
         await service.create(request)
 
         added = session.add.call_args[0][0]
@@ -152,6 +163,7 @@ class TestFormPromptServiceCreate:
             temporal_activity_id="form1",
         )
 
+        _mock_execution_project(session, request.project_id)
         await service.create(request)
 
         # Should add FormPrompt + 2 responder junctions
@@ -173,6 +185,7 @@ class TestFormPromptServiceCreate:
             temporal_activity_id="form1",
         )
 
+        _mock_execution_project(session, request.project_id)
         await service.create(request)
 
         # Should add FormPrompt + 1 group junction
@@ -193,6 +206,7 @@ class TestFormPromptServiceCreate:
             temporal_activity_id="form1",
         )
 
+        _mock_execution_project(session, request.project_id)
         await service.create(request)
 
         added = session.add.call_args[0][0]
