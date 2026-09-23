@@ -714,8 +714,9 @@ describe('BuilderContent', () => {
       await user.click(screen.getByRole('button', { name: 'Run' }))
 
       await waitFor(() => {
-        expect(screen.getByText(/Run workflow\?/)).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: 'Run now' })).toBeInTheDocument()
+        const dialog = screen.getByRole('dialog')
+        expect(within(dialog).getByRole('heading', { name: 'Run workflow?' })).toBeInTheDocument()
+        expect(within(dialog).getByRole('button', { name: 'Run now' })).toBeInTheDocument()
       })
     })
 
