@@ -54,7 +54,7 @@ Selectors are non-empty, so default routing does not apply.
   },
   "payload": {
     "activity": {
-      "type": "registry.redhat.io/ao/agentic:1.0.0",
+      "image": "registry.redhat.io/ao/agentic:1.0.0",
       "params": {
         "prompt": "Summarize https://example.com/status"
       }
@@ -88,7 +88,7 @@ Selectors are non-empty, so default routing does not apply.
 | Field | Meaning for EP |
 |---|---|
 | `selectors.backend_type` | Must match an ExecutionTarget label `backend_type=openshell`. |
-| `payload.activity.type` | Container image reference. |
+| `payload.activity.image` | Container image reference. |
 | `payload.activity.params` | Input passed to the running sandbox. |
 | `payload.sandbox_policy` | Extra OpenShell policy, on top of the target's `default_policies`. Worker Manager only. |
 
@@ -172,14 +172,14 @@ match.
    `backend_type: openshell`.
 3. **Run.** That Worker Manager creates the sandbox at
    `ep-openshell.endpoint` in namespace `ao-openshell`, using
-   `payload.activity.type` as the image. It applies
+   `payload.activity.image`. It applies
    `ep-openshell.default_policies`, then `payload.sandbox_policy` as
    extra constraints. Container input is `payload.activity.params`.
 
 ```text
 WorkItem
   selectors.backend_type=openshell  →  ep-openshell (label)
-  payload.activity.type             →  container image
+  payload.activity.image             →  container image
   ep-openshell.default_policies     →  baseline OpenShell policy
   payload.sandbox_policy            →  extra OpenShell policy (Worker Manager)
   payload.activity.params           →  sandbox input

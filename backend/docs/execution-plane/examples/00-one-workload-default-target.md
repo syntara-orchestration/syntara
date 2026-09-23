@@ -31,7 +31,7 @@ invariants are in
 ## Incoming workload
 
 AO submits a WorkItem. `selectors` is empty: AO sent no placement
-constraints. `activity.type` is the container image AO already
+constraints. `activity.image` is the container image AO already
 resolved (here, `registry.redhat.io/ao/http-request:1.0.0`). It is
 not a node-type alias such as `http_request`.
 
@@ -40,7 +40,7 @@ not a node-type alias such as `http_request`.
   "selectors": {},
   "payload": {
     "activity": {
-      "type": "registry.redhat.io/ao/http-request:1.0.0",
+      "image": "registry.redhat.io/ao/http-request:1.0.0",
       "params": {
         "url": "https://google.ca"
       }
@@ -52,10 +52,10 @@ not a node-type alias such as `http_request`.
 | Field | Meaning for EP |
 |---|---|
 | `selectors` | Placement constraints. Empty → [default routing](../executiontarget-reconciler.md#default-routing). |
-| `payload.activity.type` | Container image reference. AO resolved it from the Extension (or a user override) before submit. EP does not look up an alias. |
+| `payload.activity.image` | Container image reference. AO resolved it from the Extension (or a user override) before submit. EP does not look up an alias. |
 | `payload.activity.params` | Input passed to the running container. |
 
-The Worker Manager uses `payload.activity.type` to construct the pod.
+The Worker Manager uses `payload.activity.image` to construct the pod.
 It is not a required selector in this example. A required image
 selector would exclude any default ExecutionTarget that does not
 advertise that image. The default target is image-agnostic cold-start.
@@ -115,13 +115,13 @@ ExecutionTarget labels:
 2. **Dispatch.** The Work Scheduler picks that target. The Worker
    Manager for `backend_type=k8s` cold-starts a pod in namespace
    `ao-execution`.
-3. **Run.** The pod uses `payload.activity.type` as the image.
+3. **Run.** The pod uses `payload.activity.image`.
    Container input is `payload.activity.params`.
 
 ```text
 WorkItem
   selectors {}                 →  ep-default (is_default)
-  payload.activity.type        →  container image
+  payload.activity.image        →  container image
   payload.activity.params      →  container input
 ```
 
@@ -134,12 +134,12 @@ sequenceDiagram
     participant WM as k8s Worker Manager
     participant NS as namespace ao-execution
 
-    AO->>WS: WorkItem { selectors: {}, activity.type: image URL }
+    AO->>WS: WorkItem { selectors: {}, activity.image: image URL }
     Sch->>ETR: resolve(selectors={})
     Note over ETR: empty selectors → default routing
     ETR-->>Sch: available = [ep-default on local-openshift]
     Sch->>WM: dispatch(work, ep-default)
-    WM->>NS: cold-start Pod from activity.type
+    WM->>NS: cold-start Pod from activity.image
 ```
 
 ## Out of scope here
