@@ -2,21 +2,14 @@ import { Button, Form, Modal, ModalBody, ModalFooter, ModalHeader } from '@patte
 import { z } from 'zod'
 
 import { SynForm } from '../../../components/forms/SynForm'
-import { SynTextAreaField } from '../../../components/forms/SynTextAreaField'
-import { SynTextField } from '../../../components/forms/SynTextField'
 import { useSynForm } from '../../../hooks/useSynForm'
 import { useAlerts } from '../../../providers/alerts'
 import { accessClient } from '../../access/accessClient'
 import type { ProjectPolicyRead } from '../../access/types'
 
-import {
-  addProjectPolicySchema,
-  policyStatementSchema,
-  PROJECT_POLICY_NAME_HINT,
-  STATEMENTS_JSON_HINT,
-} from './addProjectPolicySchema'
+import { addProjectPolicySchema, policyStatementSchema } from './addProjectPolicySchema'
 import type { AddProjectPolicyFormData } from './addProjectPolicySchema'
-import { NodeKindStatementBuilder } from './NodeKindStatementBuilder'
+import { PolicyFormFields } from './PolicyFormFields'
 
 type EditProjectPolicyDialogProps = {
   projectId: string
@@ -104,26 +97,11 @@ export function EditProjectPolicyDialog({
       <ModalBody>
         <Form id={formId} onSubmit={handleSubmit(onSubmit)}>
           <SynForm form={form}>
-            <SynTextField
-              name="name"
-              label="Policy name"
-              fieldId="project-policy-name"
-              isRequired
-              hint={PROJECT_POLICY_NAME_HINT}
-            />
-            <SynTextField name="description" label="Policy description" fieldId="project-policy-description" />
-            <NodeKindStatementBuilder
+            <PolicyFormFields
               statementsJson={statementsJson}
-              onAppend={(next) => setValue('statementsJson', next, { shouldDirty: true, shouldValidate: true })}
-            />
-            <SynTextAreaField
-              name="statementsJson"
-              label="Policy statements JSON"
-              fieldId="project-policy-statements"
-              isRequired
-              hint={STATEMENTS_JSON_HINT}
-              rows={10}
-              resizeOrientation="vertical"
+              onAppendStatement={(next) =>
+                setValue('statementsJson', next, { shouldDirty: true, shouldValidate: true })
+              }
             />
           </SynForm>
         </Form>

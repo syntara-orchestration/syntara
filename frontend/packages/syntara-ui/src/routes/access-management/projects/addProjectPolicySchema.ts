@@ -5,7 +5,7 @@ export const PROJECT_POLICY_NAME_HINT = 'Lowercase alphanumeric with hyphens (e.
 
 /** Inline hint shown under the statements JSON field before validation errors */
 export const STATEMENTS_JSON_HINT =
-  'JSON array of statement objects with effect, actions, scope and optional conditions fields'
+  'The saved policy definition — a JSON array of statement objects with effect, actions, scope and optional conditions. Use the helper above or edit directly.'
 
 /** Resource type whose actions a deny-effect statement may target (ANSTRAT-1750). */
 export const NODE_RESOURCE_TYPE = 'workflow_node'

@@ -62,7 +62,7 @@ describe('NodeKindStatementBuilder', () => {
     render(<NodeKindStatementBuilder statementsJson="[]" onAppend={onAppend} />)
 
     await selectKind(user, 'script')
-    await user.click(screen.getByRole('button', { name: 'Add node-kind statement' }))
+    await user.click(screen.getByRole('button', { name: 'Append to statements JSON' }))
 
     expect(JSON.parse(onAppend.mock.calls[0][0] as string)).toEqual([
       {
@@ -88,7 +88,7 @@ describe('NodeKindStatementBuilder', () => {
     expect(screen.getByRole('textbox', { name: 'tool_name' })).toBeInTheDocument()
   })
 
-  it('appends normalized attributes and previews the label set', async () => {
+  it('appends normalized attributes and previews the exact statement JSON', async () => {
     const onAppend = vi.fn()
     const user = userEvent.setup()
     render(<NodeKindStatementBuilder statementsJson="[]" onAppend={onAppend} />)
@@ -97,9 +97,13 @@ describe('NodeKindStatementBuilder', () => {
     await user.click(screen.getByRole('button', { name: 'Any value' }))
     await user.click(await screen.findByRole('option', { name: 'python' }))
 
-    expect(screen.getByText('Statement target: script · language=python')).toBeInTheDocument()
+    const preview = screen.getByLabelText('Preview of the statement to append')
+    expect(preview).toHaveTextContent('"effect": "deny"')
+    expect(preview).toHaveTextContent('"workflow_node:write"')
+    expect(preview).toHaveTextContent('"kind": "script"')
+    expect(preview).toHaveTextContent('"language": "python"')
 
-    await user.click(screen.getByRole('button', { name: 'Add node-kind statement' }))
+    await user.click(screen.getByRole('button', { name: 'Append to statements JSON' }))
     const appendedStatement: unknown = JSON.parse(onAppend.mock.calls[0][0] as string)
     expect(appendedStatement).toEqual([
       {
@@ -123,7 +127,7 @@ describe('NodeKindStatementBuilder', () => {
     await selectKind(user, 'script')
 
     expect(screen.getByRole('button', { name: 'Any value' })).toBeInTheDocument()
-    expect(screen.queryByText(/language=bash/)).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Preview of the statement to append')).not.toHaveTextContent('"language": "bash"')
   })
 
   it('does nothing until a node kind is chosen', async () => {
@@ -131,7 +135,7 @@ describe('NodeKindStatementBuilder', () => {
     const user = userEvent.setup()
     render(<NodeKindStatementBuilder statementsJson="[]" onAppend={onAppend} />)
 
-    await user.click(screen.getByRole('button', { name: 'Add node-kind statement' }))
+    await user.click(screen.getByRole('button', { name: 'Append to statements JSON' }))
 
     expect(onAppend).not.toHaveBeenCalled()
   })
@@ -142,7 +146,7 @@ describe('NodeKindStatementBuilder', () => {
     render(<NodeKindStatementBuilder statementsJson="not json" onAppend={onAppend} />)
 
     await selectKind(user, 'script')
-    await user.click(screen.getByRole('button', { name: 'Add node-kind statement' }))
+    await user.click(screen.getByRole('button', { name: 'Append to statements JSON' }))
 
     expect(onAppend).not.toHaveBeenCalled()
     expect(await screen.findByText(/Fix the statements JSON/)).toBeInTheDocument()
@@ -157,6 +161,26 @@ describe('NodeKindStatementBuilder', () => {
     await user.click(screen.getByRole('button', { name: 'Select a node kind' }))
 
     expect(await screen.findByRole('option', { name: 'condition' })).toBeInTheDocument()
+  })
+
+  it('shows append feedback and clears it when a choice changes', async () => {
+    const user = userEvent.setup()
+    render(<NodeKindStatementBuilder statementsJson="[]" onAppend={vi.fn()} />)
+
+    await selectKind(user, 'script')
+    await user.click(screen.getByRole('button', { name: 'Append to statements JSON' }))
+    expect(screen.getByText('Statement appended to the Policy statements JSON below.')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Deny' }))
+    await user.click(await screen.findByRole('option', { name: 'Allow' }))
+    expect(screen.queryByText('Statement appended to the Policy statements JSON below.')).not.toBeInTheDocument()
+  })
+
+  it('renders the helper as a labelled panel', () => {
+    render(<NodeKindStatementBuilder statementsJson="[]" onAppend={vi.fn()} />)
+
+    expect(screen.getByRole('heading', { name: 'Statement helper' })).toBeInTheDocument()
+    expect(screen.getByText('optional')).toBeInTheDocument()
   })
 
   it('has no accessibility violations', async () => {

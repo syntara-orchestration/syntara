@@ -150,7 +150,7 @@ describe('EditProjectPolicyDialog', () => {
     await user.type(screen.getByRole('textbox', { name: 'Policy name' }), 'deny-scripts')
     await user.click(screen.getByRole('button', { name: 'Select a node kind' }))
     await user.click(await screen.findByRole('option', { name: 'script' }))
-    await user.click(screen.getByRole('button', { name: 'Add node-kind statement' }))
+    await user.click(screen.getByRole('button', { name: 'Append to statements JSON' }))
     await user.click(screen.getByRole('button', { name: 'Create' }))
 
     await waitFor(() => expect(mockMutate).toHaveBeenCalled())
@@ -172,6 +172,11 @@ describe('EditProjectPolicyDialog', () => {
     const { container } = renderDialog()
     const results = await axe(container)
     expect(results).toHaveNoViolations()
+  })
+
+  it('explains that the statements JSON is the saved policy definition', () => {
+    renderCreateDialog()
+    expect(screen.getByText(/The saved policy definition — a JSON array of statement objects/)).toBeInTheDocument()
   })
 
   it('renders the modal header', () => {
