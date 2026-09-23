@@ -25,20 +25,22 @@ function kind(overrides: Partial<NodeKind> & { kind: string }): NodeKind {
     switchable: true,
     deniable_actions: ['write', 'execute'],
     can_write: true,
+    attributes: [],
     ...overrides,
   }
 }
 
 beforeEach(() => {
   mockNodeKinds.current = [
-    kind({ kind: 'script' }),
+    kind({ kind: 'script', attributes: [{ name: 'language', allowed_values: ['python', 'bash'] }] }),
+    kind({ kind: 'mcp_tool', attributes: [{ name: 'tool_name', allowed_values: null }] }),
     kind({ kind: 'manual_trigger', category: 'trigger', deniable_actions: ['write'] }),
     kind({ kind: 'condition', category: 'flow_control', switchable: false, deniable_actions: [] }),
   ]
 })
 
 async function selectKind(user: ReturnType<typeof userEvent.setup>, label: string) {
-  await user.click(screen.getByRole('button', { name: /Select a node kind|script|manual_trigger/ }))
+  await user.click(screen.getByRole('button', { name: /Select a node kind|script|mcp_tool|manual_trigger/ }))
   await user.click(await screen.findByRole('option', { name: label }))
 }
 
@@ -70,6 +72,58 @@ describe('NodeKindStatementBuilder', () => {
         conditions: { resource_labels: { kind: 'script' } },
       },
     ])
+  })
+
+  it('renders select and text attributes declared by the selected kind', async () => {
+    const user = userEvent.setup()
+    render(<NodeKindStatementBuilder statementsJson="[]" onAppend={vi.fn()} />)
+
+    await selectKind(user, 'script')
+
+    expect(screen.getByRole('button', { name: 'Any value' })).toBeInTheDocument()
+    expect(screen.getByText('Optional. Leave empty to match every value.')).toBeInTheDocument()
+
+    await selectKind(user, 'mcp_tool')
+
+    expect(screen.getByRole('textbox', { name: 'tool_name' })).toBeInTheDocument()
+  })
+
+  it('appends normalized attributes and previews the label set', async () => {
+    const onAppend = vi.fn()
+    const user = userEvent.setup()
+    render(<NodeKindStatementBuilder statementsJson="[]" onAppend={onAppend} />)
+
+    await selectKind(user, 'script')
+    await user.click(screen.getByRole('button', { name: 'Any value' }))
+    await user.click(await screen.findByRole('option', { name: 'python' }))
+
+    expect(screen.getByText('Statement target: script · language=python')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Add node-kind statement' }))
+    const appendedStatement: unknown = JSON.parse(onAppend.mock.calls[0][0] as string)
+    expect(appendedStatement).toEqual([
+      {
+        effect: 'deny',
+        actions: ['workflow_node:write'],
+        scope: 'project',
+        conditions: { resource_labels: { kind: 'script', language: 'python' } },
+      },
+    ])
+  })
+
+  it('resets attribute values when the kind changes', async () => {
+    const user = userEvent.setup()
+    render(<NodeKindStatementBuilder statementsJson="[]" onAppend={vi.fn()} />)
+
+    await selectKind(user, 'script')
+    await user.click(screen.getByRole('button', { name: 'Any value' }))
+    await user.click(await screen.findByRole('option', { name: 'bash' }))
+    await selectKind(user, 'mcp_tool')
+    await user.type(screen.getByRole('textbox', { name: 'tool_name' }), 'Ping')
+    await selectKind(user, 'script')
+
+    expect(screen.getByRole('button', { name: 'Any value' })).toBeInTheDocument()
+    expect(screen.queryByText(/language=bash/)).not.toBeInTheDocument()
   })
 
   it('does nothing until a node kind is chosen', async () => {

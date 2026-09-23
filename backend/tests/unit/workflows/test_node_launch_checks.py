@@ -1,8 +1,7 @@
 """Unit tests for launch-time node-kind checks (ANSTRAT-1750, slice 4).
 
 Covers the kill-switch pre-flight, the denied-set computation (with a stubbed
-evaluator and against the real Rego policy), run-principal resolution and the
-``permission_check`` edge rule.
+evaluator and against the real Rego policy), and run-principal resolution.
 """
 
 from typing import Any
@@ -20,7 +19,6 @@ from syntara.workflows.node_launch_checks import (
     load_principal_authz_context,
     resolve_run_principal,
     set_node_authz_evaluator,
-    validate_permission_check_edges,
 )
 from syntara.workflows.node_permissions import NodeKindDenial
 from tests.unit.authz.conftest import deny_policy, policies_for_role
@@ -151,7 +149,7 @@ class TestComputeDeniedNodesWithStubEvaluator:
     @pytest.mark.asyncio
     async def test_one_evaluation_per_kind_fanned_out_to_nodes(self) -> None:
         with patch(
-            "syntara.workflows.node_launch_checks.denied_node_kinds",
+            "syntara.workflows.node_launch_checks.denied_node_labels",
             AsyncMock(return_value=[NodeKindDenial(kind="script", denied_by="no-scripts", reason="policy_deny")]),
         ) as mock_denied:
             result = await compute_denied_nodes(
@@ -163,18 +161,21 @@ class TestComputeDeniedNodesWithStubEvaluator:
             )
 
         assert result == [
-            {"node_id": "script_a", "kind": "script", "denied_by": "no-scripts"},
-            {"node_id": "script_b", "kind": "script", "denied_by": "no-scripts"},
+            {"node_id": "script_a", "kind": "script", "labels": {"kind": "script"}, "denied_by": "no-scripts"},
+            {"node_id": "script_b", "kind": "script", "labels": {"kind": "script"}, "denied_by": "no-scripts"},
         ]
         # Only action kinds are evaluated, and each distinct kind exactly once.
         assert mock_denied.await_args is not None
-        assert sorted(mock_denied.await_args.kwargs["kinds"]) == ["http_request", "script"]
+        assert mock_denied.await_args.kwargs["label_sets"] == {
+            frozenset({("kind", "http_request")}),
+            frozenset({("kind", "script")}),
+        }
 
     @pytest.mark.asyncio
     async def test_passes_principal_labels_and_metadata(self) -> None:
         user = MagicMock(labels={"team": "infra"}, authz_metadata={"clearance": "low"})
         with patch(
-            "syntara.workflows.node_launch_checks.denied_node_kinds",
+            "syntara.workflows.node_launch_checks.denied_node_labels",
             AsyncMock(return_value=[]),
         ) as mock_denied:
             await compute_denied_nodes(
@@ -191,6 +192,36 @@ class TestComputeDeniedNodesWithStubEvaluator:
         assert kwargs["user_metadata"] == {"clearance": "low"}
         assert kwargs["project_name"] == "proj"
         assert kwargs["action"] == "execute"
+
+    @pytest.mark.asyncio
+    async def test_distinct_label_sets_are_evaluated_and_fanned_out(self) -> None:
+        labels = {"kind": "script", "language": "python"}
+        definition = {
+            "nodes": [
+                {"id": "python-a", "type": "script", "parameters": {"language": "python"}},
+                {"id": "python-b", "type": "script", "parameters": {"language": "Python"}},
+                {"id": "bash", "type": "script", "parameters": {"language": "bash"}},
+            ]
+        }
+        denial = NodeKindDenial(kind="script", labels=labels, denied_by="no-python", reason="policy_deny")
+        with patch(
+            "syntara.workflows.node_launch_checks.denied_node_labels",
+            AsyncMock(return_value=[denial]),
+        ) as mock_denied:
+            result = await compute_denied_nodes(
+                _db_stub(),
+                MagicMock(),
+                definition=definition,
+                project_id=None,
+                principal_id=PRINCIPAL_ID,
+            )
+
+        assert result == [
+            {"node_id": "python-a", "kind": "script", "labels": labels, "denied_by": "no-python"},
+            {"node_id": "python-b", "kind": "script", "labels": labels, "denied_by": "no-python"},
+        ]
+        assert mock_denied.await_args is not None
+        assert len(mock_denied.await_args.kwargs["label_sets"]) == 2
 
 
 class TestLoadPrincipalAuthzContext:
@@ -318,50 +349,6 @@ class TestComputeDeniedNodesWithRealRego:
 
         assert caller_denied == []
         assert [entry["node_id"] for entry in publisher_denied] == ["call"]
-
-
-class TestPermissionCheckEdgeRule:
-    """The shape rule the definition validator should enforce for permission_check."""
-
-    def test_valid_node_reports_no_problems(self) -> None:
-        definition = {
-            "nodes": [
-                {"id": "step", "type": "script"},
-                {"id": "check", "type": "permission_check"},
-                {"id": "ok", "type": "script"},
-                {"id": "nope", "type": "script"},
-            ],
-            "edges": [
-                {"from": "step", "to": "check"},
-                {"from": "check", "to": "ok", "from_port": "allowed"},
-                {"from": "check", "to": "nope", "from_port": "denied"},
-            ],
-        }
-        assert validate_permission_check_edges(definition) == []
-
-    def test_reports_wrong_incoming_edge_count(self) -> None:
-        definition = {
-            "nodes": [{"id": "check", "type": "permission_check"}],
-            "edges": [{"from": "a", "to": "check"}, {"from": "b", "to": "check"}],
-        }
-        problems = validate_permission_check_edges(definition)
-        assert [node_id for node_id, _ in problems] == ["check"]
-        assert "exactly one incoming edge" in problems[0][1]
-
-    def test_reports_invalid_output_port(self) -> None:
-        definition = {
-            "nodes": [{"id": "check", "type": "permission_check"}],
-            "edges": [
-                {"from": "a", "to": "check"},
-                {"from": "check", "to": "next", "from_port": "true"},
-            ],
-        }
-        problems = validate_permission_check_edges(definition)
-        assert "invalid output port" in problems[0][1]
-
-    def test_no_permission_check_nodes_is_a_no_op(self) -> None:
-        assert validate_permission_check_edges(_definition()) == []
-        assert validate_permission_check_edges(None) == []
 
 
 class TestEvaluatorRegistry:

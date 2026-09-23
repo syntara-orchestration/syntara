@@ -63,11 +63,6 @@ TEMPORAL_PAYLOAD_MAX_BYTES = int(_TEMPORAL_BLOB_SIZE_ERROR * 0.9)
 NODE_EXECUTE_DENIED_ERROR_CODE = "node_execute_denied"
 """Stable error code on a node that was not executed because of a deny policy."""
 
-PERMISSION_CHECK_ALLOWED_PORT = "allowed"
-PERMISSION_CHECK_DENIED_PORT = "denied"
-PERMISSION_CHECK_PORTS: frozenset[str] = frozenset({PERMISSION_CHECK_ALLOWED_PORT, PERMISSION_CHECK_DENIED_PORT})
-"""Output ports of the ``permission_check`` node, mirroring ``condition``'s true/false."""
-
 CHECK_NODE_KIND_ENABLED_ACTIVITY = "check_node_kind_enabled"
 RECORD_NODE_EXECUTE_DENIED_ACTIVITY = "record_node_execute_denied"
 RECOMPUTE_DENIED_NODES_ACTIVITY = "recompute_denied_nodes"

@@ -5,7 +5,12 @@ import { axe } from 'vitest-axe'
 import { DeniedNodesAlert } from './DeniedNodesAlert'
 
 const deniedNodes = [
-  { node_id: 'restart_service', kind: 'http_request', denied_by: 'no-restarts-in-production' },
+  {
+    node_id: 'restart_service',
+    kind: 'http_request',
+    labels: { kind: 'http_request', method: 'post' },
+    denied_by: 'no-restarts-in-production',
+  },
   { node_id: 'run_script' },
 ]
 
@@ -32,7 +37,7 @@ describe('DeniedNodesAlert', () => {
   it('shows the node kind and the denying policy', () => {
     render(<DeniedNodesAlert deniedNodes={deniedNodes} />)
 
-    expect(screen.getByText('http_request')).toBeInTheDocument()
+    expect(screen.getByText('http_request (method=post)')).toBeInTheDocument()
     expect(screen.getByText('Denied by policy "no-restarts-in-production"')).toBeInTheDocument()
   })
 

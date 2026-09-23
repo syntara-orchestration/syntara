@@ -196,28 +196,6 @@ def _reachable_from_triggers(workflow_definition: dict[str, Any], trigger_ids: s
     return visited - trigger_ids
 
 
-def _check_permission_check_node_findings(workflow_definition: dict[str, Any]) -> list[ValidationFinding]:
-    """Return findings for malformed ``permission_check`` nodes.
-
-    The rule itself lives next to the runtime (``node_launch_checks``) so the
-    validator and the engine agree: exactly one incoming edge, outgoing edges
-    only on the ``allowed`` / ``denied`` ports.
-    """
-    # Imported lazily: node_launch_checks pulls the authz engine, which the
-    # validator must not load at import time.
-    from syntara.workflows.node_launch_checks import validate_permission_check_edges  # noqa: PLC0415
-
-    return [
-        ValidationFinding(
-            severity=ValidationSeverity.error,
-            category=ValidationCategory.permission_check_configuration,
-            message=problem,
-            node_id=node_id,
-        )
-        for node_id, problem in validate_permission_check_edges(workflow_definition)
-    ]
-
-
 def _check_converge_node_findings(
     workflow_definition: dict[str, Any],
 ) -> list[ValidationFinding]:
@@ -766,7 +744,6 @@ class WorkflowValidator:
             findings.extend(_check_cycles_findings(workflow_definition, node_ids))
             findings.extend(_check_orphaned_nodes_findings(workflow_definition, node_ids))
             findings.extend(_check_converge_node_findings(workflow_definition))
-            findings.extend(_check_permission_check_node_findings(workflow_definition))
             findings.extend(
                 _check_approval_node_findings(
                     workflow_definition,

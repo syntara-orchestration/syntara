@@ -74,6 +74,7 @@ async def record_node_execute_denied(
     kind: str,
     denied_by: str,
     principal_id: str | None = None,
+    labels: dict[str, str] | None = None,
 ) -> None:
     """Emit the audit event for one node that was not executed because of a denial."""
     async with AsyncSessionLocal() as session:
@@ -85,6 +86,7 @@ async def record_node_execute_denied(
             execution_id=UUID(execution_id),
             node_id=node_id,
             kind=kind,
+            labels=labels or {"kind": kind},
             denied_by=denied_by,
             principal_id=UUID(principal_id) if principal_id else None,
             workflow_id=workflow_id,

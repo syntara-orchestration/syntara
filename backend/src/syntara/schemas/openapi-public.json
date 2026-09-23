@@ -49735,6 +49735,38 @@
           }
         }
       },
+      "DeniedNodeRead": {
+        "type": "object",
+        "title": "DeniedNodeRead",
+        "description": "One workflow node refused by a launch-time authorization check.",
+        "properties": {
+          "node_id": {
+            "type": "string",
+            "title": "Node Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "labels": {
+            "type": "object",
+            "title": "Labels",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "denied_by": {
+            "type": "string",
+            "title": "Denied By"
+          }
+        },
+        "required": [
+          "node_id",
+          "kind",
+          "labels",
+          "denied_by"
+        ]
+      },
       "ExecutionRead": {
         "type": "object",
         "title": "ExecutionRead",
@@ -49961,8 +49993,7 @@
               {
                 "type": "array",
                 "items": {
-                  "additionalProperties": true,
-                  "type": "object"
+                  "$ref": "#/components/schemas/DeniedNodeRead"
                 }
               },
               {
@@ -49970,7 +50001,7 @@
               }
             ],
             "title": "Denied Nodes",
-            "description": "Nodes the run principal was not allowed to execute, as [{node_id, kind, denied_by}]. Null when nothing was denied."
+            "description": "Nodes the run principal was not allowed to execute, as [{node_id, kind, labels, denied_by}]. Null when nothing was denied."
           },
           "labels": {
             "additionalProperties": true,
@@ -50281,7 +50312,6 @@
           "loop",
           "switch",
           "wait",
-          "permission_check",
           "aap_job_template",
           "aap_workflow_job_template",
           "agentic",
@@ -50649,6 +50679,13 @@
           "can_write": {
             "type": "boolean",
             "title": "Can Write"
+          },
+          "attributes": {
+            "type": "array",
+            "title": "Attributes",
+            "items": {
+              "$ref": "#/components/schemas/NodeAttributeRead"
+            }
           }
         },
         "required": [
@@ -50657,7 +50694,37 @@
           "enabled",
           "switchable",
           "deniable_actions",
-          "can_write"
+          "can_write",
+          "attributes"
+        ]
+      },
+      "NodeAttributeRead": {
+        "type": "object",
+        "title": "NodeAttributeRead",
+        "description": "One node parameter exposed as an authorization resource label.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "allowed_values": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowed Values"
+          }
+        },
+        "required": [
+          "name",
+          "allowed_values"
         ]
       },
       "NodeKindsListResponse": {
@@ -51702,9 +51769,6 @@
                 },
                 {
                   "$ref": "#/components/schemas/WaitNode"
-                },
-                {
-                  "$ref": "#/components/schemas/PermissionCheckNode"
                 }
               ],
               "discriminator": {
@@ -51719,7 +51783,6 @@
                   "http_request": "#/components/schemas/HTTPRequestNode",
                   "loop": "#/components/schemas/LoopNode",
                   "mcp_tool": "#/components/schemas/MCPToolNode",
-                  "permission_check": "#/components/schemas/PermissionCheckNode",
                   "script": "#/components/schemas/ScriptNode",
                   "switch": "#/components/schemas/SwitchNode",
                   "wait": "#/components/schemas/WaitNode"
@@ -52836,97 +52899,6 @@
         ],
         "title": "WaitNode",
         "description": "Wait (delay) control node."
-      },
-      "PermissionCheckNode": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
-            "title": "Id",
-            "description": "Unique identifier for the node within the workflow"
-          },
-          "name": {
-            "anyOf": [
-              {
-                "type": "string",
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name",
-            "description": "Human-readable name for the node"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string",
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description",
-            "description": "Human-readable description of the node purpose"
-          },
-          "outputs": {
-            "anyOf": [
-              {
-                "additionalProperties": {
-                  "type": "string"
-                },
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Outputs",
-            "description": "Output extraction mapping"
-          },
-          "position": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/NodePosition"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Optional UI position hint"
-          },
-          "type": {
-            "type": "string",
-            "const": "permission_check",
-            "title": "Type"
-          },
-          "parameters": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Parameters",
-            "description": "No configuration; accepted for uniformity"
-          },
-          "settings": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/NodeSettingsBase"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "additionalProperties": true,
-        "type": "object",
-        "required": [
-          "id",
-          "type"
-        ],
-        "title": "PermissionCheckNode",
-        "description": "Permission check control node (ANSTRAT-1750).\n\nTakes no configuration.  It inspects the node feeding its single incoming\nedge and routes to the ``allowed`` or ``denied`` output port depending on\nwhether that node was denied ``workflow_node:execute`` for this run."
       },
       "AAPJobTemplateExecutorParameters": {
         "properties": {
@@ -54292,8 +54264,7 @@
           "converge_configuration",
           "approval_configuration",
           "definition_limits",
-          "node_kind_disabled",
-          "permission_check_configuration"
+          "node_kind_disabled"
         ]
       },
       "ValidationFinding": {

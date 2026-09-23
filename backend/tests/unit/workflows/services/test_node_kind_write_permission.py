@@ -60,7 +60,7 @@ class TestCheckNodeKindWritePermission:
     async def test_kind_already_in_baseline_is_not_evaluated(self) -> None:
         """A kind present in the baseline is not introduced — no evaluation at all."""
         svc = _make_service()
-        with patch(f"{_SERVICE_MODULE}.denied_node_kinds", new_callable=AsyncMock) as denied:
+        with patch(f"{_SERVICE_MODULE}.denied_node_labels", new_callable=AsyncMock) as denied:
             await svc._check_node_kind_write_permission(
                 _definition("http_request"),
                 _definition("http_request"),
@@ -73,7 +73,7 @@ class TestCheckNodeKindWritePermission:
         """Adding another node of a kind already in the baseline introduces nothing."""
         svc = _make_service()
         new_definition = _definition("http_request", "http_request", "script")
-        with patch(f"{_SERVICE_MODULE}.denied_node_kinds", new_callable=AsyncMock, return_value=[]) as denied:
+        with patch(f"{_SERVICE_MODULE}.denied_node_labels", new_callable=AsyncMock, return_value=[]) as denied:
             await svc._check_node_kind_write_permission(
                 new_definition,
                 _definition("http_request", "script"),
@@ -85,7 +85,7 @@ class TestCheckNodeKindWritePermission:
     async def test_new_workflow_baseline_makes_every_kind_introduced(self) -> None:
         """A None baseline (new workflow, import, clone) introduces every kind."""
         svc = _make_service()
-        with patch(f"{_SERVICE_MODULE}.denied_node_kinds", new_callable=AsyncMock, return_value=[]) as denied:
+        with patch(f"{_SERVICE_MODULE}.denied_node_labels", new_callable=AsyncMock, return_value=[]) as denied:
             await svc._check_node_kind_write_permission(
                 _definition("http_request", "script"),
                 None,
@@ -93,7 +93,10 @@ class TestCheckNodeKindWritePermission:
             )
         denied.assert_awaited_once()
         assert denied.await_args is not None
-        assert denied.await_args.kwargs["kinds"] == {"http_request", "script"}
+        assert denied.await_args.kwargs["label_sets"] == {
+            frozenset({("kind", "http_request")}),
+            frozenset({("kind", "script")}),
+        }
         assert denied.await_args.kwargs["action"] == "write"
         assert denied.await_args.kwargs["user_id"] == svc.user.id
         assert denied.await_args.kwargs["project_name"] == "test-project"
@@ -102,14 +105,14 @@ class TestCheckNodeKindWritePermission:
     async def test_only_newly_added_kind_is_evaluated(self) -> None:
         """Editing a workflow only evaluates the kinds the edit adds."""
         svc = _make_service()
-        with patch(f"{_SERVICE_MODULE}.denied_node_kinds", new_callable=AsyncMock, return_value=[]) as denied:
+        with patch(f"{_SERVICE_MODULE}.denied_node_labels", new_callable=AsyncMock, return_value=[]) as denied:
             await svc._check_node_kind_write_permission(
                 _definition("script", "http_request"),
                 _definition("script"),
                 uuid4(),
             )
         assert denied.await_args is not None
-        assert denied.await_args.kwargs["kinds"] == {"http_request"}
+        assert denied.await_args.kwargs["label_sets"] == {frozenset({("kind", "http_request")})}
 
     @pytest.mark.asyncio
     async def test_denied_kind_raises(self) -> None:
@@ -117,7 +120,7 @@ class TestCheckNodeKindWritePermission:
         svc = _make_service()
         denial = NodeKindDenial(kind="http_request", denied_by="no-http", reason="policy_deny")
         with (
-            patch(f"{_SERVICE_MODULE}.denied_node_kinds", new_callable=AsyncMock, return_value=[denial]),
+            patch(f"{_SERVICE_MODULE}.denied_node_labels", new_callable=AsyncMock, return_value=[denial]),
             pytest.raises(NodeKindWriteDeniedError) as exc_info,
         ):
             await svc._check_node_kind_write_permission(_definition("http_request"), None, uuid4())
@@ -128,7 +131,7 @@ class TestCheckNodeKindWritePermission:
     async def test_empty_definition_skips_evaluation(self) -> None:
         """A definition with no nodes introduces nothing."""
         svc = _make_service()
-        with patch(f"{_SERVICE_MODULE}.denied_node_kinds", new_callable=AsyncMock) as denied:
+        with patch(f"{_SERVICE_MODULE}.denied_node_labels", new_callable=AsyncMock) as denied:
             await svc._check_node_kind_write_permission(_definition(), None, uuid4())
         denied.assert_not_awaited()
 
@@ -136,7 +139,7 @@ class TestCheckNodeKindWritePermission:
     async def test_no_evaluator_skips_check(self) -> None:
         """Without an evaluator the check is skipped rather than failing the save."""
         svc = _make_service(with_opa=False)
-        with patch(f"{_SERVICE_MODULE}.denied_node_kinds", new_callable=AsyncMock) as denied:
+        with patch(f"{_SERVICE_MODULE}.denied_node_labels", new_callable=AsyncMock) as denied:
             await svc._check_node_kind_write_permission(_definition("http_request"), None, uuid4())
         denied.assert_not_awaited()
 
@@ -144,7 +147,7 @@ class TestCheckNodeKindWritePermission:
     async def test_no_project_resolves_empty_project_name(self) -> None:
         """A workflow with no project evaluates with an empty project scope."""
         svc = _make_service()
-        with patch(f"{_SERVICE_MODULE}.denied_node_kinds", new_callable=AsyncMock, return_value=[]) as denied:
+        with patch(f"{_SERVICE_MODULE}.denied_node_labels", new_callable=AsyncMock, return_value=[]) as denied:
             await svc._check_node_kind_write_permission(_definition("script"), None, None)
         assert denied.await_args is not None
         assert denied.await_args.kwargs["project_name"] == ""
@@ -213,7 +216,7 @@ class TestRestorePathCheck:
         denial = NodeKindDenial(kind="http_request", denied_by="no-http", reason="policy_deny")
 
         with (
-            patch(f"{_SERVICE_MODULE}.denied_node_kinds", new_callable=AsyncMock, return_value=[denial]),
+            patch(f"{_SERVICE_MODULE}.denied_node_labels", new_callable=AsyncMock, return_value=[denial]),
             pytest.raises(NodeKindWriteDeniedError),
         ):
             await svc.restore_workflow_version(uuid4(), 1)
@@ -229,7 +232,7 @@ class TestRestorePathCheck:
         svc.get_workflow_with_version = AsyncMock(return_value=(MagicMock(), MagicMock()))  # type: ignore[method-assign]
         svc._create_version_record = AsyncMock(return_value=None)  # type: ignore[method-assign]
 
-        with patch(f"{_SERVICE_MODULE}.denied_node_kinds", new_callable=AsyncMock, return_value=[]):
+        with patch(f"{_SERVICE_MODULE}.denied_node_labels", new_callable=AsyncMock, return_value=[]):
             await svc.restore_workflow_version(uuid4(), 1)
 
         svc._create_version_record.assert_awaited_once()
@@ -261,6 +264,16 @@ class TestNodeKindWriteDeniedHandler:
         assert data["retryable"] is False
         assert data["instance"] == "https://api.example.com/api/v1/workflows"
         assert data["denied_kinds"] == [
-            {"kind": "http_request", "denied_by": "no-http", "reason": "policy_deny"},
-            {"kind": "script", "denied_by": "no-script", "reason": "policy_deny"},
+            {
+                "kind": "http_request",
+                "labels": {"kind": "http_request"},
+                "denied_by": "no-http",
+                "reason": "policy_deny",
+            },
+            {
+                "kind": "script",
+                "labels": {"kind": "script"},
+                "denied_by": "no-script",
+                "reason": "policy_deny",
+            },
         ]

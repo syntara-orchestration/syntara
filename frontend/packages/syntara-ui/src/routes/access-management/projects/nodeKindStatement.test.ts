@@ -11,6 +11,7 @@ function kind(overrides: Partial<NodeKind> & { kind: string }): NodeKind {
     switchable: true,
     deniable_actions: ['write', 'execute'],
     can_write: true,
+    attributes: [],
     ...overrides,
   }
 }
@@ -29,6 +30,17 @@ describe('buildNodeKindStatement', () => {
       scope: 'project',
       conditions: { resource_labels: { kind: 'script' } },
     })
+  })
+
+  it('normalizes non-empty attribute labels and drops empty values', () => {
+    expect(
+      buildNodeKindStatement({
+        effect: 'deny',
+        action: 'write',
+        kind: 'script',
+        attributes: { language: ' Python ', integration_id: '   ' },
+      }).conditions.resource_labels
+    ).toEqual({ kind: 'script', language: 'python' })
   })
 
   it('expands the both selection into two actions', () => {

@@ -25,7 +25,6 @@ afterAll(async () => {
 })
 
 type MockNode = { id: string; type: string; parameters?: Record<string, unknown> }
-type MockEdge = { from: string; to: string; from_port?: string }
 
 async function fetchWorkflowByName(name: string) {
   const list = await fetch(`${baseUrl}/api/v1/workflows?limit=100`).then((response) => response.json())
@@ -35,28 +34,6 @@ async function fetchWorkflowByName(name: string) {
 }
 
 describe('node-kind example workflows', () => {
-  it('seeds a permission_check example with allowed and denied ports', async () => {
-    const workflow = await fetchWorkflowByName('permission-check-routing')
-    const definition = workflow.version.workflow_definition
-
-    const check = (definition.nodes as MockNode[]).find((node) => node.type === 'permission_check')
-    expect(check).toBeDefined()
-
-    const ports = (definition.edges as MockEdge[])
-      .filter((edge) => edge.from === check?.id)
-      .map((edge) => edge.from_port)
-    expect(ports).toEqual(['allowed', 'denied'])
-  })
-
-  it('seeds a permission_check example with exactly one incoming edge on the check', async () => {
-    const workflow = await fetchWorkflowByName('permission-check-routing')
-    const definition = workflow.version.workflow_definition
-    const check = (definition.nodes as MockNode[]).find((node) => node.type === 'permission_check')
-
-    const incoming = (definition.edges as MockEdge[]).filter((edge) => edge.to === check?.id)
-    expect(incoming).toHaveLength(1)
-  })
-
   it('seeds an mcp_tool example with integration_id, tool_name and arguments', async () => {
     const workflow = await fetchWorkflowByName('mcp-tool-call')
     const definition = workflow.version.workflow_definition
@@ -78,7 +55,12 @@ describe('denied execution fixture', () => {
     )
 
     expect(execution.denied_nodes).toEqual([
-      { node_id: 'restart_service', kind: 'http_request', denied_by: 'no-restarts-in-production' },
+      {
+        node_id: 'restart_service',
+        kind: 'http_request',
+        labels: { kind: 'http_request', method: 'post' },
+        denied_by: 'no-restarts-in-production',
+      },
     ])
   })
 

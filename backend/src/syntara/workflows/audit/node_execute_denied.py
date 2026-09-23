@@ -33,6 +33,7 @@ class NodeExecuteDeniedEvent:
     execution_id: UUID
     node_id: str
     kind: str
+    labels: dict[str, str]
     denied_by: str
     principal_id: UUID | None = field(default=None)
     workflow_id: UUID | None = field(default=None)
@@ -47,6 +48,7 @@ class NodeExecuteDeniedHandler(AuditEventHandler[NodeExecuteDeniedEvent]):
             data_type="node-execute-denied",
             node_id=event.node_id,
             node_kind=event.kind,
+            node_labels=event.labels,
             denied_by=event.denied_by,
             principal_id=str(event.principal_id) if event.principal_id else None,
         )

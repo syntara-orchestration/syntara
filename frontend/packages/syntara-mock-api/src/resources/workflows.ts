@@ -65,7 +65,6 @@ const yamlFiles = [
   'converge/converge-all-strategy.yaml',
   'approval/approval-gate-basic.yaml',
   'approval/deployment-approval.yaml',
-  'permission_check/permission-check-routing.yaml',
   'mcp_tool/mcp-tool-call.yaml',
 ]
 

@@ -34,12 +34,20 @@ export function buildNodeKindStatement(options: {
   effect: NodeKindStatementEffect
   action: NodeKindStatementAction
   kind: string
+  attributes?: Record<string, string>
 }): NodeKindStatement {
+  const attributes = Object.entries(options.attributes ?? {}).reduce<Record<string, string>>(
+    (normalizedAttributes, [name, value]) => {
+      const normalizedValue = value.trim().toLowerCase()
+      return normalizedValue ? { ...normalizedAttributes, [name]: normalizedValue } : normalizedAttributes
+    },
+    {}
+  )
   return {
     effect: options.effect,
     actions: ACTIONS_BY_SELECTION[options.action].map((action) => `${NODE_RESOURCE_TYPE}:${action}`),
     scope: 'project',
-    conditions: { resource_labels: { [NODE_KIND_LABEL]: options.kind } },
+    conditions: { resource_labels: { [NODE_KIND_LABEL]: options.kind, ...attributes } },
   }
 }
 

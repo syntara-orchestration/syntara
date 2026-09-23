@@ -3,8 +3,13 @@ import { useMemo } from 'react'
 
 import { nodeKindsClient } from '../client'
 
+/** One policy-addressable node attribute declared by a workflow node kind. */
+export type NodeKindAttribute = NodeKindsAPI.components['schemas']['NodeAttributeRead']
+
 /** One workflow node kind as the calling principal sees it. */
-export type NodeKind = NodeKindsAPI.components['schemas']['NodeKindRead']
+export type NodeKind = NodeKindsAPI.components['schemas']['NodeKindRead'] & {
+  attributes: NodeKindAttribute[]
+}
 
 /** Registry grouping that decides which actions may be denied for a kind. */
 export type NodeKindCategory = NodeKindsAPI.components['schemas']['NodeKindCategory']

@@ -155,17 +155,6 @@
       "since": "2.0.0"
     },
     {
-      "type": "permission_check",
-      "name": "Permission Check",
-      "description": "Route on whether the upstream node was denied execution for this run",
-      "labels": {
-        "category": "control"
-      },
-      "schema_ref": "../control-nodes/permission_check.schema.json",
-      "deprecated": false,
-      "since": "2.0.0"
-    },
-    {
       "type": "condition",
       "name": "Condition",
       "description": "Binary conditional branching (if/then/else)",

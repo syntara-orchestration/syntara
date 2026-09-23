@@ -151,19 +151,6 @@ class WaitNode(WorkflowNodeBase):
     settings: NodeSettingsCofDisabled | None = None
 
 
-class PermissionCheckNode(WorkflowNodeBase):
-    """Permission check control node (ANSTRAT-1750).
-
-    Takes no configuration.  It inspects the node feeding its single incoming
-    edge and routes to the ``allowed`` or ``denied`` output port depending on
-    whether that node was denied ``workflow_node:execute`` for this run.
-    """
-
-    type: Literal["permission_check"]
-    parameters: dict[str, Any] = Field(default_factory=dict, description="No configuration; accepted for uniformity")
-    settings: NodeSettingsBase | None = None
-
-
 _AllNodeTypes = (
     AAPJobTemplateNode
     | AAPWorkflowJobTemplateNode
@@ -177,7 +164,6 @@ _AllNodeTypes = (
     | LoopNode
     | ConvergeNode
     | WaitNode
-    | PermissionCheckNode
 )
 
 WorkflowNode = Annotated[_AllNodeTypes, Discriminator("type")]

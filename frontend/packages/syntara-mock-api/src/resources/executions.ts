@@ -12,7 +12,6 @@ const HELLO_WORLD = workflowIdByName['hello-world']
 const LOOP_DEMO = workflowIdByName['loop-demo']
 const PARALLEL_DEMO = workflowIdByName['parallel-demo']
 const DEPLOYMENT_APPROVAL = workflowIdByName['deployment-approval']
-const PERMISSION_CHECK_ROUTING = workflowIdByName['permission-check-routing']
 
 export const executions: Execution[] = [
   {
@@ -215,14 +214,21 @@ export const executions: Execution[] = [
     id: 'exec-denied',
     created_at: mockDate.hoursAgo2,
     updated_at: mockDate.hoursAgo2,
-    workflow_id: PERMISSION_CHECK_ROUTING,
-    workflow_name: workflowNames[PERMISSION_CHECK_ROUTING],
+    workflow_id: CONDITIONAL_DEMO,
+    workflow_name: workflowNames[CONDITIONAL_DEMO],
     status: 'completed_with_errors',
     started_at: mockDate.hoursAgo2Plus1s,
     completed_at: mockDate.hoursAgo1,
     started_by: 'user-2',
     input_data: {},
-    denied_nodes: [{ node_id: 'restart_service', kind: 'http_request', denied_by: 'no-restarts-in-production' }],
+    denied_nodes: [
+      {
+        node_id: 'restart_service',
+        kind: 'http_request',
+        labels: { kind: 'http_request', method: 'post' },
+        denied_by: 'no-restarts-in-production',
+      },
+    ],
   },
   // Execution for deployment-approval — completed with approval audit
   {

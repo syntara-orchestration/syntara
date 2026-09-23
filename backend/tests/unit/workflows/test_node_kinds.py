@@ -22,8 +22,11 @@ from syntara.workflows.node_kinds import (
     get_node_kind,
     node_kind_action_pairs,
     node_kinds_by_category,
+    node_labels,
+    normalise_attribute_value,
     validate_node_kind_statements,
 )
+from syntara.workflows.node_permissions import introduced_label_sets, label_sets_in_definition
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 
 
@@ -61,6 +64,19 @@ class TestRegistryCoverage:
     def test_get_node_kind_unknown(self) -> None:
         assert get_node_kind("http_requst") is None
 
+    def test_node_labels_uses_declared_normalized_attributes_only(self) -> None:
+        node = {"type": "script", "parameters": {"language": " Python ", "unknown": "value"}}
+        assert node_labels(node) == {"kind": "script", "language": "python"}
+
+    def test_template_and_non_string_attributes_are_absent(self) -> None:
+        assert node_labels({"type": "script", "parameters": {"language": "{{ runtime }}"}}) == {"kind": "script"}
+        assert normalise_attribute_value(3) is None
+
+    def test_value_outside_schema_enum_is_absent(self) -> None:
+        assert node_labels({"type": "internal_activity", "parameters": {"activity": "unknown"}}) == {
+            "kind": "internal_activity"
+        }
+
     def test_categories_partition_registry(self) -> None:
         by_category = {c: node_kinds_by_category(c) for c in NodeKindCategory}
         total = sum(len(v) for v in by_category.values())
@@ -77,8 +93,31 @@ class TestRegistryCoverage:
             "loop",
             "switch",
             "wait",
-            "permission_check",
         }
+
+
+class TestDefinitionLabelSets:
+    """Save-time introduction compares complete node label sets."""
+
+    @staticmethod
+    def _definition(*languages: str) -> dict[str, Any]:
+        return {
+            "nodes": [
+                {"id": f"script-{index}", "type": "script", "parameters": {"language": language}}
+                for index, language in enumerate(languages)
+            ]
+        }
+
+    def test_language_switch_introduces_new_label_set(self) -> None:
+        introduced = introduced_label_sets(self._definition("python"), self._definition("bash"))
+        assert introduced == {frozenset({("kind", "script"), ("language", "python")})}
+
+    def test_duplicate_identical_node_introduces_nothing(self) -> None:
+        assert not introduced_label_sets(self._definition("bash", "bash"), self._definition("bash"))
+
+    def test_none_baseline_introduces_every_label_set(self) -> None:
+        definition = self._definition("bash", "python")
+        assert introduced_label_sets(definition, None) == label_sets_in_definition(definition)
 
 
 class TestDeniableActions:
@@ -137,13 +176,28 @@ class TestValidateNodeKindStatements:
         stmts = [_stmt("deny", ["workflow_node:execute"])]
         assert validate_node_kind_statements(stmts) is None
 
-    def test_other_labels_not_inspected(self) -> None:
+    def test_attribute_without_kind_rejected(self) -> None:
         stmts = [_stmt("deny", ["workflow_node:execute"], conditions={"resource_labels": {"team": "x"}})]
-        assert validate_node_kind_statements(stmts) is None
+        assert validate_node_kind_statements(stmts) == "Node attribute labels require a 'kind' label"
 
     def test_known_kind_valid(self) -> None:
         stmts = [_stmt("deny", ["workflow_node:execute"], kind="http_request")]
         assert validate_node_kind_statements(stmts) is None
+
+    @pytest.mark.parametrize(
+        ("labels", "message"),
+        [
+            ({"kind": "script", "runtime": "python"}, "Unknown attribute 'runtime'"),
+            ({"kind": "script", "language": "Python"}, "must be a non-empty normalized string"),
+            ({"kind": "script", "language": "ruby"}, "Allowed: bash, python"),
+        ],
+    )
+    def test_invalid_attribute_label_rejected(self, labels: dict[str, str], message: str) -> None:
+        error = validate_node_kind_statements(
+            [_stmt("deny", ["workflow_node:execute"], conditions={"resource_labels": labels})]
+        )
+        assert error is not None
+        assert message in error
 
     def test_unknown_kind_rejected(self) -> None:
         error = validate_node_kind_statements([_stmt("deny", ["workflow_node:execute"], kind="http_requst")])

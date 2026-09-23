@@ -27,7 +27,6 @@ export const RegistryNodeId = {
   LOGIC_LOOP: 'logic-loop',
   LOGIC_SWITCH: 'logic-switch',
   LOGIC_WAIT: 'logic-wait',
-  LOGIC_PERMISSION_CHECK: 'logic-permission-check',
   AGENT: 'agent',
   AAP_EXECUTION: 'aap-execution',
   AAP_JOB_TEMPLATE: 'aap-job-template',

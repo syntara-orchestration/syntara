@@ -133,6 +133,22 @@ export type webhooks = Record<string, never>
 export interface components {
   schemas: {
     /**
+     * DeniedNodeRead
+     * @description One workflow node refused by a launch-time authorization check.
+     */
+    DeniedNodeRead: {
+      /** Node Id */
+      node_id: string
+      /** Kind */
+      kind: string
+      /** Labels */
+      labels: {
+        [key: string]: string
+      }
+      /** Denied By */
+      denied_by: string
+    }
+    /**
      * ExecutionRead
      * @description Schema for execution response (GET /executions/{id}).
      *
@@ -234,13 +250,9 @@ export interface components {
       interface?: string | null
       /**
        * Denied Nodes
-       * @description Nodes the run principal was not allowed to execute, as [{node_id, kind, denied_by}]. Null when nothing was denied.
+       * @description Nodes the run principal was not allowed to execute, as [{node_id, kind, labels, denied_by}]. Null when nothing was denied.
        */
-      denied_nodes?:
-        | {
-            [key: string]: unknown
-          }[]
-        | null
+      denied_nodes?: components['schemas']['DeniedNodeRead'][] | null
       /** Labels */
       labels?: {
         [key: string]: unknown
@@ -377,7 +389,6 @@ export interface components {
       | 'loop'
       | 'switch'
       | 'wait'
-      | 'permission_check'
       | 'aap_job_template'
       | 'aap_workflow_job_template'
       | 'agentic'
@@ -1525,55 +1536,6 @@ export interface components {
       [key: string]: unknown
     }
     /**
-     * PermissionCheckNode
-     * @description Permission check control node (ANSTRAT-1750).
-     *
-     *     Takes no configuration.  It inspects the node feeding its single incoming
-     *     edge and routes to the ``allowed`` or ``denied`` output port depending on
-     *     whether that node was denied ``workflow_node:execute`` for this run.
-     */
-    PermissionCheckNode: {
-      /**
-       * Id
-       * @description Unique identifier for the node within the workflow
-       */
-      id: string
-      /**
-       * Name
-       * @description Human-readable name for the node
-       */
-      name?: string | null
-      /**
-       * Description
-       * @description Human-readable description of the node purpose
-       */
-      description?: string | null
-      /**
-       * Outputs
-       * @description Output extraction mapping
-       */
-      outputs?: {
-        [key: string]: string
-      } | null
-      /** @description Optional UI position hint */
-      position?: components['schemas']['NodePosition'] | null
-      /**
-       * @description discriminator enum property added by openapi-typescript
-       * @enum {string}
-       */
-      type: 'permission_check'
-      /**
-       * Parameters
-       * @description No configuration; accepted for uniformity
-       */
-      parameters?: {
-        [key: string]: unknown
-      }
-      settings?: components['schemas']['NodeSettingsBase'] | null
-    } & {
-      [key: string]: unknown
-    }
-    /**
      * ScriptLanguage
      * @description Supported script languages for script executor.
      * @enum {string}
@@ -1826,7 +1788,6 @@ export interface components {
         | components['schemas']['LoopNode']
         | components['schemas']['ConvergeNode']
         | components['schemas']['WaitNode']
-        | components['schemas']['PermissionCheckNode']
       )[]
       /**
        * Edges

@@ -31,14 +31,13 @@ from syntara.core.models import User
 from syntara.service_accounts.models.service_account import ServiceAccount
 from syntara.workflows.exceptions import NodeKindDisabledError
 from syntara.workflows.node_kind_switch import disabled_nodes_in_definition, get_disabled_node_kinds
-from syntara.workflows.node_kinds import NODE_ACTION_EXECUTE
+from syntara.workflows.node_kinds import NODE_ACTION_EXECUTE, node_labels
 from syntara.workflows.node_permissions import (
-    denied_node_kinds,
-    executable_kinds,
-    kinds_in_definition,
+    denied_node_labels,
+    executable_label_sets,
+    label_sets_in_definition,
     resolve_project_name,
 )
-from syntara.workflows.workflow_engine.constants import PERMISSION_CHECK_PORTS
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 
 if TYPE_CHECKING:
@@ -151,8 +150,8 @@ async def compute_denied_nodes(
     Returns an empty list when no evaluator is available; a missing evaluator
     must never silently deny, and it is logged so the gap is visible.
     """
-    kinds = executable_kinds(kinds_in_definition(definition))
-    if not kinds:
+    label_sets = executable_label_sets(label_sets_in_definition(definition))
+    if not label_sets:
         return []
 
     if evaluator is None:
@@ -164,12 +163,12 @@ async def compute_denied_nodes(
 
     project_name = await resolve_project_name(db, project_id)
     user_labels, user_metadata = await load_principal_authz_context(db, principal_id)
-    denials = await denied_node_kinds(
+    denials = await denied_node_labels(
         db,
         evaluator,
         user_id=principal_id,
         action=NODE_ACTION_EXECUTE,
-        kinds=kinds,
+        label_sets=label_sets,
         project_name=project_name,
         user_labels=user_labels,
         user_metadata=user_metadata,
@@ -177,16 +176,20 @@ async def compute_denied_nodes(
     if not denials:
         return []
 
-    denied_by_kind = {denial.kind: denial.denied_by for denial in denials}
+    denied_by_labels = {frozenset(denial.labels.items()): denial.denied_by for denial in denials}
     denied_nodes: list[dict[str, Any]] = []
     for node in (definition or {}).get("nodes") or []:
         if not isinstance(node, dict):
             continue
-        kind = node.get("type")
+        labels = node_labels(node)
+        kind = labels.get("kind")
         node_id = node.get("id")
-        if not isinstance(kind, str) or not isinstance(node_id, str) or kind not in denied_by_kind:
+        label_set = frozenset(labels.items())
+        if not isinstance(kind, str) or not isinstance(node_id, str) or label_set not in denied_by_labels:
             continue
-        denied_nodes.append({"node_id": node_id, "kind": kind, "denied_by": denied_by_kind[kind]})
+        denied_nodes.append(
+            {"node_id": node_id, "kind": kind, "labels": labels, "denied_by": denied_by_labels[label_set]}
+        )
 
     if denied_nodes:
         logger.info(
@@ -195,39 +198,3 @@ async def compute_denied_nodes(
             denied_node_ids=[entry["node_id"] for entry in denied_nodes],
         )
     return denied_nodes
-
-
-def validate_permission_check_edges(definition: dict[str, Any] | None) -> list[tuple[str, str]]:
-    """Return ``(node_id, problem)`` for every malformed ``permission_check`` node.
-
-    A permission check evaluates the source of its single incoming edge, so it
-    must have exactly one, and its outgoing edges may only use the ``allowed``
-    and ``denied`` ports.
-
-    This is the rule the definition validator should emit findings for; it lives
-    here so the runtime and the validator agree on one implementation.
-    """
-    if not definition:
-        return []
-    nodes = definition.get("nodes") or []
-    edges = definition.get("edges") or []
-    check_ids = [
-        node["id"]
-        for node in nodes
-        if isinstance(node, dict) and node.get("type") == NodeType.PERMISSION_CHECK.value and node.get("id")
-    ]
-    if not check_ids:
-        return []
-
-    problems: list[tuple[str, str]] = []
-    for node_id in check_ids:
-        incoming = [e for e in edges if isinstance(e, dict) and e.get("to") == node_id]
-        if len(incoming) != 1:
-            problems.append((node_id, f"expected exactly one incoming edge, found {len(incoming)}"))
-        for edge in edges:
-            if not isinstance(edge, dict) or edge.get("from") != node_id:
-                continue
-            port = edge.get("from_port")
-            if port not in PERMISSION_CHECK_PORTS:
-                problems.append((node_id, f"invalid output port {port!r}; expected 'allowed' or 'denied'"))
-    return problems

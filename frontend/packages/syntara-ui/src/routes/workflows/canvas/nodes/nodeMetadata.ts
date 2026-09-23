@@ -12,7 +12,6 @@ import {
   RhUiTreeViewIcon,
   RhUiClockIcon,
   RhUiMcpServerIcon,
-  RhUiSecurityIcon,
   RhUiSettingsIcon,
 } from '@patternfly/react-icons'
 import type { ComponentType } from 'react'
@@ -83,11 +82,6 @@ export const nodeMetadata: Record<string, NodeMetadata> = {
   wait: {
     icon: RhUiClockIcon,
     label: 'Wait',
-    expandable: false,
-  },
-  permission_check: {
-    icon: RhUiSecurityIcon,
-    label: 'Permission check',
     expandable: false,
   },
   /** Canvas Approval node (task executor); separate from `task` so expandable can be false. */

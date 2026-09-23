@@ -30,8 +30,7 @@ NODE_KIND_DISABLED_ERROR_CODE = "node_kind_disabled"
 def is_kind_switchable(kind: str) -> bool:
     """Return ``True`` if *kind* may be disabled.
 
-    Flow-control kinds (including ``permission_check``) can never be
-    disabled: doing so would break routing and denial handling itself.
+    Flow-control kinds can never be disabled: doing so would break routing.
     Unknown kinds are not switchable either.
     """
     info = get_node_kind(kind)

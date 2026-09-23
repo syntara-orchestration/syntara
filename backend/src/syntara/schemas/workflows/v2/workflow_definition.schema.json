@@ -71,7 +71,7 @@
     },
     "node_common": {
       "type": "object",
-      "description": "Base node properties shared by all node types. Node types without configuration (permission_check) reference this directly so that 'parameters' stays optional, matching how the API serializes them.",
+      "description": "Base node properties shared by all node types.",
       "unevaluatedProperties": false,
       "required": [
         "id",
@@ -400,27 +400,6 @@
                 "settings": {
                   "type": "object",
                   "additionalProperties": false
-                }
-              }
-            }
-          ]
-        },
-        {
-          "$comment": "permission_check takes no configuration, so 'parameters' is optional here.",
-          "allOf": [
-            {
-              "$ref": "#/$defs/node_common"
-            },
-            {
-              "properties": {
-                "type": {
-                  "const": "permission_check"
-                },
-                "parameters": {
-                  "$ref": "control-nodes/permission_check.schema.json#/parameterSchema"
-                },
-                "settings": {
-                  "$ref": "control-nodes/permission_check.schema.json#/settingSchema"
                 }
               }
             }

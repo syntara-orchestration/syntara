@@ -43,6 +43,15 @@ class ExecutionMode(StrEnum):
     DEBUG = "debug"
 
 
+class DeniedNodeRead(SQLModel):
+    """One workflow node refused by a launch-time authorization check."""
+
+    node_id: str
+    kind: str
+    labels: dict[str, str]
+    denied_by: str
+
+
 class ExecutionStatus(str, Enum):
     """Current state of a workflow execution lifecycle."""
 
@@ -268,7 +277,7 @@ class Execution(UserOwnedResource, table=True):
     denied_nodes: list[dict[str, Any]] | None = Field(
         default=None,
         sa_column=Column(JSONB, nullable=True),
-        description="Nodes the run principal was denied to execute: [{node_id, kind, denied_by}]",
+        description="Nodes the run principal was denied to execute: [{node_id, kind, labels, denied_by}]",
     )
 
     # Relationships
@@ -489,11 +498,11 @@ class ExecutionRead(UserReferenceFieldsMixin, SQLModel):
         default=None,
         description="Originating interface (ui or api)",
     )
-    denied_nodes: list[dict[str, Any]] | None = Field(
+    denied_nodes: list[DeniedNodeRead] | None = Field(
         default=None,
         description=(
             "Nodes the run principal was not allowed to execute, as "
-            "[{node_id, kind, denied_by}]. Null when nothing was denied."
+            "[{node_id, kind, labels, denied_by}]. Null when nothing was denied."
         ),
     )
 

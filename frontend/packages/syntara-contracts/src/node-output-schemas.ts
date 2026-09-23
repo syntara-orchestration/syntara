@@ -107,29 +107,6 @@ export const NODE_OUTPUT_SCHEMAS: Record<string, OutputFieldDef[]> = {
     },
   ],
   internal_activity: [{ name: 'status', type: 'string', description: 'Operation result status' }],
-  permission_check: [
-    { name: 'status', type: 'string', description: 'Permission check nodes always complete; they never fail' },
-    {
-      name: 'allowed',
-      type: 'boolean',
-      description: "True when the upstream node was not denied, routing via the 'allowed' port",
-    },
-    {
-      name: 'checked_node_id',
-      type: 'string',
-      description: 'Id of the upstream node that was evaluated (a permission check always has exactly one)',
-    },
-    {
-      name: 'kind',
-      type: 'string',
-      description: 'Node kind of the denied upstream node (present only when allowed is false)',
-    },
-    {
-      name: 'denied_by',
-      type: 'string',
-      description: 'Name of the policy that denied the upstream node (present only when allowed is false)',
-    },
-  ],
   condition: [
     { name: 'status', type: 'string', description: 'Condition evaluated successfully' },
     { name: 'evaluated_result', type: 'boolean', description: 'Result of condition evaluation (true or false)' },

@@ -654,7 +654,6 @@ class ActivitySyncService:
                     # they never produce a Temporal event of their own — sync them
                     # here so the UI shows DENIED while the run is still going.
                     await self._sync_denied_nodes(metadata, handle)
-                    await self._sync_permission_check_nodes(metadata, handle)
                     await self._sync_skipped_nodes(metadata, handle)
 
         if event.event_type in {
@@ -942,7 +941,6 @@ class ActivitySyncService:
             if failed_node_map is None:
                 failed_node_map = self._extract_failed_activities_from_event(event)
             await self._sync_denied_nodes(metadata, handle)
-            await self._sync_permission_check_nodes(metadata, handle)
             await self._sync_skipped_nodes(metadata, handle)
             await self._sync_detached_nodes(metadata, handle)
             await self._update_execution_status_from_event(metadata, event, failed_node_map)
@@ -2607,43 +2605,6 @@ class ActivitySyncService:
                 execution_id=metadata.execution_id,
             )
 
-    async def _sync_permission_check_nodes(
-        self,
-        metadata: ExecutionMonitorMetadata,
-        handle: WorkflowHandle[Any, Any],
-    ) -> None:
-        """Persist ``permission_check`` results as COMPLETED rows with their output.
-
-        A permission check is evaluated inside the workflow without a Temporal
-        activity (ANSTRAT-1750, F-20), so no completion event ever reaches the
-        history processor; without this sync its pre-created PENDING row would
-        end up SKIPPED even though it routed the run.
-        """
-        try:
-            results: dict[str, dict[str, Any]] = await handle.query("get_permission_check_results")
-        except Exception:
-            logger.exception(
-                "Error querying permission check results",
-                execution_id=metadata.execution_id,
-            )
-            return
-
-        if not isinstance(results, dict) or not results:
-            return
-
-        try:
-            await self._sync_nodes_to_terminal_status(
-                metadata,
-                node_ids=list(results),
-                target_status=ActivityStatus.COMPLETED,
-                output_map=results,
-            )
-        except Exception:
-            logger.exception(
-                "Error syncing permission check nodes to database",
-                execution_id=metadata.execution_id,
-            )
-
     async def _sync_detached_nodes(
         self,
         metadata: ExecutionMonitorMetadata,
@@ -2780,7 +2741,6 @@ class ActivitySyncService:
         node_ids: list[str],
         target_status: ActivityStatus,
         error_map: dict[str, str] | None = None,
-        output_map: dict[str, dict[str, Any]] | None = None,
     ) -> None:
         """Update ActivityExecution records to a terminal status and publish patches.
 
@@ -2793,8 +2753,6 @@ class ActivitySyncService:
             node_ids: Node IDs to update
             target_status: Terminal status to set (SKIPPED, FAILED, etc.)
             error_map: Optional mapping of node ID to error message
-            output_map: Optional mapping of node ID to output data (for nodes
-                evaluated inside the workflow without a Temporal activity)
 
         """
         if not node_ids:
@@ -2843,10 +2801,6 @@ class ActivitySyncService:
                 base_name = activity.activity_name.split(_COMPOSITE_ITER_SEP)[0]
                 if error_map is not None:
                     activity.error_details = error_map.get(base_name)
-                if output_map is not None and base_name in output_map:
-                    activity.output_data = output_map[base_name]
-                    if activity.started_at is None:
-                        activity.started_at = now
                 activity.updated_at = now
                 updated_activities.append((activity, old_values))
 

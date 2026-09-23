@@ -17,17 +17,6 @@ function hasConditionNodePlaceholders(nodes: Node[], sourceId: string): boolean 
 }
 
 /**
- * Check if a permission check node has placeholder nodes for allowed/denied branches
- */
-function hasPermissionCheckNodePlaceholders(nodes: Node[], sourceId: string): boolean {
-  return nodes.some(
-    (n) =>
-      n.id === `placeholder-${sourceId}-${EdgeHandleEnum.ALLOWED}` ||
-      n.id === `placeholder-${sourceId}-${EdgeHandleEnum.DENIED}`
-  )
-}
-
-/**
  * Check if a loop node has placeholder nodes for done/loop branches
  */
 function hasLoopNodePlaceholders(nodes: Node[], sourceId: string): boolean {
@@ -53,8 +42,6 @@ function isNamedBranchHandle(sourceHandle: string | undefined): boolean {
     EdgeHandleEnum.FALSE,
     EdgeHandleEnum.DONE,
     EdgeHandleEnum.LOOP,
-    EdgeHandleEnum.ALLOWED,
-    EdgeHandleEnum.DENIED,
     EdgeHandleEnum.DEFAULT,
   ]
   return namedHandles.includes(sourceHandle) || isSwitchCasePort(sourceHandle)
@@ -65,7 +52,6 @@ function hasRemainingBranchPlaceholders(nodes: Node[], sourceId: string, nodeTyp
   if (nodeType === FlowNodeType.CONDITION) return hasConditionNodePlaceholders(nodes, sourceId)
   if (nodeType === FlowNodeType.LOOP) return hasLoopNodePlaceholders(nodes, sourceId)
   if (nodeType === FlowNodeType.SWITCH) return hasSwitchNodePlaceholders(nodes, sourceId)
-  if (nodeType === FlowNodeType.PERMISSION_CHECK) return hasPermissionCheckNodePlaceholders(nodes, sourceId)
   return false
 }
 

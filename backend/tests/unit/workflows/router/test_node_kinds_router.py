@@ -74,7 +74,7 @@ class TestListNodeKinds:
     async def _call(self, disabled: frozenset[str], denials: list[NodeKindDenial]) -> module.NodeKindsListResponse:
         with (
             patch.object(module, "get_disabled_node_kinds", AsyncMock(return_value=disabled)),
-            patch.object(module, "denied_node_kinds", AsyncMock(return_value=denials)),
+            patch.object(module, "denied_node_labels", AsyncMock(return_value=denials)),
         ):
             return await module.list_node_kinds(AsyncMock(), _user(), MagicMock())
 
@@ -99,7 +99,6 @@ class TestListNodeKinds:
         by_kind = {entry.kind: entry for entry in response.resources}
         assert by_kind["script"].switchable is True
         assert by_kind["condition"].switchable is False
-        assert by_kind["permission_check"].switchable is False
 
     async def test_deniable_actions_are_reported(self) -> None:
         response = await self._call(frozenset(), [])
@@ -107,6 +106,14 @@ class TestListNodeKinds:
         assert by_kind["script"].deniable_actions == ["execute", "write"]
         assert by_kind["manual_trigger"].deniable_actions == ["write"]
         assert by_kind["condition"].deniable_actions == []
+
+    async def test_authorization_attributes_are_reported(self) -> None:
+        response = await self._call(frozenset(), [])
+        by_kind = {entry.kind: entry for entry in response.resources}
+        assert [attribute.model_dump() for attribute in by_kind["script"].attributes] == [
+            {"name": "language", "allowed_values": ["bash", "python"]}
+        ]
+        assert by_kind["approval"].attributes == []
 
     async def test_can_write_is_true_by_default(self) -> None:
         response = await self._call(frozenset(), [])
@@ -124,12 +131,12 @@ class TestListNodeKinds:
         denied = AsyncMock(return_value=[])
         with (
             patch.object(module, "get_disabled_node_kinds", AsyncMock(return_value=frozenset())),
-            patch.object(module, "denied_node_kinds", denied),
+            patch.object(module, "denied_node_labels", denied),
         ):
             await module.list_node_kinds(AsyncMock(), _user(), MagicMock())
         await_args = denied.await_args
         assert await_args is not None
-        evaluated = set(await_args.kwargs["kinds"])
+        evaluated = {dict(label_set)["kind"] for label_set in await_args.kwargs["label_sets"]}
         assert "script" in evaluated
         assert "condition" not in evaluated
         assert await_args.kwargs["project_name"] == ""
@@ -152,7 +159,7 @@ class TestSetNodeKindEnabled:
         dispatch = MagicMock()
         with (
             patch.object(module, "get_disabled_node_kinds", AsyncMock(return_value=disabled)),
-            patch.object(module, "denied_node_kinds", AsyncMock(return_value=[])),
+            patch.object(module, "denied_node_labels", AsyncMock(return_value=[])),
             patch.object(module, "SettingsService", service_cls),
             patch.object(AuditEventDispatcher, "dispatch", dispatch),
         ):
@@ -169,7 +176,7 @@ class TestSetNodeKindEnabled:
         with pytest.raises(NodeKindNotFoundError):
             await self._call("not_a_kind", enabled=False)
 
-    @pytest.mark.parametrize("kind", ["condition", "converge", "loop", "switch", "wait", "permission_check"])
+    @pytest.mark.parametrize("kind", ["condition", "converge", "loop", "switch", "wait"])
     async def test_flow_control_kind_is_rejected(self, kind: str) -> None:
         with pytest.raises(NodeKindNotSwitchableError) as exc_info:
             await self._call(kind, enabled=False)

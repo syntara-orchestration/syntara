@@ -8,7 +8,6 @@ import { validateConvergeInputs } from './rules/validateConvergeInputs'
 import { validateLoopNodes } from './rules/validateLoopNodes'
 import { validateNoDanglingNodes } from './rules/validateNoDanglingNodes'
 import { validateNoGenericNodes } from './rules/validateNoGenericNodes'
-import { validatePermissionCheckConnections } from './rules/validatePermissionCheckConnections'
 import { validateVariableReferences } from './rules/validateVariableReferences'
 import type { ValidationContext, ValidationError, ValidationResult, ValidationRule } from './types'
 
@@ -21,7 +20,6 @@ const ERROR_RULES: ValidationRule[] = [
   validateConvergeInputs,
   validateLoopNodes,
   validateNoGenericNodes,
-  validatePermissionCheckConnections,
   validateVariableReferences,
 ]
 

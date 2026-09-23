@@ -459,19 +459,6 @@ export function createSwitchActivity(
 /**
  * Create a wait node (v2).
  */
-/**
- * Create a permission check node (v2).
- * The kind has no parameters: it always evaluates the single upstream node.
- */
-export function createPermissionCheckActivity(id: string, name: string): Activity {
-  return {
-    id,
-    type: ActivityTypeEnum.PERMISSION_CHECK,
-    name,
-    parameters: {},
-  }
-}
-
 export type CreateMcpToolActivityOptions = {
   id: string
   name: string

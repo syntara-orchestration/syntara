@@ -366,7 +366,7 @@ function nodeNeedsButtonEdgeClass(
   if (lookup.regularNodeIds.has(nodeId)) {
     return true
   }
-  if (nodeType === FlowNodeType.CONDITION || nodeType === FlowNodeType.PERMISSION_CHECK) {
+  if (nodeType === FlowNodeType.CONDITION) {
     return lookup.conditionNodeIds.has(nodeId)
   }
   if (nodeType === FlowNodeType.LOOP) {

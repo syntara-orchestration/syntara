@@ -128,18 +128,6 @@ export function useConnectionHandlers({
           }
         }
 
-        // Same two-handle rule for permission check nodes (allowed / denied)
-        if (sourceNode.type === FlowNodeType.PERMISSION_CHECK) {
-          const hasRemainingPlaceholders = filtered.some(
-            (n) =>
-              n.id === getPlaceholderNodeId(connection.source, EdgeHandleEnum.ALLOWED) ||
-              n.id === getPlaceholderNodeId(connection.source, EdgeHandleEnum.DENIED)
-          )
-          if (hasRemainingPlaceholders) {
-            return filtered
-          }
-        }
-
         // Remove the has-button-edge class if no more button edges
         return filtered.map((n) => {
           if (n.id === connection.source) {

@@ -3,7 +3,6 @@ import type {
   ConditionActivity,
   ConvergeActivity,
   LoopActivity,
-  PermissionCheckActivity,
   SwitchActivity,
   TaskActivity,
   WaitActivity,
@@ -38,7 +37,6 @@ import {
   ConditionNodeDetails,
   ConvergeNodeDetails,
   LoopNodeDetails,
-  PermissionCheckNodeDetails,
   SwitchNodeDetails,
   TaskNodeDetails,
   TriggerNodeDetails,
@@ -82,7 +80,6 @@ function getAddModeFormId(
     [RegistryNodeId.AGENT]: 'ai-agent-node-form',
     [RegistryNodeId.APPROVAL]: 'approval-node-form',
     [RegistryNodeId.ACTION_MCP_TOOL]: 'mcp-tool-node-form',
-    [RegistryNodeId.LOGIC_PERMISSION_CHECK]: 'permission-check-node-form',
   }
   if (nodeTypeId && nodeTypeId in simpleFormMap) return simpleFormMap[nodeTypeId]
 
@@ -152,7 +149,6 @@ function getEditModeFormId(node: Node<NodeType['data']> | undefined): string | u
   if (node.type === FlowNodeType.WAIT) return 'wait-node-form'
   if (node.type === FlowNodeType.APPROVAL) return 'approval-node-form'
   if (node.type === FlowNodeType.SWITCH) return 'switch-node-form'
-  if (node.type === FlowNodeType.PERMISSION_CHECK) return 'permission-check-node-form'
   if (node.type === FlowNodeType.TASK) {
     return getTaskFormId(node.data as TaskActivity)
   }
@@ -165,7 +161,6 @@ const CONTROL_FLOW_TYPES: ReadonlySet<string> = new Set([
   FlowNodeType.CONVERGE,
   FlowNodeType.SWITCH,
   FlowNodeType.WAIT,
-  FlowNodeType.PERMISSION_CHECK,
 ])
 
 function resolveMenuNodeType(flowNodeType: string | undefined): MenuNodeTypeUnion {
@@ -270,17 +265,6 @@ function renderEditModeContent(
     return (
       <SwitchNodeDetails
         switchData={node.data as SwitchActivity}
-        nodeId={node.id}
-        onClose={onClose}
-        onHeaderContentChange={onHeaderContentChange}
-      />
-    )
-  }
-
-  if (node.type === FlowNodeType.PERMISSION_CHECK) {
-    return (
-      <PermissionCheckNodeDetails
-        permissionCheckData={node.data as PermissionCheckActivity}
         nodeId={node.id}
         onClose={onClose}
         onHeaderContentChange={onHeaderContentChange}

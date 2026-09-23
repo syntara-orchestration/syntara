@@ -31,7 +31,7 @@ class TestIsKindSwitchable:
     def test_switchable_kinds(self, kind: str) -> None:
         assert is_kind_switchable(kind) is True
 
-    @pytest.mark.parametrize("kind", ["condition", "converge", "loop", "switch", "wait", "permission_check"])
+    @pytest.mark.parametrize("kind", ["condition", "converge", "loop", "switch", "wait"])
     def test_flow_control_is_never_switchable(self, kind: str) -> None:
         assert is_kind_switchable(kind) is False
 
@@ -52,7 +52,7 @@ class TestGetDisabledNodeKinds:
 
     async def test_drops_unswitchable_and_unknown_entries(self) -> None:
         """A stale or hand-edited value cannot disable flow control."""
-        stored = ["script", "condition", "permission_check", "not_a_kind", 7]
+        stored = ["script", "condition", "not_a_kind", 7]
         with patch.object(node_kind_switch, "get_runtime_settings", return_value=_cache(stored)):
             assert await get_disabled_node_kinds() == frozenset({"script"})
 

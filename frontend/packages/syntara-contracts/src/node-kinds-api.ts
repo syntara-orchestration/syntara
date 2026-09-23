@@ -85,6 +85,18 @@ export interface components {
       deniable_actions: string[]
       /** Can Write */
       can_write: boolean
+      /** Attributes */
+      attributes: components['schemas']['NodeAttributeRead'][]
+    }
+    /**
+     * NodeAttributeRead
+     * @description One node parameter exposed as an authorization resource label.
+     */
+    NodeAttributeRead: {
+      /** Name */
+      name: string
+      /** Allowed Values */
+      allowed_values: string[] | null
     }
     /**
      * NodeKindsListResponse

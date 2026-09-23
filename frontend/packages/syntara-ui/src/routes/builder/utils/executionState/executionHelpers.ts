@@ -72,7 +72,6 @@ export const ACTIVITY_TYPES = {
   CONVERGE: 'converge',
   APPROVAL: 'approval',
   SWITCH: 'switch',
-  PERMISSION_CHECK: 'permission_check',
 } as const
 
 export type ActivityTypeValue = (typeof ACTIVITY_TYPES)[keyof typeof ACTIVITY_TYPES]

@@ -32,7 +32,6 @@ export const ActivityTypeEnum = {
   CONVERGE: 'converge',
   SWITCH: 'switch',
   WAIT: 'wait',
-  PERMISSION_CHECK: 'permission_check',
   MCP_TOOL: 'mcp_tool',
   INTERNAL_ACTIVITY: 'internal_activity',
 } as const
@@ -359,12 +358,6 @@ export interface WaitActivity extends ActivityBase {
   parameters: WaitConfig & { [key: string]: unknown }
 }
 
-/** Permission check node — routes on whether the upstream node was allowed to run */
-export interface PermissionCheckActivity extends ActivityBase {
-  type: 'permission_check'
-  parameters?: Record<string, unknown>
-}
-
 /** MCP tool invocation node */
 export interface MCPToolActivity extends ActivityBase {
   type: 'mcp_tool'
@@ -411,7 +404,6 @@ export type TypedActivity =
   | ConvergeActivity
   | SwitchActivity
   | WaitActivity
-  | PermissionCheckActivity
   | MCPToolActivity
 
 // ============================================================================

@@ -31,8 +31,6 @@ with workflow.unsafe.imports_passed_through():
         ENGINE_TIMEOUT_SECONDS_KEY,
         INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS,
         NODE_EXECUTE_DENIED_ERROR_CODE,
-        PERMISSION_CHECK_ALLOWED_PORT,
-        PERMISSION_CHECK_DENIED_PORT,
         RECOMPUTE_DENIED_NODES_ACTIVITY,
         RECORD_NODE_EXECUTE_DENIED_ACTIVITY,
     )
@@ -227,7 +225,6 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         self._run_principal_id: str = run_principal_id or ""
         self._denied_node_kinds: dict[str, dict[str, Any]] = self._index_denied_nodes(denied_nodes)
         self._denied_nodes: dict[str, dict[str, Any]] = {}
-        self._permission_check_results: dict[str, dict[str, Any]] = {}
 
     @staticmethod
     def _index_denied_nodes(denied_nodes: list[dict[str, Any]] | None) -> dict[str, dict[str, Any]]:
@@ -236,10 +233,13 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         for entry in denied_nodes or []:
             node_id = entry.get("node_id")
             if isinstance(node_id, str) and node_id:
-                indexed[node_id] = {
+                info: dict[str, Any] = {
                     "kind": entry.get("kind", ""),
                     "denied_by": entry.get("denied_by", ""),
                 }
+                if isinstance(entry.get("labels"), dict):
+                    info["labels"] = entry["labels"]
+                indexed[node_id] = info
         return indexed
 
     def _blocked_node_ids(self) -> set[str]:
@@ -681,7 +681,6 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             NodeType.LOOP,
             NodeType.APPROVAL,
             NodeType.SWITCH,
-            NodeType.PERMISSION_CHECK,
         ):
             workflow.logger.warning(
                 f"Control-flow node {completed_node_id} (type={completed_node.type}) "
@@ -693,7 +692,6 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             NodeType.CONDITION,
             NodeType.APPROVAL,
             NodeType.SWITCH,
-            NodeType.PERMISSION_CHECK,
         ):
             self._skip_non_taken_branches(completed_node_id, from_port, graph)
 
@@ -722,9 +720,8 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 await self._schedule_successors(successor.id, graph, pending_tasks)
                 continue
 
-            # Execute denials (ANSTRAT-1750): the node never runs, it goes
-            # straight to the terminal DENIED state and only a permission_check
-            # downstream of it still runs.
+            # Execute denials (ANSTRAT-1750): the node never runs and goes
+            # straight to the terminal DENIED state.
             if successor.id in self._denied_node_kinds:
                 await self._handle_denied_node(successor, graph, pending_tasks)
                 continue
@@ -766,11 +763,9 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         """Mark a node DENIED without executing it, then route around it (F-19).
 
         The node's activity is never scheduled.  Its namespace carries
-        ``status="denied"`` and the structured error so downstream expressions
-        and the UI can tell a denial from a failure.  Routing matches a failed
-        node — the rest of this branch does not run — except that a
-        ``permission_check`` immediately downstream still runs, which is the
-        whole point of that node (F-20).
+        ``status="denied"`` and the structured error so the UI can tell a
+        denial from a failure. Routing matches a failed node: the rest of this
+        branch does not run.
         """
         info = self._denied_node_kinds[node.id]
         self._denied_nodes[node.id] = dict(info)
@@ -811,6 +806,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                     info.get("kind", ""),
                     info.get("denied_by", ""),
                     self._run_principal_id or None,
+                    info.get("labels", {}),
                 ],
                 activity_id=f"__internal__node_denied_{node_id}",
                 start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
@@ -821,37 +817,6 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 "Failed to record node execute denial (best-effort)",
                 extra={"node_id": node_id},
             )
-
-    def _execute_permission_check_node(self, node: ActivityNode, graph: WorkflowGraph) -> dict[str, Any]:
-        """Evaluate a ``permission_check`` node: a pure lookup, no activity, no DB.
-
-        The node inspects the source of its single incoming edge and routes to
-        ``denied`` when that node was denied, ``allowed`` otherwise.  It runs even
-        when its upstream node was denied — that is the case it exists for.
-        """
-        predecessors = graph.get_predecessors(node.id)
-        upstream_id = predecessors[0] if predecessors else None
-        if len(predecessors) > 1:
-            workflow.logger.warning(
-                f"Permission check node {node.id} has {len(predecessors)} incoming edges; "
-                f"evaluating the first one ({upstream_id})"
-            )
-        denial = self._denied_nodes.get(upstream_id) if upstream_id else None
-        allowed = denial is None
-        port = PERMISSION_CHECK_ALLOWED_PORT if allowed else PERMISSION_CHECK_DENIED_PORT
-        workflow.logger.info(f"Permission check {node.id} routing via port '{port}' (upstream={upstream_id})")
-        output: dict[str, Any] = {
-            "status": "completed",
-            "allowed": allowed,
-            "checked_node_id": upstream_id,
-        }
-        if denial is not None:
-            output["kind"] = denial.get("kind", "")
-            output["denied_by"] = denial.get("denied_by", "")
-        # No Temporal activity runs for this node, so the sync service reads the
-        # result through ``get_permission_check_results`` to mark it completed.
-        self._permission_check_results[node.id] = dict(output)
-        return {"output": output, "control": {"next_port": port}}
 
     async def _maybe_recheck_denied_nodes(self, resumed_node_id: str) -> None:
         """Re-check denials after a suspension, guarded by the change marker."""
@@ -1145,11 +1110,8 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
 
                 # Converge nodes have strategy-aware failure logic;
                 # let _check_converge_successors handle them.
-                # A permission check is the deliberate exception to skip
-                # propagation: it exists to observe that its upstream node was
-                # denied, so it must still run (F-20).
                 succ_node = graph.get_node(succ_id)
-                if succ_node.type in (NodeType.CONVERGE, NodeType.PERMISSION_CHECK):
+                if succ_node.type == NodeType.CONVERGE:
                     continue
 
                 if boundary is not None and succ_id not in boundary:
@@ -1882,8 +1844,6 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 timeout_seconds=temporal_timeout,
                 extra_args=extra_args,
             )
-        if node_type == NodeType.PERMISSION_CHECK:
-            return self._execute_permission_check_node(node, graph)
         if node_type in (NodeType.APPROVAL, NodeType.WAIT):
             return await self._execute_suspending_node(node, resolved_parameters, graph)
         if node_type == NodeType.CONVERGE:
@@ -2027,20 +1987,6 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
 
         """
         return list(self.pre_resolved_outputs.keys())
-
-    @workflow.query
-    def get_permission_check_results(self) -> dict[str, dict[str, Any]]:
-        """Query the outputs of every ``permission_check`` node evaluated so far.
-
-        Permission checks are pure in-workflow lookups with no Temporal activity,
-        so ActivitySyncService uses this to persist their COMPLETED status and
-        output instead of leaving the pre-created row to be relabelled SKIPPED.
-
-        Returns:
-            Dict mapping node ID to the node's output dict.
-
-        """
-        return {node_id: dict(output) for node_id, output in self._permission_check_results.items()}
 
     @workflow.query
     def get_denied_nodes(self) -> dict[str, dict[str, Any]]:

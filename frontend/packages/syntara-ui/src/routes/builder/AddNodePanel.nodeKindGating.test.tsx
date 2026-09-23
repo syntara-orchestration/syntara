@@ -35,6 +35,7 @@ function kind(overrides: Partial<NodeKind> & { kind: string }): NodeKind {
     switchable: true,
     deniable_actions: ['write', 'execute'],
     can_write: true,
+    attributes: [],
     ...overrides,
   }
 }

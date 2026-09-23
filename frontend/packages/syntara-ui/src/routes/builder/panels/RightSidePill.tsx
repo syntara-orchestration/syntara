@@ -33,10 +33,6 @@ const BRANCHING_HANDLES: Record<string, BranchHandle[]> = {
     { handle: EdgeHandleEnum.LOOP, label: 'In loop' },
     { handle: EdgeHandleEnum.DONE, label: 'On done' },
   ],
-  [FlowNodeType.PERMISSION_CHECK]: [
-    { handle: EdgeHandleEnum.ALLOWED, label: 'On Allowed' },
-    { handle: EdgeHandleEnum.DENIED, label: 'On Denied' },
-  ],
 }
 
 /**

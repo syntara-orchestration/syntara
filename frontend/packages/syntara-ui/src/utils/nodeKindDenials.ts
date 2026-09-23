@@ -1,11 +1,20 @@
+import { describeNodeLabels } from './nodeLabels'
+
 /** Error code of the 403 problem details returned when a save introduces a denied node kind. */
 export const NODE_KIND_WRITE_DENIED_CODE = 'NODE_KIND_WRITE_DENIED'
 
 /** One node kind the save was not allowed to introduce. */
 export type NodeKindDenial = {
   kind: string
+  labels: Record<string, string>
   denied_by: string
   reason: string
+}
+
+function stringRecord(value: unknown): Record<string, string> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const entries = Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === 'string')
+  return Object.fromEntries(entries)
 }
 
 function unwrapErrorBody(error: unknown): Record<string, unknown> | null {
@@ -27,6 +36,7 @@ function toDenial(entry: unknown): NodeKindDenial | null {
   if (typeof row.kind !== 'string' || !row.kind) return null
   return {
     kind: row.kind,
+    labels: stringRecord(row.labels) ?? { kind: row.kind },
     denied_by: typeof row.denied_by === 'string' ? row.denied_by : '',
     reason: typeof row.reason === 'string' ? row.reason : '',
   }
@@ -76,7 +86,12 @@ export function extractNodeKindDenials(error: unknown): NodeKindDenial[] {
 
 /** Render one denial as `kind (denied by policy-name)`. */
 function describeDenial(denial: NodeKindDenial): string {
-  return denial.denied_by ? `${denial.kind} (denied by ${denial.denied_by})` : denial.kind
+  const labelSet = describeNodeLabels(denial.kind, denial.labels)
+  if (!denial.denied_by) return labelSet
+  const hasAttributes = labelSet !== denial.kind
+  return hasAttributes
+    ? `${labelSet} — denied by ${denial.denied_by}`
+    : `${denial.kind} (denied by ${denial.denied_by})`
 }
 
 /**

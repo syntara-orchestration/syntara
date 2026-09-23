@@ -12,9 +12,8 @@ info:
     grouped into three categories:
 
     - **trigger** — entry points that start a run (manual, scheduled, webhook, EDA)
-    - **flow_control** — routing nodes (condition, converge, loop, switch, wait,
-      permission_check); these are required by the engine and can never be
-      denied or disabled
+    - **flow_control** — routing nodes (condition, converge, loop, switch, wait);
+      these are required by the engine and can never be denied or disabled
     - **action** — units of work (script, HTTP request, agentic, approval,
       Ansible Automation Platform job templates, MCP tool)
 
@@ -177,6 +176,11 @@ components:
         can_write:
           type: boolean
           title: Can Write
+        attributes:
+          type: array
+          title: Attributes
+          items:
+            $ref: '#/components/schemas/NodeAttributeRead'
       required:
         - kind
         - category
@@ -184,6 +188,26 @@ components:
         - switchable
         - deniable_actions
         - can_write
+        - attributes
+
+    NodeAttributeRead:
+      type: object
+      title: NodeAttributeRead
+      description: One node parameter exposed as an authorization resource label.
+      properties:
+        name:
+          type: string
+          title: Name
+        allowed_values:
+          anyOf:
+            - type: array
+              items:
+                type: string
+            - type: 'null'
+          title: Allowed Values
+      required:
+        - name
+        - allowed_values
 
     NodeKindsListResponse:
       type: object

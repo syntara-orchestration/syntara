@@ -59,8 +59,12 @@ class NodeKindWriteDeniedError(WorkflowError):
     def __init__(self, denials: "Sequence[NodeKindDenial]") -> None:
         """Initialize with the denied node kinds."""
         self.denials = list(denials)
-        kinds = ", ".join(denial.kind for denial in self.denials)
-        super().__init__(f"Not allowed to add workflow nodes of kind: {kinds}")
+        formatted: list[str] = []
+        for denial in self.denials:
+            attributes = ",".join(f"{key}={value}" for key, value in sorted(denial.labels.items()) if key != "kind")
+            formatted.append(f"{denial.kind}{{{attributes}}}" if attributes else denial.kind)
+        label_sets = ", ".join(formatted)
+        super().__init__(f"Not allowed to add workflow node label sets: {label_sets}")
 
 
 @fastapi_exception(handler="syntara.workflows.error_handlers.node_kind_disabled_handler")

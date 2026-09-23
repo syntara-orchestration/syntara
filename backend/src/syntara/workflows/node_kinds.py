@@ -19,8 +19,8 @@ Categories decide which actions may be *denied* for a kind:
 - ``trigger`` kinds may be denied for ``write`` (introducing the kind into a
   workflow) but never for ``execute`` -- a trigger starts the run, and whose
   permissions a run uses is decided at launch, not per trigger.
-- ``flow_control`` kinds are never deniable; denying ``condition`` or the
-  permission check node would break denial handling itself.
+- ``flow_control`` kinds are never deniable; denying them would break workflow
+  routing semantics.
 - ``action`` kinds may be denied for both ``write`` and ``execute``.
 """
 
@@ -60,11 +60,20 @@ _DENIABLE_BY_CATEGORY: dict[NodeKindCategory, frozenset[str]] = {
 
 
 @dataclass(frozen=True)
+class NodeAttributeInfo:
+    """One node parameter exposed as an authorization resource label."""
+
+    name: str
+    allowed_values: frozenset[str] | None = None
+
+
+@dataclass(frozen=True)
 class NodeKindInfo:
     """Canonical description of one node kind."""
 
     kind: str
     category: NodeKindCategory
+    attributes: tuple[NodeAttributeInfo, ...] = ()
 
     @property
     def deniable_actions(self) -> frozenset[str]:
@@ -88,7 +97,6 @@ _CATEGORY_BY_TYPE: dict[NodeType, NodeKindCategory] = {
     NodeType.LOOP: NodeKindCategory.FLOW_CONTROL,
     NodeType.SWITCH: NodeKindCategory.FLOW_CONTROL,
     NodeType.WAIT: NodeKindCategory.FLOW_CONTROL,
-    NodeType.PERMISSION_CHECK: NodeKindCategory.FLOW_CONTROL,
     NodeType.AAP_JOB_TEMPLATE: NodeKindCategory.ACTION,
     NodeType.AAP_WORKFLOW_JOB_TEMPLATE: NodeKindCategory.ACTION,
     NodeType.AGENTIC: NodeKindCategory.ACTION,
@@ -99,8 +107,38 @@ _CATEGORY_BY_TYPE: dict[NodeType, NodeKindCategory] = {
     NodeType.SCRIPT: NodeKindCategory.ACTION,
 }
 
+_ATTRIBUTES_BY_KIND: dict[str, tuple[NodeAttributeInfo, ...]] = {
+    "script": (NodeAttributeInfo("language", frozenset({"python", "bash"})),),
+    "http_request": (NodeAttributeInfo("method", frozenset({"get", "post", "put", "patch", "delete"})),),
+    "mcp_tool": (NodeAttributeInfo("tool_name"), NodeAttributeInfo("integration_id")),
+    "aap_job_template": (NodeAttributeInfo("job_template_name"), NodeAttributeInfo("integration_id")),
+    "aap_workflow_job_template": (
+        NodeAttributeInfo("workflow_job_template_name"),
+        NodeAttributeInfo("integration_id"),
+    ),
+    "agentic": (NodeAttributeInfo("model"),),
+    "internal_activity": (
+        NodeAttributeInfo(
+            "activity",
+            frozenset(
+                {
+                    "document_conversion",
+                    "invocation_execution",
+                    "integration_health_check",
+                    "integration_resource_discovery",
+                }
+            ),
+        ),
+    ),
+}
+
 NODE_KINDS: tuple[NodeKindInfo, ...] = tuple(
-    NodeKindInfo(kind=node_type.value, category=_CATEGORY_BY_TYPE[node_type]) for node_type in NodeType
+    NodeKindInfo(
+        kind=node_type.value,
+        category=_CATEGORY_BY_TYPE[node_type],
+        attributes=_ATTRIBUTES_BY_KIND.get(node_type.value, ()),
+    )
+    for node_type in NodeType
 )
 """Every registered node kind, in ``NodeType`` declaration order."""
 
@@ -132,6 +170,59 @@ def node_kind_action_pairs() -> frozenset[tuple[str, str]]:
     return frozenset((NODE_RESOURCE_TYPE, action) for action in NODE_ACTIONS)
 
 
+def normalise_attribute_value(value: object) -> str | None:
+    """Return the normalized label value, or ``None`` when it must be omitted."""
+    if not isinstance(value, str) or "{{" in value:
+        return None
+    normalized = value.strip().lower()
+    return normalized or None
+
+
+def node_labels(node: dict[str, Any]) -> dict[str, str]:
+    """Derive the authorization labels for a workflow node dictionary."""
+    kind = node.get("type")
+    if not isinstance(kind, str) or not kind:
+        return {}
+    labels = {NODE_KIND_LABEL: kind}
+    info = get_node_kind(kind)
+    parameters = node.get("parameters")
+    if info is None or not isinstance(parameters, dict):
+        return labels
+    for attribute in info.attributes:
+        value = normalise_attribute_value(parameters.get(attribute.name))
+        if value is not None and (attribute.allowed_values is None or value in attribute.allowed_values):
+            labels[attribute.name] = value
+    return labels
+
+
+def _validate_attribute_labels(labels: dict[str, Any]) -> str | None:  # noqa: PLR0911
+    """Validate one positive or negative resource-label condition."""
+    attribute_names = set(labels) - {NODE_KIND_LABEL}
+    kind = labels.get(NODE_KIND_LABEL)
+    if attribute_names and kind is None:
+        return "Node attribute labels require a 'kind' label"
+    if kind is None:
+        return None
+    info = get_node_kind(kind)
+    if info is None:
+        known = ", ".join(sorted(_KIND_MAP))
+        return f"Unknown node kind '{kind}'. Registered kinds: {known}"
+    attributes = {attribute.name: attribute for attribute in info.attributes}
+    for name in sorted(attribute_names):
+        attribute = attributes.get(name)
+        allowed_names = ", ".join(sorted(attributes)) or "none"
+        if attribute is None:
+            return f"Unknown attribute '{name}' for node kind '{kind}'. Allowed: {allowed_names}"
+        value = labels[name]
+        normalized = normalise_attribute_value(value)
+        if normalized is None or normalized != value:
+            return f"Attribute '{name}' for node kind '{kind}' must be a non-empty normalized string"
+        if attribute.allowed_values is not None and value not in attribute.allowed_values:
+            allowed_values = ", ".join(sorted(attribute.allowed_values))
+            return f"Invalid value '{value}' for attribute '{name}' on node kind '{kind}'. Allowed: {allowed_values}"
+    return None
+
+
 def _node_actions_in(actions: list[str]) -> list[str]:
     """Return the node actions (``write``, ``execute`` or ``*``) referenced by *actions*."""
     found: list[str] = []
@@ -142,7 +233,7 @@ def _node_actions_in(actions: list[str]) -> list[str]:
     return found
 
 
-def validate_node_kind_statements(statements: list[dict[str, Any]]) -> str | None:
+def validate_node_kind_statements(statements: list[dict[str, Any]]) -> str | None:  # noqa: C901
     """Validate the ``kind`` label on ``workflow_node`` policy statements.
 
     Labels are free-form everywhere else in the system; for node kinds a
@@ -158,6 +249,13 @@ def validate_node_kind_statements(statements: list[dict[str, Any]]) -> str | Non
             continue
         conditions = stmt.get("conditions") or {}
         resource_labels = conditions.get("resource_labels") or {}
+        error = _validate_attribute_labels(resource_labels)
+        if error:
+            return error
+        resource_labels_not = conditions.get("resource_labels_not") or {}
+        error = _validate_attribute_labels(resource_labels_not)
+        if error:
+            return error
         kind = resource_labels.get(NODE_KIND_LABEL)
         if kind is None:
             continue

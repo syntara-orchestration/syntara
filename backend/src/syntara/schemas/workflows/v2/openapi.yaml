@@ -1049,8 +1049,6 @@ components:
       $ref: ./shared-schemas.yaml#/components/schemas/ConvergeNode
     WaitNode:
       $ref: ./shared-schemas.yaml#/components/schemas/WaitNode
-    PermissionCheckNode:
-      $ref: ./shared-schemas.yaml#/components/schemas/PermissionCheckNode
     # Node parameter and settings schemas
     AAPJobTemplateExecutorParameters:
       $ref: ./shared-schemas.yaml#/components/schemas/AAPJobTemplateExecutorParameters
@@ -1163,7 +1161,6 @@ components:
         - approval_configuration
         - definition_limits
         - node_kind_disabled
-        - permission_check_configuration
 
     ValidationFinding:
       type: object

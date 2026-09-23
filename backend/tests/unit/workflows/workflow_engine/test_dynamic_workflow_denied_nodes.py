@@ -4,7 +4,6 @@ Covers:
 - a denied node reaching terminal DENIED without executing anything;
 - parallel siblings and other branches continuing;
 - final status COMPLETED vs COMPLETED_WITH_ERRORS (F-23/AD-22);
-- ``permission_check`` routing on the allowed/denied ports;
 - the kill-switch check at activity start (AD-19);
 - the denied-set re-check when a suspended run resumes (AD-12).
 
@@ -59,7 +58,6 @@ def _make_workflow(denied: dict[str, dict[str, Any]] | None = None) -> Orchestra
     wf.loop_iteration_results = {}
     wf._timeout_tasks = {}
     wf._timed_out_converge_nodes = set()
-    wf._permission_check_results = {}
     wf._detached_nodes = set()
     wf._cof_failed_nodes = set()
     wf._converge_branch_nodes = {}
@@ -95,21 +93,6 @@ def _sole_path_graph() -> WorkflowGraph:
     backend.add_node("downstream", {"id": "downstream", "type": "script", "parameters": {}})
     backend.add_edge("trigger", "denied_node", None)
     backend.add_edge("denied_node", "downstream", None)
-    return WorkflowGraph(backend)
-
-
-def _permission_check_graph() -> WorkflowGraph:
-    """Build: trigger -> step -> check -> (allowed: ok, denied: fallback)."""
-    backend = InMemoryGraphBackend()
-    backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
-    backend.add_node("step", {"id": "step", "type": "script", "parameters": {}})
-    backend.add_node("check", {"id": "check", "type": "permission_check", "parameters": {}})
-    backend.add_node("ok", {"id": "ok", "type": "script", "parameters": {}})
-    backend.add_node("fallback", {"id": "fallback", "type": "script", "parameters": {}})
-    backend.add_edge("trigger", "step", None)
-    backend.add_edge("step", "check", None)
-    backend.add_edge("check", "ok", {"from_port": "allowed"})
-    backend.add_edge("check", "fallback", {"from_port": "denied"})
     return WorkflowGraph(backend)
 
 
@@ -241,64 +224,6 @@ class TestFinalStatus:
         wf.resolver.set_namespace("sibling", {"status": "completed"})
 
         assert wf._build_result("exec-1", include_node_results=False)["status"] == "completed"
-
-
-class TestPermissionCheckNode:
-    """permission_check evaluates the node feeding its single incoming edge."""
-
-    def test_routes_denied_when_upstream_was_denied(self) -> None:
-        wf = _make_workflow({"step": {"kind": "script", "denied_by": DENIED_BY}})
-        graph = _permission_check_graph()
-
-        _schedule(wf, "trigger", graph)
-        result = wf._execute_permission_check_node(graph.get_node("check"), graph)
-        assert wf.get_permission_check_results() == {"check": result["output"]}
-
-        assert result["control"] == {"next_port": "denied"}
-        assert result["output"]["allowed"] is False
-        assert result["output"]["checked_node_id"] == "step"
-        assert result["output"]["denied_by"] == DENIED_BY
-
-    def test_routes_allowed_when_upstream_ran(self) -> None:
-        wf = _make_workflow()
-        graph = _permission_check_graph()
-        wf.resolver.set_namespace("step", {"status": "completed"})
-
-        result = wf._execute_permission_check_node(graph.get_node("check"), graph)
-
-        assert result["control"] == {"next_port": "allowed"}
-        assert result["output"]["allowed"] is True
-        assert "denied_by" not in result["output"]
-
-    def test_still_scheduled_downstream_of_a_denied_node(self) -> None:
-        wf = _make_workflow({"step": {"kind": "script", "denied_by": DENIED_BY}})
-        graph = _permission_check_graph()
-
-        pending = _schedule(wf, "trigger", graph)
-
-        assert "check" in pending
-        assert "check" not in wf.skipped_nodes
-
-    def test_denied_port_skips_the_allowed_branch(self) -> None:
-        wf = _make_workflow({"step": {"kind": "script", "denied_by": DENIED_BY}})
-        graph = _permission_check_graph()
-        wf.resolver.set_namespace("check", {"status": "completed"})
-        wf.node_control_data["check"] = {"next_port": "denied"}
-
-        pending = _schedule(wf, "check", graph)
-
-        assert "fallback" in pending
-        assert "ok" in wf.skipped_nodes
-
-    def test_dispatch_routes_permission_check_without_an_activity(self, mock_workflow: MagicMock) -> None:
-        wf = _make_workflow({"step": {"kind": "script", "denied_by": DENIED_BY}})
-        graph = _permission_check_graph()
-        wf._denied_nodes["step"] = {"kind": "script", "denied_by": DENIED_BY}
-
-        result = _run(wf._dispatch_node_to_executor(graph.get_node("check"), {}, graph, 60))
-
-        assert result["control"] == {"next_port": "denied"}
-        mock_workflow.execute_activity.assert_not_awaited()
 
 
 class TestKillSwitchAtActivityStart:

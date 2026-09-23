@@ -46,7 +46,7 @@ from syntara.workflows.node_kinds import (
     NodeKindCategory,
     get_node_kind,
 )
-from syntara.workflows.node_permissions import denied_node_kinds
+from syntara.workflows.node_permissions import denied_node_labels
 
 if TYPE_CHECKING:
     from syntara.workflows.node_kinds import NodeKindInfo
@@ -81,6 +81,14 @@ class NodeKindRead(SQLModel):
     switchable: bool
     deniable_actions: list[str]
     can_write: bool
+    attributes: list["NodeAttributeRead"]
+
+
+class NodeAttributeRead(SQLModel):
+    """One node parameter exposed as an authorization resource label."""
+
+    name: str
+    allowed_values: list[str] | None
 
 
 class NodeKindsListResponse(SQLModel):
@@ -121,6 +129,13 @@ def _to_read(info: "NodeKindInfo", *, disabled: frozenset[str], denied_kinds: fr
         switchable=is_kind_switchable(info.kind),
         deniable_actions=sorted(info.deniable_actions),
         can_write=info.kind not in denied_kinds,
+        attributes=[
+            NodeAttributeRead(
+                name=attribute.name,
+                allowed_values=sorted(attribute.allowed_values) if attribute.allowed_values is not None else None,
+            )
+            for attribute in info.attributes
+        ],
     )
 
 
@@ -136,12 +151,12 @@ async def _write_denied_kinds(
     the policy engine.
     """
     candidates = [info.kind for info in NODE_KINDS if info.is_deniable(NODE_ACTION_WRITE)]
-    denials = await denied_node_kinds(
+    denials = await denied_node_labels(
         db,
         evaluator,
         user_id=user.id,
         action=NODE_ACTION_WRITE,
-        kinds=candidates,
+        label_sets=[frozenset({("kind", kind)}) for kind in candidates],
         project_name="",
         user_labels=user.labels,
         user_metadata=user.authz_metadata,

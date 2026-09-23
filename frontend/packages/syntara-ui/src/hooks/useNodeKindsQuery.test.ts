@@ -28,6 +28,7 @@ const scriptKind = {
   switchable: true,
   deniable_actions: ['write', 'execute'],
   can_write: true,
+  attributes: [{ name: 'language', allowed_values: ['python', 'bash'] }],
 }
 
 const conditionKind = {
@@ -37,6 +38,7 @@ const conditionKind = {
   switchable: false,
   deniable_actions: [],
   can_write: true,
+  attributes: [],
 }
 
 describe('useNodeKindsQuery', () => {

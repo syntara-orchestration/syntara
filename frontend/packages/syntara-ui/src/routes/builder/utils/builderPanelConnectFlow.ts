@@ -38,14 +38,6 @@ function hasApprovalNodePlaceholders(nodes: Node[], sourceId: string): boolean {
   )
 }
 
-function hasPermissionCheckNodePlaceholders(nodes: Node[], sourceId: string): boolean {
-  return nodes.some(
-    (n) =>
-      n.id === `placeholder-${sourceId}-${EdgeHandleEnum.ALLOWED}` ||
-      n.id === `placeholder-${sourceId}-${EdgeHandleEnum.DENIED}`
-  )
-}
-
 function removeButtonEdgeClass(nodes: Node[], sourceId: string): Node[] {
   return nodes.map((n) => {
     if (n.id === sourceId) {
@@ -81,9 +73,6 @@ function updateNodesAfterPanelConnect(nds: Node[], sourceId: string, sourcePlace
     return filtered
   }
   if (sourceNode.type === FlowNodeType.APPROVAL && hasApprovalNodePlaceholders(filtered, sourceId)) {
-    return filtered
-  }
-  if (sourceNode.type === FlowNodeType.PERMISSION_CHECK && hasPermissionCheckNodePlaceholders(filtered, sourceId)) {
     return filtered
   }
   return removeButtonEdgeClass(filtered, sourceId)

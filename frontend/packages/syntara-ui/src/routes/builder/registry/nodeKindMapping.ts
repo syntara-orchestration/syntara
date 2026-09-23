@@ -28,7 +28,6 @@ export const NODE_KIND_BY_REGISTRY_ID: Readonly<Record<string, string>> = {
   [RegistryNodeId.LOGIC_LOOP]: ActivityTypeEnum.LOOP,
   [RegistryNodeId.LOGIC_SWITCH]: ActivityTypeEnum.SWITCH,
   [RegistryNodeId.LOGIC_WAIT]: ActivityTypeEnum.WAIT,
-  [RegistryNodeId.LOGIC_PERMISSION_CHECK]: ActivityTypeEnum.PERMISSION_CHECK,
   [RegistryNodeId.ACTION_MCP_TOOL]: ActivityTypeEnum.MCP_TOOL,
   [RegistryNodeId.AAP_JOB_TEMPLATE]: ActivityTypeEnum.AAP_JOB_TEMPLATE,
   [RegistryNodeId.AAP_WORKFLOW_TEMPLATE]: ActivityTypeEnum.AAP_WORKFLOW_JOB_TEMPLATE,
@@ -49,7 +48,7 @@ function normalizeRegistryId(registryNodeId: string): string {
  * Resolve the backend node kind a palette entry creates.
  *
  * Entries registered after this map was written are resolved by normalizing the
- * registry id (`logic-permission-check` → `permission_check`) and accepting the
+ * registry id (`logic-custom-step` → `custom_step`) and accepting the
  * result only when the backend registry knows that kind, so a newly registered
  * node kind is gated without a second edit here.
  *

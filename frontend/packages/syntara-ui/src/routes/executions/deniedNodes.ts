@@ -15,8 +15,17 @@ export type DeniedNode = {
   nodeId: string
   /** Node kind that was denied (e.g. `http_request`). */
   kind?: string
+  /** Policy-addressable labels derived from the node configuration. */
+  labels?: Record<string, string>
   /** Name of the policy that produced the deny. */
   deniedBy?: string
+}
+
+function optionalStringRecord(value: unknown): Record<string, string> | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
+  return Object.fromEntries(
+    Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === 'string')
+  )
 }
 
 function optionalString(value: unknown): string | undefined {
@@ -31,6 +40,7 @@ function toDeniedNode(value: unknown): DeniedNode | null {
   return {
     nodeId,
     kind: optionalString(record.kind),
+    labels: optionalStringRecord(record.labels),
     deniedBy: optionalString(record.denied_by),
   }
 }

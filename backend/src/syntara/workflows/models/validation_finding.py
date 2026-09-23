@@ -31,7 +31,6 @@ class ValidationCategory(StrEnum):
     approval_configuration = "approval_configuration"
     definition_limits = "definition_limits"
     node_kind_disabled = "node_kind_disabled"
-    permission_check_configuration = "permission_check_configuration"
 
 
 class ValidationFinding(SQLModel):

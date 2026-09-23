@@ -65,7 +65,7 @@ from syntara.workflows.models.validation_finding import (
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 from syntara.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
 from syntara.workflows.node_kinds import NODE_ACTION_WRITE
-from syntara.workflows.node_permissions import denied_node_kinds, introduced_kinds, resolve_project_name
+from syntara.workflows.node_permissions import denied_node_labels, introduced_label_sets, resolve_project_name
 from syntara.workflows.services.scheduled_trigger_service import ScheduledTriggerService
 from syntara.workflows.services.webhook_trigger_service import WEBHOOK_TRIGGER_TYPES, WebhookTriggerService
 from syntara.workflows.services.workflow_diff import generate_change_summary
@@ -558,7 +558,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             NodeKindWriteDeniedError: If any introduced kind is denied.
 
         """
-        introduced = introduced_kinds(workflow_definition, baseline_definition)
+        introduced = introduced_label_sets(workflow_definition, baseline_definition)
         if not introduced:
             return
 
@@ -566,17 +566,17 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             logger.warning(
                 "Authorization evaluator unavailable — skipping workflow_node:write check",
                 user_id=str(self.user.id),
-                kinds=sorted(introduced),
+                label_sets=[dict(label_set) for label_set in sorted(introduced, key=lambda item: sorted(item))],
             )
             return
 
         project_name = await resolve_project_name(self.session, project_id)
-        denials = await denied_node_kinds(
+        denials = await denied_node_labels(
             self.session,
             self.opa_client,
             user_id=self.user.id,
             action=NODE_ACTION_WRITE,
-            kinds=introduced,
+            label_sets=introduced,
             project_name=project_name,
             user_labels=self.user.labels,
             user_metadata=self.user.authz_metadata,
@@ -585,7 +585,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             logger.warning(
                 "Workflow save denied: node kinds not permitted",
                 user_id=str(self.user.id),
-                denied_kinds=[denial.kind for denial in denials],
+                denied_label_sets=[denial.labels for denial in denials],
             )
             raise NodeKindWriteDeniedError(denials)
 

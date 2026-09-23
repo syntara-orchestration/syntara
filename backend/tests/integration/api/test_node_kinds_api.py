@@ -73,6 +73,7 @@ class TestListNodeKinds:
             "switchable": True,
             "deniable_actions": ["execute", "write"],
             "can_write": True,
+            "attributes": [{"name": "language", "allowed_values": ["bash", "python"]}],
         }
         assert entries["condition"]["switchable"] is False
         assert entries["condition"]["deniable_actions"] == []
@@ -95,11 +96,6 @@ class TestSetNodeKindEnabledErrors:
         assert body["code"] == "NODE_KIND_NOT_SWITCHABLE"
         assert "flow control" in body["detail"]
 
-    @pytest.mark.asyncio
-    async def test_permission_check_cannot_be_disabled(self, auth_client: AsyncClient) -> None:
-        resp = await auth_client.put(f"{_NODE_KINDS_URL}/permission_check/enabled", json={"enabled": False})
-        assert resp.status_code == 422
-
 
 class TestKillSwitchRoundTrip:
     """Flipping a kind off blocks validation, flipping it back on restores it."""
@@ -121,6 +117,7 @@ class TestKillSwitchRoundTrip:
             "switchable": True,
             "deniable_actions": ["execute", "write"],
             "can_write": True,
+            "attributes": [{"name": "language", "allowed_values": ["bash", "python"]}],
         }
 
         # The registry listing reflects the switch.

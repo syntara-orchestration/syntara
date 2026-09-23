@@ -82,10 +82,6 @@ export function getCanvasNodeIconDescriptor(
     return { icon: nodeMetadata.wait.icon, id: RegistryNodeId.LOGIC_WAIT }
   }
 
-  if (node.type === 'permission_check') {
-    return { icon: nodeMetadata.permission_check.icon, id: RegistryNodeId.LOGIC_PERMISSION_CHECK }
-  }
-
   if (node.type === 'task') {
     const taskData = node.data as TaskActivity
     return getTaskIconDescriptor(taskData)

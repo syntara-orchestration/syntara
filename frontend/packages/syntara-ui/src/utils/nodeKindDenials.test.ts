@@ -14,8 +14,13 @@ const problemDetails = {
   code: NODE_KIND_WRITE_DENIED_CODE,
   retryable: false,
   denied_kinds: [
-    { kind: 'script', denied_by: 'no-scripts', reason: 'denied by policy no-scripts' },
-    { kind: 'agentic', denied_by: 'no-agents', reason: 'denied by policy no-agents' },
+    {
+      kind: 'script',
+      labels: { kind: 'script', language: 'python' },
+      denied_by: 'no-scripts',
+      reason: 'denied by policy no-scripts',
+    },
+    { kind: 'agentic', labels: { kind: 'agentic' }, denied_by: 'no-agents', reason: 'denied by policy no-agents' },
   ],
 }
 
@@ -38,8 +43,18 @@ describe('isNodeKindWriteDeniedError', () => {
 describe('extractNodeKindDenials', () => {
   it('reads the denied kinds with their policy names', () => {
     expect(extractNodeKindDenials(problemDetails)).toEqual([
-      { kind: 'script', denied_by: 'no-scripts', reason: 'denied by policy no-scripts' },
-      { kind: 'agentic', denied_by: 'no-agents', reason: 'denied by policy no-agents' },
+      {
+        kind: 'script',
+        labels: { kind: 'script', language: 'python' },
+        denied_by: 'no-scripts',
+        reason: 'denied by policy no-scripts',
+      },
+      {
+        kind: 'agentic',
+        labels: { kind: 'agentic' },
+        denied_by: 'no-agents',
+        reason: 'denied by policy no-agents',
+      },
     ])
   })
 
@@ -53,7 +68,7 @@ describe('extractNodeKindDenials', () => {
       denied_kinds: [{ kind: 'script' }, { denied_by: 'no-kind' }, null, 'nonsense'],
     })
 
-    expect(denials).toEqual([{ kind: 'script', denied_by: '', reason: '' }])
+    expect(denials).toEqual([{ kind: 'script', labels: { kind: 'script' }, denied_by: '', reason: '' }])
   })
 
   it('returns an empty list when there is nothing to read', () => {
@@ -69,7 +84,7 @@ describe('nodeKindWriteDeniedAlert', () => {
     expect(alert).toEqual({
       title: 'Cannot save workflow: node kind not allowed',
       description:
-        'Your changes were not saved. You are not allowed to add nodes of kind: script (denied by no-scripts), agentic (denied by no-agents).',
+        'Your changes were not saved. You are not allowed to add nodes of kind: script (language=python) — denied by no-scripts, agentic (denied by no-agents).',
     })
   })
 

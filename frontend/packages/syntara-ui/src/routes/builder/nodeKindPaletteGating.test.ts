@@ -12,6 +12,7 @@ function kind(overrides: Partial<NodeKind> & { kind: string }): NodeKind {
     switchable: true,
     deniable_actions: ['write', 'execute'],
     can_write: true,
+    attributes: [],
     ...overrides,
   }
 }
@@ -110,9 +111,9 @@ describe('gatePaletteEntry', () => {
   })
 
   it('resolves a newly registered kind from its registry id', () => {
-    const kinds = registry(kind({ kind: 'permission_check', category: 'flow_control', switchable: false }))
+    const kinds = registry(kind({ kind: 'custom_step', category: 'flow_control', switchable: false }))
 
-    expect(gatePaletteEntry({ id: 'logic-permission-check' }, kinds)).toMatchObject({ kind: 'permission_check' })
+    expect(gatePaletteEntry({ id: 'logic-custom-step' }, kinds)).toMatchObject({ kind: 'custom_step' })
   })
 })
 

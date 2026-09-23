@@ -54,7 +54,6 @@ class TestDisabledNodeKindsCatalogEntry:
     def test_flow_control_kinds_are_not_allowed(self) -> None:
         """Flow control kinds can never be written into the setting."""
         assert "condition" not in SWITCHABLE_NODE_KINDS
-        assert "permission_check" not in SWITCHABLE_NODE_KINDS
 
     def test_schema_is_compatible_with_value_type(self) -> None:
         defn = _catalog_by_key[DISABLED_NODE_KINDS_KEY]

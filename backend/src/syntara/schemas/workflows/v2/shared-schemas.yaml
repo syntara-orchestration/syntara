@@ -430,6 +430,27 @@ components:
             - type: 'null'
           title: Completed At
 
+    DeniedNodeRead:
+      type: object
+      title: DeniedNodeRead
+      description: One workflow node refused by a launch-time authorization check.
+      properties:
+        node_id:
+          type: string
+          title: Node Id
+        kind:
+          type: string
+          title: Kind
+        labels:
+          type: object
+          title: Labels
+          additionalProperties:
+            type: string
+        denied_by:
+          type: string
+          title: Denied By
+      required: [node_id, kind, labels, denied_by]
+
     ExecutionRead:
       type: object
       title: ExecutionRead
@@ -571,13 +592,12 @@ components:
           anyOf:
             - type: array
               items:
-                additionalProperties: true
-                type: object
+                $ref: "#/components/schemas/DeniedNodeRead"
             - type: 'null'
           title: Denied Nodes
           description: >-
             Nodes the run principal was not allowed to execute, as
-            [{node_id, kind, denied_by}]. Null when nothing was denied.
+            [{node_id, kind, labels, denied_by}]. Null when nothing was denied.
         labels:
           additionalProperties: true
           type: object
@@ -732,7 +752,6 @@ components:
         - loop
         - switch
         - wait
-        - permission_check
         - aap_job_template
         - aap_workflow_job_template
         - agentic
@@ -1205,7 +1224,6 @@ components:
               - $ref: '#/components/schemas/LoopNode'
               - $ref: '#/components/schemas/ConvergeNode'
               - $ref: '#/components/schemas/WaitNode'
-              - $ref: '#/components/schemas/PermissionCheckNode'
             discriminator:
               propertyName: type
               mapping:
@@ -1218,7 +1236,6 @@ components:
                 http_request: '#/components/schemas/HTTPRequestNode'
                 loop: '#/components/schemas/LoopNode'
                 mcp_tool: '#/components/schemas/MCPToolNode'
-                permission_check: '#/components/schemas/PermissionCheckNode'
                 script: '#/components/schemas/ScriptNode'
                 switch: '#/components/schemas/SwitchNode'
                 wait: '#/components/schemas/WaitNode'
@@ -1877,65 +1894,6 @@ components:
       title: WaitNode
       description: Wait (delay) control node.
 
-    PermissionCheckNode:
-      properties:
-        id:
-          type: string
-          pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
-          title: Id
-          description: Unique identifier for the node within the workflow
-        name:
-          anyOf:
-            - type: string
-              minLength: 1
-            - type: 'null'
-          title: Name
-          description: Human-readable name for the node
-        description:
-          anyOf:
-            - type: string
-              minLength: 1
-            - type: 'null'
-          title: Description
-          description: Human-readable description of the node purpose
-        outputs:
-          anyOf:
-            - additionalProperties:
-                type: string
-              type: object
-            - type: 'null'
-          title: Outputs
-          description: Output extraction mapping
-        position:
-          anyOf:
-            - $ref: '#/components/schemas/NodePosition'
-            - type: 'null'
-          description: Optional UI position hint
-        type:
-          type: string
-          const: permission_check
-          title: Type
-        parameters:
-          additionalProperties: true
-          type: object
-          title: Parameters
-          description: No configuration; accepted for uniformity
-        settings:
-          anyOf:
-            - $ref: '#/components/schemas/NodeSettingsBase'
-            - type: 'null'
-      additionalProperties: true
-      type: object
-      required:
-        - id
-        - type
-      title: PermissionCheckNode
-      description: |-
-        Permission check control node (ANSTRAT-1750).
-
-        Takes no configuration.  It inspects the node feeding its single incoming
-        edge and routes to the ``allowed`` or ``denied`` output port depending on
-        whether that node was denied ``workflow_node:execute`` for this run.
     AAPJobTemplateExecutorParameters:
       properties:
         credential_id:

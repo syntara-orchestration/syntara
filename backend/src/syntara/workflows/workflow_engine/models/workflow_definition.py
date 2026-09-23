@@ -173,7 +173,6 @@ class NodeType(str, Enum):
     LOOP = "loop"
     SWITCH = "switch"
     WAIT = "wait"
-    PERMISSION_CHECK = "permission_check"
     # Executor nodes
     AAP_JOB_TEMPLATE = "aap_job_template"
     AAP_WORKFLOW_JOB_TEMPLATE = "aap_workflow_job_template"

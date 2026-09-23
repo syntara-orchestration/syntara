@@ -16,9 +16,8 @@ Node-kind level permissions (ANSTRAT-1750) need three schema additions:
   was denied.
 - ``activitystatus`` enum gains the terminal value ``denied`` for a node that
   was never started because its kind was denied for the run principal.
-- ``nodetype`` enum gains the two new node kinds, ``permission_check`` and
-  ``mcp_tool``; activity rows are written with this enum, so an execution
-  containing either kind fails without them.
+- ``nodetype`` enum gains the new node kind ``mcp_tool``; activity rows are
+  written with this enum, so an execution containing that kind fails without it.
 
 Custom SQL is required for the enum values: PostgreSQL enum values cannot be
 added through the SQLAlchemy operations and cannot be removed, so the
@@ -64,7 +63,6 @@ def upgrade() -> None:
 
     # CUSTOM: PostgreSQL enum values can only be added with ALTER TYPE.
     op.execute("ALTER TYPE activitystatus ADD VALUE IF NOT EXISTS 'denied'")
-    op.execute("ALTER TYPE nodetype ADD VALUE IF NOT EXISTS 'permission_check'")
     op.execute("ALTER TYPE nodetype ADD VALUE IF NOT EXISTS 'mcp_tool'")
     # END CUSTOM
 

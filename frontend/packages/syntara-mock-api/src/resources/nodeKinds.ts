@@ -2,6 +2,7 @@ import type { NodeKindsAPI } from '@syntara/contracts'
 
 type NodeKindRead = NodeKindsAPI['components']['schemas']['NodeKindRead']
 type NodeKindCategory = NodeKindsAPI['components']['schemas']['NodeKindCategory']
+type NodeAttributeRead = NodeKindsAPI['components']['schemas']['NodeAttributeRead']
 
 /** Actions a deny-effect policy may target, per category (mirrors node_kinds.py). */
 const DENIABLE_ACTIONS: Record<NodeKindCategory, string[]> = {
@@ -15,6 +16,35 @@ function isSwitchable(category: NodeKindCategory): boolean {
   return category !== 'flow_control'
 }
 
+const ATTRIBUTES_BY_KIND: Record<string, NodeAttributeRead[]> = {
+  script: [{ name: 'language', allowed_values: ['python', 'bash'] }],
+  http_request: [{ name: 'method', allowed_values: ['get', 'post', 'put', 'patch', 'delete'] }],
+  mcp_tool: [
+    { name: 'tool_name', allowed_values: null },
+    { name: 'integration_id', allowed_values: null },
+  ],
+  aap_job_template: [
+    { name: 'job_template_name', allowed_values: null },
+    { name: 'integration_id', allowed_values: null },
+  ],
+  aap_workflow_job_template: [
+    { name: 'workflow_job_template_name', allowed_values: null },
+    { name: 'integration_id', allowed_values: null },
+  ],
+  agentic: [{ name: 'model', allowed_values: null }],
+  internal_activity: [
+    {
+      name: 'activity',
+      allowed_values: [
+        'document_conversion',
+        'invocation_execution',
+        'integration_health_check',
+        'integration_resource_discovery',
+      ],
+    },
+  ],
+}
+
 function nodeKind(kind: string, category: NodeKindCategory): NodeKindRead {
   return {
     kind,
@@ -23,6 +53,7 @@ function nodeKind(kind: string, category: NodeKindCategory): NodeKindRead {
     switchable: isSwitchable(category),
     deniable_actions: DENIABLE_ACTIONS[category],
     can_write: true,
+    attributes: ATTRIBUTES_BY_KIND[kind] ?? [],
   }
 }
 
@@ -37,7 +68,6 @@ export const nodeKinds: NodeKindRead[] = [
   nodeKind('loop', 'flow_control'),
   nodeKind('switch', 'flow_control'),
   nodeKind('wait', 'flow_control'),
-  nodeKind('permission_check', 'flow_control'),
   nodeKind('aap_job_template', 'action'),
   nodeKind('aap_workflow_job_template', 'action'),
   nodeKind('agentic', 'action'),

@@ -17,7 +17,7 @@ matched (or the principal has no effective allow at all).
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
@@ -32,6 +32,7 @@ from syntara.workflows.node_kinds import (
     NODE_RESOURCE_TYPE,
     NodeKindCategory,
     get_node_kind,
+    node_labels,
 )
 
 if TYPE_CHECKING:
@@ -49,10 +50,16 @@ class NodeKindDenial:
     kind: str
     denied_by: str
     reason: str
+    labels: dict[str, str] = field(default_factory=dict)
 
-    def to_dict(self) -> dict[str, str]:
+    def __post_init__(self) -> None:
+        """Ensure every denial carries at least its required kind label."""
+        if not self.labels:
+            object.__setattr__(self, "labels", {NODE_KIND_LABEL: self.kind})
+
+    def to_dict(self) -> dict[str, Any]:
         """Serialize for API error bodies and execution records."""
-        return {"kind": self.kind, "denied_by": self.denied_by, "reason": self.reason}
+        return {"kind": self.kind, "labels": self.labels, "denied_by": self.denied_by, "reason": self.reason}
 
 
 def kinds_in_definition(definition: dict[str, Any] | None) -> set[str]:
@@ -69,27 +76,37 @@ def kinds_in_definition(definition: dict[str, Any] | None) -> set[str]:
     return kinds
 
 
-def introduced_kinds(new_definition: dict[str, Any] | None, baseline_definition: dict[str, Any] | None) -> set[str]:
-    """Kinds present in *new_definition* but absent from *baseline_definition*.
+def label_sets_in_definition(definition: dict[str, Any] | None) -> set[frozenset[tuple[str, str]]]:
+    """Return every distinct node authorization label set in *definition*."""
+    result: set[frozenset[tuple[str, str]]] = set()
+    for node in (definition or {}).get("nodes") or []:
+        if isinstance(node, dict):
+            labels = node_labels(node)
+            if labels:
+                result.add(frozenset(labels.items()))
+    return result
 
-    Presence is the only test: adding a second node of a kind that the
-    baseline already contains introduces nothing.  A ``None`` baseline (new
-    workflow, clone, import) means every kind is introduced.
-    """
-    return kinds_in_definition(new_definition) - kinds_in_definition(baseline_definition)
+
+def introduced_label_sets(
+    new_definition: dict[str, Any] | None,
+    baseline_definition: dict[str, Any] | None,
+) -> set[frozenset[tuple[str, str]]]:
+    """Return label sets in *new_definition* that are absent from the baseline."""
+    return label_sets_in_definition(new_definition) - label_sets_in_definition(baseline_definition)
 
 
-def executable_kinds(kinds: Iterable[str]) -> set[str]:
-    """Filter *kinds* down to the ones whose ``execute`` action can be denied.
-
-    Triggers and flow-control kinds are never denied for execution, so they
-    are skipped to avoid pointless evaluations.
-    """
-    result: set[str] = set()
-    for kind in kinds:
+def executable_label_sets(
+    label_sets: Iterable[frozenset[tuple[str, str]]],
+) -> set[frozenset[tuple[str, str]]]:
+    """Filter label sets to action kinds whose ``execute`` action is deniable."""
+    result: set[frozenset[tuple[str, str]]] = set()
+    for label_set in label_sets:
+        kind = dict(label_set).get(NODE_KIND_LABEL)
+        if kind is None:
+            continue
         info = get_node_kind(kind)
         if info is not None and info.category is NodeKindCategory.ACTION:
-            result.add(kind)
+            result.add(label_set)
     return result
 
 
@@ -102,39 +119,40 @@ async def resolve_project_name(db: AsyncSession, project_id: UUID | str | None) 
     return result.first() or ""
 
 
-async def evaluate_node_kinds(
+async def evaluate_node_labels(
     db: AsyncSession,
     evaluator: AuthzEvaluator,
     *,
     user_id: UUID,
     action: str,
-    kinds: Iterable[str],
+    label_sets: Iterable[frozenset[tuple[str, str]]],
     project_name: str = "",
     user_labels: dict[str, str] | None = None,
     user_metadata: dict[str, Any] | None = None,
-) -> dict[str, AuthzResult]:
-    """Evaluate ``workflow_node:<action>`` for every kind in *kinds*.
+) -> dict[frozenset[tuple[str, str]], AuthzResult]:
+    """Evaluate ``workflow_node:<action>`` for every distinct label set.
 
     Args:
         db: Database session used to resolve effective policies.
         evaluator: Authorization evaluator.
         user_id: Principal the check runs as (user or service account id).
         action: ``write`` or ``execute``.
-        kinds: Node kinds to evaluate (deduplicated, evaluated in sorted order).
+        label_sets: Node label sets to evaluate (deduplicated and sorted).
         project_name: Name of the workflow's project (``""`` for none).
         user_labels: Principal labels, when available.
         user_metadata: Principal authz metadata, when available.
 
     Returns:
-        Mapping of kind to its authorization result.
+        Mapping of label set to its authorization result.
 
     """
     if action not in (NODE_ACTION_WRITE, NODE_ACTION_EXECUTE):
         msg = f"Unsupported workflow_node action: {action}"
         raise ValueError(msg)
-    results: dict[str, AuthzResult] = {}
-    for kind in sorted(set(kinds)):
-        results[kind] = await authorize(
+    results: dict[frozenset[tuple[str, str]], AuthzResult] = {}
+    for label_set in sorted(set(label_sets), key=lambda item: sorted(item)):
+        labels = dict(label_set)
+        results[label_set] = await authorize(
             db,
             evaluator,
             AuthzRequest(
@@ -142,7 +160,7 @@ async def evaluate_node_kinds(
                 action=action,
                 resource_type=NODE_RESOURCE_TYPE,
                 resource_id="",
-                resource_labels={NODE_KIND_LABEL: kind},
+                resource_labels=labels,
                 resource_project=project_name,
                 user_labels=user_labels or {},
                 user_metadata=user_metadata or {},
@@ -151,34 +169,35 @@ async def evaluate_node_kinds(
     return results
 
 
-async def denied_node_kinds(
+async def denied_node_labels(
     db: AsyncSession,
     evaluator: AuthzEvaluator,
     *,
     user_id: UUID,
     action: str,
-    kinds: Iterable[str],
+    label_sets: Iterable[frozenset[tuple[str, str]]],
     project_name: str = "",
     user_labels: dict[str, str] | None = None,
     user_metadata: dict[str, Any] | None = None,
 ) -> list[NodeKindDenial]:
-    """Return the kinds in *kinds* the principal may not use for *action*, sorted by kind."""
-    results = await evaluate_node_kinds(
+    """Return the node label sets the principal may not use for *action*."""
+    results = await evaluate_node_labels(
         db,
         evaluator,
         user_id=user_id,
         action=action,
-        kinds=kinds,
+        label_sets=label_sets,
         project_name=project_name,
         user_labels=user_labels,
         user_metadata=user_metadata,
     )
     return [
         NodeKindDenial(
-            kind=kind,
+            kind=dict(label_set)[NODE_KIND_LABEL],
+            labels=dict(label_set),
             denied_by=result.denied_by,
             reason=result.denial_reason or ("policy_deny" if result.denied else "no_matching_policy"),
         )
-        for kind, result in results.items()
+        for label_set, result in results.items()
         if not result.allowed
     ]

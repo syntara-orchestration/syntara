@@ -35,6 +35,7 @@ type NodeKindRow = {
   switchable: boolean
   deniable_actions: string[]
   can_write: boolean
+  attributes: { name: string; allowed_values: string[] | null }[]
 }
 
 const listNodeKinds = async (): Promise<{ resources: NodeKindRow[]; disabled_kinds: string[] }> =>
@@ -53,7 +54,6 @@ describe('GET /api/v1/node_kinds', () => {
 
     expect(body.resources[0].kind).toBe('manual_trigger')
     expect(body.resources.at(-1)?.kind).toBe('script')
-    expect(body.resources.map((row) => row.kind)).toContain('permission_check')
     expect(body.resources.map((row) => row.kind)).toContain('mcp_tool')
   })
 
@@ -65,11 +65,21 @@ describe('GET /api/v1/node_kinds', () => {
     expect(byKind.get('condition')?.deniable_actions).toEqual([])
   })
 
+  it('reports policy attributes and their allowlists', async () => {
+    const byKind = new Map((await listNodeKinds()).resources.map((row) => [row.kind, row]))
+
+    expect(byKind.get('script')?.attributes).toEqual([{ name: 'language', allowed_values: ['python', 'bash'] }])
+    expect(byKind.get('mcp_tool')?.attributes).toEqual([
+      { name: 'tool_name', allowed_values: null },
+      { name: 'integration_id', allowed_values: null },
+    ])
+    expect(byKind.get('manual_trigger')?.attributes).toEqual([])
+  })
+
   it('marks flow control kinds as not switchable', async () => {
     const byKind = new Map((await listNodeKinds()).resources.map((row) => [row.kind, row]))
 
     expect(byKind.get('condition')?.switchable).toBe(false)
-    expect(byKind.get('permission_check')?.switchable).toBe(false)
     expect(byKind.get('script')?.switchable).toBe(true)
   })
 
@@ -109,6 +119,5 @@ describe('PUT /api/v1/node_kinds/{kind}/enabled', () => {
 
   it('returns 422 for a kind that cannot be switched off', async () => {
     expect((await setEnabled('condition', false)).status).toBe(422)
-    expect((await setEnabled('permission_check', false)).status).toBe(422)
   })
 })

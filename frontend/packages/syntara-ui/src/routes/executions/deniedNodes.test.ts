@@ -10,14 +10,28 @@ describe('parseDeniedNodes', () => {
   })
 
   it('narrows well-formed entries', () => {
-    expect(parseDeniedNodes([{ node_id: 'restart_service', kind: 'http_request', denied_by: 'no-restarts' }])).toEqual([
-      { nodeId: 'restart_service', kind: 'http_request', deniedBy: 'no-restarts' },
+    expect(
+      parseDeniedNodes([
+        {
+          node_id: 'restart_service',
+          kind: 'http_request',
+          labels: { kind: 'http_request', method: 'post' },
+          denied_by: 'no-restarts',
+        },
+      ])
+    ).toEqual([
+      {
+        nodeId: 'restart_service',
+        kind: 'http_request',
+        labels: { kind: 'http_request', method: 'post' },
+        deniedBy: 'no-restarts',
+      },
     ])
   })
 
   it('keeps entries with only a node id', () => {
     expect(parseDeniedNodes([{ node_id: 'step_a' }])).toEqual([
-      { nodeId: 'step_a', kind: undefined, deniedBy: undefined },
+      { nodeId: 'step_a', kind: undefined, labels: undefined, deniedBy: undefined },
     ])
   })
 

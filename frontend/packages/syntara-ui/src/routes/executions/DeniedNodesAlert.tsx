@@ -1,6 +1,7 @@
 import { Alert, Content, ContentVariants, List, ListItem } from '@patternfly/react-core'
 
 import { SynLabel } from '../../components/labels/SynLabel'
+import { describeNodeLabels } from '../../utils/nodeLabels'
 
 import { parseDeniedNodes } from './deniedNodes'
 import styles from './DeniedNodesAlert.module.css'
@@ -29,7 +30,9 @@ export function DeniedNodesAlert({ deniedNodes, nameMap }: DeniedNodesAlertProps
         {entries.map((entry) => (
           <ListItem key={entry.nodeId} className={styles.deniedNodeEntry}>
             <strong>{nameMap?.get(entry.nodeId) ?? entry.nodeId}</strong>
-            {entry.kind ? <SynLabel className={styles.kindLabel}>{entry.kind}</SynLabel> : null}
+            {entry.kind ? (
+              <SynLabel className={styles.kindLabel}>{describeNodeLabels(entry.kind, entry.labels)}</SynLabel>
+            ) : null}
             <Content component={ContentVariants.small}>
               {entry.deniedBy ? `Denied by policy "${entry.deniedBy}"` : 'Denied by policy'}
             </Content>
