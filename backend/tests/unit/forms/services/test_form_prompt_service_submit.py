@@ -287,14 +287,3 @@ class TestFormPromptServiceSubmit:
 
             # Should rollback on race condition
             session.rollback.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_submit_without_user_raises_error(self) -> None:
-        """Submitting without user context raises ValueError."""
-        session = Mock(spec=AsyncSession)
-        service = FormPromptService(session=session, user=None)
-
-        prompt_id = uuid4()
-
-        with pytest.raises(ValueError, match="User context required"):
-            await service.submit(prompt_id, {})

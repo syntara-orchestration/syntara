@@ -5,24 +5,12 @@ using the existing activity signal endpoint. It follows the established
 HTTP client patterns with retry logic and graceful error handling.
 """
 
-import asyncio
-from types import TracebackType
 from uuid import UUID
 
-import httpx
-import structlog
-
-from syntara.core.config.base import get_settings
-from syntara.core.tls.http_client import build_internal_http_client
-from syntara.workflows.utils.url import generate_activity_signal_url
-
-# HTTP status code constants for error classification
-_HTTP_STATUS_MIN_SERVER_ERROR = 500
-
-logger = structlog.stdlib.get_logger(__name__)
+from syntara.core.utils.http_retry_client import BaseHttpRetryClient
 
 
-class WorkflowApiClient:
+class WorkflowApiClient(BaseHttpRetryClient):
     """Client for communicating with workflow engine for approval signals.
 
     This client provides reliable communication with the workflow engine
@@ -32,59 +20,6 @@ class WorkflowApiClient:
     Uses WorkflowClientSettings from configuration for retry and timeout parameters.
 
     """
-
-    def __init__(self) -> None:
-        """Initialize the workflow API client.
-
-        Uses WorkflowClientSettings from application configuration.
-
-        """
-        settings = get_settings()
-
-        self.timeout = settings.workflow_client_request_timeout_seconds
-        self.max_retries = settings.workflow_client_max_retries
-        self.retry_backoff_base = settings.workflow_client_initial_backoff_seconds
-        self.backoff_growth_factor = settings.workflow_client_backoff_growth_factor
-        self.max_backoff_seconds = settings.workflow_client_max_backoff_seconds
-
-        # Create HTTP client with timeout configuration
-        self.http_client = build_internal_http_client(
-            timeout=httpx.Timeout(self.timeout),
-            follow_redirects=True,
-        )
-
-    async def __aenter__(self) -> "WorkflowApiClient":
-        """Async context manager entry."""
-        return self
-
-    async def __aexit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: TracebackType | None,
-    ) -> None:
-        """Async context manager exit."""
-        await self.http_client.aclose()
-
-    def _is_retryable_error(self, error: Exception) -> bool:
-        """Check if an error should trigger a retry.
-
-        Args:
-            error: The exception to check
-
-        Returns:
-            True if the error is retryable, False otherwise
-
-        """
-        # Retry on connection and timeout errors
-        if isinstance(error, httpx.ConnectError | httpx.TimeoutException):
-            return True
-
-        # Retry on server errors (5xx), not client errors (4xx)
-        if isinstance(error, httpx.HTTPStatusError):
-            return error.response.status_code >= _HTTP_STATUS_MIN_SERVER_ERROR
-
-        return False
 
     async def send_approval_signal(
         self,
@@ -128,7 +63,6 @@ class WorkflowApiClient:
 
         """
         activity_id = temporal_activity_id or approval_node_id
-        signal_url = generate_activity_signal_url(execution_id, activity_id)
 
         # Build signal payload with fields matching the approval resultSchema
         signal_payload = {
@@ -140,78 +74,18 @@ class WorkflowApiClient:
             }
         }
 
-        logger.info(
-            "Sending approval signal to workflow",
+        # Prepare logging context
+        log_context = {
+            "approval_node_id": approval_node_id,
+            "decision": decision,
+            "approval_id": approval_id,
+        }
+
+        # Delegate to base class retry logic
+        await self._send_signal_with_retry(
             execution_id=execution_id,
-            approval_node_id=approval_node_id,
-            decision=decision,
-            approval_id=approval_id,
-            signal_url=signal_url,
+            temporal_activity_id=activity_id,
+            signal_payload=signal_payload,
+            log_context=log_context,
+            operation_name="approval",
         )
-
-        # Retry logic with exponential backoff
-        last_error: httpx.HTTPError | None = None
-
-        for attempt in range(self.max_retries + 1):
-            try:
-                auth_headers = {
-                    "Content-Type": "application/json",
-                }
-                response = await self.http_client.post(
-                    signal_url,
-                    json=signal_payload,
-                    headers=auth_headers,
-                )
-                response.raise_for_status()
-
-                logger.info(
-                    "Approval signal sent successfully",
-                    execution_id=execution_id,
-                    approval_node_id=approval_node_id,
-                    decision=decision,
-                    approval_id=approval_id,
-                    attempt=attempt,
-                    response_status=response.status_code,
-                )
-                return
-
-            except httpx.HTTPError as e:
-                last_error = e
-
-                # Check if we should retry
-                is_last_attempt = attempt == self.max_retries
-                should_retry = self._is_retryable_error(e) and not is_last_attempt
-
-                if not should_retry:
-                    logger.exception(
-                        "Approval signal failed - non-retryable error or max attempts reached",
-                        execution_id=execution_id,
-                        approval_node_id=approval_node_id,
-                        decision=decision,
-                        approval_id=approval_id,
-                        attempt=attempt,
-                    )
-                    raise
-
-                # Calculate exponential backoff with growth factor and cap
-                backoff = self.retry_backoff_base * (self.backoff_growth_factor**attempt)
-                backoff = min(backoff, self.max_backoff_seconds)
-                logger.warning(
-                    "Approval signal failed - retrying with backoff",
-                    execution_id=execution_id,
-                    approval_node_id=approval_node_id,
-                    decision=decision,
-                    approval_id=approval_id,
-                    attempt=attempt,
-                    max_retries=self.max_retries,
-                    backoff_seconds=backoff,
-                    error_type=type(e).__name__,
-                    error=str(e),
-                )
-                await asyncio.sleep(backoff)
-
-        # This should never be reached due to the raise in the loop
-        if last_error:
-            raise last_error
-        msg = "Signal sending failed: no result and no error"
-        raise RuntimeError(msg)

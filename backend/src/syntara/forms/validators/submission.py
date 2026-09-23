@@ -13,9 +13,17 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
 
+    from syntara.forms.models.form_prompt import FormPrompt
+
 from pydantic import EmailStr, TypeAdapter, ValidationError
 
-from syntara.forms.exceptions import FormDataValidationError
+from syntara.forms.exceptions import (
+    FormDataValidationError,
+    FormPromptAlreadyRespondedError,
+    FormPromptCancelledError,
+    FormPromptExpiredError,
+)
+from syntara.forms.models.api_models import TERMINAL_PROMPT_STATUSES, FormPromptStatus
 from syntara.forms.models.form_errors import FormFieldError
 from syntara.forms.models.form_fields import (
     CheckboxField,
@@ -47,6 +55,25 @@ class _FormatError(ValueError):
     Subclasses ValueError so the existing coercion guard still catches it; the
     caller distinguishes it to report code "invalid_format" rather than "type".
     """
+
+
+def validate_prompt_submission_state(prompt: FormPrompt) -> None:
+    """Raise when a prompt is no longer eligible for a response.
+
+    Raises:
+        FormPromptExpiredError: If the prompt has expired
+        FormPromptCancelledError: If the prompt was cancelled
+        FormPromptAlreadyRespondedError: If the prompt was already submitted
+
+    """
+    if prompt.status not in TERMINAL_PROMPT_STATUSES:
+        return
+
+    if prompt.status == FormPromptStatus.EXPIRED:
+        raise FormPromptExpiredError(prompt.id, prompt.timeout_at)
+    if prompt.status == FormPromptStatus.CANCELLED:
+        raise FormPromptCancelledError(prompt.id)
+    raise FormPromptAlreadyRespondedError(prompt.id, prompt.status)
 
 
 def validate_form_submission(

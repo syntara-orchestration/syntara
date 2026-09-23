@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, ClassVar
 from uuid import UUID
 
+from pydantic import PrivateAttr
 from sqlalchemy import Column, Index, String, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import DateTime, Field, Relationship
@@ -181,6 +182,18 @@ class FormPrompt(BaseFormPrompt, table=True):
         ),
         Index("ix_form_prompts_labels", "labels", postgresql_using="gin"),
     )
+
+    # Transient response metadata; kept out of the database schema.
+    _signal_delivery_error: str | None = PrivateAttr(default=None)
+
+    @property
+    def signal_delivery_error(self) -> str | None:
+        """Expose the response-only workflow signal error to FormPromptRead."""
+        return self._signal_delivery_error
+
+    @signal_delivery_error.setter
+    def signal_delivery_error(self, value: str | None) -> None:
+        self._signal_delivery_error = value
 
     # Filterable and sortable fields for API endpoints
     __filterable_fields__: ClassVar[list[str]] = [

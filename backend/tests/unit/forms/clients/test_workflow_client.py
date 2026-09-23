@@ -30,7 +30,7 @@ class TestWorkflowApiClient:
             "prompt_id": str(uuid4()),
         }
 
-        with patch("syntara.forms.clients.workflow_client.generate_activity_signal_url") as mock_generate_url:
+        with patch("syntara.core.utils.http_retry_client.generate_activity_signal_url") as mock_generate_url:
             mock_generate_url.return_value = "http://localhost:8000/api/v1/signal"
 
             with respx.mock:
@@ -76,7 +76,7 @@ class TestWorkflowApiClient:
             "prompt_id": str(uuid4()),
         }
 
-        with patch("syntara.forms.clients.workflow_client.generate_activity_signal_url") as mock_generate_url:
+        with patch("syntara.core.utils.http_retry_client.generate_activity_signal_url") as mock_generate_url:
             mock_generate_url.return_value = "http://localhost:8000/api/v1/signal"
 
             with respx.mock:
@@ -106,7 +106,7 @@ class TestWorkflowApiClient:
             "prompt_id": str(uuid4()),
         }
 
-        with patch("syntara.forms.clients.workflow_client.generate_activity_signal_url") as mock_generate_url:
+        with patch("syntara.core.utils.http_retry_client.generate_activity_signal_url") as mock_generate_url:
             mock_generate_url.return_value = "http://localhost:8000/api/v1/signal"
 
             with respx.mock:
@@ -146,7 +146,7 @@ class TestWorkflowApiClient:
             "prompt_id": str(uuid4()),
         }
 
-        with patch("syntara.forms.clients.workflow_client.generate_activity_signal_url") as mock_generate_url:
+        with patch("syntara.core.utils.http_retry_client.generate_activity_signal_url") as mock_generate_url:
             mock_generate_url.return_value = "http://localhost:8000/api/v1/signal"
 
             with respx.mock:
@@ -186,7 +186,7 @@ class TestWorkflowApiClient:
 
         with (
             override_settings(workflow_client_max_retries=0),
-            patch("syntara.forms.clients.workflow_client.generate_activity_signal_url") as mock_generate_url,
+            patch("syntara.core.utils.http_retry_client.generate_activity_signal_url") as mock_generate_url,
         ):
             mock_generate_url.return_value = "http://localhost:8000/api/v1/signal"
 
@@ -224,7 +224,7 @@ class TestWorkflowApiClient:
             "prompt_id": str(uuid4()),
         }
 
-        with patch("syntara.forms.clients.workflow_client.generate_activity_signal_url") as mock_generate_url:
+        with patch("syntara.core.utils.http_retry_client.generate_activity_signal_url") as mock_generate_url:
             mock_generate_url.return_value = "http://localhost:8000/api/v1/signal"
 
             with respx.mock:
@@ -264,7 +264,7 @@ class TestWorkflowApiClient:
             "prompt_id": str(uuid4()),
         }
 
-        with patch("syntara.forms.clients.workflow_client.generate_activity_signal_url") as mock_generate_url:
+        with patch("syntara.core.utils.http_retry_client.generate_activity_signal_url") as mock_generate_url:
             mock_generate_url.return_value = "http://localhost:8000/api/v1/signal"
 
             with respx.mock:

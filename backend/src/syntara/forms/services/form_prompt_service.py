@@ -1,8 +1,4 @@
-"""Service layer for form prompt operations.
-
-Minimal internal-facing implementation for workflow engine integration.
-AAP-91889 will extend with full filtering/sorting/enrichment.
-"""
+"""Service layer for form prompt operations."""
 
 from __future__ import annotations
 
@@ -11,10 +7,10 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import selectinload
 from sqlmodel import select, update
 
 if TYPE_CHECKING:
-    import builtins
     from collections.abc import Iterable
     from uuid import UUID
 
@@ -24,34 +20,31 @@ if TYPE_CHECKING:
     from syntara.core.models import User
 
 from syntara.audit.dispatcher import AuditEventDispatcher
-from syntara.core.services.base import (
-    BaseService,
-    DefaultConvertResourceMixin,
-    DefaultEnrichQueryMixin,
-    DefaultPostProcessingMixin,
-)
+from syntara.core.models.user_reference import UserReference
+from syntara.core.services.base import BaseService
 from syntara.forms.audit.form_prompt import FormPromptSubmittedEvent
 from syntara.forms.exceptions import (
     FormPromptAlreadyRequestedError,
     FormPromptAlreadyRespondedError,
-    FormPromptCancelledError,
-    FormPromptExpiredError,
     FormPromptNotFoundError,
     InvalidResponderReferenceError,
 )
 from syntara.forms.models.api_models import (
-    TERMINAL_PROMPT_STATUSES,
     BatchFormPromptRequest,
     BatchUpdateResponse,
     BatchUpdateResult,
     FormPromptCreateRequest,
     FormPromptStatus,
     FormPromptSummary,
+    ResponderGroupSummary,
+    ResponderUserSummary,
     can_transition,
 )
-from syntara.forms.models.form_prompt import FormPrompt, FormPromptListResponse
+from syntara.forms.models.form_prompt import FormPrompt, FormPromptListResponse, FormPromptRead
 from syntara.forms.models.form_prompt_responders import FormPromptResponderGroup, FormPromptResponderUser
-from syntara.forms.validators.submission import validate_form_submission
+from syntara.forms.validators.submission import validate_form_submission, validate_prompt_submission_state
+from syntara.workflows.exceptions import ExecutionNotFoundError
+from syntara.workflows.models.execution import Execution
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -59,7 +52,7 @@ logger = structlog.stdlib.get_logger(__name__)
 class FormPromptService(BaseService):
     """Service for managing form prompts.
 
-    Minimal service covering workflow engine needs:
+    Service covering workflow engine needs:
     - create: atomically create form_prompts row + responder junctions
     - list: fetch prompts with pagination and filtering
     - batch_update_status: update prompt statuses (expire/cancel)
@@ -69,24 +62,16 @@ class FormPromptService(BaseService):
     def __init__(
         self,
         session: AsyncSession,
-        user: User | None = None,
+        user: User,
     ) -> None:
         """Initialize service with database session and user context.
 
         Args:
             session: SQLAlchemy async session
-            user: Current authenticated user (optional for workflow-internal operations)
+            user: Current authenticated user or service principal
 
         """
-        # Skip super().__init__() because BaseService requires non-None user,
-        # but FormPromptService needs to support workflow-internal operations without a user.
-        # Manually initialize the required attributes from BaseService.
-        self.session = session
-        self.user: User | None = user  # type: ignore[assignment]
-        # Initialize mixins required by BaseService.list_resources()
-        self.enrich_query_mixin = DefaultEnrichQueryMixin()
-        self.convert_resource_mixin = DefaultConvertResourceMixin()
-        self.post_processing_mixin = DefaultPostProcessingMixin()
+        super().__init__(session=session, user=user)
 
     def _map_fk_error_to_domain_exception(
         self,
@@ -120,6 +105,14 @@ class FormPromptService(BaseService):
 
         return None
 
+    async def _validate_execution_project(self, request: FormPromptCreateRequest) -> None:
+        execution = await self.session.get(Execution, request.execution_id)
+        if execution is None:
+            raise ExecutionNotFoundError(request.execution_id)
+        if execution.project_id != request.project_id:
+            msg = f"project_id {request.project_id} does not match execution's project {execution.project_id}"
+            raise ValueError(msg)
+
     async def create(self, request: FormPromptCreateRequest) -> FormPromptSummary:
         """Create a new form prompt.
 
@@ -133,6 +126,8 @@ class FormPromptService(BaseService):
             FormPromptAlreadyRequestedError: If a prompt for this already exists
 
         """
+        await self._validate_execution_project(request)
+
         try:
             # Create the prompt
             form_prompt = FormPrompt(
@@ -240,6 +235,53 @@ class FormPromptService(BaseService):
             include_total=include_total,
             allowed_projects=allowed_projects,
         )
+
+    async def get(self, prompt_id: UUID) -> FormPromptRead:
+        """Get a single form prompt by ID.
+
+        Args:
+            prompt_id: UUID of the form prompt
+
+        Returns:
+            The form prompt with responder and submitter details
+
+        Raises:
+            FormPromptNotFoundError: If the form prompt does not exist
+
+        """
+        query = (
+            select(FormPrompt)
+            .where(FormPrompt.id == prompt_id)  # type: ignore[arg-type]
+            .options(
+                selectinload(FormPrompt.responder),  # type: ignore[arg-type]
+                selectinload(FormPrompt.responder_user_records),  # type: ignore[arg-type]
+                selectinload(FormPrompt.responder_group_records),  # type: ignore[arg-type]
+            )
+        )
+        result = await self.session.exec(query)
+        form_prompt = result.one_or_none()
+        if form_prompt is None:
+            raise FormPromptNotFoundError(prompt_id)
+
+        read = FormPromptRead.model_validate(
+            form_prompt.model_dump(
+                exclude={"responded_by", "responder_user_records", "responder_group_records", "responder"}
+            )
+        )
+        read.responder_users = [
+            ResponderUserSummary(id=user.id, username=user.username) for user in form_prompt.responder_user_records
+        ]
+        read.responder_groups = [
+            ResponderGroupSummary(id=group.id, name=group.name) for group in form_prompt.responder_group_records
+        ]
+        if form_prompt.responded_by is not None:
+            responder = form_prompt.responder
+            read.responded_by = UserReference(
+                id=form_prompt.responded_by,
+                name=responder.display_name if responder is not None else "",
+            )
+
+        return read
 
     async def batch_update_status(self, request: BatchFormPromptRequest) -> BatchUpdateResponse:
         """Batch update form prompt statuses with concurrency safety and project scoping.
@@ -358,54 +400,6 @@ class FormPromptService(BaseService):
             total_failed=failed_count,
         )
 
-    async def validate_submission(
-        self,
-        prompt_id: UUID,
-        submitted_data: dict[str, Any],
-    ) -> dict[str, Any]:
-        """Validate form submission data against prompt definition.
-
-        Validates both prompt state (must be PENDING and not expired) and
-        form data (required fields, types, options).
-
-        Args:
-            prompt_id: Form prompt ID
-            submitted_data: Raw submitted form data
-
-        Returns:
-            Cleaned and coerced form data ready for workflow namespace
-
-        Raises:
-            FormPromptNotFoundError: If prompt does not exist
-            FormPromptExpiredError: If prompt has expired
-            FormPromptCancelledError: If prompt has been cancelled
-            FormPromptAlreadyRespondedError: If prompt already has a response (SUBMITTED)
-            FormDataValidationError: If form data fails validation (carries field errors)
-
-        """
-        # Fetch the prompt
-        prompt = await self.session.get(FormPrompt, prompt_id)
-        if prompt is None:
-            raise FormPromptNotFoundError(prompt_id)
-
-        # Check prompt state
-        if prompt.status in TERMINAL_PROMPT_STATUSES:
-            if prompt.status == FormPromptStatus.EXPIRED:
-                raise FormPromptExpiredError(prompt_id, prompt.timeout_at)
-            if prompt.status == FormPromptStatus.CANCELLED:
-                raise FormPromptCancelledError(prompt_id)
-
-        # Validate form data against definition
-        cleaned_data = validate_form_submission(prompt.form_definition, submitted_data)
-
-        logger.info(
-            "Validated form submission",
-            prompt_id=prompt_id,
-            field_count=len(cleaned_data),
-        )
-
-        return cleaned_data
-
     async def submit(
         self,
         prompt_id: UUID,
@@ -431,17 +425,19 @@ class FormPromptService(BaseService):
             FormDataValidationError: If form data fails validation
 
         """
-        if self.user is None:
-            msg = "User context required for form submission"
-            raise ValueError(msg)
-
-        # Validate submission (includes state checks and data validation)
-        cleaned_data = await self.validate_submission(prompt_id, submitted_data)
-
-        # Get the prompt again for the update (validate_submission already checked it exists)
+        # Load the prompt, validate its state, then validate the submitted fields.
         prompt = await self.session.get(FormPrompt, prompt_id)
         if prompt is None:
             raise FormPromptNotFoundError(prompt_id)
+
+        validate_prompt_submission_state(prompt)
+        cleaned_data = validate_form_submission(prompt.form_definition, submitted_data)
+
+        logger.info(
+            "Validated form submission",
+            prompt_id=prompt_id,
+            field_count=len(cleaned_data),
+        )
 
         responded_at = datetime.now(UTC)
 
@@ -458,7 +454,7 @@ class FormPromptService(BaseService):
                 responded_at=responded_at,
             )
         )
-        result = await self.session.execute(stmt)
+        result = await self.session.exec(stmt)
         rowcount = result.rowcount  # type: ignore[attr-defined]
 
         if rowcount == 0:
@@ -475,7 +471,7 @@ class FormPromptService(BaseService):
         # Refresh to get the updated state
         await self.session.refresh(prompt)
 
-        # Calculate wait time for telemetry (AC-9)
+        # Calculate wait time for telemetry
         submitted = responded_at.replace(tzinfo=None)
         created = prompt.created_at.replace(tzinfo=None)
         wait_time_ms = int((submitted - created).total_seconds() * 1000)
@@ -517,7 +513,7 @@ class FormPromptService(BaseService):
                 exc_info=True,
             )
 
-        # Emit audit event with telemetry data (AC-9)
+        # Emit audit event with telemetry data
         AuditEventDispatcher.dispatch(
             FormPromptSubmittedEvent(
                 prompt_id=prompt_id,
@@ -532,36 +528,9 @@ class FormPromptService(BaseService):
             )
         )
 
-        # Store signal error for the response (not persisted to DB)
+        # Store the error as transient response metadata (not persisted to DB).
         if signal_error:
-            # Note: This would need a FormPromptRead model with signal_delivery_error field
-            # For now, just log it - the caller can check logs
+            prompt.signal_delivery_error = signal_error
             logger.error("Signal delivery failed", prompt_id=prompt_id, error=signal_error)
 
         return prompt
-
-    async def _get_form_prompt(
-        self,
-        execution_id: UUID,
-        prompt_node_id: str,
-        loop_iteration_path: builtins.list[int],
-    ) -> FormPrompt | None:
-        """Get form prompt by unique key (execution_id, prompt_node_id, loop_iteration_path).
-
-        Args:
-            execution_id: Workflow execution ID
-            prompt_node_id: Canvas node ID
-            loop_iteration_path: Loop iteration path
-
-        Returns:
-            FormPrompt if found, None otherwise
-
-        """
-        query = (
-            select(FormPrompt)
-            .where(FormPrompt.execution_id == execution_id)
-            .where(FormPrompt.prompt_node_id == prompt_node_id)
-            .where(FormPrompt.loop_iteration_path == loop_iteration_path)
-        )
-        result = await self.session.execute(query)
-        return result.scalar_one_or_none()
