@@ -319,9 +319,14 @@ class NodeSettingsCofDisabled(NodeSettingsCof):
 
 
 class NodeSettingsNoRetry(NodeSettingsCofDisabled):
-    """Settings with disabled, continue_on_failure, and timeout (script, agentic, approval)."""
+    """Settings with disabled, continue_on_failure, timeout, and expected_duration (script, agentic, approval)."""
 
     timeout: int | None = Field(default=None, ge=1)
+    expected_duration: int | None = Field(
+        default=None,
+        ge=1,
+        description="Expected duration in seconds. Nodes running longer are flagged as stalled. Independent of timeout.",
+    )
 
 
 class NodeSettingsFull(NodeSettingsNoRetry):

@@ -31,6 +31,16 @@ _TIMEOUT_CATALOG_KEYS: dict[str, str] = {
     NodeType.AGENTIC: "workflow_engine.agentic_timeout_seconds",
 }
 
+# Maps executor node type to its catalog setting key for expected_duration.
+# Same types as timeout — approval uses decision_window so is excluded here too.
+_EXPECTED_DURATION_CATALOG_KEYS: dict[str, str] = {
+    NodeType.SCRIPT: "workflow_engine.script_expected_duration_seconds",
+    NodeType.HTTP_REQUEST: "workflow_engine.http_request_expected_duration_seconds",
+    NodeType.AAP_JOB_TEMPLATE: "workflow_engine.aap_expected_duration_seconds",
+    NodeType.AAP_WORKFLOW_JOB_TEMPLATE: "workflow_engine.aap_expected_duration_seconds",
+    NodeType.AGENTIC: "workflow_engine.agentic_expected_duration_seconds",
+}
+
 _MAX_OUTPUT_CATALOG_KEYS: dict[str, str] = {
     NodeType.SCRIPT: "workflow_engine.script_max_output_kb",
 }
@@ -101,6 +111,30 @@ def resolve_timeout(node: ActivityNode, runtime_settings: dict[str, Any]) -> int
     if isinstance(node.settings, NodeSettingsNoRetry) and node.settings.timeout is not None:
         return node.settings.timeout
     return get_default_timeout(node.type, runtime_settings)
+
+
+def get_default_expected_duration(node_type: str, runtime_settings: dict[str, Any]) -> int | None:
+    """Return the catalog default expected duration (seconds) for a node type, or None.
+
+    Resolution: catalog key from runtime_settings → None (no hardcoded fallback).
+    """
+    key = _EXPECTED_DURATION_CATALOG_KEYS.get(node_type)
+    if key:
+        value = runtime_settings.get(key)
+        if value is not None:
+            return int(value)
+    return None
+
+
+def resolve_expected_duration(node: ActivityNode, runtime_settings: dict[str, Any]) -> int | None:
+    """Return the expected duration (seconds) for a node, or None if not set.
+
+    Resolution: node.settings.expected_duration → catalog global → None.
+    If None, the node is never flagged as stalled.
+    """
+    if isinstance(node.settings, NodeSettingsNoRetry) and node.settings.expected_duration is not None:
+        return node.settings.expected_duration
+    return get_default_expected_duration(node.type, runtime_settings)
 
 
 def resolve_max_output_bytes(node: ActivityNode, runtime_settings: dict[str, Any]) -> int:
