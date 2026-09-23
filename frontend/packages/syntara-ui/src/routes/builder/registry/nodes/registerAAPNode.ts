@@ -12,8 +12,8 @@ import {
   buildAAPWorkflowTemplateConfig,
   buildExpressionModeActivity,
   buildWorkflowExpressionModeActivity,
-  hasExpressionValue,
   isJobTemplateInputVariablesMode,
+  isWorkflowTemplateInputVariablesMode,
 } from '../../utils/aapHelpers'
 import { buildNamedActivity } from '../../utils/nodeCreationHelpers'
 import { getDefaultNodeBaseName } from '../../utils/nodeNaming'
@@ -97,7 +97,7 @@ export default function registerAAPNode() {
           // Workflow Template subtype
           if (subtypeId === RegistryNodeId.AAP_WORKFLOW_TEMPLATE) {
             const workflowData = data as AAPWorkflowTemplateFormData
-            if (hasExpressionValue(workflowData.workflow_job_template_name, workflowData.organization_name)) {
+            if (isWorkflowTemplateInputVariablesMode(workflowData)) {
               const baseName = getDefaultNodeBaseName({
                 nodeTypeId: RegistryNodeId.AAP_WORKFLOW_TEMPLATE,
                 label: 'AAP Workflow Template',

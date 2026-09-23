@@ -255,7 +255,10 @@ export function UserFormFields({
   isFederatedUser,
 }: Readonly<UserFormFieldsProps>) {
   const federatedUser = Boolean(isFederatedUser)
-  const emailLabelHelp = isEdit && federatedUser ? userHelp.emailFederatedEdit : userHelp.email
+  let emailLabelHelp = userHelp.emailCreate
+  if (isEdit) {
+    emailLabelHelp = federatedUser ? userHelp.emailFederatedEdit : userHelp.email
+  }
 
   return (
     <>

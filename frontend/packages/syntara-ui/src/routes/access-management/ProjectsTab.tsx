@@ -2,16 +2,15 @@ import { Button, Content, Truncate } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiEditFillIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { ThProps } from '@patternfly/react-table'
-import { useNavigate } from '@tanstack/react-router'
 import { useCallback, useMemo } from 'react'
 
-import { AppRoute } from '../../app/AppRoute'
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { IconLabel } from '../../components/IconLabel'
 import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../components/panels/list/SynListPanel'
 import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 import { SynKebabMenu, type KebabAction } from '../../components/SynKebabMenu'
 import { DateCell } from '../../components/table/DateCell'
+import { LinkCell } from '../../components/table/LinkCell'
 import { useCursorPagination, useCursorReset } from '../../hooks/useCursorPagination'
 import { useDialogState } from '../../hooks/useDialogState'
 import { useTableSort } from '../../hooks/useTableSort'
@@ -23,6 +22,7 @@ import { detachPromise } from '../../utils/detachPromise'
 import { accessClient } from '../access/accessClient'
 import type { ProjectRead } from '../access/types'
 
+import { getProjectDetailPath } from './accessManagementPaths'
 import { ProjectFormModal } from './ProjectFormModal'
 import { ProjectDeleteDialog } from './projects/ProjectDeleteDialog'
 import { useProjectPermissions } from './useProjectPermissions'
@@ -81,7 +81,6 @@ function ProjectRow({
   onEdit: (p: ProjectRead) => void
   onDelete: (p: ProjectRead) => void
 }>) {
-  const navigate = useNavigate()
   const permissions = useProjectPermissions({
     resourceProject: project.name || project.id || undefined,
   })
@@ -89,17 +88,9 @@ function ProjectRow({
   return (
     <Tr>
       <Td dataLabel="Name">
-        <Button
-          variant="link"
-          isInline
-          onClick={() =>
-            detachPromise(
-              navigate({ to: AppRoute.AccessManagement.ProjectDetail.replace(':projectId', project.id ?? '') })
-            )
-          }
-        >
+        <LinkCell href={getProjectDetailPath(project.id ?? '')}>
           <Truncate content={project.name ?? ''} />
-        </Button>
+        </LinkCell>
       </Td>
       <Td dataLabel="Description">
         <Truncate content={project.description ?? ''} />

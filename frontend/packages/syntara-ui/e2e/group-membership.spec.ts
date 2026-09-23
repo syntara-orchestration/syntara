@@ -30,7 +30,7 @@ async function openGroupByName(app: Page, name: string) {
   const table = app.getByRole('grid', { name: 'Groups table' })
   await app.getByPlaceholder('Filter by name').fill(name)
   await app.getByRole('button', { name: 'Apply filter' }).click()
-  await table.getByRole('button', { name, exact: true }).click()
+  await table.getByRole('link', { name, exact: true }).click()
   await expect(app.getByRole('heading', { level: 1, name, exact: true })).toBeVisible()
 }
 
@@ -105,7 +105,7 @@ test.describe('Group Detail — Navigation & Tabs', () => {
     await app.getByPlaceholder('Filter by name').fill(seededGroups[0].name)
     await app.getByRole('button', { name: 'Apply filter' }).click()
     await expect(
-      app.getByRole('grid', { name: 'Groups table' }).getByRole('button', { name: seededGroups[0].name, exact: true })
+      app.getByRole('grid', { name: 'Groups table' }).getByRole('link', { name: seededGroups[0].name, exact: true })
     ).toBeVisible()
   })
 
