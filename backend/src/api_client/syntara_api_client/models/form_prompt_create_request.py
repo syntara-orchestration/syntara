@@ -29,10 +29,10 @@ class FormPromptCreateRequest:
             project_id (UUID): Project ID (denormalized from execution)
             prompt_node_id (str): Canvas node ID from the workflow definition
             name (str): Display name for the form prompt
+            temporal_activity_id (str): Temporal activity ID to signal on submit
             form_definition (FormDefinition): Complete form definition with fields and metadata.
             message (None | str | Unset): Resolved message shown above the form
             loop_iteration_path (list[int] | Unset): Enclosing-loop indices, outermost first (empty when not inside a loop)
-            temporal_activity_id (None | str | Unset): Temporal activity ID to signal on submit (defaults to prompt_node_id)
             timeout_at (datetime.datetime | None | Unset): When this prompt expires (null = no timeout)
             submit_label (None | str | Unset): Submit button label
             success_message (None | str | Unset): Success message after submit
@@ -47,10 +47,10 @@ class FormPromptCreateRequest:
     project_id: UUID
     prompt_node_id: str
     name: str
+    temporal_activity_id: str
     form_definition: FormDefinition
     message: None | str | Unset = UNSET
     loop_iteration_path: list[int] | Unset = UNSET
-    temporal_activity_id: None | str | Unset = UNSET
     timeout_at: datetime.datetime | None | Unset = UNSET
     submit_label: None | str | Unset = UNSET
     success_message: None | str | Unset = UNSET
@@ -69,6 +69,8 @@ class FormPromptCreateRequest:
 
         name = self.name
 
+        temporal_activity_id = self.temporal_activity_id
+
         form_definition = self.form_definition.to_dict()
 
         message: None | str | Unset
@@ -80,12 +82,6 @@ class FormPromptCreateRequest:
         loop_iteration_path: list[int] | Unset = UNSET
         if not isinstance(self.loop_iteration_path, Unset):
             loop_iteration_path = self.loop_iteration_path
-
-        temporal_activity_id: None | str | Unset
-        if isinstance(self.temporal_activity_id, Unset):
-            temporal_activity_id = UNSET
-        else:
-            temporal_activity_id = self.temporal_activity_id
 
         timeout_at: None | str | Unset
         if isinstance(self.timeout_at, Unset):
@@ -151,6 +147,7 @@ class FormPromptCreateRequest:
                 "project_id": project_id,
                 "prompt_node_id": prompt_node_id,
                 "name": name,
+                "temporal_activity_id": temporal_activity_id,
                 "form_definition": form_definition,
             }
         )
@@ -158,8 +155,6 @@ class FormPromptCreateRequest:
             field_dict["message"] = message
         if loop_iteration_path is not UNSET:
             field_dict["loop_iteration_path"] = loop_iteration_path
-        if temporal_activity_id is not UNSET:
-            field_dict["temporal_activity_id"] = temporal_activity_id
         if timeout_at is not UNSET:
             field_dict["timeout_at"] = timeout_at
         if submit_label is not UNSET:
@@ -190,6 +185,8 @@ class FormPromptCreateRequest:
 
         name = d.pop("name")
 
+        temporal_activity_id = d.pop("temporal_activity_id")
+
         form_definition = FormDefinition.from_dict(d.pop("form_definition"))
 
         def _parse_message(data: object) -> None | str | Unset:
@@ -202,15 +199,6 @@ class FormPromptCreateRequest:
         message = _parse_message(d.pop("message", UNSET))
 
         loop_iteration_path = cast(list[int], d.pop("loop_iteration_path", UNSET))
-
-        def _parse_temporal_activity_id(data: object) -> None | str | Unset:
-            if data is None:
-                return data
-            if isinstance(data, Unset):
-                return data
-            return cast(None | str | Unset, data)
-
-        temporal_activity_id = _parse_temporal_activity_id(d.pop("temporal_activity_id", UNSET))
 
         def _parse_timeout_at(data: object) -> datetime.datetime | None | Unset:
             if data is None:
@@ -314,10 +302,10 @@ class FormPromptCreateRequest:
             project_id=project_id,
             prompt_node_id=prompt_node_id,
             name=name,
+            temporal_activity_id=temporal_activity_id,
             form_definition=form_definition,
             message=message,
             loop_iteration_path=loop_iteration_path,
-            temporal_activity_id=temporal_activity_id,
             timeout_at=timeout_at,
             submit_label=submit_label,
             success_message=success_message,

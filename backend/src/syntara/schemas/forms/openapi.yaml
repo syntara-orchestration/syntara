@@ -729,6 +729,7 @@ components:
         - prompt_node_id
         - name
         - status
+        - temporal_activity_id
       properties:
         id:
           type: string
@@ -833,8 +834,8 @@ components:
         - project_id
         - prompt_node_id
         - name
-        - form_definition
         - temporal_activity_id
+        - form_definition
       properties:
         execution_id:
           type: string

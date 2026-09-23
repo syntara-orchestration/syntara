@@ -8,22 +8,22 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
-from uuid import UUID
 
 import structlog
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import select, update
 
 if TYPE_CHECKING:
+    import builtins
     from collections.abc import Iterable
+    from uuid import UUID
 
     from sqlmodel.ext.asyncio.session import AsyncSession
 
-if TYPE_CHECKING:
+    from syntara.authz.engine import AllowedProjectsResult
     from syntara.core.models import User
 
 from syntara.audit.dispatcher import AuditEventDispatcher
-from syntara.authz.engine import AllowedProjectsResult
 from syntara.core.services.base import BaseService
 from syntara.forms.audit.form_prompt import FormPromptSubmittedEvent
 from syntara.forms.exceptions import (
@@ -64,7 +64,7 @@ class FormPromptService(BaseService):
     def __init__(
         self,
         session: AsyncSession,
-        user: "User | None" = None,
+        user: User | None = None,
     ) -> None:
         """Initialize service with database session and user context.
 
@@ -73,9 +73,10 @@ class FormPromptService(BaseService):
             user: Current authenticated user (optional for workflow-internal operations)
 
         """
-        super().__init__(session, user)
+        # Skip super().__init__() because BaseService requires non-None user,
+        # but FormPromptService needs to support workflow-internal operations without a user.
         self.session = session
-        self.user = user
+        self.user: User | None = user  # type: ignore[assignment]
 
     def _map_fk_error_to_domain_exception(
         self,
@@ -533,7 +534,7 @@ class FormPromptService(BaseService):
         self,
         execution_id: UUID,
         prompt_node_id: str,
-        loop_iteration_path: list[int],
+        loop_iteration_path: builtins.list[int],
     ) -> FormPrompt | None:
         """Get form prompt by unique key (execution_id, prompt_node_id, loop_iteration_path).
 
@@ -548,9 +549,9 @@ class FormPromptService(BaseService):
         """
         query = (
             select(FormPrompt)
-            .where(FormPrompt.execution_id == execution_id)  # type: ignore[arg-type]
-            .where(FormPrompt.prompt_node_id == prompt_node_id)  # type: ignore[arg-type]
-            .where(FormPrompt.loop_iteration_path == loop_iteration_path)  # type: ignore[arg-type]
+            .where(FormPrompt.execution_id == execution_id)
+            .where(FormPrompt.prompt_node_id == prompt_node_id)
+            .where(FormPrompt.loop_iteration_path == loop_iteration_path)
         )
         result = await self.session.execute(query)
         return result.scalar_one_or_none()

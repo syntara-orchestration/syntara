@@ -408,7 +408,7 @@ export interface components {
        * Temporal Activity Id
        * @description Temporal activity ID for async completion
        */
-      temporal_activity_id?: string | null
+      temporal_activity_id: string
     }
     /**
      * FormPromptListResponse
@@ -494,9 +494,9 @@ export interface components {
       loop_iteration_path?: number[]
       /**
        * Temporal Activity Id
-       * @description Temporal activity ID to signal on submit (defaults to prompt_node_id)
+       * @description Temporal activity ID to signal on submit
        */
-      temporal_activity_id?: string | null
+      temporal_activity_id: string
       /**
        * Timeout At
        * @description When this prompt expires (null = no timeout)

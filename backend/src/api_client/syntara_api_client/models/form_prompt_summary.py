@@ -29,8 +29,8 @@ class FormPromptSummary:
             prompt_node_id (str): Canvas node ID from the workflow definition
             name (str): Display name for the form prompt
             status (FormPromptStatus): Form prompt status enumeration.
+            temporal_activity_id (str): Temporal activity ID for async completion
             loop_iteration_path (list[int] | Unset): Enclosing-loop indices, outermost first
-            temporal_activity_id (None | str | Unset): Temporal activity ID for async completion
     """
 
     id: UUID
@@ -39,8 +39,8 @@ class FormPromptSummary:
     prompt_node_id: str
     name: str
     status: FormPromptStatus
+    temporal_activity_id: str
     loop_iteration_path: list[int] | Unset = UNSET
-    temporal_activity_id: None | str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -56,15 +56,11 @@ class FormPromptSummary:
 
         status = self.status.value
 
+        temporal_activity_id = self.temporal_activity_id
+
         loop_iteration_path: list[int] | Unset = UNSET
         if not isinstance(self.loop_iteration_path, Unset):
             loop_iteration_path = self.loop_iteration_path
-
-        temporal_activity_id: None | str | Unset
-        if isinstance(self.temporal_activity_id, Unset):
-            temporal_activity_id = UNSET
-        else:
-            temporal_activity_id = self.temporal_activity_id
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -76,12 +72,11 @@ class FormPromptSummary:
                 "prompt_node_id": prompt_node_id,
                 "name": name,
                 "status": status,
+                "temporal_activity_id": temporal_activity_id,
             }
         )
         if loop_iteration_path is not UNSET:
             field_dict["loop_iteration_path"] = loop_iteration_path
-        if temporal_activity_id is not UNSET:
-            field_dict["temporal_activity_id"] = temporal_activity_id
 
         return field_dict
 
@@ -100,16 +95,9 @@ class FormPromptSummary:
 
         status = FormPromptStatus(d.pop("status"))
 
+        temporal_activity_id = d.pop("temporal_activity_id")
+
         loop_iteration_path = cast(list[int], d.pop("loop_iteration_path", UNSET))
-
-        def _parse_temporal_activity_id(data: object) -> None | str | Unset:
-            if data is None:
-                return data
-            if isinstance(data, Unset):
-                return data
-            return cast(None | str | Unset, data)
-
-        temporal_activity_id = _parse_temporal_activity_id(d.pop("temporal_activity_id", UNSET))
 
         form_prompt_summary = cls(
             id=id,
@@ -118,8 +106,8 @@ class FormPromptSummary:
             prompt_node_id=prompt_node_id,
             name=name,
             status=status,
-            loop_iteration_path=loop_iteration_path,
             temporal_activity_id=temporal_activity_id,
+            loop_iteration_path=loop_iteration_path,
         )
 
         form_prompt_summary.additional_properties = d

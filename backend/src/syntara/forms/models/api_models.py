@@ -195,7 +195,10 @@ class FormPromptSummary(SQLModel):
     name: str = Field(..., description="Display name for the form prompt")
     status: FormPromptStatus = Field(..., description="Current prompt status")
     loop_iteration_path: list[int] = Field(default_factory=list, description="Enclosing-loop indices, outermost first")
-    temporal_activity_id: str | None = Field(None, description="Temporal activity ID for async completion")
+    temporal_activity_id: str = Field(
+        max_length=FieldLimits.TEMPORAL_ACTIVITY_ID_MAX_LENGTH,
+        description="Temporal activity ID for async completion",
+    )
 
 
 class BatchUpdateResult(SQLModel):

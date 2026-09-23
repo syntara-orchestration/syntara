@@ -44467,7 +44467,8 @@
           "project_id",
           "prompt_node_id",
           "name",
-          "status"
+          "status",
+          "temporal_activity_id"
         ],
         "properties": {
           "id": {
@@ -44511,14 +44512,8 @@
             }
           },
           "temporal_activity_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
+            "maxLength": 512,
             "title": "Temporal Activity Id",
             "description": "Temporal activity ID for async completion"
           }
@@ -44610,6 +44605,7 @@
           "project_id",
           "prompt_node_id",
           "name",
+          "temporal_activity_id",
           "form_definition"
         ],
         "properties": {
@@ -44659,17 +44655,10 @@
             }
           },
           "temporal_activity_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 512
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
+            "maxLength": 512,
             "title": "Temporal Activity Id",
-            "description": "Temporal activity ID to signal on submit (defaults to prompt_node_id)"
+            "description": "Temporal activity ID to signal on submit"
           },
           "timeout_at": {
             "anyOf": [
