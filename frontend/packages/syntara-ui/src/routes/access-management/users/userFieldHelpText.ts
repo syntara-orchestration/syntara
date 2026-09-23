@@ -5,6 +5,9 @@ export const USERNAME_HELP =
 
 export const EMAIL_HELP = 'Contact email address for this user.'
 
+export const EMAIL_CREATE_HELP =
+  "Each user must have a unique email address. Accounts already using this email address can't be reused for a new user."
+
 export const EMAIL_FEDERATED_EDIT_HELP =
   'Contact email for this user. It was set from the identity provider at first sign-in. You can change it here; it is not updated automatically on later logins.'
 

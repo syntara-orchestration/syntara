@@ -1,4 +1,3 @@
-import { zodResolver } from '@hookform/resolvers/zod'
 import {
   Button,
   DescriptionList,
@@ -8,26 +7,23 @@ import {
   Flex,
   FlexItem,
   Form,
-  FormGroup,
-  FormHelperText,
-  HelperText,
-  HelperTextItem,
   Label,
   Stack,
   StackItem,
-  TextArea,
   Title,
   ToggleGroup,
   ToggleGroupItem,
 } from '@patternfly/react-core'
 import type { Approval } from '@syntara/contracts'
 import { useQueryClient } from '@tanstack/react-query'
-import { Controller, useForm, useWatch } from 'react-hook-form'
 
 import { approvalsClient } from '../../client'
 import { SynCodeBlock } from '../../components/details/SynCodeBlock'
+import { SynForm } from '../../components/forms/SynForm'
+import { SynFormField } from '../../components/forms/SynFormField'
+import { SynTextAreaField } from '../../components/forms/SynTextAreaField'
 import { SynPanel } from '../../components/layout/SynPanel'
-import { useFormMutationErrorHandler } from '../../hooks/useFormMutationErrorHandler'
+import { useSynForm } from '../../hooks/useSynForm'
 import { useAlerts } from '../../providers/alerts'
 import { detachPromise } from '../../utils/detachPromise'
 import { lookupMapByApprovalNodeId } from '../approvals/approvalNodeId'
@@ -35,7 +31,11 @@ import { ApprovalSummaryList } from '../approvals/ApprovalSummaryList'
 import { useApprovalPermissions } from '../approvals/useApprovalPermissions'
 import { useCanDecideApproval } from '../approvals/useCanDecideApproval'
 
-import { approvalDecisionSchema, type ApprovalDecisionFormData } from './approvalDecisionSchema'
+import {
+  approvalDecisionSchema,
+  APPROVAL_NOTES_MAX_LENGTH,
+  type ApprovalDecisionFormData,
+} from './approvalDecisionSchema'
 import { ApprovalReadOnlyView } from './ApprovalReadOnlyView'
 
 type NextStep = { id: string; name: string; type: string; parameters?: Record<string, unknown> }
@@ -102,22 +102,14 @@ export function ApprovalReviewView({ approval, activityNameMap, onClose }: Appro
   const canDecide = permissions.canDecide && canDecideBasedOnApproverList
   const isCheckingPermissions = permissions.isChecking || isCheckingApproverList
 
-  const {
-    handleSubmit,
-    setValue,
-    setError,
-    control,
-    formState: { errors },
-  } = useForm<ApprovalDecisionFormData>({
-    resolver: zodResolver(approvalDecisionSchema, undefined, { mode: 'sync' }),
+  const form = useSynForm<ApprovalDecisionFormData>({
+    schema: approvalDecisionSchema,
     defaultValues: {
       status: 'approved',
       notes: '',
     },
   })
-
-  const handleError = useFormMutationErrorHandler(setError)
-  const currentStatus = useWatch({ control, name: 'status' })
+  const { handleSubmit, handleError } = form
   const approvalId = approval.id
 
   if (!approvalId) return null
@@ -229,50 +221,37 @@ export function ApprovalReviewView({ approval, activityNameMap, onClose }: Appro
 
         <StackItem style={{ flexShrink: 0 }}>
           <Title headingLevel="h3">Decision</Title>
-          <Form>
-            <FormGroup label="Action" isRequired role="group">
-              <ToggleGroup aria-label="Approval decision">
-                <ToggleGroupItem
-                  text="Approve"
-                  buttonId="approve-toggle"
-                  isSelected={currentStatus === 'approved'}
-                  onChange={() => setValue('status', 'approved')}
-                  isDisabled={isCheckingPermissions || !canDecide}
-                />
-                <ToggleGroupItem
-                  text="Reject"
-                  buttonId="reject-toggle"
-                  isSelected={currentStatus === 'rejected'}
-                  onChange={() => setValue('status', 'rejected')}
-                  isDisabled={isCheckingPermissions || !canDecide}
-                />
-              </ToggleGroup>
-            </FormGroup>
-
-            <FormGroup label="Notes" fieldId="approval-notes">
-              <Controller
-                name="notes"
-                control={control}
-                render={({ field }) => (
-                  <TextArea
-                    id="approval-notes"
-                    aria-label="Decision notes"
-                    placeholder="Explain the reason for your decision..."
-                    validated={errors.notes ? 'error' : 'default'}
-                    value={field.value}
-                    onChange={(_event, value) => field.onChange(value)}
-                    onBlur={field.onBlur}
-                  />
+          <Form id="approval-decision-form" onSubmit={handleSubmit(onSubmit)}>
+            <SynForm form={form}>
+              <SynFormField name="status" label="Action" fieldId="approval-status" isRequired>
+                {({ field }) => (
+                  <ToggleGroup aria-label="Approval decision">
+                    <ToggleGroupItem
+                      text="Approve"
+                      buttonId="approve-toggle"
+                      isSelected={field.value === 'approved'}
+                      onChange={() => field.onChange('approved')}
+                      isDisabled={isCheckingPermissions || !canDecide}
+                    />
+                    <ToggleGroupItem
+                      text="Reject"
+                      buttonId="reject-toggle"
+                      isSelected={field.value === 'rejected'}
+                      onChange={() => field.onChange('rejected')}
+                      isDisabled={isCheckingPermissions || !canDecide}
+                    />
+                  </ToggleGroup>
                 )}
+              </SynFormField>
+
+              <SynTextAreaField
+                name="notes"
+                label="Notes"
+                fieldId="approval-notes"
+                placeholder="Explain the reason for your decision..."
+                maxLength={APPROVAL_NOTES_MAX_LENGTH}
               />
-              {errors.notes && (
-                <FormHelperText>
-                  <HelperText>
-                    <HelperTextItem variant="error">{errors.notes.message}</HelperTextItem>
-                  </HelperText>
-                </FormHelperText>
-              )}
-            </FormGroup>
+            </SynForm>
           </Form>
         </StackItem>
       </Stack>
