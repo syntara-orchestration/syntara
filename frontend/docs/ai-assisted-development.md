@@ -2,6 +2,8 @@
 
 Use AI agents such as Codex, Claude Code, or Cursor to implement, review, and test UI features. Canonical skill files live under `.agents/skills/`; `.claude/skills/` contains tracked symlinks for Claude Code. The agent handles React, PatternFly, and project conventions.
 
+Invocation syntax depends on the agent: in Codex, use `$skill-name` or choose a skill from the `/skills` picker; in Claude Code, use `/skill-name`. With other clients, ask the agent to use the skill by name.
+
 **You provide:** the API endpoint, what the page should do, and optionally a mockup screenshot.
 **The agent handles:** component selection, TypeScript types, form validation, tests, and design tokens.
 
@@ -20,9 +22,9 @@ Use AI agents such as Codex, Claude Code, or Cursor to implement, review, and te
 9. [Quality Gates](#8-quality-gates-before-opening-a-pr)
 10. [Fixing Guideline Violations](#9-fixing-guideline-violations)
 11. [Quick-Reference Checklist](#10-quick-reference-for-new-contributors)
-12. [Skills & Commands Reference](#11-skills--commands-reference)
+12. [Skills Reference](#11-skills-reference)
 13. [Verify with a Final Screenshot](#12-verify-with-a-final-screenshot)
-14. [/frontend-build-ui-feature](#13-frontend-build-ui-feature)
+14. [Build UI feature skill](#13-build-ui-feature-skill)
 
 ---
 
@@ -30,7 +32,7 @@ Use AI agents such as Codex, Claude Code, or Cursor to implement, review, and te
 
 ```mermaid
 flowchart TD
-    A[Issue ID + UX mockup] --> B["/frontend-build-ui-feature"]
+    A[Issue ID + UX mockup] --> B["Build UI feature skill"]
     B --> C{Ask questions}
     C --> C1[What is the issue ID?]
     C --> C2[Do you have a screenshot?]
@@ -89,7 +91,7 @@ Step 3 — REVIEW LOCALLY
 Run npm start, open http://localhost:5173, test every state in the browser.
 
 Step 4 — CODE REVIEW
-Type /frontend-review-pr. Fix all Blocking issues.
+Use the `frontend-review-pr` skill. Fix all Blocking issues.
 
 Step 5 — UX CHECK
 Use the frontend-patternfly-ux skill + paste a screenshot.
@@ -183,12 +185,12 @@ npm run test:ui # unit tests with coverage
 
 Run two checks after implementation:
 
-**1. Code quality** — type `/frontend-review-pr` in the agent chat. It scans changed files against the [quality checklist](../AGENTS.md) and returns Blocking/Suggestion/Nitpick issues. See [§9](#9-fixing-guideline-violations) for common violations.
+**1. Code quality** — ask the agent to use the `frontend-review-pr` skill. It scans changed files against the [quality checklist](../AGENTS.md) and returns Blocking/Suggestion/Nitpick issues. See [§9](#9-fixing-guideline-violations) for common violations.
 
 **2. Visual / UX** — paste a screenshot and ask the agent to verify against the `frontend-patternfly-ux` skill.
 
 ```text
-Implement → /frontend-review-pr (fix blockers) → UX skill + screenshot (fix visual gaps)
+Implement → `frontend-review-pr` skill (fix blockers) → UX skill + screenshot (fix visual gaps)
   → lint/tsc/coverage → Open PR with screenshots
 ```
 
@@ -222,7 +224,7 @@ Always check in a browser before opening a PR. Run `npm start` (UI at http://loc
 Use after implementing a feature, or when reviewing a teammate's PR. The agent validates against the [quality checklist](../AGENTS.md), flags missing tests, and produces a draft PR description.
 
 ```text
-/frontend-review-pr
+Use the frontend-review-pr skill to review my current branch.
 ```
 
 Or with focus areas:
@@ -293,7 +295,7 @@ npm run e2e     # Playwright integration tests
 
 ## 9. Fixing Guideline Violations
 
-When `/frontend-review-pr` or a reviewer flags violations, here are the most common ones. You can also paste any violation into the agent and say "explain and fix this."
+When the `frontend-review-pr` skill or another reviewer flags violations, here are the most common ones. You can also paste any violation into the agent and say "explain and fix this."
 
 | Violation                           | How to fix                                                                                 |
 | ----------------------------------- | ------------------------------------------------------------------------------------------ |
@@ -327,7 +329,7 @@ Shortest path from "I need to build this page" to an open PR:
 8. **Review locally** — `npm start`, open http://localhost:5173, walk through every state ([§4](#4-review-your-changes-locally))
 9. **Side-by-side screenshot** — paste your page + mockup back to fix visual gaps
 10. **Run quality checks** -- `npm run check && npm run test:ui`
-11. **`/frontend-review-pr`** — fix every Blocking issue ([§9](#9-fixing-guideline-violations) if unclear)
+11. **`frontend-review-pr` skill** — fix every Blocking issue ([§9](#9-fixing-guideline-violations) if unclear)
 12. **UX skill + screenshot** — fix visual divergences
 13. **Open the PR** with screenshots of every state (loaded, empty, error, success toast) following the PR template provided
 
@@ -343,43 +345,43 @@ Shortest path from "I need to build this page" to an open PR:
 
 ---
 
-## 11. Skills & Commands Reference
+## 11. Skills Reference
 
 ### Skills (`.agents/skills/`)
 
-Skills are detailed reference guides the agent consults while working. You can also ask the agent to use a specific skill by name. Claude Code discovers them through the `.claude/skills/` symlinks.
+Skills are detailed reference guides the agent consults while working. You can also ask the agent to use a specific skill by name. Codex reads them from `.agents/skills/`; Claude Code discovers them through the `.claude/skills/` symlinks.
 
 | Skill                           | File                                   | What it does                                                                                                                                                        | When to use it                                                                                                                               |
 | ------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Coding Standards**            | `frontend-coding-standards/SKILL.md`   | Patterns with code examples: typed API clients, `useQueryState`, Zod forms, error handling, design tokens, accessibility                                            | Every implementation task. The agent reads this automatically, but you can say "check against the coding standards skill" to force a review. |
 | **Testing Guidelines**          | `frontend-testing-guidelines/SKILL.md` | Coverage requirements, query priority (`getByRole` > `getByLabelText` > `getByText`), `userEvent` over `fireEvent`, `vitest-axe` accessibility tests, mock patterns | Writing or reviewing tests. Say "use the frontend-testing-guidelines skill" to verify test quality.                                          |
-| **PR Review**                   | `frontend-pr-review/SKILL.md`          | Structured review process: identify scope, read every changed file, categorize issues as Blocking/Suggestion/Nitpick, generate PR description                       | Before opening a PR. Type `/frontend-review-pr` and the agent runs the full checklist.                                                       |
+| **PR Review**                   | `frontend-pr-review/SKILL.md`          | Structured review process: identify scope, read every changed file, categorize issues as Blocking/Suggestion/Nitpick, generate PR description                       | Before opening a PR. Invoke the `frontend-review-pr` skill to run the full checklist.                                                        |
 | **Playwright E2E**              | `frontend-playwright-e2e/SKILL.md`     | E2E test writing: fixtures, selectors, mock API setup, waiting strategies, debugging, CI integration                                                                | Writing browser-level tests for user flows. Say "use the frontend-playwright-e2e skill" to write E2E tests.                                  |
 | **PatternFly UX Design System** | `frontend-patternfly-ux/SKILL.md`      | PF6 component selection rules, table variants, form thresholds, modal sizes, alert casing, spacing tokens, color tokens                                             | Verifying that your UI matches the design system. Paste a screenshot and say "use the frontend-patternfly-ux skill to check this."           |
 | **Frontend Specialist**         | `frontend-specialist/SKILL.md`         | React 19, TypeScript, PatternFly 6, and Vitest implementation standards, pre-submission checklist, quality gates, and implementation workflow                       | Any implementation, review, or refactoring task. Triggered automatically via AGENTS.md.                                                      |
 | **Library References**          | `frontend-library-references/SKILL.md` | `llms.txt` URLs for React, Zod, Zustand, Vitest, Vite, and TanStack Query. Ensures current API docs are used instead of stale training data.                        | Before writing code that uses any of these libraries. Triggered automatically via AGENTS.md.                                                 |
-| **Build UI feature**            | `frontend-build-ui-feature/SKILL.md`   | Guided wizard: asks what to build, then implements using project skills (optionally Playwright E2E)                                                                 | Type `/frontend-build-ui-feature` to walk through a new page or component.                                                                   |
-| **Accessibility audit**         | `frontend-a11y-audit/SKILL.md`         | Registry axe sweep (`npm run e2e:a11y-audit`) plus manual keyboard/media/semantic checks and bug drafting                                                           | Say "run an a11y audit" or type `/frontend-a11y-audit` before drafting accessibility bugs.                                                   |
+| **Build UI feature**            | `frontend-build-ui-feature/SKILL.md`   | Guided wizard: asks what to build, then implements using project skills (optionally Playwright E2E)                                                                 | Invoke the `frontend-build-ui-feature` skill to walk through a new page or component.                                                        |
+| **Accessibility audit**         | `frontend-a11y-audit/SKILL.md`         | Registry axe sweep (`npm run e2e:a11y-audit`) plus manual keyboard/media/semantic checks and bug drafting                                                           | Ask the agent to run the skill before drafting accessibility bugs.                                                                           |
 
 ### User-invocable skills
 
-Type these in the agent chat. They live under `.agents/skills/` (this repository does not ship `.claude/commands/`).
+Codex accepts `$skill-name` or the `/skills` picker; Claude Code accepts `/skill-name`. These skills live under `.agents/skills/` (this repository does not ship `.claude/commands/`).
 
-| Command                      | What it does                                                                             |
-| ---------------------------- | ---------------------------------------------------------------------------------------- |
-| `/frontend-review-pr`        | Runs the full PR review skill against your current branch                                |
-| `/frontend-build-ui-feature` | Guided wizard: asks what to build, then implements using project skills (optionally E2E) |
-| `/frontend-run-e2e`          | Runs Playwright E2E tests with the project's runner and defaults                         |
-| `/frontend-a11y-audit`       | Registry axe sweep plus manual keyboard, viewport/media, and semantic WCAG checks        |
+| Skill                       | Codex                        | Claude Code                  | What it does                                                                             |
+| --------------------------- | ---------------------------- | ---------------------------- | ---------------------------------------------------------------------------------------- |
+| `frontend-review-pr`        | `$frontend-review-pr`        | `/frontend-review-pr`        | Runs the full PR review skill against your current branch                                |
+| `frontend-build-ui-feature` | `$frontend-build-ui-feature` | `/frontend-build-ui-feature` | Guided wizard: asks what to build, then implements using project skills (optionally E2E) |
+| `frontend-run-e2e`          | `$frontend-run-e2e`          | `/frontend-run-e2e`          | Runs Playwright E2E tests with the project's runner and defaults                         |
+| `frontend-a11y-audit`       | `$frontend-a11y-audit`       | `/frontend-a11y-audit`       | Registry axe sweep plus manual keyboard, viewport/media, and semantic WCAG checks        |
 
 ### Typical flow for a new feature
 
 ```text
-/frontend-build-ui-feature
-    → asks what to build, plans, implements, tests, then /frontend-review-pr
+frontend-build-ui-feature
+    → asks what to build, plans, implements, tests, then frontend-review-pr
 ```
 
-You can skip the wizard. For a quick bug fix, describe the problem and let the agent fix it, then run `/frontend-review-pr` before opening the PR.
+You can skip the wizard. For a quick bug fix, describe the problem and let the agent fix it, then ask it to use the `frontend-review-pr` skill before opening the PR.
 
 ---
 
@@ -425,9 +427,9 @@ Include these screenshots in the PR description so reviewers can verify without 
 
 ---
 
-## 13. /frontend-build-ui-feature
+## 13. Build UI feature skill
 
-Instead of copying prompts and chaining skills manually, type `/frontend-build-ui-feature`. It walks you through the full implementation in conversation.
+Instead of copying prompts and chaining skills manually, invoke `frontend-build-ui-feature` using the syntax for your agent. It walks you through the full implementation in conversation.
 
 ### What it does
 
@@ -439,40 +441,41 @@ The skill asks you 5 questions, then handles the rest:
 4. What should this page or component do?
 5. Should I write E2E tests?
 
-After collecting your answers, it runs the full workflow: finds a similar existing page as a reference, reads the coding standards and PatternFly UX skills, creates a plan for your approval, implements the component with unit tests and accessibility checks, verifies against the design system, optionally writes Playwright E2E tests, and finishes with `/frontend-review-pr`.
+After collecting your answers, it runs the full workflow: finds a similar existing page as a reference, reads the coding standards and PatternFly UX skills, creates a plan for your approval, implements the component with unit tests and accessibility checks, verifies against the design system, optionally writes Playwright E2E tests, and finishes with the `frontend-review-pr` skill.
 
 ### Why a user-invocable skill
 
-`/frontend-build-ui-feature` is a user-invocable skill: you type it to start a conversation. Reference skills (`frontend-coding-standards`, `frontend-patternfly-ux`, and so on) are documents the agent reads while working. This workflow is interactive: it needs to ask questions, wait for answers, show a plan, and get approval before writing code.
+`frontend-build-ui-feature` is a user-invocable skill: invoke it with `$frontend-build-ui-feature` in Codex or `/frontend-build-ui-feature` in Claude Code. Reference skills (`frontend-coding-standards`, `frontend-patternfly-ux`, and so on) are documents the agent reads while working. This workflow is interactive: it needs to ask questions, wait for answers, show a plan, and get approval before writing code.
 
 ### Example
 
 ```text
-You: /frontend-build-ui-feature
+You (Codex): $frontend-build-ui-feature
+You (Claude Code): /frontend-build-ui-feature
 
-Claude: What is the issue ID or feature description?
+Agent: What is the issue ID or feature description?
 
 You: Update destructive modals to match UX spec
 
-Claude: Do you have a screenshot or mockup?
+Agent: Do you have a screenshot or mockup?
 
 You: [pastes Figma screenshot]
 
-Claude: What is the API endpoint?
+Agent: What is the API endpoint?
 
 You: This is a UI-only change, no new API calls needed. The SynConfirmationDialog
      component already exists.
 
-Claude: What should this page or component do?
+Agent: What should this page or component do?
 
 You: Update all delete modals to have a warning icon, checkbox confirmation,
      and the body text format from the UX spec.
 
-Claude: Should I write E2E tests?
+Agent: Should I write E2E tests?
 
 You: Yes, for the integration delete flow.
 
-Claude: Here is my plan...
+Agent: Here is my plan...
 [shows plan, waits for approval, then implements]
 ```
 

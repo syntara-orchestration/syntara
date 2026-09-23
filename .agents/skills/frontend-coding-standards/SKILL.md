@@ -145,7 +145,7 @@ const { register, handleSubmit } = useForm<FormData>({
 1. Create a schema file next to your form: `myNodeFormSchema.ts` — define shape and validation with `z.object()` (use `.superRefine()` for conditional rules, or `z.discriminatedUnion()` for executor-type-style forms). Export the schema and `type MyFormData = z.infer<typeof myNodeFormSchema>`. Import `z` from `'zod'`.
 2. For optional number fields use `optionalNumber` from `src/routes/builder/node-forms/shared/formSchemaUtils` so empty `valueAsNumber` inputs (NaN) validate
 3. In form component: `useForm<MyFormData>({ resolver: zodResolver(myNodeFormSchema, undefined, { mode: 'sync' }), defaultValues })` — import `zodResolver` from `./shared/formSchemaUtils`
-4. Use `useFormMutationErrorHandler(setError)` for API 422 field errors; Zod handles client-side only. See: [`frontend/docs/error-handling.md`](frontend/docs/error-handling.md) - "Client-side validation (Zod + @hookform/resolvers)"
+4. Use `useFormMutationErrorHandler(setError)` for API 422 field errors; Zod handles client-side only. See: [`frontend/docs/error-handling.md`](../../../frontend/docs/error-handling.md) - "Client-side validation (Zod + @hookform/resolvers)"
 
 ---
 
@@ -653,7 +653,7 @@ Before writing a string comparison or assignment:
 
 ## 11. Error Handling with RFC 9457 Problem Details
 
-The application uses RFC 9457 Problem Details for API error responses. See [`frontend/docs/error-handling.md`](frontend/docs/error-handling.md) for complete patterns.
+The application uses RFC 9457 Problem Details for API error responses. See [`frontend/docs/error-handling.md`](../../../frontend/docs/error-handling.md) for complete patterns.
 
 ### Error Format
 
@@ -1488,7 +1488,7 @@ function useCanI(action: string, resourceType: string, options?: UseCanIOptions)
 
 ## 31. Permission Gating Patterns
 
-All CRUD and destructive actions must be gated by permissions. See [`frontend/docs/permissions-rbac.md`](frontend/docs/permissions-rbac.md) for the full architecture.
+All CRUD and destructive actions must be gated by permissions. See [`frontend/docs/permissions-rbac.md`](../../../frontend/docs/permissions-rbac.md) for the full architecture.
 
 ### When to create a domain hook vs inline `useCanI`
 

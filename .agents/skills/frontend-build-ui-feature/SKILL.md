@@ -33,7 +33,7 @@ Before writing any code:
 
 1. **Find the most similar page or component that already exists in the codebase.** This is the starting point — always follow existing patterns and conventions rather than inventing new ones.
 2. Read `.agents/skills/frontend-coding-standards/SKILL.md`, `.agents/skills/frontend-patternfly-ux/SKILL.md`, and `.agents/skills/frontend-testing-guidelines/SKILL.md`. These are the authoritative guidelines for code quality, UX, and unit/a11y tests. Do not skip the testing skill — Phase 3 always writes unit tests.
-3. Write a short plan: which files you'll create or change, which PatternFly components you'll use, and how you'll handle each state. The plan must align with existing codebase patterns. **New routes** must include an entry in `frontend/packages/syntara-ui/e2e/visual-regression/page-registry.ts` (see `VISUAL_REGRESSION.md`).
+3. Write a short plan: which files you'll create or change, which PatternFly components you'll use, and how you'll handle each state. The plan must align with existing codebase patterns. **New routes** must include an entry in `frontend/packages/syntara-ui/e2e/visual-regression/page-registry.ts` (see `frontend/packages/syntara-ui/VISUAL_REGRESSION.md`).
 4. Show the plan and wait for approval. Do not write code until the user says go.
 
 ## Phase 3: Build it
@@ -82,7 +82,7 @@ Check the browser console for errors or warnings. Tab through the page to verify
 
 ## Phase 6: Code review
 
-1. Run `/frontend-review-pr` to check against the quality checklist.
+1. Invoke the `frontend-review-pr` skill to check against the quality checklist.
 2. Fix any Blocking issues it finds.
 3. Show a summary: what files were created or changed, what the PR does.
 4. Remind the user to include screenshots of each state in the PR description. If you added a route, confirm the visual-regression registry row exists.
