@@ -44,7 +44,15 @@ vi.mock('../../access/builtinFilterDefinitions', async () => {
 })
 
 vi.mock('./EditProjectPolicyDialog', () => ({
-  EditProjectPolicyDialog: ({ policy, onClose, onSuccess }: { policy?: unknown; onClose: () => void; onSuccess: () => void }) => (
+  EditProjectPolicyDialog: ({
+    policy,
+    onClose,
+    onSuccess,
+  }: {
+    policy?: unknown
+    onClose: () => void
+    onSuccess: () => void
+  }) => (
     <div role="dialog" aria-label={policy ? 'Edit project policy' : 'Create policy'}>
       <button type="button" onClick={onClose}>
         Close edit
