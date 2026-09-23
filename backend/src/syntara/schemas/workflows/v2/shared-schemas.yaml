@@ -1089,24 +1089,23 @@ components:
             type: string
           title: Failure Point Ids
           description: Normalized failure points validated
-        changed_node_ids:
-          type: array
-          items:
-            type: string
-          title: Changed Node Ids
-          description: Upstream nodes whose definition changed (empty when eligible)
         sanitized_node_ids:
           type: array
           items:
             type: string
           title: Sanitized Node Ids
           description: Upstream nodes with sanitized stored outputs referenced on the restart path
-        truncated_node_ids:
-          type: array
-          items:
-            type: string
-          title: Truncated Node Ids
-          description: Upstream nodes with truncated stored outputs referenced on the restart path
+        step_count_by_failure_point:
+          type: object
+          additionalProperties:
+            type: integer
+          title: Step Count By Failure Point
+          description: Re-run step count for each selected failure point, computed against the retained version
+        total_step_count:
+          type: integer
+          title: Total Step Count
+          default: 0
+          description: Deduplicated total step count across the whole selection, computed against the retained version
 
     # WebSocket-specific schemas
     WebSocketMessage:

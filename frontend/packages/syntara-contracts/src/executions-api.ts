@@ -99,7 +99,7 @@ export interface paths {
     put?: never
     /**
      * Validate restart from failure
-     * @description Validate that an execution can be restarted from the given failure points. Checks execution state, failure-point eligibility, converge-mootness, the version-mismatch guard, and the tainted-output guard. Returns a pass/fail verdict without mutating any state.
+     * @description Validate that an execution can be restarted from the given failure points. Checks execution state, failure-point eligibility, converge-mootness, the retained-version guard, and the sanitized-output guard. Returns a pass/fail verdict without mutating any state.
      */
     post: operations['validate_restart_from_failure']
     delete?: never
@@ -597,20 +597,23 @@ export interface components {
        */
       failure_point_ids?: string[]
       /**
-       * Changed Node Ids
-       * @description Upstream nodes whose definition changed (empty when eligible)
-       */
-      changed_node_ids?: string[]
-      /**
        * Sanitized Node Ids
        * @description Upstream nodes with sanitized stored outputs referenced on the restart path
        */
       sanitized_node_ids?: string[]
       /**
-       * Truncated Node Ids
-       * @description Upstream nodes with truncated stored outputs referenced on the restart path
+       * Step Count By Failure Point
+       * @description Re-run step count for each selected failure point, computed against the retained version
        */
-      truncated_node_ids?: string[]
+      step_count_by_failure_point?: {
+        [key: string]: number
+      }
+      /**
+       * Total Step Count
+       * @description Deduplicated total step count across the whole selection, computed against the retained version
+       * @default 0
+       */
+      total_step_count?: number
     }
     /**
      * TestExecutionCreate

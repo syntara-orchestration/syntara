@@ -1265,9 +1265,9 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         """Validate a restart without mutating any state (AAP-92820).
 
         Runs the shared pre-restart validation chain (state guard,
-        failure-point eligibility, converge-mootness, version-mismatch guard,
-        tainted-output guard) and returns the
-        verdict for the UI to surface before the operator commits.
+        failure-point eligibility, converge-mootness, retained-version guard,
+        sanitized-output guard) and returns the verdict for the UI to surface
+        before the user commits.
 
         Raises:
             ExecutionNotFoundError: If the source execution is gone.
@@ -1284,9 +1284,9 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             eligible=validation.eligible,
             reason=validation.reason,
             failure_point_ids=validation.failure_point_ids,
-            changed_node_ids=validation.changed_node_ids,
             sanitized_node_ids=validation.sanitized_node_ids,
-            truncated_node_ids=validation.truncated_node_ids,
+            step_count_by_failure_point=validation.step_count_by_failure_point,
+            total_step_count=validation.total_step_count,
         )
 
     async def restart_from_failure(self, execution_id: UUID, failure_point_ids: list[str]) -> ExecutionRead:
@@ -1295,9 +1295,11 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         Independently repeats the full validation chain before doing any work
         — never assumes the validate endpoint was called first. On success,
         creates a new execution linked to the source (restart count, failure
-        points, triggered-by) running the *current* workflow version, and
-        triggers a Temporal run carrying ``restart_from_execution_id`` for the
-        engine's node classification (AAP-92821).
+        points, triggered-by) running the exact workflow version *retained
+        from the original run* — later edits to the definition never affect a
+        retry (SDP ANSTRAT-1779 R10) — and triggers a Temporal run carrying
+        ``restart_from_execution_id`` for the engine's node classification
+        (AAP-92821).
 
         Args:
             execution_id: ID of the source (failed) execution
@@ -1326,19 +1328,16 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         if workflow is None:
             raise ExecutionNotFoundError(execution_id)
 
-        current_result = await self.session.exec(
-            select(WorkflowVersion).where(
-                WorkflowVersion.workflow_id == workflow.id,
-                WorkflowVersion.version == workflow.current_version,
-            )
+        snapshot_result = await self.session.exec(
+            select(WorkflowVersion).where(WorkflowVersion.id == source.workflow_version_id)
         )
-        current_version = current_result.one_or_none()
-        if current_version is None:
-            raise ExecutionNotRestartableError(execution_id, "current workflow version no longer exists")
+        snapshot_version = snapshot_result.one_or_none()
+        if snapshot_version is None:
+            raise ExecutionNotRestartableError(execution_id, "original workflow version no longer exists")
 
         if source.trigger_node_id is None:
             raise ExecutionNotRestartableError(execution_id, "source execution has no trigger_node_id recorded")
-        trigger_node_id, _ = resolve_trigger_node(current_version.workflow_definition, source.trigger_node_id)
+        trigger_node_id, _ = resolve_trigger_node(snapshot_version.workflow_definition, source.trigger_node_id)
 
         logger.info(
             "Restarting execution",
@@ -1353,7 +1352,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
 
         return await self._start_temporal_and_create_execution(
             workflow=workflow,
-            workflow_version=current_version,
+            workflow_version=snapshot_version,
             input_data=source.input_data,
             trigger_node_id=trigger_node_id,
             recorder=recorder,

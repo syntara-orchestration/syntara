@@ -471,16 +471,17 @@ class RestartValidationResponse(SQLModel):
     eligible: bool = Field(description="Whether the restart is allowed to proceed")
     reason: str | None = Field(default=None, description="Rejection reason when eligible is false, null otherwise")
     failure_point_ids: list[str] = Field(default_factory=list, description="Normalized failure points validated")
-    changed_node_ids: list[str] = Field(
-        default_factory=list, description="Upstream nodes whose definition changed (empty when eligible)"
-    )
     sanitized_node_ids: list[str] = Field(
         default_factory=list,
         description="Upstream nodes with sanitized stored outputs referenced on the restart path",
     )
-    truncated_node_ids: list[str] = Field(
-        default_factory=list,
-        description="Upstream nodes with truncated stored outputs referenced on the restart path",
+    step_count_by_failure_point: dict[str, int] = Field(
+        default_factory=dict,
+        description="Re-run step count for each selected failure point, computed against the retained version",
+    )
+    total_step_count: int = Field(
+        default=0,
+        description="Deduplicated total step count across the whole selection, computed against the retained version",
     )
 
 

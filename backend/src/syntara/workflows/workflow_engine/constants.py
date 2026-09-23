@@ -50,9 +50,3 @@ DEFAULT_MAX_OUTPUT_BYTES = 1_048_576
 _TEMPORAL_BLOB_SIZE_ERROR = 2_097_152  # 2 MB
 # 10% headroom covers JSON escaping expansion and protobuf envelope overhead.
 TEMPORAL_PAYLOAD_MAX_BYTES = int(_TEMPORAL_BLOB_SIZE_ERROR * 0.9)
-
-#: Reserved output key carrying truncation provenance. Injected post-dump so it
-#: survives ``output_config`` mapping, which would otherwise drop the stderr
-#: notice a mapped-only output never persists. Read by restart validation;
-#: opaque (and harmless) to downstream consumers.
-TRUNCATED_FIELDS_KEY = "__truncated_fields"

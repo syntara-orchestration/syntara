@@ -309,8 +309,8 @@ async def retry_execution(
     operation_id="validate_restart_from_failure",
     summary="Validate restart from failure",
     description="Validate that an execution can be restarted from the given failure points. "
-    "Checks execution state, failure-point eligibility, converge-mootness, the version-mismatch guard, "
-    "and the tainted-output guard. "
+    "Checks execution state, failure-point eligibility, converge-mootness, the retained-version guard, "
+    "and the sanitized-output guard. "
     "Returns a pass/fail verdict without mutating any state.",
     response_model=RestartValidationResponse,
     response_description="Restart validation verdict",

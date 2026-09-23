@@ -247,6 +247,8 @@ class TestValidateRestart:
         assert data["eligible"] is True
         assert data["reason"] is None
         assert data["failure_point_ids"] == ["step_2"]
+        assert data["step_count_by_failure_point"] == {"step_2": 2}
+        assert data["total_step_count"] == 2
 
     async def test_validate_rejects_non_restartable_state(
         self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
@@ -279,30 +281,13 @@ class TestValidateRestart:
         assert response.status_code == status.HTTP_200_OK
         assert response.json()["eligible"] is False
 
-    async def test_validate_rejects_upstream_change(
+    async def test_validate_ignores_later_definition_changes(
         self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
     ) -> None:
+        """SDP R10: retry is pinned to the retained version; later saves never affect it."""
         execution = await _eligible_execution(test_db_session, test_workflow, test_user)
-        # Save a NEW version with an upstream change; the execution snapshot stays on the old one.
-        changed = [
-            dict(node, parameters={"code": "exit 0"}) if node["id"] == "step_1" else node for node in GRAPH_NODES
-        ]
-        await _save_new_version(test_db_session, test_workflow, test_user, changed)
-
-        response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/validate-restart-from-failure",
-            json={"failure_point_ids": ["step_2"]},
-        )
-
-        assert response.status_code == status.HTTP_200_OK
-        data = response.json()
-        assert data["eligible"] is False
-        assert data["changed_node_ids"] == ["step_1"]
-
-    async def test_validate_rejects_inserted_upstream_node(
-        self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
-    ) -> None:
-        execution = await _eligible_execution(test_db_session, test_workflow, test_user)
+        # Save a NEW version with an upstream change and an inserted node; the execution
+        # snapshot stays on the old one, so this must have zero effect on eligibility.
         gate = {"id": "step_1b", "name": "gate", "type": "script", "parameters": {"code": "echo gate"}}
         gate_edges = [
             {"from": "trigger_manual", "to": "step_1"},
@@ -310,9 +295,10 @@ class TestValidateRestart:
             {"from": "step_1b", "to": "step_2"},
             {"from": "step_2", "to": "step_3"},
         ]
-        await _save_new_version(
-            test_db_session, test_workflow, test_user, [GRAPH_NODES[0], gate, *GRAPH_NODES[1:]], gate_edges
-        )
+        changed = [
+            dict(node, parameters={"code": "exit 0"}) if node["id"] == "step_1" else node for node in GRAPH_NODES
+        ]
+        await _save_new_version(test_db_session, test_workflow, test_user, [changed[0], gate, *changed[1:]], gate_edges)
 
         response = await auth_client.post(
             f"/api/v1/executions/{execution.id}/validate-restart-from-failure",
@@ -321,8 +307,7 @@ class TestValidateRestart:
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert data["eligible"] is False
-        assert data["changed_node_ids"] == ["step_1b"]
+        assert data["eligible"] is True
 
     async def test_validate_rejects_sanitized_upstream_output(
         self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
@@ -411,61 +396,6 @@ class TestValidateRestart:
         data = response.json()
         assert data["eligible"] is True
         assert data["sanitized_node_ids"] == []
-        assert data["truncated_node_ids"] == []
-
-    async def test_validate_rejects_truncated_referenced_field(
-        self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
-    ) -> None:
-        nodes = [
-            dict(node, parameters={**node.get("parameters", {}), "input_ref": "${step_1.stderr}"})
-            if node.get("id") == "step_2"
-            else node
-            for node in GRAPH_NODES
-        ]
-        await _set_version_definition(test_db_session, test_workflow, nodes)
-        execution = await _create_execution(test_db_session, test_workflow, test_user)
-        await _add_failed_activity(test_db_session, execution, "step_2")
-        stderr = "part\n[Output truncated: exceeded 1048576 byte limit (stdout: complete, stderr: truncated)]"
-        await _add_completed_activity(test_db_session, execution, "step_1", {"stdout": "ok", "stderr": stderr})
-
-        response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/validate-restart-from-failure",
-            json={"failure_point_ids": ["step_2"]},
-        )
-
-        assert response.status_code == status.HTTP_200_OK
-        data = response.json()
-        assert data["eligible"] is False
-        assert data["truncated_node_ids"] == ["step_1"]
-
-    async def test_validate_rejects_provenance_tainted_field(
-        self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
-    ) -> None:
-        nodes = [
-            dict(node, parameters={**node.get("parameters", {}), "input_ref": "${step_1.stdout}"})
-            if node.get("id") == "step_2"
-            else node
-            for node in GRAPH_NODES
-        ]
-        await _set_version_definition(test_db_session, test_workflow, nodes)
-        execution = await _create_execution(test_db_session, test_workflow, test_user)
-        await _add_failed_activity(test_db_session, execution, "step_2")
-        await _add_completed_activity(
-            test_db_session,
-            execution,
-            "step_1",
-            {"stdout": "trimmed", "stderr": "clean", "__truncated_fields": ["stdout", "stdout_json"]},
-        )
-
-        response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/validate-restart-from-failure",
-            json={"failure_point_ids": ["step_2"]},
-        )
-
-        assert response.status_code == status.HTTP_200_OK
-        data = response.json()
-        assert data["eligible"] is False
-        assert data["truncated_node_ids"] == ["step_1"]
 
     async def test_validate_missing_execution_returns_404(self, auth_client: AsyncClient) -> None:
         response = await auth_client.post(
@@ -522,6 +452,36 @@ class TestRestartExecution:
         _, kwargs = mock_temporal_service.start_workflow.call_args
         assert kwargs["workflow_metadata"]["restart"]["restart_from_execution_id"] == str(execution.id)
         assert kwargs["workflow_metadata"]["restart"]["failure_point_ids"] == ["step_2"]
+
+    async def test_restart_uses_retained_version_not_current(
+        self,
+        auth_client: AsyncClient,
+        test_db_session: AsyncSession,
+        test_user: User,
+        test_workflow: Workflow,
+        mock_temporal_service: Mock,
+    ) -> None:
+        """SDP R10: restart runs the version retained from the original run, never a later save."""
+        execution = await _eligible_execution(test_db_session, test_workflow, test_user)
+        original_version_id = execution.workflow_version_id
+        changed = [
+            dict(node, parameters={"code": "exit 0"}) if node["id"] == "step_1" else node for node in GRAPH_NODES
+        ]
+        await _save_new_version(test_db_session, test_workflow, test_user, changed)
+
+        response = await auth_client.post(
+            f"/api/v1/executions/{execution.id}/restart-from-failure",
+            json={"failure_point_ids": ["step_2"]},
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        data = response.json()
+        assert data["workflow_version_id"] == str(original_version_id)
+
+        mock_temporal_service.start_workflow.assert_called_once()
+        _, kwargs = mock_temporal_service.start_workflow.call_args
+        restarted_step_1 = next(node for node in kwargs["workflow_def"]["nodes"] if node["id"] == "step_1")
+        assert restarted_step_1["parameters"]["code"] == "echo hi"
 
     async def test_restart_rejected_state_returns_409(
         self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow

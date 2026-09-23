@@ -24898,7 +24898,7 @@ paths:
   /executions/{execution_id}/validate-restart-from-failure:
     post:
       summary: Validate restart from failure
-      description: Validate that an execution can be restarted from the given failure points. Checks execution state, failure-point eligibility, converge-mootness, the version-mismatch guard, and the tainted-output guard. Returns a pass/fail verdict without mutating any state.
+      description: Validate that an execution can be restarted from the given failure points. Checks execution state, failure-point eligibility, converge-mootness, the retained-version guard, and the sanitized-output guard. Returns a pass/fail verdict without mutating any state.
       operationId: validate_restart_from_failure
       tags:
         - Executions
@@ -35440,24 +35440,23 @@ components:
             type: string
           title: Failure Point Ids
           description: Normalized failure points validated
-        changed_node_ids:
-          type: array
-          items:
-            type: string
-          title: Changed Node Ids
-          description: Upstream nodes whose definition changed (empty when eligible)
         sanitized_node_ids:
           type: array
           items:
             type: string
           title: Sanitized Node Ids
           description: Upstream nodes with sanitized stored outputs referenced on the restart path
-        truncated_node_ids:
-          type: array
-          items:
-            type: string
-          title: Truncated Node Ids
-          description: Upstream nodes with truncated stored outputs referenced on the restart path
+        step_count_by_failure_point:
+          type: object
+          additionalProperties:
+            type: integer
+          title: Step Count By Failure Point
+          description: Re-run step count for each selected failure point, computed against the retained version
+        total_step_count:
+          type: integer
+          title: Total Step Count
+          default: 0
+          description: Deduplicated total step count across the whole selection, computed against the retained version
     TestExecutionCreate:
       type: object
       title: TestExecutionCreate
