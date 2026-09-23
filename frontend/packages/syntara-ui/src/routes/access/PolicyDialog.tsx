@@ -23,10 +23,7 @@ import { SynSelect } from '../../components/SynSelect'
 import { invalidateAuthzCaches } from '../../hooks/invalidateAuthzCaches'
 import { useSynForm } from '../../hooks/useSynForm'
 import { useAlerts } from '../../providers/alerts'
-import {
-  addProjectPolicySchema,
-  policyStatementSchema,
-} from '../access-management/projects/addProjectPolicySchema'
+import { addProjectPolicySchema, policyStatementSchema } from '../access-management/projects/addProjectPolicySchema'
 import { PolicyFormFields } from '../access-management/projects/PolicyFormFields'
 
 import { accessClient } from './accessClient'
@@ -196,7 +193,8 @@ export function PolicyDialog({ policy, projectNameMap, onClose, onSuccess }: Rea
           <SynForm form={form}>
             {policy ? (
               <Content>
-                Scope: {policy.project_id ? `Project ${projectNameMap.get(policy.project_id) ?? policy.project_id}` : 'System'}
+                Scope:{' '}
+                {policy.project_id ? `Project ${projectNameMap.get(policy.project_id) ?? policy.project_id}` : 'System'}
               </Content>
             ) : (
               <PolicyScopeFields
@@ -222,7 +220,9 @@ export function PolicyDialog({ policy, projectNameMap, onClose, onSuccess }: Rea
         <Button variant="primary" form="global-policy-form" type="submit" isLoading={isPending} isDisabled={isPending}>
           {mode === 'create' ? 'Create' : 'Save policy'}
         </Button>
-        <Button variant="link" onClick={handleClose} isDisabled={isPending}>Cancel</Button>
+        <Button variant="link" onClick={handleClose} isDisabled={isPending}>
+          Cancel
+        </Button>
       </ModalFooter>
     </Modal>
   )

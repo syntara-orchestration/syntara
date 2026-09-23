@@ -35,7 +35,9 @@ const { mockPolicyPermissions } = vi.hoisted(() => ({
 vi.mock('./usePolicyPermissions', () => ({ usePolicyPermissions: () => mockPolicyPermissions }))
 
 vi.mock('./PolicyDialog', () => ({
-  PolicyDialog: ({ policy }: { policy?: PolicyRead }) => <div role="dialog">{policy ? 'Edit policy dialog' : 'Create policy dialog'}</div>,
+  PolicyDialog: ({ policy }: { policy?: PolicyRead }) => (
+    <div role="dialog">{policy ? 'Edit policy dialog' : 'Create policy dialog'}</div>
+  ),
 }))
 
 vi.mock('./useProjectNameMap', () => ({
