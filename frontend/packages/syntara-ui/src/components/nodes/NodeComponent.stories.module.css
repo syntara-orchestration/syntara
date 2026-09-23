@@ -4,23 +4,12 @@
   background: var(--pf-t--global--background--color--secondary--default);
 }
 
-.comparisonGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(22.5rem, 1fr));
-  gap: var(--pf-t--global--spacer--2xl);
-  align-items: start;
-}
-
+.comparisonGrid,
 .gallery {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(22.5rem, 1fr));
   gap: var(--pf-t--global--spacer--2xl);
   align-items: start;
-}
-
-.gallerySection {
-  display: grid;
-  gap: var(--pf-t--global--spacer--lg);
 }
 
 .nodeExample {

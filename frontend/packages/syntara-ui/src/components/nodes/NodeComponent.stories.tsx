@@ -5,7 +5,6 @@ import { ReactFlow, type Node, type NodeProps } from '@xyflow/react'
 import { userEvent } from 'storybook/test'
 
 import { FlowNodeType } from '../../constants'
-import { ACTIVITY_STATUS } from '../../routes/builder/utils/executionState/executionHelpers'
 import { StandardNodeHeader } from '../../routes/workflows/canvas/nodes/common/StandardNodeHeader'
 import { NODE_TYPE_COLORS } from '../../routes/workflows/canvas/nodeTypeColors'
 
@@ -13,6 +12,7 @@ import { NodeBody } from './NodeBody'
 import { NodeComponent } from './NodeComponent'
 import {
   createNodeProps,
+  EXECUTION_STATES,
   MENU_ACTIONS,
   NodeExample,
   NodeStoryCanvas,
@@ -22,8 +22,6 @@ import styles from './NodeComponent.stories.module.css'
 import { NodeExpandToggle } from './NodeExpandToggle'
 import { NodeHeader } from './NodeHeader'
 import { NodeTitle } from './NodeTitle'
-
-const executionStatuses = Object.values(ACTIVITY_STATUS)
 
 type NodeStoryParameters = {
   storyCanvas?: { minimumHeight?: number }
@@ -76,7 +74,7 @@ const meta: Meta<typeof NodeComponent> = {
           '`NodeExpandToggle`, `NodeTitle`, `NodeMenu`, and `NodeBody` to build a complete node. ' +
           'State owned by the workflow node belongs in `nodeProps.data` (for example `settings.disabled`, ' +
           '`__validationError`, and `metadata.__mockDataPinned`); visual layout options belong on `NodeComponent`. ' +
-          'The Kitchen Sink is the fixed visual inventory for supported global-node states.',
+          'The Inventory story is the fixed visual inventory for supported global-node states.',
       },
     },
   },
@@ -162,11 +160,11 @@ export const ExecutionStates: Story = {
   parameters: { storyCanvas: { minimumHeight: 640 } },
   render: () => (
     <div className={styles.gallery}>
-      {executionStatuses.map((status) => (
+      {EXECUTION_STATES.map(({ status, retry_count }) => (
         <NodeExample key={status} label={status}>
           <NodeComponent
             nodeProps={createNodeProps({ id: `execution-${status}`, name: `${status} task` })}
-            executionState={{ status, retry_count: status === ACTIVITY_STATUS.RETRYING ? 2 : undefined }}
+            executionState={{ status, retry_count }}
             topBarColor={NODE_TYPE_COLORS.actionScript}
           >
             <NodeHeader>
@@ -342,7 +340,7 @@ export const Handles: Story = {
           </NodeHeader>
         </NodeComponent>
       </NodeExample>
-      <NodeExample label="Start and end handles">
+      <NodeExample label="Visible start handle; hidden loop-end target">
         <NodeComponent
           nodeProps={createNodeProps({ id: 'handles-start-end' })}
           enableStart
@@ -350,7 +348,7 @@ export const Handles: Story = {
           topBarColor={NODE_TYPE_COLORS.logic}
         >
           <NodeHeader>
-            <NodeTitle title="Start and end handles" />
+            <NodeTitle title="Loop start and end target" />
           </NodeHeader>
         </NodeComponent>
       </NodeExample>

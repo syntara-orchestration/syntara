@@ -2,16 +2,21 @@ import { Content, ContentVariants, Flex, FlexItem, Stack, StackItem, Title, Titl
 import { RhUiWarningFillIcon } from '@patternfly/react-icons'
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import { ExecutorTypeEnum } from '@syntara/contracts'
-import { userEvent } from 'storybook/test'
+import { userEvent, within } from 'storybook/test'
 
 import { FlowNodeType } from '../../constants'
-import { ACTIVITY_STATUS } from '../../routes/builder/utils/executionState/executionHelpers'
 import { StandardNodeHeader } from '../../routes/workflows/canvas/nodes/common/StandardNodeHeader'
 import { NODE_TYPE_COLORS } from '../../routes/workflows/canvas/nodeTypeColors'
 
 import { NodeBody } from './NodeBody'
 import { NodeComponent } from './NodeComponent'
-import { createNodeProps, MENU_ACTIONS, NodeExample, NodeStoryCanvas } from './NodeComponent.stories.helpers'
+import {
+  createNodeProps,
+  EXECUTION_STATES,
+  MENU_ACTIONS,
+  NodeExample,
+  NodeStoryCanvas,
+} from './NodeComponent.stories.helpers'
 import styles from './NodeComponent.stories.module.css'
 
 function NodeComponentInventory() {
@@ -26,7 +31,7 @@ function NodeComponentInventory() {
         <div className={styles.gallery}>
           <NodeExample label="Full composition">
             <NodeComponent
-              nodeProps={createNodeProps({ id: 'kitchen-base' })}
+              nodeProps={createNodeProps({ id: 'inventory-base' })}
               topBarColor={NODE_TYPE_COLORS.actionScript}
             >
               <StandardNodeHeader
@@ -35,11 +40,16 @@ function NodeComponentInventory() {
                 subtitle="Script task"
                 title="Run inventory synchronization"
               />
+              <NodeBody>
+                <Content component={ContentVariants.small}>
+                  Synchronize inventory across the selected managed hosts.
+                </Content>
+              </NodeBody>
             </NodeComponent>
           </NodeExample>
           <NodeExample label="Selected dashed placeholder">
             <NodeComponent
-              nodeProps={createNodeProps({ id: 'kitchen-selected', selected: true, type: FlowNodeType.GENERIC })}
+              nodeProps={createNodeProps({ id: 'inventory-selected', selected: true, type: FlowNodeType.GENERIC })}
               hasDashedBorder
             >
               <StandardNodeHeader title="Selected placeholder" />
@@ -48,7 +58,7 @@ function NodeComponentInventory() {
           <NodeExample label="Disabled validation error with mock data pinned">
             <NodeComponent
               nodeProps={createNodeProps({
-                id: 'kitchen-disabled-invalid',
+                id: 'inventory-disabled-invalid',
                 data: { settings: { disabled: true }, __validationError: true, metadata: { __mockDataPinned: true } },
               })}
               topBarColor={NODE_TYPE_COLORS.logic}
@@ -56,9 +66,9 @@ function NodeComponentInventory() {
               <StandardNodeHeader title="Invalid pinned condition" />
             </NodeComponent>
           </NodeExample>
-          <NodeExample label="Collapsed content">
+          <NodeExample label="Collapsed content" testId="collapsed-content-example">
             <NodeComponent
-              nodeProps={createNodeProps({ id: 'kitchen-collapsed' })}
+              nodeProps={createNodeProps({ id: 'inventory-collapsed' })}
               topBarColor={NODE_TYPE_COLORS.actionScript}
             >
               <StandardNodeHeader expandable title="Collapsed task" />
@@ -69,7 +79,7 @@ function NodeComponentInventory() {
           </NodeExample>
           <NodeExample label="Generic wide node">
             <NodeComponent
-              nodeProps={createNodeProps({ id: 'kitchen-generic', type: FlowNodeType.GENERIC })}
+              nodeProps={createNodeProps({ id: 'inventory-generic', type: FlowNodeType.GENERIC })}
               hasDashedBorder
             >
               <StandardNodeHeader title="Generic placeholder" />
@@ -77,15 +87,15 @@ function NodeComponentInventory() {
           </NodeExample>
           <NodeExample label="Agentic wide task">
             <NodeComponent
-              nodeProps={createNodeProps({ id: 'kitchen-agentic', data: { type: ExecutorTypeEnum.AGENTIC } })}
+              nodeProps={createNodeProps({ id: 'inventory-agentic', data: { type: ExecutorTypeEnum.AGENTIC } })}
               topBarColor={NODE_TYPE_COLORS.actionAgentic}
             >
               <StandardNodeHeader title="Agentic task" />
             </NodeComponent>
           </NodeExample>
-          <NodeExample label="Reversed start and end handles">
+          <NodeExample label="Reversed source/target; visible start and hidden end">
             <NodeComponent
-              nodeProps={createNodeProps({ id: 'kitchen-handles' })}
+              nodeProps={createNodeProps({ id: 'inventory-handles' })}
               enableEnd
               enableStart
               reverseHandles
@@ -98,22 +108,25 @@ function NodeComponentInventory() {
             <NodeComponent
               disableSource
               disableTarget
-              nodeProps={createNodeProps({ id: 'kitchen-no-handles' })}
+              nodeProps={createNodeProps({ id: 'inventory-no-handles' })}
               topBarColor={NODE_TYPE_COLORS.logic}
             >
               <StandardNodeHeader title="No handles" />
             </NodeComponent>
           </NodeExample>
           <NodeExample label="Subtitle-only title">
-            <NodeComponent nodeProps={createNodeProps({ id: 'kitchen-subtitle' })} topBarColor={NODE_TYPE_COLORS.logic}>
+            <NodeComponent
+              nodeProps={createNodeProps({ id: 'inventory-subtitle' })}
+              topBarColor={NODE_TYPE_COLORS.logic}
+            >
               <StandardNodeHeader subtitle="Fallback title from subtitle" />
             </NodeComponent>
           </NodeExample>
-          {Object.values(ACTIVITY_STATUS).map((status) => (
+          {EXECUTION_STATES.map(({ status, retry_count }) => (
             <NodeExample key={status} label={`${status} execution state`}>
               <NodeComponent
-                executionState={{ status, retry_count: status === ACTIVITY_STATUS.RETRYING ? 2 : undefined }}
-                nodeProps={createNodeProps({ id: `kitchen-${status}`, name: `${status} task` })}
+                executionState={{ status, retry_count }}
+                nodeProps={createNodeProps({ id: `inventory-${status}`, name: `${status} task` })}
                 topBarColor={NODE_TYPE_COLORS.actionScript}
               >
                 <StandardNodeHeader title={`${status} task`} />
@@ -155,7 +168,7 @@ type Story = StoryObj<typeof meta>
 export const Inventory: Story = {
   render: () => <NodeComponentInventory />,
   play: async ({ canvas }) => {
-    const [collapsedToggle] = canvas.getAllByRole('button', { name: 'Collapse step details' })
-    if (collapsedToggle) await userEvent.click(collapsedToggle)
+    const collapsedExample = within(canvas.getByTestId('collapsed-content-example'))
+    await userEvent.click(collapsedExample.getByRole('button', { name: 'Collapse step details' }))
   },
 }

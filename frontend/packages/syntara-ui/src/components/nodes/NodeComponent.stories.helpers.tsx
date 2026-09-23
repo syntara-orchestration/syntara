@@ -5,6 +5,7 @@ import { Background, BackgroundVariant, Position, ReactFlow } from '@xyflow/reac
 import { useCallback, useState, type ReactNode } from 'react'
 
 import { FlowNodeType } from '../../constants'
+import { ACTIVITY_STATUS } from '../../routes/builder/utils/executionState/executionHelpers'
 
 import styles from './NodeComponent.stories.module.css'
 
@@ -15,6 +16,11 @@ export const MENU_ACTIONS = [
   { id: 'separator', label: '', onClick: () => undefined, separator: true },
   { id: 'delete', label: 'Delete', onClick: () => undefined, icon: <RhUiTrashIcon />, variant: 'danger' as const },
 ]
+
+export const EXECUTION_STATES = Object.values(ACTIVITY_STATUS).map((status) => ({
+  status,
+  retry_count: status === ACTIVITY_STATUS.RETRYING ? 2 : undefined,
+}))
 
 /** Minimal workflow data used to render `NodeComponent` states outside a builder canvas. */
 export type StoryNodeData = Record<string, unknown> & {
@@ -126,9 +132,13 @@ export function NodeStoryCanvas({
 }
 
 /** Adds a concise visible label to an individual state in a node-story gallery. */
-export function NodeExample({ label, children }: Readonly<{ label: string; children: ReactNode }>) {
+export function NodeExample({
+  label,
+  children,
+  testId,
+}: Readonly<{ label: string; children: ReactNode; testId?: string }>) {
   return (
-    <div className={styles.nodeExample}>
+    <div className={styles.nodeExample} data-testid={testId}>
       <Content component={ContentVariants.small} className={styles.nodeLabel}>
         {label}
       </Content>
