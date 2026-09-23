@@ -19,6 +19,11 @@ Matching, default routing, and ineligibility reasons live in the
 re-specify that algorithm. It exists because review of that design
 showed the *vocabulary* and *ownership* of labels were still ambiguous.
 
+Worked inventories (empty selectors, `region` / `env`, volume
+mounts, OpenShell) are in [examples/](examples/). Key names in those
+files are for readability; they are not the final field or label
+vocabulary.
+
 It does not specify Automation Orchestrator (AO) UI, Execution Profile
 combination rules, or how Project / Workflow / Node objects store
 affinity. Those are AO concerns. They must produce a single selector
@@ -69,7 +74,7 @@ not interchangeable.
 | **Selector** | A `key → string value` required by a work item. Every requested key must exist on the target with that exact value. |
 | **Natural label** | Written by provisioning / discovery from facts about the target (cluster type, cluster identity, observed region). |
 | **User label** | Written by an administrator (or later a designer-facing control) to express intent the platform cannot infer. |
-| **Reserved key** | A key the EP itself interprets (today: `execution-plane/default`). |
+| **Reserved key** | A key the EP itself interprets. Default routing does **not** use a label; it uses `ExecutionTarget.is_default`. |
 
 This is **not** the Syntara / AO `BaseResource.labels` column used for
 list filters, RBAC policy, and resource tagging. See
@@ -85,8 +90,9 @@ requires the reconciler to understand live infrastructure.
 |---|---|---|
 | Lifecycle (`active`, `degraded`, …) and `enabled` | Discrete fields on Cluster / ExecutionTarget; `IneligibilityReason` | A closed enum stays typed; stuffing status into labels loses that. |
 | Live capacity, health, network reachability | Resource Monitor ([AAP-92724](https://redhat.atlassian.net/browse/AAP-92724)) | Eligibility that depends on current load is a filter, not a static advertisement. |
-| Isolation policy | Isolation Policy ([AAP-92726](https://redhat.atlassian.net/browse/AAP-92726)), via `workload_type` | Policy is not a key-value subset match. |
-| Volume mounts, CPU/memory requests as *live* resources | Work payload / Worker Manager; Extension metadata | The reconciler must not inspect volume or network *state* of a target in order to match. A static capability such as "this target can mount volumes" is a later label *if* routing needs it; constructing the mount is execution, not placement. |
+| Isolation / sandbox policy | Isolation Policy ([AAP-92726](https://redhat.atlassian.net/browse/AAP-92726)); work payload and target `default_policies` | Policy is not a key-value subset match. Extra sandbox constraints travel on the work payload; a target may hold baseline policy. See [example 03](examples/03-openshell-sandbox-policy.md). |
+| Volume mounts, CPU/memory requests as *live* resources | Work payload / Worker Manager; Extension metadata | The reconciler must not inspect volume or network *state* of a target in order to match. Constructing the mount is execution, not placement. See [example 02](examples/02-volume-mount.md). |
+| Default ExecutionTarget identity | `ExecutionTarget.is_default` | A boolean field, not a label. Empty work selectors take default routing. |
 | Kubernetes pod template fields | Worker Manager / backend integration | Affinity labels are not copied onto pods unless a backend explicitly maps a reserved key. |
 | AO object identity (project, workflow, node) as EP-interpreted keys | AO, when it builds the selector map | EP does not know what a Project is. AO *may* put `project_id=…` on work if an admin also labelled a target that way; EP still treats it as an opaque string match. |
 
@@ -140,7 +146,8 @@ backend understands.
 
 Labels that are true of the whole environment live on the Cluster
 (region, cluster identity). Labels that are true of one place live on
-the ExecutionTarget (`gpu=true`, `execution-plane/default=true`).
+the ExecutionTarget (`gpu=true`, `env=production`). The Cluster's
+protected default is `is_default`, not a label.
 
 Matching uses one map. For each ExecutionTarget the reconciler builds
 **effective labels**: start from `Cluster.labels`, then overlay
@@ -159,8 +166,11 @@ effective labels:        { region: us-east-1, cluster: prod-a, gpu: true }
 `cluster_type` and connection secrets stay discrete Cluster fields;
 `backend_type` stays a discrete ExecutionTarget field. They are how
 the Worker Manager is selected and how it connects, not how work is
-matched. Those values may also be copied into labels if work needs to
-select on them.
+matched. Copy the value onto labels when work must select a
+non-default backend (for example `backend_type=openshell` in
+[example 03](examples/03-openshell-sandbox-policy.md)). Matching still
+uses the label map; the discrete field still selects the Worker
+Manager after the target is chosen.
 
 ## How selectors get onto work
 
@@ -217,11 +227,12 @@ Summary only; the algorithm is in the
    (soft) affinities. Preferred-then-sort is a later addition: still
    filter on required keys, then order in memory.
 
-Every Cluster has a default ExecutionTarget, advertised with
-`execution-plane/default=true`. That target is the cold-start fallback
-for the cluster. One default per container image is **not** required;
-the default is image-agnostic cold-start unless we later decide
-otherwise.
+Every Cluster has a default ExecutionTarget (`is_default=True`). That
+target is the cold-start fallback for the cluster. One default per
+container image is **not** required; the default is image-agnostic
+cold-start unless we later decide otherwise. The image comes from the
+activity type on the work payload, not from a required selector. See
+[example 00](examples/00-one-workload-default-target.md).
 
 Required selectors and the default target are in tension: a required
 key the default does not carry will not select the default. Work then
@@ -235,25 +246,26 @@ Exact vocabulary is not frozen. Keys should be namespaced so natural
 and user values for the same concept do not collide:
 
 ```
-system/region          = us-east-1
-user/region            = NorthAmerica
-execution-plane/default = true
+system/region = us-east-1
+user/region   = NorthAmerica
 ```
 
 | Prefix | Owner | Example |
 |---|---|---|
-| `execution-plane/` | EP | `execution-plane/default=true` |
 | `system/` | Provisioning / discovery | `system/region`, cluster identity |
 | `user/` | Administrator | `user/region`, `user/gpu` |
 
 Until a vocabulary list lands, treat any other key as an opaque
-string. The reconciler does not interpret key names except
-`execution-plane/default` (default routing). Cluster identity is a
+string. The reconciler does not interpret key names. Default routing
+uses `is_default`, not a reserved label. Cluster identity is a
 Cluster label like any other; it is not a reserved matcher key.
 
+The keys used in [examples/](examples/) (`region`, `env`,
+`backend_type`) are the same: readable stand-ins, not the final
+names.
+
 Prohibit (in API/UI validation, not in the matcher) user writes to
-`system/` and `execution-plane/` so natural keys stay owned by
-provisioning.
+`system/` so natural keys stay owned by provisioning.
 
 ## Relationship to AO resource labels
 
@@ -323,9 +335,13 @@ or the ExecutionTarget relationship above.
 
 ## Coordination
 
+- **[examples/](examples/):** concrete WorkItem, Cluster, and
+  ExecutionTarget inventories for default routing, `region` / `env`,
+  volume mounts, and OpenShell.
 - **[ExecutionTarget Reconciler](executiontarget-reconciler.md):** matcher, default
   routing, lifecycle filter. Reads `ClusterSnapshot.labels` and
   `ExecutionTargetSnapshot.labels` as opaque `dict[str, str]`.
+  Default routing uses `is_default`, not a label.
 - **AAP-92716 (Cluster / ExecutionTarget Registry):** persist labels;
   auto-label on provision; preserve user keys when natural facts
   change.
