@@ -1,4 +1,5 @@
 ---
+name: backend-fix-api-spec-drift
 description: "Detect and interactively fix OpenAPI spec drift between sub-schemas and the implementation."
 ---
 
