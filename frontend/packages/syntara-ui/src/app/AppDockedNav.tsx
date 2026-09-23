@@ -1,4 +1,5 @@
 import {
+  Avatar,
   Brand,
   Button,
   CompassDockMain,
@@ -24,12 +25,7 @@ import {
   Tooltip,
 } from '@patternfly/react-core'
 import type { MenuToggleElement } from '@patternfly/react-core'
-import {
-  RhUiDarkModeIcon,
-  RhUiLightModeIcon,
-  RhUiProfileFillIcon,
-  RhUiQuestionMarkCircleIcon,
-} from '@patternfly/react-icons'
+import { RhUiDarkModeIcon, RhUiLightModeIcon, RhUiQuestionMarkCircleIcon } from '@patternfly/react-icons'
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useMemo, useRef, useState } from 'react'
 
@@ -91,6 +87,10 @@ function openExternalDoc(url: string) {
   globalThis.open(url, '_blank', 'noopener,noreferrer')
 }
 
+function getAvatarInitial(username: string): string {
+  return username.charAt(0).toUpperCase()
+}
+
 function getNavGroupId(itemPath: string): string {
   return `nav-expandable-${itemPath.replaceAll('/', '-')}`
 }
@@ -148,12 +148,20 @@ function NavExpandableItem({
   /* v8 ignore stop */
 }
 
-function UserMenuDropdown() {
+function UserMenuDropdown({
+  isTextExpanded,
+  showTooltip,
+}: Readonly<{
+  isTextExpanded: boolean
+  showTooltip: boolean
+}>) {
   const [isOpen, setIsOpen] = useState(false)
+  const userMenuRef = useRef<MenuToggleElement>(null)
   const navigate = useNavigate()
   const logout = useAuthStore((s) => s.logout)
   const { showAlert } = useAlerts()
   const { data: currentUser } = authClient.useQuery('get', '/auth/me')
+  const username = currentUser?.username ?? 'User'
 
   const handleLogoutClick = () => {
     setIsOpen(false)
@@ -172,41 +180,53 @@ function UserMenuDropdown() {
   /* v8 ignore start -- phantom branches from compiled JSX props */
   const toggle = (dropdownRef: React.Ref<MenuToggleElement>) => (
     <MenuToggle
-      ref={dropdownRef}
+      ref={(element) => {
+        userMenuRef.current = element
+        if (typeof dropdownRef === 'function') {
+          dropdownRef(element)
+        } else if (dropdownRef) {
+          dropdownRef.current = element
+        }
+      }}
       isExpanded={isOpen}
       variant="plain"
-      icon={<RhUiProfileFillIcon />}
+      icon={<Avatar alt="" size="sm" color="gray" initials={getAvatarInitial(username)} />}
       isDocked
+      isTextExpanded={isTextExpanded}
       aria-label="User menu"
       onClick={() => setIsOpen(!isOpen)}
-      onMouseEnter={() => setIsOpen(true)}
     >
-      {currentUser?.username ?? 'User'}
+      {username}
     </MenuToggle>
   )
 
   return (
-    <Dropdown
-      isOpen={isOpen}
-      onOpenChange={setIsOpen}
-      toggle={toggle}
-      popperProps={{ position: 'right', preventOverflow: true }}
-    >
-      <DropdownList>
-        <DropdownItem
-          key="profile"
-          onClick={() => {
-            detachPromise(navigate({ to: AppRoute.MyProfile.Root }))
-            setIsOpen(false)
-          }}
-        >
-          My Profile
-        </DropdownItem>
-        <DropdownItem key="logout" onClick={handleLogoutClick}>
-          Logout
-        </DropdownItem>
-      </DropdownList>
-    </Dropdown>
+    <>
+      <Dropdown
+        isOpen={isOpen}
+        onOpenChange={setIsOpen}
+        toggle={toggle}
+        popperProps={{ placement: 'right-start', preventOverflow: true, enableFlip: false }}
+      >
+        <DropdownList>
+          <DropdownItem
+            key="profile"
+            onClick={() => {
+              detachPromise(navigate({ to: AppRoute.MyProfile.Root }))
+              setIsOpen(false)
+            }}
+          >
+            My Profile
+          </DropdownItem>
+          <DropdownItem key="logout" onClick={handleLogoutClick}>
+            Logout
+          </DropdownItem>
+        </DropdownList>
+      </Dropdown>
+      {showTooltip && (
+        <Tooltip aria="none" aria-live="off" triggerRef={userMenuRef} content={username} position="right" />
+      )}
+    </>
   )
   /* v8 ignore stop */
 }
@@ -376,7 +396,7 @@ export function AppDockedNav() {
                   </Button>
                 </ToolbarItem>
                 <ToolbarItem>
-                  <UserMenuDropdown />
+                  <UserMenuDropdown isTextExpanded={isDockTextExpanded} showTooltip={showTooltips} />
                 </ToolbarItem>
               </ToolbarGroup>
             </ToolbarContent>

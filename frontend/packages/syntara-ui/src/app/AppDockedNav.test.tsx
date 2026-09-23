@@ -405,9 +405,10 @@ describe('AppDockedNav', () => {
       expect(screen.getByText('Documentation')).toBeInTheDocument()
     })
 
-    it('does not apply icon-only nav styles when mobile overlay is expanded', () => {
+    it('does not use icon-only nav presentation when mobile overlay is expanded', () => {
       renderDockedNav()
-      expect(screen.getByRole('navigation', { name: 'Main navigation' })).not.toHaveClass(styles.iconDockNav)
+      expect(screen.getByRole('button', { name: 'Configuration' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'System Administration' })).toBeInTheDocument()
     })
 
     it('renders expandable nav groups when dock is expanded on mobile', () => {
