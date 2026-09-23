@@ -325,7 +325,7 @@ class NodeSettingsNoRetry(NodeSettingsCofDisabled):
     expected_duration: int | None = Field(
         default=None,
         ge=1,
-        description="Expected duration in seconds. Nodes running longer are flagged as stalled. Independent of timeout.",
+        description="Expected duration in seconds. Nodes running longer are flagged as stalled.",
     )
 
 

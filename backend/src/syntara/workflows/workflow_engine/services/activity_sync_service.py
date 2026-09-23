@@ -2818,9 +2818,7 @@ class ActivitySyncService:
                     node_settings = activity_def.get("settings") or {}
                     raw_expected_duration = node_settings.get("expected_duration")
                     expected_duration: int | None = (
-                        int(raw_expected_duration)
-                        if raw_expected_duration is not None
-                        else None
+                        int(raw_expected_duration) if raw_expected_duration is not None else None
                     )
 
                     new_activity = ActivityExecution(
