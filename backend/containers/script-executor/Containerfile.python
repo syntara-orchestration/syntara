@@ -1,0 +1,22 @@
+FROM golang:1.24-alpine AS runner-build
+WORKDIR /src
+COPY runner/go.mod ./
+COPY runner/main.go ./
+RUN CGO_ENABLED=0 go build -trimpath -ldflags='-s -w -X main.runtimeLanguage=python' -o /script-executor .
+
+# Distroless Python includes only the interpreter and standard library: no pip,
+# compiler, shell, or OS package manager is available at runtime.
+FROM gcr.io/distroless/python3-debian12:nonroot
+COPY --from=runner-build /script-executor /usr/local/bin/script-executor
+USER nonroot:nonroot
+ENV PATH=/usr/bin:/bin \
+    HOME=/nonexistent \
+    TMPDIR=/nonexistent \
+    TMP=/nonexistent \
+    TEMP=/nonexistent \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONNOUSERSITE=1 \
+    SCRIPT_EXECUTOR_KEEP_ALIVE=false \
+    SCRIPT_EXECUTOR_MAX_TIMEOUT_SECONDS=300 \
+    SCRIPT_EXECUTOR_MAX_OUTPUT_BYTES=1048576
+ENTRYPOINT ["/usr/local/bin/script-executor"]

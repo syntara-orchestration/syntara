@@ -12,6 +12,32 @@ The detected ROSA API endpoint for this environment is
 `https://api.pde-ao-03.cjjv.p3.openshiftapps.com:443`. Use the endpoint returned
 by `oc whoami --show-server`; ROSA does not require changing it to port 6443.
 
+## Build or reuse executor images
+
+The HTTP and Python executor source is included in this branch under
+`backend/containers/` and `backend/src/syntara/http_executor/`. The existing
+demo tags are `quay.io/ahetheri/http-executor:amd64` and
+`quay.io/ahetheri/script-python-executor:amd64`. Teammates with pull access
+can reuse them. To publish your own images for AMD64 OpenShift nodes, replace
+`quay.io/YOUR_ORG` below with a registry location you can push and pull:
+
+```bash
+docker buildx build --platform linux/amd64 --push \
+  -f backend/containers/http-executor/Containerfile \
+  -t quay.io/YOUR_ORG/http-executor:amd64 backend
+docker buildx build --platform linux/amd64 --push \
+  -f backend/containers/script-executor/Containerfile.python \
+  -t quay.io/YOUR_ORG/script-python-executor:amd64 backend/containers/script-executor
+export APP_EP_HTTP_EXECUTOR_IMAGE=quay.io/YOUR_ORG/http-executor:amd64
+export APP_EP_SCRIPT_PYTHON_EXECUTOR_IMAGE=quay.io/YOUR_ORG/script-python-executor:amd64
+```
+
+For private images, use a registry robot with pull access. The setup script
+reads its token from a local file and creates the namespace's image-pull Secret;
+no registry password belongs in Git. The Bash image source is also included,
+but Bash workflow nodes remain disabled in this POC until its Quay repository
+grants the robot Read access and `APP_EP_SCRIPT_BASH_EXECUTOR_IMAGE` is set.
+
 ## One-time setup
 
 From the repository root:
