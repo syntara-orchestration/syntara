@@ -37,7 +37,7 @@ def _check_disallowed_components(
 
     if not allow_path and parsed.path and parsed.path != "/":
         msg = (
-            f"{label} must not contain a path. Use only scheme://hostname[:port], e.g., https://controller.example.com"
+            f"{label} must not contain a path. Use only scheme://hostname[:port], e.g., https://gateway.aap.example.com"
         )
         raise ValueError(msg)
 
