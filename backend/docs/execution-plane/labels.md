@@ -190,7 +190,7 @@ Sources AO may combine **before** that map exists:
 | Source | Typical keys | Notes |
 |---|---|---|
 | Extension registry ([ANSTRAT-2422](https://redhat.atlassian.net/browse/ANSTRAT-2422)) | container image (if treated as a selector) | Built-in node types are Extensions; the image comes from the Extension, not from the author typing a digest. |
-| Execution Profile or node routing controls | `region`, `gpu`, similar | What Ron called routing selectors. |
+| Execution Profile or node routing controls | `region`, `gpu`, similar | routing selectors as defined during PoC. |
 | Future project / org / system defaults | same shape | Combination rules are an AO design. EP only sees the result. |
 
 ### What "global labels only" means
