@@ -26,6 +26,7 @@ There is **no hook-based enforcement** in upstream. The replacement is
 | --- | --- |
 | `CLAUDE.md`, `AGENTS.md`, and component `CLAUDE.md` / `AGENTS.md` | On-demand agent instructions |
 | `.claude/skills/**` | Skill documents maintainers choose to ship |
+| `.agents/skills/**` | Tracked repository symlinks to the canonical `.claude/skills/**` |
 | `.claude/commands/**` (when present) | Slash-command prompts as markdown |
 
 Skills and commands are documentation loaded by the agent. They are **not**
@@ -54,7 +55,7 @@ Do not force-add ignored agent settings or hooks in a pull request.
 | --- | --- |
 | This policy (`.github/AI_AGENT_POLICY.md`) | `@syntara-orchestration/syntara-leads` (see [CODEOWNERS](CODEOWNERS)) |
 | Root / component `CLAUDE.md`, `AGENTS.md` | Same reviewers as the area of the change; treat policy-affecting edits as governance |
-| `.claude/skills/**` | Owning product team per [CODEOWNERS](CODEOWNERS) (for example UX owns the PatternFly UX skill) |
+| `.claude/skills/**` and `.agents/skills/**` | Owning product team per [CODEOWNERS]; `.agents/skills/**` links to `.claude/skills/**` |
 | Re-introducing hooks or shipping `settings.json` | **Not permitted** under this policy. Requires an explicit policy revision reviewed by `@syntara-orchestration/syntara-leads` |
 
 ### Review bar for skill and instruction changes
@@ -72,6 +73,11 @@ Pull requests that change shared agent skills or instruction files should:
 **This repository is the source of truth for the shared skills under
 `.claude/skills/`.** They stay here so any contributor's agent can load them.
 Do not remove them from this tree in favor of a private copy.
+
+Codex discovers repository skills under `.agents/skills/`. Keep tracked relative
+symlinks there, pointing to the canonical `.claude/skills/` directories. Codex
+follows symlinked skill directories, so contributors get the same workflows
+without maintaining duplicate copies. Keep skill content in `.claude/skills/`.
 
 ### The test (apply before adding or expanding a skill)
 

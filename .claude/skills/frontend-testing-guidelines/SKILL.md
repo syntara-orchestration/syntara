@@ -1,4 +1,5 @@
 ---
+name: frontend-testing-guidelines
 description: "Frontend testing standards — Vitest, Testing Library, vitest-axe, coverage requirements, accessibility testing."
 user-invocable: false
 ---

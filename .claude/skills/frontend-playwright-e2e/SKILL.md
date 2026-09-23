@@ -1,4 +1,5 @@
 ---
+name: frontend-playwright-e2e
 description: "Playwright E2E testing guide — fixtures, patterns, test structure, and best practices for the frontend."
 user-invocable: false
 ---

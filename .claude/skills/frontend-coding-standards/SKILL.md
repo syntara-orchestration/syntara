@@ -1,4 +1,5 @@
 ---
+name: frontend-coding-standards
 description: "Frontend coding standards — PatternFly patterns, API integration, forms, testing, permissions."
 user-invocable: false
 ---

@@ -1,4 +1,5 @@
 ---
+name: frontend-specialist
 description: "Standards for implementing, reviewing, and refactoring frontend code — React 19, TypeScript 5.9+, PatternFly 6, Vitest."
 user-invocable: false
 ---

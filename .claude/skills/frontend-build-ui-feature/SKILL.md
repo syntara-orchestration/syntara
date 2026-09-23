@@ -1,4 +1,5 @@
 ---
+name: frontend-build-ui-feature
 description: "Walk through building a frontend UI feature step by step — gathers requirements, implements, and validates."
 user-invocable: true
 ---

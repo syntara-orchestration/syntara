@@ -1,4 +1,5 @@
 ---
+name: frontend-pr-review
 description: "Comprehensive PR review checklist and validation workflow for frontend code."
 user-invocable: false
 ---
