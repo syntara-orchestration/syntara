@@ -165,6 +165,7 @@ export async function addAgenticNode(page: Page, name: string, prompt = 'Analyze
   const { name: credName } = await ensureLlmCredential(page)
   await openAddNodePanel(page)
   await selectDirectNodeType(page, 'Task Agent')
+  await expectAiAgentNodeFormReady(page)
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
   await selectLlmCredential(page, credName, integrationName)
   await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill(prompt)
@@ -669,4 +670,41 @@ export async function openScheduleTriggerForEditing(page: Page, nodeName: string
   await openSavedNodeForEditing(page, nodeName, async (p) => {
     await expect(p.getByLabel('Schedule expression', { exact: true })).toBeVisible({ timeout: 5_000 })
   })
+}
+
+// ---------------------------------------------------------------------------
+// Task Agent (AI Agent)
+// ---------------------------------------------------------------------------
+
+/** Wait until the Task Agent create/edit form and model control have hydrated. */
+export async function expectAiAgentNodeFormReady(page: Page) {
+  await expect(page.getByTestId('ai-agent-node-form')).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByRole('button', { name: 'Model', exact: true })).toBeEnabled({ timeout: 15_000 })
+}
+
+/** Open Task Agent from the add-node panel and wait for the form. */
+export async function openTaskAgentNodeCreateForm(page: Page) {
+  const panel = await clickAddConnectedStep(page)
+  await panel.getByRole('button', { name: 'Task Agent' }).click()
+  await expectAiAgentNodeFormReady(page)
+}
+
+/** Open a saved Task Agent node on the canvas for editing. */
+export async function openAiAgentNodeForEditing(page: Page, nodeName: string) {
+  await openSavedNodeForEditing(page, nodeName, async (p) => {
+    await expect(p.getByTestId('ai-agent-node-form')).toBeVisible({ timeout: 5_000 })
+    await expect(p.getByRole('button', { name: 'Model', exact: true })).toBeEnabled({ timeout: 5_000 })
+  })
+}
+
+/** Open the model picker; retries while integration options load under CI load. */
+export async function openAiAgentModelPicker(page: Page) {
+  const modelToggle = page.getByRole('button', { name: 'Model', exact: true })
+  await expect(async () => {
+    await expect(modelToggle).toBeEnabled({ timeout: 5_000 })
+    await modelToggle.click()
+    await expect(page.getByPlaceholder('Select a model').or(page.locator('[role="option"]').first())).toBeVisible({
+      timeout: 5_000,
+    })
+  }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] })
 }
