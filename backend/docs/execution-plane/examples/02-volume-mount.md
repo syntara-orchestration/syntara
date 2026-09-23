@@ -150,6 +150,7 @@ concern (cold-start vs warm pool), not a reconciler match on a
 |---|---|
 | Empty selectors without a volume | [Example 00](00-one-workload-default-target.md) |
 | `region` / `env` placement | [Example 01](01-select-region-and-env.md) |
+| Selectors that match nothing | [Example 04](04-no-matching-targets.md) |
 | OpenShell sandbox policy | [Example 03](03-openshell-sandbox-policy.md) |
 | `volume-mount` as a label or selector | Not in the EP vocabulary; [open question](../labels.md#open-questions) in labels.md |
 | Warm-pool claim of an already-running pod | Volume mounts are cold-start only |

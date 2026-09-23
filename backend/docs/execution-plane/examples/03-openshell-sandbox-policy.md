@@ -214,6 +214,7 @@ that the default does not carry exclude it. That is intended.
 |---|---|
 | Empty selectors / default routing | [Example 00](00-one-workload-default-target.md) |
 | `region` / `env` placement | [Example 01](01-select-region-and-env.md) |
+| Selectors that match nothing | [Example 04](04-no-matching-targets.md) |
 | Volume mount | [Example 02](02-volume-mount.md) |
 | Isolation Policy DSL vs native OpenShell YAML | Open question on AAP-92726 |
 | `PolicyFilter` as the way to pick OpenShell | AAP-92726; this example uses a selector |

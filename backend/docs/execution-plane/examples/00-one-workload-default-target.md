@@ -17,6 +17,8 @@ selectors (`region`, `env`).
 mount.
 [Example 03](03-openshell-sandbox-policy.md) adds an OpenShell
 ExecutionTarget and a sandbox policy on the payload.
+[Example 04](04-no-matching-targets.md) is example 01 when no target
+matches: the work fails (`NO_MATCHING_TARGETS`).
 
 EP's unit of work is the submitted workload. EP does not read AO
 workflow, node, project, or Execution Profile definitions. AO must
@@ -149,6 +151,7 @@ sequenceDiagram
 | Extra Clusters | [Example 01](01-select-region-and-env.md) |
 | Extra ExecutionTargets / namespaces | [Example 01](01-select-region-and-env.md) |
 | Non-empty `selectors` (`region`, `env`) | [Example 01](01-select-region-and-env.md) |
+| Selectors that match nothing | [Example 04](04-no-matching-targets.md) |
 | Other user labels (`gpu`, team) | Later examples |
 | Volume mount | [Example 02](02-volume-mount.md) |
 | OpenShell sandbox policy | [Example 03](03-openshell-sandbox-policy.md) |
