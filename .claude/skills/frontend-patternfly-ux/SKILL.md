@@ -1,4 +1,5 @@
 ---
+name: frontend-patternfly-ux
 description: "PatternFly 6 UX design system guide — component selection, layout patterns, accessibility, project conventions."
 user-invocable: false
 ---
