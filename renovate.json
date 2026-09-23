@@ -81,7 +81,7 @@
       "enabled": false
     },
     {
-      "description": "Group routine GitHub Actions updates into a single PR. Every external action is SHA-pinned, so each upstream release produces a separate digest update; ungrouped these filled 14 of the 20 PR slots MintMaker allows and starved lockfile maintenance PRs.",
+      "description": "Group routine GitHub Actions updates into a single PR.",
       "matchManagers": ["github-actions"],
       "matchUpdateTypes": ["minor", "patch", "pin", "pinDigest", "digest"],
       "groupName": "github actions",
