@@ -4,10 +4,13 @@ Tests verify that form_prompts are correctly created through the internal
 Forms API endpoint.
 """
 
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import pytest
 from httpx import AsyncClient
+
+from syntara.core.models import User
+from syntara.workflows.models.execution import Execution
 
 FORM_PROMPTS_URL = "/api/v1/form_prompts"
 
@@ -48,10 +51,10 @@ def _form_prompt_payload(
 class TestFormPromptCreateAPI:
     """API integration tests for form_prompt creation."""
 
-    async def test_create_form_prompt_success(self, jwt_client: AsyncClient, test_project_id: UUID) -> None:
+    async def test_create_form_prompt_success(self, jwt_client: AsyncClient, test_execution: Execution) -> None:
         """Create form_prompt returns 201 with prompt ID."""
-        exec_id = uuid4()
-        payload = _form_prompt_payload(exec_id, test_project_id)
+        exec_id = test_execution.id
+        payload = _form_prompt_payload(exec_id, test_execution.project_id)
 
         response = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
 
@@ -63,11 +66,14 @@ class TestFormPromptCreateAPI:
         assert data["status"] == "pending"
 
     async def test_create_form_prompt_with_responders(
-        self, jwt_client: AsyncClient, test_project_id: UUID, test_user
+        self,
+        jwt_client: AsyncClient,
+        test_execution: Execution,
+        test_user: User,
     ) -> None:
         """Create form_prompt with responder_user_ids stores responders."""
-        exec_id = uuid4()
-        payload = _form_prompt_payload(exec_id, test_project_id)
+        exec_id = test_execution.id
+        payload = _form_prompt_payload(exec_id, test_execution.project_id)
         payload["responder_user_ids"] = [str(test_user.id)]
 
         response = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
@@ -76,10 +82,10 @@ class TestFormPromptCreateAPI:
         data = response.json()
         assert data["execution_id"] == str(exec_id)
 
-    async def test_create_form_prompt_with_message(self, jwt_client: AsyncClient, test_project_id: UUID) -> None:
+    async def test_create_form_prompt_with_message(self, jwt_client: AsyncClient, test_execution: Execution) -> None:
         """Create form_prompt with message field succeeds (message not in summary response)."""
-        exec_id = uuid4()
-        payload = _form_prompt_payload(exec_id, test_project_id)
+        exec_id = test_execution.id
+        payload = _form_prompt_payload(exec_id, test_execution.project_id)
         payload["message"] = "Please fill out this form carefully"
 
         response = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
@@ -91,11 +97,13 @@ class TestFormPromptCreateAPI:
         assert data["execution_id"] == str(exec_id)
 
     async def test_create_duplicate_form_prompt_returns_409(
-        self, jwt_client: AsyncClient, test_project_id: UUID
+        self,
+        jwt_client: AsyncClient,
+        test_execution: Execution,
     ) -> None:
         """Creating duplicate form_prompt (same execution_id, prompt_node_id, loop_iteration_path) returns 409."""
-        exec_id = uuid4()
-        payload = _form_prompt_payload(exec_id, test_project_id, prompt_node_id="form1")
+        exec_id = test_execution.id
+        payload = _form_prompt_payload(exec_id, test_execution.project_id, prompt_node_id="form1")
 
         # First request succeeds
         response1 = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
@@ -105,13 +113,13 @@ class TestFormPromptCreateAPI:
         response2 = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
         assert response2.status_code == 409
 
-    async def test_list_form_prompts_by_execution(self, jwt_client: AsyncClient, test_project_id: UUID) -> None:
+    async def test_list_form_prompts_by_execution(self, jwt_client: AsyncClient, test_execution: Execution) -> None:
         """List form_prompts filtered by execution_id returns matching prompts."""
-        exec_id = uuid4()
+        exec_id = test_execution.id
 
         # Create two form_prompts for same execution
-        payload1 = _form_prompt_payload(exec_id, test_project_id, prompt_node_id="form1", name="Form 1")
-        payload2 = _form_prompt_payload(exec_id, test_project_id, prompt_node_id="form2", name="Form 2")
+        payload1 = _form_prompt_payload(exec_id, test_execution.project_id, prompt_node_id="form1", name="Form 1")
+        payload2 = _form_prompt_payload(exec_id, test_execution.project_id, prompt_node_id="form2", name="Form 2")
 
         response1 = await jwt_client.post(FORM_PROMPTS_URL, json=payload1)
         response2 = await jwt_client.post(FORM_PROMPTS_URL, json=payload2)
@@ -130,10 +138,10 @@ class TestFormPromptCreateAPI:
         assert "Form 1" in prompt_names
         assert "Form 2" in prompt_names
 
-    async def test_batch_update_form_prompt_status(self, jwt_client: AsyncClient, test_project_id: UUID) -> None:
+    async def test_batch_update_form_prompt_status(self, jwt_client: AsyncClient, test_execution: Execution) -> None:
         """Batch update form_prompt status via /form_prompts/batch endpoint."""
-        exec_id = uuid4()
-        payload = _form_prompt_payload(exec_id, test_project_id)
+        exec_id = test_execution.id
+        payload = _form_prompt_payload(exec_id, test_execution.project_id)
 
         # Create prompt
         create_response = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
@@ -150,11 +158,13 @@ class TestFormPromptCreateAPI:
         assert batch_result["total_failed"] == 0
 
     async def test_create_form_prompt_with_loop_iteration_path(
-        self, jwt_client: AsyncClient, test_project_id: UUID
+        self,
+        jwt_client: AsyncClient,
+        test_execution: Execution,
     ) -> None:
         """Create form_prompt with loop_iteration_path stores the path."""
-        exec_id = uuid4()
-        payload = _form_prompt_payload(exec_id, test_project_id, loop_iteration_path=[0, 1])
+        exec_id = test_execution.id
+        payload = _form_prompt_payload(exec_id, test_execution.project_id, loop_iteration_path=[0, 1])
 
         response = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
 
