@@ -4,7 +4,7 @@ description: "Playwright E2E testing guide — fixtures, patterns, test structur
 user-invocable: false
 ---
 
-# Claude Skill: Playwright E2E Testing
+# Playwright E2E Testing
 
 Your goal is to author comprehensive, production-grade end-to-end tests using Playwright that follow the project's established patterns and cover critical user workflows.
 
@@ -85,19 +85,19 @@ Override ports if needed:
 SYNTARA_E2E_PORT=5174 SYNTARA_E2E_API_PORT=3301 npm run e2e
 ```
 
-**How the runner works:** `npm run e2e` executes `e2e/run-e2e.ts` via `tsx`, which probes for free ports (preferring 4173 / 3300, falling back to OS-assigned ports) and passes them to Playwright as `SYNTARA_E2E_PORT`, `SYNTARA_E2E_API_PORT`, and `SYNTARA_E2E_BASE_URL`. This means stale processes on the default ports are never silently reused — Playwright always starts fresh servers on confirmed-free ports.
+**How server startup works:** `npm run e2e` invokes Playwright directly. The Playwright config starts the mock API and UI on ports 3300 and 4173 by default; locally it can reuse servers already listening on those ports. Set `SYNTARA_E2E_PORT` and `SYNTARA_E2E_API_PORT` to use different ports.
 
-If you bypass the runner (e.g. `SYNTARA_E2E_SKIP_WEB_SERVER=1`) and manage servers manually, make sure they are configured with `VITE_API_URL=http://localhost:<apiPort>` or API calls will return 404.
+If you set `SYNTARA_E2E_SKIP_WEB_SERVER=1`, the Playwright config will not start either server. Start the UI and API yourself, set `VITE_API_URL=http://localhost:<apiPort>`, and set `SYNTARA_E2E_BASE_URL` to the UI URL.
 
 ### Real Backend Mode
 
 To test against the real Syntara backend instead of the mock API:
 
-1. **Start the real backend** (see backend repo README):
+1. **Start the real backend** from the monorepo root (see [`backend/README.md`](../../../backend/README.md)):
 
    ```bash
-   cd ../syntara
-   # Follow backend setup instructions — runs on http://localhost:8000
+   make -C backend run-all
+   # Starts the backend API and supporting services
    ```
 
 2. **Start the UI** pointing to the real backend:
@@ -153,7 +153,7 @@ From the existing tests, note:
 - **File naming:** `feature-name.spec.ts` (kebab-case)
 - **Test titles:** Descriptive, user-action-based ("user creates and saves a multi-step workflow")
 - **Scoping:** Some files use `test.describe()` blocks (accessibility, filtering), others use top-level tests
-- **Conditional skipping:** `test.skip(!condition, 'reason')` for environment-dependent tests (see [Data-Dependent Tests](#data-dependent-tests--skip-when-seed-data-is-missing) for when to use `test.skip` vs `expect`)
+- **Conditional skipping:** `test.skip(!condition, 'reason')` for environment-dependent tests (see [Data-Dependent Tests](#data-dependent-tests--fail-when-expected-data-is-missing) for when to use `test.skip` vs `expect`)
 - **Multi-tab testing:** Some tests use `{ app, context }` to test URL sharing across tabs
 
 **CRITICAL:** New tests MUST match existing style. A reviewer should not be able to distinguish new tests from existing ones.
@@ -749,7 +749,7 @@ test.describe('Integration Filtering', () => {
 })
 ```
 
-This ensures missing data is surfaced as a test failure rather than silently skipped. Use `test.skip()` only for **environment constraints** (see [When to use test.skip vs expect](#when-testskip-vs-expect--choosing-the-right-guard)).
+This ensures missing data is surfaced as a test failure rather than silently skipped. Use `test.skip()` only for **environment constraints** (see [the `test.skip` and `test.fixme` guidance](#never-commit-testfixme-as-a-long-term-state)).
 
 ---
 
@@ -1277,4 +1277,4 @@ npm run tsc
 2. **Helpers** — Reusable functions in `frontend/packages/syntara-ui/e2e/helpers/`
 3. **Resource utilities** — `frontend/packages/syntara-ui/e2e/utils/` (if creating API-based setup/teardown)
 4. **Coverage summary** — Brief comment documenting features, edge cases, and known gaps
-5. **Visual regression** — If the PR changes any UI layout or visual appearance, check whether a visual regression snapshot exists. See [`packages/syntara-ui/VISUAL_REGRESSION.md`](../packages/syntara-ui/VISUAL_REGRESSION.md) for the page registry, baseline update workflow, and CI screenshot comparison. Run `npm run e2e:visual-regression` to verify; run with `--update-snapshots` to update baselines.
+5. **Visual regression** — If the PR changes any UI layout or visual appearance, check whether a visual regression snapshot exists. See [`packages/syntara-ui/VISUAL_REGRESSION.md`](../../../frontend/packages/syntara-ui/VISUAL_REGRESSION.md) for the page registry, baseline update workflow, and CI screenshot comparison. Run `npm run e2e:visual-regression` to verify; run with `--update-snapshots` to update baselines.

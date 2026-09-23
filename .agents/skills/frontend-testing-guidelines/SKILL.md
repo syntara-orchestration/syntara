@@ -657,7 +657,7 @@ it('shows a fallback title while loading', () => {
 })
 ```
 
-**E2E:** Static page titles are covered by `e2e/page-titles.spec.ts`. Add `expect(page).toHaveTitle(...)` to feature specs that already navigate to a page as part of their setup.
+**E2E:** Existing feature specs assert page titles when they navigate to a page. Add `expect(app).toHaveTitle(...)` to the relevant feature spec when adding a page or route.
 
 ## Permission Gating Tests
 

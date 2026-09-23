@@ -4,7 +4,7 @@ description: "Comprehensive PR review checklist and validation workflow for fron
 user-invocable: false
 ---
 
-# Claude Skill: Pull Request Review & Self-Review
+# Pull Request Review & Self-Review
 
 Your goal is to review code with high clarity, consistency, and alignment with the repo's standards. This skill serves two purposes:
 
@@ -317,7 +317,7 @@ When reviewing your own implementation before committing, verify these gates pas
 
 ### Independent Review (High-Risk Changes)
 
-For high-risk UI changes (new pages, auth flows, complex state management), run `/frontend-review-pr` from a **fresh chat session** before merging. A fresh context provides a second-pass perspective that catches issues the implementation context may overlook.
+For high-risk UI changes (new pages, auth flows, complex state management), run `frontend-review-pr` from a **fresh chat session** before merging. A fresh context provides a second-pass perspective that catches issues the implementation context may overlook.
 
 ---
 

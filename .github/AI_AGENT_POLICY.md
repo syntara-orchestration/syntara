@@ -77,8 +77,9 @@ Do not remove them from this tree in favor of a private copy.
 Codex discovers repository skills under `.agents/skills/`. Claude Code discovers
 project skills under `.claude/skills/`. Keep tracked relative symlinks in
 `.claude/skills/` pointing to the canonical `.agents/skills/` directories.
-Both tools follow symlinked skill directories, so contributors get the same
-workflows without maintaining duplicate copies.
+Codex reads the canonical directories directly; Claude Code uses the symlinks
+at its project discovery path. This keeps one maintained copy while giving each
+tool its expected discovery path.
 
 ### The test (apply before adding or expanding a skill)
 

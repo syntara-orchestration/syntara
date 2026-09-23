@@ -28,7 +28,7 @@ When MCP servers are available in the session, use them so you do not invent pro
 
 - **Storybook MCP** (`localhost:5174/mcp`) — this app’s wrappers (`Syn*`). Storybook must be running or the server is dead; start it or ask.
 - **PatternFly MCP** — official PF6 component props. Use this for raw PatternFly, not for `Syn*` wrappers.
-- One browser MCP (Playwright or Chrome DevTools) — screenshots and console in `/frontend-build-ui-feature` Phase 5.
+- One browser MCP (Playwright or Chrome DevTools) — screenshots and console in the `frontend-build-ui-feature` skill Phase 5.
 
 **CRITICAL: Never hallucinate component properties.** Before using any prop on a component — including seemingly obvious ones like `shadow`, `size`, `variant` — you must verify it is actually documented. A story name may not reflect the underlying prop name, so always check the documentation, not just story names.
 

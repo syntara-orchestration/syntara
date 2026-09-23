@@ -11,7 +11,7 @@ List pages (Workflows, Credentials, Executions, Approvals, Integrations, Users, 
 
 Typical list filter toolbar (Workflows list with the Name attribute search ready):
 
-![Workflows list filter toolbar](./images/workflows-list-filters.png)
+![Workflows list filter toolbar](../../packages/syntara-ui/e2e/visual-regression/page-screenshots.spec.ts-snapshots/workflows/workflows-list-linux.png)
 
 1. **Attribute search** — Choose a field (for example Name, Keyword, Status), enter or select a value, then apply (press **Enter** or use the apply control).
 2. **Active filter chips** — Each applied filter appears as a removable chip under the inputs.
@@ -21,11 +21,11 @@ Some pages also show standalone controls (toggles, multi-selects, or label edito
 
 When filters match nothing, the list shows a filtered empty state (not the “create first resource” empty state):
 
-![Workflows empty filtered results](./images/workflows-list-empty-filter.png)
+![Workflows empty filtered results](../../packages/syntara-ui/e2e/visual-regression/page-screenshots.spec.ts-snapshots/workflows/workflows-list-empty-filter-linux.png)
 
 Credentials and other list pages use the same pattern (keyword/name text filter + chips + clear all):
 
-![Credentials empty filtered results](./images/credentials-list-empty-filter.png)
+![Credentials empty filtered results](../../packages/syntara-ui/e2e/visual-regression/page-screenshots.spec.ts-snapshots/configuration/credentials/credentials-list-empty-filter-linux.png)
 
 ```mermaid
 sequenceDiagram

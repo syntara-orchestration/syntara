@@ -149,7 +149,7 @@ Run E2E tests only when needed:
 
 ### CI Workflow
 
-See [.github/workflows/pull-request.yml](../../.github/workflows/pull-request.yml) for:
+See [.github/workflows/ci-frontend.yml](../../../.github/workflows/ci-frontend.yml) for:
 
 - Standard tests with coverage on every PR
 - Container build validation

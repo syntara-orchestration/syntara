@@ -5,12 +5,12 @@ user-invocable: false
 ---
 
 <!--
-  SYNC NOTE: A condensed version of this file exists at .cursor/rules/patternfly-ux-design-system.mdc
+  SYNC NOTE: A condensed version of this file exists at frontend/.cursor/rules/patternfly-ux-design-system.mdc
   (the Cursor rule). Both files must stay in sync — when updating one, update the other.
   This file is the comprehensive source of truth. The Cursor rule is the lightweight version.
 -->
 
-# Claude Skill: PatternFly UX Design System — Opinionated Implementation
+# PatternFly UX Design System — Opinionated Implementation
 
 > **Before writing React, Zod, Zustand, or other library code**, fetch current docs from [`.agents/skills/frontend-library-references/SKILL.md`](../frontend-library-references/SKILL.md).
 
@@ -41,7 +41,7 @@ For engagement questions, reach out to the UX team in the project's contributor 
 
 | Category            | Tools                                     |
 | ------------------- | ----------------------------------------- |
-| IDE and Agent Tools | Cursor, Claude Code, Gemini               |
+| IDE and Agent Tools | Codex, Cursor, Claude Code, Gemini        |
 | Design Library      | [PatternFly](https://www.patternfly.org/) |
 | Design Tooling      | Figma, Miro                               |
 
@@ -1353,7 +1353,7 @@ For create/edit forms accessible via direct URL:
 
 **Note:** List/detail pages use in-page empty states or tab filtering -- not route guards. Route guards target mutation form routes only.
 
-See [`frontend/docs/permissions-rbac.md`](frontend/docs/permissions-rbac.md) for the full permission gating architecture.
+See [`frontend/docs/permissions-rbac.md`](../../../frontend/docs/permissions-rbac.md) for the full permission gating architecture.
 
 ### Empty-State Actions Must Be Permission-Gated
 

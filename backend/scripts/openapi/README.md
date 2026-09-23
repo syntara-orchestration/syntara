@@ -325,4 +325,4 @@ To add a new OpenAPI validation:
 ## References
 
 - [oasdiff documentation](https://github.com/oasdiff/oasdiff)
-- [Breaking Changes Detection](../../docs/openapi-breaking-changes.md)
+- [Breaking Changes Detection](../../docs/standards/openapi-spec-management.md#breaking-change-policy)
