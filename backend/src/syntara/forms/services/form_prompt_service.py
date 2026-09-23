@@ -251,7 +251,7 @@ class FormPromptService(BaseService):
         """
         query = (
             select(FormPrompt)
-            .where(FormPrompt.id == prompt_id)  # type: ignore[arg-type]
+            .where(FormPrompt.id == prompt_id)
             .options(
                 selectinload(FormPrompt.responder),  # type: ignore[arg-type]
                 selectinload(FormPrompt.responder_user_records),  # type: ignore[arg-type]
@@ -455,7 +455,7 @@ class FormPromptService(BaseService):
             )
         )
         result = await self.session.exec(stmt)
-        rowcount = result.rowcount  # type: ignore[attr-defined]
+        rowcount = result.rowcount
 
         if rowcount == 0:
             # Prompt was submitted by another user between our check and this UPDATE
