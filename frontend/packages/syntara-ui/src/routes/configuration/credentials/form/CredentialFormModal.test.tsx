@@ -95,7 +95,7 @@ const mockCredential = {
   inputs: { token: '$encrypted$' },
   enabled: true,
   labels: {},
-  created_by: { id: '550e8400-e29b-41d4-a716-446655440001', name: 'user-1' },
+  created_by: { id: '550e8400-e29b-41d4-a716-446655440001', name: 'user-1', type: 'user' },
   project_id: 'proj-1',
   created_at: '2026-03-01T00:00:00Z',
   updated_at: '2026-03-01T00:00:00Z',
@@ -117,8 +117,8 @@ describe('CredentialFormModal', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(credentialsClient.useMutation).mockReturnValue({ mutate: mockMutate, isPending: false } as any)
     const projectsMock = { projects: mockProjects, isLoading: false, error: null, refetch: vi.fn() }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
-    vi.mocked(useSelectableProjects).mockReturnValue(projectsMock as any)
+
+    vi.mocked(useSelectableProjects).mockReturnValue(projectsMock)
   })
 
   it('has no accessibility violations in create mode', async () => {
@@ -238,7 +238,7 @@ describe('CredentialFormModal', () => {
 
   it('shows save button in edit mode', () => {
     render(<CredentialFormModal isOpen onClose={vi.fn()} credentialToEdit={mockCredential} />, { wrapper })
-    expect(screen.getByRole('button', { name: 'Save changes' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save credential' })).toBeInTheDocument()
   })
 
   it('calls onClose when cancel is clicked', async () => {
@@ -322,7 +322,7 @@ describe('CredentialFormModal', () => {
 
     await user.clear(screen.getByDisplayValue('My Token'))
     await user.type(screen.getByLabelText('Credential name'), 'Updated Token')
-    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    await user.click(screen.getByRole('button', { name: 'Save credential' }))
 
     await waitFor(() => expect(mockMutate).toHaveBeenCalled())
   })
@@ -477,8 +477,8 @@ describe('CredentialFormModal', () => {
 
   it('shows loading state for projects', () => {
     const loadingMock = { projects: [], isLoading: true, error: null, refetch: vi.fn() }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
-    vi.mocked(useSelectableProjects).mockReturnValue(loadingMock as any)
+
+    vi.mocked(useSelectableProjects).mockReturnValue(loadingMock)
 
     render(<CredentialFormModal isOpen onClose={vi.fn()} />, { wrapper })
 
@@ -488,8 +488,8 @@ describe('CredentialFormModal', () => {
 
   it('shows error when projects fail to load', () => {
     const errorMock = { projects: [], isLoading: false, error: new Error('Network error'), refetch: vi.fn() }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
-    vi.mocked(useSelectableProjects).mockReturnValue(errorMock as any)
+
+    vi.mocked(useSelectableProjects).mockReturnValue(errorMock)
 
     render(<CredentialFormModal isOpen onClose={vi.fn()} />, { wrapper })
 
@@ -596,7 +596,7 @@ describe('CredentialFormModal', () => {
         inputs: { username: 'admin', password: '$encrypted$' },
         enabled: true,
         labels: {},
-        created_by: { id: '550e8400-e29b-41d4-a716-446655440001', name: 'user-1' },
+        created_by: { id: '550e8400-e29b-41d4-a716-446655440001', name: 'user-1', type: 'user' },
         project_id: 'proj-1',
         created_at: '2026-03-01T00:00:00Z',
         updated_at: '2026-03-01T00:00:00Z',

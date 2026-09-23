@@ -1,7 +1,7 @@
 import { Truncate } from '@patternfly/react-core'
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { IntegrationsAPI } from '@syntara/contracts'
-import { useCallback, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 
 import { AppRoute } from '../../../app/AppRoute'
 import { integrationsClient } from '../../../client'
@@ -10,6 +10,7 @@ import { SynListPanelTable, SynListPanelView } from '../../../components/panels/
 import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import { LinkCell } from '../../../components/table/LinkCell'
 import { UserTimestamp } from '../../../components/table/UserTimestamp'
+import { useClientPagination } from '../../../hooks/useClientPagination'
 import { useExpandableRowIds } from '../../../hooks/useExpandableRowIds'
 import { detachPromise } from '../../../utils/detachPromise'
 import { INTEGRATION_TYPE_LABELS } from '../integrations/integrationFilters'
@@ -119,19 +120,13 @@ function IntegrationsTable({
 }
 
 export function CredentialIntegrationsTab({ credentialId }: Readonly<CredentialIntegrationsTabProps>) {
-  const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(20)
-
-  const handlePerPageChange = useCallback((newPerPage: number) => {
-    setPerPage(newPerPage)
-    setPage(1)
-  }, [])
+  const { paginate, getFooterProps } = useClientPagination()
 
   const query = integrationsClient.useQuery('get', '/integrations', {
     params: { query: { management_credential_id: credentialId } },
   })
   const integrations = query.data?.resources ?? []
-  const paginatedIntegrations = integrations.slice((page - 1) * perPage, page * perPage)
+  const paginatedIntegrations = paginate(integrations)
   const expandableIds = useMemo(() => expandableRowIds(paginatedIntegrations, 'integration'), [paginatedIntegrations])
   const { expandedRows, allRowsExpanded, handleToggleRow, handleCollapseAll } = useExpandableRowIds(expandableIds)
 
@@ -155,15 +150,7 @@ export function CredentialIntegrationsTab({ credentialId }: Readonly<CredentialI
           <SynListPanelTable
             caption="Integrations using this credential"
             isExpandable
-            footer={{
-              page,
-              perPage,
-              total: integrations.length,
-              hasNext: page * perPage < integrations.length,
-              onPrev: () => setPage((p) => Math.max(1, p - 1)),
-              onNext: () => setPage((p) => p + 1),
-              onPerPageChange: handlePerPageChange,
-            }}
+            footer={getFooterProps(integrations.length)}
           >
             <IntegrationsTable
               integrations={paginatedIntegrations}

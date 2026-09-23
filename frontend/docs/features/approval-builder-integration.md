@@ -431,13 +431,15 @@ const statusIcons: Record<ApprovalStatus, React.ComponentType<{ className?: stri
 **Implementation**:
 
 ```typescript
+import { capitalize } from '../../utils/capitalize'
+
 export function ApprovalStatusBadges(props: Readonly<{ status?: ApprovalStatus | null }>) {
   if (!props.status) {
     return null
   }
 
   const IconComponent = statusIcons[props.status]
-  const capitalizedStatus = props.status.charAt(0).toUpperCase() + props.status.slice(1)
+  const capitalizedStatus = capitalize(props.status)
 
   return (
     <SynLabel variant="outline" status={statusMap[props.status]} icon={<IconComponent />}>

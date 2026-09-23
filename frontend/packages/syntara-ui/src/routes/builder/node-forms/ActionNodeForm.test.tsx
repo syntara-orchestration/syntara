@@ -65,17 +65,17 @@ describe('ActionNodeForm', () => {
       isPending: false,
       error: null,
       refetch: vi.fn(),
-    } as never)
+    })
     vi.mocked(useAllCredentials).mockReturnValue({
       credentials: [],
       isLoading: false,
       error: null,
-      refetch: vi.fn() as unknown as ReturnType<typeof useAllCredentials>['refetch'],
+      refetch: vi.fn(),
     })
     vi.mocked(credentialsClient.useMutation).mockReturnValue({
       mutate: vi.fn(),
       isPending: false,
-    } as never)
+    })
     vi.mocked(useAllProjects).mockReturnValue({ projects: [], isLoading: false, error: null, refetch: vi.fn() })
     vi.mocked(useSelectableProjects).mockReturnValue({ projects: [], isLoading: false, error: null, refetch: vi.fn() })
   })
@@ -342,6 +342,7 @@ describe('ActionNodeForm', () => {
       project_id: 'proj-1',
       created_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-01-01T00:00:00Z',
+      created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1', type: 'user' as const },
     }
     const mockBearerType = {
       id: 'type-bearer',
@@ -363,6 +364,7 @@ describe('ActionNodeForm', () => {
       project_id: 'proj-1',
       created_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-01-01T00:00:00Z',
+      created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1', type: 'user' as const },
     }
 
     // `credentialsClient.useQuery` is still mocked with path-based branching here because
@@ -396,7 +398,7 @@ describe('ActionNodeForm', () => {
         credentials: [mockSecretUrlCredential],
         isLoading: false,
         error: null,
-        refetch: vi.fn() as unknown as ReturnType<typeof useAllCredentials>['refetch'],
+        refetch: vi.fn(),
       })
     }
 
@@ -425,7 +427,7 @@ describe('ActionNodeForm', () => {
         credentials: [mockSecretUrlCredential, mockBearerCredential],
         isLoading: false,
         error: null,
-        refetch: vi.fn() as unknown as ReturnType<typeof useAllCredentials>['refetch'],
+        refetch: vi.fn(),
       })
     }
 
@@ -536,7 +538,7 @@ describe('ActionNodeForm', () => {
         credentials: [mockBearerCredential],
         isLoading: false,
         error: null,
-        refetch: vi.fn() as unknown as ReturnType<typeof useAllCredentials>['refetch'],
+        refetch: vi.fn(),
       })
       renderWithHeader(<ActionNodeForm onSubmit={mockOnSubmit} initialData={{ executor: 'http_request' }} />)
 
@@ -579,7 +581,7 @@ describe('ActionNodeForm', () => {
         isError: false,
         error: null,
         refetch: vi.fn(),
-      } as never)
+      })
       renderWithHeader(
         <ActionNodeForm
           onSubmit={mockOnSubmit}

@@ -496,8 +496,10 @@ test.describe('Approval Workflow Operations', () => {
     try {
       // Add approval node with a unique name so we can find it in the approvals list
       await addApprovalNodeWithBranch(app, approvalNodeName)
-      await app.getByRole('button', { name: 'Save', exact: true }).click()
+      await app.getByRole('button', { name: 'Save workflow' }).click()
       await runWorkflowFromBuilder(app)
+      const executionId = app.url().match(/\/executions\/([^/?]+)/)?.[1]
+      expect(executionId, 'Could not parse execution ID after run').toBeTruthy()
 
       // Wait for execution to pause at the approval node (requires Temporal)
       const reachedApproval = await waitForExecutionPaused(app)
@@ -527,9 +529,16 @@ test.describe('Approval Workflow Operations', () => {
       await app.getByPlaceholder(/Explain the reason for approving/i).fill('Approved in E2E test')
       await app.getByRole('button', { name: 'Submit decision' }).click()
 
-      // Verify approval was submitted and execution resumes
+      // Verify approval was submitted, then poll API for terminal state (UI live updates can lag)
       await expect(app.getByText('Approval submitted')).toBeVisible({ timeout: 15_000 })
-      await expect(app.getByText('Completed')).toBeVisible({ timeout: 30_000 })
+      await pollExecutionStatus(app, executionId!, ['completed', 'completed_with_errors', 'failed', 'cancelled'], {
+        timeout: 60_000,
+      })
+      await app.reload()
+      await expect(app.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 })
+      await expect(app.getByTestId('execution-status-badge').getByText('Completed')).toBeVisible({
+        timeout: 30_000,
+      })
     } finally {
       if (workflowId) {
         await apiRequest(app, 'delete', `/workflows/${workflowId}`).catch(() => {})

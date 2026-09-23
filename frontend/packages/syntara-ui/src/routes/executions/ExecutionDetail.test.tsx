@@ -6,6 +6,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { executionsClient } from '../../client'
+import { capitalize } from '../../utils/capitalize'
 import { useExecutionStore } from '../workflows/stores/useExecutionStore'
 
 import ExecutionDetail from './ExecutionDetail'
@@ -221,7 +222,7 @@ vi.mock('../builder/WorkflowHistoryCard', () => ({
 // Mock StatusLabel component
 vi.mock('../builder/ExecutionStatus', () => ({
   StatusLabel: ({ status }: { status: string }) => {
-    const capitalizedStatus = status.charAt(0).toUpperCase() + status.slice(1)
+    const capitalizedStatus = capitalize(status)
     return <div>{capitalizedStatus}</div>
   },
 }))

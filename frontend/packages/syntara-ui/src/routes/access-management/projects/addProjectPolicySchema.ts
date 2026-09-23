@@ -1,5 +1,11 @@
 import { z } from 'zod'
 
+/** Inline hint shown under the policy name field before validation errors */
+export const PROJECT_POLICY_NAME_HINT = 'Lowercase alphanumeric with hyphens (e.g. my-custom-policy)'
+
+/** Inline hint shown under the statements JSON field before validation errors */
+export const STATEMENTS_JSON_HINT = 'JSON array of statement objects with effect, actions, and scope fields'
+
 export const policyStatementSchema = z.object({
   effect: z.enum(['allow', 'deny']),
   actions: z.array(z.string()).min(1, 'At least one action is required'),

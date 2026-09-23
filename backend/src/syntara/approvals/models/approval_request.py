@@ -23,7 +23,7 @@ from syntara.approvals.models.approval_approvers import ApprovalApproverGroup, A
 from syntara.core.constants import FieldLimits
 from syntara.core.models.base import BaseResource
 from syntara.core.models.pagination import ResourcesResponse
-from syntara.core.models.user_reference import UserReference
+from syntara.core.models.user_reference import UserReference, UserReferenceFieldsMixin
 from syntara.core.utils.sqlmodel import postgres_enum_column
 
 if TYPE_CHECKING:
@@ -210,7 +210,7 @@ class ApprovalRequest(BaseApprovalRequest, table=True):
     )
 
 
-class ApprovalRequestRead(BaseApprovalRequest, table=False):
+class ApprovalRequestRead(UserReferenceFieldsMixin, BaseApprovalRequest, table=False):
     """ApprovalRequest API response model with typed nested fields.
 
     Overrides the JSONB dict fields from BaseApprovalRequest with typed models
@@ -242,6 +242,8 @@ class ApprovalRequestRead(BaseApprovalRequest, table=False):
         default_factory=list,
         description="Groups whose members can approve this request",
     )
+
+    USER_REFERENCE_FIELDS: ClassVar[tuple[str, ...]] = ("decided_by",)
 
     # Decision field - API returns UserReference object
     decided_by: UserReference | None = Field(

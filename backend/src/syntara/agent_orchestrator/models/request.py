@@ -8,8 +8,10 @@ from enum import Enum
 from uuid import UUID
 
 from fastapi import UploadFile
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, field_validator
 from sqlmodel import SQLModel
+
+from syntara.core.jsonb_limits import validate_jsonb_size
 
 
 class CancellationResult(Enum):
@@ -57,6 +59,12 @@ class InvocationCreateRequest(SQLModel, populate_by_name=True):
         serialization_alias="project_id",
         description="Project to associate this invocation with",
     )
+
+    @field_validator("context_data", mode="before")
+    @classmethod
+    def validate_context_data_size(cls, v: dict[str, object]) -> dict[str, object]:
+        """Reject oversized context_data payloads."""
+        return validate_jsonb_size(v, field_name="context_data")
 
 
 class InvocationRequestWithFile(SQLModel):

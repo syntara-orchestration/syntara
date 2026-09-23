@@ -19,7 +19,13 @@ export function useSelectedActivity(opts: UseSelectedActivityOptions) {
   const [selectedActivityKey, setSelectedActivityKey] = useState<string | null>(null)
   const [prevNodeId, setPrevNodeId] = useState(selectedNodeId)
 
-  const resolvedNodeId = selectedNodeId ?? null
+  const resolvedNodeId = useMemo(() => {
+    if (selectedNodeId != null) return selectedNodeId
+    if (selectedActivityKey) {
+      return parseCompositeKey(selectedActivityKey).baseId
+    }
+    return null
+  }, [selectedNodeId, selectedActivityKey])
 
   if (selectedNodeId !== prevNodeId) {
     setPrevNodeId(selectedNodeId)
@@ -29,9 +35,13 @@ export function useSelectedActivity(opts: UseSelectedActivityOptions) {
   }
 
   const effectiveKey = useMemo(() => {
-    if (selectedActivityKey && selectedNodeId) {
-      const { baseId } = parseCompositeKey(selectedActivityKey)
-      if (baseId === selectedNodeId) return selectedActivityKey
+    if (selectedActivityKey) {
+      if (selectedNodeId) {
+        const { baseId } = parseCompositeKey(selectedActivityKey)
+        if (baseId === selectedNodeId) return selectedActivityKey
+      } else {
+        return selectedActivityKey
+      }
     }
     return selectedNodeId ?? null
   }, [selectedActivityKey, selectedNodeId])

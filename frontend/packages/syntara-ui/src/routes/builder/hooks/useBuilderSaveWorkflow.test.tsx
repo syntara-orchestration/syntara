@@ -3,6 +3,7 @@ import { describe, expect, it, vi, beforeEach, type MockedFunction } from 'vites
 
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
+import { expectStringContaining } from '../../../test/test-helpers'
 import { detachPromise } from '../../../utils/detachPromise'
 
 import type { UseBuilderSaveWorkflowParams } from './useBuilderSaveWorkflow'
@@ -18,7 +19,7 @@ const baseCreateResponse: CreateResponse = {
   name: 'test-wf',
   current_version: 1,
   is_enabled: true,
-  created_by: 'user-1',
+  created_by: { id: 'u-1', name: 'user-1', type: 'user' },
   project_id: 'proj-1',
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
@@ -31,7 +32,7 @@ const baseUpdateResponse: UpdateResponse = {
     workflow_id: 'test-id',
     version: 1,
     schema_version: '2.0.0',
-    created_by: 'user-1',
+    created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'demo', type: 'user' },
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
     workflow_definition: { schema_version: '2.0.0', name: 'test-wf', triggers: [], nodes: [], edges: [] },
@@ -210,12 +211,12 @@ describe('useBuilderSaveWorkflow', () => {
     await expect(result.current()).resolves.toBe(false)
     expect(showError).toHaveBeenCalledWith({
       title: 'Failed to create workflow',
-      description: expect.stringContaining('Failed to create workflow') as unknown as string,
+      description: expectStringContaining('Failed to create workflow'),
     })
   })
 
   it('does not call create when update path is used', async () => {
-    const createWorkflow = vi.fn() as MockedFunction<CreateWorkflow>
+    const createWorkflow = vi.fn()
     const updateWorkflow = vi.fn((...args: Parameters<UpdateWorkflow>) => {
       detachPromise(args[1]?.onSuccess?.(updateResponse()))
     }) as MockedFunction<UpdateWorkflow>

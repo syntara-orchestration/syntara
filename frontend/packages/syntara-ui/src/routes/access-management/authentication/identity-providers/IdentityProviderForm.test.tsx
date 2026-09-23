@@ -78,11 +78,11 @@ function setupMocks() {
     isError: false,
     error: null,
     refetch: vi.fn(),
-  } as never)
+  })
   vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
     mutate: vi.fn(),
     isPending: false,
-  } as never)
+  })
 }
 
 describe('IdentityProviderForm', () => {
@@ -195,11 +195,11 @@ describe('IdentityProviderForm', () => {
         isError: false,
         error: null,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
         mutate: vi.fn(),
         isPending: false,
-      } as never)
+      })
     }
 
     it('renders the edit form with Save button on last step', async () => {
@@ -241,11 +241,11 @@ describe('IdentityProviderForm', () => {
         isError: true,
         error: notFoundError,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
         mutate: vi.fn(),
         isPending: false,
-      } as never)
+      })
 
       const { container } = render(<IdentityProviderForm mode="edit" />, { wrapper })
 
@@ -267,11 +267,11 @@ describe('IdentityProviderForm', () => {
         refetch: vi.fn(),
         status: 'pending',
         fetchStatus: 'fetching',
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
         mutate: vi.fn(),
         isPending: false,
-      } as never)
+      })
 
       render(<IdentityProviderForm mode="edit" />, { wrapper })
 
@@ -289,7 +289,7 @@ describe('IdentityProviderForm', () => {
         isError: false,
         error: null,
         refetch: vi.fn(),
-      } as never)
+      })
 
       vi.mocked(identityProvidersClient.useMutation).mockImplementation(((method: string) => {
         if (method === 'patch') {
@@ -339,7 +339,7 @@ describe('IdentityProviderForm', () => {
         isError: false,
         error: null,
         refetch: vi.fn(),
-      } as never)
+      })
 
       vi.mocked(identityProvidersClient.useMutation).mockImplementation(((method: string) => {
         if (method === 'patch') {
@@ -384,7 +384,7 @@ describe('IdentityProviderForm', () => {
         isError: false,
         error: null,
         refetch: vi.fn(),
-      } as never)
+      })
 
       vi.mocked(identityProvidersClient.useMutation).mockImplementation(((method: string) => {
         if (method === 'patch') {
@@ -437,11 +437,11 @@ describe('IdentityProviderForm', () => {
         isError: false,
         error: null,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
         mutate: vi.fn(),
         isPending: false,
-      } as never)
+      })
 
       // Should render without crashing — null mapped_group_id defaults to ''
       render(<IdentityProviderForm mode="edit" />, { wrapper })
@@ -471,11 +471,11 @@ describe('IdentityProviderForm', () => {
         isError: false,
         error: null,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
         mutate: vi.fn(),
         isPending: false,
-      } as never)
+      })
 
       render(<IdentityProviderForm mode="edit" />, { wrapper })
 
@@ -508,7 +508,7 @@ describe('IdentityProviderForm', () => {
         isError: false,
         error: null,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockImplementation(((method: string) => {
         if (method === 'patch') {
           return { mutate: mockPatch, isPending: false }

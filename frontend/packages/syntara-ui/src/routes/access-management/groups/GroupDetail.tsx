@@ -183,7 +183,12 @@ function GroupTabContent({
         <GroupMembersPanel groupId={groupId} onMembershipChange={onMembersChange} />
       )}
       {activeTab === 'roles' && showAssignments && (
-        <RoleAssignmentsPanel principalType={RolePrincipalType.GROUP} principalId={groupId} />
+        <RoleAssignmentsPanel
+          principalType={RolePrincipalType.GROUP}
+          principalId={groupId}
+          tabKey="roles"
+          tabLabel="Assignments"
+        />
       )}
     </>
   )
@@ -337,7 +342,7 @@ export function GroupDetail() {
           onClose={deleteDialog.close}
           onConfirm={() => handleDelete(deleteDialog.item)}
           title="Delete group?"
-          confirmLabel="Delete"
+          confirmLabel="Delete group"
           confirmVariant="danger"
           titleIconVariant="warning"
           destructiveAcknowledgement={{

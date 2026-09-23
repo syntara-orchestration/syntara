@@ -1,29 +1,33 @@
 import { describe, expect, it } from 'vitest'
 
-import { convertWouterPathToTanStack } from './convertParamSyntax'
+import { toTanStackPathTemplate } from './convertParamSyntax'
 
-describe('convertWouterPathToTanStack', () => {
+describe('toTanStackPathTemplate', () => {
   it('returns an unchanged path when there are no params', () => {
-    expect(convertWouterPathToTanStack('/workflows')).toBe('/workflows')
+    expect(toTanStackPathTemplate('/workflows')).toBe('/workflows')
   })
 
   it('converts a single :param to $param', () => {
-    expect(convertWouterPathToTanStack('/workflows/:workflowId')).toBe('/workflows/$workflowId')
+    expect(toTanStackPathTemplate('/workflows/:workflowId')).toBe('/workflows/$workflowId')
   })
 
   it('converts multiple :params', () => {
-    expect(convertWouterPathToTanStack('/users/:userId/groups/:groupId')).toBe('/users/$userId/groups/$groupId')
+    expect(toTanStackPathTemplate('/users/:userId/groups/:groupId')).toBe('/users/$userId/groups/$groupId')
   })
 
   it('strips the trailing ? from an optional param', () => {
-    expect(convertWouterPathToTanStack('/settings/:tab?')).toBe('/settings/$tab')
+    expect(toTanStackPathTemplate('/settings/:tab?')).toBe('/settings/$tab')
   })
 
   it('handles a param at the very end of the path', () => {
-    expect(convertWouterPathToTanStack('/:id')).toBe('/$id')
+    expect(toTanStackPathTemplate('/:id')).toBe('/$id')
   })
 
   it('handles a param in the middle of the path', () => {
-    expect(convertWouterPathToTanStack('/users/:userId/edit')).toBe('/users/$userId/edit')
+    expect(toTanStackPathTemplate('/users/:userId/edit')).toBe('/users/$userId/edit')
+  })
+
+  it('leaves TanStack $param templates unchanged', () => {
+    expect(toTanStackPathTemplate('/users/$userId/edit')).toBe('/users/$userId/edit')
   })
 })

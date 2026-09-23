@@ -68,7 +68,7 @@ describe('fetchAllPoliciesForSelect', () => {
       { name: 'workflow-admin', is_project_eligible: false },
       { name: 'policy:update:project', is_project_eligible: true },
     ]
-    vi.mocked(fetchAllPages).mockResolvedValue(policies as never)
+    vi.mocked(fetchAllPages).mockResolvedValue(policies)
 
     const result = await fetchAllPoliciesForSelect({})
 
@@ -87,7 +87,7 @@ describe('fetchAllProjectPoliciesForSelect', () => {
       { id: '1', name: 'read-policy' },
       { id: '2', name: 'write-policy' },
     ]
-    vi.mocked(fetchAllPages).mockResolvedValue(policies as never)
+    vi.mocked(fetchAllPages).mockResolvedValue(policies)
 
     const result = await fetchAllProjectPoliciesForSelect('proj-1')
 
