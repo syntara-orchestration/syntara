@@ -66,7 +66,7 @@ export function StandardNodeHeader(props: Readonly<StandardNodeHeaderProps>) {
             <Flex>
               {props.expandable && (
                 <FlexItem>
-                  <NodeExpandToggle />
+                  <NodeExpandToggle nodeLabel={props.title || props.subtitle} />
                 </FlexItem>
               )}
               {props.menuActions &&

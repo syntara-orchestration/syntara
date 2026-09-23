@@ -4,6 +4,14 @@
   background: var(--pf-t--global--background--color--secondary--default);
 }
 
+.storyCanvas :global(.react-flow__handle) {
+  pointer-events: none;
+}
+
+.storyCanvasNode {
+  width: calc(100% - 9rem);
+}
+
 .comparisonGrid,
 .gallery {
   display: grid;
@@ -13,7 +21,8 @@
 }
 
 .nodeExample {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: var(--pf-t--global--spacer--sm);
   min-width: 0;
 }

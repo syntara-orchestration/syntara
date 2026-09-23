@@ -13,7 +13,7 @@ import { NodeComponent } from './NodeComponent'
 import {
   createNodeProps,
   EXECUTION_STATES,
-  MENU_ACTIONS,
+  FullNodeStoryComposition,
   NodeExample,
   NodeStoryCanvas,
 } from './NodeComponent.stories.helpers'
@@ -30,22 +30,10 @@ function NodeComponentInventory() {
       <StackItem>
         <div className={styles.gallery}>
           <NodeExample label="Full composition">
-            <NodeComponent
-              nodeProps={createNodeProps({ id: 'inventory-base' })}
-              topBarColor={NODE_TYPE_COLORS.actionScript}
-            >
-              <StandardNodeHeader
-                expandable
-                menuActions={MENU_ACTIONS}
-                subtitle="Script task"
-                title="Run inventory synchronization"
-              />
-              <NodeBody>
-                <Content component={ContentVariants.small}>
-                  Synchronize inventory across the selected managed hosts.
-                </Content>
-              </NodeBody>
-            </NodeComponent>
+            <FullNodeStoryComposition
+              id="inventory-base"
+              description="Synchronize inventory across the selected managed hosts."
+            />
           </NodeExample>
           <NodeExample label="Selected dashed placeholder">
             <NodeComponent
@@ -122,14 +110,17 @@ function NodeComponentInventory() {
               <StandardNodeHeader subtitle="Fallback title from subtitle" />
             </NodeComponent>
           </NodeExample>
-          {EXECUTION_STATES.map(({ status, retry_count }) => (
-            <NodeExample key={status} label={`${status} execution state`}>
+          {EXECUTION_STATES.map((executionState) => (
+            <NodeExample key={executionState.status} label={`${executionState.status} execution state`}>
               <NodeComponent
-                executionState={{ status, retry_count }}
-                nodeProps={createNodeProps({ id: `inventory-${status}`, name: `${status} task` })}
+                executionState={executionState}
+                nodeProps={createNodeProps({
+                  id: `inventory-${executionState.status}`,
+                  name: `${executionState.status} task`,
+                })}
                 topBarColor={NODE_TYPE_COLORS.actionScript}
               >
-                <StandardNodeHeader title={`${status} task`} />
+                <StandardNodeHeader title={`${executionState.status} task`} />
               </NodeComponent>
             </NodeExample>
           ))}
@@ -169,6 +160,6 @@ export const Inventory: Story = {
   render: () => <NodeComponentInventory />,
   play: async ({ canvas }) => {
     const collapsedExample = within(canvas.getByTestId('collapsed-content-example'))
-    await userEvent.click(collapsedExample.getByRole('button', { name: 'Collapse step details' }))
+    await userEvent.click(collapsedExample.getByRole('button', { name: 'Collapse details for Collapsed task' }))
   },
 }

@@ -6,7 +6,11 @@ import { useCallback, useState, type ReactNode } from 'react'
 
 import { FlowNodeType } from '../../constants'
 import { ACTIVITY_STATUS } from '../../routes/builder/utils/executionState/executionHelpers'
+import { StandardNodeHeader } from '../../routes/workflows/canvas/nodes/common/StandardNodeHeader'
+import { NODE_TYPE_COLORS } from '../../routes/workflows/canvas/nodeTypeColors'
 
+import { NodeBody } from './NodeBody'
+import { NodeComponent } from './NodeComponent'
 import styles from './NodeComponent.stories.module.css'
 
 /** Shared inert actions for stories that demonstrate a node header's action menu. */
@@ -69,6 +73,23 @@ export function createNodeProps(options: NodePropsOptions): NodeProps<Node<Story
   }
 }
 
+/** Reusable full node used by the focused Default story and the state inventory. */
+export function FullNodeStoryComposition({ id, description }: Readonly<{ id: string; description: string }>) {
+  return (
+    <NodeComponent nodeProps={createNodeProps({ id })} topBarColor={NODE_TYPE_COLORS.actionScript}>
+      <StandardNodeHeader
+        expandable
+        menuActions={MENU_ACTIONS}
+        subtitle="Script task"
+        title="Run inventory synchronization"
+      />
+      <NodeBody>
+        <Content component={ContentVariants.small}>{description}</Content>
+      </NodeBody>
+    </NodeComponent>
+  )
+}
+
 type StoryCanvasNode = Node<{ content: ReactNode; onContentResize: (height: number) => void }, 'storybook'>
 
 function StoryCanvasNodeComponent(props: NodeProps<StoryCanvasNode>) {
@@ -101,6 +122,7 @@ export function NodeStoryCanvas({
     [minimumHeight]
   )
 
+  // StandardNodeHeader uses this flag for menu visibility; scoped CSS disables handle input.
   return (
     <div className={styles.storyCanvas} style={{ height }}>
       <ReactFlow
@@ -111,7 +133,8 @@ export function NodeStoryCanvas({
             type: 'storybook',
             position: { x: 64, y: 64 },
             data: { content: children, onContentResize },
-            style: { width: 'calc(100% - 9rem)' },
+            className: styles.storyCanvasNode,
+            focusable: false,
           },
         ]}
         nodeTypes={STORY_CANVAS_NODE_TYPES}

@@ -13,6 +13,7 @@ import { NodeComponent } from './NodeComponent'
 import {
   createNodeProps,
   EXECUTION_STATES,
+  FullNodeStoryComposition,
   MENU_ACTIONS,
   NodeExample,
   NodeStoryCanvas,
@@ -43,7 +44,7 @@ function SemanticZoomNode(props: NodeProps<SemanticZoomFlowNode>) {
       hasDashedBorder={props.data.settings?.disabled === true}
     >
       <NodeHeader>
-        <NodeExpandToggle />
+        <NodeExpandToggle nodeLabel={props.data.name} />
         <NodeTitle title={props.data.name} subTitle="Condition" />
       </NodeHeader>
       <NodeBody>Detailed content is visible above the semantic-zoom threshold.</NodeBody>
@@ -87,17 +88,7 @@ type Story = StoryObj<typeof meta>
 /** A realistic node composition with its header, body, handles, and action menu. */
 export const Default: Story = {
   render: () => (
-    <NodeComponent nodeProps={createNodeProps({ id: 'default' })} topBarColor={NODE_TYPE_COLORS.actionScript}>
-      <StandardNodeHeader
-        expandable
-        menuActions={MENU_ACTIONS}
-        subtitle="Script task"
-        title="Run inventory synchronization"
-      />
-      <NodeBody>
-        <Content component={ContentVariants.small}>Collect inventory from the selected managed hosts.</Content>
-      </NodeBody>
-    </NodeComponent>
+    <FullNodeStoryComposition id="default" description="Collect inventory from the selected managed hosts." />
   ),
 }
 
@@ -132,7 +123,7 @@ export const DisabledAndValidationError: Story = {
         topBarColor={NODE_TYPE_COLORS.actionScript}
       >
         <NodeHeader>
-          <NodeExpandToggle />
+          <NodeExpandToggle nodeLabel="Disabled deployment" />
           <NodeTitle title="Disabled deployment" subTitle="Script task" />
         </NodeHeader>
         <NodeBody>
@@ -144,7 +135,7 @@ export const DisabledAndValidationError: Story = {
         topBarColor={NODE_TYPE_COLORS.logic}
       >
         <NodeHeader>
-          <NodeExpandToggle />
+          <NodeExpandToggle nodeLabel="Check deployment policy" />
           <NodeTitle title="Check deployment policy" subTitle="Condition" />
         </NodeHeader>
         <NodeBody>
@@ -160,15 +151,18 @@ export const ExecutionStates: Story = {
   parameters: { storyCanvas: { minimumHeight: 640 } },
   render: () => (
     <div className={styles.gallery}>
-      {EXECUTION_STATES.map(({ status, retry_count }) => (
-        <NodeExample key={status} label={status}>
+      {EXECUTION_STATES.map((executionState) => (
+        <NodeExample key={executionState.status} label={executionState.status}>
           <NodeComponent
-            nodeProps={createNodeProps({ id: `execution-${status}`, name: `${status} task` })}
-            executionState={{ status, retry_count }}
+            nodeProps={createNodeProps({
+              id: `execution-${executionState.status}`,
+              name: `${executionState.status} task`,
+            })}
+            executionState={executionState}
             topBarColor={NODE_TYPE_COLORS.actionScript}
           >
             <NodeHeader>
-              <NodeTitle title={`${status} task`} subTitle="Script task" />
+              <NodeTitle title={`${executionState.status} task`} subTitle="Script task" />
             </NodeHeader>
             <NodeBody>
               <Content component={ContentVariants.small}>Execution badge shown below the node.</Content>
@@ -186,7 +180,7 @@ export const CollapsedAndExpanded: Story = {
     <div className={styles.comparisonGrid}>
       <NodeComponent nodeProps={createNodeProps({ id: 'expanded' })} topBarColor={NODE_TYPE_COLORS.actionScript}>
         <NodeHeader>
-          <NodeExpandToggle />
+          <NodeExpandToggle nodeLabel="Expanded node" />
           <NodeTitle title="Expanded node" subTitle="Script task" />
         </NodeHeader>
         <NodeBody>
@@ -197,7 +191,7 @@ export const CollapsedAndExpanded: Story = {
       </NodeComponent>
       <NodeComponent nodeProps={createNodeProps({ id: 'collapsed' })} topBarColor={NODE_TYPE_COLORS.actionScript}>
         <NodeHeader>
-          <NodeExpandToggle />
+          <NodeExpandToggle nodeLabel="Collapsed node" />
           <NodeTitle title="Collapsed node" subTitle="Script task" />
         </NodeHeader>
         <NodeBody>
@@ -207,8 +201,7 @@ export const CollapsedAndExpanded: Story = {
     </div>
   ),
   play: async ({ canvas }) => {
-    const [, collapsedToggle] = canvas.getAllByRole('button', { name: 'Collapse step details' })
-    if (collapsedToggle) await userEvent.click(collapsedToggle)
+    await userEvent.click(canvas.getByRole('button', { name: 'Collapse details for Collapsed node' }))
   },
 }
 
