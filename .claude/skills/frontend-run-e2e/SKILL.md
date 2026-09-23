@@ -241,6 +241,9 @@ npx playwright test --grep @pr-check
 # Exclude visual-regression (they require npm run e2e:visual-regression, not the default runner)
 npx playwright test --grep-invert @local-only
 
+# Full-app accessibility audit (report-only; mock API; see frontend-a11y-audit skill)
+npm run e2e:a11y-audit
+
 # Show trace from a failed run
 npx playwright show-trace test-results/*/trace.zip
 ```
@@ -275,5 +278,6 @@ See `.claude/skills/frontend-playwright-e2e/SKILL.md` → **Test Suite Tags** fo
 | Filtering, search, pagination | Yes (seed data) | Yes (if data exists) |
 | Permission gating (viewer/auditor/user) | Yes (mock tokens) | Yes (real roles created) |
 | Visual regression | Yes | No (skipped) |
+| Accessibility audit (`e2e:a11y-audit`) | Yes (report-only) | No (skipped) |
 | Journey tests (auth flows) | No (skipped) | Yes |
 | Role provisioning tests | No (skipped) | Yes |
