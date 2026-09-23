@@ -62,7 +62,8 @@ def upgrade() -> None:
         sa.Column("response_data", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("responded_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("responded_by", sa.Uuid(), nullable=True),
-        sa.Column("temporal_activity_id", sa.String(length=255), nullable=True),
+        sa.Column("temporal_activity_id", sa.String(length=512), nullable=False),
+        sa.Column("notes", sa.String(length=2000), nullable=True),
         sa.ForeignKeyConstraint(
             ["project_id"],
             ["projects.id"],
