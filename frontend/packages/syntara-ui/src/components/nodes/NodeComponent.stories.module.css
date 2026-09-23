@@ -1,11 +1,12 @@
 .storyCanvas {
-  height: 32rem;
   overflow: hidden;
   background: var(--pf-t--global--background--color--secondary--default);
 }
 
-.storyCanvas :global(.react-flow__handle) {
-  pointer-events: none;
+.storyCanvas :global(.react-flow__node) :global(.react-flow__handle),
+.semanticZoomCanvas :global(.react-flow__node) :global(.react-flow__handle) {
+  /* Semantic-zoom branch handles set pointer-events inline for workflow connections. */
+  pointer-events: none !important;
 }
 
 .storyCanvasNode {

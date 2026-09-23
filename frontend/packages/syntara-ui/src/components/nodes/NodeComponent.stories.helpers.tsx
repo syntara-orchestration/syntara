@@ -2,7 +2,7 @@ import { Content, ContentVariants } from '@patternfly/react-core'
 import { RhUiDuplicateIcon, RhUiPlayIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import type { Node, NodeProps } from '@xyflow/react'
 import { Background, BackgroundVariant, Position, ReactFlow } from '@xyflow/react'
-import { useCallback, useState, type ReactNode } from 'react'
+import { useCallback, useState, type MouseEvent, type ReactNode } from 'react'
 
 import { FlowNodeType } from '../../constants'
 import { ACTIVITY_STATUS } from '../../routes/builder/utils/executionState/executionHelpers'
@@ -92,6 +92,10 @@ export function FullNodeStoryComposition({ id, description }: Readonly<{ id: str
 
 type StoryCanvasNode = Node<{ content: ReactNode; onContentResize: (height: number) => void }, 'storybook'>
 
+function stopStoryCanvasNodeSelection(event: MouseEvent) {
+  event.stopPropagation()
+}
+
 function StoryCanvasNodeComponent(props: NodeProps<StoryCanvasNode>) {
   const contentRef = useCallback(
     (element: HTMLDivElement | null) => {
@@ -122,7 +126,8 @@ export function NodeStoryCanvas({
     [minimumHeight]
   )
 
-  // StandardNodeHeader uses this flag for menu visibility; scoped CSS disables handle input.
+  // StandardNodeHeader uses this flag for menu visibility.
+  // onNodeClick keeps nested controls targetable while the layout node stays unselectable.
   return (
     <div className={styles.storyCanvas} style={{ height }}>
       <ReactFlow
@@ -135,11 +140,13 @@ export function NodeStoryCanvas({
             data: { content: children, onContentResize },
             className: styles.storyCanvasNode,
             focusable: false,
+            selectable: false,
           },
         ]}
         nodeTypes={STORY_CANVAS_NODE_TYPES}
         nodesConnectable
         nodesDraggable={false}
+        onNodeClick={stopStoryCanvasNodeSelection}
         panOnDrag={false}
         panOnScroll={false}
         preventScrolling={false}
