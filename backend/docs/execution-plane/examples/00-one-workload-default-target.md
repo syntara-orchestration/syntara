@@ -72,11 +72,11 @@ cluster:
   status: active
   enabled: true
   labels:
-    system/cluster: local-openshift
+    cluster: local-openshift
 ```
 
-`system/cluster` is a natural label from provisioning, not a
-user-written key.
+`cluster` is a natural label from provisioning, not a user-written
+key.
 
 ## Default ExecutionTarget
 
@@ -103,7 +103,7 @@ Effective labels for matching are Cluster labels overlaid with
 ExecutionTarget labels:
 
 ```text
-{ system/cluster: local-openshift }
+{ cluster: local-openshift }
 ```
 
 ## What EP does

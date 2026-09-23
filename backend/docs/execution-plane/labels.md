@@ -116,12 +116,11 @@ facts about the target:
 - concrete cluster identity (name, UUID, hostname)
 - region or other topology the provisioner can observe
 
-When those facts change, the provisioner may update natural keys. It
-must not clobber user keys. Provenance is therefore required:
-namespaced keys (see [Key format](#key-format)), or two maps that the
-reconciler unions. Matching does **not** distinguish the sources. A
-natural `region=us-east-1` and a user `region=us-east-1` are the same
-constraint.
+When those facts change, the provisioner may update them. It must not
+clobber keys an administrator set. Matching does **not** distinguish
+who wrote a key. A provisioned `region=us-east-1` and an admin
+`region=us-east-1` are the same constraint. Labels are a single flat
+map (see [Key format](#key-format)).
 
 ### User labels (intent the platform cannot infer)
 
@@ -249,30 +248,22 @@ routing.
 
 ## Key format
 
-Exact vocabulary is not frozen. Keys should be namespaced so natural
-and user values for the same concept do not collide:
+Exact vocabulary is not frozen. Keys are a single flat map of opaque
+strings.
 
 ```
-system/region = us-east-1
-user/region   = NorthAmerica
+region = us-east-1
+gpu    = true
+cluster = local-openshift
 ```
 
-| Prefix | Owner | Example |
-|---|---|---|
-| `system/` | Provisioning / discovery | `system/region`, cluster identity |
-| `user/` | Administrator | `user/region`, `user/gpu` |
-
-Until a vocabulary list lands, treat any other key as an opaque
-string. The reconciler does not interpret key names. Default routing
-uses `is_default`, not a reserved label. Cluster identity is a
-Cluster label like any other; it is not a reserved matcher key.
+The reconciler does not interpret key names. Default routing uses
+`is_default`, not a reserved label. Cluster identity is a Cluster
+label like any other; it is not a reserved matcher key.
 
 The keys used in [examples/](examples/) (`region`, `env`,
-`backend_type`) are the same: readable stand-ins, not the final
+`backend_type`, `cluster`) are readable stand-ins, not the final
 names.
-
-Prohibit (in API/UI validation, not in the matcher) user writes to
-`system/` so natural keys stay owned by provisioning.
 
 ## Relationship to AO resource labels
 
@@ -328,9 +319,9 @@ or the ExecutionTarget relationship above.
    image. A payload-only image means warm-pool matching needs another
    mechanism. Leaning: the Worker Manager *runs* `activity.image`;
    whether the reconciler *matches* on it is separate.
-2. **Natural vs user storage.** One namespaced `labels` map (simpler
-   for snapshots) versus two fields merged at match time (clearer
-   provenance). Matching semantics are the same.
+2. **Natural vs user storage.** Prefixes (`system/`, `user/`) are out
+   for now: one flat `labels` map. Two fields merged at match time
+   remains an option if provenance becomes a real problem.
 3. **Preferred (soft) affinities.** Out of MVP. When they exist, they
    sort the eligible set; they do not change the boolean filter.
 4. **AO combination rules** (system / project / workflow / node, and
