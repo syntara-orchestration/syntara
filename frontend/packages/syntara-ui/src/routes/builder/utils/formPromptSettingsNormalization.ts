@@ -3,7 +3,6 @@ import { ActivityTypeEnum, EdgeHandleEnum, type Activity } from '@syntara/contra
 import type { EdgeConnection } from '../types/edge'
 
 import { handleToV2Port } from './edgeHelpers'
-import { formPromptFallbackBehaviorFromDecision } from './formPromptFallbackBehavior'
 
 export function buildOutgoingPorts(
   edges: EdgeConnection[],
@@ -34,25 +33,20 @@ export function formPromptHasFallbackEdge(activityId: string, edges: EdgeConnect
 }
 
 /**
- * Ensures `fallback_behavior` is set when only `fallback_decision` is present.
- * Does not override on-failure settings or infer routing from canvas edges alone.
+ * Strips UI-only `fallback_behavior` before workflow definition validation/save.
+ * Backend form_prompt parameterSchema allows `fallback_decision` only (`additionalProperties: false`).
  */
 export function normalizeFormPromptActivityForDefinition(activity: Activity): Activity {
   if (activity.type !== ActivityTypeEnum.FORM_PROMPT) return activity
 
   const parameters = { ...(activity.parameters ?? {}) } as Record<string, unknown>
-  if (parameters.fallback_behavior !== undefined) {
-    return activity
-  }
-  if (parameters.fallback_decision === undefined) {
+  if (!('fallback_behavior' in parameters)) {
     return activity
   }
 
+  const { fallback_behavior: _removed, ...rest } = parameters
   return {
     ...activity,
-    parameters: {
-      ...parameters,
-      fallback_behavior: formPromptFallbackBehaviorFromDecision(parameters.fallback_decision as 'submit' | 'fallback'),
-    },
+    parameters: rest,
   }
 }

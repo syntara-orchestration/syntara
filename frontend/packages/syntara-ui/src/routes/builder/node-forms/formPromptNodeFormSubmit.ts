@@ -1,5 +1,4 @@
 import { resolveEffectiveContinueOnFailure } from '../hooks/useEffectiveContinueOnFailure'
-import { formPromptFallbackBehaviorFromDecision } from '../utils/formPromptFallbackBehavior'
 
 import type { FormPromptFormSubmitData } from './FormPromptNodeForm'
 import type { FormPromptFormData } from './formPromptNodeFormSchema'
@@ -25,7 +24,6 @@ export function mapFormPromptFormDataToSubmit(
     responder_groups: data.responder_groups && data.responder_groups.length > 0 ? data.responder_groups : undefined,
     response_window: data.response_window ?? null,
     fallback_decision: fallbackDecision,
-    fallback_behavior: formPromptFallbackBehaviorFromDecision(fallbackDecision),
     ...(submitLabel ? { submit_label: submitLabel } : {}),
     ...(successMessage ? { success_message: successMessage } : {}),
     ...(timezone ? { timezone } : {}),

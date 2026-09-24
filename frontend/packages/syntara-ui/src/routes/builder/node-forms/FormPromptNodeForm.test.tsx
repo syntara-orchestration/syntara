@@ -143,7 +143,7 @@ describe('FormPromptNodeForm', () => {
   })
 
   describe('Form submission', () => {
-    it('submits trimmed parameters and derived fallback_behavior', async () => {
+    it('submits trimmed parameters and fallback_decision', async () => {
       const user = userEvent.setup()
       const formDefinition = defaultFormDefinition
 
@@ -182,7 +182,6 @@ describe('FormPromptNodeForm', () => {
           responder_groups: ['operators'],
           response_window: 3600,
           fallback_decision: 'fallback',
-          fallback_behavior: 'fallback',
           submit_label: 'Send',
           success_message: 'Thanks',
           timezone: 'America/New_York',
@@ -190,7 +189,7 @@ describe('FormPromptNodeForm', () => {
       )
     })
 
-    it('forces submit path and fail behavior when continue on failure is off', async () => {
+    it('forces submit fallback_decision when continue on failure is off', async () => {
       const user = userEvent.setup()
 
       renderFormPrompt(
@@ -214,7 +213,6 @@ describe('FormPromptNodeForm', () => {
       expect(mockOnSubmit).toHaveBeenCalledWith(
         expect.objectContaining({
           fallback_decision: 'submit',
-          fallback_behavior: 'fail',
         })
       )
     })

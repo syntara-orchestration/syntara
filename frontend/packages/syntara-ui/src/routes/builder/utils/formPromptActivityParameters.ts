@@ -7,7 +7,6 @@ export type FormPromptActivityParameterInput = {
   responder_groups?: string[]
   response_window?: number | null
   fallback_decision?: 'submit' | 'fallback' | null
-  fallback_behavior?: 'fail' | 'fallback'
   submit_label?: string | null
   success_message?: string | null
   timezone?: string | null
@@ -22,7 +21,6 @@ export function buildFormPromptActivityParameters(input: FormPromptActivityParam
     responder_groups,
     response_window,
     fallback_decision,
-    fallback_behavior,
     submit_label,
     success_message,
     timezone,
@@ -33,7 +31,6 @@ export function buildFormPromptActivityParameters(input: FormPromptActivityParam
     form_definition,
     ...(message != null && message !== '' && { message }),
     ...(fallback_decision !== undefined && fallback_decision !== null && { fallback_decision }),
-    ...(fallback_behavior !== undefined && { fallback_behavior }),
     ...(response_window !== undefined && response_window !== null && { response_window }),
     ...(responder_users !== undefined && responder_users.length > 0 && { responder_users }),
     ...(responder_groups !== undefined && responder_groups.length > 0 && { responder_groups }),

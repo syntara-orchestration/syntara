@@ -178,7 +178,7 @@ describe('buildWorkflowDefinition', () => {
       expect(result.nodes[0]).toHaveProperty('settings', { timeout: 300, continue_on_failure: true })
     })
 
-    it('derives fallback_behavior from fallback_decision without changing continue_on_failure', () => {
+    it('omits fallback_behavior from saved definition (backend schema uses fallback_decision only)', () => {
       const activities: Activity[] = [
         {
           id: 'form-1',
@@ -196,8 +196,8 @@ describe('buildWorkflowDefinition', () => {
       expect(result.nodes[0]).toHaveProperty('settings', { continue_on_failure: false })
       expect(result.nodes[0].parameters).toMatchObject({
         fallback_decision: 'fallback',
-        fallback_behavior: 'fallback',
       })
+      expect(result.nodes[0].parameters).not.toHaveProperty('fallback_behavior')
     })
 
     it('persists form_prompt parameters and settings in workflow definition', () => {
@@ -238,7 +238,6 @@ describe('buildWorkflowDefinition', () => {
         responder_groups: ['operators'],
         response_window: 7200,
         fallback_decision: 'submit',
-        fallback_behavior: 'fail',
         submit_label: 'Send',
         success_message: 'Done',
         timezone: 'UTC',

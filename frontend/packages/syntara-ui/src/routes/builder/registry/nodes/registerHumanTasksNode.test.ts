@@ -75,7 +75,6 @@ describe('registerHumanTasksNode', () => {
         name: 'Survey',
         form_definition: { fields: [] },
         fallback_decision: 'fallback',
-        fallback_behavior: 'fallback',
       },
       onSuccess,
       onError,

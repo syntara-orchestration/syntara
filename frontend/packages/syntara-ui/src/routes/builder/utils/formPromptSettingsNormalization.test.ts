@@ -26,17 +26,21 @@ describe('formPromptSettingsNormalization', () => {
     expect(formPromptHasFallbackEdge('form-2', edges)).toBe(false)
   })
 
-  it('does not override continue_on_failure when a fallback edge exists', () => {
+  it('does not change settings when stripping fallback_behavior', () => {
     const result = normalizeFormPromptActivityForDefinition(
-      formActivity('form-1', { fallback_decision: 'fallback' }, { continue_on_failure: false })
+      formActivity('form-1', { fallback_decision: 'fallback', fallback_behavior: 'fallback' }, { continue_on_failure: false })
     )
     expect(result.settings).toEqual({ continue_on_failure: false })
-    expect(result.parameters).toMatchObject({ fallback_behavior: 'fallback' })
+    expect(result.parameters).toMatchObject({ fallback_decision: 'fallback' })
+    expect(result.parameters).not.toHaveProperty('fallback_behavior')
   })
 
-  it('fills fallback_behavior from fallback_decision only', () => {
-    const result = normalizeFormPromptActivityForDefinition(formActivity('form-1', { fallback_decision: 'submit' }))
-    expect(result.parameters).toMatchObject({ fallback_behavior: 'fail' })
+  it('strips fallback_behavior before workflow definition save', () => {
+    const result = normalizeFormPromptActivityForDefinition(
+      formActivity('form-1', { fallback_decision: 'submit', fallback_behavior: 'fail' })
+    )
+    expect(result.parameters).toMatchObject({ fallback_decision: 'submit' })
+    expect(result.parameters).not.toHaveProperty('fallback_behavior')
   })
 
   it('buildOutgoingPorts uses resolved source ids', () => {

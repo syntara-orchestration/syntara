@@ -51,7 +51,6 @@ export function FormPromptNodeDetails({
     response_window: parameters.response_window,
     fallback_decision:
       parameters.fallback_decision ?? formPromptFallbackDecisionFromBehavior(parameters.fallback_behavior ?? undefined),
-    fallback_behavior: parameters.fallback_behavior ?? undefined,
     submit_label: parameters.submit_label,
     success_message: parameters.success_message,
     timezone: parameters.timezone,
@@ -78,7 +77,6 @@ export function FormPromptNodeDetails({
   const formStateKey = [
     nodeId,
     taskData.settings?.continue_on_failure ?? 'default',
-    parameters.fallback_behavior ?? '',
     parameters.fallback_decision ?? '',
   ].join(':')
 

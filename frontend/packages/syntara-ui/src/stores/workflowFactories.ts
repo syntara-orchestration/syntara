@@ -361,7 +361,6 @@ export type CreateFormPromptActivityOptions = {
   responder_groups?: string[]
   response_window?: number | null
   fallback_decision?: 'submit' | 'fallback' | null
-  fallback_behavior?: 'fail' | 'fallback'
   submit_label?: string | null
   success_message?: string | null
   timezone?: string | null

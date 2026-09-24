@@ -1,4 +1,4 @@
-/** API parameter `parameters.fallback_behavior` for form_prompt nodes. */
+/** Derived routing mode for client validation (not persisted — backend uses `fallback_decision`). */
 export type FormPromptFallbackBehavior = 'fail' | 'fallback'
 
 export function formPromptFallbackBehaviorFromDecision(

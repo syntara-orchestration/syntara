@@ -82,7 +82,6 @@ export default function registerHumanTasksNode() {
               responder_groups: formData.responder_groups,
               response_window: formData.response_window,
               fallback_decision: formData.fallback_decision,
-              fallback_behavior: formData.fallback_behavior,
               submit_label: formData.submit_label,
               success_message: formData.success_message,
               timezone: formData.timezone,

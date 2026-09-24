@@ -35,7 +35,6 @@ export default function registerFormPromptNode() {
             responder_groups: data.responder_groups,
             response_window: data.response_window,
             fallback_decision: data.fallback_decision,
-            fallback_behavior: data.fallback_behavior,
             submit_label: data.submit_label,
             success_message: data.success_message,
             timezone: data.timezone,
