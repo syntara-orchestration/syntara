@@ -1,39 +1,20 @@
-import {
-  Alert,
-  Content,
-  ContentVariants,
-  FormGroup,
-  FormHelperText,
-  HelperText,
-  HelperTextItem,
-  StackItem,
-} from '@patternfly/react-core'
-import { Controller, useFormContext } from 'react-hook-form'
+import { Alert, Content, ContentVariants, StackItem } from '@patternfly/react-core'
 
 import { FieldHelpPopover } from '../../../components/FieldHelpPopover'
 import { FormLabelWithHelp } from '../../../components/FormLabelWithHelp'
+import { SynFormField } from '../../../components/forms/SynFormField'
 import { WEBHOOK_BASE_URL } from '../../../utils/backendUrl'
 
 import { PayloadValidationSection } from './PayloadValidationSection'
 import { SampleCurlSection } from './SampleCurlSection'
 import { ServiceAccountSelect } from './ServiceAccountSelect'
-import type { TriggerFormData } from './triggerFormSchema'
 import { DEFAULT_JSON_SCHEMA, EXAMPLE_JSON_SCHEMA, JSON_SCHEMA_DOWNLOAD_FILENAME } from './triggerFormSchema'
 import { useWebhookUrl } from './useWebhookUrl'
 import { WebhookPathField } from './WebhookPathField'
 import { WebhookUrlPreview } from './WebhookUrlPreview'
 
-export function WebhookFields({
-  errors,
-}: Readonly<{
-  errors: Readonly<{
-    webhookPath?: { message?: string }
-    inputSchema?: { message?: string }
-    authorizedServiceAccountIds?: { message?: string }
-  }>
-}>) {
+export function WebhookFields() {
   const fullWebhookUrl = useWebhookUrl(WEBHOOK_BASE_URL)
-  const { control } = useFormContext<TriggerFormData>()
 
   return (
     <>
@@ -56,7 +37,6 @@ export function WebhookFields({
         }
         placeholder="/jira-updates"
         helperText="A unique slug for this endpoint (e.g., /jira-updates)."
-        error={errors.webhookPath?.message}
       />
 
       <WebhookUrlPreview
@@ -70,34 +50,25 @@ export function WebhookFields({
       />
 
       <StackItem>
-        <FormGroup
-          label={
-            <FormLabelWithHelp
-              label="Authorized service accounts"
+        <SynFormField
+          name="authorizedServiceAccountIds"
+          label="Authorized service accounts"
+          fieldId="webhook-authorized-service-accounts"
+          labelHelp={
+            <FieldHelpPopover
+              headerContent="Authorized service accounts"
               helpText="Select the service accounts that are allowed to invoke this webhook trigger endpoint. Callers must authenticate with a Bearer token from one of these service accounts."
             />
           }
-          fieldId="webhook-authorized-service-accounts"
         >
-          <Controller
-            control={control}
-            name="authorizedServiceAccountIds"
-            render={({ field }) => (
-              <ServiceAccountSelect
-                id="webhook-authorized-service-accounts"
-                selectedIds={field.value ?? []}
-                onChange={field.onChange}
-              />
-            )}
-          />
-          {errors.authorizedServiceAccountIds?.message && (
-            <FormHelperText>
-              <HelperText>
-                <HelperTextItem variant="error">{errors.authorizedServiceAccountIds.message}</HelperTextItem>
-              </HelperText>
-            </FormHelperText>
+          {({ field }) => (
+            <ServiceAccountSelect
+              id="webhook-authorized-service-accounts"
+              selectedIds={(field.value ?? []) as string[]}
+              onChange={field.onChange}
+            />
           )}
-        </FormGroup>
+        </SynFormField>
       </StackItem>
 
       <StackItem>
@@ -114,7 +85,6 @@ export function WebhookFields({
           ariaLabel="JSON schema validation editor"
           downloadFilename={JSON_SCHEMA_DOWNLOAD_FILENAME}
           helperText="Optional JSON Schema for validating incoming webhook payloads."
-          error={errors.inputSchema?.message}
         />
       </StackItem>
 

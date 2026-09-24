@@ -18,6 +18,10 @@ export type UseSynFormOptions<T extends FieldValues> = {
    * forms that hydrate from a query so fields do not flash empty before reset.
    */
   values?: T
+  /** RHF validation mode (e.g. `onChange` for builder node editors). */
+  mode?: 'onBlur' | 'onChange' | 'onSubmit'
+  /** RHF re-validation mode (e.g. `onChange` for builder node editors). */
+  reValidateMode?: 'onBlur' | 'onChange' | 'onSubmit'
   /** Called after `reset()` when `handleClose` is invoked. */
   onClose?: () => void
 }
@@ -89,12 +93,16 @@ export function useSynForm<T extends FieldValues>({
   schema,
   defaultValues,
   values,
+  mode,
+  reValidateMode,
   onClose,
 }: UseSynFormOptions<T>): UseSynFormReturn<T> {
   const form = useForm<T>({
     resolver: zodResolver(schema as ZodResolverSchema, undefined, { mode: 'sync' }) as Resolver<T>,
     defaultValues,
     values,
+    mode,
+    reValidateMode,
   })
 
   const { reset, setError } = form
@@ -106,5 +114,5 @@ export function useSynForm<T extends FieldValues>({
     onClose?.()
   }, [reset, onClose])
 
-  return { ...form, handleError, handleClose }
+  return { ...form, handleError, handleClose } as UseSynFormReturn<T>
 }

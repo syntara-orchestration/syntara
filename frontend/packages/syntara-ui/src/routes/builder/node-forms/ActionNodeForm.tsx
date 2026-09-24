@@ -1,10 +1,6 @@
 import {
   Flex,
   FlexItem,
-  FormGroup,
-  FormHelperText,
-  HelperText,
-  HelperTextItem,
   Label,
   MenuToggle,
   type MenuToggleElement,
@@ -14,12 +10,14 @@ import {
   StackItem,
   TextArea,
 } from '@patternfly/react-core'
-import { RhUiErrorIcon } from '@patternfly/react-icons'
 import { ExecutorTypeEnum } from '@syntara/contracts'
 import React, { type ReactNode, use, useEffect, useMemo, useRef, useState } from 'react'
-import { Controller, FormProvider, useForm, useFormContext, useWatch } from 'react-hook-form'
+import { useFormContext, useWatch } from 'react-hook-form'
 
+import { SynForm } from '../../../components/forms/SynForm'
+import { SynFormField } from '../../../components/forms/SynFormField'
 import { SynSelect } from '../../../components/SynSelect'
+import { useSynForm } from '../../../hooks/useSynForm'
 import {
   ExpandableCodeEditor,
   type CodeLanguage,
@@ -31,10 +29,9 @@ import { DroppableField } from '../panels/fields/DroppableField'
 import { useIsVersionView } from '../VersionViewContext'
 
 import { actionFormSchema, type ActionFormData, type ActionFormValues } from './actionFormSchema'
-import { HttpCredentialSection, HttpUrlField, type ActionFormMethods } from './httpCredentialSection'
+import { HttpCredentialSection, HttpUrlField } from './httpCredentialSection'
 import { KeyValueFields } from './KeyValueFields'
 import { ActivityNameField } from './shared/ActivityNameField'
-import { zodResolver } from './shared/formSchemaUtils'
 import { nodeHelp } from './shared/nodeFieldHelp'
 import { NodeFormContainer } from './shared/NodeFormContainer'
 import { NodeFormTabsLayout } from './shared/NodeFormTabsLayout'
@@ -158,64 +155,58 @@ function HttpMethodSelect({
   )
 }
 
-type ScriptEnvironmentVariablesProps = {
-  register: ReturnType<typeof useFormContext<ActionFormValues>>['register']
-  getValues: ReturnType<typeof useFormContext<ActionFormValues>>['getValues']
-  setValue: ReturnType<typeof useFormContext<ActionFormValues>>['setValue']
-  errors: { parameters?: { message?: string } }
-  isDisabled: boolean
-}
+function ScriptEnvironmentVariables({ isDisabled }: Readonly<{ isDisabled: boolean }>) {
+  const { getValues, setValue } = useFormContext<ActionFormValues>()
 
-function ScriptEnvironmentVariables({
-  register,
-  getValues,
-  setValue,
-  errors,
-  isDisabled,
-}: ScriptEnvironmentVariablesProps) {
   return (
-    <FormGroup label="Environment variables" labelHelp={nodeHelp.scriptEnvVars} fieldId="action-parameters">
-      <DroppableField
-        onDropText={(text) => {
-          const current = getValues('parameters')
-          setValue('parameters', (current ?? '') + text)
-        }}
-      >
-        <TextArea
-          {...register('parameters')}
-          id="action-parameters"
-          placeholder='{"MY_VAR": "value"}'
-          rows={3}
-          isDisabled={isDisabled}
-          validated={errors.parameters ? 'error' : 'default'}
-        />
-      </DroppableField>
-      <FormHelperText>
-        <HelperText>
-          <HelperTextItem {...(errors.parameters && { icon: <RhUiErrorIcon />, variant: 'error' as const })}>
-            {errors.parameters?.message ?? 'Environment variables available during script execution'}
-          </HelperTextItem>
-        </HelperText>
-      </FormHelperText>
-    </FormGroup>
+    <SynFormField
+      name="parameters"
+      label="Environment variables"
+      labelHelp={nodeHelp.scriptEnvVars}
+      fieldId="action-parameters"
+      hint="Environment variables available during script execution"
+    >
+      {({ field, fieldState }) => (
+        <DroppableField
+          onDropText={(text) => {
+            const current = getValues('parameters')
+            setValue('parameters', (current ?? '') + text)
+          }}
+        >
+          <TextArea
+            id="action-parameters"
+            placeholder='{"MY_VAR": "value"}'
+            rows={3}
+            isDisabled={isDisabled}
+            validated={fieldState.error ? 'error' : 'default'}
+            value={typeof field.value === 'string' ? field.value : ''}
+            onChange={field.onChange}
+            onBlur={field.onBlur}
+            name={field.name}
+          />
+        </DroppableField>
+      )}
+    </SynFormField>
   )
 }
 
 /** Script + API form fields (Stack content) for action node. */
 type ActionParametersContentProps = Readonly<{
-  register: ActionFormMethods['register']
-  control: ActionFormMethods['control']
-  getValues: ActionFormMethods['getValues']
-  setValue: ActionFormMethods['setValue']
-  errors: { code?: { message?: string }; url?: { message?: string }; parameters?: { message?: string } }
+  errors: { code?: { message?: string } }
   executor: ActionFormValues['executor']
   scriptEditorRef?: React.RefObject<ExpandableCodeEditorHandle | null>
   editorLanguage: CodeLanguage
   projectId?: string
 }>
 
-function ActionParametersContent(props: ActionParametersContentProps) {
-  const { register, control, getValues, setValue, errors, executor, scriptEditorRef, editorLanguage, projectId } = props
+function ActionParametersContent({
+  errors,
+  executor,
+  scriptEditorRef,
+  editorLanguage,
+  projectId,
+}: ActionParametersContentProps) {
+  const { register, getValues, setValue } = useFormContext<ActionFormValues>()
   const isVersionView = useIsVersionView()
 
   return (
@@ -224,124 +215,110 @@ function ActionParametersContent(props: ActionParametersContentProps) {
       {executor === ExecutorTypeEnum.SCRIPT && (
         <>
           <StackItem>
-            <FormGroup label="Language" labelHelp={nodeHelp.scriptLanguage} fieldId="action-language">
-              <Controller
-                control={control}
-                name="language"
-                render={({ field }) => (
-                  <ScriptLanguageSelect
-                    value={field.value ?? 'python'}
-                    onChange={field.onChange}
-                    isDisabled={isVersionView}
+            <SynFormField
+              name="language"
+              label="Language"
+              labelHelp={nodeHelp.scriptLanguage}
+              fieldId="action-language"
+            >
+              {({ field }) => (
+                <ScriptLanguageSelect
+                  value={typeof field.value === 'string' ? field.value : 'python'}
+                  onChange={field.onChange}
+                  isDisabled={isVersionView}
+                />
+              )}
+            </SynFormField>
+          </StackItem>
+          <StackItem>
+            <SynFormField
+              name="code"
+              label="Script"
+              labelHelp={nodeHelp.scriptCode}
+              isRequired
+              fieldId="action-code"
+              hint="Script code to execute"
+            >
+              {({ field, fieldState }) => (
+                <div
+                  style={
+                    fieldState.error || errors.code
+                      ? {
+                          borderBottom: '2px solid var(--pf-t--global--color--status--danger--default)',
+                        }
+                      : undefined
+                  }
+                >
+                  <ExpandableCodeEditor
+                    ref={scriptEditorRef ?? undefined}
+                    code={typeof field.value === 'string' ? field.value : ''}
+                    onCodeChange={field.onChange}
+                    language={editorLanguage}
+                    height="200px"
+                    ariaLabel="Script code editor"
+                    isDarkTheme
+                    isReadOnly={isVersionView}
+                    onDropText={(text) => {
+                      scriptEditorRef?.current?.insertAtCursor(text)
+                    }}
                   />
-                )}
-              />
-            </FormGroup>
+                </div>
+              )}
+            </SynFormField>
           </StackItem>
           <StackItem>
-            <FormGroup label="Script" labelHelp={nodeHelp.scriptCode} isRequired fieldId="action-code">
-              <Controller
-                control={control}
-                name="code"
-                render={({ field }) => (
-                  <div
-                    style={
-                      errors.code
-                        ? {
-                            borderBottom: '2px solid var(--pf-t--global--color--status--danger--default)',
-                          }
-                        : undefined
-                    }
-                  >
-                    <ExpandableCodeEditor
-                      ref={scriptEditorRef ?? undefined}
-                      code={field.value ?? ''}
-                      onCodeChange={field.onChange}
-                      language={editorLanguage}
-                      height="200px"
-                      ariaLabel="Script code editor"
-                      isDarkTheme
-                      isReadOnly={isVersionView}
-                      onDropText={(text) => {
-                        scriptEditorRef?.current?.insertAtCursor(text)
-                      }}
-                    />
-                  </div>
-                )}
-              />
-              <FormHelperText>
-                <HelperText>
-                  <HelperTextItem {...(errors.code && { icon: <RhUiErrorIcon />, variant: 'error' as const })}>
-                    {errors.code?.message ?? 'Script code to execute'}
-                  </HelperTextItem>
-                </HelperText>
-              </FormHelperText>
-            </FormGroup>
-          </StackItem>
-          <StackItem>
-            <ScriptEnvironmentVariables
-              register={register}
-              getValues={getValues}
-              setValue={setValue}
-              errors={errors}
-              isDisabled={isVersionView}
-            />
+            <ScriptEnvironmentVariables isDisabled={isVersionView} />
           </StackItem>
         </>
       )}
       {executor === ExecutorTypeEnum.HTTP_REQUEST && (
         <>
-          <HttpCredentialSection
-            control={control}
-            register={register}
-            getValues={getValues}
-            setValue={setValue}
-            urlError={errors.url}
-            isVersionView={isVersionView}
-            projectId={projectId}
-          />
+          <HttpCredentialSection isVersionView={isVersionView} projectId={projectId} />
           <StackItem>
-            <FormGroup label="HTTP Method" labelHelp={nodeHelp.httpMethod} fieldId="action-method">
-              <Controller
-                control={control}
-                name="method"
-                render={({ field }) => (
-                  <HttpMethodSelect value={field.value ?? 'GET'} onChange={field.onChange} isDisabled={isVersionView} />
-                )}
-              />
-            </FormGroup>
+            <SynFormField name="method" label="HTTP Method" labelHelp={nodeHelp.httpMethod} fieldId="action-method">
+              {({ field }) => (
+                <HttpMethodSelect
+                  value={typeof field.value === 'string' ? field.value : 'GET'}
+                  onChange={field.onChange}
+                  isDisabled={isVersionView}
+                />
+              )}
+            </SynFormField>
           </StackItem>
           <StackItem>
-            <Controller
-              control={control}
-              name="headers"
-              render={({ field }) => (
+            <SynFormField name="headers" label="" hideFormGroupLabel hideFooter>
+              {({ field }) => (
                 <KeyValueFields
-                  entries={field.value ?? []}
+                  entries={Array.isArray(field.value) ? field.value : []}
                   onChange={field.onChange}
                   isDisabled={isVersionView}
                   labelHelp={nodeHelp.httpHeaders}
                 />
               )}
-            />
+            </SynFormField>
           </StackItem>
           <StackItem>
-            <FormGroup label="Body" labelHelp={nodeHelp.httpBody} fieldId="action-body">
-              <DroppableField
-                onDropText={(text) => {
-                  const current = getValues('body')
-                  setValue('body', (current ?? '') + text)
-                }}
-              >
-                <TextArea
-                  {...register('body')}
-                  id="action-body"
-                  placeholder='{"key": "value"}'
-                  rows={3}
-                  isDisabled={isVersionView}
-                />
-              </DroppableField>
-            </FormGroup>
+            <SynFormField name="body" label="Body" labelHelp={nodeHelp.httpBody} fieldId="action-body" hideFooter>
+              {({ field }) => (
+                <DroppableField
+                  onDropText={(text) => {
+                    const current = getValues('body')
+                    setValue('body', (current ?? '') + text)
+                  }}
+                >
+                  <TextArea
+                    id="action-body"
+                    placeholder='{"key": "value"}'
+                    rows={3}
+                    isDisabled={isVersionView}
+                    value={typeof field.value === 'string' ? field.value : ''}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    name={field.name}
+                  />
+                </DroppableField>
+              )}
+            </SynFormField>
           </StackItem>
         </>
       )}
@@ -364,10 +341,7 @@ function ActionFormFields({
   projectId?: string
 }>) {
   const {
-    register,
     control,
-    getValues,
-    setValue,
     formState: { errors: contextErrors },
   } = useFormContext<ActionFormValues>()
   const errors = validationErrors ?? contextErrors
@@ -384,8 +358,8 @@ function ActionFormFields({
     () => (
       <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapSm' }}>
         <FlexItem>
-          <ActivityNameField<ActionFormValues>
-            register={register}
+          <ActivityNameField
+            control={control}
             fieldId="action-name"
             placeholder="Enter activity name"
             ariaLabel="Name"
@@ -400,7 +374,7 @@ function ActionFormFields({
         )}
       </Flex>
     ),
-    [register, executor]
+    [control, executor]
   )
 
   useEffect(() => {
@@ -416,10 +390,6 @@ function ActionFormFields({
 
   const parametersContent = (
     <ActionParametersContent
-      register={register}
-      control={control}
-      getValues={getValues}
-      setValue={setValue}
       errors={errors}
       executor={executor}
       scriptEditorRef={scriptEditorRef}
@@ -469,29 +439,29 @@ export function ActionNodeForm(props: Readonly<ActionNodeFormProps>) {
     props.onSubmit(cleanedData)
   }
 
-  const methods = useForm<ActionFormValues>({
-    resolver: zodResolver(actionFormSchema, undefined, { mode: 'sync' }),
+  const form = useSynForm({
+    schema: actionFormSchema,
     defaultValues,
   })
 
   const autoSubmitRef = use(NodeEditorAutoSubmitContext)
-  useRegisterAutoSubmit(autoSubmitRef, methods, handleSubmit)
+  useRegisterAutoSubmit(autoSubmitRef, form, handleSubmit)
 
   const {
     formState: { errors },
-  } = methods
+  } = form
   const scriptEditorRef = useRef<ExpandableCodeEditorHandle | null>(null)
 
   return (
-    <FormProvider {...methods}>
-      <NodeFormContainer formId="action-node-form" onSubmit={methods.handleSubmit(handleSubmit)}>
+    <NodeFormContainer formId="action-node-form" onSubmit={form.handleSubmit(handleSubmit)}>
+      <SynForm form={form}>
         <ActionFormFields
           onHeaderContentChange={props.onHeaderContentChange}
           validationErrors={errors}
           scriptEditorRef={scriptEditorRef}
           projectId={props.projectId}
         />
-      </NodeFormContainer>
-    </FormProvider>
+      </SynForm>
+    </NodeFormContainer>
   )
 }

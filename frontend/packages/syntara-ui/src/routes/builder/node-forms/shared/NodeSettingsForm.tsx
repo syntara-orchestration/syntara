@@ -9,11 +9,12 @@ import {
   Stack,
   StackItem,
   Switch,
-  TextInput,
 } from '@patternfly/react-core'
 import { useState } from 'react'
-import { Controller, useFormContext, useWatch } from 'react-hook-form'
+import { useFormContext, useWatch } from 'react-hook-form'
 
+import { SynFormField } from '../../../../components/forms/SynFormField'
+import { SynTextField } from '../../../../components/forms/SynTextField'
 import { SynSelect } from '../../../../components/SynSelect'
 import type { TimeoutNodeType } from '../../hooks/useWorkflowEngineDefaults'
 import { useWorkflowEngineDefaults } from '../../hooks/useWorkflowEngineDefaults'
@@ -160,19 +161,10 @@ type TimeoutSectionProps = {
   timeoutFormat: 'seconds' | 'duration'
   timeoutDefault: number | null
   timeoutPlaceholder: string
-  control: ReturnType<typeof useFormContext<FormWithSettings>>['control']
-  register: ReturnType<typeof useFormContext<FormWithSettings>>['register']
   isDisabled?: boolean
 }
 
-function TimeoutSection({
-  timeoutFormat,
-  timeoutDefault,
-  timeoutPlaceholder,
-  control,
-  register,
-  isDisabled,
-}: TimeoutSectionProps) {
+function TimeoutSection({ timeoutFormat, timeoutDefault, timeoutPlaceholder, isDisabled }: TimeoutSectionProps) {
   const durationHelp =
     timeoutDefault !== null
       ? `How long to wait before timing out. System default: ${formatSeconds(timeoutDefault)}.`
@@ -183,20 +175,22 @@ function TimeoutSection({
       <FormSection title="Timeout">
         <Stack hasGutter>
           <StackItem>
-            <FormGroup label="Timeout" labelHelp={nodeHelp.timeout} fieldId="node-settings-timeout">
-              <Controller
-                control={control}
-                name="settings.timeout"
-                render={({ field }) => (
-                  <DurationInput
-                    value={field.value}
-                    onChange={field.onChange}
-                    idPrefix="node-settings-timeout"
-                    isDisabled={isDisabled}
-                  />
-                )}
-              />
-            </FormGroup>
+            <SynFormField
+              name="settings.timeout"
+              label="Timeout"
+              labelHelp={nodeHelp.timeout}
+              fieldId="node-settings-timeout"
+              hideFooter
+            >
+              {({ field }) => (
+                <DurationInput
+                  value={field.value as number | undefined}
+                  onChange={field.onChange}
+                  idPrefix="node-settings-timeout"
+                  isDisabled={isDisabled}
+                />
+              )}
+            </SynFormField>
           </StackItem>
           <StackItem>
             <HelperText>
@@ -210,23 +204,20 @@ function TimeoutSection({
 
   return (
     <FormSection title="Timeout (seconds)">
-      <FormGroup label="Timeout (seconds)" labelHelp={nodeHelp.timeout} fieldId="node-settings-timeout-seconds">
-        <TextInput
-          {...register('settings.timeout', { setValueAs: (v) => (v === '' || v === null ? undefined : Number(v)) })}
-          id="node-settings-timeout-seconds"
-          aria-label="Timeout (seconds)"
-          type="number"
-          min={1}
-          placeholder={timeoutPlaceholder}
-          isDisabled={isDisabled}
-        />
-      </FormGroup>
+      <SynTextField
+        name="settings.timeout"
+        label="Timeout (seconds)"
+        labelHelp={nodeHelp.timeout}
+        fieldId="node-settings-timeout-seconds"
+        type="number"
+        placeholder={timeoutPlaceholder}
+        isDisabled={isDisabled}
+      />
     </FormSection>
   )
 }
 
 type RetryFieldsProps = {
-  register: ReturnType<typeof useFormContext<FormWithSettings>>['register']
   retryDefaults: {
     maxRetries: number | null
     initialInterval: number | null
@@ -240,74 +231,53 @@ function retryPlaceholder(val: number | null | undefined, fallback: string): str
   return val !== null && val !== undefined ? `${String(val)} — system default` : fallback
 }
 
-function RetryPolicyFields({ register, retryDefaults, isDisabled }: RetryFieldsProps) {
+function RetryPolicyFields({ retryDefaults, isDisabled }: RetryFieldsProps) {
   return (
     <>
       <StackItem>
-        <FormGroup label="Max retries" labelHelp={nodeHelp.maxRetries} fieldId="node-settings-max-retries">
-          <TextInput
-            {...register('settings.retry_policy.max_retries', { valueAsNumber: true })}
-            id="node-settings-max-retries"
-            type="number"
-            min={0}
-            placeholder={retryPlaceholder(retryDefaults?.maxRetries, '0 = no retry')}
-            isDisabled={isDisabled}
-          />
-        </FormGroup>
-        <HelperText>
-          <HelperTextItem>Number of retries after the initial attempt. 0 = explicitly no retry.</HelperTextItem>
-        </HelperText>
+        <SynTextField
+          name="settings.retry_policy.max_retries"
+          label="Max retries"
+          labelHelp={nodeHelp.maxRetries}
+          fieldId="node-settings-max-retries"
+          type="number"
+          placeholder={retryPlaceholder(retryDefaults?.maxRetries, '0 = no retry')}
+          isDisabled={isDisabled}
+          hint="Number of retries after the initial attempt. 0 = explicitly no retry."
+        />
       </StackItem>
       <StackItem>
-        <FormGroup
+        <SynTextField
+          name="settings.retry_policy.initial_interval"
           label="Initial interval (seconds)"
           labelHelp={nodeHelp.initialInterval}
           fieldId="node-settings-initial-interval"
-        >
-          <TextInput
-            {...register('settings.retry_policy.initial_interval', {
-              setValueAs: (v) => (v === '' || v === null ? undefined : Number(v)),
-            })}
-            id="node-settings-initial-interval"
-            type="number"
-            min={1}
-            placeholder={retryPlaceholder(retryDefaults?.initialInterval, 'System default')}
-            isDisabled={isDisabled}
-          />
-        </FormGroup>
+          type="number"
+          placeholder={retryPlaceholder(retryDefaults?.initialInterval, 'System default')}
+          isDisabled={isDisabled}
+        />
       </StackItem>
       <StackItem>
-        <FormGroup label="Max interval (seconds)" labelHelp={nodeHelp.maxInterval} fieldId="node-settings-max-interval">
-          <TextInput
-            {...register('settings.retry_policy.max_interval', {
-              setValueAs: (v) => (v === '' || v === null ? undefined : Number(v)),
-            })}
-            id="node-settings-max-interval"
-            type="number"
-            min={1}
-            placeholder={retryPlaceholder(retryDefaults?.maxInterval, 'System default')}
-            isDisabled={isDisabled}
-          />
-        </FormGroup>
+        <SynTextField
+          name="settings.retry_policy.max_interval"
+          label="Max interval (seconds)"
+          labelHelp={nodeHelp.maxInterval}
+          fieldId="node-settings-max-interval"
+          type="number"
+          placeholder={retryPlaceholder(retryDefaults?.maxInterval, 'System default')}
+          isDisabled={isDisabled}
+        />
       </StackItem>
       <StackItem>
-        <FormGroup
+        <SynTextField
+          name="settings.retry_policy.backoff_coefficient"
           label="Backoff coefficient"
           labelHelp={nodeHelp.backoffCoefficient}
           fieldId="node-settings-backoff-coefficient"
-        >
-          <TextInput
-            {...register('settings.retry_policy.backoff_coefficient', {
-              setValueAs: (v) => (v === '' || v === null ? undefined : Number(v)),
-            })}
-            id="node-settings-backoff-coefficient"
-            type="number"
-            min={1}
-            step={0.1}
-            placeholder={retryPlaceholder(retryDefaults?.backoffCoefficient, 'System default')}
-            isDisabled={isDisabled}
-          />
-        </FormGroup>
+          type="number"
+          placeholder={retryPlaceholder(retryDefaults?.backoffCoefficient, 'System default')}
+          isDisabled={isDisabled}
+        />
       </StackItem>
     </>
   )
@@ -328,7 +298,7 @@ export function NodeSettingsForm({
   timeoutNodeType,
 }: NodeSettingsFormProps) {
   const isVersionView = useIsVersionView()
-  const { control, register, setValue } = useFormContext<FormWithSettings>()
+  const { control, setValue } = useFormContext<FormWithSettings>()
   const retryPolicy = useWatch({ control, name: 'settings.retry_policy' })
   const continueOnFailure = useWatch({ control, name: 'settings.continue_on_failure' })
   const overrideRetry = retryPolicy !== undefined
@@ -374,8 +344,6 @@ export function NodeSettingsForm({
             timeoutFormat={timeoutFormat}
             timeoutDefault={timeoutDefault}
             timeoutPlaceholder={timeoutPlaceholder}
-            control={control}
-            register={register}
             isDisabled={isVersionView}
           />
         </StackItem>
@@ -403,9 +371,7 @@ export function NodeSettingsForm({
                   <HelperTextItem>{retryHelp}</HelperTextItem>
                 </HelperText>
               </StackItem>
-              {overrideRetry && (
-                <RetryPolicyFields register={register} retryDefaults={retryDefaults} isDisabled={isVersionView} />
-              )}
+              {overrideRetry && <RetryPolicyFields retryDefaults={retryDefaults} isDisabled={isVersionView} />}
             </Stack>
           </FormSection>
         </StackItem>

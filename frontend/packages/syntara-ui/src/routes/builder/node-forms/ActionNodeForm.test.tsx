@@ -1,14 +1,15 @@
 import { render, fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { useForm } from 'react-hook-form'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { credentialsClient } from '../../../client'
+import { SynForm } from '../../../components/forms/SynForm'
+import { useSynForm } from '../../../hooks/useSynForm'
 import { useAllProjects, useSelectableProjects } from '../../access/useAllProjects'
 import { useAllCredentials } from '../components/useAllCredentials'
 
-import type { ActionFormValues } from './actionFormSchema'
+import { actionFormSchema } from './actionFormSchema'
 import { ActionNodeForm, HttpUrlField } from './ActionNodeForm'
 import { renderWithHeader } from './test-utils/renderWithHeader'
 
@@ -607,18 +608,15 @@ describe('ActionNodeForm', () => {
       // Render HttpUrlField directly — avoids the PatternFly tab aria-controls/id
       // mismatch that occurs in happy-dom when testing the full ActionNodeForm.
       function Wrapper() {
-        const { register, getValues, setValue } = useForm<ActionFormValues>({
-          defaultValues: { executor: 'http_request', url: '' },
+        const form = useSynForm({
+          schema: actionFormSchema,
+          defaultValues: { name: '', executor: 'http_request', url: '', settings: {} },
         })
         return (
           <form>
-            <HttpUrlField
-              register={register}
-              getValues={getValues}
-              setValue={setValue}
-              isUrlManagedByCredential
-              isDisabled={false}
-            />
+            <SynForm form={form}>
+              <HttpUrlField isUrlManagedByCredential isDisabled={false} />
+            </SynForm>
           </form>
         )
       }

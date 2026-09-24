@@ -1,9 +1,13 @@
-import { Alert, FormGroup, HelperText, HelperTextItem, Stack, StackItem, TextArea } from '@patternfly/react-core'
+import { Alert, HelperText, HelperTextItem, Stack, StackItem } from '@patternfly/react-core'
 import type { Activity } from '@syntara/contracts'
 import type { ReactNode } from 'react'
 import { use, useEffect, useMemo } from 'react'
-import { Controller, FormProvider, useForm, useFormContext, useWatch } from 'react-hook-form'
+import { useFormContext } from 'react-hook-form'
 
+import { SynForm } from '../../../components/forms/SynForm'
+import { SynFormField } from '../../../components/forms/SynFormField'
+import { SynTextAreaField } from '../../../components/forms/SynTextAreaField'
+import { useSynForm } from '../../../hooks/useSynForm'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import { NodeEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useNodeEditorAutoSubmit'
 import { useWorkflowEngineDefaults } from '../hooks/useWorkflowEngineDefaults'
@@ -27,7 +31,6 @@ import { ApproverMultiSelect } from './ApproverMultiSelect'
 import { FallbackDecisionField } from './FallbackDecisionField'
 import { ActivityNameField } from './shared/ActivityNameField'
 import { DurationInput } from './shared/DurationInput'
-import { zodResolver } from './shared/formSchemaUtils'
 import { nodeHelp } from './shared/nodeFieldHelp'
 import { NodeFormContainer } from './shared/NodeFormContainer'
 import nodeFormStyles from './shared/nodeFormStyles.module.css'
@@ -178,8 +181,7 @@ function ApprovalFormFields({
   projectId?: string
 }) {
   const isVersionView = useIsVersionView()
-  const { register, control, setValue } = useFormContext<ApprovalFormData>()
-  const decisionWindow = useWatch({ control, name: 'decision_window' })
+  const { control } = useFormContext<ApprovalFormData>()
   const { defaults } = useWorkflowEngineDefaults()
   const approvalTimeoutDefault = defaults?.timeoutSeconds.approval ?? null
 
@@ -195,8 +197,8 @@ function ApprovalFormFields({
   const { groups, isLoading: isLoadingGroups } = useApprovalDecideGroups()
 
   const nameField = useMemo(
-    () => <ActivityNameField register={register} fieldId="approval-name" ariaLabel="Name" />,
-    [register]
+    () => <ActivityNameField control={control} fieldId="approval-name" ariaLabel="Name" />,
+    [control]
   )
 
   useEffect(() => {
@@ -209,85 +211,93 @@ function ApprovalFormFields({
   const parametersContent = (
     <Stack hasGutter>
       <StackItem>
-        <FormGroup label={APPROVER_USERS_LABEL} labelHelp={nodeHelp.approverUsers} fieldId="approval-approver-users">
-          <fieldset disabled={isVersionView} className={nodeFormStyles.disabledFieldset}>
-            <Controller
-              name="approver_users"
-              control={control}
-              render={({ field: { value, onChange } }) => (
-                <ApproverUsersSelect
-                  value={value ?? []}
-                  onChange={onChange}
-                  users={users}
-                  isLoading={isLoadingUsers}
-                  validationError={validationErrors?.approver_users}
-                  isPermissionDenied={usersPermissionDenied}
-                  hasProjectContext={!!effectiveProjectId}
-                />
-              )}
-            />
-          </fieldset>
-        </FormGroup>
+        <SynFormField
+          name="approver_users"
+          label={APPROVER_USERS_LABEL}
+          labelHelp={nodeHelp.approverUsers}
+          fieldId="approval-approver-users"
+          hideFooter
+        >
+          {({ field }) => (
+            <fieldset disabled={isVersionView} className={nodeFormStyles.disabledFieldset}>
+              <ApproverUsersSelect
+                value={Array.isArray(field.value) ? field.value : []}
+                onChange={field.onChange}
+                users={users}
+                isLoading={isLoadingUsers}
+                validationError={validationErrors?.approver_users}
+                isPermissionDenied={usersPermissionDenied}
+                hasProjectContext={!!effectiveProjectId}
+              />
+            </fieldset>
+          )}
+        </SynFormField>
       </StackItem>
       <StackItem>
-        <FormGroup label={APPROVER_GROUPS_LABEL} fieldId="approval-approver-groups" labelHelp={nodeHelp.approverGroups}>
-          <fieldset disabled={isVersionView} className={nodeFormStyles.disabledFieldset}>
-            <Controller
-              name="approver_groups"
-              control={control}
-              render={({ field: { value, onChange } }) => (
-                <ApproverGroupsSelect
-                  value={value ?? []}
-                  onChange={onChange}
-                  groups={groups}
-                  isLoading={isLoadingGroups}
-                  validationError={validationErrors?.approver_groups}
-                />
-              )}
-            />
-          </fieldset>
-        </FormGroup>
+        <SynFormField
+          name="approver_groups"
+          label={APPROVER_GROUPS_LABEL}
+          fieldId="approval-approver-groups"
+          labelHelp={nodeHelp.approverGroups}
+          hideFooter
+        >
+          {({ field }) => (
+            <fieldset disabled={isVersionView} className={nodeFormStyles.disabledFieldset}>
+              <ApproverGroupsSelect
+                value={Array.isArray(field.value) ? field.value : []}
+                onChange={field.onChange}
+                groups={groups}
+                isLoading={isLoadingGroups}
+                validationError={validationErrors?.approver_groups}
+              />
+            </fieldset>
+          )}
+        </SynFormField>
       </StackItem>
       <StackItem>
-        <FormGroup label="Message" labelHelp={nodeHelp.approvalMessage} fieldId="approval-prompt">
-          <TextArea
-            {...register('prompt')}
-            id="approval-prompt"
-            placeholder="Please approve this deployment to production"
-            rows={3}
-            isDisabled={isVersionView}
-          />
-        </FormGroup>
+        <SynTextAreaField
+          name="prompt"
+          label="Message"
+          labelHelp={nodeHelp.approvalMessage}
+          fieldId="approval-prompt"
+          placeholder="Please approve this deployment to production"
+          rows={3}
+          isDisabled={isVersionView}
+        />
       </StackItem>
       <StackItem>
         <FallbackDecisionField />
       </StackItem>
       <StackItem>
-        <FormGroup
+        <SynFormField
+          name="decision_window"
           label="Decision window"
           labelHelp={nodeHelp.approvalDecisionWindow}
           fieldId="approval-decision-window"
+          hideFooter
         >
-          <Stack hasGutter>
-            <StackItem>
-              <DurationInput
-                value={decisionWindow}
-                onChange={(val) => setValue('decision_window', val, { shouldDirty: true })}
-                idPrefix="approval-decision-window"
-                isDisabled={isVersionView}
-              />
-            </StackItem>
-            <StackItem>
-              <HelperText>
-                <HelperTextItem>
-                  {approvalTimeoutDefault !== null
-                    ? `How long the approver has to respond before the request expires. Falls back to system default (${formatDuration(approvalTimeoutDefault)}) if not set.`
-                    : 'How long the approver has to respond before the request expires. Falls back to system default if not set.'}
-                </HelperTextItem>
-              </HelperText>
-            </StackItem>
-          </Stack>
-        </FormGroup>
+          {({ field }) => (
+            <Stack hasGutter>
+              <StackItem>
+                <DurationInput
+                  value={field.value as number | undefined}
+                  onChange={field.onChange}
+                  idPrefix="approval-decision-window"
+                  isDisabled={isVersionView}
+                />
+              </StackItem>
+              <StackItem>
+                <HelperText>
+                  <HelperTextItem>
+                    {approvalTimeoutDefault !== null
+                      ? `How long the approver has to respond before the request expires. Falls back to system default (${formatDuration(approvalTimeoutDefault)}) if not set.`
+                      : 'How long the approver has to respond before the request expires. Falls back to system default if not set.'}
+                  </HelperTextItem>
+                </HelperText>
+              </StackItem>
+            </Stack>
+          )}
+        </SynFormField>
       </StackItem>
     </Stack>
   )
@@ -326,27 +336,27 @@ export function ApprovalNodeForm(props: ApprovalNodeFormProps) {
     })
   }
 
-  const methods = useForm<ApprovalFormData>({
-    resolver: zodResolver(approvalFormSchema, undefined, { mode: 'sync' }),
+  const form = useSynForm({
+    schema: approvalFormSchema,
     defaultValues,
   })
 
   const autoSubmitRef = use(NodeEditorAutoSubmitContext)
-  useRegisterAutoSubmit(autoSubmitRef, methods, handleSubmit)
+  useRegisterAutoSubmit(autoSubmitRef, form, handleSubmit)
 
   const {
     formState: { errors },
-  } = methods
+  } = form
 
   return (
-    <FormProvider {...methods}>
-      <NodeFormContainer formId="approval-node-form" onSubmit={methods.handleSubmit(handleSubmit)}>
+    <NodeFormContainer formId="approval-node-form" onSubmit={form.handleSubmit(handleSubmit)}>
+      <SynForm form={form}>
         <ApprovalFormFields
           onHeaderContentChange={props.onHeaderContentChange}
           validationErrors={errors}
           projectId={props.projectId}
         />
-      </NodeFormContainer>
-    </FormProvider>
+      </SynForm>
+    </NodeFormContainer>
   )
 }
