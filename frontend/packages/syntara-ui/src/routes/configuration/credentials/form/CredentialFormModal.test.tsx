@@ -150,8 +150,8 @@ describe('CredentialFormModal', () => {
 
   it('renders name and description fields', () => {
     render(<CredentialFormModal isOpen onClose={vi.fn()} />, { wrapper })
-    expect(screen.getByLabelText('Credential name')).toBeInTheDocument()
-    expect(screen.getByLabelText('Credential description')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Enter credential name')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Enter description (optional)')).toBeInTheDocument()
   })
 
   it('renders credential type dropdown with types', async () => {
@@ -297,7 +297,7 @@ describe('CredentialFormModal', () => {
     const user = userEvent.setup()
     render(<CredentialFormModal isOpen onClose={vi.fn()} defaultProjectId="proj-1" />, { wrapper })
 
-    await user.type(screen.getByLabelText('Credential name'), 'New Token')
+    await user.type(screen.getByPlaceholderText('Enter credential name'), 'New Token')
     // type-1 (HTTP Bearer Token) is auto-selected, no need to re-select
     await user.type(screen.getByLabelText('Token', { selector: 'input' }), 'my-secret-token')
     await user.click(screen.getByRole('button', { name: 'Create credential' }))
@@ -321,7 +321,7 @@ describe('CredentialFormModal', () => {
     render(<CredentialFormModal isOpen onClose={vi.fn()} credentialToEdit={mockCredential} />, { wrapper })
 
     await user.clear(screen.getByDisplayValue('My Token'))
-    await user.type(screen.getByLabelText('Credential name'), 'Updated Token')
+    await user.type(screen.getByPlaceholderText('Enter credential name'), 'Updated Token')
     await user.click(screen.getByRole('button', { name: 'Save credential' }))
 
     await waitFor(() => expect(mockMutate).toHaveBeenCalled())
@@ -340,7 +340,7 @@ describe('CredentialFormModal', () => {
       wrapper,
     })
 
-    await user.type(screen.getByLabelText('Credential name'), 'New Token')
+    await user.type(screen.getByPlaceholderText('Enter credential name'), 'New Token')
     // type-1 (HTTP Bearer Token) is auto-selected
     await user.type(screen.getByLabelText('Token', { selector: 'input' }), 'secret')
     await user.click(screen.getByRole('button', { name: 'Create credential' }))
@@ -373,7 +373,7 @@ describe('CredentialFormModal', () => {
     expect(screen.getByText('Name is required')).toBeInTheDocument()
 
     // Type in name to clear error
-    await user.type(screen.getByLabelText('Credential name'), 'Test')
+    await user.type(screen.getByPlaceholderText('Enter credential name'), 'Test')
     expect(screen.queryByText('Name is required')).not.toBeInTheDocument()
   })
 
@@ -423,7 +423,7 @@ describe('CredentialFormModal', () => {
     const user = userEvent.setup()
     render(<CredentialFormModal isOpen onClose={vi.fn()} />, { wrapper })
 
-    await user.type(screen.getByLabelText('Credential name'), 'New Token')
+    await user.type(screen.getByPlaceholderText('Enter credential name'), 'New Token')
     // type-1 (HTTP Bearer Token) is auto-selected
     await user.type(screen.getByLabelText('Token', { selector: 'input' }), 'my-secret-token')
     await user.click(screen.getByRole('button', { name: 'Create credential' }))
@@ -435,7 +435,7 @@ describe('CredentialFormModal', () => {
     const user = userEvent.setup()
     render(<CredentialFormModal isOpen onClose={vi.fn()} defaultProjectId="proj-1" />, { wrapper })
 
-    await user.type(screen.getByLabelText('Credential name'), 'New Token')
+    await user.type(screen.getByPlaceholderText('Enter credential name'), 'New Token')
     // type-1 (HTTP Bearer Token) is auto-selected
     await user.type(screen.getByLabelText('Token', { selector: 'input' }), 'my-secret-token')
     await user.click(screen.getByRole('button', { name: 'Create credential' }))
@@ -452,7 +452,7 @@ describe('CredentialFormModal', () => {
 
     await user.click(screen.getByRole('button', { name: 'Credential project' }))
     await user.click(screen.getByRole('option', { name: 'Project Beta' }))
-    await user.type(screen.getByLabelText('Credential name'), 'New Token')
+    await user.type(screen.getByPlaceholderText('Enter credential name'), 'New Token')
     // type-1 (HTTP Bearer Token) is auto-selected
     await user.type(screen.getByLabelText('Token', { selector: 'input' }), 'my-secret-token')
     await user.click(screen.getByRole('button', { name: 'Create credential' }))
@@ -508,7 +508,7 @@ describe('CredentialFormModal', () => {
       wrapper,
     })
 
-    await user.type(screen.getByLabelText('Credential name'), 'New Token')
+    await user.type(screen.getByPlaceholderText('Enter credential name'), 'New Token')
     // type-1 (HTTP Bearer Token) is auto-selected
     await user.type(screen.getByLabelText('Token', { selector: 'input' }), 'secret')
     await user.click(screen.getByRole('button', { name: 'Create credential' }))
@@ -616,7 +616,7 @@ describe('CredentialFormModal', () => {
 
       await selectAAPType(user)
       await selectAuthMethod(user, 'Basic Auth')
-      await user.type(screen.getByLabelText('Credential name'), 'Test AAP')
+      await user.type(screen.getByPlaceholderText('Enter credential name'), 'Test AAP')
       await user.type(screen.getByLabelText('Username', { selector: 'input' }), 'admin')
       await user.click(screen.getByRole('button', { name: 'Create credential' }))
 
