@@ -13,7 +13,7 @@ import { nodeSettingsSchema } from './nodeSettingsSchema'
 
 const mockDefaults = {
   continueOnFailure: false,
-  timeoutSeconds: { script: 300, agentic: 300, aap: 3600, approval: 86400, http_request: 30 },
+  timeoutSeconds: { script: 300, agentic: 300, aap: 3600, approval: 86400, form_prompt: 86400, http_request: 30 },
   retry: { maxRetries: 3, initialInterval: 1, maxInterval: 60, backoffCoefficient: 2 },
   maxLoopIterations: 10000,
   convergeWaitDuration: null,
