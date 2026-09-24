@@ -1,9 +1,17 @@
 # Execution Plane: Workload data sharing
 
-How successive WorkItems in one Automation Orchestrator (AO) workflow
-share a workspace, and how a run pushes file results. Object-store
-files and Git trees are not Execution Plane input schemes: AO fetches
-them with a dedicated activity (HTTP or Git) into the workspace.
+Two jobs:
+
+1. Successive WorkItems in one Automation Orchestrator (AO) workflow
+   share a directory (`/workspace`).
+2. After a run, listed files are uploaded so later nodes or the UI
+   can get them without stuffing bytes into `WorkItem.result`.
+
+To clone a Git repo or download a file, AO does **not** ask the
+Execution Plane to implement fetch. It runs a normal WorkItem whose
+image is already a Git client or an HTTP client. That container
+writes into `/workspace`. The next WorkItem on the same workspace
+UUID just reads the disk.
 
 - Ticket: [AAP-94189](https://redhat.atlassian.net/browse/AAP-94189)
 - Feature: [ANSTRAT-1803](https://redhat.atlassian.net/browse/ANSTRAT-1803)
@@ -17,17 +25,16 @@ A first cut of the **data-sharing contract** on the WorkItem payload.
 It names the use-cases, who owns each side, and a payload shape EP can
 implement without knowing what a Project or Workflow is.
 
-It is not a Kubernetes PVC spec and not a Podman volume spec. Those
-are the same concept on different backends. It is not AO FileManager
-internals ([file-storage.md](../file-storage.md)), and not the
-in-container SDK. Listed outputs are paths. HTTP(S) files and Git
-trees are dedicated activities writing into the workspace. The
-workspace is a volume with a globally unique UUID, on one
-ExecutionTarget.
+The workspace is the same idea on every backend (Kubernetes PVC or
+Podman volume). This is not a PVC spec, not AO FileManager
+([file-storage.md](../file-storage.md)), and not the in-container SDK.
+Listed outputs are filesystem paths.
 
-Placement stays in [labels.md](labels.md). The reconciler does not
-read this payload. See [example 02](examples/02-volume-mount.md)
-for a cold-start inventory that ignores data sharing when matching.
+Placement stays in [syntara#620](https://github.com/syntara-orchestration/syntara/pull/620).
+The reconciler does not read this payload.
+[syntara#634](https://github.com/syntara-orchestration/syntara/pull/634)
+example 02 is a cold-start inventory that ignores data sharing when
+matching.
 
 ## Principles
 
@@ -37,21 +44,25 @@ for a cold-start inventory that ignores data sharing when matching.
    on exactly one of them, so WorkItems that cite that id run on that
    target. AO already owns that (selectors or default routing). The
    reconciler still does not read `data`.
-2. **HTTP and Git are activities, not `data.inputs`.** Fetching
-   object-store bytes is a WorkItem whose `activity.image` is an HTTP
-   client (for example `registry.redhat.io/ao/http-request:1.0.0`).
-   Fetching a Git tree is a WorkItem whose image is a Git client (for
-   example `registry.redhat.io/ao/git-clone:1.0.0`). Both write into
-   `/workspace`. The workspace *is* a volume (Kubernetes PVC or
-   Podman volume; same concept). There is no `data.inputs` list.
-3. **AO resolves Git refs and HTTP URLs before submit.** EP does not
-   call `POST /files`, look up `FileMetadata`, or resolve a Git
-   branch name. AO turns a file id into an HTTP(S) URL on the HTTP
-   activity, and a repo ref into a clone URL plus SHA on the Git
-   activity.
-4. **JSON result ≠ file artifacts.** `WorkItem.result` stays a small
-   JSON blob (stdout, return code, artifact URIs). Large files go to
-   object storage. Temporal payload limits make that split mandatory.
+2. **Git and HTTP downloads are ordinary WorkItems.** There is no
+   `data.inputs` list on the playbook (or other) WorkItem. To get a
+   repo or a file onto disk, AO submits a WorkItem whose
+   `activity.image` is a Git client (for example
+   `registry.redhat.io/ao/git-clone:1.0.0`) or an HTTP client (for
+   example `registry.redhat.io/ao/http-request:1.0.0`). That
+   container writes into `/workspace`. EP does not clone or GET
+   inside the Worker Manager.
+3. **AO prepares URLs before it submits.** If the author attached a
+   file, AO already stored it ([file-storage.md](../file-storage.md))
+   and passes an HTTP(S) URL to the HTTP WorkItem. If the author
+   pointed at a Git branch, AO pins a commit SHA and passes clone
+   URL plus SHA to the Git WorkItem. EP never calls AO's file-upload
+   API and never resolves `main`.
+4. **JSON result ≠ file bytes.** `WorkItem.result` stays a small
+   JSON blob (stdout, return code). Large files go to object
+   storage. The result may list **references** (`artifacts[]`: path,
+   uri, status, size), not the bytes. Temporal payload limits make
+   that split mandatory.
 5. **A workspace has a UUID unique across all ExecutionTargets.** The
    volume lives on exactly one target. It is mounted at `/workspace`
    by default. ReadWriteOnce: **only one WorkItem can mount that
@@ -62,112 +73,18 @@ for a cold-start inventory that ignores data sharing when matching.
 
 ## Primary use-cases
 
-| # | Use-case | What the WorkItem carries | When it happens |
-|---|---|---|---|
-| 1 | **Share a workspace** | Globally unique workspace **UUID**. Volume on one ET at `/workspace`. **One WorkItem at a time.** | Until TTL from last unmount, or delete API |
-| 2 | **Push results** | List of in-container file paths to upload | After the run, **in the background**; does not gate the next WorkItem. Artifacts land on `WorkItem.result` with `status` `uploading`, then `available` or `failed` |
+| # | Use-case | What the WorkItem carries |
+|---|---|---|
+| 1 | **Share a workspace** | Globally unique workspace **UUID**. Volume on one ET at `/workspace`. **One WorkItem at a time.** |
+| 2 | **Push results** | List of in-container file paths to upload |
 
-Object-store files and Git trees are not payload use-cases. AO runs
-an HTTP or Git activity against a URL or clone it already resolved
-and writes under `/workspace`. Later nodes mount the same workspace
-UUID.
+To get a Git repo or an uploaded file onto disk, AO runs its Git or
+HTTP WorkItem first, with the same workspace UUID. The playbook (or
+other) WorkItem then reads `/workspace`. No extra EP fetch step.
 
-Both use-cases use the same payload block. They compose: a node can
-read and write `/workspace` and list files to upload as results.
-
-## Fetching files into the workspace (not payload use-cases)
-
-The author attached files, pointed at a bucket, or pointed at a Git
-repo. Those bytes belong on the **workspace**, not on `data.inputs`.
-There is no `data.inputs` list. AO submits a dedicated activity that
-writes under `/workspace`.
-
-### HTTP (object store)
-
-AO already stores uploads in S3-compatible storage
-([file-storage.md](../file-storage.md)). It turns a file id into an
-HTTP(S) URL (presigned, or the platform file HTTP API) and submits a
-WorkItem whose activity is HTTP:
-
-```json
-{
-  "payload": {
-    "activity": {
-      "image": "registry.redhat.io/ao/http-request:1.0.0",
-      "params": {
-        "url": "https://files.example.com/files/abc123/site.yml",
-        "dest": "/workspace/site.yml"
-      }
-    },
-    "data": {
-      "workspace": "7c1a9f3e-4b2d-41a8-9c1f-91c0d4e5a6b7"
-    }
-  }
-}
-```
-
-`activity.params` is owned by the HTTP activity (AO / Extension), not
-by this contract. The activity must write the body to a filesystem
-path (for example `dest`), not only into `WorkItem.result`.
-
-Same pattern for a minted artifact URI from use-case 2: a later HTTP
-activity GETs that URL into `/workspace`. A different target cannot
-mount that UUID; AO runs the HTTP activity there into a workspace on
-that target, or the next node consumes the URI itself.
-
-### Git
-
-AO turns the author's branch or tag into a clone URL plus a **pinned
-commit SHA** (the same way it resolves an image tag → digest for
-`activity.image`) and submits a Git activity:
-
-```json
-{
-  "payload": {
-    "activity": {
-      "image": "registry.redhat.io/ao/git-clone:1.0.0",
-      "params": {
-        "uri": "git+https://gitlab.example.com/org/playbooks.git",
-        "ref": "a1b2c3d4e5f6",
-        "dest": "/workspace/src"
-      }
-    },
-    "data": {
-      "workspace": "7c1a9f3e-4b2d-41a8-9c1f-91c0d4e5a6b7"
-    }
-  }
-}
-```
-
-`activity.params` is owned by the Git activity, not by this contract.
-EP does not follow `main`. A floating branch name would make two
-nodes of one execution clone different trees. Credentials are a
-Credential Provider reference on the activity, not a password in the
-URI.
-
-The clone is writeable on disk like any other workspace files. Pushing
-commits back to the remote is not a use-case here; later nodes see
-whatever was left under `/workspace`.
-
-Submodules, LFS, sparse checkout, and clone depth are the Git
-activity's problem, not EP's. Lean MVP for that Extension: one repo,
-one SHA, full tree, shallow clone, no LFS.
-
-### What EP does
-
-That WorkItem mounts the workspace UUID; the activity writes at a
-path under `/workspace`. The next WorkItem on the same UUID reads
-the files. There is no Worker Manager GET or `git clone` at start of
-the playbook (or other) WorkItem.
-
-OpenShell has no volume attach. HTTP and Git activities still run;
-they cannot leave files on a workspace for the next WorkItem.
-Cross-run files on that backend go through use-case 2 (listed
-outputs) or stay in that one container.
-
-[Example 02](examples/02-volume-mount.md) used
-`payload.volume_mounts` as a stand-in. Read that as the workspace
-volume, not as an input list.
+Both numbered use-cases use the same payload block. They compose: a
+node can read and write `/workspace` and list files to upload as
+results.
 
 ## Use-case 1: share a workspace across WorkItems
 
@@ -220,7 +137,8 @@ that workspace at a time.** The Work Scheduler does not dispatch a
 second item for that id until the first has exited and released the
 mount. Parallel nodes that share an id must be sequenced by AO (or
 they queue). Parallel work that must not wait uses a different
-workspace id, a different target, or use-case 2.
+workspace id, use-case 2, or an object-store snapshot with `ro` or
+`copy`.
 
 Sharing requires **placement on the target that owns the id**. AO
 keeps those WorkItems together with selectors, or they all take
@@ -228,9 +146,66 @@ keeps those WorkItems together with selectors, or they all take
 to the same protected default. The reconciler does not read the
 workspace id. A WorkItem whose workspace lives on `ep-default` but
 whose selectors land it elsewhere cannot see that volume; pass files
-through use-case 2 instead.
+through use-case 2, or use an object-store snapshot (below).
 
-### Volume life time
+### Alternative: object-store snapshot
+
+A volume pins the workspace to **one** ExecutionTarget (one
+cluster). The alternative is to publish a **full copy** of
+`/workspace` to object storage (S3) when a writer exits, and
+hydrate `/workspace` from that snapshot on the next WorkItem.
+
+That snapshot is the **whole tree**, not use-case 2 listed files. Any
+ExecutionTarget that can reach the bucket can run the next
+WorkItem. AO does not have to keep those nodes on the same cluster.
+
+```text
+workspace id 7c1a9f3e-4b2d-41a8-9c1f-91c0d4e5a6b7
+                          →  snapshot s3://workspaces/7c1a9f3e-…/
+
+AO execution
+  node A  access=rw    →  cluster-1  →  writes /workspace  →  EP PUTs snapshot
+  node B  access=ro    →  cluster-2  →  hydrates snapshot, reads only
+  node C  access=copy  →  cluster-3  →  hydrates a private writable copy
+```
+
+B and C can run **in parallel** after A's snapshot is `available`.
+They must not both be exclusive `rw` on the same generation.
+
+Parallel use of one snapshot is only safe if AO flags each WorkItem:
+
+| Flag | Disk | Parallel | Write-back |
+|---|---|---|---|
+| **`rw`** | Writable | **No.** One writer per generation (same idea as volume RWO). | Snapshot after exit becomes the next generation. |
+| **`ro`** | Read-only | **Yes.** Many WorkItems, any cluster. | None. Nobody thinks they own the tree. |
+| **`copy`** | Private writable copy | **Yes.** Many WorkItems, any cluster. | Local only unless AO publishes that copy as a new generation. Two parallel copies do not merge. |
+
+Omitted flag is `rw`. Illustrative payload:
+
+```json
+"data": {
+  "workspace": {
+    "id": "7c1a9f3e-4b2d-41a8-9c1f-91c0d4e5a6b7",
+    "access": "ro"
+  }
+}
+```
+
+Unlike listed `outputs`, this PUT **can** gate the next WorkItem
+when that item runs on another target: it cannot hydrate until the
+snapshot is `available`. A successor on the **same volume** still
+does not wait on S3.
+
+| System | Pros | Cons |
+|---|---|---|
+| **Volume** (PVC / Podman volume) | Live directory; no pack/unpack. **Better for a large workspace:** the next WorkItem does not upload the tree. Next WorkItem on the same target is unmount + mount. Native Kubernetes and Podman. Writes are visible on disk immediately. | Pinned to one ExecutionTarget / cluster. ReadWriteOnce: one mount at a time; parallel nodes queue or split ids. Target going away takes the tree with it. OpenShell has no volume attach. |
+| **Object-store snapshot** (S3) | Any cluster. Parallel `ro` or `copy` without RWO. Survives the original target. Hydrate into a container filesystem (OpenShell). | Full-tree PUT/GET every generation (time, bandwidth, cost). Cross-target next WorkItem waits for `available`. Parallel `copy` has no merge; two writers still need `rw` sequencing or an AO rule. Extra contract: snapshot format (tar vs prefix) and generation id. |
+
+Leaning for MVP: **volume**. Snapshot is the path when AO must place
+WorkItems on different clusters, run `ro` / `copy` in parallel, or
+share a tree on a backend with no volume attach.
+
+### Workspace life time
 
 AO owns workspace lifetime. **Creation** is an API call against the
 Execution Plane: AO mints the UUID, then creates the volume (`POST`
@@ -255,8 +230,9 @@ Git and object-store files are **not** a second volume. They arrive
 because an HTTP or Git activity wrote under `/workspace`. Mutable
 state later nodes must see uses the same directory.
 
-OpenShell has no volume attach. Workspaces on OpenShell are an open
-question (SDK snapshot, or no shared directory).
+OpenShell has no volume attach. A workspace there is the
+object-store snapshot path (hydrate into the container), or no
+shared directory.
 
 ## Use-case 2: collect results after each execution
 
@@ -264,24 +240,49 @@ Two kinds of "result":
 
 | Kind | Where it lives | Size |
 |---|---|---|
-| **Status JSON** | `WorkItem.result`, then the Completion Notifier / Temporal callback | Small. Today's `ScriptOutput` (return code, stdout, stderr) plus artifact URIs. |
-| **File artifacts** | Object storage | Large. |
+| **Status JSON** | `WorkItem.result`, then the Completion Notifier / Temporal callback | Small. Today's `ScriptOutput` (return code, stdout, stderr). |
+| **File artifacts** | Object storage | Large. `artifacts[]` on the result is UI metadata (`path`, `uri`, `status`, `size`), not the bytes. |
 
 The WorkItem names **which files** to upload. That is enough. It does
-not name a destination URI. After the container exits, the Worker
-Manager / SDK harvests the listed paths, mints an object key for
-each, and the WorkItem can complete. **Upload to object storage (S3)
-runs in the background.** It does not delay AO triggering the next
-WorkItem. Each artifact on `WorkItem.result` has a `status`
-(`uploading` until that PUT finishes, then `available` or `failed`)
-and a `size` in bytes (from harvest). AO uses `available` URIs to
-show or chain artifacts that are not still on a shared workspace.
+not name a destination URI.
+
+After the container exits, the Worker Manager **copies listed paths
+aside** (a spool), mints an object key for each, and **unmounts** the
+workspace. The WorkItem can then complete. **Upload to object
+storage (S3) runs in the background from that copy**, not from the
+live volume. It does not delay AO triggering the next WorkItem. A
+later WorkItem on the same UUID can mount immediately without tearing
+the PUT.
+
+Each artifact on `WorkItem.result` has a `status` (`uploading` until
+that PUT finishes, then `available` or `failed`) and a `size` in
+bytes (from harvest). That metadata is for the UI. **Chaining does
+not wait on it.** Temporal already completed.
+
+How a later node gets the bytes:
+
+| Situation | How |
+|---|---|
+| **Same workspace UUID** (volume still there) | Read `/workspace`. Do not download. |
+| **Same namespace** | GET an HTTP server on the **producer** WorkItem's sidecar. That sidecar outlives the activity container and exposes the harvested spool. Only reachable in that namespace. It can serve before the S3 PUT is `available`. |
+| **Other cluster / other namespace** | The consumer activity calls a **localhost HTTP API** on **its** sidecar. That sidecar holds object-store credentials and GETs S3. It retries until `available` or `failed`. |
+
+A CLI is a wrapper around those HTTP APIs, not a second protocol.
+The activity image does not get S3 credentials.
+
+The sidecar is the observer the Completion Notifier cannot be: the
+next WorkItem is already running; the fetch blocks **inside the
+container at first use**. Same-namespace traffic hits the producer
+sidecar; cross-namespace traffic hits S3 through the consumer
+sidecar. Do not add a dedicated HTTP-activity WorkItem per artifact
+for this. HTTP and Git activities stay the path for AO-resolved
+**inputs** (file id → URL, Git SHA).
 
 ```json
 "data": {
   "outputs": [
-    "/work/out/report.json",
-    "/work/out/summary.txt"
+    "/workspace/out/report.json",
+    "/workspace/out/summary.txt"
   ]
 }
 ```
@@ -291,13 +292,13 @@ show or chain artifacts that are not still on a shared workspace.
   "output": { "...": "status JSON" },
   "artifacts": [
     {
-      "path": "/work/out/report.json",
+      "path": "/workspace/out/report.json",
       "uri": "s3://orchestrator-files/artifacts/wi-7c1a/report.json",
       "status": "available",
       "size": 12480
     },
     {
-      "path": "/work/out/summary.txt",
+      "path": "/workspace/out/summary.txt",
       "uri": "s3://orchestrator-files/artifacts/wi-7c1a/summary.txt",
       "status": "uploading",
       "size": 882
@@ -311,21 +312,21 @@ Both objects are on the result as soon as the WorkItem completes.
 size in bytes at harvest. `status` starts as `uploading`, then
 `available` when that PUT succeeds, or `failed` when it errors.
 PUTs can finish at different times; the snapshot above is mid-flight.
+The sidecar uses `path` (and the producer WorkItem id), not AO polling
+`status`. Same-namespace GETs can hit the producer sidecar's spool
+directly.
 
 | Field | On the WorkItem | Meaning |
 |---|---|---|
 | `data.outputs[]` | payload, at submit | In-container file path to upload. No `uri`. |
-| `result.artifacts[].path` | result, from complete | Same path, so AO can match. |
-| `result.artifacts[].uri` | result, from complete | Object key minted at harvest. GET-able only when `status` is `available`. |
-| `result.artifacts[].status` | result, from complete | `uploading`, `available`, or `failed`. |
+| `result.artifacts[].path` | result, from complete | Same path, so AO and the sidecar can match. |
+| `result.artifacts[].uri` | result, from complete | Object key minted at harvest. Sidecar GET-able only when `status` is `available`. UI may show it. |
+| `result.artifacts[].status` | result, from complete | `uploading`, `available`, or `failed`. UI. Sidecar waits; AO does not. |
 | `result.artifacts[].size` | result, from complete | File size in bytes, taken at harvest. |
 
-AO does not pick object keys before submit. A later node that needs
-an artifact right away already shares the workspace (the file is
-still on disk; no wait on S3). A node that consumes the minted URI
-waits until that artifact is `available`, then runs an HTTP activity
-that GETs it into `/workspace`. `failed` means the PUT errored; AO
-must not wait on `uploading` forever. There is no `data.inputs` list.
+AO does not pick object keys before submit. There is no `data.inputs`
+list. `failed` means the PUT errored; the sidecar must not wait on
+`uploading` forever.
 
 Push happens even on failure when a listed file exists: partial
 artifacts are often what the author needs. Whether a failed run still
@@ -336,6 +337,103 @@ uploads is an open question; leaning yes, with the JSON result still
 Status JSON does not go through S3. It stays on `WorkItem.result` as
 today ([Work Store](work-store.md)). That JSON is what AO uses to
 trigger the next WorkItem; it does not wait on the background PUT.
+
+## Getting Git and HTTP files onto `/workspace`
+
+The author attached a file, pointed at a bucket, or pointed at a Git
+repo. EP does not grow a fetch feature for that. AO submits a normal
+WorkItem whose image already speaks HTTP or Git. That WorkItem
+writes under `/workspace`. The next WorkItem on the same UUID sees
+the files. There is no `data.inputs` list.
+
+### HTTP (object store)
+
+AO already stores uploads in S3-compatible storage
+([file-storage.md](../file-storage.md)). It turns a file id into an
+HTTP(S) URL (presigned, or the platform file HTTP API) and submits a
+WorkItem whose activity is HTTP:
+
+```json
+{
+  "payload": {
+    "activity": {
+      "image": "registry.redhat.io/ao/http-request:1.0.0",
+      "params": {
+        "url": "https://files.example.com/files/abc123/site.yml",
+        "dest": "/workspace/site.yml"
+      }
+    },
+    "data": {
+      "workspace": "7c1a9f3e-4b2d-41a8-9c1f-91c0d4e5a6b7"
+    }
+  }
+}
+```
+
+`activity.params` is owned by the HTTP activity (AO / Extension), not
+by this contract. The activity must write the body to a filesystem
+path (for example `dest`), not only into `WorkItem.result`.
+
+Same pattern is **not** used for use-case 2 listed outputs. A later
+node that does not share the workspace pulls through the Worker
+Manager sidecar (localhost HTTP), not through a second HTTP-activity
+WorkItem. A different target cannot mount that UUID; AO either
+shares a workspace on that target, uses an object-store snapshot, or
+the next node calls the sidecar.
+
+### Git
+
+AO turns the author's branch or tag into a clone URL plus a **pinned
+commit SHA** (the same way it resolves an image tag → digest for
+`activity.image`) and submits a Git activity:
+
+```json
+{
+  "payload": {
+    "activity": {
+      "image": "registry.redhat.io/ao/git-clone:1.0.0",
+      "params": {
+        "uri": "git+https://gitlab.example.com/org/playbooks.git",
+        "ref": "a1b2c3d4e5f6",
+        "dest": "/workspace/src"
+      }
+    },
+    "data": {
+      "workspace": "7c1a9f3e-4b2d-41a8-9c1f-91c0d4e5a6b7"
+    }
+  }
+}
+```
+
+`activity.params` is owned by the Git activity, not by this contract.
+EP does not follow `main`. A floating branch name would make two
+nodes of one execution clone different trees. Credentials are a
+Credential Provider reference on the activity, not a password in the
+URI.
+
+The clone is writeable on disk like any other workspace files. Pushing
+commits back to the remote is not a use-case here; later nodes see
+whatever was left under `/workspace`.
+
+Submodules, LFS, sparse checkout, and clone depth are the Git
+activity's problem, not EP's. Lean MVP for that Extension: one repo,
+one SHA, full tree, shallow clone, no LFS.
+
+### What EP does
+
+That WorkItem mounts the workspace UUID; the Git or HTTP image writes
+at a path under `/workspace`. The next WorkItem on the same UUID
+reads the files. The Worker Manager does not clone or GET as a
+start-of-run step on the playbook WorkItem.
+
+OpenShell has no volume attach. HTTP and Git activities still run;
+they cannot leave files on a workspace for the next WorkItem.
+Cross-run files on that backend go through use-case 2 (listed
+outputs) or stay in that one container.
+
+[Example 02](examples/02-volume-mount.md) used
+`payload.volume_mounts` as a stand-in. Read that as the workspace
+volume, not as an input list.
 
 ## Payload shape
 
@@ -353,8 +451,8 @@ Illustrative keys only. Not the final field design.
     },
     "data": {
       "outputs": [
-        "/work/out/report.json",
-        "/work/out/summary.txt"
+        "/workspace/out/report.json",
+        "/workspace/out/summary.txt"
       ],
       "workspace": "7c1a9f3e-4b2d-41a8-9c1f-91c0d4e5a6b7"
     }
@@ -364,8 +462,8 @@ Illustrative keys only. Not the final field design.
 
 | Block | Direction | Shared across WorkItems? |
 |---|---|---|
-| HTTP or Git activity + `workspace` | URL or clone → `/workspace` | Yes, once written. The fetch is its own WorkItem. |
-| `outputs` | container → object store | No. List of files. URIs, `status` (`uploading` \| `available` \| `failed`), and `size` appear on `WorkItem.result`. |
+| HTTP or Git WorkItem + `workspace` | URL or clone → `/workspace` | Yes, once that Git/HTTP WorkItem has written. |
+| `outputs` | container → object store | No. List of files. Copy-aside, then background PUT. UI metadata on `WorkItem.result`. Cross-volume consume via sidecar. |
 | `workspace` | live directory, **UUID unique across all ExecutionTargets**, volume on one target | Yes, **successive** WorkItems on **that** UUID. One RW mount. Default path `/workspace`. Purged by TTL (from last unmount) or delete API. |
 
 Omitted `outputs` / `workspace` mean "none". There is no
@@ -380,12 +478,14 @@ list. This document replaces that sketch.
 ```
 AO
   resolve file id → HTTP(S) URL; Git ref → clone URL + SHA
-  place sharing nodes on one ExecutionTarget
+  place sharing nodes on one ExecutionTarget (volume)
+  or any reachable target (object-store snapshot)
     → HTTP or Git WorkItem (activity writes under /workspace)
     → later WorkItem.payload.data (workspace UUID, outputs)
         → Worker Manager
               workspace id → volume on its ExecutionTarget → /workspace
-              outputs → harvest, mint keys (status=uploading); complete; S3 PUT in background (status=available or failed)
+              outputs → copy aside, mint keys, complete, unmount; S3 PUT from copy (background)
+              sidecar on later WorkItems → GET artifact (retry until available or failed)
         → Work Watcher
               WorkItem.result (JSON + artifacts[].uri, status, size)
         → Completion Notifier → AO
@@ -397,16 +497,19 @@ AO
 | Mint globally unique workspace UUID; create volume on one ET via EP API | AO |
 | Default workspace size (no per-workspace override) | ExecutionTarget |
 | Refuse duplicate workspace UUID | Execution Plane |
-| Place WorkItems that share a workspace id on that target | AO (selectors or default routing) |
-| Serialize dispatch per workspace id (one RW mount) | Work Scheduler |
+| Place WorkItems that share a **volume** id on that target | AO (selectors or default routing) |
+| Flag workspace access (`rw` / `ro` / `copy`); snapshot is the cross-cluster path | AO |
+| Serialize dispatch per workspace id (volume RWO, or snapshot `rw`) | Work Scheduler |
+| Hydrate / publish workspace snapshot (full tree to S3) | Worker Manager / SDK |
 | Delete workspace (`DELETE` by id against EP) | AO |
 | Purge workspace (TTL from last unmount) | Execution Plane |
 | Map file ids to HTTP(S) URLs; run HTTP activity into `/workspace` | AO |
 | Map repo + branch/tag to clone URL + SHA; run Git activity into `/workspace` | AO |
 | Credential reference for Git remote (or HTTP if not presigned) | AO → Credential Provider |
-| Mount workspace id at `/workspace` | Worker Manager |
-| Harvest listed output paths, mint keys (`status=uploading`); S3 PUT in the background (`status=available` or `failed`); does not gate the next WorkItem | Worker Manager / SDK |
-| Write `artifacts[]` on `WorkItem.result`; patch `status` when a PUT finishes or fails | Work Watcher / Work Store |
+| Mount workspace id at `/workspace`; inject artifact sidecar (producer HTTP server and/or consumer localhost client) | Worker Manager |
+| Copy listed outputs aside, then unmount; S3 PUT from the copy (`status=uploading` → `available` or `failed`); does not gate the next WorkItem | Worker Manager |
+| Write `artifacts[]` on `WorkItem.result` (UI); patch `status` when a PUT finishes or fails | Work Watcher / Work Store |
+| Fetch listed outputs of a prior WorkItem when no shared volume | Same namespace: GET the producer sidecar HTTP server (spool). Else: consumer sidecar GETs S3 (holds credentials). |
 | Match ExecutionTarget | ExecutionTarget Reconciler (ignores `data`) |
 
 EP does not become a file manager. If the HTTP URL or Git remote is
@@ -417,25 +520,32 @@ is a connectivity / credential problem, not a selector miss.
 
 The workspace is a volume on the ExecutionTarget. Object-store bytes
 and Git trees arrive because an HTTP or Git activity wrote them
-there. Listed outputs are uploaded to object storage in the
-background after the run. That PUT does not delay the next WorkItem.
+there. Listed outputs are **copied aside**, then uploaded to object
+storage in the background from that copy. That PUT does not delay
+the next WorkItem and does not read the live volume.
 
 | Mechanism | Fits | Warm pool |
 |---|---|---|
 | **HTTP or Git activity** writing into `/workspace` | K8s and Podman (needs the workspace volume) | The activity itself yes; workspace is one holder per id |
-| **Listed outputs** uploaded in the background after the run | All backends (K8s, Podman, OpenShell) | Yes. Does not gate the next WorkItem |
+| **Listed outputs** copied aside, then uploaded in the background | All backends (K8s, Podman, OpenShell) | Yes. Does not gate the next WorkItem. Consume via disk or sidecar |
+| **Artifact sidecar** (WM-injected HTTP) | Producer: server on the original WorkItem (same namespace only, serves the spool). Consumer: localhost client to S3 when that server is unreachable. OpenShell: open. | Image stays dumb. S3 credentials stay in the sidecar. |
 | **Workspace volume** (globally unique UUID, one ET) at `/workspace` | K8s PVC and Podman volume | One holder per id: concurrency 1 |
+| **Workspace snapshot** (full tree to S3, hydrate anywhere) | All backends that can reach the bucket (incl. OpenShell) | `rw` serial; `ro` / `copy` may run in parallel |
 
-OpenShell has no volume attach. Listed outputs still work. Workspace
-on OpenShell is an open question; HTTP and Git activities cannot leave
-files for the next WorkItem via `/workspace` on that backend.
+OpenShell has no volume attach. Listed outputs still work. A shared
+`/workspace` on OpenShell is the object-store snapshot path; HTTP
+and Git activities cannot leave files for the next WorkItem via a
+volume on that backend.
 
-Leaning for MVP: **HTTP or Git activity + workspace** for inbound
-files, **listed outputs** uploaded in the background after the run
-(minting URIs into the result). That upload does not delay the next
-WorkItem. The Worker Manager attaches the workspace UUID at
-`/workspace`. It does not GET object storage or clone Git as WorkItem
-inputs.
+Leaning for MVP: **HTTP or Git activity + workspace volume** for
+inbound files, **listed outputs** copied aside then uploaded in the
+background. That listed-output PUT does not delay the next WorkItem.
+A later node on the same UUID reads `/workspace`. A later node
+without that volume calls the **Worker Manager sidecar**.
+Object-store **workspace snapshot** is the alternative when AO needs
+another cluster, parallel `ro` / `copy`, or OpenShell. The Worker
+Manager attaches the workspace UUID at `/workspace`. It does not GET
+object storage or clone Git as WorkItem **inputs**.
 
 Because that volume is ReadWriteOnce, a second container cannot
 mount the same id while the first WorkItem is running. Two different
@@ -453,7 +563,9 @@ sequenceDiagram
     participant AO as Automation Orchestrator
     participant WS as Work Store
     participant WM as Worker Manager
-    participant C as container
+    participant Play as playbook
+    participant Cons as consumer
+    participant Side as sidecar
     participant HTTP as HTTP activity
     participant Vol as workspace 7c1a9f3e-4b2d-41a8-9c1f-91c0d4e5a6b7 on ep-default
     participant S3 as object storage
@@ -466,14 +578,21 @@ sequenceDiagram
     Note over Vol: RW volume released; only now can B mount the same id
 
     AO->>WS: WorkItem B { image: ansible-playbook, workspace: 7c1a9f3e-… } on ep-default
-    WM->>C: start with same workspace id at /workspace
-    C->>Vol: read /workspace/site.yml
-    C->>Vol: write /workspace/state.json
-    C-->>WM: exit
+    WM->>Play: start with same workspace id at /workspace
+    Play->>Vol: read /workspace/site.yml
+    Play->>Vol: write /workspace/out/report.json
+    Play-->>WM: exit
+    WM->>WM: copy listed outputs aside
+    Note over Vol: RW volume released; PUT reads the copy, not the live tree
     WM->>WS: result JSON + artifacts status=uploading. Next WorkItem can start
-    Note over Vol: RW volume released; S3 PUT does not hold the mount
-    WM->>S3: PUT listed output files (background)
-    WM->>WS: artifact status=available or failed
+    WM->>S3: PUT from copy (background)
+
+    AO->>WS: WorkItem C { no shared volume }
+    WM->>Cons: start with sidecar on localhost
+    Cons->>Side: GET artifact /workspace/out/report.json
+    Side->>S3: GET (retry until available)
+    WM->>WS: artifact status=available or failed (UI)
+    Side-->>Cons: file bytes
 ```
 
 ## Out of scope
@@ -483,38 +602,48 @@ sequenceDiagram
 | Placement / selectors | [labels.md](labels.md) |
 | Live PVC / Podman volume or disk capacity as a selector | Not a label. Open question in labels.md. |
 | AO file upload, conversion, RBAC | [file-storage.md](../file-storage.md) |
-| In-container SDK API | Separate SDK design |
-| Customer S3 IAM setup | Platform / credential work |
+| In-container activity SDK beyond curl/CLI to the sidecar | Separate SDK design. Sidecar HTTP is this contract. |
+| Customer S3 IAM setup | Platform / credential work. Sidecar holds EP credentials; the activity image does not. |
 | Git write-back (commit, push, PR) | Git activity is clone into `/workspace`. Writes stay on the volume or go to `outputs`. |
-| Cross-target workspace | An id exists on exactly one ExecutionTarget. Cross-target files: use-case 2, then an HTTP activity on the other target. |
+| Cross-target **volume** | A volume lives on exactly one ExecutionTarget. Cross-target: object-store snapshot, or use-case 2 via the sidecar. |
 | Per-workspace size override | Size is the ExecutionTarget default. Not on the WorkItem. |
-| `data.inputs` | HTTP or Git activity + workspace instead. |
+| `data.inputs` | Use a Git or HTTP WorkItem that writes into `/workspace`. |
 | Streaming stdout as files | Still `WorkItem.result` / log plumbing |
 
 ## Open questions
 
-1. **SDK vs Worker Manager for listed outputs.** SDK-inside-the-image
-   keeps backends honest and works on warm pools. Worker Manager copy
-   after exit keeps images dumb. HTTP and Git fetch are activities,
-   not this copy path.
+1. **Sidecar transport.** Localhost HTTP is the contract. A CLI wraps
+   that API. Exact routes, auth to the sidecar, and OpenShell (no
+   sidecar) are implementation. Lean: HTTP on localhost, no S3 creds
+   in the activity image.
 2. **Credential reference shape.** Payload-level secret is wrong.
    HTTP and Git activities may take a Credential Provider id, or AO
-   mints a presigned URL so an HTTP GET is unauthenticated.
+   mints a presigned URL so an HTTP GET is unauthenticated. Listed
+   output PUT/GET credentials stay in the sidecar.
 3. **Failed runs and partial uploads.** Lean yes for listed
    `outputs`, so the author can inspect. Workspace files stay on the
    volume either way.
 4. **Two workspace ids on one target at once.** Different volumes
    could in principle mount in parallel. Lean: serialize per id;
    two ids may run together if the target has capacity.
-5. **OpenShell workspace.** No volume attach. Snapshot via SDK, or
-   no shared directory on that backend. HTTP and Git activities then
-   cannot leave files for the next WorkItem via `/workspace`.
+5. **OpenShell workspace.** No volume attach. Object-store snapshot
+   (hydrate into the container), or no shared directory on that
+   backend. HTTP and Git activities cannot leave files for the next
+   WorkItem via a volume.
 6. **Minted object-key scheme.** Work item id + basename is enough
     for uniqueness. Exact prefix (`artifacts/wi-…/`) is an
     implementation choice, not a payload field.
 7. **Listed path missing after the run.** Omit from `artifacts`, or
     record an error for that path. Lean: omit, do not fail the whole
     upload list.
+8. **Workspace snapshot format.** Tar blob vs key prefix per file;
+   generation id on the WorkItem vs implicit "latest". Lean: one
+   generation per exclusive `rw` exit; `ro` / `copy` pin that
+   generation.
+9. **When the snapshot PUT runs.** A cross-target successor must wait
+   for `available`. Same-target volume successors do not. Whether the
+   pack is Worker Manager after exit or a dedicated activity is
+   open.
 
 Git extras (submodules, LFS, sparse checkout, clone depth) and Git
 credentials (HTTPS token vs SSH key) belong to the Git activity
@@ -530,21 +659,27 @@ Extension, not this contract.
   all ExecutionTargets and the volume lives on one of them; AO uses
   selectors / default routing to keep WorkItems on that target.
 - **[Worker Manager](worker-manager.md):** looks up the workspace id,
-  mounts its volume at `/workspace` (one RW mount per id); harvests
-  `data.outputs` and uploads them to object storage in the
-  background. That PUT does not delay the next WorkItem. It does not
-  GET object storage or clone Git as WorkItem inputs.
-- **AAP-92722 (Work Scheduler):** do not dispatch a second WorkItem
-  for a workspace id whose volume is still mounted.
+  mounts its volume at `/workspace` (one RW mount per id); copies
+  `data.outputs` aside, unmounts, uploads from the copy in the
+  background. Injects the artifact sidecar: HTTP server on the
+  producer WorkItem (same namespace, serves the spool) and localhost
+  client on consumers that must GET S3. That PUT does not delay the
+  next WorkItem. It does not GET object storage or clone Git as
+  WorkItem inputs.
+- **AAP-92722 (Work Scheduler):** do not dispatch a second **`rw`**
+  WorkItem for a workspace id whose volume is still mounted.
+  Snapshot `ro` / `copy` may overlap after that generation is
+  `available`.
 - **Workspace API:** AO owns create (`POST` id, target, optional TTL)
   and `DELETE` by id against the Execution Plane. Size comes from
   the ExecutionTarget; create does not take a size. TTL (from last
   unmount) is an EP background task.
 - **[Work Store](work-store.md):** `WorkItem.result` stays small JSON
-  (run status plus `artifacts[]` with minted `uri`, `status`
+  (run status plus `artifacts[]` UI metadata: minted `uri`, `status`
   `uploading` | `available` | `failed`, and `size` in bytes). Artifact
   bytes are not a JSONB column. EP patches `artifacts[].status` when a
-  background PUT finishes or fails.
+  background PUT finishes or fails. Chaining does not poll this;
+  the sidecar does.
 - **[file-storage.md](../file-storage.md):** AO S3 for uploads. AO
   turns file ids into HTTP(S) URLs for the HTTP activity. EP does
   not import `FileManager`.
@@ -557,5 +692,7 @@ Extension, not this contract.
   `/workspace`. Params such as `uri`, `ref`, and `dest` are the
   Extension's.
 - **Container SDK (AO / EP, separate design):** how the image reads
-  `/workspace`, and how listed outputs are harvested for a background
-  object-store upload.
+  `/workspace`. Listed-output **fetch** is the Worker Manager sidecar:
+  HTTP server on the producer WorkItem (same namespace) or localhost
+  client to S3. Optional CLI wrapper. Harvest is copy-aside in the
+  Worker Manager after exit, not an SDK inside the activity image.
