@@ -11,6 +11,7 @@ from uuid import uuid4
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
+from syntara.core.constants import FieldLimits
 from syntara.core.error_handlers import PROBLEM_TYPES
 from syntara.forms.error_handlers import (
     form_data_validation_error_handler,
@@ -181,3 +182,26 @@ class TestFormDataValidationErrorHandler:
         assert problem.errors[0].label == "Reason"
         assert problem.errors[0].code == "required"
         assert problem.errors[0].message == "This field is required"
+
+    def test_truncates_detail_without_truncating_structured_errors(self) -> None:
+        request = Mock(spec=Request)
+        request.url = "https://api.example.com/api/v1/form_prompts/123/submit"
+        errors = [
+            FormFieldError(
+                field=f"field_{index}",
+                label=f"Field {index}",
+                code="invalid",
+                message="x" * 100,
+            )
+            for index in range(100)
+        ]
+
+        response = form_data_validation_error_handler(request, FormDataValidationError(errors=errors))
+        data = json.loads(bytes(response.body))
+
+        assert response.status_code == 422
+        assert len(data["detail"]) == FieldLimits.DESCRIPTION_MAX_LENGTH
+        assert data["detail"].endswith("...")
+        assert len(data["errors"]) == len(errors)
+        assert data["errors"][0]["field"] == "field_0"
+        assert data["errors"][-1]["field"] == "field_99"

@@ -9,6 +9,7 @@ import structlog
 from fastapi import Request, status
 from fastapi.responses import JSONResponse
 
+from syntara.core.constants import FieldLimits
 from syntara.core.error_handlers import PROBLEM_TYPES, create_problem_details_response
 from syntara.forms.models.api_models import FormDataValidationProblem, FormFieldErrorResponse
 
@@ -112,6 +113,8 @@ def form_data_validation_error_handler(request: Request, exc: "FormDataValidatio
     )
 
     detail = "Form validation failed: " + "; ".join(f"{err.field}: {err.message}" for err in exc.errors)
+    if len(detail) > FieldLimits.DESCRIPTION_MAX_LENGTH:
+        detail = detail[: FieldLimits.DESCRIPTION_MAX_LENGTH - 3] + "..."
 
     problem = FormDataValidationProblem(
         type=PROBLEM_TYPES["validation_error"],

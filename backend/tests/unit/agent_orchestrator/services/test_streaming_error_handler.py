@@ -11,6 +11,7 @@ from uuid import uuid4
 import pytest
 
 from syntara.agent_orchestrator.exceptions import AgentTimeoutError, ToolDiscoveryError, ToolSelectionUnavailableError
+from syntara.agent_orchestrator.models.llm_error import LLMErrorData
 from syntara.agent_orchestrator.services.error_handler import (
     ERROR_TYPE_BASE_URI,
     classify_streaming_error,
@@ -166,6 +167,14 @@ def test_tool_discovery_not_misclassified_as_llm_network_error() -> None:
     assert "ConnectionError" not in (error.detail or "")
     assert "Tool Manager unavailable" not in (error.detail or "")
     assert "could not be discovered" in (error.detail or "")
+
+
+def test_llm_error_examples_are_attached_to_llm_specific_model() -> None:
+    error = classify_streaming_error(Exception("API rate limit exceeded"))
+    schema = LLMErrorData.model_json_schema()
+
+    assert isinstance(error, LLMErrorData)
+    assert schema["examples"][0]["code"] == "RATE_LIMIT_EXCEEDED"
 
 
 def test_tool_selection_not_default_llm_streaming_error() -> None:

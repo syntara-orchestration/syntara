@@ -167,6 +167,31 @@ class FormFieldErrorResponse(SQLModel):
 class FormDataValidationProblem(ErrorData):
     """RFC 9457 form validation problem with per-field error details."""
 
+    model_config: ClassVar[ConfigDict] = ConfigDict(
+        from_attributes=True,
+        validate_by_name=True,
+        json_schema_extra={
+            "examples": [
+                {
+                    "type": "https://api.example.com/errors/validation-error",
+                    "title": "Form Validation Error",
+                    "detail": "Form validation failed: reason: This field is required",
+                    "code": "FORM_VALIDATION_ERROR",
+                    "retryable": False,
+                    "instance": "/api/v1/form_prompts/550e8400-e29b-41d4-a716-446655440000/submit",
+                    "errors": [
+                        {
+                            "field": "reason",
+                            "label": "Reason",
+                            "code": "required",
+                            "message": "This field is required",
+                        }
+                    ],
+                }
+            ]
+        },
+    )  # type: ignore[assignment]
+
     errors: list[FormFieldErrorResponse] = Field(..., description="Per-field validation errors")
 
 

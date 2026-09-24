@@ -31,9 +31,10 @@ async def _create_prompt(
     project_id: UUID,
     *,
     status: FormPromptStatus = FormPromptStatus.PENDING,
+    timeout_at: datetime | None = None,
     form_definition: dict[str, Any] | None = None,
 ) -> FormPrompt:
-    """Persist a prompt in a selected state."""
+    """Persist a prompt with the requested status and deadline."""
     prompt = FormPrompt(
         project_id=project_id,
         execution_id=uuid4(),
@@ -42,7 +43,7 @@ async def _create_prompt(
         name="Test form",
         form_definition=form_definition or _FORM_DEFINITION,
         status=status,
-        timeout_at=datetime.now(UTC) - timedelta(seconds=1) if status == FormPromptStatus.EXPIRED else None,
+        timeout_at=timeout_at,
         responded_by=None,
         responded_at=datetime.now(UTC) if status == FormPromptStatus.SUBMITTED else None,
     )
@@ -182,6 +183,30 @@ class TestFormPromptSubmitAPI:
         refreshed = await test_db_session.get(FormPrompt, prompt.id)
         assert refreshed is not None
         assert refreshed.status == FormPromptStatus.SUBMITTED
+
+    async def test_submit_pending_prompt_past_deadline_returns_409(
+        self,
+        auth_client: AsyncClient,
+        test_db_session: AsyncSession,
+        test_project_id: UUID,
+    ) -> None:
+        prompt = await _create_prompt(
+            test_db_session,
+            test_project_id,
+            status=FormPromptStatus.PENDING,
+            timeout_at=datetime.now(UTC) - timedelta(minutes=1),
+        )
+        assert prompt.status == FormPromptStatus.PENDING
+
+        response = await auth_client.post(
+            f"{FORM_PROMPTS_URL}/{prompt.id}/submit",
+            json={"response_data": {"reason": "too late"}},
+        )
+
+        assert response.status_code == 409
+        assert response.json()["code"] == "FORM_EXPIRED"
+        await test_db_session.refresh(prompt)
+        assert prompt.status == FormPromptStatus.PENDING
 
     @pytest.mark.parametrize(
         ("status", "expected_code"),
