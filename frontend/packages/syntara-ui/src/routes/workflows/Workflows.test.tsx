@@ -585,10 +585,13 @@ describe('Workflows Component', () => {
 
       // Verify confirmation dialog is shown
       await waitFor(() => {
-        expect(screen.getByText('Run Important Project Workflow?')).toBeInTheDocument()
+        const dialog = screen.getByRole('dialog')
+        expect(within(dialog).getByText('Run workflow?')).toBeInTheDocument()
+        expect(within(dialog).getByText(/You are about to manually run the workflow/)).toBeInTheDocument()
+        expect(within(dialog).getByText('Important Project Workflow')).toBeInTheDocument()
         expect(
-          screen.getByText(
-            /You are about to manually run this workflow. This action will start the workflow immediately, bypassing its normal trigger conditions./
+          within(dialog).getByText(
+            /This action will start the workflow immediately, bypassing its normal trigger conditions./
           )
         ).toBeInTheDocument()
       })
@@ -633,7 +636,7 @@ describe('Workflows Component', () => {
 
       // Verify dialog is closed
       await waitFor(() => {
-        expect(screen.queryByText('Run Important Project Workflow?')).not.toBeInTheDocument()
+        expect(screen.queryByText('Run workflow?')).not.toBeInTheDocument()
       })
     })
 
