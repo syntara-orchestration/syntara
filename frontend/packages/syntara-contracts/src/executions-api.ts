@@ -232,6 +232,12 @@ export interface components {
        * @description Originating interface (ui or api)
        */
       interface?: string | null
+      /**
+       * Is Stalled
+       * @description Whether any activity in this execution has been flagged as stalled.
+       * @default false
+       */
+      is_stalled?: boolean
       /** Labels */
       labels?: {
         [key: string]: unknown
@@ -315,6 +321,16 @@ export interface components {
        * @description Iteration number if activity is within a loop (0-indexed)
        */
       iteration?: number | null
+      /**
+       * Expected Duration
+       * @description Resolved expected duration in seconds, copied from node settings at dispatch time.
+       */
+      expected_duration?: number | null
+      /**
+       * Stall Alert At
+       * @description Timestamp when stall was first detected by PeriodicWorker. Written once, never cleared.
+       */
+      stall_alert_at?: string | null
     }
     /**
      * ActivityData
@@ -786,6 +802,11 @@ export interface components {
       continue_on_failure?: boolean | null
       /** Disabled */
       disabled?: boolean | null
+      /**
+       * Expected Duration
+       * @description Expected duration in seconds. Nodes running longer are flagged as stalled.
+       */
+      expected_duration?: number | null
       /** Timeout */
       timeout?: number | null
       retry_policy?: components['schemas']['RetryPolicyParameters'] | null
@@ -1027,13 +1048,18 @@ export interface components {
     }
     /**
      * NodeSettingsNoRetry
-     * @description Settings with disabled, continue_on_failure, and timeout (script, agentic, approval).
+     * @description Settings with disabled, continue_on_failure, timeout, and expected_duration (script, agentic, approval).
      */
     NodeSettingsNoRetry: {
       /** Continue On Failure */
       continue_on_failure?: boolean | null
       /** Disabled */
       disabled?: boolean | null
+      /**
+       * Expected Duration
+       * @description Expected duration in seconds. Nodes running longer are flagged as stalled.
+       */
+      expected_duration?: number | null
       /** Timeout */
       timeout?: number | null
     }
