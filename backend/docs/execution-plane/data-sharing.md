@@ -52,12 +52,13 @@ matching.
    example `registry.redhat.io/ao/http-request:1.0.0`). That
    container writes into `/workspace`. EP does not clone or GET
    inside the Worker Manager.
-3. **AO prepares URLs before it submits.** If the author attached a
-   file, AO already stored it ([file-storage.md](../file-storage.md))
-   and passes an HTTP(S) URL to the HTTP WorkItem. If the author
-   pointed at a Git branch, AO pins a commit SHA and passes clone
-   URL plus SHA to the Git WorkItem. EP never calls AO's file-upload
-   API and never resolves `main`.
+3. **AO writes the exact link. EP just uses it.** The author may
+   say "this file" or "branch main". AO turns that into something
+   that cannot move **before** it submits the WorkItem: a download
+   URL for a file it already stored
+   ([file-storage.md](../file-storage.md)), or a clone URL plus one
+   commit SHA for Git. EP does not ask AO "where is that file?" and
+   does not ask Git "what is `main` today?"
 4. **JSON result ≠ file bytes.** `WorkItem.result` stays a small
    JSON blob (stdout, return code). Large files go to object
    storage. The result may list **references** (`artifacts[]`: path,
