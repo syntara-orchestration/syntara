@@ -45274,7 +45274,7 @@
       "FormPromptSummary": {
         "type": "object",
         "title": "FormPromptSummary",
-        "description": "Minimal form prompt response for internal workflow engine endpoints.\n\nContains only the 8 documented fields used by expire/cancel activities\nand workflow lifecycle management. Does not expose user-submitted form data\nor rendering configuration fields (those will appear in FormPromptRead for\nuser-facing endpoints in AAP-91889).",
+        "description": "Minimal form prompt response for internal workflow engine endpoints.\n\nContains only the 8 documented fields used by expire/cancel activities\nand workflow lifecycle management. Does not expose user-submitted form data\nor rendering configuration fields.",
         "required": [
           "id",
           "execution_id",
