@@ -1,5 +1,6 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useLayoutEffect } from 'react'
 import { useForm, type UseFormReturn } from 'react-hook-form'
 import { describe, expect, it } from 'vitest'
 import { axe } from 'vitest-axe'
@@ -31,9 +32,11 @@ function TestWrapper({
     },
   })
 
-  if (formRef) {
-    formRef.current = form
-  }
+  useLayoutEffect(() => {
+    if (formRef) {
+      formRef.current = form
+    }
+  }, [form, formRef])
 
   return (
     <SynForm form={form}>
