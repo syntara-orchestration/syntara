@@ -47,3 +47,19 @@ class FormPromptsApi:
     async def async_batch_update(self, **kwargs: Any) -> Response[Any]:
         endpoint_module = self._load_endpoint_module("batch_update_form_prompts")
         return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
+
+    def get(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("get_form_prompt")
+        return endpoint_module.sync_detailed(client=self._client, **kwargs)
+
+    async def async_get(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("get_form_prompt")
+        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
+
+    def submit(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("submit_form_prompt")
+        return endpoint_module.sync_detailed(client=self._client, **kwargs)
+
+    async def async_submit(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("submit_form_prompt")
+        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
