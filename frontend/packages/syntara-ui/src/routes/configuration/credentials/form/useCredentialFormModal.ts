@@ -24,6 +24,7 @@ import {
 
 type UseCredentialFormModalOptions = {
   form: ReturnType<typeof useSynForm<CredentialFormData>>
+  isOpen: boolean
   credentialToEdit?: Credential | null
   isEditMode: boolean
   preSelectedTypeId?: string
@@ -34,6 +35,7 @@ type UseCredentialFormModalOptions = {
 
 export function useCredentialFormModal({
   form,
+  isOpen,
   credentialToEdit,
   isEditMode,
   preSelectedTypeId,
@@ -59,7 +61,7 @@ export function useCredentialFormModal({
   const exclusiveGroups = useMemo(() => (typeInputs ? buildExclusiveGroups(typeInputs) : []), [typeInputs])
   const [activeGroupIndex, setActiveGroupIndex] = useState(0)
 
-  const resetKey = credentialToEdit?.id ?? preSelectedTypeId ?? 'create'
+  const resetKey = isOpen ? (credentialToEdit?.id ?? preSelectedTypeId ?? 'create') : 'closed'
   const [prevResetKey, setPrevResetKey] = useState<string | null>(null)
   if (resetKey !== prevResetKey) {
     setPrevResetKey(resetKey)
@@ -104,6 +106,8 @@ export function useCredentialFormModal({
   )
 
   useEffect(() => {
+    if (!isOpen) return
+
     if (credentialToEdit) {
       reset({
         name: credentialToEdit.name,

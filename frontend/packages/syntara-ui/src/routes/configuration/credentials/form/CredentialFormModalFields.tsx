@@ -52,6 +52,7 @@ export function CredentialFormModalFields({ form, state }: Readonly<CredentialFo
         isRequired
         placeholder="Enter credential name"
         labelHelp={credentialHelp.name}
+        ariaLabel="Credential name"
       />
       <SynTextField
         name="description"
@@ -59,6 +60,7 @@ export function CredentialFormModalFields({ form, state }: Readonly<CredentialFo
         fieldId="credential-description"
         placeholder="Enter description (optional)"
         labelHelp={credentialHelp.description}
+        ariaLabel="Credential description"
       />
       <SynFormField
         name="project_id"
