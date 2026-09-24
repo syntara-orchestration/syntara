@@ -190,7 +190,7 @@ class FormDataValidationProblem(ErrorData):
                 }
             ]
         },
-    )  # type: ignore[assignment]
+    )
 
     errors: list[FormFieldErrorResponse] = Field(..., description="Per-field validation errors")
 
