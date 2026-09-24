@@ -33,7 +33,6 @@ export function ScopeFields<T extends FieldValues>({
         label="Scope"
         fieldId={`${idPrefix}-scope`}
         labelHelp={integrationHelp.scope}
-        hideFormGroupLabel
         hideFooter
       >
         {({ field }) => (

@@ -62,6 +62,7 @@ describe('ScopeFields', () => {
     it('renders scope toggle in global state (checked)', () => {
       render(<TestWrapper defaultScope="global" />)
 
+      expect(screen.getByText('Scope')).toBeInTheDocument()
       const toggle = screen.getByRole('switch', { name: /integration scope/i })
       expect(toggle).toBeChecked()
     })
