@@ -1,11 +1,5 @@
 import { createFieldHelp } from '../../../../components/createFieldHelp'
 import { APPROVER_GROUPS_LABEL, APPROVER_USERS_LABEL } from '../approverConstants'
-import {
-  RESPONDER_GROUPS_HELPER_TEXT,
-  RESPONDER_GROUPS_LABEL,
-  RESPONDER_USERS_HELPER_TEXT,
-  RESPONDER_USERS_LABEL,
-} from '../formPromptResponderConstants'
 
 import * as T from './nodeFieldHelpText'
 
@@ -44,17 +38,6 @@ export const nodeHelp = {
   approvalMessage: createFieldHelp('Message', T.APPROVAL_MESSAGE_HELP),
   approvalFallback: createFieldHelp('Fallback decision', T.APPROVAL_FALLBACK_DECISION_HELP),
   approvalDecisionWindow: createFieldHelp('Decision window', T.APPROVAL_DECISION_WINDOW_HELP),
-
-  // Form prompt
-  formPromptMessage: createFieldHelp('Message', T.FORM_PROMPT_MESSAGE_HELP),
-  formPromptResponderUsers: createFieldHelp(RESPONDER_USERS_LABEL, RESPONDER_USERS_HELPER_TEXT),
-  formPromptResponderGroups: createFieldHelp(RESPONDER_GROUPS_LABEL, RESPONDER_GROUPS_HELPER_TEXT),
-  formPromptFallback: createFieldHelp('Fallback decision', T.FORM_PROMPT_FALLBACK_DECISION_HELP),
-  formPromptResponseWindow: createFieldHelp('Form submission window', T.FORM_PROMPT_RESPONSE_WINDOW_HELP),
-  formPromptSubmitLabel: createFieldHelp('Submit button label', T.FORM_PROMPT_SUBMIT_LABEL_HELP),
-  formPromptSuccessMessage: createFieldHelp('Success message', T.FORM_PROMPT_SUCCESS_MESSAGE_HELP),
-  formPromptTimezone: createFieldHelp('Timezone for date fields', T.FORM_PROMPT_TIMEZONE_HELP),
-  formPromptCssOverride: createFieldHelp('CSS override', T.FORM_PROMPT_CSS_OVERRIDE_HELP),
 
   // Loop / logic
   loopItems: createFieldHelp('Items expression', T.LOOP_ITEMS_HELP),

@@ -87,35 +87,6 @@ export const APPROVAL_FALLBACK_ENABLE_LINK = 'Enable continue on failure'
 export const APPROVAL_DECISION_WINDOW_HELP =
   'Enter the amount of time that approvers have to respond. If no approver responds within this window, the request expires and the approval step fails. Falls back to the system default if not set.'
 
-export const FORM_PROMPT_MESSAGE_HELP =
-  'Message shown above the form when the prompt is presented. Supports ${...} template expressions.'
-
-export const FORM_PROMPT_FALLBACK_DECISION_HELP =
-  'When the response window expires with Continue on failure enabled: Fallback routes to the fallback branch; Submit with defaults auto-submits using each field’s default value from the form definition.'
-
-export const FORM_PROMPT_FALLBACK_ENABLED_HELPER =
-  'Determines the routing path when the prompt cannot complete (response window expired).'
-
-export const FORM_PROMPT_FALLBACK_ENABLE_LINK = 'Enable continue on failure'
-
-export const FORM_PROMPT_FALLBACK_DEFAULTS_HELPER =
-  'On timeout, the form is auto-submitted using the default values defined for each field on the Parameters tab.'
-
-export const FORM_PROMPT_RESPONSE_WINDOW_HELP =
-  'How long the user has to submit the form before it expires. Falls back to the system default if not set.'
-
-export const FORM_PROMPT_SUBMISSION_WINDOW_HELPER =
-  'How long the user has to submit the form before it expires. Falls back to system default (1d) if not set.'
-
-export const FORM_PROMPT_SUBMIT_LABEL_HELP = 'Label on the submit button when the form is shown to responders.'
-
-export const FORM_PROMPT_SUCCESS_MESSAGE_HELP = 'Message shown after the responder successfully submits the form.'
-
-export const FORM_PROMPT_TIMEZONE_HELP =
-  'IANA timezone used when interpreting date and datetime field values in the form.'
-
-export const FORM_PROMPT_CSS_OVERRIDE_HELP = 'Custom CSS applied to the form view when presented to responders.'
-
 export const LOOP_ITEMS_HELP =
   'Enter an expression that resolves to a list of items, for example ${previous_step.server_list}. The loop will iterate once for each item in the list.'
 
