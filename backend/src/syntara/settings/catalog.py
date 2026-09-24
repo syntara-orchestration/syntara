@@ -790,6 +790,90 @@ SETTINGS_CATALOG: list[SettingDefinition] = [
         group=WorkflowEngineGroup.EXECUTION,
         validation_schema={"min": 1},
     ),
+    # --- Expected duration defaults for stall detection (AAP-92824) ---
+    # These define the catalog-level fallback for expected_duration per node type.
+    # If set, nodes without a per-node expected_duration override will use these
+    # values. Nodes exceeding their expected_duration are flagged as stalled.
+    # No default_value is set (None) — stall detection is opt-in until an admin
+    # configures these values.
+    SettingDefinition(
+        key="workflow_engine.script_expected_duration_seconds",
+        name="Script expected duration (seconds)",
+        category=SettingCategory.WORKFLOW_EXECUTION,
+        value_type=SettingValueType.INTEGER,
+        default_value=None,
+        description=(
+            "Expected execution time for script activities. If a script runs "
+            "longer than this, it is flagged as stalled. This is informational "
+            "only — the node continues running until its timeout. Set to enable "
+            "stall detection for script nodes."
+        ),
+        helper_text="Minimum 1 second. Not set by default (stall detection disabled).",
+        group=WorkflowEngineGroup.EXECUTION,
+        validation_schema={"min": 1},
+    ),
+    SettingDefinition(
+        key="workflow_engine.http_request_expected_duration_seconds",
+        name="HTTP request expected duration (seconds)",
+        category=SettingCategory.WORKFLOW_EXECUTION,
+        value_type=SettingValueType.INTEGER,
+        default_value=None,
+        description=(
+            "Expected execution time for HTTP request activities. If an HTTP "
+            "request runs longer than this, it is flagged as stalled. This is "
+            "informational only — the node continues running until its timeout."
+        ),
+        helper_text="Minimum 1 second. Not set by default (stall detection disabled).",
+        group=WorkflowEngineGroup.EXECUTION,
+        validation_schema={"min": 1},
+    ),
+    SettingDefinition(
+        key="workflow_engine.agentic_expected_duration_seconds",
+        name="Agentic expected duration (seconds)",
+        category=SettingCategory.WORKFLOW_EXECUTION,
+        value_type=SettingValueType.INTEGER,
+        default_value=None,
+        description=(
+            "Expected execution time for agentic activities. If an agentic "
+            "node runs longer than this, it is flagged as stalled. This is "
+            "informational only — the node continues running until its timeout."
+        ),
+        helper_text="Minimum 1 second. Not set by default (stall detection disabled).",
+        group=WorkflowEngineGroup.EXECUTION,
+        validation_schema={"min": 1},
+    ),
+    SettingDefinition(
+        key="workflow_engine.aap_expected_duration_seconds",
+        name="AAP expected duration (seconds)",
+        category=SettingCategory.WORKFLOW_EXECUTION,
+        value_type=SettingValueType.INTEGER,
+        default_value=None,
+        description=(
+            "Expected execution time for AAP job template and workflow job "
+            "template activities. If an AAP job runs longer than this, it is "
+            "flagged as stalled. This is informational only — the node "
+            "continues running until its timeout."
+        ),
+        helper_text="Minimum 1 second. Not set by default (stall detection disabled).",
+        group=WorkflowEngineGroup.EXECUTION,
+        validation_schema={"min": 1},
+    ),
+    SettingDefinition(
+        key="workflow_engine.approval_expected_duration_seconds",
+        name="Approval expected duration (seconds)",
+        category=SettingCategory.WORKFLOW_EXECUTION,
+        value_type=SettingValueType.INTEGER,
+        default_value=None,
+        description=(
+            "Expected time for an approval decision. If an approval node "
+            "runs longer than this, it is flagged as stalled. This is "
+            "informational only — the node continues running until its "
+            "decision window expires."
+        ),
+        helper_text="Minimum 1 second. Not set by default (stall detection disabled).",
+        group=WorkflowEngineGroup.EXECUTION,
+        validation_schema={"min": 1},
+    ),
     SettingDefinition(
         key="workflow_engine.converge_wait_duration_seconds",
         name="Converge wait duration (seconds)",
