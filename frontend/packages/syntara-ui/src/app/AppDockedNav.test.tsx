@@ -136,9 +136,14 @@ describe('AppDockedNav', () => {
     expect(screen.getByRole('navigation', { name: 'Main navigation' })).toBeInTheDocument()
   })
 
-  it('renders user menu toggle', () => {
+  it.each([
+    { buttonName: 'User menu', description: 'user menu toggle' },
+    { buttonName: 'Documentation (opens in a new tab)', description: 'documentation button' },
+    { buttonName: 'Switch to light mode', description: 'color scheme toggle when in dark mode' },
+    { buttonName: 'Global navigation', description: 'menu toggle button' },
+  ])('renders $description', ({ buttonName }) => {
     renderDockedNav()
-    expect(screen.getByRole('button', { name: 'User menu' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: buttonName })).toBeInTheDocument()
   })
 
   it('uses PatternFly docked nav classes', () => {
@@ -146,16 +151,6 @@ describe('AppDockedNav', () => {
 
     expect(screen.getByRole('banner')).toHaveClass('pf-v6-c-masthead', 'pf-m-docked')
     expect(screen.getByRole('navigation', { name: 'Main navigation' })).toHaveClass('pf-m-docked')
-  })
-
-  it('renders documentation button', () => {
-    renderDockedNav()
-    expect(screen.getByRole('button', { name: 'Documentation (opens in a new tab)' })).toBeInTheDocument()
-  })
-
-  it('renders color scheme toggle when in dark mode', () => {
-    renderDockedNav()
-    expect(screen.getByRole('button', { name: 'Switch to light mode' })).toBeInTheDocument()
   })
 
   it('persists light mode and updates document when toggling from dark', async () => {
@@ -167,16 +162,11 @@ describe('AppDockedNav', () => {
     expect(screen.getByRole('button', { name: 'Switch to dark mode' })).toBeInTheDocument()
   })
 
-  it('renders menu toggle button', () => {
-    renderDockedNav()
-    expect(screen.getByRole('button', { name: 'Global navigation' })).toBeInTheDocument()
-  })
-
-  it('shows My Profile and Logout in user menu when hovered', async () => {
+  it('shows My Profile and Logout in user menu when clicked', async () => {
     const user = userEvent.setup()
     renderDockedNav()
 
-    await user.hover(screen.getByRole('button', { name: 'User menu' }))
+    await user.click(screen.getByRole('button', { name: 'User menu' }))
 
     const menu = screen.getByRole('menu')
     expect(within(menu).getByText('My Profile')).toBeInTheDocument()
@@ -185,22 +175,23 @@ describe('AppDockedNav', () => {
 
   it('opens user menu when Enter is pressed while focused', async () => {
     const user = userEvent.setup()
+    mockUseDockState.mockReturnValue(createMockDockState({ isDockTextExpanded: true }))
     renderDockedNav()
 
-    await user.tab()
     const userMenuButton = screen.getByRole('button', { name: 'User menu' })
     userMenuButton.focus()
     await user.keyboard('{Enter}')
 
-    expect(screen.getByText('My Profile')).toBeInTheDocument()
-    expect(screen.getByText('Logout')).toBeInTheDocument()
+    const menu = await screen.findByRole('menu')
+    expect(within(menu).getByText('My Profile')).toBeInTheDocument()
+    expect(within(menu).getByText('Logout')).toBeInTheDocument()
   })
 
   it('navigates to /my-profile when My Profile is clicked', async () => {
     const user = userEvent.setup()
     renderDockedNav()
 
-    await user.hover(screen.getByRole('button', { name: 'User menu' }))
+    await user.click(screen.getByRole('button', { name: 'User menu' }))
     await user.click(screen.getByText('My Profile'))
 
     expect(mockNavigate).toHaveBeenCalledWith({ to: '/my-profile' })
@@ -277,7 +268,11 @@ describe('AppDockedNav', () => {
     expect(screen.getByRole('link', { name: 'Credentials' })).toBeInTheDocument()
   })
 
-  it('navigates to Integrations when Configuration child link is clicked', async () => {
+  it.each([
+    { linkName: 'Integrations', expectedPath: '/configuration/integrations' },
+    { linkName: 'Access Management', expectedPath: '/system-administration/access-management' },
+    { linkName: 'Identity Providers', expectedPath: '/system-administration/authentication' },
+  ])('navigates to $linkName when child link is clicked', async ({ linkName, expectedPath }) => {
     mockUseDockState.mockReturnValue(
       createMockDockState({
         isDockTextExpanded: true,
@@ -287,8 +282,8 @@ describe('AppDockedNav', () => {
     const user = userEvent.setup()
     renderDockedNav()
 
-    await user.click(screen.getByRole('link', { name: 'Integrations' }))
-    expect(mockRequestNavigation).toHaveBeenCalledWith('/configuration/integrations')
+    await user.click(screen.getByRole('link', { name: linkName }))
+    expect(mockRequestNavigation).toHaveBeenCalledWith(expectedPath)
   })
 
   it('shows System Administration child links when the group is expanded', () => {
@@ -303,34 +298,6 @@ describe('AppDockedNav', () => {
     expect(screen.getByRole('link', { name: 'Access Management' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Identity Providers' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Settings' })).toBeInTheDocument()
-  })
-
-  it('navigates to Access Management from System Administration child link', async () => {
-    mockUseDockState.mockReturnValue(
-      createMockDockState({
-        isDockTextExpanded: true,
-        isNavGroupExpanded: () => true,
-      })
-    )
-    const user = userEvent.setup()
-    renderDockedNav()
-
-    await user.click(screen.getByRole('link', { name: 'Access Management' }))
-    expect(mockRequestNavigation).toHaveBeenCalledWith('/system-administration/access-management')
-  })
-
-  it('navigates to Identity Providers from System Administration child link', async () => {
-    mockUseDockState.mockReturnValue(
-      createMockDockState({
-        isDockTextExpanded: true,
-        isNavGroupExpanded: () => true,
-      })
-    )
-    const user = userEvent.setup()
-    renderDockedNav()
-
-    await user.click(screen.getByRole('link', { name: 'Identity Providers' }))
-    expect(mockRequestNavigation).toHaveBeenCalledWith('/system-administration/authentication')
   })
 
   describe('Expanded text mode', () => {
@@ -526,7 +493,7 @@ describe('AppDockedNav', () => {
     const user = userEvent.setup()
     renderDockedNav()
 
-    await user.hover(screen.getByRole('button', { name: 'User menu' }))
+    await user.click(screen.getByRole('button', { name: 'User menu' }))
     await user.click(screen.getByText('Logout'))
 
     // Should call logout directly — no modal
