@@ -54,6 +54,7 @@ export function CredentialFormModal({
       {isOpen && (
         <CredentialFormModalContent
           form={form}
+          isOpen={isOpen}
           credentialToEdit={credentialToEdit}
           isEditMode={isEditMode}
           preSelectedTypeId={preSelectedTypeId}
@@ -68,6 +69,7 @@ export function CredentialFormModal({
 
 type CredentialFormModalContentProps = {
   form: ReturnType<typeof useSynForm<import('./credentialFormSchema').CredentialFormData>>
+  isOpen: boolean
   credentialToEdit?: Credential | null
   isEditMode: boolean
   preSelectedTypeId?: string
@@ -78,6 +80,7 @@ type CredentialFormModalContentProps = {
 
 function CredentialFormModalContent({
   form,
+  isOpen,
   credentialToEdit,
   isEditMode,
   preSelectedTypeId,
@@ -87,6 +90,7 @@ function CredentialFormModalContent({
 }: Readonly<CredentialFormModalContentProps>) {
   const modalState = useCredentialFormModal({
     form,
+    isOpen,
     credentialToEdit,
     isEditMode,
     preSelectedTypeId,
