@@ -207,6 +207,73 @@ async def test_validate_restart_rejects_sanitized_upstream_output() -> None:
 
 
 @pytest.mark.asyncio
+async def test_validate_restart_default_selection_auto_includes_sanitized_dependency() -> None:
+    """SDP AC-15/R9a Q4: default selection auto-moves the start point to the sanitized node."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    ref_nodes = [
+        dict(n, parameters={**n.get("parameters", {}), "input_ref": "${step_1.token}"}) if n["id"] == "step_2" else n
+        for n in NODES
+    ]
+    snapshot = _make_version(1, nodes=ref_nodes)
+    session = _mock_session(
+        (execution, "one"),
+        ([_make_activity("step_2")], "all"),
+        ([_make_completed_activity("step_1", {"token": "[REDACTED]"})], "all"),
+        (snapshot, "one"),
+    )
+    verdict = await validate_restart_from_failure(session, execution.id, [])
+    assert verdict.eligible is True
+    assert verdict.failure_point_ids == ["step_1", "step_2"]
+    assert verdict.auto_included_node_ids == ["step_1"]
+    assert verdict.sanitized_node_ids == []
+    assert verdict.total_step_count == 3
+
+
+@pytest.mark.asyncio
+async def test_validate_restart_default_selection_cascades_through_chained_dependencies() -> None:
+    """Auto-inclusion repeats until no sanitized dependency remains (multi-level chain)."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    step_0 = {"id": "step_0", "type": "script", "parameters": {"code": "echo hi"}}
+    step_1 = {
+        "id": "step_1",
+        "type": "script",
+        "parameters": {"code": "echo hi", "input_ref": "${step_0.value}"},
+    }
+    step_2 = {
+        "id": "step_2",
+        "type": "script",
+        "parameters": {"code": "exit 1", "input_ref": "${step_1.token}"},
+    }
+    step_3 = {"id": "step_3", "type": "script", "parameters": {"code": "echo done"}}
+    nodes = [step_0, step_1, step_2, step_3]
+    edges = [
+        {"from": "trigger_1", "to": "step_0"},
+        {"from": "step_0", "to": "step_1"},
+        {"from": "step_1", "to": "step_2"},
+        {"from": "step_2", "to": "step_3"},
+    ]
+    snapshot = _make_version(1, nodes=nodes)
+    snapshot.workflow_definition["edges"] = edges
+    session = _mock_session(
+        (execution, "one"),
+        ([_make_activity("step_2")], "all"),
+        (
+            [
+                _make_completed_activity("step_0", {"value": "[REDACTED]"}),
+                _make_completed_activity("step_1", {"token": "[REDACTED]"}),
+            ],
+            "all",
+        ),
+        (snapshot, "one"),
+    )
+    verdict = await validate_restart_from_failure(session, execution.id, [])
+    assert verdict.eligible is True
+    assert verdict.failure_point_ids == ["step_0", "step_1", "step_2"]
+    assert verdict.auto_included_node_ids == ["step_0", "step_1"]
+    assert verdict.total_step_count == 4
+
+
+@pytest.mark.asyncio
 async def test_template_reference_forms() -> None:
     """Field paths extracted precisely; whole-namespace refs yield empty paths; prefixes safe."""
     from syntara.workflows.utils.template_refs import find_template_refs as _all_template_refs
@@ -370,12 +437,22 @@ def _run_session(
 
 
 @pytest.mark.asyncio
-async def test_validate_restart_rejects_empty_selection() -> None:
-    """Empty selection is rejected with guidance (documented behavior)."""
+async def test_validate_restart_empty_selection_defaults_to_all_failed() -> None:
+    """SDP R11/AC-15: empty selection means 'all currently failed nodes', not an error."""
     execution = _make_execution(ExecutionStatus.FAILED)
     verdict = await validate_restart_from_failure(_run_session(execution, _definition()), execution.id, [])
+    assert verdict.eligible is True
+    assert verdict.failure_point_ids == ["step_2"]
+    assert verdict.auto_included_node_ids == []
+
+
+@pytest.mark.asyncio
+async def test_validate_restart_rejects_empty_selection_with_no_failed_nodes() -> None:
+    """Defaulting still rejects when there are no failed nodes at all to default to."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    verdict = await validate_restart_from_failure(_run_session(execution, _definition(), failed=[]), execution.id, [])
     assert verdict.eligible is False
-    assert "no failure points selected" in (verdict.reason or "")
+    assert "no failed nodes" in (verdict.reason or "")
 
 
 @pytest.mark.asyncio

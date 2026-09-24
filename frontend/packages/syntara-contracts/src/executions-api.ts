@@ -540,7 +540,7 @@ export interface components {
     RestartValidateRequest: {
       /**
        * Failure Point Ids
-       * @description Failure points to restart from (node IDs from the source execution)
+       * @description Failure points to restart from (node IDs from the source execution). Empty selects the default: all currently failed nodes.
        */
       failure_point_ids?: string[]
     }
@@ -551,7 +551,7 @@ export interface components {
     RestartRequest: {
       /**
        * Failure Point Ids
-       * @description Failure points to restart from (node IDs from the source execution). A subset may be passed when multiple parallel branches failed; unselected branches are skipped.
+       * @description Failure points to restart from (node IDs from the source execution). A subset may be passed when multiple parallel branches failed; unselected branches are skipped. Empty selects the default: all currently failed nodes.
        */
       failure_point_ids?: string[]
     }
@@ -580,6 +580,11 @@ export interface components {
        * @description Upstream nodes with sanitized stored outputs referenced on the restart path
        */
       sanitized_node_ids?: string[]
+      /**
+       * Auto Included Node Ids
+       * @description Sanitized nodes automatically added as restart points to resolve a dependency (default selection only; empty otherwise)
+       */
+      auto_included_node_ids?: string[]
       /**
        * Step Count By Failure Point
        * @description Re-run step count for each selected failure point, computed against the retained version

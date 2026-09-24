@@ -1276,6 +1276,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             reason=validation.reason,
             failure_point_ids=validation.failure_point_ids,
             sanitized_node_ids=validation.sanitized_node_ids,
+            auto_included_node_ids=validation.auto_included_node_ids,
             step_count_by_failure_point=validation.step_count_by_failure_point,
             total_step_count=validation.total_step_count,
         )

@@ -31,15 +31,23 @@ Validation is a chain of checks:
    for restart validation — it affects all executions equally and is not
    restart-specific (SDP scope reduction, R9a).
 
-Design decisions (SDP ANSTRAT-1779, aligned 2026-09-23):
+   For an **explicit** selection, a sanitized dependency always rejects. For
+   the **default** selection (empty input — see below), a sanitized
+   dependency instead expands the restart points to include the sanitized
+   node, repeated until no dependency remains, and reports what was added
+   instead of rejecting (SDP AC-15/R9a, Q4).
+
+Design decisions (SDP ANSTRAT-1779, aligned 2026-09-24):
 
 - Loop-iteration activities (``<node>#iter-<n>``) normalize to their base node
   id for eligibility; iteration-level classification is AAP-92821's job.
-- An empty failure-point selection is rejected — the user must select
-  explicitly; the API does not assume "all".
+- An empty failure-point selection means "all currently failed nodes"
+  (SDP R11/AC-15) — not an error. A non-empty selection means exactly those
+  nodes. Rejected only if there are no failed nodes at all to default to.
 - The response includes a re-run step count per failure point and a
   deduplicated total across the whole selection (SDP R11a/AC-2), computed
-  against the retained version.
+  against the retained version — and, for the default selection, against
+  whatever nodes were auto-included to resolve a sanitized dependency.
 """
 
 from __future__ import annotations
@@ -79,6 +87,7 @@ class RestartValidation:
     failure_point_ids: list[str] = field(default_factory=list)
     upstream_node_ids: list[str] = field(default_factory=list)
     sanitized_node_ids: list[str] = field(default_factory=list)
+    auto_included_node_ids: list[str] = field(default_factory=list)
     snapshot_version: int | None = None
     step_count_by_failure_point: dict[str, int] = field(default_factory=dict)
     total_step_count: int = 0
@@ -184,9 +193,14 @@ def _state_reason(source: Execution) -> str | None:
 
 
 def _selection_reason(normalized: list[str], failed_ids: set[str]) -> str | None:
-    """Rejection reason for an empty or ineligible selection, else None."""
+    """Rejection reason for an empty or ineligible selection, else None.
+
+    ``normalized`` has already been resolved to the default (all currently
+    failed nodes) if the caller's selection was empty, so an empty result
+    here only happens when there are no failed nodes at all to default to.
+    """
     if not normalized:
-        return "no failure points selected"
+        return "no failed nodes in this execution to restart from"
     unknown = [point for point in normalized if point not in failed_ids]
     if unknown:
         return f"not failed nodes in this execution: {', '.join(unknown)}"
@@ -322,22 +336,47 @@ def _version_reason(
     normalized: list[str],
     snapshot: WorkflowVersion | None,
     completed_outputs: dict[str, list],
-) -> tuple[str | None, list[str]]:
-    """Rejection reason and sanitized nodes for the retained-version and taint guards."""
+    *,
+    is_default_selection: bool,
+) -> tuple[str | None, list[str], list[str], list[str]]:
+    """Rejection reason, blocking sanitized nodes, auto-included nodes, and the final selection.
+
+    For an explicit selection, any sanitized dependency rejects outright
+    (``sanitized`` names the blocking nodes, the selection is unchanged). For
+    the default selection (SDP AC-15), a sanitized dependency instead expands
+    the selection to include the sanitized node as an additional restart
+    point — repeated until no dependency remains — and reports what was
+    auto-included instead of rejecting.
+    """
     if snapshot is None:
-        return "original workflow version no longer exists", []
+        return "original workflow version no longer exists", [], [], normalized
     snapshot_def = snapshot.workflow_definition or {}
     snapshot_ids = {node.get("id") for node in definition_nodes(snapshot_def)}
     missing = [point for point in normalized if point not in snapshot_ids]
     if missing:
-        return f"not nodes in the executed workflow version: {', '.join(missing)}", []
-    sanitized = _tainted_nodes(snapshot_def, normalized, completed_outputs)
-    if sanitized:
-        return (
-            "upstream nodes have sanitized outputs referenced on the restart path "
-            f"({', '.join(sanitized)}); restarting would inject redacted data"
-        ), sanitized
-    return None, []
+        return f"not nodes in the executed workflow version: {', '.join(missing)}", [], [], normalized
+
+    selection = set(normalized)
+    auto_included: set[str] = set()
+    while True:
+        sanitized = _tainted_nodes(snapshot_def, sorted(selection), completed_outputs)
+        if not sanitized:
+            return None, [], sorted(auto_included), sorted(selection)
+        if not is_default_selection:
+            return (
+                (
+                    "upstream nodes have sanitized outputs referenced on the restart path "
+                    f"({', '.join(sanitized)}); restarting would inject redacted data"
+                ),
+                sanitized,
+                [],
+                normalized,
+            )
+        newly_added = set(sanitized) - selection
+        if not newly_added:
+            return None, [], sorted(auto_included), sorted(selection)
+        selection |= newly_added
+        auto_included |= newly_added
 
 
 async def validate_restart_from_failure(
@@ -351,6 +390,9 @@ async def validate_restart_from_failure(
     activities, and the retained workflow version, then runs the guard chain
     (state, selection, converge-mootness, retained-version, sanitized-taint).
     Never mutates state.
+
+    An empty ``failure_point_ids`` means the default selection — all
+    currently failed nodes (SDP R11/AC-15) — not an error.
 
     Raises:
         ExecutionNotFoundError: If the source execution is gone.
@@ -371,7 +413,8 @@ async def validate_restart_from_failure(
             ),
             failure_point_ids=sorted({point.strip() for point in failure_point_ids if point and point.strip()}),
         )
-    normalized = sorted({point.strip() for point in failure_point_ids if point and point.strip()})
+    normalized_input = sorted({point.strip() for point in failure_point_ids if point and point.strip()})
+    is_default_selection = not normalized_input
 
     activities = (
         await session.exec(
@@ -382,6 +425,7 @@ async def validate_restart_from_failure(
         )
     ).all()
     failed_ids = {strip_iteration_suffix(activity.activity_name) for activity in activities}
+    normalized = sorted(failed_ids) if is_default_selection else normalized_input
 
     completed = (
         await session.exec(
@@ -404,7 +448,9 @@ async def validate_restart_from_failure(
     )
     snapshot = snapshot_result.one_or_none()
 
-    version_reason, sanitized = _version_reason(normalized, snapshot, completed_outputs)
+    version_reason, sanitized, auto_included, final_selection = _version_reason(
+        normalized, snapshot, completed_outputs, is_default_selection=is_default_selection
+    )
     snapshot_def = (snapshot.workflow_definition or {}) if snapshot is not None else {}
     reason = (
         _state_reason(source)
@@ -414,14 +460,15 @@ async def validate_restart_from_failure(
     )
 
     snapshot_version = snapshot.version if snapshot is not None else None
-    upstream = collect_upstream_node_ids(snapshot_def, normalized)
-    step_counts, total_steps = _step_counts(snapshot_def, normalized) if snapshot is not None else ({}, 0)
+    reported_selection = final_selection if reason is None else normalized
+    upstream = collect_upstream_node_ids(snapshot_def, reported_selection)
+    step_counts, total_steps = _step_counts(snapshot_def, reported_selection) if snapshot is not None else ({}, 0)
 
     if reason is not None:
         return RestartValidation(
             eligible=False,
             reason=reason,
-            failure_point_ids=normalized,
+            failure_point_ids=reported_selection,
             upstream_node_ids=sorted(upstream),
             sanitized_node_ids=sanitized,
             snapshot_version=snapshot_version,
@@ -431,8 +478,9 @@ async def validate_restart_from_failure(
 
     return RestartValidation(
         eligible=True,
-        failure_point_ids=normalized,
+        failure_point_ids=reported_selection,
         upstream_node_ids=sorted(upstream),
+        auto_included_node_ids=auto_included,
         snapshot_version=snapshot_version,
         step_count_by_failure_point=step_counts,
         total_step_count=total_steps,

@@ -420,7 +420,8 @@ class RestartValidateRequest(SQLModel):
 
     failure_point_ids: list[str] = Field(
         default_factory=list,
-        description="Failure points to restart from (node IDs from the source execution)",
+        description="Failure points to restart from (node IDs from the source execution). "
+        "Empty selects the default: all currently failed nodes.",
     )
 
 
@@ -432,7 +433,8 @@ class RestartRequest(SQLModel):
     failure_point_ids: list[str] = Field(
         default_factory=list,
         description="Failure points to restart from (node IDs from the source execution). "
-        "A subset may be passed when multiple parallel branches failed; unselected branches are skipped.",
+        "A subset may be passed when multiple parallel branches failed; unselected branches are skipped. "
+        "Empty selects the default: all currently failed nodes.",
     )
 
 
@@ -445,6 +447,11 @@ class RestartValidationResponse(SQLModel):
     sanitized_node_ids: list[str] = Field(
         default_factory=list,
         description="Upstream nodes with sanitized stored outputs referenced on the restart path",
+    )
+    auto_included_node_ids: list[str] = Field(
+        default_factory=list,
+        description="Sanitized nodes automatically added as restart points to resolve a dependency "
+        "(default selection only; empty otherwise)",
     )
     step_count_by_failure_point: dict[str, int] = Field(
         default_factory=dict,
