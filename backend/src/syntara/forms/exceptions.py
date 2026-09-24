@@ -38,6 +38,17 @@ class FormPromptAlreadyRespondedError(FormError):
         super().__init__(f"Form prompt {form_prompt_id} has already been responded to with status '{current_status}'")
 
 
+@fastapi_exception(handler="syntara.forms.error_handlers.form_prompt_not_authorized_handler")
+class FormPromptNotAuthorizedError(FormError):
+    """Raised when a user is not configured to respond to a form prompt."""
+
+    def __init__(self, form_prompt_id: UUID, user_id: UUID) -> None:
+        """Initialize exception with form prompt ID and user ID."""
+        self.form_prompt_id = form_prompt_id
+        self.user_id = user_id
+        super().__init__(f"User {user_id} is not authorized to respond to form prompt {form_prompt_id}")
+
+
 @fastapi_exception(handler="syntara.forms.error_handlers.form_prompt_expired_handler")
 class FormPromptExpiredError(FormError):
     """Raised when attempting to respond to an expired form prompt."""

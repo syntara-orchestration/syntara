@@ -22,11 +22,12 @@ if TYPE_CHECKING:
 
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.core.models.user_reference import UserReference
-from syntara.core.services.base import BaseService
+from syntara.core.services import BaseService, GroupMembershipService
 from syntara.forms.audit.form_prompt import FormPromptSubmittedEvent
 from syntara.forms.exceptions import (
     FormPromptAlreadyRequestedError,
     FormPromptAlreadyRespondedError,
+    FormPromptNotAuthorizedError,
     FormPromptNotFoundError,
     InvalidResponderReferenceError,
 )
@@ -87,6 +88,26 @@ class FormPromptService(BaseService):
         )
         result = await self.session.exec(query)
         return result.one_or_none()
+
+    async def _validate_responder(self, prompt: FormPrompt) -> None:
+        """Ensure the current user is configured to respond to this prompt."""
+        responder_users = prompt.responder_user_records
+        responder_groups = prompt.responder_group_records
+
+        # Empty responder lists preserve the permission-based fallback.
+        if not responder_users and not responder_groups:
+            return
+
+        if self.user.id in {responder.id for responder in responder_users}:
+            return
+
+        if responder_groups and await GroupMembershipService(self.session).is_user_in_any_group_by_ids(
+            user_id=self.user.id,
+            group_ids=[group.id for group in responder_groups],
+        ):
+            return
+
+        raise FormPromptNotAuthorizedError(prompt.id, self.user.id)
 
     @staticmethod
     def _to_read_model(prompt: FormPrompt, *, signal_delivery_error: str | None = None) -> FormPromptRead:
@@ -434,6 +455,7 @@ class FormPromptService(BaseService):
 
         Raises:
             FormPromptNotFoundError: If prompt does not exist
+            FormPromptNotAuthorizedError: If the current user is not a configured responder
             FormPromptExpiredError: If prompt has expired
             FormPromptCancelledError: If prompt has been cancelled
             FormPromptAlreadyRespondedError: If prompt already has a response
@@ -445,6 +467,7 @@ class FormPromptService(BaseService):
         if prompt is None:
             raise FormPromptNotFoundError(prompt_id)
 
+        await self._validate_responder(prompt)
         validate_prompt_submission_state(prompt)
         cleaned_data = validate_form_submission(prompt.form_definition, submitted_data)
 

@@ -69,7 +69,6 @@ async def create_form_prompt(
 
 @router.get(
     "",
-    dependencies=[Depends(PermissionChecker("form_prompt", "read"))],
     operation_id="list_form_prompts",
     summary="List form prompts",
     description="""List form prompts with filtering, sorting, and pagination.
