@@ -209,8 +209,7 @@ class FormPromptSummary(SQLModel):
 
     Contains only the 8 documented fields used by expire/cancel activities
     and workflow lifecycle management. Does not expose user-submitted form data
-    or rendering configuration fields (those will appear in FormPromptRead for
-    user-facing endpoints in AAP-91889).
+    or rendering configuration fields.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)  # type: ignore[assignment]

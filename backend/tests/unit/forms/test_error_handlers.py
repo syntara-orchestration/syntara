@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse
 
 from syntara.core.error_handlers import PROBLEM_TYPES
 from syntara.forms.error_handlers import (
+    form_data_validation_error_handler,
     form_prompt_already_requested_handler,
     form_prompt_already_responded_handler,
     form_prompt_cancelled_handler,
@@ -20,13 +21,15 @@ from syntara.forms.error_handlers import (
     form_prompt_not_found_handler,
 )
 from syntara.forms.exceptions import (
+    FormDataValidationError,
     FormPromptAlreadyRequestedError,
     FormPromptAlreadyRespondedError,
     FormPromptCancelledError,
     FormPromptExpiredError,
     FormPromptNotFoundError,
 )
-from syntara.forms.models.api_models import FormPromptStatus
+from syntara.forms.models.api_models import FormDataValidationProblem, FormPromptStatus
+from syntara.forms.models.form_errors import FormFieldError
 
 
 class TestFormPromptNotFoundHandler:
@@ -149,3 +152,32 @@ class TestFormPromptAlreadyRequestedHandler:
         assert prompt_node_id in data["detail"]
         assert data["code"] == "FORM_ALREADY_REQUESTED"
         assert data["retryable"] is False
+
+
+class TestFormDataValidationErrorHandler:
+    """Test the structured RFC 9457 response for invalid form submissions."""
+
+    def test_response_matches_form_validation_problem_model(self) -> None:
+        request = Mock(spec=Request)
+        request.url = "https://api.example.com/api/v1/form_prompts/123/submit"
+        exc = FormDataValidationError(
+            errors=[
+                FormFieldError(
+                    field="reason",
+                    label="Reason",
+                    code="required",
+                    message="This field is required",
+                )
+            ]
+        )
+
+        response = form_data_validation_error_handler(request, exc)
+
+        assert response.status_code == 422
+        assert response.media_type == "application/problem+json"
+        problem = FormDataValidationProblem.model_validate(json.loads(bytes(response.body)))
+        assert problem.code == "FORM_VALIDATION_ERROR"
+        assert problem.errors[0].field == "reason"
+        assert problem.errors[0].label == "Reason"
+        assert problem.errors[0].code == "required"
+        assert problem.errors[0].message == "This field is required"

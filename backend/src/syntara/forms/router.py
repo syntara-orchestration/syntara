@@ -154,5 +154,4 @@ async def submit_form_prompt(
     service: Annotated[FormPromptService, Depends(get_form_prompt_service)],
 ) -> FormPromptRead:
     """Submit a response to a pending form prompt and resume its workflow."""
-    # TODO(AAP-91890): https://issues.redhat.com/browse/AAP-91890 — enforce responder membership before submit.
     return await service.submit(form_prompt_id, request.response_data)

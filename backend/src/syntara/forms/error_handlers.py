@@ -3,14 +3,14 @@
 This module provides error handling for form-specific exceptions.
 """
 
-import json
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import structlog
 from fastapi import Request, status
 from fastapi.responses import JSONResponse
 
 from syntara.core.error_handlers import PROBLEM_TYPES, create_problem_details_response
+from syntara.forms.models.api_models import FormDataValidationProblem, FormFieldErrorResponse
 
 if TYPE_CHECKING:
     from syntara.forms.exceptions import (
@@ -113,25 +113,26 @@ def form_data_validation_error_handler(request: Request, exc: "FormDataValidatio
 
     detail = "Form validation failed: " + "; ".join(f"{err.field}: {err.message}" for err in exc.errors)
 
-    response = create_problem_details_response(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        problem_type=PROBLEM_TYPES["validation_error"],
+    problem = FormDataValidationProblem(
+        type=PROBLEM_TYPES["validation_error"],
         title="Form Validation Error",
         detail=detail,
         code="FORM_VALIDATION_ERROR",
         retryable=False,
         instance=str(request.url),
+        errors=[
+            FormFieldErrorResponse(
+                field=error.field,
+                label=error.label,
+                code=error.code,
+                message=error.message,
+            )
+            for error in exc.errors
+        ],
     )
-    # RFC 9457 permits application-specific extension members. Preserve structured
-    # field errors so clients can map validation failures back to form controls.
-    content: dict[str, Any] = json.loads(bytes(response.body))
-    content["errors"] = [
-        {"field": error.field, "label": error.label, "code": error.code, "message": error.message}
-        for error in exc.errors
-    ]
     return JSONResponse(
-        status_code=response.status_code,
-        content=content,
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content=problem.model_dump(mode="json", exclude_none=True),
         media_type="application/problem+json",
     )
 
