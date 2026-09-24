@@ -38,6 +38,12 @@ export type SynTextFieldProps<
   placeholder?: string
   /** Disables the input. */
   isDisabled?: boolean
+  /** Accessible name when the visible FormGroup label is hidden or insufficient. */
+  ariaLabel?: string
+  /**
+   * When true, omits the visible `FormGroup` label (e.g. compact header name inputs).
+   */
+  hideFormGroupLabel?: boolean
   /** HTML `autocomplete` attribute forwarded to the underlying `TextInput`. */
   autoComplete?: string
   /** Input type. Defaults to `'text'`. */
@@ -77,6 +83,8 @@ export function SynTextField<
   hint,
   placeholder,
   isDisabled,
+  hideFormGroupLabel,
+  ariaLabel,
   autoComplete,
   type = 'text',
   ariaLabel,
@@ -92,11 +100,13 @@ export function SynTextField<
       isRequired={isRequired}
       labelHelp={labelHelp}
       hint={hint}
+      hideFormGroupLabel={hideFormGroupLabel}
     >
       {({ field, fieldState }) => (
         <TextInput
           id={resolvedFieldId}
           type={type}
+          aria-label={ariaLabel}
           placeholder={placeholder}
           validated={fieldState.error ? 'error' : 'default'}
           value={field.value ?? ''}

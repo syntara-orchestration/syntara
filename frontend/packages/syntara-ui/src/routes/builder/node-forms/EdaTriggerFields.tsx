@@ -1,22 +1,12 @@
-import {
-  Alert,
-  Content,
-  ContentVariants,
-  FormGroup,
-  FormHelperText,
-  HelperText,
-  HelperTextItem,
-  StackItem,
-} from '@patternfly/react-core'
-import { Controller, useFormContext } from 'react-hook-form'
+import { Alert, Content, ContentVariants, StackItem } from '@patternfly/react-core'
 
 import { FieldHelpPopover } from '../../../components/FieldHelpPopover'
 import { FormLabelWithHelp } from '../../../components/FormLabelWithHelp'
+import { SynFormField } from '../../../components/forms/SynFormField'
 import { WEBHOOK_BASE_URL } from '../../../utils/backendUrl'
 
 import { PayloadValidationSection } from './PayloadValidationSection'
 import { ServiceAccountSelect } from './ServiceAccountSelect'
-import type { TriggerFormData } from './triggerFormSchema'
 import { DEFAULT_JSON_SCHEMA, EXAMPLE_JSON_SCHEMA, JSON_SCHEMA_DOWNLOAD_FILENAME } from './triggerFormSchema'
 import { useWebhookUrl } from './useWebhookUrl'
 import { WebhookPathField } from './WebhookPathField'
@@ -24,17 +14,8 @@ import { WebhookUrlPreview } from './WebhookUrlPreview'
 
 const EDA_WEBHOOK_BASE_URL = `${WEBHOOK_BASE_URL}/eda`
 
-export function EdaFields({
-  errors,
-}: Readonly<{
-  errors: Readonly<{
-    webhookPath?: { message?: string }
-    inputSchema?: { message?: string }
-    authorizedServiceAccountIds?: { message?: string }
-  }>
-}>) {
+export function EdaFields() {
   const fullEdaUrl = useWebhookUrl(EDA_WEBHOOK_BASE_URL)
-  const { control } = useFormContext<TriggerFormData>()
 
   return (
     <>
@@ -58,7 +39,6 @@ export function EdaFields({
         }
         placeholder="/eda-events"
         helperText="A unique slug for this endpoint (e.g., /eda-events)."
-        error={errors.webhookPath?.message}
       />
 
       <WebhookUrlPreview
@@ -73,34 +53,25 @@ export function EdaFields({
       />
 
       <StackItem>
-        <FormGroup
-          label={
-            <FormLabelWithHelp
-              label="Authorized service accounts"
+        <SynFormField
+          name="authorizedServiceAccountIds"
+          label="Authorized service accounts"
+          fieldId="eda-authorized-service-accounts"
+          labelHelp={
+            <FieldHelpPopover
+              headerContent="Authorized service accounts"
               helpText="Select the service accounts that are allowed to invoke this EDA trigger endpoint. Callers must authenticate with a Bearer token from one of these service accounts."
             />
           }
-          fieldId="eda-authorized-service-accounts"
         >
-          <Controller
-            control={control}
-            name="authorizedServiceAccountIds"
-            render={({ field }) => (
-              <ServiceAccountSelect
-                id="eda-authorized-service-accounts"
-                selectedIds={field.value ?? []}
-                onChange={field.onChange}
-              />
-            )}
-          />
-          {errors.authorizedServiceAccountIds?.message && (
-            <FormHelperText>
-              <HelperText>
-                <HelperTextItem variant="error">{errors.authorizedServiceAccountIds.message}</HelperTextItem>
-              </HelperText>
-            </FormHelperText>
+          {({ field }) => (
+            <ServiceAccountSelect
+              id="eda-authorized-service-accounts"
+              selectedIds={(field.value ?? []) as string[]}
+              onChange={field.onChange}
+            />
           )}
-        </FormGroup>
+        </SynFormField>
       </StackItem>
 
       <StackItem>
@@ -117,7 +88,6 @@ export function EdaFields({
           ariaLabel="JSON schema validation editor"
           downloadFilename={JSON_SCHEMA_DOWNLOAD_FILENAME}
           helperText="Optional JSON Schema for validating incoming EDA payloads."
-          error={errors.inputSchema?.message}
         />
       </StackItem>
     </>

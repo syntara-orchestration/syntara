@@ -31,6 +31,8 @@ export type UseSynFormOptions<T extends FieldValues> = {
    * away, ahead of a manual `trigger()` call (e.g. wizard step navigation).
    */
   mode?: Mode
+  /** RHF re-validation mode (e.g. `onChange` for builder node editors). */
+  reValidateMode?: Mode
   /** Called after `reset()` when `handleClose` is invoked. */
   onClose?: () => void
 }
@@ -103,6 +105,7 @@ export function useSynForm<T extends FieldValues>({
   defaultValues,
   values,
   mode,
+  reValidateMode,
   onClose,
 }: UseSynFormOptions<T>): UseSynFormReturn<T> {
   const form = useForm<T>({
@@ -110,6 +113,7 @@ export function useSynForm<T extends FieldValues>({
     defaultValues,
     values,
     ...(mode !== undefined ? { mode } : {}),
+    ...(reValidateMode !== undefined ? { reValidateMode } : {}),
   })
 
   const { reset, setError } = form

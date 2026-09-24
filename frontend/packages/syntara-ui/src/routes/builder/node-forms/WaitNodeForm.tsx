@@ -1,14 +1,16 @@
-import { FormGroup, FormHelperText, HelperText, HelperTextItem, Stack, StackItem } from '@patternfly/react-core'
+import { Stack, StackItem } from '@patternfly/react-core'
 import type { ReactNode } from 'react'
 import { use, useEffect, useMemo } from 'react'
-import { Controller, FormProvider, useForm, useFormContext, useFormState } from 'react-hook-form'
+import { useFormContext } from 'react-hook-form'
 
+import { SynForm } from '../../../components/forms/SynForm'
+import { SynFormField } from '../../../components/forms/SynFormField'
+import { useSynForm } from '../../../hooks/useSynForm'
 import { NodeEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useNodeEditorAutoSubmit'
 import { useIsVersionView } from '../VersionViewContext'
 
 import { ActivityNameField } from './shared/ActivityNameField'
 import { DurationInput } from './shared/DurationInput'
-import { zodResolver } from './shared/formSchemaUtils'
 import { nodeHelp } from './shared/nodeFieldHelp'
 import { NodeFormContainer } from './shared/NodeFormContainer'
 import { NodeFormTabsLayout } from './shared/NodeFormTabsLayout'
@@ -30,12 +32,11 @@ type WaitFormFieldsProps = Readonly<{
 
 function WaitFormFields({ onHeaderContentChange }: WaitFormFieldsProps) {
   const isVersionView = useIsVersionView()
-  const { register, control } = useFormContext<WaitFormData>()
-  const { errors } = useFormState<WaitFormData>()
+  const { control } = useFormContext<WaitFormData>()
 
   const nameField = useMemo(
-    () => <ActivityNameField register={register} fieldId="wait-name" ariaLabel="Name" />,
-    [register]
+    () => <ActivityNameField control={control} fieldId="wait-name" ariaLabel="Name" />,
+    [control]
   )
 
   useEffect(() => {
@@ -45,35 +46,28 @@ function WaitFormFields({ onHeaderContentChange }: WaitFormFieldsProps) {
     }
   }, [nameField, onHeaderContentChange])
 
-  const durationError = errors.duration
-
   const parametersContent = (
     <Stack hasGutter>
-      {!onHeaderContentChange && <ActivityNameField register={register} fieldId="wait-name" />}
+      {!onHeaderContentChange && <ActivityNameField fieldId="wait-name" />}
 
       <StackItem>
-        <FormGroup label="Wait duration" labelHelp={nodeHelp.waitDuration} fieldId="wait-duration" isRequired>
-          <Controller
-            control={control}
-            name="duration"
-            render={({ field }) => (
-              <DurationInput
-                value={field.value}
-                onChange={field.onChange}
-                idPrefix="wait"
-                isDisabled={isVersionView}
-                validated={durationError ? 'error' : undefined}
-              />
-            )}
-          />
-          {durationError && (
-            <FormHelperText>
-              <HelperText>
-                <HelperTextItem variant="error">{durationError.message}</HelperTextItem>
-              </HelperText>
-            </FormHelperText>
+        <SynFormField
+          name="duration"
+          label="Wait duration"
+          labelHelp={nodeHelp.waitDuration}
+          fieldId="wait-duration"
+          isRequired
+        >
+          {({ field, fieldState }) => (
+            <DurationInput
+              value={field.value as number | undefined}
+              onChange={field.onChange}
+              idPrefix="wait"
+              isDisabled={isVersionView}
+              validated={fieldState.error ? 'error' : undefined}
+            />
           )}
-        </FormGroup>
+        </SynFormField>
       </StackItem>
     </Stack>
   )
@@ -95,22 +89,22 @@ export function WaitNodeForm(props: Readonly<WaitNodeFormProps>) {
     ...props.initialData,
   }
 
-  const methods = useForm<WaitFormData>({
-    resolver: zodResolver(schema, undefined, { mode: 'sync' }),
+  const form = useSynForm({
+    schema,
     defaultValues,
     mode: 'onChange',
   })
 
   const autoSubmitRef = use(NodeEditorAutoSubmitContext)
-  useRegisterAutoSubmit(autoSubmitRef, methods, props.onSubmit)
+  useRegisterAutoSubmit(autoSubmitRef, form, props.onSubmit)
 
   if (isLoading) return null
 
   return (
-    <FormProvider {...methods}>
-      <NodeFormContainer formId="wait-node-form" onSubmit={methods.handleSubmit(props.onSubmit)}>
+    <NodeFormContainer formId="wait-node-form" onSubmit={form.handleSubmit(props.onSubmit)}>
+      <SynForm form={form}>
         <WaitFormFields onHeaderContentChange={props.onHeaderContentChange} />
-      </NodeFormContainer>
-    </FormProvider>
+      </SynForm>
+    </NodeFormContainer>
   )
 }

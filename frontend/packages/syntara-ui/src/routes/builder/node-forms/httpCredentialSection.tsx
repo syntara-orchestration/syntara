@@ -1,10 +1,10 @@
-import { FormGroup, FormHelperText, HelperText, HelperTextItem, StackItem, TextInput } from '@patternfly/react-core'
-import { RhUiErrorIcon } from '@patternfly/react-icons'
+import { FormHelperText, HelperText, HelperTextItem, StackItem, TextInput } from '@patternfly/react-core'
 import type { CredentialsAPI } from '@syntara/contracts'
 import { useMemo } from 'react'
-import { Controller, useFormContext, useWatch } from 'react-hook-form'
+import { useFormContext, useWatch } from 'react-hook-form'
 
 import { credentialsClient } from '../../../client'
+import { SynFormField } from '../../../components/forms/SynFormField'
 import { CredentialSelector } from '../components/CredentialSelector'
 import { DroppableField } from '../panels/fields/DroppableField'
 
@@ -19,90 +19,70 @@ type CredentialQueryParams = CredentialsAPI.operations['list_credentials']['para
   project_id?: string
 }
 
-export type ActionFormMethods = ReturnType<typeof useFormContext<ActionFormValues>>
-
 export type HttpUrlFieldProps = Readonly<{
-  register: ActionFormMethods['register']
-  getValues: ActionFormMethods['getValues']
-  setValue: ActionFormMethods['setValue']
-  urlError?: { message?: string }
   isUrlManagedByCredential: boolean
   isDisabled: boolean
 }>
 
 // Exported for isolated accessibility testing (avoids PatternFly tab happy-dom issue in full-form tests)
-export function HttpUrlField({
-  register,
-  getValues,
-  setValue,
-  urlError,
-  isUrlManagedByCredential,
-  isDisabled,
-}: HttpUrlFieldProps) {
+export function HttpUrlField({ isUrlManagedByCredential, isDisabled }: HttpUrlFieldProps) {
+  const { getValues, setValue } = useFormContext<ActionFormValues>()
   const isFieldDisabled = isDisabled || isUrlManagedByCredential
 
   return (
-    <FormGroup label="URL" labelHelp={nodeHelp.httpUrl} isRequired={!isUrlManagedByCredential} fieldId="action-url">
-      <DroppableField
-        onDropText={(text) => {
-          const current = getValues('url')
-          setValue('url', (current ?? '') + text)
-        }}
-        isDisabled={isFieldDisabled}
-      >
-        <TextInput
-          {...register('url')}
-          id="action-url"
-          type="url"
-          placeholder={isUrlManagedByCredential ? 'URL managed by credential' : 'https://api.example.com/endpoint'}
-          validated={urlError ? 'error' : 'default'}
-          isDisabled={isFieldDisabled}
-        />
-      </DroppableField>
-      {isUrlManagedByCredential ? (
-        <FormHelperText>
-          <HelperText>
-            <HelperTextItem>
-              This value will be injected at execution time and is never stored in the workflow definition.
-            </HelperTextItem>
-          </HelperText>
-        </FormHelperText>
-      ) : (
-        urlError && (
-          <FormHelperText>
-            <HelperText>
-              <HelperTextItem icon={<RhUiErrorIcon />} variant="error">
-                {urlError.message}
-              </HelperTextItem>
-            </HelperText>
-          </FormHelperText>
-        )
+    <SynFormField
+      name="url"
+      label="URL"
+      labelHelp={nodeHelp.httpUrl}
+      isRequired={!isUrlManagedByCredential}
+      fieldId="action-url"
+      hideFooter={isUrlManagedByCredential}
+    >
+      {({ field, fieldState }) => (
+        <>
+          <DroppableField
+            onDropText={(text) => {
+              const current = getValues('url')
+              setValue('url', (current ?? '') + text)
+            }}
+            isDisabled={isFieldDisabled}
+          >
+            <TextInput
+              id="action-url"
+              type="url"
+              placeholder={isUrlManagedByCredential ? 'URL managed by credential' : 'https://api.example.com/endpoint'}
+              validated={fieldState.error ? 'error' : 'default'}
+              isDisabled={isFieldDisabled}
+              value={typeof field.value === 'string' ? field.value : ''}
+              onChange={field.onChange}
+              onBlur={field.onBlur}
+              name={field.name}
+            />
+          </DroppableField>
+          {isUrlManagedByCredential && (
+            <FormHelperText>
+              <HelperText>
+                <HelperTextItem>
+                  This value will be injected at execution time and is never stored in the workflow definition.
+                </HelperTextItem>
+              </HelperText>
+            </FormHelperText>
+          )}
+        </>
       )}
-    </FormGroup>
+    </SynFormField>
   )
 }
 
 type HttpCredentialSectionProps = Readonly<{
-  control: ActionFormMethods['control']
-  register: ActionFormMethods['register']
-  getValues: ActionFormMethods['getValues']
-  setValue: ActionFormMethods['setValue']
-  urlError?: { message?: string }
   isVersionView: boolean
   projectId?: string
 }>
 
 /** Renders the credential selector and URL field for HTTP request nodes.
  *  Owns credential type queries and the isUrlManagedByCredential state. */
-export function HttpCredentialSection({
-  control,
-  register,
-  getValues,
-  setValue,
-  urlError,
-  isVersionView,
-  projectId,
-}: HttpCredentialSectionProps) {
+export function HttpCredentialSection({ isVersionView, projectId }: HttpCredentialSectionProps) {
+  const { control, setValue } = useFormContext<ActionFormValues>()
   const credentialId = useWatch({ control, name: 'credential_id' })
   const credentialQueryParams = useMemo<CredentialQueryParams>(
     () => (projectId ? { project_id: projectId } : {}),
@@ -123,12 +103,10 @@ export function HttpCredentialSection({
   return (
     <>
       <StackItem>
-        <Controller
-          control={control}
-          name="credential_id"
-          render={({ field }) => (
+        <SynFormField name="credential_id" label="Authentication credential" fieldId="action-credential" hideFooter>
+          {({ field }) => (
             <CredentialSelector
-              value={field.value ?? undefined}
+              value={typeof field.value === 'string' ? field.value : undefined}
               onChange={(newId) => {
                 field.onChange(newId)
                 // Clear URL when switching to a Secret URL credential so the locked
@@ -149,17 +127,10 @@ export function HttpCredentialSection({
               )}
             />
           )}
-        />
+        </SynFormField>
       </StackItem>
       <StackItem>
-        <HttpUrlField
-          register={register}
-          getValues={getValues}
-          setValue={setValue}
-          urlError={urlError}
-          isUrlManagedByCredential={isUrlManagedByCredential}
-          isDisabled={isVersionView}
-        />
+        <HttpUrlField isUrlManagedByCredential={isUrlManagedByCredential} isDisabled={isVersionView} />
       </StackItem>
     </>
   )
