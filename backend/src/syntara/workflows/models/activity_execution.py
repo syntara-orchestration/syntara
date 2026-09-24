@@ -185,6 +185,7 @@ class ActivityExecution(BaseResource, table=True):
     # Stall detection (AAP-92824)
     expected_duration: int | None = Field(
         None,
+        ge=1,
         description="Resolved expected duration in seconds, copied from node settings at dispatch time.",
     )
     stall_alert_at: datetime | None = Field(

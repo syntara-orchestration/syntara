@@ -689,6 +689,7 @@ components:
             expected_duration:
               anyOf:
                 - type: integer
+                  minimum: 1.0
                 - type: 'null'
               description: Resolved expected duration in seconds, copied from node settings at dispatch time.
               title: Expected Duration
