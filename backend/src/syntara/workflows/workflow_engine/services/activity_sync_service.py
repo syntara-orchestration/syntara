@@ -2839,9 +2839,7 @@ class ActivitySyncService:
                     if raw_expected_duration is not None:
                         expected_duration: int | None = int(raw_expected_duration)
                     else:
-                        expected_duration = get_default_expected_duration(
-                            node_type.value, runtime_settings
-                        )
+                        expected_duration = get_default_expected_duration(node_type.value, runtime_settings)
 
                     new_activity = ActivityExecution(
                         execution_id=execution_id,

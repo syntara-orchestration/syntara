@@ -1,5 +1,5 @@
 ---
-schema_version: "2.0.0"
+schema_version: '2.0.0'
 name: conditional-agent-routing
 description: Route to different specialized agents based on conditions
 metadata:

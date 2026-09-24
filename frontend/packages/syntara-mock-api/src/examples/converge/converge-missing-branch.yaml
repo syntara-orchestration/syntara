@@ -1,5 +1,5 @@
 ---
-schema_version: "2.0.0"
+schema_version: '2.0.0'
 name: converge-missing-branch-test
 description: Test converge with a branch ID that doesn't exist
 triggers:
