@@ -24,7 +24,7 @@ class FormDataValidationProblem:
         title (str): Short, human-readable summary of the problem
         detail (str): Human-readable explanation specific to this occurrence
         code (str): Machine-readable error code for programmatic handling
-        retryable (bool): Whether this error can be retried by creating a new invocation
+        retryable (bool): Whether this error can be retried
         errors (list[FormFieldErrorResponse]): Per-field validation errors
         instance (None | str | Unset): Optional URI reference identifying the specific occurrence
     """

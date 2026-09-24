@@ -21,7 +21,7 @@ class ErrorData:
         title: Short, human-readable summary of the problem
         detail: Human-readable explanation specific to this occurrence
         code: Machine-readable error code for programmatic handling
-        retryable: Whether this error can be retried by creating a new invocation
+        retryable: Whether this error can be retried
         instance: Optional URI reference identifying the specific occurrence
 
         Attributes:
@@ -29,7 +29,7 @@ class ErrorData:
             title (str): Short, human-readable summary of the problem
             detail (str): Human-readable explanation specific to this occurrence
             code (str): Machine-readable error code for programmatic handling
-            retryable (bool): Whether this error can be retried by creating a new invocation
+            retryable (bool): Whether this error can be retried
             instance (None | str | Unset): Optional URI reference identifying the specific occurrence
     """
 
