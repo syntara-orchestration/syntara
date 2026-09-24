@@ -672,10 +672,6 @@ export async function openScheduleTriggerForEditing(page: Page, nodeName: string
   })
 }
 
-// ---------------------------------------------------------------------------
-// Task Agent (AI Agent)
-// ---------------------------------------------------------------------------
-
 /** Wait until the Task Agent create/edit form and model control have hydrated. */
 export async function expectAiAgentNodeFormReady(page: Page) {
   await expect(page.getByTestId('ai-agent-node-form')).toBeVisible({ timeout: 15_000 })
@@ -714,7 +710,7 @@ export async function expectAiAgentIntegrationGroupsVisible(page: Page, integrat
       const groupTitle = page.getByText(name, { exact: true })
       await expect(groupTitle).toBeVisible({ timeout: 5_000 })
       const integrationGroup = groupTitle.locator('xpath=..')
-      await expect(integrationGroup.locator('[role="option"]').first()).toBeVisible({ timeout: 5_000 })
+      await expect(integrationGroup.getByRole('option')).not.toHaveCount(0, { timeout: 5_000 })
     }
   }).toPass({ timeout: 60_000, intervals: [500, 1_000, 2_000] })
 }
