@@ -26,12 +26,7 @@ export function PrincipalField<TFieldValues extends FieldValues>({
   isLoading,
 }: Readonly<PrincipalFieldProps<TFieldValues>>) {
   return (
-    <SynFormField<TFieldValues, FieldPath<TFieldValues>>
-      name={name}
-      label={label}
-      fieldId={fieldId}
-      isRequired
-    >
+    <SynFormField<TFieldValues, FieldPath<TFieldValues>> name={name} label={label} fieldId={fieldId} isRequired>
       {({ field, fieldState }) => (
         <TypeaheadSelect
           id={fieldId}
