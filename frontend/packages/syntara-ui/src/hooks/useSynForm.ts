@@ -1,6 +1,13 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback } from 'react'
-import { useForm, type DefaultValues, type FieldValues, type Resolver, type UseFormReturn } from 'react-hook-form'
+import {
+  useForm,
+  type DefaultValues,
+  type FieldValues,
+  type Resolver,
+  type UseFormProps,
+  type UseFormReturn,
+} from 'react-hook-form'
 import type { ZodType } from 'zod'
 
 import { useFormMutationErrorHandler } from './useFormMutationErrorHandler'
@@ -18,6 +25,8 @@ export type UseSynFormOptions<T extends FieldValues> = {
    * forms that hydrate from a query so fields do not flash empty before reset.
    */
   values?: T
+  /** Passed through to RHF `useForm` when using the `values` prop (e.g. `keepDirtyValues`). */
+  resetOptions?: UseFormProps<T>['resetOptions']
   /** Called after `reset()` when `handleClose` is invoked. */
   onClose?: () => void
 }
@@ -89,12 +98,14 @@ export function useSynForm<T extends FieldValues>({
   schema,
   defaultValues,
   values,
+  resetOptions,
   onClose,
 }: UseSynFormOptions<T>): UseSynFormReturn<T> {
   const form = useForm<T>({
     resolver: zodResolver(schema as ZodResolverSchema, undefined, { mode: 'sync' }) as Resolver<T>,
     defaultValues,
     values,
+    resetOptions,
   })
 
   const { reset, setError } = form
