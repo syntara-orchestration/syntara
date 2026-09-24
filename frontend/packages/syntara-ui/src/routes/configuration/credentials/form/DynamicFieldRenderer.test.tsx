@@ -84,7 +84,7 @@ describe('DynamicFieldRenderer', () => {
   it('renders help icon when help_text is provided', () => {
     renderDynamicField(textField)
 
-    expect(screen.getByRole('button', { name: 'More info for Host' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Host help' })).toBeInTheDocument()
   })
 
   it('updates text input value on change', async () => {
@@ -118,7 +118,7 @@ describe('DynamicFieldRenderer', () => {
     renderDynamicField(booleanField, { verify_ssl: true })
 
     expect(screen.getByText('Enabled')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'More info for Verify SSL' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Verify SSL help' })).toBeInTheDocument()
   })
 
   it('updates boolean value on toggle', async () => {

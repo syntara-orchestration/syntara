@@ -111,8 +111,7 @@ function CredentialFormModalContent({
       <ModalFooter>
         <Button
           variant="primary"
-          type="submit"
-          form={CREDENTIAL_FORM_ID}
+          onClick={handleSubmit(onSubmit)}
           isDisabled={isSubmitting}
           isLoading={isSubmitting}
           icon={isEditMode ? undefined : <RhUiAddIcon />}
