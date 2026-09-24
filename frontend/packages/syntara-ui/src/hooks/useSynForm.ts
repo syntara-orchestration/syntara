@@ -101,8 +101,8 @@ export function useSynForm<T extends FieldValues>({
     resolver: zodResolver(schema as ZodResolverSchema, undefined, { mode: 'sync' }) as Resolver<T>,
     defaultValues,
     values,
-    mode,
-    reValidateMode,
+    ...(mode !== undefined ? { mode } : {}),
+    ...(reValidateMode !== undefined ? { reValidateMode } : {}),
   })
 
   const { reset, setError } = form
@@ -114,5 +114,6 @@ export function useSynForm<T extends FieldValues>({
     onClose?.()
   }, [reset, onClose])
 
-  return { ...form, handleError, handleClose } as UseSynFormReturn<T>
+  const result: UseSynFormReturn<T> = { ...form, handleError, handleClose }
+  return result
 }
