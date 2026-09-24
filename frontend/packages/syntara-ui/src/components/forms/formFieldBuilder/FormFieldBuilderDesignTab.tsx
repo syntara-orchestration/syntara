@@ -77,10 +77,7 @@ export function FormFieldBuilderDesignTab({ isDisabled }: Readonly<FormFieldBuil
   const pendingRemoveLabel =
     pendingRemoveIndex !== null ? fields[pendingRemoveIndex]?.label?.trim() || 'Field label' : ''
 
-  const definitionValidation = useMemo(
-    () => safeParseFormDefinition({ fields: watchedFields }),
-    [watchedFields]
-  )
+  const definitionValidation = useMemo(() => safeParseFormDefinition({ fields: watchedFields }), [watchedFields])
 
   return (
     <Stack hasGutter className={styles.designTab}>
