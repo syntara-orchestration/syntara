@@ -188,13 +188,7 @@ export function ImportWorkflowDialog({ isOpen, onClose, onSuccess }: ImportWorkf
         </Form>
       </ModalBody>
       <ModalFooter>
-        <Button
-          variant="primary"
-          type="submit"
-          form="import-workflow-form"
-          isDisabled={isSaving}
-          isLoading={isSaving}
-        >
+        <Button variant="primary" type="submit" form="import-workflow-form" isDisabled={isSaving} isLoading={isSaving}>
           Import workflow
         </Button>
         <Button variant="link" onClick={handleClose} isDisabled={isSaving}>

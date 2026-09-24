@@ -54,12 +54,7 @@ export function EditVersionDialog({
       <ModalBody>
         <Form onSubmit={handleSubmit(onSubmit)} id="edit-version-form">
           <SynForm form={form}>
-            <SynTextField
-              name="name"
-              label="Version name"
-              fieldId="edit-version-name"
-              ariaLabel="Version name"
-            />
+            <SynTextField name="name" label="Version name" fieldId="edit-version-name" ariaLabel="Version name" />
             <SynTextAreaField
               name="change_description"
               label="Description"
