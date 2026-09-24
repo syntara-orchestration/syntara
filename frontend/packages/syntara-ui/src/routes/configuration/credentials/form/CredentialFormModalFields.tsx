@@ -94,7 +94,7 @@ export function CredentialFormModalFields({ form, state }: Readonly<CredentialFo
           <CredentialTypeSelect
             types={types}
             selectedTypeId={asStringFieldValue(field.value)}
-            onSelect={(_event, typeId) => handleTypeSelect(typeId, field.onChange)}
+            onSelect={(_event, typeId) => handleTypeSelect(typeId)}
             isDisabled={isTypeSelectDisabled}
             isLoading={typesQuery.isLoading}
             hasError={Boolean(fieldState.error)}

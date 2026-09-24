@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { UseFormReturn } from 'react-hook-form'
+import { useWatch } from 'react-hook-form'
 
 import { credentialsClient } from '../../../../client'
 import { useSynForm } from '../../../../hooks/useSynForm'
@@ -44,10 +45,10 @@ export function useCredentialFormModal({
   const { projects, isLoading: isLoadingProjects, error: projectsError } = useSelectableProjects()
   const [touchedSecrets, setTouchedSecrets] = useState<Set<string>>(() => new Set())
 
-  const { handleSubmit, handleError, handleClose, reset, watch, setValue, setError } = form
+  const { handleSubmit, handleError, handleClose, reset, setValue, setError, control } = form
 
-  const selectedTypeId = watch('credential_type_id')
-  const inputs = watch('inputs')
+  const selectedTypeId = useWatch({ control, name: 'credential_type_id' }) ?? ''
+  const inputs = useWatch({ control, name: 'inputs' }) ?? {}
 
   const typesQuery = credentialsClient.useQuery('get', '/credential_types')
   const types = useMemo(() => typesQuery.data?.resources ?? [], [typesQuery.data])
@@ -122,7 +123,8 @@ export function useCredentialFormModal({
       credential_type_id: preSelectedTypeId ?? '',
       inputs: preSelectedType ? getDefaultInputs(preSelectedType) : {},
     })
-  }, [resetKey, credentialToEdit, preSelectedTypeId, defaultProjectId, types, reset])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset on modal open / target change, keyed by resetKey
+  }, [resetKey])
 
   useEffect(() => {
     if (!isEditMode && !selectedTypeId && !preSelectedTypeId && types.length > 0) {
@@ -191,14 +193,13 @@ export function useCredentialFormModal({
     )
   }
 
-  const credentialTypeHint =
-    selectedType?.description && !typesQuery.error ? selectedType.description : undefined
+  const credentialTypeHint = selectedType?.description && !typesQuery.error ? selectedType.description : undefined
 
   const handleTypeSelect = useCallback(
-    (typeId: string | number | undefined, onTypeChange: (value: string) => void) => {
+    (typeId: string | number | undefined) => {
       if (typeId == null) return
       const id = String(typeId)
-      onTypeChange(id)
+      setValue('credential_type_id', id, { shouldValidate: true })
       if (!isEditMode) {
         const newType = types.find((t) => t.id === id)
         setValue('inputs', newType ? getDefaultInputs(newType) : {})
