@@ -198,6 +198,40 @@ async def _seed_authenticated_group(test_db_session: AsyncSession) -> None:
         await test_db_session.flush()
 
 
+@pytest_asyncio.fixture(autouse=True)
+async def _reset_outbox_worker_for_test(
+    test_db_session: AsyncSession,
+    test_db_session_factory: async_sessionmaker[AsyncSession],
+) -> AsyncGenerator[None, None]:
+    """Bind the cached outbox worker to this test's restored database.
+
+    The app-scoped worker is a singleton, so it can retain the production
+    session factory if it was initialized before the integration app patched
+    database factories. Rebind it for each test to keep background audit writes
+    on the test database and clear tasks from earlier asyncio loops.
+    """
+    del test_db_session  # Ensure the test database has been restored before rebinding.
+
+    from syntara.audit.outbox.worker import get_outbox_worker
+
+    if get_outbox_worker.cache_info().currsize == 0:
+        yield
+        return
+
+    worker = get_outbox_worker()
+    worker._pending.clear()
+
+    original_write_factory = worker._write_session_factory
+    original_session_factory = worker._session_factory
+    worker._write_session_factory = test_db_session_factory
+    worker._session_factory = test_db_session_factory
+    try:
+        yield
+    finally:
+        worker._write_session_factory = original_write_factory
+        worker._session_factory = original_session_factory
+
+
 @pytest_asyncio.fixture
 async def _seed_integration_data(test_db_session: AsyncSession) -> None:
     """Seed authz and builtin workflow data.

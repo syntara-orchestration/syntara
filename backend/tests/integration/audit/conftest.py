@@ -27,7 +27,6 @@ from syntara.audit.models.audit_event import (
     EventStatus,
 )
 from syntara.audit.models.structured_data import AuditContextData
-from syntara.audit.outbox.worker import get_outbox_worker
 from syntara.core.models.principal import PrincipalType
 
 if TYPE_CHECKING:
@@ -208,55 +207,6 @@ async def _verify_deployment(audit_perf_engine: AsyncEngine) -> None:
         )
     else:
         logger.info("audit_perf: found active CRUD triggers", count=count)
-
-
-# ---------------------------------------------------------------------------
-# Per-test outbox worker state reset
-# ---------------------------------------------------------------------------
-
-
-@pytest_asyncio.fixture(autouse=True)
-async def _reset_outbox_worker_for_test(
-    test_db_session_factory: async_sessionmaker[AsyncSession],
-) -> AsyncGenerator[None, None]:
-    """Isolate the outbox worker singleton between integration tests.
-
-    Two problems this fixture solves:
-
-    1. **Orphaned tasks**: pytest-asyncio uses a new event loop per test function.
-       Tasks created by a previous test's cleanup (e.g., DELETE in a finally block)
-       may not complete before the loop closes. Those Task objects stay in
-       ``worker._pending`` referencing a closed loop. When the next test's
-       ``drain()`` calls ``asyncio.gather(*pending)``, awaiting a Task from a
-       closed loop can block indefinitely.  Clearing ``_pending`` at test start
-       removes these stale references.
-
-    2. **Stale session factory**: The worker singleton holds a session-scoped
-       ``_write_session_factory``. Swapping it for a function-scoped factory
-       (created after ``_restore_from_template`` has run) ensures every async
-       write targets the freshly-restored test database rather than a factory
-       that may have cached state from before the restore.
-    """
-    # Skip reset if the worker singleton has not been initialised yet (e.g. in
-    # performance tests that do not boot the full app via session_app/base_client).
-    if get_outbox_worker.cache_info().currsize == 0:
-        yield
-        return
-
-    worker = get_outbox_worker()
-
-    # Remove orphaned Task objects left over from previous test event loops.
-    worker._pending.clear()
-
-    original_write_factory = worker._write_session_factory
-    original_session_factory = worker._session_factory
-    worker._write_session_factory = test_db_session_factory
-    worker._session_factory = test_db_session_factory
-    try:
-        yield
-    finally:
-        worker._write_session_factory = original_write_factory
-        worker._session_factory = original_session_factory
 
 
 # ---------------------------------------------------------------------------
