@@ -1,27 +1,21 @@
-import {
-  Checkbox,
-  ExpandableSection,
-  FormGroup,
-  FormHelperText,
-  HelperText,
-  HelperTextItem,
-  TextArea,
-} from '@patternfly/react-core'
-import { RhUiErrorIcon } from '@patternfly/react-icons'
+import { Checkbox, ExpandableSection, HelperText, HelperTextItem, TextArea } from '@patternfly/react-core'
 import { useState } from 'react'
-import { Controller, useWatch, type Control, type FieldErrors } from 'react-hook-form'
+import { useFormContext, useFormState, useWatch } from 'react-hook-form'
+
+import { SynFormField } from '../../../components/forms/SynFormField'
 
 import styles from './EditIntegrationForm.module.css'
 import type { EditIntegrationFormValues } from './editIntegrationFormSchema'
 
-type EditSecurityFieldsProps = Readonly<{
-  control: Control<EditIntegrationFormValues>
-  errors: FieldErrors<EditIntegrationFormValues>
-}>
+const CA_CERT_HINT = "PEM-encoded CA certificate to trust for this integration's TLS connections."
 
-export function EditSecurityFields({ control, errors }: EditSecurityFieldsProps) {
+export function EditSecurityFields() {
+  const { control } = useFormContext<EditIntegrationFormValues>()
+  const { errors } = useFormState({ control })
   const [userExpanded, setUserExpanded] = useState(false)
-  const skipTlsVerify = useWatch({ control, name: 'insecure_skip_tls_verify' })
+  const skipTlsVerify = useWatch<EditIntegrationFormValues, 'insecure_skip_tls_verify'>({
+    name: 'insecure_skip_tls_verify',
+  })
   const isExpanded = userExpanded || !!errors.ca_certificate
 
   return (
@@ -32,10 +26,14 @@ export function EditSecurityFields({ control, errors }: EditSecurityFieldsProps)
       isIndented
     >
       <div className={styles.securityFields}>
-        <Controller
+        <SynFormField<EditIntegrationFormValues, 'allow_http'>
           name="allow_http"
-          control={control}
-          render={({ field }) => (
+          label="Allow HTTP connections"
+          fieldId="edit-allow-http"
+          hideFormGroupLabel
+          hideFooter
+        >
+          {({ field }) => (
             <Checkbox
               id="edit-allow-http"
               label="Allow HTTP connections"
@@ -44,11 +42,15 @@ export function EditSecurityFields({ control, errors }: EditSecurityFieldsProps)
               onChange={(_event, checked) => field.onChange(checked)}
             />
           )}
-        />
-        <Controller
+        </SynFormField>
+        <SynFormField<EditIntegrationFormValues, 'insecure_skip_tls_verify'>
           name="insecure_skip_tls_verify"
-          control={control}
-          render={({ field }) => (
+          label="Disable TLS certificate verification"
+          fieldId="edit-insecure-skip-tls-verify"
+          hideFormGroupLabel
+          hideFooter
+        >
+          {({ field }) => (
             <Checkbox
               id="edit-insecure-skip-tls-verify"
               label="Disable TLS certificate verification"
@@ -66,39 +68,29 @@ export function EditSecurityFields({ control, errors }: EditSecurityFieldsProps)
               }
             />
           )}
-        />
+        </SynFormField>
         {!skipTlsVerify && (
-          <FormGroup label="CA certificate" fieldId="edit-ca-certificate">
-            <Controller
-              name="ca_certificate"
-              control={control}
-              render={({ field }) => (
-                <TextArea
-                  id="edit-ca-certificate"
-                  placeholder={'-----BEGIN CERTIFICATE-----\n\n-----END CERTIFICATE-----'}
-                  aria-label="CA certificate"
-                  resizeOrientation="vertical"
-                  rows={4}
-                  validated={errors.ca_certificate ? 'error' : 'default'}
-                  value={field.value ?? ''}
-                  onChange={(_event, value) => field.onChange(value || null)}
-                  onBlur={field.onBlur}
-                  name={field.name}
-                />
-              )}
-            />
-            <FormHelperText>
-              <HelperText>
-                <HelperTextItem
-                  variant={errors.ca_certificate ? 'error' : 'default'}
-                  icon={errors.ca_certificate ? <RhUiErrorIcon /> : undefined}
-                >
-                  {errors.ca_certificate?.message ??
-                    "PEM-encoded CA certificate to trust for this integration's TLS connections."}
-                </HelperTextItem>
-              </HelperText>
-            </FormHelperText>
-          </FormGroup>
+          <SynFormField<EditIntegrationFormValues, 'ca_certificate'>
+            name="ca_certificate"
+            label="CA certificate"
+            fieldId="edit-ca-certificate"
+            hint={CA_CERT_HINT}
+          >
+            {({ field, fieldState }) => (
+              <TextArea
+                id="edit-ca-certificate"
+                placeholder={'-----BEGIN CERTIFICATE-----\n\n-----END CERTIFICATE-----'}
+                aria-label="CA certificate"
+                resizeOrientation="vertical"
+                rows={4}
+                validated={fieldState.error ? 'error' : 'default'}
+                value={field.value ?? ''}
+                onChange={(_event, value) => field.onChange(value || null)}
+                onBlur={field.onBlur}
+                name={field.name}
+              />
+            )}
+          </SynFormField>
         )}
       </div>
     </ExpandableSection>
