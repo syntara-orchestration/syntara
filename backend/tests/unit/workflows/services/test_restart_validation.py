@@ -196,6 +196,7 @@ async def test_validate_restart_rejects_sanitized_upstream_output() -> None:
     assert verdict.eligible is False
     assert verdict.sanitized_node_ids == ["step_1"]
     assert "step_1" in (verdict.reason or "")
+    assert verdict.sanitized_replacements == {"step_2": ["step_1"]}
 
     clean = await validate_restart_from_failure(
         _session_for([_make_completed_activity("step_1", {"token": "abc123"})]),
@@ -204,6 +205,7 @@ async def test_validate_restart_rejects_sanitized_upstream_output() -> None:
     )
     assert clean.eligible is True
     assert clean.sanitized_node_ids == []
+    assert clean.sanitized_replacements == {}
 
 
 @pytest.mark.asyncio
@@ -226,6 +228,7 @@ async def test_validate_restart_default_selection_auto_includes_sanitized_depend
     assert verdict.failure_point_ids == ["step_1", "step_2"]
     assert verdict.auto_included_node_ids == ["step_1"]
     assert verdict.sanitized_node_ids == []
+    assert verdict.sanitized_replacements == {"step_2": ["step_1"]}
     assert verdict.total_step_count == 3
 
 
@@ -270,7 +273,39 @@ async def test_validate_restart_default_selection_cascades_through_chained_depen
     assert verdict.eligible is True
     assert verdict.failure_point_ids == ["step_0", "step_1", "step_2"]
     assert verdict.auto_included_node_ids == ["step_0", "step_1"]
+    assert verdict.sanitized_replacements == {"step_2": ["step_0", "step_1"]}
     assert verdict.total_step_count == 4
+
+
+@pytest.mark.asyncio
+async def test_validate_restart_replacements_scoped_to_affected_failed_nodes() -> None:
+    """sanitized_replacements only names failed nodes that actually depend on a sanitized node.
+
+    Computed per failed node in isolation, independent of what was requested
+    (Bill Wei, 2026-09-24): the mapping should let the UI disallow selecting
+    step_a specifically, while step_b (unaffected) stays selectable.
+    """
+    execution = _make_execution(ExecutionStatus.FAILED)
+    step_x = {"id": "step_x", "type": "script", "parameters": {"code": "echo hi"}}
+    step_a = {"id": "step_a", "type": "script", "parameters": {"code": "exit 1", "input_ref": "${step_x.token}"}}
+    step_b = {"id": "step_b", "type": "script", "parameters": {"code": "exit 1"}}
+    nodes = [step_x, step_a, step_b]
+    edges = [
+        {"from": "trigger_1", "to": "step_x"},
+        {"from": "step_x", "to": "step_a"},
+        {"from": "trigger_1", "to": "step_b"},
+    ]
+    snapshot = _make_version(1, nodes=nodes)
+    snapshot.workflow_definition["edges"] = edges
+    session = _mock_session(
+        (execution, "one"),
+        ([_make_activity("step_a"), _make_activity("step_b")], "all"),
+        ([_make_completed_activity("step_x", {"token": "[REDACTED]"})], "all"),
+        (snapshot, "one"),
+    )
+    verdict = await validate_restart_from_failure(session, execution.id, [])
+    assert verdict.eligible is True
+    assert verdict.sanitized_replacements == {"step_a": ["step_x"]}
 
 
 @pytest.mark.asyncio

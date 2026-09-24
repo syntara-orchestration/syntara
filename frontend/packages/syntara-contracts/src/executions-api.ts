@@ -586,6 +586,13 @@ export interface components {
        */
       auto_included_node_ids?: string[]
       /**
+       * Sanitized Replacements
+       * @description For every currently-failed node, the sanitized node(s) it must be replaced by if any (independent of the failure points actually requested) — lets the UI disallow selecting a failed node explicitly before submitting a request
+       */
+      sanitized_replacements?: {
+        [key: string]: string[]
+      }
+      /**
        * Step Count By Failure Point
        * @description Re-run step count for each selected failure point, computed against the retained version
        */

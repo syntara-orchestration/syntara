@@ -453,6 +453,12 @@ class RestartValidationResponse(SQLModel):
         description="Sanitized nodes automatically added as restart points to resolve a dependency "
         "(default selection only; empty otherwise)",
     )
+    sanitized_replacements: dict[str, list[str]] = Field(
+        default_factory=dict,
+        description="For every currently-failed node, the sanitized node(s) it must be replaced by "
+        "if any (independent of the failure points actually requested) — lets the UI disallow "
+        "selecting a failed node explicitly before submitting a request",
+    )
     step_count_by_failure_point: dict[str, int] = Field(
         default_factory=dict,
         description="Re-run step count for each selected failure point, computed against the retained version",

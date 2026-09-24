@@ -35,7 +35,12 @@ Validation is a chain of checks:
    the **default** selection (empty input — see below), a sanitized
    dependency instead expands the restart points to include the sanitized
    node, repeated until no dependency remains, and reports what was added
-   instead of rejecting (SDP AC-15/R9a, Q4).
+   instead of rejecting (SDP AC-15/R9a). Either way, the response also
+   reports ``sanitized_replacements`` — for *every* currently-failed node
+   (not just the ones requested), which sanitized node(s) it would need to
+   be replaced by — so the UI can disallow selecting a failed node
+   explicitly before the user even submits a request (per Bill Wei,
+   2026-09-24: "so that the UI can disallow replaced nodes being selected").
 
 Design decisions (SDP ANSTRAT-1779, aligned 2026-09-24):
 
@@ -88,6 +93,7 @@ class RestartValidation:
     upstream_node_ids: list[str] = field(default_factory=list)
     sanitized_node_ids: list[str] = field(default_factory=list)
     auto_included_node_ids: list[str] = field(default_factory=list)
+    sanitized_replacements: dict[str, list[str]] = field(default_factory=dict)
     snapshot_version: int | None = None
     step_count_by_failure_point: dict[str, int] = field(default_factory=dict)
     total_step_count: int = 0
@@ -332,6 +338,29 @@ def _tainted_nodes(
     return sorted(sanitized)
 
 
+def _expand_sanitized_chain(
+    snapshot_def: dict[str, Any],
+    seed: set[str],
+    completed_outputs: dict[str, list],
+) -> tuple[set[str], list[str]]:
+    """Expand a starting selection to include every sanitized dependency, transitively.
+
+    Repeats the taint check against the growing selection until a pass finds
+    nothing new outside it — so a sanitized node that itself depends on a
+    further sanitized ancestor is followed to the end of the chain, not just
+    one level. Returns the expanded selection and the sorted nodes added.
+    """
+    selection = set(seed)
+    added: set[str] = set()
+    while True:
+        sanitized = _tainted_nodes(snapshot_def, sorted(selection), completed_outputs)
+        newly_added = set(sanitized) - selection
+        if not newly_added:
+            return selection, sorted(added)
+        selection |= newly_added
+        added |= newly_added
+
+
 def _version_reason(
     normalized: list[str],
     snapshot: WorkflowVersion | None,
@@ -341,12 +370,12 @@ def _version_reason(
 ) -> tuple[str | None, list[str], list[str], list[str]]:
     """Rejection reason, blocking sanitized nodes, auto-included nodes, and the final selection.
 
-    For an explicit selection, any sanitized dependency rejects outright
-    (``sanitized`` names the blocking nodes, the selection is unchanged). For
-    the default selection (SDP AC-15), a sanitized dependency instead expands
-    the selection to include the sanitized node as an additional restart
-    point — repeated until no dependency remains — and reports what was
-    auto-included instead of rejecting.
+    Either way, the full transitive chain of sanitized dependencies is
+    resolved first. For an explicit selection, that chain rejects outright
+    (``sanitized`` names every node in it, the selection is unchanged). For
+    the default selection (SDP AC-15), the selection is instead expanded to
+    include the whole chain as additional restart points, and what was
+    auto-included is reported instead of rejecting.
     """
     if snapshot is None:
         return "original workflow version no longer exists", [], [], normalized
@@ -356,27 +385,41 @@ def _version_reason(
     if missing:
         return f"not nodes in the executed workflow version: {', '.join(missing)}", [], [], normalized
 
-    selection = set(normalized)
-    auto_included: set[str] = set()
-    while True:
-        sanitized = _tainted_nodes(snapshot_def, sorted(selection), completed_outputs)
-        if not sanitized:
-            return None, [], sorted(auto_included), sorted(selection)
-        if not is_default_selection:
-            return (
-                (
-                    "upstream nodes have sanitized outputs referenced on the restart path "
-                    f"({', '.join(sanitized)}); restarting would inject redacted data"
-                ),
-                sanitized,
-                [],
-                normalized,
-            )
-        newly_added = set(sanitized) - selection
-        if not newly_added:
-            return None, [], sorted(auto_included), sorted(selection)
-        selection |= newly_added
-        auto_included |= newly_added
+    expanded, added = _expand_sanitized_chain(snapshot_def, set(normalized), completed_outputs)
+    if not added:
+        return None, [], [], sorted(expanded)
+    if not is_default_selection:
+        return (
+            (
+                "upstream nodes have sanitized outputs referenced on the restart path "
+                f"({', '.join(added)}); restarting would inject redacted data"
+            ),
+            added,
+            [],
+            normalized,
+        )
+    return None, [], added, sorted(expanded)
+
+
+def _sanitized_replacements(
+    snapshot_def: dict[str, Any],
+    failed_ids: set[str],
+    completed_outputs: dict[str, list],
+) -> dict[str, list[str]]:
+    """For every currently-failed node, the sanitized node(s) it must be replaced by.
+
+    Computed per failed node in isolation (not against the request's actual
+    selection) so the response always reflects every failed node's own
+    restart-path dependency — independent of what this particular request
+    asked for. Lets the UI disallow selecting a failed node explicitly
+    before the user submits a request that would just be rejected.
+    """
+    replacements: dict[str, list[str]] = {}
+    for node_id in sorted(failed_ids):
+        _, added = _expand_sanitized_chain(snapshot_def, {node_id}, completed_outputs)
+        if added:
+            replacements[node_id] = added
+    return replacements
 
 
 async def validate_restart_from_failure(
@@ -463,6 +506,7 @@ async def validate_restart_from_failure(
     reported_selection = final_selection if reason is None else normalized
     upstream = collect_upstream_node_ids(snapshot_def, reported_selection)
     step_counts, total_steps = _step_counts(snapshot_def, reported_selection) if snapshot is not None else ({}, 0)
+    replacements = _sanitized_replacements(snapshot_def, failed_ids, completed_outputs) if snapshot is not None else {}
 
     if reason is not None:
         return RestartValidation(
@@ -471,6 +515,7 @@ async def validate_restart_from_failure(
             failure_point_ids=reported_selection,
             upstream_node_ids=sorted(upstream),
             sanitized_node_ids=sanitized,
+            sanitized_replacements=replacements,
             snapshot_version=snapshot_version,
             step_count_by_failure_point=step_counts,
             total_step_count=total_steps,
@@ -481,6 +526,7 @@ async def validate_restart_from_failure(
         failure_point_ids=reported_selection,
         upstream_node_ids=sorted(upstream),
         auto_included_node_ids=auto_included,
+        sanitized_replacements=replacements,
         snapshot_version=snapshot_version,
         step_count_by_failure_point=step_counts,
         total_step_count=total_steps,

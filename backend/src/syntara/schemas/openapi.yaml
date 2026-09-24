@@ -35427,6 +35427,14 @@ components:
             type: string
           title: Auto Included Node Ids
           description: Sanitized nodes automatically added as restart points to resolve a dependency (default selection only; empty otherwise)
+        sanitized_replacements:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          title: Sanitized Replacements
+          description: For every currently-failed node, the sanitized node(s) it must be replaced by if any (independent of the failure points actually requested) — lets the UI disallow selecting a failed node explicitly before submitting a request
         step_count_by_failure_point:
           type: object
           additionalProperties:

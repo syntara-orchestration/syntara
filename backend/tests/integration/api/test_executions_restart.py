@@ -267,6 +267,7 @@ class TestValidateRestart:
         assert data["eligible"] is True
         assert data["failure_point_ids"] == ["step_2"]
         assert data["auto_included_node_ids"] == []
+        assert data["sanitized_replacements"] == {}
 
     async def test_validate_rejects_non_restartable_state(
         self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
@@ -360,6 +361,7 @@ class TestValidateRestart:
         data = response.json()
         assert data["eligible"] is False
         assert data["sanitized_node_ids"] == ["step_1"]
+        assert data["sanitized_replacements"] == {"step_2": ["step_1"]}
 
     async def test_validate_default_selection_auto_includes_sanitized_dependency(
         self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
@@ -396,6 +398,7 @@ class TestValidateRestart:
         assert data["failure_point_ids"] == ["step_1", "step_2"]
         assert data["auto_included_node_ids"] == ["step_1"]
         assert data["sanitized_node_ids"] == []
+        assert data["sanitized_replacements"] == {"step_2": ["step_1"]}
 
     async def test_validate_rejects_failure_under_completed_converge(
         self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
