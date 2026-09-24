@@ -1,5 +1,8 @@
 import { z } from 'zod'
 
+/** Inline hint shown under the role name field before validation errors */
+export const ROLE_NAME_HINT = 'Lowercase alphanumeric with hyphens (e.g. my-custom-role)'
+
 /** Shared fields for both add and edit role forms */
 export const roleBaseSchema = z.object({
   name: z

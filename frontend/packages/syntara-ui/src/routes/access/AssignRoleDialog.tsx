@@ -1,11 +1,6 @@
-import { zodResolver } from '@hookform/resolvers/zod'
 import {
   Button,
   Form,
-  FormGroup,
-  FormHelperText,
-  HelperText,
-  HelperTextItem,
   MenuToggle,
   type MenuToggleElement,
   Modal,
@@ -18,12 +13,15 @@ import {
 import { RhUiAddIcon } from '@patternfly/react-icons'
 import { useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
-import { Controller, useForm, useWatch } from 'react-hook-form'
+import { useWatch } from 'react-hook-form'
 
 import { FormFieldWarning } from '../../components/FormFieldError'
+import { SynForm } from '../../components/forms/SynForm'
+import { SynFormField } from '../../components/forms/SynFormField'
 import { SynSelect } from '../../components/SynSelect'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
-import { useFormMutationErrorHandler } from '../../hooks/useFormMutationErrorHandler'
+import type { UseSynFormReturn } from '../../hooks/useSynForm'
+import { useSynForm } from '../../hooks/useSynForm'
 import { useAlerts } from '../../providers/alerts'
 import { detachPromise } from '../../utils/detachPromise'
 import { buildAssignmentBody, RolePrincipalType } from '../access-management/RoleAssignmentTypes'
@@ -64,35 +62,6 @@ function assignmentAddedDescription(
   return `Assignment for ${principalName} has been added.`
 }
 
-// ── Form body (extracted to stay within max-lines-per-function) ───────────
-
-type AssignRoleFormBodyProps = {
-  control: ReturnType<typeof useForm<AssignRoleFormData>>['control']
-  setValue: ReturnType<typeof useForm<AssignRoleFormData>>['setValue']
-  principalType: RolePrincipalType
-  isProjectScoped: boolean
-  projectOptions: { value: string; label: string }[]
-  userOptions: { value: string; label: string }[]
-  groupOptions: { value: string; label: string }[]
-  serviceAccountOptions: { value: string; label: string }[]
-  roleOptions: { value: string; label: string }[]
-  roleDisabled: boolean
-  isProjectsLoading: boolean
-  onUserSearchChange: (term: string) => void
-  hasMoreUsers: boolean
-  isUsersLoading: boolean
-  onGroupSearchChange: (term: string) => void
-  hasMoreGroups: boolean
-  isGroupsLoading: boolean
-  onServiceAccountSearchChange: (term: string) => void
-  hasMoreServiceAccounts: boolean
-  isServiceAccountsLoading: boolean
-  onRoleSearchChange: (term: string) => void
-  hasMoreRoles: boolean
-  isRolesLoading: boolean
-  isAssignmentsError: boolean
-}
-
 function ScopeSelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const [isOpen, setIsOpen] = useState(false)
   return (
@@ -125,9 +94,37 @@ function ScopeSelect({ value, onChange }: { value: string; onChange: (value: str
   )
 }
 
+type AssignRoleFormBodyProps = {
+  form: UseSynFormReturn<AssignRoleFormData>
+  principalType: RolePrincipalType
+  isProjectScoped: boolean
+  projectOptions: { value: string; label: string }[]
+  userOptions: { value: string; label: string }[]
+  groupOptions: { value: string; label: string }[]
+  serviceAccountOptions: { value: string; label: string }[]
+  roleOptions: { value: string; label: string }[]
+  roleDisabled: boolean
+  isProjectsLoading: boolean
+  onUserSearchChange: (term: string) => void
+  hasMoreUsers: boolean
+  isUsersLoading: boolean
+  onGroupSearchChange: (term: string) => void
+  hasMoreGroups: boolean
+  isGroupsLoading: boolean
+  onServiceAccountSearchChange: (term: string) => void
+  hasMoreServiceAccounts: boolean
+  isServiceAccountsLoading: boolean
+  onRoleSearchChange: (term: string) => void
+  hasMoreRoles: boolean
+  isRolesLoading: boolean
+  isAssignmentsError: boolean
+  onPrincipalTypeChange: (value: RolePrincipalType) => void
+  onScopeChange: (value: string) => void
+  onProjectChange: (value: string) => void
+}
+
 function AssignRoleFormBody({
-  control,
-  setValue,
+  form,
   principalType,
   isProjectScoped,
   projectOptions,
@@ -150,85 +147,77 @@ function AssignRoleFormBody({
   hasMoreRoles,
   isRolesLoading,
   isAssignmentsError,
+  onPrincipalTypeChange,
+  onScopeChange,
+  onProjectChange,
 }: Readonly<AssignRoleFormBodyProps>) {
   return (
-    <>
-      <FormGroup label="Principal type" isRequired fieldId="principal-type" labelHelp={accessControlHelp.principalType}>
-        <Controller
-          name="principalType"
-          control={control}
-          render={({ field }) => (
-            <PrincipalTypeSelect
+    <SynForm form={form}>
+      <SynFormField<AssignRoleFormData, 'principalType'>
+        name="principalType"
+        label="Principal type"
+        fieldId="principal-type"
+        isRequired
+        labelHelp={accessControlHelp.principalType}
+      >
+        {({ field }) => (
+          <PrincipalTypeSelect
+            value={field.value}
+            onChange={(value) => {
+              field.onChange(value)
+              onPrincipalTypeChange(value as RolePrincipalType)
+            }}
+          />
+        )}
+      </SynFormField>
+
+      {principalType !== RolePrincipalType.SERVICE_ACCOUNT && (
+        <SynFormField<AssignRoleFormData, 'scope'>
+          name="scope"
+          label="Scope"
+          fieldId="scope"
+          isRequired
+          labelHelp={accessControlHelp.scope}
+        >
+          {({ field }) => (
+            <ScopeSelect
               value={field.value}
               onChange={(value) => {
                 field.onChange(value)
-                setValue('userId', '')
-                setValue('groupId', '')
-                setValue('serviceAccountId', '')
-                if (value === RolePrincipalType.SERVICE_ACCOUNT) {
-                  setValue('scope', 'project')
-                  setValue('roleName', '')
-                }
+                onScopeChange(value)
               }}
             />
           )}
-        />
-      </FormGroup>
-
-      {principalType !== RolePrincipalType.SERVICE_ACCOUNT && (
-        <FormGroup label="Scope" isRequired fieldId="scope" labelHelp={accessControlHelp.scope}>
-          <Controller
-            name="scope"
-            control={control}
-            render={({ field }) => (
-              <ScopeSelect
-                value={field.value}
-                onChange={(value) => {
-                  field.onChange(value)
-                  setValue('roleName', '')
-                }}
-              />
-            )}
-          />
-        </FormGroup>
+        </SynFormField>
       )}
 
       {isProjectScoped && (
-        <FormGroup label="Project" isRequired fieldId="project-id">
-          <Controller
-            name="projectId"
-            control={control}
-            render={({ field, fieldState }) => (
-              <>
-                <TypeaheadSelect
-                  id="project-id"
-                  ariaLabel="Project"
-                  options={projectOptions}
-                  selected={field.value ?? ''}
-                  onChange={(value) => {
-                    field.onChange(value)
-                    setValue('roleName', '')
-                  }}
-                  placeholder="Select a project..."
-                  hasError={!!fieldState.error}
-                  isLoading={isProjectsLoading}
-                />
-                {fieldState.error && (
-                  <FormHelperText>
-                    <HelperText>
-                      <HelperTextItem variant="error">{fieldState.error.message}</HelperTextItem>
-                    </HelperText>
-                  </FormHelperText>
-                )}
-              </>
-            )}
-          />
-        </FormGroup>
+        <SynFormField<AssignRoleFormData, 'projectId'>
+          name="projectId"
+          label="Project"
+          fieldId="project-id"
+          isRequired
+        >
+          {({ field, fieldState }) => (
+            <TypeaheadSelect
+              id="project-id"
+              ariaLabel="Project"
+              options={projectOptions}
+              selected={field.value ?? ''}
+              onChange={(value) => {
+                field.onChange(value)
+                onProjectChange(value)
+              }}
+              placeholder="Select a project..."
+              hasError={!!fieldState.error}
+              isLoading={isProjectsLoading}
+            />
+          )}
+        </SynFormField>
       )}
 
       {principalType === RolePrincipalType.USER && (
-        <PrincipalField
-          control={control}
+        <PrincipalField<AssignRoleFormData>
           name="userId"
           label="User"
           fieldId="user-id"
@@ -241,8 +230,7 @@ function AssignRoleFormBody({
       )}
 
       {principalType === RolePrincipalType.GROUP && (
-        <PrincipalField
-          control={control}
+        <PrincipalField<AssignRoleFormData>
           name="groupId"
           label="Group"
           fieldId="group-id"
@@ -255,8 +243,7 @@ function AssignRoleFormBody({
       )}
 
       {principalType === RolePrincipalType.SERVICE_ACCOUNT && (
-        <PrincipalField
-          control={control}
+        <PrincipalField<AssignRoleFormData>
           name="serviceAccountId"
           label="Service account"
           fieldId="service-account-id"
@@ -268,42 +255,35 @@ function AssignRoleFormBody({
         />
       )}
 
-      <FormGroup label="Role" isRequired fieldId="role-select" labelHelp={accessControlHelp.role}>
-        <Controller
-          name="roleName"
-          control={control}
-          render={({ field, fieldState }) => (
-            <>
-              <TypeaheadSelect
-                id="role-select"
-                ariaLabel="Role"
-                options={roleOptions}
-                selected={field.value ?? ''}
-                onChange={field.onChange}
-                placeholder={roleDisabled ? 'Select a project first...' : 'Select a role...'}
-                hasError={!!fieldState.error}
-                isDisabled={roleDisabled}
-                onSearchChange={onRoleSearchChange}
-                hasMore={hasMoreRoles}
-                isLoading={isRolesLoading}
-              />
-              {fieldState.error && (
-                <FormHelperText>
-                  <HelperText>
-                    <HelperTextItem variant="error">{fieldState.error.message}</HelperTextItem>
-                  </HelperText>
-                </FormHelperText>
-              )}
-              <FormFieldWarning message={isAssignmentsError ? 'Unable to check existing assignments' : undefined} />
-            </>
-          )}
-        />
-      </FormGroup>
-    </>
+      <SynFormField<AssignRoleFormData, 'roleName'>
+        name="roleName"
+        label="Role"
+        fieldId="role-select"
+        isRequired
+        labelHelp={accessControlHelp.role}
+      >
+        {({ field, fieldState }) => (
+          <>
+            <TypeaheadSelect
+              id="role-select"
+              ariaLabel="Role"
+              options={roleOptions}
+              selected={field.value ?? ''}
+              onChange={field.onChange}
+              placeholder={roleDisabled ? 'Select a project first...' : 'Select a role...'}
+              hasError={!!fieldState.error}
+              isDisabled={roleDisabled}
+              onSearchChange={onRoleSearchChange}
+              hasMore={hasMoreRoles}
+              isLoading={isRolesLoading}
+            />
+            <FormFieldWarning message={isAssignmentsError ? 'Unable to check existing assignments' : undefined} />
+          </>
+        )}
+      </SynFormField>
+    </SynForm>
   )
 }
-
-// ── Dialog ─────────────────────────────────────────────────────────────────
 
 type AssignRoleDialogProps = {
   onClose: () => void
@@ -314,8 +294,8 @@ export function AssignRoleDialog({ onClose, onSuccess }: Readonly<AssignRoleDial
   const queryClient = useQueryClient()
   const { showSuccess } = useAlerts()
 
-  const { handleSubmit, control, setValue, setError } = useForm<AssignRoleFormData>({
-    resolver: zodResolver(assignRoleSchema, undefined, { mode: 'sync' }),
+  const form = useSynForm({
+    schema: assignRoleSchema,
     defaultValues: {
       principalType: RolePrincipalType.USER,
       scope: 'project',
@@ -325,7 +305,9 @@ export function AssignRoleDialog({ onClose, onSuccess }: Readonly<AssignRoleDial
       serviceAccountId: '',
       roleName: '',
     },
+    onClose,
   })
+  const { handleSubmit, handleError, handleClose, control, setValue } = form
 
   const principalType = useWatch({ control, name: 'principalType' })
   const scope = useWatch({ control, name: 'scope' })
@@ -442,7 +424,26 @@ export function AssignRoleDialog({ onClose, onSuccess }: Readonly<AssignRoleDial
   )
   const isPending = isPendingSystem || isPendingProject
 
-  const handleError = useFormMutationErrorHandler<AssignRoleFormData>(setError)
+  const onPrincipalTypeChange = (value: RolePrincipalType) => {
+    setValue('userId', '')
+    setValue('groupId', '')
+    setValue('serviceAccountId', '')
+    if (value === RolePrincipalType.SERVICE_ACCOUNT) {
+      setValue('scope', 'project')
+      setValue('roleName', '')
+    }
+  }
+
+  const onScopeChange = (value: string) => {
+    setValue('roleName', '')
+    if (value !== 'project') {
+      setValue('projectId', '')
+    }
+  }
+
+  const onProjectChange = () => {
+    setValue('roleName', '')
+  }
 
   const onSubmit = (data: AssignRoleFormData) => {
     const principalIdByType: Record<RolePrincipalType, string> = {
@@ -462,8 +463,8 @@ export function AssignRoleDialog({ onClose, onSuccess }: Readonly<AssignRoleDial
         title: 'Assignment added',
         description: assignmentAddedDescription(data, userOptions, groupOptions, serviceAccountOptions),
       })
+      handleClose()
       onSuccess()
-      onClose()
     }
     const onMutationError = handleError({ title: 'Failed to add assignment' })
 
@@ -478,13 +479,12 @@ export function AssignRoleDialog({ onClose, onSuccess }: Readonly<AssignRoleDial
   }
 
   return (
-    <Modal isOpen onClose={onClose} variant="small">
+    <Modal isOpen onClose={handleClose} variant="small">
       <ModalHeader title="Add Assignment" />
       <ModalBody>
         <Form id="assign-role-form" onSubmit={handleSubmit(onSubmit)}>
           <AssignRoleFormBody
-            control={control}
-            setValue={setValue}
+            form={form}
             principalType={principalType}
             isProjectScoped={isProjectScoped}
             projectOptions={projectOptions}
@@ -507,14 +507,24 @@ export function AssignRoleDialog({ onClose, onSuccess }: Readonly<AssignRoleDial
             hasMoreRoles={!!activeRolesQuery.data?.next}
             isRolesLoading={activeRolesQuery.isFetching || isAssignmentsLoading}
             isAssignmentsError={isAssignmentsError}
+            onPrincipalTypeChange={onPrincipalTypeChange}
+            onScopeChange={onScopeChange}
+            onProjectChange={onProjectChange}
           />
         </Form>
       </ModalBody>
       <ModalFooter>
-        <Button variant="primary" form="assign-role-form" type="submit" isLoading={isPending} icon={<RhUiAddIcon />}>
+        <Button
+          variant="primary"
+          form="assign-role-form"
+          type="submit"
+          isDisabled={isPending}
+          isLoading={isPending}
+          icon={<RhUiAddIcon />}
+        >
           Add assignment
         </Button>
-        <Button variant="link" onClick={onClose}>
+        <Button variant="link" onClick={handleClose} isDisabled={isPending}>
           Cancel
         </Button>
       </ModalFooter>

@@ -125,12 +125,12 @@ describe('EditRoleDialog', () => {
 
     it('pre-fills name input with role name', () => {
       renderDialog()
-      expect(screen.getByRole('textbox', { name: /role name/i })).toHaveValue('my-custom-role')
+      expect(screen.getByLabelText(/^Name/)).toHaveValue('my-custom-role')
     })
 
     it('pre-fills description input with role description', () => {
       renderDialog()
-      expect(screen.getByRole('textbox', { name: /role description/i })).toHaveValue('A custom role for testing')
+      expect(screen.getByLabelText(/^Description/)).toHaveValue('A custom role for testing')
     })
 
     it('pre-fills policies with role policies', () => {
@@ -157,7 +157,7 @@ describe('EditRoleDialog', () => {
   describe('Form pre-population', () => {
     it('handles role with null description', () => {
       renderDialog({ ...mockRole, description: null })
-      expect(screen.getByRole('textbox', { name: /role description/i })).toHaveValue('')
+      expect(screen.getByLabelText(/^Description/)).toHaveValue('')
     })
 
     it('handles role with multiple policies', () => {
@@ -172,7 +172,7 @@ describe('EditRoleDialog', () => {
       const user = userEvent.setup()
       renderDialog()
 
-      const nameInput = screen.getByRole('textbox', { name: /role name/i })
+      const nameInput = screen.getByLabelText(/^Name/)
       await user.clear(nameInput)
       await user.click(screen.getByRole('button', { name: 'Save role' }))
 
@@ -189,7 +189,7 @@ describe('EditRoleDialog', () => {
       renderDialog()
 
       // Modify the description
-      const descInput = screen.getByRole('textbox', { name: /role description/i })
+      const descInput = screen.getByLabelText(/^Description/)
       await user.clear(descInput)
       await user.type(descInput, 'Updated description')
 
@@ -254,7 +254,7 @@ describe('EditRoleDialog', () => {
       const user = userEvent.setup()
       renderDialog()
 
-      const descInput = screen.getByRole('textbox', { name: /role description/i })
+      const descInput = screen.getByLabelText(/^Description/)
       await user.clear(descInput)
 
       await user.click(screen.getByRole('button', { name: 'Save role' }))

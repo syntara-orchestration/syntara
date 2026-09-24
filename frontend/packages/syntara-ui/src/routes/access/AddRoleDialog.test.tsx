@@ -187,12 +187,12 @@ describe('AddRoleDialog', () => {
 
     it('renders name input', () => {
       renderDialog()
-      expect(screen.getByRole('textbox', { name: /role name/i })).toBeInTheDocument()
+      expect(screen.getByLabelText(/^Name/)).toBeInTheDocument()
     })
 
     it('renders description input', () => {
       renderDialog()
-      expect(screen.getByRole('textbox', { name: /role description/i })).toBeInTheDocument()
+      expect(screen.getByLabelText(/^Description/)).toBeInTheDocument()
     })
 
     it('renders Create role button', () => {
@@ -247,7 +247,7 @@ describe('AddRoleDialog', () => {
       const user = userEvent.setup()
       renderDialog()
 
-      await user.type(screen.getByRole('textbox', { name: /role name/i }), 'Invalid Name!')
+      await user.type(screen.getByLabelText(/^Name/), 'Invalid Name!')
       await user.click(screen.getByRole('button', { name: 'Create role' }))
 
       await waitFor(() => {
@@ -260,7 +260,7 @@ describe('AddRoleDialog', () => {
       const user = userEvent.setup()
       renderDialog()
 
-      await user.type(screen.getByRole('textbox', { name: /role name/i }), 'valid-role')
+      await user.type(screen.getByLabelText(/^Name/), 'valid-role')
       await user.click(screen.getByRole('button', { name: 'Create role' }))
 
       await waitFor(() => {
@@ -276,9 +276,9 @@ describe('AddRoleDialog', () => {
       renderDialog()
 
       // Fill in name
-      await user.type(screen.getByRole('textbox', { name: /role name/i }), 'my-role')
+      await user.type(screen.getByLabelText(/^Name/), 'my-role')
       // Fill in description
-      await user.type(screen.getByRole('textbox', { name: /role description/i }), 'A test role')
+      await user.type(screen.getByLabelText(/^Description/), 'A test role')
 
       // Select a policy
       await selectPolicy(user)
@@ -304,7 +304,7 @@ describe('AddRoleDialog', () => {
       const user = userEvent.setup()
       renderDialog()
 
-      await user.type(screen.getByRole('textbox', { name: /role name/i }), 'my-role')
+      await user.type(screen.getByLabelText(/^Name/), 'my-role')
 
       // Select a policy
       await selectPolicy(user)
@@ -329,7 +329,7 @@ describe('AddRoleDialog', () => {
       const user = userEvent.setup()
       renderDialog()
 
-      await user.type(screen.getByRole('textbox', { name: /role name/i }), 'my-role')
+      await user.type(screen.getByLabelText(/^Name/), 'my-role')
 
       await selectPolicy(user)
 
@@ -354,7 +354,7 @@ describe('AddRoleDialog', () => {
       const user = userEvent.setup()
       renderDialog()
 
-      await user.type(screen.getByRole('textbox', { name: /role name/i }), 'my-role')
+      await user.type(screen.getByLabelText(/^Name/), 'my-role')
 
       await selectPolicy(user)
 
@@ -372,7 +372,7 @@ describe('AddRoleDialog', () => {
       const user = userEvent.setup()
       renderDialog({ defaultScope: 'project', defaultProjectId: 'proj-1' })
 
-      await user.type(screen.getByRole('textbox', { name: /role name/i }), 'proj-role')
+      await user.type(screen.getByLabelText(/^Name/), 'proj-role')
 
       await selectPolicy(user)
 
