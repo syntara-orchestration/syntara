@@ -33,6 +33,7 @@ from syntara.workflows.audit.execution_lifecycle import ExecutionAction, Executi
 from syntara.workflows.exceptions import (
     ExecutionInTerminalStateError,
     ExecutionNotFoundError,
+    ExecutionNotRestartableError,
     ExecutionNotRetryableError,
     TemporalUnavailableError,
     TriggerValidationError,
@@ -41,7 +42,11 @@ from syntara.workflows.exceptions import (
     WorkflowNotPublishedError,
 )
 from syntara.workflows.json_schema_validation import apply_schema_defaults
-from syntara.workflows.models.activity_execution import ActivityExecution, ActivityExecutionListResponse
+from syntara.workflows.models.activity_execution import (
+    ActivityExecution,
+    ActivityExecutionListResponse,
+    ActivityStatus,
+)
 from syntara.workflows.models.execution import (
     TERMINAL_EXECUTION_STATUSES,
     ActivityData,
@@ -52,10 +57,12 @@ from syntara.workflows.models.execution import (
     ExecutionRead,
     ExecutionStatus,
     PreResolvedNodeOutput,
+    RestartValidationResponse,
 )
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 from syntara.workflows.models.workflow_version import WorkflowVersion
+from syntara.workflows.services.restart_validation import validate_restart_from_failure
 from syntara.workflows.utils.workflow_metadata import build_workflow_metadata, resolve_user_display_name
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType, resolve_trigger_node
 from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
@@ -148,6 +155,10 @@ class ExecutionsConvertResourceMixin(ConvertResourceMixin):
             mode=resource.mode,
             execution_metadata=resource.execution_metadata,
             retried_from_execution_id=resource.retried_from_execution_id,
+            source_execution_id=resource.source_execution_id,
+            failed_node_ids=list(resource.failed_node_ids or []),
+            triggered_by=resource.triggered_by,
+            restart_count=resource.restart_count,
             trigger_type=resource.trigger_type,
             interface=resource.interface,
         )
@@ -169,6 +180,7 @@ class ExecutionsConvertResourceMixin(ConvertResourceMixin):
                         started_at=activity.started_at,
                         completed_at=activity.completed_at,
                         iteration=activity.iteration,
+                        replayed=activity.replayed,
                     )
                     for activity in resource.activities
                 ]
@@ -372,12 +384,17 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         recorder: "MetricsRecorder",
         component: ComponentLabel,
         retried_from_execution_id: UUID | None = None,
+        source_execution_id: UUID | None = None,
+        failed_node_ids: list[str] | None = None,
+        triggered_by: UUID | None = None,
+        restart_count: int = 0,
+        pre_resolved_outputs: dict[str, dict[str, Any]] | None = None,
     ) -> ExecutionRead:
         """Start a Temporal workflow and persist the execution record.
 
-        Shared by create_execution and retry_execution to avoid duplication.
-        Starts Temporal first, then creates the DB record. On DB commit failure,
-        attempts to cancel the orphaned Temporal workflow.
+        Shared by create_execution, retry_execution, and restart_from_failure to
+        avoid duplication. Starts Temporal first, then creates the DB record.
+        On DB commit failure, attempts to cancel the orphaned Temporal workflow.
         """
         # Enforce application-level concurrency cap before touching Temporal.
         # Uses a DB count of non-terminal executions — accurate across API server
@@ -410,6 +427,8 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             created_by_user_id=str(self.user.id),
             created_at=now.isoformat(),
             workflow_version_id=workflow_version.id,
+            restart_from_execution_id=str(source_execution_id) if source_execution_id is not None else None,
+            restart_failure_point_ids=failed_node_ids,
         )
 
         # Start Temporal workflow FIRST (if temporal_service is available)
@@ -431,6 +450,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
                     workflow_metadata=workflow_metadata,
                     execution_id=pre_generated_execution_id,
                     is_builtin=workflow.is_builtin,
+                    pre_resolved_outputs=pre_resolved_outputs,
                 )
             temporal_workflow_id = temporal_result.temporal_workflow_id
             execution_id = UUID(temporal_result.execution_id)
@@ -461,6 +481,10 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             input_data=input_data,
             trigger_node_id=trigger_node_id,
             retried_from_execution_id=retried_from_execution_id,
+            source_execution_id=source_execution_id,
+            failed_node_ids=list(failed_node_ids or []),
+            triggered_by=triggered_by,
+            restart_count=restart_count,
             trigger_type=trigger_node.get("type"),
             interface=interface_context_var.get(),
             created_by=self.user.id,
@@ -1240,4 +1264,125 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             recorder=recorder,
             component=component,
             retried_from_execution_id=original.id,
+        )
+
+    async def validate_restart_from_failure(
+        self, execution_id: UUID, failure_point_ids: list[str]
+    ) -> RestartValidationResponse:
+        """Validate a restart without mutating any state (AAP-92820).
+
+        Runs the shared pre-restart validation chain (state guard,
+        failure-point eligibility, version-mismatch guard) and returns the
+        verdict for the UI to surface before the operator commits.
+
+        Raises:
+            ExecutionNotFoundError: If the source execution is gone.
+
+        """
+        validation = await validate_restart_from_failure(self.session, execution_id, failure_point_ids)
+        logger.info(
+            "Restart validation",
+            execution_id=execution_id,
+            eligible=validation.eligible,
+            reason=validation.reason,
+        )
+        return RestartValidationResponse(
+            eligible=validation.eligible,
+            reason=validation.reason,
+            failure_point_ids=validation.failure_point_ids,
+            changed_node_ids=validation.changed_node_ids,
+            sanitized_node_ids=validation.sanitized_node_ids,
+        )
+
+    async def restart_from_failure(self, execution_id: UUID, failure_point_ids: list[str]) -> ExecutionRead:
+        """Restart an execution from failure points (AAP-92820).
+
+        Independently repeats the full validation chain before doing any work
+        — never assumes the validate endpoint was called first. On success,
+        creates a new execution linked to the source (restart count, failure
+        points, triggered-by) running the *current* workflow version, and
+        triggers a Temporal run carrying ``restart_from_execution_id`` for the
+        engine's node classification (AAP-92821).
+
+        Args:
+            execution_id: ID of the source (failed) execution
+            failure_point_ids: Failure points to restart from; a subset may be
+                passed when multiple parallel branches failed
+
+        Returns:
+            The newly created execution with status=PENDING
+
+        Raises:
+            ExecutionNotFoundError: If the source execution is gone
+            ExecutionNotRestartableError: If validation rejects the restart
+
+        """
+        validation = await self.validate_restart_from_failure(execution_id, failure_point_ids)
+        if not validation.eligible:
+            raise ExecutionNotRestartableError(execution_id, validation.reason or "restart validation failed")
+
+        result = await self.session.exec(select(Execution).where(Execution.id == execution_id))
+        source = result.one_or_none()
+        if source is None:  # Deleted between validation and restart
+            raise ExecutionNotFoundError(execution_id)
+
+        workflow_result = await self.session.exec(select(Workflow).where(Workflow.id == source.workflow_id))
+        workflow = workflow_result.one_or_none()
+        if workflow is None:
+            raise ExecutionNotFoundError(execution_id)
+
+        current_result = await self.session.exec(
+            select(WorkflowVersion).where(
+                WorkflowVersion.workflow_id == workflow.id,
+                WorkflowVersion.version == workflow.current_version,
+            )
+        )
+        current_version = current_result.one_or_none()
+        if current_version is None:
+            raise ExecutionNotRestartableError(execution_id, "current workflow version no longer exists")
+
+        if source.trigger_node_id is None:
+            raise ExecutionNotRestartableError(execution_id, "source execution has no trigger_node_id recorded")
+        trigger_node_id, _ = resolve_trigger_node(current_version.workflow_definition, source.trigger_node_id)
+
+        # Transport for output injection (AAP-92821): map source COMPLETED nodes
+        # to the pre-resolved channel the engine already honors. Failed and
+        # downstream nodes are never included; the engine classifies at dispatch
+        # which entries to consume. Control-flow routing (condition/switch ports)
+        # is re-evaluated by the engine at runtime — control is therefore None here.
+        completed = (
+            await self.session.exec(
+                select(ActivityExecution).where(
+                    ActivityExecution.execution_id == source.id,
+                    ActivityExecution.status == ActivityStatus.COMPLETED,
+                )
+            )
+        ).all()
+        pre_resolved_outputs = {
+            activity.activity_name: {"output": activity.output_data or {}, "control": None} for activity in completed
+        }
+
+        logger.info(
+            "Restarting execution",
+            source_execution_id=execution_id,
+            workflow_id=source.workflow_id,
+            failure_point_ids=validation.failure_point_ids,
+            triggered_by=str(self.user.id),
+        )
+
+        recorder = get_metrics_recorder()
+        component = ComponentLabel.EXECUTION_SERVICE
+
+        return await self._start_temporal_and_create_execution(
+            workflow=workflow,
+            workflow_version=current_version,
+            input_data=source.input_data,
+            trigger_node_id=trigger_node_id,
+            recorder=recorder,
+            component=component,
+            source_execution_id=source.id,
+            failed_node_ids=validation.failure_point_ids,
+            triggered_by=self.user.id,
+            restart_count=source.restart_count + 1,
+            pre_resolved_outputs=pre_resolved_outputs or None,
         )

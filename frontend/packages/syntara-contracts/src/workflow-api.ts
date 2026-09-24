@@ -935,6 +935,27 @@ export interface components {
       /** Retried From Execution Id */
       retried_from_execution_id?: string | null
       /**
+       * Source Execution Id
+       * @description ID of the source execution this was restarted from
+       */
+      source_execution_id?: string | null
+      /**
+       * Failed Node Ids
+       * @description Failure points selected for restart (node IDs)
+       */
+      failed_node_ids?: string[]
+      /**
+       * Triggered By
+       * @description ID of the user who triggered the restart
+       */
+      triggered_by?: string | null
+      /**
+       * Restart Count
+       * @description Restart generation (0 = original run)
+       * @default 0
+       */
+      restart_count?: number
+      /**
        * Trigger Type
        * @description Trigger node type (manual_trigger, scheduled_trigger, webhook_trigger, eda_trigger)
        */
@@ -2328,6 +2349,11 @@ export interface components {
       started_at?: string | null
       /** Completed At */
       completed_at?: string | null
+      /**
+       * Replayed
+       * @description Whether this activity reused output from a previous run (true) or executed fresh (false); null for pre-feature rows, treated as fresh
+       */
+      replayed?: boolean | null
     }
   }
   responses: {

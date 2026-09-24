@@ -35,14 +35,21 @@ def build_workflow_metadata(
     created_by_user_id: str,
     created_at: str,
     workflow_version_id: UUID,
+    restart_from_execution_id: str | None = None,
+    restart_failure_point_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     """Build the ``workflow_metadata`` dict consumed by ``DynamicWorkflow``.
 
     Returns the nested structure that the workflow engine unpacks in
     ``_init_state()`` to populate ``_project_id``, the expression
     resolver's ``workflow_context`` namespace, and audit fields.
+
+    When restarting from failure (AAP-92820), ``restart_from_execution_id``
+    carries the source execution id and ``restart_failure_point_ids`` the
+    selected failure points; the engine (AAP-92821) uses them for node
+    classification and output injection. Absent for normal runs.
     """
-    return {
+    metadata: dict[str, Any] = {
         "workflow_context": {
             "workflow": {
                 "name": workflow_name,
@@ -62,6 +69,12 @@ def build_workflow_metadata(
             },
         },
     }
+    if restart_from_execution_id is not None:
+        metadata["restart"] = {
+            "restart_from_execution_id": restart_from_execution_id,
+            "failure_point_ids": list(restart_failure_point_ids or []),
+        }
+    return metadata
 
 
 async def resolve_user_display_name(session: AsyncSession, user_id: UUID) -> str:

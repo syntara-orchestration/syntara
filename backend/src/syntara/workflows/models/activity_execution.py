@@ -176,6 +176,14 @@ class ActivityExecution(BaseResource, table=True):
     # Loop tracking
     iteration: int | None = Field(None, description="Iteration number if activity is within a loop (0-indexed)")
 
+    # Restart tracking (AAP-92821: restart from failure point)
+    replayed: bool | None = Field(
+        default=None,
+        nullable=True,
+        description="Whether this activity reused output from a previous run "
+        "(true) or executed fresh (false); null for pre-feature rows, treated as fresh",
+    )
+
 
 class ActivityExecutionListResponse(ResourcesResponse[ActivityExecution]):
     """Paginated list response for activity executions."""

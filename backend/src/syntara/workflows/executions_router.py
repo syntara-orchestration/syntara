@@ -24,6 +24,9 @@ from syntara.workflows.models.execution import (
     ExecutionCreate,
     ExecutionListResponse,
     ExecutionRead,
+    RestartRequest,
+    RestartValidateRequest,
+    RestartValidationResponse,
 )
 from syntara.workflows.models.query_params import ActivityListParams, ExecutionIncludeParams
 from syntara.workflows.services import ExecutionService
@@ -299,6 +302,49 @@ async def retry_execution(
     """Retry a completed workflow execution."""
     logger.info("Retrying execution", execution_id=execution_id)
     return await service.retry_execution(execution_id)
+
+
+@router.post(
+    "/{execution_id}/validate-restart-from-failure",
+    operation_id="validate_restart_from_failure",
+    summary="Validate restart from failure",
+    description="Validate that an execution can be restarted from the given failure points. "
+    "Checks execution state, failure-point eligibility, and the version-mismatch guard. "
+    "Returns a pass/fail verdict without mutating any state.",
+    response_model=RestartValidationResponse,
+    response_description="Restart validation verdict",
+    dependencies=[Depends(_exec_perm_run)],
+)
+async def validate_restart_from_failure(
+    execution_id: UUID,
+    body: RestartValidateRequest,
+    service: Annotated[ExecutionService, Depends(get_execution_service)],
+) -> RestartValidationResponse:
+    """Validate a restart from failure points without mutating state."""
+    logger.info("Validating restart", execution_id=execution_id)
+    return await service.validate_restart_from_failure(execution_id, body.failure_point_ids)
+
+
+@router.post(
+    "/{execution_id}/restart-from-failure",
+    operation_id="restart_from_failure",
+    summary="Restart from failure",
+    description="Restart a failed execution from the given failure points. "
+    "Independently repeats all validation checks, then creates a new execution "
+    "linked to the source and triggers a Temporal run carrying restart context.",
+    status_code=status.HTTP_201_CREATED,
+    response_model=ExecutionRead,
+    response_description="New execution created from restart",
+    dependencies=[Depends(_exec_perm_run)],
+)
+async def restart_from_failure(
+    execution_id: UUID,
+    body: RestartRequest,
+    service: Annotated[ExecutionService, Depends(get_execution_service)],
+) -> ExecutionRead:
+    """Restart a failed execution from failure points."""
+    logger.info("Restarting execution", execution_id=execution_id)
+    return await service.restart_from_failure(execution_id, body.failure_point_ids)
 
 
 @router.get(
