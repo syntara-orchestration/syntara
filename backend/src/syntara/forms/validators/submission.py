@@ -7,7 +7,7 @@ and enforcing required fields and option membership constraints.
 from __future__ import annotations
 
 import math
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -66,14 +66,15 @@ def validate_prompt_submission_state(prompt: FormPrompt) -> None:
         FormPromptAlreadyRespondedError: If the prompt was already submitted
 
     """
-    if prompt.status not in TERMINAL_PROMPT_STATUSES:
-        return
-
     if prompt.status == FormPromptStatus.EXPIRED:
         raise FormPromptExpiredError(prompt.id, prompt.timeout_at)
     if prompt.status == FormPromptStatus.CANCELLED:
         raise FormPromptCancelledError(prompt.id)
-    raise FormPromptAlreadyRespondedError(prompt.id, prompt.status)
+    if prompt.status in TERMINAL_PROMPT_STATUSES:
+        raise FormPromptAlreadyRespondedError(prompt.id, prompt.status)
+
+    if prompt.timeout_at is not None and prompt.timeout_at <= datetime.now(UTC):
+        raise FormPromptExpiredError(prompt.id, prompt.timeout_at)
 
 
 def validate_form_submission(

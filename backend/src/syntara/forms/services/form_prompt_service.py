@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 import structlog
+from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 from sqlmodel import select, update
@@ -447,6 +448,12 @@ class FormPromptService(BaseService):
             update(FormPrompt)
             .where(FormPrompt.id == prompt_id)  # type: ignore[arg-type]
             .where(FormPrompt.status == FormPromptStatus.PENDING)  # type: ignore[arg-type]
+            .where(
+                or_(
+                    FormPrompt.timeout_at.is_(None),  # type: ignore[union-attr]
+                    FormPrompt.timeout_at > responded_at,  # type: ignore[operator]
+                )
+            )
             .values(
                 status=FormPromptStatus.SUBMITTED,
                 response_data=cleaned_data,
@@ -463,6 +470,7 @@ class FormPromptService(BaseService):
             # Re-fetch to get current status for error message
             prompt = await self.session.get(FormPrompt, prompt_id)
             if prompt:
+                validate_prompt_submission_state(prompt)
                 raise FormPromptAlreadyRespondedError(prompt_id, prompt.status)
             raise FormPromptNotFoundError(prompt_id)
 

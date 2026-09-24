@@ -20,6 +20,8 @@ class WorkflowApiClient(BaseHttpRetryClient):
 
     Uses WorkflowClientSettings from configuration for retry and timeout parameters.
 
+    Inherits BaseHttpRetryClient, which handles the retry and backoff logic.
+
     """
 
     async def send_form_signal(

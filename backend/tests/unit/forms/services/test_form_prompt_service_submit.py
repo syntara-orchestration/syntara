@@ -27,7 +27,11 @@ _MINIMAL_FORM_DEFINITION = {
 }
 
 
-def _make_service_with_user(*, prompt: FormPrompt | None = None) -> tuple[FormPromptService, Mock, Mock]:
+def _make_service_with_user(
+    *,
+    prompt: FormPrompt | None = None,
+    rowcount: int = 1,
+) -> tuple[FormPromptService, Mock, Mock]:
     """Build FormPromptService with mocked session and user."""
     session = Mock(spec=AsyncSession)
     user = Mock()
@@ -37,10 +41,10 @@ def _make_service_with_user(*, prompt: FormPrompt | None = None) -> tuple[FormPr
     # Mock session.get for prompt lookups
     session.get = AsyncMock(return_value=prompt)
 
-    # Mock session.execute for UPDATE statement
+    # Mock session.exec for the conditional UPDATE statement.
     mock_result = Mock()
-    mock_result.rowcount = 1 if prompt and prompt.status == FormPromptStatus.PENDING else 0
-    session.execute = AsyncMock(return_value=mock_result)
+    mock_result.rowcount = rowcount
+    session.exec = AsyncMock(return_value=mock_result)
 
     session.commit = AsyncMock()
     session.refresh = AsyncMock()
@@ -52,6 +56,33 @@ def _make_service_with_user(*, prompt: FormPrompt | None = None) -> tuple[FormPr
 
 class TestFormPromptServiceSubmit:
     """Test FormPromptService.submit method."""
+
+    @pytest.mark.asyncio
+    async def test_submit_concurrent_submission_raises_already_responded(self) -> None:
+        """A zero-row conditional update reports the prompt's updated state."""
+        prompt_id = uuid4()
+        prompt = Mock(spec=FormPrompt)
+        prompt.id = prompt_id
+        prompt.status = FormPromptStatus.PENDING
+        prompt.timeout_at = None
+        prompt.form_definition = _MINIMAL_FORM_DEFINITION
+
+        responded_prompt = Mock(spec=FormPrompt)
+        responded_prompt.id = prompt_id
+        responded_prompt.status = FormPromptStatus.SUBMITTED
+        responded_prompt.timeout_at = None
+
+        service, session, _user = _make_service_with_user(prompt=prompt, rowcount=0)
+        session.get = AsyncMock(side_effect=[prompt, responded_prompt])
+
+        with patch("syntara.forms.services.form_prompt_service.validate_form_submission"):
+            with pytest.raises(FormPromptAlreadyRespondedError):
+                await service.submit(prompt_id, {"field1": "test value"})
+
+        session.exec.assert_awaited_once()
+        session.rollback.assert_awaited_once()
+        session.commit.assert_not_awaited()
+        assert session.get.await_count == 2
 
     @pytest.mark.asyncio
     async def test_submit_success_updates_status(self) -> None:
