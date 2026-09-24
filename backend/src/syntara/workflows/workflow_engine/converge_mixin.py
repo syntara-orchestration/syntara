@@ -46,6 +46,7 @@ class WorkflowConvergeMixin:
     _converge_branch_nodes: dict[str, set[str]]
     _timed_out_converge_nodes: set[str]
     _detached_nodes: set[str]
+    _denied_nodes: dict[str, dict[str, Any]]
 
     # Methods provided by OrchestratorWorkflow (resolved via MRO)
     def _are_predecessors_complete(self, node_id: str, graph: WorkflowGraph) -> bool: ...  # type: ignore[empty-body]
@@ -217,11 +218,12 @@ class WorkflowConvergeMixin:
         )
 
     def _count_successful_predecessors(self, predecessor_ids: list[str]) -> int:
-        """Count predecessors that completed successfully (not failed, not skipped)."""
+        """Count predecessors that completed successfully (not failed, skipped or denied)."""
         return sum(
             1
             for p in predecessor_ids
             if p not in self.skipped_nodes
+            and p not in self._denied_nodes
             and self.resolver.has_namespace(p)
             and (p not in self.failed_nodes or p in self._cof_failed_nodes)
         )

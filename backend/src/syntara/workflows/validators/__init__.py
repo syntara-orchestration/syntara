@@ -4,8 +4,13 @@ This module provides validation for workflow definitions and metadata.
 """
 
 from syntara.settings.cache.settings_cache import get_runtime_settings
+from syntara.workflows.node_kind_switch import get_disabled_node_kinds
 
-from .workflow_definition import WorkflowValidator, collect_scheduled_trigger_config_findings
+from .workflow_definition import (
+    WorkflowValidator,
+    collect_scheduled_trigger_config_findings,
+    disabled_kind_findings,
+)
 from .workflow_integrations import validate_workflow_references
 
 # Convenience singleton instance for easy usage
@@ -21,6 +26,8 @@ async def get_system_continue_on_failure() -> bool:
 __all__ = [
     "WorkflowValidator",
     "collect_scheduled_trigger_config_findings",
+    "disabled_kind_findings",
+    "get_disabled_node_kinds",
     "get_system_continue_on_failure",
     "validate_workflow_references",
     "workflow_validator",

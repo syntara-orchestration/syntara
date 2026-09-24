@@ -11,6 +11,7 @@ import { useElapsedTime } from '../../hooks/useElapsedTime'
 import type { FilterConfig } from '../../types/filters'
 import { formatElapsedTime } from '../../utils/dateUtils'
 import { detachPromise } from '../../utils/detachPromise'
+import { DeniedNodesAlert } from '../executions/DeniedNodesAlert'
 import { NodeExecutionDetailsPanel } from '../executions/NodeExecutionDetailsPanel'
 import type { ActivityState } from '../workflows/execution/types'
 import {
@@ -192,6 +193,7 @@ type SinglePanelLayoutProps = {
     completed_at?: string | null
     status?: ExecutionStatus | null
     error_details?: string | null
+    denied_nodes?: unknown
   }
   elapsedLabel?: string
   isRunning: boolean
@@ -271,6 +273,10 @@ function SinglePanelLayout({
             </section>
           </StackItem>
         )}
+
+        <StackItem style={{ flexShrink: 0 }}>
+          <DeniedNodesAlert deniedNodes={execution.denied_nodes} nameMap={nameMap} />
+        </StackItem>
 
         {execution.status === 'failed' && resolvedError && (
           <StackItem style={{ flexShrink: 0, paddingBottom: 'var(--pf-t--global--spacer--sm)' }}>

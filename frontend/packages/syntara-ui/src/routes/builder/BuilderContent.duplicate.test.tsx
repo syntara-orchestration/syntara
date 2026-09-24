@@ -34,6 +34,17 @@ vi.mock('../../client', () => ({
   interfaceTagMiddleware: { onRequest: vi.fn() },
 }))
 
+// AddNodePanel reads the node-kind registry; gating is covered by
+// AddNodePanel.nodeKindGating.test.tsx.
+vi.mock('../../hooks/useNodeKindsQuery', () => ({
+  useNodeKindsQuery: () => ({
+    query: { isPending: false },
+    nodeKinds: [],
+    nodeKindByKind: new Map(),
+    disabledKinds: new Set<string>(),
+  }),
+}))
+
 vi.mock('../../hooks/useProjectSelector', () => ({
   useProjectSelector: () => ({
     selectedProject: { id: 'project-1', name: 'Test Project' },

@@ -11,6 +11,7 @@ import {
   Title,
 } from '@patternfly/react-core'
 
+import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { SynPanel } from '../../components/layout/SynPanel'
 import { AAP_NODE_IDS, RegistryNodeId } from '../../constants'
 import { renderNodeIcon } from '../workflows/canvas/nodes/renderNodeIcon'
@@ -19,7 +20,15 @@ import { getAddNodePanelColor } from '../workflows/canvas/nodeTypeColors'
 import type { NodeSubtypeDefinition, NodeTypeDefinition } from './registry/NodeRegistry'
 import { resolveIconForType } from './utils/nodeIcons'
 
-export type NodeTypeOption = Pick<NodeTypeDefinition | NodeSubtypeDefinition, 'id' | 'label' | 'icon' | 'description'>
+export type NodeTypeOption = Pick<
+  NodeTypeDefinition | NodeSubtypeDefinition,
+  'id' | 'label' | 'icon' | 'description'
+> & {
+  /** Entry stays listed but cannot be added (for example a denied node kind). */
+  isDisabled?: boolean
+  /** Explains why the entry is disabled; shown in a tooltip on hover and focus. */
+  disabledTooltip?: string
+}
 
 type NodeTypeOptionsListProps = {
   nodeTypes: NodeTypeOption[]
@@ -28,6 +37,7 @@ type NodeTypeOptionsListProps = {
 
 export function NodeTypeOptionsList(props: NodeTypeOptionsListProps) {
   return props.nodeTypes.map((nodeType) => {
+    const isDisabled = nodeType.isDisabled === true
     const { icon, id } = resolveIconForType({ nodeTypeId: nodeType.id })
     const accentColor = getAddNodePanelColor(nodeType.id)
     // AAP nodes use gray icon (no color tint)
@@ -37,70 +47,75 @@ export function NodeTypeOptionsList(props: NodeTypeOptionsListProps) {
 
     return (
       <StackItem key={nodeType.id}>
-        <SynPanel
-          isGlass={false}
-          isScrollable={false}
-          onClick={() => props.onSelect(nodeType.id)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault()
-              props.onSelect(nodeType.id)
-            }
-          }}
-          style={{
-            cursor: 'pointer',
-            ...(accentColor
-              ? {
-                  borderTopWidth: 4,
-                  borderTopStyle: 'solid',
-                  borderTopColor: accentColor,
-                  borderRightWidth: 0,
-                  borderBottomWidth: 0,
-                  borderLeftWidth: 0,
-                }
-              : {}),
-          }}
-          role="button"
-          tabIndex={0}
-          aria-label={nodeType.label}
-        >
-          <Stack hasGutter>
-            <StackItem>
-              <Split hasGutter>
-                <SplitItem isFilled={false} style={{ width: '2rem', flexShrink: 0 }}>
-                  {nodeIcon}
-                </SplitItem>
-                <SplitItem isFilled>
-                  <Flex
-                    alignItems={{ default: 'alignItemsCenter' }}
-                    gap={{ default: 'gapSm' }}
-                    flexWrap={{ default: 'nowrap' }}
-                  >
-                    <FlexItem flex={{ default: 'flexNone' }}>
-                      <Title headingLevel="h3" size="md">
-                        {nodeType.label}
-                      </Title>
-                    </FlexItem>
-                    {nodeType.id === RegistryNodeId.ACTION_SCRIPT && (
-                      <FlexItem>
-                        <Label isCompact color="orange" style={{ fontSize: 'var(--pf-t--global--font--size--sm)' }}>
-                          Developer Preview
-                        </Label>
+        <DisabledWithTooltip isDisabled={isDisabled} content={nodeType.disabledTooltip ?? ''} position="left">
+          <SynPanel
+            isGlass={false}
+            isScrollable={false}
+            onClick={isDisabled ? undefined : () => props.onSelect(nodeType.id)}
+            onKeyDown={(e) => {
+              if (isDisabled) return
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                props.onSelect(nodeType.id)
+              }
+            }}
+            style={{
+              cursor: isDisabled ? 'not-allowed' : 'pointer',
+              ...(isDisabled ? { opacity: 0.5 } : {}),
+              ...(accentColor
+                ? {
+                    borderTopWidth: 4,
+                    borderTopStyle: 'solid',
+                    borderTopColor: accentColor,
+                    borderRightWidth: 0,
+                    borderBottomWidth: 0,
+                    borderLeftWidth: 0,
+                  }
+                : {}),
+            }}
+            role="button"
+            tabIndex={0}
+            aria-label={nodeType.label}
+            aria-disabled={isDisabled || undefined}
+          >
+            <Stack hasGutter>
+              <StackItem>
+                <Split hasGutter>
+                  <SplitItem isFilled={false} style={{ width: '2rem', flexShrink: 0 }}>
+                    {nodeIcon}
+                  </SplitItem>
+                  <SplitItem isFilled>
+                    <Flex
+                      alignItems={{ default: 'alignItemsCenter' }}
+                      gap={{ default: 'gapSm' }}
+                      flexWrap={{ default: 'nowrap' }}
+                    >
+                      <FlexItem flex={{ default: 'flexNone' }}>
+                        <Title headingLevel="h3" size="md">
+                          {nodeType.label}
+                        </Title>
                       </FlexItem>
-                    )}
-                  </Flex>
-                </SplitItem>
-              </Split>
-            </StackItem>
-            <StackItem>
-              {nodeType.description && (
-                <Content data-testid="node-type-description" component={ContentVariants.small}>
-                  {nodeType.description}
-                </Content>
-              )}
-            </StackItem>
-          </Stack>
-        </SynPanel>
+                      {nodeType.id === RegistryNodeId.ACTION_SCRIPT && (
+                        <FlexItem>
+                          <Label isCompact color="orange" style={{ fontSize: 'var(--pf-t--global--font--size--sm)' }}>
+                            Developer Preview
+                          </Label>
+                        </FlexItem>
+                      )}
+                    </Flex>
+                  </SplitItem>
+                </Split>
+              </StackItem>
+              <StackItem>
+                {nodeType.description && (
+                  <Content data-testid="node-type-description" component={ContentVariants.small}>
+                    {nodeType.description}
+                  </Content>
+                )}
+              </StackItem>
+            </Stack>
+          </SynPanel>
+        </DisabledWithTooltip>
       </StackItem>
     )
   })

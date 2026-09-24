@@ -7,7 +7,7 @@ import type {
   TaskActivity,
   WaitActivity,
 } from '@syntara/contracts'
-import { ExecutorTypeEnum } from '@syntara/contracts'
+import { ActivityTypeEnum, ExecutorTypeEnum } from '@syntara/contracts'
 import type { Node } from '@xyflow/react'
 import type { ReactNode } from 'react'
 import { useState } from 'react'
@@ -79,6 +79,7 @@ function getAddModeFormId(
     [RegistryNodeId.ACTION]: 'action-node-form',
     [RegistryNodeId.AGENT]: 'ai-agent-node-form',
     [RegistryNodeId.APPROVAL]: 'approval-node-form',
+    [RegistryNodeId.ACTION_MCP_TOOL]: 'mcp-tool-node-form',
   }
   if (nodeTypeId && nodeTypeId in simpleFormMap) return simpleFormMap[nodeTypeId]
 
@@ -123,6 +124,11 @@ function getTaskFormId(taskData: TaskActivity): string {
   // Check if it's an AI Agent task
   if (executor === ExecutorTypeEnum.AGENTIC) {
     return 'ai-agent-node-form'
+  }
+
+  // MCP tool task
+  if (executor === ActivityTypeEnum.MCP_TOOL) {
+    return 'mcp-tool-node-form'
   }
 
   // Script or HTTP request

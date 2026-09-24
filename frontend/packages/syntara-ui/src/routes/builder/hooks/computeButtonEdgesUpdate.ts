@@ -72,6 +72,8 @@ const HANDLE_TO_KEY_SET: Record<string, 'conditionKeys' | 'loopKeys' | 'approval
   [EdgeHandleEnum.LOOP]: 'loopKeys',
   [EdgeHandleEnum.APPROVED]: 'approvalKeys',
   [EdgeHandleEnum.REJECTED]: 'approvalKeys',
+  [EdgeHandleEnum.ALLOWED]: 'conditionKeys',
+  [EdgeHandleEnum.DENIED]: 'conditionKeys',
 }
 
 function buildButtonHandleKeySets(existingButtonEdges: EdgeType[]): ButtonHandleKeySets {

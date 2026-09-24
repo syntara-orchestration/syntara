@@ -5,7 +5,7 @@ the receive_webhook / receive_eda_webhook endpoints with mocked dependencies.
 """
 
 from collections.abc import AsyncIterator, Callable
-from typing import Any
+from typing import Any, cast
 from unittest.mock import AsyncMock, Mock, patch
 from uuid import UUID, uuid4
 
@@ -35,7 +35,17 @@ from syntara.workflows.webhook_router import (
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
+
 # ============================================================================
+def _api_request() -> Request:
+    """Minimal Request stand-in carrying the app-state authorization evaluator."""
+    request: Any = Mock(spec=Request)
+    request.app = Mock()
+    request.app.state = Mock()
+    request.app.state.authz_evaluator = Mock()
+    return cast("Request", request)
+
+
 # _check_payload_size tests
 # ============================================================================
 
@@ -285,6 +295,7 @@ class TestReceiveWebhookEndpoints:
                 caller=caller,
                 temporal_service=AsyncMock(spec=TemporalExecutionService),
                 db=mock_db,
+                http_request=_api_request(),
                 _payload_size=None,
             )
 
@@ -318,6 +329,7 @@ class TestReceiveWebhookEndpoints:
                     caller=caller,
                     temporal_service=None,
                     db=mock_db,
+                    http_request=_api_request(),
                     _payload_size=None,
                 )
 
@@ -348,6 +360,7 @@ class TestReceiveWebhookEndpoints:
                     caller=caller,
                     temporal_service=mock_temporal,
                     db=mock_db,
+                    http_request=_api_request(),
                     _payload_size=None,
                 )
 
@@ -381,6 +394,7 @@ class TestReceiveWebhookEndpoints:
                 caller=caller,
                 temporal_service=AsyncMock(spec=TemporalExecutionService),
                 db=mock_db,
+                http_request=_api_request(),
                 _payload_size=None,
             )
 

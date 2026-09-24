@@ -28,6 +28,8 @@ const v2PortHandles: Set<string> = new Set([
   EdgeHandleEnum.FALSE,
   EdgeHandleEnum.APPROVED,
   EdgeHandleEnum.REJECTED,
+  EdgeHandleEnum.ALLOWED,
+  EdgeHandleEnum.DENIED,
   EdgeHandleEnum.LOOP,
   EdgeHandleEnum.DONE,
   EdgeHandleEnum.END,
@@ -36,7 +38,7 @@ const v2PortHandles: Set<string> = new Set([
 /**
  * Converts a React Flow source handle to a v2 API from_port value.
  * - `loop` → `iterate`, `done` → `complete`
- * - `true`, `false`, `approved`, `rejected` pass through unchanged
+ * - `true`, `false`, `approved`, `rejected`, `allowed`, `denied` pass through unchanged
  * - Switch handles (`case_0`, `default`) pass through unchanged
  * - Non-port handles (e.g. `source`) return `undefined`
  */

@@ -133,6 +133,22 @@ export type webhooks = Record<string, never>
 export interface components {
   schemas: {
     /**
+     * DeniedNodeRead
+     * @description One workflow node refused by a launch-time authorization check.
+     */
+    DeniedNodeRead: {
+      /** Node Id */
+      node_id: string
+      /** Kind */
+      kind: string
+      /** Labels */
+      labels: {
+        [key: string]: string
+      }
+      /** Denied By */
+      denied_by: string
+    }
+    /**
      * ExecutionRead
      * @description Schema for execution response (GET /executions/{id}).
      *
@@ -232,6 +248,11 @@ export interface components {
        * @description Originating interface (ui or api)
        */
       interface?: string | null
+      /**
+       * Denied Nodes
+       * @description Nodes the run principal was not allowed to execute, as [{node_id, kind, labels, denied_by}]. Null when nothing was denied.
+       */
+      denied_nodes?: components['schemas']['DeniedNodeRead'][] | null
       /** Labels */
       labels?: {
         [key: string]: unknown
@@ -343,7 +364,16 @@ export interface components {
      * @description Activity execution status enumeration.
      * @enum {string}
      */
-    ActivityStatus: 'pending' | 'running' | 'waiting' | 'completed' | 'failed' | 'retrying' | 'skipped' | 'cancelled'
+    ActivityStatus:
+      | 'pending'
+      | 'running'
+      | 'waiting'
+      | 'completed'
+      | 'failed'
+      | 'retrying'
+      | 'skipped'
+      | 'cancelled'
+      | 'denied'
     /**
      * NodeType
      * @description Node types for V2 workflows (used by telemetry).
@@ -365,6 +395,7 @@ export interface components {
       | 'approval'
       | 'http_request'
       | 'internal_activity'
+      | 'mcp_tool'
       | 'script'
     /**
      * CurrentActivity
@@ -1438,6 +1469,73 @@ export interface components {
       [key: string]: unknown
     }
     /**
+     * MCPToolExecutorParameters
+     * @description Parameters for MCP tool executor (mcp_tool activity).
+     */
+    MCPToolExecutorParameters: {
+      /**
+       * Integration Id
+       * @description UUID of the mcp_server integration that provides the tool
+       */
+      integration_id: string
+      /**
+       * Tool Name
+       * @description Name of the MCP tool to invoke
+       */
+      tool_name: string
+      /**
+       * Arguments
+       * @description Arguments passed to the MCP tool (values support templating)
+       */
+      arguments?: {
+        [key: string]: unknown
+      }
+      /**
+       * Timeout Seconds
+       * @description Deadline for the tool call in seconds. Defaults to the node's resolved engine timeout and is capped at 600s.
+       */
+      timeout_seconds?: number | null
+    }
+    /**
+     * MCPToolNode
+     * @description MCP tool executor node.
+     */
+    MCPToolNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'mcp_tool'
+      parameters: components['schemas']['MCPToolExecutorParameters']
+      settings?: components['schemas']['NodeSettingsNoRetry'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
      * ScriptLanguage
      * @description Supported script languages for script executor.
      * @enum {string}
@@ -1681,6 +1779,7 @@ export interface components {
         | components['schemas']['AAPJobTemplateNode']
         | components['schemas']['AAPWorkflowJobTemplateNode']
         | components['schemas']['HTTPRequestNode']
+        | components['schemas']['MCPToolNode']
         | components['schemas']['AgenticNode']
         | components['schemas']['ScriptNode']
         | components['schemas']['ApprovalNode']

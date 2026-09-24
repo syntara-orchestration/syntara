@@ -152,6 +152,7 @@ async def _handle_webhook_request(
     caller: tuple[User, UUID],
     temporal_service: TemporalExecutionService | None,
     db: AsyncSession,
+    http_request: Request,
     label: str = "",
 ) -> WebhookResponse:
     label = f"{label} webhook" if label else "webhook"
@@ -181,7 +182,12 @@ async def _handle_webhook_request(
     if temporal_service is None:
         raise TemporalUnavailableError(f"{label} triggering")  # noqa: EM102, TRY003
 
-    execution_service = ExecutionService(db, user, temporal_service=temporal_service)
+    execution_service = ExecutionService(
+        db,
+        user,
+        temporal_service=temporal_service,
+        authz_evaluator=http_request.app.state.authz_evaluator,
+    )
     trigger_input = payload
 
     execution = await execution_service.create_execution(
@@ -244,6 +250,7 @@ async def receive_webhook(
     caller: Annotated[tuple[User, UUID], Depends(get_webhook_caller)],
     temporal_service: Annotated[TemporalExecutionService | None, Depends(get_webhook_temporal_service)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    http_request: Request,
     _payload_size: Annotated[None, Depends(_check_payload_size)],
 ) -> WebhookResponse:
     """Receive a webhook event and trigger the matching workflow."""
@@ -254,6 +261,7 @@ async def receive_webhook(
         caller=caller,
         temporal_service=temporal_service,
         db=db,
+        http_request=http_request,
     )
 
 
@@ -290,6 +298,7 @@ async def receive_eda_webhook(
     caller: Annotated[tuple[User, UUID], Depends(get_webhook_caller)],
     temporal_service: Annotated[TemporalExecutionService | None, Depends(get_webhook_temporal_service)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    http_request: Request,
     _payload_size: Annotated[None, Depends(_check_payload_size)],
 ) -> WebhookResponse:
     """Receive a webhook event from EDA and trigger the matching workflow."""
@@ -300,5 +309,6 @@ async def receive_eda_webhook(
         caller=caller,
         temporal_service=temporal_service,
         db=db,
+        http_request=http_request,
         label="EDA",
     )

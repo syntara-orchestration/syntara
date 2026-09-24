@@ -34,6 +34,27 @@ function hasSwitchNodePlaceholders(nodes: Node[], sourceId: string): boolean {
   )
 }
 
+/** True when the handle addresses a named branch port (so the placeholder id carries the handle). */
+function isNamedBranchHandle(sourceHandle: string | undefined): boolean {
+  if (!sourceHandle) return false
+  const namedHandles: string[] = [
+    EdgeHandleEnum.TRUE,
+    EdgeHandleEnum.FALSE,
+    EdgeHandleEnum.DONE,
+    EdgeHandleEnum.LOOP,
+    EdgeHandleEnum.DEFAULT,
+  ]
+  return namedHandles.includes(sourceHandle) || isSwitchCasePort(sourceHandle)
+}
+
+/** True when the source node still has placeholders on its other branch handles. */
+function hasRemainingBranchPlaceholders(nodes: Node[], sourceId: string, nodeType: string | undefined): boolean {
+  if (nodeType === FlowNodeType.CONDITION) return hasConditionNodePlaceholders(nodes, sourceId)
+  if (nodeType === FlowNodeType.LOOP) return hasLoopNodePlaceholders(nodes, sourceId)
+  if (nodeType === FlowNodeType.SWITCH) return hasSwitchNodePlaceholders(nodes, sourceId)
+  return false
+}
+
 /**
  * Parameters for creating edges when connecting nodes from the add panel
  */
@@ -148,13 +169,9 @@ export function calculateEdgeConnection(
   }
 
   // Determine placeholder node to remove
-  const isConditionHandle = sourceHandle === EdgeHandleEnum.TRUE || sourceHandle === EdgeHandleEnum.FALSE
-  const isLoopHandle = sourceHandle === EdgeHandleEnum.DONE || sourceHandle === EdgeHandleEnum.LOOP
-  const isSwitchLikeHandle = isSwitchCasePort(sourceHandle) || sourceHandle === EdgeHandleEnum.DEFAULT
-  placeholderIdToRemove =
-    isConditionHandle || isLoopHandle || isSwitchLikeHandle
-      ? `placeholder-${sourceId}-${sourceHandle}`
-      : `placeholder-${sourceId}`
+  placeholderIdToRemove = isNamedBranchHandle(sourceHandle)
+    ? `placeholder-${sourceId}-${sourceHandle}`
+    : `placeholder-${sourceId}`
 
   // Check if button edge class should be removed from source node
   const nodes = reactFlowInstance.getNodes()
@@ -164,12 +181,7 @@ export function calculateEdgeConnection(
     const filteredNodes = nodes.filter((n) => n.id !== placeholderIdToRemove)
 
     // Keep button edge class only if source node still has other placeholders
-    const hasOtherPlaceholders =
-      (sourceNode.type === FlowNodeType.CONDITION && hasConditionNodePlaceholders(filteredNodes, sourceId)) ||
-      (sourceNode.type === FlowNodeType.LOOP && hasLoopNodePlaceholders(filteredNodes, sourceId)) ||
-      (sourceNode.type === FlowNodeType.SWITCH && hasSwitchNodePlaceholders(filteredNodes, sourceId))
-
-    shouldRemoveButtonEdgeClass = !hasOtherPlaceholders
+    shouldRemoveButtonEdgeClass = !hasRemainingBranchPlaceholders(filteredNodes, sourceId, sourceNode.type)
   }
 
   return {
@@ -266,13 +278,7 @@ export function applyEdgeConnection(
           if (!sourceNode) return filtered
 
           // Check if we should keep or remove the button edge class
-          if (sourceNode.type === FlowNodeType.CONDITION && hasConditionNodePlaceholders(filtered, params.sourceId)) {
-            return filtered
-          }
-          if (sourceNode.type === FlowNodeType.LOOP && hasLoopNodePlaceholders(filtered, params.sourceId)) {
-            return filtered
-          }
-          if (sourceNode.type === FlowNodeType.SWITCH && hasSwitchNodePlaceholders(filtered, params.sourceId)) {
+          if (hasRemainingBranchPlaceholders(filtered, params.sourceId, sourceNode.type)) {
             return filtered
           }
 

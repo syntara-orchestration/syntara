@@ -12,7 +12,17 @@ import {
 describe('constants', () => {
   describe('BRANCH_HANDLES', () => {
     it('contains all branch handle values', () => {
-      expect(BRANCH_HANDLES).toEqual(['true', 'false', 'approved', 'rejected', 'done', 'loop', 'default'])
+      expect(BRANCH_HANDLES).toEqual([
+        'true',
+        'false',
+        'approved',
+        'rejected',
+        'allowed',
+        'denied',
+        'done',
+        'loop',
+        'default',
+      ])
     })
   })
 
@@ -22,6 +32,8 @@ describe('constants', () => {
       expect(isBranchHandle('false')).toBe(true)
       expect(isBranchHandle('approved')).toBe(true)
       expect(isBranchHandle('rejected')).toBe(true)
+      expect(isBranchHandle('allowed')).toBe(true)
+      expect(isBranchHandle('denied')).toBe(true)
       expect(isBranchHandle('done')).toBe(true)
       expect(isBranchHandle('loop')).toBe(true)
       expect(isBranchHandle('default')).toBe(true)
@@ -65,10 +77,21 @@ describe('constants', () => {
       expect(ACTIVITY_STATUS.RETRYING).toBe('retrying')
       expect(ACTIVITY_STATUS.SKIPPED).toBe('skipped')
       expect(ACTIVITY_STATUS.CANCELLED).toBe('cancelled')
+      expect(ACTIVITY_STATUS.DENIED).toBe('denied')
     })
 
     it('has all expected status keys', () => {
-      const expectedKeys = ['PENDING', 'RUNNING', 'WAITING', 'COMPLETED', 'FAILED', 'RETRYING', 'SKIPPED', 'CANCELLED']
+      const expectedKeys = [
+        'PENDING',
+        'RUNNING',
+        'WAITING',
+        'COMPLETED',
+        'FAILED',
+        'RETRYING',
+        'SKIPPED',
+        'CANCELLED',
+        'DENIED',
+      ]
       expect(Object.keys(ACTIVITY_STATUS)).toEqual(expectedKeys)
     })
   })
@@ -78,6 +101,8 @@ describe('constants', () => {
       expect(TERMINAL_ACTIVITY_STATUSES).toContain('completed')
       expect(TERMINAL_ACTIVITY_STATUSES).toContain('failed')
       expect(TERMINAL_ACTIVITY_STATUSES).toContain('cancelled')
+      // A denied node never runs, so it is terminal like a failed node.
+      expect(TERMINAL_ACTIVITY_STATUSES).toContain('denied')
     })
 
     it('does not contain non-terminal statuses', () => {
@@ -87,8 +112,8 @@ describe('constants', () => {
       expect(TERMINAL_ACTIVITY_STATUSES).not.toContain('skipped')
     })
 
-    it('has exactly 3 terminal statuses', () => {
-      expect(TERMINAL_ACTIVITY_STATUSES).toHaveLength(3)
+    it('has exactly 4 terminal statuses', () => {
+      expect(TERMINAL_ACTIVITY_STATUSES).toHaveLength(4)
     })
   })
 
@@ -97,6 +122,7 @@ describe('constants', () => {
       expect(isTerminalState('completed')).toBe(true)
       expect(isTerminalState('failed')).toBe(true)
       expect(isTerminalState('cancelled')).toBe(true)
+      expect(isTerminalState('denied')).toBe(true)
     })
 
     it('returns false for non-terminal states', () => {

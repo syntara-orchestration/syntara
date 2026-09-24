@@ -8,6 +8,7 @@ import type { AlertMessage } from '../../../providers/alerts'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
 import { detachPromise } from '../../../utils/detachPromise'
+import { nodeKindWriteDeniedAlert } from '../../../utils/nodeKindDenials'
 import type { BuilderAction } from '../builderReducer'
 import { formatHistoryDateTime } from '../historyDateUtils'
 import type { EdgeConnection } from '../types/edge'
@@ -154,8 +155,9 @@ export function useBuilderVersionHistory({
           )
           showSuccess({ title: 'Version restored', description: `Restored from version ${versionToRestore}` })
         },
-        onError: () => {
-          showError({ title: 'Failed to restore version' })
+        onError: (error: unknown) => {
+          const deniedAlert = nodeKindWriteDeniedAlert(error, 'restore')
+          showError(deniedAlert ?? { title: 'Failed to restore version' })
         },
       }
     )

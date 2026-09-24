@@ -59,13 +59,23 @@
   "additionalProperties": false,
   "$defs": {
     "node_base": {
+      "description": "Base node properties for node types that carry configuration",
+      "allOf": [
+        {
+          "$ref": "#/$defs/node_common"
+        }
+      ],
+      "required": [
+        "parameters"
+      ]
+    },
+    "node_common": {
       "type": "object",
-      "description": "Base node properties shared by all node types",
+      "description": "Base node properties shared by all node types.",
       "unevaluatedProperties": false,
       "required": [
         "id",
-        "type",
-        "parameters"
+        "type"
       ],
       "properties": {
         "id": {
@@ -268,6 +278,26 @@
                 },
                 "settings": {
                   "$ref": "common-definitions.schema.json#/$defs/nodeSettingsFull"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/node_base"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "mcp_tool"
+                },
+                "parameters": {
+                  "$ref": "executors/mcp_tool.schema.json#/parameterSchema"
+                },
+                "settings": {
+                  "$ref": "common-definitions.schema.json#/$defs/nodeSettingsNoRetry"
                 }
               }
             }

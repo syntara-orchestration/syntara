@@ -308,3 +308,17 @@ class TestRegistryIntegrity:  # noqa: D101
                 f"Policy '{policy.name}' has scope='own' but is not assigned to any "
                 f"project-scoped roles. Assigned to: {sorted(assigned_roles)}"
             )
+
+
+class TestWorkflowNodeDefaultAllow:
+    """ANSTRAT-1750: every authenticated principal may use every node kind unless denied."""
+
+    def test_authenticated_has_workflow_node_write_and_execute(self) -> None:
+        names = builtin_role_policy_names("authenticated")
+        assert "workflow_node:write:any" in names
+        assert "workflow_node:execute:any" in names
+
+    def test_no_other_builtin_role_repeats_the_grant(self) -> None:
+        for role in ("admin", "user", "auditor", "project-admin", "project-user", "project-auditor"):
+            names = builtin_role_policy_names(role)
+            assert not any(n.startswith("workflow_node:") for n in names), role

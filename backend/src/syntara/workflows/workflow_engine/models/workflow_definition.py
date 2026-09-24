@@ -31,6 +31,11 @@ TEMPLATE_PATTERN = re.compile(r"\$\{[^}]+\}")
 
 _CONFIG_VALIDATION_FAILED = "Config validation failed"
 
+# Upper bound for the mcp_tool node's per-call deadline. MCP tool calls are
+# synchronous request/response round trips; anything longer belongs in an
+# agentic node with async completion.
+MCP_TOOL_MAX_TIMEOUT_SECONDS = 600
+
 
 def validate_tool_selection_coherence(
     strategy: str | None,
@@ -137,6 +142,7 @@ class ActivityName(StrEnum):
     APPROVAL = "execute_approval_activity"
     HTTP_REQUEST = "execute_http_request_activity"
     INTERNAL_ACTIVITY = "execute_internal_activity"
+    MCP_TOOL = "execute_mcp_tool_activity"
     SCRIPT = "execute_script_activity"
     # Internal
     CREDENTIAL_RESOLUTION = "resolve_workflow_credentials"
@@ -174,6 +180,7 @@ class NodeType(str, Enum):
     APPROVAL = "approval"
     HTTP_REQUEST = "http_request"
     INTERNAL_ACTIVITY = "internal_activity"
+    MCP_TOOL = "mcp_tool"
     SCRIPT = "script"
 
 
@@ -377,6 +384,46 @@ class APIExecutorParameters(TemplateAwareBaseModel):
         parsed = urlparse(v)
         if parsed.scheme and parsed.scheme not in ("http", "https"):
             msg = f"URL scheme '{parsed.scheme}' is not allowed. Only http:// and https:// are supported."
+            raise SafeValueError(msg)
+        return v
+
+
+class MCPToolExecutorParameters(TemplateAwareBaseModel):
+    """Parameters for MCP tool executor (mcp_tool activity)."""
+
+    # The node is bound to an integration of type mcp_server; the activity resolves
+    # that integration, connects to the server and invokes tool_name with arguments.
+    # Argument values support template expressions and are resolved by the engine
+    # before the activity runs, exactly like the http_request node's body and headers.
+
+    integration_id: str = Field(description="UUID of the mcp_server integration that provides the tool")
+    tool_name: str = Field(min_length=1, description="Name of the MCP tool to invoke")
+    arguments: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Arguments passed to the MCP tool (values support templating)",
+    )
+    timeout_seconds: int | None = Field(
+        default=None,
+        ge=1,
+        le=MCP_TOOL_MAX_TIMEOUT_SECONDS,
+        description=(
+            "Deadline for the tool call in seconds. Defaults to the node's resolved engine timeout "
+            f"and is capped at {MCP_TOOL_MAX_TIMEOUT_SECONDS}s."
+        ),
+    )
+
+    @field_validator("integration_id")
+    @classmethod
+    def validate_integration_id(cls, v: str) -> str:
+        """Validate that integration_id is a valid UUID or a template expression."""
+        return validate_uuid_or_template(v, "integration_id")
+
+    @field_validator("tool_name")
+    @classmethod
+    def validate_tool_name_not_blank(cls, v: str) -> str:
+        """Reject whitespace-only tool names."""
+        if not v.strip():
+            msg = "tool_name must not be blank"
             raise SafeValueError(msg)
         return v
 
@@ -947,6 +994,15 @@ class HttpRequestOutput(NodeOutput):
     elapsed: float | None = None
 
 
+class MCPToolOutput(NodeOutput):
+    """Output model for MCP tool executor nodes."""
+
+    tool_name: str | None = None
+    integration_id: str | None = None
+    result: Any = None
+    is_error: bool | None = None
+
+
 class AAPJobTemplateOutput(NodeOutput):
     """Output model for AAP job template executor nodes."""
 
@@ -1025,6 +1081,7 @@ class WaitOutput(NodeOutput):
 NODE_OUTPUT_MODELS: dict[str, type[NodeOutput]] = {
     NodeType.SCRIPT: ScriptOutput,
     NodeType.HTTP_REQUEST: HttpRequestOutput,
+    NodeType.MCP_TOOL: MCPToolOutput,
     NodeType.AAP_JOB_TEMPLATE: AAPJobTemplateOutput,
     NodeType.AAP_WORKFLOW_JOB_TEMPLATE: AAPWorkflowJobTemplateOutput,
     NodeType.AGENTIC: AgenticOutput,

@@ -10,6 +10,16 @@ import { accessClient } from '../../access/accessClient'
 
 import { ProjectPoliciesTab } from './ProjectPoliciesTab'
 
+const { mockPolicyPermissions } = vi.hoisted(() => ({
+  mockPolicyPermissions: {
+    current: {
+      canCreate: true,
+      isLoading: false,
+      tooltips: { create: 'Create permission required' },
+    },
+  },
+}))
+
 vi.mock('../../access/accessClient', () => ({
   accessClient: {
     useQuery: vi.fn(),
@@ -22,6 +32,10 @@ vi.mock('../../../client', () => ({
   interfaceTagMiddleware: { onRequest: vi.fn() },
 }))
 
+vi.mock('../../access/usePolicyPermissions', () => ({
+  usePolicyPermissions: () => mockPolicyPermissions.current,
+}))
+
 vi.mock('../../access/builtinFilterDefinitions', async () => {
   const actual = await vi.importActual<typeof import('../../access/builtinFilterDefinitions')>(
     '../../access/builtinFilterDefinitions'
@@ -30,8 +44,16 @@ vi.mock('../../access/builtinFilterDefinitions', async () => {
 })
 
 vi.mock('./EditProjectPolicyDialog', () => ({
-  EditProjectPolicyDialog: ({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) => (
-    <div role="dialog" aria-label="Edit project policy">
+  EditProjectPolicyDialog: ({
+    policy,
+    onClose,
+    onSuccess,
+  }: {
+    policy?: unknown
+    onClose: () => void
+    onSuccess: () => void
+  }) => (
+    <div role="dialog" aria-label={policy ? 'Edit project policy' : 'Create policy'}>
       <button type="button" onClick={onClose}>
         Close edit
       </button>
@@ -111,6 +133,11 @@ describe('ProjectPoliciesTab', () => {
     searchParams = new URLSearchParams()
     mockRefetch.mockResolvedValue({})
     setupMocks()
+    mockPolicyPermissions.current = {
+      canCreate: true,
+      isLoading: false,
+      tooltips: { create: 'Create permission required' },
+    }
   })
 
   it('has no accessibility violations with policies', async () => {
@@ -134,6 +161,38 @@ describe('ProjectPoliciesTab', () => {
     expect(screen.getByText('custom-policy')).toBeInTheDocument()
     expect(screen.getByText('Read access')).toBeInTheDocument()
     expect(screen.getByText('-')).toBeInTheDocument()
+  })
+
+  it('shows an enabled create button and opens the dialog when allowed', async () => {
+    const user = userEvent.setup()
+    render(<ProjectPoliciesTab projectId="proj-1" />, { wrapper })
+    const button = screen.getByRole('button', { name: 'Create policy' })
+    expect(button).toBeEnabled()
+    await user.click(button)
+    expect(screen.getByRole('dialog', { name: 'Create policy' })).toBeInTheDocument()
+  })
+
+  it('aria-disables create and provides its permission tooltip when denied', async () => {
+    mockPolicyPermissions.current = {
+      canCreate: false,
+      isLoading: false,
+      tooltips: { create: 'Create permission required' },
+    }
+    const user = userEvent.setup()
+    render(<ProjectPoliciesTab projectId="proj-1" />, { wrapper })
+    const button = screen.getByRole('button', { name: 'Create policy' })
+    expect(button).toHaveAttribute('aria-disabled', 'true')
+    await user.hover(button)
+    expect(await screen.findByText('Create permission required')).toBeInTheDocument()
+  })
+
+  it('shows the create action in the empty state when allowed', async () => {
+    setupMocks([])
+    const user = userEvent.setup()
+    render(<ProjectPoliciesTab projectId="proj-1" />, { wrapper })
+    const button = screen.getByRole('button', { name: 'Create policy' })
+    await user.click(button)
+    expect(screen.getByRole('dialog', { name: 'Create policy' })).toBeInTheDocument()
   })
 
   it('shows Built-in label for built-in policies', () => {

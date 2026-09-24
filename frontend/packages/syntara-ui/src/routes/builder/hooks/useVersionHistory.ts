@@ -9,6 +9,7 @@ import { useAlerts } from '../../../providers/alerts'
 import { getErrorMessage } from '../../../utils/apiErrors'
 import { detachPromise } from '../../../utils/detachPromise'
 import { downloadVersionExport } from '../../../utils/downloadWorkflowExport'
+import { nodeKindWriteDeniedAlert } from '../../../utils/nodeKindDenials'
 
 import { buildWorkflowVersionsQuery } from './buildWorkflowVersionsQuery'
 import { resolvePublishedVersionName } from './versionHistoryHelpers'
@@ -124,6 +125,11 @@ export function useVersionHistory({ workflowId, isNew, onVersionUpdated }: UseVe
             )
           },
           onError: (error: unknown) => {
+            const deniedAlert = nodeKindWriteDeniedAlert(error, 'publish')
+            if (deniedAlert) {
+              showError(deniedAlert)
+              return
+            }
             showError({ title: 'Failed to publish version', description: getErrorMessage(error) })
           },
         }

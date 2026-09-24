@@ -16,6 +16,17 @@ vi.mock('./registry/NodeRegistry', () => ({
   },
 }))
 
+// Node-kind gating is covered by AddNodePanel.nodeKindGating.test.tsx; keep the
+// registry empty here so every palette entry stays ungated.
+vi.mock('../../hooks/useNodeKindsQuery', () => ({
+  useNodeKindsQuery: () => ({
+    query: { isPending: false },
+    nodeKinds: [],
+    nodeKindByKind: new Map(),
+    disabledKinds: new Set<string>(),
+  }),
+}))
+
 const mockNodeTypes = [
   {
     id: 'action',

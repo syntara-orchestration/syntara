@@ -117,6 +117,14 @@ class FakeSettingsCache:
         """Return the setting value as a ``bool``."""
         return await self._get_typed(key, bool, "bool", default=default)  # type: ignore[no-any-return]
 
+    async def get_list(self, key: str, *, default: list[Any] | None = None) -> list[Any]:
+        """Return the setting value as a ``list``."""
+        return await self._get_typed(key, list, "list", default=default)  # type: ignore[no-any-return]
+
+    async def get_dict(self, key: str, *, default: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Return the setting value as a ``dict``."""
+        return await self._get_typed(key, dict, "dict", default=default)  # type: ignore[no-any-return]
+
     async def invalidate(self, key: str) -> None:
         """Evict key from store."""
         self._store.pop(key, None)

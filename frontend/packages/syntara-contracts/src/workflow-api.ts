@@ -556,6 +556,11 @@ export interface components {
        */
       readonly created_by?: components['schemas']['UserReference'] | null
       /**
+       * Published By
+       * @description Principal that last published the version; triggered runs evaluate node permissions as them
+       */
+      readonly published_by?: components['schemas']['UserReference'] | null
+      /**
        * Created At
        * Format: date-time
        */
@@ -944,6 +949,11 @@ export interface components {
        * @description Originating interface (ui or api)
        */
       interface?: string | null
+      /**
+       * Denied Nodes
+       * @description Nodes the run principal was not allowed to execute, as [{node_id, kind, labels, denied_by}]. Null when nothing was denied.
+       */
+      denied_nodes?: components['schemas']['DeniedNodeRead'][] | null
       /** Labels */
       labels?: {
         [key: string]: unknown
@@ -1010,6 +1020,7 @@ export interface components {
         | components['schemas']['AAPJobTemplateNode']
         | components['schemas']['AAPWorkflowJobTemplateNode']
         | components['schemas']['HTTPRequestNode']
+        | components['schemas']['MCPToolNode']
         | components['schemas']['AgenticNode']
         | components['schemas']['ScriptNode']
         | components['schemas']['ApprovalNode']
@@ -1141,6 +1152,45 @@ export interface components {
       type: 'http_request'
       parameters: components['schemas']['APIExecutorParameters']
       settings?: components['schemas']['NodeSettingsFull'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
+     * MCPToolNode
+     * @description MCP tool executor node.
+     */
+    MCPToolNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'mcp_tool'
+      parameters: components['schemas']['MCPToolExecutorParameters']
+      settings?: components['schemas']['NodeSettingsNoRetry'] | null
     } & {
       [key: string]: unknown
     }
@@ -1695,6 +1745,34 @@ export interface components {
       credential_id?: string | null
     }
     /**
+     * MCPToolExecutorParameters
+     * @description Parameters for MCP tool executor (mcp_tool activity).
+     */
+    MCPToolExecutorParameters: {
+      /**
+       * Integration Id
+       * @description UUID of the mcp_server integration that provides the tool
+       */
+      integration_id: string
+      /**
+       * Tool Name
+       * @description Name of the MCP tool to invoke
+       */
+      tool_name: string
+      /**
+       * Arguments
+       * @description Arguments passed to the MCP tool (values support templating)
+       */
+      arguments?: {
+        [key: string]: unknown
+      }
+      /**
+       * Timeout Seconds
+       * @description Deadline for the tool call in seconds. Defaults to the node's resolved engine timeout and is capped at 600s.
+       */
+      timeout_seconds?: number | null
+    }
+    /**
      * AgenticExecutorParameters
      * @description Parameters for agentic executor.
      */
@@ -2120,6 +2198,7 @@ export interface components {
       | 'converge_configuration'
       | 'approval_configuration'
       | 'definition_limits'
+      | 'node_kind_disabled'
     /**
      * ValidationFinding
      * @description A single structured validation finding.
@@ -2286,6 +2365,22 @@ export interface components {
      * @enum {string}
      */
     ExecutionStatus: 'pending' | 'running' | 'paused' | 'completed' | 'completed_with_errors' | 'failed' | 'cancelled'
+    /**
+     * DeniedNodeRead
+     * @description One workflow node refused by a launch-time authorization check.
+     */
+    DeniedNodeRead: {
+      /** Node Id */
+      node_id: string
+      /** Kind */
+      kind: string
+      /** Labels */
+      labels: {
+        [key: string]: string
+      }
+      /** Denied By */
+      denied_by: string
+    }
     /**
      * CurrentActivity
      * @description Currently executing activity information.

@@ -143,6 +143,11 @@ authenticated:
     path: /api/v1/workflows/validate
     justification: Stateless, side-effect-free validation of caller-supplied definition; no project_id/workflow_id to authorize against
 
+  # -- workflows: node kind registry --
+  - method: GET
+    path: /api/v1/node_kinds
+    justification: Read-only node kind catalog; response is scoped to the caller and reports the caller's own workflow_node:write verdicts
+
 public:
   # -- auth: pre-authentication flow --
   - method: POST

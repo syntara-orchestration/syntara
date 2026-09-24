@@ -1,10 +1,11 @@
-import { Label, Truncate } from '@patternfly/react-core'
-import { RhUiEditFillIcon, RhUiLockIcon, RhUiTrashIcon } from '@patternfly/react-icons'
+import { Button, Label, Truncate } from '@patternfly/react-core'
+import { RhUiAddIcon, RhUiEditFillIcon, RhUiLockIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { IAction, ThProps } from '@patternfly/react-table'
 import { useState } from 'react'
 
 import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
+import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
 import {
   SynListPanel,
@@ -21,6 +22,7 @@ import { accessClient } from '../../access/accessClient'
 import { builtinFilterDefinitions } from '../../access/builtinFilterDefinitions'
 import type { ProjectPolicyRead } from '../../access/types'
 import { useBuiltinListState } from '../../access/useBuiltinListState'
+import { usePolicyPermissions } from '../../access/usePolicyPermissions'
 
 import { EditProjectPolicyDialog } from './EditProjectPolicyDialog'
 
@@ -100,6 +102,7 @@ function ProjectPoliciesTable({
 }
 
 export function ProjectPoliciesTab({ projectId }: Readonly<{ projectId: string }>) {
+  const policyPermissions = usePolicyPermissions({ resourceProject: projectId })
   const {
     filters,
     hasActiveFilters,
@@ -114,6 +117,7 @@ export function ProjectPoliciesTab({ projectId }: Readonly<{ projectId: string }
     goToNextPage,
   } = useBuiltinListState(sortFieldByColumn)
   const [policyToEdit, setPolicyToEdit] = useState<ProjectPolicyRead | null>(null)
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
   const deleteDialog = useDialogState<ProjectPolicyRead>()
   const { showSuccess, showError } = useAlerts()
 
@@ -161,15 +165,37 @@ export function ProjectPoliciesTab({ projectId }: Readonly<{ projectId: string }
           hasActiveFilters={hasActiveFilters}
           onClearAllFilters={clearAllFilters}
           noDataState={
-            <SynEmptyStateNoData title="No policies yet" description="No policies are available for this project." />
+            <SynEmptyStateNoData
+              title="No policies yet"
+              description="No policies are available for this project."
+              buttonText="Create policy"
+              addData={policyPermissions.canCreate ? () => setIsCreateOpen(true) : undefined}
+            />
           }
           toolbar={
-            <SynListPanelToolbar
-              filters={filters}
-              filterDefinitions={builtinFilterDefinitions}
-              onFilterChange={handleFilterChange}
-              clearAllFilters={clearAllFilters}
-            />
+            policies.length > 0 || hasActiveFilters ? (
+              <SynListPanelToolbar
+                filters={filters}
+                filterDefinitions={builtinFilterDefinitions}
+                onFilterChange={handleFilterChange}
+                clearAllFilters={clearAllFilters}
+                actions={
+                  <DisabledWithTooltip
+                    isDisabled={!policyPermissions.canCreate}
+                    content={policyPermissions.tooltips.create}
+                  >
+                    <Button
+                      variant="primary"
+                      icon={<RhUiAddIcon />}
+                      isAriaDisabled={!policyPermissions.canCreate}
+                      onClick={policyPermissions.canCreate ? () => setIsCreateOpen(true) : undefined}
+                    >
+                      Create policy
+                    </Button>
+                  </DisabledWithTooltip>
+                }
+              />
+            ) : undefined
           }
           body={
             <SynListPanelTable
@@ -200,6 +226,14 @@ export function ProjectPoliciesTab({ projectId }: Readonly<{ projectId: string }
           projectId={projectId}
           policy={policyToEdit}
           onClose={() => setPolicyToEdit(null)}
+          onSuccess={handlePoliciesChanged}
+        />
+      )}
+
+      {isCreateOpen && (
+        <EditProjectPolicyDialog
+          projectId={projectId}
+          onClose={() => setIsCreateOpen(false)}
           onSuccess={handlePoliciesChanged}
         />
       )}

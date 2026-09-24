@@ -41,6 +41,7 @@ import { useProjectPermissions } from '../useProjectPermissions'
 import { ProjectDeleteDialog } from './ProjectDeleteDialog'
 import { canShowTabContent, computeProjectTabState, type ProjectTab } from './projectDetailTabs'
 import { ProjectNotFoundState } from './ProjectNotFoundState'
+import { ProjectPoliciesTab } from './ProjectPoliciesTab'
 import { ProjectRoleAssignmentsTab } from './ProjectRoleAssignmentsTab'
 import { ProjectWorkflowsTab } from './ProjectWorkflowsTab'
 import { useProjectDetailPermissions } from './useProjectDetailPermissions'
@@ -135,6 +136,34 @@ function ProjectDetailsTab({ project }: Readonly<{ project: ProjectRead }>) {
   )
 }
 
+const PROJECT_TAB_LABELS: ReadonlyArray<{ key: ProjectTab; label: string }> = [
+  { key: 'workflows', label: 'Workflows' },
+  { key: 'policies', label: 'Policies' },
+  { key: 'role-assignments', label: 'Assignments' },
+]
+
+function ProjectDetailTabList({
+  basePath,
+  urlValidTabs,
+  visibleTabs,
+}: {
+  basePath: string
+  urlValidTabs: ProjectTab[]
+  visibleTabs: ProjectTab[]
+}) {
+  const tabs = [
+    <Tab key="details" eventKey="details" title={<TabTitleText>Details</TabTitleText>} />,
+    ...PROJECT_TAB_LABELS.filter(({ key }) => visibleTabs.includes(key)).map(({ key, label }) => (
+      <Tab key={key} eventKey={key} title={<TabTitleText>{label}</TabTitleText>} />
+    )),
+  ]
+  return (
+    <SynListPanelTabs basePath={basePath} defaultTab="details" validTabs={urlValidTabs} aria-label="Project details">
+      {tabs}
+    </SynListPanelTabs>
+  )
+}
+
 export function ProjectDetail() {
   const navigate = useNavigate()
   const projectsDocLink = useDocLink('projects')
@@ -147,13 +176,14 @@ export function ProjectDetail() {
   const {
     canReadWorkflows,
     canReadAssignments,
+    canReadPolicies,
     isLoading: permissionsLoading,
   } = useProjectDetailPermissions(projectId ?? '')
   const { mutate: deleteProject } = accessClient.useMutation('delete', '/projects/{project_id}')
 
   const { visibleTabs, urlValidTabs } = useMemo(
-    () => computeProjectTabState(canReadWorkflows, canReadAssignments, permissionsLoading, activeTab),
-    [canReadWorkflows, canReadAssignments, permissionsLoading, activeTab]
+    () => computeProjectTabState(canReadWorkflows, canReadAssignments, permissionsLoading, activeTab, canReadPolicies),
+    [canReadWorkflows, canReadAssignments, canReadPolicies, permissionsLoading, activeTab]
   )
 
   const projectQuery = accessClient.useQuery(
@@ -225,20 +255,7 @@ export function ProjectDetail() {
       />
       <SynPageBody>
         <SynListPanel>
-          <SynListPanelTabs
-            basePath={basePath}
-            defaultTab="details"
-            validTabs={urlValidTabs}
-            aria-label="Project details"
-          >
-            <Tab eventKey="details" title={<TabTitleText>Details</TabTitleText>} />
-            {visibleTabs.includes('workflows') && (
-              <Tab eventKey="workflows" title={<TabTitleText>Workflows</TabTitleText>} />
-            )}
-            {visibleTabs.includes('role-assignments') && (
-              <Tab eventKey="role-assignments" title={<TabTitleText>Assignments</TabTitleText>} />
-            )}
-          </SynListPanelTabs>
+          <ProjectDetailTabList basePath={basePath} urlValidTabs={urlValidTabs} visibleTabs={visibleTabs} />
 
           {activeTab === 'details' && (
             <SynListPanelView
@@ -255,6 +272,9 @@ export function ProjectDetail() {
           )}
           {activeTab === 'workflows' && canShowTabContent('workflows', visibleTabs, permissionsLoading, activeTab) && (
             <ProjectWorkflowsTab projectId={projectId ?? ''} isBuiltin={projectData.is_builtin} />
+          )}
+          {activeTab === 'policies' && canShowTabContent('policies', visibleTabs, permissionsLoading, activeTab) && (
+            <ProjectPoliciesTab projectId={projectId ?? ''} />
           )}
           {activeTab === 'role-assignments' &&
             canShowTabContent('role-assignments', visibleTabs, permissionsLoading, activeTab) && (

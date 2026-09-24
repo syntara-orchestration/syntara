@@ -6,6 +6,7 @@ import type { AlertMessage } from '../../../providers/alerts'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
 import { extractVersionConflictInfo, getErrorMessage, isWorkflowVersionConflictError } from '../../../utils/apiErrors'
+import { nodeKindWriteDeniedAlert } from '../../../utils/nodeKindDenials'
 import type { ValidationError } from '../builderReducer'
 import { extractValidationErrors, extractValidationErrorsFromUnknown } from '../useWorkflowVerification'
 import { buildWorkflowDefinition } from '../utils/workflowDefinitionBuilder'
@@ -71,6 +72,14 @@ function reportSaveError(
   showError: (options: AlertMessage) => void,
   onValidationFindings?: (errors: ValidationError[]) => void
 ): void {
+  // A node-kind write denial means nothing was saved: name the kinds and the
+  // policies instead of the generic backend detail (F-7/F-8).
+  const deniedAlert = nodeKindWriteDeniedAlert(error, action)
+  if (deniedAlert) {
+    showError(deniedAlert)
+    return
+  }
+
   const findings = extractValidationErrorsFromUnknown(error)
   showError({
     title: `Failed to ${action} workflow`,

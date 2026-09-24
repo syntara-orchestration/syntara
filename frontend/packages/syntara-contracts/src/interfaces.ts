@@ -32,6 +32,7 @@ export const ActivityTypeEnum = {
   CONVERGE: 'converge',
   SWITCH: 'switch',
   WAIT: 'wait',
+  MCP_TOOL: 'mcp_tool',
   INTERNAL_ACTIVITY: 'internal_activity',
 } as const
 
@@ -92,6 +93,7 @@ export const ExecutorTypeEnum = {
   AAP_JOB_TEMPLATE: 'aap_job_template',
   AAP_WORKFLOW_JOB_TEMPLATE: 'aap_workflow_job_template',
   APPROVAL: 'approval',
+  MCP_TOOL: 'mcp_tool',
 } as const
 
 /**
@@ -106,6 +108,8 @@ export const EdgeHandleEnum = {
   FALSE: 'false',
   APPROVED: 'approved',
   REJECTED: 'rejected',
+  ALLOWED: 'allowed',
+  DENIED: 'denied',
   DONE: 'done',
   DEFAULT: 'default',
   // Target handles
@@ -128,6 +132,25 @@ export const ExecutionStatusEnum = {
   COMPLETED_WITH_ERRORS: 'completed_with_errors',
   FAILED: 'failed',
   CANCELLED: 'cancelled',
+} as const
+
+/**
+ * Constants for per-node (activity) execution status discriminators.
+ * Use these constants instead of string literals when comparing activity.status values.
+ *
+ * Derived from the ActivityStatus schema in the OpenAPI contract:
+ * `ExecutionsAPI.components['schemas']['ActivityStatus']`
+ */
+export const ActivityStatusEnum = {
+  PENDING: 'pending',
+  RUNNING: 'running',
+  WAITING: 'waiting',
+  COMPLETED: 'completed',
+  FAILED: 'failed',
+  RETRYING: 'retrying',
+  SKIPPED: 'skipped',
+  CANCELLED: 'cancelled',
+  DENIED: 'denied',
 } as const
 
 /**
@@ -243,6 +266,7 @@ export type LoopConfig =
 export type ConvergeConfig = WorkflowAPI.components['schemas']['ConvergeNodeParameters']
 export type SwitchConfig = WorkflowAPI.components['schemas']['SwitchNodeParameters']
 export type WaitConfig = WorkflowAPI.components['schemas']['WaitNodeParameters']
+export type MCPToolConfig = WorkflowAPI.components['schemas']['MCPToolExecutorParameters']
 
 // ============================================================================
 // Activity Base Interface
@@ -334,6 +358,12 @@ export interface WaitActivity extends ActivityBase {
   parameters: WaitConfig & { [key: string]: unknown }
 }
 
+/** MCP tool invocation node */
+export interface MCPToolActivity extends ActivityBase {
+  type: 'mcp_tool'
+  parameters: MCPToolConfig & { [key: string]: unknown }
+}
+
 // ============================================================================
 // Activity Discriminated Union (Typed - Opt-In)
 // ============================================================================
@@ -374,6 +404,7 @@ export type TypedActivity =
   | ConvergeActivity
   | SwitchActivity
   | WaitActivity
+  | MCPToolActivity
 
 // ============================================================================
 // Activity (Loose - Backward Compatible)
@@ -406,5 +437,6 @@ export type TaskActivity =
   | ScriptActivity
   | HttpRequestActivity
   | AgenticActivity
+  | MCPToolActivity
   | AAPJobTemplateActivity
   | AAPWorkflowJobTemplateActivity

@@ -41,6 +41,15 @@ describe('ExecutionStatusBadge', () => {
     expect(style).toContain('border-color: var(--pf-t--global--color--status--danger--default)')
   })
 
+  it('maps denied status to a dashed warning badge', () => {
+    render(<ExecutionStatusBadge status="denied" />)
+
+    const badge = screen.getByLabelText('Denied')
+    const style = badge.getAttribute('style') ?? ''
+    expect(style).toContain('border-color: var(--pf-t--global--color--status--warning--default)')
+    expect(style).toContain('border-style: dashed')
+  })
+
   it('maps retrying status to running styling with retry label', () => {
     render(<ExecutionStatusBadge status="retrying" retryCount={3} />)
 

@@ -3,6 +3,7 @@ import { useCanI } from '../../../hooks/useCanI'
 type ProjectDetailPermissions = {
   canReadWorkflows: boolean
   canReadAssignments: boolean
+  canReadPolicies: boolean
   isLoading: boolean
 }
 
@@ -10,7 +11,7 @@ type ProjectDetailPermissions = {
  * Permission checks for project detail page tabs.
  *
  * Scoped to the concrete project so a grant in another project does not unlock
- * the Workflows or Assignments tabs here.
+ * the Workflows, Policies or Assignments tabs here.
  */
 export function useProjectDetailPermissions(resourceProject: string): ProjectDetailPermissions {
   const enabled = Boolean(resourceProject)
@@ -22,10 +23,15 @@ export function useProjectDetailPermissions(resourceProject: string): ProjectDet
     resourceProject,
     enabled,
   })
+  const { allowed: canReadPolicies, isChecking: isCheckingPolicies } = useCanI('read', 'policy', {
+    resourceProject,
+    enabled,
+  })
 
   return {
     canReadWorkflows,
     canReadAssignments,
-    isLoading: isCheckingWorkflows || isCheckingAssignments,
+    canReadPolicies,
+    isLoading: isCheckingWorkflows || isCheckingAssignments || isCheckingPolicies,
   }
 }

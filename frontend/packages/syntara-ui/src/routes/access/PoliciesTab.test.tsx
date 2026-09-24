@@ -14,11 +14,30 @@ import type { PolicyRead } from './types'
 vi.mock('./accessClient', () => ({
   accessClient: {
     useQuery: vi.fn(),
+    useMutation: vi.fn(),
   },
   accessFetchClient: {
     GET: vi.fn(),
     POST: vi.fn(),
   },
+}))
+
+const { mockPolicyPermissions } = vi.hoisted(() => ({
+  mockPolicyPermissions: {
+    canCreate: true,
+    canUpdate: true,
+    canDelete: true,
+    isLoading: false,
+    tooltips: { create: 'create denied', update: 'update denied', delete: 'delete denied' },
+  },
+}))
+
+vi.mock('./usePolicyPermissions', () => ({ usePolicyPermissions: () => mockPolicyPermissions }))
+
+vi.mock('./PolicyDialog', () => ({
+  PolicyDialog: ({ policy }: { policy?: PolicyRead }) => (
+    <div role="dialog">{policy ? 'Edit policy dialog' : 'Create policy dialog'}</div>
+  ),
 }))
 
 vi.mock('./useProjectNameMap', () => ({
@@ -82,6 +101,7 @@ const wrapper = ({ children }: { children: React.ReactNode }) => (
 )
 
 const mockRefetch = vi.fn().mockResolvedValue({})
+const mockDelete = vi.fn()
 
 function setupPoliciesQuery(policies: PolicyRead[], options?: { total?: number; next?: string | null }) {
   vi.mocked(accessClient.useQuery).mockReturnValue({
@@ -104,6 +124,8 @@ describe('PoliciesTab', () => {
     vi.clearAllMocks()
     queryClient.clear()
     vi.mocked(useQueryState).mockReturnValue(null)
+    vi.mocked(accessClient.useMutation).mockReturnValue({ mutate: mockDelete })
+    Object.assign(mockPolicyPermissions, { canCreate: true, canUpdate: true, canDelete: true })
   })
 
   it('renders empty state when no policies exist', () => {
@@ -113,6 +135,63 @@ describe('PoliciesTab', () => {
 
     expect(screen.getByText('No policies yet')).toBeInTheDocument()
     expect(screen.getByText('No policies are available.')).toBeInTheDocument()
+  })
+
+  it('enables create policy and opens the dialog when permitted', async () => {
+    const user = userEvent.setup()
+    setupPoliciesQuery(samplePolicies)
+    render(<PoliciesTab />, { wrapper })
+
+    await user.click(screen.getByRole('button', { name: 'Create policy' }))
+    expect(screen.getByRole('dialog')).toHaveTextContent('Create policy dialog')
+  })
+
+  it('disables create policy when permission is missing', () => {
+    mockPolicyPermissions.canCreate = false
+    setupPoliciesQuery(samplePolicies)
+    render(<PoliciesTab />, { wrapper })
+
+    expect(screen.getByRole('button', { name: 'Create policy' })).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('keeps built-in rows view-only and gives custom rows edit and delete actions', async () => {
+    const user = userEvent.setup()
+    setupPoliciesQuery(samplePolicies)
+    render(<PoliciesTab />, { wrapper })
+
+    const kebabs = screen.getAllByRole('button', { name: 'Kebab toggle' })
+    await user.click(kebabs[0])
+    expect(screen.queryByRole('menuitem', { name: /edit policy/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /delete policy/i })).not.toBeInTheDocument()
+    await user.keyboard('{Escape}')
+    await user.click(kebabs[1])
+    expect(await screen.findByRole('menuitem', { name: /edit policy/i })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /delete policy/i })).toBeInTheDocument()
+  })
+
+  it('disables custom edit and delete actions when permissions are missing', async () => {
+    const user = userEvent.setup()
+    Object.assign(mockPolicyPermissions, { canUpdate: false, canDelete: false })
+    setupPoliciesQuery(samplePolicies)
+    render(<PoliciesTab />, { wrapper })
+
+    await user.click(screen.getAllByRole('button', { name: 'Kebab toggle' })[1])
+    expect(await screen.findByRole('menuitem', { name: /edit policy/i })).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByRole('menuitem', { name: /delete policy/i })).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('confirms deletion and calls the policy DELETE mutation', async () => {
+    const user = userEvent.setup()
+    setupPoliciesQuery(samplePolicies)
+    render(<PoliciesTab />, { wrapper })
+
+    await user.click(screen.getAllByRole('button', { name: 'Kebab toggle' })[1])
+    await user.click(await screen.findByRole('menuitem', { name: /delete policy/i }))
+    await user.click(screen.getByRole('checkbox'))
+    await user.click(screen.getByRole('button', { name: 'Delete policy' }))
+
+    expect(accessClient.useMutation).toHaveBeenCalledWith('delete', '/policies/{policy_id}')
+    expect(mockDelete.mock.calls[0][0]).toEqual({ params: { path: { policy_id: 'p2' } } })
   })
 
   it('renders loading state when query is pending', () => {

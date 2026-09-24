@@ -49,7 +49,11 @@ from syntara.workflows.models import (
 from syntara.workflows.models.execution import ExecutionRead, TestExecutionCreate
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 from syntara.workflows.services import ExecutionService, WorkflowService
-from syntara.workflows.validators import get_system_continue_on_failure, workflow_validator
+from syntara.workflows.validators import (
+    get_disabled_node_kinds,
+    get_system_continue_on_failure,
+    workflow_validator,
+)
 from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
 
@@ -214,6 +218,7 @@ def get_workflow_service(
 
 
 def get_execution_service(
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
     temporal_service: Annotated[
@@ -225,7 +230,12 @@ def get_execution_service(
 
     FastAPI will call this function automatically, injecting all dependencies.
     """
-    return ExecutionService(db, current_user, temporal_service=temporal_service)
+    return ExecutionService(
+        db,
+        current_user,
+        temporal_service=temporal_service,
+        authz_evaluator=request.app.state.authz_evaluator,
+    )
 
 
 # ============================================================================
@@ -259,6 +269,7 @@ async def validate_workflow_definition(
     result = workflow_validator.collect_findings(
         request.workflow_definition,
         system_continue_on_failure=system_cof,
+        disabled_node_kinds=await get_disabled_node_kinds(),
     )
     if not result.is_valid:
         raise WorkflowDefinitionInvalidError(result)

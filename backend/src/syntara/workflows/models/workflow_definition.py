@@ -20,6 +20,7 @@ from syntara.workflows.workflow_engine.models.workflow_definition import (
     ConvergeNodeParameters,
     DoWhileLoopParameters,
     ForEachLoopParameters,
+    MCPToolExecutorParameters,
     NodeSettingsBase,
     NodeSettingsCof,
     NodeSettingsCofDisabled,
@@ -76,6 +77,14 @@ class HTTPRequestNode(WorkflowNodeBase):
     type: Literal["http_request"]
     parameters: APIExecutorParameters
     settings: NodeSettingsFull | None = None
+
+
+class MCPToolNode(WorkflowNodeBase):
+    """MCP tool executor node."""
+
+    type: Literal["mcp_tool"]
+    parameters: MCPToolExecutorParameters
+    settings: NodeSettingsNoRetry | None = None
 
 
 class AgenticNode(WorkflowNodeBase):
@@ -146,6 +155,7 @@ _AllNodeTypes = (
     AAPJobTemplateNode
     | AAPWorkflowJobTemplateNode
     | HTTPRequestNode
+    | MCPToolNode
     | AgenticNode
     | ScriptNode
     | ApprovalNode

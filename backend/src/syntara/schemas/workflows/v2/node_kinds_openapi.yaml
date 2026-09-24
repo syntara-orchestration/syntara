@@ -1,0 +1,249 @@
+---
+openapi: 3.1.0
+info:
+  title: Workflow Node Kinds API
+  description: |
+    Registry of workflow node kinds and the platform-wide kill switch that
+    decides which of them may be used.
+
+    ## Node kinds
+
+    A node kind is the `type` of a node inside a workflow definition. Kinds are
+    grouped into three categories:
+
+    - **trigger** — entry points that start a run (manual, scheduled, webhook, EDA)
+    - **flow_control** — routing nodes (condition, converge, loop, switch, wait);
+      these are required by the engine and can never be denied or disabled
+    - **action** — units of work (script, HTTP request, agentic, approval,
+      Ansible Automation Platform job templates, MCP tool)
+
+    ## Kill switch versus permissions
+
+    Disabling a kind is not a permission: it applies to every principal,
+    administrators included, and is stored in the
+    `workflows.disabled_node_kinds` runtime setting. A disabled kind disappears
+    from the builder palette, definitions containing it cannot be saved or
+    published, launches are refused and any node of that kind fails at start.
+    Exporting a workflow is never blocked.
+
+    Per-principal restrictions are separate: they are deny-effect policies on
+    the `workflow_node` resource type, reported per kind as `can_write`.
+  version: 1.0.0
+  contact:
+    name: Orchestrator Team
+
+servers:
+  - url: /api/v1
+    description: API server (relative path)
+
+tags:
+  - name: Node Kinds
+    description: Workflow node kind registry and platform-wide kill switch
+
+paths:
+  /node_kinds:
+    get:
+      summary: List node kinds
+      description: |
+        List every registered workflow node kind.
+
+        Requires authentication but no specific permission: the response is scoped
+        to the caller and describes reference data plus the caller's own verdicts.
+      operationId: list_node_kinds
+      tags:
+        - Node Kinds
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Node kind registry with the caller's write verdicts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeKindsListResponse'
+        '400':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+        '401':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+        '404':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+        '409':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+        '422':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
+        '429':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError'
+        '500':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+
+  /node_kinds/{kind}/enabled:
+    put:
+      summary: Set node kind enabled
+      description: |
+        Switch one node kind on or off platform-wide.
+
+        Disabling is not a permission: it applies to every principal,
+        administrators included. Flow control kinds cannot be switched off.
+      operationId: set_node_kind_enabled
+      tags:
+        - Node Kinds
+      security:
+        - bearerAuth: []
+      x-app-permission:
+        resource: setting
+        action: write
+      parameters:
+        - name: kind
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Kind
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NodeKindEnabledUpdate'
+      responses:
+        '200':
+          description: The updated node kind
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeKindRead'
+        '400':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+        '401':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+        '404':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+        '409':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+        '422':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
+        '429':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError'
+        '500':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+
+components:
+  schemas:
+    NodeKindCategory:
+      type: string
+      title: NodeKindCategory
+      description: Coarse grouping that decides which actions may be denied for a kind.
+      enum:
+        - trigger
+        - flow_control
+        - action
+
+    NodeKindRead:
+      type: object
+      title: NodeKindRead
+      description: |
+        One workflow node kind as the calling principal sees it.
+
+        Attributes:
+            kind: The node kind identifier (a `NodeType` value).
+            category: Registry grouping (trigger, flow_control or action).
+            enabled: False when the kind is switched off platform-wide.
+            switchable: Whether this kind may be switched off at all.
+            deniable_actions: Actions a deny-effect policy may target for this kind.
+            can_write: The caller's own `workflow_node:write` verdict for this
+                kind with no project in scope.
+      properties:
+        kind:
+          type: string
+          title: Kind
+        category:
+          $ref: '#/components/schemas/NodeKindCategory'
+        enabled:
+          type: boolean
+          title: Enabled
+        switchable:
+          type: boolean
+          title: Switchable
+        deniable_actions:
+          type: array
+          title: Deniable Actions
+          items:
+            type: string
+        can_write:
+          type: boolean
+          title: Can Write
+        attributes:
+          type: array
+          title: Attributes
+          items:
+            $ref: '#/components/schemas/NodeAttributeRead'
+      required:
+        - kind
+        - category
+        - enabled
+        - switchable
+        - deniable_actions
+        - can_write
+        - attributes
+
+    NodeAttributeRead:
+      type: object
+      title: NodeAttributeRead
+      description: One node parameter exposed as an authorization resource label.
+      properties:
+        name:
+          type: string
+          title: Name
+        allowed_values:
+          anyOf:
+            - type: array
+              items:
+                type: string
+            - type: 'null'
+          title: Allowed Values
+      required:
+        - name
+        - allowed_values
+
+    NodeKindsListResponse:
+      type: object
+      title: NodeKindsListResponse
+      description: |
+        Response schema for the node-kind registry listing.
+
+        Attributes:
+            resources: Every registered kind, in registry declaration order.
+            disabled_kinds: Echo of the `workflows.disabled_node_kinds` setting.
+      properties:
+        resources:
+          type: array
+          title: Resources
+          items:
+            $ref: '#/components/schemas/NodeKindRead'
+        disabled_kinds:
+          type: array
+          title: Disabled Kinds
+          items:
+            type: string
+      required:
+        - resources
+        - disabled_kinds
+
+    NodeKindEnabledUpdate:
+      type: object
+      title: NodeKindEnabledUpdate
+      description: |
+        Request body for `PUT /node_kinds/{kind}/enabled`.
+
+        Attributes:
+            enabled: True to switch the kind on, False to switch it off.
+      properties:
+        enabled:
+          type: boolean
+          title: Enabled
+      required:
+        - enabled

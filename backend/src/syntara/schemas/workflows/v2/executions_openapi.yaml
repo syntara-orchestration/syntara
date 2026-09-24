@@ -363,6 +363,8 @@ paths:
 
 components:
   schemas:
+    DeniedNodeRead:
+      $ref: ./shared-schemas.yaml#/components/schemas/DeniedNodeRead
     ExecutionRead:
       $ref: ./shared-schemas.yaml#/components/schemas/ExecutionRead
 

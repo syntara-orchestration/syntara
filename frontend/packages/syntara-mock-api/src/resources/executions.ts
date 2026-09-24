@@ -209,6 +209,27 @@ export const executions: Execution[] = [
       },
     ],
   },
+  // Execution where a policy denied one node; the run still completed via the denied branch
+  {
+    id: 'exec-denied',
+    created_at: mockDate.hoursAgo2,
+    updated_at: mockDate.hoursAgo2,
+    workflow_id: CONDITIONAL_DEMO,
+    workflow_name: workflowNames[CONDITIONAL_DEMO],
+    status: 'completed_with_errors',
+    started_at: mockDate.hoursAgo2Plus1s,
+    completed_at: mockDate.hoursAgo1,
+    started_by: 'user-2',
+    input_data: {},
+    denied_nodes: [
+      {
+        node_id: 'restart_service',
+        kind: 'http_request',
+        labels: { kind: 'http_request', method: 'post' },
+        denied_by: 'no-restarts-in-production',
+      },
+    ],
+  },
   // Execution for deployment-approval — completed with approval audit
   {
     id: 'exec-42',

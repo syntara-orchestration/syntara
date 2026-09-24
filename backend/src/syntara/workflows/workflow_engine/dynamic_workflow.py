@@ -25,10 +25,14 @@ with workflow.unsafe.imports_passed_through():
     from syntara.workflows.workflow_engine.activities.integration_scope_activity import validate_node_references
     from syntara.workflows.workflow_engine.activities.wait_activity import complete_wait
     from syntara.workflows.workflow_engine.constants import (
+        CHECK_NODE_KIND_ENABLED_ACTIVITY,
         DEFAULT_ACTIVITY_TIMEOUT_SECONDS,
         ENGINE_MAX_OUTPUT_BYTES_KEY,
         ENGINE_TIMEOUT_SECONDS_KEY,
         INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS,
+        NODE_EXECUTE_DENIED_ERROR_CODE,
+        RECOMPUTE_DENIED_NODES_ACTIVITY,
+        RECORD_NODE_EXECUTE_DENIED_ACTIVITY,
     )
     from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
     from syntara.workflows.workflow_engine.node_settings_resolver import (
@@ -69,6 +73,11 @@ ALLOWED_TRIGGER_TYPES: set[str] = {
 # Marker value for pre-resolved node inputs in test executions
 PRE_RESOLVED_MARKER = "__pre_resolved"
 
+# Change marker for the node-kind permission commands (ANSTRAT-1750).  Guards the
+# activities this feature adds to existing code paths so replaying a history
+# recorded before it shipped keeps the old command sequence.
+NODE_PERMISSIONS_PATCH = "node-kind-permissions"
+
 
 def _parse_items(items: Any) -> Any:  # noqa: ANN401
     """Parse loop items from string JSON to a list if needed."""
@@ -96,6 +105,8 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         pre_resolved_outputs: dict[str, dict[str, Any]] | None = None,
         stop_after_nodes: list[str] | None = None,
         workflow_metadata: dict[str, Any] | None = None,
+        denied_nodes: list[dict[str, Any]] | None = None,
+        run_principal_id: str | None = None,
     ) -> dict[str, Any]:
         """Execute a v2 workflow with concurrent execution and convergence support.
 
@@ -112,6 +123,12 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             pre_resolved_outputs: Optional dict mapping node IDs to pre-computed outputs for single-node testing
             stop_after_nodes: Optional list of node IDs to stop scheduling successors after execution
             workflow_metadata: Optional dict of workflow/execution metadata for expression resolution
+            denied_nodes: Nodes the run principal may not execute, as
+                ``[{node_id, kind, denied_by}]``.  Computed at launch and passed
+                here because workflow code cannot evaluate policies itself; being
+                a start argument it is covered by the workflow-auth HMAC.
+            run_principal_id: Principal the run acts with, used to re-evaluate
+                ``denied_nodes`` when the run resumes from a suspension.
 
         Returns:
             Workflow execution result matching WorkflowResultResponse schema.
@@ -129,6 +146,8 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 pre_resolved_outputs=pre_resolved_outputs,
                 stop_after_nodes=stop_after_nodes,
                 workflow_metadata=workflow_metadata,
+                denied_nodes=denied_nodes,
+                run_principal_id=run_principal_id,
             )
             self._runtime_settings = cast(
                 "dict[str, Any]",
@@ -167,6 +186,8 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         pre_resolved_outputs: dict[str, dict[str, Any]] | None = None,
         stop_after_nodes: list[str] | None = None,
         workflow_metadata: dict[str, Any] | None = None,
+        denied_nodes: list[dict[str, Any]] | None = None,
+        run_principal_id: str | None = None,
     ) -> None:
         """Initialize all workflow state for a new execution."""
         self.execution_id = execution_id
@@ -200,6 +221,34 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         self._runtime_settings = {}  # populated by run() after settings fetch
         self.pre_resolved_outputs: dict[str, dict[str, Any]] = pre_resolved_outputs or {}
         self.stop_after_nodes: set[str] = set(stop_after_nodes) if stop_after_nodes else set()
+        self._trigger_node_id: str = ""
+        self._run_principal_id: str = run_principal_id or ""
+        self._denied_node_kinds: dict[str, dict[str, Any]] = self._index_denied_nodes(denied_nodes)
+        self._denied_nodes: dict[str, dict[str, Any]] = {}
+
+    @staticmethod
+    def _index_denied_nodes(denied_nodes: list[dict[str, Any]] | None) -> dict[str, dict[str, Any]]:
+        """Index a launch-time denied list by node ID."""
+        indexed: dict[str, dict[str, Any]] = {}
+        for entry in denied_nodes or []:
+            node_id = entry.get("node_id")
+            if isinstance(node_id, str) and node_id:
+                info: dict[str, Any] = {
+                    "kind": entry.get("kind", ""),
+                    "denied_by": entry.get("denied_by", ""),
+                }
+                if isinstance(entry.get("labels"), dict):
+                    info["labels"] = entry["labels"]
+                indexed[node_id] = info
+        return indexed
+
+    def _blocked_node_ids(self) -> set[str]:
+        """Return every node that can no longer produce a usable result.
+
+        Skipped, failed and denied nodes all block the branch they sit on, so
+        reachability and skip propagation treat them alike.
+        """
+        return self.skipped_nodes | set(self.failed_nodes) | set(self._denied_nodes)
 
     def _skip_unselected_triggers(self, trigger_node_id: str, graph: WorkflowGraph) -> None:
         """Mark unselected triggers as skipped and propagate to their exclusive downstream nodes."""
@@ -239,6 +288,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         trigger_node = graph.get_node(trigger_node_id)
         workflow.logger.info(f"Executing trigger node: {trigger_node.id} (type={trigger_node.type})")
 
+        self._trigger_node_id = trigger_node.id
         self._skip_unselected_triggers(trigger_node_id, graph)
 
         self.node_inputs[trigger_node.id] = trigger_inputs
@@ -560,6 +610,10 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             workflow_status = "failed"
         elif self.failed_nodes:
             workflow_status = "completed_with_errors"
+        elif self._denied_nodes and not self._has_completed_non_denied_node():
+            # Sole-path denial: nothing else got to run, so the run did not do
+            # its job — but a denial on its own is never a failure (F-23/AD-22).
+            workflow_status = "completed_with_errors"
         else:
             workflow_status = "completed"
         return {
@@ -573,7 +627,33 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             ),
             "completed_activities": list(node_outputs.keys()),
             "failed_activities": self.failed_nodes,
+            "denied_activities": {
+                node_id: self._denied_node_message(info) for node_id, info in self._denied_nodes.items()
+            },
         }
+
+    @staticmethod
+    def _denied_node_message(info: dict[str, Any]) -> str:
+        """Render the error message stored for a denied node."""
+        return (
+            f"{NODE_EXECUTE_DENIED_ERROR_CODE}: execute denied for node kind "
+            f"'{info.get('kind', '')}' by policy '{info.get('denied_by', '')}'"
+        )
+
+    def _has_completed_non_denied_node(self) -> bool:
+        """Return True when some node other than the trigger completed successfully.
+
+        Used to decide the final status of a run that had denials: another branch
+        finishing makes the run COMPLETED, nothing finishing makes it
+        COMPLETED_WITH_ERRORS (F-23).
+        """
+        reserved = {"trigger", "workflow_context", "loop", self._trigger_node_id}
+        for node_id, namespace in self.resolver.get_all_namespaces().items():
+            if node_id in reserved or node_id in self._denied_nodes:
+                continue
+            if isinstance(namespace, dict) and namespace.get("status") == "completed":
+                return True
+        return False
 
     async def _schedule_successors(
         self,
@@ -608,7 +688,11 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             )
 
         # Handle branch skipping for control-flow nodes
-        if from_port and completed_node.type in (NodeType.CONDITION, NodeType.APPROVAL, NodeType.SWITCH):
+        if from_port and completed_node.type in (
+            NodeType.CONDITION,
+            NodeType.APPROVAL,
+            NodeType.SWITCH,
+        ):
             self._skip_non_taken_branches(completed_node_id, from_port, graph)
 
         # Stop after nodes: return after branch-skipping but before scheduling successors
@@ -634,6 +718,12 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 self.resolver.set_namespace(successor.id, {})
                 workflow.logger.info(f"Node {successor.id} is disabled — skipping, scheduling its successors")
                 await self._schedule_successors(successor.id, graph, pending_tasks)
+                continue
+
+            # Execute denials (ANSTRAT-1750): the node never runs and goes
+            # straight to the terminal DENIED state.
+            if successor.id in self._denied_node_kinds:
+                await self._handle_denied_node(successor, graph, pending_tasks)
                 continue
 
             # All dependencies met — schedule execution
@@ -663,6 +753,108 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                         f"Node {skipped_successor} marked as skipped (on non-taken port '{edge_port}')"
                     )
                     self._mark_downstream_as_skipped(skipped_successor, graph)
+
+    async def _handle_denied_node(
+        self,
+        node: ActivityNode,
+        graph: WorkflowGraph,
+        pending_tasks: dict[str, asyncio.Task[Any]],
+    ) -> None:
+        """Mark a node DENIED without executing it, then route around it (F-19).
+
+        The node's activity is never scheduled.  Its namespace carries
+        ``status="denied"`` and the structured error so the UI can tell a
+        denial from a failure. Routing matches a failed node: the rest of this
+        branch does not run.
+        """
+        info = self._denied_node_kinds[node.id]
+        self._denied_nodes[node.id] = dict(info)
+
+        namespace_entry = self._build_empty_node_output(node)
+        namespace_entry["status"] = "denied"
+        namespace_entry["error"] = {
+            "code": NODE_EXECUTE_DENIED_ERROR_CODE,
+            "kind": info.get("kind", ""),
+            "denied_by": info.get("denied_by", ""),
+        }
+        self.resolver.set_namespace(node.id, namespace_entry)
+        workflow.logger.info(
+            f"Node {node.id} denied: execute withheld by policy {info.get('denied_by', '')!r}",
+            extra={"node_type": node.type, "node_kind": info.get("kind", "")},
+        )
+
+        await self._record_denied_node(node.id, info)
+
+        # Same routing as a failed node, minus the workflow-level failure.
+        self._mark_downstream_as_skipped(node.id, graph)
+        self._check_converge_successors(node.id, graph, pending_tasks)
+        await self._schedule_successors(node.id, graph, pending_tasks)
+
+    async def _record_denied_node(self, node_id: str, info: dict[str, Any]) -> None:
+        """Emit the audit event for a denied node (AD-15), best effort.
+
+        Workflow code has no database, so the event is dispatched from an
+        activity.  Losing an audit record must never stall the run, so a failure
+        here is logged and swallowed.
+        """
+        try:
+            await workflow.execute_activity(
+                RECORD_NODE_EXECUTE_DENIED_ACTIVITY,
+                args=[
+                    self.execution_id,
+                    node_id,
+                    info.get("kind", ""),
+                    info.get("denied_by", ""),
+                    self._run_principal_id or None,
+                    info.get("labels", {}),
+                ],
+                activity_id=f"__internal__node_denied_{node_id}",
+                start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
+                retry_policy=RetryPolicy(maximum_attempts=1),
+            )
+        except Exception:  # noqa: BLE001
+            workflow.logger.warning(
+                "Failed to record node execute denial (best-effort)",
+                extra={"node_id": node_id},
+            )
+
+    async def _maybe_recheck_denied_nodes(self, resumed_node_id: str) -> None:
+        """Re-check denials after a suspension, guarded by the change marker."""
+        if workflow.patched(NODE_PERMISSIONS_PATCH):
+            await self._recheck_denied_nodes(resumed_node_id)
+
+    async def _recheck_denied_nodes(self, resumed_node_id: str) -> None:
+        """Re-evaluate the denied set after a suspension resolved (AD-12).
+
+        An approval or wait can hold a run for hours; the verdict that matters
+        when it resumes is the current one, not the one taken at launch.  The
+        activity also replaces the copy stored on the execution row.
+
+        Args:
+            resumed_node_id: The node that just came back from suspension; names
+                the activity so a suspension inside a loop stays unique per
+                iteration.
+
+        """
+        if not self._run_principal_id:
+            return
+        activity_id = f"__internal__recheck_denied_{self._approval_activity_id(resumed_node_id)}"
+        try:
+            refreshed = cast(
+                "list[dict[str, Any]]",
+                await workflow.execute_activity(
+                    RECOMPUTE_DENIED_NODES_ACTIVITY,
+                    args=[self.execution_id, self._run_principal_id],
+                    activity_id=activity_id,
+                    start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
+                    retry_policy=RetryPolicy(maximum_attempts=1),
+                ),
+            )
+        except Exception:  # noqa: BLE001
+            workflow.logger.warning("Failed to re-check node denials on resume (keeping launch-time set)")
+            return
+        self._denied_node_kinds = self._index_denied_nodes(refreshed)
+        workflow.logger.info(f"Denied node set refreshed on resume: {sorted(self._denied_node_kinds)}")
 
     def _setup_loop_namespace(self, loop_node_id: str) -> None:
         """Set up the loop namespace with current iteration data."""
@@ -757,6 +949,38 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         # No control data = no port-based routing (regular executor node)
         return None
 
+    def _predecessor_outcome(self, pred_id: str, graph: WorkflowGraph) -> bool | None:
+        """Classify one converge predecessor.
+
+        Returns ``True`` when it counts towards the convergence requirement,
+        ``False`` when it is terminal but does not count (skipped, denied, failed
+        without continue_on_failure, or transitively unreachable), and ``None``
+        when it is still running.
+
+        Side effect: a transitively unreachable predecessor is recorded as
+        skipped, matching the pre-existing behaviour of this check.
+        """
+        if pred_id in self.skipped_nodes:
+            return False
+
+        # A denied predecessor is terminal but produced nothing, so it never
+        # satisfies a convergence requirement.
+        if pred_id in self._denied_nodes:
+            return False
+
+        if pred_id in self.failed_nodes:
+            return pred_id in self._cof_failed_nodes
+
+        if self.resolver.has_namespace(pred_id):
+            return True
+
+        if self._is_unreachable(pred_id, graph):
+            self.skipped_nodes.add(pred_id)
+            workflow.logger.info(f"Node {pred_id} marked as skipped (transitively unreachable)")
+            return False
+
+        return None
+
     def _are_predecessors_complete(self, node_id: str, graph: WorkflowGraph) -> bool:
         """Check if predecessors of a converge node satisfy its convergence strategy.
 
@@ -782,25 +1006,11 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         completed_count = 0
 
         for pred_id in predecessor_ids:
-            if pred_id in self.skipped_nodes:
-                continue
-
-            if pred_id in self.failed_nodes:
-                if pred_id in self._cof_failed_nodes:
-                    completed_count += 1
-                continue
-
-            if self.resolver.has_namespace(pred_id):
+            outcome = self._predecessor_outcome(pred_id, graph)
+            if outcome is True:
                 completed_count += 1
-                continue
-
-            if self._is_unreachable(pred_id, graph):
-                self.skipped_nodes.add(pred_id)
-                workflow.logger.info(f"Node {pred_id} marked as skipped (transitively unreachable)")
-                continue
-
-            # Predecessor is still running (not yet in a terminal state)
-            if strategy == ConvergeStrategy.ALL:
+            elif outcome is None and strategy == ConvergeStrategy.ALL:
+                # Predecessor is still running (not yet in a terminal state)
                 return False
 
         if strategy == ConvergeStrategy.ANY:
@@ -832,6 +1042,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         """
         visited: set[str] = set()
         stack = [node_id]
+        blocked = self._blocked_node_ids()
 
         while stack:
             current = stack.pop()
@@ -839,14 +1050,14 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 continue
             visited.add(current)
 
-            if current in self.skipped_nodes or current in self.failed_nodes:
+            if current in blocked:
                 continue  # This path is blocked, check remaining paths
 
             # A completed predecessor proves reachability only if it can
             # actually reach node_id through non-blocked edges.  We verify
             # this with a forward has_path check (cheap for nearby nodes).
             if current != node_id and self.resolver.has_namespace(current) and current not in self.failed_nodes:
-                if graph.has_forward_path(current, node_id, self.skipped_nodes | set(self.failed_nodes.keys())):
+                if graph.has_forward_path(current, node_id, blocked):
                     return False
                 # Completed but no forward path to target — keep searching
                 continue
@@ -885,6 +1096,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
 
         """
         queue = collections.deque([start_node_id])
+        blocked = self._blocked_node_ids()
 
         while queue:
             node_id = queue.popleft()
@@ -893,11 +1105,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             successors = graph.get_successors(node_id)
             for succ_id in successors:
                 # Skip if already processed
-                if (
-                    succ_id in self.skipped_nodes
-                    or succ_id in self.failed_nodes
-                    or self.resolver.has_namespace(succ_id)
-                ):
+                if succ_id in blocked or self.resolver.has_namespace(succ_id):
                     continue
 
                 # Converge nodes have strategy-aware failure logic;
@@ -909,12 +1117,15 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 if boundary is not None and succ_id not in boundary:
                     continue
 
-                # Check if ALL predecessors of this successor are skipped or failed
+                # Check if ALL predecessors of this successor are blocked
                 pred_ids = graph.get_predecessors(succ_id)
-                all_skipped = all(pred_id in self.skipped_nodes or pred_id in self.failed_nodes for pred_id in pred_ids)
+                all_skipped = all(pred_id in blocked for pred_id in pred_ids)
 
                 if all_skipped:
                     self.skipped_nodes.add(succ_id)
+                    # Keep the local snapshot current so propagation sees this
+                    # node as blocked for its own successors.
+                    blocked.add(succ_id)
                     workflow.logger.info(f"Node {succ_id} marked as skipped (all predecessors skipped)")
                     queue.append(succ_id)  # Propagate further
 
@@ -941,7 +1152,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             # Skip if already executed, marked, or detached (still running in Temporal)
             if self.resolver.has_namespace(node_id) or node_id in self.skipped_nodes:
                 continue
-            if node_id in self._detached_nodes:
+            if node_id in self._detached_nodes or node_id in self._denied_nodes:
                 continue
 
             # If workflow is done and node didn't execute, it's unreachable
@@ -1054,11 +1265,18 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             NodeType.SCRIPT,
             NodeType.HTTP_REQUEST,
             NodeType.INTERNAL_ACTIVITY,
+            NodeType.MCP_TOOL,
             NodeType.AAP_JOB_TEMPLATE,
             NodeType.AAP_WORKFLOW_JOB_TEMPLATE,
             NodeType.AGENTIC,
         }
     )
+
+    # Flow-control kinds in the executor map can never be disabled (the kill
+    # switch refuses to disable them), so they skip the per-node re-check.
+    # Kept as a literal set rather than calling node_kinds.is_kind_switchable:
+    # that module's neighbours pull the settings cache into the workflow sandbox.
+    _KIND_SWITCH_EXEMPT_TYPES: ClassVar[frozenset[str]] = frozenset({NodeType.CONDITION, NodeType.SWITCH})
 
     # Mapping from node type to activity name.
     # Approval is NOT in this map — it needs custom args and routing logic.
@@ -1067,6 +1285,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         NodeType.AAP_WORKFLOW_JOB_TEMPLATE: ActivityName.AAP_WORKFLOW_JOB_TEMPLATE,
         NodeType.HTTP_REQUEST: ActivityName.HTTP_REQUEST,
         NodeType.INTERNAL_ACTIVITY: ActivityName.INTERNAL_ACTIVITY,
+        NodeType.MCP_TOOL: ActivityName.MCP_TOOL,
         NodeType.SCRIPT: ActivityName.SCRIPT,
         NodeType.CONDITION: ActivityName.CONDITION,
         NodeType.SWITCH: ActivityName.SWITCH,
@@ -1086,6 +1305,19 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         activity_name = self._EXECUTOR_ACTIVITY_MAP.get(node_type)
         if not activity_name:
             return {"output": {"status": "skipped", "reason": f"Unknown executor type: {node_type}"}}
+
+        # Kill switch re-read at node start (AD-19): a kind disabled after launch
+        # fails the node instead of running it.  Flow-control kinds can never be
+        # disabled, so they skip the round trip.
+        if node_type not in self._KIND_SWITCH_EXEMPT_TYPES and workflow.patched(NODE_PERMISSIONS_PATCH):
+            await workflow.execute_local_activity(
+                CHECK_NODE_KIND_ENABLED_ACTIVITY,
+                args=[node_type],
+                activity_id=f"__internal__node_kind_enabled_{node.id}",
+                start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
+                retry_policy=RetryPolicy(maximum_attempts=1),
+            )
+
         args: list[Any] = [resolved_parameters, outputs]
         if extra_args:
             args.extend(extra_args)
@@ -1557,6 +1789,24 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         finally:
             self._scrub_activity_credentials(resolved_parameters)
 
+    async def _execute_suspending_node(
+        self,
+        node: ActivityNode,
+        resolved_parameters: dict[str, Any],
+        graph: WorkflowGraph,
+    ) -> dict[str, Any]:
+        """Run a node that suspends the workflow (approval or wait), then re-check denials.
+
+        A suspension can last hours, so the denied set is re-evaluated as the run
+        resumes and the fresh verdict governs the rest of the graph (AD-12).
+        """
+        if node.type == NodeType.APPROVAL:
+            result = await self._execute_approval_node(node, graph, resolved_parameters)
+        else:
+            result = await self._execute_wait_node(node.id, resolved_parameters, node.outputs)
+        await self._maybe_recheck_denied_nodes(node.id)
+        return result
+
     async def _dispatch_node_to_executor(
         self,
         node: ActivityNode,
@@ -1594,10 +1844,8 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 timeout_seconds=temporal_timeout,
                 extra_args=extra_args,
             )
-        if node_type == NodeType.APPROVAL:
-            return await self._execute_approval_node(node, graph, resolved_parameters)
-        if node_type == NodeType.WAIT:
-            return await self._execute_wait_node(node_id, resolved_parameters, node.outputs)
+        if node_type in (NodeType.APPROVAL, NodeType.WAIT):
+            return await self._execute_suspending_node(node, resolved_parameters, graph)
         if node_type == NodeType.CONVERGE:
             return await self._execute_converge_node(
                 node_id, resolved_parameters, node.outputs, graph, timeout_seconds=timeout_seconds
@@ -1739,6 +1987,20 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
 
         """
         return list(self.pre_resolved_outputs.keys())
+
+    @workflow.query
+    def get_denied_nodes(self) -> dict[str, dict[str, Any]]:
+        """Query the nodes the run reached but was not allowed to execute.
+
+        Consumed by ActivitySyncService to persist status DENIED on those
+        activities.  Only nodes the scheduler actually reached appear here —
+        denied nodes on a branch that never ran are ordinary skipped nodes.
+
+        Returns:
+            Dict mapping node ID to ``{kind, denied_by}``.
+
+        """
+        return {node_id: dict(info) for node_id, info in self._denied_nodes.items()}
 
     @workflow.query
     def get_failed_nodes(self) -> dict[str, str]:

@@ -27,7 +27,7 @@ with workflow.unsafe.imports_passed_through():
     from syntara.core.models.principal import service_principal_id
     from syntara.metrics.dependencies import get_metrics_recorder
     from syntara.metrics.types import MetricType
-    from syntara.workflows.exceptions import WorkflowNotPublishedError
+    from syntara.workflows.exceptions import NodeKindDisabledError, WorkflowNotPublishedError
     from syntara.workflows.models.execution import Execution, ExecutionStatus
     from syntara.workflows.models.workflow import Workflow
     from syntara.workflows.models.workflow_version import WorkflowVersion
@@ -89,6 +89,8 @@ class ScheduledWorkflowLauncher:
                 None,
                 None,
                 setup_result["workflow_metadata"],
+                setup_result.get("denied_nodes"),
+                setup_result.get("run_principal_id"),
             ],
             id=temporal_workflow_id,
             task_queue=setup_result["task_queue"],
@@ -199,6 +201,21 @@ class ScheduledExecutionLauncher:
                 )
             except Exception:  # noqa: BLE001
                 logger.debug("Failed to record error metric", exc_info=True)
+            if isinstance(exc, NodeKindDisabledError):
+                # Kill switch: the published definition still contains a kind an
+                # administrator disabled.  Permanent until the setting or the
+                # definition changes, so do not retry (AD-21).
+                logger.warning(
+                    "Scheduled workflow launch refused: disabled node kind",
+                    workflow_id=workflow_id_str,
+                    trigger_node_id=trigger_node_id,
+                    disabled_nodes=exc.disabled_nodes,
+                )
+                raise ApplicationError(
+                    str(exc),
+                    type="NodeKindDisabledError",
+                    non_retryable=True,
+                ) from exc
             if isinstance(exc, WorkflowNotPublishedError):
                 # Permanent state: workflow is missing, disabled,
                 # or has no published version.  Mark non-retryable so Temporal
@@ -254,6 +271,33 @@ class ScheduledExecutionLauncher:
                     msg = f"Workflow concurrency limit reached: {active}/{limit} active workflows."
                     raise ApplicationError(msg, non_retryable=True)
 
+            # Node-kind gates (ANSTRAT-1750).  A scheduled run has no
+            # interactive caller, so it acts as the principal that published
+            # this version; the verdict is recomputed on every fire (F-15).
+            # Imported here, not at module scope: node_launch_checks pulls in the
+            # authz (regopy) stack, and this module is loaded by the Temporal
+            # workflow sandbox when it validates ScheduledWorkflowLauncher.
+            from syntara.workflows.node_launch_checks import (  # noqa: PLC0415
+                check_node_kinds_enabled,
+                compute_denied_nodes,
+                get_node_authz_evaluator,
+                resolve_run_principal,
+            )
+
+            await check_node_kinds_enabled(workflow_def)
+            run_principal_id = resolve_run_principal(
+                wf_version,
+                invoker_id=svc_principal_id,
+                trigger_type=ActivityName.SCHEDULED_TRIGGER.value,
+            )
+            denied_nodes = await compute_denied_nodes(
+                session,
+                get_node_authz_evaluator(),
+                definition=workflow_def,
+                project_id=wf_project_id,
+                principal_id=run_principal_id,
+            )
+
         # Phase 2: Prepare execution identity and metadata
         pre_generated_execution_id = str(uuid4())
         temporal_workflow_id = f"{wf_name}-{pre_generated_execution_id}"
@@ -297,6 +341,7 @@ class ScheduledExecutionLauncher:
                 trigger_node_id=trigger_node_id,
                 trigger_type=ActivityName.SCHEDULED_TRIGGER.value,
                 interface=None,
+                denied_nodes=denied_nodes or None,
                 created_by=svc_principal_id,
                 updated_by=svc_principal_id,
                 execution_metadata={
@@ -325,6 +370,8 @@ class ScheduledExecutionLauncher:
             "input_data": input_data,
             "task_queue": self._task_queue,
             "workflow_metadata": workflow_metadata,
+            "denied_nodes": denied_nodes or None,
+            "run_principal_id": str(run_principal_id),
         }
 
     @staticmethod

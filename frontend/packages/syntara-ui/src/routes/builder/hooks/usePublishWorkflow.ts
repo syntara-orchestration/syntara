@@ -7,6 +7,7 @@ import { useAlerts } from '../../../providers/alerts'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import { extractVersionConflictInfo, getErrorMessage, isWorkflowVersionConflictError } from '../../../utils/apiErrors'
 import { detachPromise } from '../../../utils/detachPromise'
+import { nodeKindWriteDeniedAlert } from '../../../utils/nodeKindDenials'
 import { buildWorkflowDefinition } from '../utils/workflowDefinitionBuilder'
 import type { ConflictInfo } from '../VersionConflictDialog'
 
@@ -94,6 +95,11 @@ export function usePublishWorkflow(
           onError: (error: unknown) => {
             if (isWorkflowVersionConflictError(error) && options?.onConflict) {
               options.onConflict(extractVersionConflictInfo(error))
+              return
+            }
+            const deniedAlert = nodeKindWriteDeniedAlert(error, 'publish')
+            if (deniedAlert) {
+              showError(deniedAlert)
               return
             }
             showError({ title: 'Failed to publish workflow', description: getErrorMessage(error) })

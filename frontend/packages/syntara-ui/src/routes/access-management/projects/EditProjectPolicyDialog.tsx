@@ -2,24 +2,18 @@ import { Button, Form, Modal, ModalBody, ModalFooter, ModalHeader } from '@patte
 import { z } from 'zod'
 
 import { SynForm } from '../../../components/forms/SynForm'
-import { SynTextAreaField } from '../../../components/forms/SynTextAreaField'
-import { SynTextField } from '../../../components/forms/SynTextField'
 import { useSynForm } from '../../../hooks/useSynForm'
 import { useAlerts } from '../../../providers/alerts'
 import { accessClient } from '../../access/accessClient'
 import type { ProjectPolicyRead } from '../../access/types'
 
-import {
-  addProjectPolicySchema,
-  policyStatementSchema,
-  PROJECT_POLICY_NAME_HINT,
-  STATEMENTS_JSON_HINT,
-} from './addProjectPolicySchema'
+import { addProjectPolicySchema, policyStatementSchema } from './addProjectPolicySchema'
 import type { AddProjectPolicyFormData } from './addProjectPolicySchema'
+import { PolicyFormFields } from './PolicyFormFields'
 
 type EditProjectPolicyDialogProps = {
   projectId: string
-  policy: ProjectPolicyRead
+  policy?: ProjectPolicyRead
   onClose: () => void
   onSuccess: () => void
 }
@@ -31,33 +25,57 @@ export function EditProjectPolicyDialog({
   onSuccess,
 }: Readonly<EditProjectPolicyDialogProps>) {
   const { showSuccess } = useAlerts()
+  const mode = policy ? 'edit' : 'create'
 
   const form = useSynForm({
     schema: addProjectPolicySchema,
     defaultValues: {
-      name: policy.name,
-      description: policy.description ?? '',
-      statementsJson: JSON.stringify(policy.statements ?? [], null, 2),
+      name: policy?.name ?? '',
+      description: policy?.description ?? '',
+      statementsJson: policy ? JSON.stringify(policy.statements ?? [], null, 2) : '[]',
     },
     onClose,
   })
-  const { handleSubmit, handleError, handleClose } = form
+  const { handleSubmit, handleError, handleClose, setValue, watch } = form
+  const statementsJson = watch('statementsJson')
 
   const { mutate: updatePolicy, isPending } = accessClient.useMutation(
     'put',
     '/projects/{project_id}/policies/{policy_id}'
   )
+  const { mutate: createPolicy, isPending: isCreating } = accessClient.useMutation(
+    'post',
+    '/projects/{project_id}/policies'
+  )
 
   const onSubmit = (data: AddProjectPolicyFormData) => {
     const statements = z.array(policyStatementSchema).parse(JSON.parse(data.statementsJson))
+    const body = {
+      name: data.name,
+      description: data.description || undefined,
+      statements,
+    }
+    if (!policy) {
+      createPolicy(
+        {
+          params: { path: { project_id: projectId } },
+          body,
+        },
+        {
+          onSuccess: () => {
+            showSuccess({ title: 'Policy created', description: 'Policy created successfully' })
+            handleClose()
+            onSuccess()
+          },
+          onError: handleError({ title: 'Failed to create policy' }),
+        }
+      )
+      return
+    }
     updatePolicy(
       {
         params: { path: { project_id: projectId, policy_id: policy.id } },
-        body: {
-          name: data.name,
-          description: data.description || undefined,
-          statements,
-        },
+        body,
       },
       {
         onSuccess: () => {
@@ -70,28 +88,20 @@ export function EditProjectPolicyDialog({
     )
   }
 
+  const mutationIsPending = isPending || isCreating
+  const formId = `${mode}-project-policy-form`
+
   return (
     <Modal isOpen onClose={handleClose} variant="medium">
-      <ModalHeader title="Edit Project Policy" />
+      <ModalHeader title={mode === 'create' ? 'Create policy' : 'Edit Project Policy'} />
       <ModalBody>
-        <Form id="edit-project-policy-form" onSubmit={handleSubmit(onSubmit)}>
+        <Form id={formId} onSubmit={handleSubmit(onSubmit)}>
           <SynForm form={form}>
-            <SynTextField
-              name="name"
-              label="Policy name"
-              fieldId="project-policy-name"
-              isRequired
-              hint={PROJECT_POLICY_NAME_HINT}
-            />
-            <SynTextField name="description" label="Policy description" fieldId="project-policy-description" />
-            <SynTextAreaField
-              name="statementsJson"
-              label="Policy statements JSON"
-              fieldId="project-policy-statements"
-              isRequired
-              hint={STATEMENTS_JSON_HINT}
-              rows={10}
-              resizeOrientation="vertical"
+            <PolicyFormFields
+              statementsJson={statementsJson}
+              onAppendStatement={(next) =>
+                setValue('statementsJson', next, { shouldDirty: true, shouldValidate: true })
+              }
             />
           </SynForm>
         </Form>
@@ -99,14 +109,14 @@ export function EditProjectPolicyDialog({
       <ModalFooter>
         <Button
           variant="primary"
-          form="edit-project-policy-form"
+          form={formId}
           type="submit"
-          isDisabled={isPending}
-          isLoading={isPending}
+          isDisabled={mutationIsPending}
+          isLoading={mutationIsPending}
         >
-          Save policy
+          {mode === 'create' ? 'Create' : 'Save policy'}
         </Button>
-        <Button variant="link" onClick={handleClose} isDisabled={isPending}>
+        <Button variant="link" onClick={handleClose} isDisabled={mutationIsPending}>
           Cancel
         </Button>
       </ModalFooter>

@@ -30,6 +30,7 @@ describe('ActivityStatusLabel', () => {
     ['retrying', 'Retrying'],
     ['skipped', 'Skipped'],
     ['cancelled', 'Cancelled'],
+    ['denied', 'Denied'],
   ])('renders "%s" as "%s"', (status, label) => {
     render(<ActivityStatusLabel status={status} />)
     expect(screen.getByText(label)).toBeInTheDocument()
@@ -72,6 +73,7 @@ describe('ActivityStatusLabel', () => {
       'retrying',
       'skipped',
       'cancelled',
+      'denied',
     ]
 
     // Verify each status renders without throwing
@@ -82,7 +84,7 @@ describe('ActivityStatusLabel', () => {
     })
 
     // Add a passing assertion to satisfy vitest/expect-expect rule
-    expect(statuses).toHaveLength(8)
+    expect(statuses).toHaveLength(9)
   })
 
   it('handles unknown activity status with fallback', () => {

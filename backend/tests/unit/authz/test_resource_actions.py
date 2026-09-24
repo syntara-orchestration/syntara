@@ -516,3 +516,25 @@ class TestValidateProjectStatements:
         assert error is not None
         assert "create" in error
         assert "scope='own'" in error
+
+
+# ============================================================================
+# workflow_node contributed by the node-kind registry (ANSTRAT-1750)
+# ============================================================================
+
+
+class TestWorkflowNodeContribution:
+    """Node kinds have no routes; the declarative registry contributes them."""
+
+    def test_workflow_node_registered_with_write_and_execute(self) -> None:
+        registry = get_resource_actions()
+        assert registry.get("workflow_node") == ["execute", "write"]
+
+    def test_workflow_node_is_project_eligible(self) -> None:
+        from syntara.authz.resource_actions import get_project_eligible_resource_types
+
+        assert "workflow_node" in get_project_eligible_resource_types()
+
+    def test_workflow_node_statements_validate(self) -> None:
+        stmts = [{"actions": ["workflow_node:execute", "workflow_node:*"]}]
+        assert validate_statements(stmts) == []

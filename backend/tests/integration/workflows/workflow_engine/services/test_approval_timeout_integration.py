@@ -21,6 +21,7 @@ from temporalio.worker import Worker
 
 from syntara.workflows.workflow_engine.activities.converge import converge
 from syntara.workflows.workflow_engine.activities.manual_trigger import manual_trigger
+from syntara.workflows.workflow_engine.activities.node_permissions_activity import NODE_PERMISSION_ACTIVITIES
 from syntara.workflows.workflow_engine.activities.runtime_settings_activity import fetch_workflow_runtime_settings
 from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
@@ -244,6 +245,7 @@ class TestApprovalTimeoutIntegration:
                 _test_expire_approval_activity,
                 _test_script_activity,
                 fetch_workflow_runtime_settings,
+                *NODE_PERMISSION_ACTIVITIES,
             ],
         ):
             execution_service = TemporalExecutionService(
@@ -290,6 +292,7 @@ class TestApprovalTimeoutIntegration:
                 _test_expire_approval_activity,
                 _test_script_activity,
                 fetch_workflow_runtime_settings,
+                *NODE_PERMISSION_ACTIVITIES,
             ],
         ):
             execution_service = TemporalExecutionService(
@@ -366,6 +369,7 @@ class TestApprovalTimeoutIntegration:
                     fetch_workflow_runtime_settings,
                     fail_detached_approval_activity,
                     converge,
+                    *NODE_PERMISSION_ACTIVITIES,
                 ],
             ):
                 execution_service = TemporalExecutionService(

@@ -178,6 +178,11 @@ BUILTIN_POLICIES: list[PolicyInfo] = [
     PolicyInfo("invocation", "create", roles=("admin",)),
     PolicyInfo("invocation", "read", roles=("admin",)),
     PolicyInfo("invocation", "cancel", roles=("admin",)),
+    # -- workflow nodes (ANSTRAT-1750) --
+    # Every principal may introduce and execute every node kind by default;
+    # restrictions are custom deny-effect policies, and deny always wins.
+    PolicyInfo("workflow_node", "write", roles=("authenticated",)),
+    PolicyInfo("workflow_node", "execute", roles=("authenticated",)),
     # -- project-scoped --
     PolicyInfo("workflow", "create", scope="project", roles=("project-admin", "project-user")),
     PolicyInfo("workflow", "read", scope="project", roles=("project-admin", "project-user", "project-auditor")),

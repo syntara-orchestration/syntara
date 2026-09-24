@@ -67,6 +67,8 @@ class TemporalExecutionService:
         workflow_metadata: dict[str, Any] | None = None,
         execution_id: str | None = None,
         is_builtin: bool = False,
+        denied_nodes: list[dict[str, Any]] | None = None,
+        run_principal_id: str | None = None,
     ) -> WorkflowStartResponse:
         """Start a V2 workflow from dict definition.
 
@@ -85,6 +87,11 @@ class TemporalExecutionService:
             is_builtin: When True, routes the workflow to the background task queue instead of
                 the user workflow queue. Built-in workflows (Document Conversion, Agent
                 Execution) run on a dedicated deployment to prevent worker starvation.
+            denied_nodes: Nodes the run principal may not execute, as
+                ``[{node_id, kind, denied_by}]``.  Passed as a positional workflow
+                argument so it is covered by the HMAC over the start arguments.
+            run_principal_id: Principal whose permissions the run acts with, used
+                to re-evaluate the denied set when a suspended run resumes.
 
         Returns:
             WorkflowStartResponse containing:
@@ -164,6 +171,8 @@ class TemporalExecutionService:
                         pre_resolved_outputs,
                         stop_after_nodes,
                         workflow_metadata,
+                        denied_nodes,
+                        run_principal_id,
                     ],
                     id=temporal_workflow_id,
                     task_queue=self.background_task_queue if is_builtin else self.task_queue,
