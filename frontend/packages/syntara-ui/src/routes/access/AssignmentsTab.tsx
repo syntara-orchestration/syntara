@@ -262,7 +262,7 @@ export function AssignmentsTab() {
   const { expandedRows, allRowsExpanded, handleToggleRow, handleCollapseAll } = useExpandableRowIds(rowIds)
   const refetch = useCallback(() => detachPromise(assignmentsQuery.refetch()), [assignmentsQuery])
 
-  useCursorReset(rows.length, hasActiveFilters, cursor, isFetching, resetPagination)
+  useCursorReset({ itemCount: rows.length, hasActiveFilters, cursor, isFetching, resetPagination })
 
   const { mutate: deleteRoleAssignment } = accessClient.useMutation('delete', '/role_assignments/{assignment_id}')
   const { mutate: deleteProjectRoleAssignment } = accessClient.useMutation(

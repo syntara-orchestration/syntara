@@ -117,7 +117,7 @@ describe('workflowFactories', () => {
 
     describe('createEventTrigger', () => {
       it('creates an event trigger', () => {
-        const trigger = createEventTrigger('trigger-12', 'github', 'push')
+        const trigger = createEventTrigger({ id: 'trigger-12', source: 'github', eventType: 'push' })
 
         expect(trigger.id).toBe('trigger-12')
         expect(trigger.type).toBe('event')
@@ -126,14 +126,25 @@ describe('workflowFactories', () => {
       })
 
       it('creates an event trigger with filter', () => {
-        const trigger = createEventTrigger('trigger-13', 'github', 'push', { branch: 'main' })
+        const trigger = createEventTrigger({
+          id: 'trigger-13',
+          source: 'github',
+          eventType: 'push',
+          filter: { branch: 'main' },
+        })
 
         expect(trigger.id).toBe('trigger-13')
         expect(trigger.parameters.filter).toEqual({ branch: 'main' })
       })
 
       it('creates an event trigger with name', () => {
-        const trigger = createEventTrigger('trigger-14', 'github', 'push', undefined, 'GitHub Push')
+        const trigger = createEventTrigger({
+          id: 'trigger-14',
+          source: 'github',
+          eventType: 'push',
+          filter: undefined,
+          name: 'GitHub Push',
+        })
 
         expect(trigger.id).toBe('trigger-14')
         expect(trigger.name).toBe('GitHub Push')
@@ -142,7 +153,7 @@ describe('workflowFactories', () => {
 
     describe('createWebhookTrigger', () => {
       it('creates a webhook trigger with path', () => {
-        const trigger = createWebhookTrigger('trigger-20', 'jira-updates')
+        const trigger = createWebhookTrigger({ id: 'trigger-20', webhookPath: 'jira-updates' })
 
         expect(trigger.id).toBe('trigger-20')
         expect(trigger.type).toBe(TriggerTypeEnum.WEBHOOK_TRIGGER)
@@ -153,7 +164,7 @@ describe('workflowFactories', () => {
 
       it('creates a webhook trigger with JSON schema', () => {
         const schema = { type: 'object', properties: { name: { type: 'string' } } }
-        const trigger = createWebhookTrigger('trigger-21', 'github-push', schema)
+        const trigger = createWebhookTrigger({ id: 'trigger-21', webhookPath: 'github-push', inputSchema: schema })
 
         expect(trigger.id).toBe('trigger-21')
         expect(trigger.parameters.webhook_path).toBe('github-push')
@@ -161,21 +172,26 @@ describe('workflowFactories', () => {
       })
 
       it('creates a webhook trigger with custom name', () => {
-        const trigger = createWebhookTrigger('trigger-22', 'slack-events', undefined, 'Slack Webhook')
+        const trigger = createWebhookTrigger({
+          id: 'trigger-22',
+          webhookPath: 'slack-events',
+          inputSchema: undefined,
+          name: 'Slack Webhook',
+        })
 
         expect(trigger.id).toBe('trigger-22')
         expect(trigger.name).toBe('Slack Webhook')
       })
 
       it('creates trigger with any path (format validation in schema layer)', () => {
-        const trigger = createWebhookTrigger('trigger-23', 'api/v2/events')
+        const trigger = createWebhookTrigger({ id: 'trigger-23', webhookPath: 'api/v2/events' })
         expect(trigger.parameters.webhook_path).toBe('api/v2/events')
       })
     })
 
     describe('createEdaTrigger', () => {
       it('creates an EDA trigger with path', () => {
-        const trigger = createEdaTrigger('trigger-30', 'eda-events')
+        const trigger = createEdaTrigger({ id: 'trigger-30', webhookPath: 'eda-events' })
 
         expect(trigger.id).toBe('trigger-30')
         expect(trigger.type).toBe(TriggerTypeEnum.EDA_TRIGGER)
@@ -186,7 +202,7 @@ describe('workflowFactories', () => {
 
       it('creates an EDA trigger with JSON schema', () => {
         const schema = { type: 'object', properties: { name: { type: 'string' } } }
-        const trigger = createEdaTrigger('trigger-31', 'eda-push', schema)
+        const trigger = createEdaTrigger({ id: 'trigger-31', webhookPath: 'eda-push', inputSchema: schema })
 
         expect(trigger.id).toBe('trigger-31')
         expect(trigger.parameters.webhook_path).toBe('eda-push')
@@ -194,14 +210,19 @@ describe('workflowFactories', () => {
       })
 
       it('creates an EDA trigger with custom name', () => {
-        const trigger = createEdaTrigger('trigger-32', 'eda-alerts', undefined, 'My EDA Trigger')
+        const trigger = createEdaTrigger({
+          id: 'trigger-32',
+          webhookPath: 'eda-alerts',
+          inputSchema: undefined,
+          name: 'My EDA Trigger',
+        })
 
         expect(trigger.id).toBe('trigger-32')
         expect(trigger.name).toBe('My EDA Trigger')
       })
 
       it('creates trigger with any path (format validation in schema layer)', () => {
-        const trigger = createEdaTrigger('trigger-33', 'api/v2/events')
+        const trigger = createEdaTrigger({ id: 'trigger-33', webhookPath: 'api/v2/events' })
         expect(trigger.parameters.webhook_path).toBe('api/v2/events')
       })
     })
@@ -569,10 +590,15 @@ describe('workflowFactories', () => {
 
     describe('createLoopActivity', () => {
       it('creates a forEach loop activity', () => {
-        const activity = createLoopActivity('loop-1', 'Process Items', 'forEach', {
-          items: '{{ items }}',
-          itemVariable: 'item',
-          indexVariable: 'idx',
+        const activity = createLoopActivity({
+          id: 'loop-1',
+          name: 'Process Items',
+          loopType: 'forEach',
+          config: {
+            items: '{{ items }}',
+            itemVariable: 'item',
+            indexVariable: 'idx',
+          },
         })
 
         expect(activity.type).toBe('loop')
@@ -582,9 +608,14 @@ describe('workflowFactories', () => {
       })
 
       it('creates a while loop activity', () => {
-        const activity = createLoopActivity('loop-1', 'While Loop', 'while', {
-          condition: 'count < 10',
-          maxIterations: 100,
+        const activity = createLoopActivity({
+          id: 'loop-1',
+          name: 'While Loop',
+          loopType: 'while',
+          config: {
+            condition: 'count < 10',
+            maxIterations: 100,
+          },
         })
 
         expect(activity.parameters.type).toBe('do_while')
@@ -593,36 +624,52 @@ describe('workflowFactories', () => {
       })
 
       it('does not include invalid maxIterations', () => {
-        const activity = createLoopActivity('loop-1', 'While Loop', 'while', {
-          condition: 'count < 10',
-          maxIterations: Number.NaN,
+        const activity = createLoopActivity({
+          id: 'loop-1',
+          name: 'While Loop',
+          loopType: 'while',
+          config: {
+            condition: 'count < 10',
+            maxIterations: Number.NaN,
+          },
         })
 
         expect(activity.parameters).not.toHaveProperty('max_iterations')
       })
 
       it('omits items when config is missing', () => {
-        const activity = createLoopActivity('loop-1', 'Loop', 'forEach', {})
+        const activity = createLoopActivity({ id: 'loop-1', name: 'Loop', loopType: 'forEach', config: {} })
 
         expect(activity.parameters.type).toBe('for_each')
         expect(activity.parameters).not.toHaveProperty('items')
       })
 
       it('omits condition when config is missing', () => {
-        const activity = createLoopActivity('loop-1', 'Loop', 'while', {})
+        const activity = createLoopActivity({ id: 'loop-1', name: 'Loop', loopType: 'while', config: {} })
 
         expect(activity.parameters.type).toBe('do_while')
         expect(activity.parameters).not.toHaveProperty('condition')
       })
 
       it('includes settings when provided', () => {
-        const activity = createLoopActivity('loop-1', 'Loop', 'forEach', { items: '{{ list }}' }, { timeout: 300 })
+        const activity = createLoopActivity({
+          id: 'loop-1',
+          name: 'Loop',
+          loopType: 'forEach',
+          config: { items: '{{ list }}' },
+          settings: { timeout: 300 },
+        })
 
         expect(activity.settings).toEqual({ timeout: 300 })
       })
 
       it('includes max_iterations for forEach', () => {
-        const activity = createLoopActivity('loop-1', 'Loop', 'forEach', { items: '{{ list }}', maxIterations: 50 })
+        const activity = createLoopActivity({
+          id: 'loop-1',
+          name: 'Loop',
+          loopType: 'forEach',
+          config: { items: '{{ list }}', maxIterations: 50 },
+        })
 
         expect(activity.parameters.max_iterations).toBe(50)
       })
@@ -683,7 +730,7 @@ describe('workflowFactories', () => {
 
     describe('createAAPJobTemplateActivity', () => {
       it('creates an AAP job template activity', () => {
-        const activity = createAAPJobTemplateActivity('aap-1', 'Run Playbook', 123)
+        const activity = createAAPJobTemplateActivity({ id: 'aap-1', name: 'Run Playbook', jobTemplateId: 123 })
 
         expect(activity.type).toBe('aap_job_template')
         expect(activity.id).toBe('aap-1')
@@ -691,17 +738,22 @@ describe('workflowFactories', () => {
       })
 
       it('creates an AAP activity with full config', () => {
-        const activity = createAAPJobTemplateActivity('aap-1', 'Run Playbook', 123, {
-          inventory: 456,
-          extraVars: { env: 'prod' },
-          limit: 'web-servers',
-          tags: 'deploy',
-          skipTags: 'test',
-          verbosity: 2,
-          jobType: 'run',
-          forks: 10,
-          jobSlicing: 2,
-          diffMode: true,
+        const activity = createAAPJobTemplateActivity({
+          id: 'aap-1',
+          name: 'Run Playbook',
+          jobTemplateId: 123,
+          config: {
+            inventory: 456,
+            extraVars: { env: 'prod' },
+            limit: 'web-servers',
+            tags: 'deploy',
+            skipTags: 'test',
+            verbosity: 2,
+            jobType: 'run',
+            forks: 10,
+            jobSlicing: 2,
+            diffMode: true,
+          },
         })
 
         expect(activity.parameters.inventory_id).toBe(456)
@@ -717,25 +769,40 @@ describe('workflowFactories', () => {
       })
 
       it('includes integration_id when integrationId is set in config', () => {
-        const activity = createAAPJobTemplateActivity('aap-1', 'Run Playbook', 123, {
-          integrationId: 'int-aap-1',
+        const activity = createAAPJobTemplateActivity({
+          id: 'aap-1',
+          name: 'Run Playbook',
+          jobTemplateId: 123,
+          config: {
+            integrationId: 'int-aap-1',
+          },
         })
 
         expect(activity.parameters.integration_id).toBe('int-aap-1')
       })
 
       it('omits integration_id when integrationId is empty string', () => {
-        const activity = createAAPJobTemplateActivity('aap-1', 'Run Playbook', 123, {
-          integrationId: '',
+        const activity = createAAPJobTemplateActivity({
+          id: 'aap-1',
+          name: 'Run Playbook',
+          jobTemplateId: 123,
+          config: {
+            integrationId: '',
+          },
         })
 
         expect(activity.parameters).not.toHaveProperty('integration_id')
       })
 
       it('includes both credential_id and integration_id when both set', () => {
-        const activity = createAAPJobTemplateActivity('aap-1', 'Run Playbook', 123, {
-          credentialId: 'cred-123',
-          integrationId: 'int-aap-1',
+        const activity = createAAPJobTemplateActivity({
+          id: 'aap-1',
+          name: 'Run Playbook',
+          jobTemplateId: 123,
+          config: {
+            credentialId: 'cred-123',
+            integrationId: 'int-aap-1',
+          },
         })
 
         expect(activity.parameters.credential_id).toBe('cred-123')
@@ -743,8 +810,13 @@ describe('workflowFactories', () => {
       })
 
       it('persists use_input_variables when useInputVariables is true', () => {
-        const activity = createAAPJobTemplateActivity('aap-1', 'Run Playbook', undefined, {
-          useInputVariables: true,
+        const activity = createAAPJobTemplateActivity({
+          id: 'aap-1',
+          name: 'Run Playbook',
+          jobTemplateId: undefined,
+          config: {
+            useInputVariables: true,
+          },
         })
 
         expect(activity.parameters.use_input_variables).toBe(true)
@@ -754,7 +826,11 @@ describe('workflowFactories', () => {
 
     describe('createAAPWorkflowTemplateActivity', () => {
       it('creates an AAP workflow template activity', () => {
-        const activity = createAAPWorkflowTemplateActivity('aap-wf-1', 'Run Workflow', 456)
+        const activity = createAAPWorkflowTemplateActivity({
+          id: 'aap-wf-1',
+          name: 'Run Workflow',
+          workflowTemplateId: 456,
+        })
 
         expect(activity.type).toBe('aap_workflow_job_template')
         expect(activity.id).toBe('aap-wf-1')
@@ -762,14 +838,19 @@ describe('workflowFactories', () => {
       })
 
       it('creates an AAP workflow template activity with full config', () => {
-        const activity = createAAPWorkflowTemplateActivity('aap-wf-1', 'Run Workflow', 456, {
-          inventory_id: 789,
-          extra_vars: { env: 'staging' },
-          limit: 'db-servers',
-          scm_branch: 'main',
-          tags: 'deploy',
-          skip_tags: 'debug',
-          labels: ['production', 'critical'],
+        const activity = createAAPWorkflowTemplateActivity({
+          id: 'aap-wf-1',
+          name: 'Run Workflow',
+          workflowTemplateId: 456,
+          config: {
+            inventory_id: 789,
+            extra_vars: { env: 'staging' },
+            limit: 'db-servers',
+            scm_branch: 'main',
+            tags: 'deploy',
+            skip_tags: 'debug',
+            labels: ['production', 'critical'],
+          },
         })
 
         expect(activity.parameters.workflow_job_template_id).toBe(456)
@@ -783,10 +864,15 @@ describe('workflowFactories', () => {
       })
 
       it('creates an AAP workflow template activity with credential and organization', () => {
-        const activity = createAAPWorkflowTemplateActivity('aap-wf-1', 'Run Workflow', 456, {
-          credential_id: 'cred-123',
-          organization_id: 10,
-          organization_name: 'Engineering',
+        const activity = createAAPWorkflowTemplateActivity({
+          id: 'aap-wf-1',
+          name: 'Run Workflow',
+          workflowTemplateId: 456,
+          config: {
+            credential_id: 'cred-123',
+            organization_id: 10,
+            organization_name: 'Engineering',
+          },
         })
 
         expect(activity.parameters.credential_id).toBe('cred-123')
@@ -795,17 +881,27 @@ describe('workflowFactories', () => {
       })
 
       it('includes integration_id when set in workflow config', () => {
-        const activity = createAAPWorkflowTemplateActivity('aap-wf-1', 'Run Workflow', 456, {
-          integration_id: 'int-aap-2',
+        const activity = createAAPWorkflowTemplateActivity({
+          id: 'aap-wf-1',
+          name: 'Run Workflow',
+          workflowTemplateId: 456,
+          config: {
+            integration_id: 'int-aap-2',
+          },
         })
 
         expect(activity.parameters.integration_id).toBe('int-aap-2')
       })
 
       it('includes both credential_id and integration_id in workflow config', () => {
-        const activity = createAAPWorkflowTemplateActivity('aap-wf-1', 'Run Workflow', 456, {
-          credential_id: 'cred-xyz',
-          integration_id: 'int-aap-3',
+        const activity = createAAPWorkflowTemplateActivity({
+          id: 'aap-wf-1',
+          name: 'Run Workflow',
+          workflowTemplateId: 456,
+          config: {
+            credential_id: 'cred-xyz',
+            integration_id: 'int-aap-3',
+          },
         })
 
         expect(activity.parameters.credential_id).toBe('cred-xyz')
@@ -813,25 +909,40 @@ describe('workflowFactories', () => {
       })
 
       it('creates an AAP workflow template activity with inventory name', () => {
-        const activity = createAAPWorkflowTemplateActivity('aap-wf-1', 'Run Workflow', 456, {
-          inventory_name: 'Production Inventory',
+        const activity = createAAPWorkflowTemplateActivity({
+          id: 'aap-wf-1',
+          name: 'Run Workflow',
+          workflowTemplateId: 456,
+          config: {
+            inventory_name: 'Production Inventory',
+          },
         })
 
         expect(activity.parameters.inventory_name).toBe('Production Inventory')
       })
 
       it('creates an AAP workflow template activity with workflow job template name', () => {
-        const activity = createAAPWorkflowTemplateActivity('aap-wf-1', 'Run Workflow', 456, {
-          workflow_job_template_name: 'Deploy Application',
+        const activity = createAAPWorkflowTemplateActivity({
+          id: 'aap-wf-1',
+          name: 'Run Workflow',
+          workflowTemplateId: 456,
+          config: {
+            workflow_job_template_name: 'Deploy Application',
+          },
         })
 
         expect(activity.parameters.workflow_job_template_name).toBe('Deploy Application')
       })
 
       it('does not include job-specific fields (job_type, verbosity, forks, etc.)', () => {
-        const activity = createAAPWorkflowTemplateActivity('aap-wf-1', 'Run Workflow', 456, {
-          inventory_id: 789,
-          extra_vars: { env: 'prod' },
+        const activity = createAAPWorkflowTemplateActivity({
+          id: 'aap-wf-1',
+          name: 'Run Workflow',
+          workflowTemplateId: 456,
+          config: {
+            inventory_id: 789,
+            extra_vars: { env: 'prod' },
+          },
         })
 
         // Workflow templates should NOT have job-specific fields
@@ -849,18 +960,28 @@ describe('workflowFactories', () => {
       })
 
       it('includes scm_branch field (workflow-specific)', () => {
-        const activity = createAAPWorkflowTemplateActivity('aap-wf-1', 'Run Workflow', 456, {
-          scm_branch: 'feature/new-deployment',
+        const activity = createAAPWorkflowTemplateActivity({
+          id: 'aap-wf-1',
+          name: 'Run Workflow',
+          workflowTemplateId: 456,
+          config: {
+            scm_branch: 'feature/new-deployment',
+          },
         })
 
         expect(activity.parameters.scm_branch).toBe('feature/new-deployment')
       })
 
       it('filters undefined values correctly', () => {
-        const activity = createAAPWorkflowTemplateActivity('aap-wf-1', 'Run Workflow', 456, {
-          inventory_id: undefined,
-          extra_vars: undefined,
-          limit: undefined,
+        const activity = createAAPWorkflowTemplateActivity({
+          id: 'aap-wf-1',
+          name: 'Run Workflow',
+          workflowTemplateId: 456,
+          config: {
+            inventory_id: undefined,
+            extra_vars: undefined,
+            limit: undefined,
+          },
         })
 
         expect(activity.parameters).not.toHaveProperty('inventory_id')
@@ -869,9 +990,14 @@ describe('workflowFactories', () => {
       })
 
       it('handles numeric zero values correctly (defined predicate)', () => {
-        const activity = createAAPWorkflowTemplateActivity('aap-wf-1', 'Run Workflow', 456, {
-          inventory_id: 0,
-          organization_id: 0,
+        const activity = createAAPWorkflowTemplateActivity({
+          id: 'aap-wf-1',
+          name: 'Run Workflow',
+          workflowTemplateId: 456,
+          config: {
+            inventory_id: 0,
+            organization_id: 0,
+          },
         })
 
         // Zero is a valid value for numeric fields (defined predicate)
@@ -880,9 +1006,14 @@ describe('workflowFactories', () => {
       })
 
       it('filters invalid numeric values (NaN, Infinity)', () => {
-        const activity = createAAPWorkflowTemplateActivity('aap-wf-1', 'Run Workflow', 456, {
-          inventory_id: Number.NaN,
-          organization_id: Number.POSITIVE_INFINITY,
+        const activity = createAAPWorkflowTemplateActivity({
+          id: 'aap-wf-1',
+          name: 'Run Workflow',
+          workflowTemplateId: 456,
+          config: {
+            inventory_id: Number.NaN,
+            organization_id: Number.POSITIVE_INFINITY,
+          },
         })
 
         expect(activity.parameters).not.toHaveProperty('inventory_id')
@@ -890,10 +1021,15 @@ describe('workflowFactories', () => {
       })
 
       it('filters empty strings for truthy predicate fields', () => {
-        const activity = createAAPWorkflowTemplateActivity('aap-wf-1', 'Run Workflow', 456, {
-          organization_name: '',
-          workflow_job_template_name: '',
-          limit: '',
+        const activity = createAAPWorkflowTemplateActivity({
+          id: 'aap-wf-1',
+          name: 'Run Workflow',
+          workflowTemplateId: 456,
+          config: {
+            organization_name: '',
+            workflow_job_template_name: '',
+            limit: '',
+          },
         })
 
         expect(activity.parameters).not.toHaveProperty('organization_name')
@@ -902,8 +1038,13 @@ describe('workflowFactories', () => {
       })
 
       it('includes empty arrays for labels field', () => {
-        const activity = createAAPWorkflowTemplateActivity('aap-wf-1', 'Run Workflow', 456, {
-          labels: [],
+        const activity = createAAPWorkflowTemplateActivity({
+          id: 'aap-wf-1',
+          name: 'Run Workflow',
+          workflowTemplateId: 456,
+          config: {
+            labels: [],
+          },
         })
 
         // Empty array is still truthy in JavaScript (all objects are truthy)
@@ -911,8 +1052,13 @@ describe('workflowFactories', () => {
       })
 
       it('includes non-empty arrays for labels field', () => {
-        const activity = createAAPWorkflowTemplateActivity('aap-wf-1', 'Run Workflow', 456, {
-          labels: ['production'],
+        const activity = createAAPWorkflowTemplateActivity({
+          id: 'aap-wf-1',
+          name: 'Run Workflow',
+          workflowTemplateId: 456,
+          config: {
+            labels: ['production'],
+          },
         })
 
         expect(activity.parameters.labels).toEqual(['production'])

@@ -14,19 +14,45 @@ vi.mock('../../../../stores/useWorkflowStore', () => ({
     })),
   },
   createAAPJobTemplateActivity: vi.fn(
-    (id: string, name: string, templateId: number, parameters: Record<string, unknown>) => ({
+    ({
+      id,
+      name,
+      jobTemplateId,
+      config,
+    }: {
+      id: string
+      name: string
+      jobTemplateId?: number
+      config?: Record<string, unknown>
+    }) => ({
       id,
       name,
       type: 'aap_job_template' as const,
-      parameters: { job_template_id: templateId, ...parameters },
+      parameters: {
+        ...(jobTemplateId !== undefined && { job_template_id: jobTemplateId }),
+        ...config,
+      },
     })
   ),
   createAAPWorkflowTemplateActivity: vi.fn(
-    (id: string, name: string, workflowTemplateId: number, parameters: Record<string, unknown>) => ({
+    ({
+      id,
+      name,
+      workflowTemplateId,
+      config,
+    }: {
+      id: string
+      name: string
+      workflowTemplateId?: number
+      config?: Record<string, unknown>
+    }) => ({
       id,
       name,
       type: 'aap_workflow_job_template' as const,
-      parameters: { workflow_job_template_id: workflowTemplateId, ...parameters },
+      parameters: {
+        ...(workflowTemplateId !== undefined && { workflow_job_template_id: workflowTemplateId }),
+        ...config,
+      },
     })
   ),
 }))
