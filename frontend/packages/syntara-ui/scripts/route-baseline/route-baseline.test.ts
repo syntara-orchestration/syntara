@@ -145,17 +145,21 @@ export const orphanRoutes = [
     expect(() => updateRouteBaseline(tempRoot)).toThrow(/Refusing to update route baseline/)
   })
 
-  it('updateRouteBaseline writes a manifest that checkRouteBaseline accepts', { timeout: updateBaselineTimeout }, () => {
-    const tempRoot = makeFixturePackageRoot()
+  it(
+    'updateRouteBaseline writes a manifest that checkRouteBaseline accepts',
+    { timeout: updateBaselineTimeout },
+    () => {
+      const tempRoot = makeFixturePackageRoot()
 
-    const update = updateRouteBaseline(tempRoot)
-    expect(update.routeCount).toBe(3)
-    expect(readFileSync(update.path, 'utf-8').length).toBeGreaterThan(0)
+      const update = updateRouteBaseline(tempRoot)
+      expect(update.routeCount).toBe(3)
+      expect(readFileSync(update.path, 'utf-8').length).toBeGreaterThan(0)
 
-    const check = checkRouteBaseline(tempRoot)
-    expect(check.ok).toBe(true)
-    expect(check.manifest.routes).toHaveLength(update.routeCount)
-  })
+      const check = checkRouteBaseline(tempRoot)
+      expect(check.ok).toBe(true)
+      expect(check.manifest.routes).toHaveLength(update.routeCount)
+    }
+  )
 
   it('buildRouteManifest output is sorted, unique, and versioned', () => {
     const tempRoot = makeFixturePackageRoot()
