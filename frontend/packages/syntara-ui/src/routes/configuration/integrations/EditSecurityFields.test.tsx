@@ -1,20 +1,20 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { useForm, type FieldErrors, type UseFormReturn } from 'react-hook-form'
+import { useForm, type UseFormReturn } from 'react-hook-form'
 import { describe, expect, it } from 'vitest'
 import { axe } from 'vitest-axe'
+
+import { SynForm } from '../../../components/forms/SynForm'
 
 import type { EditIntegrationFormValues } from './editIntegrationFormSchema'
 import { EditSecurityFields } from './EditSecurityFields'
 
 function TestWrapper({
   defaultValues,
-  onFormReady,
-  errorOverride,
+  formRef,
 }: Readonly<{
   defaultValues?: Partial<EditIntegrationFormValues>
-  onFormReady?: (form: UseFormReturn<EditIntegrationFormValues>) => void
-  errorOverride?: FieldErrors<EditIntegrationFormValues>
+  formRef?: { current: UseFormReturn<EditIntegrationFormValues> | undefined }
 }>) {
   const form = useForm<EditIntegrationFormValues>({
     defaultValues: {
@@ -31,13 +31,15 @@ function TestWrapper({
     },
   })
 
-  onFormReady?.(form)
+  if (formRef) {
+    formRef.current = form
+  }
 
-  return <EditSecurityFields control={form.control} errors={errorOverride ?? form.formState.errors} />
-}
-
-const CA_CERT_ERROR: FieldErrors<EditIntegrationFormValues> = {
-  ca_certificate: { type: 'server', message: 'Invalid PEM format' },
+  return (
+    <SynForm form={form}>
+      <EditSecurityFields />
+    </SynForm>
+  )
 }
 
 describe('EditSecurityFields', () => {
@@ -109,8 +111,8 @@ describe('EditSecurityFields', () => {
 
   it('sets ca_certificate to null when textarea is cleared', async () => {
     const user = userEvent.setup()
-    let formRef: UseFormReturn<EditIntegrationFormValues> | undefined
-    render(<TestWrapper defaultValues={{ ca_certificate: 'existing-cert' }} onFormReady={(f) => (formRef = f)} />)
+    const formRef: { current: UseFormReturn<EditIntegrationFormValues> | undefined } = { current: undefined }
+    render(<TestWrapper defaultValues={{ ca_certificate: 'existing-cert' }} formRef={formRef} />)
 
     await user.click(screen.getByText('Security'))
     const textarea = screen.getByRole('textbox', { name: /ca certificate/i })
@@ -118,7 +120,7 @@ describe('EditSecurityFields', () => {
 
     await user.clear(textarea)
     expect(textarea).toHaveValue('')
-    expect(formRef!.getValues('ca_certificate')).toBeNull()
+    expect(formRef.current!.getValues('ca_certificate')).toBeNull()
   })
 
   it('renders null ca_certificate as empty string in textarea', async () => {
@@ -205,36 +207,59 @@ describe('EditSecurityFields', () => {
     expect(screen.getByText(/will not be verified/)).toBeInTheDocument()
   })
 
-  it('auto-expands when ca_certificate has a validation error', () => {
-    const { rerender } = render(<TestWrapper />)
+  it('auto-expands when ca_certificate has a validation error', async () => {
+    const formRef: { current: UseFormReturn<EditIntegrationFormValues> | undefined } = { current: undefined }
+    render(<TestWrapper formRef={formRef} />)
 
     expect(screen.queryByRole('textbox', { name: /ca certificate/i })).not.toBeInTheDocument()
 
-    rerender(<TestWrapper errorOverride={CA_CERT_ERROR} />)
+    act(() => {
+      formRef.current!.setError('ca_certificate', { type: 'server', message: 'Invalid PEM format' })
+    })
 
-    expect(screen.getByRole('textbox', { name: /ca certificate/i })).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByRole('textbox', { name: /ca certificate/i })).toBeInTheDocument()
+    })
     expect(screen.getByText('Invalid PEM format')).toBeInTheDocument()
   })
 
   it('stays expanded while ca_certificate error is present', async () => {
     const user = userEvent.setup()
-    render(<TestWrapper errorOverride={CA_CERT_ERROR} />)
+    const formRef: { current: UseFormReturn<EditIntegrationFormValues> | undefined } = { current: undefined }
+    render(<TestWrapper formRef={formRef} />)
 
-    expect(screen.getByRole('textbox', { name: /ca certificate/i })).toBeInTheDocument()
+    act(() => {
+      formRef.current!.setError('ca_certificate', { type: 'server', message: 'Invalid PEM format' })
+    })
+
+    await waitFor(() => {
+      expect(screen.getByRole('textbox', { name: /ca certificate/i })).toBeInTheDocument()
+    })
 
     await user.click(screen.getByText('Security'))
 
     expect(screen.getByRole('textbox', { name: /ca certificate/i })).toBeInTheDocument()
   })
 
-  it('collapses automatically when ca_certificate error is cleared', () => {
-    const { rerender } = render(<TestWrapper errorOverride={CA_CERT_ERROR} />)
+  it('collapses automatically when ca_certificate error is cleared', async () => {
+    const formRef: { current: UseFormReturn<EditIntegrationFormValues> | undefined } = { current: undefined }
+    render(<TestWrapper formRef={formRef} />)
 
-    expect(screen.getByRole('textbox', { name: /ca certificate/i })).toBeInTheDocument()
+    act(() => {
+      formRef.current!.setError('ca_certificate', { type: 'server', message: 'Invalid PEM format' })
+    })
 
-    rerender(<TestWrapper />)
+    await waitFor(() => {
+      expect(screen.getByRole('textbox', { name: /ca certificate/i })).toBeInTheDocument()
+    })
 
-    expect(screen.queryByRole('textbox', { name: /ca certificate/i })).not.toBeInTheDocument()
+    act(() => {
+      formRef.current!.clearErrors('ca_certificate')
+    })
+
+    await waitFor(() => {
+      expect(screen.queryByRole('textbox', { name: /ca certificate/i })).not.toBeInTheDocument()
+    })
     expect(screen.queryByText('Invalid PEM format')).not.toBeInTheDocument()
   })
 
