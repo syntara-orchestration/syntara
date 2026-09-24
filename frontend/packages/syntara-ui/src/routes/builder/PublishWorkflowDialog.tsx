@@ -1,30 +1,14 @@
-import { zodResolver } from '@hookform/resolvers/zod'
-import {
-  Button,
-  Content,
-  Form,
-  FormGroup,
-  FormHelperText,
-  HelperText,
-  HelperTextItem,
-  Modal,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
-  TextArea,
-  TextInput,
-} from '@patternfly/react-core'
+import { Button, Content, Form, Modal, ModalBody, ModalFooter, ModalHeader } from '@patternfly/react-core'
 import { format } from 'date-fns'
 import { useEffect } from 'react'
-import { Controller, useForm } from 'react-hook-form'
-import { z } from 'zod'
 
-const publishWorkflowSchema = z.object({
-  name: z.string().min(1, 'Version name is required').max(255),
-  description: z.string().max(1000, 'Description must be 1000 characters or fewer').optional().or(z.literal('')),
-})
+import { SynForm } from '../../components/forms/SynForm'
+import { SynTextAreaField } from '../../components/forms/SynTextAreaField'
+import { SynTextField } from '../../components/forms/SynTextField'
+import { useSynForm } from '../../hooks/useSynForm'
 
-type PublishWorkflowFormData = z.infer<typeof publishWorkflowSchema>
+import { publishWorkflowSchema } from './publishWorkflowSchema'
+import type { PublishWorkflowFormData } from './publishWorkflowSchema'
 
 function getDefaultVersionName(): string {
   return format(new Date(), 'PPp')
@@ -38,10 +22,12 @@ type PublishWorkflowDialogProps = Readonly<{
 }>
 
 export function PublishWorkflowDialog({ isOpen, isPublishing, onClose, onPublish }: PublishWorkflowDialogProps) {
-  const { control, handleSubmit, reset } = useForm<PublishWorkflowFormData>({
-    resolver: zodResolver(publishWorkflowSchema, undefined, { mode: 'sync' }),
+  const form = useSynForm({
+    schema: publishWorkflowSchema,
     defaultValues: { name: '', description: '' },
+    onClose,
   })
+  const { handleSubmit, handleClose, reset } = form
 
   useEffect(() => {
     if (isOpen) {
@@ -56,7 +42,7 @@ export function PublishWorkflowDialog({ isOpen, isPublishing, onClose, onPublish
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} variant="small" aria-label="Publish workflow">
+    <Modal isOpen={isOpen} onClose={handleClose} variant="small" aria-label="Publish workflow">
       <ModalHeader title="Publish workflow?" />
       <ModalBody>
         <Content component="p" style={{ marginBottom: 'var(--pf-t--global--spacer--md)' }}>
@@ -65,58 +51,23 @@ export function PublishWorkflowDialog({ isOpen, isPublishing, onClose, onPublish
           previously published workflow can be viewed in version history.
         </Content>
         <Form onSubmit={handleSubmit(onSubmit)} id="publish-workflow-form">
-          <FormGroup label="Version name" isRequired fieldId="publish-name">
-            <Controller
+          <SynForm form={form}>
+            <SynTextField
               name="name"
-              control={control}
-              render={({ field, fieldState }) => (
-                <>
-                  <TextInput
-                    id="publish-name"
-                    type="text"
-                    aria-label="Version name"
-                    isRequired
-                    validated={fieldState.error ? 'error' : 'default'}
-                    value={field.value ?? ''}
-                    onChange={(_event, value) => field.onChange(value)}
-                  />
-                  {fieldState.error && (
-                    <FormHelperText>
-                      <HelperText>
-                        <HelperTextItem variant="error">{fieldState.error.message}</HelperTextItem>
-                      </HelperText>
-                    </FormHelperText>
-                  )}
-                </>
-              )}
+              label="Version name"
+              fieldId="publish-name"
+              isRequired
+              ariaLabel="Version name"
             />
-          </FormGroup>
-          <FormGroup label="Description" fieldId="publish-description">
-            <Controller
+            <SynTextAreaField
               name="description"
-              control={control}
-              render={({ field, fieldState }) => (
-                <>
-                  <TextArea
-                    id="publish-description"
-                    aria-label="Description"
-                    placeholder="Describe what changed"
-                    validated={fieldState.error ? 'error' : 'default'}
-                    value={field.value ?? ''}
-                    onChange={(_event, value) => field.onChange(value)}
-                    rows={4}
-                  />
-                  {fieldState.error && (
-                    <FormHelperText>
-                      <HelperText>
-                        <HelperTextItem variant="error">{fieldState.error.message}</HelperTextItem>
-                      </HelperText>
-                    </FormHelperText>
-                  )}
-                </>
-              )}
+              label="Description"
+              fieldId="publish-description"
+              placeholder="Describe what changed"
+              rows={4}
+              ariaLabel="Description"
             />
-          </FormGroup>
+          </SynForm>
         </Form>
       </ModalBody>
       <ModalFooter>
@@ -129,7 +80,7 @@ export function PublishWorkflowDialog({ isOpen, isPublishing, onClose, onPublish
         >
           Publish workflow
         </Button>
-        <Button variant="link" onClick={onClose} isDisabled={isPublishing}>
+        <Button variant="link" onClick={handleClose} isDisabled={isPublishing}>
           Cancel
         </Button>
       </ModalFooter>
