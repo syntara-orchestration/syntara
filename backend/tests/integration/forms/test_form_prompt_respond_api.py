@@ -80,7 +80,7 @@ def _controlled_authorizer(
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-class TestFormPromptRespondAPI:
+class TestFormPromptSubmitAPI:
     """Route-level tests for the response action."""
 
     async def test_submit_success_returns_200(
