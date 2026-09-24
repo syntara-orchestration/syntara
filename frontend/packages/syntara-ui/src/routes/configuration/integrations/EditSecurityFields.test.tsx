@@ -220,9 +220,7 @@ describe('EditSecurityFields', () => {
       formRef.current!.setError('ca_certificate', { type: 'server', message: 'Invalid PEM format' })
     })
 
-    await waitFor(() => {
-      expect(screen.getByRole('textbox', { name: /ca certificate/i })).toBeInTheDocument()
-    })
+    await screen.findByRole('textbox', { name: /ca certificate/i })
     expect(screen.getByText('Invalid PEM format')).toBeInTheDocument()
   })
 
@@ -235,9 +233,7 @@ describe('EditSecurityFields', () => {
       formRef.current!.setError('ca_certificate', { type: 'server', message: 'Invalid PEM format' })
     })
 
-    await waitFor(() => {
-      expect(screen.getByRole('textbox', { name: /ca certificate/i })).toBeInTheDocument()
-    })
+    await screen.findByRole('textbox', { name: /ca certificate/i })
 
     await user.click(screen.getByText('Security'))
 
@@ -252,9 +248,7 @@ describe('EditSecurityFields', () => {
       formRef.current!.setError('ca_certificate', { type: 'server', message: 'Invalid PEM format' })
     })
 
-    await waitFor(() => {
-      expect(screen.getByRole('textbox', { name: /ca certificate/i })).toBeInTheDocument()
-    })
+    await screen.findByRole('textbox', { name: /ca certificate/i })
 
     act(() => {
       formRef.current!.clearErrors('ca_certificate')

@@ -120,7 +120,6 @@ function EditIntegrationFormFields({
         label="Description"
         fieldId="edit-description"
         resizeOrientation="vertical"
-        rows={3}
       />
 
       {!hideBaseUrl && (
