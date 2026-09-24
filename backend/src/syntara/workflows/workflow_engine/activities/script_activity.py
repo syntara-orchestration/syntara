@@ -534,8 +534,7 @@ async def execute_script_activity(  # noqa: C901
             stderr=result["stderr"],
             stdout_json=result.get("output"),
         )
-        mapped = output.dump(output_config)
-        return _enforce_payload_limit({"output": mapped})
+        return _enforce_payload_limit({"output": output.dump(output_config)})
 
     except ApplicationError:
         raise
