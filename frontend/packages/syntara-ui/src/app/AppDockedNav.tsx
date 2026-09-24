@@ -1,5 +1,4 @@
 import {
-  Avatar,
   Brand,
   Button,
   CompassDockMain,
@@ -25,7 +24,12 @@ import {
   Tooltip,
 } from '@patternfly/react-core'
 import type { MenuToggleElement } from '@patternfly/react-core'
-import { RhUiDarkModeIcon, RhUiLightModeIcon, RhUiQuestionMarkCircleIcon } from '@patternfly/react-icons'
+import {
+  RhUiDarkModeIcon,
+  RhUiLightModeIcon,
+  RhUiProfileFillIcon,
+  RhUiQuestionMarkCircleIcon,
+} from '@patternfly/react-icons'
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useMemo, useRef, useState } from 'react'
 
@@ -43,6 +47,10 @@ import type { TNavigationItem } from './navigationItems'
 import { useDockState } from './useDockState'
 import { useFilteredNavigationItems } from './useFilteredNavigationItems'
 import { useUnsavedChanges } from './useUnsavedChanges'
+
+function MastheadHomeLink(props: React.ComponentProps<typeof Link>) {
+  return <Link {...props} to="/" />
+}
 
 function findFirstEnabledPath(item: TNavigationItem): string {
   if (item.children?.length) {
@@ -85,10 +93,6 @@ function navigateToNavItem(
 
 function openExternalDoc(url: string) {
   globalThis.open(url, '_blank', 'noopener,noreferrer')
-}
-
-function getAvatarInitial(username: string): string {
-  return username.charAt(0).toUpperCase()
 }
 
 function getNavGroupId(itemPath: string): string {
@@ -190,7 +194,7 @@ function UserMenuDropdown({
       }}
       isExpanded={isOpen}
       variant="plain"
-      icon={<Avatar alt="" size="sm" color="gray" initials={getAvatarInitial(username)} />}
+      icon={<RhUiProfileFillIcon />}
       isDocked
       isTextExpanded={isTextExpanded}
       aria-label="User menu"
@@ -280,7 +284,7 @@ export function AppDockedNav() {
             />
           </MastheadToggle>
           <MastheadBrand>
-            <MastheadLogo component={(props) => <Link {...props} to="/" />} aria-label="Home" isCompact>
+            <MastheadLogo component={MastheadHomeLink} aria-label="Home" isCompact>
               <Brand
                 src={brand.logoCollapsed}
                 alt={brand.appTitle}
@@ -288,7 +292,7 @@ export function AppDockedNav() {
                 data-testid="brand-logo"
               />
             </MastheadLogo>
-            <MastheadLogo component={(props) => <Link {...props} to="/" />} aria-label="Home">
+            <MastheadLogo component={MastheadHomeLink} aria-label="Home">
               <Brand
                 src={colorScheme === 'dark' ? brand.logoExpandedDark : brand.logoExpandedLight}
                 alt={brand.appTitle}
