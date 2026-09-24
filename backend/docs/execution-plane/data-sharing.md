@@ -226,15 +226,8 @@ that is still mounted is never deleted; a long run can outlive the
 original TTL. If the volume was never mounted, create time counts
 as the last unmount (idle from birth).
 
-Git and object-store files are **not** a second volume. They arrive
-because an HTTP or Git activity wrote under `/workspace`. Mutable
-state later nodes must see uses the same directory.
 
-OpenShell has no volume attach. A workspace there is the
-object-store snapshot path (hydrate into the container), or no
-shared directory.
-
-## Use-case 2: collect results after each execution
+## Use-case 2: collect results after each execution (No Workspace)
 
 Two kinds of "result":
 
@@ -263,7 +256,6 @@ How a later node gets the bytes:
 
 | Situation | How |
 |---|---|
-| **Same workspace UUID** (volume still there) | Read `/workspace`. Do not download. |
 | **Same namespace** | GET an HTTP server on the **producer** WorkItem's sidecar. That sidecar outlives the activity container and exposes the harvested spool. Only reachable in that namespace. It can serve before the S3 PUT is `available`. |
 | **Other cluster / other namespace** | The consumer activity calls a **localhost HTTP API** on **its** sidecar. That sidecar holds object-store credentials and GETs S3. It retries until `available` or `failed`. |
 
