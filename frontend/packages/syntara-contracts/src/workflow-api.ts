@@ -1877,11 +1877,6 @@ export interface components {
        */
       response_window?: number | null
       /**
-       * Fallback Behavior
-       * @description On timeout, fail the workflow or route to the fallback output port
-       */
-      fallback_behavior?: ('fail' | 'fallback') | null
-      /**
        * Fallback Decision
        * @description Decision when form prompt times out with continue_on_failure enabled
        */
