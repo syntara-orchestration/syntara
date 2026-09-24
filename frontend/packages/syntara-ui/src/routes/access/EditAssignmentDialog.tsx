@@ -168,7 +168,13 @@ export function EditAssignmentDialog({ row, displayName, onClose, onSuccess }: R
         </Form>
       </ModalBody>
       <ModalFooter>
-        <Button variant="primary" form="edit-assignment-form" type="submit" isDisabled={isPending} isLoading={isPending}>
+        <Button
+          variant="primary"
+          form="edit-assignment-form"
+          type="submit"
+          isDisabled={isPending}
+          isLoading={isPending}
+        >
           Save assignment
         </Button>
         <Button variant="link" onClick={handleClose} isDisabled={isPending}>

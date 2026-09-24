@@ -120,12 +120,7 @@ function AddRoleFormFields({
       </SynFormField>
 
       {scope === 'project' && (
-        <SynFormField<AddRoleFormData, 'projectId'>
-          name="projectId"
-          label="Project"
-          fieldId="role-project"
-          isRequired
-        >
+        <SynFormField<AddRoleFormData, 'projectId'> name="projectId" label="Project" fieldId="role-project" isRequired>
           {({ field, fieldState }) => (
             <TypeaheadSelect
               id="role-project"
