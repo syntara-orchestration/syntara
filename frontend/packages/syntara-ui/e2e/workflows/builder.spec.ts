@@ -38,7 +38,7 @@ test('catalog panel shows available node types organized by category', async ({ 
 
     await expect(panel.getByRole('button', { name: 'Action', exact: true })).toBeVisible()
     await expect(panel.getByRole('button', { name: 'AAP Execution', exact: true })).toBeVisible()
-    await expect(panel.getByRole('button', { name: 'Approval', exact: true })).toBeVisible()
+    await expect(panel.getByRole('button', { name: 'Human tasks', exact: true })).toBeVisible()
     await expect(panel.getByRole('button', { name: 'Logic', exact: true })).toBeVisible()
   } finally {
     await deleteWorkflow(app, workflowName)
@@ -238,6 +238,8 @@ test('multiple nodes can be added sequentially', async ({ app }) => {
 
     // Add second node - Approval
     let panel = await clickAddConnectedStep(app)
+
+    await panel.getByRole('button', { name: 'Human tasks', exact: true }).click()
 
     // Wait for Approval button to be stable before clicking
     await expect(async () => {

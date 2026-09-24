@@ -38,6 +38,14 @@ function hasApprovalNodePlaceholders(nodes: Node[], sourceId: string): boolean {
   )
 }
 
+function hasFormPromptNodePlaceholders(nodes: Node[], sourceId: string): boolean {
+  return nodes.some(
+    (n) =>
+      n.id === `placeholder-${sourceId}-${EdgeHandleEnum.SUBMITTED}` ||
+      n.id === `placeholder-${sourceId}-${EdgeHandleEnum.FALLBACK}`
+  )
+}
+
 function removeButtonEdgeClass(nodes: Node[], sourceId: string): Node[] {
   return nodes.map((n) => {
     if (n.id === sourceId) {
@@ -73,6 +81,9 @@ function updateNodesAfterPanelConnect(nds: Node[], sourceId: string, sourcePlace
     return filtered
   }
   if (sourceNode.type === FlowNodeType.APPROVAL && hasApprovalNodePlaceholders(filtered, sourceId)) {
+    return filtered
+  }
+  if (sourceNode.type === FlowNodeType.FORM_PROMPT && hasFormPromptNodePlaceholders(filtered, sourceId)) {
     return filtered
   }
   return removeButtonEdgeClass(filtered, sourceId)

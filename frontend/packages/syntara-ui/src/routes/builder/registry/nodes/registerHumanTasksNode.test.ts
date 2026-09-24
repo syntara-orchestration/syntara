@@ -17,6 +17,11 @@ vi.mock('../../../../stores/useWorkflowStore', () => ({
     name: opts.name,
     type: 'approval' as const,
   })),
+  createFormPromptActivity: vi.fn((opts: Record<string, unknown>) => ({
+    id: opts.id,
+    name: opts.name,
+    type: 'form_prompt' as const,
+  })),
 }))
 
 describe('registerHumanTasksNode', () => {
@@ -25,13 +30,13 @@ describe('registerHumanTasksNode', () => {
     NodeRegistry.unregister(RegistryNodeId.HUMAN_TASKS)
   })
 
-  it('registers Human tasks with Approval subtype', () => {
+  it('registers Human tasks with Approval and Form subtypes', () => {
     registerHumanTasksNode()
 
     const registration = NodeRegistry.get(RegistryNodeId.HUMAN_TASKS)
     expect(registration?.label).toBe('Human tasks')
     expect(registration?.category).toBe('human_tasks')
-    expect(registration?.subtypes?.map((s) => s.id)).toEqual([RegistryNodeId.APPROVAL])
+    expect(registration?.subtypes?.map((s) => s.id)).toEqual([RegistryNodeId.APPROVAL, RegistryNodeId.FORM_PROMPT])
     expect(registration?.description).toBe('Pause the workflow for human approval or structured input')
   })
 
@@ -56,13 +61,39 @@ describe('registerHumanTasksNode', () => {
     expect(onError).not.toHaveBeenCalled()
   })
 
+  it('onSubmit adds form prompt activity when subtype is Form', () => {
+    const addActivity = vi.fn()
+    vi.mocked(useWorkflowStore.getState).mockReturnValue({ addActivity } as never)
+
+    registerHumanTasksNode()
+    const registration = NodeRegistry.get(RegistryNodeId.HUMAN_TASKS)
+    const onSuccess = vi.fn()
+    const onError = vi.fn()
+
+    registration?.onSubmit(
+      {
+        name: 'Survey',
+        form_definition: { fields: [] },
+        fallback_decision: 'fallback',
+        fallback_behavior: 'fallback',
+      },
+      onSuccess,
+      onError,
+      RegistryNodeId.FORM_PROMPT
+    )
+
+    expect(addActivity).toHaveBeenCalledOnce()
+    expect(onSuccess).toHaveBeenCalled()
+    expect(onError).not.toHaveBeenCalled()
+  })
+
   it('onSubmit calls onError when subtype is missing', () => {
     registerHumanTasksNode()
     const registration = NodeRegistry.get(RegistryNodeId.HUMAN_TASKS)
     const onError = vi.fn()
 
-    registration?.onSubmit({ name: 'X', prompt: '' }, vi.fn(), onError)
+    registration?.onSubmit({ name: 'X', form_definition: { fields: [] } }, vi.fn(), onError)
 
-    expect(onError).toHaveBeenCalledWith('Select Approval')
+    expect(onError).toHaveBeenCalledWith('Select Approval or Form')
   })
 })

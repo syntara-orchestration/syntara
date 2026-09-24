@@ -46,6 +46,10 @@ vi.mock('./utils/validation/rules/validateMinimumWorkflow', () => ({
   validateMinimumWorkflow: () => mockValidateMinimum(),
 }))
 
+vi.mock('./hooks/useWorkflowEngineDefaults', () => ({
+  useWorkflowEngineDefaults: () => ({ defaults: { continueOnFailure: false }, isLoading: false }),
+}))
+
 vi.mock('./utils/workflowDefinitionBuilder', () => ({
   buildWorkflowDefinition: (...args: unknown[]) => mockBuildDefinition(...args),
 }))

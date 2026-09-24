@@ -47,6 +47,8 @@ export type ValidationResult = {
 export type ValidationContext = {
   /** Trigger nodes — their parameters.input_schema defines valid ${trigger.*} references */
   triggers?: Activity[]
+  /** Admin workflow_engine.continue_on_failure default (for form prompt timeout validation). */
+  systemContinueOnFailure?: boolean
 }
 
 /**

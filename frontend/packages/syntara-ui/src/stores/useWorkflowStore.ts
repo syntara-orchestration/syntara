@@ -102,13 +102,12 @@ export const useWorkflowStore: UseWorkflowStoreBound = create<WorkflowStore>()(
       },
 
       replaceWorkflowContent: (workflow, edges, nodePositions) => {
-        const hasPositions = nodePositions != null && Object.keys(nodePositions).length > 0
         set((state) => ({
           currentWorkflow: workflow,
           workflowVersion: state.workflowVersion + 1,
           edges,
           nodePositions: nodePositions ?? {},
-          _positionsUserModified: hasPositions,
+          _positionsUserModified: nodePositions != null && Object.keys(nodePositions).length > 0,
           isDirty: true,
           _preserveHistoryOnLayout: true,
           validationErrorCount: 0,
@@ -483,15 +482,7 @@ export const useWorkflowStore: UseWorkflowStoreBound = create<WorkflowStore>()(
         })
       },
 
-      /**
-       * Atomic batch operation to remove nodes and update edges simultaneously.
-       * This prevents race conditions by updating all related state in a single transaction.
-       *
-       * Use this instead of calling removeActivity() and setEdges() separately to avoid:
-       * - Ghost edges from initialEdges recomputation
-       * - Race conditions between multiple async updates
-       * - Synchronization issues
-       */
+      /** Remove nodes and edges in one update (avoids ghost edges / races vs removeActivity + setEdges). */
       batchRemoveNodesAndEdges: ({ nodeIds, edges, triggerIndices = [] }) => {
         set((state) => {
           if (!state.currentWorkflow) return state
@@ -618,12 +609,7 @@ export type {
 export { getActivityMetadata } from './workflowStoreTypes'
 export * from './workflowStoreSelectors'
 
-// ============================================================================
-// Factory Functions - Re-exported from workflowFactories.ts
-// ============================================================================
-// These functions are maintained in a separate file for better organization.
-// They are re-exported here for backward compatibility.
-// ============================================================================
+// Factory helpers live in workflowFactories.ts and are re-exported here for compatibility.
 export {
   createManualTrigger,
   createScheduledTrigger,
@@ -641,10 +627,12 @@ export {
   createAAPWorkflowTemplateActivity,
   createGenericActivity,
   createApprovalActivity,
+  createFormPromptActivity,
   createWaitActivity,
 } from './workflowFactories'
 export type {
   CreateApiActivityOptions,
   CreateAgenticActivityOptions,
   CreateApprovalActivityOptions,
+  CreateFormPromptActivityOptions,
 } from './workflowFactories'

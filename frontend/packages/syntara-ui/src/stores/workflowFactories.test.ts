@@ -1,6 +1,7 @@
 import { EdgeHandleEnum, TriggerTypeEnum } from '@syntara/contracts'
 import { describe, expect, it } from 'vitest'
 
+import { createEmptyFormDefinition } from '../components/forms/formFieldBuilder/createDefaultField'
 import { buildSwitchCasePort } from '../routes/builder/utils/switchCaseHelpers'
 
 import {
@@ -9,6 +10,7 @@ import {
   createAAPWorkflowTemplateActivity,
   createApiActivity,
   createApprovalActivity,
+  createFormPromptActivity,
   createConditionActivity,
   createConvergeActivity,
   createEventTrigger,
@@ -1032,6 +1034,59 @@ describe('workflowFactories', () => {
         })
 
         expect(activity.parameters.approver_groups).toEqual(['admins', 'deployers'])
+      })
+    })
+
+    describe('createFormPromptActivity', () => {
+      it('creates form_prompt activity with core parameters', () => {
+        const formDefinition = createEmptyFormDefinition()
+        const activity = createFormPromptActivity({
+          id: 'form-1',
+          name: 'Collect input',
+          form_definition: formDefinition,
+          message: 'Please respond',
+          responder_users: ['alice'],
+          responder_groups: ['operators'],
+          response_window: 3600,
+          fallback_decision: 'fallback',
+          fallback_behavior: 'fallback',
+          submit_label: 'Submit',
+          success_message: 'Thanks',
+          timezone: 'UTC',
+          css_override: '.form { margin: 0; }',
+          settings: { continue_on_failure: true },
+        })
+
+        expect(activity.type).toBe('form_prompt')
+        expect(activity.parameters).toEqual({
+          form_definition: formDefinition,
+          message: 'Please respond',
+          responder_users: ['alice'],
+          responder_groups: ['operators'],
+          response_window: 3600,
+          fallback_decision: 'fallback',
+          fallback_behavior: 'fallback',
+          submit_label: 'Submit',
+          success_message: 'Thanks',
+          timezone: 'UTC',
+          css_override: '.form { margin: 0; }',
+        })
+        expect(activity.settings).toEqual({ continue_on_failure: true })
+      })
+
+      it('omits empty optional strings and empty responder lists', () => {
+        const emptyDefinition = createEmptyFormDefinition()
+        const activity = createFormPromptActivity({
+          id: 'form-2',
+          name: 'Form',
+          form_definition: emptyDefinition,
+          message: '',
+          responder_users: [],
+          responder_groups: [],
+        })
+
+        expect(activity.parameters).toEqual({ form_definition: emptyDefinition })
+        expect(activity).not.toHaveProperty('settings')
       })
     })
 

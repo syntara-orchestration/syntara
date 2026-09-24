@@ -17,6 +17,8 @@ export type SynFormFieldBuilderProps = {
   value: FormDefinition
   onChange: (definition: FormDefinition) => void
   isDisabled?: boolean
+  /** When true, shows only the field cards (no Design / Preview / JSON tabs). */
+  designOnly?: boolean
 }
 
 /**
@@ -25,7 +27,12 @@ export type SynFormFieldBuilderProps = {
  * Intended for workflow builder / prompt configuration once wired by the parent feature.
  * File upload fields are not supported until they are added to the FormDefinition schema.
  */
-export function SynFormFieldBuilder({ value, onChange, isDisabled }: Readonly<SynFormFieldBuilderProps>) {
+export function SynFormFieldBuilder({
+  value,
+  onChange,
+  isDisabled,
+  designOnly = false,
+}: Readonly<SynFormFieldBuilderProps>) {
   const [activeTab, setActiveTab] = useState<BuilderTab>('design')
   const lastEmittedRef = useRef(JSON.stringify(value))
 
@@ -38,6 +45,11 @@ export function SynFormFieldBuilder({ value, onChange, isDisabled }: Readonly<Sy
 
   const valueKey = JSON.stringify(value)
   useEffect(() => {
+    // Parent-controlled value (e.g. workflow node form_definition). Skip reset when this
+    // update is our own commit echoing back — otherwise every keystroke resets RHF and drops focus.
+    if (valueKey === lastEmittedRef.current) {
+      return
+    }
     lastEmittedRef.current = valueKey
     methods.reset(JSON.parse(valueKey) as FormDefinitionSchemaInput)
   }, [valueKey, methods])
@@ -54,24 +66,30 @@ export function SynFormFieldBuilder({ value, onChange, isDisabled }: Readonly<Sy
     }
   }, [methods, onChange])
 
+  const designTab = <FormFieldBuilderDesignTab isDisabled={isDisabled} />
+
   return (
     <FormProvider {...methods}>
       <FormFieldBuilderCommitContext value={commit}>
-        <Tabs
-          activeKey={activeTab}
-          onSelect={(_event, tabIndex) => setActiveTab(tabIndex as BuilderTab)}
-          aria-label="Form builder views"
-        >
-          <Tab eventKey="design" title={<TabTitleText>Design</TabTitleText>}>
-            <FormFieldBuilderDesignTab isDisabled={isDisabled} />
-          </Tab>
-          <Tab eventKey="preview" title={<TabTitleText>Preview</TabTitleText>}>
-            <FormFieldBuilderPreviewTab />
-          </Tab>
-          <Tab eventKey="json" title={<TabTitleText>JSON Schema</TabTitleText>}>
-            <FormFieldBuilderJsonSchemaTab />
-          </Tab>
-        </Tabs>
+        {designOnly ? (
+          designTab
+        ) : (
+          <Tabs
+            activeKey={activeTab}
+            onSelect={(_event, tabIndex) => setActiveTab(tabIndex as BuilderTab)}
+            aria-label="Form builder views"
+          >
+            <Tab eventKey="design" title={<TabTitleText>Design</TabTitleText>}>
+              {designTab}
+            </Tab>
+            <Tab eventKey="preview" title={<TabTitleText>Preview</TabTitleText>}>
+              <FormFieldBuilderPreviewTab />
+            </Tab>
+            <Tab eventKey="json" title={<TabTitleText>JSON Schema</TabTitleText>}>
+              <FormFieldBuilderJsonSchemaTab />
+            </Tab>
+          </Tabs>
+        )}
       </FormFieldBuilderCommitContext>
     </FormProvider>
   )

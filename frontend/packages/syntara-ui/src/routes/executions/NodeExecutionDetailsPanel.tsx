@@ -249,12 +249,14 @@ function NodeDetailsHeader({
   nodeCompleted,
   nodeElapsedLabel,
   status,
+  nodeType,
 }: Readonly<{
   nodeName: string
   nodeStarted: string | null
   nodeCompleted: string | null
   nodeElapsedLabel?: string
   status?: ActivityState['status']
+  nodeType?: string
 }>) {
   return (
     <StackItem className={styles.headerRow}>
@@ -290,7 +292,7 @@ function NodeDetailsHeader({
             )}
             {status && (
               <FlexItem style={{ display: 'flex', alignItems: 'center' }}>
-                <ActivityStatusLabel status={status} />
+                <ActivityStatusLabel status={status} nodeType={nodeType} />
               </FlexItem>
             )}
           </Flex>
@@ -393,6 +395,7 @@ export function NodeExecutionDetailsPanel({
         nodeCompleted={nodeCompleted}
         nodeElapsedLabel={nodeElapsedLabel}
         status={nodeState?.status}
+        nodeType={nodeType}
       />
 
       {/* Approval audit strip (shown only for decided approval nodes) */}

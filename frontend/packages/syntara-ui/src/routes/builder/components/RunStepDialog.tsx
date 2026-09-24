@@ -35,7 +35,12 @@ type PredecessorNode = Readonly<{
   isTrigger?: boolean
 }>
 
-const CONTROL_FLOW_TYPES = new Set<string>([FlowNodeType.CONDITION, FlowNodeType.LOOP, FlowNodeType.APPROVAL])
+const CONTROL_FLOW_TYPES = new Set<string>([
+  FlowNodeType.CONDITION,
+  FlowNodeType.LOOP,
+  FlowNodeType.APPROVAL,
+  FlowNodeType.FORM_PROMPT,
+])
 
 export type RunStepDialogData = {
   nodeId: string

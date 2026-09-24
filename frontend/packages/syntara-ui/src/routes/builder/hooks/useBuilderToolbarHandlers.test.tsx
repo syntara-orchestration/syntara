@@ -21,6 +21,10 @@ vi.mock('../node-forms/useMaxWaitDuration', () => ({
   fetchMaxWaitDuration: () => Promise.resolve(2_592_000),
 }))
 
+vi.mock('./useWorkflowEngineDefaults', () => ({
+  useWorkflowEngineDefaults: () => ({ defaults: { continueOnFailure: false }, isLoading: false }),
+}))
+
 vi.mock('../../../stores/useWorkflowStore', () => ({
   useWorkflowStore: {
     getState: vi.fn(),

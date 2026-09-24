@@ -77,6 +77,13 @@ const MULTI_HANDLE_CONFIGS: Record<string, MultiHandleConfig> = {
       [EdgeHandleEnum.REJECTED]: { yOffset: 30 },
     },
   },
+  [FlowNodeType.FORM_PROMPT]: {
+    handles: [EdgeHandleEnum.SUBMITTED, EdgeHandleEnum.FALLBACK],
+    handlePositions: {
+      [EdgeHandleEnum.SUBMITTED]: { yOffset: -30 },
+      [EdgeHandleEnum.FALLBACK]: { yOffset: 30 },
+    },
+  },
   [FlowNodeType.LOOP]: {
     handles: [EdgeHandleEnum.DONE, EdgeHandleEnum.LOOP],
     handlePositions: {
@@ -161,6 +168,7 @@ function runButtonEdgeMaintenanceWork({
     [FlowNodeType.CONDITION]: conditionHandlesNeedingButtonEdges,
     [FlowNodeType.LOOP]: loopHandlesNeedingButtonEdges,
     [FlowNodeType.APPROVAL]: approvalHandlesNeedingButtonEdges,
+    [FlowNodeType.FORM_PROMPT]: approvalHandlesNeedingButtonEdges,
   }
 
   const existingNodeIds = new Set(nodes.map((node) => node.id))

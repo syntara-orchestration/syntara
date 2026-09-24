@@ -9,6 +9,7 @@ import {
   RhUiConditionNodeIcon,
   RhUiLoopNodeIcon,
   RhUiUserCheckIcon,
+  RhUiTaskIcon,
   RhUiTreeViewIcon,
   RhUiClockIcon,
   RhUiSettingsIcon,
@@ -89,6 +90,11 @@ export const nodeMetadata: Record<string, NodeMetadata> = {
     label: 'Approval',
     expandable: false,
   },
+  form_prompt: {
+    icon: RhUiTaskIcon,
+    label: 'Form',
+    expandable: false,
+  },
 }
 
 type ExecutorDisplayMetadata = { icon: ComponentType<{ className?: string }>; label: string }
@@ -109,5 +115,6 @@ export const executorMetadata: Record<string, ExecutorDisplayMetadata> = {
   /** Internal key from detectTaskNodeType (agentic + ansible connector prompt), not an API executor string */
   aap: aapJobExecutorDisplay,
   approval: { icon: RhUiUserCheckIcon, label: 'Approval' },
+  form_prompt: { icon: RhUiTaskIcon, label: 'Form' },
   internal_activity: { icon: RhUiSettingsIcon, label: 'System' },
 }

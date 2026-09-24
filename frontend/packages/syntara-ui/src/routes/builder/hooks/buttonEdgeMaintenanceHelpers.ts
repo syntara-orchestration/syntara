@@ -119,6 +119,8 @@ const HANDLE_TO_CONTEXT_KEY: Record<
   [EdgeHandleEnum.LOOP]: 'loopHandles',
   [EdgeHandleEnum.APPROVED]: 'approvalHandles',
   [EdgeHandleEnum.REJECTED]: 'approvalHandles',
+  [EdgeHandleEnum.SUBMITTED]: 'approvalHandles',
+  [EdgeHandleEnum.FALLBACK]: 'approvalHandles',
 }
 
 export function getKeptButtonEdge<

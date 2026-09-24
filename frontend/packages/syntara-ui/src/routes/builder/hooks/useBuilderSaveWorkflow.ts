@@ -1,4 +1,4 @@
-import type { WorkflowAPI } from '@syntara/contracts'
+import type { Activity, WorkflowAPI } from '@syntara/contracts'
 import type { Query, QueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 
@@ -7,10 +7,14 @@ import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
 import { extractVersionConflictInfo, getErrorMessage, isWorkflowVersionConflictError } from '../../../utils/apiErrors'
 import type { ValidationError } from '../builderReducer'
+import type { EdgeConnection } from '../types/edge'
 import { extractValidationErrors, extractValidationErrorsFromUnknown } from '../useWorkflowVerification'
+import { validateWorkflow } from '../utils/validation'
 import { buildWorkflowDefinition } from '../utils/workflowDefinitionBuilder'
 import { DEFAULT_WORKFLOW_NAME, getNextDefaultWorkflowName } from '../utils/workflowNaming'
 import type { ConflictInfo } from '../VersionConflictDialog'
+
+import { useWorkflowEngineDefaults } from './useWorkflowEngineDefaults'
 
 type CleanedNode = { id: string; parameters?: Record<string, unknown> }
 
@@ -81,6 +85,47 @@ function reportSaveError(
   }
 }
 
+function runClientValidationBeforeSave(opts: {
+  activities: Activity[]
+  saveEdges: EdgeConnection[]
+  triggers: Activity[]
+  systemContinueOnFailure: boolean
+  showError: (options: AlertMessage) => void
+  onValidationFindings?: (errors: ValidationError[]) => void
+}): boolean {
+  const clientValidation = validateWorkflow(opts.activities, opts.saveEdges, {
+    triggers: opts.triggers,
+    systemContinueOnFailure: opts.systemContinueOnFailure,
+  })
+  if (clientValidation.valid) {
+    return true
+  }
+  const errorMessages = clientValidation.errors.map((error) => error.message).join('\n• ')
+  opts.showError({
+    title: 'Cannot save workflow',
+    description: `Workflow validation failed:\n• ${errorMessages}`,
+  })
+  opts.onValidationFindings?.(
+    clientValidation.errors.map((error) => ({
+      message: error.message,
+      nodeId: error.nodeId ?? null,
+      severity: (error.severity === 'warning' ? 'warning' : 'error') as ValidationError['severity'],
+    }))
+  )
+  return false
+}
+
+function resolveWorkflowNameForSave(
+  isNew: boolean,
+  workflowName: string,
+  workflowsListResources: { name: string }[] | undefined
+): string {
+  if (isNew && workflowName === DEFAULT_WORKFLOW_NAME && workflowsListResources) {
+    return getNextDefaultWorkflowName(workflowsListResources)
+  }
+  return workflowName
+}
+
 function buildSavePayloads(opts: {
   nameToSave: string
   workflowDescription: string
@@ -107,6 +152,27 @@ function buildSavePayloads(opts: {
 type WorkflowCreateResponse = WorkflowAPI.components['schemas']['WorkflowRead']
 type WorkflowUpdateResponse = WorkflowAPI.components['schemas']['WorkflowReadWithVersion']
 type SaveResponseData = WorkflowCreateResponse | WorkflowUpdateResponse
+
+/**
+ * When `blockOnWarnings` is set (e.g. Run), only block if the save response includes
+ * structured findings. A bare `has_validation_issues` flag without `validation_result`
+ * can be stale relative to the definition the client just saved.
+ */
+export function shouldBlockWorkflowActionAfterSave(
+  data: SaveResponseData | undefined,
+  blockOnWarnings?: boolean
+): boolean {
+  if (!blockOnWarnings || data?.has_validation_issues !== true) {
+    return false
+  }
+  const findings = extractValidationErrors({
+    validation_result: data.validation_result as Record<string, unknown> | undefined,
+  })
+  if (!findings || findings.length === 0) {
+    return false
+  }
+  return findings.some((f) => f.severity === 'error' || f.severity === 'warning')
+}
 
 function reportSaveValidationIssues(
   data: SaveResponseData | undefined,
@@ -273,7 +339,7 @@ async function processSaveResult(
   const newVersion = saveResult.data?.current_version
   if (ctx.willPatchExisting && newVersion != null) ctx.onVersionUpdated?.(newVersion)
   if (!hasIssues) ctx.onValidationFindings?.([])
-  if (hasIssues && ctx.blockOnWarnings) return false
+  if (shouldBlockWorkflowActionAfterSave(saveResult.data, ctx.blockOnWarnings)) return false
   return true
 }
 
@@ -304,6 +370,8 @@ export function useBuilderSaveWorkflow(
     updateWorkflow,
   } = params
 
+  const { defaults } = useWorkflowEngineDefaults()
+
   const getWorkflowDefinition = useCallback(() => {
     const { edges, nodePositions, currentWorkflow: freshWorkflow } = useWorkflowStore.getState()
     const activities = freshWorkflow?.workflow.activities ?? []
@@ -329,10 +397,23 @@ export function useBuilderSaveWorkflow(
         return false
       }
 
-      const nameToSave =
-        isNew && workflowName === DEFAULT_WORKFLOW_NAME && workflowsListResources
-          ? getNextDefaultWorkflowName(workflowsListResources)
-          : workflowName
+      const nameToSave = resolveWorkflowNameForSave(isNew, workflowName, workflowsListResources)
+
+      const { edges: saveEdges } = useWorkflowStore.getState()
+      const activities = currentWorkflow.workflow.activities
+      const triggers = currentWorkflow.triggers ?? []
+      if (
+        !runClientValidationBeforeSave({
+          activities,
+          saveEdges,
+          triggers,
+          systemContinueOnFailure: defaults?.continueOnFailure ?? false,
+          showError,
+          onValidationFindings,
+        })
+      ) {
+        return false
+      }
 
       const workflowDef = getWorkflowDefinition()
       workflowDef.name = nameToSave
@@ -394,6 +475,7 @@ export function useBuilderSaveWorkflow(
       setLocation,
       queryClient,
       markClean,
+      defaults?.continueOnFailure,
     ]
   )
 }

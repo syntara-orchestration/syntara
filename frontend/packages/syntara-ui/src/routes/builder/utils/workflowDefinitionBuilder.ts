@@ -6,6 +6,7 @@ import { parseTriggerIndex } from '../../../utils/triggerNodeIds'
 import type { EdgeConnection } from '../types/edge'
 
 import { handleToV2Port } from './edgeHelpers'
+import { normalizeFormPromptActivityForDefinition } from './formPromptSettingsNormalization'
 
 // Type guard for Activity with inputs property
 function hasInputs(activity: Activity): activity is Activity & { inputs: Record<string, unknown> } {
@@ -257,11 +258,13 @@ export function buildWorkflowDefinition(
 
   validateEntityIds(activities, triggers, edges)
 
+  const activitiesForDefinition = activities.map((activity) => normalizeFormPromptActivityForDefinition(activity))
+
   // SECURITY: Build allowlist of known real IDs for positive validation of edge endpoints.
   // After trigger display IDs are resolved, every edge source/target must match a known
   // activity or trigger ID. This is more robust than negative prefix checks alone.
   const knownIds = new Set<string>()
-  for (const a of activities) {
+  for (const a of activitiesForDefinition) {
     knownIds.add(a.id)
   }
   for (const t of triggers) {
@@ -285,7 +288,7 @@ export function buildWorkflowDefinition(
         ...(nodePositions[t.id] ? { position: nodePositions[t.id] } : {}),
       }
     }),
-    nodes: activities.map((a) => {
+    nodes: activitiesForDefinition.map((a) => {
       validateNameLength(a.name, 'Step name')
       const sanitizedNodeName = a.name?.replace(CONTROL_CHAR_PATTERN, '')
       const inputs = hasInputs(a) ? a.inputs : undefined

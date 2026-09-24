@@ -74,6 +74,14 @@ describe('ExecutionStatusBadge', () => {
     expect(style).toContain('border-style: solid')
   })
 
+  it('renders waiting status as waiting for input for form prompt nodes', () => {
+    render(<ExecutionStatusBadge status="waiting" nodeType="form_prompt" />)
+
+    const badge = screen.getByLabelText('Waiting for input')
+    const style = badge.getAttribute('style') ?? ''
+    expect(style).toContain('border-color: var(--pf-t--global--color--status--warning--default)')
+  })
+
   it('renders waiting status as running for wait nodes', () => {
     render(<ExecutionStatusBadge status="waiting" nodeType="wait" />)
 
