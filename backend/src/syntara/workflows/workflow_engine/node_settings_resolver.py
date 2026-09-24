@@ -32,13 +32,13 @@ _TIMEOUT_CATALOG_KEYS: dict[str, str] = {
 }
 
 # Maps executor node type to its catalog setting key for expected_duration.
-# Same types as timeout — approval uses decision_window so is excluded here too.
 _EXPECTED_DURATION_CATALOG_KEYS: dict[str, str] = {
     NodeType.SCRIPT: "workflow_engine.script_expected_duration_seconds",
     NodeType.HTTP_REQUEST: "workflow_engine.http_request_expected_duration_seconds",
     NodeType.AAP_JOB_TEMPLATE: "workflow_engine.aap_expected_duration_seconds",
     NodeType.AAP_WORKFLOW_JOB_TEMPLATE: "workflow_engine.aap_expected_duration_seconds",
     NodeType.AGENTIC: "workflow_engine.agentic_expected_duration_seconds",
+    NodeType.APPROVAL: "workflow_engine.approval_expected_duration_seconds",
 }
 
 _MAX_OUTPUT_CATALOG_KEYS: dict[str, str] = {

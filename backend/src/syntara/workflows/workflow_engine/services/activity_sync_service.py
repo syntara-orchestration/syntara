@@ -32,6 +32,8 @@ from syntara.audit.context_managers import actor_context
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.core.constants import FieldLimits
 from syntara.core.exceptions import SafeValueError
+from syntara.settings.cache.settings_cache import get_runtime_settings
+from syntara.settings.catalog import SETTINGS_CATALOG
 from syntara.telemetry.events.workflow_emitters import (
     _map_execution_status_to_telemetry,
     emit_activities,
@@ -52,6 +54,7 @@ from syntara.workflows.workflow_engine.activities.common import (
     HEARTBEAT_STOP_MONITOR,
 )
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, NodeType
+from syntara.workflows.workflow_engine.node_settings_resolver import get_default_expected_duration
 from syntara.workflows.workflow_engine.utils.credential_scrubber import scrub_credentials
 from syntara.workflows.workflow_engine.utils.loop_iteration_ids import (
     innermost_iteration_index,
@@ -541,7 +544,10 @@ class ActivitySyncService:
 
         activity_definitions_map = await self._fetch_activity_definitions_map(workflow_version_id)
 
-        await self._create_all_activities_upfront(execution_id, activity_definitions_map)
+        # Fetch runtime settings for resolving catalog defaults (e.g. expected_duration).
+        runtime_settings = await self._fetch_runtime_settings()
+
+        await self._create_all_activities_upfront(execution_id, activity_definitions_map, runtime_settings)
 
         # Build activity index map after activities are created (for patch generation)
         activity_index_map = await self._build_activity_index_map(execution_id)
@@ -2502,6 +2508,18 @@ class ActivitySyncService:
 
             return activity_definitions_map
 
+    @staticmethod
+    async def _fetch_runtime_settings() -> dict[str, Any]:
+        """Fetch workflow_engine.* runtime settings for catalog default resolution.
+
+        Uses the same settings cache as the Temporal runtime_settings activity.
+        Returns a flat dict of key→value for all configured workflow_engine.* keys.
+        """
+        cache = get_runtime_settings()
+        keys = [e.key for e in SETTINGS_CATALOG if e.key.startswith("workflow_engine.")]
+        values = await asyncio.gather(*[cache.get(k) for k in keys])
+        return {k: v for k, v in zip(keys, values, strict=True) if v is not None}
+
     async def _sync_skipped_nodes(
         self,
         metadata: ExecutionMonitorMetadata,
@@ -2765,6 +2783,7 @@ class ActivitySyncService:
         self,
         execution_id: UUID,
         activity_definitions_map: dict[str, dict[str, Any]],
+        runtime_settings: dict[str, Any],
     ) -> None:
         """Create all ActivityExecution records upfront with status=PENDING.
 
@@ -2778,6 +2797,7 @@ class ActivitySyncService:
         Args:
             execution_id: Database execution ID
             activity_definitions_map: Map of activity definitions from workflow
+            runtime_settings: Workflow engine runtime settings for catalog default resolution
 
         """
         async with self.session_factory() as session:
@@ -2813,13 +2833,15 @@ class ActivitySyncService:
                         node_type = NodeType.INTERNAL_ACTIVITY
 
                     # V2 workflows: Create records for all node types (triggers, control, executors)
-                    # Extract expected_duration from node settings if present (per-node override).
-                    # Catalog defaults are resolved at Temporal dispatch time in dynamic_workflow.py.
+                    # Resolve expected_duration: per-node override → catalog default → None.
                     node_settings = activity_def.get("settings") or {}
                     raw_expected_duration = node_settings.get("expected_duration")
-                    expected_duration: int | None = (
-                        int(raw_expected_duration) if raw_expected_duration is not None else None
-                    )
+                    if raw_expected_duration is not None:
+                        expected_duration: int | None = int(raw_expected_duration)
+                    else:
+                        expected_duration = get_default_expected_duration(
+                            node_type.value, runtime_settings
+                        )
 
                     new_activity = ActivityExecution(
                         execution_id=execution_id,
