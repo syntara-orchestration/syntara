@@ -205,7 +205,13 @@ export default function Workflows() {
     isAllProjects
   )
 
-  useCursorReset(sortedWorkflows.length, hasActiveFilters, cursor, workflowsQuery.isFetching, resetPagination)
+  useCursorReset({
+    itemCount: sortedWorkflows.length,
+    hasActiveFilters,
+    cursor,
+    isFetching: workflowsQuery.isFetching,
+    resetPagination,
+  })
 
   const { handleDeleteProject: handleDeleteProjectBase, isDeletingProject } = useProjectActions({
     showSuccess,

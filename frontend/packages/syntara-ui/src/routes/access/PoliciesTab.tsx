@@ -166,7 +166,13 @@ export function PoliciesTab() {
   const policies = useMemo(() => (data?.resources ?? []).map(toPolicyRead), [data?.resources])
   const refetch = useCallback(() => detachPromise(policiesQuery.refetch()), [policiesQuery])
 
-  useCursorReset(policies.length, hasActiveFilters, cursor, policiesQuery.isFetching, resetPagination)
+  useCursorReset({
+    itemCount: policies.length,
+    hasActiveFilters,
+    cursor,
+    isFetching: policiesQuery.isFetching,
+    resetPagination,
+  })
 
   const showToolbar = policies.length > 0 || hasActiveFilters
   const policyJsonItem = policyJsonDialog.item

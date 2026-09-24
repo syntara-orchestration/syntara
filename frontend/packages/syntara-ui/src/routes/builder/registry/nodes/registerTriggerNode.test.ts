@@ -27,11 +27,11 @@ vi.mock('../../../../stores/useWorkflowStore', () => ({
     id,
     type: TriggerTypeEnum.SCHEDULED,
   })),
-  createWebhookTrigger: vi.fn((id: string) => ({
+  createWebhookTrigger: vi.fn(({ id }: { id: string }) => ({
     id,
     type: TriggerTypeEnum.WEBHOOK_TRIGGER,
   })),
-  createEdaTrigger: vi.fn((id: string) => ({
+  createEdaTrigger: vi.fn(({ id }: { id: string }) => ({
     id,
     type: TriggerTypeEnum.EDA_TRIGGER,
   })),
@@ -203,13 +203,14 @@ describe('registerTriggerNode', () => {
       onError
     )
 
-    expect(vi.mocked(createWebhookTrigger)).toHaveBeenCalledWith(
-      expect.any(String),
-      '',
-      undefined,
-      expect.any(String),
-      undefined
-    )
+    const [webhookArgs] = vi.mocked(createWebhookTrigger).mock.calls[0] ?? []
+    expect(webhookArgs).toMatchObject({
+      webhookPath: '',
+      inputSchema: undefined,
+      authorizedServiceAccountIds: undefined,
+    })
+    expect(typeof webhookArgs?.id).toBe('string')
+    expect(typeof webhookArgs?.name).toBe('string')
     expect(onSuccess).toHaveBeenCalled()
   })
 
@@ -264,13 +265,14 @@ describe('registerTriggerNode', () => {
       onError
     )
 
-    expect(vi.mocked(createWebhookTrigger)).toHaveBeenCalledWith(
-      expect.any(String),
-      '/hooks/deploy',
-      undefined,
-      expect.any(String),
-      serviceAccountIds
-    )
+    const [webhookArgs] = vi.mocked(createWebhookTrigger).mock.calls[0] ?? []
+    expect(webhookArgs).toMatchObject({
+      webhookPath: '/hooks/deploy',
+      inputSchema: undefined,
+      authorizedServiceAccountIds: serviceAccountIds,
+    })
+    expect(typeof webhookArgs?.id).toBe('string')
+    expect(typeof webhookArgs?.name).toBe('string')
     expect(onSuccess).toHaveBeenCalled()
   })
 
@@ -298,13 +300,14 @@ describe('registerTriggerNode', () => {
       onError
     )
 
-    expect(vi.mocked(createEdaTrigger)).toHaveBeenCalledWith(
-      expect.any(String),
-      '/eda/events',
-      undefined,
-      expect.any(String),
-      serviceAccountIds
-    )
+    const [edaArgs] = vi.mocked(createEdaTrigger).mock.calls[0] ?? []
+    expect(edaArgs).toMatchObject({
+      webhookPath: '/eda/events',
+      inputSchema: undefined,
+      authorizedServiceAccountIds: serviceAccountIds,
+    })
+    expect(typeof edaArgs?.id).toBe('string')
+    expect(typeof edaArgs?.name).toBe('string')
     expect(onSuccess).toHaveBeenCalled()
   })
 
