@@ -147,10 +147,7 @@ class ExecutionsConvertResourceMixin(ConvertResourceMixin):
             error_details=resource.error_details,
             labels=resource.labels,
             approval_pending=resource.approval_pending,
-            is_stalled=any(
-                a.stall_alert_at is not None
-                for a in (resource.activities if resource.activities else [])
-            ),
+            is_stalled=any(a.stall_alert_at is not None for a in (resource.activities if resource.activities else [])),
             mode=resource.mode,
             execution_metadata=resource.execution_metadata,
             retried_from_execution_id=resource.retried_from_execution_id,
