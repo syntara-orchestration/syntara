@@ -53,10 +53,7 @@ export function AuthMethodSelector({ groups, activeIndex, onChange, helpText }: 
     [isOpen, handleToggle, groups, activeIndex]
   )
 
-  const labelHelp = useMemo(
-    () => (helpText ? createFieldHelp('Auth method', helpText) : undefined),
-    [helpText]
-  )
+  const labelHelp = useMemo(() => (helpText ? createFieldHelp('Auth method', helpText) : undefined), [helpText])
 
   return (
     <FormGroup label="Auth method" fieldId="auth-method" isRequired labelHelp={labelHelp}>
