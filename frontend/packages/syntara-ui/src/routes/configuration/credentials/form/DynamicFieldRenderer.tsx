@@ -4,6 +4,7 @@ import {
   InputGroupItem,
   MenuToggle,
   type MenuToggleElement,
+  Popover,
   SelectList,
   SelectOption,
   Switch,
@@ -11,10 +12,10 @@ import {
   TextInput,
 } from '@patternfly/react-core'
 import { RhUiViewIcon, RhUiViewOffIcon } from '@patternfly/react-icons'
-import { useMemo, useState, type Ref } from 'react'
+import { useMemo, useState, type ReactElement, type Ref } from 'react'
 import type { FieldPath } from 'react-hook-form'
 
-import { createFieldHelp } from '../../../../components/createFieldHelp'
+import { FieldHelpIcon } from '../../../../components/FieldHelpIcon'
 import { SynFormField } from '../../../../components/forms/SynFormField'
 import { SynSelect } from '../../../../components/SynSelect'
 import { ENCRYPTED_SENTINEL } from '../credentialConstants'
@@ -44,6 +45,16 @@ function inputFieldName(fieldId: string): FieldPath<CredentialFormData> {
   return `inputs.${fieldId}` as FieldPath<CredentialFormData>
 }
 
+/** Matches legacy `FormLabelWithHelp` aria labels for credential dynamic fields (E2E + a11y). */
+function dynamicFieldLabelHelp(label: string, helpText: string): ReactElement {
+  const helpAriaLabel = `${label} help`
+  return (
+    <Popover bodyContent={helpText} aria-label={helpAriaLabel}>
+      <Button variant="plain" aria-label={helpAriaLabel} icon={<FieldHelpIcon />} />
+    </Popover>
+  )
+}
+
 function toFieldString(value: unknown): string {
   return value != null && (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean')
     ? String(value)
@@ -60,7 +71,7 @@ type DynamicSynFormFieldProps = DynamicFieldRendererProps & {
 
 function DynamicSynFormField({ field, isRequired, children }: Readonly<DynamicSynFormFieldProps>) {
   const labelHelp = useMemo(
-    () => (field.help_text ? createFieldHelp(field.label, field.help_text) : undefined),
+    () => (field.help_text ? dynamicFieldLabelHelp(field.label, field.help_text) : undefined),
     [field.label, field.help_text]
   )
 
