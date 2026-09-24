@@ -451,7 +451,7 @@ class FormPromptService(BaseService):
             .where(
                 or_(
                     FormPrompt.timeout_at.is_(None),  # type: ignore[union-attr]
-                    FormPrompt.timeout_at > responded_at,  # type: ignore[operator]
+                    FormPrompt.timeout_at > responded_at,  # type: ignore[arg-type, operator]
                 )
             )
             .values(
