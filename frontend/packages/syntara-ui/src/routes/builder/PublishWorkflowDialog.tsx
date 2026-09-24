@@ -52,13 +52,7 @@ export function PublishWorkflowDialog({ isOpen, isPublishing, onClose, onPublish
         </Content>
         <Form onSubmit={handleSubmit(onSubmit)} id="publish-workflow-form">
           <SynForm form={form}>
-            <SynTextField
-              name="name"
-              label="Version name"
-              fieldId="publish-name"
-              isRequired
-              ariaLabel="Version name"
-            />
+            <SynTextField name="name" label="Version name" fieldId="publish-name" isRequired ariaLabel="Version name" />
             <SynTextAreaField
               name="description"
               label="Description"
