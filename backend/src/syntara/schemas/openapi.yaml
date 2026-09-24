@@ -34992,31 +34992,6 @@ components:
               format: uuid
             - type: 'null'
           title: Retried From Execution Id
-        source_execution_id:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
-          title: Source Execution Id
-          description: ID of the source execution this was restarted from
-        failed_node_ids:
-          type: array
-          items:
-            type: string
-          title: Failed Node Ids
-          description: Failure points selected for restart (node IDs)
-        triggered_by:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
-          title: Triggered By
-          description: ID of the user who triggered the restart
-        restart_count:
-          type: integer
-          title: Restart Count
-          description: Restart generation (0 = original run)
-          default: 0
         trigger_type:
           anyOf:
             - type: string

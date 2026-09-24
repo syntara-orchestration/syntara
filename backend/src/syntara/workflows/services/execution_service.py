@@ -151,10 +151,6 @@ class ExecutionsConvertResourceMixin(ConvertResourceMixin):
             mode=resource.mode,
             execution_metadata=resource.execution_metadata,
             retried_from_execution_id=resource.retried_from_execution_id,
-            source_execution_id=resource.source_execution_id,
-            failed_node_ids=list(resource.failed_node_ids or []),
-            triggered_by=resource.triggered_by,
-            restart_count=resource.restart_count,
             trigger_type=resource.trigger_type,
             interface=resource.interface,
         )
@@ -379,10 +375,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         recorder: "MetricsRecorder",
         component: ComponentLabel,
         retried_from_execution_id: UUID | None = None,
-        source_execution_id: UUID | None = None,
         failed_node_ids: list[str] | None = None,
-        triggered_by: UUID | None = None,
-        restart_count: int = 0,
     ) -> ExecutionRead:
         """Start a Temporal workflow and persist the execution record.
 
@@ -421,7 +414,9 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             created_by_user_id=str(self.user.id),
             created_at=now.isoformat(),
             workflow_version_id=workflow_version.id,
-            restart_from_execution_id=str(source_execution_id) if source_execution_id is not None else None,
+            restart_from_execution_id=(
+                str(retried_from_execution_id) if failed_node_ids is not None and retried_from_execution_id else None
+            ),
             restart_failure_point_ids=failed_node_ids,
         )
 
@@ -474,10 +469,6 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             input_data=input_data,
             trigger_node_id=trigger_node_id,
             retried_from_execution_id=retried_from_execution_id,
-            source_execution_id=source_execution_id,
-            failed_node_ids=list(failed_node_ids or []),
-            triggered_by=triggered_by,
-            restart_count=restart_count,
             trigger_type=trigger_node.get("type"),
             interface=interface_context_var.get(),
             created_by=self.user.id,
@@ -1294,12 +1285,13 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
 
         Independently repeats the full validation chain before doing any work
         — never assumes the validate endpoint was called first. On success,
-        creates a new execution linked to the source (restart count, failure
-        points, triggered-by) running the exact workflow version *retained
-        from the original run* — later edits to the definition never affect a
-        retry (SDP ANSTRAT-1779 R10) — and triggers a Temporal run carrying
-        ``restart_from_execution_id`` for the engine's node classification
-        (AAP-92821).
+        creates a new execution linked to the source via
+        ``retried_from_execution_id`` (the same lineage field used by plain
+        retries) running the exact workflow version *retained from the
+        original run* — later edits to the definition never affect a retry
+        (SDP ANSTRAT-1779 R10) — and triggers a Temporal run carrying
+        ``restart_from_execution_id`` and the selected failure points for the
+        engine's node classification (AAP-92821).
 
         Args:
             execution_id: ID of the source (failed) execution
@@ -1357,8 +1349,6 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             trigger_node_id=trigger_node_id,
             recorder=recorder,
             component=component,
-            source_execution_id=source.id,
+            retried_from_execution_id=source.id,
             failed_node_ids=validation.failure_point_ids,
-            triggered_by=self.user.id,
-            restart_count=source.restart_count + 1,
         )

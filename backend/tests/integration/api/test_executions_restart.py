@@ -18,6 +18,7 @@ from syntara.workflows.models.workflow_version import WorkflowVersion
 from syntara.workflows.workflow_engine.models.responses import WorkflowStartResponse
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
+from tests.helpers.user_reference import assert_user_reference
 from tests.integration.helpers.error_data import assert_error_data
 
 GRAPH_NODES = [
@@ -436,10 +437,8 @@ class TestRestartExecution:
         assert response.status_code == status.HTTP_201_CREATED
         data = response.json()
         assert data["status"] == "pending"
-        assert data["source_execution_id"] == str(execution.id)
-        assert data["failed_node_ids"] == ["step_2"]
-        assert data["triggered_by"] == str(test_user.id)
-        assert data["restart_count"] == 1
+        assert data["retried_from_execution_id"] == str(execution.id)
+        assert_user_reference(data["created_by"], test_user)
         version_result = await test_db_session.exec(
             select(WorkflowVersion.id).where(
                 WorkflowVersion.workflow_id == test_workflow.id,

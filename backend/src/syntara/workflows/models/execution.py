@@ -227,35 +227,6 @@ class Execution(UserOwnedResource, table=True):
         description="ID of the execution this was retried from (null if not a retry)",
     )
 
-    # Restart lineage (AAP-92820: restart from failure point)
-    source_execution_id: UUID | None = Field(
-        default=None,
-        foreign_key="executions.id",
-        nullable=True,
-        ondelete="SET NULL",
-        index=True,
-        description="ID of the source execution this was restarted from (null if not a restart)",
-    )
-
-    failed_node_ids: list[str] = Field(
-        default_factory=list,
-        sa_column=Column(JSONB, nullable=False, server_default=text("'[]'::jsonb")),
-        description="Failure points selected for restart (node IDs from the source execution)",
-    )
-
-    triggered_by: UUID | None = Field(
-        default=None,
-        nullable=True,
-        description="ID of the user who triggered the restart",
-    )
-
-    restart_count: int = Field(
-        default=0,
-        nullable=False,
-        sa_column_kwargs={"server_default": text("0")},
-        description="Restart generation (0 = original run, source restart_count + 1 for restarts)",
-    )
-
     # Telemetry: trigger type and interface
     trigger_type: str | None = Field(
         default=None,
@@ -547,14 +518,6 @@ class ExecutionRead(UserReferenceFieldsMixin, SQLModel):
     mode: ExecutionMode = ExecutionMode.STANDARD
     execution_metadata: dict[str, Any] | None = None
     retried_from_execution_id: UUID | None = None
-    source_execution_id: UUID | None = Field(
-        default=None, description="ID of the source execution this was restarted from"
-    )
-    failed_node_ids: list[str] = Field(
-        default_factory=list, description="Failure points selected for restart (node IDs)"
-    )
-    triggered_by: UUID | None = Field(default=None, description="ID of the user who triggered the restart")
-    restart_count: int = Field(default=0, description="Restart generation (0 = original run)")
     trigger_type: str | None = Field(
         default=None,
         description="Trigger node type (manual_trigger, scheduled_trigger, webhook_trigger, eda_trigger)",
