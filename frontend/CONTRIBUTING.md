@@ -8,7 +8,7 @@ All pull requests must pass the `(Frontend) Required Checks` CI gate before merg
 
 ## AI-Assisted Development
 
-This project ships with AI agent skills (in `.claude/skills/`) that handle the repetitive parts of the development workflow — implementing features, reviewing code, and writing tests — while enforcing the project's standards automatically. These skills work with Claude Code, Cursor, or any tool that reads the skill files.
+This project ships with AI agent skills (canonical files in `.agents/skills/`; Claude Code symlinks in `.claude/skills/`) that guide agents through the development workflow — implementing features, reviewing code, and writing tests — using the project's standards. These skills work with Codex, Claude Code, Cursor, or any tool that reads the skill files.
 
 **New contributors should read [`docs/ai-assisted-development.md`](docs/ai-assisted-development.md) before writing any code.** It explains:
 
@@ -18,7 +18,7 @@ This project ships with AI agent skills (in `.claude/skills/`) that handle the r
 - How to apply the **UX Design System** skill to match the project design language
 - How to review your implementation locally (dev server, browser states, keyboard/accessibility)
 - How to fix common guideline violations flagged during review
-- How to use `/frontend-build-ui-feature` to walk through the full workflow step by step
+- How to invoke `frontend-build-ui-feature` (`$frontend-build-ui-feature` in Codex or `/frontend-build-ui-feature` in Claude Code) to walk through the workflow
 
 The guide includes copy-ready prompt templates, a workflow diagram, and worked examples.
 

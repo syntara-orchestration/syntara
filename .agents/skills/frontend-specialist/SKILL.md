@@ -1,9 +1,10 @@
 ---
+name: frontend-specialist
 description: "Standards for implementing, reviewing, and refactoring frontend code — React 19, TypeScript 5.9+, PatternFly 6, Vitest."
 user-invocable: false
 ---
 
-# Claude Skill: Frontend Specialist
+# Frontend Specialist
 
 Standards for implementing, reviewing, and refactoring frontend code using React 19, TypeScript 5.9+, PatternFly 6, Vite, and Vitest. Ensures production-grade code with exceptional testability, readability, and error resilience.
 
@@ -13,11 +14,11 @@ Standards for implementing, reviewing, and refactoring frontend code using React
 
 **Before implementing ANY code**, read these project skill files:
 
-1. **`.claude/skills/frontend-coding-standards/SKILL.md`** — API integration rules, form patterns, shared hooks (`useCursorPagination`, `useDialogState`, `useDeleteAction`, `SynConfirmationDialog`), PatternFly guidelines, i18n rules, and enum constant usage.
+1. **`.agents/skills/frontend-coding-standards/SKILL.md`** — API integration rules, form patterns, shared hooks (`useCursorPagination`, `useDialogState`, `useDeleteAction`, `SynConfirmationDialog`), PatternFly guidelines, i18n rules, and enum constant usage.
 
-2. **`.claude/skills/frontend-testing-guidelines/SKILL.md`** — Testing rules (userEvent over fireEvent, accessible queries, vitest-axe), coverage (CI: 85% global statements; authoring target ~80% on new files), AAA pattern, and accessibility testing at three levels.
+2. **`.agents/skills/frontend-testing-guidelines/SKILL.md`** — Testing rules (userEvent over fireEvent, accessible queries, vitest-axe), coverage (CI: 85% global statements; authoring target ~80% on new files), AAA pattern, and accessibility testing at three levels.
 
-3. **`.claude/skills/frontend-library-references/SKILL.md`** — `llms.txt` URLs and official docs for all frontend libraries (React, Zod, Zustand, Vitest, Vite, TanStack Query/Router, React Flow, Storybook, dnd-kit, and more). **Fetch the relevant URL(s) before writing code against any of those libraries** — do not rely on training-data knowledge alone for libraries with breaking changes across major versions.
+3. **`.agents/skills/frontend-library-references/SKILL.md`** — `llms.txt` URLs and official docs for all frontend libraries (React, Zod, Zustand, Vitest, Vite, TanStack Query/Router, React Flow, Storybook, dnd-kit, and more). **Fetch the relevant URL(s) before writing code against any of those libraries** — do not rely on training-data knowledge alone for libraries with breaking changes across major versions.
 
 **Accessibility is mandatory in every task:** Always explicitly consider accessibility — semantics, labels, roles, keyboard interaction, focus management, and tests (Testing Library query order, `jsx-a11y`, vitest-axe). Do not ship or approve UI changes without an accessibility pass.
 
@@ -97,8 +98,8 @@ Standards for implementing, reviewing, and refactoring frontend code using React
 - [ ] `RhUi*` icons for all action buttons -- not PatternFly icons like `PlusCircleIcon`
 - [ ] No `eslint-disable` or `eslint-disable-next-line` in new/modified code -- fix the code so every rule passes; pre-existing suppressions are tech debt being cleaned up
 - [ ] No `// TODO` / `// FIXME` comments -- track deferred work in an issue, not code
-- [ ] All async server state uses TanStack Query (`useQuery`/`useMutation`/`useQueries`) -- no manual `useEffect` + `useState` for API calls (see .claude/skills/frontend-coding-standards/SKILL.md §30)
-- [ ] Hooks called unconditionally but used conditionally -- extract to wrapper component (see .claude/skills/frontend-coding-standards/SKILL.md §29)
+- [ ] All async server state uses TanStack Query (`useQuery`/`useMutation`/`useQueries`) -- no manual `useEffect` + `useState` for API calls (see .agents/skills/frontend-coding-standards/SKILL.md §30)
+- [ ] Hooks called unconditionally but used conditionally -- extract to wrapper component (see .agents/skills/frontend-coding-standards/SKILL.md §29)
 
 ### Permission Gating
 
@@ -106,7 +107,7 @@ Standards for implementing, reviewing, and refactoring frontend code using React
 - [ ] Create/edit routes: set `routePermission` for `ProtectedRoute` guard
 - [ ] New CRUD actions: wrap in `DisabledWithTooltip` with domain permission hook and `permissionTooltip()`
 - [ ] New permission-gated features: add role-aware mock handlers in `handlers.ts` for all 4 roles
-- [ ] See [`frontend/docs/permissions-rbac.md`](../../frontend/docs/permissions-rbac.md) for architecture
+- [ ] See [`frontend/docs/permissions-rbac.md`](../../../frontend/docs/permissions-rbac.md) for architecture
 
 ### Documentation Links
 
@@ -123,7 +124,7 @@ Standards for implementing, reviewing, and refactoring frontend code using React
 
 ## Implementation Workflow
 
-1. **Read the skills** — `.claude/skills/frontend-coding-standards/SKILL.md`, `.claude/skills/frontend-testing-guidelines/SKILL.md`, and `.claude/skills/frontend-library-references/SKILL.md` (fetch the relevant `llms.txt` URLs for any library you will use)
+1. **Read the skills** — `.agents/skills/frontend-coding-standards/SKILL.md`, `.agents/skills/frontend-testing-guidelines/SKILL.md`, and `.agents/skills/frontend-library-references/SKILL.md` (fetch the relevant `llms.txt` URLs for any library you will use)
 2. **Check for reusability** — Search `frontend/packages/syntara-ui/src/components/` and PatternFly docs before creating new components
 3. **Implement incrementally** — Happy path first, then edge cases
 4. **Write tests concurrently** — Tests alongside implementation

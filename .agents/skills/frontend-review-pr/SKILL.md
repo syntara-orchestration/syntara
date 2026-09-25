@@ -1,11 +1,12 @@
 ---
+name: frontend-review-pr
 description: "Review a frontend PR against the project's 36-item checklist and coding standards."
 user-invocable: true
 ---
 
 # Review PR
 
-Follow the steps in `.claude/skills/frontend-pr-review/SKILL.md` to conduct a thorough pull request review.
+Follow the steps in `.agents/skills/frontend-pr-review/SKILL.md` to conduct a thorough pull request review.
 
 Start by:
 

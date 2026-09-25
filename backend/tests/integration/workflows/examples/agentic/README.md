@@ -220,4 +220,4 @@ task:
 
 ## Related Documentation
 
-- [Agentic Activity Implementation](../../../../../src/syntara/workflows/activities/agentic_activity.py)
+- [Agentic Activity Implementation](../../../../../src/syntara/workflows/workflow_engine/activities/agentic_activity.py)

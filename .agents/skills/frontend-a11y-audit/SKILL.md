@@ -36,7 +36,7 @@ When citing success criteria, use the machine-readable catalog at [WCAG 2.2 JSON
 - User asks for keyboard audit, skip link check, heading hierarchy, or "beyond axe" review
 - Completing an accessibility audit story (draft one bug per violation for user review)
 
-Load `.claude/skills/frontend-testing-guidelines/SKILL.md` for unit-test axe patterns and `.claude/skills/frontend-playwright-e2e/SKILL.md` for targeted E2E axe setup.
+Load `.agents/skills/frontend-testing-guidelines/SKILL.md` for unit-test axe patterns and `.agents/skills/frontend-playwright-e2e/SKILL.md` for targeted E2E axe setup.
 
 ---
 

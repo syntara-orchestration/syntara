@@ -46,7 +46,7 @@ plus community-specific clarity:
 | **Scope fit**          | Change fits [Scope of welcome contributions](#scope-of-welcome-contributions). Out-of-scope proposals are closed with a pointer to this document.                                    |
 
 Reviewers use the PR template checklists and the area coding standards under
-`backend/docs/standards/` and `frontend/AGENTS.md` / `.claude/skills/`.
+`backend/docs/standards/` and `frontend/AGENTS.md` / `.agents/skills/`.
 
 ## Acceptance process
 

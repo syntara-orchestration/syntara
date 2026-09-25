@@ -1,4 +1,5 @@
 ---
+name: frontend-library-references
 description: "Library llms.txt URLs and official docs for all frontend libraries. Fetch before writing code against these libraries."
 user-invocable: false
 ---

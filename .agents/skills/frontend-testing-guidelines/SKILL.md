@@ -1,4 +1,5 @@
 ---
+name: frontend-testing-guidelines
 description: "Frontend testing standards — Vitest, Testing Library, vitest-axe, coverage requirements, accessibility testing."
 user-invocable: false
 ---
@@ -155,7 +156,7 @@ test('user creates a workflow', async ({ app }) => {
 
 **Important:** When running against the real backend, always clean up created resources (they persist in a real database). See the [Playwright E2E skill](../frontend-playwright-e2e/SKILL.md) for both mock API and real backend setup.
 
-**For comprehensive E2E guidance:** See [`.claude/skills/frontend-playwright-e2e/SKILL.md`](../frontend-playwright-e2e/SKILL.md)
+**For comprehensive E2E guidance:** See [`.agents/skills/frontend-playwright-e2e/SKILL.md`](../frontend-playwright-e2e/SKILL.md)
 
 ### Why the Distinction Matters
 
@@ -313,7 +314,7 @@ screen.getByRole('status') // or screen.getByText(/loading/i)
 screen.getByRole('alert') // for error states
 ```
 
-Rules with many pre-existing violations are set to `warn` (not `error`) to allow gradual migration. **New test code must produce zero warnings** -- these rules will be promoted to `error` once existing violations are cleaned up. See [.claude/skills/frontend-coding-standards/SKILL.md section 8 -- Zero New Warnings Policy](../frontend-coding-standards/SKILL.md).
+Rules with many pre-existing violations are set to `warn` (not `error`) to allow gradual migration. **New test code must produce zero warnings** -- these rules will be promoted to `error` once existing violations are cleaned up. See [.agents/skills/frontend-coding-standards/SKILL.md section 8 -- Zero New Warnings Policy](../frontend-coding-standards/SKILL.md).
 
 **Async queries: use `findBy*` instead of `waitFor + getBy*`**
 
@@ -427,7 +428,7 @@ This ensures the hook file itself is measured (not only indirect coverage from a
 
 ### 4. Unnecessary `useEffect` in Hooks
 
-The ESLint plugin `eslint-plugin-react-you-might-not-need-an-effect` (configured at `warn` level) catches most unnecessary `useEffect` patterns automatically. See [.claude/skills/frontend-coding-standards/SKILL.md §23](../frontend-coding-standards/SKILL.md) for details.
+The ESLint plugin `eslint-plugin-react-you-might-not-need-an-effect` (configured at `warn` level) catches most unnecessary `useEffect` patterns automatically. See [.agents/skills/frontend-coding-standards/SKILL.md §23](../frontend-coding-standards/SKILL.md) for details.
 
 ### 5. Isolate the Field Under Test in Validation Tests
 
@@ -656,7 +657,7 @@ it('shows a fallback title while loading', () => {
 })
 ```
 
-**E2E:** Static page titles are covered by `e2e/page-titles.spec.ts`. Add `expect(page).toHaveTitle(...)` to feature specs that already navigate to a page as part of their setup.
+**E2E:** Existing feature specs assert page titles when they navigate to a page. Add `expect(app).toHaveTitle(...)` to the relevant feature spec when adding a page or route.
 
 ## Permission Gating Tests
 
