@@ -3,21 +3,17 @@ import {
   Content,
   ContentVariants,
   FormGroup,
-  FormHelperText,
-  HelperText,
-  HelperTextItem,
   MenuToggle,
   type MenuToggleElement,
   SelectList,
   SelectOption,
   Stack,
   StackItem,
-  TextInput,
 } from '@patternfly/react-core'
 import { MissedSchedulePolicyEnum, ScheduleTypeEnum, TriggerTypeEnum, WEBHOOK_TRIGGER_TYPES } from '@syntara/contracts'
 import type { ReactNode } from 'react'
 import { useCallback, use, useEffect, useMemo, useState } from 'react'
-import { Controller, FormProvider, useForm, useFormContext, useWatch } from 'react-hook-form'
+import { useFormContext, useWatch } from 'react-hook-form'
 
 import { FieldHelpPopover } from '../../../components/FieldHelpPopover'
 import { ScheduleBuilderFields } from '../../../components/forms/ScheduleBuilderFields'
@@ -26,7 +22,11 @@ import {
   EXECUTION_CONFLICT_HELP,
   SCHEDULE_EXPRESSION_HELP,
 } from '../../../components/forms/scheduleHelpText'
+import { SynForm } from '../../../components/forms/SynForm'
+import { SynFormField } from '../../../components/forms/SynFormField'
+import { SynTextField } from '../../../components/forms/SynTextField'
 import { SynSelect } from '../../../components/SynSelect'
+import { useSynForm } from '../../../hooks/useSynForm'
 import { getDefaultRepeatingInterval } from '../../../utils/triggerFormatting'
 import { generateWebhookPath } from '../../../utils/webhookPath'
 import { NodeEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useNodeEditorAutoSubmit'
@@ -35,7 +35,6 @@ import { useIsVersionView } from '../VersionViewContext'
 import { EdaFields } from './EdaTriggerFields'
 import { ManualTriggerFields } from './ManualTriggerFields'
 import { ActivityNameField } from './shared/ActivityNameField'
-import { zodResolver } from './shared/formSchemaUtils'
 import { NodeFormContainer } from './shared/NodeFormContainer'
 import nodeFormStyles from './shared/nodeFormStyles.module.css'
 import { NodeFormTabsLayout } from './shared/NodeFormTabsLayout'
@@ -238,6 +237,33 @@ function ScheduleTypeSelect({
   )
 }
 
+function ScheduleIntervalFields({
+  intervalError,
+  isEndDateError,
+}: Readonly<{
+  intervalError?: { message?: string }
+  isEndDateError: boolean
+}>) {
+  const timezone = useWatch<TriggerFormData, 'timezone'>({ name: 'timezone' })
+  const { setValue } = useFormContext<TriggerFormData>()
+
+  return (
+    <SynFormField name="interval" label="" hideFormGroupLabel hideFooter>
+      {({ field }) => (
+        <ScheduleBuilderFields
+          value={typeof field.value === 'string' ? field.value : ''}
+          onChange={field.onChange}
+          timezone={timezone ?? 'UTC'}
+          onTimezoneChange={(tz) => setValue('timezone', tz, { shouldDirty: true })}
+          required
+          error={!!intervalError && !isEndDateError}
+          errorMessage={intervalError?.message}
+        />
+      )}
+    </SynFormField>
+  )
+}
+
 // ── Main form fields ─────────────────────────────────────────────────────
 
 function TriggerFormFields({
@@ -262,7 +288,7 @@ function TriggerFormFields({
   const triggerType = useWatch({ control, name: 'triggerType' })
   const scheduleType = useWatch({ control, name: 'scheduleType' })
 
-  const isEndDateError = errors.interval?.message?.toLowerCase().includes('end date')
+  const isEndDateError = Boolean(errors.interval?.message?.toLowerCase().includes('end date'))
 
   useEffect(() => {
     if (!errors.interval) return
@@ -276,14 +302,9 @@ function TriggerFormFields({
 
   const nameField = useMemo(
     () => (
-      <ActivityNameField<TriggerFormData>
-        register={register}
-        fieldId="trigger-name"
-        placeholder="Enter trigger name"
-        ariaLabel="Name"
-      />
+      <ActivityNameField control={control} fieldId="trigger-name" placeholder="Enter trigger name" ariaLabel="Name" />
     ),
-    [register]
+    [control]
   )
 
   useEffect(() => {
@@ -315,60 +336,39 @@ function TriggerFormFields({
           </StackItem>
 
           <StackItem>
-            <FormGroup
+            <SynFormField
+              name="scheduleType"
               label="Schedule expression"
               labelHelp={scheduleExpressionLabelHelp}
               fieldId="schedule-expression"
               isRequired
             >
-              <Controller
-                control={control}
-                name="scheduleType"
-                render={({ field }) => (
-                  <ScheduleTypeSelect value={field.value} onChange={field.onChange} isDisabled={isVersionView} />
-                )}
-              />
-            </FormGroup>
+              {({ field }) => (
+                <ScheduleTypeSelect
+                  value={field.value as TriggerFormData['scheduleType']}
+                  onChange={field.onChange}
+                  isDisabled={isVersionView}
+                />
+              )}
+            </SynFormField>
           </StackItem>
 
           {scheduleType === ScheduleTypeEnum.INTERVAL && (
             <fieldset disabled={isVersionView} className={nodeFormStyles.disabledFieldset}>
               <Stack hasGutter>
                 <StackItem>
-                  <Controller
-                    control={control}
-                    name="interval"
-                    render={({ field: intervalField }) => (
-                      <Controller
-                        control={control}
-                        name="timezone"
-                        render={({ field: tzField }) => (
-                          <ScheduleBuilderFields
-                            value={intervalField.value ?? ''}
-                            onChange={intervalField.onChange}
-                            timezone={tzField.value ?? 'UTC'}
-                            onTimezoneChange={tzField.onChange}
-                            required
-                            error={!!errors.interval && !isEndDateError}
-                            errorMessage={errors.interval?.message}
-                          />
-                        )}
-                      />
-                    )}
-                  />
+                  <ScheduleIntervalFields intervalError={errors.interval} isEndDateError={isEndDateError} />
                 </StackItem>
 
-                <Controller
-                  control={control}
-                  name="missedSchedulePolicy"
-                  render={({ field }) => (
+                <SynFormField name="missedSchedulePolicy" label="" hideFormGroupLabel hideFooter>
+                  {({ field }) => (
                     <ExecutionConflictPolicyField
-                      value={field.value ?? MissedSchedulePolicyEnum.SKIP}
+                      value={(field.value as TriggerFormData['missedSchedulePolicy']) ?? MissedSchedulePolicyEnum.SKIP}
                       onChange={field.onChange}
                       isDisabled={isVersionView}
                     />
                   )}
-                />
+                </SynFormField>
               </Stack>
             </fieldset>
           )}
@@ -377,48 +377,28 @@ function TriggerFormFields({
             <fieldset disabled={isVersionView} className={nodeFormStyles.disabledFieldset}>
               <Stack hasGutter>
                 <StackItem>
-                  <FormGroup
+                  <SynTextField
+                    name="cron"
                     label="Cron expression"
+                    ariaLabel="Cron expression"
                     labelHelp={cronExpressionLabelHelp}
                     fieldId="cron-expression"
                     isRequired
-                  >
-                    <Controller
-                      control={control}
-                      name="cron"
-                      render={({ field }) => (
-                        <TextInput
-                          id="cron-expression"
-                          aria-label="Cron expression"
-                          value={field.value ?? ''}
-                          onChange={(_event, value) => field.onChange(value)}
-                          placeholder="0 9 * * 1"
-                          validated={errors.cron ? 'error' : 'default'}
-                        />
-                      )}
-                    />
-                    <FormHelperText>
-                      <HelperText>
-                        <HelperTextItem variant={errors.cron ? 'error' : 'default'}>
-                          {errors.cron?.message ??
-                            'Format: [Minute] [Hour] [Day of the Month] [Month] [Day of the Week]'}
-                        </HelperTextItem>
-                      </HelperText>
-                    </FormHelperText>
-                  </FormGroup>
+                    placeholder="0 9 * * 1"
+                    hint="Format: [Minute] [Hour] [Day of the Month] [Month] [Day of the Week]"
+                    isDisabled={isVersionView}
+                  />
                 </StackItem>
 
-                <Controller
-                  control={control}
-                  name="missedSchedulePolicy"
-                  render={({ field }) => (
+                <SynFormField name="missedSchedulePolicy" label="" hideFormGroupLabel hideFooter>
+                  {({ field }) => (
                     <ExecutionConflictPolicyField
-                      value={field.value ?? MissedSchedulePolicyEnum.SKIP}
+                      value={(field.value as TriggerFormData['missedSchedulePolicy']) ?? MissedSchedulePolicyEnum.SKIP}
                       onChange={field.onChange}
                       isDisabled={isVersionView}
                     />
                   )}
-                />
+                </SynFormField>
               </Stack>
             </fieldset>
           )}
@@ -428,7 +408,7 @@ function TriggerFormFields({
       {triggerType === TriggerTypeEnum.WEBHOOK_TRIGGER && (
         <fieldset disabled={isVersionView} className={nodeFormStyles.disabledFieldset}>
           <Stack hasGutter>
-            <WebhookFields errors={errors} />
+            <WebhookFields />
           </Stack>
         </fieldset>
       )}
@@ -436,7 +416,7 @@ function TriggerFormFields({
       {triggerType === TriggerTypeEnum.EDA_TRIGGER && (
         <fieldset disabled={isVersionView} className={nodeFormStyles.disabledFieldset}>
           <Stack hasGutter>
-            <EdaFields errors={errors} />
+            <EdaFields />
           </Stack>
         </fieldset>
       )}
@@ -449,14 +429,14 @@ function TriggerFormFields({
 export function TriggerNodeForm(props: TriggerNodeFormProps) {
   const [defaultValues] = useState<TriggerFormData>(() => buildTriggerFormDefaults(props.initialData))
 
-  const methods = useForm<TriggerFormData>({
-    resolver: zodResolver(triggerFormSchema, undefined, { mode: 'sync' }),
+  const form = useSynForm({
+    schema: triggerFormSchema,
     defaultValues,
   })
 
   const {
     formState: { errors },
-  } = methods
+  } = form
 
   const handleSubmit = (data: TriggerFormData) => {
     const isManual = data.triggerType === TriggerTypeEnum.MANUAL_TRIGGER
@@ -479,13 +459,13 @@ export function TriggerNodeForm(props: TriggerNodeFormProps) {
   }
 
   const autoSubmitRef = use(NodeEditorAutoSubmitContext)
-  useRegisterAutoSubmit(autoSubmitRef, methods, handleSubmit)
+  useRegisterAutoSubmit(autoSubmitRef, form, handleSubmit)
 
   return (
-    <FormProvider {...methods}>
-      <NodeFormContainer formId="trigger-node-form" onSubmit={methods.handleSubmit(handleSubmit)}>
+    <NodeFormContainer formId="trigger-node-form" onSubmit={form.handleSubmit(handleSubmit)}>
+      <SynForm form={form}>
         <TriggerFormFields onHeaderContentChange={props.onHeaderContentChange} validationErrors={errors} />
-      </NodeFormContainer>
-    </FormProvider>
+      </SynForm>
+    </NodeFormContainer>
   )
 }

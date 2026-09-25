@@ -13,10 +13,12 @@ import type { IntegrationsAPI, ToolManagerAPI } from '@syntara/contracts'
 import type { ReactNode } from 'react'
 import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Control, UseFormSetValue } from 'react-hook-form'
-import { Controller, FormProvider, useForm, useFormContext, useFormState, useWatch } from 'react-hook-form'
+import { Controller, useFormContext, useFormState, useWatch } from 'react-hook-form'
 
 import { AppRoute } from '../../../app/AppRoute'
+import { SynForm } from '../../../components/forms/SynForm'
 import { SynLink } from '../../../components/SynLink'
+import { useSynForm } from '../../../hooks/useSynForm'
 import { detachPromise } from '../../../utils/detachPromise'
 import { useIntegrationPermissions } from '../../configuration/integrations/useIntegrationPermissions'
 import { ExpandableCodeEditor } from '../components/ExpandableCodeEditor'
@@ -31,7 +33,6 @@ import { aiAgentFormSchema, type AIAgentFormData } from './aiAgentFormSchema'
 import { LLMSection, NO_PROJECT_MESSAGE, ToolsLoadError } from './AIAgentFormSections'
 import { ConnectionsSection } from './ConnectionsSection'
 import { ActivityNameField } from './shared/ActivityNameField'
-import { zodResolver } from './shared/formSchemaUtils'
 import { nodeHelp } from './shared/nodeFieldHelp'
 import { NodeFormContainer } from './shared/NodeFormContainer'
 import nodeFormStyles from './shared/nodeFormStyles.module.css'
@@ -181,10 +182,8 @@ function AIAgentFormFields({
   const [staleToolsWarning, setStaleToolsWarning] = useState('')
 
   const nameField = useMemo(
-    () => (
-      <ActivityNameField register={register} fieldId="agent-name" placeholder="Enter agent name" ariaLabel="Name" />
-    ),
-    [register]
+    () => <ActivityNameField control={control} fieldId="agent-name" placeholder="Enter agent name" ariaLabel="Name" />,
+    [control]
   )
 
   useEffect(() => {
@@ -457,20 +456,17 @@ export function AIAgentNodeForm(props: Readonly<AIAgentNodeFormProps>) {
     [completedFiles, onSubmitProp, markPersisted]
   )
 
-  const methods = useForm<AIAgentFormData>({
-    resolver: zodResolver(aiAgentFormSchema, undefined, { mode: 'sync' }),
+  const form = useSynForm({
+    schema: aiAgentFormSchema,
     defaultValues,
     mode: 'onChange',
     reValidateMode: 'onChange',
   })
 
-  const onFormSubmit = useCallback(
-    (e: React.FormEvent) => methods.handleSubmit(handleSubmit)(e),
-    [methods, handleSubmit]
-  )
+  const onFormSubmit = useCallback((e: React.FormEvent) => form.handleSubmit(handleSubmit)(e), [form, handleSubmit])
 
   const autoSubmitRef = use(NodeEditorAutoSubmitContext)
-  useRegisterAutoSubmit(autoSubmitRef, methods, handleSubmit)
+  useRegisterAutoSubmit(autoSubmitRef, form, handleSubmit)
 
   const fileContextValue = useMemo(
     () => ({
@@ -496,7 +492,7 @@ export function AIAgentNodeForm(props: Readonly<AIAgentNodeFormProps>) {
 
   return (
     <AIAgentFileContext.Provider value={fileContextValue}>
-      <FormProvider {...methods}>
+      <SynForm form={form}>
         <NodeFormContainer formId="ai-agent-node-form" onSubmit={onFormSubmit}>
           <AIAgentFormFields
             onHeaderContentChange={props.onHeaderContentChange}
@@ -509,7 +505,7 @@ export function AIAgentNodeForm(props: Readonly<AIAgentNodeFormProps>) {
             hasNoIntegrations={hasNoIntegrations}
           />
         </NodeFormContainer>
-      </FormProvider>
+      </SynForm>
     </AIAgentFileContext.Provider>
   )
 }

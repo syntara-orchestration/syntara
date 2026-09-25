@@ -1,25 +1,18 @@
-import {
-  Alert,
-  Content,
-  FormGroup,
-  FormHelperText,
-  HelperText,
-  HelperTextItem,
-  Stack,
-  StackItem,
-} from '@patternfly/react-core'
+import { Alert, Content, Stack, StackItem } from '@patternfly/react-core'
 import type { ReactNode } from 'react'
 import { use, useEffect, useMemo } from 'react'
-import { Controller, FormProvider, useForm, useFormContext } from 'react-hook-form'
+import { useFormContext } from 'react-hook-form'
 
 import { ExpressionBuilderCore as ExpressionBuilder } from '../../../components/expressions/ExpressionBuilderCore'
+import { SynForm } from '../../../components/forms/SynForm'
+import { SynFormField } from '../../../components/forms/SynFormField'
+import { useSynForm } from '../../../hooks/useSynForm'
 import { NodeEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useNodeEditorAutoSubmit'
 import { useIsVersionView } from '../VersionViewContext'
 
 import { conditionFormSchema, type ConditionFormData } from './conditionFormSchema'
 import { ActivityNameField } from './shared/ActivityNameField'
 import { ConditionalExpressionHelp } from './shared/ConditionalExpressionHelp'
-import { zodResolver } from './shared/formSchemaUtils'
 import { NodeFormContainer } from './shared/NodeFormContainer'
 import nodeFormStyles from './shared/nodeFormStyles.module.css'
 import { NodeFormTabsLayout } from './shared/NodeFormTabsLayout'
@@ -38,11 +31,11 @@ function ConditionFormFields({
   onHeaderContentChange?: (content: ReactNode | null) => void
 }) {
   const isVersionView = useIsVersionView()
-  const { register, control } = useFormContext<ConditionFormData>()
+  const { control } = useFormContext<ConditionFormData>()
 
   const nameField = useMemo(
-    () => <ActivityNameField register={register} fieldId="condition-name" ariaLabel="Name" />,
-    [register]
+    () => <ActivityNameField control={control} fieldId="condition-name" ariaLabel="Name" />,
+    [control]
   )
 
   useEffect(() => {
@@ -54,7 +47,7 @@ function ConditionFormFields({
 
   const parametersContent = (
     <Stack hasGutter>
-      {!onHeaderContentChange && <ActivityNameField register={register} fieldId="condition-name" />}
+      {!onHeaderContentChange && <ActivityNameField fieldId="condition-name" />}
 
       <StackItem>
         <Alert
@@ -72,37 +65,25 @@ function ConditionFormFields({
       </StackItem>
 
       <StackItem>
-        <FormGroup
+        <SynFormField
+          name="condition"
           label="Conditional expression"
           labelHelp={<ConditionalExpressionHelp />}
           isRequired
           fieldId="condition-expression"
         >
-          <fieldset disabled={isVersionView} className={nodeFormStyles.disabledFieldset}>
-            <Controller
-              control={control}
-              name="condition"
-              render={({ field, fieldState }) => (
-                <>
-                  <ExpressionBuilder
-                    id="condition-expression"
-                    value={field.value || ''}
-                    onChange={field.onChange}
-                    error={!!fieldState.error}
-                    placeholder="Build your condition"
-                  />
-                  {fieldState.error && (
-                    <FormHelperText>
-                      <HelperText>
-                        <HelperTextItem variant="error">{fieldState.error.message}</HelperTextItem>
-                      </HelperText>
-                    </FormHelperText>
-                  )}
-                </>
-              )}
-            />
-          </fieldset>
-        </FormGroup>
+          {({ field, fieldState }) => (
+            <fieldset disabled={isVersionView} className={nodeFormStyles.disabledFieldset}>
+              <ExpressionBuilder
+                id="condition-expression"
+                value={typeof field.value === 'string' ? field.value : ''}
+                onChange={field.onChange}
+                error={!!fieldState.error}
+                placeholder="Build your condition"
+              />
+            </fieldset>
+          )}
+        </SynFormField>
       </StackItem>
     </Stack>
   )
@@ -117,19 +98,19 @@ export function ConditionNodeForm(props: ConditionNodeFormProps) {
     ...props.initialData,
   }
 
-  const methods = useForm<ConditionFormData>({
-    resolver: zodResolver(conditionFormSchema, undefined, { mode: 'sync' }),
+  const form = useSynForm({
+    schema: conditionFormSchema,
     defaultValues,
   })
 
   const autoSubmitRef = use(NodeEditorAutoSubmitContext)
-  useRegisterAutoSubmit(autoSubmitRef, methods, props.onSubmit)
+  useRegisterAutoSubmit(autoSubmitRef, form, props.onSubmit)
 
   return (
-    <FormProvider {...methods}>
-      <NodeFormContainer formId="condition-node-form" onSubmit={methods.handleSubmit(props.onSubmit)}>
+    <NodeFormContainer formId="condition-node-form" onSubmit={form.handleSubmit(props.onSubmit)}>
+      <SynForm form={form}>
         <ConditionFormFields onHeaderContentChange={props.onHeaderContentChange} />
-      </NodeFormContainer>
-    </FormProvider>
+      </SynForm>
+    </NodeFormContainer>
   )
 }

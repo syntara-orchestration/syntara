@@ -38,10 +38,28 @@ export type SynTextFieldProps<
   placeholder?: string
   /** Disables the input. */
   isDisabled?: boolean
+  /** Accessible name when the visible FormGroup label is hidden or insufficient. */
+  ariaLabel?: string
+  /**
+   * When true, omits the visible `FormGroup` label (e.g. compact header name inputs).
+   */
+  hideFormGroupLabel?: boolean
   /** HTML `autocomplete` attribute forwarded to the underlying `TextInput`. */
   autoComplete?: string
   /** Input type. Defaults to `'text'`. */
   type?: 'text' | 'email' | 'password' | 'search' | 'tel' | 'url' | 'number'
+  /** Forwarded to `TextInput` when `type="number"`. */
+  min?: number
+  /** Forwarded to `TextInput` when `type="number"`. */
+  max?: number
+  /** Forwarded to `TextInput` when `type="number"`. */
+  step?: number
+}
+
+function optionalNumberFromInput(value: string | number | undefined): number | undefined {
+  if (value === '' || value === undefined || value === null) return undefined
+  const n = typeof value === 'number' ? value : Number(value)
+  return Number.isNaN(n) ? undefined : n
 }
 
 /**
@@ -75,10 +93,16 @@ export function SynTextField<
   hint,
   placeholder,
   isDisabled,
+  hideFormGroupLabel,
+  ariaLabel,
   autoComplete,
   type = 'text',
+  min,
+  max,
+  step,
 }: Readonly<SynTextFieldProps<TFieldValues, TName>>) {
   const resolvedFieldId = fieldId ?? name
+  const isNumberInput = type === 'number'
 
   return (
     <SynFormField
@@ -89,19 +113,30 @@ export function SynTextField<
       isRequired={isRequired}
       labelHelp={labelHelp}
       hint={hint}
+      hideFormGroupLabel={hideFormGroupLabel}
     >
       {({ field, fieldState }) => (
         <TextInput
           id={resolvedFieldId}
           type={type}
+          aria-label={ariaLabel}
           placeholder={placeholder}
           validated={fieldState.error ? 'error' : 'default'}
-          value={field.value ?? ''}
-          onChange={field.onChange}
+          value={isNumberInput && (field.value === undefined || field.value === null) ? '' : (field.value ?? '')}
+          onChange={(_event, value) => {
+            if (isNumberInput) {
+              field.onChange(optionalNumberFromInput(value))
+            } else {
+              field.onChange(value)
+            }
+          }}
           onBlur={field.onBlur}
           name={field.name}
           isDisabled={isDisabled}
           autoComplete={autoComplete}
+          min={isNumberInput ? min : undefined}
+          max={isNumberInput ? max : undefined}
+          step={isNumberInput ? step : undefined}
         />
       )}
     </SynFormField>

@@ -93,6 +93,27 @@ describe('SynTextField', () => {
     expect(screen.getByRole('textbox', { name: 'Group name' })).toBeDisabled()
   })
 
+  it('coerces number input values to numbers for zod number fields', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    const numberSchema = z.object({ count: z.number().int().positive().optional() })
+
+    renderWithForm({ schema: numberSchema, defaultValues: {} }, ({ control, handleSubmit }) => (
+      <>
+        <SynTextField name="count" control={control} label="Count" type="number" min={1} />
+        <button type="button" onClick={handleSubmit(onSubmit)}>
+          Submit
+        </button>
+      </>
+    ))
+
+    const input = screen.getByRole('spinbutton', { name: 'Count' })
+    await user.type(input, '300')
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+
+    expect(onSubmit).toHaveBeenCalledWith({ count: 300 }, expect.anything())
+  })
+
   it('forwards autoComplete to the input', () => {
     renderWithForm<FormData>({ schema, defaultValues: { name: '', email: '' } }, ({ control }) => (
       <SynTextField name="name" control={control} label="Group name" autoComplete="off" />

@@ -50,7 +50,7 @@ function AAPFormFields({
   extraVarsEditorRef: React.RefObject<ExpandableCodeEditorHandle | null>
 }>) {
   const isVersionView = useIsVersionView()
-  const { register } = useFormContext<AAPWorkflowTemplateFormData>()
+  const { control } = useFormContext<AAPWorkflowTemplateFormData>()
 
   const expressionMode = Boolean(useWatch({ name: 'use_input_variables' }))
 
@@ -65,8 +65,8 @@ function AAPFormFields({
   )
 
   const nameField = useMemo(
-    () => <ActivityNameField register={register} fieldId="aap-wf-name" ariaLabel="Name" />,
-    [register]
+    () => <ActivityNameField control={control} fieldId="aap-wf-name" ariaLabel="Name" />,
+    [control]
   )
 
   useEffect(() => {

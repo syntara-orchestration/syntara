@@ -10,8 +10,9 @@ import {
 } from '@patternfly/react-core'
 import type { ReactNode } from 'react'
 import { useCallback, useId, useState } from 'react'
-import { Controller, useFormContext } from 'react-hook-form'
+import { useFormContext, useFormState } from 'react-hook-form'
 
+import { SynFormField } from '../../../components/forms/SynFormField'
 import { ExpandableCodeEditor } from '../components/ExpandableCodeEditor'
 import { JsonEditorControls } from '../components/JsonEditorToolbar'
 
@@ -82,6 +83,8 @@ export function PayloadValidationSection({
   label,
 }: Readonly<PayloadValidationSectionProps>) {
   const { control, getValues } = useFormContext<TriggerFormData>()
+  const { errors } = useFormState({ control })
+  const schemaError = errors.inputSchema?.message
   const idPrefix = useId()
   const [mode, setMode] = useState<ValidationMode>(() => {
     const currentCode = getValues('inputSchema')
@@ -108,10 +111,8 @@ export function PayloadValidationSection({
   }, [])
 
   return (
-    <Controller
-      control={control}
-      name="inputSchema"
-      render={({ field }) => (
+    <SynFormField name="inputSchema" label="" hideFormGroupLabel hideFooter control={control}>
+      {({ field }) => (
         <PayloadValidationContent
           mode={mode}
           onModeChange={(newMode) => handleModeChange(newMode, field.value)}
@@ -124,13 +125,13 @@ export function PayloadValidationSection({
           ariaLabel={ariaLabel}
           downloadFilename={downloadFilename}
           helperText={helperText}
-          error={error}
+          error={error ?? schemaError}
           switchError={switchError}
           label={label}
           idPrefix={idPrefix}
         />
       )}
-    />
+    </SynFormField>
   )
 }
 
