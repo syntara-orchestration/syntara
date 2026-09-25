@@ -16,7 +16,6 @@ from syntara.core.syntara_router import SyntaraRouter
 from syntara.forms.models.api_models import (
     BatchFormPromptRequest,
     BatchUpdateResponse,
-    FormDataValidationProblem,
     FormPromptCreateRequest,
     FormPromptSubmitRequest,
     FormPromptSummary,
@@ -146,7 +145,6 @@ async def get_form_prompt(
     operation_id="submit_form_prompt",
     summary="Submit a response to a form prompt",
     response_description="Updated form prompt with the submitted response",
-    responses={422: {"model": FormDataValidationProblem, "description": "Form field validation failed"}},
 )
 async def submit_form_prompt(
     form_prompt_id: UUID,

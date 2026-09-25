@@ -13,7 +13,6 @@ from pydantic import ConfigDict, Field, field_validator
 from sqlmodel import SQLModel
 
 from syntara.core.constants import FieldLimits
-from syntara.core.models.error import ErrorData
 from syntara.forms.models.form_fields import FormDefinition
 
 
@@ -153,46 +152,6 @@ class FormPromptSubmitRequest(SQLModel):
         ...,
         description="Submitted form field values, keyed by field name",
     )
-
-
-class FormFieldErrorResponse(SQLModel):
-    """Structured validation error for one submitted form field."""
-
-    field: str = Field(..., description="Submitted field name")
-    label: str = Field(..., description="Display label for the field")
-    code: str = Field(..., description="Machine-readable validation error code")
-    message: str = Field(..., description="User-facing validation message")
-
-
-class FormDataValidationProblem(ErrorData):
-    """RFC 9457 form validation problem with per-field error details."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(
-        from_attributes=True,
-        validate_by_name=True,
-        json_schema_extra={
-            "examples": [
-                {
-                    "type": "https://api.example.com/errors/validation-error",
-                    "title": "Form Validation Error",
-                    "detail": "Form validation failed: reason: This field is required",
-                    "code": "FORM_VALIDATION_ERROR",
-                    "retryable": False,
-                    "instance": "/api/v1/form_prompts/550e8400-e29b-41d4-a716-446655440000/submit",
-                    "errors": [
-                        {
-                            "field": "reason",
-                            "label": "Reason",
-                            "code": "required",
-                            "message": "This field is required",
-                        }
-                    ],
-                }
-            ]
-        },
-    )
-
-    errors: list[FormFieldErrorResponse] = Field(..., description="Per-field validation errors")
 
 
 class BatchFormPromptStatus(str, Enum):

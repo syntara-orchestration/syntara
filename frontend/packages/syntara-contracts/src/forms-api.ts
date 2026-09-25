@@ -295,89 +295,6 @@ export interface components {
       name: string
     }
     /**
-     * FormDataValidationProblem
-     * @description RFC 9457 form validation problem with per-field error details.
-     * @example {
-     *       "type": "https://api.example.com/errors/validation-error",
-     *       "title": "Form Validation Error",
-     *       "detail": "Form validation failed: reason: This field is required",
-     *       "code": "FORM_VALIDATION_ERROR",
-     *       "retryable": false,
-     *       "instance": "/api/v1/form_prompts/550e8400-e29b-41d4-a716-446655440000/submit",
-     *       "errors": [
-     *         {
-     *           "field": "reason",
-     *           "label": "Reason",
-     *           "code": "required",
-     *           "message": "This field is required"
-     *         }
-     *       ]
-     *     }
-     */
-    FormDataValidationProblem: {
-      /**
-       * Type
-       * @description URI reference identifying the problem type
-       */
-      type: string
-      /**
-       * Title
-       * @description Short, human-readable summary of the problem
-       */
-      title: string
-      /**
-       * Detail
-       * @description Human-readable explanation specific to this occurrence
-       */
-      detail: string
-      /**
-       * Code
-       * @description Machine-readable error code for programmatic handling
-       */
-      code: string
-      /**
-       * Retryable
-       * @description Whether this error can be retried
-       */
-      retryable: boolean
-      /**
-       * Instance
-       * @description Optional URI reference identifying the specific occurrence
-       */
-      instance?: string | null
-      /**
-       * Errors
-       * @description Per-field validation errors
-       */
-      errors: components['schemas']['FormFieldErrorResponse'][]
-    }
-    /**
-     * FormFieldErrorResponse
-     * @description Structured validation error for one submitted form field.
-     */
-    FormFieldErrorResponse: {
-      /**
-       * Field
-       * @description Submitted field name
-       */
-      field: string
-      /**
-       * Label
-       * @description Display label for the field
-       */
-      label: string
-      /**
-       * Code
-       * @description Machine-readable validation error code
-       */
-      code: string
-      /**
-       * Message
-       * @description User-facing validation message
-       */
-      message: string
-    }
-    /**
      * FormDefinition
      * @description Complete form definition with fields and metadata.
      */
@@ -946,38 +863,60 @@ export interface components {
      *         title: Short, human-readable summary of the problem
      *         detail: Human-readable explanation specific to this occurrence
      *         code: Machine-readable error code for programmatic handling
-     *         retryable: Whether this error can be retried
+     *         retryable: Whether this error can be retried by creating a new invocation
      *         instance: Optional URI reference identifying the specific occurrence
+     * @example {
+     *       "type": "https://api.example.com/errors/llm-error",
+     *       "title": "LLM Rate Limit Exceeded",
+     *       "detail": "OpenRouter API rate limit exceeded. Please try again in a few moments.",
+     *       "code": "RATE_LIMIT_EXCEEDED",
+     *       "retryable": true,
+     *       "instance": "/invocations/550e8400-e29b-41d4-a716-446655440000"
+     *     }
+     * @example {
+     *       "type": "https://api.example.com/errors/timeout-error",
+     *       "title": "Streaming Timeout",
+     *       "detail": "LLM streaming timed out after 30 seconds",
+     *       "code": "STREAM_TIMEOUT",
+     *       "retryable": true,
+     *       "instance": "/invocations/550e8400-e29b-41d4-a716-446655440000"
+     *     }
      */
     ErrorData: {
       /**
        * Type
        * @description URI reference identifying the problem type
+       * @example https://api.example.com/errors/llm-error
        */
       type: string
       /**
        * Title
        * @description Short, human-readable summary of the problem
+       * @example LLM Service Unavailable
        */
       title: string
       /**
        * Detail
        * @description Human-readable explanation specific to this occurrence
+       * @example OpenRouter API returned error: rate limit exceeded. Please try again in a few moments.
        */
       detail: string
       /**
        * Code
        * @description Machine-readable error code for programmatic handling
+       * @example RATE_LIMIT_EXCEEDED
        */
       code: string
       /**
        * Retryable
-       * @description Whether this error can be retried
+       * @description Whether this error can be retried by creating a new invocation
+       * @example true
        */
       retryable: boolean
       /**
        * Instance
        * @description Optional URI reference identifying the specific occurrence
+       * @example /invocations/550e8400-e29b-41d4-a716-446655440000
        */
       instance?: string | null
     }
@@ -1308,15 +1247,7 @@ export interface operations {
       403: components['responses']['ForbiddenError']
       404: components['responses']['NotFoundError']
       409: components['responses']['ConflictError']
-      /** @description Form field validation failed */
-      422: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/problem+json': components['schemas']['FormDataValidationProblem']
-        }
-      }
+      422: components['responses']['ValidationError']
       429: components['responses']['RateLimitError']
       500: components['responses']['InternalServerError']
     }

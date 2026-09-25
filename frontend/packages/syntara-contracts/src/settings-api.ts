@@ -278,38 +278,60 @@ export interface components {
      *         title: Short, human-readable summary of the problem
      *         detail: Human-readable explanation specific to this occurrence
      *         code: Machine-readable error code for programmatic handling
-     *         retryable: Whether this error can be retried
+     *         retryable: Whether this error can be retried by creating a new invocation
      *         instance: Optional URI reference identifying the specific occurrence
+     * @example {
+     *       "type": "https://api.example.com/errors/llm-error",
+     *       "title": "LLM Rate Limit Exceeded",
+     *       "detail": "OpenRouter API rate limit exceeded. Please try again in a few moments.",
+     *       "code": "RATE_LIMIT_EXCEEDED",
+     *       "retryable": true,
+     *       "instance": "/invocations/550e8400-e29b-41d4-a716-446655440000"
+     *     }
+     * @example {
+     *       "type": "https://api.example.com/errors/timeout-error",
+     *       "title": "Streaming Timeout",
+     *       "detail": "LLM streaming timed out after 30 seconds",
+     *       "code": "STREAM_TIMEOUT",
+     *       "retryable": true,
+     *       "instance": "/invocations/550e8400-e29b-41d4-a716-446655440000"
+     *     }
      */
     ErrorData: {
       /**
        * Type
        * @description URI reference identifying the problem type
+       * @example https://api.example.com/errors/llm-error
        */
       type: string
       /**
        * Title
        * @description Short, human-readable summary of the problem
+       * @example LLM Service Unavailable
        */
       title: string
       /**
        * Detail
        * @description Human-readable explanation specific to this occurrence
+       * @example OpenRouter API returned error: rate limit exceeded. Please try again in a few moments.
        */
       detail: string
       /**
        * Code
        * @description Machine-readable error code for programmatic handling
+       * @example RATE_LIMIT_EXCEEDED
        */
       code: string
       /**
        * Retryable
-       * @description Whether this error can be retried
+       * @description Whether this error can be retried by creating a new invocation
+       * @example true
        */
       retryable: boolean
       /**
        * Instance
        * @description Optional URI reference identifying the specific occurrence
+       * @example /invocations/550e8400-e29b-41d4-a716-446655440000
        */
       instance?: string | null
     }

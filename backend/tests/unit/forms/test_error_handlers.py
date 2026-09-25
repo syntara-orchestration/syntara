@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse
 
 from syntara.core.constants import FieldLimits
 from syntara.core.error_handlers import PROBLEM_TYPES
+from syntara.core.models.error import ErrorData
 from syntara.forms.error_handlers import (
     form_data_validation_error_handler,
     form_prompt_already_requested_handler,
@@ -29,7 +30,7 @@ from syntara.forms.exceptions import (
     FormPromptExpiredError,
     FormPromptNotFoundError,
 )
-from syntara.forms.models.api_models import FormDataValidationProblem, FormPromptStatus
+from syntara.forms.models.api_models import FormPromptStatus
 from syntara.forms.models.form_errors import FormFieldError
 
 
@@ -156,9 +157,9 @@ class TestFormPromptAlreadyRequestedHandler:
 
 
 class TestFormDataValidationErrorHandler:
-    """Test the structured RFC 9457 response for invalid form submissions."""
+    """Test the RFC 9457 response for invalid form submissions."""
 
-    def test_response_matches_form_validation_problem_model(self) -> None:
+    def test_response_uses_standard_problem_details_with_concatenated_errors(self) -> None:
         request = Mock(spec=Request)
         request.url = "https://api.example.com/api/v1/form_prompts/123/submit"
         exc = FormDataValidationError(
@@ -176,14 +177,16 @@ class TestFormDataValidationErrorHandler:
 
         assert response.status_code == 422
         assert response.media_type == "application/problem+json"
-        problem = FormDataValidationProblem.model_validate(json.loads(bytes(response.body)))
+        problem = ErrorData.model_validate(json.loads(bytes(response.body)))
+        assert problem.type == PROBLEM_TYPES["validation_error"]
+        assert problem.title == "Form Validation Error"
+        assert problem.detail == "Form validation failed: reason: This field is required"
         assert problem.code == "FORM_VALIDATION_ERROR"
-        assert problem.errors[0].field == "reason"
-        assert problem.errors[0].label == "Reason"
-        assert problem.errors[0].code == "required"
-        assert problem.errors[0].message == "This field is required"
+        assert problem.retryable is False
+        assert problem.instance == str(request.url)
+        assert "errors" not in json.loads(bytes(response.body))
 
-    def test_truncates_detail_without_truncating_structured_errors(self) -> None:
+    def test_truncates_concatenated_detail(self) -> None:
         request = Mock(spec=Request)
         request.url = "https://api.example.com/api/v1/form_prompts/123/submit"
         errors = [
@@ -202,6 +205,4 @@ class TestFormDataValidationErrorHandler:
         assert response.status_code == 422
         assert len(data["detail"]) == FieldLimits.DESCRIPTION_MAX_LENGTH
         assert data["detail"].endswith("...")
-        assert len(data["errors"]) == len(errors)
-        assert data["errors"][0]["field"] == "field_0"
-        assert data["errors"][-1]["field"] == "field_99"
+        assert "errors" not in data

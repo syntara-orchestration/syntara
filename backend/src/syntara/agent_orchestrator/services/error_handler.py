@@ -7,7 +7,6 @@ RFC 9457 Problem Details format for WebSocket error events.
 from uuid import UUID
 
 from syntara.agent_orchestrator.exceptions import AgentTimeoutError, ToolDiscoveryError, ToolSelectionUnavailableError
-from syntara.agent_orchestrator.models.llm_error import LLMErrorData
 from syntara.core.models.error import ErrorData
 
 # Base URI for error types
@@ -85,7 +84,7 @@ def _classify_by_exception_type(exception: Exception, instance: str | None) -> E
         )
 
     if isinstance(exception, TimeoutError):
-        return LLMErrorData(
+        return ErrorData(
             type=f"{ERROR_TYPE_BASE_URI}/timeout-error",
             title="Streaming Timeout",
             detail="LLM streaming request timed out. Please try again.",
@@ -125,7 +124,7 @@ def classify_streaming_error(exception: Exception, invocation_id: UUID | None = 
 
     # Rate limiting (429 status)
     if _is_rate_limit_error(error_msg):
-        return LLMErrorData(
+        return ErrorData(
             type=f"{ERROR_TYPE_BASE_URI}/llm-error",
             title="LLM Rate Limit Exceeded",
             detail="OpenRouter API rate limit exceeded. Please try again in a few moments.",
@@ -136,7 +135,7 @@ def classify_streaming_error(exception: Exception, invocation_id: UUID | None = 
 
     # Authentication errors (401/403)
     if _is_auth_error(error_msg):
-        return LLMErrorData(
+        return ErrorData(
             type=f"{ERROR_TYPE_BASE_URI}/llm-error",
             title="LLM Authentication Failed",
             detail="Failed to authenticate with LLM provider. Please check your API configuration.",
@@ -147,7 +146,7 @@ def classify_streaming_error(exception: Exception, invocation_id: UUID | None = 
 
     # Server errors (5xx)
     if _is_server_error(error_msg):
-        return LLMErrorData(
+        return ErrorData(
             type=f"{ERROR_TYPE_BASE_URI}/network-error",
             title="Upstream Service Error",
             detail="LLM provider is experiencing issues. Please try again later.",
@@ -158,7 +157,7 @@ def classify_streaming_error(exception: Exception, invocation_id: UUID | None = 
 
     # Connection/network errors
     if _is_network_error(error_msg):
-        return LLMErrorData(
+        return ErrorData(
             type=f"{ERROR_TYPE_BASE_URI}/network-error",
             title="Network Connection Error",
             detail="Failed to connect to LLM provider. Please check your network connection.",
@@ -168,7 +167,7 @@ def classify_streaming_error(exception: Exception, invocation_id: UUID | None = 
         )
 
     # Default to non-retryable LLM error
-    return LLMErrorData(
+    return ErrorData(
         type=f"{ERROR_TYPE_BASE_URI}/llm-error",
         title="LLM Streaming Error",
         detail="An unexpected error occurred during LLM streaming. Please try again.",

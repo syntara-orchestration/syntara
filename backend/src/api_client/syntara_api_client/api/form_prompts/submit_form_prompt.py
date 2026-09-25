@@ -7,7 +7,6 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.error_data import ErrorData
-from ...models.form_data_validation_problem import FormDataValidationProblem
 from ...models.form_prompt_read import FormPromptRead
 from ...models.form_prompt_submit_request import FormPromptSubmitRequest
 from ...types import Response
@@ -35,7 +34,7 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> ErrorData | FormDataValidationProblem | FormPromptRead | None:
+) -> ErrorData | FormPromptRead | None:
     if response.status_code == 200:
         response_200 = FormPromptRead.from_dict(response.json())
 
@@ -67,7 +66,7 @@ def _parse_response(
         return response_409
 
     if response.status_code == 422:
-        response_422 = FormDataValidationProblem.from_dict(response.json())
+        response_422 = ErrorData.from_dict(response.json())
 
         return response_422
 
@@ -89,7 +88,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[ErrorData | FormDataValidationProblem | FormPromptRead]:
+) -> Response[ErrorData | FormPromptRead]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -105,7 +104,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: FormPromptSubmitRequest,
-) -> Response[ErrorData | FormDataValidationProblem | FormPromptRead]:
+) -> Response[ErrorData | FormPromptRead]:
     """Submit a response to a form prompt
 
      Submit a response to a pending form prompt and resume its workflow.
@@ -120,7 +119,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ErrorData | FormDataValidationProblem | FormPromptRead]
+        Response[ErrorData | FormPromptRead]
     """
 
     kwargs = _get_kwargs(
@@ -140,7 +139,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: FormPromptSubmitRequest,
-) -> ErrorData | FormDataValidationProblem | FormPromptRead | None:
+) -> ErrorData | FormPromptRead | None:
     """Submit a response to a form prompt
 
      Submit a response to a pending form prompt and resume its workflow.
@@ -155,7 +154,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ErrorData | FormDataValidationProblem | FormPromptRead
+        ErrorData | FormPromptRead
     """
 
     return sync_detailed(
@@ -170,7 +169,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: FormPromptSubmitRequest,
-) -> Response[ErrorData | FormDataValidationProblem | FormPromptRead]:
+) -> Response[ErrorData | FormPromptRead]:
     """Submit a response to a form prompt
 
      Submit a response to a pending form prompt and resume its workflow.
@@ -185,7 +184,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ErrorData | FormDataValidationProblem | FormPromptRead]
+        Response[ErrorData | FormPromptRead]
     """
 
     kwargs = _get_kwargs(
@@ -203,7 +202,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: FormPromptSubmitRequest,
-) -> ErrorData | FormDataValidationProblem | FormPromptRead | None:
+) -> ErrorData | FormPromptRead | None:
     """Submit a response to a form prompt
 
      Submit a response to a pending form prompt and resume its workflow.
@@ -218,7 +217,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ErrorData | FormDataValidationProblem | FormPromptRead
+        ErrorData | FormPromptRead
     """
 
     return (

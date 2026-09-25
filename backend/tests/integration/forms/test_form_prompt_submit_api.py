@@ -234,7 +234,7 @@ class TestFormPromptSubmitAPI:
         assert response.status_code == 409
         assert response.json()["code"] == expected_code
 
-    async def test_submit_missing_required_field_returns_structured_422(
+    async def test_submit_missing_required_field_returns_422_detail(
         self,
         auth_client: AsyncClient,
         test_db_session: AsyncSession,
@@ -245,9 +245,8 @@ class TestFormPromptSubmitAPI:
         response = await auth_client.post(f"{FORM_PROMPTS_URL}/{prompt.id}/submit", json={"response_data": {}})
 
         assert response.status_code == 422
-        assert response.json()["errors"] == [
-            {"field": "reason", "label": "Reason", "code": "required", "message": "This field is required"}
-        ]
+        assert response.json()["detail"] == "Form validation failed: reason: This field is required"
+        assert "errors" not in response.json()
 
     async def test_submit_wrong_field_type_returns_422(
         self,
@@ -263,8 +262,8 @@ class TestFormPromptSubmitAPI:
         )
 
         assert response.status_code == 422
-        assert response.json()["errors"][0]["field"] == "reason"
-        assert response.json()["errors"][0]["code"] == "type"
+        assert response.json()["detail"].startswith("Form validation failed: reason:")
+        assert "errors" not in response.json()
 
     async def test_submit_invalid_option_returns_422(
         self,
@@ -294,8 +293,8 @@ class TestFormPromptSubmitAPI:
         )
 
         assert response.status_code == 422
-        assert response.json()["errors"][0]["field"] == "decision"
-        assert response.json()["errors"][0]["code"] == "not_in_options"
+        assert response.json()["detail"].startswith("Form validation failed: decision:")
+        assert "errors" not in response.json()
 
     async def test_submit_not_found_returns_404(self, auth_client: AsyncClient) -> None:
         response = await auth_client.post(

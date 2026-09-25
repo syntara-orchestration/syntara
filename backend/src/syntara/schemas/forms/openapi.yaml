@@ -261,11 +261,7 @@ paths:
         "409":
           $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
         "422":
-          description: Form field validation failed
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/FormDataValidationProblem"
+          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
         "429":
           $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
         "500":
@@ -502,99 +498,6 @@ components:
 
         Represents a group of users who can collectively respond to a prompt.
         Used in API responses to show which groups have response authority.
-
-    FormDataValidationProblem:
-      properties:
-        type:
-          type: string
-          maxLength: 500
-          minLength: 1
-          title: Type
-          description: URI reference identifying the problem type
-        title:
-          type: string
-          maxLength: 200
-          minLength: 1
-          title: Title
-          description: Short, human-readable summary of the problem
-        detail:
-          type: string
-          maxLength: 2000
-          minLength: 1
-          title: Detail
-          description: Human-readable explanation specific to this occurrence
-        code:
-          type: string
-          maxLength: 100
-          minLength: 1
-          title: Code
-          description: Machine-readable error code for programmatic handling
-        retryable:
-          type: boolean
-          title: Retryable
-          description: Whether this error can be retried
-        instance:
-          anyOf:
-            - type: string
-              maxLength: 2048
-            - type: 'null'
-          title: Instance
-          description: Optional URI reference identifying the specific occurrence
-        errors:
-          items:
-            $ref: "#/components/schemas/FormFieldErrorResponse"
-          type: array
-          title: Errors
-          description: Per-field validation errors
-      type: object
-      required:
-        - type
-        - title
-        - detail
-        - code
-        - retryable
-        - errors
-      title: FormDataValidationProblem
-      description: RFC 9457 form validation problem with per-field error details.
-      examples:
-        - type: https://api.example.com/errors/validation-error
-          title: Form Validation Error
-          detail: "Form validation failed: reason: This field is required"
-          code: FORM_VALIDATION_ERROR
-          retryable: false
-          instance: /api/v1/form_prompts/550e8400-e29b-41d4-a716-446655440000/submit
-          errors:
-            - field: reason
-              label: Reason
-              code: required
-              message: This field is required
-
-    FormFieldErrorResponse:
-      properties:
-        field:
-          type: string
-          title: Field
-          description: Submitted field name
-        label:
-          type: string
-          title: Label
-          description: Display label for the field
-        code:
-          type: string
-          title: Code
-          description: Machine-readable validation error code
-        message:
-          type: string
-          title: Message
-          description: User-facing validation message
-      type: object
-      required:
-        - field
-        - label
-        - code
-        - message
-      title: FormFieldErrorResponse
-      description: Structured validation error for one submitted form field.
 
     # Form definition schemas (from original spec)
     FormDefinition:
