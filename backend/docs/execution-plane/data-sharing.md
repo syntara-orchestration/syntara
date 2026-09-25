@@ -201,19 +201,22 @@ API call. EP creates the volume on the ExecutionTarget chosen for the
 dispatch. AO does not pass a target. EP refuses the UUID if it already
 exists anywhere.
 
-**Deletion** is EP deleting the volume. Two ways:
+**Deletion** is EP deleting the volume. **MVP is the API.** AO
+`DELETE`s by id when it is done with the folder (for example when the
+execution finishes). That is how AO scopes the workspace's life.
 
-| How | Who | When |
-|---|---|---|
-| **TTL** | Execution Plane | For example `3h` **after last unmount**. EP deletes the workspace when that timer fires. |
-| **API** | AO | `DELETE` the workspace by id against the Execution Plane, at any time (for example when the AO execution finishes). |
+TTL is a safety net if nobody DELETEs. The ExecutionTarget default applies.
 
-TTL is the ExecutionTarget default, set when EP creates the volume.
-The clock is **last unmount**: it starts when a WorkItem that held
+| How | Who | When | Priority |
+|---|---|---|---|
+| **API** | AO | `DELETE` by id, at any time | **MVP.** AO owns the folder's life. |
+| **TTL** | Execution Plane | For example `3h` **after last unmount** | Also useful. User-controlled. |
+
+The TTL clock is **last unmount**: it starts when a WorkItem that held
 the volume exits, and it resets on every later unmount of the same
-id. A workspace that is still mounted is never deleted; a long run
-can outlive the original TTL. If the volume was never mounted, create
-time counts as the last unmount (idle from birth).
+id. A workspace that is still mounted is never deleted by TTL; a long
+run can outlive the original TTL. If the volume was never mounted,
+create time counts as the last unmount (idle from birth).
 
 
 ## Use-case 2: collect results after each execution (No Workspace)
@@ -445,7 +448,7 @@ Illustrative keys only. Not the final field design.
 |---|---|---|
 | HTTP or Git WorkItem + `workspace` | URL or clone → `/workspace` | Yes, once that Git/HTTP WorkItem has written. |
 | `outputs` | container → object store | No. List of files. Copy-aside, then background PUT. UI metadata on `WorkItem.result`. Cross-volume consume via sidecar. |
-| `workspace` | live directory, **UUID unique across all ExecutionTargets**, volume on one target | Yes, **successive** WorkItems on **that** UUID. Reuse pins those WorkItems to that target. One RW mount. Default path `/workspace`. Purged by TTL (from last unmount) or delete API. |
+| `workspace` | live directory, **UUID unique across all ExecutionTargets**, volume on one target | Yes, **successive** WorkItems on **that** UUID. Reuse pins those WorkItems to that target. One RW mount. Default path `/workspace`. AO `DELETE`s by id (MVP). TTL is an optional user-set safety net (last unmount). |
 
 Omitted `outputs` / `workspace` mean "none". There is no
 `data.inputs`.
@@ -483,8 +486,8 @@ AO
 | Flag workspace access (`rw` / `ro` / `copy`); snapshot is the cross-cluster path | AO |
 | Serialize dispatch per workspace id (volume RWO, or snapshot `rw`) | Work Scheduler |
 | Hydrate / publish workspace snapshot (full tree to S3) | Worker Manager / SDK |
-| Delete workspace (`DELETE` by id against EP) | AO |
-| Purge workspace (TTL from last unmount) | Execution Plane |
+| Delete workspace (`DELETE` by id against EP). **MVP.** AO scopes the folder's life. | AO |
+| Purge workspace (optional TTL from last unmount). User-set; ET default if omitted. | Execution Plane |
 | Map file ids to HTTP(S) URLs; run HTTP activity into `/workspace` | AO |
 | Map repo + branch/tag to clone URL + SHA; run Git activity into `/workspace` | AO |
 | Credential reference for Git remote (or HTTP if not presigned) | AO → Credential Provider |
@@ -660,8 +663,10 @@ Extension, not this contract.
 - **Workspace API:** AO mints the UUID on the WorkItem. EP creates
   the volume on the ExecutionTarget chosen for the first WorkItem
   that cites that id, after reconcile and before dispatch. AO does
-  not pass a target. AO `DELETE`s by id. Size and TTL come from the
-  ExecutionTarget. TTL (from last unmount) is an EP background task.
+  not pass a target. **MVP lifetime:** AO `DELETE`s by id (for
+  example when the execution finishes). **Also:** optional TTL, set
+  by the user through AO (ExecutionTarget default if omitted). Clock
+  is last unmount. Size comes from the ExecutionTarget.
 - **[Work Store](work-store.md):** `WorkItem.result` stays small JSON
   (run status plus `artifacts[]` UI metadata: minted `uri`, `status`
   `uploading` | `available` | `failed`, and `size` in bytes). Artifact

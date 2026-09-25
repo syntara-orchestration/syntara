@@ -178,7 +178,8 @@ The directory outlives each container. Only the mount comes and goes.
 | WorkItem C exits | `src/`, `site.yml`, **and** `out/report.json` |
 
 If AO submits a fourth WorkItem with the same UUID, that tree is still
-there until TTL (from last unmount) or `DELETE`.
+there until AO `DELETE`s it. TTL is only a safety net if nobody
+DELETEs.
 
 ## What EP does
 
@@ -255,7 +256,7 @@ sequenceDiagram
     Note over Vol: src and site.yml still there, write /workspace/out/report.json
     WM->>Vol: unmount
 
-    Note over Vol: tree remains until TTL or DELETE
+    Note over Vol: tree remains until AO DELETE
 ```
 
 ## Out of scope here
