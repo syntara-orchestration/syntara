@@ -4,6 +4,7 @@ import type { WorkflowAPI } from '@syntara/contracts'
 import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../components/panels/list/SynListPanel'
 import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 import type { TableFooterProps } from '../../components/table/SynScrollableTableContainer'
+import { columnWidths } from '../../components/table/tableColumnWidths'
 import type { FilterConfig, FilterFieldDefinition } from '../../types/filters'
 import type { ProjectRead } from '../access/types'
 
@@ -104,12 +105,16 @@ export function WorkflowsListView({
           <Thead>
             <Tr>
               <Th sort={getSortParams('name')}>Name</Th>
-              <Th sort={getSortParams('created_at')}>Created at</Th>
-              <Th sort={getSortParams('updated_at')}>Updated at</Th>
-              <Th sort={getSortParams('is_enabled')} info={workflowStateColumnInfo}>
+              <Th width={columnWidths.dateTime} sort={getSortParams('created_at')}>
+                Created at
+              </Th>
+              <Th width={columnWidths.dateTime} sort={getSortParams('updated_at')}>
+                Updated at
+              </Th>
+              <Th width={columnWidths.status} sort={getSortParams('is_enabled')} info={workflowStateColumnInfo}>
                 State
               </Th>
-              {showRowActions && <Th screenReaderText="Actions" />}
+              {showRowActions && <Th width={columnWidths.actions} screenReaderText="Actions" />}
             </Tr>
           </Thead>
           {isAllProjects && groupedWorkflows ? (
