@@ -239,8 +239,8 @@ class FormPromptService(BaseService):
                     )
                     self.session.add(responder_group)
 
-            await self.session.commit()
-
+            # Stage the business audit record in this transaction so the prompt
+            # and its lifecycle event commit or roll back together.
             AuditEventDispatcher.dispatch(
                 FormPromptCreatedEvent(
                     prompt_id=form_prompt.id,
@@ -249,8 +249,12 @@ class FormPromptService(BaseService):
                     prompt_node_id=request.prompt_node_id,
                     initiated_by=execution.created_by,
                     created_at=form_prompt.created_at,
-                )
+                ),
+                # AsyncSession.add() is synchronous, which is all the outbox writer uses.
+                session=self.session,  # type: ignore[arg-type]
             )
+
+            await self.session.commit()
 
             logger.info(
                 "Created form prompt",
@@ -356,17 +360,18 @@ class FormPromptService(BaseService):
 
         current_status = FormPromptStatus(prompt.status)
         target_status = FormPromptStatus(update_request.status.value)
+        if current_status is target_status:
+            return (
+                BatchUpdateResult(
+                    prompt_id=str(update_request.prompt_id),
+                    success=True,
+                    message=f"Already {target_status.value}",
+                ),
+                True,
+                None,
+            )
+
         if not can_transition(current_status, target_status):
-            if current_status == target_status:
-                return (
-                    BatchUpdateResult(
-                        prompt_id=str(update_request.prompt_id),
-                        success=True,
-                        message=f"Already {target_status.value}",
-                    ),
-                    True,
-                    None,
-                )
             return (
                 BatchUpdateResult(
                     prompt_id=str(update_request.prompt_id),
