@@ -339,9 +339,7 @@ describe('SynFormFieldBuilder', () => {
     await user.clear(valueNameInput)
     await user.type(valueNameInput, '1bad')
 
-    expect(
-      screen.getByText('Fix validation errors before changes are saved to the parent form.')
-    ).toBeInTheDocument()
+    expect(screen.getByText('Fix validation errors before changes are saved to the parent form.')).toBeInTheDocument()
     expect(onChange).not.toHaveBeenCalled()
   })
 

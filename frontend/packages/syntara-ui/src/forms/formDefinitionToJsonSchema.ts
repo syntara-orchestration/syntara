@@ -28,12 +28,11 @@ function jsonSchemaTypeForScalarValues(values: readonly OptionScalar[]): string 
   return 'string'
 }
 
-function defaultForJsonSchema(field: FormField): unknown | undefined {
+function defaultForJsonSchema(field: FormField): unknown {
   if (!Object.hasOwn(field, 'default')) {
     return undefined
   }
-  const value = field.default
-  return value === undefined ? undefined : value
+  return field.default
 }
 
 function syntaraOptionsExtension(field: FormField): SyntaraFormOptionsExtension | undefined {

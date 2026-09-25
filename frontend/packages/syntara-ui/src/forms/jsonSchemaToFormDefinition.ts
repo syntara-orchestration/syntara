@@ -17,6 +17,14 @@ type JsonSchemaProperty = {
   [SYNTARA_FORM_OPTIONS_EXTENSION]?: unknown
 }
 
+type FieldBase = {
+  value_name: string
+  label: string
+  placeholder: string | null
+  help_text: string | null
+  required: boolean
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -67,10 +75,6 @@ function inferFieldType(property: JsonSchemaProperty): FormField['type'] | null 
     return property.type === 'array' ? FormFieldTypeEnum.MULTI_SELECT : FormFieldTypeEnum.DROPDOWN
   }
   if (property.type === 'array') {
-    const items = isRecord(property.items) ? property.items : null
-    if (items && parseEnumValues(items.enum)) {
-      return FormFieldTypeEnum.MULTI_SELECT
-    }
     return FormFieldTypeEnum.MULTI_SELECT
   }
   if (parseEnumValues(property.enum)) {
@@ -98,6 +102,64 @@ function defaultFromProperty(property: JsonSchemaProperty): unknown {
   return Object.hasOwn(property, 'default') ? property.default : undefined
 }
 
+function dropdownDefaultFromImported(importedDefault: unknown): string | number | boolean | null {
+  if (
+    importedDefault === null ||
+    typeof importedDefault === 'string' ||
+    typeof importedDefault === 'number' ||
+    typeof importedDefault === 'boolean'
+  ) {
+    return importedDefault
+  }
+  return null
+}
+
+function dropdownFieldFromProperty(base: FieldBase, property: JsonSchemaProperty): FormField | null {
+  const dynamicOptions = parseSyntaraOptionsExtension(property)
+  if (dynamicOptions) {
+    return {
+      ...base,
+      type: FormFieldTypeEnum.DROPDOWN,
+      options: dynamicOptions,
+      default: dropdownDefaultFromImported(defaultFromProperty(property)),
+    }
+  }
+  const enumValues = parseEnumValues(property.enum)
+  if (!enumValues) {
+    return null
+  }
+  return {
+    ...base,
+    type: FormFieldTypeEnum.DROPDOWN,
+    options: staticOptionsFromEnum(enumValues),
+    default: dropdownDefaultFromImported(defaultFromProperty(property)),
+  }
+}
+
+function multiSelectFieldFromProperty(base: FieldBase, property: JsonSchemaProperty): FormField | null {
+  const dynamicOptions = parseSyntaraOptionsExtension(property)
+  const importedDefault = defaultFromProperty(property)
+  if (dynamicOptions) {
+    return {
+      ...base,
+      type: FormFieldTypeEnum.MULTI_SELECT,
+      options: dynamicOptions,
+      default: Array.isArray(importedDefault) ? importedDefault : null,
+    }
+  }
+  const items = isRecord(property.items) ? property.items : null
+  const enumValues = items ? parseEnumValues(items.enum) : null
+  if (!enumValues) {
+    return null
+  }
+  return {
+    ...base,
+    type: FormFieldTypeEnum.MULTI_SELECT,
+    options: staticOptionsFromEnum(enumValues),
+    default: Array.isArray(importedDefault) ? importedDefault : null,
+  }
+}
+
 function fieldFromProperty(valueName: string, property: JsonSchemaProperty, required: boolean): FormField | null {
   const fieldType = inferFieldType(property)
   if (fieldType === null || !isValidFormFieldValueName(valueName)) {
@@ -105,11 +167,11 @@ function fieldFromProperty(valueName: string, property: JsonSchemaProperty, requ
   }
 
   const label = typeof property.title === 'string' && property.title.trim() !== '' ? property.title : valueName
-  const base = {
+  const base: FieldBase = {
     value_name: valueName,
     label,
-    placeholder: null as string | null,
-    help_text: null as string | null,
+    placeholder: null,
+    help_text: null,
     required,
   }
 
@@ -134,61 +196,10 @@ function fieldFromProperty(valueName: string, property: JsonSchemaProperty, requ
         type: FormFieldTypeEnum.DATE,
         default: typeof importedDefault === 'string' ? importedDefault : null,
       }
-    case FormFieldTypeEnum.DROPDOWN: {
-      const dynamicOptions = parseSyntaraOptionsExtension(property)
-      if (dynamicOptions) {
-        return {
-          ...base,
-          type: FormFieldTypeEnum.DROPDOWN,
-          options: dynamicOptions,
-          default:
-            importedDefault === null ||
-            typeof importedDefault === 'string' ||
-            typeof importedDefault === 'number' ||
-            typeof importedDefault === 'boolean'
-              ? importedDefault
-              : null,
-        }
-      }
-      const enumValues = parseEnumValues(property.enum)
-      if (!enumValues) {
-        return null
-      }
-      return {
-        ...base,
-        type: FormFieldTypeEnum.DROPDOWN,
-        options: staticOptionsFromEnum(enumValues),
-        default:
-          importedDefault === null ||
-          typeof importedDefault === 'string' ||
-          typeof importedDefault === 'number' ||
-          typeof importedDefault === 'boolean'
-            ? importedDefault
-            : null,
-      }
-    }
-    case FormFieldTypeEnum.MULTI_SELECT: {
-      const dynamicOptions = parseSyntaraOptionsExtension(property)
-      if (dynamicOptions) {
-        return {
-          ...base,
-          type: FormFieldTypeEnum.MULTI_SELECT,
-          options: dynamicOptions,
-          default: Array.isArray(importedDefault) ? importedDefault : null,
-        }
-      }
-      const items = isRecord(property.items) ? property.items : null
-      const enumValues = items ? parseEnumValues(items.enum) : null
-      if (!enumValues) {
-        return null
-      }
-      return {
-        ...base,
-        type: FormFieldTypeEnum.MULTI_SELECT,
-        options: staticOptionsFromEnum(enumValues),
-        default: Array.isArray(importedDefault) ? importedDefault : null,
-      }
-    }
+    case FormFieldTypeEnum.DROPDOWN:
+      return dropdownFieldFromProperty(base, property)
+    case FormFieldTypeEnum.MULTI_SELECT:
+      return multiSelectFieldFromProperty(base, property)
     case FormFieldTypeEnum.TEXT:
       return {
         ...base,
@@ -232,7 +243,7 @@ export function jsonSchemaToFormDefinition(input: unknown): JsonSchemaToFormDefi
     if (!isRecord(rawProperty)) {
       return { success: false, error: `Invalid property schema for "${valueName}"` }
     }
-    const field = fieldFromProperty(valueName, rawProperty as JsonSchemaProperty, requiredNames.has(valueName))
+    const field = fieldFromProperty(valueName, rawProperty, requiredNames.has(valueName))
     if (!field) {
       return { success: false, error: `Unsupported or invalid property "${valueName}"` }
     }
