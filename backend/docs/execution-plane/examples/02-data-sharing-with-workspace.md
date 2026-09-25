@@ -15,12 +15,7 @@ WorkItem are still there for the next.
 ## What this example is
 
 A concrete inventory of a **volume-based workspace** (Kubernetes PVC
-on this target). Not an object-store snapshot. Not listed `outputs`.
-
-AO has already minted the workspace UUID and created the volume on
-`ep-default`. EP sees three WorkItems. It does not see the AO
-workflow, nodes, or project. Matching still ignores `data`; there is
-no `volume-mount` selector.
+on this target).
 
 The three WorkItems run **one at a time** (ReadWriteOnce). After each
 exits, the Worker Manager unmounts. The volume is not deleted. The
@@ -41,26 +36,17 @@ AO execution
 
 ## Workspace create
 
-AO creates the volume **before** the first WorkItem. Size is the
-ExecutionTarget default. Illustrative keys only.
+AO mints the UUID and puts it on the WorkItems. It does **not** create
+the volume. It does not know the ExecutionTarget yet.
 
-```json
-POST /workspaces
-{
-  "id": "7c1a9f3e-4b2d-41a8-9c1f-91c0d4e5a6b7",
-  "target": "ep-default",
-  "ttl": "3h"
-}
-```
+EP creates the volume **after** WorkItem A is matched, **before** it
+is dispatched. Size is the ExecutionTarget default. EP refuses the
+UUID if it already exists anywhere. WorkItems B and C reuse that
+volume; they do not create another.
 
-EP refuses the UUID if it already exists anywhere. The WorkItems carry
-that UUID, not a PVC name.
+The WorkItems carry the UUID, not a PVC name.
 
 ## Incoming WorkItems
-
-`selectors` is empty on all three: [default
-routing](../executiontarget-reconciler.md#default-routing) to
-`ep-default`, which already holds the volume.
 
 ### WorkItem A — clone into `/workspace`
 
@@ -188,12 +174,17 @@ there until TTL (from last unmount) or `DELETE`.
 
 For each WorkItem:
 
-1. **Reconcile.** `selectors: {}` takes default routing. Eligible set
+1. **Claim.** The Work Scheduler picks up the WorkItem from the Work
+   Store.
+2. **Reconcile.** `selectors: {}` takes default routing. Eligible set
    `{ep-default}`. The reconciler does not read `data.workspace`.
-2. **Dispatch.** The Work Scheduler waits until no other WorkItem
+3. **Create (A only).** The Work Scheduler now has an ExecutionTarget.
+   It creates the volume on `ep-default` before dispatch. B and C skip
+   this: the UUID already has a volume.
+4. **Dispatch.** The Work Scheduler waits until no other WorkItem
    holds this UUID (ReadWriteOnce). Then it sends the work to the
    Kubernetes Worker Manager for `ep-default`.
-3. **Run.** That Worker Manager mounts workspace
+5. **Run.** That Worker Manager mounts workspace
    `7c1a9f3e-4b2d-41a8-9c1f-91c0d4e5a6b7` at `/workspace` and
    cold-starts a pod from `payload.activity.image`. On exit it
    unmounts. It does not delete the volume.
@@ -209,34 +200,34 @@ WorkItem A, B, C
 ```mermaid
 sequenceDiagram
     participant AO as Automation Orchestrator
-    participant EP as Execution Plane API
     participant WS as Work Store
-    participant ETR as ExecutionTarget Reconciler
     participant Sch as Work Scheduler
+    participant ETR as ExecutionTarget Reconciler
     participant WM as k8s Worker Manager
     participant Vol as /workspace on ep-default
 
-    AO->>EP: POST workspace 7c1a9f3e-… on ep-default
-    EP->>Vol: create volume
-
     AO->>WS: WorkItem A { git-clone, workspace: 7c1a9f3e-… }
+    Sch->>WS: pick up A
     Sch->>ETR: resolve(selectors={})
     ETR-->>Sch: available = [ep-default]
+    Sch->>Vol: create volume 7c1a9f3e-… on ep-default
     Sch->>WM: dispatch A
     WM->>Vol: mount
     Note over Vol: write /workspace/src
     WM->>Vol: unmount
 
     AO->>WS: WorkItem B { http-request, workspace: 7c1a9f3e-… }
+    Sch->>WS: pick up B
     Sch->>WM: dispatch B
     WM->>Vol: mount
-    Note over Vol: src still there; write /workspace/site.yml
+    Note over Vol: src still there, write /workspace/site.yml
     WM->>Vol: unmount
 
     AO->>WS: WorkItem C { ansible-playbook, workspace: 7c1a9f3e-… }
+    Sch->>WS: pick up C
     Sch->>WM: dispatch C
     WM->>Vol: mount
-    Note over Vol: src and site.yml still there; write /workspace/out/report.json
+    Note over Vol: src and site.yml still there, write /workspace/out/report.json
     WM->>Vol: unmount
 
     Note over Vol: tree remains until TTL or DELETE

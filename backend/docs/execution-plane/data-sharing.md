@@ -106,10 +106,11 @@ AO execution
   node B  WorkItem  workspace=7c1a9f3e-4b2d-41a8-9c1f-91c0d4e5a6b7  →  ep-default  →  reads  /workspace/state.json
 ```
 
-AO mints the UUID and creates the volume through an API call against
-the Execution Plane. EP creates the volume on the chosen
-ExecutionTarget, using that target's **default workspace size**, and
-refuses the UUID if it already exists anywhere. There is no size
+AO mints the UUID and puts it on the WorkItem. It does not create the
+volume: it does not know the ExecutionTarget yet. After the first
+WorkItem is matched, and **before** it is dispatched, EP creates the
+volume on that target, using the target's **default workspace size**,
+and refuses the UUID if it already exists anywhere. There is no size
 field on the WorkItem and no per-workspace override for now.
 
 The WorkItem carries the **UUID**, not a PVC or Podman volume id. The
@@ -125,7 +126,7 @@ Worker Manager looks up which target holds that UUID and mounts it.
 |---|---|
 | `data.workspace` | Workspace **UUID**. Unique across every ExecutionTarget. |
 | Mount path | `/workspace` by default. Override with `{ "id": "7c1a9f3e-4b2d-41a8-9c1f-91c0d4e5a6b7", "path": "/work" }`. |
-| Size | Default on the **ExecutionTarget**. The WorkItem and the workspace create API do not override it. |
+| Size | Default on the **ExecutionTarget**. The WorkItem does not override it. |
 
 Omitted `workspace` means this WorkItem does not mount a workspace.
 
@@ -205,10 +206,11 @@ share a tree on a backend with no volume attach.
 
 ### Workspace life time
 
-AO owns workspace lifetime. **Creation** is an API call against the
-Execution Plane: AO mints the UUID, then creates the volume (`POST`
-id, target, optional TTL). EP creates the volume on that
-ExecutionTarget and refuses the UUID if it already exists anywhere.
+AO mints the UUID and later **deletes** it. **Creation** is not an AO
+API call. EP creates the volume on the ExecutionTarget chosen for the
+**first** WorkItem that cites that id, after reconcile and before
+dispatch. AO does not pass a target. EP refuses the UUID if it already
+exists anywhere.
 
 **Deletion** is EP deleting the volume. Two ways:
 
@@ -217,12 +219,12 @@ ExecutionTarget and refuses the UUID if it already exists anywhere.
 | **TTL** | Execution Plane | For example `3h` **after last unmount**. EP deletes the workspace when that timer fires. |
 | **API** | AO | `DELETE` the workspace by id against the Execution Plane, at any time (for example when the AO execution finishes). |
 
-TTL is set when the workspace is created. The clock is **last
-unmount**: it starts when a WorkItem that held the volume exits,
-and it resets on every later unmount of the same id. A workspace
-that is still mounted is never deleted; a long run can outlive the
-original TTL. If the volume was never mounted, create time counts
-as the last unmount (idle from birth).
+TTL is the ExecutionTarget default, set when EP creates the volume.
+The clock is **last unmount**: it starts when a WorkItem that held
+the volume exits, and it resets on every later unmount of the same
+id. A workspace that is still mounted is never deleted; a long run
+can outlive the original TTL. If the volume was never mounted, create
+time counts as the last unmount (idle from birth).
 
 
 ## Use-case 2: collect results after each execution (No Workspace)
@@ -483,7 +485,8 @@ AO
 | Concern | Owner |
 |---|---|
 | Upload UI, `POST /files`, `FileMetadata` | AO |
-| Mint globally unique workspace UUID; create volume on one ET via EP API | AO |
+| Mint globally unique workspace UUID | AO |
+| Create volume on the selected ET (first WorkItem, after reconcile, before dispatch) | Work Scheduler |
 | Default workspace size (no per-workspace override) | ExecutionTarget |
 | Refuse duplicate workspace UUID | Execution Plane |
 | Place WorkItems that share a **volume** id on that target | AO (selectors or default routing) |
@@ -658,10 +661,11 @@ Extension, not this contract.
   WorkItem for a workspace id whose volume is still mounted.
   Snapshot `ro` / `copy` may overlap after that generation is
   `available`.
-- **Workspace API:** AO owns create (`POST` id, target, optional TTL)
-  and `DELETE` by id against the Execution Plane. Size comes from
-  the ExecutionTarget; create does not take a size. TTL (from last
-  unmount) is an EP background task.
+- **Workspace API:** AO mints the UUID on the WorkItem. EP creates
+  the volume on the ExecutionTarget chosen for the first WorkItem
+  that cites that id, after reconcile and before dispatch. AO does
+  not pass a target. AO `DELETE`s by id. Size and TTL come from the
+  ExecutionTarget. TTL (from last unmount) is an EP background task.
 - **[Work Store](work-store.md):** `WorkItem.result` stays small JSON
   (run status plus `artifacts[]` UI metadata: minted `uri`, `status`
   `uploading` | `available` | `failed`, and `size` in bytes). Artifact
