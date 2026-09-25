@@ -2,8 +2,6 @@
 import { pathToFileURL } from 'node:url'
 import { SlackNotifier } from './lib/slack.js'
 
-type VisualRegressionNotifier = Pick<SlackNotifier, 'sendVisualRegressionBaselineReady'>
-type VisualRegressionNotifierFactory = (webhookUrl: string) => VisualRegressionNotifier
 type VisualRegressionEnvironment = {
   SLACK_VISUAL_REGRESSION_WEBHOOK_URL?: string
   VISUAL_REGRESSION_PR_URL?: string
@@ -15,8 +13,7 @@ const processEnvironment: VisualRegressionEnvironment = {
 }
 
 export async function notifyVisualRegressionBaseline(
-  env: VisualRegressionEnvironment = processEnvironment,
-  createNotifier: VisualRegressionNotifierFactory = (webhookUrl) => new SlackNotifier(webhookUrl)
+  env: VisualRegressionEnvironment = processEnvironment
 ): Promise<boolean> {
   const webhookUrl = env.SLACK_VISUAL_REGRESSION_WEBHOOK_URL
   const prUrl = env.VISUAL_REGRESSION_PR_URL
@@ -30,7 +27,7 @@ export async function notifyVisualRegressionBaseline(
     throw new Error('VISUAL_REGRESSION_PR_URL is required when Slack notification is enabled')
   }
 
-  await createNotifier(webhookUrl).sendVisualRegressionBaselineReady(prUrl)
+  await new SlackNotifier(webhookUrl).sendVisualRegressionBaselineReady(prUrl)
   return true
 }
 

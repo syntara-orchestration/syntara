@@ -8,7 +8,7 @@ type SlackAttachment = {
   blocks: SlackBlock[]
 }
 
-export type SlackMessage = {
+type SlackMessage = {
   attachments: SlackAttachment[]
 }
 
