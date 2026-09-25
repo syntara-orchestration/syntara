@@ -2,10 +2,16 @@
 
 Builds on
 [00-one-workload-default-target.md](00-one-workload-default-target.md).
-Same Cluster, same default ExecutionTarget, empty selectors. AO shares
-one **workspace** volume across three successive WorkItems. Each
-container mounts it at `/workspace`. Files written by an earlier
-WorkItem are still there for the next.
+Same Cluster, same default ExecutionTarget. AO shares one **workspace**
+volume across three successive WorkItems. Each container mounts it at
+`/workspace`. Files written by an earlier WorkItem are still there for
+the next.
+
+WorkItem A places with empty selectors ([default
+routing](../executiontarget-reconciler.md#default-routing)). After EP
+creates the volume on `ep-default`, B and C **reuse** that UUID. That
+reuse is a **placement constraint**: they run on `ep-default` because
+that is the ExecutionTarget associated with the workspace.
 
 - Ticket: [AAP-94189](https://redhat.atlassian.net/browse/AAP-94189)
 - Feature: [ANSTRAT-1803](https://redhat.atlassian.net/browse/ANSTRAT-1803)
@@ -41,8 +47,11 @@ the volume. It does not know the ExecutionTarget yet.
 
 EP creates the volume **after** WorkItem A is matched, **before** it
 is dispatched. Size is the ExecutionTarget default. EP refuses the
-UUID if it already exists anywhere. WorkItems B and C reuse that
-volume; they do not create another.
+UUID if it already exists anywhere.
+
+WorkItems B and C reuse that UUID. They do not create another volume.
+Reuse pins them to `ep-default`, the ExecutionTarget that already
+holds the workspace.
 
 The WorkItems carry the UUID, not a PVC name.
 
@@ -116,10 +125,10 @@ writes `/workspace/out/report.json`.
 
 | Field | Meaning for EP |
 |---|---|
-| `selectors` | Empty → default routing. Not derived from the workspace id. |
+| `selectors` | Used for **A** (empty → default routing). Not how B and C pick a target. |
 | `payload.activity.image` | Container image. Git, HTTP, and playbook are ordinary WorkItems. |
 | `payload.activity.params` | Owned by that activity. `dest` / playbook paths under `/workspace` are the activity's. |
-| `payload.data.workspace` | Workspace UUID. Worker Manager mounts that volume at `/workspace`. The reconciler does not read this. |
+| `payload.data.workspace` | Workspace UUID. First use: create the volume on the matched ExecutionTarget. Reuse: placement constraint to the ExecutionTarget that holds that volume. |
 
 There is no `data.inputs` list and no `payload.volume_mounts`.
 
@@ -153,9 +162,10 @@ execution_target:
   labels: {}
 ```
 
-The workspace volume lives on this target. Effective labels for
-matching are still only `{ cluster: local-openshift }`. The workspace
-id is not a label.
+The workspace volume lives on this target after A runs. Effective
+labels for matching A are still only `{ cluster: local-openshift }`.
+The workspace id is not a label. For B and C it is a placement
+constraint: the Work Scheduler uses this ExecutionTarget.
 
 ## What is on `/workspace`
 
@@ -172,27 +182,40 @@ there until TTL (from last unmount) or `DELETE`.
 
 ## What EP does
 
-For each WorkItem:
+**WorkItem A** (new UUID):
 
 1. **Claim.** The Work Scheduler picks up the WorkItem from the Work
    Store.
 2. **Reconcile.** `selectors: {}` takes default routing. Eligible set
    `{ep-default}`. The reconciler does not read `data.workspace`.
-3. **Create (A only).** The Work Scheduler now has an ExecutionTarget.
-   It creates the volume on `ep-default` before dispatch. B and C skip
-   this: the UUID already has a volume.
-4. **Dispatch.** The Work Scheduler waits until no other WorkItem
-   holds this UUID (ReadWriteOnce). Then it sends the work to the
-   Kubernetes Worker Manager for `ep-default`.
+3. **Create.** The Work Scheduler now has an ExecutionTarget. It
+   creates the volume on `ep-default` before dispatch.
+4. **Dispatch.** The Work Scheduler sends the work to the Kubernetes
+   Worker Manager for `ep-default`.
 5. **Run.** That Worker Manager mounts workspace
    `7c1a9f3e-4b2d-41a8-9c1f-91c0d4e5a6b7` at `/workspace` and
    cold-starts a pod from `payload.activity.image`. On exit it
    unmounts. It does not delete the volume.
 
+**WorkItems B and C** (reuse):
+
+1. **Claim.** The Work Scheduler picks up the WorkItem from the Work
+   Store.
+2. **Pin.** The UUID already has a volume on `ep-default`. That is a
+   **placement constraint**. The Work Scheduler uses that
+   ExecutionTarget. It does not call the reconciler. It waits until
+   no other WorkItem holds this UUID (ReadWriteOnce).
+3. **Dispatch.** Same Worker Manager for `ep-default`.
+4. **Run.** Same mount at `/workspace`. On exit, unmount. The volume
+   stays.
+
 ```text
-WorkItem A, B, C
+WorkItem A
   selectors {}                 →  ep-default (is_default)
-  data.workspace               →  volume on ep-default → /workspace
+  data.workspace (new)         →  create volume on ep-default → /workspace
+
+WorkItem B, C
+  data.workspace (reuse)       →  ep-default (workspace's ExecutionTarget)
   payload.activity.image       →  container image
   payload.activity.params      →  container input
 ```
@@ -218,6 +241,7 @@ sequenceDiagram
 
     AO->>WS: WorkItem B { http-request, workspace: 7c1a9f3e-… }
     Sch->>WS: pick up B
+    Note over Sch: workspace already on ep-default
     Sch->>WM: dispatch B
     WM->>Vol: mount
     Note over Vol: src still there, write /workspace/site.yml
@@ -225,6 +249,7 @@ sequenceDiagram
 
     AO->>WS: WorkItem C { ansible-playbook, workspace: 7c1a9f3e-… }
     Sch->>WS: pick up C
+    Note over Sch: workspace already on ep-default
     Sch->>WM: dispatch C
     WM->>Vol: mount
     Note over Vol: src and site.yml still there, write /workspace/out/report.json

@@ -29,18 +29,19 @@ Podman volume). This is not a PVC spec, not AO FileManager
 Listed outputs are filesystem paths.
 
 Placement stays in [syntara#620](https://github.com/syntara-orchestration/syntara/pull/620).
-The reconciler does not read this payload.
-[Example 02](examples/02-data-sharing-with-workspace.md) is three WorkItems on one
-volume workspace. Matching still ignores `data`.
+The reconciler does not read this payload for the **first** WorkItem.
+Reusing a volume workspace pins later WorkItems to the ExecutionTarget
+that holds the volume
+([example 02](examples/02-data-sharing-with-workspace.md)).
 
 ## Principles
 
-1. **Outputs and workspace are not placement.** They do not select an
-   ExecutionTarget. There is no `volume-mount` selector. A workspace
-   **id** is unique across every ExecutionTarget and the volume lives
-   on exactly one of them, so WorkItems that cite that id run on that
-   target. AO already owns that (selectors or default routing). The
-   reconciler still does not read `data`.
+1. **A new workspace is not a selector. Reusing one is placement.**
+   There is no `volume-mount` label. The first WorkItem that cites a
+   UUID is placed by selectors (or default routing). The reconciler
+   does not read `data`. Once the volume exists on an ExecutionTarget,
+   later WorkItems with that UUID run on **that** target. The Work
+   Scheduler applies that pin. Listed `outputs` never place.
 2. **Git and HTTP downloads are ordinary WorkItems.** There is no
    `data.inputs` list on the playbook (or other) WorkItem. To get a
    repo or a file onto disk, AO submits a WorkItem whose
@@ -115,6 +116,8 @@ field on the WorkItem and no per-workspace override for now.
 
 The WorkItem carries the **UUID**, not a PVC or Podman volume id. The
 Worker Manager looks up which target holds that UUID and mounts it.
+After the volume exists, later WorkItems with the same UUID are
+dispatched to that ExecutionTarget.
 
 ```json
 "data": {
@@ -139,13 +142,11 @@ they queue). Parallel work that must not wait uses a different
 workspace id, use-case 2, or an object-store snapshot with `ro` or
 `copy`.
 
-Sharing requires **placement on the target that owns the id**. AO
-keeps those WorkItems together with selectors, or they all take
-[default routing](executiontarget-reconciler.md#default-routing)
-to the same protected default. The reconciler does not read the
-workspace id. A WorkItem whose workspace lives on `ep-default` but
-whose selectors land it elsewhere cannot see that volume; pass files
-through use-case 2, or use an object-store snapshot (below).
+Once the volume exists, **reuse is a placement constraint.** The Work
+Scheduler looks up the UUID, sees the volume on that ExecutionTarget,
+and dispatches later WorkItems there. It does not ask the reconciler
+again. Selectors on those later WorkItems do not pick a different
+target.
 
 ### Alternative: object-store snapshot
 
@@ -456,7 +457,7 @@ Illustrative keys only. Not the final field design.
 |---|---|---|
 | HTTP or Git WorkItem + `workspace` | URL or clone → `/workspace` | Yes, once that Git/HTTP WorkItem has written. |
 | `outputs` | container → object store | No. List of files. Copy-aside, then background PUT. UI metadata on `WorkItem.result`. Cross-volume consume via sidecar. |
-| `workspace` | live directory, **UUID unique across all ExecutionTargets**, volume on one target | Yes, **successive** WorkItems on **that** UUID. One RW mount. Default path `/workspace`. Purged by TTL (from last unmount) or delete API. |
+| `workspace` | live directory, **UUID unique across all ExecutionTargets**, volume on one target | Yes, **successive** WorkItems on **that** UUID. Reuse pins those WorkItems to that target. One RW mount. Default path `/workspace`. Purged by TTL (from last unmount) or delete API. |
 
 Omitted `outputs` / `workspace` mean "none". There is no
 `data.inputs`.
@@ -469,10 +470,10 @@ payload (`data.workspace`), not an input list.
 ```
 AO
   resolve file id → HTTP(S) URL; Git ref → clone URL + SHA
-  place sharing nodes on one ExecutionTarget (volume)
-  or any reachable target (object-store snapshot)
-    → HTTP or Git WorkItem (activity writes under /workspace)
-    → later WorkItem.payload.data (workspace UUID, outputs)
+    → HTTP or Git WorkItem (workspace UUID)
+        → Work Scheduler
+              first UUID: reconcile, create volume on selected ET
+              reuse: pin to the ET that holds the volume
         → Worker Manager
               workspace id → volume on its ExecutionTarget → /workspace
               outputs → copy aside, mint keys, complete, unmount; S3 PUT from copy (background)
@@ -489,7 +490,8 @@ AO
 | Create volume on the selected ET (first WorkItem, after reconcile, before dispatch) | Work Scheduler |
 | Default workspace size (no per-workspace override) | ExecutionTarget |
 | Refuse duplicate workspace UUID | Execution Plane |
-| Place WorkItems that share a **volume** id on that target | AO (selectors or default routing) |
+| Place the first WorkItem that cites a new workspace UUID | ExecutionTarget Reconciler (selectors; ignores `data`) |
+| Place later WorkItems that reuse a volume workspace | Work Scheduler (ExecutionTarget that holds the volume) |
 | Flag workspace access (`rw` / `ro` / `copy`); snapshot is the cross-cluster path | AO |
 | Serialize dispatch per workspace id (volume RWO, or snapshot `rw`) | Work Scheduler |
 | Hydrate / publish workspace snapshot (full tree to S3) | Worker Manager / SDK |
@@ -502,7 +504,7 @@ AO
 | Copy listed outputs aside, then unmount; S3 PUT from the copy (`status=uploading` → `available` or `failed`); does not gate the next WorkItem | Worker Manager |
 | Write `artifacts[]` on `WorkItem.result` (UI); patch `status` when a PUT finishes or fails | Work Watcher / Work Store |
 | Fetch listed outputs of a prior WorkItem when no shared volume | Same namespace: GET the producer sidecar HTTP server (spool). Else: consumer sidecar GETs S3 (holds credentials). |
-| Match ExecutionTarget | ExecutionTarget Reconciler (ignores `data`) |
+| Match ExecutionTarget | First WorkItem: Reconciler (ignores `data`). Volume workspace reuse: Work Scheduler (ET that holds the volume). |
 
 EP does not become a file manager. If the HTTP URL or Git remote is
 unreachable from the ExecutionTarget, that fetch WorkItem fails. That
@@ -643,12 +645,13 @@ Extension, not this contract.
 ## Coordination
 
 - **[example 02](examples/02-data-sharing-with-workspace.md):** three WorkItems on
-  one volume workspace at `/workspace`. Matching still ignores
-  `data`. The tree remains after each unmount.
+  one volume workspace at `/workspace`. The first places via
+  selectors. Reuse pins B and C to that ExecutionTarget. The tree
+  remains after each unmount.
 - **[labels.md](labels.md):** HTTP and Git activity params and
-  workspace UUID are not labels. A workspace UUID is unique across
-  all ExecutionTargets and the volume lives on one of them; AO uses
-  selectors / default routing to keep WorkItems on that target.
+  workspace UUID are not labels. Reuse of a volume workspace is a
+  Work Scheduler placement constraint to the ExecutionTarget that
+  holds the volume.
 - **[Worker Manager](worker-manager.md):** looks up the workspace id,
   mounts its volume at `/workspace` (one RW mount per id); copies
   `data.outputs` aside, unmounts, uploads from the copy in the
@@ -657,10 +660,11 @@ Extension, not this contract.
   client on consumers that must GET S3. That PUT does not delay the
   next WorkItem. It does not GET object storage or clone Git as
   WorkItem inputs.
-- **AAP-92722 (Work Scheduler):** do not dispatch a second **`rw`**
-  WorkItem for a workspace id whose volume is still mounted.
-  Snapshot `ro` / `copy` may overlap after that generation is
-  `available`.
+- **AAP-92722 (Work Scheduler):** after claim, if the workspace UUID
+  already has a volume, dispatch to that ExecutionTarget. Do not
+  dispatch a second **`rw`** WorkItem for a workspace id whose volume
+  is still mounted. Snapshot `ro` / `copy` may overlap after that
+  generation is `available`.
 - **Workspace API:** AO mints the UUID on the WorkItem. EP creates
   the volume on the ExecutionTarget chosen for the first WorkItem
   that cites that id, after reconcile and before dispatch. AO does
