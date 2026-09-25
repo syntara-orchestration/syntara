@@ -65,7 +65,7 @@ export function TypeaheadMenuToggle({
           }}
           onChange={(_event, val) => onFilterChange(val)}
           autoComplete="off"
-          id={`${fieldId}-filter`}
+          inputId={fieldId}
           aria-label={ariaLabel}
         />
         {showClearFilter && (

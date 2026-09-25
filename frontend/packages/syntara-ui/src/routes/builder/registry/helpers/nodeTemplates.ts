@@ -40,7 +40,12 @@ type NodeConfig<TFormData = unknown> = {
  */
 export function createCustomNode<TFormData = unknown>(
   config: NodeConfig<TFormData>,
-  onSubmit: (data: TFormData, onSuccess: (newNodeId?: string) => void, onError: (error: string) => void) => void
+  onSubmit: (
+    data: TFormData,
+    onSuccess: (newNodeId?: string) => void,
+    onError: (error: string) => void,
+    subtypeId?: string
+  ) => void
 ): NodeTypeDefinition<TFormData> {
   return {
     ...config,

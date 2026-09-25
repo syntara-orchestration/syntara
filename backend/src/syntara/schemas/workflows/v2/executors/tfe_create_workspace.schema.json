@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://automation.example.com/schemas/workflows/v2/executors/tfe_create_workspace",
+  "title": "Create Workspace Node",
+  "description": "Create a Terraform Enterprise workspace",
+  "parameterSchema": {
+    "type": "object",
+    "required": [
+      "integration_id",
+      "credential_id",
+      "name"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "integration_id": {
+        "type": "string"
+      },
+      "credential_id": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "organization": {
+        "type": "string"
+      },
+      "auto_apply": {
+        "type": "boolean"
+      },
+      "execution_mode": {
+        "type": "string",
+        "enum": [
+          "remote",
+          "local",
+          "agent"
+        ]
+      },
+      "preset": {
+        "type": "string",
+        "enum": [
+          "remote_no_vcs",
+          "agent",
+          "remote_oauth_vcs",
+          "remote_github"
+        ],
+        "description": "Remote (no VCS), agent execution, remote + OAuth VCS, or remote + GitHub"
+      },
+      "agent_pool_id": {
+        "type": "string"
+      },
+      "repository": {
+        "type": "string"
+      },
+      "branch": {
+        "type": "string"
+      },
+      "oauth_token_id": {
+        "type": "string"
+      },
+      "github_app_installation_id": {
+        "type": "string"
+      },
+      "terraform_version": {
+        "type": "string"
+      },
+      "description": {
+        "type": "string"
+      },
+      "working_directory": {
+        "type": "string"
+      },
+      "project_id": {
+        "type": "string"
+      }
+    }
+  },
+  "resultSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "workspace_id": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "workspace_name": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "organization": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    }
+  }
+}

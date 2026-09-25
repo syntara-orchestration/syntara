@@ -10,6 +10,33 @@ from pydantic import Discriminator, Field, field_validator
 from sqlmodel import SQLModel
 
 from syntara.core.constants import JsonbLimits
+from syntara.workflows.workflow_engine.models.tfe_types import (
+    TFEAddRunCommentParameters,
+    TFEAddVariableParameters,
+    TFEAssignTeamPermissionsParameters,
+    TFECreateProjectParameters,
+    TFECreateWorkspaceParameters,
+    TFEDeleteProjectParameters,
+    TFEDeleteVariableParameters,
+    TFEDeleteWorkspaceParameters,
+    TFEFetchStateOutputsParameters,
+    TFEGetGitHubInstallationParameters,
+    TFEGetProjectParameters,
+    TFEGetRunStatusParameters,
+    TFELinkVCSParameters,
+    TFEListGitHubInstallationsParameters,
+    TFEListProjectsParameters,
+    TFEListRunsParameters,
+    TFEListVariablesParameters,
+    TFEListWorkspacesParameters,
+    TFEMoveWorkspaceToProjectParameters,
+    TFERunActionParameters,
+    TFETriggerRunParameters,
+    TFEUpdateProjectParameters,
+    TFEUpdateVariableParameters,
+    TFEUpdateWorkspaceParameters,
+    TFEUploadConfigurationVersionParameters,
+)
 from syntara.workflows.workflow_engine.models.workflow_definition import (
     AAPJobTemplateExecutorParameters,
     AAPWorkflowJobTemplateExecutorParameters,
@@ -134,6 +161,230 @@ class ConvergeNode(WorkflowNodeBase):
     settings: NodeSettingsCof | None = None
 
 
+class TFECreateWorkspaceNode(WorkflowNodeBase):
+    """TFE Create Workspace executor node."""
+
+    type: Literal["tfe_create_workspace"]
+    parameters: TFECreateWorkspaceParameters
+    settings: NodeSettingsNoRetry | None = None
+
+
+class TFEListWorkspacesNode(WorkflowNodeBase):
+    """TFE List Workspaces executor node."""
+
+    type: Literal["tfe_list_workspaces"]
+    parameters: TFEListWorkspacesParameters
+    settings: NodeSettingsFull | None = None
+
+
+class TFEUpdateWorkspaceNode(WorkflowNodeBase):
+    """TFE Update Workspace executor node."""
+
+    type: Literal["tfe_update_workspace"]
+    parameters: TFEUpdateWorkspaceParameters
+    settings: NodeSettingsNoRetry | None = None
+
+
+class TFEDeleteWorkspaceNode(WorkflowNodeBase):
+    """TFE Delete Workspace executor node."""
+
+    type: Literal["tfe_delete_workspace"]
+    parameters: TFEDeleteWorkspaceParameters
+    settings: NodeSettingsNoRetry | None = None
+
+
+class TFEFetchStateOutputsNode(WorkflowNodeBase):
+    """TFE Fetch State Outputs executor node."""
+
+    type: Literal["tfe_fetch_state_outputs"]
+    parameters: TFEFetchStateOutputsParameters
+    settings: NodeSettingsFull | None = None
+
+
+class TFEAddVariableNode(WorkflowNodeBase):
+    """TFE Add Variable executor node."""
+
+    type: Literal["tfe_add_variable"]
+    parameters: TFEAddVariableParameters
+    settings: NodeSettingsNoRetry | None = None
+
+
+class TFEListVariablesNode(WorkflowNodeBase):
+    """TFE List Variables executor node."""
+
+    type: Literal["tfe_list_variables"]
+    parameters: TFEListVariablesParameters
+    settings: NodeSettingsFull | None = None
+
+
+class TFEUpdateVariableNode(WorkflowNodeBase):
+    """TFE Update Variable executor node."""
+
+    type: Literal["tfe_update_variable"]
+    parameters: TFEUpdateVariableParameters
+    settings: NodeSettingsNoRetry | None = None
+
+
+class TFEDeleteVariableNode(WorkflowNodeBase):
+    """TFE Delete Variable executor node."""
+
+    type: Literal["tfe_delete_variable"]
+    parameters: TFEDeleteVariableParameters
+    settings: NodeSettingsNoRetry | None = None
+
+
+class TFEUploadConfigurationVersionNode(WorkflowNodeBase):
+    """TFE Upload Configuration Version executor node."""
+
+    type: Literal["tfe_upload_configuration_version"]
+    parameters: TFEUploadConfigurationVersionParameters
+    settings: NodeSettingsNoRetry | None = None
+
+
+class TFETriggerRunNode(WorkflowNodeBase):
+    """TFE Trigger Run executor node."""
+
+    type: Literal["tfe_trigger_run"]
+    parameters: TFETriggerRunParameters
+    settings: NodeSettingsNoRetry | None = None
+
+
+class TFEGetRunStatusNode(WorkflowNodeBase):
+    """TFE Get Run Status executor node."""
+
+    type: Literal["tfe_get_run_status"]
+    parameters: TFEGetRunStatusParameters
+    settings: NodeSettingsFull | None = None
+
+
+class TFEApplyRunNode(WorkflowNodeBase):
+    """TFE Apply Run executor node."""
+
+    type: Literal["tfe_apply_run"]
+    parameters: TFERunActionParameters
+    settings: NodeSettingsNoRetry | None = None
+
+
+class TFEDiscardRunNode(WorkflowNodeBase):
+    """TFE Discard Run executor node."""
+
+    type: Literal["tfe_discard_run"]
+    parameters: TFERunActionParameters
+    settings: NodeSettingsNoRetry | None = None
+
+
+class TFECancelRunNode(WorkflowNodeBase):
+    """TFE Cancel Run executor node."""
+
+    type: Literal["tfe_cancel_run"]
+    parameters: TFERunActionParameters
+    settings: NodeSettingsNoRetry | None = None
+
+
+class TFEForceCancelRunNode(WorkflowNodeBase):
+    """TFE Force Cancel Run executor node."""
+
+    type: Literal["tfe_force_cancel_run"]
+    parameters: TFERunActionParameters
+    settings: NodeSettingsNoRetry | None = None
+
+
+class TFEListRunsNode(WorkflowNodeBase):
+    """TFE List Runs executor node."""
+
+    type: Literal["tfe_list_runs"]
+    parameters: TFEListRunsParameters
+    settings: NodeSettingsFull | None = None
+
+
+class TFEAddRunCommentNode(WorkflowNodeBase):
+    """TFE Add Run Comment executor node."""
+
+    type: Literal["tfe_add_run_comment"]
+    parameters: TFEAddRunCommentParameters
+    settings: NodeSettingsNoRetry | None = None
+
+
+class TFEListGitHubInstallationsNode(WorkflowNodeBase):
+    """TFE List Git Hub Installations executor node."""
+
+    type: Literal["tfe_list_github_installations"]
+    parameters: TFEListGitHubInstallationsParameters
+    settings: NodeSettingsFull | None = None
+
+
+class TFEGetGitHubInstallationNode(WorkflowNodeBase):
+    """TFE Get Git Hub Installation executor node."""
+
+    type: Literal["tfe_get_github_installation"]
+    parameters: TFEGetGitHubInstallationParameters
+    settings: NodeSettingsFull | None = None
+
+
+class TFELinkVCSNode(WorkflowNodeBase):
+    """TFE Link V C S executor node."""
+
+    type: Literal["tfe_link_vcs"]
+    parameters: TFELinkVCSParameters
+    settings: NodeSettingsNoRetry | None = None
+
+
+class TFECreateProjectNode(WorkflowNodeBase):
+    """TFE Create Project executor node."""
+
+    type: Literal["tfe_create_project"]
+    parameters: TFECreateProjectParameters
+    settings: NodeSettingsNoRetry | None = None
+
+
+class TFEListProjectsNode(WorkflowNodeBase):
+    """TFE List Projects executor node."""
+
+    type: Literal["tfe_list_projects"]
+    parameters: TFEListProjectsParameters
+    settings: NodeSettingsFull | None = None
+
+
+class TFEGetProjectNode(WorkflowNodeBase):
+    """TFE Get Project executor node."""
+
+    type: Literal["tfe_get_project"]
+    parameters: TFEGetProjectParameters
+    settings: NodeSettingsFull | None = None
+
+
+class TFEUpdateProjectNode(WorkflowNodeBase):
+    """TFE Update Project executor node."""
+
+    type: Literal["tfe_update_project"]
+    parameters: TFEUpdateProjectParameters
+    settings: NodeSettingsNoRetry | None = None
+
+
+class TFEDeleteProjectNode(WorkflowNodeBase):
+    """TFE Delete Project executor node."""
+
+    type: Literal["tfe_delete_project"]
+    parameters: TFEDeleteProjectParameters
+    settings: NodeSettingsNoRetry | None = None
+
+
+class TFEMoveWorkspaceToProjectNode(WorkflowNodeBase):
+    """TFE Move Workspace To Project executor node."""
+
+    type: Literal["tfe_move_workspace_to_project"]
+    parameters: TFEMoveWorkspaceToProjectParameters
+    settings: NodeSettingsNoRetry | None = None
+
+
+class TFEAssignTeamPermissionsNode(WorkflowNodeBase):
+    """TFE Assign Team Permissions executor node."""
+
+    type: Literal["tfe_assign_team_permissions"]
+    parameters: TFEAssignTeamPermissionsParameters
+    settings: NodeSettingsNoRetry | None = None
+
+
 class WaitNode(WorkflowNodeBase):
     """Wait (delay) control node."""
 
@@ -154,6 +405,34 @@ _AllNodeTypes = (
     | LoopNode
     | ConvergeNode
     | WaitNode
+    | TFECreateWorkspaceNode
+    | TFEListWorkspacesNode
+    | TFEUpdateWorkspaceNode
+    | TFEDeleteWorkspaceNode
+    | TFEFetchStateOutputsNode
+    | TFEAddVariableNode
+    | TFEListVariablesNode
+    | TFEUpdateVariableNode
+    | TFEDeleteVariableNode
+    | TFEUploadConfigurationVersionNode
+    | TFETriggerRunNode
+    | TFEGetRunStatusNode
+    | TFEApplyRunNode
+    | TFEDiscardRunNode
+    | TFECancelRunNode
+    | TFEForceCancelRunNode
+    | TFEListRunsNode
+    | TFEAddRunCommentNode
+    | TFEListGitHubInstallationsNode
+    | TFEGetGitHubInstallationNode
+    | TFELinkVCSNode
+    | TFECreateProjectNode
+    | TFEListProjectsNode
+    | TFEGetProjectNode
+    | TFEUpdateProjectNode
+    | TFEDeleteProjectNode
+    | TFEMoveWorkspaceToProjectNode
+    | TFEAssignTeamPermissionsNode
 )
 
 WorkflowNode = Annotated[_AllNodeTypes, Discriminator("type")]

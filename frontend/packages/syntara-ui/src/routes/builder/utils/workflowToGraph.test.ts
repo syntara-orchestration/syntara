@@ -81,6 +81,15 @@ describe('workflowToGraph', () => {
       expect(tasks[0].id).toBe('aap-1')
     })
 
+    it('extracts terraform enterprise activities', () => {
+      const activities: Activity[] = [
+        { id: 'tfe-1', type: 'tfe_create_workspace', name: 'Create Workspace', parameters: { name: 'demo' } },
+      ]
+      const tasks = extractTaskActivities(activities)
+      expect(tasks).toHaveLength(1)
+      expect(tasks[0].id).toBe('tfe-1')
+    })
+
     it('skips unknown activity types', () => {
       const activities = [{ id: 'unknown-1', type: 'unknown_type', name: 'Unknown', parameters: {} }] as Activity[]
       const tasks = extractTaskActivities(activities)

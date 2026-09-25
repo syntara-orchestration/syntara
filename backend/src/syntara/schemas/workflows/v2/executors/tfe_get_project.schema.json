@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://automation.example.com/schemas/workflows/v2/executors/tfe_get_project",
+  "title": "Get Project Details Node",
+  "description": "Get project details and team permissions",
+  "parameterSchema": {
+    "type": "object",
+    "required": [
+      "integration_id",
+      "credential_id",
+      "project_id"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "integration_id": {
+        "type": "string"
+      },
+      "credential_id": {
+        "type": "string"
+      },
+      "project_id": {
+        "type": "string"
+      }
+    }
+  },
+  "resultSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "project_id": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "name": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "description": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "teams": {
+        "type": [
+          "array",
+          "null"
+        ]
+      }
+    }
+  }
+}

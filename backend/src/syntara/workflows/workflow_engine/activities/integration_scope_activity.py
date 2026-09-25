@@ -31,6 +31,7 @@ logger = structlog.stdlib.get_logger(__name__)
 _session_factory = AsyncSessionLocal
 
 _AAP_NODE_TYPES: frozenset[str] = frozenset({NodeType.AAP_JOB_TEMPLATE, NodeType.AAP_WORKFLOW_JOB_TEMPLATE})
+_TFE_NODE_PREFIX = "tfe_"
 
 
 def _is_valid_uuid(value: str) -> bool:
@@ -85,6 +86,57 @@ async def _extract_tool_parent_ids(session: AsyncSession, tool_selections: list[
     return {iid for iid in result.scalars().all() if iid is not None}
 
 
+def _parse_reference_uuid(value: object) -> UUID | None:
+    """Return a UUID when value is a valid UUID string."""
+    if isinstance(value, str) and _is_valid_uuid(value):
+        return UUID(value)
+    return None
+
+
+def _expected_direct_integration_type(node_type: str) -> str | None:
+    """Return the integration type for nodes that store a single integration_id."""
+    if node_type in _AAP_NODE_TYPES:
+        return IntegrationType.ANSIBLE_AUTOMATION_PLATFORM
+    if str(node_type).startswith(_TFE_NODE_PREFIX):
+        return IntegrationType.TERRAFORM_ENTERPRISE
+    return None
+
+
+def _collect_agentic_integrations(
+    reference_ids: dict[str, Any],
+    integration_ids: set[UUID],
+    expected_types: dict[UUID, str],
+) -> None:
+    """Add MCP server integrations referenced by an agentic node's connections."""
+    for conn in reference_ids.get("integration_connections") or []:
+        parsed = _parse_reference_uuid(conn.get("integration_id"))
+        if parsed is None:
+            continue
+        integration_ids.add(parsed)
+        expected_types[parsed] = IntegrationType.MCP_SERVER
+
+
+def _collect_declared_integrations(
+    node_type: str,
+    reference_ids: dict[str, Any],
+) -> tuple[set[UUID], dict[UUID, str]]:
+    """Collect integration IDs declared on the node and the type each one must have."""
+    integration_ids: set[UUID] = set()
+    expected_types: dict[UUID, str] = {}
+
+    direct_type = _expected_direct_integration_type(node_type)
+    if direct_type is not None:
+        parsed = _parse_reference_uuid(reference_ids.get("integration_id"))
+        if parsed is not None:
+            integration_ids.add(parsed)
+            expected_types[parsed] = direct_type
+
+    if node_type == NodeType.AGENTIC:
+        _collect_agentic_integrations(reference_ids, integration_ids, expected_types)
+
+    return integration_ids, expected_types
+
+
 async def _validate_node(
     session: AsyncSession,
     node_type: str,
@@ -92,23 +144,7 @@ async def _validate_node(
     reference_ids: dict[str, Any],
     project_id: str,
 ) -> None:
-    integration_ids: set[UUID] = set()
-    expected_types: dict[UUID, str] = {}
-
-    if node_type in _AAP_NODE_TYPES:
-        direct_id = reference_ids.get("integration_id")
-        if direct_id and _is_valid_uuid(direct_id):
-            parsed = UUID(direct_id)
-            integration_ids.add(parsed)
-            expected_types[parsed] = IntegrationType.ANSIBLE_AUTOMATION_PLATFORM
-
-    if node_type == NodeType.AGENTIC:
-        for conn in reference_ids.get("integration_connections") or []:
-            conn_id = conn.get("integration_id")
-            if conn_id and _is_valid_uuid(conn_id):
-                parsed = UUID(conn_id)
-                integration_ids.add(parsed)
-                expected_types[parsed] = IntegrationType.MCP_SERVER
+    integration_ids, expected_types = _collect_declared_integrations(node_type, reference_ids)
 
     llm_model_id = reference_ids.get("llm_model_id")
     if llm_model_id and _is_valid_uuid(llm_model_id):

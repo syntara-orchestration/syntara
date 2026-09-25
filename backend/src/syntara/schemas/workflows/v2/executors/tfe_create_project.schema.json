@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://automation.example.com/schemas/workflows/v2/executors/tfe_create_project",
+  "title": "Create Project Node",
+  "description": "Create a Terraform Enterprise project",
+  "parameterSchema": {
+    "type": "object",
+    "required": [
+      "integration_id",
+      "credential_id",
+      "name"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "integration_id": {
+        "type": "string"
+      },
+      "credential_id": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "description": {
+        "type": "string"
+      }
+    }
+  },
+  "resultSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "project_id": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    }
+  }
+}

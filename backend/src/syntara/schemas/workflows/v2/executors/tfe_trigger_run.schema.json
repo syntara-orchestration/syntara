@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://automation.example.com/schemas/workflows/v2/executors/tfe_trigger_run",
+  "title": "Trigger Run Node",
+  "description": "Trigger a Terraform Enterprise run",
+  "parameterSchema": {
+    "type": "object",
+    "required": [
+      "integration_id",
+      "credential_id",
+      "workspace_id",
+      "mode"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "integration_id": {
+        "type": "string"
+      },
+      "credential_id": {
+        "type": "string"
+      },
+      "workspace_id": {
+        "type": "string"
+      },
+      "mode": {
+        "type": "string"
+      },
+      "configuration_version_id": {
+        "type": "string"
+      },
+      "target_resources": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "replace_resources": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "message": {
+        "type": "string"
+      }
+    }
+  },
+  "resultSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "run_id": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "mode": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "status": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    }
+  }
+}

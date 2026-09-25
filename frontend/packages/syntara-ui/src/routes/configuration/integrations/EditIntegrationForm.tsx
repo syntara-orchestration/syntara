@@ -65,6 +65,8 @@ const CREDENTIAL_DESCRIPTION: Record<string, string> = {
     'This credential is used to verify the connection to this integration and perform periodic health checks. Workflow credentials are configured separately in the workflow builder.',
   [IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM]:
     'This credential is used to verify the connection to the Ansible Automation Platform. Workflow credentials are configured separately in the workflow builder.',
+  [IntegrationTypeEnum.TERRAFORM_ENTERPRISE]:
+    'This API token credential is used to verify the connection to Terraform Enterprise. Workflow credentials are configured separately in the workflow builder.',
 }
 
 type FormFieldsProps = Readonly<{
@@ -77,6 +79,43 @@ type FormFieldsProps = Readonly<{
   setValue: ReturnType<typeof useForm<EditIntegrationFormValues>>['setValue']
   onTestConnection: () => void
 }>
+
+function TerraformOrganizationField({
+  integrationType,
+  control,
+  errors,
+}: Readonly<{
+  integrationType: string | undefined
+  control: FormFieldsProps['control']
+  errors: FormFieldsProps['errors']
+}>) {
+  if (integrationType !== IntegrationTypeEnum.TERRAFORM_ENTERPRISE) return null
+  return (
+    <FormGroup label="Organization" isRequired fieldId="edit-organization">
+      <Controller
+        name="organization"
+        control={control}
+        render={({ field }) => (
+          <TextInput
+            id="edit-organization"
+            isRequired
+            validated={errors.organization ? 'error' : 'default'}
+            {...field}
+          />
+        )}
+      />
+      {errors.organization && (
+        <FormHelperText>
+          <HelperText>
+            <HelperTextItem icon={<RhUiErrorIcon />} variant="error">
+              {errors.organization.message}
+            </HelperTextItem>
+          </HelperText>
+        </FormHelperText>
+      )}
+    </FormGroup>
+  )
+}
 
 function EditIntegrationFormFields({
   integration,
@@ -91,6 +130,7 @@ function EditIntegrationFormFields({
   const isCredentialRequired = CREDENTIAL_REQUIRED_TYPES.has(integration.integration_type ?? '')
   const isTestDisabled = (isCredentialRequired && !credentialId) || isTesting
   const isAnsibleAutomationPlatform = integration.integration_type === IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM
+  const isTFE = integration.integration_type === IntegrationTypeEnum.TERRAFORM_ENTERPRISE
   const isLLM = isLLMProvider(integration)
   const hideBaseUrl = isLLM && PROVIDERS_HIDING_BASE_URL.has(getProviderHint(integration))
 
@@ -158,7 +198,7 @@ function EditIntegrationFormFields({
 
       {!hideBaseUrl && (
         <FormGroup
-          label="API URL"
+          label={isTFE ? 'TFE URL' : 'API URL'}
           isRequired={!isLLM}
           fieldId="edit-base-url"
           labelHelp={isAnsibleAutomationPlatform ? integrationHelp.aapUrl : integrationHelp.apiUrl}
@@ -186,6 +226,8 @@ function EditIntegrationFormFields({
           )}
         </FormGroup>
       )}
+
+      <TerraformOrganizationField integrationType={integration.integration_type} control={control} errors={errors} />
 
       <EditSecurityFields control={control} errors={errors} />
 
@@ -315,6 +357,7 @@ export function EditIntegrationForm() {
       description: integration.description ?? '',
       integration_type: integration.integration_type ?? IntegrationTypeEnum.MCP_SERVER,
       base_url: 'base_url' in config ? String(config.base_url ?? '') : '',
+      organization: 'organization' in config ? String(config.organization ?? '') : '',
       allow_http: 'allow_http' in config ? Boolean(config.allow_http) : false,
       insecure_skip_tls_verify: 'insecure_skip_tls_verify' in config ? Boolean(config.insecure_skip_tls_verify) : false,
       ca_certificate: 'ca_certificate' in config ? (config.ca_certificate ?? null) : null,
@@ -340,6 +383,7 @@ export function EditIntegrationForm() {
       description: '',
       integration_type: '',
       base_url: '',
+      organization: '',
       allow_http: false,
       insecure_skip_tls_verify: false,
       ca_certificate: null,

@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://automation.example.com/schemas/workflows/v2/executors/tfe_update_variable",
+  "title": "Update Variable Node",
+  "description": "Update a workspace variable",
+  "parameterSchema": {
+    "type": "object",
+    "required": [
+      "integration_id",
+      "credential_id",
+      "variable_id"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "integration_id": {
+        "type": "string"
+      },
+      "credential_id": {
+        "type": "string"
+      },
+      "variable_id": {
+        "type": "string"
+      },
+      "value": {
+        "type": "string"
+      },
+      "hcl": {
+        "type": "boolean"
+      },
+      "category": {
+        "type": "string",
+        "enum": [
+          "terraform",
+          "env"
+        ]
+      }
+    }
+  },
+  "resultSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "variable_id": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    }
+  }
+}

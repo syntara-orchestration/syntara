@@ -62,7 +62,8 @@ export function extractTaskActivities(activities: Activity[]): Activity[] {
       activity.type === ActivityTypeEnum.AAP_WORKFLOW_JOB_TEMPLATE ||
       activity.type === ActivityTypeEnum.APPROVAL ||
       activity.type === ActivityTypeEnum.INTERNAL_ACTIVITY ||
-      activity.type === 'generic'
+      activity.type === 'generic' ||
+      activity.type.startsWith('tfe_')
     ) {
       tasks.push(activity)
     }

@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://automation.example.com/schemas/workflows/v2/executors/tfe_add_run_comment",
+  "title": "Add Run Comment Node",
+  "description": "Add a comment to a run",
+  "parameterSchema": {
+    "type": "object",
+    "required": [
+      "integration_id",
+      "credential_id",
+      "run_id",
+      "comment"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "integration_id": {
+        "type": "string"
+      },
+      "credential_id": {
+        "type": "string"
+      },
+      "run_id": {
+        "type": "string"
+      },
+      "comment": {
+        "type": "string"
+      }
+    }
+  },
+  "resultSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "comment_id": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    }
+  }
+}

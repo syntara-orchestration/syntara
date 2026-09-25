@@ -135,6 +135,104 @@ export const NODE_OUTPUT_SCHEMAS: Record<string, OutputFieldDef[]> = {
     { name: 'matched_port', type: 'string', description: 'Port that was selected for routing' },
   ],
   wait: [{ name: 'status', type: 'string', description: 'Wait duration elapsed successfully' }],
+  tfe_create_workspace: [
+    { name: 'workspace_id', type: 'unknown', description: '' },
+    { name: 'workspace_name', type: 'unknown', description: '' },
+    { name: 'organization', type: 'unknown', description: '' },
+  ],
+  tfe_list_workspaces: [
+    { name: 'workspaces', type: 'unknown', description: '' },
+    { name: 'count', type: 'unknown', description: '' },
+  ],
+  tfe_update_workspace: [{ name: 'workspace_id', type: 'unknown', description: '' }],
+  tfe_delete_workspace: [{ name: 'deleted', type: 'unknown', description: '' }],
+  tfe_fetch_state_outputs: [
+    { name: 'has_state', type: 'unknown', description: '' },
+    { name: 'state_version_id', type: 'unknown', description: '' },
+    { name: 'outputs', type: 'unknown', description: '' },
+  ],
+  tfe_add_variable: [{ name: 'variable_id', type: 'unknown', description: '' }],
+  tfe_list_variables: [
+    { name: 'variables', type: 'unknown', description: '' },
+    { name: 'count', type: 'unknown', description: '' },
+  ],
+  tfe_update_variable: [{ name: 'variable_id', type: 'unknown', description: '' }],
+  tfe_delete_variable: [{ name: 'deleted', type: 'unknown', description: '' }],
+  tfe_upload_configuration_version: [{ name: 'configuration_version_id', type: 'unknown', description: '' }],
+  tfe_trigger_run: [
+    { name: 'run_id', type: 'unknown', description: '' },
+    { name: 'mode', type: 'unknown', description: '' },
+    { name: 'status', type: 'unknown', description: '' },
+  ],
+  tfe_get_run_status: [
+    { name: 'run_id', type: 'unknown', description: '' },
+    { name: 'status', type: 'unknown', description: '' },
+    { name: 'phase', type: 'unknown', description: '' },
+    { name: 'plan_exit_code', type: 'unknown', description: '' },
+    { name: 'has_changes', type: 'unknown', description: '' },
+    { name: 'resource_changes', type: 'unknown', description: '' },
+    { name: 'is_confirmable', type: 'unknown', description: '' },
+    { name: 'is_cancelable', type: 'unknown', description: '' },
+    { name: 'is_force_cancelable', type: 'unknown', description: '' },
+  ],
+  tfe_apply_run: [
+    { name: 'run_id', type: 'unknown', description: '' },
+    { name: 'action_queued', type: 'unknown', description: '' },
+  ],
+  tfe_discard_run: [
+    { name: 'run_id', type: 'unknown', description: '' },
+    { name: 'action_queued', type: 'unknown', description: '' },
+  ],
+  tfe_cancel_run: [
+    { name: 'run_id', type: 'unknown', description: '' },
+    { name: 'action_queued', type: 'unknown', description: '' },
+  ],
+  tfe_force_cancel_run: [
+    { name: 'run_id', type: 'unknown', description: '' },
+    { name: 'action_queued', type: 'unknown', description: '' },
+  ],
+  tfe_list_runs: [
+    { name: 'runs', type: 'unknown', description: '' },
+    { name: 'count', type: 'unknown', description: '' },
+  ],
+  tfe_add_run_comment: [{ name: 'comment_id', type: 'unknown', description: '' }],
+  tfe_list_github_installations: [
+    { name: 'installations', type: 'unknown', description: '' },
+    { name: 'count', type: 'unknown', description: '' },
+  ],
+  tfe_get_github_installation: [
+    { name: 'installation_id', type: 'unknown', description: '' },
+    { name: 'owner', type: 'unknown', description: '' },
+    { name: 'display_name', type: 'unknown', description: '' },
+    { name: 'repositories', type: 'unknown', description: '' },
+  ],
+  tfe_link_vcs: [
+    { name: 'linked', type: 'unknown', description: '' },
+    { name: 'identifier', type: 'unknown', description: '' },
+    { name: 'branch', type: 'unknown', description: '' },
+  ],
+  tfe_create_project: [{ name: 'project_id', type: 'unknown', description: '' }],
+  tfe_list_projects: [
+    { name: 'projects', type: 'unknown', description: '' },
+    { name: 'count', type: 'unknown', description: '' },
+  ],
+  tfe_get_project: [
+    { name: 'project_id', type: 'unknown', description: '' },
+    { name: 'name', type: 'unknown', description: '' },
+    { name: 'description', type: 'unknown', description: '' },
+    { name: 'teams', type: 'unknown', description: '' },
+  ],
+  tfe_update_project: [{ name: 'project_id', type: 'unknown', description: '' }],
+  tfe_delete_project: [{ name: 'deleted', type: 'unknown', description: '' }],
+  tfe_move_workspace_to_project: [
+    { name: 'workspace_id', type: 'unknown', description: '' },
+    { name: 'project_id', type: 'unknown', description: '' },
+  ],
+  tfe_assign_team_permissions: [
+    { name: 'project_id', type: 'unknown', description: '' },
+    { name: 'team_id', type: 'unknown', description: '' },
+    { name: 'access', type: 'unknown', description: '' },
+  ],
 }
 
 export function getNodeOutputSchema(nodeType: string): OutputFieldDef[] | null {

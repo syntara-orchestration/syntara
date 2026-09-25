@@ -28,6 +28,7 @@ from syntara.integrations.models.integration_configuration import (
     LLMProviderHint,
     MCPServerConfiguration,
     MCPServerConfigurationInput,
+    TFEConfiguration,
 )
 from syntara.integrations.models.llm_model import (
     LLMModel,
@@ -70,4 +71,5 @@ __all__ = [
     "MCPServerConfiguration",
     "MCPServerConfigurationInput",
     "RefreshResult",
+    "TFEConfiguration",
 ]

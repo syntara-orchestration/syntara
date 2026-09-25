@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://automation.example.com/schemas/workflows/v2/executors/tfe_update_workspace",
+  "title": "Update Workspace Settings Node",
+  "description": "Update Terraform Enterprise workspace settings",
+  "parameterSchema": {
+    "type": "object",
+    "required": [
+      "integration_id",
+      "credential_id",
+      "workspace_id"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "integration_id": {
+        "type": "string"
+      },
+      "credential_id": {
+        "type": "string"
+      },
+      "workspace_id": {
+        "type": "string"
+      },
+      "auto_apply": {
+        "type": "boolean"
+      },
+      "description": {
+        "type": "string"
+      },
+      "working_directory": {
+        "type": "string"
+      },
+      "terraform_version": {
+        "type": "string"
+      },
+      "execution_mode": {
+        "type": "string",
+        "enum": [
+          "remote",
+          "local",
+          "agent"
+        ]
+      },
+      "preset": {
+        "type": "string",
+        "enum": [
+          "remote_no_vcs",
+          "agent",
+          "remote_oauth_vcs",
+          "remote_github"
+        ]
+      },
+      "agent_pool_id": {
+        "type": "string"
+      },
+      "repository": {
+        "type": "string"
+      },
+      "branch": {
+        "type": "string"
+      },
+      "oauth_token_id": {
+        "type": "string"
+      },
+      "github_app_installation_id": {
+        "type": "string"
+      }
+    }
+  },
+  "resultSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "workspace_id": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    }
+  }
+}

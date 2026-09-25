@@ -72,6 +72,27 @@ const aapSchema = z.object({
     }),
 })
 
+const tfeSchema = z.object({
+  ...sharedFields,
+  integration_type: z.literal(IntegrationTypeEnum.TERRAFORM_ENTERPRISE),
+  configuration: z
+    .object({
+      integration_type: z.literal(IntegrationTypeEnum.TERRAFORM_ENTERPRISE),
+      base_url: z.string().min(1, 'TFE URL is required').url('Must be a valid URL'),
+      organization: z.string().min(1, 'Organization is required'),
+      ...securityFields,
+    })
+    .superRefine((data, ctx) => {
+      if (!isAllowedScheme(data.base_url, data.allow_http)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: data.allow_http ? 'Must be an HTTP or HTTPS URL' : 'Must be an HTTPS URL',
+          path: ['base_url'],
+        })
+      }
+    }),
+})
+
 const llmProviderSchema = z.object({
   ...sharedFields,
   integration_type: z.literal(IntegrationTypeEnum.LLM_PROVIDER),
@@ -106,7 +127,7 @@ const llmProviderSchema = z.object({
  * Backend 422 errors are still applied via useFormMutationErrorHandler.
  */
 export const integrationFormSchema = z
-  .discriminatedUnion('integration_type', [mcpServerSchema, aapSchema, llmProviderSchema])
+  .discriminatedUnion('integration_type', [mcpServerSchema, aapSchema, tfeSchema, llmProviderSchema])
   .superRefine((data, ctx) => {
     if (data.scope === 'project' && data.project_ids.length === 0) {
       ctx.addIssue({
@@ -134,6 +155,8 @@ export function getStep1Fields(integrationType: string, scope?: string): string[
       return [...shared, 'configuration.base_url']
     case IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM:
       return [...shared, 'configuration.base_url']
+    case IntegrationTypeEnum.TERRAFORM_ENTERPRISE:
+      return [...shared, 'configuration.base_url', 'configuration.organization']
     case IntegrationTypeEnum.LLM_PROVIDER:
       return [...shared, 'configuration.provider_hint', 'configuration.base_url']
     default:
@@ -147,6 +170,13 @@ export function getDefaultConfiguration(integrationType: string): IntegrationFor
       return {
         integration_type: 'ansible_automation_platform' as const,
         base_url: '',
+        ...SECURITY_DEFAULTS,
+      }
+    case IntegrationTypeEnum.TERRAFORM_ENTERPRISE:
+      return {
+        integration_type: 'terraform_enterprise' as const,
+        base_url: '',
+        organization: '',
         ...SECURITY_DEFAULTS,
       }
     case IntegrationTypeEnum.LLM_PROVIDER:
@@ -164,6 +194,7 @@ export function getDefaultConfiguration(integrationType: string): IntegrationFor
 export const INTEGRATION_TYPE_OPTIONS = [
   { value: IntegrationTypeEnum.MCP_SERVER, label: 'MCP Server' },
   { value: IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM, label: 'Ansible Automation Platform' },
+  { value: IntegrationTypeEnum.TERRAFORM_ENTERPRISE, label: 'Terraform Enterprise' },
   { value: IntegrationTypeEnum.LLM_PROVIDER, label: 'LLM Provider' },
 ] as const
 

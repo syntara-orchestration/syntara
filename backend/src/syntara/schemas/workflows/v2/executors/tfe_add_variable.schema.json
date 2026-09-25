@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://automation.example.com/schemas/workflows/v2/executors/tfe_add_variable",
+  "title": "Add Variable Node",
+  "description": "Add a workspace variable",
+  "parameterSchema": {
+    "type": "object",
+    "required": [
+      "integration_id",
+      "credential_id",
+      "workspace_id",
+      "key",
+      "value"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "integration_id": {
+        "type": "string"
+      },
+      "credential_id": {
+        "type": "string"
+      },
+      "workspace_id": {
+        "type": "string"
+      },
+      "key": {
+        "type": "string"
+      },
+      "value": {
+        "type": "string"
+      },
+      "category": {
+        "type": "string",
+        "enum": [
+          "terraform",
+          "env"
+        ]
+      },
+      "sensitive": {
+        "type": "boolean"
+      },
+      "hcl": {
+        "type": "boolean"
+      }
+    }
+  },
+  "resultSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "variable_id": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    }
+  }
+}

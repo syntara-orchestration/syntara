@@ -113,7 +113,10 @@ export function TaskActivityDetails(
   const { actualExecutor } = detectTaskNodeType(props.data)
   const dataWithMetadata = props.data as TaskActivityWithMetadata
 
-  const executorMeta = executorMetadata[actualExecutor] ?? executorMetadata[props.data.type ?? '']
+  const executorMeta =
+    executorMetadata[actualExecutor] ??
+    (actualExecutor.startsWith('tfe_') ? { label: 'Terraform' } : undefined) ??
+    executorMetadata[props.data.type ?? '']
   const { id: iconId } = getTaskIconDescriptor(props.data)
   const iconNode = renderNodeIcon(executorMeta?.icon, iconId, 'canvas', props.iconColor)
   const taskExecutorLabel = executorMeta?.label ?? 'Task'

@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://automation.example.com/schemas/workflows/v2/executors/tfe_move_workspace_to_project",
+  "title": "Move Workspace to Project Node",
+  "description": "Move a workspace into a project",
+  "parameterSchema": {
+    "type": "object",
+    "required": [
+      "integration_id",
+      "credential_id",
+      "workspace_id"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "integration_id": {
+        "type": "string"
+      },
+      "credential_id": {
+        "type": "string"
+      },
+      "workspace_id": {
+        "type": "string"
+      },
+      "project_id": {
+        "type": "string"
+      }
+    }
+  },
+  "resultSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "workspace_id": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "project_id": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    }
+  }
+}

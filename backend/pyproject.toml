@@ -177,6 +177,16 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401", "D104"]
 "src/syntara/core/models/base/resource.py" = ["A005"]  # Allow module name shadowing stdlib
+# TFE activities: many thin wrappers around TFEError with structured error codes (SDP R10.2)
+"src/syntara/workflows/workflow_engine/activities/tfe_activities.py" = [
+    "TRY003",
+    "TRY301",
+    "TRY203",
+    "EM101",
+    "EM102",
+    "E501",
+    "TC001",
+]
 "tools/**/*.py" = ["T201", "INP001", "PLC0415", "ARG001", "ANN401", "TRY003", "EM102"]  # CLI tools: print, deferred imports, unused args
 "scripts/**/*.py" = ["T201", "INP001", "D103"]  # Standalone scripts: print, no package, no docstrings
 "tests/**/*.py" = [

@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://automation.example.com/schemas/workflows/v2/executors/tfe_get_run_status",
+  "title": "Get Run Status Node",
+  "description": "Get Terraform Enterprise run status",
+  "parameterSchema": {
+    "type": "object",
+    "required": [
+      "integration_id",
+      "credential_id",
+      "run_id"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "integration_id": {
+        "type": "string"
+      },
+      "credential_id": {
+        "type": "string"
+      },
+      "run_id": {
+        "type": "string"
+      },
+      "wait_for_completion": {
+        "type": "boolean"
+      },
+      "poll_interval_seconds": {
+        "type": "integer"
+      },
+      "timeout_seconds": {
+        "type": "integer"
+      }
+    }
+  },
+  "resultSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "run_id": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "status": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "phase": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "plan_exit_code": {
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "has_changes": {
+        "type": [
+          "boolean",
+          "null"
+        ]
+      },
+      "resource_changes": {
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "is_confirmable": {
+        "type": [
+          "boolean",
+          "null"
+        ]
+      },
+      "is_cancelable": {
+        "type": [
+          "boolean",
+          "null"
+        ]
+      },
+      "is_force_cancelable": {
+        "type": [
+          "boolean",
+          "null"
+        ]
+      }
+    }
+  }
+}

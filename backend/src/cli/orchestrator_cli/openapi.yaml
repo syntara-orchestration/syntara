@@ -31002,6 +31002,7 @@ components:
         - mcp_server
         - llm_provider
         - ansible_automation_platform
+        - terraform_enterprise
       title: IntegrationType
       description: Type of external integration.
     IntegrationStatus:
@@ -31141,6 +31142,7 @@ components:
             - $ref: '#/components/schemas/MCPServerConfigurationInput'
             - $ref: '#/components/schemas/LLMProviderConfiguration'
             - $ref: '#/components/schemas/AAPConfiguration'
+            - $ref: '#/components/schemas/TFEConfiguration'
           title: Configuration
           description: Integration-specific configuration
           discriminator:
@@ -31149,6 +31151,7 @@ components:
               ansible_automation_platform: '#/components/schemas/AAPConfiguration'
               llm_provider: '#/components/schemas/LLMProviderConfiguration'
               mcp_server: '#/components/schemas/MCPServerConfigurationInput'
+              terraform_enterprise: '#/components/schemas/TFEConfiguration'
         management_credential_id:
           anyOf:
             - type: string
@@ -31291,12 +31294,14 @@ components:
                 - $ref: '#/components/schemas/MCPServerConfigurationInput'
                 - $ref: '#/components/schemas/LLMProviderConfiguration'
                 - $ref: '#/components/schemas/AAPConfiguration'
+                - $ref: '#/components/schemas/TFEConfiguration'
               discriminator:
                 propertyName: integration_type
                 mapping:
                   ansible_automation_platform: '#/components/schemas/AAPConfiguration'
                   llm_provider: '#/components/schemas/LLMProviderConfiguration'
                   mcp_server: '#/components/schemas/MCPServerConfigurationInput'
+                  terraform_enterprise: '#/components/schemas/TFEConfiguration'
             - type: 'null'
           title: Configuration
           description: Integration-specific configuration
@@ -31343,10 +31348,12 @@ components:
               mcp_server: '#/components/schemas/MCPServerConfigurationInput'
               llm_provider: '#/components/schemas/LLMProviderConfiguration'
               ansible_automation_platform: '#/components/schemas/AAPConfiguration'
+              terraform_enterprise: '#/components/schemas/TFEConfiguration'
           oneOf:
             - $ref: '#/components/schemas/MCPServerConfigurationInput'
             - $ref: '#/components/schemas/LLMProviderConfiguration'
             - $ref: '#/components/schemas/AAPConfiguration'
+            - $ref: '#/components/schemas/TFEConfiguration'
           title: Configuration
         credential_id:
           anyOf:
@@ -31442,6 +31449,7 @@ components:
             - $ref: '#/components/schemas/MCPServerConfigurationInput'
             - $ref: '#/components/schemas/LLMProviderConfiguration'
             - $ref: '#/components/schemas/AAPConfiguration'
+            - $ref: '#/components/schemas/TFEConfiguration'
           title: Configuration
           description: Integration-specific configuration
           discriminator:
@@ -31450,6 +31458,7 @@ components:
               ansible_automation_platform: '#/components/schemas/AAPConfiguration'
               llm_provider: '#/components/schemas/LLMProviderConfiguration'
               mcp_server: '#/components/schemas/MCPServerConfigurationInput'
+              terraform_enterprise: '#/components/schemas/TFEConfiguration'
         last_validated_at:
           anyOf:
             - type: string
@@ -31637,6 +31646,47 @@ components:
       required:
         - base_url
       title: AAPConfiguration
+      type: object
+    TFEConfiguration:
+      description: Configuration for Terraform Enterprise / HCP Terraform integrations.
+      additionalProperties: false
+      properties:
+        integration_type:
+          type: string
+          const: terraform_enterprise
+          default: terraform_enterprise
+          title: Integration Type
+        base_url:
+          type: string
+          format: uri
+          title: TFE URL
+          description: Base URL for Terraform Enterprise or HCP Terraform (e.g. https://app.terraform.io)
+        organization:
+          type: string
+          minLength: 1
+          maxLength: 255
+          title: Organization
+          description: Default Terraform Enterprise organization name used as the scope for workflow steps
+        allow_http:
+          type: boolean
+          title: Allow Http
+          description: Allow HTTP (unencrypted) connections. Loopback addresses are always permitted over HTTP.
+          default: false
+        insecure_skip_tls_verify:
+          type: boolean
+          title: Insecure Skip Tls Verify
+          description: Disable TLS certificate verification for connections to this integration.
+          default: false
+        ca_certificate:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Ca Certificate
+          description: PEM-encoded CA certificate to trust for this integration's TLS connections.
+      required:
+        - base_url
+        - organization
+      title: TFEConfiguration
       type: object
     DiscoveredLLMModel:
       description: A model discovered from an LLM provider.

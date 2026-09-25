@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://automation.example.com/schemas/workflows/v2/executors/tfe_link_vcs",
+  "title": "Link VCS to Workspace Node",
+  "description": "Link a GitHub repository to a workspace",
+  "parameterSchema": {
+    "type": "object",
+    "required": [
+      "integration_id",
+      "credential_id",
+      "workspace_id",
+      "installation_id",
+      "repository",
+      "branch"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "integration_id": {
+        "type": "string"
+      },
+      "credential_id": {
+        "type": "string"
+      },
+      "workspace_id": {
+        "type": "string"
+      },
+      "installation_id": {
+        "type": "string"
+      },
+      "repository": {
+        "type": "string"
+      },
+      "branch": {
+        "type": "string"
+      }
+    }
+  },
+  "resultSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "linked": {
+        "type": [
+          "boolean",
+          "null"
+        ]
+      },
+      "identifier": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "branch": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    }
+  }
+}

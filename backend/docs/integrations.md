@@ -26,7 +26,7 @@ graph TD
 
 Key properties:
 
-- **Three integration types** — MCP servers provide tools, LLM providers provide models, AAP instances provide automation endpoints
+- **Four integration types** — MCP servers provide tools, LLM providers provide models, AAP instances provide automation endpoints, Terraform Enterprise provides workspace/run APIs
 - **Adapter protocol** — each type implements a common two-method protocol (`validate` + `discover`) via a registry-based factory
 - **Two credential roles** — management credentials for admin-controlled health checks and discovery; execution credentials for workflow-time operations
 - **Project scoping** — integrations are either globally visible or restricted to assigned projects
@@ -39,6 +39,7 @@ Key properties:
 | `mcp_server` | Tools (name, description, parameters) |
 | `llm_provider` | Models (id, name, capability profile) |
 | `ansible_automation_platform` | None (connectivity check only) |
+| `terraform_enterprise` | None (connectivity check only; org-scoped workflow steps) |
 
 ## Configuration Schema
 
@@ -206,6 +207,10 @@ The LLM adapter delegates to provider-specific implementations via `LLMProviderB
 ### Ansible Automation Platform
 
 The AAP integration stores the API URL and TLS configuration. It does not discover sub-resources — AAP objects (job templates, inventories, organizations) are browsed at workflow-design time through `GET /api/v1/proxies/aap/*`. The proxy uses the integration's management credential when the caller does not pass an execution `credential_id`, so a unique visible enabled AAP integration is sufficient to list controller resources. If more than one AAP integration is visible, pass `integration_id`; `credential_id` is still optional.
+
+### Terraform Enterprise
+
+The TFE integration stores `base_url`, `organization`, and TLS configuration. It requires an **HTTP Bearer Token** management credential (user or team API token). Validate pings `GET /api/v2/organizations/{org}`. There is no resource discovery/refresh — workspace, run, VCS, and project operations are modular workflow node types that call the TFE v2 API at execution time via `syntara.terraform.client.TFEClient`.
 
 **Design Decisions:**
 - **Static credential authentication.** The adapter uses `aap_oauth_token` (Bearer) if present, falling back to `aap_username` + `aap_password` (Basic Auth). No support for short-lived tokens, token refresh, or OIDC — this is a known limitation.

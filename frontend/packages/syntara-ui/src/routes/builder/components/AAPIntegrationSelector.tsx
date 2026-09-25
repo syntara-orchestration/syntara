@@ -133,9 +133,8 @@ export function AAPIntegrationSelector({
   const formGroupLabel = helpText ? <FormLabelWithHelp label={label} helpText={helpText} /> : label
 
   return (
-    <FormGroup label={formGroupLabel} fieldId={fieldId} isRequired={isRequired}>
+    <FormGroup label={formGroupLabel} isRequired={isRequired}>
       <SynSelect
-        id={fieldId}
         isOpen={isOpen}
         selected={value}
         onSelect={handleSelect}

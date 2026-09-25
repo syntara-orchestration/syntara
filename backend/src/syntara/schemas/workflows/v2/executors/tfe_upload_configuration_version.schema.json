@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://automation.example.com/schemas/workflows/v2/executors/tfe_upload_configuration_version",
+  "title": "Upload Configuration Version Node",
+  "description": "Upload HCL configuration artifact",
+  "parameterSchema": {
+    "type": "object",
+    "required": [
+      "integration_id",
+      "credential_id",
+      "workspace_id",
+      "artifact"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "integration_id": {
+        "type": "string"
+      },
+      "credential_id": {
+        "type": "string"
+      },
+      "workspace_id": {
+        "type": "string"
+      },
+      "artifact": {
+        "type": "string"
+      },
+      "auto_queue_runs": {
+        "type": "boolean"
+      }
+    }
+  },
+  "resultSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "configuration_version_id": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    }
+  }
+}

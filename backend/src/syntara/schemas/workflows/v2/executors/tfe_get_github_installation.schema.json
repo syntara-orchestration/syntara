@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://automation.example.com/schemas/workflows/v2/executors/tfe_get_github_installation",
+  "title": "Get Installation Details Node",
+  "description": "Get GitHub App installation details",
+  "parameterSchema": {
+    "type": "object",
+    "required": [
+      "integration_id",
+      "credential_id",
+      "installation_id"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "integration_id": {
+        "type": "string"
+      },
+      "credential_id": {
+        "type": "string"
+      },
+      "installation_id": {
+        "type": "string"
+      }
+    }
+  },
+  "resultSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "installation_id": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "owner": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "display_name": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "repositories": {
+        "type": [
+          "array",
+          "null"
+        ]
+      }
+    }
+  }
+}

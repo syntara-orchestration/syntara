@@ -31,7 +31,7 @@ import styles from './WizardSteps.module.css'
 
 type ControlledTextFieldProps = Readonly<{
   control: Control<IntegrationFormData>
-  name: 'name' | 'description' | 'configuration.base_url'
+  name: 'name' | 'description' | 'configuration.base_url' | 'configuration.organization'
   label: string
   fieldId: string
   placeholder: string
@@ -269,6 +269,12 @@ function SecurityFields({ control }: Readonly<{ control: Control<IntegrationForm
   )
 }
 
+function connectionUrlPlaceholder(isAap: boolean, isTfe: boolean): string {
+  if (isAap) return 'e.g. https://aap.example.com'
+  if (isTfe) return 'e.g. https://app.terraform.io'
+  return 'https://mcp-server.example.com/mcp'
+}
+
 type IntegrationDetailsStepProps = Readonly<{
   control: Control<IntegrationFormData>
   setValue: UseFormSetValue<IntegrationFormData>
@@ -284,6 +290,7 @@ export function IntegrationDetailsStep({ control, setValue, onTypeChange }: Inte
 
   const isLLM = integrationType === IntegrationTypeEnum.LLM_PROVIDER
   const isAAP = integrationType === IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM
+  const isTFE = integrationType === IntegrationTypeEnum.TERRAFORM_ENTERPRISE
   const typeConfig = isLLM
     ? {
         nameLabel: 'Name',
@@ -292,6 +299,7 @@ export function IntegrationDetailsStep({ control, setValue, onTypeChange }: Inte
         hideBaseUrl: typeof providerHint === 'string' && PROVIDERS_HIDING_BASE_URL.has(providerHint),
         requireBaseUrl: typeof providerHint === 'string' && PROVIDERS_REQUIRING_BASE_URL.has(providerHint),
         baseUrlPlaceholder: 'https://api.example.com/v1',
+        showOrganization: false,
       }
     : {
         nameLabel: 'Server name / ID',
@@ -299,7 +307,8 @@ export function IntegrationDetailsStep({ control, setValue, onTypeChange }: Inte
         showProviderHint: false,
         hideBaseUrl: false,
         requireBaseUrl: true,
-        baseUrlPlaceholder: isAAP ? 'e.g. https://aap.example.com' : 'https://mcp-server.example.com/mcp',
+        baseUrlPlaceholder: connectionUrlPlaceholder(isAAP, isTFE),
+        showOrganization: isTFE,
       }
 
   const renderTypeToggle = useCallback(
@@ -406,11 +415,21 @@ export function IntegrationDetailsStep({ control, setValue, onTypeChange }: Inte
           <ControlledTextField
             control={control}
             name="configuration.base_url"
-            label="API URL"
+            label={isTFE ? 'TFE URL' : 'API URL'}
             fieldId="base-url"
             placeholder={typeConfig.baseUrlPlaceholder}
             isRequired={typeConfig.requireBaseUrl}
             labelHelp={isAAP ? integrationHelp.aapUrl : integrationHelp.apiUrl}
+          />
+        )}
+        {typeConfig.showOrganization && (
+          <ControlledTextField
+            control={control}
+            name="configuration.organization"
+            label="Organization"
+            fieldId="organization"
+            placeholder="Enter TFE organization name"
+            isRequired
           />
         )}
 

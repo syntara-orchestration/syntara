@@ -33,6 +33,34 @@ export const ActivityTypeEnum = {
   SWITCH: 'switch',
   WAIT: 'wait',
   INTERNAL_ACTIVITY: 'internal_activity',
+  TFE_CREATE_WORKSPACE: 'tfe_create_workspace',
+  TFE_LIST_WORKSPACES: 'tfe_list_workspaces',
+  TFE_UPDATE_WORKSPACE: 'tfe_update_workspace',
+  TFE_DELETE_WORKSPACE: 'tfe_delete_workspace',
+  TFE_FETCH_STATE_OUTPUTS: 'tfe_fetch_state_outputs',
+  TFE_ADD_VARIABLE: 'tfe_add_variable',
+  TFE_LIST_VARIABLES: 'tfe_list_variables',
+  TFE_UPDATE_VARIABLE: 'tfe_update_variable',
+  TFE_DELETE_VARIABLE: 'tfe_delete_variable',
+  TFE_UPLOAD_CONFIGURATION_VERSION: 'tfe_upload_configuration_version',
+  TFE_TRIGGER_RUN: 'tfe_trigger_run',
+  TFE_GET_RUN_STATUS: 'tfe_get_run_status',
+  TFE_APPLY_RUN: 'tfe_apply_run',
+  TFE_DISCARD_RUN: 'tfe_discard_run',
+  TFE_CANCEL_RUN: 'tfe_cancel_run',
+  TFE_FORCE_CANCEL_RUN: 'tfe_force_cancel_run',
+  TFE_LIST_RUNS: 'tfe_list_runs',
+  TFE_ADD_RUN_COMMENT: 'tfe_add_run_comment',
+  TFE_LIST_GITHUB_INSTALLATIONS: 'tfe_list_github_installations',
+  TFE_GET_GITHUB_INSTALLATION: 'tfe_get_github_installation',
+  TFE_LINK_VCS: 'tfe_link_vcs',
+  TFE_CREATE_PROJECT: 'tfe_create_project',
+  TFE_LIST_PROJECTS: 'tfe_list_projects',
+  TFE_GET_PROJECT: 'tfe_get_project',
+  TFE_UPDATE_PROJECT: 'tfe_update_project',
+  TFE_DELETE_PROJECT: 'tfe_delete_project',
+  TFE_MOVE_WORKSPACE_TO_PROJECT: 'tfe_move_workspace_to_project',
+  TFE_ASSIGN_TEAM_PERMISSIONS: 'tfe_assign_team_permissions',
 } as const
 
 /**
@@ -160,6 +188,7 @@ export const IntegrationTypeEnum = {
   MCP_SERVER: 'mcp_server',
   LLM_PROVIDER: 'llm_provider',
   ANSIBLE_AUTOMATION_PLATFORM: 'ansible_automation_platform',
+  TERRAFORM_ENTERPRISE: 'terraform_enterprise',
 } as const
 
 /**

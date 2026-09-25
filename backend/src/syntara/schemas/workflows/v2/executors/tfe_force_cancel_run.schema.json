@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://automation.example.com/schemas/workflows/v2/executors/tfe_force_cancel_run",
+  "title": "Force Cancel Run Node",
+  "description": "Force-cancel a run",
+  "parameterSchema": {
+    "type": "object",
+    "required": [
+      "integration_id",
+      "credential_id",
+      "run_id"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "integration_id": {
+        "type": "string"
+      },
+      "credential_id": {
+        "type": "string"
+      },
+      "run_id": {
+        "type": "string"
+      },
+      "comment": {
+        "type": "string"
+      }
+    }
+  },
+  "resultSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "run_id": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "action_queued": {
+        "type": [
+          "boolean",
+          "null"
+        ]
+      }
+    }
+  }
+}
