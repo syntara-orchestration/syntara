@@ -58,7 +58,7 @@ from syntara.workflows.models.execution import (
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 from syntara.workflows.models.workflow_version import WorkflowVersion
-from syntara.workflows.services.restart_validation import validate_restart_from_failure
+from syntara.workflows.services.restart_validation import _state_reason, validate_restart_from_failure
 from syntara.workflows.utils.workflow_metadata import build_workflow_metadata, resolve_user_display_name
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType, resolve_trigger_node
 from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
@@ -1316,6 +1316,11 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         source = result.one_or_none()
         if source is None:  # Deleted between validation and restart
             raise ExecutionNotFoundError(execution_id)
+        # Re-check terminal state: the execution may have transitioned (e.g. cancelled)
+        # between validation passing and this second load.
+        stale_reason = _state_reason(source)
+        if stale_reason is not None:
+            raise ExecutionNotRestartableError(execution_id, stale_reason)
 
         workflow_result = await self.session.exec(select(Workflow).where(Workflow.id == source.workflow_id))
         workflow = workflow_result.one_or_none()
@@ -1338,7 +1343,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             source_execution_id=execution_id,
             workflow_id=source.workflow_id,
             failure_point_ids=validation.failure_point_ids,
-            triggered_by=str(self.user.id),
+            created_by=str(self.user.id),
         )
 
         recorder = get_metrics_recorder()

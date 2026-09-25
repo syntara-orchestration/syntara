@@ -146,15 +146,11 @@ def collect_upstream_node_ids(
     return upstream
 
 
-def collect_downstream_node_ids(
-    definition: dict[str, Any],
-    failure_point_ids: list[str],
-) -> set[str]:
-    """Return failure points plus every successor downstream (inclusive).
+def build_successors(definition: dict[str, Any]) -> dict[str, set[str]]:
+    """Successor adjacency (node id → downstream ids), built once per validation.
 
-    The restart re-executes exactly this set (for the selected points), so
-    only references originating here can consume injected outputs, and its
-    size is the re-run step count (SDP R11a/AC-2).
+    Shared by downstream walks so repeated traversals don't rebuild the edge
+    map from scratch on every call.
     """
     nodes = definition_nodes(definition)
     edges = definition.get("edges", []) or []
@@ -163,6 +159,22 @@ def collect_downstream_node_ids(
         src, dst = edge.get("from"), edge.get("to")
         if src is not None and dst is not None:
             successors.setdefault(src, set()).add(dst)
+    return successors
+
+
+def collect_downstream_node_ids(
+    definition: dict[str, Any],
+    failure_point_ids: list[str],
+    successors: dict[str, set[str]] | None = None,
+) -> set[str]:
+    """Return failure points plus every successor downstream (inclusive).
+
+    The restart re-executes exactly this set (for the selected points), so
+    only references originating here can consume injected outputs, and its
+    size is the re-run step count (SDP R11a/AC-2).
+    """
+    if successors is None:
+        successors = build_successors(definition)
 
     downstream: set[str] = set()
     stack = list(failure_point_ids)
@@ -175,7 +187,11 @@ def collect_downstream_node_ids(
     return downstream
 
 
-def _step_counts(definition: dict[str, Any], failure_point_ids: list[str]) -> tuple[dict[str, int], int]:
+def _step_counts(
+    definition: dict[str, Any],
+    failure_point_ids: list[str],
+    successors: dict[str, set[str]] | None = None,
+) -> tuple[dict[str, int], int]:
     """Re-run step count per failure point, plus the deduplicated total.
 
     Per-point counts are computed independently (a node reachable from two
@@ -183,8 +199,12 @@ def _step_counts(definition: dict[str, Any], failure_point_ids: list[str]) -> tu
     total is the size of the union across the whole selection, matching a
     branch converging back into another selected branch's path.
     """
-    per_point = {point: len(collect_downstream_node_ids(definition, [point])) for point in failure_point_ids}
-    total = len(collect_downstream_node_ids(definition, failure_point_ids))
+    if successors is None:
+        successors = build_successors(definition)
+    per_point = {
+        point: len(collect_downstream_node_ids(definition, [point], successors)) for point in failure_point_ids
+    }
+    total = len(collect_downstream_node_ids(definition, failure_point_ids, successors))
     return per_point, total
 
 
@@ -309,6 +329,7 @@ def _tainted_nodes(
     snapshot_def: dict[str, Any],
     normalized: list[str],
     completed_outputs: dict[str, list],
+    successors: dict[str, set[str]] | None = None,
 ) -> list[str]:
     """Sanitized node ids whose taint is referenced on the restart path.
 
@@ -320,7 +341,7 @@ def _tainted_nodes(
     outputs are never injected — only nodes outside it (skipped upstream nodes
     and completed side branches) can feed tainted data into the rerun.
     """
-    restart_path = collect_downstream_node_ids(snapshot_def, normalized)
+    restart_path = collect_downstream_node_ids(snapshot_def, normalized, successors)
     referenced = _restart_path_refs(snapshot_def, restart_path)
 
     sanitized: list[str] = []
@@ -332,6 +353,8 @@ def _tainted_nodes(
             continue
         redacted: set[tuple] = set()
         for output in outputs:
+            if output is None:
+                continue
             redacted |= _redacted_paths(output)
         if any(paths_overlap(tainted, ref) for tainted in redacted for ref in refs):
             sanitized.append(node_id)
@@ -352,8 +375,9 @@ def _expand_sanitized_chain(
     """
     selection = set(seed)
     added: set[str] = set()
+    successors = build_successors(snapshot_def)
     while True:
-        sanitized = _tainted_nodes(snapshot_def, sorted(selection), completed_outputs)
+        sanitized = _tainted_nodes(snapshot_def, sorted(selection), completed_outputs, successors)
         newly_added = set(sanitized) - selection
         if not newly_added:
             return selection, sorted(added)
