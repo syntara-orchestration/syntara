@@ -285,26 +285,6 @@ EP does not read AO resource labels. If a designer tags a workflow
 that into `WorkRequirements.selectors` and an administrator must have
 labelled an ExecutionTarget accordingly. There is no implicit join.
 
-## Sequence (ownership only)
-
-```mermaid
-sequenceDiagram
-    participant Admin as Administrator / provisioner
-    participant AO as Automation Orchestrator
-    participant WS as Work Store
-    participant R as ExecutionTarget Reconciler
-    participant CR as Cluster Registry
-    participant TR as ExecutionTarget Registry
-
-    Admin->>CR: register Cluster (natural + user labels)
-    Admin->>TR: register ExecutionTarget labels<br/>(location, default, gpu, …)
-    AO->>AO: resolve node / profile / extension<br/>into one selector map and image
-    AO->>WS: WorkItem with selectors and activity.image
-    R->>CR: list clusters
-    R->>TR: list targets per cluster
-    Note over R: exact AND of work selectors<br/>against Cluster.labels ∪ target.labels
-    R-->>AO: eligible ExecutionTarget set
-```
 
 ## Open questions
 
