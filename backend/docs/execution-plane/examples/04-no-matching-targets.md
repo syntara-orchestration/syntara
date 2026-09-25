@@ -135,21 +135,6 @@ WorkItem
   payload.activity.params          →  unused
 ```
 
-```mermaid
-sequenceDiagram
-    participant AO as Automation Orchestrator
-    participant WS as Work Store
-    participant ETR as ExecutionTarget Reconciler
-    participant Sch as Work Scheduler
-
-    AO->>WS: WorkItem { selectors: {region: ap-southeast-1} }
-    Sch->>ETR: resolve(selectors)
-    Note over ETR: AND match; default routing skipped
-    ETR-->>Sch: outcome = NO_MATCHING_TARGETS
-    Note over Sch: selector_mismatch, not capacity
-    Sch-->>AO: fail unschedulable
-```
-
 `resolve()` does not raise. No-match is an outcome, not an exception.
 The scheduler turns that outcome into the error.
 
