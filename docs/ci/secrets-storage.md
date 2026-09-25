@@ -44,6 +44,7 @@ are stored at **repo level**.
 | `CURRENTS_API_KEY` | Per-repo Currents.dev API access |
 | `RAPIDAST_GCP_KEY` | Only this repo runs DAST scans |
 | `SLACK_CI_MONITORING_WEBHOOK_URL` | Slack webhook for merge queue monitoring alerts |
+| `SLACK_VISUAL_REGRESSION_WEBHOOK_URL` | Slack webhook for weekly visual regression baseline review notifications |
 
 ### Repo-Level Variables (on `syntara-orchestration/syntara`)
 
