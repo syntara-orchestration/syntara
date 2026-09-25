@@ -43,9 +43,7 @@ function Wrapper({
     <FormProvider {...methods}>
       <form onSubmit={methods.handleSubmit((data) => onValid?.(data))}>
         {children}
-        {onValid ? (
-          <button type="submit">Save settings</button>
-        ) : null}
+        {onValid ? <button type="submit">Save settings</button> : null}
       </form>
     </FormProvider>
   )
