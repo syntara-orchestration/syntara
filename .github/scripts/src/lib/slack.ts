@@ -8,8 +8,27 @@ type SlackAttachment = {
   blocks: SlackBlock[]
 }
 
-type SlackMessage = {
+export type SlackMessage = {
   attachments: SlackAttachment[]
+}
+
+export function buildVisualRegressionBaselineReadyMessage(prUrl: string): SlackMessage {
+  return {
+    attachments: [
+      {
+        color: '#36a64f',
+        blocks: [
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: `Visual regression baseline PR ready for review: <${prUrl}|Review PR>`,
+            },
+          },
+        ],
+      },
+    ],
+  }
 }
 
 /**
@@ -201,24 +220,7 @@ export class SlackNotifier {
    * Sends a concise review notification for the weekly visual regression PR.
    */
   async sendVisualRegressionBaselineReady(prUrl: string): Promise<void> {
-    const message: SlackMessage = {
-      attachments: [
-        {
-          color: '#36a64f',
-          blocks: [
-            {
-              type: 'section',
-              text: {
-                type: 'mrkdwn',
-                text: `Visual regression baseline PR ready for review: <${prUrl}|Review PR>`,
-              },
-            },
-          ],
-        },
-      ],
-    }
-
-    await this.send(message)
+    await this.send(buildVisualRegressionBaselineReadyMessage(prUrl))
   }
 
   /**
