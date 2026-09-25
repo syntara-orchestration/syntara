@@ -2,7 +2,7 @@
 import { pathToFileURL } from 'node:url'
 import { SlackNotifier } from './lib/slack.js'
 
-/** Environment variables used to send a visual regression baseline notification. */
+/** Configuration used to send a visual regression baseline notification. */
 type VisualRegressionEnvironment = {
   SLACK_VISUAL_REGRESSION_WEBHOOK_URL?: string
   VISUAL_REGRESSION_PR_URL?: string

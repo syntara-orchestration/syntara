@@ -1,16 +1,16 @@
-/** Represents a Block Kit element included in a Slack attachment. */
+/** Block Kit element included in a Slack attachment. */
 type SlackBlock = {
   type: string
   [key: string]: unknown
 }
 
-/** Represents a color-coded Slack attachment containing Block Kit elements. */
+/** Color-coded Slack attachment containing Block Kit elements. */
 type SlackAttachment = {
   color: string
   blocks: SlackBlock[]
 }
 
-/** Represents the payload sent to a Slack incoming webhook. */
+/** Payload sent to a Slack incoming webhook. */
 type SlackMessage = {
   attachments: SlackAttachment[]
 }

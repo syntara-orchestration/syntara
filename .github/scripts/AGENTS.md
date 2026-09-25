@@ -7,4 +7,6 @@
 
 ## Source documentation
 
-- Add JSDoc descriptions for variables and functions introduced or changed in TypeScript source files.
+- Add concise JSDoc descriptions for variables and functions introduced or changed in TypeScript source files.
+- Describe purpose or non-obvious behavior; do not repeat type information already expressed by TypeScript or add `{Type}` annotations.
+- Keep comments to one sentence when possible, and use `@param`, `@returns`, or `@throws` only when they add useful context beyond the signature.
