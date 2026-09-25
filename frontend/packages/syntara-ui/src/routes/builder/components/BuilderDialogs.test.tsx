@@ -50,6 +50,7 @@ function renderDialogs(overrides: Partial<React.ComponentProps<typeof BuilderDia
     dispatch: vi.fn(),
     handleRunWorkflow: vi.fn(),
     handleDeleteWorkflow: vi.fn(),
+    isDeleting: false,
     triggerName: 'Manual Trigger',
     runStepDialog: {
       isOpen: false,
@@ -74,14 +75,14 @@ describe('BuilderDialogs', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(useWorkflowStore).mockImplementation((selector: (s: any) => unknown) => selector({ isDirty: false }))
 
-    vi.mocked(approvalsClient.useQuery).mockReturnValue({ data: undefined, refetch: vi.fn() } as never)
-    vi.mocked(approvalsClient.useMutation).mockReturnValue({ mutate: vi.fn(), isPending: false } as never)
+    vi.mocked(approvalsClient.useQuery).mockReturnValue({ data: undefined, refetch: vi.fn() })
+    vi.mocked(approvalsClient.useMutation).mockReturnValue({ mutate: vi.fn(), isPending: false })
   })
 
   it('renders nothing visible when all dialogs are closed', () => {
     renderDialogs()
 
-    expect(screen.queryByText('Run Test Workflow?')).not.toBeInTheDocument()
+    expect(screen.queryByText('Run workflow?')).not.toBeInTheDocument()
     expect(screen.queryByText('Set mock output data for Manual Trigger')).not.toBeInTheDocument()
     expect(screen.queryByText('Delete workflow?')).not.toBeInTheDocument()
     expect(screen.queryByText('Review approval')).not.toBeInTheDocument()
@@ -90,8 +91,11 @@ describe('BuilderDialogs', () => {
   it('shows the run confirmation dialog when confirmDialogOpen is true', () => {
     renderDialogs({ confirmDialogOpen: true })
 
-    expect(screen.getByText('Run Test Workflow?')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Run now' })).toBeInTheDocument()
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByRole('heading', { name: 'Run workflow?' })).toBeInTheDocument()
+    expect(within(dialog).getByText(/You are about to manually run the workflow/)).toBeInTheDocument()
+    expect(within(dialog).getByText('Test Workflow')).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Run now' })).toBeInTheDocument()
   })
 
   it('shows the run workflow modal after confirming the run dialog when trigger has input schema', async () => {
@@ -123,7 +127,7 @@ describe('BuilderDialogs', () => {
   it('shows trigger name in confirmation dialog body when workflow is clean', () => {
     renderDialogs({ confirmDialogOpen: true, triggerName: 'Webhook' })
 
-    expect(screen.getByText(/starting from Webhook/)).toBeInTheDocument()
+    expect(screen.getByText(/immediately start the workflow from Webhook/)).toBeInTheDocument()
     expect(screen.queryByText(/unsaved changes/)).not.toBeInTheDocument()
   })
 
@@ -133,7 +137,7 @@ describe('BuilderDialogs', () => {
     renderDialogs({ confirmDialogOpen: true })
 
     expect(screen.getByRole('button', { name: 'Save and run' })).toBeInTheDocument()
-    expect(screen.getByText(/unsaved changes will be saved/)).toBeInTheDocument()
+    expect(screen.getByText(/Unsaved changes will be saved/)).toBeInTheDocument()
   })
 
   it('shows delete confirmation dialog when deleteDialogOpen is true', () => {
@@ -141,6 +145,14 @@ describe('BuilderDialogs', () => {
 
     expect(screen.getByText('Delete workflow?')).toBeInTheDocument()
     expect(screen.getByText('Test Workflow')).toBeInTheDocument()
+  })
+
+  it('disables delete dialog actions while delete mutation is pending', () => {
+    renderDialogs({ deleteDialogOpen: true, isDeleting: true })
+
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByRole('button', { name: /Delete/ })).toBeDisabled()
+    expect(within(dialog).getByRole('button', { name: 'Cancel' })).toBeDisabled()
   })
 
   it('calls handleRunWorkflow when run modal is confirmed (with input schema)', async () => {
@@ -168,6 +180,7 @@ describe('BuilderDialogs', () => {
       dispatch: vi.fn(),
       handleRunWorkflow: vi.fn(),
       handleDeleteWorkflow: vi.fn(),
+      isDeleting: false,
       triggerName: 'Manual Trigger',
       triggerInputSchema: { type: 'object', properties: { name: { type: 'string' } } },
       runStepDialog: {
@@ -214,7 +227,7 @@ describe('BuilderDialogs', () => {
         </ColorSchemeProvider>
       </QueryClientProvider>
     )
-    expect(screen.getByText('Run Test Workflow?')).toBeInTheDocument()
+    expect(screen.getByText('Run workflow?')).toBeInTheDocument()
   })
 
   it('closes run modal when onClose is called from RunWorkflowModal', async () => {

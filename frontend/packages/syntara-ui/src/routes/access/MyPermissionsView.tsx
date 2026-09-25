@@ -8,6 +8,7 @@ import { SynLabel } from '../../components/labels/SynLabel'
 import { SynPanelContentStack } from '../../components/layout/SynPanelContentStack'
 import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../components/panels/list/SynListPanel'
 import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
+import { useClientPagination } from '../../hooks/useClientPagination'
 import type { FilterConfig, FilterFieldDefinition } from '../../types/filters'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../types/filters'
 import { detachPromise } from '../../utils/detachPromise'
@@ -135,25 +136,22 @@ export function MyPermissionsView() {
   const [filters, setFilters] = useState<FilterConfig[]>([])
   const [activeSortIndex, setActiveSortIndex] = useState<number | undefined>(undefined)
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
-  const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(20)
+  const { paginate, getFooterProps, resetPage } = useClientPagination()
 
   const hasActiveFilters = filters.length > 0
 
-  const handleFilterChange = useCallback((newFilters: FilterConfig[]) => {
-    setFilters(newFilters)
-    setPage(1)
-  }, [])
+  const handleFilterChange = useCallback(
+    (newFilters: FilterConfig[]) => {
+      setFilters(newFilters)
+      resetPage()
+    },
+    [resetPage]
+  )
 
   const clearAllFilters = useCallback(() => {
     setFilters([])
-    setPage(1)
-  }, [])
-
-  const handlePerPageChange = useCallback((newPerPage: number) => {
-    setPerPage(newPerPage)
-    setPage(1)
-  }, [])
+    resetPage()
+  }, [resetPage])
 
   const getSortParams = useCallback(
     (columnIndex: number): ThProps['sort'] => ({
@@ -164,12 +162,12 @@ export function MyPermissionsView() {
       },
       onSort: (_event, index, direction) => {
         setActiveSortIndex(index)
-        setSortDirection(direction as SortDirection)
-        setPage(1)
+        setSortDirection(direction)
+        resetPage()
       },
       columnIndex,
     }),
-    [activeSortIndex, sortDirection]
+    [activeSortIndex, sortDirection, resetPage]
   )
 
   const filtered = useMemo(() => {
@@ -190,23 +188,8 @@ export function MyPermissionsView() {
     return result
   }, [filtered, activeSortIndex, sortDirection])
 
-  const totalFiltered = sorted.length
-  const startIndex = (page - 1) * perPage
-  const pageData = useMemo(() => sorted.slice(startIndex, startIndex + perPage), [sorted, startIndex, perPage])
-  const hasNextPage = startIndex + perPage < totalFiltered
-
-  const tableFooter = useMemo(
-    () => ({
-      page,
-      perPage,
-      total: totalFiltered,
-      hasNext: hasNextPage,
-      onPrev: () => setPage((p) => Math.max(1, p - 1)),
-      onNext: () => setPage((p) => p + 1),
-      onPerPageChange: handlePerPageChange,
-    }),
-    [page, perPage, totalFiltered, hasNextPage, handlePerPageChange]
-  )
+  const pageData = useMemo(() => paginate(sorted), [sorted, paginate])
+  const tableFooter = useMemo(() => getFooterProps(sorted.length), [getFooterProps, sorted.length])
 
   return (
     <SynPanelContentStack hasGutter>

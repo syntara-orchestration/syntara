@@ -44,13 +44,19 @@ type TypeaheadSelectProps = {
   isLoading?: boolean
 }
 
-function renderOptions(
-  options: TypeaheadOption[],
-  filterValue: string,
-  selected: string,
-  hasMore?: boolean,
+function renderOptions({
+  options,
+  filterValue,
+  selected,
+  hasMore,
+  isLoading,
+}: {
+  options: TypeaheadOption[]
+  filterValue: string
+  selected: string
+  hasMore?: boolean
   isLoading?: boolean
-) {
+}) {
   if (isLoading) {
     return <SelectOption isDisabled>Loading...</SelectOption>
   }
@@ -151,6 +157,7 @@ export function TypeaheadSelect({
     >
       <TextInputGroup isPlain isDisabled={isDisabled}>
         <TextInputGroupMain
+          inputId={id}
           value={isOpen ? filterValue : selectedLabel}
           onChange={(_e, val) => {
             handleFilterChange(val)
@@ -194,7 +201,6 @@ export function TypeaheadSelect({
 
   return (
     <SynSelect
-      id={id}
       aria-label={ariaLabel}
       isOpen={isOpen}
       onOpenChange={handleOpenChange}
@@ -203,7 +209,7 @@ export function TypeaheadSelect({
       toggle={toggle}
     >
       <SelectList style={{ maxHeight: '200px', overflow: 'auto' }}>
-        {renderOptions(filteredOptions, filterValue, selected, hasMore, isLoading)}
+        {renderOptions({ options: filteredOptions, filterValue, selected, hasMore, isLoading })}
       </SelectList>
     </SynSelect>
   )

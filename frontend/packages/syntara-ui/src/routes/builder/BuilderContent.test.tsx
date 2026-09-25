@@ -135,7 +135,7 @@ describe('BuilderContent', () => {
     labels: {},
     created_at: '2023-01-01T00:00:00Z',
     updated_at: '2023-01-02T00:00:00Z',
-    created_by: 'user-1',
+    created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1', type: 'user' },
     current_version: 1,
     version: {
       workflow_definition: {
@@ -301,7 +301,7 @@ describe('BuilderContent', () => {
     vi.mocked(executionsClient.useMutation).mockReturnValue(createMockMutation())
 
     vi.mocked(workflowFetchClient.GET).mockResolvedValue({
-      data: { current_version: 1, version: { version: 1 } } as WorkflowWithVersion,
+      data: { current_version: 1, version: { version: 1 } },
       error: undefined,
       response: new Response(),
     })
@@ -714,8 +714,9 @@ describe('BuilderContent', () => {
       await user.click(screen.getByRole('button', { name: 'Run' }))
 
       await waitFor(() => {
-        expect(screen.getByText(/Run Test Workflow\?/)).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: 'Run now' })).toBeInTheDocument()
+        const dialog = screen.getByRole('dialog')
+        expect(within(dialog).getByRole('heading', { name: 'Run workflow?' })).toBeInTheDocument()
+        expect(within(dialog).getByRole('button', { name: 'Run now' })).toBeInTheDocument()
       })
     })
 
@@ -727,12 +728,12 @@ describe('BuilderContent', () => {
       })
 
       await user.click(screen.getByRole('button', { name: 'Run' }))
-      await screen.findByText(/Run Test Workflow\?/)
+      await screen.findByText(/Run workflow\?/)
 
       await user.click(screen.getByRole('button', { name: 'Cancel' }))
 
       await waitFor(() => {
-        expect(screen.queryByText(/Run Test Workflow\?/)).not.toBeInTheDocument()
+        expect(screen.queryByText(/Run workflow\?/)).not.toBeInTheDocument()
       })
     })
 
@@ -759,7 +760,7 @@ describe('BuilderContent', () => {
       })
 
       await user.click(screen.getByRole('button', { name: 'Run' }))
-      await screen.findByText(/Run Test Workflow\?/)
+      await screen.findByText(/Run workflow\?/)
       await user.click(screen.getByRole('button', { name: 'Run now' }))
       await screen.findByText(/Set mock output data for/)
       await user.click(screen.getByRole('button', { name: 'Run' }))
@@ -793,7 +794,7 @@ describe('BuilderContent', () => {
       })
 
       await user.click(screen.getByRole('button', { name: 'Run' }))
-      await screen.findByText(/Run Test Workflow\?/)
+      await screen.findByText(/Run workflow\?/)
       await user.click(screen.getByRole('button', { name: 'Run now' }))
       await screen.findByText(/Set mock output data for/)
       await user.click(screen.getByRole('button', { name: 'Run' }))
@@ -811,12 +812,12 @@ describe('BuilderContent', () => {
       })
 
       await user.click(screen.getByRole('button', { name: 'Run' }))
-      await screen.findByText(/Run Test Workflow\?/)
+      await screen.findByText(/Run workflow\?/)
 
       await user.click(screen.getByRole('button', { name: 'Cancel' }))
 
       await waitFor(() => {
-        expect(screen.queryByText(/Run Test Workflow\?/)).not.toBeInTheDocument()
+        expect(screen.queryByText(/Run workflow\?/)).not.toBeInTheDocument()
       })
     })
 
@@ -829,7 +830,7 @@ describe('BuilderContent', () => {
       })
 
       await user.click(screen.getByRole('button', { name: 'Run' }))
-      await screen.findByText(/Run Test Workflow\?/)
+      await screen.findByText(/Run workflow\?/)
       await user.click(screen.getByRole('button', { name: 'Run now' }))
       await screen.findByText(/Set mock output data for/)
 
@@ -1269,7 +1270,7 @@ describe('BuilderContent', () => {
           name: /I understand this workflow will be deleted and any in-progress runs will stop immediately/,
         })
       )
-      await user.click(screen.getByRole('button', { name: 'Delete' }))
+      await user.click(screen.getByRole('button', { name: 'Delete workflow' }))
 
       await waitFor(() => {
         expect(mockDeleteMutate).toHaveBeenCalled()
@@ -1303,7 +1304,7 @@ describe('BuilderContent', () => {
           name: /I understand this workflow will be deleted and any in-progress runs will stop immediately/,
         })
       )
-      await user.click(screen.getByRole('button', { name: 'Delete' }))
+      await user.click(screen.getByRole('button', { name: 'Delete workflow' }))
 
       await waitFor(() => {
         expect(mockDeleteMutate).toHaveBeenCalled()
@@ -1522,7 +1523,7 @@ describe('BuilderContent', () => {
         act(() => {
           useWorkflowStore.getState().markDirty()
         })
-        const event = new Event('beforeunload', { cancelable: true }) as BeforeUnloadEvent
+        const event = new Event('beforeunload', { cancelable: true })
         act(() => {
           handler(event)
         })
@@ -1586,7 +1587,7 @@ describe('BuilderContent', () => {
       }
 
       await renderBuilder({
-        workflow: workflowNoDescription as WorkflowWithVersion,
+        workflow: workflowNoDescription,
         isNew: false,
         workflowId: 'workflow-1',
       })
@@ -2223,7 +2224,7 @@ describe('BuilderContent', () => {
       })
 
       await user.click(screen.getByRole('button', { name: 'Run' }))
-      await screen.findByText(/Run Test Workflow\?/)
+      await screen.findByText(/Run workflow\?/)
       await user.click(screen.getByRole('button', { name: 'Run now' }))
       await screen.findByText(/Set mock output data for/)
       await user.click(screen.getByRole('button', { name: 'Run' }))
@@ -2451,7 +2452,7 @@ describe('BuilderContent', () => {
           name: /I understand this workflow will be deleted and any in-progress runs will stop immediately/,
         })
       )
-      await user.click(screen.getByRole('button', { name: 'Delete' }))
+      await user.click(screen.getByRole('button', { name: 'Delete workflow' }))
 
       await waitFor(() => {
         expect(mockDeleteMutate).toHaveBeenCalled()
@@ -2484,7 +2485,7 @@ describe('BuilderContent', () => {
 
       // Click Run → confirmation dialog → input modal → confirm
       await user.click(screen.getByRole('button', { name: 'Run' }))
-      await screen.findByText(/Run Test Workflow\?/)
+      await screen.findByText(/Run workflow\?/)
       await user.click(screen.getByRole('button', { name: 'Run now' }))
       await screen.findByText(/Set mock output data for/)
       await user.click(screen.getByRole('button', { name: 'Run' }))
@@ -2912,8 +2913,7 @@ describe('BuilderContent', () => {
         change_description: 'Second version',
         status: 'draft',
         name: null,
-        created_by: 'user-1',
-        created_by_username: 'sarah.chen',
+        created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'sarah.chen', type: 'user' },
       },
       {
         id: 'ver-1',
@@ -2925,8 +2925,7 @@ describe('BuilderContent', () => {
         change_description: 'First version',
         status: 'published',
         name: null,
-        created_by: 'user-1',
-        created_by_username: 'marcus.williams',
+        created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'marcus.williams', type: 'user' },
       },
     ]
 
@@ -3118,7 +3117,7 @@ describe('BuilderContent', () => {
       })
 
       const user = userEvent.setup()
-      await user.click(screen.getByRole('button', { name: 'Collapse version history' }))
+      await user.click(screen.getByRole('button', { name: 'Close version history' }))
 
       await waitFor(() => {
         expect(screen.queryByRole('heading', { level: 2, name: 'Version history' })).not.toBeInTheDocument()
@@ -3149,7 +3148,7 @@ describe('BuilderContent', () => {
         ...mockWorkflow.version,
         version: 3,
       },
-    } as unknown as WorkflowWithVersion
+    }
 
     function setupConflictOnSave() {
       const mockUpdateMutate = vi.fn((_params: unknown, callbacks?: MutationCallbacks) => {
@@ -3386,8 +3385,7 @@ describe('BuilderContent', () => {
         change_description: 'Second version',
         status: 'draft',
         name: null,
-        created_by: 'user-1',
-        created_by_username: 'sarah.chen',
+        created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'sarah.chen', type: 'user' },
       },
       {
         id: 'ver-1',
@@ -3399,8 +3397,7 @@ describe('BuilderContent', () => {
         change_description: 'First version',
         status: 'published',
         name: null,
-        created_by: 'user-1',
-        created_by_username: 'marcus.williams',
+        created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'marcus.williams', type: 'user' },
       },
     ]
 
@@ -3481,8 +3478,7 @@ describe('BuilderContent', () => {
         change_description: 'Second version',
         status: 'draft',
         name: null,
-        created_by: 'user-1',
-        created_by_username: 'sarah.chen',
+        created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'sarah.chen', type: 'user' },
       },
     ]
 
@@ -3518,7 +3514,7 @@ describe('BuilderContent', () => {
       const workflowWithProject = {
         ...mockWorkflow,
         project_id: 'project-1',
-      } as unknown as WorkflowWithVersion
+      }
 
       await renderBuilder({ workflow: workflowWithProject, isNew: false, workflowId: 'workflow-1' })
 
@@ -3554,7 +3550,7 @@ describe('BuilderContent', () => {
       const workflowWithProject = {
         ...mockWorkflow,
         project_id: 'project-1',
-      } as unknown as WorkflowWithVersion
+      }
 
       await renderBuilder({ workflow: workflowWithProject, isNew: false, workflowId: 'workflow-1' })
 
@@ -3581,7 +3577,7 @@ describe('BuilderContent', () => {
       const workflowWithProject = {
         ...mockWorkflow,
         project_id: 'project-1',
-      } as unknown as WorkflowWithVersion
+      }
 
       await renderBuilder({ workflow: workflowWithProject, isNew: false, workflowId: 'workflow-1' })
 

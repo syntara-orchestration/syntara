@@ -117,6 +117,7 @@ files below.
 | `frontend-pr-review` / `frontend-review-pr` | Review checklist |
 | `frontend-build-ui-feature` | Feature wizard (tracker-neutral) |
 | `frontend-library-references` | Public `llms.txt` URLs |
+| `frontend-a11y-audit` | Registry axe sweep plus manual WCAG audits beyond axe-core (keyboard, media matrix, semantics, bug drafting) |
 | `backend-fix-api-spec-drift` | Public OpenAPI workflow |
 
 If a consumer vendors these files, re-copy from this repository after merge.

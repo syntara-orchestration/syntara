@@ -38,11 +38,11 @@ async function createPendingApproval(
   const approvalName = buildUniqueName(namePrefix)
 
   // Create the complete workflow via API: trigger → approval → approved-branch script
-  const { id: workflowId, versionNumber } = await createWorkflowViaApi(
+  const { id: workflowId, versionNumber } = await createWorkflowViaApi({
     app,
-    workflowName,
-    [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
-    [
+    name: workflowName,
+    triggers: [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
+    nodes: [
       { id: 'approval_1', type: 'approval', name: approvalName, parameters: {} },
       {
         id: 'script_1',
@@ -51,11 +51,11 @@ async function createPendingApproval(
         parameters: { language: 'python', code: 'print("approved")' },
       },
     ],
-    [
+    edges: [
       { from: 'trigger_1', to: 'approval_1' },
       { from: 'approval_1', to: 'script_1', from_port: 'approved' },
-    ]
-  )
+    ],
+  })
 
   // Publish the workflow so it can be run
   await publishWorkflowViaApi(app, workflowId, versionNumber)
@@ -96,11 +96,11 @@ async function createPendingApprovalLight(
   const approvalName = buildUniqueName(namePrefix)
   const hasTemporal = !!process.env['SYNTARA_E2E_HAS_TEMPORAL_WORKER']
 
-  const { id: workflowId, versionNumber } = await createWorkflowViaApi(
+  const { id: workflowId, versionNumber } = await createWorkflowViaApi({
     app,
-    workflowName,
-    [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
-    [
+    name: workflowName,
+    triggers: [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
+    nodes: [
       { id: 'approval_1', type: 'approval', name: approvalName, parameters: {} },
       {
         id: 'script_1',
@@ -109,11 +109,11 @@ async function createPendingApprovalLight(
         parameters: { language: 'python', code: 'print("approved")' },
       },
     ],
-    [
+    edges: [
       { from: 'trigger_1', to: 'approval_1' },
       { from: 'approval_1', to: 'script_1', from_port: 'approved' },
-    ]
-  )
+    ],
+  })
 
   await publishWorkflowViaApi(app, workflowId, versionNumber)
 
@@ -488,16 +488,20 @@ test.describe('Approval Workflow Operations', () => {
     // substring match and collides with the workflow link button on execution detail.
     const workflowName = buildUniqueName('e2e-ui29')
     const approvalNodeName = buildUniqueName('gate')
-    const { id: workflowId } = await createWorkflowViaApi(app, workflowName, [
-      { id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} },
-    ])
+    const { id: workflowId } = await createWorkflowViaApi({
+      app,
+      name: workflowName,
+      triggers: [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
+    })
     await openWorkflowInBuilder(app, workflowName, workflowId)
 
     try {
       // Add approval node with a unique name so we can find it in the approvals list
       await addApprovalNodeWithBranch(app, approvalNodeName)
-      await app.getByRole('button', { name: 'Save', exact: true }).click()
+      await app.getByRole('button', { name: 'Save workflow' }).click()
       await runWorkflowFromBuilder(app)
+      const executionId = app.url().match(/\/executions\/([^/?]+)/)?.[1]
+      expect(executionId, 'Could not parse execution ID after run').toBeTruthy()
 
       // Wait for execution to pause at the approval node (requires Temporal)
       const reachedApproval = await waitForExecutionPaused(app)
@@ -527,9 +531,16 @@ test.describe('Approval Workflow Operations', () => {
       await app.getByPlaceholder(/Explain the reason for approving/i).fill('Approved in E2E test')
       await app.getByRole('button', { name: 'Submit decision' }).click()
 
-      // Verify approval was submitted and execution resumes
+      // Verify approval was submitted, then poll API for terminal state (UI live updates can lag)
       await expect(app.getByText('Approval submitted')).toBeVisible({ timeout: 15_000 })
-      await expect(app.getByText('Completed')).toBeVisible({ timeout: 30_000 })
+      await pollExecutionStatus(app, executionId!, ['completed', 'completed_with_errors', 'failed', 'cancelled'], {
+        timeout: 60_000,
+      })
+      await app.reload()
+      await expect(app.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 })
+      await expect(app.getByTestId('execution-status-badge').getByText('Completed')).toBeVisible({
+        timeout: 30_000,
+      })
     } finally {
       if (workflowId) {
         await apiRequest(app, 'delete', `/workflows/${workflowId}`).catch(() => {})

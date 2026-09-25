@@ -131,7 +131,7 @@ test.describe('Transfer Identity Wizard (AAP-75585)', () => {
       app.getByRole('heading', { level: 1, name: new RegExp(`Transfer identity to ${prefix}-target`) })
     ).toBeVisible({ timeout: 15_000 })
 
-    await app.getByRole('link', { name: 'Cancel' }).click()
+    await app.getByRole('button', { name: 'Cancel' }).click()
 
     await expect(app).toHaveURL(new RegExp(`${targetUserId}/identities`))
   })

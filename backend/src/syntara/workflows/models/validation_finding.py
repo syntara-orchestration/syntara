@@ -30,6 +30,7 @@ class ValidationCategory(StrEnum):
     converge_configuration = "converge_configuration"
     approval_configuration = "approval_configuration"
     form_prompt_configuration = "form_prompt_configuration"
+    definition_limits = "definition_limits"
 
 
 class ValidationFinding(SQLModel):

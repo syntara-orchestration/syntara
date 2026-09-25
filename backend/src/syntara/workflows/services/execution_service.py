@@ -24,6 +24,7 @@ from syntara.core.config.base import get_settings
 from syntara.core.models import User
 from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin, EnrichQueryMixin
+from syntara.core.services.user_reference_resolution import UserReferenceResolverMixin
 from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.emission import emit_completion_metrics
 from syntara.metrics.interface_tag import interface_context_var
@@ -175,7 +176,7 @@ class ExecutionsConvertResourceMixin(ConvertResourceMixin):
         return result
 
 
-class ExecutionService(BaseService):
+class ExecutionService(UserReferenceResolverMixin, BaseService):
     """Service for execution business logic.
 
     This service encapsulates all execution-related business operations,
@@ -520,7 +521,7 @@ class ExecutionService(BaseService):
             mode=ExecutionMode.STANDARD.value,
         )
 
-        return self.convert_resource_mixin.convert_resource(execution)  # type: ignore[no-any-return]
+        return await self._to_read(execution)
 
     async def create_execution_by_name(
         self,
@@ -847,7 +848,18 @@ class ExecutionService(BaseService):
         # Intentionally omitting total_workflows/active_workflows gauge increments
         # to avoid skewing production metrics with test executions
 
-        return self.convert_resource_mixin.convert_resource(execution)  # type: ignore[no-any-return]
+        return await self._to_read(execution)
+
+    async def _to_read(self, execution: Execution, include: set[ExecutionInclude] | None = None) -> ExecutionRead:
+        """Convert an Execution to its response model, with user references resolved.
+
+        Every ExecutionRead this service hands out is built here, so no endpoint can
+        return one with unresolved created_by/updated_by.
+        """
+        mixin = ExecutionsConvertResourceMixin(include) if include is not None else self.convert_resource_mixin
+        read: ExecutionRead = mixin.convert_resource(execution)
+        await self.resolve_user_references([read])
+        return read
 
     async def get_execution(self, execution_id: UUID, *, include: set[ExecutionInclude] | None = None) -> ExecutionRead:
         """Get an execution by ID.
@@ -883,9 +895,7 @@ class ExecutionService(BaseService):
 
         await self._emit_completion_metrics(execution)
 
-        # We need to use an "include"-aware instance of ExecutionsConvertResourceMixin
-        mixin: ExecutionsConvertResourceMixin = ExecutionsConvertResourceMixin(include)
-        return mixin.convert_resource(execution)
+        return await self._to_read(execution, include if include is not None else set())
 
     async def list_executions(
         self,
@@ -1127,11 +1137,23 @@ class ExecutionService(BaseService):
         # this execution.  Agentic activities use async-completion so the
         # Temporal cancel above does not reach the running agent process.
         try:
+            from syntara.agent_orchestrator.services.invocation_service import (  # noqa: PLC0415
+                InvocationService,
+            )
             from syntara.workflows.services.invocation_cancellation import (  # noqa: PLC0415
                 cancel_invocations_for_execution,
             )
 
-            await cancel_invocations_for_execution(self.session, self.user, execution_id)
+            # InvocationService owns the rest: it marks each invocation CANCELLED
+            # and cancels the builtin workflow running it.  It is constructed
+            # here rather than inside the bridge module so temporal_service --
+            # this service's dependency -- does not have to travel through a
+            # module that never uses it.
+            await cancel_invocations_for_execution(
+                self.session,
+                execution_id,
+                InvocationService(self.session, self.user, temporal_service=self.temporal_service),
+            )
         except Exception:
             logger.exception(
                 "Best-effort invocation cancellation failed",

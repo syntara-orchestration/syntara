@@ -57,11 +57,11 @@ function setupMocks() {
     isError: false,
     error: null,
     refetch: vi.fn(),
-  } as never)
+  })
   vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
     mutate: vi.fn(),
     isPending: false,
-  } as never)
+  })
 }
 
 describe('AddIdentityProvider', () => {

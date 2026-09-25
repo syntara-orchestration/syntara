@@ -1,8 +1,4 @@
 import {
-  FormGroup,
-  FormHelperText,
-  HelperText,
-  HelperTextItem,
   Label,
   LabelGroup,
   MenuToggle,
@@ -14,8 +10,8 @@ import {
   type MenuToggleElement,
 } from '@patternfly/react-core'
 import { useEffect, useRef, useState, type ReactElement } from 'react'
-import { Controller, useFormContext } from 'react-hook-form'
 
+import { SynFormField } from '../../../components/forms/SynFormField'
 import { SynSelect } from '../../../components/SynSelect'
 import { DEBOUNCE_MS } from '../../../constants/timing'
 import type { AAPLabel } from '../../../hooks/useAAPBrowser'
@@ -52,10 +48,6 @@ type LabelToggleRenderProps = {
   readonly ariaDescribedBy: string
 }
 
-/**
- * Render prop component for the Select toggle - extracted to satisfy Sonar S6478.
- * This component is passed data as props and is defined at module scope.
- */
 function LabelToggleRender({
   isOpen,
   isLoading,
@@ -123,14 +115,12 @@ export function AAPLabelsField({
   onSearchChange,
   labelHelp,
 }: AAPLabelsFieldProps) {
-  const { control } = useFormContext<AAPJobTemplateFormData>()
   const [isOpen, setIsOpen] = useState(false)
   const [filterValue, setFilterValue] = useState('')
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   const helperTextId = `${fieldId}-helper`
 
-  // Debounce the search callback for server-side filtering
   useEffect(() => {
     if (!onSearchChange) return
     debounceRef.current = setTimeout(() => {
@@ -141,112 +131,103 @@ export function AAPLabelsField({
 
   return (
     <StackItem>
-      <FormGroup label={label} labelHelp={labelHelp} fieldId={fieldId}>
-        <Controller
-          control={control}
-          name="labels"
-          render={({ field }) => {
-            // Extract label names from available labels
-            const labelNames: readonly string[] = availableLabels.map((l) => l.name)
+      <SynFormField<AAPJobTemplateFormData, 'labels'>
+        name="labels"
+        label={label}
+        labelHelp={labelHelp}
+        fieldId={fieldId}
+        hint={helperText}
+      >
+        {({ field }) => {
+          const labelNames: readonly string[] = availableLabels.map((l) => l.name)
+          const selectedLabels: readonly string[] = Array.isArray(field.value) ? field.value : []
 
-            // Simple: labels are always strings
-            const selectedLabels: readonly string[] = Array.isArray(field.value) ? field.value : []
+          const knownSet = new Set(labelNames)
+          const customLabels = selectedLabels.filter((name) => !knownSet.has(name))
+          const allLabels = Array.from(new Set([...labelNames, ...customLabels]))
 
-            // Merge known + custom labels
-            const knownSet = new Set(labelNames)
-            const customLabels = selectedLabels.filter((name) => !knownSet.has(name))
-            const allLabels = Array.from(new Set([...labelNames, ...customLabels]))
+          const filteredLabels = filterValue
+            ? allLabels.filter((labelName) => labelName.toLowerCase().includes(filterValue.toLowerCase()))
+            : allLabels
 
-            // Filter all labels based on search input
-            const filteredLabels = filterValue
-              ? allLabels.filter((labelName) => labelName.toLowerCase().includes(filterValue.toLowerCase()))
-              : allLabels
+          const trimmedFilter = filterValue.trim()
+          const canCreateNew =
+            trimmedFilter.length > 0 && !allLabels.some((name) => name.toLowerCase() === trimmedFilter.toLowerCase())
 
-            // Check if the current filter value could create a new label
-            const trimmedFilter = filterValue.trim()
-            const canCreateNew =
-              trimmedFilter.length > 0 && !allLabels.some((name) => name.toLowerCase() === trimmedFilter.toLowerCase())
+          const handleSelect = (_event: React.MouseEvent | undefined, value: string | number | undefined) => {
+            if (!value || typeof value !== 'string') return
 
-            const handleSelect = (_event: React.MouseEvent | undefined, value: string | number | undefined) => {
-              if (!value || typeof value !== 'string') return
+            const isSelected = selectedLabels.includes(value)
+            const newLabels = isSelected
+              ? selectedLabels.filter((labelName) => labelName !== value)
+              : [...selectedLabels, value]
 
-              const isSelected = selectedLabels.includes(value)
-              const newLabels = isSelected
-                ? selectedLabels.filter((label) => label !== value)
-                : [...selectedLabels, value]
+            field.onChange(newLabels)
+          }
 
-              field.onChange(newLabels)
+          const handleToggle = () => {
+            setIsOpen((prev) => !prev)
+          }
+
+          const handleOpenChange = (open: boolean) => {
+            setIsOpen(open)
+            if (!open) {
+              setFilterValue('')
             }
+          }
 
-            const handleToggle = () => {
-              setIsOpen((prev) => !prev)
-            }
-
-            const handleOpenChange = (open: boolean) => {
-              setIsOpen(open)
-              if (!open) {
-                setFilterValue('')
-              }
-            }
-
-            return (
-              <SynSelect
-                isOpen={isOpen}
-                selected={selectedLabels}
-                onSelect={handleSelect}
-                onOpenChange={handleOpenChange}
-                toggle={LabelToggleRender({
-                  isOpen,
-                  isLoading,
-                  selectedLabels,
-                  placeholderText,
-                  onToggle: handleToggle,
-                  ariaDescribedBy: helperTextId,
-                })}
-              >
-                <SearchInput
-                  placeholder={placeholderText}
-                  value={filterValue}
-                  onChange={(_event, value) => setFilterValue(value)}
-                  onClear={() => setFilterValue('')}
-                />
-                <SelectList aria-label={label}>
-                  {canCreateNew && (
+          return (
+            <SynSelect
+              isOpen={isOpen}
+              selected={selectedLabels}
+              onSelect={handleSelect}
+              onOpenChange={handleOpenChange}
+              toggle={LabelToggleRender({
+                isOpen,
+                isLoading,
+                selectedLabels,
+                placeholderText,
+                onToggle: handleToggle,
+                ariaDescribedBy: helperTextId,
+              })}
+            >
+              <SearchInput
+                placeholder={placeholderText}
+                value={filterValue}
+                onChange={(_event, value) => setFilterValue(value)}
+                onClear={() => setFilterValue('')}
+              />
+              <SelectList aria-label={label}>
+                {canCreateNew && (
+                  <SelectOption
+                    key={`create-${trimmedFilter}`}
+                    value={trimmedFilter}
+                    description="Create new label"
+                    hasCheckbox
+                    isSelected={selectedLabels.includes(trimmedFilter)}
+                  >
+                    {trimmedFilter}
+                  </SelectOption>
+                )}
+                {filteredLabels.length === 0 && !canCreateNew ? (
+                  <SelectOption isDisabled>{isLoading ? 'Loading...' : 'No labels available'}</SelectOption>
+                ) : (
+                  filteredLabels.map((labelName) => (
                     <SelectOption
-                      key={`create-${trimmedFilter}`}
-                      value={trimmedFilter}
-                      description="Create new label"
+                      key={labelName}
+                      value={labelName}
                       hasCheckbox
-                      isSelected={selectedLabels.includes(trimmedFilter)}
+                      isSelected={selectedLabels.includes(labelName)}
                     >
-                      {trimmedFilter}
+                      {labelName}
                     </SelectOption>
-                  )}
-                  {filteredLabels.length === 0 && !canCreateNew ? (
-                    <SelectOption isDisabled>{isLoading ? 'Loading...' : 'No labels available'}</SelectOption>
-                  ) : (
-                    filteredLabels.map((labelName) => (
-                      <SelectOption
-                        key={labelName}
-                        value={labelName}
-                        hasCheckbox
-                        isSelected={selectedLabels.includes(labelName)}
-                      >
-                        {labelName}
-                      </SelectOption>
-                    ))
-                  )}
-                </SelectList>
-              </SynSelect>
-            )
-          }}
-        />
-        <FormHelperText>
-          <HelperText id={helperTextId}>
-            <HelperTextItem>{helperText}</HelperTextItem>
-          </HelperText>
-        </FormHelperText>
-      </FormGroup>
+                  ))
+                )}
+              </SelectList>
+            </SynSelect>
+          )
+        }}
+      </SynFormField>
     </StackItem>
   )
 }

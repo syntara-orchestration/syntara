@@ -32,6 +32,7 @@ from syntara.auth import get_current_user
 from syntara.authz.dependencies import PermissionChecker, VisibilityFilter
 from syntara.authz.engine import VisibilityResult
 from syntara.core.database.session import get_db
+from syntara.core.jsonb_limits import validate_jsonb_size
 from syntara.core.models import User
 from syntara.core.syntara_router import SyntaraRouter
 from syntara.core.utils.session_factory import create_session_factory_from_request
@@ -117,6 +118,7 @@ async def get_invocation_service_with_temporal(
         current_user,
         session_factory=session_factory,
         execution_service=execution_service,
+        temporal_service=temporal_service,
     )
 
 
@@ -247,6 +249,8 @@ async def create_invocation_chat(
     """
     prompt, session_id = _validate_multipart_required_fields(form.prompt, form.session_id)
     context_data: dict[str, object] | None = json.loads(form.context_data) if form.context_data else None
+    if context_data is not None:
+        validate_jsonb_size(context_data, field_name="context_data")
 
     try:
         project_id = UUID(form.project_id)
@@ -536,7 +540,7 @@ async def cancel_invocation(
         ),
     ],
     request_body: InvocationCancelRequest,
-    service: Annotated[InvocationService, Depends(get_invocation_service)],
+    service: Annotated[InvocationService, Depends(get_invocation_service_with_temporal)],
 ) -> InvocationCancelResponse:
     """Cancel a running or pending invocation.
 

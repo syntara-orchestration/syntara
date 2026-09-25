@@ -20,6 +20,7 @@ This file provides guidance to AI coding assistants when working in the frontend
 | **Before committing code or reporting a task as done**                              | `.claude/skills/frontend-pr-review/SKILL.md` (self-review against PR checklist)           |
 | **Before writing or modifying any component, hook, or pattern**                     | `.claude/skills/frontend-coding-standards/SKILL.md`                                       |
 | **Before writing code using React, Zod, Zustand, Vitest, Vite, or TanStack Query**  | `.claude/skills/frontend-library-references/SKILL.md` (fetch the relevant `llms.txt` URL) |
+| **Before an accessibility audit or drafting a11y bugs beyond axe-core**             | `.claude/skills/frontend-a11y-audit/SKILL.md`                                             |
 
 ### Storybook MCP and PatternFly MCP (when available)
 
@@ -127,6 +128,7 @@ The items below cover patterns ESLint **cannot** catch:
 31. **Prefer ref callback cleanup functions** -- when attaching DOM listeners or observers, return a cleanup from the ref callback instead of pairing `useRef` + `useEffect` (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §38)
 32. **No new `useContext`** -- React 19 reads context with `use(Context)`; do not add `useContext` (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §39)
 33. **Prefer `useOptimistic` for clear toggle/counter mutations** -- update UI inside a `startTransition` Action with `mutateAsync`; do not hand-roll pending mirror state for simple before/after mutations (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §40)
+34. **No new barrel files in `src/`** -- do not create a file that only re-exports from other files. Import directly from the source file instead. ESLint enforces this at `warn` (`barrel-files/avoid-barrel-files`), scoped to `src/**/*.{ts,tsx}` -- new `src/` code must not add a new warning. Does not apply to `e2e/` or other non-production directories (see [`.claude/skills/frontend-coding-standards/SKILL.md`](../.claude/skills/frontend-coding-standards/SKILL.md) §43)
 
 ### Feature Preservation Rules
 
@@ -260,6 +262,7 @@ See: [`docs/data-flow.md`](docs/data-flow.md) — "Type-Safe API Clients"
 2. Add navigation item to `packages/syntara-ui/src/app/navigationItems.tsx` with lazy-loaded component
 3. The router auto-discovers it from `navigationItems` — no manual route config needed
 4. In the page component, render `<title>{toPageTitle(['Page Name'])}</title>` as the first child of `<SynPage>`; import `toPageTitle` from `src/utils/toPageTitle`
+5. Run `npm run route-baseline:update` and commit the regenerated `manifest.gen.json`
 
 #### How do I add filters to a list page?
 

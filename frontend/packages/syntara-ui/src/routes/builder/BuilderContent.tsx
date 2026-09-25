@@ -40,7 +40,7 @@ import { useBuilderDerivedUiFlags } from './hooks/useBuilderDerivedUiFlags'
 import { useBuilderDialogProps } from './hooks/useBuilderDialogProps'
 import { useBuilderFlowInteractionHandlers } from './hooks/useBuilderFlowInteractionHandlers'
 import { useBuilderLiveRunPanel } from './hooks/useBuilderLiveRunPanel'
-import { useBuilderSaveWorkflow, type UseBuilderSaveWorkflowParams } from './hooks/useBuilderSaveWorkflow'
+import { useBuilderSaveWorkflow } from './hooks/useBuilderSaveWorkflow'
 import { useBuilderToolbarHandlers } from './hooks/useBuilderToolbarHandlers'
 import { useBuilderValidation } from './hooks/useBuilderValidation'
 import { useBuilderVersionPanel } from './hooks/useBuilderVersionPanel'
@@ -207,7 +207,10 @@ export function BuilderContent(props: BuilderContentProps) {
     '/workflows/{workflow_id}'
   )
   const { mutate: executeWorkflow } = executionsClient.useMutation('post', '/executions')
-  const { mutate: deleteWorkflow } = workflowClient.useMutation('delete', '/workflows/{workflow_id}')
+  const { mutate: deleteWorkflow, isPending: isDeleting } = workflowClient.useMutation(
+    'delete',
+    '/workflows/{workflow_id}'
+  )
   const workflowMetadata = useWorkflowMetadata(workflow)
   const currentVersion = workflow?.current_version ?? workflow?.version?.version
 
@@ -254,24 +257,26 @@ export function BuilderContent(props: BuilderContentProps) {
       dispatch({ type: 'SET_VALIDATION_ERRORS', payload: errors, source: 'save' })
       useWorkflowStore.getState().setValidationErrorCount(errors.length)
     },
-    createWorkflow: createWorkflow as UseBuilderSaveWorkflowParams['createWorkflow'],
+    createWorkflow: createWorkflow,
     updateWorkflow,
   })
-  const guardedSaveWorkflow = useGuardedSaveWorkflow(
+  const guardedSaveWorkflow = useGuardedSaveWorkflow({
     handleSaveWorkflow,
     isNodeEditorOpen,
     nodeEditorMode,
     autoSubmitRef,
-    dispatch
-  )
+    dispatch,
+  })
 
-  const { publish: onPublish, isPublishing } = usePublishWorkflow(
+  const { publish: onPublish, isPublishing } = usePublishWorkflow({
     workflowId,
     currentVersion,
     workflowName,
     workflowDescription,
-    { expectedVersion: loadedVersion, onConflict: handleConflict('publish'), onVersionUpdated }
-  )
+    expectedVersion: loadedVersion,
+    onConflict: handleConflict('publish'),
+    onVersionUpdated,
+  })
 
   const mostRecentExecution = mostRecentExecutionQuery.data
   const {
@@ -307,7 +312,7 @@ export function BuilderContent(props: BuilderContentProps) {
     handleToggleHistory,
     handleToggleVersionHistory: baseHandleToggleVersionHistory,
   } = useBuilderToolbarHandlers({
-    workflow: workflow as { id: string } | undefined,
+    workflow: workflow,
     workflowName,
     detailsOpen,
     historyCardOpen,
@@ -456,7 +461,11 @@ export function BuilderContent(props: BuilderContentProps) {
     const { edges, nodePositions } = useWorkflowStore.getState()
     const activities = currentWorkflow.workflow.activities ?? []
     const triggers = currentWorkflow.triggers ?? []
-    const definition = buildWorkflowDefinition(workflowName, workflowDescription, activities, triggers, {
+    const definition = buildWorkflowDefinition({
+      workflowName: workflowName,
+      workflowDescription: workflowDescription,
+      activities: activities,
+      triggers: triggers,
       edges,
       nodePositions,
     })
@@ -561,12 +570,13 @@ export function BuilderContent(props: BuilderContentProps) {
     dispatch,
     handleRunWorkflow,
     handleDeleteWorkflow,
+    isDeleting,
     runStepDialog,
     lastRunStepNodeIdRef,
     pendingImport,
     setPendingImport,
     selectedProject: stableProjectId ? { id: stableProjectId } : null,
-    createWorkflow: createWorkflow as UseBuilderSaveWorkflowParams['createWorkflow'],
+    createWorkflow: createWorkflow,
     setLocation,
     pinnedMockDataForDialog,
   })
@@ -680,11 +690,7 @@ export function BuilderContent(props: BuilderContentProps) {
                       {showMostRecentRunPanelInEditor && mostRecentExecutionId && (
                         <ExecutionDetailsPanelWrapper
                           executionId={mostRecentExecutionId}
-                          workflowDefinition={
-                            workflow?.version?.workflow_definition as Parameters<
-                              typeof ExecutionDetailsPanelWrapper
-                            >[0]['workflowDefinition']
-                          }
+                          workflowDefinition={workflow?.version?.workflow_definition}
                           selectedNodeId={mostRecentSelectedNodeId}
                           selectedNodeName={mostRecentSelectedNodeName}
                           onNodeSelect={handleMostRecentNodeSelect}

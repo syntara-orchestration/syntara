@@ -16,7 +16,7 @@ from sqlmodel import DateTime, Field, Relationship
 from syntara.core.constants import FieldLimits
 from syntara.core.models.base import BaseResource
 from syntara.core.models.pagination import ResourcesResponse
-from syntara.core.models.user_reference import UserReference
+from syntara.core.models.user_reference import UserReference, UserReferenceFieldsMixin
 from syntara.core.utils.sqlmodel import DiscriminatedJSONB, postgres_enum_column
 from syntara.forms.models.api_models import (
     FormPromptStatus,
@@ -248,13 +248,15 @@ class FormPrompt(BaseFormPrompt, table=True):
     )
 
 
-class FormPromptRead(BaseFormPrompt, table=False):
+class FormPromptRead(UserReferenceFieldsMixin, BaseFormPrompt, table=False):
     """FormPrompt API response model with typed nested fields.
 
     Overrides the JSONB dict fields from BaseFormPrompt with typed models
     so API consumers get proper validation and type safety. Pydantic coerces
     the raw dicts from the database into these typed models during serialization.
     """
+
+    USER_REFERENCE_FIELDS: ClassVar[tuple[str, ...]] = ("responded_by",)
 
     # Override JSONB dict fields with typed models
     loop_iteration_path: list[int] = Field(

@@ -106,7 +106,11 @@ class TestFormPromptSubmitAPI:
         data = response.json()
         assert data["status"] == "submitted"
         assert data["response_data"] == submitted
-        assert data["responded_by"] == {"id": str(test_user.id), "name": test_user.display_name}
+        assert data["responded_by"] == {
+            "id": str(test_user.id),
+            "name": test_user.display_name,
+            "type": "user",
+        }
         assert data["responded_at"] is not None
         assert data["signal_delivery_error"] is None
 

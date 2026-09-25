@@ -8,7 +8,7 @@ import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.core.models import Group, User
-from syntara.core.models.user_reference import UserReference
+from syntara.core.models.user_reference import UserReference, UserReferenceType
 from syntara.forms.exceptions import FormPromptNotFoundError
 from syntara.forms.models.api_models import FormPromptStatus, ResponderGroupSummary, ResponderUserSummary
 from syntara.forms.models.form_prompt import FormPrompt
@@ -93,7 +93,9 @@ class TestFormPromptServiceGet:
 
         response = await _make_service(prompt).get(prompt.id)
 
-        assert response.responded_by == UserReference(id=prompt.responded_by, name="Ada Lovelace")
+        assert response.responded_by == UserReference(
+            id=prompt.responded_by, name="Ada Lovelace", type=UserReferenceType.USER
+        )
 
     @pytest.mark.asyncio
     async def test_get_responded_by_none_when_pending(self) -> None:

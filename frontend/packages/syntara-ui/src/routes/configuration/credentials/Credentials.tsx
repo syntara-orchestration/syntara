@@ -1,4 +1,5 @@
 import { Button, StackItem } from '@patternfly/react-core'
+import { RhUiAddIcon } from '@patternfly/react-icons'
 import { Th, Thead, Tr } from '@patternfly/react-table'
 import { useCallback, useMemo, useState } from 'react'
 
@@ -54,7 +55,7 @@ function CredentialPageToolbar({ permissions, isBuiltinProject, onCreateClick }:
   const tooltip = isBuiltinProject ? builtinProjectTooltip('create a credential') : permissions.tooltips.create
   return (
     <DisabledWithTooltip isDisabled={!canCreate} content={tooltip}>
-      <Button variant="primary" isAriaDisabled={!canCreate} onClick={onCreateClick}>
+      <Button variant="primary" icon={<RhUiAddIcon />} isAriaDisabled={!canCreate} onClick={onCreateClick}>
         Create credential
       </Button>
     </DisabledWithTooltip>
@@ -117,7 +118,13 @@ export default function Credentials() {
   const query = credentialsClient.useQuery('get', '/credentials', { params: { query: finalQueryParams } })
   const serverCredentials = useMemo(() => query.data?.resources ?? [], [query.data?.resources])
 
-  useCursorReset(serverCredentials.length, hasActiveFilters, cursor, query.isFetching, resetPagination)
+  useCursorReset({
+    itemCount: serverCredentials.length,
+    hasActiveFilters,
+    cursor,
+    isFetching: query.isFetching,
+    resetPagination,
+  })
 
   // Fetch credential types for type name lookup
   const typesQuery = credentialsClient.useQuery('get', '/credential_types')

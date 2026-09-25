@@ -9,13 +9,19 @@ type WorkflowStepDef = { id: string; type: string; name?: string; parameters: Re
 type WorkflowEdgeDef = { from: string; to: string; from_port?: string }
 
 /** Create a workflow via the API. Returns the new workflow ID. */
-export async function createWorkflowViaApi(
-  app: Page,
-  name: string,
-  triggers: WorkflowStepDef[],
-  nodes: WorkflowStepDef[] = [],
-  edges: WorkflowEdgeDef[] = []
-): Promise<{
+export async function createWorkflowViaApi({
+  app,
+  name,
+  triggers,
+  nodes = [],
+  edges = [],
+}: {
+  app: Page
+  name: string
+  triggers: WorkflowStepDef[]
+  nodes?: WorkflowStepDef[]
+  edges?: WorkflowEdgeDef[]
+}): Promise<{
   /** UUID of the created workflow. */
   id: string
   /** Version number of the initial draft, as returned by POST /workflows (`current_version`). Pass to `publishWorkflowViaApi` to avoid a separate GET. */
@@ -120,11 +126,11 @@ export async function createBasicWorkflowViaApi(
     return { id: body.id, name, versionNumber: body.current_version }
   }
 
-  const { id, versionNumber } = await createWorkflowViaApi(
+  const { id, versionNumber } = await createWorkflowViaApi({
     app,
     name,
-    [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
-    [
+    triggers: [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
+    nodes: [
       {
         id: 'action_1',
         type: 'script',
@@ -132,8 +138,8 @@ export async function createBasicWorkflowViaApi(
         parameters: { language: 'python', code: 'print("hello")' },
       },
     ],
-    [{ from: 'trigger_1', to: 'action_1' }]
-  )
+    edges: [{ from: 'trigger_1', to: 'action_1' }],
+  })
   return { id, name, versionNumber }
 }
 

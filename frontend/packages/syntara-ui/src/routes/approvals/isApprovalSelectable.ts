@@ -6,13 +6,19 @@ import type { ApprovalWithDetails } from './Approvals'
  *
  * @returns true if the approval checkbox should be enabled, false if disabled
  */
-export function isApprovalSelectable(
-  approval: ApprovalWithDetails,
-  canDecideOnThisApproval: boolean,
-  canDecideBasedOnApproverList: boolean,
-  isLoadingPermissions: boolean,
+export function isApprovalSelectable({
+  approval,
+  canDecideOnThisApproval,
+  canDecideBasedOnApproverList,
+  isLoadingPermissions,
+  isCheckingApproverList,
+}: {
+  approval: ApprovalWithDetails
+  canDecideOnThisApproval: boolean
+  canDecideBasedOnApproverList: boolean
+  isLoadingPermissions: boolean
   isCheckingApproverList: boolean
-): boolean {
+}): boolean {
   // Not pending → not selectable
   if (approval.status !== 'pending') return false
 

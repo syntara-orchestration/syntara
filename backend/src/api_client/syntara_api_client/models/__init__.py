@@ -369,6 +369,7 @@ __all__ = (
     "UserListResponse",
     "UserRead",
     "UserReference",
+    "UserReferenceType",
     "UserUpdate",
     "ValidateNameResourceType",
     "ValidateNameResponse",

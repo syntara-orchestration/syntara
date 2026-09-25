@@ -45,6 +45,7 @@ type BuilderDialogsProps = Readonly<{
   dispatch: Dispatch<BuilderAction>
   handleRunWorkflow: (inputData?: Record<string, unknown>, triggerNodeId?: string) => void
   handleDeleteWorkflow: () => void
+  isDeleting: boolean
   triggerName: string
   triggerNodeId?: string
   triggerInputSchema?: Record<string, unknown>
@@ -143,6 +144,7 @@ export function BuilderDialogs({
   dispatch,
   handleRunWorkflow,
   handleDeleteWorkflow,
+  isDeleting,
   triggerName,
   triggerNodeId,
   triggerInputSchema,
@@ -176,7 +178,7 @@ export function BuilderDialogs({
         isOpen={showConfirmStep}
         onClose={closeAll}
         onConfirm={handleConfirmRun}
-        title={`Run ${workflowName}?`}
+        title="Run workflow?"
         confirmLabel={isDirty ? 'Save and run' : 'Run now'}
         aria-labelledby="run-workflow-modal-title"
         aria-describedby="run-workflow-modal-description"
@@ -184,9 +186,10 @@ export function BuilderDialogs({
         <Stack hasGutter>
           <StackItem>
             <Content component="p">
+              You are about to manually run the workflow <strong>{workflowName}</strong>.
               {isDirty
-                ? 'You are about to save and run this workflow. Your unsaved changes will be saved before the workflow starts, bypassing its normal trigger conditions.'
-                : `You are able to run this automation starting from ${triggerName}. This action will start the workflow immediately, bypassing its normal trigger conditions.`}
+                ? ' Unsaved changes will be saved before the workflow starts, bypassing its normal trigger conditions.'
+                : ` This action will immediately start the workflow from ${triggerName}, bypassing its normal trigger conditions.`}
             </Content>
           </StackItem>
           <StackItem>
@@ -215,6 +218,7 @@ export function BuilderDialogs({
         workflowName={workflowName}
         onClose={() => dispatch({ type: 'SET_DELETE_DIALOG', payload: false })}
         onConfirm={handleDeleteWorkflow}
+        confirmLoading={isDeleting}
         aria-labelledby="delete-workflow-modal-title"
         aria-describedby="delete-workflow-modal-body"
       />

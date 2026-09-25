@@ -380,6 +380,6 @@ test.describe('Access Management — Policies Tab Columns', () => {
     await expect(table.getByRole('row').filter({ hasText: policy.name })).toBeVisible({ timeout: 15_000 })
 
     const policyRow = table.getByRole('row').filter({ hasText: policy.name })
-    await expect(policyRow.locator('td[data-label="Project"]').getByRole('button')).toBeVisible()
+    await expect(policyRow.locator('td[data-label="Project"]').getByRole('link')).toBeVisible()
   })
 })

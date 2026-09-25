@@ -93,13 +93,19 @@ const DELETE_USER_ACKNOWLEDGEMENT = {
   label: 'I understand this user will be permanently deleted.',
 }
 
-function getRowActions(
-  user: User,
-  onDelete: (user: User) => void,
-  onRevoke: (user: User) => void,
-  permissions: ReturnType<typeof useUserPermissions>,
+function getRowActions({
+  user,
+  onDelete,
+  onRevoke,
+  permissions,
+  onNavigate,
+}: {
+  user: User
+  onDelete: (user: User) => void
+  onRevoke: (user: User) => void
+  permissions: ReturnType<typeof useUserPermissions>
   onNavigate: (path: string) => void
-): KebabAction[] {
+}): KebabAction[] {
   return [
     {
       key: 'edit',
@@ -140,7 +146,7 @@ function disableConfirmCopy(
   if (!user) {
     return {
       title: 'Disable user?',
-      confirmLabel: 'Disable',
+      confirmLabel: 'Disable user',
       body: null,
     }
   }
@@ -170,7 +176,7 @@ function disableConfirmCopy(
   }
   return {
     title: 'Disable user?',
-    confirmLabel: 'Disable',
+    confirmLabel: 'Disable user',
     body: (
       <>
         The user <strong>{user.username}</strong> will be disabled and will no longer be able to sign in.
@@ -254,7 +260,7 @@ function UserTableRow({
       <Td isActionCell>
         {!user.is_builtin && (
           <SynKebabMenu
-            actions={getRowActions(user, onDelete, onRevoke, permissions, onNavigate)}
+            actions={getRowActions({ user, onDelete, onRevoke, permissions, onNavigate })}
             aria-label={`Actions for ${user.username}`}
           />
         )}
@@ -299,7 +305,13 @@ export function UsersTab() {
   const isAdminEnabled = builtinUser?.is_enabled ?? true
   const refetch = useCallback(() => query.refetch(), [query])
 
-  useCursorReset(serverUsers.length, hasActiveFilters, cursor, query.isFetching, resetPagination)
+  useCursorReset({
+    itemCount: serverUsers.length,
+    hasActiveFilters,
+    cursor,
+    isFetching: query.isFetching,
+    resetPagination,
+  })
 
   const handleCreateUser = permissions.canCreate
     ? () => detachPromise(navigate({ to: AppRoute.AccessManagement.CreateUser }))
@@ -422,7 +434,7 @@ export function UsersTab() {
         onClose={deleteDialog.close}
         onConfirm={() => handleDelete(deleteDialog.item)}
         title="Delete user?"
-        confirmLabel="Delete"
+        confirmLabel="Delete user"
         confirmVariant="danger"
         titleIconVariant="warning"
         destructiveAcknowledgement={DELETE_USER_ACKNOWLEDGEMENT}

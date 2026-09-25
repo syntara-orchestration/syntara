@@ -1,6 +1,5 @@
 import {
   Button,
-  FormGroup,
   FormHelperText,
   HelperText,
   HelperTextItem,
@@ -16,11 +15,12 @@ import {
   TextInputGroupMain,
   TextInputGroupUtilities,
 } from '@patternfly/react-core'
-import { RhUiCloseIcon, RhUiErrorIcon, RhUiViewIcon, RhUiViewOffIcon } from '@patternfly/react-icons'
-import { type ReactElement, type Ref, useCallback, useMemo, useRef, useState } from 'react'
-import type { Control, ControllerFieldState, ControllerRenderProps } from 'react-hook-form'
-import { Controller } from 'react-hook-form'
+import { RhUiCloseIcon, RhUiViewIcon, RhUiViewOffIcon } from '@patternfly/react-icons'
+import { type Ref, useCallback, useMemo, useRef, useState } from 'react'
+import type { ControllerFieldState, ControllerRenderProps } from 'react-hook-form'
 
+import { SynFormField } from '../../../components/forms/SynFormField'
+import { SynTextField } from '../../../components/forms/SynTextField'
 import { SynLabel } from '../../../components/labels/SynLabel'
 import { SynSelect } from '../../../components/SynSelect'
 import { useAllGroups } from '../../access/useAllGroups'
@@ -30,65 +30,6 @@ import type { UserFormData } from '../userFormSchema'
 
 import { userHelp } from './userFieldHelp'
 import { GROUPS_AUTHENTICATED_HINT } from './userFieldHelpText'
-
-type ControlledTextFieldProps = {
-  name: 'username' | 'first_name' | 'last_name' | 'email' | 'password'
-  control: Control<UserFormData>
-  label: string
-  fieldId: string
-  placeholder?: string
-  isRequired?: boolean
-  isDisabled?: boolean
-  type?: 'text' | 'email' | 'password' | 'search' | 'tel' | 'url' | 'date' | 'time' | 'number'
-  autoComplete?: string
-  labelHelp?: ReactElement
-}
-
-function ControlledTextField({
-  name,
-  control,
-  label,
-  fieldId,
-  placeholder,
-  isRequired,
-  isDisabled,
-  type,
-  autoComplete,
-  labelHelp,
-}: Readonly<ControlledTextFieldProps>) {
-  return (
-    <Controller
-      name={name}
-      control={control}
-      render={({ field, fieldState }) => (
-        <FormGroup label={label} fieldId={fieldId} isRequired={isRequired} labelHelp={labelHelp}>
-          <TextInput
-            id={fieldId}
-            aria-label={label}
-            placeholder={placeholder}
-            type={type}
-            validated={fieldState.error ? 'error' : 'default'}
-            isDisabled={isDisabled}
-            value={field.value ?? ''}
-            onChange={field.onChange}
-            onBlur={field.onBlur}
-            name={field.name}
-            autoComplete={autoComplete}
-          />
-          {fieldState.error && (
-            <FormHelperText>
-              <HelperText>
-                <HelperTextItem icon={<RhUiErrorIcon />} variant="error">
-                  {fieldState.error.message}
-                </HelperTextItem>
-              </HelperText>
-            </FormHelperText>
-          )}
-        </FormGroup>
-      )}
-    />
-  )
-}
 
 type GroupOption = {
   name: string
@@ -221,39 +162,36 @@ function GroupMultiSelect({
 }
 
 type UserFormFieldsProps = {
-  control: Control<UserFormData>
   isEdit: boolean
   isBuiltinUser?: boolean
   isBuiltinSelf?: boolean
   isFederatedUser?: boolean
 }
 
-function GroupField({ control }: Readonly<{ control: Control<UserFormData> }>) {
+function GroupField() {
   const { groups, isLoading: isLoadingGroups } = useAllGroups()
   const groupOptions = useMemo(
     () => excludeAuthenticatedGroup(groups).map((g) => ({ name: g.name, description: g.description ?? null })),
     [groups]
   )
+
   return (
-    <Controller
+    <SynFormField<UserFormData, 'group_names'>
       name="group_names"
-      control={control}
-      render={({ field }) => (
-        <FormGroup label="Groups" fieldId="user-groups-select" labelHelp={userHelp.groups}>
-          <GroupMultiSelect
-            selected={field.value ?? []}
-            onChange={field.onChange}
-            isLoading={isLoadingGroups}
-            groupOptions={groupOptions}
-          />
-          <FormHelperText>
-            <HelperText>
-              <HelperTextItem>{GROUPS_AUTHENTICATED_HINT}</HelperTextItem>
-            </HelperText>
-          </FormHelperText>
-        </FormGroup>
+      label="Groups"
+      fieldId="user-groups-select"
+      labelHelp={userHelp.groups}
+      hint={GROUPS_AUTHENTICATED_HINT}
+    >
+      {({ field }) => (
+        <GroupMultiSelect
+          selected={field.value ?? []}
+          onChange={field.onChange}
+          isLoading={isLoadingGroups}
+          groupOptions={groupOptions}
+        />
       )}
-    />
+    </SynFormField>
   )
 }
 
@@ -306,61 +244,50 @@ function PasswordFieldInput({ field, fieldState, isEdit, isDisabled }: Readonly<
           </HelperText>
         </FormHelperText>
       )}
-      {fieldState.error && (
-        <FormHelperText>
-          <HelperText>
-            <HelperTextItem icon={<RhUiErrorIcon />} variant="error">
-              {fieldState.error.message}
-            </HelperTextItem>
-          </HelperText>
-        </FormHelperText>
-      )}
     </>
   )
 }
 
 export function UserFormFields({
-  control,
   isEdit,
   isBuiltinUser = false,
   isBuiltinSelf = false,
   isFederatedUser,
 }: Readonly<UserFormFieldsProps>) {
   const federatedUser = Boolean(isFederatedUser)
-  const emailLabelHelp = isEdit && federatedUser ? userHelp.emailFederatedEdit : userHelp.email
+  let emailLabelHelp = userHelp.emailCreate
+  if (isEdit) {
+    emailLabelHelp = federatedUser ? userHelp.emailFederatedEdit : userHelp.email
+  }
 
   return (
     <>
-      <ControlledTextField
+      <SynTextField
         name="username"
-        control={control}
         label="Username"
         fieldId="user-username"
         placeholder="Enter username"
         isRequired
         isDisabled={isBuiltinUser}
-        autoComplete="off"
         labelHelp={userHelp.username}
+        autoComplete="off"
       />
-      <ControlledTextField
+      <SynTextField
         name="first_name"
-        control={control}
         label="First Name"
         fieldId="user-first-name"
         placeholder="Enter first name"
         isDisabled={isBuiltinUser}
       />
-      <ControlledTextField
+      <SynTextField
         name="last_name"
-        control={control}
         label="Last Name"
         fieldId="user-last-name"
         placeholder="Enter last name"
         isDisabled={isBuiltinUser}
       />
-      <ControlledTextField
+      <SynTextField
         name="email"
-        control={control}
         label="Email"
         fieldId="user-email"
         placeholder="Enter email address"
@@ -368,38 +295,40 @@ export function UserFormFields({
         labelHelp={emailLabelHelp}
       />
       {!federatedUser && (
-        <Controller
+        <SynFormField<UserFormData, 'password'>
           name="password"
-          control={control}
-          render={({ field, fieldState }) => (
-            <FormGroup label="Password" fieldId="user-password" isRequired={!isEdit}>
-              <PasswordFieldInput
-                field={field}
-                fieldState={fieldState}
-                isEdit={isEdit}
-                isDisabled={isBuiltinUser && !isBuiltinSelf}
-              />
-            </FormGroup>
+          label="Password"
+          fieldId="user-password"
+          isRequired={!isEdit}
+        >
+          {({ field, fieldState }) => (
+            <PasswordFieldInput
+              field={field}
+              fieldState={fieldState}
+              isEdit={isEdit}
+              isDisabled={isBuiltinUser && !isBuiltinSelf}
+            />
           )}
-        />
+        </SynFormField>
       )}
-      {!isEdit && <GroupField control={control} />}
+      {!isEdit && <GroupField />}
       {!isEdit && (
-        <Controller
+        <SynFormField<UserFormData, 'is_enabled'>
           name="is_enabled"
-          control={control}
-          render={({ field }) => (
-            <FormGroup label="Status" fieldId="user-is-enabled" labelHelp={userHelp.status}>
-              <Switch
-                id="user-is-enabled"
-                aria-label="Enabled"
-                label={field.value ? 'Enabled' : 'Disabled'}
-                isChecked={field.value}
-                onChange={(_event, checked) => field.onChange(checked)}
-              />
-            </FormGroup>
+          label="Status"
+          fieldId="user-is-enabled"
+          labelHelp={userHelp.status}
+        >
+          {({ field }) => (
+            <Switch
+              id="user-is-enabled"
+              aria-label="Enabled"
+              label={field.value ? 'Enabled' : 'Disabled'}
+              isChecked={field.value}
+              onChange={(_event, checked) => field.onChange(checked)}
+            />
           )}
-        />
+        </SynFormField>
       )}
     </>
   )

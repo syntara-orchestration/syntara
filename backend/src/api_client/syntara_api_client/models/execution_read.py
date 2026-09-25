@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from ..models.execution_read_execution_metadata_type_0 import ExecutionReadExecutionMetadataType0
     from ..models.execution_read_input_data import ExecutionReadInputData
     from ..models.execution_read_labels import ExecutionReadLabels
+    from ..models.user_reference import UserReference
     from ..models.workflow_definition import WorkflowDefinition
 
 
@@ -40,17 +41,17 @@ class ExecutionRead:
             project_id (UUID):
             temporal_workflow_id (str):
             status (ExecutionStatus): Current state of a workflow execution lifecycle.
-            created_by (UUID):
             created_at (datetime.datetime):
             completed_at (datetime.datetime | None):
             updated_at (datetime.datetime):
-            updated_by (None | UUID):
             input_data (ExecutionReadInputData):
             error_details (None | str):
             workflow_name (None | str | Unset): Name of the workflow
             workflow_version (int | None | Unset): Version number of the workflow version that was executed
             workflow_version_name (None | str | Unset): Name of the executed version, if one was set
             workflow_version_created_at (datetime.datetime | None | Unset): Timestamp when the executed version was created
+            created_by (None | Unset | UserReference): User who started the execution
+            updated_by (None | Unset | UserReference): User who last modified the execution
             trigger_node_id (None | str | Unset):
             mode (ExecutionMode | Unset): Execution mode for workflow runs.
             execution_metadata (ExecutionReadExecutionMetadataType0 | None | Unset):
@@ -73,17 +74,17 @@ class ExecutionRead:
     project_id: UUID
     temporal_workflow_id: str
     status: ExecutionStatus
-    created_by: UUID
     created_at: datetime.datetime
     completed_at: datetime.datetime | None
     updated_at: datetime.datetime
-    updated_by: None | UUID
     input_data: ExecutionReadInputData
     error_details: None | str
     workflow_name: None | str | Unset = UNSET
     workflow_version: int | None | Unset = UNSET
     workflow_version_name: None | str | Unset = UNSET
     workflow_version_created_at: datetime.datetime | None | Unset = UNSET
+    created_by: None | Unset | UserReference = UNSET
+    updated_by: None | Unset | UserReference = UNSET
     trigger_node_id: None | str | Unset = UNSET
     mode: ExecutionMode | Unset = UNSET
     execution_metadata: ExecutionReadExecutionMetadataType0 | None | Unset = UNSET
@@ -99,6 +100,7 @@ class ExecutionRead:
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.execution_read_execution_metadata_type_0 import ExecutionReadExecutionMetadataType0
+        from ..models.user_reference import UserReference
         from ..models.workflow_definition import WorkflowDefinition
 
         id = str(self.id)
@@ -113,8 +115,6 @@ class ExecutionRead:
 
         status = self.status.value
 
-        created_by = str(self.created_by)
-
         created_at = self.created_at.isoformat()
 
         completed_at: None | str
@@ -124,12 +124,6 @@ class ExecutionRead:
             completed_at = self.completed_at
 
         updated_at = self.updated_at.isoformat()
-
-        updated_by: None | str
-        if isinstance(self.updated_by, UUID):
-            updated_by = str(self.updated_by)
-        else:
-            updated_by = self.updated_by
 
         input_data = self.input_data.to_dict()
 
@@ -161,6 +155,22 @@ class ExecutionRead:
             workflow_version_created_at = self.workflow_version_created_at.isoformat()
         else:
             workflow_version_created_at = self.workflow_version_created_at
+
+        created_by: dict[str, Any] | None | Unset
+        if isinstance(self.created_by, Unset):
+            created_by = UNSET
+        elif isinstance(self.created_by, UserReference):
+            created_by = self.created_by.to_dict()
+        else:
+            created_by = self.created_by
+
+        updated_by: dict[str, Any] | None | Unset
+        if isinstance(self.updated_by, Unset):
+            updated_by = UNSET
+        elif isinstance(self.updated_by, UserReference):
+            updated_by = self.updated_by.to_dict()
+        else:
+            updated_by = self.updated_by
 
         trigger_node_id: None | str | Unset
         if isinstance(self.trigger_node_id, Unset):
@@ -243,11 +253,9 @@ class ExecutionRead:
                 "project_id": project_id,
                 "temporal_workflow_id": temporal_workflow_id,
                 "status": status,
-                "created_by": created_by,
                 "created_at": created_at,
                 "completed_at": completed_at,
                 "updated_at": updated_at,
-                "updated_by": updated_by,
                 "input_data": input_data,
                 "error_details": error_details,
             }
@@ -260,6 +268,10 @@ class ExecutionRead:
             field_dict["workflow_version_name"] = workflow_version_name
         if workflow_version_created_at is not UNSET:
             field_dict["workflow_version_created_at"] = workflow_version_created_at
+        if created_by is not UNSET:
+            field_dict["created_by"] = created_by
+        if updated_by is not UNSET:
+            field_dict["updated_by"] = updated_by
         if trigger_node_id is not UNSET:
             field_dict["trigger_node_id"] = trigger_node_id
         if mode is not UNSET:
@@ -292,6 +304,7 @@ class ExecutionRead:
         from ..models.execution_read_execution_metadata_type_0 import ExecutionReadExecutionMetadataType0
         from ..models.execution_read_input_data import ExecutionReadInputData
         from ..models.execution_read_labels import ExecutionReadLabels
+        from ..models.user_reference import UserReference
         from ..models.workflow_definition import WorkflowDefinition
 
         d = dict(src_dict)
@@ -306,8 +319,6 @@ class ExecutionRead:
         temporal_workflow_id = d.pop("temporal_workflow_id")
 
         status = ExecutionStatus(d.pop("status"))
-
-        created_by = UUID(d.pop("created_by"))
 
         created_at = isoparse(d.pop("created_at"))
 
@@ -327,21 +338,6 @@ class ExecutionRead:
         completed_at = _parse_completed_at(d.pop("completed_at"))
 
         updated_at = isoparse(d.pop("updated_at"))
-
-        def _parse_updated_by(data: object) -> None | UUID:
-            if data is None:
-                return data
-            try:
-                if not isinstance(data, str):
-                    raise TypeError()
-                updated_by_type_0 = UUID(data)
-
-                return updated_by_type_0
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            return cast(None | UUID, data)
-
-        updated_by = _parse_updated_by(d.pop("updated_by"))
 
         input_data = ExecutionReadInputData.from_dict(d.pop("input_data"))
 
@@ -395,6 +391,40 @@ class ExecutionRead:
             return cast(datetime.datetime | None | Unset, data)
 
         workflow_version_created_at = _parse_workflow_version_created_at(d.pop("workflow_version_created_at", UNSET))
+
+        def _parse_created_by(data: object) -> None | Unset | UserReference:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                created_by_type_0 = UserReference.from_dict(data)
+
+                return created_by_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(None | Unset | UserReference, data)
+
+        created_by = _parse_created_by(d.pop("created_by", UNSET))
+
+        def _parse_updated_by(data: object) -> None | Unset | UserReference:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                updated_by_type_0 = UserReference.from_dict(data)
+
+                return updated_by_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(None | Unset | UserReference, data)
+
+        updated_by = _parse_updated_by(d.pop("updated_by", UNSET))
 
         def _parse_trigger_node_id(data: object) -> None | str | Unset:
             if data is None:
@@ -528,17 +558,17 @@ class ExecutionRead:
             project_id=project_id,
             temporal_workflow_id=temporal_workflow_id,
             status=status,
-            created_by=created_by,
             created_at=created_at,
             completed_at=completed_at,
             updated_at=updated_at,
-            updated_by=updated_by,
             input_data=input_data,
             error_details=error_details,
             workflow_name=workflow_name,
             workflow_version=workflow_version,
             workflow_version_name=workflow_version_name,
             workflow_version_created_at=workflow_version_created_at,
+            created_by=created_by,
+            updated_by=updated_by,
             trigger_node_id=trigger_node_id,
             mode=mode,
             execution_metadata=execution_metadata,

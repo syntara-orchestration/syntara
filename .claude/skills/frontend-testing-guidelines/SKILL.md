@@ -614,6 +614,24 @@ export default defineConfig({
 })
 ```
 
+### 15. A Refactor Must Not Leave a Test Checking the Old Code Path
+
+When you change how a function works, check every test for that function. A test can still pass after a refactor, but check the wrong thing. This happens when a test spies on or mocks a mechanism the new code no longer uses.
+
+Example: a test spies on `document.querySelector` to check a dialog opens. A refactor changes the code to open the dialog a different way. The code no longer calls `document.querySelector`. The spy assertion still passes — it just never runs the code that matters. The test now proves nothing.
+
+**Checklist for every function or hook you refactor:**
+
+1. Read each existing test for that function or hook.
+2. Ask: "Does this test still call the new code path?" Not: "Does this test still pass?"
+3. If a mock or spy targets a mechanism the new code does not use, rewrite the test against the real behavior. Do not just leave the old mock in place.
+4. Also check: does this test change remove coverage of a branch that used to be tested? A test edit that makes two tests cover the same new branch, while an old branch is now untested, is a coverage regression even though every test still passes. Compare against the function's branches (`if`/`else`, `switch`, early returns), not just against the diff.
+
+### 16. Use Exact Text Matchers; Extract Repeated Label Strings to a Constant
+
+- **Prefer an exact string match over a regex** when the text is fixed and known, for example `screen.getByRole('button', { name: 'Delete group' })`, not `screen.getByRole('button', { name: /delete group/i })`. A regex is only needed when the text is dynamic or partial.
+- **When the same label string appears 2 or more times in a file, extract it to a constant** at the top of the file, for example `const DELETE_GROUP_LABEL = 'Delete group'`. Reuse the constant in every query and every assertion. This way the label only needs to change in one place.
+
 ---
 
 ## Browser Tab Title Tests

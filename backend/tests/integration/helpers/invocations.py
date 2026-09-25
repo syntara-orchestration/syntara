@@ -4,8 +4,14 @@ import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
+from uuid import UUID, uuid4
 
 from httpx import AsyncClient
+from sqlmodel.ext.asyncio.session import AsyncSession
+
+from syntara.agent_orchestrator.models.invocation import Invocation, InvocationStatus
+from syntara.authz.models.project import Project
+from syntara.core.models import User
 
 
 @asynccontextmanager
@@ -49,3 +55,69 @@ async def wait_for_invocation_execution(
             final_data = status_response.json()
 
     yield final_data
+
+
+class InvocationFactory:
+    """Factory for creating invocations in integration tests.
+
+    Collapses the hand-rolled ``_make_invocation`` helpers that each test
+    module used to carry. ``project_id`` defaults to a project the factory
+    creates on first use, so tests that only need *an* invocation do not have
+    to reach for a project fixture.
+    """
+
+    def __init__(self, session: AsyncSession, user: User) -> None:
+        """Initialize with database session and owning user."""
+        self.session = session
+        self.user = user
+        self._default_project_id: UUID | None = None
+
+    async def _resolve_project_id(self) -> UUID:
+        if self._default_project_id is None:
+            project = Project(
+                name=f"invocation-factory-project-{uuid4().hex[:8]}",
+                description="Invocation factory project",
+            )
+            self.session.add(project)
+            await self.session.flush()
+            self._default_project_id = project.id
+        return self._default_project_id
+
+    async def create(
+        self,
+        *,
+        project_id: UUID | None = None,
+        status: InvocationStatus = InvocationStatus.RUNNING,
+        context_data: dict[str, Any] | None = None,
+        agent_execution_id: UUID | None = None,
+        commit: bool = True,
+    ) -> Invocation:
+        """Create a single invocation.
+
+        Args:
+            project_id: Owning project; a factory-owned project is used if omitted.
+            status: Initial invocation status.
+            context_data: Raw context JSONB.
+            agent_execution_id: Builtin Agent Execution execution running this invocation.
+            commit: Commit (and refresh) instead of only flushing.
+
+        Returns:
+            The persisted invocation.
+
+        """
+        invocation = Invocation(
+            prompt="summarise the incident report",
+            created_by=self.user.id,
+            session_id=f"session-{uuid4()}",
+            project_id=project_id if project_id is not None else await self._resolve_project_id(),
+            status=status,
+            context_data=context_data or {},
+            agent_execution_id=agent_execution_id,
+        )
+        self.session.add(invocation)
+        if commit:
+            await self.session.commit()
+            await self.session.refresh(invocation)
+        else:
+            await self.session.flush()
+        return invocation

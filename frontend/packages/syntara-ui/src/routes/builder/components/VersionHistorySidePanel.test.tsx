@@ -154,7 +154,7 @@ describe('VersionHistorySidePanel', () => {
     render(<VersionHistorySidePanel sidePanel={sidePanel} isNodeEditorOpen={false} />)
 
     expect(screen.getByText('Restore version from May 19, 2026?')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Restore' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Restore version' })).toBeInTheDocument()
   })
 
   it('calls onConfirm when Restore button is clicked', async () => {
@@ -171,7 +171,7 @@ describe('VersionHistorySidePanel', () => {
     })
     render(<VersionHistorySidePanel sidePanel={sidePanel} isNodeEditorOpen={false} />)
 
-    await user.click(screen.getByRole('button', { name: 'Restore' }))
+    await user.click(screen.getByRole('button', { name: 'Restore version' }))
 
     expect(onConfirm).toHaveBeenCalledTimes(1)
   })

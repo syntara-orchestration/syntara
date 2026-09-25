@@ -134,13 +134,14 @@ export function useBuilderConflict(params: UseBuilderConflictParams) {
       setIsConflictLoading(true)
       try {
         const { edges, nodePositions } = useWorkflowStore.getState()
-        const definition = buildWorkflowDefinition(
-          workflowName,
-          workflowDescription,
-          currentWorkflow.workflow.activities ?? [],
-          currentWorkflow.triggers ?? [],
-          { edges, nodePositions }
-        )
+        const definition = buildWorkflowDefinition({
+          workflowName: workflowName,
+          workflowDescription: workflowDescription,
+          activities: currentWorkflow.workflow.activities ?? [],
+          triggers: currentWorkflow.triggers ?? [],
+          edges,
+          nodePositions,
+        })
         const projectId = workflowProjectId ?? selectedProjectId
 
         const { data: created, error: createError } = await workflowFetchClient.POST('/workflows', {
@@ -216,7 +217,7 @@ export function useBuilderConflict(params: UseBuilderConflictParams) {
     conflictDialogProps: {
       isOpen: conflictDialog.isOpen,
       onClose: conflictDialog.close,
-      conflictAction: conflictDialog.item?.action ?? ('save' as ConflictAction),
+      conflictAction: conflictDialog.item?.action ?? 'save',
       conflictInfo: conflictDialog.item?.info,
       onSaveAsNewest: handleSaveAsNewest,
       onDuplicate: handleDuplicateWorkflow,

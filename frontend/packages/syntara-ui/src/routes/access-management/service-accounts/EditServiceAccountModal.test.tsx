@@ -44,7 +44,7 @@ describe('EditServiceAccountModal', () => {
     status: 'active',
     project_id: '550e8400-e29b-41d4-a716-446655440000',
     last_authenticated_at: '2024-06-15T10:00:00Z',
-    created_by: 'admin',
+    created_by: { id: 'u-004', name: 'admin', type: 'user' },
     updated_by: null,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-02T00:00:00Z',
@@ -71,7 +71,7 @@ describe('EditServiceAccountModal', () => {
       variables: undefined,
       status: 'idle',
       isPaused: false,
-    } as never)
+    })
   })
 
   it('renders with "Edit service account" title', () => {
@@ -139,7 +139,7 @@ describe('EditServiceAccountModal', () => {
     await user.clear(nameInput)
     await user.type(nameInput, 'updated-name')
 
-    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await user.click(screen.getByRole('button', { name: 'Save service account' }))
 
     await waitFor(() => {
       expect(mockMutate).toHaveBeenCalled()
@@ -166,7 +166,7 @@ describe('EditServiceAccountModal', () => {
       { wrapper }
     )
 
-    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await user.click(screen.getByRole('button', { name: 'Save service account' }))
 
     await waitFor(() => {
       expect(mockMutate).toHaveBeenCalled()
@@ -195,7 +195,7 @@ describe('EditServiceAccountModal', () => {
 
     const nameInput = screen.getByRole('textbox', { name: 'Name' })
     await user.clear(nameInput)
-    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await user.click(screen.getByRole('button', { name: 'Save service account' }))
 
     await waitFor(() => {
       expect(screen.getByText('Name is required')).toBeInTheDocument()

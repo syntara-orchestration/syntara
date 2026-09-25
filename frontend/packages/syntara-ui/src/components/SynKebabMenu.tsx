@@ -26,6 +26,8 @@ type SynKebabMenuProps = Readonly<{
   actions: KebabAction[]
   /** Accessible label for the toggle button — must be unique per context (e.g. per table row). */
   'aria-label': string
+  /** Called when the dropdown opens or closes. */
+  onOpenChange?: (isOpen: boolean) => void
 }>
 
 /** Ensures only one SynKebabMenu is open at a time across the app. */
@@ -49,7 +51,7 @@ function KebabToggle({
   )
 }
 
-export function SynKebabMenu({ actions, 'aria-label': ariaLabel }: SynKebabMenuProps) {
+export function SynKebabMenu({ actions, 'aria-label': ariaLabel, onOpenChange }: SynKebabMenuProps) {
   const menuId = useId()
   const [isOpen, setIsOpen] = useState(false)
   const toggleRef = useRef<MenuToggleElement>(null)
@@ -71,18 +73,18 @@ export function SynKebabMenu({ actions, 'aria-label': ariaLabel }: SynKebabMenuP
         }
       }
       setIsOpen(nextOpen)
+      onOpenChange?.(nextOpen)
     },
-    [menuId]
+    [menuId, onOpenChange]
   )
 
   const renderToggle = useCallback(
     (ref: React.Ref<MenuToggleElement>) => (
       <KebabToggle
         toggleRef={(node: MenuToggleElement | null) => {
-          ;(toggleRef as React.MutableRefObject<MenuToggleElement | null>).current = node
+          toggleRef.current = node
           if (typeof ref === 'function') ref(node)
-          else if (ref && typeof ref === 'object')
-            (ref as React.MutableRefObject<MenuToggleElement | null>).current = node
+          else if (ref && typeof ref === 'object') ref.current = node
         }}
         isExpanded={isOpen}
         ariaLabel={ariaLabel}

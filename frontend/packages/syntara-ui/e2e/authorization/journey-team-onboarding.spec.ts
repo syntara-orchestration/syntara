@@ -100,8 +100,8 @@ test.describe('Team onboarding journey', () => {
 
       // 5. Assign roles: group gets reader, alice gets writer, bob gets operator
       await assignGroupProjectRoleApi(app, project.id, group.id, readerRole)
-      await assignProjectRoleApi(app, project.id, alice.id, writerRole)
-      await assignProjectRoleApi(app, project.id, bob.id, operatorRole)
+      await assignProjectRoleApi({ page: app, projectId: project.id, userId: alice.id, roleName: writerRole })
+      await assignProjectRoleApi({ page: app, projectId: project.id, userId: bob.id, roleName: operatorRole })
 
       // 6. Admin verifies in UI
       await loginViaUI(app, 'admin', adminPassword)

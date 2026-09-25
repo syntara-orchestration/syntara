@@ -117,7 +117,7 @@ describe('ApprovalReviewView', () => {
     vi.mocked(approvalsClient.useMutation).mockReturnValue({
       mutate: mockMutate,
       isPending: false,
-    } as never)
+    })
   })
 
   it('renders approval name, summary list, context, and form', () => {
@@ -130,7 +130,7 @@ describe('ApprovalReviewView', () => {
     expect(screen.getByRole('heading', { name: 'Decision' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Reject' })).toBeInTheDocument()
-    expect(screen.getByRole('textbox', { name: 'Decision notes' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Notes' })).toBeInTheDocument()
   })
 
   it('renders next steps showing what happens on approve and reject', () => {
@@ -197,7 +197,7 @@ describe('ApprovalReviewView', () => {
 
     render(<ApprovalReviewView {...defaultProps} />, { wrapper: createWrapper() })
 
-    await user.type(screen.getByRole('textbox', { name: 'Decision notes' }), 'Looks good to deploy')
+    await user.type(screen.getByRole('textbox', { name: 'Notes' }), 'Looks good to deploy')
     await user.click(screen.getByRole('button', { name: 'Submit decision' }))
 
     expect(mockMutate).toHaveBeenCalledWith(
@@ -238,7 +238,7 @@ describe('ApprovalReviewView', () => {
 
     render(<ApprovalReviewView {...defaultProps} onClose={onClose} />, { wrapper: createWrapper() })
 
-    await user.type(screen.getByRole('textbox', { name: 'Decision notes' }), 'Approved')
+    await user.type(screen.getByRole('textbox', { name: 'Notes' }), 'Approved')
     await user.click(screen.getByRole('button', { name: 'Submit decision' }))
 
     expect(onClose).toHaveBeenCalledOnce()
@@ -253,7 +253,7 @@ describe('ApprovalReviewView', () => {
     vi.mocked(approvalsClient.useMutation).mockReturnValue({
       mutate: mockMutate,
       isPending: true,
-    } as never)
+    })
 
     render(<ApprovalReviewView {...defaultProps} />, { wrapper: createWrapper() })
 

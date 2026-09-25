@@ -32,6 +32,14 @@ describe('SynTextAreaField', () => {
     expect(screen.getByPlaceholderText('Enter description')).toBeInTheDocument()
   })
 
+  it('passes maxLength to the textarea', () => {
+    renderWithForm<FormData>({ schema, defaultValues: { description: '', notes: '' } }, ({ control }) => (
+      <SynTextAreaField name="description" control={control} label="Description" maxLength={10} />
+    ))
+
+    expect(screen.getByRole('textbox', { name: 'Description' })).toHaveAttribute('maxlength', '10')
+  })
+
   it('shows hint text when valid', () => {
     renderWithForm<FormData>({ schema, defaultValues: { description: '', notes: '' } }, ({ control }) => (
       <SynTextAreaField name="description" control={control} label="Description" hint="Up to 2000 characters" />

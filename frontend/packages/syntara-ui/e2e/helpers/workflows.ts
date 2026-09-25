@@ -44,6 +44,10 @@ export async function waitForUIReady(page: Page) {
  * Click the "Reset layout" button to trigger an auto-layout of the canvas.
  * Uses explicit `toBeVisible()` to ride out any layout animations still settling
  * from a previous call (e.g. after addScriptNode).
+ *
+ * Use this when you only need nodes repositioned after adding steps. Use
+ * {@link layoutCanvas} when tests must also fit the viewport (typical in CI) before
+ * clicking nodes or edge controls.
  */
 export async function triggerLayout(page: Page) {
   const layoutButton = page.getByRole('button', { name: 'Reset layout', exact: true })
@@ -51,6 +55,8 @@ export async function triggerLayout(page: Page) {
   await layoutButton.click()
   await waitForUIReady(page)
 }
+
+export { clickNode, layoutCanvas } from './canvas-interaction'
 
 export async function closeNodeEditorPanel(page: Page) {
   // The node editor cancel button has different aria-labels depending on mode:
@@ -110,20 +116,25 @@ export async function saveAndCloseNodeForm(page: Page, isUpdate = false, nodeNam
 
 /**
  * Open a node for editing by double-clicking it on the canvas.
- * Uses toPass retry pattern to handle React Flow rendering delays.
+ *
+ * Retries layout + click while the editor hydrates. Under CI load the click can
+ * land during a React Flow viewport transform and be lost, so callers must not
+ * use a bare `getByText(nodeName).click()`.
  *
  * @param page - Playwright Page instance
  * @param nodeName - Name of the node to open
  */
 export async function openNodeForEditing(page: Page, nodeName: string) {
+  await triggerLayout(page)
   const node = page.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: nodeName })
   await waitForUIReady(page)
 
   const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
   await expect(async () => {
-    await node.dblclick({ force: true })
-    await expect(nameInput).toBeVisible()
-  }).toPass({ timeout: 15_000, intervals: [1_000, 2_000, 3_000] })
+    await expect(node).toBeVisible({ timeout: 5_000 })
+    await node.dblclick({ force: true, timeout: 5_000 })
+    await expect(nameInput).toHaveValue(nodeName, { timeout: 5_000 })
+  }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] })
 }
 
 export async function fillCodeEditor(
@@ -411,7 +422,7 @@ export async function deleteWorkflow(page: Page, workflowName: string) {
       await page
         .getByRole('checkbox', { name: /I understand this workflow/i })
         .check({ timeout: CLEANUP_ACTION_TIMEOUT })
-      await page.getByRole('button', { name: 'Delete' }).click({ timeout: CLEANUP_ACTION_TIMEOUT })
+      await page.getByRole('button', { name: 'Delete workflow' }).click({ timeout: CLEANUP_ACTION_TIMEOUT })
 
       // Wait for deletion to complete - delete dialog should close
       const deleteDialog = page.getByRole('dialog', { name: /Delete workflow/i })
@@ -460,7 +471,7 @@ export async function deleteProject(page: Page, projectName: string) {
     const deleteDialog = page.getByRole('dialog', { name: /Delete project/i })
     await expect(deleteDialog).toBeVisible()
     await deleteDialog.getByRole('checkbox', { name: /I understand/i }).check()
-    await deleteDialog.getByRole('button', { name: 'Delete' }).click()
+    await deleteDialog.getByRole('button', { name: 'Delete project' }).click()
 
     // Wait for dialog to close
     await expect(deleteDialog)

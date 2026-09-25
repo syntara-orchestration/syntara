@@ -1,5 +1,5 @@
 import { Button, EmptyState, EmptyStateBody, EmptyStateActions, EmptyStateFooter } from '@patternfly/react-core'
-import { PlusCircleIcon } from '@patternfly/react-icons'
+import { PlusCircleIcon, RhUiAddIcon } from '@patternfly/react-icons'
 import type { ReactNode } from 'react'
 
 import { SynEmptyStateImageIcon } from './SynEmptyStateImageIcon'
@@ -11,7 +11,7 @@ import { SynEmptyStateImageIcon } from './SynEmptyStateImageIcon'
  * <SynEmptyStateNoData
  *   title="No workflows yet"
  *   description="Create your first workflow to get started."
- *   buttonText="Create Workflow"
+ *   buttonText="Create workflow"
  *   addData={() => navigate('/create')}
  * />
  */
@@ -41,7 +41,7 @@ export function SynEmptyStateNoData(props: SynEmptyStateNoDataProps) {
       {addData && (
         <EmptyStateFooter>
           <EmptyStateActions>
-            <Button variant="primary" onClick={addData}>
+            <Button variant="primary" icon={<RhUiAddIcon />} onClick={addData}>
               {buttonText ?? defaultButtonText}
             </Button>
           </EmptyStateActions>

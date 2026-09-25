@@ -81,7 +81,21 @@
       "enabled": false
     },
     {
-      "description": "Do not let the bot bump the CI Python version.",
+      "description": "Group routine GitHub Actions updates into a single PR.",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch", "pin", "pinDigest", "digest"],
+      "groupName": "github actions",
+      "schedule": ["before 6am on Monday"]
+    },
+    {
+      "description": "Keep major GitHub Actions bumps in their own PR so a breaking runtime change cannot block routine digest and security updates",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["major"],
+      "groupName": "github actions (major)",
+      "schedule": ["before 6am on Monday"]
+    },
+    {
+      "description": "Do not let the bot bump the CI Python version. Keep this rule after the grouping rules above: enabled=false is not reset by a later rule that only sets groupName.",
       "matchManagers": ["github-actions"],
       "matchPackageNames": ["actions/python-versions", "python"],
       "enabled": false

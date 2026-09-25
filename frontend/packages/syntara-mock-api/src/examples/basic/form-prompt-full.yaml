@@ -1,5 +1,5 @@
 ---
-schema_version: "2.0.0"
+schema_version: '2.0.0'
 name: form-prompt-full
 description: Form prompt with all parameters populated
 
@@ -11,7 +11,7 @@ nodes:
   - id: collect_info
     type: form_prompt
     parameters:
-      message: "Please provide deployment details to continue"
+      message: 'Please provide deployment details to continue'
       form_definition:
         fields:
           - type: dropdown
@@ -31,8 +31,8 @@ nodes:
             value_name: version
             label: Version
             required: true
-            placeholder: "v1.0.0"
-            help_text: "Version must match pattern: v#.#.#"
+            placeholder: 'v1.0.0'
+            help_text: 'Version must match pattern: v#.#.#'
           - type: checkbox
             value_name: confirmation
             label: I confirm this deployment
@@ -47,10 +47,10 @@ nodes:
       submit_label: Deploy
       success_message: Deployment request submitted successfully
       timezone: America/New_York
-      css_override: ".form { max-width: 600px; margin: 0 auto; }"
+      css_override: '.form { max-width: 600px; margin: 0 auto; }'
     settings:
       timeout: 3700
-      continue_on_failure: true
+      continue_on_failure: false
   - id: deploy
     type: script
     parameters:

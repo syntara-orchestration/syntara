@@ -17,7 +17,6 @@ components:
         - id
         - current_version
         - is_enabled
-        - created_by
         - project_id
         - created_at
         - updated_at
@@ -36,7 +35,8 @@ components:
           title: Description
           description: Workflow description
         labels:
-          additionalProperties: true
+          additionalProperties:
+            type: string
           type: object
           title: Labels
           description: Workflow labels
@@ -59,9 +59,19 @@ components:
           default: false
           title: Has Validation Issues
         created_by:
-          type: string
-          format: uuid
+          anyOf:
+            - $ref: ../../base/shared-resources.openapi.yaml#/components/schemas/UserReference
+            - type: 'null'
+          description: User who created the workflow
+          readOnly: true
           title: Created By
+        updated_by:
+          anyOf:
+            - $ref: ../../base/shared-resources.openapi.yaml#/components/schemas/UserReference
+            - type: 'null'
+          description: User who last modified the workflow
+          readOnly: true
+          title: Updated By
         project_id:
           type: string
           format: uuid
@@ -103,7 +113,6 @@ components:
         - id
         - current_version
         - is_enabled
-        - created_by
         - project_id
         - created_at
         - updated_at
@@ -123,7 +132,8 @@ components:
           title: Description
           description: Workflow description
         labels:
-          additionalProperties: true
+          additionalProperties:
+            type: string
           type: object
           title: Labels
           description: Workflow labels
@@ -146,9 +156,19 @@ components:
           default: false
           title: Has Validation Issues
         created_by:
-          type: string
-          format: uuid
+          anyOf:
+            - $ref: ../../base/shared-resources.openapi.yaml#/components/schemas/UserReference
+            - type: 'null'
+          description: User who created the workflow
+          readOnly: true
           title: Created By
+        updated_by:
+          anyOf:
+            - $ref: ../../base/shared-resources.openapi.yaml#/components/schemas/UserReference
+            - type: 'null'
+          description: User who last modified the workflow
+          readOnly: true
+          title: Updated By
         project_id:
           type: string
           format: uuid
@@ -178,7 +198,7 @@ components:
             - type: 'null'
           description: Validation findings from the last save operation. Only included in create/update responses; use has_validation_issues for the durable indicator.
         version:
-          $ref: './openapi.yaml#/components/schemas/WorkflowVersionRead'
+          $ref: '#/components/schemas/WorkflowVersionRead'
           description: Current active version details
 
     PublishWorkflowVersionResponse:
@@ -190,7 +210,6 @@ components:
         - id
         - current_version
         - is_enabled
-        - created_by
         - project_id
         - created_at
         - updated_at
@@ -210,7 +229,8 @@ components:
           title: Description
           description: Workflow description
         labels:
-          additionalProperties: true
+          additionalProperties:
+            type: string
           type: object
           title: Labels
           description: Workflow labels
@@ -233,9 +253,19 @@ components:
           default: false
           title: Has Validation Issues
         created_by:
-          type: string
-          format: uuid
+          anyOf:
+            - $ref: ../../base/shared-resources.openapi.yaml#/components/schemas/UserReference
+            - type: 'null'
+          description: User who created the workflow
+          readOnly: true
           title: Created By
+        updated_by:
+          anyOf:
+            - $ref: ../../base/shared-resources.openapi.yaml#/components/schemas/UserReference
+            - type: 'null'
+          description: User who last modified the workflow
+          readOnly: true
+          title: Updated By
         project_id:
           type: string
           format: uuid
@@ -265,13 +295,90 @@ components:
             - type: 'null'
           description: Validation findings from the last save operation. Only included in create/update responses; use has_validation_issues for the durable indicator.
         version:
-          $ref: './openapi.yaml#/components/schemas/WorkflowVersionRead'
+          $ref: '#/components/schemas/WorkflowVersionRead'
           description: Current active version details
         warning:
           type: string
           default: ''
           title: Warning
           description: Non-fatal warning from the publish operation
+
+    WorkflowVersionRead:
+      type: object
+      title: WorkflowVersionRead
+      description: Schema for workflow version response (GET /workflows/{id}/versions/{version}).
+      required:
+        - id
+        - workflow_id
+        - version
+        - schema_version
+        - workflow_definition
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        workflow_id:
+          type: string
+          format: uuid
+          title: Workflow Id
+        version:
+          type: integer
+          title: Version
+        schema_version:
+          type: string
+          title: Schema Version
+        workflow_definition:
+          additionalProperties: true
+          type: object
+          title: Workflow Definition
+        change_description:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Change Description
+        status:
+          type: string
+          default: draft
+          enum:
+            - draft
+            - published
+            - previously_published
+          title: Status
+        last_published_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          title: Last Published At
+        last_unpublished_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          title: Last Unpublished At
+        name:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Name
+        created_by:
+          anyOf:
+            - $ref: ../../base/shared-resources.openapi.yaml#/components/schemas/UserReference
+            - type: 'null'
+          description: User who created the version
+          readOnly: true
+          title: Created By
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
 
     ActivityData:
       type: object
@@ -332,11 +439,9 @@ components:
         - project_id
         - temporal_workflow_id
         - status
-        - created_by
         - created_at
         - completed_at
         - updated_at
-        - updated_by
         - input_data
         - error_details
       properties:
@@ -387,8 +492,11 @@ components:
         status:
           $ref: "#/components/schemas/ExecutionStatus"
         created_by:
-          type: string
-          format: uuid
+          anyOf:
+            - $ref: ../../base/shared-resources.openapi.yaml#/components/schemas/UserReference
+            - type: 'null'
+          description: User who started the execution
+          readOnly: true
           title: Created By
         created_at:
           type: string
@@ -406,9 +514,10 @@ components:
           title: Updated At
         updated_by:
           anyOf:
-            - type: string
-              format: uuid
+            - $ref: ../../base/shared-resources.openapi.yaml#/components/schemas/UserReference
             - type: 'null'
+          description: User who last modified the execution
+          readOnly: true
           title: Updated By
         input_data:
           additionalProperties: true
@@ -739,7 +848,8 @@ components:
           title: Description
           description: Workflow description
         labels:
-          additionalProperties: true
+          additionalProperties:
+            type: string
           type: object
           title: Labels
           description: Workflow labels
@@ -783,7 +893,8 @@ components:
           description: Update workflow description
         labels:
           anyOf:
-            - additionalProperties: true
+            - additionalProperties:
+                type: string
               type: object
             - type: "null"
           title: Labels
@@ -1090,6 +1201,7 @@ components:
                 script: '#/components/schemas/ScriptNode'
                 switch: '#/components/schemas/SwitchNode'
                 wait: '#/components/schemas/WaitNode'
+          maxItems: 200
           type: array
           title: Nodes
           description: Execution and control nodes in the workflow graph
@@ -1097,6 +1209,7 @@ components:
           items:
             additionalProperties: true
             type: object
+          maxItems: 500
           type: array
           title: Edges
           description: List of directed edges connecting triggers and nodes in the workflow graph

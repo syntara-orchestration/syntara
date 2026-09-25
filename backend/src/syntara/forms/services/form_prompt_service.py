@@ -21,8 +21,9 @@ if TYPE_CHECKING:
     from syntara.core.models import User
 
 from syntara.audit.dispatcher import AuditEventDispatcher
-from syntara.core.models.user_reference import UserReference
+from syntara.core.models.user_reference import UserReference, UserReferenceType
 from syntara.core.services import BaseService, GroupMembershipService
+from syntara.core.services.user_reference_resolution import DELETED_USER_NAME
 from syntara.forms.audit.form_prompt import FormPromptSubmittedEvent
 from syntara.forms.exceptions import (
     FormPromptAlreadyRequestedError,
@@ -131,9 +132,10 @@ class FormPromptService(BaseService):
         ]
         if prompt.responded_by is not None:
             responder = prompt.responder
-            read.responded_by = UserReference(
-                id=prompt.responded_by,
-                name=responder.display_name if responder is not None else "",
+            read.responded_by = (
+                UserReference(id=prompt.responded_by, name=responder.display_name, type=UserReferenceType.USER)
+                if responder is not None
+                else UserReference(id=prompt.responded_by, name=DELETED_USER_NAME, type=UserReferenceType.DELETED_USER)
             )
         read.signal_delivery_error = signal_delivery_error
         return read
@@ -586,5 +588,5 @@ class FormPromptService(BaseService):
             logger.error("Signal delivery failed", prompt_id=prompt_id, error=signal_error)
 
         read = self._to_read_model(prompt, signal_delivery_error=signal_error)
-        read.responded_by = UserReference(id=self.user.id, name=self.user.display_name)
+        read.responded_by = UserReference(id=self.user.id, name=self.user.display_name, type=UserReferenceType.USER)
         return read

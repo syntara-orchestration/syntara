@@ -48,6 +48,33 @@ class FieldLimits:
     # Cursor and JSON limits for security
     MAX_CURSOR_SIZE = 1024  # 1KB limit for cursor tokens
 
+    # Labels JSONB limits (applied via validate_labels_dict)
+    MAX_LABELS_COUNT = 100
+    MAX_LABEL_KEY_LENGTH = 253
+    MAX_LABEL_VALUE_LENGTH = 256
+    MAX_LABELS_BYTES = 65536  # 64KB serialized
+
+
+class RequestLimits:
+    """HTTP request ingress limits."""
+
+    DEFAULT_MAX_BODY_MB = 10
+    # Hard ceiling on the multipart body allowance, regardless of file upload settings.
+    # Bounds the damage from a spoofed multipart Content-Type on a non-multipart request.
+    MAX_MULTIPART_BODY_BYTES = 200 * 1024 * 1024  # 200MB
+
+
+class JsonbLimits:
+    """Serialized size limits for free-form JSONB API fields."""
+
+    MAX_FIELD_BYTES = 1_048_576  # 1MB — context_data, input_data, trigger_inputs, etc.
+    # 1.5MB — aligns with Temporal's blobSize.warn threshold (development-sql.yaml) and
+    # stays well under the 2MB hard error limit, leaving headroom for the protobuf envelope
+    # and other start_workflow arguments serialized alongside the definition.
+    MAX_WORKFLOW_DEFINITION_BYTES = 1_572_864  # 1.5MB
+    MAX_WORKFLOW_NODES = 200
+    MAX_WORKFLOW_EDGES = 500
+
 
 class WebSocketConfig:
     """WebSocket configuration constants."""

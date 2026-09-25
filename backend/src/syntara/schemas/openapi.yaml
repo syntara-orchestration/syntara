@@ -11,7 +11,7 @@
 openapi: 3.1.0
 info:
   title: Orchestrator API
-  version: 1.1.1
+  version: 1.3.0
   description: A distributed multi-agent workflow orchestration system
 servers:
   - url: /api/v1
@@ -27967,11 +27967,13 @@ components:
       title: UserReference
       description: |-
         Minimal user identification for embedding in other resources.
-        This model captures user identity at the time of an action, providing
-        a snapshot that doesn't change even if the user's details are updated later.
+        The name is resolved from the database when the response is built, not
+        stored alongside the id, so it always reflects the principal's current
+        name. Renaming a user therefore changes the name shown for their past actions.
       required:
         - id
         - name
+        - type
       properties:
         id:
           type: string
@@ -27979,7 +27981,26 @@ components:
           description: User's unique identifier
         name:
           type: string
-          description: User's display name at time of action
+          description: 'Principal''s current display name, resolved when the response is built. Not a username: for a user this is their first and last name, falling back to the username when both are blank; for a service account it is the account name; for an internal service it is derived from the certificate CN.'
+        type:
+          $ref: '#/components/schemas/UserReferenceType'
+          description: Kind of principal this reference points at. Only `user` references have a user detail page; `deleted_user` / `deleted_service_account` are hard-deleted principals that are still recorded as the actor.
+    UserReferenceType:
+      type: string
+      title: UserReferenceType
+      description: |-
+        Kind of principal a UserReference points at.
+
+        Only ``user`` references have a user detail page. ``deleted_user`` and
+        ``deleted_service_account`` mark principals that were hard-deleted but are
+        still recorded as the actor.
+      enum:
+        - user
+        - service_account
+        - service
+        - system
+        - deleted_user
+        - deleted_service_account
     ErrorData:
       type: object
       title: ErrorData
@@ -28784,6 +28805,7 @@ components:
             - $ref: '#/components/schemas/UserReference'
             - type: 'null'
           description: User who made the decision
+          readOnly: true
         decided_at:
           anyOf:
             - format: date-time
@@ -29139,6 +29161,7 @@ components:
             - $ref: '#/components/schemas/UserReference'
             - type: 'null'
           description: User who made the decision (if successful)
+          readOnly: true
         decision_notes:
           anyOf:
             - type: string
@@ -30635,11 +30658,10 @@ components:
       properties:
         created_by:
           anyOf:
-            - type: string
-            - format: uuid
-              type: string
+            - $ref: '#/components/schemas/UserReference'
             - type: 'null'
-          description: Username or UUID of the workflow creator
+          description: User who created the workflow
+          readOnly: true
           title: Created By
         created_at:
           anyOf:
@@ -31029,6 +31051,7 @@ components:
             - $ref: '#/components/schemas/UserReference'
             - type: 'null'
           description: User who submitted the response
+          readOnly: true
         signal_delivery_error:
           anyOf:
             - type: string
@@ -32498,22 +32521,6 @@ components:
             environment: production
             region: us-east-1
             team: platform
-        created_by:
-          type: string
-          format: uuid
-          readOnly: true
-          title: Created By
-          description: User (or automation) that created the resource
-          example: 770e8400-e29b-41d4-a716-446655440000
-        updated_by:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
-          readOnly: true
-          title: Updated By
-          description: User (or automation) that last updated the resource
-          example: 880e8400-e29b-41d4-a716-446655440000
         name:
           type: string
           minLength: 1
@@ -32529,6 +32536,20 @@ components:
           title: Description
           description: Detailed description of the resource
           example: Handles user authentication and authorization workflows
+        created_by:
+          anyOf:
+            - $ref: '#/components/schemas/UserReference'
+            - type: 'null'
+          description: User who created the identity provider
+          readOnly: true
+          title: Created By
+        updated_by:
+          anyOf:
+            - $ref: '#/components/schemas/UserReference'
+            - type: 'null'
+          description: User who last modified the identity provider
+          readOnly: true
+          title: Updated By
         enabled:
           type: boolean
           title: Enabled
@@ -32538,7 +32559,6 @@ components:
           $ref: '#/components/schemas/OIDCConfigurationResponse'
           description: Identity provider configuration
       required:
-        - created_by
         - name
         - configuration
       type: object
@@ -33098,28 +33118,6 @@ components:
             environment: production
             region: us-east-1
             team: platform
-        created_by:
-          type: string
-          format: uuid
-          readOnly: true
-          title: Created By
-          description: Username or UUID of the creator
-          example: 770e8400-e29b-41d4-a716-446655440000
-          anyOf:
-            - type: string
-            - type: string
-              format: uuid
-            - type: 'null'
-        updated_by:
-          anyOf:
-            - type: string
-            - type: string
-              format: uuid
-            - type: 'null'
-          readOnly: true
-          title: Updated By
-          description: Username or UUID of the last modifier
-          example: 880e8400-e29b-41d4-a716-446655440000
         name:
           type: string
           minLength: 1
@@ -33135,6 +33133,20 @@ components:
           title: Description
           description: Detailed description of the resource
           example: Handles user authentication and authorization workflows
+        created_by:
+          anyOf:
+            - $ref: '#/components/schemas/UserReference'
+            - type: 'null'
+          description: User who created the integration
+          readOnly: true
+          title: Created By
+        updated_by:
+          anyOf:
+            - $ref: '#/components/schemas/UserReference'
+            - type: 'null'
+          description: User who last modified the integration
+          readOnly: true
+          title: Updated By
         integration_type:
           $ref: '#/components/schemas/IntegrationType'
         enabled:
@@ -33226,7 +33238,6 @@ components:
           title: Enabled Model Count
           description: Number of enabled models linked to this integration
       required:
-        - created_by
         - name
         - integration_type
         - configuration
@@ -33900,22 +33911,6 @@ components:
             environment: production
             region: us-east-1
             team: platform
-        created_by:
-          type: string
-          format: uuid
-          readOnly: true
-          title: Created By
-          description: User (or automation) that created the resource
-          example: 770e8400-e29b-41d4-a716-446655440000
-        updated_by:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
-          readOnly: true
-          title: Updated By
-          description: User (or automation) that last updated the resource
-          example: 880e8400-e29b-41d4-a716-446655440000
         name:
           type: string
           minLength: 1
@@ -33931,6 +33926,20 @@ components:
           title: Description
           description: Detailed description of the resource
           example: Handles user authentication and authorization workflows
+        created_by:
+          anyOf:
+            - $ref: '#/components/schemas/UserReference'
+            - type: 'null'
+          description: User who created the tool
+          readOnly: true
+          title: Created By
+        updated_by:
+          anyOf:
+            - $ref: '#/components/schemas/UserReference'
+            - type: 'null'
+          description: User who last modified the tool
+          readOnly: true
+          title: Updated By
         integration_id:
           type: string
           format: uuid
@@ -33978,7 +33987,6 @@ components:
           title: Parameters
           description: Tool parameters
       required:
-        - created_by
         - name
         - integration_id
         - namespaced_name
@@ -34713,14 +34721,18 @@ components:
             - type: 'null'
           title: Last Authenticated At
         created_by:
-          type: string
-          format: uuid
+          anyOf:
+            - $ref: '#/components/schemas/UserReference'
+            - type: 'null'
+          description: User who created the service account
+          readOnly: true
           title: Created By
         updated_by:
           anyOf:
-            - type: string
-              format: uuid
+            - $ref: '#/components/schemas/UserReference'
             - type: 'null'
+          description: User who last modified the service account
+          readOnly: true
           title: Updated By
         created_at:
           type: string
@@ -34741,7 +34753,6 @@ components:
         - name
         - status
         - project_id
-        - created_by
         - created_at
         - updated_at
       title: ServiceAccountRead
@@ -34856,14 +34867,18 @@ components:
             - type: 'null'
           title: Old Secret Valid Until
         created_by:
-          type: string
-          format: uuid
+          anyOf:
+            - $ref: '#/components/schemas/UserReference'
+            - type: 'null'
+          description: User who created the credential
+          readOnly: true
           title: Created By
         updated_by:
           anyOf:
-            - type: string
-              format: uuid
+            - $ref: '#/components/schemas/UserReference'
             - type: 'null'
+          description: User who last modified the credential
+          readOnly: true
           title: Updated By
         created_at:
           type: string
@@ -34881,7 +34896,6 @@ components:
         - identifier
         - status
         - grace_period_seconds
-        - created_by
         - created_at
         - updated_at
       title: ServiceAccountCredentialRead
@@ -34925,14 +34939,18 @@ components:
             - type: 'null'
           title: Old Secret Valid Until
         created_by:
-          type: string
-          format: uuid
+          anyOf:
+            - $ref: '#/components/schemas/UserReference'
+            - type: 'null'
+          description: User who created the credential
+          readOnly: true
           title: Created By
         updated_by:
           anyOf:
-            - type: string
-              format: uuid
+            - $ref: '#/components/schemas/UserReference'
             - type: 'null'
+          description: User who last modified the credential
+          readOnly: true
           title: Updated By
         created_at:
           type: string
@@ -34956,7 +34974,6 @@ components:
         - identifier
         - status
         - grace_period_seconds
-        - created_by
         - created_at
         - updated_at
       title: ServiceAccountCredentialCreateResponse
@@ -35013,14 +35030,18 @@ components:
             - type: 'null'
           title: Old Secret Valid Until
         created_by:
-          type: string
-          format: uuid
+          anyOf:
+            - $ref: '#/components/schemas/UserReference'
+            - type: 'null'
+          description: User who created the credential
+          readOnly: true
           title: Created By
         updated_by:
           anyOf:
-            - type: string
-              format: uuid
+            - $ref: '#/components/schemas/UserReference'
             - type: 'null'
+          description: User who last modified the credential
+          readOnly: true
           title: Updated By
         created_at:
           type: string
@@ -35044,7 +35065,6 @@ components:
         - identifier
         - status
         - grace_period_seconds
-        - created_by
         - created_at
         - updated_at
       title: ServiceAccountCredentialRotateResponse
@@ -35886,9 +35906,10 @@ components:
           title: Is Builtin
         created_by:
           anyOf:
-            - type: string
-              format: uuid
+            - $ref: '#/components/schemas/UserReference'
             - type: 'null'
+          description: User who created the group
+          readOnly: true
           title: Created By
         source:
           type: string
@@ -35976,9 +35997,10 @@ components:
           title: Is Builtin
         created_by:
           anyOf:
-            - type: string
-              format: uuid
+            - $ref: '#/components/schemas/UserReference'
             - type: 'null'
+          description: User who created the group
+          readOnly: true
           title: Created By
         source:
           type: string
@@ -36321,11 +36343,9 @@ components:
         - project_id
         - temporal_workflow_id
         - status
-        - created_by
         - created_at
         - completed_at
         - updated_at
-        - updated_by
         - input_data
         - error_details
       properties:
@@ -36376,8 +36396,11 @@ components:
         status:
           $ref: '#/components/schemas/ExecutionStatus'
         created_by:
-          type: string
-          format: uuid
+          anyOf:
+            - $ref: '#/components/schemas/UserReference'
+            - type: 'null'
+          description: User who started the execution
+          readOnly: true
           title: Created By
         created_at:
           type: string
@@ -36395,9 +36418,10 @@ components:
           title: Updated At
         updated_by:
           anyOf:
-            - type: string
-              format: uuid
+            - $ref: '#/components/schemas/UserReference'
             - type: 'null'
+          description: User who last modified the execution
+          readOnly: true
           title: Updated By
         input_data:
           additionalProperties: true
@@ -36894,7 +36918,6 @@ components:
         - id
         - current_version
         - is_enabled
-        - created_by
         - project_id
         - created_at
         - updated_at
@@ -36913,7 +36936,8 @@ components:
           title: Description
           description: Workflow description
         labels:
-          additionalProperties: true
+          additionalProperties:
+            type: string
           type: object
           title: Labels
           description: Workflow labels
@@ -36936,9 +36960,19 @@ components:
           default: false
           title: Has Validation Issues
         created_by:
-          type: string
-          format: uuid
+          anyOf:
+            - $ref: '#/components/schemas/UserReference'
+            - type: 'null'
+          description: User who created the workflow
+          readOnly: true
           title: Created By
+        updated_by:
+          anyOf:
+            - $ref: '#/components/schemas/UserReference'
+            - type: 'null'
+          description: User who last modified the workflow
+          readOnly: true
+          title: Updated By
         project_id:
           type: string
           format: uuid
@@ -36979,7 +37013,6 @@ components:
         - id
         - current_version
         - is_enabled
-        - created_by
         - project_id
         - created_at
         - updated_at
@@ -36999,7 +37032,8 @@ components:
           title: Description
           description: Workflow description
         labels:
-          additionalProperties: true
+          additionalProperties:
+            type: string
           type: object
           title: Labels
           description: Workflow labels
@@ -37022,9 +37056,19 @@ components:
           default: false
           title: Has Validation Issues
         created_by:
-          type: string
-          format: uuid
+          anyOf:
+            - $ref: '#/components/schemas/UserReference'
+            - type: 'null'
+          description: User who created the workflow
+          readOnly: true
           title: Created By
+        updated_by:
+          anyOf:
+            - $ref: '#/components/schemas/UserReference'
+            - type: 'null'
+          description: User who last modified the workflow
+          readOnly: true
+          title: Updated By
         project_id:
           type: string
           format: uuid
@@ -37065,7 +37109,6 @@ components:
         - id
         - current_version
         - is_enabled
-        - created_by
         - project_id
         - created_at
         - updated_at
@@ -37085,7 +37128,8 @@ components:
           title: Description
           description: Workflow description
         labels:
-          additionalProperties: true
+          additionalProperties:
+            type: string
           type: object
           title: Labels
           description: Workflow labels
@@ -37108,9 +37152,19 @@ components:
           default: false
           title: Has Validation Issues
         created_by:
-          type: string
-          format: uuid
+          anyOf:
+            - $ref: '#/components/schemas/UserReference'
+            - type: 'null'
+          description: User who created the workflow
+          readOnly: true
           title: Created By
+        updated_by:
+          anyOf:
+            - $ref: '#/components/schemas/UserReference'
+            - type: 'null'
+          description: User who last modified the workflow
+          readOnly: true
+          title: Updated By
         project_id:
           type: string
           format: uuid
@@ -37157,7 +37211,6 @@ components:
         - version
         - schema_version
         - workflow_definition
-        - created_by
         - created_at
         - updated_at
       properties:
@@ -37210,14 +37263,12 @@ components:
             - type: 'null'
           title: Name
         created_by:
-          type: string
-          format: uuid
-          title: Created By
-        created_by_username:
           anyOf:
-            - type: string
+            - $ref: '#/components/schemas/UserReference'
             - type: 'null'
-          title: Created By Username
+          description: User who created the version
+          readOnly: true
+          title: Created By
         created_at:
           type: string
           format: date-time
@@ -37344,7 +37395,8 @@ components:
           title: Description
           description: Workflow description
         labels:
-          additionalProperties: true
+          additionalProperties:
+            type: string
           type: object
           title: Labels
           description: Workflow labels
@@ -37393,7 +37445,8 @@ components:
           description: Update workflow description
         labels:
           anyOf:
-            - additionalProperties: true
+            - additionalProperties:
+                type: string
               type: object
             - type: 'null'
           title: Labels
@@ -37501,6 +37554,7 @@ components:
                 script: '#/components/schemas/ScriptNode'
                 switch: '#/components/schemas/SwitchNode'
                 wait: '#/components/schemas/WaitNode'
+          maxItems: 200
           type: array
           title: Nodes
           description: Execution and control nodes in the workflow graph
@@ -37508,6 +37562,7 @@ components:
           items:
             additionalProperties: true
             type: object
+          maxItems: 500
           type: array
           title: Edges
           description: List of directed edges connecting triggers and nodes in the workflow graph
@@ -39065,6 +39120,7 @@ components:
         - converge_configuration
         - approval_configuration
         - form_prompt_configuration
+        - definition_limits
     ValidationFinding:
       type: object
       title: ValidationFinding
