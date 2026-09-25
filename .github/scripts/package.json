@@ -9,6 +9,7 @@
     "check-queue-health": "tsx src/queue-health-poll.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "notify-visual-regression-pr": "tsx src/visual-regression-pr-notification.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "tsc": "tsc --noEmit"

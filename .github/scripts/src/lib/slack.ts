@@ -198,6 +198,30 @@ export class SlackNotifier {
   }
 
   /**
+   * Sends a concise review notification for the weekly visual regression PR.
+   */
+  async sendVisualRegressionBaselineReady(prUrl: string): Promise<void> {
+    const message: SlackMessage = {
+      attachments: [
+        {
+          color: '#36a64f',
+          blocks: [
+            {
+              type: 'section',
+              text: {
+                type: 'mrkdwn',
+                text: `:eyes: Visual regression baseline PR ready for review: <${prUrl}|Review PR>`,
+              },
+            },
+          ],
+        },
+      ],
+    }
+
+    await this.send(message)
+  }
+
+  /**
    * Posts a Block Kit message to the configured Slack webhook.
    * Throws if the webhook request fails.
    */

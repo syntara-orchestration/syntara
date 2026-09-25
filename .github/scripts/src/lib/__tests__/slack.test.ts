@@ -150,4 +150,35 @@ describe('SlackNotifier', () => {
       })
     })
   })
+
+  describe('sendVisualRegressionBaselineReady', () => {
+    it('sends a concise review notification with the PR link', async () => {
+      let requestBody: unknown = null
+
+      server.use(
+        http.post(webhookUrl, async ({ request }) => {
+          requestBody = await request.json()
+          return HttpResponse.text('ok')
+        })
+      )
+
+      await notifier.sendVisualRegressionBaselineReady('https://github.com/owner/repo/pull/42')
+
+      expect(requestBody).toMatchObject({
+        attachments: [
+          {
+            blocks: [
+              {
+                type: 'section',
+                text: {
+                  type: 'mrkdwn',
+                  text: ':eyes: Visual regression baseline PR ready for review: <https://github.com/owner/repo/pull/42|Review PR>',
+                },
+              },
+            ],
+          },
+        ],
+      })
+    })
+  })
 })

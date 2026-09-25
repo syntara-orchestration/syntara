@@ -2,6 +2,8 @@
 
 TypeScript monitoring scripts for the merge queue. Alerts are sent to Slack when the queue stalls or PRs are repeatedly dequeued.
 
+The package also includes `notify-visual-regression-pr`, which posts the weekly baseline PR review link to Slack when configured by the visual regression workflow.
+
 ## Development
 
 ### Install Dependencies

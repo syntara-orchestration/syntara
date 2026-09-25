@@ -21,6 +21,7 @@ workflows.
 | `RAPIDAST_GCP_KEY` | Downstream-only | Repo | `dast` | GCP service account for uploading DAST results | Annual (GCP SA key) |
 | `SONAR_TOKEN` | Shared | Repo | `ci-backend`, `ci-frontend`, `sonarcloud-backend`, `sonarcloud-frontend` | SonarCloud code quality and security analysis | Annual |
 | `SLACK_CI_MONITORING_WEBHOOK_URL` | Shared | Repo or Org | `merge-queue-health-poll`, `merge-queue-dequeue-alert` | Slack webhook for merge queue health alerts | N/A (webhook URL, not rotatable credential) |
+| `SLACK_VISUAL_REGRESSION_WEBHOOK_URL` | Shared | Repo | `visual-regression-schedule` | Slack notification when weekly baseline PR is ready for review | N/A (webhook URL, not rotatable credential) |
 
 ### Classification Key
 

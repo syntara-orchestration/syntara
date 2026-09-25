@@ -44,7 +44,9 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: |
+            frontend/package-lock.json
+            .github/scripts/package-lock.json
 
       - run: npm ci
         working-directory: frontend
@@ -113,6 +115,7 @@ jobs:
           git reset
 
       - name: Open baseline refresh PR
+        id: create-pr
         if: steps.detect.outputs.has_changes == 'true'
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
@@ -138,6 +141,18 @@ jobs:
             This branch is reused week to week: if last Monday's PR is still open, this run updated it in place with the latest diff instead of opening a duplicate.
 
             _Opened automatically by the weekly Visual Regression workflow. No application code is included — baseline PNGs only._
+
+      - name: Notify Slack that baseline PR is ready
+        if: >-
+          env.SLACK_VISUAL_REGRESSION_WEBHOOK_URL != ''
+          && contains(fromJson('["created", "updated"]'), steps.create-pr.outputs.pull-request-operation)
+        env:
+          SLACK_VISUAL_REGRESSION_WEBHOOK_URL: ${{ secrets.SLACK_VISUAL_REGRESSION_WEBHOOK_URL }}
+          VISUAL_REGRESSION_PR_URL: ${{ steps.create-pr.outputs.pull-request-url }}
+        run: |
+          npm ci
+          npm run notify-visual-regression-pr
+        working-directory: .github/scripts
 
       - name: Write summary
         if: always()
