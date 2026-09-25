@@ -41,6 +41,7 @@ jobs:
         with:
           ref: devel
           fetch-depth: 0
+          persist-credentials: false
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
@@ -157,23 +158,31 @@ jobs:
 
       - name: Write summary
         if: always()
+        env:
+          FILTER_NOISE_OUTCOME: ${{ steps.filter-noise.outcome }}
+          SCREENSHOTS_OUTCOME: ${{ steps.screenshots.outcome }}
+          BASELINES_OUTCOME: ${{ steps.baselines.outcome }}
+          HAS_CHANGES: ${{ steps.detect.outputs.has_changes }}
+          BASELINE_ADDED: ${{ steps.detect.outputs.added }}
+          BASELINE_MODIFIED: ${{ steps.detect.outputs.modified }}
+          BASELINE_PR_URL: ${{ github.server_url }}/${{ github.repository }}/pulls?q=head%3A${{ env.BASELINE_REFRESH_BRANCH }}
         run: |
-          if [[ "${{ steps.filter-noise.outcome }}" == "failure" ]]; then
+          if [[ "$FILTER_NOISE_OUTCOME" == "failure" ]]; then
             echo "### :x: Visual Regression — baseline noise filter failed" >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
             echo "Screenshot PNGs were rewritten but the keep/restore filter crashed. No weekly PR was opened. See the Filter noisy baseline diffs step log." >> "$GITHUB_STEP_SUMMARY"
-          elif [[ "${{ steps.screenshots.outcome }}" == "failure" ]]; then
+          elif [[ "$SCREENSHOTS_OUTCOME" == "failure" ]]; then
             echo "### :x: Visual Regression — screenshot generation had errors" >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
             echo "Check the \`visual-regression-weekly-results\` artifact — this means a real test error (timeout, crash), not a pixel diff." >> "$GITHUB_STEP_SUMMARY"
-          elif [[ "${{ steps.baselines.outcome }}" == "failure" ]]; then
+          elif [[ "$BASELINES_OUTCOME" == "failure" ]]; then
             echo "### :warning: Baseline coverage check failed" >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
             echo "Missing baselines or uncovered routes detected. See the step log above for details." >> "$GITHUB_STEP_SUMMARY"
-          elif [[ "${{ steps.detect.outputs.has_changes }}" == "true" ]]; then
-            echo "### :camera: Visual Regression — ${{ steps.detect.outputs.added }} new, ${{ steps.detect.outputs.modified }} changed" >> "$GITHUB_STEP_SUMMARY"
+          elif [[ "$HAS_CHANGES" == "true" ]]; then
+            echo "### :camera: Visual Regression — $BASELINE_ADDED new, $BASELINE_MODIFIED changed" >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "Opened/updated the [weekly baseline refresh PR](${{ github.server_url }}/${{ github.repository }}/pulls?q=head%3A${{ env.BASELINE_REFRESH_BRANCH }})." >> "$GITHUB_STEP_SUMMARY"
+            echo "Opened/updated the [weekly baseline refresh PR]($BASELINE_PR_URL)." >> "$GITHUB_STEP_SUMMARY"
           else
             echo "### :white_check_mark: Visual Regression — no drift this week" >> "$GITHUB_STEP_SUMMARY"
           fi
