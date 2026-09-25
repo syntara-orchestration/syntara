@@ -111,7 +111,7 @@ test: test-unit ## Alias to unit tests
 
 .PHONY: test-unit
 test-unit: check-deps ## Run unit tests only
-	$(call run-tests,tests/unit/ execution-plane/tests/ -v -n auto)
+	$(call run-tests,tests/unit/ execution-plane/tests/ execution-plane/tools/ -v -n auto)
 
 .PHONY: test-api-compliance
 test-api-compliance: check-deps ## Run API compliance tests
@@ -151,13 +151,13 @@ endif
 .PHONY: test-unit-coverage
 test-unit-coverage: check-deps ## Run unit tests with coverage report
 	@echo "📊 Running unit tests with coverage..."
-	$(call run-tests,tests/unit/ execution-plane/tests/ -v -n auto --cov=src --cov=execution-plane/src --cov-report=html:htmlcov-unit --cov-report=term --cov-config=pyproject.toml --cov-fail-under=85 --junitxml=pytest-results-unit.xml)
+	$(call run-tests,tests/unit/ execution-plane/tests/ execution-plane/tools/ -v -n auto --cov=src --cov=execution-plane/src --cov=execution-plane/tools --cov-report=html:htmlcov-unit --cov-report=term --cov-config=pyproject.toml --cov-fail-under=85 --junitxml=pytest-results-unit.xml)
 	@echo "✅ Unit test coverage report: htmlcov-unit/index.html"
 
 .PHONY: test-cli-coverage
 test-cli-coverage: check-deps ## Run CLI tests with coverage report
 	@echo "📊 Running CLI tests with coverage..."
-	$(call run-tests,tests/cli/ -v -n auto --cov=src --cov=execution-plane/src --cov-report=html:htmlcov-cli --cov-report=term --cov-config=pyproject.toml --cov-fail-under=0 --junitxml=pytest-results-cli.xml)
+	$(call run-tests,tests/cli/ execution-plane/tools/ -v -n auto --cov=src --cov=execution-plane/src --cov=execution-plane/tools --cov-report=html:htmlcov-cli --cov-report=term --cov-config=pyproject.toml --cov-fail-under=0 --junitxml=pytest-results-cli.xml)
 	@echo "✅ CLI test coverage report: htmlcov-cli/index.html"
 
 .PHONY: test-integration-coverage
@@ -168,22 +168,22 @@ test-integration-coverage: check-deps ## Run integration tests with coverage rep
 
 .PHONY: test-coverage
 test-coverage: check-deps ## Run tests with combined coverage report (XML for CI)
-	$(call run-tests,tests/ execution-plane/tests/ -n auto -m "not mcp" --cov=src --cov=execution-plane/src --cov-report=xml --cov-report=term --cov-config=pyproject.toml --junitxml=pytest-results.xml)
+	$(call run-tests,tests/ execution-plane/tests/ execution-plane/tools/ -n auto -m "not mcp" --cov=src --cov=execution-plane/src --cov=execution-plane/tools --cov-report=xml --cov-report=term --cov-config=pyproject.toml --junitxml=pytest-results.xml)
 
 .PHONY: test-coverage-report
 test-coverage-report: check-deps ## Run tests with combined coverage report (HTML)
-	$(call run-tests,tests/ execution-plane/tests/ -n auto -m "not mcp" --cov=src --cov=execution-plane/src --cov-report=html --cov-report=term --cov-config=pyproject.toml --junitxml=pytest-results.xml)
+	$(call run-tests,tests/ execution-plane/tests/ execution-plane/tools/ -n auto -m "not mcp" --cov=src --cov=execution-plane/src --cov=execution-plane/tools --cov-report=html --cov-report=term --cov-config=pyproject.toml --junitxml=pytest-results.xml)
 
 .PHONY: test-fast
 test-fast: check-deps ## Run tests with fail-fast and short traceback
-	$(call run-tests,tests/ execution-plane/tests/ -x --tb=short)
+	$(call run-tests,tests/ execution-plane/tests/ execution-plane/tools/ -x --tb=short)
 
 .PHONY: test-all
 test-all: check-deps ## Run all tests (unit + integration; E2E runs separately via test-e2e)
 	# E2E tests require a full running stack (API, Temporal, MCP server) and are
 	# run by the dedicated `test-e2e` target; ignore them here so this target can
 	# run against the testcontainers-only environment.
-	$(call run-tests,tests/ execution-plane/tests/ -v -n auto -m "not mcp" --ignore=tests/e2e --cov=src --cov=execution-plane/src --cov-config=pyproject.toml)
+	$(call run-tests,tests/ execution-plane/tests/ execution-plane/tools/ -v -n auto -m "not mcp" --ignore=tests/e2e --cov=src --cov=execution-plane/src --cov=execution-plane/tools --cov-config=pyproject.toml)
 
 # _e2e-run: shared infrastructure setup for all e2e targets.
 # Starts mock Segment, database, Temporal, and the API server,
@@ -333,6 +333,25 @@ ep-worker-run: check-deps _ensure-secrets _ensure-certs ## Run execution plane T
 	APP_S2S_TLS_CERT_PATH=.secrets/certs/worker.crt \
 	APP_S2S_TLS_KEY_PATH=.secrets/certs/worker.key \
 	uv run python -m execution_plane.worker
+
+.PHONY: ep-dev-doctor ep-dev-status ep-dev-up ep-dev-down ep-dev-reset ep-dev-connect
+ep-dev-doctor: check-deps ## Check the selected Kubernetes development environment
+	@uv run python execution-plane/tools/dev_cli.py doctor
+
+ep-dev-status: check-deps ## Check connectivity to the selected Kubernetes development environment
+	@uv run python execution-plane/tools/dev_cli.py status
+
+ep-dev-up: check-deps ## Create or start the local Kubernetes development environment
+	@uv run python execution-plane/tools/dev_cli.py up
+
+ep-dev-down: check-deps ## Stop or remove the local Kubernetes development environment
+	@uv run python execution-plane/tools/dev_cli.py down
+
+ep-dev-reset: check-deps ## Recreate the local Kubernetes development environment
+	@uv run python execution-plane/tools/dev_cli.py reset --yes
+
+ep-dev-connect: check-deps ## Validate access to the configured remote OpenShift environment
+	@uv run python execution-plane/tools/dev_cli.py --provider openshift connect
 
 .PHONY: background-worker-run
 background-worker-run: check-deps _ensure-secrets _ensure-certs ## Run Temporal workflow background worker
@@ -732,7 +751,7 @@ endif
 
 # Code quality
 # ========================================================
-FORMAT_PATHS := src/ tools/ tests/ execution-plane/src/ execution-plane/tests/
+FORMAT_PATHS := src/ tools/ tests/ execution-plane/src/ execution-plane/tests/ execution-plane/tools/
 SDK_SRC := test-sdk/src/
 
 .PHONY: reachability
@@ -784,7 +803,7 @@ lint: ## Run linters and type checking (no file modifications)
 .PHONY: typecheck
 typecheck: ## Run type checking only with mypy
 	@echo "🔍 Running type checking..."
-	uv run mypy --strict src/ tests/ execution-plane/src/ execution-plane/tests/
+	uv run mypy --strict src/ tests/ execution-plane/src/ execution-plane/tests/ execution-plane/tools/
 	uv run mypy --config-file test-sdk/pyproject.toml test-sdk/src/
 	@echo "✅ Type checking completed"
 

@@ -206,6 +206,8 @@ ignore = [
 ]
 "execution-plane/tests/**/*.py" = ["INP001"]  # Keep this separate test tree out of the tests package namespace
 "execution-plane/src/execution_plane/migrations/**/*.py" = ["INP001", "D400", "D415", "PLR0915"]
+"execution-plane/tools/dev_cli.py" = ["EM101", "EM102", "FBT001", "INP001", "T201", "TRY003", "TRY301"]
+"execution-plane/tools/test_dev_cli.py" = ["D102", "D103", "D101", "D107", "INP001", "S101"]
 "tests/performance/conftest.py" = ["E402"]  # pytest_plugins must precede imports
 "src/syntara/api/repositories/*.py" = ["ANN401"]  # Allow Any for database row types
 "src/syntara/core/database/migrations/**/*.py" = ["INP001", "D400", "D415", "PLR0915"]  # Alembic files (auto-generated)
@@ -221,10 +223,10 @@ ignore = [
 # Mypy (strict) continues to run in CI via a dedicated GitHub Actions job.
 [tool.pyrefly]
 python-version = "3.12.0"
-project-includes = ["src", "execution-plane/src"]
+project-includes = ["src", "execution-plane/src", "execution-plane/tools"]
 # Editable installs are otherwise inferred as third-party directories and skipped.
 disable-project-excludes-heuristics = true
-project-excludes = ["**/__pycache__", "**/node_modules", ".venv/**", "src/api_client", "src/cli", "test-sdk/src"]
+project-excludes = ["**/__pycache__", "**/node_modules", ".venv/**", "src/api_client", "src/cli", "test-sdk/src", "execution-plane/tools/test_dev_cli.py"]
 
 # SQLModel/SQLAlchemy stubs cause false positives for these rules.
 # unbound-name and bad-return have a few false positives in existing code
@@ -300,7 +302,7 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 minversion = "7.0"
 addopts = "-ra -q --strict-markers --strict-config"
-testpaths = ["tests", "execution-plane/tests"]
+testpaths = ["tests", "execution-plane/tests", "execution-plane/tools"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
@@ -322,7 +324,7 @@ markers = [
 
 # Coverage configuration
 [tool.coverage.run]
-source = ["src", "execution-plane/src"]
+source = ["src", "execution-plane/src", "execution-plane/tools"]
 relative_files = true
 concurrency = ["greenlet", "thread"]
 omit = [

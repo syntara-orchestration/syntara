@@ -98,6 +98,8 @@ RUN if [ -n "${PIP_FIND_LINKS:-}" ]; then \
 FROM builder-base AS ep-builder
 
 RUN uv sync --frozen --no-dev --no-editable --package execution-plane
+# Development-only CLI and tests are intentionally kept outside the EP runtime image.
+RUN rm -rf /opt/app-root/src/execution-plane/tools
 
 
 # ── runtime-base: shared minimal UBI runtime ────────────────────────────────
