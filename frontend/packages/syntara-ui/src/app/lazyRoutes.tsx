@@ -16,6 +16,9 @@ export const EditIntegration = lazy(() =>
   import('../routes/configuration/integrations/EditIntegrationForm').then((m) => ({ default: m.EditIntegrationForm }))
 )
 export const Settings = lazy(() => import('../routes/configuration/settings/Settings'))
+export const SettingsCategoryRoute = lazy(() =>
+  import('../routes/configuration/settings/SettingsCategoryRoute').then((m) => ({ default: m.SettingsCategoryRoute }))
+)
 export const Glossary = lazy(() => import('../routes/documentation/glossary/Glossary'))
 export const Approvals = lazy(() => import('../routes/approvals/Approvals'))
 export const AccessManagement = lazy(() =>
