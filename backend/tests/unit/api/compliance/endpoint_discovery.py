@@ -25,7 +25,6 @@ _ACTION_OPERATION_PREFIXES = (
     "restore_",
     "rotate_",
     "retry_",
-    "respond_to_",
     "submit_",
 )
 
