@@ -6,6 +6,7 @@ import { useIsVersionView } from '../VersionViewContext'
 import { FormPromptFallbackDecisionField } from './FormPromptFallbackDecisionField'
 import type { FormPromptFormData } from './formPromptNodeFormSchema'
 import { DurationInput } from './shared/DurationInput'
+import { nodeHelp } from './shared/nodeFieldHelp'
 
 export function FormPromptTimeoutSection() {
   const isVersionView = useIsVersionView()
@@ -23,7 +24,11 @@ export function FormPromptTimeoutSection() {
         <FormPromptFallbackDecisionField />
       </StackItem>
       <StackItem>
-        <FormGroup label="Form submission window" fieldId="form-prompt-response-window">
+        <FormGroup
+          label="Form submission window"
+          labelHelp={nodeHelp.formPromptResponseWindow}
+          fieldId="form-prompt-response-window"
+        >
           <DurationInput
             value={responseWindow}
             onChange={(val) => setValue('response_window', val, { shouldDirty: true })}

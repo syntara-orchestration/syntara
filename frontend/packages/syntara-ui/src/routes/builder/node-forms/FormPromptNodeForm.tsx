@@ -34,6 +34,7 @@ import { FormPromptTimeoutSection } from './FormPromptTimeoutSection'
 import { ActivityNameField } from './shared/ActivityNameField'
 import { zodResolver } from './shared/formSchemaUtils'
 import { nodeHelp } from './shared/nodeFieldHelp'
+import { nodeHelp } from './shared/nodeFieldHelp'
 import { NodeFormContainer } from './shared/NodeFormContainer'
 import nodeFormStyles from './shared/nodeFormStyles.module.css'
 import { NodeFormTabsLayout } from './shared/NodeFormTabsLayout'
@@ -262,7 +263,7 @@ function FormPromptFormFields({
         </FormGroup>
       </StackItem>
       <StackItem>
-        <FormGroup label="Message" fieldId="form-prompt-message">
+        <FormGroup label="Message" labelHelp={nodeHelp.formPromptMessage} fieldId="form-prompt-message">
           <TextArea
             {...register('message')}
             id="form-prompt-message"

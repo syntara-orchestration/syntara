@@ -1,4 +1,4 @@
-import type { Activity } from '@syntara/contracts'
+import { ActivityTypeEnum, type Activity } from '@syntara/contracts'
 import { EdgeHandleEnum } from '@syntara/contracts'
 
 import type { EdgeConnection } from '../../../types/edge'
@@ -11,7 +11,7 @@ import { validateBranchConnections } from './validateBranchConnections'
  */
 export function validateFormPromptConnections(activities: Activity[], edges: EdgeConnection[]): ValidationError[] {
   return validateBranchConnections(activities, edges, {
-    nodeFilter: (a) => a.type === 'form_prompt',
+    nodeFilter: (a) => a.type === ActivityTypeEnum.FORM_PROMPT,
     requiredHandle: EdgeHandleEnum.SUBMITTED,
     nodeTypeName: 'Form',
     branchName: 'Submitted',

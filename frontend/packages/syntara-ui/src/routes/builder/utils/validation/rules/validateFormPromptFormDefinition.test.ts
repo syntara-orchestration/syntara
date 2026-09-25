@@ -1,13 +1,9 @@
 import { ActivityTypeEnum } from '@syntara/contracts'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import { createEmptyFormDefinition } from '../../../../../components/forms/formFieldBuilder/createDefaultField'
 
 import { validateFormPromptFormDefinition } from './validateFormPromptFormDefinition'
-
-vi.mock('../../../../../utils/generateUUID', () => ({
-  generateUUID: () => 'uuid',
-}))
 
 describe('validateFormPromptFormDefinition', () => {
   it('returns no errors for a valid form definition', () => {
@@ -37,6 +33,7 @@ describe('validateFormPromptFormDefinition', () => {
     expect(errors).toHaveLength(1)
     expect(errors[0].rule).toBe('form-prompt-form-definition')
     expect(errors[0].nodeId).toBe('form-1')
+    expect(errors[0].id).toBe('form-prompt-definition-form-1')
     expect(errors[0].message).toContain('Survey')
   })
 
