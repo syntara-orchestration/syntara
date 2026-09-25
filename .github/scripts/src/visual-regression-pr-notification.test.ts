@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { server } from './__tests__/setup.js'
-import { notifyVisualRegressionBaseline } from './visual-regression-pr-notification.js'
+import { notifyVisualRegressionBaseline } from './lib/visual-regression.js'
 
 describe('notifyVisualRegressionBaseline', () => {
   /** Fake Slack webhook URL used by MSW during notification tests. */
