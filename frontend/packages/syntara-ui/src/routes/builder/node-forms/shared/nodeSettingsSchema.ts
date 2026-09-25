@@ -24,5 +24,11 @@ export function persistNodeSettings(settings?: NodeSettingsFormData): NodeSettin
   if (next.continue_on_failure === undefined) {
     delete next.continue_on_failure
   }
+  if (next.timeout === undefined) {
+    delete next.timeout
+  }
+  if (next.retry_policy === undefined) {
+    delete next.retry_policy
+  }
   return Object.keys(next).length > 0 ? next : undefined
 }

@@ -27,6 +27,7 @@ import { ApproverMultiSelect } from './ApproverMultiSelect'
 import { FallbackDecisionField } from './FallbackDecisionField'
 import { ActivityNameField } from './shared/ActivityNameField'
 import { DurationInput } from './shared/DurationInput'
+import { persistNodeSettings } from './shared/nodeSettingsSchema'
 import { zodResolver } from './shared/formSchemaUtils'
 import { nodeHelp } from './shared/nodeFieldHelp'
 import { NodeFormContainer } from './shared/NodeFormContainer'
@@ -322,7 +323,7 @@ export function ApprovalNodeForm(props: ApprovalNodeFormProps) {
       prompt: data.prompt?.trim() || '',
       fallback_decision: data.fallback_decision,
       decision_window: data.decision_window,
-      settings: data.settings,
+      settings: persistNodeSettings(data.settings),
     })
   }
 
