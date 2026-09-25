@@ -23,12 +23,12 @@ public methods:
 | Component | Operation |
 |---|---|
 | [Work Executor](work-executor.md) | Creates the initial `WorkItem` record |
-| Work Scheduler | `claim_one()` — atomically moves one item from `PENDING` to `CLAIMED` |
-| [Worker Manager](worker-manager.md) | `set_result()` — writes result and transitions to `COMPLETED` or `FAILED` |
-| [Worker Manager](worker-manager.md) | Records placement failure timestamp to prevent thrashing *(not yet implemented)* |
+| [Work Scheduler](work-scheduler.md) | `claim_one()` — atomically moves one item from `PENDING` to `CLAIMED` |
+| Work Watcher | `set_result()` — writes result and transitions to `COMPLETED` or `FAILED` |
+| [Work Scheduler](work-scheduler.md) | Records placement failure timestamp to prevent thrashing *(not yet implemented)* |
 | Completion Notifier | Reads terminal items with undelivered callbacks |
 | Startup recovery | `find_undelivered()` — finds terminal items with `NULL signaled_at` |
-| [Worker Manager](worker-manager.md) | `mark_signal_delivered()` — sets `signaled_at` after callback is confirmed |
+| Completion Notifier | `mark_signal_delivered()` — sets `signaled_at` after the callback is confirmed |
 
 ---
 

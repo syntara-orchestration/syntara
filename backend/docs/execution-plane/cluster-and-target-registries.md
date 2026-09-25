@@ -14,6 +14,10 @@ environment, such as an OpenShift installation, a RHEL machine pool, or
 another supported environment. An ExecutionTarget is a concrete endpoint at
 which work can be executed.
 
+The architectural concepts and design rationale for these entities are described in
+[cluster-and-target-model.md](cluster-and-target-model.md). This document specifies the
+persistence model, registry/store boundaries, and operational invariants.
+
 ## Architectural principles
 
 - A fully registered Cluster owns at least one ExecutionTarget. The ownership
@@ -88,7 +92,7 @@ exactly one Cluster.
 | `id` | UUID primary key |
 | `cluster_id` | Non-null foreign key to `execution_plane.clusters.id` |
 | `name` | User-facing target name |
-| `backend_type` | Supported execution backend, such as `vanilla_k8s` or `openshell` |
+| `backend_type` | Supported execution backend, such as `vanilla_k8s` or `openshell`. See [cluster-and-target-model.md](cluster-and-target-model.md) for the architectural relationship between `cluster_type` (gateway selection) and `backend_type` (WorkerManager implementation). |
 | `endpoint` | Endpoint used for worker connectivity |
 | `api_key` | Protected credential used to authenticate to the target |
 | `status` | `REGISTERING`, `VALIDATING`, `BOOTSTRAPPING`, `ACTIVE`, `DEGRADED`, `DRAINING`, or `FAILED` |

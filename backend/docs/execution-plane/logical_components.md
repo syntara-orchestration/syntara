@@ -74,7 +74,7 @@ graph LR
   - In: `WorkItem`s from Work Executor; results and completion events from Worker Manager
   - Out: claimable `WorkItem`s to Work Scheduler; completion events to Completion Notifier
 
-- **Work Scheduler**
+- **[Work Scheduler](work-scheduler.md)**
   - In: claimed `WorkItem` from [`WorkStore`](work-store.md); ranked `ExecutionTarget`s (`ReconcileResult`) from `ExecutionTarget` Reconciler
   - Out: demand signal to Pool Autoscaler; for each candidate `ExecutionTarget` in rank order, instantiates a `WorkerManager` and calls `dispatch` — moves to the next candidate on failure, leaves `WorkItem` in `PENDING` if all fail
 

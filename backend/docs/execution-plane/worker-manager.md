@@ -84,7 +84,7 @@ this claim happens *outside* `dispatch` so that the locking mechanism stays sepa
 the submission logic and users retain flexibility over how capacity is managed.
 
 The capacity claim mechanism is not yet settled. One option is to use the
-`WorkItem`→`ExecutionTarget` reference (see `pool-reconciler-notes.md` for the DB-level
+`WorkItem`→`ExecutionTarget` reference (see [work-scheduler.md §Capacity management](work-scheduler.md#capacity-management) for the DB-level
 locking options), but the exact approach depends on the chosen locking model. What is
 clear: some form of lock or atomic reservation must be held before `dispatch` is called,
 because dispatching to a Target that is already at capacity wastes an infrastructure call.
@@ -93,7 +93,7 @@ because dispatching to a Target that is already at capacity wastes an infrastruc
 
 Before submitting, check that the Target has remaining capacity by comparing
 `current_jobs` against `pool_size` in Postgres. This is the DB-level atomic selection
-described in `pool-reconciler-notes.md`. It is fast, local, and handles concurrent EP
+described in [work-scheduler.md §Capacity management](work-scheduler.md#capacity-management). It is fast, local, and handles concurrent EP
 workers correctly without locking across K8s calls.
 
 ### Reactive

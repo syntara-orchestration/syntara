@@ -330,16 +330,21 @@ allow it with reduced capacity). Until then, degraded is ineligible.
 
 Selector matching is boolean: an ExecutionTarget either satisfies every
 requested key or it does not. Extra labels do not make a target more
-eligible. The reconciler therefore **does not order** `available_targets`
-and **does not pick** a `selected_target`.
+eligible. For MVP exact-match selectors, all matching targets are equally
+preferred — the reconciler does not order `available_targets` and does not
+pick a `selected_target`.
 
-All eligible ExecutionTargets are equivalent from this component's point of
-view. Name sort, least-loaded, round-robin, and try-order on claim failure
-belong to the Work Scheduler (AAP-92722) or later Resource Monitor data
+Name sort, least-loaded, round-robin, and try-order on claim failure belong
+to the Work Scheduler (AAP-92722) or later Resource Monitor data
 (AAP-92724). None of those policies belong here for MVP.
 
-Callers must treat `available_targets` as a set. List order in the result
-is unspecified.
+**Preference-label selectors** — labels that indicate a preferred target
+attribute without making it a hard requirement — will require the reconciler
+to score and rank candidates. When preference labels are introduced,
+`available_targets` must be returned ordered highest-preference first, so
+the Work Scheduler can try preferred targets first and fall back gracefully.
+Callers must iterate `available_targets` in list order to support this
+without interface changes when preference labels land.
 
 A future health filter (AAP-92724) may mark an ExecutionTarget
 `IneligibilityReason.CAPACITY_EXHAUSTED`. That reason is not produced in
@@ -375,8 +380,10 @@ class ReconcileResult:
     outcome: ResolveOutcome
 ```
 
-`available_targets` is an unordered set of equally eligible
-ExecutionTargets (a list only because it is easy to serialize). The
+`available_targets` is a list of eligible ExecutionTargets. For MVP
+exact-match selectors the list is unordered; preference-label selectors
+(planned) will return it ordered highest-preference first — callers must
+iterate in list order. The
 Cluster is not a separate element of the result: it is
 `target.cluster`. Callers that need the Cluster (`cluster_type`,
 connection) use that backref; `backend_type` and location stay on the
