@@ -27,6 +27,9 @@ import { useMutationErrorHandler } from '../../hooks/useMutationErrorHandler'
 import { useProjectSelector } from '../../hooks/useProjectSelector'
 import { useSynForm, type UseSynFormReturn } from '../../hooks/useSynForm'
 import { useAlerts } from '../../providers/alerts'
+import { OutputSchemaView } from '../builder/panels/views/OutputSchemaView'
+import { OutputTableView } from '../builder/panels/views/OutputTableView'
+import { ViewToggle, type PanelView } from '../builder/panels/ViewToggle'
 import { APPROVAL_NOTES_MAX_LENGTH } from '../executions/approvalDecisionSchema'
 
 import styles from './ApprovalDetailContent.module.css'
@@ -228,6 +231,29 @@ function ApprovalSummary({
 }
 
 /**
+ * Approval context data with Schema/Table/JSON view toggle, matching the pattern
+ * used by the builder's input/output panels for reviewing schema-less structured data.
+ */
+function ApprovalDataView({ approval }: Readonly<{ approval: Approval }>) {
+  const [view, setView] = useState<PanelView>('json')
+
+  return (
+    <Stack hasGutter className={styles.codeBlockContainer}>
+      <StackItem>
+        <ViewToggle activeView={view} onChange={setView} ariaLabel="Approval data view selection" />
+      </StackItem>
+      <StackItem isFilled>
+        {view === 'schema' && <OutputSchemaView data={approval} />}
+        {view === 'table' && <OutputTableView data={approval} />}
+        {view === 'json' && (
+          <SynCodeBlock jsonObject={approval} enableCopy enableExpand expandTitle="Approval context" fillHeight />
+        )}
+      </StackItem>
+    </Stack>
+  )
+}
+
+/**
  * Reusable approval detail content: decision actions, summary, and context JSON.
  * Used by the execution viewer and builder approval side panels.
  *
@@ -401,8 +427,8 @@ export function ApprovalDetailContent({
               onWorkflowClick={onWorkflowClick}
             />
           </StackItem>
-          <StackItem className={styles.codeBlockContainer}>
-            <SynCodeBlock jsonObject={approval} enableCopy enableExpand expandTitle="Approval context" fillHeight />
+          <StackItem>
+            <ApprovalDataView approval={approval} />
           </StackItem>
         </Stack>
       </StackItem>
