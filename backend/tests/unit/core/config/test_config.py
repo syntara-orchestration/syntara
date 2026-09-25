@@ -328,6 +328,20 @@ class TestServerSettings:
         with pytest.raises(ValidationError, match="pattern"):
             Settings(_env_file=None)
 
+    def test_otel_service_name_derives_from_product_name(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """otel_service_name is slugified from product_name when not explicitly set."""
+        monkeypatch.setenv("APP_PRODUCT_NAME", "Automation Orchestrator")
+        monkeypatch.delenv("APP_OTEL_SERVICE_NAME", raising=False)
+        settings = Settings(_env_file=None)
+        assert settings.otel_service_name == "automation-orchestrator"
+
+    def test_explicit_default_otel_service_name_is_preserved(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """An explicit OTEL service name matching the default is not derived over."""
+        monkeypatch.setenv("APP_PRODUCT_NAME", "Automation Orchestrator")
+        monkeypatch.setenv("APP_OTEL_SERVICE_NAME", "syntara")
+        settings = Settings(_env_file=None)
+        assert settings.otel_service_name == "syntara"
+
     def test_server_settings_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test server settings can be configured via environment."""
         monkeypatch.setenv("APP_SERVER_HOST", "127.0.0.1")
