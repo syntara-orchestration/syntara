@@ -319,7 +319,7 @@ class TestAAPSetupErrors:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_app_creation_duplicate_raises_friendly_error(self) -> None:
+    async def test_app_creation_duplicate_is_idempotent_no_op(self) -> None:
         respx.get(f"{_AAP_API}/organizations/").mock(return_value=httpx.Response(200, json=_org_response()))
         respx.post(f"{_AAP_API}/applications/").mock(
             return_value=httpx.Response(
@@ -327,9 +327,12 @@ class TestAAPSetupErrors:
             )
         )
 
-        service = _make_service()
-        with pytest.raises(AAPSetupError, match="already exists"):
-            await service.setup(_make_request())
+        idp_service = _mock_idp_service()
+        service = _make_service(idp_service=idp_service)
+        result = await service.setup(_make_request())
+
+        assert result is None
+        idp_service.create_provider.assert_not_awaited()
 
     @pytest.mark.asyncio
     @respx.mock

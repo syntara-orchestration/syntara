@@ -37,7 +37,7 @@ if TYPE_CHECKING:
 logger = structlog.stdlib.get_logger(__name__)
 
 _AAP_API_PREFIX = "/api/gateway/v1"
-_IDP_NAME = "Ansible Automation Platform"
+IDP_NAME = "Ansible Automation Platform"
 _IDP_DESCRIPTION = "Auto-configured AAP OIDC provider"
 
 _AAP_SCOPES = "read write openid roles"
@@ -99,8 +99,14 @@ class AAPOIDCSetupService:
         self._idp_service = idp_service
         self._settings = settings
 
-    async def setup(self, request: AAPOIDCSetupRequest) -> IdentityProviderRead:
-        """Create an OAuth2 app on AAP and configure the IdP in Syntara."""
+    async def setup(self, request: AAPOIDCSetupRequest) -> IdentityProviderRead | None:
+        """Create an OAuth2 app on AAP and configure the IdP in Syntara.
+
+        Returns None if an OAuth2 application with this name already exists on AAP.
+        This is treated as an idempotent no-op rather than a hard failure, since AAP
+        does not expose a way to recover an existing application's client secret.
+        Callers should fall back to the existing identity provider in that case.
+        """
         aap_url = request.aap_url.rstrip("/")
         redirect_uri = f"{self._settings.jwt_issuer}{OIDC_CALLBACK_PATH}"
 
@@ -116,14 +122,16 @@ class AAPOIDCSetupService:
             timeout=30.0,
         ) as client:
             org_id = await self._resolve_organization(client, aap_url, auth, request.organization, auth_headers)
-            client_id, client_secret = await self._create_oauth2_app(
-                client, aap_url, auth, redirect_uri, org_id, auth_headers
-            )
+            app_credentials = await self._create_oauth2_app(client, aap_url, auth, redirect_uri, org_id, auth_headers)
 
+        if app_credentials is None:
+            return None
+
+        client_id, client_secret = app_credentials
         issuer_url = f"{aap_url}/o/"
 
         provider_create = IdentityProviderCreate(
-            name=_IDP_NAME,
+            name=IDP_NAME,
             description=_IDP_DESCRIPTION,
             configuration=OIDCConfiguration(
                 provider_type="oidc",
@@ -196,8 +204,13 @@ class AAPOIDCSetupService:
         redirect_uri: str,
         organization_id: int,
         extra_headers: dict[str, str] | None = None,
-    ) -> tuple[str, str]:
-        """Create an OAuth2 application on AAP, returning (client_id, client_secret)."""
+    ) -> tuple[str, str] | None:
+        """Create an OAuth2 application on AAP, returning (client_id, client_secret).
+
+        Returns None if an application with this name already exists on AAP for this
+        organization. AAP does not return the client_id/client_secret of an existing
+        application on conflict, so this is surfaced as a no-op rather than re-fetched.
+        """
         url = f"{aap_url}{_AAP_API_PREFIX}/applications/"
         oauth2_app_name = self._settings.product_name
         body = {
@@ -213,7 +226,18 @@ class AAPOIDCSetupService:
             "app_url": self._settings.jwt_issuer,
         }
 
-        data = await self._aap_post(client, url, auth, body, extra_headers=extra_headers)
+        response = await self._send_request(client, "POST", url, auth, json_body=body, extra_headers=extra_headers)
+
+        if response.status_code == HTTPStatus.BAD_REQUEST and self._is_existing_app_conflict(response):
+            logger.info(
+                "OAuth2 application already exists on AAP; treating setup as an idempotent no-op",
+                app_name=oauth2_app_name,
+                aap_host=urlparse(aap_url).hostname,
+            )
+            return None
+
+        self._raise_for_aap_status(response)
+        data = self._parse_json(response)
 
         client_id = data.get("client_id")
         client_secret = data.get("client_secret")
@@ -229,6 +253,15 @@ class AAPOIDCSetupService:
         )
 
         return client_id, client_secret
+
+    @staticmethod
+    def _is_existing_app_conflict(response: httpx.Response) -> bool:
+        """Check whether a 400 response is AAP's duplicate application-name error."""
+        try:
+            body = response.json()
+        except ValueError:
+            return False
+        return isinstance(body, dict) and _is_duplicate_app_error(body)
 
     async def _aap_get(
         self,
