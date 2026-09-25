@@ -33,7 +33,7 @@ class TestWorkflowVersionRestoredTelemetryHandler:
         registry.send_event.assert_called_once()
         event = registry.send_event.call_args[0][0]
         assert isinstance(event, WorkflowVersionRestoredTelemetryEvent)
-        assert event.workflow_id == str(workflow_id)
+        assert event.workflow_id == workflow_id
         assert event.restored_from_version == 3
         assert event.new_version == 7
         assert event.entitlement_id == "ent-test-456"

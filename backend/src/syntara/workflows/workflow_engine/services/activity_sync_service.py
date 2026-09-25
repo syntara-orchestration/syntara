@@ -41,7 +41,7 @@ from syntara.workflows.audit.execution_completed import WorkflowCompletedEvent
 from syntara.workflows.audit.execution_error import WorkflowExecutionErrorEvent
 from syntara.workflows.audit.execution_started import WorkflowStartEvent
 from syntara.workflows.models.activity_execution import TERMINAL_ACTIVITY_STATUSES, ActivityExecution, ActivityStatus
-from syntara.workflows.models.execution import ActivityData, Execution, ExecutionStatus
+from syntara.workflows.models.execution import ActivityData, Execution, ExecutionMode, ExecutionStatus
 from syntara.workflows.models.visualization import JsonPatchOperation
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_version import WorkflowVersion
@@ -86,6 +86,28 @@ _MONITOR_RETRY_BASE_DELAY_S = 1.0
 _MONITOR_RETRY_MAX_DELAY_S = 30.0
 _MONITOR_RETRY_BACKOFF_FACTOR = 2.0
 _MONITOR_RETRY_JITTER_FACTOR = 0.5
+
+
+def _completion_error_type(*, is_workflow_timeout: bool, has_error_details: bool) -> str | None:
+    """Categorize the error_type for a workflow completion telemetry event.
+
+    A workflow-level timeout is surfaced as ``WorkflowTimedOut`` so the
+    ``timeout_count`` metric is derivable from the completion event alone
+    (AAP-92215); any other failure with error details is a generic activity error.
+
+    Args:
+        is_workflow_timeout: Whether the terminal event was a workflow timeout.
+        has_error_details: Whether the execution recorded error details.
+
+    Returns:
+        The categorized error type, or None when the run succeeded.
+
+    """
+    if is_workflow_timeout:
+        return "WorkflowTimedOut"
+    if has_error_details:
+        return "ActivityExecutionError"
+    return None
 
 
 @dataclass
@@ -152,6 +174,9 @@ class ExecutionMonitorMetadata:
     request_id: UUID | None = None
     workflow_run_timeout_seconds: float | None = None
     workflow_name: str | None = None
+    mode: ExecutionMode | None = None
+    workflow_version: int | None = None
+    used_published: bool | None = None
 
 
 class ActivitySyncService:
@@ -354,6 +379,10 @@ class ActivitySyncService:
                             workflow_name=workflow_name,
                             trigger_type=trigger_activity_type,
                             interface=execution.interface,
+                            mode=metadata.mode,
+                            workflow_version=metadata.workflow_version,
+                            used_published=metadata.used_published,
+                            is_retry=execution.retried_from_execution_id is not None,
                             request_id=metadata.request_id,
                         )
                     )
@@ -529,6 +558,7 @@ class ActivitySyncService:
             workflow_id = execution.workflow_id
             workflow_version_id = execution.workflow_version_id
             last_processed_event_id = execution.last_processed_event_id
+            mode = execution.mode
 
             # Load workflow name for audit events
             workflow_result = await session.exec(select(Workflow).where(Workflow.id == workflow_id))
@@ -538,6 +568,12 @@ class ActivitySyncService:
                 logger.error(msg)
                 raise RuntimeError(msg)
             workflow_name = workflow.name
+            # Telemetry: version number and whether the run used the published version
+            used_published = workflow.published_version_id == workflow_version_id
+            version_result = await session.exec(
+                select(WorkflowVersion.version).where(WorkflowVersion.id == workflow_version_id)
+            )
+            workflow_version = version_result.one_or_none()
 
         activity_definitions_map = await self._fetch_activity_definitions_map(workflow_version_id)
 
@@ -574,6 +610,9 @@ class ActivitySyncService:
             workflow_id=workflow_id,
             request_id=request_id,
             workflow_name=workflow_name,
+            mode=mode,
+            workflow_version=workflow_version,
+            used_published=used_published,
         )
 
     async def _build_activity_index_map(self, execution_id: UUID) -> dict[str, int]:
@@ -1602,7 +1641,12 @@ class ActivitySyncService:
                 error_count = sum(1 for a in activities if a.status == ActivityStatus.FAILED)
                 duration_ms = int((completed_at - execution.created_at).total_seconds() * 1000)
                 telemetry_status = _map_execution_status_to_telemetry(status)
-                error_type: str | None = "ActivityExecutionError" if error_details else None
+                # Surface a workflow timeout on the completion event so the timeout_count
+                # metric is derivable from a single event (AAP-92215).
+                error_type = _completion_error_type(
+                    is_workflow_timeout=event.event_type == EventType.EVENT_TYPE_WORKFLOW_EXECUTION_TIMED_OUT,
+                    has_error_details=bool(error_details),
+                )
                 trigger_type = next((a for a in ActivityName if a == execution.trigger_type), None)
 
                 AuditEventDispatcher.dispatch(
@@ -1616,6 +1660,10 @@ class ActivitySyncService:
                         error_type=error_type,
                         trigger_type=trigger_type,
                         interface=execution.interface,
+                        mode=metadata.mode,
+                        workflow_version=metadata.workflow_version,
+                        used_published=metadata.used_published,
+                        is_retry=execution.retried_from_execution_id is not None,
                         request_id=metadata.request_id,
                         workflow_name=metadata.workflow_name,
                     )
@@ -2037,6 +2085,8 @@ class ActivitySyncService:
             execution_id=metadata.execution_id,
             activity_definitions_map=metadata.activity_definitions_map,
             updated_activities=updated_activities,
+            workflow_id=metadata.workflow_id,
+            mode=metadata.mode,
             request_id=metadata.request_id,
         )
 

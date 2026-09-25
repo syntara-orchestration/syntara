@@ -34,10 +34,10 @@ class TestWorkflowVersionUnpublishedTelemetryHandler:
         registry.send_event.assert_called_once()
         event = registry.send_event.call_args[0][0]
         assert isinstance(event, WorkflowVersionUnpublishedTelemetryEvent)
-        assert event.workflow_id == str(workflow_id)
+        assert event.workflow_id == workflow_id
         assert event.version == 4
         assert event.workflow_name == "test-wf"
-        assert event.project_id == str(project_id)
+        assert event.project_id == project_id
         assert event.error_type is None
         assert event.entitlement_id == "ent-test-321"
 

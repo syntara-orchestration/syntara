@@ -58,7 +58,7 @@ class TestToolExecutionEvent:
         assert props["namespaced_name"] == "mcp::get_greeting"
         assert props["status"] == "success"
         assert props["duration_ms"] == 142
-        assert props["workflow_execution_id"] == VALID_WORKFLOW_EXECUTION_ID
+        assert props["workflow_execution_id"] == str(VALID_WORKFLOW_EXECUTION_ID)
         assert props["entitlement_id"] == "ent-123"
 
     def test_workflow_execution_id_null_when_none(self):

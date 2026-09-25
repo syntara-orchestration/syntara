@@ -6,6 +6,7 @@ from uuid import uuid4
 from syntara.telemetry.events.workflow_execution import WorkflowExecutionStartEvent
 from syntara.telemetry.handlers.workflow_start import WorkflowStartTelemetryHandler
 from syntara.workflows.audit.execution_started import WorkflowStartEvent
+from syntara.workflows.models.execution import ExecutionMode
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
 
 
@@ -35,7 +36,7 @@ class TestWorkflowStartTelemetryHandler:
         registry.send_event.assert_called_once()
         event = registry.send_event.call_args[0][0]
         assert isinstance(event, WorkflowExecutionStartEvent)
-        assert event.workflow_execution_id == str(execution_id)
+        assert event.workflow_execution_id == execution_id
         assert event.trigger_type == ActivityName.MANUAL_TRIGGER
         assert event.interface is None
         assert event.entitlement_id == "ent-test-123"
@@ -87,6 +88,33 @@ class TestWorkflowStartTelemetryHandler:
         event = registry.send_event.call_args[0][0]
         assert event.trigger_type is None
         assert event.interface is None
+
+    @patch("syntara.telemetry.handlers.workflow_start.get_telemetry_registry")
+    def test_passes_workflow_metrics_fields_through(self, mock_get_registry: MagicMock) -> None:
+        """AAP-92215: workflow_id, mode, workflow_version, used_published, is_retry."""
+        registry = MagicMock()
+        registry.is_initialized.return_value = True
+        registry.entitlement_id = "ent"
+        mock_get_registry.return_value = registry
+
+        workflow_id = uuid4()
+        domain_event = WorkflowStartEvent(
+            execution_id=uuid4(),
+            workflow_id=workflow_id,
+            workflow_name="wf",
+            mode=ExecutionMode.STANDARD,
+            workflow_version=6,
+            used_published=True,
+            is_retry=True,
+        )
+        WorkflowStartTelemetryHandler().handle(domain_event)
+
+        event = registry.send_event.call_args[0][0]
+        assert event.workflow_id == workflow_id
+        assert event.mode == ExecutionMode.STANDARD
+        assert event.workflow_version == 6
+        assert event.used_published is True
+        assert event.is_retry is True
 
     @patch("syntara.telemetry.handlers.workflow_start.get_telemetry_registry")
     def test_passes_interface_through(self, mock_get_registry: MagicMock) -> None:
