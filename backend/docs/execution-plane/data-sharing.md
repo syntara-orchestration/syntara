@@ -29,23 +29,13 @@ Podman volume). This is not a PVC spec, not AO FileManager
 Listed outputs are filesystem paths.
 
 Placement stays in [syntara#620](https://github.com/syntara-orchestration/syntara/pull/620).
-The reconciler does not read this payload for the **first** WorkItem.
-Reusing a volume workspace pins later WorkItems to the ExecutionTarget
-that holds the volume
-([example 02](examples/02-data-sharing-with-workspace.md)).
-Reusing an object-store workspace hydrates `/workspace` from S3 and
-does not pin the target
-([example 03](examples/03-data-sharing-with-workspace-object-store.md)).
+Volume vs object-store workspace is in
+[example 02](examples/02-data-sharing-with-workspace.md) and
+[example 03](examples/03-data-sharing-with-workspace-object-store.md).
 
 ## Principles
 
-1. **A new workspace is not a selector. Reusing one is placement.**
-   There is no `volume-mount` label. The first WorkItem that cites a
-   UUID is placed by selectors (or default routing). The reconciler
-   does not read `data`. Once the volume exists on an ExecutionTarget,
-   later WorkItems with that UUID run on **that** target. The Work
-   Scheduler applies that pin. Listed `outputs` never place.
-2. **Git and HTTP downloads are ordinary WorkItems.** There is no
+1. **Git and HTTP downloads are ordinary WorkItems.** There is no
    `data.inputs` list on the playbook (or other) WorkItem. To get a
    repo or a file onto disk, AO submits another WorkItem whose
    `activity.image` is a Git client (for example
@@ -53,25 +43,18 @@ does not pin the target
    example `registry.redhat.io/ao/http-request:1.0.0`). That
    container writes into `/workspace`. EP does not clone or GET
    inside the Worker Manager.
-3. **AO writes the exact link. EP just uses it.** The author may
+2. **AO writes the exact link. EP just uses it.** The author may
    say "this file" or "branch main". AO turns that into something
    that cannot move **before** it submits the WorkItem: a download
    URL for a file it already stored
    ([file-storage.md](../file-storage.md)), or a clone URL plus one
    commit SHA for Git. EP does not ask AO "where is that file?" and
    does not ask Git "what is `main` today?"
-4. **JSON result ≠ file bytes.** `WorkItem.result` stays a small
+3. **JSON result ≠ file bytes.** `WorkItem.result` stays a small
    JSON blob (stdout, return code). Large files go to object
    storage. The result may list **references** (`artifacts[]`: path,
    uri, status, size), not the bytes. Temporal payload limits make
    that split mandatory.
-5. **A workspace has a UUID unique across all ExecutionTargets.** The
-   volume lives on exactly one target. It is mounted at `/workspace`
-   by default. ReadWriteOnce: **only one WorkItem can mount that
-   workspace at a time.** Purge is a TTL (for example 3 hours from
-   last unmount) or an API call; EP deletes the volume. Volume size
-   is the ExecutionTarget default; there is no per-workspace override
-   for now.
 
 ## Primary use-cases
 
