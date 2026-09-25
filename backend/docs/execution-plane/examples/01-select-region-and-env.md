@@ -173,16 +173,17 @@ The default ExecutionTarget on `ocp-us-east-1` is not mixed into the
 eligible set. Required selectors that the default does not carry
 exclude it. That is intended. If **no** target had matched, the
 outcome would be `NO_MATCHING_TARGETS` and the work would fail; see
-[example 04](04-no-matching-targets.md).
+[example 05](05-no-matching-targets.md).
 
 ## Out of scope here
 
 | Omitted | Why |
 |---|---|
 | Empty selectors / default routing | [Example 00](00-one-workload-default-target.md) |
-| Selectors that match nothing | [Example 04](04-no-matching-targets.md) |
-| Volume mount | [Example 02](02-volume-mount.md) |
-| OpenShell sandbox policy | [Example 03](03-openshell-sandbox-policy.md) |
+| Selectors that match nothing | [Example 05](05-no-matching-targets.md) |
+| Volume workspace | [Example 02](02-data-sharing-with-workspace.md) |
+| Object-store workspace | [Example 03](03-data-sharing-with-workspace-object-store.md) |
+| OpenShell sandbox policy | [Example 04](04-openshell-sandbox-policy.md) |
 | Warm pools | MVP is cold-start vanilla Kubernetes |
 | Preferred (soft) affinities | Out of MVP; matching is boolean |
 | AO workflow / node / Execution Profile rows | Not visible to EP |
