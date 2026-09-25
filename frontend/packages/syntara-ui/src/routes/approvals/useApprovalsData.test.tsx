@@ -242,7 +242,7 @@ describe('useApprovalsData', () => {
     const sorted = result.current.sortedApprovals as ApprovalWithDetails[]
     expect(sorted[0]?.id).toBe('approval-2')
     expect(sorted[1]?.id).toBe('approval-1')
-    expect(sorted).toEqual(result.current.enrichedApprovals)
+    expect(sorted.map((approval) => approval.id)).toEqual(['approval-2', 'approval-1'])
   })
 
   it('groups approvals by project when isAllProjects is true', async () => {

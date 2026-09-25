@@ -219,8 +219,9 @@ describe('useWorkflowStore - reorderActivitiesFromEdges', () => {
 
       const run2 = useWorkflowStore.getState().currentWorkflow?.workflow.activities.map((a) => a.id) ?? []
 
-      // Should produce same sorted order (alphabetical due to sort in algorithm)
-      expect(run1.sort()).toEqual(run2.sort())
+      // The input order changes, so a stable reorder must produce the same explicit order.
+      expect(run1).toEqual(['A', 'B', 'C'])
+      expect(run2).toEqual(['A', 'B', 'C'])
     })
   })
 

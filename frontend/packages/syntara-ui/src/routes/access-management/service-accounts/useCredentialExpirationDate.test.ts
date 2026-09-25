@@ -1,8 +1,6 @@
 import { act, renderHook } from '@testing-library/react'
-import { addDays, startOfDay } from 'date-fns'
+import { addDays, format, startOfDay } from 'date-fns'
 import { describe, expect, it, vi } from 'vitest'
-
-import { formatDateYMD } from '../../../utils/dateUtils'
 
 import { useCredentialExpirationDate } from './useCredentialExpirationDate'
 
@@ -13,13 +11,14 @@ vi.mock('../../../utils/dateUtils', async (importOriginal) => {
 
 const today = startOfDay(new Date())
 const tomorrow = addDays(today, 1)
+const formatExpectedDate = (date: Date) => format(date, 'yyyy-MM-dd')
 
 describe('useCredentialExpirationDate', () => {
   describe('default behavior (no maxLifetimeDays)', () => {
     it('defaults to 180-day max lifetime', () => {
       const { result } = renderHook(() => useCredentialExpirationDate())
       const expectedMax = addDays(today, 179)
-      expect(result.current.value).toBe(formatDateYMD(expectedMax))
+      expect(result.current.value).toBe(formatExpectedDate(expectedMax))
     })
 
     it('starts with no error', () => {
@@ -37,14 +36,14 @@ describe('useCredentialExpirationDate', () => {
     it('uses the provided max lifetime', () => {
       const { result } = renderHook(() => useCredentialExpirationDate(30))
       const expectedMax = addDays(today, 29)
-      expect(result.current.value).toBe(formatDateYMD(expectedMax))
+      expect(result.current.value).toBe(formatExpectedDate(expectedMax))
       expect(result.current.helperText).toContain('30 days')
     })
 
     it('enforces minimum of 1 day for maxDate', () => {
       const { result } = renderHook(() => useCredentialExpirationDate(1))
       const expectedMax = addDays(today, 1)
-      expect(result.current.value).toBe(formatDateYMD(expectedMax))
+      expect(result.current.value).toBe(formatExpectedDate(expectedMax))
     })
   })
 
@@ -52,7 +51,7 @@ describe('useCredentialExpirationDate', () => {
     it('defaults to 365 days in the future', () => {
       const { result } = renderHook(() => useCredentialExpirationDate(0))
       const expected365 = addDays(today, 365)
-      expect(result.current.value).toBe(formatDateYMD(expected365))
+      expect(result.current.value).toBe(formatExpectedDate(expected365))
     })
 
     it('shows unlimited helper text', () => {
@@ -103,10 +102,10 @@ describe('useCredentialExpirationDate', () => {
       const validDate = addDays(today, 10)
 
       act(() => {
-        result.current.handleChange({} as React.FormEvent<HTMLInputElement>, formatDateYMD(validDate), validDate)
+        result.current.handleChange({} as React.FormEvent<HTMLInputElement>, formatExpectedDate(validDate), validDate)
       })
 
-      expect(result.current.value).toBe(formatDateYMD(validDate))
+      expect(result.current.value).toBe(formatExpectedDate(validDate))
       expect(result.current.error).toBe('')
     })
 
@@ -139,7 +138,7 @@ describe('useCredentialExpirationDate', () => {
       const validDate = addDays(today, 10)
 
       act(() => {
-        result.current.handleChange({} as React.FormEvent<HTMLInputElement>, formatDateYMD(validDate), validDate)
+        result.current.handleChange({} as React.FormEvent<HTMLInputElement>, formatExpectedDate(validDate), validDate)
       })
 
       let isValid = false
@@ -193,7 +192,7 @@ describe('useCredentialExpirationDate', () => {
       const tooFar = addDays(today, 31)
 
       act(() => {
-        result.current.handleChange({} as React.FormEvent<HTMLInputElement>, formatDateYMD(tooFar), tooFar)
+        result.current.handleChange({} as React.FormEvent<HTMLInputElement>, formatExpectedDate(tooFar), tooFar)
       })
 
       expect(result.current.error).toBe('Date exceeds maximum credential lifetime')

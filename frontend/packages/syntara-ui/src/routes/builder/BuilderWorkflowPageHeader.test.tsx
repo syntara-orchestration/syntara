@@ -782,18 +782,18 @@ describe('BuilderWorkflowPageHeader', () => {
   it('prepends dirty indicator to page title when isDirty is true', () => {
     render(<BuilderWorkflowPageHeader {...baseProps} isDirty={true} isNew={false} workflowName="my-workflow" />)
 
-    expectPageTitle(['● my-workflow', 'Workflows'])
+    expectPageTitle('● my-workflow | Workflows | Syntara')
   })
 
   it('does not prepend dirty indicator to page title when isDirty is false', () => {
     render(<BuilderWorkflowPageHeader {...baseProps} isDirty={false} isNew={false} workflowName="my-workflow" />)
 
-    expectPageTitle(['my-workflow', 'Workflows'])
+    expectPageTitle('my-workflow | Workflows | Syntara')
   })
 
   it('prepends dirty indicator to new workflow page title when isDirty is true', () => {
     render(<BuilderWorkflowPageHeader {...baseProps} isDirty={true} isNew={true} />)
 
-    expectPageTitle(['● New Workflow', 'Workflows'])
+    expectPageTitle('● New Workflow | Workflows | Syntara')
   })
 })
