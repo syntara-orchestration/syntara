@@ -23,7 +23,7 @@ info:
     - Format: `{"key": "value"}` (both key and value must be strings)
     - Use cases: environment tags, team ownership, priority levels, cost centers
     - Queryable: Filter resources by label selectors in list endpoints
-  version: 2.0.0
+  version: 2.1.0
   contact:
     name: Orchestrator Team
 
@@ -254,6 +254,106 @@ paths:
         '500':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
 
+  /executions/{execution_id}/validate-restart-from-failure:
+    post:
+      summary: Validate restart from failure
+      description: Validate that an execution can be restarted from the given failure points. Checks execution state, failure-point eligibility, converge-mootness, the retained-version guard, and the sanitized-output guard. Returns a pass/fail verdict without mutating any state.
+      operationId: validate_restart_from_failure
+      tags:
+        - Executions
+      security:
+        - bearerAuth: []
+      x-app-permission:
+        resource: execution
+        action: run
+      parameters:
+        - name: execution_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Execution Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RestartValidateRequest'
+      responses:
+        '200':
+          description: Restart validation verdict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestartValidationResponse'
+        '400':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+        '401':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+        '404':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+        '409':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+        '422':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
+        '500':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+        '429':
+          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+  /executions/{execution_id}/restart-from-failure:
+    post:
+      summary: Restart from failure
+      description: Restart a failed execution from the given failure points. Independently repeats all validation checks, then creates a new execution linked to the source and triggers a Temporal run carrying restart context.
+      operationId: restart_from_failure
+      tags:
+        - Executions
+      security:
+        - bearerAuth: []
+      x-app-permission:
+        resource: execution
+        action: run
+      parameters:
+        - name: execution_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Execution Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RestartRequest'
+      responses:
+        '201':
+          description: New execution created from restart
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionRead'
+        '400':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+        '401':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+        '404':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+        '409':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+        '422':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
+        '500':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+        '429':
+          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
   /executions/{execution_id}/activities:
     get:
       summary: List activity executions
@@ -394,6 +494,15 @@ components:
 
     ExecutionCreate:
       $ref: ./shared-schemas.yaml#/components/schemas/ExecutionCreate
+
+    RestartValidateRequest:
+      $ref: ./shared-schemas.yaml#/components/schemas/RestartValidateRequest
+
+    RestartRequest:
+      $ref: ./shared-schemas.yaml#/components/schemas/RestartRequest
+
+    RestartValidationResponse:
+      $ref: ./shared-schemas.yaml#/components/schemas/RestartValidationResponse
 
     TestExecutionCreate:
       $ref: ./shared-schemas.yaml#/components/schemas/TestExecutionCreate

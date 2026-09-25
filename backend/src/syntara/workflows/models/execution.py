@@ -413,6 +413,62 @@ class TestExecutionCreate(SQLModel):
         return self
 
 
+class RestartValidateRequest(SQLModel):
+    """Request body for POST /executions/{id}/validate-restart-from-failure."""
+
+    __test__ = False  # Prevent pytest from collecting this as a test class
+
+    failure_point_ids: list[str] = Field(
+        default_factory=list,
+        description="Failure points to restart from (node IDs from the source execution). "
+        "Empty selects the default: all currently failed nodes.",
+    )
+
+
+class RestartRequest(SQLModel):
+    """Request body for POST /executions/{id}/restart-from-failure."""
+
+    __test__ = False  # Prevent pytest from collecting this as a test class
+
+    failure_point_ids: list[str] = Field(
+        default_factory=list,
+        description="Failure points to restart from (node IDs from the source execution). "
+        "A subset may be passed when multiple parallel branches failed; unselected branches are skipped. "
+        "Empty selects the default: all currently failed nodes.",
+    )
+
+
+class RestartValidationResponse(SQLModel):
+    """Pre-restart validation verdict (POST /executions/{id}/validate-restart-from-failure)."""
+
+    eligible: bool = Field(description="Whether the restart is allowed to proceed")
+    reason: str | None = Field(default=None, description="Rejection reason when eligible is false, null otherwise")
+    failure_point_ids: list[str] = Field(default_factory=list, description="Normalized failure points validated")
+    sanitized_node_ids: list[str] = Field(
+        default_factory=list,
+        description="Upstream nodes with sanitized stored outputs referenced on the restart path",
+    )
+    auto_included_node_ids: list[str] = Field(
+        default_factory=list,
+        description="Sanitized nodes automatically added as restart points to resolve a dependency "
+        "(default selection only; empty otherwise)",
+    )
+    sanitized_replacements: dict[str, list[str]] = Field(
+        default_factory=dict,
+        description="For every currently-failed node, the sanitized node(s) it must be replaced by "
+        "if any (independent of the failure points actually requested) — lets the UI disallow "
+        "selecting a failed node explicitly before submitting a request",
+    )
+    step_count_by_failure_point: dict[str, int] = Field(
+        default_factory=dict,
+        description="Re-run step count for each selected failure point, computed against the retained version",
+    )
+    total_step_count: int = Field(
+        default=0,
+        description="Deduplicated total step count across the whole selection, computed against the retained version",
+    )
+
+
 class CurrentActivity(SQLModel):
     """Currently executing activity information."""
 

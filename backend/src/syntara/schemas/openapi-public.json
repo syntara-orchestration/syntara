@@ -35249,6 +35249,388 @@
         }
       }
     },
+    "/executions/{execution_id}/validate-restart-from-failure": {
+      "post": {
+        "summary": "Validate restart from failure",
+        "description": "Validate that an execution can be restarted from the given failure points. Checks execution state, failure-point eligibility, converge-mootness, the retained-version guard, and the sanitized-output guard. Returns a pass/fail verdict without mutating any state.",
+        "operationId": "validate_restart_from_failure",
+        "tags": [
+          "Executions"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-app-permission": {
+          "resource": "execution",
+          "action": "run"
+        },
+        "parameters": [
+          {
+            "name": "execution_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Execution Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestartValidateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Restart validation verdict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RestartValidationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/bad-request",
+                  "title": "Bad Request",
+                  "detail": "The request was malformed or contained invalid parameters",
+                  "code": "BAD_REQUEST",
+                  "retryable": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/unauthorized",
+                  "title": "Unauthorized",
+                  "detail": "Authentication is required to access this resource",
+                  "code": "UNAUTHORIZED",
+                  "retryable": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/forbidden",
+                  "title": "Forbidden",
+                  "detail": "You do not have permission to access this resource",
+                  "code": "FORBIDDEN",
+                  "retryable": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/not-found",
+                  "title": "Resource Not Found",
+                  "detail": "No resource exists with the provided identifier",
+                  "code": "NOT_FOUND",
+                  "retryable": false,
+                  "instance": "/api/v1/workflows"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/conflict",
+                  "title": "Conflict",
+                  "detail": "The request conflicts with the current state of the resource",
+                  "code": "CONFLICT",
+                  "retryable": false
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/validation-error",
+                  "title": "Validation Error",
+                  "detail": "Field 'name' must be between 1 and 255 characters",
+                  "code": "VALIDATION_ERROR",
+                  "retryable": false,
+                  "instance": "/api/v1/workflows"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/internal-error",
+                  "title": "Internal Server Error",
+                  "detail": "An unexpected error occurred",
+                  "code": "INTERNAL_ERROR",
+                  "retryable": true
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/rate-limited",
+                  "title": "Too Many Requests",
+                  "detail": "Rate limit exceeded. Try again in 60 seconds.",
+                  "code": "RATE_LIMITED",
+                  "retryable": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/executions/{execution_id}/restart-from-failure": {
+      "post": {
+        "summary": "Restart from failure",
+        "description": "Restart a failed execution from the given failure points. Independently repeats all validation checks, then creates a new execution linked to the source and triggers a Temporal run carrying restart context.",
+        "operationId": "restart_from_failure",
+        "tags": [
+          "Executions"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-app-permission": {
+          "resource": "execution",
+          "action": "run"
+        },
+        "parameters": [
+          {
+            "name": "execution_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Execution Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestartRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "New execution created from restart",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionRead"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/bad-request",
+                  "title": "Bad Request",
+                  "detail": "The request was malformed or contained invalid parameters",
+                  "code": "BAD_REQUEST",
+                  "retryable": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/unauthorized",
+                  "title": "Unauthorized",
+                  "detail": "Authentication is required to access this resource",
+                  "code": "UNAUTHORIZED",
+                  "retryable": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/forbidden",
+                  "title": "Forbidden",
+                  "detail": "You do not have permission to access this resource",
+                  "code": "FORBIDDEN",
+                  "retryable": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/not-found",
+                  "title": "Resource Not Found",
+                  "detail": "No resource exists with the provided identifier",
+                  "code": "NOT_FOUND",
+                  "retryable": false,
+                  "instance": "/api/v1/workflows"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/conflict",
+                  "title": "Conflict",
+                  "detail": "The request conflicts with the current state of the resource",
+                  "code": "CONFLICT",
+                  "retryable": false
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/validation-error",
+                  "title": "Validation Error",
+                  "detail": "Field 'name' must be between 1 and 255 characters",
+                  "code": "VALIDATION_ERROR",
+                  "retryable": false,
+                  "instance": "/api/v1/workflows"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/internal-error",
+                  "title": "Internal Server Error",
+                  "detail": "An unexpected error occurred",
+                  "code": "INTERNAL_ERROR",
+                  "retryable": true
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/rate-limited",
+                  "title": "Too Many Requests",
+                  "detail": "Rate limit exceeded. Try again in 60 seconds.",
+                  "code": "RATE_LIMITED",
+                  "retryable": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/executions/{execution_id}/activities": {
       "get": {
         "summary": "List activity executions",
@@ -50124,6 +50506,112 @@
             "title": "Use Published",
             "description": "If true, run the published version instead of the current version",
             "default": false
+          }
+        }
+      },
+      "RestartValidateRequest": {
+        "type": "object",
+        "title": "RestartValidateRequest",
+        "description": "Request body for POST /executions/{id}/validate-restart-from-failure.",
+        "properties": {
+          "failure_point_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "Failure Point Ids",
+            "description": "Failure points to restart from (node IDs from the source execution). Empty selects the default: all currently failed nodes."
+          }
+        }
+      },
+      "RestartRequest": {
+        "type": "object",
+        "title": "RestartRequest",
+        "description": "Request body for POST /executions/{id}/restart-from-failure.",
+        "properties": {
+          "failure_point_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "Failure Point Ids",
+            "description": "Failure points to restart from (node IDs from the source execution). A subset may be passed when multiple parallel branches failed; unselected branches are skipped. Empty selects the default: all currently failed nodes."
+          }
+        }
+      },
+      "RestartValidationResponse": {
+        "type": "object",
+        "title": "RestartValidationResponse",
+        "description": "Pre-restart validation verdict (POST /executions/{id}/validate-restart-from-failure).",
+        "required": [
+          "eligible"
+        ],
+        "properties": {
+          "eligible": {
+            "type": "boolean",
+            "title": "Eligible",
+            "description": "Whether the restart is allowed to proceed"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Rejection reason when eligible is false, null otherwise"
+          },
+          "failure_point_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "Failure Point Ids",
+            "description": "Normalized failure points validated"
+          },
+          "sanitized_node_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "Sanitized Node Ids",
+            "description": "Upstream nodes with sanitized stored outputs referenced on the restart path"
+          },
+          "auto_included_node_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "Auto Included Node Ids",
+            "description": "Sanitized nodes automatically added as restart points to resolve a dependency (default selection only; empty otherwise)"
+          },
+          "sanitized_replacements": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "title": "Sanitized Replacements",
+            "description": "For every currently-failed node, the sanitized node(s) it must be replaced by if any (independent of the failure points actually requested) — lets the UI disallow selecting a failed node explicitly before submitting a request"
+          },
+          "step_count_by_failure_point": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Step Count By Failure Point",
+            "description": "Re-run step count for each selected failure point, computed against the retained version"
+          },
+          "total_step_count": {
+            "type": "integer",
+            "title": "Total Step Count",
+            "default": 0,
+            "description": "Deduplicated total step count across the whole selection, computed against the retained version"
           }
         }
       },

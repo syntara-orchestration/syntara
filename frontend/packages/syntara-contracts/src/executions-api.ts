@@ -88,6 +88,46 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/executions/{execution_id}/validate-restart-from-failure': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Validate restart from failure
+     * @description Validate that an execution can be restarted from the given failure points. Checks execution state, failure-point eligibility, converge-mootness, the retained-version guard, and the sanitized-output guard. Returns a pass/fail verdict without mutating any state.
+     */
+    post: operations['validate_restart_from_failure']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/executions/{execution_id}/restart-from-failure': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Restart from failure
+     * @description Restart a failed execution from the given failure points. Independently repeats all validation checks, then creates a new execution linked to the source and triggers a Temporal run carrying restart context.
+     */
+    post: operations['restart_from_failure']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/executions/{execution_id}/activities': {
     parameters: {
       query?: never
@@ -492,6 +532,79 @@ export interface components {
        * @default false
        */
       use_published?: boolean
+    }
+    /**
+     * RestartValidateRequest
+     * @description Request body for POST /executions/{id}/validate-restart-from-failure.
+     */
+    RestartValidateRequest: {
+      /**
+       * Failure Point Ids
+       * @description Failure points to restart from (node IDs from the source execution). Empty selects the default: all currently failed nodes.
+       */
+      failure_point_ids?: string[]
+    }
+    /**
+     * RestartRequest
+     * @description Request body for POST /executions/{id}/restart-from-failure.
+     */
+    RestartRequest: {
+      /**
+       * Failure Point Ids
+       * @description Failure points to restart from (node IDs from the source execution). A subset may be passed when multiple parallel branches failed; unselected branches are skipped. Empty selects the default: all currently failed nodes.
+       */
+      failure_point_ids?: string[]
+    }
+    /**
+     * RestartValidationResponse
+     * @description Pre-restart validation verdict (POST /executions/{id}/validate-restart-from-failure).
+     */
+    RestartValidationResponse: {
+      /**
+       * Eligible
+       * @description Whether the restart is allowed to proceed
+       */
+      eligible: boolean
+      /**
+       * Reason
+       * @description Rejection reason when eligible is false, null otherwise
+       */
+      reason?: string | null
+      /**
+       * Failure Point Ids
+       * @description Normalized failure points validated
+       */
+      failure_point_ids?: string[]
+      /**
+       * Sanitized Node Ids
+       * @description Upstream nodes with sanitized stored outputs referenced on the restart path
+       */
+      sanitized_node_ids?: string[]
+      /**
+       * Auto Included Node Ids
+       * @description Sanitized nodes automatically added as restart points to resolve a dependency (default selection only; empty otherwise)
+       */
+      auto_included_node_ids?: string[]
+      /**
+       * Sanitized Replacements
+       * @description For every currently-failed node, the sanitized node(s) it must be replaced by if any (independent of the failure points actually requested) — lets the UI disallow selecting a failed node explicitly before submitting a request
+       */
+      sanitized_replacements?: {
+        [key: string]: string[]
+      }
+      /**
+       * Step Count By Failure Point
+       * @description Re-run step count for each selected failure point, computed against the retained version
+       */
+      step_count_by_failure_point?: {
+        [key: string]: number
+      }
+      /**
+       * Total Step Count
+       * @description Deduplicated total step count across the whole selection, computed against the retained version
+       * @default 0
+       */
+      total_step_count?: number
     }
     /**
      * TestExecutionCreate
@@ -2130,6 +2243,74 @@ export interface operations {
     requestBody?: never
     responses: {
       /** @description New execution created from retry */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ExecutionRead']
+        }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
+      422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
+  validate_restart_from_failure: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        execution_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RestartValidateRequest']
+      }
+    }
+    responses: {
+      /** @description Restart validation verdict */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['RestartValidationResponse']
+        }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
+      422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
+  restart_from_failure: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        execution_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RestartRequest']
+      }
+    }
+    responses: {
+      /** @description New execution created from restart */
       201: {
         headers: {
           [name: string]: unknown
