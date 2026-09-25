@@ -153,7 +153,7 @@ jobs:
           VISUAL_REGRESSION_PR_URL: ${{ steps.create-pr.outputs.pull-request-url }}
         run: |
           npm ci
-          npm run notify-visual-regression-pr
+          npm run notify:visual-regression-pr
         working-directory: .github/scripts
 
       - name: Write summary

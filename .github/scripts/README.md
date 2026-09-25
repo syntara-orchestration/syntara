@@ -1,8 +1,14 @@
 # GitHub Actions Scripts
 
-TypeScript monitoring scripts for the merge queue. Alerts are sent to Slack when the queue stalls or PRs are repeatedly dequeued.
+TypeScript GitHub Actions scripts for merge-queue monitoring and visual-regression review notifications.
 
-The package also includes `notify-visual-regression-pr`, which posts the weekly baseline PR review link to Slack when configured by the visual regression workflow.
+## Available Commands
+
+| Command                               | Purpose                                                              |
+| ------------------------------------- | -------------------------------------------------------------------- |
+| `npm run notify:dequeue-burst`        | Alerts Slack when multiple PRs are dequeued in a short period.       |
+| `npm run notify:queue-health`         | Alerts Slack when the merge queue becomes unhealthy or recovers.     |
+| `npm run notify:visual-regression-pr` | Posts the weekly visual regression baseline PR review link to Slack. |
 
 ## Development
 
@@ -29,8 +35,8 @@ export GITHUB_REPOSITORY="syntara-orchestration/syntara"
 export GITHUB_RUN_ID="123456"
 export GITHUB_HEAD_REF="gh-readonly-queue/devel/pr-123-abc123"
 
-npm run check-dequeue-burst
-npm run check-queue-health
+npm run notify:dequeue-burst
+npm run notify:queue-health
 ```
 
 ## Testing in CI
