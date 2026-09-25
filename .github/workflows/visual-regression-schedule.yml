@@ -34,6 +34,8 @@ jobs:
   refresh-baselines:
     name: Weekly Visual Regression Baseline Refresh
     runs-on: ubuntu-24.04
+    env:
+      SLACK_VISUAL_REGRESSION_WEBHOOK_URL: ${{ secrets.SLACK_VISUAL_REGRESSION_WEBHOOK_URL }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
@@ -147,7 +149,6 @@ jobs:
           env.SLACK_VISUAL_REGRESSION_WEBHOOK_URL != ''
           && contains(fromJson('["created", "updated"]'), steps.create-pr.outputs.pull-request-operation)
         env:
-          SLACK_VISUAL_REGRESSION_WEBHOOK_URL: ${{ secrets.SLACK_VISUAL_REGRESSION_WEBHOOK_URL }}
           VISUAL_REGRESSION_PR_URL: ${{ steps.create-pr.outputs.pull-request-url }}
         run: |
           npm ci
